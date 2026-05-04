@@ -3,8 +3,11 @@
 #include "Translate.h"
 #include "WResourceManager.h"
 #include "TranslateKeys.h"
-#ifdef SDL_CONFIG
+#if defined(SDL_CONFIG) && !defined(VITA)
 #include <SDL.h>
+#endif
+#ifdef VITA
+#include <psp2/ctrl.h>
 #endif
 #ifdef QT_CONFIG
 #include <QKeySequence>
@@ -15,7 +18,40 @@ using std::map;
 static map<const LocalKeySym, KeyRep> fattable;
 static map<const JButton, KeyRep> slimtable;
 
-#if defined(LINUX) || defined (IOS) || defined (ANDROID) || defined (SDL_CONFIG) || defined (QT_CONFIG)
+#if defined(VITA)
+const KeyRep& translateKey(LocalKeySym key)
+{
+    map<const LocalKeySym, KeyRep>::iterator res = fattable.find(key);
+    if (res == fattable.end())
+    {
+        if (fattable.empty())
+        {
+            // sceCtrl bitmasks doubled as LocalKeySym in JGECreateDefaultBindings
+            fattable[SCE_CTRL_CROSS]    = make_pair(_("Cross"),    static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_CIRCLE]   = make_pair(_("Circle"),   static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_SQUARE]   = make_pair(_("Square"),   static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_TRIANGLE] = make_pair(_("Triangle"), static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_LTRIGGER] = make_pair(_("L"),        static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_RTRIGGER] = make_pair(_("R"),        static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_START]    = make_pair(_("Start"),    static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_SELECT]   = make_pair(_("Select"),   static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_UP]       = make_pair(_("Up"),       static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_DOWN]     = make_pair(_("Down"),     static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_LEFT]     = make_pair(_("Left"),     static_cast<JQuad*>(NULL));
+            fattable[SCE_CTRL_RIGHT]    = make_pair(_("Right"),    static_cast<JQuad*>(NULL));
+            res = fattable.find(key);
+        }
+        if (res == fattable.end())
+        {
+            char* str = NEW char[11];
+            sprintf(str, "%lu", (long unsigned int)key);
+            fattable[key] = make_pair(str, static_cast<JQuad*>(NULL));
+            res = fattable.find(key);
+        }
+    }
+    return res->second;
+}
+#elif defined(LINUX) || defined (IOS) || defined (ANDROID) || defined (SDL_CONFIG) || defined (QT_CONFIG)
 const KeyRep& translateKey(LocalKeySym key)
 {
     {
@@ -28,7 +64,7 @@ const KeyRep& translateKey(LocalKeySym key)
 
 #if !defined(QT_CONFIG) && !defined(IOS) && !defined (SDL_CONFIG)
     str = XKeysymToString(key);
-#elif defined (SDL_CONFIG)
+#elif defined(SDL_CONFIG) && !defined(VITA)
     str = (char*)SDL_GetKeyName(key);
 #elif defined (QT_CONFIG)
     str = (char*)QKeySequence(key).toString().toUtf8().constData();

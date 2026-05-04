@@ -1603,7 +1603,8 @@ void GameStateDeckViewer::Render()
     if (wpTex)
     {
         JQuadPtr wpQuad = WResourceManager::Instance()->RetrieveTempQuad(kBgFile);
-        JRenderer::GetInstance()->RenderQuad(wpQuad.get(), 0, 0, 0, SCREEN_WIDTH_F / wpQuad->mWidth, SCREEN_HEIGHT_F / wpQuad->mHeight);
+        if (wpQuad.get())
+            JRenderer::GetInstance()->RenderQuad(wpQuad.get(), 0, 0, 0, SCREEN_WIDTH_F / wpQuad->mWidth, SCREEN_HEIGHT_F / wpQuad->mHeight);
     }
     /*if (mView->deck() == myDeck && mStage != STAGE_MENU)
         renderDeckBackground();*/

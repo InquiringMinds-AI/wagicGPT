@@ -629,7 +629,7 @@ bool JTTFont::PreCacheExtendedASCII()
 	{
 		int i = 32;
 		mCurr = 0;
-		for (int n=0;n<=count;n++)
+		for (int n=0;n<count;n++)
 		{
 			PreCacheChar(i, i);
 			i++;

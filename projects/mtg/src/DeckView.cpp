@@ -167,12 +167,19 @@ void DeckView::renderCard(int index, int alpha, bool asThumbnail, bool griddeckv
         sprintf(buffer, "x%i", deck()->count(cardPosition.card));
         WFont * font = mFont;
         font->SetScale(1.4f);
+#ifdef VITA
+        // Vita: skip shadow text + DrawRect border to reduce draw calls (2 per card × 14 cards)
+        JRenderer::GetInstance()->FillRect(qtX, qtY, font->GetStringWidth(buffer) + 6, 15, ARGB(fontAlpha/2,0,0,0));
+        font->SetColor(ARGB(fontAlpha,255,255,255));
+        font->DrawString(buffer, qtX + 4, qtY - 1);
+#else
         font->SetColor(ARGB(fontAlpha/2,0,0,0));
         JRenderer::GetInstance()->FillRect(qtX, qtY, font->GetStringWidth(buffer) + 6, 15, ARGB(fontAlpha/2,0,0,0));
         JRenderer::GetInstance()->DrawRect(qtX, qtY, font->GetStringWidth(buffer) + 6, 15, ARGB(fontAlpha/2,240,240,240));
         font->DrawString(buffer, qtX + 5, qtY + 0);
         font->SetColor(ARGB(fontAlpha,255,255,255));
         font->DrawString(buffer, qtX + 4, qtY - 1);
+#endif
         font->SetColor(ARGB(255,255,255,255));
         font->SetScale(1.0f);
     }

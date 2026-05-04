@@ -18,7 +18,10 @@
 
 #include "JTypes.h"
 
-#ifdef ANDROID
+#ifdef VITA
+#include <SDL2/SDL_mixer.h>
+
+#elif defined ANDROID
 #include <SLES/OpenSLES.h>
 #include "SLES/OpenSLES_Android.h"
 
@@ -68,7 +71,9 @@ public:
     void Update();
     int getPlayTime();
 
-#ifdef USE_PHONON
+#ifdef VITA
+    Mix_Music* mTrack;
+#elif defined USE_PHONON
     Phonon::AudioOutput* mOutput;
     Phonon::MediaObject* mMediaObject;
 public slots:
@@ -105,7 +110,9 @@ public:
     ~JSample();
 
     unsigned long fileSize();
-#if (defined QT_CONFIG) && (!defined USE_PHONON)
+#if defined(VITA)
+    Mix_Chunk* mSample;
+#elif (defined QT_CONFIG) && (!defined USE_PHONON)
     QMediaPlayer* effect;
     void* mSample;
 #elif defined (PSP)
@@ -252,7 +259,7 @@ protected:
     void DestroySoundSystem();
 
 private:
-#if (defined PSP || defined ANDROID)
+#if (defined PSP || defined ANDROID || defined VITA)
     JMusic *mCurrentMusic;
     JSample *mCurrentSample;
 #endif

@@ -29,6 +29,9 @@ The content that users should not be touching.
 #pragma warning(disable : 4786)
 #include <direct.h>
 #define MAKEDIR(name) _mkdir(name)
+#elif defined(VITA)
+#include <psp2/io/stat.h>
+#define MAKEDIR(name) sceIoMkdir(name, 0777)
 #else
 #include <sys/stat.h>
 #define MAKEDIR(name) mkdir(name, 0777)
@@ -69,10 +72,15 @@ void JFileSystem::preloadZip(const string& filename)
     map<string,JZipCache *>::iterator it = mZipCache.find(filename);
     if (it != mZipCache.end()) return;
 
-    //random number of files stored in the cache.
-    // This is based on the idea that an average filepath (in Wagic) for image is 37 characters (=bytes) + 8 bytes to store the fileinfo = 45 bytes,
-    //so 4500 files represent roughly 200kB, an "ok" size for the PSP
-    if (mZipCachedElementsCount > 4500) 
+    // Zip directory cache limit.  PSP original: 4500 entries (~200KB).
+    // Vita has 256MB RAM so we cache much more, which avoids expensive zip
+    // central-directory re-parsing when browsing large card collections.
+#if defined(VITA)
+    const int zipCacheLimit = 80000;   // ~3.6MB, covers all 75k+ card entries
+#else
+    const int zipCacheLimit = 4500;    // PSP / desktop original
+#endif
+    if (mZipCachedElementsCount > zipCacheLimit)
     {
         clearZipCache();
     }
@@ -123,10 +131,17 @@ JFileSystem::JFileSystem(const string & _userPath, const string & _systemPath)
     string systemPath = _systemPath;
     string userPath = _userPath;
 
-#ifdef IOS
+#ifdef VITA
+    // Vita filesystem:
+    // app0: = read-only application data (bundled in VPK, includes card art)
+    // ux0:data/Wagic/ = writable user data (saves, settings, decks)
+    systemPath = "app0:Res/";
+    userPath = "ux0:data/Wagic/";
+
+#elif defined (IOS)
     NSArray *paths = NSSearchPathForDirectoriesInDomains( NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = [paths objectAtIndex:0];
-    
+
     userPath = [[documentsDirectory  stringByAppendingString: @"/User/"] cStringUsingEncoding:1];
     systemPath = [[documentsDirectory  stringByAppendingString: @"/Res/"] cStringUsingEncoding:1];
 
@@ -326,15 +341,7 @@ bool JFileSystem::readIntoString(const string & FilePath, string & target)
 
     int fileSize = GetFileSize(file);
 
-#ifndef __MINGW32__
-    try {
-#endif
-        target.resize((std::string::size_type) fileSize);
-#ifndef __MINGW32__
-    } catch (bad_alloc&) {
-        return false;
-    }
-#endif
+    target.resize((std::string::size_type) fileSize);
 
 
     if (fileSize)

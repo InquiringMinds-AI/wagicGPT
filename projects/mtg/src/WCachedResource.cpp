@@ -152,6 +152,11 @@ unsigned long WCachedTexture::size()
     unsigned int pixel_size = 4;
 #if defined(PSP)
     pixel_size = JRenderer::GetInstance()->PixelSize(texture->mTextureFormat);
+#elif defined(VITA)
+    if (texture->mTextureFormat == GU_PSM_5551 ||
+        texture->mTextureFormat == GU_PSM_5650 ||
+        texture->mTextureFormat == GU_PSM_4444)
+        pixel_size = 2;
 #endif
     return texture->mTexHeight * texture->mTexWidth * pixel_size;
 }

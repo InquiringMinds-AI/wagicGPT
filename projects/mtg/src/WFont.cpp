@@ -159,11 +159,12 @@ WFont(inFontID), mTexture(0)
     mGBCode = NULL;
     mCurr = 0;
 
-    char tmpFileName[32], engFileName[32];
-    strcpy(tmpFileName, fontname);
+    char tmpFileName[256], engFileName[256];
+    snprintf(tmpFileName, sizeof(tmpFileName), "%s", fontname);
     char * ep = strrchr(tmpFileName, '.');
+    if (!ep) return;
     *ep = '\0';
-    sprintf(engFileName, "%s.asc", tmpFileName);
+    snprintf(engFileName, sizeof(engFileName), "%s.asc", tmpFileName);
     JFileSystem *fileSys = JFileSystem::GetInstance();
     int size = 0;
     struct
@@ -415,10 +416,18 @@ void WFBFont::DrawString(const char *s, float x, float y, int align, float leftO
     float yy = y;
     int index = 0;
 
+#ifdef VITA
+    mRenderer->BeginQuadBatch();
+#endif
     while (*src != 0)
     {
         if (yy > SCREEN_HEIGHT_F) // don't render or count outside the buttom of viewport
+        {
+#ifdef VITA
+            mRenderer->FlushQuadBatch();
+#endif
             return;
+        }
         else if (yy + mFontSize < 0.0f)
         { // don't render when outside the top of viewport, but counted
             if (*src < 0x20)
@@ -487,7 +496,13 @@ void WFBFont::DrawString(const char *s, float x, float y, int align, float leftO
                 }
                 if (width)
                 {
-                    if (xx > x + width) return;
+                    if (xx > x + width)
+                    {
+#ifdef VITA
+                        mRenderer->FlushQuadBatch();
+#endif
+                        return;
+                    }
                     if (xx + delta > x + width)
                     {
                         delta = x + width - xx;
@@ -543,6 +558,9 @@ void WFBFont::DrawString(const char *s, float x, float y, int align, float leftO
             }
         }
     }
+#ifdef VITA
+    mRenderer->FlushQuadBatch();
+#endif
 }
 
 void WFBFont::DrawString(std::string s, float x, float y, int align, float leftOffset, float width)
@@ -606,11 +624,12 @@ WGBKFont::WGBKFont(int inFontID, const char *fontname, int lineheight, bool) :
     mGBCode = NULL;
     mCurr = 0;
 
-    char tmpFileName[32], engFileName[32];
-    strcpy(tmpFileName, fontname);
+    char tmpFileName[256], engFileName[256];
+    snprintf(tmpFileName, sizeof(tmpFileName), "%s", fontname);
     char * ep = strrchr(tmpFileName, '.');
+    if (!ep) return;
     *ep = '\0';
-    sprintf(engFileName, "%s.asc", tmpFileName);
+    snprintf(engFileName, sizeof(engFileName), "%s.asc", tmpFileName);
     JFileSystem *fileSys = JFileSystem::GetInstance();
     int size = 0;
 

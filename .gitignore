@@ -183,6 +183,17 @@ $RECYCLE.BIN/
 # Mac crap
 .DS_Store
 
+# Card image downloads (large, not for git)
+card_images_small/
+card_images_normal/
+card_images/
+
+# Project-local pinned vitaGL build (see vendor/vitaGL/README or BUILD_VITA.md)
+vendor/
+
+# CMake build dir if user runs cmake from repo root
+build_vita/
+
 
 #############
 ## Python

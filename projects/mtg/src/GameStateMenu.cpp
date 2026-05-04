@@ -190,18 +190,18 @@ void GameStateMenu::genNbCardsStr()
     if (totalUnique != totalPrints)
     {
         if (playerdata && !options[Options::ACTIVE_PROFILE].isDefault())
-            sprintf(GameApp::mynbcardsStr, _("%s: %i cards (%i) (%i unique)").c_str(), options[Options::ACTIVE_PROFILE].str.c_str(),
+            snprintf(GameApp::mynbcardsStr, sizeof(GameApp::mynbcardsStr), _("%s: %i cards (%i) (%i unique)").c_str(), options[Options::ACTIVE_PROFILE].str.c_str(),
                             playerdata->collection->totalCards(), totalPrints,totalUnique);
         else
-            sprintf(GameApp::mynbcardsStr, _("%i cards (%i unique)").c_str(),totalPrints,totalUnique);
+            snprintf(GameApp::mynbcardsStr, sizeof(GameApp::mynbcardsStr), _("%i cards (%i unique)").c_str(),totalPrints,totalUnique);
     }
     else
     {
         if (playerdata && !options[Options::ACTIVE_PROFILE].isDefault())
-            sprintf(GameApp::mynbcardsStr, _("%s: %i cards (%i)").c_str(), options[Options::ACTIVE_PROFILE].str.c_str(),
+            snprintf(GameApp::mynbcardsStr, sizeof(GameApp::mynbcardsStr), _("%s: %i cards (%i)").c_str(), options[Options::ACTIVE_PROFILE].str.c_str(),
                             playerdata->collection->totalCards(), totalPrints);
         else
-            sprintf(GameApp::mynbcardsStr, _("%i cards").c_str(),totalPrints);
+            snprintf(GameApp::mynbcardsStr, sizeof(GameApp::mynbcardsStr), _("%i cards").c_str(),totalPrints);
     }
 
     if(playerdata)

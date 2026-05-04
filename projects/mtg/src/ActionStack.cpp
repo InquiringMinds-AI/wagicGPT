@@ -57,7 +57,7 @@ void NextGamePhase::Render()
     if (observer->currentActionPlayer == observer->players[1])
         playerId = 2;
 
-    sprintf(buffer, "%s %i :  %s", _("Player").c_str(), playerId, observer->getNextGamePhaseName().c_str());
+    snprintf(buffer, sizeof(buffer), "%s %i :  %s", _("Player").c_str(), playerId, observer->getNextGamePhaseName().c_str());
 
     mFont->DrawString(buffer, x + 15, y+10, JGETEXT_LEFT);
     mFont->SetScale(DEFAULT_MAIN_FONT_SCALE);
@@ -680,7 +680,7 @@ void DrawAction::Render()
     int playerId = 1;
     if (player == observer->players[1])
         playerId = 2;
-    sprintf(buffer, _("Player %i draws %i card").c_str(), playerId, nbcards);
+    snprintf(buffer, sizeof(buffer), _("Player %i draws %i card").c_str(), playerId, nbcards);
     mFont->DrawString(buffer, x + 35, y + GetVerticalTextOffset(), JGETEXT_LEFT);
 }
 
@@ -708,11 +708,11 @@ void LifeAction::Render()
     mFont->SetScale(DEFAULT_MAIN_FONT_SCALE);
     char buffer[200];
     if(amount > 0)
-        sprintf(buffer, _("Player gains %i life").c_str(), amount);
+        snprintf(buffer, sizeof(buffer), _("Player gains %i life").c_str(), amount);
     else if(amount < 0)
-        sprintf(buffer, _("Player loses %i life").c_str(), amount);
+        snprintf(buffer, sizeof(buffer), _("Player loses %i life").c_str(), amount);
     else
-        sprintf(buffer, _("Nothing happened").c_str(), amount);
+        snprintf(buffer, sizeof(buffer), "%s", _("Nothing happened").c_str());
     mFont->DrawString(buffer, x + 20, y, JGETEXT_LEFT);
 }
 

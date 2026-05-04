@@ -297,7 +297,7 @@ void Damage::Render()
     mFont->SetBase(0);
     mFont->SetScale(DEFAULT_MAIN_FONT_SCALE);
     char buffer[200];
-    sprintf(buffer, _("Deals %i damage to").c_str(), damage);
+    snprintf(buffer, sizeof(buffer), _("Deals %i damage to").c_str(), damage);
     //mFont->DrawString(buffer, x + 20, y, JGETEXT_LEFT);
     mFont->DrawString(buffer, x + 32, y + GetVerticalTextOffset(), JGETEXT_LEFT);
     JRenderer * renderer = JRenderer::GetInstance();

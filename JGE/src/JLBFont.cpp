@@ -139,6 +139,9 @@ void JLBFont::DrawString(const char *string, float x, float y, int align, float 
     dy = floorf(dy);
     float x0 = dx;
     int index;
+#ifdef VITA
+    mRenderer->BeginQuadBatch();
+#endif
     while (*p)
     {
         if (*p == '\n')
@@ -188,7 +191,13 @@ void JLBFont::DrawString(const char *string, float x, float y, int align, float 
         if (displayWidth)
         {
             // This condiction must be tested indepently in the case leftOffset and displayWidth need a fix at the same time.
-            if (dx > x0+displayWidth)  return;
+            if (dx > x0+displayWidth)
+            {
+#ifdef VITA
+                mRenderer->FlushQuadBatch();
+#endif
+                return;
+            }
             if (dx+delta > x0+displayWidth)
             {
                 delta = x0 + displayWidth - dx;
@@ -200,6 +209,9 @@ void JLBFont::DrawString(const char *string, float x, float y, int align, float 
         dx += delta;
         p++;
     }
+#ifdef VITA
+    mRenderer->FlushQuadBatch();
+#endif
 }
 
 
@@ -209,7 +221,7 @@ void JLBFont::printf(float x, float y, const char *format, ...)
     va_list list;
 
     va_start(list, format);
-    vsprintf(buffer, format, list);
+    vsnprintf(buffer, sizeof(buffer), format, list);
     va_end(list);
 
     DrawString(buffer, x, y);

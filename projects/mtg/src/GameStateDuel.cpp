@@ -2249,7 +2249,7 @@ std::string Tournament::exportTournamentDescription()
     describtion.append(buf);
     for (unsigned int i=1;i<TournamentsDecks.size();i++)
     {
-        sprintf(buf, "%s, ",TournamentsDecks.at(i).getDeckName().c_str());
+        snprintf(buf, sizeof(buf), "%s, ",TournamentsDecks.at(i).getDeckName().c_str());
         describtion.append(buf);
 
     }
@@ -2423,21 +2423,24 @@ bool Tournament::load(bool isAI, bool loadComplete)
                     size_t p1 = s.find_first_of("[");
                     key = s.substr(0, p1);
                     string player = s.substr(p1 + 1,1);
+                    int playerIdx = atoi(player.c_str());
 
-                   // printf("player %i\n",atoi(player.c_str()));
+                   // printf("player %i\n",playerIdx);
+                    if (playerIdx < 0 || playerIdx >= NMB_PLAYERS)
+                        continue;
                     if (key.find("PlayDeck")!=string::npos)
                     {
                          size_t t1 = value.find_first_of(",");
-                         Deck[atoi(player.c_str())].setDeckNumber(atoi(value.substr(0,t1).c_str()));
+                         Deck[playerIdx].setDeckNumber(atoi(value.substr(0,t1).c_str()));
                          size_t t2 = value.find(",",t1+1);
-                          Deck[atoi(player.c_str())].setDeckType((PlayerType)atoi(value.substr(t1+1,t2).c_str()));
+                          Deck[playerIdx].setDeckType((PlayerType)atoi(value.substr(t1+1,t2).c_str()));
                           size_t t3 = value.find(",",t2+1);
-                         Deck[atoi(player.c_str())].setVictories(atoi(value.substr(t2+1,t3).c_str()));
+                         Deck[playerIdx].setVictories(atoi(value.substr(t2+1,t3).c_str()));
                          size_t t4 = value.find(",",t3+1);
-                        Deck[atoi(player.c_str())].setLastWin(atoi(value.substr(t3+1,t4).c_str()));
+                        Deck[playerIdx].setLastWin(atoi(value.substr(t3+1,t4).c_str()));
                         size_t t5 = value.find(",",t4+1);
-                        gauntletLastDeckNumber[atoi(player.c_str())]=atoi(value.substr(t4+1,t5).c_str());
-                        TournamentsDecksID[atoi(player.c_str())]=atoi(value.substr(t5+1).c_str());
+                        gauntletLastDeckNumber[playerIdx]=atoi(value.substr(t4+1,t5).c_str());
+                        TournamentsDecksID[playerIdx]=atoi(value.substr(t5+1).c_str());
                     }
                     if (key.find("TDeck")!=string::npos)
                     {
@@ -2650,13 +2653,13 @@ void Tournament::renderScoreTable()
             if (sortedTournamentDecks[i].getDeckNumber()>0 && i<10)
             {
                 if (sortedTournamentDecks[i].getDeckType()==PLAYER_TYPE_CPU)
-                  sprintf(buffer, _("%i.: %s").c_str(),sortedTournamentDecks[i].getRanking(), sortedTournamentDecks[i].getDeckName().c_str());
+                  snprintf(buffer, sizeof(buffer), _("%i.: %s").c_str(),sortedTournamentDecks[i].getRanking(), sortedTournamentDecks[i].getDeckName().c_str());
                 else
-                    sprintf(buffer, _("%i.: Player Deck: %s").c_str(),sortedTournamentDecks[i].getRanking(), sortedTournamentDecks[i].getDeckName().c_str());
+                    snprintf(buffer, sizeof(buffer), _("%i.: Player Deck: %s").c_str(),sortedTournamentDecks[i].getRanking(), sortedTournamentDecks[i].getDeckName().c_str());
                 f2->DrawString(buffer, 30, y);
-                sprintf(buffer, _("%i/%i").c_str(), sortedTournamentDecks[i].getMatchesWon(), sortedTournamentDecks[i].getMatchesPlayed());
+                snprintf(buffer, sizeof(buffer), _("%i/%i").c_str(), sortedTournamentDecks[i].getMatchesWon(), sortedTournamentDecks[i].getMatchesPlayed());
                 f2->DrawString(buffer, 300, y);
-                sprintf(buffer, _("%i/%i").c_str(), sortedTournamentDecks[i].getGamesWon(), sortedTournamentDecks[i].getGamesPlayed());
+                snprintf(buffer, sizeof(buffer), _("%i/%i").c_str(), sortedTournamentDecks[i].getGamesWon(), sortedTournamentDecks[i].getGamesPlayed());
                 f2->DrawString(buffer, 400, y);
                 y+=20;
             }

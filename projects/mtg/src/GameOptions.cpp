@@ -41,7 +41,9 @@ const string Options::optionNames[] = {
   "transitions",
   "bgStyle",
   "interruptSeconds",
-#if defined(SDL_CONFIG)
+#if defined(VITA)
+  "keybindings_vita",
+#elif defined(SDL_CONFIG)
   "keybindings_sdl",
 #elif defined(QT_CONFIG)
   "keybindings_qt",

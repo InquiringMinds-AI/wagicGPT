@@ -357,7 +357,7 @@ bool GuiCombat::CheckUserInput(JButton key)
                 else
                 {
                     signed damage = activeAtk->card->stepPower(step);
-                    for (vector<DamagerDamaged*>::iterator it = activeAtk->blockers.begin(); *it != active; ++it)
+                    for (vector<DamagerDamaged*>::iterator it = activeAtk->blockers.begin(); it != activeAtk->blockers.end() && *it != active; ++it)
                         damage -= (*it)->sumDamages();
                     signed now = active->sumDamages();
                     damage -= now;
@@ -373,9 +373,12 @@ bool GuiCombat::CheckUserInput(JButton key)
             }
             else if (ATK == cursor_pos)
             {
-                active = activeAtk->blockers.front();
-                active->zoom = kZoom_level3;
-                cursor_pos = BLK;
+                if (!activeAtk->blockers.empty())
+                {
+                    active = activeAtk->blockers.front();
+                    active->zoom = kZoom_level3;
+                    cursor_pos = BLK;
+                }
             }
             else if (OK == cursor_pos)
             {
@@ -491,8 +494,8 @@ void GuiCombat::Render()
             WFont * mFont = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
             mFont->SetColor(ARGB(255, 255, 64, 0));
             {
-                char buf[10];
-                sprintf(buf, "%i", damage);
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%i", damage);
                 mFont->DrawString(buf, enemy_avatar.actX - 25, enemy_avatar.actY - 40);
             }
 

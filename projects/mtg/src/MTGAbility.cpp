@@ -6390,7 +6390,7 @@ int AbilityFactory::getAbilities(vector<MTGAbility *> * v, Spell * spell, MTGCar
  *   - doTap (a dirty way to know if tapping is included in the cost...
  */
 int AbilityFactory::magicText(int id, Spell * spell, MTGCardInstance * card, int mode, TargetChooser * tc, MTGGameZone * dest)
-{try{
+{
     int dryMode = 0;
     if (!spell && !dest)
         dryMode = 1;
@@ -6474,11 +6474,6 @@ int AbilityFactory::magicText(int id, Spell * spell, MTGCardInstance * card, int
     }
 
     return result;
-    }
-    catch(exception) {
-     DebugTrace("MAGIC TEST ERROR: Parser returned NULL");
-    }
-    return 0;
 }
 
 void AbilityFactory::addAbilities(int _id, Spell * spell)

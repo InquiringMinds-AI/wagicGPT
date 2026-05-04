@@ -46,7 +46,7 @@ private:
      ManaCost* mCost;
 
 protected:
-    char menuText[50];
+    char menuText[256];
 
     GameObserver * game;
 
