@@ -1814,7 +1814,8 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename,
     int	rawsize, i;
 
     JFileSystem* fileSystem = JFileSystem::GetInstance();
-    if (!fileSystem->OpenFile(filename)) return;
+    if (!fileSystem->OpenFile(filename))
+        return;
 
     rawsize = fileSystem->GetFileSize();
 
@@ -1837,17 +1838,6 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename,
 
     // Process JPEG header
     jpeg_read_header(&cinfo, true);
-
-#if defined(VITA)
-    // Half-resolution IDCT decode for card textures (RGBA5551).
-    // 146x204 -> 73x102, padded to 128x128 = 32KB per card (vs 256x256 = 128KB).
-    // Cards render at ~38px tall, so 102px is still over-specified.
-    if (TextureFormat == GU_PSM_5551)
-    {
-        cinfo.scale_num   = 1;
-        cinfo.scale_denom = 2;
-    }
-#endif
 
     // Start Decompression
     jpeg_start_decompress(&cinfo);
@@ -1953,6 +1943,12 @@ static void PNGCustomWarningFn(png_structp png_ptr __attribute__((unused)), png_
     // ignore PNG warnings
 }
 
+// Default libpng error handler aborts when no setjmp is set; longjmp instead.
+static void PNGCustomErrorFn(png_structp png_ptr, png_const_charp error_msg __attribute__((unused)))
+{
+    longjmp(png_jmpbuf(png_ptr), 1);
+}
+
 
 static void PNGCustomReadDataFn(png_structp png_ptr, png_bytep data, png_size_t length)
 {
@@ -1966,6 +1962,25 @@ static void PNGCustomReadDataFn(png_structp png_ptr, png_bytep data, png_size_t 
     {
         png_error(png_ptr, "Read Error!");
     }
+}
+
+struct PngMemCursor
+{
+    const BYTE* data;
+    png_size_t size;
+    png_size_t offset;
+};
+
+static void PNGMemReadFn(png_structp png_ptr, png_bytep data, png_size_t length)
+{
+    PngMemCursor* cur = (PngMemCursor*)png_get_io_ptr(png_ptr);
+    if (cur->offset + length > cur->size)
+    {
+        png_error(png_ptr, "read past end of memory buffer");
+        return;
+    }
+    memcpy(data, cur->data + cur->offset, length);
+    cur->offset += length;
 }
 
 JTexture* JRenderer::LoadTexture(const char* filename, int mode,
@@ -2040,31 +2055,44 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
     int bit_depth, color_type, interlace_type, x, y;
     DWORD* line;
 
+    // Slurp into RAM; JFileSystem isn't safe to read across libpng callbacks.
     JFileSystem* fileSystem = JFileSystem::GetInstance();
     if (!fileSystem->OpenFile(filename))
         return JGE_ERR_CANT_OPEN_FILE;
+    int rawsize = fileSystem->GetFileSize();
+    BYTE* rawdata = new BYTE[rawsize];
+    if (!rawdata)
+    {
+        fileSystem->CloseFile();
+        return JGE_ERR_MALLOC_FAILED;
+    }
+    fileSystem->ReadFile(rawdata, rawsize);
+    fileSystem->CloseFile();
+
+    PngMemCursor cur = { rawdata, (png_size_t)rawsize, 0 };
 
     png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
     if (png_ptr == NULL)
     {
-        fileSystem->CloseFile();
-
+        delete[] rawdata;
         return JGE_ERR_PNG;
     }
 
-    png_set_error_fn(png_ptr, (png_voidp) NULL, (png_error_ptr) NULL, PNGCustomWarningFn);
+    png_set_error_fn(png_ptr, (png_voidp) NULL, PNGCustomErrorFn, PNGCustomWarningFn);
     info_ptr = png_create_info_struct(png_ptr);
     if (info_ptr == NULL)
     {
-        //fclose(fp);
-        fileSystem->CloseFile();
-
         png_destroy_read_struct(&png_ptr, NULL, NULL);
-
+        delete[] rawdata;
         return JGE_ERR_PNG;
     }
-    png_init_io(png_ptr, NULL);
-    png_set_read_fn(png_ptr, (png_voidp)fileSystem, PNGCustomReadDataFn);
+    if (setjmp(png_jmpbuf(png_ptr)))
+    {
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        delete[] rawdata;
+        return JGE_ERR_PNG;
+    }
+    png_set_read_fn(png_ptr, &cur, PNGMemReadFn);
 
     png_set_sig_bytes(png_ptr, sig_read);
     png_read_info(png_ptr, info_ptr);
@@ -2083,10 +2111,8 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
     line = (DWORD*) malloc(width * 4);
     if (!line)
     {
-        //fclose(fp);
-        fileSystem->CloseFile();
-
         png_destroy_read_struct(&png_ptr, NULL, NULL);
+        delete[] rawdata;
         return JGE_ERR_MALLOC_FAILED;
     }
 
@@ -2098,12 +2124,8 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
 
     BYTE* buffer = new BYTE[size];
 
-    //JTexture *tex = new JTexture();
-
     if (buffer)
     {
-
-
         p32 = (DWORD*) buffer;
 
         for (y = 0; y < (int)height; y++)
@@ -2133,7 +2155,7 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
     png_read_end(png_ptr, info_ptr);
     png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 
-    fileSystem->CloseFile();
+    delete[] rawdata;
 
 
     textureInfo.mBits = buffer;

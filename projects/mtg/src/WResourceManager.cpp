@@ -206,7 +206,8 @@ ResourceManagerImpl::ResourceManagerImpl()
 
     LOG("Calling CacheEngine::Create");
 
-#ifdef PSP
+#if defined(PSP) || defined(VITA)
+    // JFileSystem isn't thread-safe; threaded loads race the main thread.
     CacheEngine::Create<UnthreadedCardRetriever>(textureWCache);
 #else
     CacheEngine::Create<ThreadedCardRetriever>(textureWCache);

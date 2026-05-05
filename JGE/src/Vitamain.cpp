@@ -115,12 +115,8 @@ static uint32_t g_touchStartTime = 0;      // SDL_GetTicks at touch start
 
 void JGECreateDefaultBindings()
 {
-    // Actual gameplay input bypasses keyBinds (PollInput dispatches sceCtrl
-    // straight to HoldKey_NoRepeat(JButton)). But Options > Controls iterates
-    // JGE::keyBinds to display rows AND validates that every button in
-    // btnToCheck is bound — if keyBinds is empty, save & exit is trapped in a
-    // confirmation loop. Mirror gVitaButtonMap here so the UI/validator have
-    // entries to find.
+    // Populated for the Options > Controls UI; gameplay input is dispatched
+    // directly in PollInput.
     for (size_t i = 0; i < sizeof(gVitaButtonMap) / sizeof(gVitaButtonMap[0]); ++i)
         JGE::BindKey(gVitaButtonMap[i].sceBtn, gVitaButtonMap[i].jgeBtn);
 }
@@ -191,9 +187,6 @@ static void EnsureUserDirs()
 
 static bool VitaInit()
 {
-    // No clock overrides. Wagic is a 2D card game with a 30 fps target —
-    // default Vita clocks are plenty. Boosting clocks just costs battery.
-
     debugLog("[3b] Configuring vitaGL");
     // Initialize vitaGL directly — this owns the GPU/display.
     // vitaGL manages all rendering via GXM. We do NOT use SDL for video.
@@ -523,13 +516,8 @@ int main(int argc, char* argv[])
     }
     debugLog("[4] InitGame OK");
 
-    // InitGame loads options.txt; if a prior build (with empty keyBinds)
-    // wrote a `controls=` line, GameOptionKeyBindings::read clears keyBinds
-    // and re-loads the (broken) saved values. Force defaults here so the
-    // controls UI is always populated. Rebinding doesn't actually work on
-    // Vita anyway — sceCtrl→JButton is hard-wired in PollInput.
+    // Re-apply defaults; options.txt load can clear keyBinds.
     JGE::GetInstance()->ResetBindings();
-    debugLog("[4a] Forced default keyBinds for Vita");
 
     debugLog("[5] Entering MainLoop");
     debugLogClose();

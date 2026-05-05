@@ -297,9 +297,11 @@ bool JFileSystem::AttachZipFile(const string &zipfile, char *password /* = NULL 
     if (mZipFile.Zipped())
     {
         mZipFile.close();
-        assert(filesystem::getCurrentFS());
-        mZipFile.open(filesystem::getCurrentZipName().c_str(), filesystem::getCurrentFS()); 
-        assert(mZipFile);
+        if (!filesystem::getCurrentFS())
+            return false;
+        mZipFile.open(filesystem::getCurrentZipName().c_str(), filesystem::getCurrentFS());
+        if (!mZipFile)
+            return false;
     }
     mZipAvailable = true;
     return true;

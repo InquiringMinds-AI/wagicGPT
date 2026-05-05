@@ -155,11 +155,6 @@ JSoundSystem::~JSoundSystem()
 void JSoundSystem::InitSoundSystem()
 {
 #ifdef VITA
-  // Mix_OpenAudio without a prior Mix_Init leaves the codec dispatchers
-  // unloaded, so Mix_LoadMUS silently fails on every MP3 (no music) while
-  // WAV samples still work because that decoder is built into SDL2_mixer.
-  // Load every format we have a vdpm library for: mpg123 (MP3), vorbis+ogg
-  // (OGG), libmikmod (MOD), libFLAC (FLAC).
   int wanted = MIX_INIT_MP3 | MIX_INIT_OGG | MIX_INIT_MOD | MIX_INIT_FLAC;
   int got = Mix_Init(wanted);
   if ((got & wanted) != wanted)

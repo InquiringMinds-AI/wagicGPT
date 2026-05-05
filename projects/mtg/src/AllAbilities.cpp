@@ -10811,13 +10811,9 @@ void ATutorialMessage::ButtonPressed(int, int)
         string optionName = getOptionName();
         options[optionName].number = options[optionName].number + 1;
 #if !defined(VITA)
-        options.save(); //TODO: if we experience I/O slowness in tutorials, move this save at the end of a turn, or at the end of the game.
+        // On Vita this NAND flush takes 1-3s; rely on end-of-duel save instead.
+        options.save();
 #endif
-        // On Vita, options.save() blocks the main thread for ~1-3s on the
-        // ux0:data NAND flush, which makes closing a tip feel like a freeze.
-        // The in-memory increment alone already suppresses re-shows for this
-        // session; end-of-duel and end-of-app saves (Credits.cpp,
-        // GameStateMenu.cpp, GameStateAwards.cpp) persist it across runs.
     }
     mElapsed = 0;
     mUserCloseRequest = true;
