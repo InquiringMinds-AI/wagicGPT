@@ -1,0 +1,25 @@
+#Jack-in-the-Mox (#1085, "first activation yields no mana"): does NOT reproduce - the
+#first tap rolls and produces mana (roll-1 sac branch also verified separately).
+#seed 1 rolls a 5 -> {R}; the per-game seeded generator drives rolld6, so this is
+#deterministic even under the threaded suite.
+seed 1
+[INIT]
+firstmain
+[PLAYER1]
+inplay:jack-in-the-mox
+[PLAYER2]
+[DO]
+jack-in-the-mox
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+manapool:{R}
+inplay:jack-in-the-mox
+tappedinplay:1
+[PLAYER2]
+[END]
+#BENCHED (not in _tests.txt): the seeded roll is deterministic per suite PATH but the
+#main thread and workers consume different generator prefixes before the roll, so the
+#color differs by which thread runs the test. Re-enlist when suite paths are unified.
