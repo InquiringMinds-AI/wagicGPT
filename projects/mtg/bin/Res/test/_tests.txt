@@ -37,6 +37,7 @@ generic/call_death_dweller_i1085.txt
 generic/chalice_of_the_void_i1085.txt
 generic/chaos_wand_i1085.txt
 generic/charm_peddler_i1085.txt
+generic/chatterfang_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
