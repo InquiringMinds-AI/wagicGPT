@@ -1,0 +1,36 @@
+#From the #1085 meta-list: "Doomsday with cards already exiled, they
+#got shuffled into the deck". Cards in exile before the cast must
+#stay there; the five picks become the library, the rest is exiled,
+#and you lose half your life rounded up.
+# https://github.com/WagicProject/wagic/issues/1085
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:doomsday
+library:millstone,ornithopter,mox pearl,darksteel citadel,leaden myr
+graveyard:walking corpse
+exile:juggernaut
+manapool:{B}{B}{B}
+[PLAYER2]
+[DO]
+doomsday
+millstone
+ornithopter
+mox pearl
+darksteel citadel
+leaden myr
+goto firstmain
+goto firstmain
+goto firstmain
+goto firstmain
+goto secondmain
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+library:millstone,ornithopter,mox pearl,darksteel citadel,leaden myr
+graveyard:doomsday
+exile:juggernaut,walking corpse
+life:10
+[PLAYER2]
+[END]
