@@ -1,0 +1,25 @@
+#From the #1085 meta-list: Fade Away (no symptom given).
+#Each creature's controller sacrifices a permanent unless they pay
+#{1}: with no mana left, the caster's own bears must be sacrificed.
+# https://github.com/WagicProject/wagic/issues/1085
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears
+hand:fade away
+manapool:{2}{U}
+[PLAYER2]
+[DO]
+fade away
+goto firstmain
+goto firstmain
+choice 0
+grizzly bears
+goto secondmain
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+graveyard:fade away,grizzly bears
+[PLAYER2]
+[END]
