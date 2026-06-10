@@ -56,6 +56,7 @@ generic/first_slivers_chosen_i1085.txt
 generic/flay_essence_i1085.txt
 generic/forebears_blade_i1085.txt
 generic/gift_of_the_gargantuan_i1085.txt
+generic/gor_muldrak_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
