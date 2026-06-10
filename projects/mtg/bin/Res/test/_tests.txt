@@ -25,6 +25,7 @@ generic/proliferate_shroud_i1130.txt
 generic/populate_zektar_i1145.txt
 death_grasp.txt
 ai/goblin_artillery.txt
+ai/infect_self_target_i594.txt
 generic/devotion.txt
 generic/doesnotuntap.txt
 generic/doesnotuntap2.txt
