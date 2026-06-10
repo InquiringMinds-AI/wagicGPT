@@ -22,7 +22,8 @@ namespace
 {
 
 const char * kDefaultEndpoints[] = {
-    "http://100.116.136.74:8081", //Spark vLLM
+    "http://100.116.136.74:8084", //Spark vLLM (qwen36-35b)
+    "http://100.116.136.74:8081", //Spark vLLM (qwen35 container)
     "http://127.0.0.1:8080",      //local llama.cpp
 };
 
@@ -122,6 +123,20 @@ bool envFlag(const char * name)
 {
     const char * v = getenv(name);
     return v && *v && string(v) != "0" && string(v) != "off";
+}
+
+//The reveal zone is a plain MTGGameZone, so getName() returns "zone";
+//detect it by identity instead.
+bool isRevealZone(MTGGameZone * z)
+{
+    return z && z->owner && z == z->owner->game->reveal;
+}
+
+string zoneDesc(MTGGameZone * z)
+{
+    if (isRevealZone(z))
+        return "reveal";
+    return z->getName();
 }
 
 } //namespace
@@ -283,16 +298,50 @@ string AIPlayerGPT::describeEvent(WEvent * event)
             return "";
         Player * owner = e->to->owner;
         bool mine = (owner == this);
-        //Hidden information: never name cards entering the opponent's
-        //(the human's) hand or library.
         string toName = e->to->getName();
+        string cardName = e->card->getDisplayName();
+
+        //A card of a known name leaving the opponent's hand consumes that
+        //knowledge (it is now public anyway, or gone).
+        if (e->from->owner && e->from->owner != this && e->from == e->from->owner->game->hand)
+        {
+            std::map<string, int>::iterator known = mKnownOppHand.find(cardName);
+            if (known != mKnownOppHand.end() && --(known->second) <= 0)
+                mKnownOppHand.erase(known);
+        }
+
+        //Reveals are public information, whoever's card it is.
+        if (isRevealZone(e->to))
+        {
+            out << (mine ? "Your " : "Opponent's ") << cardName
+                << " is revealed (from " << zoneDesc(e->from) << ")";
+            return out.str();
+        }
+        if (isRevealZone(e->from))
+        {
+            if (!mine && (toName == "hand" || toName == "library"))
+            {
+                //Revealed cards stay known even in hidden zones: remember
+                //the ones a human player would remember.
+                if (toName == "hand")
+                    mKnownOppHand[cardName]++;
+                out << "Opponent puts the revealed " << cardName << " into their " << toName;
+                return out.str();
+            }
+            out << (mine ? "Your revealed " : "Opponent's revealed ") << cardName
+                << " goes to " << toName;
+            return out.str();
+        }
+
+        //Hidden information: never name cards entering the opponent's
+        //(the human's) hand or library unrevealed.
         if (!mine && (toName == "hand" || toName == "library"))
         {
             out << "Opponent puts a card into their " << toName;
             return out.str();
         }
-        out << (mine ? "Your " : "Opponent's ") << e->card->getDisplayName()
-            << ": " << e->from->getName() << " -> " << toName;
+        out << (mine ? "Your " : "Opponent's ") << cardName
+            << ": " << zoneDesc(e->from) << " -> " << toName;
         return out.str();
     }
 
@@ -359,6 +408,20 @@ string AIPlayerGPT::serializeGameState()
         describeZoneCards(out, opp->game->inPlay, true);
         out << "\nOpponent hand size: " << opp->game->hand->nb_cards
             << " | Opponent library: " << opp->game->library->nb_cards << " cards";
+        if (!mKnownOppHand.empty())
+        {
+            out << "\nCards you have seen in the opponent's hand: ";
+            bool first = true;
+            for (std::map<string, int>::iterator it = mKnownOppHand.begin(); it != mKnownOppHand.end(); ++it)
+            {
+                if (!first)
+                    out << "; ";
+                first = false;
+                if (it->second > 1)
+                    out << it->second << "x ";
+                out << it->first;
+            }
+        }
     }
     out << "\nYour library: " << game->library->nb_cards << " cards\n";
     return out.str();
@@ -394,10 +457,10 @@ string AIPlayerGPT::requestCompletion()
         {"max_tokens", maxTokens},
         {"temperature", 0.5},
     };
-    //Thinking toggle is a local-server (Qwen-style) extension; keyed cloud
-    //endpoints (OpenRouter etc.) manage reasoning themselves.
-    if (mApiKey.empty())
-        request["chat_template_kwargs"] = {{"enable_thinking", mThinking}};
+    //Qwen-style thinking toggle. Unknown-field-tolerant providers
+    //(OpenRouter etc.) ignore this; local vLLM/llama.cpp honor it, keyed
+    //or not. Matters: qwen3.6 thinks by default (~6x decision latency).
+    request["chat_template_kwargs"] = {{"enable_thinking", mThinking}};
 
     string body = httpRequest(mEndpoint + "/v1/chat/completions", request.dump(), 120000, mApiKey);
     if (body.empty())

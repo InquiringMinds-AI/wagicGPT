@@ -88,6 +88,10 @@ private:
     //chat transcript: (role, content); [0] is the system prompt once built
     vector<std::pair<string, string> > mMessages;
     string mEventLog; //narrative accumulated since the last decision
+    //Cards the opponent revealed that are now in their hand: public info a
+    //human would remember. Tracked by name (instances are recreated on zone
+    //moves), decremented when a card of that name leaves the hand.
+    std::map<string, int> mKnownOppHand;
     //Avoid re-querying the model every AI tick while nothing changed.
     string mLastUserMsg;
     int mLastChoice;
