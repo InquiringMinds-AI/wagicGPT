@@ -22,6 +22,7 @@ generic/kathari_bomber_sacrifice_i1146.txt
 generic/defense_of_heart_double_i1128.txt
 generic/gulf_squid_i1131.txt
 generic/proliferate_shroud_i1130.txt
+generic/populate_zektar_i1145.txt
 generic/devotion.txt
 generic/doesnotuntap.txt
 generic/doesnotuntap2.txt
