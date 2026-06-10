@@ -62,6 +62,7 @@ generic/gutter_grime_i1085.txt
 generic/hall_of_storm_giants_i1085.txt
 generic/heron_of_hope_i1085.txt
 generic/hooded_hydra_i1085.txt
+generic/hot_soup_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
