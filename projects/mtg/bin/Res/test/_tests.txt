@@ -33,6 +33,8 @@ generic/brudiclad_token_i1085.txt
 generic/calamity_bearer_i1085.txt
 generic/carom_i1085.txt
 generic/agony_warp_i1085.txt
+generic/call_death_dweller_i1085.txt
+generic/chalice_of_the_void_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
