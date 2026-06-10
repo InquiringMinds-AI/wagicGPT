@@ -53,6 +53,7 @@ generic/etherwrought_page_i1085.txt
 generic/extract_brain_i1085.txt
 generic/fertile_imagination_i1085.txt
 generic/first_slivers_chosen_i1085.txt
+generic/flay_essence_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
