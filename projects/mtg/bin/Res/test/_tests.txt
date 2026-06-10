@@ -18,6 +18,8 @@ generic/deathtouch_taught_i1142.txt
 generic/adarkar_unicorn_upkeep_i1085.txt
 generic/adarkar_unicorn_mainphase_i1085.txt
 generic/aegar_spell_excess_i1085.txt
+generic/alrund_hand_buff_i1085.txt
+generic/archghoul_zombie_dies_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
