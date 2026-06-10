@@ -24,6 +24,7 @@ generic/gulf_squid_i1131.txt
 generic/proliferate_shroud_i1130.txt
 generic/populate_zektar_i1145.txt
 death_grasp.txt
+ai/goblin_artillery.txt
 generic/devotion.txt
 generic/doesnotuntap.txt
 generic/doesnotuntap2.txt
