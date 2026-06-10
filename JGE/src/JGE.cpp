@@ -33,7 +33,30 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////
-#if defined (WIN32)    // WIN32 specific code
+#if defined (VITA)       // PS Vita specific code
+
+// Defined in Vitamain.cpp. Reads analog stick hardware via SDL2.
+extern u8 JGEGetAnalogX();
+extern u8 JGEGetAnalogY();
+
+u8 JGE::GetAnalogX()
+{
+    u8 val = JGEGetAnalogX();
+    // Also honor d-pad as override (like PSP did)
+    if (GetButtonState(JGE_BTN_LEFT)) return 0;
+    if (GetButtonState(JGE_BTN_RIGHT)) return 0xff;
+    return val;
+}
+
+u8 JGE::GetAnalogY()
+{
+    u8 val = JGEGetAnalogY();
+    if (GetButtonState(JGE_BTN_UP)) return 0;
+    if (GetButtonState(JGE_BTN_DOWN)) return 0xff;
+    return val;
+}
+
+#elif defined (WIN32)    // WIN32 specific code
 #include "../../Dependencies/include/fmod.h"
 
 u8 JGE::GetAnalogX()
@@ -312,7 +335,7 @@ void JGE::LeftClickedProcessed()
 
 bool JGE::GetLeftClickCoordinates(int& x, int& y)
 {
-    if(mLastLeftClickX != -1 || mlastLeftClickY != -1)
+    if(mLastLeftClickX != -1 && mlastLeftClickY != -1)
     {
         x = mLastLeftClickX;
         y = mlastLeftClickY;
@@ -324,7 +347,7 @@ bool JGE::GetLeftClickCoordinates(int& x, int& y)
 JGE::JGE()
 {
     mApp = NULL;
-#if defined (WIN32) || defined (LINUX)
+#if defined (WIN32) || defined (LINUX) || defined (VITA)
     strcpy(mDebuggingMsg, "");
     mCurrentMusic = NULL;
 #endif
@@ -548,7 +571,7 @@ void JGE::printf(const char *format, ...)
     va_list list;
 
     va_start(list, format);
-    vsprintf(mDebuggingMsg, format, list);
+    vsnprintf(mDebuggingMsg, sizeof(mDebuggingMsg), format, list);
     va_end(list);
 }
 

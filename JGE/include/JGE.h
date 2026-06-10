@@ -29,6 +29,11 @@
 typedef u32 LocalKeySym;
 #define LOCAL_KEY_NONE Qt::Key_unknown
 
+#elif defined(VITA)
+// Vita uses SDL2 game controller input, not keyboard, so no keysym bindings are needed.
+typedef u32 LocalKeySym;
+#define LOCAL_KEY_NONE ((u32)-1)
+
 #elif defined(SDL_CONFIG)
 #include <SDL.h>
 typedef SDL_Keycode LocalKeySym;
@@ -128,7 +133,7 @@ class JGE
  private:
   JApp *mApp;
 
-#if defined (WIN32) || defined (LINUX)
+#if defined (WIN32) || defined (LINUX) || defined (VITA)
   JMusic *mCurrentMusic;
 #else
  public:

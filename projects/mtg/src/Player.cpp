@@ -99,7 +99,7 @@ Player::~Player()
     SAFE_DELETE(AuraIncreased);
     SAFE_DELETE(AuraReduced);
     SAFE_DELETE(game);
-    if(mAvatarTex && observer->getResourceManager())
+    if(mAvatarTex && observer && observer->getResourceManager())
         observer->getResourceManager()->Release(mAvatarTex);
     mAvatarTex = NULL;
     SAFE_DELETE(mDeck);
@@ -107,6 +107,11 @@ Player::~Player()
 
 bool Player::loadAvatar(string file, string resName)
 {
+    // Rules.cpp:926 creates a placeholder Player(NULL, "", "") to hold
+    // parsed campaign rule data. Calling parseLine on it will route an
+    // "avatar=..." line into loadAvatar with observer == NULL — guard
+    // before dereferencing or we get a data-abort crash on Vita.
+    if (!observer) return false;
     WResourceManager * rm = observer->getResourceManager();
     if(!rm) return false;
 

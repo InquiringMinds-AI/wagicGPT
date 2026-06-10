@@ -1310,7 +1310,7 @@ void CardGui::RenderBig(MTGCard* card, const Pos& pos, bool thumb, bool noborder
             }
         }*///disabled this for universal border across game, deck editor, etc...
         //universal border
-        if(options[Options::SHOWBORDER].number)
+        if(options[Options::SHOWBORDER].number && !noborder)
         {
             if((cardsetname == "2ED"||cardsetname == "RV"||cardsetname == "4ED"||cardsetname == "5ED"||cardsetname == "6ED"||cardsetname == "7ED"||cardsetname == "8ED"||cardsetname == "9ED"||cardsetname == "S00"||cardsetname == "S99"||cardsetname == "PTK"||cardsetname == "BTD"||cardsetname == "ATH"||cardsetname == "BRB"||cardsetname == "CHR"||cardsetname == "DM")
                 && !options[Options::BLKBORDER].number)

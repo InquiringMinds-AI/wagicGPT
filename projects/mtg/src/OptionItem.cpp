@@ -582,12 +582,17 @@ bool OptionKey::CheckUserInput(JButton key)
 {
     if (btnMenu)
         return btnMenu->CheckUserInput(key);
+#if !defined(VITA)
     if (JGE_BTN_OK == key)
     {
         grabbed = true;
         g->GrabKeyboard(this);
         return true;
     }
+#endif
+    // On Vita, rebinding is disabled — PollInput dispatches sceCtrl directly to
+    // JButton and never feeds keysyms via ReadLocalKey, so entering grab mode
+    // (waiting for a keysym) would lock the player and require a restart.
     return false;
 }
 

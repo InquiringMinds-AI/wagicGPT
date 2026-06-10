@@ -9,7 +9,9 @@
 //-------------------------------------------------------------------------------------
 #include "DebugRoutines.h"
 
-#ifdef WITH_FMOD
+#ifdef VITA
+#include <SDL2/SDL_mixer.h>
+#elif defined WITH_FMOD
 #include "../../Dependencies/include/fmod.h"
 #else
 #define FSOUND_FREE 0
@@ -20,7 +22,9 @@
 
 //////////////////////////////////////////////////////////////////////////
 JMusic::JMusic()
-#ifdef USE_PHONON
+#ifdef VITA
+  : mTrack(NULL)
+#elif defined USE_PHONON
   : mOutput(0), mMediaObject(0)
 #elif defined QT_CONFIG
     : playlist(0), player(0)
@@ -33,7 +37,9 @@ void JMusic::Update(){
 }
 
 int JMusic::getPlayTime(){
-#ifdef WITH_FMOD
+#ifdef VITA
+  return 0; // SDL_mixer doesn't provide precise position
+#elif defined WITH_FMOD
   return static_cast<int>(FSOUND_GetCurrentPosition(JSoundSystem::GetInstance()->mChannel) / 44.1); //todo more generic, here it's only 44kHz
 #else
   return 0;
@@ -42,7 +48,10 @@ int JMusic::getPlayTime(){
 
 JMusic::~JMusic()
 {
-#if defined USE_PHONON
+#if defined VITA
+  JSoundSystem::GetInstance()->StopMusic(this);
+  if (mTrack) Mix_FreeMusic(mTrack);
+#elif defined USE_PHONON
   if(mOutput)
     delete mOutput;
   if(mMediaObject)
@@ -76,7 +85,9 @@ JSample::JSample()
 
 JSample::~JSample()
 {
-#if (defined QT_CONFIG) && (!defined USE_PHONON)
+#if defined VITA
+  if (mSample) Mix_FreeChunk(mSample);
+#elif (defined QT_CONFIG) && (!defined USE_PHONON)
     if(effect)
         delete effect;
 #elif USE_PHONON
@@ -91,7 +102,9 @@ JSample::~JSample()
 
 unsigned long JSample::fileSize()
 {
-#ifdef WITH_FMOD
+#ifdef VITA
+  return mSample ? mSample->alen : 0;
+#elif defined WITH_FMOD
   return FSOUND_Sample_GetLength(mSample);
 #else
   return 0;
@@ -127,7 +140,10 @@ JSoundSystem::JSoundSystem()
 {
   mVolume = 0;
   mSampleVolume = 0;
-#ifdef WITH_FMOD
+#ifdef VITA
+  mCurrentMusic = NULL;
+  mCurrentSample = NULL;
+#elif defined WITH_FMOD
   mChannel = FSOUND_FREE;
 #endif
 }
@@ -138,7 +154,19 @@ JSoundSystem::~JSoundSystem()
 
 void JSoundSystem::InitSoundSystem()
 {
-#ifdef WITH_FMOD
+#ifdef VITA
+  int wanted = MIX_INIT_MP3 | MIX_INIT_OGG | MIX_INIT_MOD | MIX_INIT_FLAC;
+  int got = Mix_Init(wanted);
+  if ((got & wanted) != wanted)
+  {
+      DebugTrace("Mix_Init partial: wanted=" << wanted << " got=" << got
+                 << " err=" << Mix_GetError());
+  }
+  if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0)
+  {
+      DebugTrace("SDL_mixer init failed: " << Mix_GetError());
+  }
+#elif defined WITH_FMOD
   FSOUND_Init(44100, 32, 0);
 #endif
 }
@@ -146,7 +174,10 @@ void JSoundSystem::InitSoundSystem()
 
 void JSoundSystem::DestroySoundSystem()
 {
-#ifdef WITH_FMOD
+#ifdef VITA
+  Mix_CloseAudio();
+  Mix_Quit();
+#elif defined WITH_FMOD
   FSOUND_Close();
 #endif
 }
@@ -155,7 +186,21 @@ void JSoundSystem::DestroySoundSystem()
 JMusic *JSoundSystem::LoadMusic(const char *fileName)
 {
     JMusic* music = NULL;
-#if (defined QT_CONFIG)  && (!defined USE_PHONON)
+#if defined VITA
+    music = new JMusic();
+    if (music)
+    {
+        string fullpath = JFileSystem::GetInstance()->GetResourceFile(fileName);
+        if (!fullpath.empty())
+        {
+            music->mTrack = Mix_LoadMUS(fullpath.c_str());
+            if (!music->mTrack)
+            {
+                DebugTrace("Mix_LoadMUS failed: " << Mix_GetError());
+            }
+        }
+    }
+#elif (defined QT_CONFIG)  && (!defined USE_PHONON)
     music = new JMusic();
     if (music)
     {
@@ -202,7 +247,14 @@ JMusic *JSoundSystem::LoadMusic(const char *fileName)
 
 void JSoundSystem::PlayMusic(JMusic *music, bool looping)
 {
-#if (defined QT_CONFIG)  && (!defined USE_PHONON)
+#if defined VITA
+    if (music && music->mTrack)
+    {
+        Mix_PlayMusic(music->mTrack, looping ? -1 : 0);
+        Mix_VolumeMusic((mVolume * 128 / 100)); // 0-100 -> 0-128
+        mCurrentMusic = music;
+    }
+#elif (defined QT_CONFIG)  && (!defined USE_PHONON)
     if(music && music->player && music->playlist)
     {
         if(looping)
@@ -242,7 +294,12 @@ void JSoundSystem::PlayMusic(JMusic *music, bool looping)
 
 void JSoundSystem::StopMusic(JMusic *music)
 {
-#if (defined QT_CONFIG) && (!defined USE_PHONON)
+#if defined VITA
+    if (music && music->mTrack)
+    {
+        Mix_HaltMusic();
+    }
+#elif (defined QT_CONFIG) && (!defined USE_PHONON)
     if (music && music->player && music->playlist)
     {
         music->player->stop();
@@ -262,13 +319,23 @@ void JSoundSystem::StopMusic(JMusic *music)
 
 void JSoundSystem::PauseMusic(JMusic *music)
 {
+#if defined VITA
+    if (music && music->mTrack)
+        Mix_PauseMusic();
+#else
     StopMusic(music);
+#endif
 }
 
 
 void JSoundSystem::ResumeMusic(JMusic *music)
 {
+#if defined VITA
+    if (music && music->mTrack)
+        Mix_ResumeMusic();
+#else
     PlayMusic(music);
+#endif
 }
 
 
@@ -280,16 +347,18 @@ void JSoundSystem::SetVolume(int volume)
 
 void JSoundSystem::SetMusicVolume(int volume)
 {
-#ifdef WITH_FMOD
+#ifdef VITA
+  Mix_VolumeMusic((volume * 128 / 100)); // 0-100 -> 0-128
+#elif defined WITH_FMOD
   if (mChannel != FSOUND_FREE) FSOUND_SetVolumeAbsolute(mChannel, static_cast<int>(volume * 2.55));
 #endif
   mVolume = volume;
 }
 
 void JSoundSystem::SetSfxVolume(int volume){
-  //this sets the volume to all channels then reverts back the volume for music..
-  //that's a bit dirty but it works
-#ifdef WITH_FMOD
+#ifdef VITA
+  // SDL_mixer channel volume applies to next PlaySample call
+#elif defined WITH_FMOD
   FSOUND_SetVolumeAbsolute(FSOUND_ALL, static_cast<int>(volume * 2.55));
 #endif
   mSampleVolume = volume;
@@ -299,7 +368,23 @@ void JSoundSystem::SetSfxVolume(int volume){
 JSample *JSoundSystem::LoadSample(const char *fileName)
 {
     JSample* sample = NULL;
-#if (defined QT_CONFIG) && (!defined USE_PHONON)
+#if defined VITA
+    sample = new JSample();
+    if (sample)
+    {
+        string fullpath = JFileSystem::GetInstance()->GetResourceFile(fileName);
+        if (!fullpath.empty())
+        {
+            sample->mSample = Mix_LoadWAV(fullpath.c_str());
+            if (!sample->mSample)
+            {
+                DebugTrace("Mix_LoadWAV failed: " << Mix_GetError());
+            }
+        }
+        else
+            sample->mSample = NULL;
+    }
+#elif (defined QT_CONFIG) && (!defined USE_PHONON)
     sample = new JSample();
     if (sample)
     {
@@ -347,7 +432,14 @@ JSample *JSoundSystem::LoadSample(const char *fileName)
 
 void JSoundSystem::PlaySample(JSample *sample)
 {
-#if (defined QT_CONFIG) && (!defined USE_PHONON)
+#if defined VITA
+    if (sample && sample->mSample)
+    {
+        int channel = Mix_PlayChannel(-1, sample->mSample, 0);
+        if (channel >= 0)
+            Mix_Volume(channel, (mSampleVolume * 128 / 100));
+    }
+#elif (defined QT_CONFIG) && (!defined USE_PHONON)
     if(sample)
     {
         sample->effect->play();

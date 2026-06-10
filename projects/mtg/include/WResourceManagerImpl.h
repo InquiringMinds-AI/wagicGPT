@@ -10,8 +10,10 @@
 #include "JLogger.h"
 #include <sstream>
 
-#if defined (PSP) 
+#if defined (PSP)
 #define HUGE_CACHE_LIMIT 25000000  // Size of the cache for PSP (in bytes) - old value is 20mb - reverted
+#elif defined (VITA)
+#define HUGE_CACHE_LIMIT 48000000  // Vita: 112MB shared VRAM, ~8MB framebuffers+vitaGL, leaves plenty
 #else
 #define HUGE_CACHE_LIMIT 60000000  // Size of the cache for Windows and Linux (in bytes) - old value is 20mb increased to 60mb
 #endif
@@ -31,7 +33,11 @@
 #define OTHERS_OFFSET 2000000000
 
 //Hard Limits.
+#if defined(VITA)
+#define MAX_CACHE_OBJECTS 800  // Vita has more RAM than PSP, so this reduces eviction thrashing in the deck builder.
+#else
 #define MAX_CACHE_OBJECTS 300
+#endif
 #define MAX_CACHE_ATTEMPTS 10
 #define MAX_CACHE_MISSES 200
 #define MAX_CACHED_SAMPLES 50

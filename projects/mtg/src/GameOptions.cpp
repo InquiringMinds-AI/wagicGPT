@@ -41,7 +41,9 @@ const string Options::optionNames[] = {
   "transitions",
   "bgStyle",
   "interruptSeconds",
-#if defined(SDL_CONFIG)
+#if defined(VITA)
+  "keybindings_vita",
+#elif defined(SDL_CONFIG)
   "keybindings_sdl",
 #elif defined(QT_CONFIG)
   "keybindings_qt",
@@ -522,6 +524,13 @@ GameOption * GameOptions::get(int optionID)
             goEnum = NEW GameOptionEnum();
             goEnum->def = OptionEconDifficulty::getInstance();
             go = goEnum;
+            break;
+        // First-launch defaults; without these the audio gate stays at 0.
+        case Options::MUSICVOLUME:
+            go = NEW GameOption(50);
+            break;
+        case Options::SFXVOLUME:
+            go = NEW GameOption(100);
             break;
         default:
             if (x >= Options::BEGIN_AWARDS)

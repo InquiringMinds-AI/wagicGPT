@@ -560,8 +560,12 @@ void GameApp::playMusic(string filename, bool loop)
         return;
 
 #if !defined (PSP)
-    if(!WResourceManager::Instance()->ssLoadMusic(filename.c_str()))
-        return; // Added to avoid opening not existing file.
+    // Use a lightweight file-existence check (musicFile() walks the same
+    // theme/sound/raw resolution as ssLoadMusic). The previous idiom called
+    // ssLoadMusic just to probe and threw away the result, which leaked a
+    // JMusic and called Mix_LoadMUS twice per playMusic.
+    if (WResourceManager::Instance()->musicFile(filename).empty())
+        return;
 #endif
 
     if (music)

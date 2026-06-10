@@ -235,8 +235,9 @@ int DeckManager::getDifficultyRating(Player *statsPlayer, Player *player)
             meta->mPlayerDeck = statsPlayer->GetCurrentDeckStatsFile();
             meta->mStatsFilename = player->deckFileSmall;
             meta->LoadStats();
+            return meta->getDifficulty();
         }
-        return meta->getDifficulty();
+        return EASY;
     }
     else
         return EASY;

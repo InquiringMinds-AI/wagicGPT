@@ -2915,7 +2915,7 @@ const string AACounter::getMenuText()
         menu.append(buffer);
     }
 
-    sprintf(menuText, "%s", menu.c_str());
+    snprintf(menuText, sizeof(menuText), "%s", menu.c_str());
     return menuText;
 }
 
@@ -5421,7 +5421,7 @@ int AAFlip::testDestroy()
 const string AAFlip::getMenuText()
 {
     string s = flipStats;
-    sprintf(menuText, "Transform:%s", s.c_str());
+    snprintf(menuText, sizeof(menuText), "Transform:%s", s.c_str());
     return menuText;
 }
 
@@ -8355,7 +8355,7 @@ const string ATransformer::getMenuText()
     if(menutext.size())
         return menutext.c_str();
     string s = menu;
-    sprintf(menuText, "Becomes %s", s.c_str());
+    snprintf(menuText, sizeof(menuText), "Becomes %s", s.c_str());
     return menuText;
 }
 
@@ -10810,7 +10810,10 @@ void ATutorialMessage::ButtonPressed(int, int)
     {
         string optionName = getOptionName();
         options[optionName].number = options[optionName].number + 1;
-        options.save(); //TODO: if we experience I/O slowness in tutorials, move this save at the end of a turn, or at the end of the game.
+#if !defined(VITA)
+        // On Vita this NAND flush takes 1-3s; rely on end-of-duel save instead.
+        options.save();
+#endif
     }
     mElapsed = 0;
     mUserCloseRequest = true;

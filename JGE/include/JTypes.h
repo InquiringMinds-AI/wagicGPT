@@ -31,6 +31,15 @@
 
 #endif
 
+// VITA: Actual display is 960x544 but game logic uses 480x272 virtual coords.
+// The GL viewport scales from virtual to actual resolution.
+#if defined(VITA)
+#define VITA_DISPLAY_WIDTH   960
+#define VITA_DISPLAY_HEIGHT  544
+#define VITA_DISPLAY_WIDTH_F  960.0f
+#define VITA_DISPLAY_HEIGHT_F 544.0f
+#endif
+
 #ifndef __GNUC__
 #define __attribute__(arg)
 #endif
@@ -106,11 +115,11 @@ enum {
 #if (defined WIN32) && (!defined LINUX)
 	#include <windows.h>
 #endif
-#if defined(LINUX) && (!defined WIN32) || defined(IOS) || defined (ANDROID)
+#if defined(LINUX) && (!defined WIN32) || defined(IOS) || defined (ANDROID) || defined(VITA)
 typedef uint8_t byte;
 typedef uint32_t DWORD;
 typedef uint8_t BYTE;
-#ifndef IOS
+#if !defined(IOS)
 typedef bool BOOL;
 #endif
 #endif
@@ -124,14 +133,18 @@ typedef uint32_t u32;
 #define PIXEL_TYPE DWORD
 #define ARGB(a, r, g, b)		((PIXEL_TYPE)((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
 #define RGBA(r, g, b, a)		((PIXEL_TYPE)((a) << 24) | ((b) << 16) | ((g) << 8) | (r))
-#ifndef PSP
+#if defined(VITA)
+#define TEXTURE_FORMAT			1  // GU_PSM_8888 (must match define below)
+#elif !defined(PSP)
 #define TEXTURE_FORMAT			0
 #endif  //PSP
 
 
 #ifndef CONSOLE_CONFIG
 #ifndef QT_CONFIG
-#if defined (IOS)
+#if defined (VITA)
+#include <vitaGL.h>
+#elif defined (IOS)
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
 #import <OpenGLES/ES1/gl.h>
@@ -257,10 +270,18 @@ typedef struct
 #define BLEND_ONE_MINUS_DST_COLOR	GL_ONE_MINUS_DST_COLOR
 #define BLEND_SRC_ALPHA_SATURATE	GL_SRC_ALPHA_SATURATE
 
+#if defined(VITA)
+  // Distinct values so texture format can be tracked per-texture on Vita.
+  #define GU_PSM_8888 1
+  #define GU_PSM_5551 2
+  #define GU_PSM_4444 3
+  #define GU_PSM_5650 4
+#else
   #define GU_PSM_8888 0
   #define GU_PSM_5551 0
   #define GU_PSM_4444 0
   #define GU_PSM_5650 0
+#endif
 
 #endif
 #else
@@ -359,6 +380,9 @@ public:
 #else
 	GLuint mTexId;
     u8* mBuffer;
+#if defined(VITA)
+    int mTextureFormat;
+#endif
 #endif
 };
 

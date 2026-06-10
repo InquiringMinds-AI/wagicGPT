@@ -16,9 +16,9 @@
 #include <string.h>
 #include <stdarg.h>
 
-#if (!defined IOS) && (!defined ANDROID) && (!defined QT_CONFIG)
+#if (!defined IOS) && (!defined ANDROID) && (!defined QT_CONFIG) && (!defined VITA)
 #include <gif_lib.h>
-#endif //IOS ANDROID
+#endif //IOS ANDROID VITA
 
 #include "JTypes.h"
 
@@ -567,10 +567,10 @@ private:
 #if (!defined IOS) && (!defined QT_CONFIG)
 	void LoadJPG(TextureInfo &textureInfo, const char *filename, int mode = 0, int TextureFormat = TEXTURE_FORMAT);
 	int LoadPNG(TextureInfo &textureInfo, const char *filename, int mode = 0, int TextureFormat = TEXTURE_FORMAT);
-#if (!defined ANDROID) && (!defined QT_CONFIG)
+#if (!defined ANDROID) && (!defined QT_CONFIG) && (!defined VITA)
 	void LoadGIF(TextureInfo &textureInfo, const char *filename, int mode = 0, int TextureFormat = TEXTURE_FORMAT);
 	int image_readgif(void * handle, TextureInfo &textureInfo, DWORD * bgcolor, InputFunc readFunc,int mode = 0, int TextureFormat = TEXTURE_FORMAT);
-#endif // (ANDROID) How can we get gif support for android ?
+#endif // (ANDROID) (VITA) How can we get gif support for android ?
 #endif //(IOS)
 	
 	static JRenderer* mInstance;
@@ -616,6 +616,23 @@ private:
 #endif
 	int mSwizzle;
 	int mCurrentTextureFilter;
+#ifdef VITA
+	int mLastBoundFilter;  // tracks last filter set via glTexParameteri to skip redundant calls
+
+	// Quad batching: accumulate character quads and draw in one glDrawArrays call.
+	// Reduces per-character draw calls (1 DrawString = 1 draw call instead of N).
+	static const int BATCH_MAX_QUADS = 256;
+	bool mBatching;
+	int mBatchCount;
+	unsigned int mBatchTexture;
+	float mBatchVerts[BATCH_MAX_QUADS * 6 * 2];     // 6 verts × 2 floats (x,y) per quad
+	float mBatchTexCoords[BATCH_MAX_QUADS * 6 * 2];  // 6 verts × 2 floats (u,v) per quad
+	unsigned char mBatchColors[BATCH_MAX_QUADS * 6 * 4]; // 6 verts × 4 bytes (rgba) per quad
+public:
+	void BeginQuadBatch();
+	void FlushQuadBatch();
+private:
+#endif
 
 	int mCurrTexBlendSrc;
 	int mCurrTexBlendDest;

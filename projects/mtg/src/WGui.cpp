@@ -2344,6 +2344,7 @@ WGuiKeyBinder::WGuiKeyBinder(string name, GameStateOptions* parent) :
 
 void WGuiKeyBinder::Update(float dt)
 {
+#if !defined(VITA)
     OptionKey* o = dynamic_cast<OptionKey*> (items[1]);
     if (!o) return;
     if (LOCAL_KEY_NONE != o->from)
@@ -2351,6 +2352,7 @@ void WGuiKeyBinder::Update(float dt)
         items.insert(items.begin() + 1, NEW OptionKey(parent, LOCAL_KEY_NONE, JGE_BTN_NONE));
         if (1 == currentItem) ++currentItem;
     }
+#endif
     for (vector<WGuiBase*>::iterator it = items.begin(); it != items.end(); ++it)
         (*it)->Update(dt);
     if (confirmMenu) confirmMenu->Update(dt);
@@ -2383,7 +2385,7 @@ void WGuiKeyBinder::setData()
     j->ResetInput();
 }
 
-#if (!defined IOS)
+#if (!defined IOS) && !defined(VITA)
 static const JButton btnToCheck[] = { JGE_BTN_MENU, JGE_BTN_CTRL, JGE_BTN_RIGHT, JGE_BTN_LEFT, JGE_BTN_UP, JGE_BTN_DOWN,
                 JGE_BTN_OK, JGE_BTN_CANCEL, JGE_BTN_PRI, JGE_BTN_SEC, JGE_BTN_PREV, JGE_BTN_NEXT };
 #endif
@@ -2442,7 +2444,7 @@ WGuiBase::CONFIRM_TYPE WGuiKeyBinder::needsConfirm()
     }
 
     // Check whether any button has no key associated to it.
-#if (!defined IOS)
+#if (!defined IOS) && !defined(VITA)
     confirmingButton = JGE_BTN_NONE;
     for (signed int i = (sizeof(btnToCheck) / sizeof(btnToCheck[0])) - 1; i >= 0; --i)
     {
@@ -2467,8 +2469,8 @@ WGuiBase::CONFIRM_TYPE WGuiKeyBinder::needsConfirm()
         confirmMenu->Add(2, _("This is okay, validate and save").c_str());
         return CONFIRM_NEED;
     }
-#endif // IOS
-    
+#endif // IOS / VITA
+
     return CONFIRM_OK;
 }
 
@@ -2535,7 +2537,12 @@ void WGuiKeyBinder::populateKeyBindingList()
 {
     items.clear();
     Add(NEW WGuiButton(NEW WGuiItem("Load Defaults..."), -102, 3, this));
+#if !defined(VITA)
+    // Sentinel "New binding..." row that lets the user grab a keysym to add a
+    // mapping. Disabled on Vita: PollInput never feeds keysyms via
+    // ReadLocalKey, so grab mode would lock the player.
     Add(NEW OptionKey(parent, LOCAL_KEY_NONE, JGE_BTN_NONE));
+#endif
 
     JGE* j = JGE::GetInstance();
     JGE::keybindings_it start = j->KeyBindings_begin(), end = j->KeyBindings_end();

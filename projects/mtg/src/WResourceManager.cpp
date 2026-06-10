@@ -206,7 +206,8 @@ ResourceManagerImpl::ResourceManagerImpl()
 
     LOG("Calling CacheEngine::Create");
 
-#ifdef PSP
+#if defined(PSP) || defined(VITA)
+    // JFileSystem isn't thread-safe; threaded loads race the main thread.
     CacheEngine::Create<UnthreadedCardRetriever>(textureWCache);
 #else
     CacheEngine::Create<ThreadedCardRetriever>(textureWCache);
@@ -1228,7 +1229,7 @@ cacheItem* WCache<cacheItem, cacheActual>::Get(int id, const string& filename, i
     //  commented out for the following reason:
     //cardgui updates so quick that the only reason a person would notice a cache miss is because it takes the 
     //engine longer to switch the card quad from kGeneric to the actual image, than it does to just let the update pass.
-#if defined (PSP) 
+#if defined(PSP) || defined(VITA)
     if (submode & TEXTURE_SUB_CARD)
     {
         // processing a cache miss, return a generic card & queue up an async read
@@ -1239,9 +1240,11 @@ cacheItem* WCache<cacheItem, cacheActual>::Get(int id, const string& filename, i
         it = managed.find(genericCardId);
         assert(it != managed.end());
 
+#if defined(PSP) || defined(VITA)
         CacheEngine::Instance()->QueueRequest(filename, submode, lookup);
+#endif
         return it->second;
-    } 
+    }
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

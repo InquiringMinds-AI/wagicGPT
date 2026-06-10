@@ -197,7 +197,7 @@ void hgeFont::printf(float x, float y, int align, const char *format, ...)
 	va_list list;
 
 	va_start(list, format);
-	vsprintf(buffer, format, list);
+	vsnprintf(buffer, sizeof(buffer), format, list);
 	va_end(list);
 
 	Render(x,y,align,buffer);
@@ -217,7 +217,7 @@ void hgeFont::printfb(float x, float y, float w, float h, int align, const char 
 	va_list list;
 
 	va_start(list, format);
-	vsprintf(buffer, format, list);
+	vsnprintf(buffer, sizeof(buffer), format, list);
 	va_end(list);
 
 

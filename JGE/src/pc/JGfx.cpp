@@ -52,6 +52,18 @@ extern "C" {
 #define checkGlError() (void(0))
 #endif
 
+#ifdef VITA
+// Vita performance: GL_VERTEX_ARRAY, GL_TEXTURE_COORD_ARRAY, and GL_COLOR_ARRAY
+// are permanently enabled between BeginScene/EndScene.  Redirect per-draw
+// enable/disable to no-ops so that ALL drawing functions (DrawRect, DrawLine,
+// DrawCircle, FillPolygon, etc.) cannot accidentally kill the persistent state.
+// BeginScene/EndScene use vita_real_* to call the actual GL functions.
+static inline void vita_real_glEnableClientState(GLenum cap)  { glEnableClientState(cap); }
+static inline void vita_real_glDisableClientState(GLenum cap) { glDisableClientState(cap); }
+#define glEnableClientState(cap)  ((void)0)
+#define glDisableClientState(cap) ((void)0)
+#endif
+
 //#define FORCE_GL2
 #ifdef FORCE_GL2
 // This code is to force the windows code to use GL_VERSION_2_0 even if it's not defined in the header files
@@ -346,6 +358,9 @@ void JQuad::SetHotSpot(float x, float y)
 JTexture::JTexture() : mWidth(0), mHeight(0), mBuffer(NULL)
 {
     mTexId = -1;
+#if defined(VITA)
+    mTextureFormat = TEXTURE_FORMAT;
+#endif
 }
 
 JTexture::~JTexture()
@@ -711,6 +726,12 @@ void JRenderer::InitRenderer()
 {
     checkGlError();
     mCurrentTextureFilter = TEX_FILTER_NONE;
+#ifdef VITA
+    mLastBoundFilter = TEX_FILTER_NONE;
+    mBatching = false;
+    mBatchCount = 0;
+    mBatchTexture = 0;
+#endif
     mImageFilter = NULL;
 
     mCurrTexBlendSrc = BLEND_SRC_ALPHA;
@@ -821,13 +842,21 @@ void JRenderer::BeginScene()
     glLoadIdentity ();											// Reset The Modelview Matrix
 #else
     esMatrixLoadIdentity(&theMvpMatrix);
-    esOrtho(&theMvpMatrix, 0.0f, SCREEN_WIDTH_F, 0.0f, SCREEN_HEIGHT_F-1.0f,-1.0f, 1.0f);
+    esOrtho(&theMvpMatrix, 0.0f, SCREEN_WIDTH_F, 0.0f, SCREEN_HEIGHT_F,-1.0f, 1.0f);
 #endif //(!defined GL_ES_VERSION_2_0) && (!defined GL_VERSION_2_0)
-#if (defined WIN32 && !defined GL_ES_VERSION_2_0) || ((defined GL_VERSION_ES_CM_1_1) && (!defined IOS))
+#if (defined WIN32 && !defined GL_ES_VERSION_2_0) || ((defined GL_VERSION_ES_CM_1_1) && (!defined IOS) && (!defined VITA))
     float scaleH = mActualHeight/SCREEN_HEIGHT_F;
     float scaleW = mActualWidth/SCREEN_WIDTH_F;
     if (scaleH != 1.0f || scaleW != 1.0f)
         glScalef(scaleW,scaleH,1.f);
+#endif
+
+#ifdef VITA
+    // Vita perf: enable vertex arrays once per frame instead of per-quad.
+    // Uses vita_real_ to bypass the no-op macros above.
+    vita_real_glEnableClientState(GL_VERTEX_ARRAY);
+    vita_real_glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    vita_real_glEnableClientState(GL_COLOR_ARRAY);
 #endif
     checkGlError();
 }
@@ -835,6 +864,11 @@ void JRenderer::BeginScene()
 
 void JRenderer::EndScene()
 {
+#ifdef VITA
+    vita_real_glDisableClientState(GL_COLOR_ARRAY);
+    vita_real_glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    vita_real_glDisableClientState(GL_VERTEX_ARRAY);
+#endif
     checkGlError();
     glFlush ();
     checkGlError();
@@ -849,9 +883,16 @@ void JRenderer::BindTexture(JTexture *tex)
 
         glBindTexture(GL_TEXTURE_2D, mCurrentTex);
 
-        //if (mCurrentTextureFilter != tex->mFilter)
+#ifdef VITA
+        // Vita perf: texture filter rarely changes (almost always LINEAR).
+        // Only set glTexParameteri when the filter actually differs from what
+        // was last applied, saving 2 GL calls per texture bind.
+        if (mCurrentTextureFilter != mLastBoundFilter)
         {
-            //mCurrentTextureFilter = tex->mFilter;
+            mLastBoundFilter = mCurrentTextureFilter;
+#else
+        {
+#endif
             if (mCurrentTextureFilter == TEX_FILTER_LINEAR)
             {
                 glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
@@ -884,6 +925,29 @@ void Swap(float *a, float *b)
     *a = *b;
     *b = n;
 }
+
+#ifdef VITA
+void JRenderer::BeginQuadBatch()
+{
+    mBatching = true;
+    mBatchCount = 0;
+    mBatchTexture = 0;
+}
+
+void JRenderer::FlushQuadBatch()
+{
+    if (mBatchCount > 0)
+    {
+        glBindTexture(GL_TEXTURE_2D, mBatchTexture);
+        glVertexPointer(2, GL_FLOAT, 0, mBatchVerts);
+        glTexCoordPointer(2, GL_FLOAT, 0, mBatchTexCoords);
+        glColorPointer(4, GL_UNSIGNED_BYTE, 0, mBatchColors);
+        glDrawArrays(GL_TRIANGLES, 0, mBatchCount * 6);
+    }
+    mBatching = false;
+    mBatchCount = 0;
+}
+#endif
 
 void JRenderer::RenderQuad(JQuad* quad, float xo, float yo, float angle, float xScale, float yScale)
 {
@@ -928,6 +992,50 @@ void JRenderer::RenderQuad(JQuad* quad, float xo, float yo, float angle, float x
 
     yo = SCREEN_HEIGHT_F - yo;
 
+#ifdef VITA
+    // Batch mode: accumulate pre-transformed quads for a single glDrawArrays call.
+    // Used by font rendering to batch all characters in a string.
+    if (mBatching && mBatchCount < BATCH_MAX_QUADS)
+    {
+        // Flush if texture changed (e.g. mana icons mixed with text)
+        if (mBatchCount > 0 && mCurrentTex != mBatchTexture)
+        {
+            FlushQuadBatch();
+            mBatching = true;
+        }
+        mBatchTexture = mCurrentTex;
+
+        // Pre-transform vertices to screen space (skip glPush/Translate/Scale/Pop)
+        float sx[4], sy[4];
+        for (int i = 0; i < 4; i++)
+        {
+            sx[i] = xo + pt[i].x * xScale;
+            sy[i] = yo + pt[i].y * yScale;
+        }
+
+        // Convert triangle strip (0,1,3,2) to GL_TRIANGLES: (0,1,3) and (1,2,3)
+        static const int triMap[6] = {0, 1, 3, 1, 2, 3};
+        int base6 = mBatchCount * 6;
+        int vi = base6 * 2;
+        int ci = base6 * 4;
+
+        for (int t = 0; t < 6; t++)
+        {
+            int s = triMap[t];
+            mBatchVerts[vi + t*2]     = sx[s];
+            mBatchVerts[vi + t*2 + 1] = sy[s];
+            mBatchTexCoords[vi + t*2]     = uv[s].x;
+            mBatchTexCoords[vi + t*2 + 1] = uv[s].y;
+            mBatchColors[ci + t*4]     = quad->mColor[s].r;
+            mBatchColors[ci + t*4 + 1] = quad->mColor[s].g;
+            mBatchColors[ci + t*4 + 2] = quad->mColor[s].b;
+            mBatchColors[ci + t*4 + 3] = quad->mColor[s].a;
+        }
+
+        mBatchCount++;
+        return;
+    }
+#endif
 
 #if (defined GL_ES_VERSION_2_0) || (defined GL_VERSION_2_0)
     ESMatrix  mvpMatrix;
@@ -1006,9 +1114,12 @@ void JRenderer::RenderQuad(JQuad* quad, float xo, float yo, float angle, float x
     }
 
 #if (defined GL_VERSION_ES_CM_1_1) || (defined GL_OES_VERSION_1_1)
+#ifndef VITA
+    // Non-Vita: enable/disable per quad (Vita does this once in BeginScene/EndScene)
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
+#endif
 
     GLfloat vertCoords[] = {
         pt[0].x, pt[0].y,
@@ -1036,9 +1147,11 @@ void JRenderer::RenderQuad(JQuad* quad, float xo, float yo, float angle, float x
     glColorPointer(4, GL_UNSIGNED_BYTE, 0, colorCoords );
     glDrawArrays(GL_TRIANGLE_STRIP,0,4);
 
+#ifndef VITA
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
+#endif
 #else
     glBegin(GL_QUADS);
 
@@ -1246,8 +1359,14 @@ void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE
 
 #elif (defined GL_VERSION_ES_CM_1_1) || (defined GL_OES_VERSION_1_1)
     glDisable(GL_TEXTURE_2D);
+#ifndef VITA
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
+#else
+    // Vita: VERTEX_ARRAY and COLOR_ARRAY already enabled from BeginScene.
+    // Temporarily disable TEXTURE_COORD_ARRAY since FillRect is untextured.
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+#endif
 
     GLfloat vVertices[] = {
         x,        y+height,
@@ -1267,8 +1386,12 @@ void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE
     glColorPointer(4, GL_UNSIGNED_BYTE,  0, colors );
     glDrawArrays(GL_TRIANGLE_STRIP,0,4);
 
+#ifndef VITA
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
+#else
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+#endif
     glEnable(GL_TEXTURE_2D);
 
 #else
@@ -1587,7 +1710,8 @@ void JRenderer::Plot(float x, float y, PIXEL_TYPE color)
     glEnd();
     glColor4ub(255, 255, 255, 255);
 #else
-    cerr << x << " " << y << " " << color << endl;
+    // Not implemented for GL ES 1.1. Plot is unused by the game.
+    (void)x; (void)y; (void)color;
 #endif //#if (!defined GL_ES_VERSION_2_0) && (!defined GL_VERSION_2_0)
     glEnable(GL_TEXTURE_2D);
     checkGlError();
@@ -1608,8 +1732,8 @@ void JRenderer::PlotArray(float *x, float *y, int count, PIXEL_TYPE color)
     glEnd();
     glColor4ub(255, 255, 255, 255);
 #else
-    // FIXME, not used
-    cerr << x << " " << y << " " << count << " " << " " << color << endl;
+    // Not implemented for GL ES 1.1. PlotArray is unused by the game.
+    (void)x; (void)y; (void)count; (void)color;
 #endif //#if (!defined GL_ES_VERSION_2_0) && (!defined GL_VERSION_2_0)
     glEnable(GL_TEXTURE_2D);
     checkGlError();
@@ -1673,7 +1797,14 @@ static void jpeg_mem_src(j_decompress_ptr cinfo, byte *mem, int len)
 LoadJPG
 ==============
 */
-void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode __attribute__((unused)), int TextureFormat __attribute__((unused)))
+void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename,
+    int mode __attribute__((unused)),
+#if defined(VITA)
+    int TextureFormat
+#else
+    int TextureFormat __attribute__((unused))
+#endif
+)
 {
     textureInfo.mBits = NULL;
 
@@ -1683,7 +1814,8 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
     int	rawsize, i;
 
     JFileSystem* fileSystem = JFileSystem::GetInstance();
-    if (!fileSystem->OpenFile(filename)) return;
+    if (!fileSystem->OpenFile(filename))
+        return;
 
     rawsize = fileSystem->GetFileSize();
 
@@ -1707,8 +1839,6 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
     // Process JPEG header
     jpeg_read_header(&cinfo, true);
 
-
-
     // Start Decompression
     jpeg_start_decompress(&cinfo);
 
@@ -1726,33 +1856,29 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
 
 
     // Allocate Memory for decompressed image
+#if defined(VITA)
+    int pixelSize = (TextureFormat == GU_PSM_5551) ? 2 : 4;
+    rgbadata = new BYTE[tw * th * pixelSize];
+#else
     rgbadata = new BYTE[tw * th * 4];
+#endif
     if(!rgbadata)
     {
-        ////		ri.Con_Printf(PRINT_ALL, "Insufficient RAM for JPEG buffer\n");
         jpeg_destroy_decompress(&cinfo);
-        ////		ri.FS_FreeFile(rawdata);
         delete [] rgbadata;
         return;
     }
-
-
-    // Pass sizes to output
 
     // Allocate Scanline buffer
     scanline = (byte *)malloc(cinfo.output_width * 3);
     if(!scanline)
     {
-        ////		ri.Con_Printf(PRINT_ALL, "Insufficient RAM for JPEG scanline buffer\n");
-
         jpeg_destroy_decompress(&cinfo);
-        ////		ri.FS_FreeFile(rawdata);
-
         delete [] rgbadata;
         return;
     }
 
-    // Read Scanlines, and expand from RGB to RGBA
+    // Read Scanlines, and expand from RGB to RGBA (or RGBA5551 on Vita)
     BYTE* currRow = rgbadata;
 
     while(cinfo.output_scanline < cinfo.output_height)
@@ -1760,17 +1886,37 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
         p = scanline;
         jpeg_read_scanlines(&cinfo, &scanline, 1);
 
-        q = currRow;
-        for(i=0; i<(int)cinfo.output_width; i++)
+#if defined(VITA)
+        if (TextureFormat == GU_PSM_5551)
         {
-            q[0] = p[0];
-            q[1] = p[1];
-            q[2] = p[2];
-            q[3] = 255;
-
-            p+=3; q+=4;
+            u16* q16 = (u16*)currRow;
+            for(i=0; i<(int)cinfo.output_width; i++)
+            {
+                // GL_UNSIGNED_SHORT_5_5_5_1 layout: RRRRRGGGGGBBBBBA (MSB to LSB)
+                u16 r = p[0] >> 3;
+                u16 g = p[1] >> 3;
+                u16 b = p[2] >> 3;
+                *q16 = (r << 11) | (g << 6) | (b << 1) | 1;
+                q16++;
+                p += 3;
+            }
+            currRow += tw * 2;
         }
-        currRow += tw*4;
+        else
+#endif
+        {
+            q = currRow;
+            for(i=0; i<(int)cinfo.output_width; i++)
+            {
+                q[0] = p[0];
+                q[1] = p[1];
+                q[2] = p[2];
+                q[3] = 255;
+
+                p+=3; q+=4;
+            }
+            currRow += tw*4;
+        }
     }
 
     // Free the scanline buffer
@@ -1783,9 +1929,7 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
     textureInfo.mTexHeight = th;
 
     // Finish Decompression
-    try {
-        jpeg_finish_decompress(&cinfo);
-    } catch(...) {}
+    jpeg_finish_decompress(&cinfo);
 
     // Destroy JPEG object
     jpeg_destroy_decompress(&cinfo);
@@ -1797,6 +1941,12 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
 static void PNGCustomWarningFn(png_structp png_ptr __attribute__((unused)), png_const_charp warning_msg __attribute__((unused)))
 {
     // ignore PNG warnings
+}
+
+// Default libpng error handler aborts when no setjmp is set; longjmp instead.
+static void PNGCustomErrorFn(png_structp png_ptr, png_const_charp error_msg __attribute__((unused)))
+{
+    longjmp(png_jmpbuf(png_ptr), 1);
 }
 
 
@@ -1814,14 +1964,43 @@ static void PNGCustomReadDataFn(png_structp png_ptr, png_bytep data, png_size_t 
     }
 }
 
-JTexture* JRenderer::LoadTexture(const char* filename, int mode, int TextureFormat __attribute__((unused)))
+struct PngMemCursor
+{
+    const BYTE* data;
+    png_size_t size;
+    png_size_t offset;
+};
+
+static void PNGMemReadFn(png_structp png_ptr, png_bytep data, png_size_t length)
+{
+    PngMemCursor* cur = (PngMemCursor*)png_get_io_ptr(png_ptr);
+    if (cur->offset + length > cur->size)
+    {
+        png_error(png_ptr, "read past end of memory buffer");
+        return;
+    }
+    memcpy(data, cur->data + cur->offset, length);
+    cur->offset += length;
+}
+
+JTexture* JRenderer::LoadTexture(const char* filename, int mode,
+#if defined(VITA)
+    int TextureFormat
+#else
+    int TextureFormat __attribute__((unused))
+#endif
+)
 {
     TextureInfo textureInfo;
 
     textureInfo.mBits = NULL;
 
     if (strstr(filename, ".jpg")!=NULL || strstr(filename, ".JPG")!=NULL)
+#if defined(VITA)
+        LoadJPG(textureInfo, filename, mode, TextureFormat);
+#else
         LoadJPG(textureInfo, filename);
+#endif
 #if (!defined IOS) && (!defined QT_CONFIG) && (!defined SDL_CONFIG)
     else if(strstr(filename, ".gif")!=NULL || strstr(filename, ".GIF")!=NULL)
         LoadGIF(textureInfo,filename);
@@ -1840,7 +2019,12 @@ JTexture* JRenderer::LoadTexture(const char* filename, int mode, int TextureForm
 
     if (tex)
     {
+#if defined(VITA)
+        // Skip image filter for 16-bit textures (filter expects 32-bit RGBA pixels)
+        if (mImageFilter != NULL && TextureFormat == GU_PSM_8888)
+#else
         if (mImageFilter != NULL)
+#endif
             mImageFilter->ProcessImage((PIXEL_TYPE*)textureInfo.mBits, textureInfo.mWidth, textureInfo.mHeight);
 
         tex->mFilter = TEX_FILTER_LINEAR;
@@ -1850,6 +2034,9 @@ JTexture* JRenderer::LoadTexture(const char* filename, int mode, int TextureForm
         tex->mTexHeight = textureInfo.mTexHeight;
 
         tex->mBuffer = textureInfo.mBits;
+#if defined(VITA)
+        tex->mTextureFormat = TextureFormat;
+#endif
     }
 
     return tex;
@@ -1868,31 +2055,44 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
     int bit_depth, color_type, interlace_type, x, y;
     DWORD* line;
 
+    // Slurp into RAM; JFileSystem isn't safe to read across libpng callbacks.
     JFileSystem* fileSystem = JFileSystem::GetInstance();
     if (!fileSystem->OpenFile(filename))
         return JGE_ERR_CANT_OPEN_FILE;
+    int rawsize = fileSystem->GetFileSize();
+    BYTE* rawdata = new BYTE[rawsize];
+    if (!rawdata)
+    {
+        fileSystem->CloseFile();
+        return JGE_ERR_MALLOC_FAILED;
+    }
+    fileSystem->ReadFile(rawdata, rawsize);
+    fileSystem->CloseFile();
+
+    PngMemCursor cur = { rawdata, (png_size_t)rawsize, 0 };
 
     png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
     if (png_ptr == NULL)
     {
-        fileSystem->CloseFile();
-
+        delete[] rawdata;
         return JGE_ERR_PNG;
     }
 
-    png_set_error_fn(png_ptr, (png_voidp) NULL, (png_error_ptr) NULL, PNGCustomWarningFn);
+    png_set_error_fn(png_ptr, (png_voidp) NULL, PNGCustomErrorFn, PNGCustomWarningFn);
     info_ptr = png_create_info_struct(png_ptr);
     if (info_ptr == NULL)
     {
-        //fclose(fp);
-        fileSystem->CloseFile();
-
         png_destroy_read_struct(&png_ptr, NULL, NULL);
-
+        delete[] rawdata;
         return JGE_ERR_PNG;
     }
-    png_init_io(png_ptr, NULL);
-    png_set_read_fn(png_ptr, (png_voidp)fileSystem, PNGCustomReadDataFn);
+    if (setjmp(png_jmpbuf(png_ptr)))
+    {
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        delete[] rawdata;
+        return JGE_ERR_PNG;
+    }
+    png_set_read_fn(png_ptr, &cur, PNGMemReadFn);
 
     png_set_sig_bytes(png_ptr, sig_read);
     png_read_info(png_ptr, info_ptr);
@@ -1911,10 +2111,8 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
     line = (DWORD*) malloc(width * 4);
     if (!line)
     {
-        //fclose(fp);
-        fileSystem->CloseFile();
-
         png_destroy_read_struct(&png_ptr, NULL, NULL);
+        delete[] rawdata;
         return JGE_ERR_MALLOC_FAILED;
     }
 
@@ -1926,12 +2124,8 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
 
     BYTE* buffer = new BYTE[size];
 
-    //JTexture *tex = new JTexture();
-
     if (buffer)
     {
-
-
         p32 = (DWORD*) buffer;
 
         for (y = 0; y < (int)height; y++)
@@ -1961,7 +2155,7 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
     png_read_end(png_ptr, info_ptr);
     png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 
-    fileSystem->CloseFile();
+    delete[] rawdata;
 
 
     textureInfo.mBits = buffer;
@@ -2394,7 +2588,12 @@ void JRenderer::TransferTextureToGLContext(JTexture& inTexture)
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
                 glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, inTexture.mTexWidth, inTexture.mTexHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, inTexture.mBuffer);
+#if defined(VITA)
+                if (inTexture.mTextureFormat == GU_PSM_5551)
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, inTexture.mTexWidth, inTexture.mTexHeight, 0, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, inTexture.mBuffer);
+                else
+#endif
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, inTexture.mTexWidth, inTexture.mTexHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, inTexture.mBuffer);
             }
         }
         delete [] inTexture.mBuffer;
@@ -2468,7 +2667,7 @@ void JRenderer::ClearScreen(PIXEL_TYPE color)
         JColor col;
         col.color = color;
 
-        glClearColor(col.r, col.g, col.b, col.a);
+        glClearColor(col.r / 255.0f, col.g / 255.0f, col.b / 255.0f, col.a / 255.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //	FillRect(0.0f, 0.0f, SCREEN_WIDTH_F, SCREEN_HEIGHT_F, color);
@@ -2525,15 +2724,15 @@ void JRenderer::Enable2D()
 
     mCurrentRenderMode = MODE_2D;
 
-    glViewport (0, 0, (GLsizei)SCREEN_WIDTH, (GLsizei)SCREEN_HEIGHT);	// Reset The Current Viewport
+    glViewport (0, 0, (GLsizei)mActualWidth, (GLsizei)mActualHeight);	// Viewport must match actual display (Vita: 960x544)
 #if (!defined GL_ES_VERSION_2_0) && (!defined GL_VERSION_2_0)
     glMatrixMode (GL_PROJECTION);										// Select The Projection Matrix
     glLoadIdentity ();													// Reset The Projection Matrix
 
 #if (defined GL_VERSION_ES_CM_1_1) || (defined GL_OES_VERSION_1_1)
-    glOrthof(0.0f, SCREEN_WIDTH_F, 0.0f, SCREEN_HEIGHT_F-1.0f, -1.0f, 1.0f);
+    glOrthof(0.0f, SCREEN_WIDTH_F, 0.0f, SCREEN_HEIGHT_F, -1.0f, 1.0f);
 #else
-    glOrtho(0.0f, SCREEN_WIDTH_F, 0.0f, SCREEN_HEIGHT_F-1.0f, -1.0f, 1.0f);
+    glOrtho(0.0f, SCREEN_WIDTH_F, 0.0f, SCREEN_HEIGHT_F, -1.0f, 1.0f);
 #endif
 
     glMatrixMode (GL_MODELVIEW);										// Select The Modelview Matrix
@@ -2569,9 +2768,22 @@ void JRenderer::Enable3D()
 }
 
 
-void JRenderer::SetClip(int, int, int, int)
-{// NOT USED
-    //glScissor(x, y, width, height);
+void JRenderer::SetClip(int x, int y, int width, int height)
+{
+    if (width <= 0 || height <= 0)
+    {
+        // Reset to full screen
+        glScissor(0, 0, (int)mActualWidth, (int)mActualHeight);
+        return;
+    }
+    // Scale from virtual coords (480x272) to actual display and flip Y (OpenGL origin is bottom-left)
+    float scaleW = mActualWidth / SCREEN_WIDTH_F;
+    float scaleH = mActualHeight / SCREEN_HEIGHT_F;
+    int sx = (int)(x * scaleW);
+    int sy = (int)((SCREEN_HEIGHT - y - height) * scaleH);
+    int sw = (int)(width * scaleW);
+    int sh = (int)(height * scaleH);
+    glScissor(sx, sy, sw, sh);
 }
 
 
@@ -3449,6 +3661,65 @@ void JRenderer::SetImageFilter(JImageFilter* imageFilter)
 
 void JRenderer::DrawRoundRect(float x, float y, float w, float h, float radius, PIXEL_TYPE color)
 {
+#ifdef VITA
+{   // own scope so locals/statics don't collide with the desktop-path block below
+    // Vita: sample the corner arcs every 10 degrees (36 vertices) instead of
+    // every 1 degree (360). Visually still rounded at the radii UI uses (1-5 px),
+    // and ~10x less vertex work per call than the original.
+    checkGlError();
+    x += w + radius;
+    y += h + radius;
+    JColor col;
+    col.color = color;
+
+    static GLfloat vVertices[3 * 36];
+    static GLubyte colors[4 * 36];
+
+    for (int i = 0; i < 36; i++) {
+        colors[4*i+0] = col.r;
+        colors[4*i+1] = col.g;
+        colors[4*i+2] = col.b;
+        colors[4*i+3] = col.a;
+    }
+
+    int v = 0;
+    for (int i = 0;   i < 90;  i += 10) {
+        vVertices[3*v+0] = x + radius * COSF(i);
+        vVertices[3*v+1] = SCREEN_HEIGHT_F - (y + radius * SINF(i));
+        vVertices[3*v+2] = 0.0f;
+        v++;
+    }
+    for (int i = 90;  i < 180; i += 10) {
+        vVertices[3*v+0] = x + radius * COSF(i) - w;
+        vVertices[3*v+1] = SCREEN_HEIGHT_F - (y + radius * SINF(i));
+        vVertices[3*v+2] = 0.0f;
+        v++;
+    }
+    for (int i = 180; i < 270; i += 10) {
+        vVertices[3*v+0] = x + radius * COSF(i) - w;
+        vVertices[3*v+1] = SCREEN_HEIGHT_F - (y + radius * SINF(i) - h);
+        vVertices[3*v+2] = 0.0f;
+        v++;
+    }
+    for (int i = 270; i < 360; i += 10) {
+        vVertices[3*v+0] = x + radius * COSF(i);
+        vVertices[3*v+1] = SCREEN_HEIGHT_F - (y + radius * SINF(i) - h);
+        vVertices[3*v+2] = 0.0f;
+        v++;
+    }
+
+    glDisable(GL_TEXTURE_2D);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glVertexPointer(3, GL_FLOAT, 0, vVertices);
+    glColorPointer(4, GL_UNSIGNED_BYTE, 0, colors);
+    glDrawArrays(GL_LINE_LOOP, 0, 36);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glEnable(GL_TEXTURE_2D);
+
+    checkGlError();
+    return;
+}
+#endif
     checkGlError();
     x+=w+radius;
     y+=h+radius;
@@ -3523,13 +3794,20 @@ void JRenderer::DrawRoundRect(float x, float y, float w, float h, float radius, 
 #elif (defined GL_VERSION_ES_CM_1_1) || (defined GL_OES_VERSION_1_1)
 
     glDisable(GL_TEXTURE_2D);
+#ifdef VITA
+    // Vita perf: static arrays avoid heap alloc/free per call (~20 calls/frame in card rendering).
+    // Client state already enabled from BeginScene; only toggle TEXTURE_COORD_ARRAY.
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    static GLfloat vVertices[3 * 360];
+    static GLubyte colors[4 * 360];
+#else
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
+    GLfloat* vVertices = new GLfloat[3*360];
+    GLubyte* colors = new GLubyte[4*360];
+#endif
 
     int number = 360;
-    GLfloat* vVertices = new GLfloat[3*number];
-    GLubyte* colors = new GLubyte[4*number];
-
     for(i = 0; i < number; i++)
     {
         colors[4*i+0]= col.r;
@@ -3572,12 +3850,15 @@ void JRenderer::DrawRoundRect(float x, float y, float w, float h, float radius, 
     glColorPointer(4, GL_UNSIGNED_BYTE, 0, colors );
     glDrawArrays(GL_LINE_LOOP,0,number);
 
+#ifdef VITA
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+#else
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
-    glEnable(GL_TEXTURE_2D);
-
     delete[] vVertices;
     delete[] colors;
+#endif
+    glEnable(GL_TEXTURE_2D);
 
 #else
     glDisable(GL_TEXTURE_2D);
@@ -3630,6 +3911,73 @@ void JRenderer::DrawRoundRect(float x, float y, float w, float h, float radius, 
 
 void JRenderer::FillRoundRect(float x, float y, float w, float h, float radius, PIXEL_TYPE color)
 {
+#ifdef VITA
+{   // own scope so locals/statics don't collide with the desktop-path block below
+    // Vita: triangle-fan with center + 36 perimeter samples (10-deg steps) +
+    // 1 closing vertex back to perimeter[0]. Same rounded look at UI radii,
+    // ~10x less vertex work than the 360-vertex original.
+    checkGlError();
+    x += w + radius;
+    y += radius;
+    JColor col;
+    col.color = color;
+
+    static GLfloat vVertices[3 * 38];
+    static GLubyte colors[4 * 38];
+
+    for (int i = 0; i < 38; i++) {
+        colors[4*i+0] = col.r;
+        colors[4*i+1] = col.g;
+        colors[4*i+2] = col.b;
+        colors[4*i+3] = col.a;
+    }
+
+    vVertices[0] = x - 5;
+    vVertices[1] = SCREEN_HEIGHT_F - y;
+    vVertices[2] = 0.0f;
+
+    int v = 1;
+    for (int i = 0;   i < 90;  i += 10) {
+        vVertices[3*v+0] = x + radius * COSF(i);
+        vVertices[3*v+1] = SCREEN_HEIGHT_F - y + radius * SINF(i);
+        vVertices[3*v+2] = 0.0f;
+        v++;
+    }
+    for (int i = 90;  i < 180; i += 10) {
+        vVertices[3*v+0] = x + radius * COSF(i) - w;
+        vVertices[3*v+1] = SCREEN_HEIGHT_F - y + radius * SINF(i);
+        vVertices[3*v+2] = 0.0f;
+        v++;
+    }
+    for (int i = 180; i < 270; i += 10) {
+        vVertices[3*v+0] = x + radius * COSF(i) - w;
+        vVertices[3*v+1] = SCREEN_HEIGHT_F - y + radius * SINF(i) - h;
+        vVertices[3*v+2] = 0.0f;
+        v++;
+    }
+    for (int i = 270; i < 360; i += 10) {
+        vVertices[3*v+0] = x + radius * COSF(i);
+        vVertices[3*v+1] = SCREEN_HEIGHT_F - y + radius * SINF(i) - h;
+        vVertices[3*v+2] = 0.0f;
+        v++;
+    }
+    // Close fan back to first perimeter vertex.
+    vVertices[3*v+0] = x + radius * COSF(0);
+    vVertices[3*v+1] = SCREEN_HEIGHT_F - y + radius * SINF(0);
+    vVertices[3*v+2] = 0.0f;
+
+    glDisable(GL_TEXTURE_2D);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glVertexPointer(3, GL_FLOAT, 0, vVertices);
+    glColorPointer(4, GL_UNSIGNED_BYTE, 0, colors);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 38);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glEnable(GL_TEXTURE_2D);
+
+    checkGlError();
+    return;
+}
+#endif
     checkGlError();
     x+=w+radius;
     y+=radius;
@@ -3712,13 +4060,19 @@ void JRenderer::FillRoundRect(float x, float y, float w, float h, float radius, 
 #elif (defined GL_VERSION_ES_CM_1_1)  || (defined GL_OES_VERSION_1_1)
 
     glDisable(GL_TEXTURE_2D);
+#ifdef VITA
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    static GLfloat vVertices[3 * 362];
+    static GLubyte colors[4 * 362];
+#else
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
+    GLfloat* vVertices = new GLfloat[3*362];
+    GLubyte* colors = new GLubyte[4*362];
+#endif
 
     int i, offset;
     int number = 2+360;
-    GLfloat* vVertices = new GLfloat[3*number];
-    GLubyte* colors = new GLubyte[4*number];
 
     for(i = 0; i < number; i++)
     {
@@ -3767,12 +4121,15 @@ void JRenderer::FillRoundRect(float x, float y, float w, float h, float radius, 
     glColorPointer(4, GL_UNSIGNED_BYTE, 0, colors );
     glDrawArrays(GL_TRIANGLE_FAN,0,number);
 
+#ifdef VITA
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+#else
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
-    glEnable(GL_TEXTURE_2D);
-
     delete[] vVertices;
     delete[] colors;
+#endif
+    glEnable(GL_TEXTURE_2D);
 
 #else
     glDisable(GL_TEXTURE_2D);
