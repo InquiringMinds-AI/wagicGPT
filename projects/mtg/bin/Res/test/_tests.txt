@@ -44,7 +44,6 @@ generic/descendants_path_i1085.txt
 generic/curse_of_thirst_i1085.txt
 generic/curse_of_opulence_i1085.txt
 generic/cursed_rack_i1085.txt
-generic/cytoplast_manipulator_i1085.txt
 generic/deadbridge_chant_i1085.txt
 generic/dread_return_countered_i1085.txt
 generic/earthbind_i1085.txt
@@ -71,6 +70,7 @@ generic/infernal_darkness_i1085.txt
 generic/krovikan_plague_i1085.txt
 generic/livewire_lash_i1085.txt
 generic/memory_leak_i1085.txt
+generic/living_death_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
