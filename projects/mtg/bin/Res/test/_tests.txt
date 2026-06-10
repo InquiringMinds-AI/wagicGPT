@@ -15,6 +15,9 @@ generic/cycling.txt
 generic/cycling2.txt
 generic/deathtouch.txt
 generic/deathtouch_taught_i1142.txt
+generic/adarkar_unicorn_upkeep_i1085.txt
+generic/adarkar_unicorn_mainphase_i1085.txt
+generic/aegar_spell_excess_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
@@ -29,6 +32,8 @@ generic/proliferate_shroud_i1130.txt
 generic/populate_zektar_i1145.txt
 death_grasp.txt
 ai/goblin_artillery.txt
+ai/death_wind_self_target_i1085.txt
+
 ai/infect_self_target_i594.txt
 generic/devotion.txt
 generic/doesnotuntap.txt
