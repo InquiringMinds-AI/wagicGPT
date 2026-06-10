@@ -15,6 +15,11 @@ windows:INCLUDEPATH += ../../JGE/Dependencies/SDL/include
 unix:INCLUDEPATH += /usr/include/GL
 unix:INCLUDEPATH += /usr/include/SDL2
 unix:QMAKE_CXXFLAGS += -std=gnu++14
+
+# Optional LLM-backed opponent (AIPlayerGPT) — Linux dev build only for now
+unix:DEFINES += WITH_GPT_AI
+unix:INCLUDEPATH += include/thirdparty
+unix:LIBS += -lcurl
 OBJECTS_DIR = objs
 MOC_DIR = objs
 DESTDIR = bin

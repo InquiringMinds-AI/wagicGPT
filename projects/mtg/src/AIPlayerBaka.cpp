@@ -2300,32 +2300,40 @@ int AIPlayerBaka::selectAbility()
         }
     }
     delete totalPotentialMana;
-    if (ranking.size())
+    const OrderedAIAction * chosenAction = chooseOrderedAction(ranking);
+    if (chosenAction)
     {
-        OrderedAIAction action = ranking.begin()->first;
-        int chance = 1;
-        if (!forceBestAbilityUse)
-            chance = 1 + randomGenerator.random() % 100;
-        int actionScore = action.getEfficiency();
-        if(action.ability->getCost() && action.ability->getCost()->hasX() && this->game->hand->cards.size())
-            actionScore = actionScore/int(this->game->hand->cards.size());//reduce chance for "x" abilities if cards are in hand.
-        if (actionScore >= chance)
+        const OrderedAIAction & action = *chosenAction;
+        if (!clickstream.size())
         {
-            if (!clickstream.size())
+            if (abilityPayment.size())
             {
-                if (abilityPayment.size())
-                {
-                    DebugTrace(" Ai knows exactly what mana to use for this ability.");
-                }
-                DebugTrace("AIPlayer:Using Activated ability");
-                if (payTheManaCost(action.ability->getCost(),action.click->has(Constants::ANYTYPEOFMANAABILITY),action.click,abilityPayment))
-                    clickstream.push(NEW AIAction(action));
+                DebugTrace(" Ai knows exactly what mana to use for this ability.");
             }
+            DebugTrace("AIPlayer:Using Activated ability");
+            if (payTheManaCost(action.ability->getCost(),action.click->has(Constants::ANYTYPEOFMANAABILITY),action.click,abilityPayment))
+                clickstream.push(NEW AIAction(action));
         }
     }
 
     abilityPayment.clear();
     return 1;
+}
+
+const OrderedAIAction * AIPlayerBaka::chooseOrderedAction(RankingContainer& ranking)
+{
+    if (!ranking.size())
+        return NULL;
+    OrderedAIAction action = ranking.begin()->first; //copy: getEfficiency() is not const
+    int chance = 1;
+    if (!forceBestAbilityUse)
+        chance = 1 + randomGenerator.random() % 100;
+    int actionScore = action.getEfficiency();
+    if(action.ability->getCost() && action.ability->getCost()->hasX() && this->game->hand->cards.size())
+        actionScore = actionScore/int(this->game->hand->cards.size());//reduce chance for "x" abilities if cards are in hand.
+    if (actionScore < chance)
+        return NULL;
+    return &(ranking.begin()->first);
 }
 
 int AIPlayerBaka::doAbility(MTGAbility * Specific, MTGCardInstance * withCard)

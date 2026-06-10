@@ -9,6 +9,10 @@
 // Instances for Factory
 #include "AIPlayerBaka.h"
 
+#ifdef WITH_GPT_AI
+#include "AIPlayerGPT.h"
+#endif
+
 #ifdef AI_CHANGE_TESTING
 #include "AIPlayerBakaB.h"
 #endif
@@ -245,7 +249,13 @@ AIPlayer * AIPlayerFactory::createAIPlayer(GameObserver *observer, MTGAllCards *
     }
     
     // AIPlayerBaka will delete MTGDeck when it's time
-    AIPlayerBaka * baka = NEW AIPlayerBaka(observer, deckFile, deckFileSmall, avatarFilename, NEW MTGDeck(deckFile, collection,0, deckSetting));
+    AIPlayerBaka * baka = NULL;
+#ifdef WITH_GPT_AI
+    if (AIPlayerGPT::isEnabled())
+        baka = NEW AIPlayerGPT(observer, deckFile, deckFileSmall, avatarFilename, NEW MTGDeck(deckFile, collection,0, deckSetting));
+#endif
+    if (!baka)
+        baka = NEW AIPlayerBaka(observer, deckFile, deckFileSmall, avatarFilename, NEW MTGDeck(deckFile, collection,0, deckSetting));
     baka->deckId = deckid;
     baka->comboHint = NULL;
     if (baka->opponent() && baka->opponent()->isHuman())

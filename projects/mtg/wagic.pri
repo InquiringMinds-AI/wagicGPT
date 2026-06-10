@@ -60,6 +60,7 @@ SOURCES += \
         src/AIMomirPlayer.cpp\
         src/AIPlayer.cpp\
         src/AIPlayerBaka.cpp\
+        src/AIPlayerGPT.cpp\
         src/AIStats.cpp\
         src/AllAbilities.cpp\
         src/CardDescriptor.cpp\
@@ -178,6 +179,7 @@ HEADERS  += \
         include/ModRules.h\
         include/AIHints.h\
         include/AIPlayerBaka.h\
+        include/AIPlayerGPT.h\
         include/AIPlayerBakaB.h\
         include/DeckEditorMenu.h\
         include/WResourceManagerImpl.h\

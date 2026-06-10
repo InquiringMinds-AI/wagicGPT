@@ -111,6 +111,10 @@ class AIPlayerBaka: public AIPlayer{
     virtual int getCreaturesInfo(Player * player, int neededInfo = INFO_NBCREATURES , int untapMode = 0, int canAttack = 0);
     virtual ManaCost * getPotentialMana(MTGCardInstance * card = NULL);
     virtual int selectAbility();
+    //Decision seam: given all legal ranked actions, pick one (or NULL to pass).
+    //Default = heuristic top pick behind the historical efficiency/chance gate.
+    //Subclasses (e.g. an LLM-backed player) can override to choose differently.
+    virtual const OrderedAIAction * chooseOrderedAction(RankingContainer& ranking);
     virtual int doAbility(MTGAbility * Specific = NULL, MTGCardInstance * withCard = NULL);
 
  public:
