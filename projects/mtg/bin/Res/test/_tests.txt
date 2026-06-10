@@ -47,6 +47,7 @@ generic/cursed_rack_i1085.txt
 generic/cytoplast_manipulator_i1085.txt
 generic/deadbridge_chant_i1085.txt
 generic/dread_return_countered_i1085.txt
+generic/earthbind_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
