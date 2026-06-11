@@ -1,0 +1,24 @@
+#Run Ashore (#1085): choose one or both - bounce a nonland permanent / owner puts one
+#on top or bottom of their library. Mode one: bounce the giant to its owner's hand.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}{U}{U}
+hand:run ashore
+[PLAYER2]
+inplay:hill giant
+[DO]
+run ashore
+goto firstmain
+goto firstmain
+choice 0
+hill giant
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:run ashore
+[PLAYER2]
+hand:hill giant
+[END]
