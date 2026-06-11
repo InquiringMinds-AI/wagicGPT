@@ -1,0 +1,36 @@
+#Parallax Nexus (#1085, "cards never returned to hand") - PARKED:
+#Cannot reach the return leg: the activated exile grants the TARGETED OPPONENT a
+#chooser over their own hand (ability$!...target(*|myhand)!$ targetedplayer) during
+#MY turn, and that chooser wedges - the opponent's hand click is not accepted (with
+#or without source-reclick confirm) and every subsequent command is swallowed.
+#Same family as Hollow Specter / the opponent-chooser-on-my-turn gap. Re-probe after
+#the chooser-ownership round; the return-on-leave leg (the actual complaint) is
+#untested until then.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}
+inplay:parallax nexus
+hand:disenchant
+[PLAYER2]
+hand:hill giant
+[DO]
+parallax nexus
+choice 0
+p2
+goto firstmain
+goto firstmain
+hill giant
+goto firstmain
+goto firstmain
+disenchant
+parallax nexus
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:disenchant,parallax nexus
+[PLAYER2]
+hand:hill giant
+[END]
