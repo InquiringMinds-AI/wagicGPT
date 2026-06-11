@@ -2466,7 +2466,22 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     }
 
     found = s.find("pay[[");
-    if (found != string::npos && storedPayString.empty())
+    //A pay[[ inside a newability[...] grant must ride INTACT into the
+    //transforms machinery: stripping it here stole the follow-up into THIS
+    //factory's storedPayString and mangled the grant text, so the granted
+    //ability paid its cost and did nothing (Nim Deathmantle, Pendrell Flux,
+    //Rhystic Lightning...). Same exclusion the pay( strip above already uses.
+    //A pay[[ inside a newability[...] grant that fires LATER (trigger- or
+    //teach-granted: Nim Deathmantle's @movedTo, Pendrell Flux's teach) must
+    //ride INTACT into the grant: stripping here stole the follow-up into THIS
+    //factory's storedPayString, so the granted ability paid and did nothing.
+    //Spell-resolution grants (Spell Rupture's counter-unless-pay transforms)
+    //are the opposite: they consume storedPayString in this same parse pass
+    //and CRASH if the strip is skipped - so only trigger/teach lines opt out.
+    size_t grantPosBr = s.find("newability[");
+    bool laterFiringGrant = (grantPosBr != string::npos && grantPosBr < found)
+        && (s.find("@") != string::npos || s.find("teach(") != string::npos);
+    if (found != string::npos && storedPayString.empty() && !laterFiringGrant)
     {
         vector<string> splitMayPaystr = parseBetween(s, "pay[[", " ", true);
         if(splitMayPaystr.size())

@@ -3676,12 +3676,15 @@ public:
     {
         if (skills.find(card) != skills.end())
         {
-            if(!game->removeObserver(skills[card]))
-            {
-                skills[card]->destroy();
-            }
-            if(skills[card])
-                skills.erase(card);
+            //Erase the map entry FIRST and never destroy() on a failed
+            //removeObserver: false means the granted ability was ALREADY
+            //moved to garbage (e.g. its source died from its own granted
+            //upkeep sacrifice - Pendrell Flux), and destroying the stale
+            //pointer crashed during the same teardown sweep.
+            MTGAbility * granted = skills[card];
+            skills.erase(card);
+            if (granted)
+                game->removeObserver(granted);
         }
         return 1;
     }

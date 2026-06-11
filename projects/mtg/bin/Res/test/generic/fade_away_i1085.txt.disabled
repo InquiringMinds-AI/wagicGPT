@@ -23,3 +23,9 @@ SECONDMAIN
 graveyard:fade away,grizzly bears
 [PLAYER2]
 [END]
+#UPDATE 2026-06-11 pay[[ round: the grant now carries its full text (engine
+#fix landed - nim/pendrell pass) and the pay menu APPEARS: choice 0 on the
+#unaffordable pay HANGS (known trap), choice 1 reaches the decline but its
+#"sacrifice notaTarget(*|mybattlefield)" auto-pick resolves choosing nothing
+#(the purging_scythe trigger-context notaTarget family). Park stands on that
+#narrower layer.

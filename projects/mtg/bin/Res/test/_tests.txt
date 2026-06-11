@@ -112,6 +112,8 @@ generic/skeleton_scavengers_i1085.txt
 generic/skyclave_apparition_i1085.txt
 generic/slaughter_the_strong_i1085.txt
 generic/sorcerous_spyglass_i1085.txt
+generic/nim_deathmantle_i1085.txt
+generic/pendrell_flux_i1085.txt
 generic/soul_charmer_i1085.txt
 generic/spin_into_myth_i1085.txt
 generic/spiteful_sliver_i1085.txt

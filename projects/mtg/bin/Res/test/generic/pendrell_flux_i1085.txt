@@ -1,0 +1,37 @@
+#Pendrell Flux (#1085): enchanted creature gets "at your upkeep, sacrifice
+#this unless you pay its mana cost". Decline (choice 1) at my T3 upkeep: the
+#bears are sacrificed and the aura follows. Rides BOTH of today's engine
+#fixes (pay[[ grant guard; ATeach::removed no longer destroy()s a granted
+#ability that was already garbage-collected when the source dies from its own
+#granted sacrifice - that teardown crashed pre-fix). The library wildcard:
+#the upkeep pay-menu eats the T3 draw step (known quirk, unasserted).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{U}
+hand:pendrell flux
+inplay:grizzly bears
+library:darksteel citadel,millstone
+[PLAYER2]
+library:darksteel citadel,millstone
+[DO]
+pendrell flux
+grizzly bears
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto upkeep
+choice 1
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:grizzly bears,pendrell flux
+library:*,*
+[PLAYER2]
+hand:*
+library:darksteel citadel
+[END]
