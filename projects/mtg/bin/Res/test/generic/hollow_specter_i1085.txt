@@ -1,0 +1,38 @@
+#Hollow Specter (#1085): combat damage to a player -> may pay {X} -> that
+#player reveals X cards from their hand, you choose one, they discard it.
+#Exercises the ability$! grant chain end to end: TrDamaged(combatdamagefoeof)
+#fires at the damage step -> may accept (choice 0) -> granted choose-one
+#menu (single live entry with a 1-card hand; the if-gated Pay-2+ legs are
+#omitted) -> GenericPaidAbility pay menu (choice 0 pays the floated {B})
+#-> inner must-may wrap from the general tc-fallback (choice 0) -> the
+#opponent-hand click discards. The myr is tapped DURING the damage step;
+#floated mana survives within the step. Life 18 proves the 2-power hit;
+#bears in graveyard (not hand) proves the reject leg hit the revealed card.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:hollow specter,leaden myr
+[PLAYER2]
+hand:grizzly bears
+library:eager cadet,eager cadet,eager cadet
+[DO]
+goto attackers
+hollow specter
+next
+next
+leaden myr
+choice 0
+choice 0
+choice 0
+choice 0
+grizzly bears
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:hollow specter,leaden myr
+[PLAYER2]
+library:*,*,*
+graveyard:grizzly bears
+life:18
+[END]
