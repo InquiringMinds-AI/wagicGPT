@@ -69,6 +69,7 @@ public:
     void Update(float dt);
     int testDestroy();
     int toResolve();
+    void fireOneShot(MTGAbility * a);
     void CardViewBackup(MTGCardInstance * backup);
     void Render();
     bool CheckUserInput(JButton key);

@@ -1,0 +1,40 @@
+#Woodvine Elemental (#1085): parley attack trigger (needs a human - eager
+#cadet bystander): each player reveals their top card; each NONLAND revealed
+#pumps my attackers +1/+1 and is drawn by its owner (data models the draw via
+#tobecast tag + transforms-granted newability[draw:1]). Both legs drive:
+#choice 0 (Draw non-land card menu) + card click per leg; 4/4 trample
+#woodvine swings as 6/6 -> life 14; P1 draws millstone, P2 juggernaut.
+#Revived by the reveal round: auto-key suite-guarded + fireOneShot resolves
+#the addObserver'd afterrevealed one-shot (ActivatedAbility family).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:woodvine elemental,eager cadet
+library:gold myr,millstone
+[PLAYER2]
+library:silver myr,juggernaut
+[DO]
+goto attackers
+woodvine elemental
+next
+choice 0
+millstone
+goto blockers
+goto blockers
+choice 0
+juggernaut
+goto blockers
+goto blockers
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:woodvine elemental,eager cadet
+hand:millstone
+library:gold myr
+[PLAYER2]
+life:14
+hand:juggernaut
+library:silver myr
+[END]

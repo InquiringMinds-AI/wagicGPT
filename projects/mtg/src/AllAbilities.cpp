@@ -298,7 +298,7 @@ void MTGRevealingCards::Update(float dt)
         revealDisplay->init(RevealZone);
         revealDisplay->zone = RevealZone;
         game->OpenedDisplay = revealDisplay;
-        toResolve();    
+        toResolve();
         initCD = true;
     }
 
@@ -319,10 +319,13 @@ void MTGRevealingCards::Update(float dt)
             initCD = false;
         }
         else if (afterReveal.size() && !afterEffectActivated)
-        { 
+        {
             afterEffectActivated = true;
             abilityAfter = contructAbility(afterReveal);
             game->addObserver(abilityAfter);
+            //same disease as the options in toResolve: an addObserver'd
+            //one-shot (draw:1 ...) never resolves on its own.
+            fireOneShot(abilityAfter);
         }
         else
             this->removeFromGame();
@@ -368,6 +371,20 @@ int MTGRevealingCards::testDestroy()
     return 1;
 }
 
+//One-shot options/after-effects are addObserver'd, which never resolves the
+//ActivatedAbility family at all, while the InstantAbility family (if/then)
+//self-fires one tick later through InstantAbility::Update - so a manual
+//resolve alone double-fires those. Fire once here and disarm the deferred one.
+void MTGRevealingCards::fireOneShot(MTGAbility * a)
+{
+    if (!a || !a->oneShot)
+        return;
+    a->resolve();
+    InstantAbility * ia = dynamic_cast<InstantAbility*>(a);
+    if (ia)
+        ia->init = 1;
+}
+
 int MTGRevealingCards::toResolve()
 {
 
@@ -385,16 +402,14 @@ int MTGRevealingCards::toResolve()
             //A one-shot option (Selvala parley's "if ... then counter(1/1)") has no
             //click/menu to fire it and nothing in the action layer resolves added
             //one-shots - it sat inert forever. Resolve it on the spot.
-            if (abilityFirst && abilityFirst->oneShot)
-                abilityFirst->resolve();
+            fireOneShot(abilityFirst);
         }
         else
         {
             repeat = false;
             abilitySecond = contructAbility(abilityTwo);
             game->addObserver(abilitySecond);
-            if (abilitySecond && abilitySecond->oneShot)
-                abilitySecond->resolve();
+            fireOneShot(abilitySecond);
         }
         SAFE_DELETE(rTc);
     }
@@ -402,8 +417,7 @@ int MTGRevealingCards::toResolve()
     {
         abilityFirst = contructAbility(abilityOne);
         game->addObserver(abilityFirst);
-        if (abilityFirst && abilityFirst->oneShot)
-            abilityFirst->resolve();
+        fireOneShot(abilityFirst);
     }
     return 1;
 }
@@ -439,7 +453,11 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
     //DO NOT REFACTOR BELOW, IT KEPT SPLIT UP TO MAINTAIN READABILITY.
     //we override check inputs, we MUST complete reveal and its effects before being allowed to do anything else.
     TargetChooser * tc = this->observer->mLayers->actionLayer()->getCurrentTargetChooser();
-    if (this->source->controller()->isAI())
+    //Suite players are always isAI (TestSuiteAI : AIPlayerBaka), so this
+    //auto-key would self-advance reveal displays before scripted clicks can
+    //land. Headless tests drive reveals explicitly with the revealok /
+    //revealnext harness commands instead.
+    if (this->source->controller()->isAI() && !getenv("WAGIC_TESTSUITE"))
     {
         if (this->source->controller() != game->isInterrupting)
             game->mLayers->stackLayer()->cancelInterruptOffer(ActionStack::DONT_INTERRUPT, false);

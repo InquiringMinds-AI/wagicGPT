@@ -1,9 +1,0 @@
-#Woodvine Elemental (#1085) - PARKED ON SIGHT, reveal-machinery family (6th
-#witness). Parley attack trigger: reveal:1 each library, +1/+1 per nonland to
-#attackers, then draws. Identical reveal:1 parley structure to
-#selvalas_enforcer (proven: optionone conditional no-ops, opponent leg
-#stalls), plus a becomes(tobecast) marker variant and ability$!-granted
-#opponent legs (opponent-chooser family on top). No probe run - revive with
-#the reveal-machinery engine round.
-#UPDATE 2026-06-11: option-oneshot fix may help its conditionals once the
-#trigger-context populate layer is fixed (same blocked shape as winota).

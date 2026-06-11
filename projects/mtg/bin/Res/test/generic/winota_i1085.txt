@@ -1,0 +1,34 @@
+#Winota, Joiner of Forces (#1085; set id 479736 - comma name): a non-Human
+#attacker triggers - look at top 6, put a Human from among them onto the
+#battlefield tapped and ATTACKING (the issue's complaint), rest to bottom +
+#shuffle. Bears attack -> Get Creature menu (choice 0) + cadet click; cadet
+#arrives attacking: opponent takes 2 (bears) + 1 (cadet) = 17. revealok then
+#Shuffle menu (choice 0) bottoms the other 5. Drove dead until the reveal
+#auto-key got suite-guarded (revealok harness driving).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:479736,grizzly bears
+library:darksteel citadel,millstone,juggernaut,gold myr,silver myr,eager cadet
+[PLAYER2]
+[DO]
+goto attackers
+grizzly bears
+next
+choice 0
+eager cadet
+goto blockers
+revealok
+goto blockers
+choice 0
+goto blockers
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:479736,grizzly bears,eager cadet
+library:*,*,*,*,*
+[PLAYER2]
+life:17
+[END]

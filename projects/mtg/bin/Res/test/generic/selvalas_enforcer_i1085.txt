@@ -1,10 +1,10 @@
 #Selvala's Enforcer (#1085): parley ETB - each player reveals their top card;
 #+1/+1 counter per nonland revealed; then each player draws. My juggernaut
-#(nonland) = one counter: the 2/2 enforcer survives a Shock at 3/3. My draw
-#happens. KNOWN RESIDUAL (engine): their card strands in the reveal zone and
-#the OPPONENT's afterrevealed draw is lost too - the second MTGRevealingCards
-#stops receiving updates after populating (see the .disabled witness) - so
-#P2's hand is deliberately not asserted here.
+#(nonland) = one counter: the 2/2 enforcer survives a Shock at 3/3. P2's
+#citadel is a LAND - no counter from that leg. Both putbacks drive via
+#revealok + choice 0 + click; BOTH afterrevealed draws fire now (P1 draws
+#juggernaut, P2 draws citadel) - the stranded-card/lost-draw residual is gone
+#(fireOneShot on the addObserver'd after-effect).
 [INIT]
 firstmain
 [PLAYER1]
@@ -18,15 +18,15 @@ library:silver myr,darksteel citadel
 selvala's enforcer
 goto firstmain
 goto firstmain
-choice 0
+revealok
 goto firstmain
-choice 1
+choice 0
 juggernaut
 goto firstmain
 goto firstmain
-choice 0
+revealok
 goto firstmain
-choice 1
+choice 0
 darksteel citadel
 goto firstmain
 goto firstmain
@@ -44,5 +44,6 @@ inplay:iron myr,selvala's enforcer
 library:millstone
 tappedinplay:1
 [PLAYER2]
+hand:darksteel citadel
 library:silver myr
 [END]

@@ -100,6 +100,8 @@ generic/run_ashore_i1085.txt
 generic/select_for_inspection_i1085.txt
 generic/selvalas_charge_i1085.txt
 generic/selvalas_enforcer_i1085.txt
+generic/winota_i1085.txt
+generic/woodvine_elemental_i1085.txt
 generic/selvala_explorer_i1085.txt
 generic/selvala_hotw_i1085.txt
 generic/selvala_hotw_bigpower_i1085.txt

@@ -1,7 +1,8 @@
 #Shifting Shadow (#1085): aura. At my upkeep destroy the enchanted creature,
 #reveal until a creature, put it onto my battlefield (shadow rehooks), bottom
 #the rest. Bears die T3; reveal = millstone then hill giant; giant lands on my
-#side, millstone goes to the bottom.
+#side, millstone goes to the bottom. DO is fully retuned for the guarded
+#reveal driving (choice 0 + giant click; revealok + choice 0 bottoms).
 [INIT]
 firstmain
 [PLAYER1]
@@ -26,9 +27,9 @@ goto upkeep
 hill giant
 goto upkeep
 goto upkeep
-choice 1
+revealok
 goto upkeep
-millstone
+choice 0
 goto upkeep
 goto upkeep
 [ASSERT]
@@ -41,15 +42,15 @@ library:millstone
 hand:juggernaut
 library:darksteel citadel
 [END]
-#PARKED: reveal-machinery family (selvalas_charge/enforcer cousins) + aura
-#lifecycle wrinkle. Trace: upkeep trigger resolves, destroy leg kills the bears,
-#but the AURA goes to the graveyard with them (SBA before rehook can happen).
-#choice 0 DOES fire a second StackAbility (the optionone choice exists and
-#resolves) but target(creature|reveal) moveto(mybattlefield) moves nothing -
-#the Reveal:1/revealuntil(creature) zone was never populated (library unchanged,
-#both cards still there). choice 1 + millstone click inert. Engine round fuel:
-#reveal-conditional machinery + revealuntil + aura-rehook-vs-SBA ordering.
-#UPDATE 2026-06-11 reveal round: the option-oneshot fix landed (parley pins
-#revived) but THIS shape still fails - the @each-upkeep aura-granted
-#revealuntil never POPULATES (the trigger-context populate layer, distinct
-#from the fixed option layer). Park stands.
+#PARKED (rehook family - queue item 3, NOT reveal machinery anymore):
+#UPDATE 2026-06-11 reveal-revival round: ALL reveal layers fixed and driving -
+#revealuntil POPULATES (2 cards), Get Card menu + giant click lands the giant,
+#revealok + choice 0 bottoms the millstone, reveal removes itself cleanly.
+#Sole residual: the `&& rehook` leg fires at TRIGGER resolution (while the
+#reveal is still open, board empty) and AANewTarget::resolve's reequip path
+#(AllAbilities.cpp ~4803) requires _target already on the battlefield + uses
+#the aura's stale target pointer (the destroyed bears) - it fizzles, the
+#giant lands later, SBA sweeps the unattached aura: graveyard gets bears AND
+#shadow, battlefield only the giant. Same defect class as Nim Deathmantle's
+#`rehook target(...)` leg - fix them together (rehook needs late binding /
+#an afterrevealed-able form). When fixed, this file should pass as-is.
