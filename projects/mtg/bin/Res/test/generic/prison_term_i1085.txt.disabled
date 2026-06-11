@@ -1,0 +1,47 @@
+#Prison Term (#1085): the enchanted creature can't attack; when a new creature enters
+#under the opponent, may retarget the Term onto it. The bears (initially termed)
+#attack and connect AFTER the Term moves to the freshly-cast giant - the bears being
+#free is the retarget proof.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}{W}
+hand:prison term
+[PLAYER2]
+inplay:grizzly bears,gold myr,copper myr,iron myr
+hand:hill giant
+[DO]
+prison term
+grizzly bears
+no
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+gold myr
+copper myr
+iron myr
+hill giant
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+goto attackers
+grizzly bears
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+life:18
+inplay:prison term
+[PLAYER2]
+inplay:grizzly bears,gold myr,copper myr,iron myr,hill giant
+[END]
+#PARKED after 5 iterations: the cast + enchant work, P2's giant cast works, and the
+#termed bears never connect (cantattack holding). The retarget-on-new-creature leg is
+#UNVERIFIED: the may prompt's timing is buried under very slow phase advancement
+#after the aura cast (each goto consumed ~10 ticks), so the scripted choice 0 never
+#met the prompt. Re-probe with the phase-advance stall understood (possibly the
+#@movedto may-trigger holding priority each tick).
