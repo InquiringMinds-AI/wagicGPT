@@ -6136,6 +6136,12 @@ int AACloner::resolve()
     MTGCardInstance * _target = (MTGCardInstance *) target;
     if (!_target)
         return 0;
+    //A resolving instant/sorcery cloning ITSELF is always the
+    //defaulted-target degenerate case (no real card token-copies its own
+    //resolving spell) - and copying it would re-resolve this very line on
+    //the copy: unbounded self-replication.
+    if (_target == source && _target->isSorceryorInstant())
+        return 0;
     if(_target->mutation && _target->parentCards.size() > 0) return 0; // Mutated down cards cannot be cloned, they will follow the fate of top-card
 
     MTGCard * clone = NULL;

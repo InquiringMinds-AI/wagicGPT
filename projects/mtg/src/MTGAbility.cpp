@@ -6562,6 +6562,17 @@ int AbilityFactory::magicText(int id, Spell * spell, MTGCardInstance * card, int
         }
         else
         {
+            //An X-targets spell cast at X=0 (zero-capacity chooser, nothing
+            //collected) must not fire its per-target lines: with no collected
+            //target the parse-time self-default survives and the line acts on
+            //the resolving spell card itself. Hour of Eternity's clone line
+            //then copies the sorcery - and the copy's resolution re-runs the
+            //clone line: infinite self-replication, stack overflow.
+            if (spell && spell->tc && spell->tc->maxtargets == 0 && a->target == (Targetable *) spell->source)
+            {
+                SAFE_DELETE(a);
+                continue;
+            }
             if (a->oneShot)
             {
                 a->resolve();

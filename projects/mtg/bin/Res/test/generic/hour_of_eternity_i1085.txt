@@ -1,0 +1,34 @@
+#Hour of Eternity (#1085) cast at X=0: no targets may be chosen, nothing
+#exiled, no token. ENGINE (3-part fix): (1) targetsReadyCheck declares a
+#zero-capacity chooser (maxtargets=0) complete from birth - the empty-list
+#early-out used to report NOK and the cast waited forever; (2)
+#TargetsList::toggleTarget refuses picks on a maxtargets=0 chooser (the
+#click path used to push unconditionally - the 'free' pick is what
+#completed the old cast AND got wrongly exiled/copied); (3) magicText
+#skips per-target spell lines whose target self-defaulted on a
+#zero-capacity chooser (the clone line used to copy the resolving sorcery
+#itself -> infinite self-replication -> stack overflow), with a matching
+#AACloner guard against sorcery self-clones. The stray graveyard click
+#below must stay inert. X-menu idiom: <prexx> menus index by X VALUE
+#(choice 0 = X0), not by total mana paid.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{U}{U}{U}
+hand:hour of eternity
+graveyard:grizzly bears
+[PLAYER2]
+[DO]
+hour of eternity
+choice 0
+goto firstmain
+goto firstmain
+grizzly bears
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:hour of eternity,grizzly bears
+[PLAYER2]
+[END]

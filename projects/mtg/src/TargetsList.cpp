@@ -77,6 +77,14 @@ int TargetsList::toggleTarget(Targetable * target)
     }
     else
     {
+        //A chooser capped at zero picks (an X-targets spell cast at X=0,
+        //e.g. Hour of Eternity) accepts no clicks. The cap must be enforced
+        //here on the CLICK path only: addTarget itself is also fed
+        //programmatically (spell internals, AI) where refusing an add
+        //breaks callers that rely on the unconditional push.
+        TargetChooser * self = dynamic_cast<TargetChooser *>(this);
+        if (self && self->maxtargets == 0)
+            return TARGET_NOK;
 
         return addTarget(target);
     }

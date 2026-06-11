@@ -1594,6 +1594,14 @@ int TargetChooser::targetsReadyCheck()
     {
         return TARGET_OK_FULL;//we have no min amount for targets and 0 targets is a valid amount player called for a forced finish.
     }
+    if (maxtargets == 0)
+    {
+        //A zero-capacity chooser (an X-targets spell cast at X=0, e.g.
+        //Hour of Eternity) is complete from birth: without this the empty
+        //check below reports NOK and the cast waits forever for clicks
+        //that toggleTarget correctly refuses to accept.
+        return TARGET_OK_FULL;
+    }
     if (!targets.size())
     {
         return TARGET_NOK;

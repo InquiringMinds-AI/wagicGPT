@@ -914,3 +914,5 @@ generic/hollow_specter_i1085.txt
 generic/world_at_war_i1085.txt
 generic/heartless_act_choice.txt
 generic/shredded_sails_choice.txt
+generic/hour_of_eternity_i1085.txt
+generic/hour_of_eternity_x1.txt
