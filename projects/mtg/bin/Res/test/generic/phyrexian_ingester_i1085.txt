@@ -1,0 +1,32 @@
+#Phyrexian Ingester (#1085): imprint-exile a nontoken creature on entry; it gets
+#+X/+Y of the exiled card. Imprinting the 3/3 hill giant makes it 6/6; it attacks
+#next turn for 6 (life 14).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{6}{U}
+hand:phyrexian ingester
+[PLAYER2]
+inplay:hill giant
+[DO]
+phyrexian ingester
+choice 1
+hill giant
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto firstmain
+goto attackers
+phyrexian ingester
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:phyrexian ingester
+[PLAYER2]
+life:14
+exile:hill giant
+[END]
