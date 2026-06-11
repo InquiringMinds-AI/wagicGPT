@@ -8929,7 +8929,9 @@ APreventDamageTypesUEOT::~APreventDamageTypesUEOT()
 // "At the beginning of your upkeep, if this permanent has a time counter on it, remove a time counter from it," and
 // "When the last time counter is removed from this permanent, sacrifice it."
 AVanishing::AVanishing(GameObserver* observer, int _id, MTGCardInstance * card, ManaCost *, int, int amount, string counterName) :
-MTGAbility(observer, _id, source, target),amount(amount),counterName(counterName)
+//was (observer, _id, source, target): both are INHERITED MEMBERS read
+//before initialization (same ctor bug class as ASeizeWrapper).
+MTGAbility(observer, _id, card),amount(amount),counterName(counterName)
 {
     target = card;
     source = card;
@@ -8988,7 +8990,7 @@ AVanishing::~AVanishing()
 
 //Produce Mana
 AProduceMana::AProduceMana(GameObserver* observer, int _id, MTGCardInstance * _source, string ManaDescription) :
-MTGAbility(observer, _id, source),ManaDescription(ManaDescription)
+MTGAbility(observer, _id, _source),ManaDescription(ManaDescription)
 {
     source = _source;
     mana[0] = "{g}"; mana[1] = "{u}"; mana[2] = "{r}"; mana[3] = "{b}"; mana[4] = "{w}";
@@ -9529,7 +9531,11 @@ ASeize::~ASeize()
 }
 
 ASeizeWrapper::ASeizeWrapper(GameObserver* observer, int _id, MTGCardInstance * card, MTGCardInstance * _target) :
-    InstantAbility(observer, _id, source, _target)
+    //was InstantAbility(observer, _id, source, _target): 'source' is the
+    //INHERITED MEMBER, uninitialized at this point - the wrapper got a
+    //garbage source, so MultiAbility's target re-point (leg->target ==
+    //leg->source) never fired and 'may steal X && ...' seized its own card.
+    InstantAbility(observer, _id, card, _target)
 {
     ability = NEW ASeize(observer, _id,card,_target);
     andAbility = NULL;
@@ -9662,7 +9668,7 @@ AShackle::~AShackle()
 }
 
 AShackleWrapper::AShackleWrapper(GameObserver* observer, int _id, MTGCardInstance * card, MTGCardInstance * _target) :
-    InstantAbility(observer, _id, source, _target)
+    InstantAbility(observer, _id, card, _target)
 {
     ability = NEW AShackle(observer, _id,card,_target);
 }
@@ -9768,7 +9774,7 @@ AGrant::~AGrant()
 }
 
 AGrantWrapper::AGrantWrapper(GameObserver* observer, int _id, MTGCardInstance * card, MTGCardInstance * _target, MTGAbility * _Grant) :
-    InstantAbility(observer, _id, source, _target), Granted(_Grant)
+    InstantAbility(observer, _id, card, _target), Granted(_Grant)
 {
     ability = NEW AGrant(observer, _id, card, _target,_Grant);
 }
@@ -10022,7 +10028,9 @@ ABlink::~ABlink()
 }
 
 ABlinkGeneric::ABlinkGeneric(GameObserver* observer, int _id, MTGCardInstance * card, MTGCardInstance * _target,bool blinkueot,bool blinkForSource,bool blinkhand,MTGAbility * stored) :
-    InstantAbility(observer, _id, source, _target)
+    //same uninitialized-member ctor bug as ASeizeWrapper: 'source' here was
+    //the inherited member read before initialization, not the card param.
+    InstantAbility(observer, _id, card, _target)
 {
     ability = NEW ABlink(observer, _id,card,_target,blinkueot,blinkForSource,blinkhand,stored);
 }

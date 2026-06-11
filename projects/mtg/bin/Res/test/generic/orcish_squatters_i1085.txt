@@ -1,0 +1,38 @@
+#Orcish Squatters (#1085): attacks unblocked -> may gain control of a land
+#the defender controls; if you do, Squatters assigns no combat damage.
+#BOTH legs work now: citadel changes controller AND life stays 20.
+#ENGINE FIX captured: ASeizeWrapper's ctor passed the UNINITIALIZED inherited
+#'source' member to its InstantAbility base (instead of the card param), so
+#MultiAbility's target re-point (leg->target == leg->source) never fired and
+#'may steal X && fog' seized its own card (ABlinkGeneric had the same ctor
+#bug). DRIVING: the trigger fires and must be answered IN the blockers step
+#(next, next, pads, choice 0, land click) - combat damage applies on the
+#single transition into the damage step, so an answer there is too late.
+#Tail pads must be goto end: goto blockers ring-walks forever once combat
+#auto-skips (no attackers next turn) and hangs the suite.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:orcish squatters
+[PLAYER2]
+inplay:darksteel citadel
+[DO]
+goto attackers
+orcish squatters
+next
+next
+goto blockers
+goto blockers
+choice 0
+goto blockers
+darksteel citadel
+goto end
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:orcish squatters,darksteel citadel
+[PLAYER2]
+life:20
+[END]
