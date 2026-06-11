@@ -1,6 +1,12 @@
-#Sen Triplets (#1085): at my upkeep, I may cast cards from the opponent's hand
-#this turn. Cross to my turn-3 upkeep, accept the may, tap myrs, cast their
-#grizzly bears -> bears enter MY battlefield.
+#Sen Triplets (#1085): at my upkeep, lock the opponent out and cast cards
+#from their hand this turn. Cross to my turn-3 upkeep, accept the may
+#(choice 0), click their grizzly bears, accept the cast menu (choice 0):
+#bears enter MY battlefield, their hand is down to the drawn millstone.
+#Revived by the opponent-chooser round: the 'castcard spawns no interaction'
+#park was the SAME MultiAbility dropped-interactive-leg bug. WART (faithful
+#to engine semantics, not oracle): castcard(normal) does not charge the
+#card's cost (cost collection is pay()'s job - madness precedent), so no
+#taps are scripted and no pool is asserted.
 [INIT]
 firstmain
 [PLAYER1]
@@ -13,8 +19,6 @@ goto end
 goto upkeep
 goto end
 goto upkeep
-copper myr
-leaden myr
 goto upkeep
 choice 0
 goto upkeep
@@ -27,7 +31,6 @@ goto upkeep
 UPKEEP
 [PLAYER1]
 inplay:sen triplets,copper myr,leaden myr,grizzly bears
-tappedinplay:2
 [PLAYER2]
 hand:millstone
 library:millstone
