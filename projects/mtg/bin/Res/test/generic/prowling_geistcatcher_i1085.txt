@@ -1,0 +1,47 @@
+#Prowling Geistcatcher (#1085, "not just dies"): sacrifice bears to Carrion
+#Feeder's {S(creature)} COST -> the @sacrificed trigger fires, bears exiled
+#with the ProwlingExiled tag; kill the geistcatcher (2/4 +1/+1 from its own
+#counter line = 3/5, needs three shocks) -> tagged creatures return to my
+#battlefield. ENGINE FIX captured: every cost-path WEventCardSacrifice was
+#built with the STALE pre-move card pointer (trigger targets compare
+#pointers; AASacrificeCard already walked ->next) - SacrificeCost,
+#SacLandsCost, Offering, fading time-counters and the two treason SBA sites
+#now walk to the new graveyard instance. Known data nit (unasserted): the
+#return line is _DIES_ but oracle says "leaves the battlefield".
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{R}{R}{R}
+inplay:prowling geistcatcher,carrion feeder,grizzly bears
+hand:shock,shock,shock
+[PLAYER2]
+[DO]
+carrion feeder
+grizzly bears
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+shock
+prowling geistcatcher
+goto firstmain
+goto firstmain
+shock
+prowling geistcatcher
+goto firstmain
+goto firstmain
+shock
+prowling geistcatcher
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:carrion feeder,grizzly bears
+graveyard:shock,shock,shock,prowling geistcatcher
+[PLAYER2]
+[END]

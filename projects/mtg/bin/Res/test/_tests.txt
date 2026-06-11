@@ -106,6 +106,7 @@ generic/watchers_of_the_dead_i1085.txt
 generic/parallax_nexus_i1085.txt
 generic/shifting_shadow_i1085.txt
 generic/sen_triplets_i1085.txt
+generic/prowling_geistcatcher_i1085.txt
 generic/selvala_explorer_i1085.txt
 generic/selvala_hotw_i1085.txt
 generic/selvala_hotw_bigpower_i1085.txt

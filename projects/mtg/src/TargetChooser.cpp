@@ -2293,6 +2293,20 @@ bool TriggerTargetChooser::canTarget(Targetable * _target,bool)
                 return true;
     }
     if (_target == target) return true;
+    //zone moves recreate instances: the stashed trigger target may be an
+    //earlier incarnation of the card being examined (a cost-paid sacrifice
+    //stashes the pre-move instance while the graveyard holds its ->next;
+    //Prowling Geistcatcher's exile-the-sacrificed leg).
+    MTGCardInstance * stash = dynamic_cast<MTGCardInstance *>(target);
+    MTGCardInstance * cand = dynamic_cast<MTGCardInstance *>(_target);
+    if (stash && cand)
+    {
+        for (MTGCardInstance * n = stash->next; n; n = n->next)
+        {
+            if (n == cand)
+                return true;
+        }
+    }
     return false;
 }
 
