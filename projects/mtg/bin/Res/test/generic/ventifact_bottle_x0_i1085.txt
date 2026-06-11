@@ -1,0 +1,32 @@
+#Ventifact Bottle X=0 leg (#1085): activated {X} costs have NO X menu - the
+#engine computes X = floated pool minus base cost at resolve (AI/suite path
+#auto-pays; humans float exactly what they want). Float exactly {1} -> X=0 ->
+#no charges -> the T3 trigger floats nothing and millstone stays in hand.
+#The old 'X=0 phantom' anomaly was a misdiagnosis: pool {3} + any choice
+#command = X=2 by design; choice N is a swallowed no-op on this path.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}
+inplay:ventifact bottle
+hand:millstone
+[PLAYER2]
+[DO]
+ventifact bottle
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto firstmain
+goto firstmain
+millstone
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:ventifact bottle
+hand:millstone
+[PLAYER2]
+[END]

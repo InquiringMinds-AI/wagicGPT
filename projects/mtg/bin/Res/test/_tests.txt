@@ -152,6 +152,7 @@ generic/uyo_i1085.txt
 generic/vapor_snare_i1085.txt
 generic/vedalken_humiliator_i1085.txt
 generic/ventifact_bottle_i1085.txt
+generic/ventifact_bottle_x0_i1085.txt
 generic/wall_of_mourning_i1085.txt
 generic/war_of_the_spark_i1085.txt
 generic/weathered_runestone_i1085.txt

@@ -1,10 +1,10 @@
 #Ventifact Bottle (#1085): {X}{1}{T} sorcery-speed - put X charge counters;
 #at my precombat main, tap it, remove all charges, add {1} per charge.
 #X=2 on T1; at T3 firstmain the trigger floats {2}, spent on the millstone.
-#KNOWN ANOMALY (stale-X family, not asserted here): activating with choice 0
-#(X=0) still places charges - the x falls back to leftover-pool-diff instead
-#of the chosen 0 (same fallback as prex; Rats' Feast cousin). No-activation
-#correctly yields no mana (verified).
+#NOTE: activated {X} has NO X menu - X = floated pool minus base ({3}-{1}=2
+#here); the 'choice 2' below is a swallowed no-op kept as a pad. The X=0 leg
+#(float exactly {1}) is pinned in ventifact_bottle_x0_i1085.txt - the old
+#'X=0 phantom' note was a misdiagnosis of the pool-as-X payment model.
 [INIT]
 firstmain
 [PLAYER1]
