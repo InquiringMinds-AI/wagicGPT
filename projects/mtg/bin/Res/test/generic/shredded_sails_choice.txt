@@ -1,0 +1,28 @@
+#Shredded Sails: choose-one instant with cycling. The hand click opens the
+#CAST-MODE menu first (choice 0 = normal cast), THEN the choose-one menu.
+#With no artifacts in play the destroy-artifact mode is omitted (CR 700.2
+#gating) so choice 0 = the 4-damage-to-flyer mode; wind drake (2/2) dies.
+#Also covers the name(X):damage:4 double-colon data shape - parses fine.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{R}
+hand:shredded sails
+[PLAYER2]
+inplay:wind drake
+[DO]
+shredded sails
+choice 0
+goto firstmain
+choice 0
+wind drake
+goto firstmain
+goto firstmain
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+graveyard:shredded sails
+[PLAYER2]
+graveyard:wind drake
+[END]

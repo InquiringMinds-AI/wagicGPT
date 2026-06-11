@@ -1,0 +1,28 @@
+#Heartless Act: choose-one instant whose modes carry the name(X):effect
+#colon (the shape suspected after Vengeful Rebirth) - probed NOT broken;
+#the merged choose-one spawns and both modes drive. Mode 1 here: destroy
+#the counterless bears (choice 0 + click). Mode 2 (counter removal) was
+#probe-verified as choice 1 + click with the spell resolving harmlessly
+#on a counterless target.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{B}
+hand:heartless act
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+heartless act
+goto firstmain
+choice 0
+grizzly bears
+goto firstmain
+goto firstmain
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+graveyard:heartless act
+[PLAYER2]
+graveyard:grizzly bears
+[END]
