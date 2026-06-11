@@ -1,0 +1,34 @@
+#Mystic Confluence (#1085): choose three (repeats allowed) - counter unless pay 3 /
+#bounce a creature / draw. With nothing else on the stack the counter mode is gated
+#out, so choice 0 = bounce, choice 1 = draw. Bounce the bears, draw twice.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{3}{U}{U}
+hand:mystic confluence
+library:millstone,gold myr,silver myr
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+mystic confluence
+goto firstmain
+goto firstmain
+choice 0
+grizzly bears
+goto firstmain
+goto firstmain
+choice 1
+goto firstmain
+goto firstmain
+choice 1
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:silver myr,gold myr
+graveyard:mystic confluence
+library:millstone
+[PLAYER2]
+hand:grizzly bears
+[END]
