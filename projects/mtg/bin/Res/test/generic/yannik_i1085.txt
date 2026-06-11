@@ -1,0 +1,40 @@
+#Yannik, Scavenging Sentinel (#1085; set id 484726): ETB - exile another
+#creature I control until Yannik leaves, distribute its power in +1/+1
+#counters. Bears (power 2) exiled via the power-2 bucket's may (choice 0 +
+#bears click); the thisforeach(2) grant menus assign both counters to
+#Yannik (choice 0 + Yannik click, twice). TWO ENGINE FIXES captured:
+#(1) '&&' now splits BEFORE the this(/thisforeach(/while( block - that
+#block matches anywhere in the line, deleted the line's tc and DISCARDED
+#everything before the keyword, so 'A && thisforeach(N) B' lost the whole
+#A leg (the exile) at parse; (2) MayAbility::isReactingToTargetClick now
+#mirrors Update's validTargetsExist gate, so a dead-chooser sibling bucket
+#can no longer claim the merged same-source menu accept and get its empty
+#chooser auto-cancelled in place of the live one.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{G}{W}
+inplay:grizzly bears
+hand:484726
+[PLAYER2]
+[DO]
+484726
+goto firstmain
+goto firstmain
+choice 0
+grizzly bears
+goto firstmain
+choice 0
+484726
+goto firstmain
+choice 0
+484726
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:484726
+exile:grizzly bears
+[PLAYER2]
+[END]

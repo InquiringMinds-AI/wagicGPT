@@ -1,5 +1,7 @@
 # Testing fury charm (keyword:vanishing)
 # Permanent with vanishing must be sacrificed immediately when the last counter is removed
+# choice 1 (was 2): modes whose chooser has no valid target no longer join the
+# merged choose-one menu (no artifact to destroy here), per CR 700.2 - indices shift.
 
 [INIT]
 FIRSTMAIN
@@ -10,7 +12,7 @@ manapool:{1}{R}
 [PLAYER2]
 [DO]
 Fury Charm
-choice 2
+choice 1
 Waning Wurm
 [ASSERT]
 FIRSTMAIN

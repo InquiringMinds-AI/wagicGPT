@@ -7503,6 +7503,16 @@ int MayAbility::isReactingToTargetClick(Targetable * card)
                 return 0;
             }
         }
+        //mirror the Update() spawn gate: a may whose chooser has no valid
+        //targets must not claim the (merged, same-source) menu accept - it
+        //otherwise fires a dead chooser that becomes the waiting action and
+        //gets auto-cancelled, orphaning its sibling's live chooser (Yannik's
+        //power-bucket mays share one source menu).
+        if (TargetAbility * ta = dynamic_cast<TargetAbility *>(ability))
+        {
+            if (!ta->getActionTc()->validTargetsExist() || ta->getActionTc()->maxtargets == 0)
+                return 0;
+        }
         return 1;
     }
     return 0;

@@ -2935,7 +2935,13 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             i = j;
         }
     }
-    if (found != string::npos && found < lord)
+    //precedence: a && chain must split FIRST (at the check further below) -
+    //this block matches thisforeach( ANYWHERE in the line, deletes the
+    //line's tc and DISCARDS everything before the keyword, so
+    //"A && thisforeach(N) B" silently lost the whole A leg and its chooser
+    //(Yannik's power buckets: the exile leg vanished at parse). Each split
+    //leg re-enters here without the && and parses normally.
+    if (found != string::npos && found < lord && s.find("&&") == string::npos)
     {
         //why does tc even exist here? This shouldn't happen...
         SAFE_DELETE(tc); //http://code.google.com/p/wagic/issues/detail?id=424
