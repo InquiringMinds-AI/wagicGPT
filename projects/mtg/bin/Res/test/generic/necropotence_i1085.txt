@@ -1,0 +1,25 @@
+#Necropotence (#1085): pay 1 life - exile the top card face down; it comes to hand at
+#the beginning of my next end step. Pay once: life 19, juggernaut arrives at end step.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:necropotence
+library:millstone,juggernaut
+[PLAYER2]
+[DO]
+necropotence
+goto firstmain
+goto firstmain
+goto end
+choice 0
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+life:19
+hand:juggernaut
+inplay:necropotence
+library:millstone
+[PLAYER2]
+[END]
