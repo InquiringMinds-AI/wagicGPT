@@ -1,0 +1,28 @@
+#Yurlok of Scorch Thrash (#1085): generic costs paid from a COLORED-ONLY
+#pool work fine - this 'engine round' dissolved as the Hill Giant trap
+#(third strike): the parked witness cast a {3}{R} mv4 giant from 3 floated
+#mana after Yurlok's {1}{T} activation ate the INIT {1}; canAfford's
+#refusal was correct arithmetic. Gray Ogre ({2}{R}) from pure {B}{R}{G}:
+#R exact, generic {2} consumed from B+G via Diff's colorless borrowing.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}
+inplay:497813
+hand:gray ogre
+[PLAYER2]
+[DO]
+497813
+goto firstmain
+goto firstmain
+gray ogre
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:497813,gray ogre
+tappedinplay:1
+[PLAYER2]
+manapool:{B}{R}{G}
+[END]
