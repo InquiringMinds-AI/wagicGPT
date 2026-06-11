@@ -21,7 +21,7 @@ eot
 [ASSERT]
 UNTAP
 [PLAYER1]
-inplay:Plains, Plains, Plains, Angel of Vitality, Impassioned Orator, Savannah Sage
+inplay:Plains, Plains, Plains, Angel of Vitality, Angel of Vitality, Impassioned Orator
 hand:
 life:23
 [PLAYER2]

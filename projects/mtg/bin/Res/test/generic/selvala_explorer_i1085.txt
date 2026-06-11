@@ -1,0 +1,29 @@
+#Selvala, Explorer Returned (#1085): parley tap. Each player's top card is drawn;
+#my top juggernaut (nonland) = add{G} + gain 1 life; opp top citadel (land) = no
+#rider. Card 382357 = Selvala (comma name needs the set id).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:382357
+library:millstone,juggernaut
+[PLAYER2]
+library:silver myr,darksteel citadel
+[DO]
+382357
+goto firstmain
+goto firstmain
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:21
+manapool:{G}
+hand:juggernaut
+inplay:382357
+library:millstone
+tappedinplay:1
+[PLAYER2]
+hand:darksteel citadel
+library:silver myr
+[END]

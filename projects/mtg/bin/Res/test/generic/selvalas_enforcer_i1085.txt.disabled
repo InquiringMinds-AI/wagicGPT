@@ -1,0 +1,49 @@
+#Selvala's Enforcer (#1085): parley ETB. My top card nonland = +1/+1 counter
+#(2/2 -> 3/3 survives Shock); opponent reveals a land = no counter from that leg.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{3}{G}
+hand:selvala's enforcer,shock
+library:millstone,juggernaut
+inplay:iron myr
+[PLAYER2]
+library:silver myr,darksteel citadel
+[DO]
+selvala's enforcer
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+choice 1
+juggernaut
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+choice 1
+darksteel citadel
+goto firstmain
+goto firstmain
+iron myr
+shock
+selvala's enforcer
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:juggernaut
+graveyard:shock
+inplay:iron myr,selvala's enforcer
+library:millstone
+tappedinplay:1
+[PLAYER2]
+hand:darksteel citadel
+library:silver myr
+[END]
+#PARKED: same reveal-conditional family as selvalas_charge (engine round: trigger-
+#context gaps / reveal-optionone). Probe result: my leg's optiontwo putback + draw
+#work, but optionone's "if type(land|reveal)~lessthan~1 then counter(1/1)" silently
+#no-ops (enforcer stayed 2/2, died to Shock). Opponent parley leg stalls after
+#their reveal (no draw). One reveal-conditional fix should revive both tests.

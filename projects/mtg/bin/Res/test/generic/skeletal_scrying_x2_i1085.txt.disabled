@@ -1,0 +1,39 @@
+#Skeletal Scrying (#1085) X=2 probe - PARKED, engine-blocked. Pool {2}{B},
+#choice 2, exile juggernaut+millstone, expect draw 2 / life 18 / exile 2.
+#FINDING (mapped, ~/Projects/wagicGPT src/ExtraCost.{h,cpp}): ExtraCost holds a
+#SINGLE MTGCardInstance* target and isPaymentSet() = (target != NULL), so ANY
+#E(...) extra cost collects exactly ONE card no matter what the TC quantity
+#says; both exile clicks land ("Clicking ON" both) but the second is ignored.
+#The spell then resolves with the chosen X anyway: draws 2, loses 2, exiles 1 -
+#cost underpayment goes unnoticed. Second layer: the <prex> maxtargets is
+#WParsedInt-evaluated at chooser CREATION (pre-X-menu), the stale-X family.
+#Fix needs multi-target ExtraCost payment (target -> vector, isPaymentSet vs
+#a re-evaluated quantity). Only this card uses E(<prex>) today. X=1 path works
+#and is pinned in skeletal_scrying_i1085.txt.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{B}
+hand:skeletal scrying
+graveyard:juggernaut,millstone,darksteel citadel
+library:hill giant,gold myr,silver myr
+[PLAYER2]
+[DO]
+skeletal scrying
+choice 2
+juggernaut
+millstone
+skeletal scrying
+goto firstmain
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:18
+hand:gold myr,silver myr
+graveyard:darksteel citadel,skeletal scrying
+exile:juggernaut,millstone
+library:hill giant
+[PLAYER2]
+[END]

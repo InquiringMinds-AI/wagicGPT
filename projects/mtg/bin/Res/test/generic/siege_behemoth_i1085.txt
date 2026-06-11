@@ -1,0 +1,27 @@
+#Siege Behemoth (#1085): when blocked, may assign its combat damage as though
+#unblocked. Behemoth (7/4) attacks, hill giant (3/3) blocks, accept the may:
+#opponent takes 7 (life 13), the giant takes nothing and survives, behemoth
+#takes 3 and survives. Declined/broken would leave life 20 and a dead giant.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:siege behemoth
+[PLAYER2]
+inplay:hill giant
+[DO]
+goto attackers
+siege behemoth
+next
+hill giant
+next
+choice 0
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:siege behemoth
+[PLAYER2]
+life:13
+inplay:hill giant
+[END]

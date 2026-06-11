@@ -1,0 +1,30 @@
+#Siren Reaver (#1085): raid - costs {2}{U} instead of {3}{U} if I attacked this
+#turn. Bears attack, then 3 mana (U+B+R myrs) cast it in second main via the
+#raid cost. Without the attack the same 3 mana cannot cast it (counterfactual).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:grizzly bears,silver myr,leaden myr,iron myr
+hand:siren reaver
+[PLAYER2]
+[DO]
+goto attackers
+grizzly bears
+next
+next
+goto secondmain
+silver myr
+leaden myr
+iron myr
+siren reaver
+choice 0
+goto secondmain
+goto secondmain
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:grizzly bears,silver myr,leaden myr,iron myr,siren reaver
+[PLAYER2]
+life:18
+[END]

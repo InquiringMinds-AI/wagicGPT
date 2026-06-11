@@ -98,6 +98,14 @@ generic/red_elemental_blast_i1085.txt
 generic/riptide_mangler_i1085.txt
 generic/run_ashore_i1085.txt
 generic/select_for_inspection_i1085.txt
+generic/selvala_explorer_i1085.txt
+generic/selvala_hotw_i1085.txt
+generic/selvala_hotw_bigpower_i1085.txt
+generic/sensei_golden_tail_i1085.txt
+generic/siege_behemoth_i1085.txt
+generic/sigarda_col_lord_i1085.txt
+generic/siren_reaver_i1085.txt
+generic/skeletal_scrying_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt

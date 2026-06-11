@@ -1,0 +1,45 @@
+#Sen Triplets (#1085): at my upkeep, I may cast cards from the opponent's hand
+#this turn. Cross to my turn-3 upkeep, accept the may, tap myrs, cast their
+#grizzly bears -> bears enter MY battlefield.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:sen triplets,copper myr,leaden myr
+[PLAYER2]
+hand:grizzly bears
+library:millstone,millstone
+[DO]
+goto end
+goto upkeep
+goto end
+goto upkeep
+copper myr
+leaden myr
+goto upkeep
+choice 0
+goto upkeep
+grizzly bears
+goto upkeep
+choice 0
+goto upkeep
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:sen triplets,copper myr,leaden myr,grizzly bears
+tappedinplay:2
+[PLAYER2]
+hand:millstone
+library:millstone
+[END]
+#PARKED after 5 iterations: the upkeep trigger fires and resolves (StackAbility
+#in log) but the "may castcard(normal) target(*|opponenthand)" leg produces NO
+#interaction whatsoever - no may-menu, no target chooser, log silent after
+#resolution. Tried: choice-0-then-click, taps-before-choice, pads between every
+#step, trailing cast-mode choice 0. Myr taps work (mana floats), bears click is
+#found-but-inert. AACastCard uses the isReactingToTargetClick protocol and never
+#became reactive -> the may/castcard leg of a triggered && chain never spawns.
+#Related untested idiom users: the Expertise cycle (spell-context may castcard),
+#Mind's Dilation, Leaf-Crowned Elder (kinship+reveal). Engine-round fuel:
+#trigger-context gaps family (queue item 2) or a castcard-specific resolution gap.
+#Other legs (noactivatedability / maxCast(*)0 lockout) untested in this probe.

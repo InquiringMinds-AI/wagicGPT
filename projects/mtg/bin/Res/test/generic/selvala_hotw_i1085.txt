@@ -1,0 +1,27 @@
+#Selvala, Heart of the Wilds (#1085): another creature entering with power
+#greater than each other creature's power = its controller may draw.
+#Hill giant (3/3) enters past Selvala (2/3) -> choice 0 accepts the draw.
+#Card 416827 = Selvala, Heart of the Wilds (comma name needs the set id).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{3}{R}
+inplay:416827
+hand:hill giant
+library:millstone,juggernaut
+[PLAYER2]
+[DO]
+hill giant
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:juggernaut
+inplay:416827,hill giant
+library:millstone
+[PLAYER2]
+[END]

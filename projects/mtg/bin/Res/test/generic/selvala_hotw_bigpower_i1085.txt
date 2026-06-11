@@ -1,0 +1,27 @@
+#Selvala, Heart of the Wilds (#1085), power 10-19 bucket: Darksteel Colossus
+#(11/11) enters past Selvala (2/3) -> 11 > 2, controller may draw. The original
+#data had an off-by-ten (power=11 bucket compared others against power>=1, so
+#Selvala herself suppressed the draw); fixed to power>=11.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{11}
+inplay:416827
+hand:darksteel colossus
+library:millstone,juggernaut
+[PLAYER2]
+[DO]
+darksteel colossus
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:juggernaut
+inplay:416827,darksteel colossus
+library:millstone
+[PLAYER2]
+[END]

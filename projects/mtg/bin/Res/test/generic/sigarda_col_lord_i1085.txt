@@ -1,0 +1,21 @@
+#Sigarda, Champion of Light (#1085), lord leg: Humans get +1/+1. Eager cadet
+#(1/1 -> 2/2) attacks unblocked: opponent at 18 (a lordless cadet would leave 19).
+#Card 535036 = Sigarda, Champion of Light (comma name needs the set id).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:535036,eager cadet
+[PLAYER2]
+[DO]
+goto attackers
+eager cadet
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:535036,eager cadet
+[PLAYER2]
+life:18
+[END]

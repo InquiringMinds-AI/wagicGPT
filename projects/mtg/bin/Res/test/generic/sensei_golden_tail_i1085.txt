@@ -1,0 +1,42 @@
+#Sensei Golden-Tail (#1085): {1}{W}{T} sorcery-speed training - target creature
+#gains bushido 1 (+ Samurai type + training counter) forever. Trained bears
+#(2/2) attack turn 3, hill giant (3/3) blocks: bushido makes them 3/3 and the
+#trade kills the giant (untrained bears would leave it alive at 3/3-2).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:sensei golden-tail,grizzly bears,gold myr,silver myr
+library:millstone,juggernaut
+[PLAYER2]
+inplay:hill giant
+library:millstone,juggernaut
+[DO]
+gold myr
+silver myr
+sensei golden-tail
+grizzly bears
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto attackers
+grizzly bears
+next
+goto blockers
+goto blockers
+hill giant
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:sensei golden-tail,gold myr,silver myr
+graveyard:grizzly bears
+hand:*
+library:millstone
+[PLAYER2]
+graveyard:hill giant
+hand:*
+library:millstone
+[END]

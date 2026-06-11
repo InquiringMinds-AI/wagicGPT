@@ -1,0 +1,31 @@
+#Skeletal Scrying (#1085): {X}{B}, exile X from my graveyard as additional
+#cost; draw X, lose X. X=1 works end-to-end and is pinned here. X>=2 is
+#engine-blocked: ExtraCost holds a SINGLE target (isPaymentSet = one card), so
+#the E(<prex>...) cost pays exactly one exile regardless of X, while draw/life
+#still use the chosen X (see skeletal_scrying_x2_i1085.txt.disabled).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{B}
+hand:skeletal scrying
+graveyard:juggernaut,millstone,darksteel citadel
+library:hill giant,gold myr,silver myr
+[PLAYER2]
+[DO]
+skeletal scrying
+choice 1
+juggernaut
+skeletal scrying
+goto firstmain
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:19
+hand:silver myr
+graveyard:millstone,darksteel citadel,skeletal scrying
+exile:juggernaut
+library:hill giant,gold myr
+[PLAYER2]
+[END]
