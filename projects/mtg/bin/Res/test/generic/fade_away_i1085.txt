@@ -1,0 +1,28 @@
+#Fade Away (#1085): each creature's controller sacrifices a permanent unless
+#they pay {1}. No mana left after casting -> decline. The granted pay menu is
+#TWO-STAGE: choice 1 (decline) -> choice 0 (the must-may wrap of "sacrifice
+#notaTarget(...)") -> click the victim. Rides the pay[[ grant fix; the old
+#single-choice driving predated the menu existing at all.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears
+hand:fade away
+manapool:{2}{U}
+[PLAYER2]
+[DO]
+fade away
+goto firstmain
+goto firstmain
+choice 1
+goto firstmain
+choice 0
+grizzly bears
+goto secondmain
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+graveyard:fade away,grizzly bears
+[PLAYER2]
+[END]

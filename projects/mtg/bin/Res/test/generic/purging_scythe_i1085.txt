@@ -1,0 +1,29 @@
+#Purging Scythe (#1085): at my upkeep, 2 damage to the creature with the
+#least toughness. The trigger's tc-bearing leaf wraps in a must-may (the
+#general fallback): choice 0 then CLICK the victim - the old park starved the
+#chooser of its click. Clicking the higher-toughness giant is refused (cf).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:purging scythe,hill giant
+[PLAYER2]
+inplay:grizzly bears
+library:darksteel citadel,millstone
+[DO]
+goto end
+goto firstmain
+goto end
+goto upkeep
+choice 0
+grizzly bears
+goto upkeep
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:purging scythe,hill giant
+[PLAYER2]
+hand:*
+library:darksteel citadel
+graveyard:grizzly bears
+[END]
