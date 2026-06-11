@@ -1,0 +1,35 @@
+#Open into Wonder (#1085): X target creatures become unblockable this turn and gain
+#"deals combat damage to a player: draw a card" until end of turn. X=1 on the bears:
+#they attack past the opposing giant (unblockable), connect for 2 (life 18), and the
+#granted rider draws a card.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{U}{U}
+inplay:grizzly bears
+hand:open into wonder
+library:millstone,juggernaut
+[PLAYER2]
+inplay:hill giant
+[DO]
+open into wonder
+choice 1
+grizzly bears
+open into wonder
+goto firstmain
+goto firstmain
+goto attackers
+grizzly bears
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+hand:juggernaut
+inplay:grizzly bears
+graveyard:open into wonder
+library:millstone
+[PLAYER2]
+life:18
+inplay:hill giant
+[END]
