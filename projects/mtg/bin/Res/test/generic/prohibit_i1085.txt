@@ -1,0 +1,30 @@
+#Prohibit (#1085): counter target spell with mana value 2 or less (4 or less if
+#kicked). Unkicked counters the shock; nobody takes damage.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{R}
+hand:shock
+[PLAYER2]
+manapool:{1}{U}
+hand:prohibit
+[DO]
+shock
+p2
+no
+yes
+prohibit
+choice 0
+shock
+goto firstmain
+goto firstmain
+endinterruption
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:shock
+[PLAYER2]
+graveyard:prohibit
+[END]

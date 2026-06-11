@@ -90,6 +90,7 @@ generic/of_one_mind_i1085.txt
 generic/oni_possession_i1085.txt
 generic/open_into_wonder_i1085.txt
 generic/out_of_time_i1085.txt
+generic/prohibit_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
