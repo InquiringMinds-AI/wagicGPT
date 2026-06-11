@@ -1,0 +1,44 @@
+#Prison Term (#1085): the enchanted creature can't attack; when a creature
+#enters under the opponent, may move the Term onto it. The termed bears are
+#held; P2 casts Hill Giant ({3}{R} = MV4 - FOUR myrs needed, the old witness
+#under-provisioned three); choice 0 accepts the retarget may; the freed
+#bears attack and connect (life 18). The aura card lists in the ENCHANTED
+#CREATURE'S CONTROLLER's battlefield zone for asserts (P2 here). Zero
+#engine changes - the parked 'phase stall' no longer reproduces.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}{W}
+hand:prison term
+[PLAYER2]
+inplay:grizzly bears,gold myr,copper myr,iron myr,leaden myr
+hand:hill giant
+[DO]
+prison term
+grizzly bears
+no
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+gold myr
+copper myr
+iron myr
+leaden myr
+hill giant
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+goto attackers
+grizzly bears
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+life:18
+[PLAYER2]
+inplay:grizzly bears,gold myr,copper myr,iron myr,leaden myr,hill giant,prison term
+[END]
