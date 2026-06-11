@@ -97,6 +97,7 @@ generic/puffer_extract_i1085.txt
 generic/red_elemental_blast_i1085.txt
 generic/riptide_mangler_i1085.txt
 generic/run_ashore_i1085.txt
+generic/select_for_inspection_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt

@@ -1,0 +1,37 @@
+#Select for Inspection (#1085): return target TAPPED creature to hand; scry 1.
+#The bears tap by attacking on turn 2; on my turn 3 the bounce takes them.
+[INIT]
+firstmain
+[PLAYER1]
+hand:select for inspection
+library:millstone,juggernaut
+inplay:silver myr
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+goto end
+goto attackers
+grizzly bears
+next
+goto end
+goto firstmain
+silver myr
+select for inspection
+grizzly bears
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:18
+graveyard:select for inspection
+inplay:silver myr
+hand:*
+library:*
+tappedinplay:1
+[PLAYER2]
+hand:grizzly bears
+[END]
