@@ -34,3 +34,15 @@ life:17
 #UPDATE 2026-06-11 reveal round: option-oneshot fix landed; this @combat
 #trigger reveal still never populates (trigger-context populate layer).
 #Park stands.
+#UPDATE 2026-06-11 trigger-populate round: the populate theory is DEAD - the
+#@combat reveal constructs AND populates (6 cards) post earlier fixes. The
+#real blocker: the AI auto-key in MTGRevealingCards::CheckUserInput (suite
+#players are always isAI) self-advances multi-card displays before scripted
+#clicks land. Infrastructure built: revealok/revealnext harness commands +
+#open-display dispatch. A WAGIC_TESTSUITE guard on the auto-key let the picks
+#drive (putbacks worked both legs!) but broke the tuned reveal:1 tests AND
+#exposed the next layer: afterrevealed effects never fire when reveals QUEUE
+#on the shared zone (the empty-branch sees the other reveal's card). REVIVAL
+#RECIPE: re-apply the guard, retune enforcer/charge DOs with revealok, fix
+#the shared-zone after-firing, then drive this with revealok + choice 0 +
+#cadet click.

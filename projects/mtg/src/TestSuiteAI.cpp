@@ -240,6 +240,32 @@ int TestSuiteAI::Act(float)
         if (observer->mLayers->stackLayer()->askIfWishesToInterrupt == this)
             observer->mLayers->stackLayer()->cancelInterruptOffer();
     }
+    else if (action.find("revealok") != string::npos || action.find("revealnext") != string::npos)
+    {
+        //Drive an open reveal display (MTGRevealingCards). The engine's AI
+        //auto-key is disabled under WAGIC_TESTSUITE, so scripts advance
+        //reveals explicitly: revealok = confirm/advance (builds option two
+        //when the first ability is done), revealnext = done-with-selection.
+        DebugTrace("TESTSUITE reveal key");
+        ActionLayer * al = observer->mLayers->actionLayer();
+        MTGRevealingCards * pick = NULL;
+        for (size_t i = 0; i < al->mObjects.size(); i++)
+        {
+            if (!al->mObjects[i]) continue;
+            MTGRevealingCards * rev = dynamic_cast<MTGRevealingCards*>((ActionElement*)al->mObjects[i]);
+            if (!rev) continue;
+            if (!pick) pick = rev;
+            //several reveals can coexist on a shared zone (parley); the key
+            //must go to the one whose display is actually open
+            if (observer->OpenedDisplay && rev->revealDisplay == observer->OpenedDisplay)
+            {
+                pick = rev;
+                break;
+            }
+        }
+        if (pick)
+            pick->CheckUserInput(action.find("revealnext") != string::npos ? JGE_BTN_NEXT : JGE_BTN_OK);
+    }
     else if (action.find("choice ") != string::npos)
     {
         DebugTrace("TESTSUITE choice !!!");
