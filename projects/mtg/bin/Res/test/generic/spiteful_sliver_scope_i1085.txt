@@ -1,0 +1,28 @@
+#Spiteful Sliver (#1085), grant scope: with TWO slivers out, shocking one must
+#re-deal only ITS damage (2 -> life 18). The original grant triggered on
+#@damaged(sliver) - any sliver - so every sliver's copy fired off one shock
+#(2+2 -> life 16). Fixed to @damaged(this).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{R}
+inplay:spiteful sliver,metallic sliver
+hand:shock
+[PLAYER2]
+[DO]
+shock
+metallic sliver
+goto firstmain
+goto firstmain
+choice 0
+p2
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:shock,metallic sliver
+inplay:spiteful sliver
+[PLAYER2]
+life:18
+[END]

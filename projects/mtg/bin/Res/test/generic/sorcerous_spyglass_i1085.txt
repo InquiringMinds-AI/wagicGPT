@@ -1,0 +1,21 @@
+#Sorcerous Spyglass (#1085): the reported edge - opponent has NO cards in
+#hand. Oracle: the ETB look at an empty hand is fine and you still choose a
+#name. The script's look leg is target(*|opponenthand), which has no legal
+#target when their hand is empty; the cast must still resolve.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}
+hand:sorcerous spyglass
+[PLAYER2]
+[DO]
+sorcerous spyglass
+goto firstmain
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:sorcerous spyglass
+[PLAYER2]
+[END]

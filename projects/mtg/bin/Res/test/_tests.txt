@@ -106,6 +106,14 @@ generic/siege_behemoth_i1085.txt
 generic/sigarda_col_lord_i1085.txt
 generic/siren_reaver_i1085.txt
 generic/skeletal_scrying_i1085.txt
+generic/skeleton_scavengers_i1085.txt
+generic/skyclave_apparition_i1085.txt
+generic/slaughter_the_strong_i1085.txt
+generic/sorcerous_spyglass_i1085.txt
+generic/soul_charmer_i1085.txt
+generic/spin_into_myth_i1085.txt
+generic/spiteful_sliver_i1085.txt
+generic/spiteful_sliver_scope_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt

@@ -1,0 +1,33 @@
+#Skyclave Apparition (#1085): cast via the "Exile opponent card" mode exiling
+#hill giant (mv 3); when the apparition dies the giant's owner gets a 3/3 blue
+#Illusion (a wrong storedmanacost of 0 would mint a 0/0 that SBA-dies - the
+#surviving token is the proof the manacost pipeline worked).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}{W}
+inplay:iron myr
+hand:skyclave apparition,shock
+[PLAYER2]
+inplay:hill giant
+[DO]
+skyclave apparition
+choice 1
+hill giant
+goto firstmain
+goto firstmain
+iron myr
+shock
+skyclave apparition
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:shock,skyclave apparition
+inplay:iron myr
+tappedinplay:1
+[PLAYER2]
+exile:hill giant
+inplay:*
+[END]

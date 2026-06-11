@@ -1,0 +1,28 @@
+#Slaughter the Strong (#1085): scripted as "each player sacrifices all
+#creatures with power >= 5" (an approximation of the oracle's total-power-4
+#keep). My juggernaut (5/3) and their craw wurm (6/4) die; bears and cadet
+#stay. The opponent half is an ability$!...!$ player-grant.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}{W}
+hand:slaughter the strong
+inplay:juggernaut,grizzly bears
+[PLAYER2]
+inplay:craw wurm,eager cadet
+[DO]
+slaughter the strong
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:slaughter the strong,juggernaut
+inplay:grizzly bears
+[PLAYER2]
+graveyard:craw wurm
+inplay:eager cadet
+[END]

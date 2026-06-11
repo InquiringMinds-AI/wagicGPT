@@ -1,0 +1,33 @@
+#Skeleton Scavengers (#1085): enters with a +1/+1 counter; pay {X} = its
+#counter count to regenerate it and add a counter. Cast it (ETB counter),
+#activate the {1} bucket (shield + grow), then bolt it: it regenerates -
+#alive and TAPPED (tappedinplay counts it + the spent myrs). Without the
+#shield the bolt kills it.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{B}
+inplay:silver myr,iron myr
+hand:skeleton scavengers,lightning bolt
+[PLAYER2]
+[DO]
+skeleton scavengers
+goto firstmain
+goto firstmain
+silver myr
+skeleton scavengers
+goto firstmain
+goto firstmain
+iron myr
+lightning bolt
+skeleton scavengers
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:silver myr,iron myr,skeleton scavengers
+graveyard:lightning bolt
+tappedinplay:3
+[PLAYER2]
+[END]

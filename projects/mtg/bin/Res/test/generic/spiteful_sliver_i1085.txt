@@ -1,0 +1,27 @@
+#Spiteful Sliver (#1085): slivers I control get "when dealt damage, deal THAT
+#MUCH to target player/planeswalker". Shock my own sliver (2 damage) -> redeal
+#2 at the opponent (life 18). The original data had damage:1 hardcoded (would
+#leave 19); fixed to damage:thatmuch.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{R}
+inplay:spiteful sliver
+hand:shock
+[PLAYER2]
+[DO]
+shock
+spiteful sliver
+goto firstmain
+goto firstmain
+choice 0
+p2
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:shock,spiteful sliver
+[PLAYER2]
+life:18
+[END]

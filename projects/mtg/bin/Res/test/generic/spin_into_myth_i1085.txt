@@ -1,0 +1,26 @@
+#Spin into Myth (#1085): put target creature on top of its owner's library,
+#then fateseal 2. Core bounce leg: hill giant leaves the battlefield onto the
+#top of P2's library (library: lists bottom-to-top, giant = last).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}{U}
+hand:spin into myth
+[PLAYER2]
+inplay:hill giant
+library:darksteel citadel,juggernaut
+[DO]
+spin into myth
+hill giant
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:spin into myth
+[PLAYER2]
+library:darksteel citadel,juggernaut,hill giant
+[END]

@@ -1,0 +1,30 @@
+#Soul Charmer (#1085): combat damage to a creature -> I gain 2 unless its
+#controller pays {2}. Charmer attacks, wall of wood (0/3) blocks, opponent has
+#no mana and declines -> I gain 2 (life 22). Only the DECLINE leg is testable:
+#the PAY leg needs opponent mana at my damage step (INIT pool drains by then,
+#and they cannot tap on my turn). choice 0 on the unaffordable pay[[ menu HANGS
+#the suite (no auto-decline) - pay[[-in-trigger-grant family, engine round 1.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:soul charmer
+[PLAYER2]
+inplay:wall of wood
+[DO]
+goto attackers
+soul charmer
+next
+wall of wood
+next
+choice 1
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+life:22
+inplay:soul charmer
+[PLAYER2]
+life:20
+inplay:wall of wood
+[END]
