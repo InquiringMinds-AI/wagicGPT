@@ -1,0 +1,32 @@
+#Riptide Mangler (#1085): {1}{U}: change its base power to target creature's power.
+#With the 3/3 giant around, the power-3 option is live: the 0/3 mangler becomes 3/3
+#and attacks for 3 next turn.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{U}
+inplay:riptide mangler
+[PLAYER2]
+inplay:hill giant
+[DO]
+riptide mangler
+choice 1
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto firstmain
+goto attackers
+riptide mangler
+choice 0
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:riptide mangler
+[PLAYER2]
+life:17
+inplay:hill giant
+[END]
