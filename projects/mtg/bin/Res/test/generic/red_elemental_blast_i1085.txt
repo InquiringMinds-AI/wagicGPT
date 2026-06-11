@@ -1,0 +1,22 @@
+#Red Elemental Blast (#1085): choose one - counter a blue spell, or destroy a blue
+#permanent. Destroy mode kills the Air Elemental.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{R}
+hand:red elemental blast
+[PLAYER2]
+inplay:air elemental
+[DO]
+red elemental blast
+choice 1
+air elemental
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:red elemental blast
+[PLAYER2]
+graveyard:air elemental
+[END]
