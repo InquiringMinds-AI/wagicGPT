@@ -62,3 +62,11 @@ exile:grizzly bears
 #lose zone/descriptor state), or must-menu cantCancel semantics. NEXT:
 #instrument DescriptorTargetChooser::clone fidelity (compare zones/nbzones/
 #cd->types before vs after clone), or test with cantCancel forced 0.
+#TRIED AND INSUFFICIENT (reverted, unproven): gating MayAbility::
+#isReactingToTargetClick with the same validTargetsExist check Update uses
+#(theory: the dead power-3 sibling joins the merged same-source menu and
+#its empty chooser becomes the waiting action; canTarget(bears)=0 against
+#power=3 fits the trace perfectly) - the probe still fails identically, so
+#either entry routing differs or there is another layer. Next session:
+#trace WHICH May's reactToTargetClick fires on choice 0 (print the bucket),
+#and what the auto-cancelled tc's power criterion actually is.
