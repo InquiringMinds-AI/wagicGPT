@@ -192,6 +192,23 @@ void WParsedInt::init(string s, Spell * spell, MTGCardInstance * card)
             delete cX;
         }
     }
+    else if(s == "prexx")
+    {
+        //Same as prex but for {X}{X} costs (Hour of Eternity): the chosen X,
+        //or pre-cast, the leftover pool halved. Previously unparsed - it fell
+        //through to atoi()=0 and the chooser ignored a zero max, so an X=0
+        //cast still let you exile a target.
+        if (card->setX > -1)
+        {
+            intValue = card->setX;
+        }
+        else
+        {
+            ManaCost * cX = card->controller()->getManaPool()->Diff(card->getManaCost());
+            intValue = cX->getCost(Constants::NB_Colors) / 2;
+            delete cX;
+        }
+    }
     else if (s == "x" || s == "X" || s == "fullpaid")
     {
         intValue = computeX(spell, card);
