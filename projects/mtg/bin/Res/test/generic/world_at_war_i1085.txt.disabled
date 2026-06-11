@@ -36,3 +36,10 @@ life:16
 #does nothing on master. (2) _REBOUND_ exile-on-resolve also fails (the spell
 #is not in exile). Engine fuel: phase-ring alteration machinery + rebound;
 #related older item = "opponent's-combat instant-cast harness gap".
+#RE-PROBED 2026-06-11 (post if-then-choice/vengeful rounds): both legs still
+#dead as-is. The _REBOUND_ exile uses all(this|mystack) (zone-correct,
+#unlike vengeful's bare all(this)) and the `if rebound` restriction counts
+#cardsSeenThisTurn-from-hand (satisfiable) - so the failure is in the
+#lord-on-stack match or cond evaluation timing; re-add LORDDBG to discriminate.
+#The extra-combat leg (nextphasealter(add,combatphaseswithmain,...)) is the
+#real phase-ring round. Park stands.
