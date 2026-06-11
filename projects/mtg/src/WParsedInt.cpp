@@ -775,6 +775,13 @@ void WParsedInt::init(string s, Spell * spell, MTGCardInstance * card)
     {
         intValue = (target->currentZone == target->controller()->game->stack)?(target->myconvertedcost + target->castX):target->myconvertedcost;//X is 0 except if it's on the stack
     }
+    else if (s == "srcmanacost") //the evaluation-context card's OWN converted cost.
+    {
+        //"manacost" reads card->target when set - an animated ATTACHED
+        //equipment (living weapon) evaluated its GERM's cost (0) and died
+        //as a 0/0. Animator grants use this target-blind spelling instead.
+        intValue = card->myconvertedcost;
+    }
     else if(s == "snowdiffmana") //Return 1 if the difference between snowpool and converted manacost is more than 0
     {
         int snowpool = target->controller()->snowManaG + target->controller()->snowManaU + target->controller()->snowManaR + target->controller()->snowManaB + target->controller()->snowManaW + target->controller()->snowManaC;

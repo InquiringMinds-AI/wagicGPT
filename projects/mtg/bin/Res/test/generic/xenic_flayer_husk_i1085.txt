@@ -1,0 +1,32 @@
+#Xenic Poltergeist + Flayer Husk (#1085): animating an ATTACHED living
+#weapon makes it a 1/1 artifact creature; it UNATTACHES from its germ (the
+#0/0 germ dies) and survives on the battlefield. ENGINE FIX captured: the
+#granted manacost/manacost P/T ability evaluated 'manacost' against
+#card->target when set - the attached husk read its GERM's mana value (0)
+#and died as a 0/0 (the unattached millstone worked: no target, falls back
+#to itself). New target-blind keyword srcmanacost; all self-referential
+#animator grants (Titania's Song, March of the Machines, Karn +1, Animate
+#Artifact, Hedron Matrix, Opalescence, Xenic) now use it.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}
+inplay:xenic poltergeist
+hand:flayer husk
+[PLAYER2]
+[DO]
+flayer husk
+goto firstmain
+goto firstmain
+xenic poltergeist
+flayer husk
+goto firstmain
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:xenic poltergeist,flayer husk
+tappedinplay:1
+[PLAYER2]
+[END]
