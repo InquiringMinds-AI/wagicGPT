@@ -1,0 +1,25 @@
+#Nightveil Specter (#1085): whenever it deals combat damage to a player, THAT PLAYER
+#exiles the top card of THEIR library (was exiling its controller's own top card -
+#data bug: mylibrary -> opponentlibrary in the trigger).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:nightveil specter
+library:millstone,juggernaut
+[PLAYER2]
+library:gold myr,silver myr
+[DO]
+goto attackers
+nightveil specter
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:nightveil specter
+library:millstone,juggernaut
+[PLAYER2]
+life:18
+library:gold myr
+exile:silver myr
+[END]
