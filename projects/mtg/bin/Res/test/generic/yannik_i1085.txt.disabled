@@ -30,11 +30,17 @@ inplay:484726
 exile:grizzly bears
 [PLAYER2]
 [END]
-#PARKED: Yannik's ETB does NOTHING on master - trace shows the creature
-#resolve with no follow-up StackAbility; the bucketed "if type(...)~morethan~0
-#then choice name(...) (blink)forsrc target(...)" lines are BARE auto= lines
-#(no @movedTo(this) trigger marker) and never fire. choice 0 + target clicks
-#land on nothing. Fix direction: wrap the buckets in @movedTo(this|
-#myBattlefield) triggers (Skyclave pattern) - or engine-round: define bare
-#conditional-choice auto lines as ETB one-shots. (blink)forsrc is also an
-#unwhitelisted leaf if the lost-chooser path ever applies.
+#PARKED - ROOT CAUSE SHARPENED (2026-06-11): two stacked parser facts kill
+#every "if cond then choice name(X) ... target(Y)" bare ETB line:
+#  1. the may/choice keyword check (MTGAbility.cpp ~2765) only matches at
+#     POSITION 0 of sWithoutTc - inside an if-then it never fires;
+#  2. the top-level tc extraction is not bracket-aware (round-23 family) and
+#     steals the then-branch's target() before IfThenAbility recurses, so
+#     even the sub-parse sees no chooser.
+#@movedTo(this|myBattlefield) wrapping was tried and does NOT fire for cast
+#ETBs (not an established idiom - Skyclave's is a death trigger).
+#THE FAMILY IS HUGE: ~2600 primitive lines share the if-then+target( shape
+#(choice-ETB damage/destroy/exile across the dataset) - this is a major
+#engine round (if-then-choice family), not a Yannik data fix. Yannik also
+#layers ability\$! counter-assignment legs (one-strip-per-parse hazard) on
+#the power>=1 buckets.
