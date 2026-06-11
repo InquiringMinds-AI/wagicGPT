@@ -1,0 +1,40 @@
+#Vapor Snare (#1085) upkeep-cost witness - PARKED, same engine bug as Thirst:
+#"all(this) transforms((,newability[upcost[...] sacrifice])) forever" never
+#registers its AUpkeep (granted upcost is dead; direct auto=upcost users work).
+#Oracle: at my upkeep, sacrifice the snare unless I return a land - with no
+#land bounced the snare must go to the graveyard and the bears return to P2.
+#The complaint ("sacrificed my creature") matches the OLD bare-upcost form
+#which - like all aura auto lines - applied to the ENCHANTED creature.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}{U}
+hand:vapor snare
+library:darksteel citadel,millstone
+[PLAYER2]
+inplay:grizzly bears
+library:darksteel citadel,millstone
+[DO]
+vapor snare
+grizzly bears
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto upkeep
+goto upkeep
+choice 1
+goto upkeep
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+graveyard:vapor snare
+hand:*
+library:darksteel citadel,millstone
+[PLAYER2]
+inplay:grizzly bears
+hand:*
+library:darksteel citadel
+[END]

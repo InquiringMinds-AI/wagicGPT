@@ -1,0 +1,24 @@
+#Weathered Runestone (#1085): nonland cards can't enter the battlefield from
+#graveyards/libraries. Zombify returns the bears - the runestone bounces them
+#straight back to the graveyard (without it the bears stay - verified
+#counterfactually; zombify itself works).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{3}{B}
+inplay:weathered runestone
+hand:zombify
+graveyard:grizzly bears
+[PLAYER2]
+[DO]
+zombify
+grizzly bears
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:weathered runestone
+graveyard:zombify,grizzly bears
+[PLAYER2]
+[END]

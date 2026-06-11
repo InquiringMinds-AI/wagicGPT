@@ -1,0 +1,41 @@
+#Vengeful Rebirth (#1085): return a card from my graveyard to hand; a nonland
+#return also deals its mana value to any target; the spell exiles itself.
+#Return hill giant (mv 3), point 3 at the opponent: life 17, giant in hand,
+#rebirth in exile.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}{R}{G}
+hand:vengeful rebirth
+graveyard:hill giant,darksteel citadel
+[PLAYER2]
+[DO]
+vengeful rebirth
+goto firstmain
+goto firstmain
+choice 1
+goto firstmain
+hill giant
+goto firstmain
+goto firstmain
+choice 0
+p2
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:hill giant
+exile:vengeful rebirth
+graveyard:darksteel citadel
+[PLAYER2]
+life:17
+[END]
+#PARKED: the spell resolves with ZERO follow-up - none of the bucketed
+#"if type(*[manacost=N]|mygraveyard)... then choice name(...):target(...)"
+#lines spawn a menu (trace shows no StackAbility after resolution), and the
+#self-exile "moveto(myexile) all(this)" no-ops too (the card lands in the
+#GRAVEYARD - all(this) of a resolving stack card matches nothing). Note the
+#odd `choice name(X):effect` COLON syntax - ~28 occurrences in the primitives,
+#possibly all dead the same way. Engine-round fuel: resolution-time choice
+#menus from spell auto-lines + stack-card self-moves + audit the colon idiom.

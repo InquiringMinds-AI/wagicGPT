@@ -1,0 +1,33 @@
+#Winota, Joiner of Forces (#1085; set id 479736 - comma name): a non-Human attacker triggers - look at top 6, put a Human
+#from among them onto the battlefield tapped and ATTACKING (the complaint).
+#Bears attack; eager cadet should arrive attacking -> opponent takes 2+1.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:479736,grizzly bears
+library:darksteel citadel,millstone,juggernaut,gold myr,silver myr,eager cadet
+[PLAYER2]
+[DO]
+goto attackers
+grizzly bears
+next
+choice 0
+goto blockers
+eager cadet
+goto blockers
+goto blockers
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:479736,grizzly bears,eager cadet
+library:*,*,*,*,*
+[PLAYER2]
+life:17
+[END]
+#PARKED: reveal-machinery family, 5th witness (selvalas charge/enforcer,
+#shifting_shadow, sigarda coven cousins; Reveal:6 variant). The attack
+#trigger fires but the optionone target(human|reveal) machinery moves nothing
+#- library untouched, no human enters, bears hit alone. The complaint's
+#"must enter attacking" (readytofight) leg is unreachable behind it.

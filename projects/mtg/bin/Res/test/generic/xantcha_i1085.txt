@@ -1,0 +1,21 @@
+#Xantcha, Sleeper Agent (#1085; set id 450651): enters under an opponent's
+#control - cast by me, it lands on THEIR battlefield. (The {3} drain is
+#"any player may activate" - unscriptable for the non-controller; the
+#controller-side activation rides the opponent-interaction gap.)
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{B}{R}
+hand:450651
+[PLAYER2]
+[DO]
+450651
+goto firstmain
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+[PLAYER2]
+inplay:450651
+[END]

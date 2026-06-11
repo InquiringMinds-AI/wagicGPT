@@ -1,0 +1,28 @@
+#Vedalken Humiliator (#1085): metalcraft attack trigger - with 3+ artifacts,
+#opponent creatures become 1/1 and lose abilities. Their craw wurm (6/4)
+#blocks as a 1/1: dies to the 3 power, humiliator survives on 1 damage
+#(unshrunk, the wurm kills the 3/4 humiliator instead - the counterfactual).
+#NOTE: the data's transforms lacks ueot (oracle: until end of turn) - the
+#shrink may persist; unobservable here (the blocker dies) and unasserted.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:vedalken humiliator,gold myr,silver myr,leaden myr
+[PLAYER2]
+inplay:craw wurm
+[DO]
+goto attackers
+vedalken humiliator
+next
+craw wurm
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:vedalken humiliator,gold myr,silver myr,leaden myr
+tappedinplay:1
+[PLAYER2]
+life:20
+graveyard:craw wurm
+[END]

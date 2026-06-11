@@ -1,0 +1,42 @@
+#Xanathar, Guild Kingpin (#1085; set id 527526): at my upkeep, until EOT I may
+#look at + play the opponent's top card with any-color mana (and they can't
+#cast). At T3 upkeep: activate the granted {0} look (their millstone to my
+#hand), choose "Can play card", pay with myrs via any-mana -> millstone on MY
+#battlefield.
+#DATA FIX captured here: the look leg was "moveto(hand)" which resolved to the
+#card OWNER's hand - the opponent got a free draw every upkeep. Now
+#moveto(myhand) (the grant lives on Xanathar, my side).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:527526,silver myr,leaden myr
+library:darksteel citadel,gold myr
+[PLAYER2]
+library:darksteel citadel,millstone,juggernaut
+[DO]
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto upkeep
+527526
+goto upkeep
+choice 1
+goto upkeep
+goto firstmain
+silver myr
+leaden myr
+millstone
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:527526,silver myr,leaden myr,millstone
+library:darksteel citadel
+hand:gold myr
+tappedinplay:2
+[PLAYER2]
+hand:*
+library:darksteel citadel
+[END]

@@ -1,0 +1,28 @@
+#War of the Spark (#1085), chapter I: saga enters with a lore counter; each
+#player may put a planeswalker/Zombie from hand or graveyard onto the
+#battlefield. My walking corpse (zombie) comes down from hand via the choice
+#menu. (Chapters II/III span more turns - chapter I is the pinned slice.)
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{3}{B}
+hand:war of the spark,walking corpse
+[PLAYER2]
+[DO]
+war of the spark
+goto firstmain
+goto firstmain
+choice 1
+goto firstmain
+walking corpse
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:war of the spark,walking corpse
+[PLAYER2]
+[END]

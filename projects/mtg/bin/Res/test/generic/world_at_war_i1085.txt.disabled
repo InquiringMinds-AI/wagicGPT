@@ -1,0 +1,38 @@
+#World at War (#1085): after the first second main, an extra combat (+main)
+#this turn; creatures that attacked untap at its start. Bears attack twice:
+#opponent at 16. Rebound exiles the spell on resolution.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{3}{R}{R}
+inplay:grizzly bears
+[PLAYER2]
+[DO]
+world at war
+goto firstmain
+goto firstmain
+goto attackers
+grizzly bears
+next
+next
+goto secondmain
+goto attackers
+grizzly bears
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:grizzly bears
+exile:world at war
+tappedinplay:1
+[PLAYER2]
+life:16
+[END]
+#PARKED: two engine findings. (1) The extra combat NEVER exists - trace shows
+#the phase ring run Main phase 2 -> End -> Cleanup directly; the
+#nextphasealter(add,combatphaseswithmain,controller,after<postbattle>) line
+#does nothing on master. (2) _REBOUND_ exile-on-resolve also fails (the spell
+#is not in exile). Engine fuel: phase-ring alteration machinery + rebound;
+#related older item = "opponent's-combat instant-cast harness gap".

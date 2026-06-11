@@ -37,4 +37,6 @@ graveyard:darksteel citadel,soul strings
 #reaches the harness's getCard but the game's target chooser doesn't take it).
 #Behind that wedge sit the real quarry: pay[[{value:storedx}]] in a transforms
 #grant (stale-X + pay[[ family, engine round 1). Compare: dreadhorde casts
-#FROM graveyard via its own ability (different path, works).
+#FROM graveyard via its own ability (different path, works). REFINED
+#2026-06-11: Zombify (single target=creature|mygraveyard) casts FINE - the
+#wedge is specific to MULTI-target (<2>) graveyard choosers at cast time.

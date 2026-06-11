@@ -1,0 +1,30 @@
+#Yurlok of Scorch Thrash (#1085; set id 497813): {1}{T} - each player adds
+#{B}{R}{G}. The R pays an exact-color shock (opponent 18); my B+G and the
+#opponent's full add float at assert time. The mana-burn static is not
+#scripted on master. Generic payment from this colored mana is engine-blocked
+#- see the .disabled witness.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}
+inplay:497813
+hand:shock
+[PLAYER2]
+[DO]
+497813
+goto firstmain
+shock
+p2
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+manapool:{B}{G}
+inplay:497813
+graveyard:shock
+tappedinplay:1
+[PLAYER2]
+manapool:{B}{R}{G}
+life:18
+[END]

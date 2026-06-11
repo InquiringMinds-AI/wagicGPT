@@ -1,0 +1,27 @@
+#Xenic Poltergeist (#1085): {T} - target noncreature artifact becomes an
+#mv/mv artifact creature until my next upkeep. Animated millstone (2/2) is
+#shock-targetable and dies; unanimated it cannot even be targeted (cf).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:xenic poltergeist,millstone,iron myr
+hand:shock
+[PLAYER2]
+[DO]
+xenic poltergeist
+millstone
+goto firstmain
+goto firstmain
+iron myr
+shock
+millstone
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:shock,millstone
+inplay:xenic poltergeist,iron myr
+tappedinplay:2
+[PLAYER2]
+[END]

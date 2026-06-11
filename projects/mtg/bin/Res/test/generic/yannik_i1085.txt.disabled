@@ -1,0 +1,40 @@
+#Yannik, Scavenging Sentinel (#1085; set id 484726): ETB - exile another
+#creature I control (until Yannik leaves) and distribute its power in +1/+1
+#counters. Single bucket on board: exile the bears (power 2), both counters
+#onto Yannik himself.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{G}{W}
+inplay:grizzly bears
+hand:484726
+[PLAYER2]
+[DO]
+484726
+goto firstmain
+goto firstmain
+choice 0
+grizzly bears
+goto firstmain
+choice 0
+484726
+goto firstmain
+choice 0
+484726
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:484726
+exile:grizzly bears
+[PLAYER2]
+[END]
+#PARKED: Yannik's ETB does NOTHING on master - trace shows the creature
+#resolve with no follow-up StackAbility; the bucketed "if type(...)~morethan~0
+#then choice name(...) (blink)forsrc target(...)" lines are BARE auto= lines
+#(no @movedTo(this) trigger marker) and never fire. choice 0 + target clicks
+#land on nothing. Fix direction: wrap the buckets in @movedTo(this|
+#myBattlefield) triggers (Skyclave pattern) - or engine-round: define bare
+#conditional-choice auto lines as ETB one-shots. (blink)forsrc is also an
+#unwhitelisted leaf if the lost-chooser path ever applies.

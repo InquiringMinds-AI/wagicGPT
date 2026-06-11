@@ -1,0 +1,28 @@
+#Wall of Mourning (#1085): ETB exiles my top card face down; coven at my end
+#step returns an exiled card to hand. Wall (0) + bears (2) + giant (3) give
+#coven on T1: the exiled juggernaut comes to hand at end of turn.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}
+hand:wall of mourning
+inplay:grizzly bears,hill giant
+library:darksteel citadel,juggernaut
+[PLAYER2]
+[DO]
+wall of mourning
+goto firstmain
+goto firstmain
+goto end
+choice 0
+juggernaut
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+hand:juggernaut
+inplay:wall of mourning,grizzly bears,hill giant
+library:darksteel citadel
+[PLAYER2]
+[END]

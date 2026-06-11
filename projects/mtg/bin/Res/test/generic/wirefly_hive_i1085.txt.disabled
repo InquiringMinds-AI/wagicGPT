@@ -1,0 +1,7 @@
+#Wirefly Hive (#1085) - DEFERRED without a probe: coin-flip cards are benched
+#until the threaded-suite path unification (main vs workers consume different
+#RNG prefixes; jack_in_the_mox precedent).
+#DATA BUG visible by inspection (fix when flips become testable): the
+#lose-branch is "loseability sacrifice loseabilityend" - it sacrifices the
+#HIVE. Oracle: "If you lose the flip, destroy all permanents named Wirefly"
+#- should be destroy all(*[Wirefly]|battlefield), the Hive survives.

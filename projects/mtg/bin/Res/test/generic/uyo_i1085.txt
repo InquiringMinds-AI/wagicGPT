@@ -1,0 +1,34 @@
+#Uyo, Silent Prophet (#1085; set id 376565): {2} + bounce two lands - copy
+#target instant/sorcery on the stack. Shock at the opponent, respond with
+#Uyo copying it, copy also at the opponent: 4 total damage (life 16), both
+#lands in hand.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{R}
+inplay:376565,darksteel citadel,ancient den
+hand:shock
+[PLAYER2]
+[DO]
+shock
+p2
+yes
+376565
+darksteel citadel
+ancient den
+shock
+goto firstmain
+choice 0
+p2
+endinterruption
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:shock
+inplay:376565
+hand:darksteel citadel,ancient den
+[PLAYER2]
+life:16
+[END]

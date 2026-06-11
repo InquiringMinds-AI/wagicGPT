@@ -1,0 +1,35 @@
+#Withercrown (#1085), upkeep leg: the enchanted creature's controller loses 1
+#life unless they sacrifice it at THEIR upkeep. Crown their giant; they
+#leave the pay prompt unanswered at their turn-2 upkeep (answering it with
+#ANY choice index pays the 1 life and keeps the giant - that's the
+#counterfactual) -> giant sacrificed, crown follows it to the graveyard. NOTE: this granted upcost WORKS because it rides a
+#teach(creature) transforms - unlike the dead all(this)/lord grants
+#(thirst, vapor snare, vile consumption) - the teach path wires AUpkeep.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{B}
+hand:withercrown
+library:darksteel citadel,millstone
+[PLAYER2]
+inplay:hill giant
+library:darksteel citadel,millstone
+[DO]
+withercrown
+hill giant
+goto firstmain
+goto firstmain
+goto end
+goto upkeep
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:withercrown
+library:darksteel citadel,millstone
+[PLAYER2]
+graveyard:hill giant
+hand:*
+library:darksteel citadel
+[END]

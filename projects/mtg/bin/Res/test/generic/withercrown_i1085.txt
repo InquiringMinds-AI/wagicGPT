@@ -1,0 +1,28 @@
+#Withercrown (#1085), power leg: enchanted creature has base power 0. Crown my
+#own bears and attack the same turn (no upkeep crossing): they connect for
+#NOTHING - opponent stays at 20 (uncrowned bears deal 2).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{B}
+hand:withercrown
+inplay:grizzly bears
+[PLAYER2]
+[DO]
+withercrown
+grizzly bears
+goto firstmain
+goto firstmain
+goto attackers
+grizzly bears
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:withercrown,grizzly bears
+tappedinplay:1
+[PLAYER2]
+life:20
+[END]

@@ -1,0 +1,22 @@
+#Vapor Snare (#1085), steal leg: aura takes control of the enchanted creature.
+#Their bears are mine right after the cast. (The at-upkeep return-a-land-or-
+#sacrifice cost is the dead granted-upcost family - see the .disabled witness;
+#asserts here stay at cast time so they hold once that engine bug is fixed.)
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}{U}
+hand:vapor snare
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+vapor snare
+grizzly bears
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:vapor snare,grizzly bears
+[PLAYER2]
+[END]

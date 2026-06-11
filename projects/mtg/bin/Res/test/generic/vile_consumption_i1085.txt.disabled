@@ -1,0 +1,39 @@
+#Vile Consumption (#1085): all creatures get "at your upkeep, sacrifice this
+#unless you pay 1 life". Decline at my T3 upkeep -> bears sacrificed (or pay:
+#life 19). On master NEITHER happens.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{U}{B}
+hand:vile consumption
+inplay:grizzly bears
+library:darksteel citadel,millstone
+[PLAYER2]
+library:darksteel citadel,millstone
+[DO]
+vile consumption
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto upkeep
+goto upkeep
+choice 1
+goto upkeep
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+graveyard:grizzly bears
+inplay:vile consumption
+library:darksteel citadel,millstone
+[PLAYER2]
+hand:*
+library:darksteel citadel
+[END]
+#PARKED: 3rd granted-upcost witness (thirst, vapor_snare_upcost cousins). The
+#lord(creature) transforms((,newability[upcost[{L:1}] sacrifice])) grant never
+#registers its AUpkeep - no prompt, no sacrifice, the enchantment is a no-op.
+#The complaint ("needs a prompt for the payment or sacrifice") is literal.
+#Engine fuel: wire AUpkeep registration for granted/teach-granted abilities.
