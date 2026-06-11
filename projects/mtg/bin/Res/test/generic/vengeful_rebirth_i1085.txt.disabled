@@ -2,6 +2,17 @@
 #return also deals its mana value to any target; the spell exiles itself.
 #Return hill giant (mv 3), point 3 at the opponent: life 17, giant in hand,
 #rebirth in exile.
+#PARK UPDATE 2026-06-11 evening: DATA FIX LANDED - the 22 'choice name(X)
+#:target(...)' colon sites in this card's buckets parsed as phantom
+#zero-cost ACTIVATED abilities (the leading colon hits the cost-split);
+#colons removed, and a choose-one menu NOW SPAWNS (choice 1 = the mv3
+#bucket accepts, hill giant click lands). REMAINING: the accepted GTA never
+#fires through the stack after the target click (no StackAbility), and the
+#self-exile line (moveto(myexile) all(this)) never fires either - the
+#rebirth ends in the graveyard. Suspect the spell-source lifecycle (the
+#instant leaves the stack at resolution; the may/GTA source is a non-
+#battlefield card) - instrument the click routing + ALord all(this) on a
+#resolving instant next. Driving so far: cast, pads, choice 1, giant click.
 [INIT]
 firstmain
 [PLAYER1]
