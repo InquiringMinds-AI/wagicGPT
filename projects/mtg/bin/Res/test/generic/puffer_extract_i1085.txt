@@ -1,0 +1,30 @@
+#Puffer Extract (#1085): {X}{T}: target creature you control gets +X/+X until end of
+#turn; destroy it at the next end step. X=2 on the bears: they swing as 4/4 (life 16),
+#then die at end of turn.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}
+inplay:puffer extract,grizzly bears
+[PLAYER2]
+[DO]
+puffer extract
+choice 2
+grizzly bears
+goto firstmain
+goto firstmain
+goto attackers
+grizzly bears
+next
+goto end
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:puffer extract
+graveyard:grizzly bears
+tappedinplay:1
+[PLAYER2]
+life:16
+[END]
