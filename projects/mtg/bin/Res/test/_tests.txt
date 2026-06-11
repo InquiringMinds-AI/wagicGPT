@@ -128,6 +128,9 @@ generic/thrasta_i1085.txt
 generic/thunderstaff_i1085.txt
 generic/time_bomb_i1085.txt
 generic/toralf_i1085.txt
+generic/torment_of_venom_i1085.txt
+generic/true_polymorph_i1085.txt
+generic/true_name_nemesis_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt

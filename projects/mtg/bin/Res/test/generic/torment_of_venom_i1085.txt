@@ -1,0 +1,25 @@
+#Torment of Venom (#1085): three -1/-1 counters on target creature - their
+#hill giant (3/3) hits 0/0 and dies. (The lose-3-unless-sacrifice rider is the
+#pay[[-in-grant family; opponent board kept empty of other nonlands.)
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{B}{B}
+hand:torment of venom
+[PLAYER2]
+inplay:hill giant
+[DO]
+torment of venom
+hill giant
+goto firstmain
+goto firstmain
+choice 1
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:torment of venom
+[PLAYER2]
+graveyard:hill giant
+[END]

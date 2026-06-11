@@ -1,0 +1,28 @@
+#True Polymorph (#1085): target artifact/creature becomes a copy of ANOTHER
+#target artifact/creature. NOTE the script's target roles: the FIRST click is
+#the COPY SOURCE (card-level target=), the second click "becomes the first
+#chosen" (per the line's own name). Bears first, cadet second -> the cadet
+#becomes a second Grizzly Bears.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}{U}{U}
+hand:true polymorph
+inplay:grizzly bears,eager cadet
+[PLAYER2]
+[DO]
+true polymorph
+grizzly bears
+goto firstmain
+goto firstmain
+choice 0
+eager cadet
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:true polymorph
+inplay:grizzly bears,grizzly bears
+[PLAYER2]
+[END]
