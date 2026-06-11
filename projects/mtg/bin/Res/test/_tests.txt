@@ -83,6 +83,7 @@ generic/lich_i1085.txt
 generic/lazotep_chancellor_i1085.txt
 generic/mirri_weatherlight_i1085.txt
 generic/mystic_confluence_i1085.txt
+generic/mystic_forge_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt

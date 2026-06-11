@@ -1,0 +1,22 @@
+#Mystic Forge (#1085, "reveals itself"): the functional half - cast the top card of
+#the library when it's an artifact. Millstone on top, {2} in pool: click it in the
+#library, it resolves to the battlefield. (The 'reveals itself' complaint is GUI
+#display-layer, untestable headlessly.)
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}
+inplay:mystic forge
+library:gold myr,millstone
+[PLAYER2]
+[DO]
+millstone
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:mystic forge,millstone
+library:gold myr
+[PLAYER2]
+[END]
