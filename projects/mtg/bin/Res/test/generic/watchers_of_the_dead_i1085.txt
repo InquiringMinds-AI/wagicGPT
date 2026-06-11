@@ -1,0 +1,34 @@
+#Watchers of the Dead (#1085): exile it - each opponent picks two graveyard
+#cards to keep and exiles the rest. They keep bears+giant, the cadet goes.
+#Drives the opponent-chooser-on-my-turn machinery end to end: the granted
+#ability$! must-may menu spawns for P2 (choice 0), P2's graveyard clicks are
+#routed via the tc-owner handover, the kept-tag (becomes forever, data fix
+#replaced the broken blink hack) lands before the deferred && continuation
+#exiles the rest. ENGINE: MultiAbility used to silently DROP interactive
+#legs (MayAbility::resolve is a no-op base) and fire the chain tail early.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:watchers of the dead
+[PLAYER2]
+graveyard:grizzly bears,hill giant,eager cadet
+[DO]
+watchers of the dead
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+grizzly bears
+goto firstmain
+hill giant
+goto firstmain
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+exile:watchers of the dead
+[PLAYER2]
+graveyard:grizzly bears,hill giant
+exile:eager cadet
+[END]

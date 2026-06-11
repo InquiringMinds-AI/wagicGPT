@@ -40,6 +40,10 @@ library:millstone
 #found-but-inert. AACastCard uses the isReactingToTargetClick protocol and never
 #became reactive -> the may/castcard leg of a triggered && chain never spawns.
 #Related untested idiom users: the Expertise cycle (spell-context may castcard),
-#Mind's Dilation, Leaf-Crowned Elder (kinship+reveal). Engine-round fuel:
-#trigger-context gaps family (queue item 2) or a castcard-specific resolution gap.
-#Other legs (noactivatedability / maxCast(*)0 lockout) untested in this probe.
+#Mind's Dilation, Leaf-Crowned Elder (kinship+reveal).
+#UPDATE 2026-06-11 opponent-chooser round: the chooser family is FIXED
+#(watchers/parallax revived: MultiAbility interactive legs + deferred &&
+#continuation + tc-owner handover all work) but THIS witness is the OTHER
+#shape - AACastCard's isReactingToTargetClick protocol never becomes
+#reactive in the may/trigger context. Distinct castcard resolution gap;
+#still parked. Other legs (noactivatedability / maxCast(*)0) untested.

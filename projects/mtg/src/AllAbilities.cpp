@@ -7419,6 +7419,7 @@ MayAbility::MayAbility(GameObserver* observer, int _id, MTGAbility * _ability, M
 {
     triggered = 0;
     mClone = NULL;
+    andAfter = NULL;
 }
 
 void MayAbility::Update(float dt)
@@ -7460,10 +7461,32 @@ int MayAbility::testDestroy()
         return 0;
     if (game->mLayers->actionLayer()->getIndexOf(mClone) != -1)
         return 0;
+    if (mClone && andAfter)
+    {
+        //the fired chooser sits on the STACK until it resolves - leaving the
+        //action layer is not the end of the interaction. The continuation
+        //must not fire before the chosen targets were actually processed.
+        ActionStack * stack = game->mLayers->stackLayer();
+        for (size_t i = 0; i < stack->mObjects.size(); i++)
+        {
+            StackAbility * sa = dynamic_cast<StackAbility *>((Interruptible *)stack->mObjects[i]);
+            if (sa && sa->state == NOT_RESOLVED && sa->ability == mClone)
+                return 0;
+        }
+    }
     if(game->currentPlayer == source->controller() && game->isInterrupting == source->controller() && dynamic_cast<AManaProducer*>(AbilityFactory::getCoreAbility(ability)))
         //if its my turn, and im interrupting myself(why?) then set interrupting to previous interrupter if the ability was a manaability
         //special case since they don't use the stack.
         game->mLayers->stackLayer()->setIsInterrupting(previousInterrupter, false);
+    if (andAfter)
+    {
+        //the interaction is over - release the rest of the && chain. Deferred
+        //one tick (ADeferredOneShot) so the interaction's own per-target
+        //effects (transform tags fire on THEIR first Update) land first.
+        ADeferredOneShot * d = NEW ADeferredOneShot(game, this->GetId(), source, andAfter);
+        game->addObserver(d);
+        andAfter = NULL; //ownership moved to the deferred wrapper
+    }
     return 1;
 }
 
@@ -7497,12 +7520,15 @@ MayAbility * MayAbility::clone() const
 {
     MayAbility * a = NEW MayAbility(*this);
     a->ability = ability->clone();
+    //the continuation is single-owner; a copied pointer would double-delete.
+    a->andAfter = NULL;
     return a;
 }
 
 MayAbility::~MayAbility()
 {
     SAFE_DELETE(ability);
+    SAFE_DELETE(andAfter);
 }
 
 //Menu building ability Abilities
@@ -7758,6 +7784,29 @@ int MultiAbility::resolve()
     {
         if (abilities[i] == NULL)
             continue;
+        //An interactive leg (a may/chooser wrap) has no meaningful resolve()
+        //- the base no-op silently dropped the whole leg (Watchers of the
+        //Dead's opponent keep-chooser). Put a live copy in the game so its
+        //menu can spawn, and hand it the REMAINING legs as a continuation so
+        //the chain keeps its order across the interaction (the exile-the-rest
+        //leg must not fire before the keep-choice happened).
+        if (dynamic_cast<MayAbility *>(abilities[i]))
+        {
+            MayAbility * live = dynamic_cast<MayAbility *>(abilities[i])->clone();
+            if (i + 1 < abilities.size())
+            {
+                MultiAbility * rest = NEW MultiAbility(game, this->GetId(), source, target, NULL);
+                for (size_t j = i + 1; j < abilities.size(); ++j)
+                {
+                    if (abilities[j])
+                        rest->Add(abilities[j]->clone());
+                }
+                rest->oneShot = 1;
+                live->andAfter = rest;
+            }
+            live->addToGame();
+            return 1;
+        }
         Targetable * backup = abilities[i]->target;
 
         if (target && target != source && abilities[i]->target == abilities[i]->source)

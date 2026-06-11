@@ -1,0 +1,37 @@
+#Parallax Nexus (#1085, "cards never returned to hand"): pay a fade counter,
+#target opponent exiles a card from their hand (their chooser, on MY turn:
+#choice 0 accepts the granted may-menu, their hand click routes via the
+#tc-owner handover); when the Nexus leaves the battlefield the exiled card
+#returns to their hand. ENGINE: the granted hand(blink)forsrc was anchored to
+#the nameless ability$! dummy (never "in play" -> return logic dead) - now
+#anchored to storedSourceCard, the real Nexus.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}
+inplay:parallax nexus
+hand:disenchant
+[PLAYER2]
+hand:hill giant
+[DO]
+parallax nexus
+choice 0
+p2
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+hill giant
+goto firstmain
+goto firstmain
+disenchant
+parallax nexus
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:disenchant,parallax nexus
+[PLAYER2]
+hand:hill giant
+[END]

@@ -1899,6 +1899,11 @@ public:
     string Cond;
     Player * previousInterrupter;
     MTGAbility * mClone;
+    //continuation for && chains: legs after an interactive leg must wait for
+    //the interaction (MultiAbility::resolve packs them in here); fired once
+    //when this may completes (testDestroy), whether accepted, declined or
+    //silently bailed - the rest of the chain must not vanish with the choice.
+    MTGAbility * andAfter;
 
     MayAbility(GameObserver* observer, int _id, MTGAbility * _ability, MTGCardInstance * _source, bool must = false, string restriction = "");
 
@@ -3095,6 +3100,40 @@ public:
     ~GenericInstantAbility()
     {
         SAFE_DELETE(ability);
+    }
+};
+
+//Fires a stored one-shot on its first Update tick. Used to sequence a &&
+//chain continuation BEHIND deferred per-target effects of the interaction
+//that released it (ATransformerInstant tags apply on THEIR first Update;
+//mObjects order makes the earlier-added effect fire first).
+class ADeferredOneShot: public InstantAbility
+{
+public:
+    MTGAbility * payload;
+    ADeferredOneShot(GameObserver* observer, int _id, MTGCardInstance * _source, MTGAbility * _payload) :
+        InstantAbility(observer, _id, _source), payload(_payload)
+    {
+    }
+    int resolve()
+    {
+        if (payload)
+            payload->resolve();
+        return 1;
+    }
+    const string getMenuText()
+    {
+        return "Deferred";
+    }
+    ADeferredOneShot * clone() const
+    {
+        ADeferredOneShot * a = NEW ADeferredOneShot(*this);
+        a->payload = payload ? payload->clone() : NULL;
+        return a;
+    }
+    ~ADeferredOneShot()
+    {
+        SAFE_DELETE(payload);
     }
 };
 

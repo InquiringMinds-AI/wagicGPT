@@ -3523,7 +3523,10 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         {
             stored = parseMagicLine(sAbility, id, spell, card);
         }
-        MTGAbility * a = NEW ABlinkGeneric(observer, id, card, target,ueoteffect,forsource,blinkhand,stored);
+        MTGCardInstance * blinkSource = card;
+        if (card && card->name.empty() && card->storedSourceCard)
+            blinkSource = card->storedSourceCard; // Fix for blink inside ability$!!$ keyword - forsrc must track the REAL granting card, not the dummy (Parallax Nexus).
+        MTGAbility * a = NEW ABlinkGeneric(observer, id, blinkSource, target,ueoteffect,forsource,blinkhand,stored);
         a->oneShot = 1;
         return a;
     }
