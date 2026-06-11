@@ -135,6 +135,10 @@ void MTGCardInstance::copy(MTGCardInstance * card, bool nolegend)
             basicAbilities[j] = data->basicAbilities[j];
     }
     exileRiderSuppressed = card->exileRiderSuppressed;
+    //the X chosen at cast must survive zone-move recreation: resolution
+    //abilities on the recreated instance (prex choosers, Rats' Feast) read
+    //setX and fell back to the leftover-pool heuristic (issue #1085)
+    setX = card->setX;
     if (exileRiderSuppressed)
     {
         basicAbilities[Constants::UNEARTH] = 0;
@@ -2106,6 +2110,7 @@ MTGCardInstance* MTGCardInstance::clone()
     //zone moves rebuild instances from the model; the rider-suppression
     //flag of copies (populate, Clone...) must survive (issue #1145)
     c->exileRiderSuppressed = exileRiderSuppressed;
+    c->setX = setX;
     if (c->exileRiderSuppressed)
     {
         c->basicAbilities[Constants::UNEARTH] = 0;

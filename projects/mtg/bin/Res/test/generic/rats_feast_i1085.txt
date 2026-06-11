@@ -1,0 +1,32 @@
+#Rats' Feast (#1085): {X}{B} - exile X cards from target player's graveyard.
+#X=2 exiles exactly the two picked cards (confirm by re-clicking the source;
+#prex chooser). ENGINE FIX captured: the X chosen at cast (setX) now survives
+#zone-move instance recreation (MTGCardInstance copy-path + clone) - the
+#resolving spell's recreated card read setX=-1 and prex fell back to the
+#leftover-pool heuristic, accepting nothing on an exact pool.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{B}
+hand:rats' feast
+[PLAYER2]
+graveyard:millstone,juggernaut,gold myr
+[DO]
+rats' feast
+choice 2
+goto firstmain
+goto firstmain
+choice 0
+millstone
+juggernaut
+rats' feast
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:rats' feast
+[PLAYER2]
+graveyard:gold myr
+exile:millstone,juggernaut
+[END]

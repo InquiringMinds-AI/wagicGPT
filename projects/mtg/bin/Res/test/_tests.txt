@@ -116,6 +116,7 @@ generic/nim_deathmantle_i1085.txt
 generic/pendrell_flux_i1085.txt
 generic/fade_away_i1085.txt
 generic/purging_scythe_i1085.txt
+generic/rats_feast_i1085.txt
 generic/soul_charmer_i1085.txt
 generic/spin_into_myth_i1085.txt
 generic/spiteful_sliver_i1085.txt
