@@ -2,10 +2,17 @@
 #Animating an ATTACHED living weapon (husk mv1 -> should be a 1/1 creature,
 #unattaching; its 0/0 germ dies) instead kills the HUSK ITSELF: probe shows
 #the husk in the graveyard and only the poltergeist left on the battlefield.
-#Suspect: the equipment-attachment SBA destroys an equipment that became a
-#creature rather than unattaching it (living weapon should survive on the
-#battlefield). The poltergeist basic animation is pinned separately
-#(xenic_poltergeist_i1085.txt, passing).
+#INVESTIGATED 2026-06-11 (deeper map): the husk dies 0/0/0 via
+#afterDamage->destroy right after the poltergeist's StackAbility resolves -
+#it is NOT the attachment SBA (unattach-on-animate + creature-exempt aura-SBA
+#edits were tried and did not change the outcome; reverted as unproven).
+#The granted newability[manacost/manacost] parses to APowerToughnessModifier
+#whose grant-loop re-points (aNew->target/source = _target, AllAbilities
+#~8300) LOOK correct, yet the +1/+1 never lands on the husk - the unattached
+#millstone works, so husk->target=germ is load-bearing somewhere deeper
+#(suspect: the leaf bound target=germ at parse via the head default, or the
+#uynt ATransformerInstant deferred path). NEXT PROBE: trace addptbonus /
+#APowerToughnessModifier::addToGame for the husk specifically.
 [INIT]
 firstmain
 [PLAYER1]
