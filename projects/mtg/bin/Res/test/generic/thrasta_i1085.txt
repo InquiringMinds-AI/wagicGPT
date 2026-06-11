@@ -1,0 +1,27 @@
+#Thrasta, Tempest's Roar (#1085; set id 522254): costs {3} less per other
+#spell cast this turn. Two shocks first -> {10}{G}{G} becomes {4}{G}{G},
+#castable on exactly that pool. Without the shocks the same pool fails (cf).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}{G}{G}{R}{R}
+hand:shock,shock,522254
+[PLAYER2]
+[DO]
+shock
+p2
+goto firstmain
+shock
+p2
+goto firstmain
+522254
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:522254
+graveyard:shock,shock
+[PLAYER2]
+life:16
+[END]

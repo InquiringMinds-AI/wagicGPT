@@ -1,0 +1,37 @@
+#Thopter Spy Network (#1085): my upkeep + an artifact -> Thopter token; my
+#ARTIFACT creatures dealing combat damage to a player -> draw 1 (once/turn).
+#Gold myr (artifact creature) + bears connect on T3: life 17, token on board,
+#hand = turn draw + exactly one trigger draw. (Juggernaut was unusable here -
+#attacks-each-combat made it auto-attack during the T1 goto pads.)
+[INIT]
+firstmain
+[PLAYER1]
+inplay:thopter spy network,gold myr,grizzly bears
+library:darksteel citadel,silver myr,millstone
+[PLAYER2]
+library:darksteel citadel,millstone
+[DO]
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto upkeep
+goto attackers
+gold myr
+choice 0
+grizzly bears
+next
+next
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:thopter spy network,gold myr,grizzly bears,*
+hand:silver myr,millstone
+library:darksteel citadel
+tappedinplay:2
+[PLAYER2]
+life:17
+hand:*
+library:darksteel citadel
+[END]

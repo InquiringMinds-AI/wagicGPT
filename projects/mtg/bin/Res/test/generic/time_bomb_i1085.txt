@@ -1,0 +1,32 @@
+#Time Bomb (#1085): a time counter at each of my upkeeps; {1}{T}{Sacrifice}:
+#damage equal to the counters to EACH creature and EACH player. One counter by
+#my turn-3 upkeep -> both players at 19, their 1/1 cadet AND my own 1/1 myr die, my bears live.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:time bomb,grizzly bears,silver myr
+[PLAYER2]
+inplay:eager cadet
+library:darksteel citadel,millstone
+[DO]
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto upkeep
+silver myr
+time bomb
+goto upkeep
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+life:19
+graveyard:time bomb,silver myr
+inplay:grizzly bears
+[PLAYER2]
+life:19
+graveyard:eager cadet
+hand:*
+library:darksteel citadel
+[END]

@@ -1,0 +1,31 @@
+#Toralf, God of Fury (#1085; set id 503766): excess noncombat damage to an
+#opponent creature -> Toralf deals THAT EXCESS to any target. Bolt their 1/1
+#cadet (2 excess), send it at the opponent's face: life 18 (a full-3 redeal
+#would leave 17 - the reported "just keeps doing excess dmg" symptom).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:503766,iron myr
+hand:lightning bolt
+[PLAYER2]
+inplay:eager cadet
+[DO]
+iron myr
+lightning bolt
+eager cadet
+goto firstmain
+goto firstmain
+choice 0
+p2
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:503766,iron myr
+graveyard:lightning bolt
+tappedinplay:1
+[PLAYER2]
+life:18
+graveyard:eager cadet
+[END]

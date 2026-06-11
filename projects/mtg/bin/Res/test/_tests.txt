@@ -123,6 +123,11 @@ generic/syr_konrad_i1085.txt
 generic/tariff_i1085.txt
 generic/thirsting_axe_i1085.txt
 generic/thirsting_axe_sac_i1085.txt
+generic/thopter_spy_network_i1085.txt
+generic/thrasta_i1085.txt
+generic/thunderstaff_i1085.txt
+generic/time_bomb_i1085.txt
+generic/toralf_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt

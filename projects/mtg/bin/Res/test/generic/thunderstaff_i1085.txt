@@ -1,0 +1,28 @@
+#Thunderstaff (#1085), pump leg: {2}{T} gives attacking creatures +1/+0.
+#Declare the bears FIRST, then tap myrs via the attack-step menus and
+#activate: they connect for 3 (opponent 17). The lord binds at activation -
+#activating before the declaration misses the attacker.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:thunderstaff,grizzly bears,silver myr,leaden myr
+[PLAYER2]
+[DO]
+goto attackers
+grizzly bears
+silver myr
+choice 1
+leaden myr
+choice 1
+thunderstaff
+next
+next
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:thunderstaff,grizzly bears,silver myr,leaden myr
+tappedinplay:4
+[PLAYER2]
+life:17
+[END]

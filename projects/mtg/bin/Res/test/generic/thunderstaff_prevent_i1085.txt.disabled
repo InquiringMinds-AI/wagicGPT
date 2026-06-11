@@ -1,0 +1,34 @@
+#Thunderstaff (#1085), prevention leg - PARKED, engine-blocked. Oracle: while
+#untapped, if a creature would deal combat damage to me, prevent 1 (giant
+#should deal 2 -> life 18; master deals the full 3).
+#MAPPED: the script grants "absorb:<count of attackers>" to the CONTROLLER (a
+#player). ABSORB only works on card targets (Damage.cpp:101 reduces damage
+#when the target has it); the basicAbility enum's own comment says absorb
+#"need[s] to be coded for players too" - player-side absorb is unimplemented,
+#so the grant silently does nothing. Engine fuel: implement player ABSORB in
+#Damage.cpp (and ensure the grant machinery can set basicAbilities on a
+#player), then enable this test. Thunderstaff is the only absorb: user.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:thunderstaff
+[PLAYER2]
+inplay:hill giant
+library:darksteel citadel,millstone
+[DO]
+goto end
+goto attackers
+hill giant
+next
+next
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+life:18
+inplay:thunderstaff
+[PLAYER2]
+inplay:hill giant
+hand:*
+library:darksteel citadel
+[END]
