@@ -42,5 +42,23 @@ exile:grizzly bears
 #THE FAMILY IS HUGE: ~2600 primitive lines share the if-then+target( shape
 #(choice-ETB damage/destroy/exile across the dataset) - this is a major
 #engine round (if-then-choice family), not a Yannik data fix. Yannik also
-#layers ability\$! counter-assignment legs (one-strip-per-parse hazard) on
+#layers ability$! counter-assignment legs (one-strip-per-parse hazard) on
 #the power>=1 buckets.
+#DEEPER MAP (2026-06-11 second sitting, trace-proven): the parse/firing
+#chain WORKS much further than thought - my earlier two-parser-facts note
+#was WRONG about the then-branch losing its target() (the if-then parser
+#recurses on the ORIGINAL string, MTGAbility.cpp ~2744, and the choice
+#keyword matches at sub-parse position 0). Confirmed working: all bucket
+#IfThenAbilitys fire at ETB, conds evaluate right, the bucket-2 May is
+#addToGame'd, its menu spawns, choice 0 accepts, the GTA clone activates
+#with a live current tc. THE ACTUAL KILL: one frame later ActionLayer::
+#Update's cantCancel block auto-cancels the waiting action because
+#ae->getActionTc()->validTargetsExist() returns FALSE - on that SAME tc
+#pointer, canTarget(bears)=0, and BOTH legs fail (TargetZoneChooser zone
+#check AND cd->match), though bears are a legal 'other creature[power=2]
+#|mybattlefield' target. The mClone is NOT GC'd (trapped - never fires).
+#Suspects: the clone-of-clone tc chain (ActionElement copy ctor clones tc
+#per generation - DescriptorTargetChooser::clone + CardDescriptor copy may
+#lose zone/descriptor state), or must-menu cantCancel semantics. NEXT:
+#instrument DescriptorTargetChooser::clone fidelity (compare zones/nbzones/
+#cd->types before vs after clone), or test with cantCancel forced 0.
