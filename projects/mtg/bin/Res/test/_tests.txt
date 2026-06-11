@@ -123,6 +123,10 @@ generic/supernatural_stamina_i1085.txt
 generic/sword_of_kaldra_i1085.txt
 generic/syr_konrad_i1085.txt
 generic/tariff_i1085.txt
+generic/thirst_i1085.txt
+generic/thirst_pay_i1085.txt
+generic/vapor_snare_upcost_i1085.txt
+generic/vile_consumption_i1085.txt
 generic/thirsting_axe_i1085.txt
 generic/thirsting_axe_sac_i1085.txt
 generic/thopter_spy_network_i1085.txt

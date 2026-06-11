@@ -8218,6 +8218,17 @@ int ATransformer::addToGame()
                 ((MultiAbility *)aNew)->source = _target;
                 ((MultiAbility *)aNew)->abilities[0]->source = _target;
             }
+            //A granted upkeep cost must operate on the card it was granted to.
+            //parseMagicLine defaults a leaf's target to card->target, so an
+            //upcost granted to an AURA aimed its nested sacrifice at the
+            //ENCHANTED CREATURE - Thirst's "sacrifice Thirst unless {U}"
+            //killed the creature instead (issue #1085).
+            AUpkeep * upk = dynamic_cast<AUpkeep*>(aNew);
+            if (upk && upk->ability)
+            {
+                upk->ability->source = _target;
+                upk->ability->target = _target;
+            }
 
             aNew->target = _target;
             aNew->source = (MTGCardInstance *) _target;
