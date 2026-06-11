@@ -1,0 +1,23 @@
+#Of One Mind (#1085): costs {2} less with a Human and a non-Human creature. With
+#Devoted Retainer (Human) and grizzly bears (non-Human), a {U}-only pool suffices
+#for the {2}{U} sorcery - affordability IS the assertion. Draw two.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{U}
+inplay:devoted retainer,grizzly bears
+hand:of one mind
+library:millstone,juggernaut
+[PLAYER2]
+[DO]
+of one mind
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:juggernaut,millstone
+graveyard:of one mind
+inplay:devoted retainer,grizzly bears
+[PLAYER2]
+[END]
