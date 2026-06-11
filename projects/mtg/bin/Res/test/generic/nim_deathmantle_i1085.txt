@@ -1,15 +1,15 @@
-#Nim Deathmantle (#1085): when a nontoken creature dies, pay {4} to return it.
-#Shock my bears, accept the pay prompt: they come back. ENGINE FIX captured:
-#the pay[[ early-strip stole a granted pay's follow-up into the load-time
-#factory (the grant paid and did nothing); pay[[ inside newability[ grants now
-#rides intact and re-parses at grant time. RESIDUAL: the mantle's rehook leg
-#(reattach to the returnee for +2/+2) does not fire - not asserted here.
+#Nim Deathmantle (#1085): when a nontoken creature dies, pay {4} to return it
+#AND reattach the mantle. Shock bears -> accept pay (choice 0) -> they return;
+#the rehook trigger is a tc-bearing leaf (must-may wrap): choice 0 + click the
+#returnee drives it (the old 'rehook leg dead' note was a DRIVING gap, not an
+#engine bug). Counterfactual: a second shock - the 2/2 dies, but the mantled
+#4/4 survives, so bears-inplay proves the reattach.
 [INIT]
 firstmain
 [PLAYER1]
-manapool:{4}{R}
+manapool:{4}{R}{R}
 inplay:nim deathmantle,grizzly bears
-hand:shock
+hand:shock,shock
 [PLAYER2]
 [DO]
 shock
@@ -19,10 +19,19 @@ goto firstmain
 choice 0
 goto firstmain
 goto firstmain
+choice 0
+goto firstmain
+grizzly bears
+goto firstmain
+goto firstmain
+shock
+grizzly bears
+goto firstmain
+goto firstmain
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
 inplay:nim deathmantle,grizzly bears
-graveyard:shock
+graveyard:shock,shock
 [PLAYER2]
 [END]

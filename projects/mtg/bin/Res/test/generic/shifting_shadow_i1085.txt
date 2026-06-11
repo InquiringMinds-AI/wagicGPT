@@ -1,0 +1,48 @@
+#Shifting Shadow (#1085): aura. At my upkeep destroy the enchanted creature,
+#reveal until a creature, put it onto my battlefield (shadow rehooks), bottom
+#the rest. Bears die T3; reveal = millstone then hill giant; giant lands on my
+#side, millstone goes to the bottom. DO drives the guarded reveal (choice 0 +
+#giant click; revealok + choice 0 bottoms the rest). DATA FIX captured: the
+#bare '&& rehook' fired at trigger resolution (reveal still open, board empty,
+#aura target = the dead bears) and fizzled - SBA then swept the unattached
+#aura. The rehook now rides the mover's and!( )! so it fires synchronously
+#with the new creature's arrival, carrying it as the target (Nim's idiom).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{R}
+hand:shifting shadow
+inplay:grizzly bears
+library:hill giant,millstone
+[PLAYER2]
+library:darksteel citadel,juggernaut
+[DO]
+shifting shadow
+grizzly bears
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto upkeep
+goto upkeep
+choice 0
+goto upkeep
+hill giant
+goto upkeep
+goto upkeep
+revealok
+goto upkeep
+choice 0
+goto upkeep
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+graveyard:grizzly bears
+inplay:shifting shadow,hill giant
+library:millstone
+[PLAYER2]
+hand:juggernaut
+library:darksteel citadel
+[END]
