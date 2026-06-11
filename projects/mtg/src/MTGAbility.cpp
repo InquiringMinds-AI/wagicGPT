@@ -2804,7 +2804,17 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             && trimmed.find("newability") == string::npos
             && trimmed.find("teach(") == string::npos
             && trimmed.find("&&") == string::npos;
-        if (plainDamage || plainPT || plainMove)
+        //Counter placement with its own target() (Strength of the Tajuru's
+        //"target(creature) counter(1/1,X)") fizzled identically - no leaf
+        //parser consumes the line's tc. Spell-counter cards are unaffected:
+        //they use the fizzle/counterspell keywords, never "counter(".
+        bool plainCounter = (trimmed.find("counter(") == 0)
+            && trimmed.find("and!(") == string::npos
+            && trimmed.find("transforms(") == string::npos
+            && trimmed.find("newability") == string::npos
+            && trimmed.find("teach(") == string::npos
+            && trimmed.find("&&") == string::npos;
+        if (plainDamage || plainPT || plainMove || plainCounter)
         {
             MTGAbility * a1 = parseMagicLine(sWithoutTc, id, spell, card);
             if (a1)

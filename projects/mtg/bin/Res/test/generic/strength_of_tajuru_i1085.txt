@@ -1,0 +1,37 @@
+#Strength of the Tajuru (#1085): {X}{G}{G} multikicker {1} - X +1/+1 counters
+#on each of (1 + kicks) targets. Unkicked, X=2 on the bears: 2/2 -> 4/4
+#survives a lightning bolt (counterless bears die to it).
+#ENGINE FIX captured here: "target(creature) counter(1/1,X)" effect lines lost
+#their chooser (the Round-23 lost-chooser class; counter( was not in the leaf
+#whitelist, and the if/then parser deletes the outer tc). counter( leaves now
+#get the mandatory-choice wrap: the target is prompted at RESOLUTION -
+#choice 0 then the target click, after the X menu.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{G}{G}
+inplay:grizzly bears,iron myr
+hand:strength of the tajuru,lightning bolt
+[PLAYER2]
+[DO]
+strength of the tajuru
+choice 2
+goto firstmain
+goto firstmain
+choice 0
+grizzly bears
+goto firstmain
+goto firstmain
+iron myr
+lightning bolt
+grizzly bears
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears,iron myr
+graveyard:strength of the tajuru,lightning bolt
+tappedinplay:1
+[PLAYER2]
+[END]

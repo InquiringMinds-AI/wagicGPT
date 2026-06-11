@@ -1,0 +1,34 @@
+#Stolen Strategy (#1085): at my upkeep exile the opponent's top card; until
+#end of turn I may cast it spending any-color mana. Cast their bears from
+#exile with U+B myrs, then cross past my end of turn: the bears must STAY on
+#my battlefield (the reported bug exiled the played card at end of turn).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:stolen strategy,silver myr,leaden myr
+library:darksteel citadel,millstone
+[PLAYER2]
+library:grizzly bears,juggernaut
+[DO]
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto upkeep
+goto firstmain
+silver myr
+leaden myr
+grizzly bears
+goto firstmain
+goto firstmain
+goto end
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:stolen strategy,silver myr,leaden myr,grizzly bears
+hand:millstone
+library:darksteel citadel
+[PLAYER2]
+hand:juggernaut
+[END]

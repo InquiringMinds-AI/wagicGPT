@@ -114,6 +114,8 @@ generic/soul_charmer_i1085.txt
 generic/spin_into_myth_i1085.txt
 generic/spiteful_sliver_i1085.txt
 generic/spiteful_sliver_scope_i1085.txt
+generic/stolen_strategy_i1085.txt
+generic/strength_of_tajuru_i1085.txt
 generic/dreadhorde_arcanist_i1125.txt
 generic/maxcast_land_then_zerodrop_i689.txt
 generic/serum_powder_leyline_i979.txt
