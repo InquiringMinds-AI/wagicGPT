@@ -110,6 +110,7 @@ generic/prowling_geistcatcher_i1085.txt
 generic/orcish_squatters_i1085.txt
 generic/yannik_i1085.txt
 generic/xenic_flayer_husk_i1085.txt
+generic/vengeful_rebirth_i1085.txt
 generic/selvala_explorer_i1085.txt
 generic/selvala_hotw_i1085.txt
 generic/selvala_hotw_bigpower_i1085.txt

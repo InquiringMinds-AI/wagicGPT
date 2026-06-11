@@ -1,0 +1,48 @@
+#Vengeful Rebirth (#1085): return a card from my graveyard to hand; a
+#nonland return also deals its mana value to any target; the spell exiles
+#itself. Hill Giant is {3}{R} = MANA VALUE 4: the mv4 bucket returns it and
+#deals 4 (life 16) - the old witness asserts assumed mv3. Driving: cast,
+#pads, choice 2 (menu = [land, mv0, mv4-live-buckets] gated by valid
+#targets), giant click, pads, choice 0 + p2 for the granted damage may.
+#DATA FIXES captured: 22 'choice name(X):target(' colon sites (phantom
+#zero-cost activated parse) and the self-exile line - 'moveto(myexile)
+#all(this)' never matches a RESOLVING sorcery (the lord scans zones, the
+#spell is mid-stack); replaced with the Devils-precedent trigger idiom
+#'@movedto(this|mygraveyard) from(mystack):all(trigger[to]) moveto(myexile)'.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}{R}{G}
+hand:vengeful rebirth
+graveyard:hill giant,darksteel citadel
+[PLAYER2]
+[DO]
+vengeful rebirth
+goto firstmain
+goto firstmain
+choice 2
+goto firstmain
+hill giant
+goto firstmain
+goto firstmain
+choice 0
+p2
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:hill giant
+exile:vengeful rebirth
+graveyard:darksteel citadel
+[PLAYER2]
+life:16
+[END]
+#PARKED: the spell resolves with ZERO follow-up - none of the bucketed
+#"if type(*[manacost=N]|mygraveyard)... then choice name(...):target(...)"
+#lines spawn a menu (trace shows no StackAbility after resolution), and the
+#self-exile "moveto(myexile) all(this)" no-ops too (the card lands in the
+#GRAVEYARD - all(this) of a resolving stack card matches nothing). Note the
+#odd `choice name(X):effect` COLON syntax - ~28 occurrences in the primitives,
+#possibly all dead the same way. Engine-round fuel: resolution-time choice
+#menus from spell auto-lines + stack-card self-moves + audit the colon idiom.
