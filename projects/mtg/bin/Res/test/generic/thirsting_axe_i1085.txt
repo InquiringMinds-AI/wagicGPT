@@ -1,0 +1,39 @@
+#Thirsting Axe (#1085): at the beginning of YOUR end step, sacrifice the
+#equipped creature if it dealt no combat damage to a creature this turn.
+#Equipped bears (6/2) damage a blocking wall on my turn -> survive my end
+#step; oracle says the check NEVER happens on the opponent's end step, so
+#they must still be alive AFTER the opponent's end step (asserted at my next
+#upkeep - the treason rule fires on end-step EXIT).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}
+inplay:thirsting axe,grizzly bears
+library:millstone,juggernaut
+[PLAYER2]
+inplay:wall of denial
+library:millstone,juggernaut
+[DO]
+thirsting axe
+grizzly bears
+goto firstmain
+goto firstmain
+goto attackers
+grizzly bears
+next
+wall of denial
+next
+goto end
+goto upkeep
+goto end
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:thirsting axe,grizzly bears
+library:millstone,juggernaut
+[PLAYER2]
+inplay:wall of denial
+hand:*
+library:millstone
+[END]

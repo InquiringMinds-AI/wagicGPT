@@ -1,0 +1,28 @@
+#Supernatural Stamina (#1085): +2/+0 ueot and "when this dies, return it
+#tapped". Bolt the pumped bears (4/2): they die and must come back tapped
+#(inplay + tappedinplay:2 with the spent myr).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{B}
+inplay:grizzly bears,iron myr
+hand:supernatural stamina,lightning bolt
+[PLAYER2]
+[DO]
+supernatural stamina
+grizzly bears
+goto firstmain
+goto firstmain
+iron myr
+lightning bolt
+grizzly bears
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears,iron myr
+graveyard:supernatural stamina,lightning bolt
+tappedinplay:2
+[PLAYER2]
+[END]

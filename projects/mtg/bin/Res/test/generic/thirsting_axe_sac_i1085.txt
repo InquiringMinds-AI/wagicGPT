@@ -1,0 +1,23 @@
+#Thirsting Axe (#1085), sacrifice half: equipped bears deal no combat damage
+#to a creature this turn -> sacrificed when my end step ends (asserted at the
+#opponent's upkeep). Uses mytreason (controller's end step only).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}
+inplay:thirsting axe,grizzly bears
+[PLAYER2]
+[DO]
+thirsting axe
+grizzly bears
+goto firstmain
+goto firstmain
+goto end
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+graveyard:grizzly bears
+inplay:thirsting axe
+[PLAYER2]
+[END]

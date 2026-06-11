@@ -269,7 +269,8 @@ const char* Constants::MTGBasicAbilities[] = {
     "eqpasinst", // Can equip as instant
     "canloyaltyasinst", // Can activate loyalty abilities as instant (e.g. "The Wandering Emperor").
     "canplayenchantmentlibrarytop", // May play enchantments from top
-	"affinitytwoalldeadcreatures" // Costs {2} less to cast for each creature that died this turn
+	"affinitytwoalldeadcreatures", // Costs {2} less to cast for each creature that died this turn
+	"mytreason" // sacrifice at the beginning of its CONTROLLER's end step only (Thirsting Axe)
 };
 
 map<string,int> Constants::MTGBasicAbilitiesMap;

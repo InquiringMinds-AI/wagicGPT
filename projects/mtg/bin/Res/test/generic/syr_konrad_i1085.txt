@@ -1,0 +1,27 @@
+#Syr Konrad, the Grim (#1085; set id 473069): any creature hitting a graveyard
+#deals 1 to the opponent. Activate his {1}{B} mill: both players mill a
+#creature (juggernaut / grizzly bears) -> two triggers -> opponent at 18.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{B}
+inplay:473069
+library:millstone,juggernaut
+[PLAYER2]
+library:darksteel citadel,grizzly bears
+[DO]
+473069
+goto firstmain
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:juggernaut
+inplay:473069
+library:millstone
+[PLAYER2]
+life:18
+graveyard:grizzly bears
+library:darksteel citadel
+[END]

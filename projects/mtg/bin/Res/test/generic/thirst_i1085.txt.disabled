@@ -1,0 +1,47 @@
+#Thirst (#1085): aura - tap + doesn't untap + "at your upkeep sacrifice THIRST
+#unless you pay {U}". Decline at my turn-3 upkeep: the AURA goes to the
+#graveyard and the bears survive (the reported bug killed the creature).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{U}
+hand:thirst
+inplay:grizzly bears
+library:millstone,juggernaut
+[PLAYER2]
+library:millstone,juggernaut
+[DO]
+thirst
+grizzly bears
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto upkeep
+goto upkeep
+choice 1
+goto upkeep
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+graveyard:thirst
+inplay:grizzly bears
+library:millstone,juggernaut
+tappedinplay:1
+[PLAYER2]
+hand:*
+library:millstone
+[END]
+#PARKED: the granted upkeep cost is fully DEAD on master. Trace at my upkeep
+#shows NO StackAbility from Thirst at all - the all(this) transforms((,
+#newability[upcost[{U}] sacrifice])) grant never registers its AUpkeep (the
+#234 direct auto=upcost users parse at load; the granted path doesn't wire
+#the phase machinery). History: the complaint ("killed my creature") matches
+#the OLD bare auto=upcost form, which - like all aura auto lines - applied to
+#the ENCHANTED CREATURE; the all(this)-wrap stopped the creature kill but
+#left the cost inert. No data fix available: pay[[{U}]]-in-trigger is the
+#other engine wedge (round 1). Engine fuel: grant-machinery upcost
+#registration + pay[[ stale-string. Current net behavior: Thirst is a free
+#permanent tap-lock (tap + doesnotuntap legs DO work).

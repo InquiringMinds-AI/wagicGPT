@@ -1,0 +1,38 @@
+#Sword of Kaldra (#1085): equip {4}, +5/+5, and any creature the equipped
+#creature damages is EXILED. Lethal damage kills first (SBA) so the trigger
+#only bites survivors: equipped bears (7/7) attack into a blocking wall of
+#denial (0/8) - the wall survives the 7 and is exiled by the trigger.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}
+inplay:sword of kaldra,grizzly bears
+library:millstone,juggernaut
+[PLAYER2]
+inplay:wall of denial
+library:millstone,juggernaut
+[DO]
+sword of kaldra
+grizzly bears
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto attackers
+grizzly bears
+next
+wall of denial
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:sword of kaldra,grizzly bears
+hand:*
+library:millstone
+[PLAYER2]
+exile:wall of denial
+hand:*
+library:millstone
+[END]

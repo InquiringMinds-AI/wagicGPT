@@ -365,7 +365,8 @@ class Constants
       CANLOYALTYASINST = 236,
       CANPLAYENCHANTMENTTOPLIBRARY = 237,//enchantment
       AFFINITYTWOALLDEADCREATURES = 238,
-      NB_BASIC_ABILITIES = 239,
+      MYTREASON = 239,//treason that only checks at its controller's end step (Thirsting Axe)
+      NB_BASIC_ABILITIES = 240,
 
     RARITY_S = 'S',   //Special Rarity
     RARITY_M = 'M',   //Mythics

@@ -3510,6 +3510,17 @@ int MTGUnearthRule::receiveEvent(WEvent * event)
                         WEvent * e = NEW WEventCardSacrifice(beforeCard,c);
                         game->receiveEvent(e);
                     }
+                    else if(c && c->has(Constants::MYTREASON) && !c->isPhased && game->currentPlayer == c->controller())
+                    {
+                        //mytreason: same sacrifice, but only at its controller's own
+                        //end step (Thirsting Axe - plain treason fires at EVERY end
+                        //step, which is correct for blitz/encore "next end step" riders).
+                        found = true;
+                        MTGCardInstance * beforeCard = c;
+                        c->controller()->game->putInZone(c, c->currentZone, c->owner->game->graveyard);
+                        WEvent * e = NEW WEventCardSacrifice(beforeCard,c);
+                        game->receiveEvent(e);
+                    }
                 }
             }
             if(found)

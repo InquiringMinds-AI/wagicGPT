@@ -1,0 +1,36 @@
+#Subtle Strike (#1085): choose one or both - target gets -1/-1 ueot; put a
+#+1/+1 counter on target. Both modes: their eager cadet (1/1) shrinks to 0/0
+#and dies; my bears get the counter (3/3) and survive a shock (2/2 would die).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{B}
+inplay:grizzly bears,iron myr
+hand:subtle strike,shock
+[PLAYER2]
+inplay:eager cadet
+[DO]
+subtle strike
+goto firstmain
+goto firstmain
+choice 0
+eager cadet
+goto firstmain
+choice 0
+grizzly bears
+goto firstmain
+goto firstmain
+iron myr
+shock
+grizzly bears
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears,iron myr
+graveyard:subtle strike,shock
+tappedinplay:1
+[PLAYER2]
+graveyard:eager cadet
+[END]

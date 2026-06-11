@@ -1,0 +1,27 @@
+#Tariff (#1085): each player sacrifices their highest-mana-value creature
+#unless they pay its cost. My only creature is hill giant (mv 3); decline the
+#pay -> sacrificed. (Pay leg is the pay[[-in-grant family, decline-only test;
+#opponent board kept empty to avoid the opponent-prompt-on-my-turn gap.)
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}
+inplay:hill giant
+hand:tariff
+[PLAYER2]
+[DO]
+tariff
+goto firstmain
+goto firstmain
+choice 0
+hill giant
+goto firstmain
+choice 1
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:tariff,hill giant
+[PLAYER2]
+[END]
