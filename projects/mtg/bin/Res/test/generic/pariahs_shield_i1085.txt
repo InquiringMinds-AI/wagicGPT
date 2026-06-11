@@ -1,0 +1,33 @@
+#Pariah's Shield (#1085): all damage that would hit you hits the equipped creature
+#instead. Equip the giant, opponent shocks ME: I stay at 20 and the 3/3 giant takes
+#2 and lives.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{3}
+inplay:pariah's shield,hill giant
+[PLAYER2]
+inplay:iron myr
+hand:shock
+[DO]
+pariah's shield
+hill giant
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+iron myr
+shock
+p1
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:20
+inplay:pariah's shield,hill giant
+[PLAYER2]
+inplay:iron myr
+graveyard:shock
+tappedinplay:1
+[END]
