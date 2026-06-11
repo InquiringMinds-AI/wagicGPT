@@ -1,0 +1,29 @@
+#Purging Scythe (#1085): at my upkeep it deals 2 to the creature with least toughness.
+#The 2/2 bears (lowest vs the 3/3 giant) die at my next upkeep.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:purging scythe,hill giant
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+goto end
+goto firstmain
+goto end
+goto upkeep
+choice 0
+goto upkeep
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:purging scythe,hill giant
+[PLAYER2]
+graveyard:grizzly bears
+[END]
+#PARKED - the trigger FIRES (StackAbility resolves at my upkeep) but the damage never
+#lands. Not the frozen-criterion problem (parse-time value 2 also matches the bears):
+#the trigger-context `damage:2 notaTarget(creature[...])` auto-pick resolves without
+#choosing anything - a TRIGGER-side cousin of the lost-chooser family (the v2/v3
+#spell-context wrap doesn't apply to triggers). The toughness dynamic-criterion
+#plumbing (mirroring #1125's manacost fix) was added anyway - correct in principle.

@@ -1088,6 +1088,16 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
                     //Toughness restrictions
                     cd->setToughness(comparisonCriterion);
                     cd->toughnessComparisonMode = comparisonMode;
+                    //"toughness=toughness:lowest:creature:battlefield"
+                    //(Purging Scythe): the criterion depends on the CURRENT
+                    //board - store the expression so the descriptor
+                    //re-evaluates it at match time (same as manacost below).
+                    if (comparisonExpression.size()
+                        && comparisonExpression.find_first_not_of("0123456789") != string::npos)
+                    {
+                        cd->dynamicToughnessExpression = comparisonExpression;
+                        cd->dynamicToughnessSource = card;
+                    }
                 }
                 else if (attribute.find("zpos") != string::npos)
                 {

@@ -50,6 +50,12 @@ class CardDescriptor: public MTGCardInstance
   string dynamicManacostExpression;
   MTGCardInstance * dynamicManacostSource;
   int currentManacostCriterion();
+  //Same treatment for toughness ("toughness=toughness:lowest:creature:
+  //battlefield", Purging Scythe): board-dependent selectors must be
+  //re-evaluated at match time, not frozen at parse.
+  string dynamicToughnessExpression;
+  MTGCardInstance * dynamicToughnessSource;
+  int currentToughnessCriterion();
   int zposComparisonMode;
   int zposition;
   int numofColorsComparisonMode;

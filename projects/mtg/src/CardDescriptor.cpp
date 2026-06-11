@@ -24,6 +24,8 @@ CardDescriptor::CardDescriptor()
     convertedManacost = -1;
     dynamicManacostExpression = "";
     dynamicManacostSource = NULL;
+    dynamicToughnessExpression = "";
+    dynamicToughnessSource = NULL;
     numofColorsComparisonMode = COMPARISON_NONE;
     numofColors = -1;
     zposComparisonMode = COMPARISON_NONE;
@@ -155,6 +157,16 @@ int CardDescriptor::currentManacostCriterion()
     return convertedManacost;
 }
 
+int CardDescriptor::currentToughnessCriterion()
+{
+    if (dynamicToughnessExpression.size() && dynamicToughnessSource)
+    {
+        WParsedInt val(dynamicToughnessExpression, NULL, dynamicToughnessSource);
+        return val.getValue();
+    }
+    return toughness;
+}
+
 bool CardDescriptor::valueInRange(int comparisonMode, int value, int criterion)
 {
     switch (comparisonMode)
@@ -228,11 +240,11 @@ MTGCardInstance * CardDescriptor::match_or(MTGCardInstance * card)
         if(!card->isCreature() && card->counters && (card->hasType(Subtypes::TYPE_PLANESWALKER) || card->hasType(Subtypes::TYPE_BATTLE))){
             for(size_t i = 0; i < card->counters->counters.size(); ++i){
                 if((card->counters->counters[i]->name == "loyalty" && card->hasType(Subtypes::TYPE_PLANESWALKER)) || (card->counters->counters[i]->name == "defense" && card->hasType(Subtypes::TYPE_BATTLE))){
-                    if(!valueInRange(toughnessComparisonMode, card->counters->counters[i]->nb, toughness))
+                    if(!valueInRange(toughnessComparisonMode, card->counters->counters[i]->nb, currentToughnessCriterion()))
                         return NULL;
                 }
             }
-        } else if(!valueInRange(toughnessComparisonMode, card->getToughness(), toughness))
+        } else if(!valueInRange(toughnessComparisonMode, card->getToughness(), currentToughnessCriterion()))
             return NULL;
     }
     if (numofColorsComparisonMode){
@@ -295,11 +307,11 @@ MTGCardInstance * CardDescriptor::match_and(MTGCardInstance * card)
        if(!card->isCreature() && card->counters && (card->hasType(Subtypes::TYPE_PLANESWALKER) || card->hasType(Subtypes::TYPE_BATTLE))){
             for(size_t i = 0; i < card->counters->counters.size(); ++i){
                 if((card->counters->counters[i]->name == "loyalty" && card->hasType(Subtypes::TYPE_PLANESWALKER)) || (card->counters->counters[i]->name == "defense" && card->hasType(Subtypes::TYPE_BATTLE))){
-                    if(!valueInRange(toughnessComparisonMode, card->counters->counters[i]->nb, toughness))
+                    if(!valueInRange(toughnessComparisonMode, card->counters->counters[i]->nb, currentToughnessCriterion()))
                         return NULL;
                 }
             }
-        } else if(!valueInRange(toughnessComparisonMode, card->getToughness(), toughness))
+        } else if(!valueInRange(toughnessComparisonMode, card->getToughness(), currentToughnessCriterion()))
             return NULL;
     }
     if (numofColorsComparisonMode){
