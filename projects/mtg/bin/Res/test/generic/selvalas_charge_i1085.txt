@@ -1,0 +1,40 @@
+#Selvala's Charge (#1085): parley - reveal tops, Elephant token per nonland,
+#then draws. My millstone (nonland) = the 3/3 Elephant token arrives (the
+#inplay wildcards - one per nonland, BOTH legs conditionals now fire); my draw happens. KNOWN RESIDUAL (engine): the opponent's
+#afterrevealed draw is lost (second reveal stops updating after populating;
+#their revealed card also strands in the reveal zone) - P2's hand and the
+#stranded card are deliberately not asserted.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{4}{G}
+hand:selvala's charge
+library:gold myr,millstone
+[PLAYER2]
+library:silver myr,juggernaut
+[DO]
+selvala's charge
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+choice 1
+millstone
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+choice 1
+juggernaut
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:millstone
+graveyard:selvala's charge
+inplay:*,*
+library:gold myr
+[PLAYER2]
+library:silver myr
+[END]

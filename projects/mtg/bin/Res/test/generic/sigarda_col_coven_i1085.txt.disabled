@@ -38,3 +38,7 @@ life:16
 #library never loses a card and nothing reaches hand. Same as shifting_shadow:
 #the choice legs resolve against an unpopulated reveal zone. reveal:5 variant.
 #The lord leg is pinned separately (sigarda_col_lord_i1085.txt, committed).
+#UPDATE 2026-06-11 reveal round: Sigarda has an aicode= line and suite
+#players ARE AIPlayerBaka subclasses (TestSuiteAI), so the suite exercises
+#the AICODE path - the player-path reveal is UNREACHABLE in the suite for
+#aicode cards. Needs GUI verification or a suite human-mode.

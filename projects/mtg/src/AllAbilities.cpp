@@ -382,14 +382,19 @@ int MTGRevealingCards::toResolve()
         {
             abilityFirst = contructAbility(abilityOne);
             game->addObserver(abilityFirst);
-            
+            //A one-shot option (Selvala parley's "if ... then counter(1/1)") has no
+            //click/menu to fire it and nothing in the action layer resolves added
+            //one-shots - it sat inert forever. Resolve it on the spot.
+            if (abilityFirst && abilityFirst->oneShot)
+                abilityFirst->resolve();
         }
         else
         {
             repeat = false;
             abilitySecond = contructAbility(abilityTwo);
             game->addObserver(abilitySecond);
-            
+            if (abilitySecond && abilitySecond->oneShot)
+                abilitySecond->resolve();
         }
         SAFE_DELETE(rTc);
     }
@@ -397,6 +402,8 @@ int MTGRevealingCards::toResolve()
     {
         abilityFirst = contructAbility(abilityOne);
         game->addObserver(abilityFirst);
+        if (abilityFirst && abilityFirst->oneShot)
+            abilityFirst->resolve();
     }
     return 1;
 }
@@ -418,7 +425,12 @@ void MTGRevealingCards::Render()
         return;
     CheckUserInput(mEngine->ReadButton());
     revealDisplay->CheckUserInput(mEngine->ReadButton());
-    revealDisplay->Render();
+    //Headless suite workers must not touch the GPU resource manager: two
+    //concurrent reveal tests crashed in CardGui::Render (fonts) from a
+    //ThreadProc worker. The input routing above still runs - it is what
+    //auto-drives the reveal for AI/suite players.
+    if (!getenv("WAGIC_TESTSUITE"))
+        revealDisplay->Render();
     return;
 }
 

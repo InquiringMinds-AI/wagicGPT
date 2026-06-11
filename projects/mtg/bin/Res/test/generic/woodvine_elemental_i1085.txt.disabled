@@ -5,3 +5,5 @@
 #stalls), plus a becomes(tobecast) marker variant and ability$!-granted
 #opponent legs (opponent-chooser family on top). No probe run - revive with
 #the reveal-machinery engine round.
+#UPDATE 2026-06-11: option-oneshot fix may help its conditionals once the
+#trigger-context populate layer is fixed (same blocked shape as winota).

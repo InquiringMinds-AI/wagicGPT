@@ -98,6 +98,8 @@ generic/red_elemental_blast_i1085.txt
 generic/riptide_mangler_i1085.txt
 generic/run_ashore_i1085.txt
 generic/select_for_inspection_i1085.txt
+generic/selvalas_charge_i1085.txt
+generic/selvalas_enforcer_i1085.txt
 generic/selvala_explorer_i1085.txt
 generic/selvala_hotw_i1085.txt
 generic/selvala_hotw_bigpower_i1085.txt

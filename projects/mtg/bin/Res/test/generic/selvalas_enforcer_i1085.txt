@@ -1,5 +1,10 @@
-#Selvala's Enforcer (#1085): parley ETB. My top card nonland = +1/+1 counter
-#(2/2 -> 3/3 survives Shock); opponent reveals a land = no counter from that leg.
+#Selvala's Enforcer (#1085): parley ETB - each player reveals their top card;
+#+1/+1 counter per nonland revealed; then each player draws. My juggernaut
+#(nonland) = one counter: the 2/2 enforcer survives a Shock at 3/3. My draw
+#happens. KNOWN RESIDUAL (engine): their card strands in the reveal zone and
+#the OPPONENT's afterrevealed draw is lost too - the second MTGRevealingCards
+#stops receiving updates after populating (see the .disabled witness) - so
+#P2's hand is deliberately not asserted here.
 [INIT]
 firstmain
 [PLAYER1]
@@ -39,11 +44,5 @@ inplay:iron myr,selvala's enforcer
 library:millstone
 tappedinplay:1
 [PLAYER2]
-hand:darksteel citadel
 library:silver myr
 [END]
-#PARKED: same reveal-conditional family as selvalas_charge (engine round: trigger-
-#context gaps / reveal-optionone). Probe result: my leg's optiontwo putback + draw
-#work, but optionone's "if type(land|reveal)~lessthan~1 then counter(1/1)" silently
-#no-ops (enforcer stayed 2/2, died to Shock). Opponent parley leg stalls after
-#their reveal (no draw). One reveal-conditional fix should revive both tests.

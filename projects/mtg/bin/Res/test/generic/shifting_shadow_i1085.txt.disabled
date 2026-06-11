@@ -49,3 +49,7 @@ library:darksteel citadel
 #the Reveal:1/revealuntil(creature) zone was never populated (library unchanged,
 #both cards still there). choice 1 + millstone click inert. Engine round fuel:
 #reveal-conditional machinery + revealuntil + aura-rehook-vs-SBA ordering.
+#UPDATE 2026-06-11 reveal round: the option-oneshot fix landed (parley pins
+#revived) but THIS shape still fails - the @each-upkeep aura-granted
+#revealuntil never POPULATES (the trigger-context populate layer, distinct
+#from the fixed option layer). Park stands.

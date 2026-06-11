@@ -31,3 +31,6 @@ life:17
 #trigger fires but the optionone target(human|reveal) machinery moves nothing
 #- library untouched, no human enters, bears hit alone. The complaint's
 #"must enter attacking" (readytofight) leg is unreachable behind it.
+#UPDATE 2026-06-11 reveal round: option-oneshot fix landed; this @combat
+#trigger reveal still never populates (trigger-context populate layer).
+#Park stands.
