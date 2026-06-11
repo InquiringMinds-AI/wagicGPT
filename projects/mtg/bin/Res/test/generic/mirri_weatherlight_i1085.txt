@@ -1,0 +1,31 @@
+#Mirri, Weatherlight Duelist (#1085; set id 433284): when she attacks, each opponent
+#can't block with more than one creature. The granted picker marks the giant as
+#non-blocking; the bears block alone and die to her first strike; the giant's attempted block is
+#refused (a successful double block would kill the 3/2 Mirri - her survival is the
+#cantblock proof).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:433284
+[PLAYER2]
+inplay:grizzly bears,hill giant
+[DO]
+goto attackers
+433284
+next
+choice 0
+hill giant
+goto blockers
+goto blockers
+grizzly bears
+hill giant
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:433284
+[PLAYER2]
+inplay:hill giant
+graveyard:grizzly bears
+[END]
