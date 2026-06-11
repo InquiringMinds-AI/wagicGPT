@@ -1,0 +1,35 @@
+#Oni Possession (#1085): enchanted creature gets +3/+3 trample and becomes a Demon
+#Spirit; at my upkeep I sacrifice a creature. Enchant the giant, sac the bears at
+#upkeep, swing for 6 (life 14).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{B}
+inplay:hill giant,grizzly bears
+hand:oni possession
+[PLAYER2]
+[DO]
+oni possession
+hill giant
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto upkeep
+choice 0
+grizzly bears
+goto upkeep
+goto upkeep
+goto attackers
+hill giant
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:oni possession,hill giant
+graveyard:grizzly bears
+[PLAYER2]
+life:14
+[END]
