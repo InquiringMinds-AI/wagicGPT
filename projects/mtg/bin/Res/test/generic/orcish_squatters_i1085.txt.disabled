@@ -1,0 +1,37 @@
+#Orcish Squatters (#1085) - PARKED, REAL PARTIAL BUG:
+#  - The may-steal leg WORKS: accept (choice 0 + pads) at the COMBATDAMAGE step,
+#    then pads + land click + pads - the land changes controller. (At blockers the
+#    @combat(notblocked) trigger has not fired yet; no prompt.)
+#  - The 'assigns no combat damage' leg (&& fog from(this) ueot) NEVER works: the
+#    trigger fires during the damage step AFTER combat damage is assigned, so the
+#    fog arrives too late and the opponent still takes 2.
+#  - Engine-round item: @combat(notblocked) needs to fire before damage assignment
+#    (or the fog needs to apply retroactively) for cards in this family.
+#Working steal sequence for re-enlistment once fixed:
+[INIT]
+firstmain
+[PLAYER1]
+inplay:orcish squatters
+[PLAYER2]
+inplay:darksteel citadel
+[DO]
+goto attackers
+orcish squatters
+next
+goto combatdamage
+goto combatdamage
+choice 0
+goto combatdamage
+goto combatdamage
+darksteel citadel
+goto combatdamage
+goto combatdamage
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:orcish squatters,darksteel citadel
+[PLAYER2]
+life:20
+[END]
