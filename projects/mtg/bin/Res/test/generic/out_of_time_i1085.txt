@@ -1,0 +1,34 @@
+#Out of Time (#1085): ETB phases out all creatures, gains a time counter per phased
+#creature (2 here); vanishing removes one per upkeep; at zero it's sacrificed and the
+#creatures phase back in. After two of my upkeeps both creatures are back and the
+#enchantment is in the graveyard.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}{W}
+inplay:grizzly bears
+hand:out of time
+[PLAYER2]
+inplay:hill giant
+[DO]
+out of time
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto firstmain
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears
+graveyard:out of time
+[PLAYER2]
+inplay:hill giant
+[END]
