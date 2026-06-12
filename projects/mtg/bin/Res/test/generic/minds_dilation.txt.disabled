@@ -52,3 +52,10 @@ tappedinplay:1
 #  - Data smell (secondary): the nested newability watches
 #    *[-land]|opponentGRAVEYARD but ingest EXILES - even with the outer
 #    trigger fixed the may-cast leg may need from()-zone correction.
+#UPDATE (same sitting): ROOT CAUSE NARROWED - see dragonlair_doublefire
+#park: opponent-stack movedto triggers DOUBLE-FIRE per single opponent
+#cast (2 insect tokens from 1 shock), while my-stack fires once
+#(Contemplation life 21 exact). Mind's Dilation's equalto~1 restriction
+#therefore sees 2 and never passes. Fix the double-fire first; this
+#witness should then need only the nested-leg zone check (ingest exiles
+#vs the newability watching opponentGRAVEYARD).

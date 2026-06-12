@@ -1,0 +1,40 @@
+#Dragonlair Spider - PARKED PINNING AN ENGINE BUG: the opponent's single
+#shock fires @movedTo(*|opponentstack) TWICE (TWO insect tokens; the
+#assert below pins the buggy 2-token state so this file flips loudly when
+#fixed - then change to one *). My-stack triggers fire exactly ONCE for
+#one's own cast (Contemplation probe: life 21 exact). The asymmetric
+#DOUBLE-FIRE is the round; it also explains Mind's Dilation (its
+#restriction{thisturn(*|opponentstack)~equalto~1} sees 2, never passes).
+#Suspect: two WEventZoneChange emissions for an opponent's stack arrival
+#(interrupt-window re-push? instance-chain re-emission?) - only the
+#opponent-relative path sees both. Instrument the movedto trigger's
+#receiveEvent + count events at TrCardAddedToZone for one opponent cast.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:dragonlair spider
+[PLAYER2]
+inplay:iron myr
+hand:shock
+library:eager cadet,eager cadet
+[DO]
+goto end
+goto firstmain
+iron myr
+shock
+p1
+goto firstmain
+goto firstmain
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:dragonlair spider,*,*
+life:18
+[PLAYER2]
+inplay:iron myr
+graveyard:shock
+hand:*
+library:*
+tappedinplay:1
+[END]
