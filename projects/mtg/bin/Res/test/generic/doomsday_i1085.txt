@@ -1,0 +1,45 @@
+#Doomsday (#1085 "cards already exiled got shuffled into the deck"):
+#search library+graveyard for five, they become the library, the rest is
+#exiled, lose half your life. The reported bug is long gone (pre-exiled
+#juggernaut stays put). Revival needed: (1) the depth-aware and!( )!
+#extraction (engine round 24 - the card's nested and! chain carried the
+#exile legs and was silently truncated before it); (2) DRIVING: the
+#sorcery resolves IMMEDIATELY (library/graveyard targets are not
+#cast-collectible) and the <5> picker opens POST-RESOLUTION via the
+#general GTA+must-may fallback - it needs choice 0 BEFORE the five
+#clicks (the notaTarget protocol; without it the clicks feed nothing
+#and the picks vacuously 'stay' in the library). ENGINE FLAVOR: Wagic
+#moves the resolving sorcery to the graveyard before the picker runs,
+#so Doomsday's own rest-exile sweeps ITSELF to exile (paper leaves it
+#in the graveyard) - asserted as engine behavior.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:doomsday
+library:millstone,ornithopter,mox pearl,darksteel citadel,leaden myr
+graveyard:walking corpse
+exile:juggernaut
+manapool:{B}{B}{B}
+[PLAYER2]
+[DO]
+doomsday
+choice 0
+millstone
+ornithopter
+mox pearl
+darksteel citadel
+leaden myr
+goto firstmain
+goto firstmain
+goto firstmain
+goto firstmain
+goto secondmain
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+library:millstone,ornithopter,mox pearl,darksteel citadel,leaden myr
+exile:juggernaut,walking corpse,doomsday
+life:10
+[PLAYER2]
+[END]
