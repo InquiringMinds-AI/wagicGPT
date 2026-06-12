@@ -52,10 +52,25 @@ tappedinplay:1
 #  - Data smell (secondary): the nested newability watches
 #    *[-land]|opponentGRAVEYARD but ingest EXILES - even with the outer
 #    trigger fixed the may-cast leg may need from()-zone correction.
-#UPDATE (same sitting): ROOT CAUSE NARROWED - see dragonlair_doublefire
-#park: opponent-stack movedto triggers DOUBLE-FIRE per single opponent
-#cast (2 insect tokens from 1 shock), while my-stack fires once
-#(Contemplation life 21 exact). Mind's Dilation's equalto~1 restriction
-#therefore sees 2 and never passes. Fix the double-fire first; this
-#witness should then need only the nested-leg zone check (ingest exiles
-#vs the newability watching opponentGRAVEYARD).
+#UPDATE 2 (same sitting, post castMethod round): THREE fixes landed and the
+#chain now runs MUCH deeper. (1) ENGINE: castMethod survives
+#MTGCardInstance::clone() (zone moves used to rebuild from the model and
+#reset it to NOT_CAST - the setX/exileRiderSuppressed precedent); (2)
+#ENGINE: the four MTGRules cast sites pre-stamp castMethod BEFORE
+#putInZone (the arrival event evaluates trigger restrictions before the
+#Spell ctor used to stamp it - seenThisTurn(CAST_ALL) excluded the
+#just-cast spell, so 'first spell this turn' counted 0); (3) DATA: the
+#granted watcher now watches opponentEXILE (ingest exiles; it watched
+#opponentgraveyard and fired on the SHOCK hitting the graveyard instead).
+#VERIFIED NOW: trigger fires, restriction passes (count=1), ingest exiles
+#the right card, the granted watcher fires ON THE DRAKE, the may prompt
+#consumes choice 0, the GTA(AACastCard) goes on the stack... and resolves
+#as a NO-OP. FINAL LEG MAP: MayAbility::reactToTargetClick clones the
+#GTA; TargetAbility::resolve does t = tc->getNextTarget() on the cloned
+#all(trigger[to]) chooser which holds NO targets (the event-target
+#binding does not survive into/through the may-clone) -> 'if (t &&
+#ability)' fails silently. AACastCard itself is correctly oneShot=false
+#and would work via the addToGame branch if t were bound. Next: find
+#where trigger payloads transfer the event target into payload tcs and
+#why the May(GTA(...)) nesting misses it (the one-shot Devils-idiom
+#payloads get it right).

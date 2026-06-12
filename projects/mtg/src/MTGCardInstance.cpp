@@ -2111,6 +2111,11 @@ MTGCardInstance* MTGCardInstance::clone()
     //flag of copies (populate, Clone...) must survive (issue #1145)
     c->exileRiderSuppressed = exileRiderSuppressed;
     c->setX = setX;
+    //how the card was cast must survive the move too: cardsSeenThisTurn
+    //filters (seenThisTurn(CAST_ALL) behind 'first spell this turn'
+    //restrictions like Mind's Dilation's) read castMethod off the
+    //post-move instance, which used to reset to NOT_CAST here.
+    c->castMethod = castMethod;
     if (c->exileRiderSuppressed)
     {
         c->basicAbilities[Constants::UNEARTH] = 0;

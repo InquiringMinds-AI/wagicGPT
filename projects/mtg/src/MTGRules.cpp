@@ -578,6 +578,19 @@ int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
             card->getManaCost()->setManaUsedToCast(NEW ManaCost());
             card->getManaCost()->getManaUsedToCast()->copy(spellCost);
         }
+        //The stack-arrival event (and any trigger restriction it evaluates,
+        //e.g. thisturn(*|opponentstack)~equalto~1 "first spell this turn")
+        //fires inside putInZone - BEFORE the Spell ctor stamps castMethod,
+        //so the just-cast spell still read as NOT_CAST and was excluded
+        //from seenThisTurn(CAST_ALL) counts. Stamp the pre-move instance
+        //now (the zone-move copy inherits it); the Spell ctor re-stamps
+        //the same value moments later.
+        switch (payResult) {
+        case ManaCost::MANA_UNPAID: card->castMethod = Constants::NOT_CAST; break;
+        case ManaCost::MANA_PAID:
+        case ManaCost::MANA_PAID_WITH_KICKER: card->castMethod = Constants::CAST_NORMALLY; break;
+        default: card->castMethod = Constants::CAST_ALTERNATE; break;
+        }
         MTGCardInstance * copy = player->game->putInZone(card, card->currentZone, player->game->stack);
         if (game->targetChooser)
         {
@@ -754,6 +767,19 @@ int MTGKickerRule::reactToClick(MTGCardInstance * card)
         if (spellCost && !card->getManaCost()->getManaUsedToCast()){
             card->getManaCost()->setManaUsedToCast(NEW ManaCost());
             card->getManaCost()->getManaUsedToCast()->copy(spellCost);
+        }
+        //The stack-arrival event (and any trigger restriction it evaluates,
+        //e.g. thisturn(*|opponentstack)~equalto~1 "first spell this turn")
+        //fires inside putInZone - BEFORE the Spell ctor stamps castMethod,
+        //so the just-cast spell still read as NOT_CAST and was excluded
+        //from seenThisTurn(CAST_ALL) counts. Stamp the pre-move instance
+        //now (the zone-move copy inherits it); the Spell ctor re-stamps
+        //the same value moments later.
+        switch (payResult) {
+        case ManaCost::MANA_UNPAID: card->castMethod = Constants::NOT_CAST; break;
+        case ManaCost::MANA_PAID:
+        case ManaCost::MANA_PAID_WITH_KICKER: card->castMethod = Constants::CAST_NORMALLY; break;
+        default: card->castMethod = Constants::CAST_ALTERNATE; break;
         }
         MTGCardInstance * copy = player->game->putInZone(card, card->currentZone, player->game->stack);
         if (game->targetChooser)
@@ -1064,6 +1090,19 @@ int MTGAlternativeCostRule::reactToClick(MTGCardInstance * card, ManaCost *alter
         if (spellCost && !card->getManaCost()->getManaUsedToCast()){
             card->getManaCost()->setManaUsedToCast(NEW ManaCost());
             card->getManaCost()->getManaUsedToCast()->copy(spellCost);
+        }
+        //The stack-arrival event (and any trigger restriction it evaluates,
+        //e.g. thisturn(*|opponentstack)~equalto~1 "first spell this turn")
+        //fires inside putInZone - BEFORE the Spell ctor stamps castMethod,
+        //so the just-cast spell still read as NOT_CAST and was excluded
+        //from seenThisTurn(CAST_ALL) counts. Stamp the pre-move instance
+        //now (the zone-move copy inherits it); the Spell ctor re-stamps
+        //the same value moments later.
+        switch (alternateCostType) {
+        case ManaCost::MANA_UNPAID: card->castMethod = Constants::NOT_CAST; break;
+        case ManaCost::MANA_PAID:
+        case ManaCost::MANA_PAID_WITH_KICKER: card->castMethod = Constants::CAST_NORMALLY; break;
+        default: card->castMethod = Constants::CAST_ALTERNATE; break;
         }
         MTGCardInstance * copy = player->game->putInZone(card, card->currentZone, player->game->stack);
         game->mLayers->stackLayer()->addSpell(copy, game->targetChooser, spellCost, alternateCostType, 0);
@@ -1566,6 +1605,7 @@ int MTGMorphCostRule::reactToClick(MTGCardInstance * card)
     }
     int iscommander = card->isCommander;
     card->isCommander = 0;//Morph is not a commander on stack
+    card->castMethod = Constants::CAST_ALTERNATE; //stamp before the arrival event fires inside putInZone (see the cast sites above)
     MTGCardInstance * copy = player->game->putInZone(card, card->currentZone, player->game->stack);
     if(iscommander > 0)
         copy->isCommander = 1;
