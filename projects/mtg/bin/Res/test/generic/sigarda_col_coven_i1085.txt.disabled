@@ -42,3 +42,10 @@ life:16
 #players ARE AIPlayerBaka subclasses (TestSuiteAI), so the suite exercises
 #the AICODE path - the player-path reveal is UNREACHABLE in the suite for
 #aicode cards. Needs GUI verification or a suite human-mode.
+#UPDATE 2026-06-12 (round 27 aftermath): the aicode line is NOT an
+#executable replacement - AIPlayerBaka.cpp ~658-682 parses it only as an
+#EFFICIENCY HINT when scoring an open GenericReveal/ScryAbility. A main-
+#phase click on Sigarda activates nothing (probed). The real blocker
+#remains the park's original one: the triggered reveal:5 resolves with
+#an UNPOPULATED reveal zone (shifting_shadow family). Fix lives in the
+#reveal-population machinery for triggered reveal:N, not in driving.
