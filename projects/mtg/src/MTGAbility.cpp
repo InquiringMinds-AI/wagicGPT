@@ -2497,12 +2497,40 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     found = s.find("and!(");
     if (found != string::npos && found + 6 != ')' && storedAndAbility.empty())
     {
-        vector<string> splitAnd = parseBetween(s, "and!(", ")!",false);
-        if(splitAnd.size())
+        //The payload may itself contain and!( ... )! (Doomsday's per-pick
+        //return chain) - match the closing ")!" at DEPTH 0, not the first
+        //one, or the outer payload truncates there and everything after it
+        //is silently dropped. The stash is consumed clear-then-parse, so
+        //the preserved inner and!( )! re-enters this extraction when the
+        //payload itself is parsed.
+        size_t scan = found + 5;
+        int depth = 1;
+        size_t real_end = string::npos;
+        while (scan + 1 < s.size())
         {
-            storedAndAbility.append(splitAnd[1]);
-            size_t real_end = s.find(")!", found);
+            if (s.compare(scan, 5, "and!(") == 0)
+            {
+                ++depth;
+                scan += 5;
+                continue;
+            }
+            if (s.compare(scan, 2, ")!") == 0)
+            {
+                --depth;
+                if (!depth)
+                {
+                    real_end = scan;
+                    break;
+                }
+                scan += 2;
+                continue;
+            }
+            ++scan;
+        }
+        if (real_end != string::npos)
+        {
             size_t sIndex = found + 5;
+            storedAndAbility.append(s.substr(sIndex, real_end - sIndex));
             s.erase(sIndex, real_end - sIndex);
         }
     }

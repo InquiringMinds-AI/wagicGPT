@@ -56,3 +56,13 @@ life:10
 #    also hung in combination with the kept-tag payload.
 #After the nesting-aware parse lands, the ORIGINAL data line should work
 #as written (its inner transforms grants were never reached).
+#UPDATE (same sitting): the depth-aware and! extraction LANDED (engine,
+#suite 907+4/0) - the inner payload now parses and reaches its mover.
+#Doomsday's remaining dead leg is ROOT CAUSE #2: the inner payload is
+#transforms((,newability[all(...) moveto(exile)],...)) ON A LIBRARY
+#CARD - granted abilities on out-of-play cards never tick (the
+#transformer machinery strips/ignores grants whose bearer is not on the
+#battlefield; same class as the watchers' pre-fix blink-hack). Next
+#shape to try when reopened: put the exile legs somewhere that ticks -
+#or extend the transformer to honor grants on the card it rides
+#regardless of zone for oneshot payloads.
