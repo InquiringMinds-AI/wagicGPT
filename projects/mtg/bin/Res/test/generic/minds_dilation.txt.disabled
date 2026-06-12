@@ -74,3 +74,29 @@ tappedinplay:1
 #where trigger payloads transfer the event target into payload tcs and
 #why the May(GTA(...)) nesting misses it (the one-shot Devils-idiom
 #payloads get it right).
+#UPDATE 3 (same sitting, round CLOSED for now - two attempted fixes
+#REVERTED as unproven): the payload is NOT May(GTA(...)): `all(` is a
+#LORD KEYWORD, so the line parses as lord-over-trigger[to] wrapping
+#May(GenericACTIVATEDAbility(AACastCard)) - gdb vtable dump of the
+#stacked may-clone says GenericActivatedAbility (tc was NULL at the
+#may-parse; trigger[to] sits in the LORD, and castcard(normal) has no
+#trigger[to] inside its parens so AACastCard gets no actionTC either ->
+#setTriggerTargets finds NO TriggerTargetChooser anywhere; how the drake
+#still reaches the clone's SOURCE is unmapped - the stacked clone showed
+#'Source: Wind Drake').
+#ATTEMPT 1 (reverted): seed TargetAbility::resolve's target list from a
+#TriggerTargetChooser binding - wrong class, never executes here (would
+#only matter for genuine GTA-with-TTC payloads, none confirmed).
+#ATTEMPT 2 (reverted): GenericActivatedAbility::resolve addToGame'ing
+#non-oneShot AACastCard nesteds (IfThen precedent, narrowed past
+#AManaProducer) - the cast FIRES but under the WRONG ANCHORING: the
+#clone's source is the DRAKE (P2's card), so the free cast resolved on
+#the wrong side and cascaded (Dilation left the battlefield, P2 board /
+#exile / library all wrong). The source corruption happens UPSTREAM of
+#the dispatch: the may-clone is stacked with source already = the
+#trigger card. NEXT ENTRY POINT: trace how the lord re-points
+#source/target on its per-card may payload (ALord grant loop ~8262
+#re-points aNew->target/source = _target) - the lord-of-may path
+#probably needs target-only re-pointing (source must stay the granting
+#card) BEFORE any lifecycle dispatch can be correct. Then re-apply
+#attempt 2's dispatch.
