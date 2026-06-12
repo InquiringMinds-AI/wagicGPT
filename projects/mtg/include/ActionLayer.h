@@ -57,7 +57,13 @@ public:
     int removeFromGame(ActionElement * e);
     
     bool moveToGarbage(ActionElement * e);
-    
+
+    //True if e already sits in the garbage list (it left mObjects via its
+    //own testDestroy). Owners with a delete-fallback (GenericInstantAbility
+    //::destroy) must check this: the layer will delete it at cleanup, and
+    //deleting it again dangles the garbage slot.
+    bool isInGarbage(ActionElement * e);
+
     void cleanGarbage();
 
 protected:

@@ -7399,6 +7399,23 @@ void MTGAbility::propagateSource(MTGAbility * a, MTGCardInstance * newSource)
     }
 }
 
+void MTGAbility::propagateTarget(MTGAbility * a, Targetable * newTarget)
+{
+    if (!a || !newTarget)
+        return;
+    a->target = newTarget;
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+    {
+        if (na->ability != a) //defensive: avoid pathological self-nesting
+            propagateTarget(na->ability, newTarget);
+    }
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+    {
+        for (size_t i = 0; i < ma->abilities.size(); ++i)
+            propagateTarget(ma->abilities[i], newTarget);
+    }
+}
+
 //
 
 ActivatedAbility::ActivatedAbility(GameObserver* observer, int id, MTGCardInstance * card, ManaCost * _cost, int restrictions,string limit,MTGAbility * sideEffect,string usesBeforeSideEffects,string castRestriction) :

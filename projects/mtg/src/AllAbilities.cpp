@@ -1006,7 +1006,23 @@ int GenericActivatedAbility::resolve()
     }
     ability->target = target; //may have been updated...
     if (ability)
+    {
+        //AACastCard works through Update ticks (it runs the whole cast flow
+        //itself); plain resolve() is a silent no-op for it, which dropped
+        //the free-cast leg of lord-granted mays (Mind's Dilation's
+        //all(trigger[to]) may castcard(normal)). Fire it through the
+        //addToGame lifecycle instead (the IfThenAbility precedent). Kept
+        //narrow: other non-oneShot payloads (AManaProducer!) legitimately
+        //fire via resolve().
+        if (!ability->oneShot && dynamic_cast<AACastCard *>(ability))
+        {
+            MTGAbility * mClone = ability->clone();
+            mClone->target = target;
+            mClone->addToGame();
+            return 1;
+        }
         return ability->resolve();
+    }
     return 0;
 }
 

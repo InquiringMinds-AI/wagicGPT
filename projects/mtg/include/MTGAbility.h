@@ -61,6 +61,11 @@ public:
     // that depend on the damage/effect source (deathtouch, lifelink...)
     // must see the taught card, not the teaching aura/equipment.
     static void propagateSource(MTGAbility * a, MTGCardInstance * newSource);
+    // The target-side twin: interaction payloads (a lord's per-card may -
+    // Mind's Dilation's free-cast leg) keep the GRANTING card as source
+    // (menu ownership and castcard's caster read source->controller());
+    // the matched card flows through the nested tree as the TARGET.
+    static void propagateTarget(MTGAbility * a, Targetable * newTarget);
     enum
     {
         NO_RESTRICTION = 0,

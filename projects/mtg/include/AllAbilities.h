@@ -3085,6 +3085,18 @@ public:
     {
         if (game->removeObserver(ability))
             ability = NULL;
+        else if (ability && game->mLayers && game->mLayers->actionLayer()
+                 && game->mLayers->actionLayer()->isInGarbage(ability))
+        {
+            //removeObserver fails BOTH when the nested ability was never
+            //added AND when it already left mObjects for the garbage list
+            //(its own testDestroy fired first - a lord's per-card may
+            //completes its interaction and self-destroys; Mind's
+            //Dilation). In the latter case the layer owns it: deleting it
+            //here too left a dangling garbage slot and a teardown
+            //segfault.
+            ability = NULL;
+        }
         else
             SAFE_DELETE(ability);
         return InstantAbility::destroy();
@@ -3598,10 +3610,23 @@ public:
         {
             if (d->type_as_damageable == Damageable::DAMAGEABLE_MTGCARDINSTANCE)
             {
-                //Repoint the whole ability tree, not just the wrapper: the
-                //nested effect's source is what damage/deathtouch/lifelink
-                //rules inspect (upstream issue #1142).
-                MTGAbility::propagateSource(a, (MTGCardInstance *) d);
+                if (dynamic_cast<MayAbility *>(a))
+                {
+                    //Interaction payloads (a per-card may - Mind's Dilation's
+                    //all(trigger[to]) may castcard leg) must keep the GRANTING
+                    //card as source: the may menu's owner and castcard's
+                    //caster both read source->controller(); re-pointing source
+                    //to the matched card handed the free cast to its
+                    //controller. The matched card is their TARGET instead.
+                    MTGAbility::propagateTarget(a, d);
+                }
+                else
+                {
+                    //Repoint the whole ability tree, not just the wrapper: the
+                    //nested effect's source is what damage/deathtouch/lifelink
+                    //rules inspect (upstream issue #1142).
+                    MTGAbility::propagateSource(a, (MTGCardInstance *) d);
+                }
             }
             if (oneShot)
             {

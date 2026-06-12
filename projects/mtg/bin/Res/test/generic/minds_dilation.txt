@@ -1,0 +1,45 @@
+#Mind's Dilation: opponent's first spell each turn -> they exile their
+#library top (ingest) -> you may cast it free. Exercises FIVE fixes:
+#castMethod surviving clone() + pre-stamped before the arrival event
+#('first spell this turn' counted 0 otherwise); the granted watcher
+#watching opponentexile (data; ingest exiles, it watched the graveyard);
+#ALord propagating the matched card as TARGET (not source) into may
+#payloads (source->controller() is the menu owner AND castcard's caster
+#- re-pointing source handed the free cast to the opponent); and
+#GenericActivatedAbility firing AACastCard through addToGame (it works
+#via Update ticks; plain resolve() was a silent no-op). Driving:
+#turn-cross, P2 taps+shocks (their first spell), choice 0 (P1's may),
+#choice 0 (cast menu) - the drake resolves under P1 for free.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:mind's dilation
+[PLAYER2]
+inplay:iron myr
+hand:shock
+library:eager cadet,wind drake,grizzly bears
+[DO]
+goto end
+goto firstmain
+iron myr
+shock
+p1
+goto firstmain
+choice 0
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:mind's dilation,wind drake
+life:18
+[PLAYER2]
+inplay:iron myr
+graveyard:shock
+hand:grizzly bears
+library:*
+tappedinplay:1
+[END]

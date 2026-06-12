@@ -66,6 +66,16 @@ bool ActionLayer::moveToGarbage(ActionElement * e)
 
 }
 
+bool ActionLayer::isInGarbage(ActionElement * e)
+{
+    for (size_t i = 0; i < garbage.size(); ++i)
+    {
+        if (garbage[i] == e)
+            return true;
+    }
+    return false;
+}
+
 void ActionLayer::cleanGarbage()
 {
     for (size_t i = 0; i < garbage.size(); ++i)
@@ -565,5 +575,27 @@ ActionLayer::~ActionLayer()
     while(mObjects.size())
         moveToGarbage((ActionElement *) mObjects[mObjects.size() - 1]);
     SAFE_DELETE(abilitiesMenu);
+    //A GenericInstantAbility wrapper ALSO addToGame's its nested ability
+    //(see GenericInstantAbility::addToGame), so at abrupt game teardown -
+    //when its destroy() never ran to detach them - BOTH the wrapper and
+    //the nested element sit in this garbage list, and the wrapper's
+    //destructor would double-delete the nested one (seen as a teardown
+    //segfault when a lord's per-card may was still alive at suite end -
+    //Mind's Dilation). Detach such pairs before the final sweep; order
+    //of deletion then no longer matters.
+    for (size_t i = 0; i < garbage.size(); ++i)
+    {
+        GenericInstantAbility * gia = dynamic_cast<GenericInstantAbility *>(garbage[i]);
+        if (!gia || !gia->ability)
+            continue;
+        for (size_t j = 0; j < garbage.size(); ++j)
+        {
+            if ((ActionElement *) gia->ability == garbage[j])
+            {
+                gia->ability = NULL;
+                break;
+            }
+        }
+    }
     cleanGarbage();
 }
