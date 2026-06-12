@@ -1,0 +1,44 @@
+#Collected Conjuring (#1085): exile the top six, cast up to two mv<=3
+#sorceries from among them free. AICODE CARD: in the suite the aicode's
+#target(<upto:2>sorcery[manacost<=3&zpos<=6]|mylibrary) leg opens the
+#standard post-resolution must-may picker (doomsday idiom) - choice 0
+#then click the two sorceries BY NAME (getCard resolves them to the
+#library copies, which ARE the chooser's valid targets).
+#The old flake: the suite click handler ran its "mimic library shuffle"
+#after EVERY pick, scrambling the zpos<=6 positions mid-collection ->
+#~5/7 dice roll. Fixed by suppressing the mimic while a zpos-restricted
+#chooser is open (TestSuiteAI::Act).
+# https://github.com/WagicProject/wagic/issues/1085
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:collected conjuring
+library:millstone,ornithopter,mox pearl,juggernaut,krenko's command,divination,darksteel citadel
+manapool:{2}{U}{R}
+[PLAYER2]
+[DO]
+collected conjuring
+goto firstmain
+goto firstmain
+goto firstmain
+goto firstmain
+choice 0
+krenko's command
+goto firstmain
+goto firstmain
+goto firstmain
+goto firstmain
+divination
+goto firstmain
+goto firstmain
+goto secondmain
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:*,*
+hand:*,*
+library:*,*,*
+graveyard:collected conjuring,krenko's command,divination
+[PLAYER2]
+[END]

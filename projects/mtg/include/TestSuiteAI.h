@@ -130,6 +130,7 @@ class TestSuiteAI:public AIPlayerBaka
 private:
     MTGCardInstance * getCard(string action);
     float timer;
+    float aiActCounter; //dt fed to AIPlayerBaka::Act in [AI] tests (was a thread-shared function static)
     TestSuiteGame * suite;
 
 public:

@@ -34,6 +34,7 @@ TestSuiteAI::TestSuiteAI(TestSuiteGame *tsGame, int playerId) :
 
     suite = tsGame;
     timer = 0;
+    aiActCounter = 1.0f;
     expectedTappedInPlay = -1;
     playMode = MODE_TEST_SUITE;
     this->deckName = "Test Suite AI";
@@ -136,10 +137,13 @@ int TestSuiteAI::Act(float)
 
     if (playMode == MODE_AI && suite->aiMaxCalls)
     {
-        float static counter = 1.0f;
+        //Per-instance, not function-local static: the static was shared by
+        //every worker thread (unsynchronized writes) and grew across all
+        //[AI] tests, so AIPlayerBaka's dt-paced timer saw schedule-dependent
+        //values. Per-instance matches what a solo run sees.
         suite->aiMaxCalls--;
         suite->timerLimit = SLOW_TEST; //TODO Remove this limitation when AI is not using a stupid timer anymore...
-        AIPlayerBaka::Act(counter++);//dt);
+        AIPlayerBaka::Act(aiActCounter++);//dt);
     }
     if (playMode == MODE_HUMAN)
     {
@@ -154,7 +158,9 @@ int TestSuiteAI::Act(float)
 
     string action = suite->getNextAction();
 //    observer->mLayers->stackLayer()->Dump();
-    DebugTrace("TESTSUITE command: " << action);
+    //The [filename] tag makes one test's commands extractable from the
+    //braided multi-worker suite log (grep "\[<testfile>\]").
+    DebugTrace("TESTSUITE command: " << action << " [" << suite->filename << "]");
 
     if (observer->mLayers->stackLayer()->askIfWishesToInterrupt == this)
     {
@@ -307,12 +313,28 @@ int TestSuiteAI::Act(float)
         MTGCardInstance * card = getCard(action);
         if (card)
         {
-            DebugTrace("TESTSUITE Clicking ON: " << card->name);
-            card->currentZone->needShuffle = true; //mimic library shuffle
+            DebugTrace("TESTSUITE Clicking ON: " << card->name << " [" << suite->filename << "]");
+            //The "mimic library shuffle" emulates paper's shuffle-after-
+            //search for clicks that resolve to library cards. But it runs
+            //after EVERY pick - and while a POSITION-restricted chooser
+            //(zpos, e.g. Collected Conjuring's top-six) is collecting,
+            //shuffling scrambles the very positions the chooser's
+            //predicate reads, randomizing the test. Suppress it for
+            //zpos-restricted choosers; name/type searches keep it.
+            bool zposPick = false;
+            if (DescriptorTargetChooser * dtc = dynamic_cast<DescriptorTargetChooser *>(observer->getCurrentTargetChooser()))
+                zposPick = dtc->cd && dtc->cd->zposComparisonMode;
+            if (!zposPick)
+                card->currentZone->needShuffle = true; //mimic library shuffle
             observer->cardClick(card, card);
-            observer->forceShuffleLibraries(); //mimic library shuffle
+            if (!zposPick)
+                observer->forceShuffleLibraries(); //mimic library shuffle
             return 1;
         }
+        //A scripted click whose card was not found is consumed and does
+        //NOTHING - the prime shape of a silent test divergence. Say so.
+        if (action.size())
+            DebugTrace("TESTSUITE SWALLOWED (no card matched): " << action << " [" << suite->filename << "]");
     }
     return 0;
 }
@@ -757,9 +779,17 @@ void TestSuite::ThreadProc(void* inParam)
     if (instance)
     {
         string filename;
-        float counter = 1.0f;
         while(instance->mProcessing && (filename = instance->getNextFile()) != "")
         {
+            //Per-test, not per-worker: this counter is each Update's dt.
+            //Initialized once per thread it kept growing across the whole
+            //queue, so a test's dt values depended on how many ticks every
+            //PREVIOUS test on that worker consumed - i.e. on the dynamic
+            //file distribution, i.e. on thread scheduling. Any dt-gated
+            //layer then behaved differently run to run. Resetting per game
+            //gives every test the same dt sequence a solo run gets
+            //(1,2,3,...), the regime all witnesses are tuned against.
+            float counter = 1.0f;
             TestSuiteGame * theGame = NULL;
             {
                 //File reads and the lazily-populated card collection are not
@@ -1021,7 +1051,9 @@ void TestSuiteGame::ResetManapools()
 
 void TestSuiteGame::initGame()
 {
-    DebugTrace("TESTSUITE Init Game");
+    //The obs= pointer keys this test's game-side trace lines (ZONE
+    //SHUFFLE etc.) back to its filename in the braided threaded log.
+    DebugTrace("TESTSUITE Init Game [" << filename << "] obs=" << (void *)observer);
     observer->phaseRing->goToPhase(initState.phase, observer->players[0], false);
     observer->setCurrentGamePhase(initState.phase);
 

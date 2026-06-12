@@ -1268,6 +1268,9 @@ void MTGGameZone::cleanupPhase()
 
 void MTGGameZone::shuffle()
 {
+    //obs= lets a shuffle be attributed to its game in the braided
+    //threaded-suite log (match against the tagged TESTSUITE Init Game line)
+    DebugTrace("ZONE SHUFFLE obs=" << (void *)owner->getObserver() << " isLibrary=" << (this == owner->game->library) << " nb=" << nb_cards);
     owner->getObserver()->getRandomGenerator()->random_shuffle(cards.begin(), cards.end());
     if(this == owner->game->library){
         owner->lastShuffleTurn = owner->getObserver()->turn;
