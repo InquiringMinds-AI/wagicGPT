@@ -1,0 +1,41 @@
+#Dragonlair Spider: @movedTo(*|opponentstack) fires exactly ONCE per
+#opponent cast - one insect token for P2's shock. WITNESS IDIOM: the
+#spider is CAST FROM HAND here, deliberately. The suite's INIT-inplay
+#routes cards library->STACK->battlefield, so an INIT-inplay spider
+#fires on the opponent's own INIT-inplay cards during board setup (the
+#one-time 'double fire' that parked this card was that artifact plus
+#the one legitimate fire). Cast trigger-bearing stack-watchers from
+#hand in tests.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{R}{R}{G}{G}
+hand:dragonlair spider
+[PLAYER2]
+inplay:iron myr
+hand:shock
+library:eager cadet,eager cadet
+[DO]
+dragonlair spider
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+iron myr
+shock
+p1
+goto firstmain
+goto firstmain
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:dragonlair spider,*
+life:18
+[PLAYER2]
+inplay:iron myr
+graveyard:shock
+hand:*
+library:*
+tappedinplay:1
+[END]

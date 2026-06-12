@@ -921,3 +921,4 @@ generic/true_name_nemesis_chooseone_i1085.txt
 generic/tnn_blocks_chosen.txt
 generic/tnn_protection_direction.txt
 generic/sram_expertise_castcard.txt
+generic/dragonlair_opponent_cast.txt
