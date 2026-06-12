@@ -66,3 +66,25 @@ life:10
 #shape to try when reopened: put the exile legs somewhere that ticks -
 #or extend the transformer to honor grants on the card it rides
 #regardless of zone for oneshot payloads.
+#UPDATE 2 (root-cause-2 dig, traces removed, sources pristine): the
+#'transforms grants on library cards' theory was WRONG TOO - the real
+#shape is stranger. Instrumented findings (all verified, then traces
+#removed):
+#  - Doomsday CASTS AND RESOLVES IMMEDIATELY (no cast-time target
+#    collection); the <5> library/graveyard picker opens POST-resolution
+#    (the general GTA+must-may fallback) and the 5 clicks feed it there.
+#  - The and!-stash chain PARSES COMPLETELY post round-24: the inner
+#    stash carries 'transforms(()) oneshot' and the transforms parse
+#    site receives the full newability content via storedString
+#    (verified at the parse site).
+#  - BUT: AAMover::resolve NEVER RUNS in the entire test (entry trace,
+#    verified present in the binary) - yet the picks END IN THE LIBRARY.
+#    Something else moves them; the and!-chain (which lives on the
+#    AAMover) is bypassed wholesale by whatever the post-resolution
+#    picker flow uses to move cards. ATransformerInstant::resolve and
+#    ATransformer::addToGame also never run.
+#  - ALord::resolve runs only twice at INIT (rule cards).
+#NEXT ENTRY: find what moves the picks in the post-resolution picker
+#flow (gdb break MTGPlayerCards::putInZone with bt during the picks) -
+#that mechanism needs to fire the line's and! chain, or the data needs
+#a shape that rides the actual mechanism.
