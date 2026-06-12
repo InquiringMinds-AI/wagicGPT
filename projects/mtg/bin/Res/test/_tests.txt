@@ -932,3 +932,4 @@ generic/collected_conjuring_i1085.txt
 generic/sigarda_col_coven_i1085.txt
 generic/jack_in_the_mox_i1085.txt
 generic/cytoplast_manipulator_i1085.txt
+generic/entrapment_maneuver_i1085.txt

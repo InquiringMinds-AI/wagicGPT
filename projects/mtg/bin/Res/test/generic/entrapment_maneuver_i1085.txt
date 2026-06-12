@@ -1,0 +1,47 @@
+#Entrapment Maneuver (#1085): target attacking player sacrifices an
+#attacker; you get toughness-X Soldier tokens.
+#INTERRUPT-AT-PHASE PROTOCOL (the key, from Misdirection's idiom):
+#offerinterruptonphase:attackers routes the phase change through the
+#stack (AddNextGamePhase); the engine asks the ACTIVE player first and
+#consumption follows isInterrupting, so the script answers BOTH asks in
+#order: `no` (P2, the attacker, declines its own window) then `yes`
+#(P1 accepts and becomes the interrupter). The old park scripted only
+#`yes` - consumed by P2, which became its own interrupter, and P1's
+#cast never happened ("harness gap" dissolved: it was witness order).
+#After endinterruption the spell resolves: choice 0 = the merged
+#choose-one (Target opponent), choice 0 = the granted picker's
+#must-may, then the attacker click (tc-owner handover routes P2's pick).
+# https://github.com/WagicProject/wagic/issues/1085
+[INIT]
+SECONDMAIN
+[PLAYER1]
+inplay:gold myr,copper myr,silver myr,leaden myr
+hand:entrapment maneuver
+offerinterruptonphase:attackers
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+goto attackers
+grizzly bears
+next
+no
+yes
+gold myr
+copper myr
+silver myr
+leaden myr
+entrapment maneuver
+endinterruption
+choice 0
+choice 0
+grizzly bears
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:gold myr,copper myr,silver myr,leaden myr,*,*
+graveyard:entrapment maneuver
+[PLAYER2]
+graveyard:grizzly bears
+[END]
