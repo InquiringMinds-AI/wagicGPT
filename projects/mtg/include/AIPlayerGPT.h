@@ -84,6 +84,11 @@ private:
     string mApiKey;
     bool mThinking;
     bool mShowHints;
+    //from ai/gpt/endpoints.txt (the per-user copy shadows the shipped one);
+    //environment variables override these
+    vector<string> mConfigUrls;
+    string mConfigModel;
+    long mMaxTokens; // -1 = use the built-in/thinking-dependent default
 
     //chat transcript: (role, content); [0] is the system prompt once built
     vector<std::pair<string, string> > mMessages;

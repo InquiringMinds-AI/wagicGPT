@@ -21,11 +21,62 @@ using json = nlohmann::json;
 namespace
 {
 
-const char * kDefaultEndpoints[] = {
-    "http://100.116.136.74:8084", //Spark vLLM (qwen36-35b)
-    "http://100.116.136.74:8081", //Spark vLLM (qwen35 container)
-    "http://127.0.0.1:8080",      //local llama.cpp
+//Runtime configuration, user-editable: Res/ai/gpt/endpoints.txt, shadowed
+//by the per-user copy (~/.Wagic/ai/gpt/endpoints.txt) so private endpoints
+//and keys never have to live in a tracked file. Environment variables
+//override file values. No endpoints are compiled in beyond localhost.
+struct GptConfig
+{
+    vector<string> urls;
+    string model;
+    string key;
+    int thinking;  // -1 unset
+    int hints;     // -1 unset
+    long maxTokens; // -1 unset
+    GptConfig() : thinking(-1), hints(-1), maxTokens(-1) {}
 };
+
+GptConfig loadGptConfig()
+{
+    GptConfig cfg;
+    string content;
+    if (!JFileSystem::GetInstance()->readIntoString("ai/gpt/endpoints.txt", content))
+        return cfg;
+    std::istringstream stream(content);
+    string line;
+    while (std::getline(stream, line))
+    {
+        size_t hash = line.find('#');
+        if (hash != string::npos)
+            line = line.substr(0, hash);
+        size_t eq = line.find('=');
+        if (eq == string::npos)
+            continue;
+        string k = line.substr(0, eq);
+        string v = line.substr(eq + 1);
+        k.erase(0, k.find_first_not_of(" \t")); k.erase(k.find_last_not_of(" \t\r") + 1);
+        v.erase(0, v.find_first_not_of(" \t")); v.erase(v.find_last_not_of(" \t\r") + 1);
+        if (v.empty())
+            continue;
+        if (k == "url") cfg.urls.push_back(v);
+        else if (k == "model") cfg.model = v;
+        else if (k == "key") cfg.key = v;
+        else if (k == "thinking") cfg.thinking = (v != "0" && v != "off") ? 1 : 0;
+        else if (k == "hints") cfg.hints = (v != "0" && v != "off") ? 1 : 0;
+        else if (k == "maxtokens") cfg.maxTokens = atol(v.c_str());
+    }
+    return cfg;
+}
+
+void replaceAllOccurrences(string& text, const string& token, const string& value)
+{
+    size_t pos = 0;
+    while ((pos = text.find(token, pos)) != string::npos)
+    {
+        text.replace(pos, token.size(), value);
+        pos += value.size();
+    }
+}
 
 const char * kRulesPrimer =
     "You are playing a duel of Magic: The Gathering. You win by reducing the opponent's life from 20 to 0.\n"
@@ -145,10 +196,16 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
+    //File config first, environment variables override.
+    GptConfig cfg = loadGptConfig();
+    mConfigUrls = cfg.urls;
+    mConfigModel = cfg.model;
+    mMaxTokens = cfg.maxTokens;
+    mApiKey = cfg.key;
     if (const char * key = getenv("WAGIC_GPT_KEY"))
         mApiKey = key;
-    mThinking = envFlag("WAGIC_GPT_THINKING");
-    mShowHints = envFlag("WAGIC_GPT_HINTS");
+    mThinking = getenv("WAGIC_GPT_THINKING") ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
+    mShowHints = getenv("WAGIC_GPT_HINTS") ? envFlag("WAGIC_GPT_HINTS") : (cfg.hints == 1);
     resolveEndpoint();
     if (mEndpoint.empty())
         fprintf(stderr, "AIPlayerGPT: no LLM endpoint reachable, falling back to Baka heuristics for every decision\n");
@@ -167,9 +224,10 @@ void AIPlayerGPT::resolveEndpoint()
     vector<string> candidates;
     if (const char * url = getenv("WAGIC_GPT_URL"))
         candidates.push_back(url);
+    else if (!mConfigUrls.empty())
+        candidates = mConfigUrls;
     else
-        for (size_t i = 0; i < sizeof(kDefaultEndpoints) / sizeof(kDefaultEndpoints[0]); i++)
-            candidates.push_back(kDefaultEndpoints[i]);
+        candidates.push_back("http://127.0.0.1:8080"); //local llama.cpp
 
     for (size_t i = 0; i < candidates.size(); i++)
     {
@@ -182,6 +240,8 @@ void AIPlayerGPT::resolveEndpoint()
             mEndpoint = candidates[i];
             if (const char * model = getenv("WAGIC_GPT_MODEL"))
                 mModel = model;
+            else if (!mConfigModel.empty())
+                mModel = mConfigModel;
             else if (models.contains("data") && !models["data"].empty())
                 mModel = models["data"][0]["id"].get<string>();
             return;
@@ -251,20 +311,34 @@ string AIPlayerGPT::loadStrategyGuide()
 
 void AIPlayerGPT::buildSystemPrompt()
 {
+    Player * opp = this->opponent();
+    string myDeck = describeDeckCards(this, true);
+    string oppDeck = opp ? describeDeckCards(opp, false) : string("(unknown)");
+    string guide = loadStrategyGuide();
+    string guideBlock = guide.empty() ? string("") : ("STRATEGY GUIDE FOR YOUR DECK:\n" + guide);
+
+    //The prompt is a user-editable runtime file (Res/ai/gpt/system_prompt.txt,
+    //shadowed by ~/.Wagic/ai/gpt/system_prompt.txt) so players can tune it
+    //without rebuilding; see Res/ai/gpt/README.txt for the placeholders.
+    string tmpl;
+    if (JFileSystem::GetInstance()->readIntoString("ai/gpt/system_prompt.txt", tmpl) && !tmpl.empty())
+    {
+        replaceAllOccurrences(tmpl, "{MY_DECK}", myDeck);
+        replaceAllOccurrences(tmpl, "{OPPONENT_DECK}", oppDeck);
+        replaceAllOccurrences(tmpl, "{STRATEGY_GUIDE}", guideBlock);
+        mMessages.insert(mMessages.begin(), std::make_pair(string("system"), tmpl));
+        return;
+    }
+
+    //Fallback when the prompt asset is missing: the same text, compiled in.
     std::ostringstream sys;
     sys << kRulesPrimer << "\n";
-
-    sys << "YOUR DECK (cards and rules text):\n" << describeDeckCards(this, true) << "\n";
-
-    Player * opp = this->opponent();
+    sys << "YOUR DECK (cards and rules text):\n" << myDeck << "\n";
     if (opp)
         sys << "CARDS IN THE OPPONENT'S DECK (you know the matchup, but not how many copies of each):\n"
-            << describeDeckCards(opp, false) << "\n";
-
-    string guide = loadStrategyGuide();
-    if (!guide.empty())
-        sys << "STRATEGY GUIDE FOR YOUR DECK:\n" << guide << "\n";
-
+            << oppDeck << "\n";
+    if (!guideBlock.empty())
+        sys << guideBlock << "\n";
     sys << "\nDuring the game you will receive the events that happened, the current board state, and a "
            "numbered list of every action that is legal for you right now. Reason about the best play like "
            "a skilled human player: consider tempo, card advantage, combat math, what the opponent may be "
@@ -448,6 +522,8 @@ string AIPlayerGPT::requestCompletion()
         messages.push_back({{"role", mMessages[i].first}, {"content", mMessages[i].second}});
 
     long maxTokens = mThinking ? 2048 : 64;
+    if (mMaxTokens > 0)
+        maxTokens = mMaxTokens;
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
         maxTokens = atol(mt);
 

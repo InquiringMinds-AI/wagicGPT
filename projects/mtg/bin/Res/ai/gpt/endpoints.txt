@@ -1,0 +1,21 @@
+# AIPlayerGPT endpoint configuration.
+#
+# This shipped file only points at a local server. Do NOT put private
+# endpoints or API keys here if your install lives in a git checkout -
+# put them in the per-user copy instead, which shadows this one:
+#     ~/.Wagic/ai/gpt/endpoints.txt   (Linux)
+#
+# Lines are key=value; '#' starts a comment. Recognized keys:
+#   url=<base>      endpoint base URL (repeatable; probed in order, the
+#                   first one whose /v1/models answers is used)
+#   model=<id>      model id (default: first id the endpoint reports)
+#   key=<token>     bearer token sent to the endpoint
+#   thinking=1      enable thinking on local Qwen-style servers
+#   hints=1         include the heuristic AI's scores in the prompt
+#   maxtokens=<n>   completion token budget
+#
+# Environment variables (WAGIC_GPT_URL, WAGIC_GPT_MODEL, WAGIC_GPT_KEY,
+# WAGIC_GPT_THINKING, WAGIC_GPT_HINTS, WAGIC_GPT_MAXTOKENS) override
+# anything set here. The GPT opponent itself is enabled with WAGIC_AI=gpt.
+
+url=http://127.0.0.1:8080
