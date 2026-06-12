@@ -8567,7 +8567,7 @@ ATransformerInstant::~ATransformerInstant()
 
 //P/t ueot
 PTInstant::PTInstant(GameObserver* observer, int id, MTGCardInstance * source, MTGCardInstance * target, WParsedPT * wppt, string s, bool nonstatic) :
-InstantAbility(observer, id, source, target), wppt(wppt), s(s), nonstatic(nonstatic)
+InstantAbility(observer, id, source, target), s(s), nonstatic(nonstatic)
 {
     ability = NEW APowerToughnessModifier(game, id, source, target, wppt, s, nonstatic);
     aType = MTGAbility::STANDARD_PUMP;

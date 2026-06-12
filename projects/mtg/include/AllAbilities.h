@@ -5567,11 +5567,12 @@ class PTInstant: public InstantAbility
 {
 public:
     APowerToughnessModifier * ability;
-    WParsedPT * wppt;
+    //No wppt member here: the nested ability OWNS its WParsedPT and
+    //replaces it on every dynamic-PT getMenuText() - any second pointer
+    //to it dangles. Read it through ability->wppt.
     string s;
     bool nonstatic;
     int lastTriggeredTurn;
-    WParsedPT * newWppt;
     PTInstant(GameObserver* observer, int id, MTGCardInstance * source, MTGCardInstance * target, WParsedPT * wppt, string s = "", bool nonstatic = false);
     int resolve();
     const string getMenuText();
