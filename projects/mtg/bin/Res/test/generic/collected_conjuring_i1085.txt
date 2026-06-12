@@ -1,10 +1,9 @@
 #Collected Conjuring (#1085): exile the top six, cast up to two mv<=3
-#sorceries from among them free. The CARD WORKS - revived by the
-#castcard-family rounds, passes SOLO deterministically (2/2 scoped runs
-#2026-06-11). BENCHED jack-in-the-mox-style: in the THREADED suite the
-#cast never happens (library stays 6, nothing exiled) - the known
-#solo-vs-suite path divergence family (queue F). Re-enlist when suite
-#paths are unified.
+#sorceries from among them free. Revived by the castcard-family rounds;
+#briefly benched when the threaded suite failed to run its cast, then
+#UN-BENCHED same day: the threaded failure was collateral from a
+#since-fixed round (castMethod / GIA teardown era) - re-tested green
+#inside the full threaded registry.
 # https://github.com/WagicProject/wagic/issues/1085
 [INIT]
 FIRSTMAIN
