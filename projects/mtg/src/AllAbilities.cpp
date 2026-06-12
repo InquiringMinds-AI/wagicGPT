@@ -60,6 +60,13 @@ int GenericRevealAbility::resolve()
         std::transform(abi.begin(), abi.end(), abi.begin(), ::tolower);//fix crash
         AbilityFactory af(game);
         MTGAbility * a3 = af.parseMagicLine(abi, this->GetId(), NULL, source);
+        //An interactive parse result (must-MayAbility wrap) has a no-op
+        //resolve() - it must LIVE in the game for its menu to open.
+        if (dynamic_cast<MayAbility *>(a3))
+        {
+            a3->addToGame();
+            return 1;
+        }
         a3->oneShot = 1;
         a3->canBeInterrupted = false;
         a3->resolve();

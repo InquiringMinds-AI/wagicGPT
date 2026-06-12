@@ -3217,7 +3217,18 @@ public:
           MTGAbility * toAdd = ability->clone();
           toAdd->target = target;
           if(toAdd->getActionTc())
-              return toAdd->reactToTargetClick(source);
+          {
+              //The self-click serves choosers that accept the source
+              //(legend rule, self-targeting activations). When it is
+              //REJECTED (e.g. Sigarda's aicode target(*[zpos=1]|
+              //mylibrary)) the effect used to silently dead-end - such
+              //an interactive chooser must live in the game instead.
+              //Try-first (not canTarget-predict): reactToTargetClick's
+              //acceptance logic is its own.
+              if (toAdd->reactToTargetClick(source))
+                  return 1;
+              return toAdd->addToGame();
+          }
           return toAdd->addToGame();
       }
 

@@ -1,0 +1,43 @@
+#Sigarda, Champion of Light (#1085), coven leg. AICODE flow (suite players
+#are AI): the @combat(attacking) restriction{coven} trigger resolves
+#GenericRevealAbility, which for AI controllers parses the aicode line:
+#activate target(*[zpos=1]|mylibrary) transforms(newability[if human in
+#top5 -> target(human[zpos<=5]|mylibrary) moveto(myBattlefield) + rest
+#top5 reveal->bottom]). NOTE aicode semantics: the human goes to the
+#BATTLEFIELD (the auto= human path puts it in hand; that path is
+#suite-unreachable).
+#Driving: attack (coven = 3 distinct powers: 4/3/1), next; choice 0
+#answers the aicode May; click the TOP library card (zpos=1 = the LIST'S
+#LAST ENTRY - library zpos is inverted, GameObserver ~700); choice 0
+#answers the human-leg picker; click the human (must be zpos<=5 = within
+#the list's last five).
+#Was parked: GenericAddToGame::resolve self-clicked the source at the
+#chooser (only valid for self-targeting activations) - rejected ->
+#whole effect silently dead. Fixed: non-self-targetable choosers now
+#addToGame as live menus.
+# https://github.com/WagicProject/wagic/issues/1085
+[INIT]
+firstmain
+[PLAYER1]
+inplay:535036,hill giant,eager cadet
+library:millstone,juggernaut,devoted retainer,gold myr,silver myr,iron myr,darksteel citadel
+[PLAYER2]
+[DO]
+goto attackers
+535036
+next
+choice 0
+darksteel citadel
+choice 0
+devoted retainer
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:535036,hill giant,eager cadet,devoted retainer
+library:*,*,*,*,*,*
+[PLAYER2]
+life:16
+[END]
