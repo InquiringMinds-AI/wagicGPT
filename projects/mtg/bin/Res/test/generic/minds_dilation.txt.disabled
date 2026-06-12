@@ -1,0 +1,54 @@
+#Mind's Dilation (G-retest 2026-06-11): opponent's first spell each turn ->
+#ingest 1 (exile their library top) -> P1 may cast the exiled card free.
+#Driving here is believed right (turn-cross: P2 taps myr, shocks P1's face
+#- shock CAST+RESOLVED, life 18 confirmed) but the @movedto(*|opponentstack)
+#trigger NEVER FIRES: zero StackAbility from Mind's Dilation in the log.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:mind's dilation
+[PLAYER2]
+inplay:iron myr
+hand:shock
+library:eager cadet,wind drake,grizzly bears
+[DO]
+goto end
+goto firstmain
+iron myr
+shock
+p1
+goto firstmain
+choice 0
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:mind's dilation,wind drake
+life:18
+[PLAYER2]
+inplay:iron myr
+graveyard:shock
+hand:grizzly bears
+library:*
+tappedinplay:1
+[END]
+#PARKED - NEW ROUND MAP (opponent-cast stack-trigger family, 62 data lines
+#share @movedto(...|...stack)):
+#  - The card's auto line PARSES (no ABILITYFACTORY error at load).
+#  - Casting DOES route through putInZone(hand->stack) (MTGRules 581/758/
+#    1068/1569) so the zone-change event exists.
+#  - 'opponentstack' IS a recognized zone string (MTGGameZones.cpp:1709).
+#  - So the break is in trigger-side matching: TrCardAddedToZone's zone
+#    list vs the opponent's stack (controller-relative resolution in
+#    trigger context), or the restriction{thisturn(*|opponentstack)
+#    ~equalto~1} evaluation. Instrument the trigger's receiveEvent.
+#  - Cheap first discriminator: does @movedto(*|mystack) fire for MY OWN
+#    casts? If yes -> opponent-relative zone bug; if no -> stack zones
+#    never match in movedto triggers at all (62 dead lines).
+#  - Data smell (secondary): the nested newability watches
+#    *[-land]|opponentGRAVEYARD but ingest EXILES - even with the outer
+#    trigger fixed the may-cast leg may need from()-zone correction.
