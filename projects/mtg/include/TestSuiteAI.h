@@ -7,6 +7,7 @@
 #define MAX_TESTUITE_CARDS 100
 
 #include "Threading.h"
+#include <atomic>
 #include "AIPlayerBaka.h"
 
 
@@ -111,7 +112,9 @@ public:
     //through a TestSuite* - the shadow meant the directive never worked
     //and AI chance gates rolled real rand() per run (flaky AI tests).
     using TestSuiteGame::seed;
-    int nbFailed, nbTests, nbAIFailed, nbAITests;
+    //atomic: incremented from every worker thread (handleResults runs
+    //unlocked on the could-not-load paths); plain ints lost updates.
+    std::atomic<int> nbFailed, nbTests, nbAIFailed, nbAITests;
     TestSuite(const char * filename);
     ~TestSuite();
     void initGame(GameObserver* g);

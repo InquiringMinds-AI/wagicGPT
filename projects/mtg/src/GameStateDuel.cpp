@@ -925,7 +925,7 @@ void GameStateDuel::Update(float dt)
                     if (getenv("WAGIC_TESTSUITE"))
                     {
                         fprintf(stderr, "Test suite finished: %d tests (%d failed), %d AI tests (%d failed)\n",
-                                testSuite->nbTests, testSuite->nbFailed, testSuite->nbAITests, testSuite->nbAIFailed);
+                                (int)testSuite->nbTests, (int)testSuite->nbFailed, (int)testSuite->nbAITests, (int)testSuite->nbAIFailed);
                         exit((testSuite->nbFailed + testSuite->nbAIFailed) ? 1 : 0);
                     }
                     setGamePhase(DUEL_STATE_END);
