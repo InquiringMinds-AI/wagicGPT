@@ -1,0 +1,37 @@
+#Flameblast Dragon (#1085 "{X}{R} with only red mana doesn't work"):
+#attack trigger -> may pay {X}{R} -> X damage to any target. ZERO engine
+#change - the engine handles X-in-pay() fine; the park was all driving:
+#(1) distinct-name mana rocks (same-named myrs always click the FIRST
+#instance); (2) tap mana DURING BLOCKERS while the trigger's may menu
+#sits open (mana abilities pierce open menus; pools drain at phase
+#change so attackers-step floats are gone by blockers); (3) float ALL
+#the X mana BEFORE answering the may - MenuAbility::Update polls the
+#ExtraManaCost every tick and auto-completes GREEDILY at minimal
+#affordability, reading X from the floated pool at that instant (one
+#{R} alone fires X=0); (4) the cascade: choice 0 may / choice 0
+#pay-mode / choice 0 inner must-may / target click.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:flameblast dragon,iron myr,leaden myr
+[PLAYER2]
+[DO]
+goto attackers
+flameblast dragon
+next
+iron myr
+leaden myr
+choice 0
+choice 0
+choice 0
+p2
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:flameblast dragon,iron myr,leaden myr
+tappedinplay:3
+[PLAYER2]
+life:14
+[END]

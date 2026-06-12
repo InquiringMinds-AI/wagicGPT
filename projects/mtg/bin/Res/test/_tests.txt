@@ -925,3 +925,4 @@ generic/dragonlair_opponent_cast.txt
 generic/minds_dilation.txt
 generic/soul_strings_i1085.txt
 generic/chill_haunting_i1085.txt
+generic/flameblast_dragon_i1085.txt
