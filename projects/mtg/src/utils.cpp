@@ -26,7 +26,11 @@ int RandomGenerator::random()
     int result;
     if (!loadedRandomValues.size() || !log)
     {
-        result = rand();
+        //xorshift32 over the per-instance state (see rngState in utils.h)
+        rngState ^= rngState << 13;
+        rngState ^= rngState >> 17;
+        rngState ^= rngState << 5;
+        result = (int)(rngState & 0x7fffffff);
     }
     else
     {

@@ -27,6 +27,8 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <list>
+#include <time.h>
+#include <stdint.h>
 
 #include "DebugRoutines.h"
 
@@ -73,13 +75,25 @@ protected:
     list<int> loadedRandomValues;
     list<int> usedRandomValues;
     bool log;
+    //Per-instance PRNG state. random()/setSeed used to call libc
+    //rand()/srand(), whose state is PROCESS-GLOBAL: every concurrent
+    //game drew from ONE shared stream, so any other thread's draw (or
+    //reseed) changed what a seeded test rolled - deterministic solo,
+    //random in the threaded suite. xorshift32 over this state instead
+    //makes the class do what its comment above always promised.
+    unsigned int rngState;
 public:
-    RandomGenerator(unsigned int seed = -1, bool doLog = false) : log(doLog) { if(seed != (unsigned int)-1) srand(seed);};
+    RandomGenerator(unsigned int seed = -1, bool doLog = false) : log(doLog) { setSeed(seed); };
     void loadRandValues(string s);
     ostream& saveUsedRandValues(ostream& out) const;
     ostream& saveLoadedRandValues(ostream& out) const;
     int random();
-    void setSeed(unsigned int seed) { srand(seed); };
+    void setSeed(unsigned int seed)
+    {
+        if (seed == (unsigned int)-1)
+            seed = (unsigned int)time(0) ^ (unsigned int)(uintptr_t)this;
+        rngState = seed ? seed : 1; //xorshift32 state must be nonzero
+    };
     template<typename Iter> void random_shuffle(Iter first, Iter last)
     {
         ptrdiff_t i, n;

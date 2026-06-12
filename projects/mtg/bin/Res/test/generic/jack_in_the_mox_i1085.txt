@@ -1,7 +1,8 @@
 #Jack-in-the-Mox (#1085, "first activation yields no mana"): does NOT reproduce - the
 #first tap rolls and produces mana (roll-1 sac branch also verified separately).
-#seed 1 rolls a 5 -> {R}; the per-game seeded generator drives rolld6, so this is
-#deterministic even under the threaded suite.
+#seed 1 rolls a 4 -> {B} (per-instance xorshift32; seed 1 first draw 270369,
+#270369 % 6 = 3, roll = 4). The generator is now truly per-observer, so this
+#is deterministic in the threaded suite regardless of which thread runs it.
 seed 1
 [INIT]
 firstmain
@@ -15,7 +16,7 @@ goto firstmain
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-manapool:{R}
+manapool:{B}
 inplay:jack-in-the-mox
 tappedinplay:1
 [PLAYER2]
