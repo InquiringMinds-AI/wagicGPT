@@ -1,0 +1,32 @@
+#True-Name Nemesis (#1085): ETB choose-a-player protection. After choosing
+#the OPPONENT (choice 0), my own battlegrowth can still target TNN.
+#ENGINE: the 'protection from(...)' parse called setAllZones()
+#unconditionally, stomping zone-scoped specs - from(*|opponentzones)
+#became protection-from-everything-everywhere, so even the controller's
+#spells were locked out. Now only quality-based specs (no '|' zone) widen
+#to all zones. The choose-one menu itself single-fires correctly (only
+#the chosen mode's protection lands - verified via protections trace).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{U}{U}{G}
+hand:true-name nemesis,battlegrowth
+[PLAYER2]
+[DO]
+true-name nemesis
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+battlegrowth
+true-name nemesis
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:battlegrowth
+inplay:true-name nemesis
+[PLAYER2]
+[END]

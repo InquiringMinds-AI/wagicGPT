@@ -917,3 +917,6 @@ generic/shredded_sails_choice.txt
 generic/hour_of_eternity_i1085.txt
 generic/hour_of_eternity_x1.txt
 generic/yurlok_generic_pay_i1085.txt
+generic/true_name_nemesis_chooseone_i1085.txt
+generic/tnn_blocks_chosen.txt
+generic/tnn_protection_direction.txt

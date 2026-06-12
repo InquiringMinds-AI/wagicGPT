@@ -1,0 +1,39 @@
+#True-Name Nemesis direction counterfactual: choosing YOURSELF (choice 1)
+#leaves TNN unprotected from the opponent - the identical P2-shock drive
+#that tnn_blocks_chosen proves refused now kills the 3/1. Proves the
+#blocking witness is not vacuously green and the menu modes map to the
+#card-line order (0 = choose opponent, 1 = choose yourself).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{U}{U}
+hand:true-name nemesis
+[PLAYER2]
+inplay:iron myr
+hand:shock
+library:eager cadet,eager cadet
+[DO]
+true-name nemesis
+goto firstmain
+goto firstmain
+choice 1
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+iron myr
+shock
+true-name nemesis
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:true-name nemesis
+[PLAYER2]
+inplay:iron myr
+graveyard:shock
+hand:*
+library:*
+tappedinplay:1
+[END]

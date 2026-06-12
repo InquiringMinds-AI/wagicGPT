@@ -5535,7 +5535,14 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         TargetChooser * fromTc = tcf.createTargetChooser(splitProtection[1], card);
         if (!fromTc)
             return NULL;
-        fromTc->setAllZones();
+        //Only quality-based protections (no explicit zone spec) widen to
+        //all zones - 'protection from(red)' must catch the red spell on
+        //the STACK, not just battlefield permanents. A zone-scoped spec
+        //('from(*|opponentzones)' - True-Name Nemesis's chosen-player
+        //protection) IS the protection's meaning: stomping it over made
+        //the bearer protected from everything everywhere.
+        if (splitProtection[1].find("|") == string::npos)
+            fromTc->setAllZones();
         if (!activated)
         {
             if (((card->hasType(Subtypes::TYPE_INSTANT) || card->hasType(Subtypes::TYPE_SORCERY)) && !forceForever && !untilYourNextEndTurn && !untilYourNextTurn) || forceUEOT)

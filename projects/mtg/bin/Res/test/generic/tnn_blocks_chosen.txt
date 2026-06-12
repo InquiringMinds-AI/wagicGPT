@@ -1,0 +1,39 @@
+#True-Name Nemesis negative direction: the CHOSEN player (opponent,
+#choice 0) cannot target TNN - on P2's turn their shock is uncastable
+#(no valid target -> the cast click no-ops; shock stays in hand, the
+#floated {R} never spends). Companion to tnn_protection_direction which
+#proves this exact drive DOES kill TNN when the other mode is chosen.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{U}{U}
+hand:true-name nemesis
+[PLAYER2]
+inplay:iron myr
+hand:shock
+library:eager cadet,eager cadet
+[DO]
+true-name nemesis
+goto firstmain
+goto firstmain
+choice 0
+goto firstmain
+goto firstmain
+goto end
+goto firstmain
+iron myr
+shock
+true-name nemesis
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:true-name nemesis
+[PLAYER2]
+inplay:iron myr
+hand:shock,*
+library:*
+manapool:{R}
+tappedinplay:1
+[END]
