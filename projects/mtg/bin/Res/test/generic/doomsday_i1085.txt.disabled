@@ -34,3 +34,25 @@ exile:juggernaut,walking corpse
 life:10
 [PLAYER2]
 [END]
+#RE-MAPPED 2026-06-11 (post 23 engine rounds) - the pre-exile bug from the
+#original report is GONE (juggernaut stays in exile; the 5 picks reach the
+#library; life halves correctly). The sole dead leg: exile-the-rest.
+#ROOT CAUSE FOUND - NESTED and! PARSE TRUNCATION: the and!( )! parse
+#(parseBetween) is not nesting-aware, so the card's
+#'and!( moveto(mylibrary) and!( <exile legs> )! )!' outer payload
+#truncates at the INNER ')!' and the remainder is silently dropped (a
+#'life:5' probe payload in the inner and! provably never fires).
+#27 DATA LINES across borderline/macros/mtg carry nested and! - all
+#truncating. ENGINE ROUND: make the and! extraction nesting-aware
+#(match and!( ... )! with depth counting) in parseMagicLine.
+#Attempted data workarounds, all dead-ended (kept for the map):
+#  - spell-level 'all(*[-fresh]|...)' lines: spell LINE ORDER is not
+#    execution order - the lords fired before the targeted chain, exiling
+#    everything including the picks ([-fresh] is tick-fragile anyway).
+#  - single-depth and! with direct lord payloads: ALord fired from an
+#    and!-clone silently matches nothing (works as a spell line).
+#  - becomes(kept) forever inside an and! payload: HANGS the suite.
+#  - @movedto(this|mygraveyard) trigger for the exiles (Devils shape):
+#    also hung in combination with the kept-tag payload.
+#After the nesting-aware parse lands, the ORIGINAL data line should work
+#as written (its inner transforms grants were never reached).
