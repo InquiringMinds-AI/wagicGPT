@@ -1,0 +1,37 @@
+#Soul Strings (#1085): {X}{B}, return two target creatures from my
+#graveyard to hand unless any player pays {X}. X=2, both players decline
+#-> bears and giant return. ENGINE: the X-resolve block in
+#MTGPutInPlayRule::reactToClick now only rewrites the cost while it
+#still CARRIES an X - the announce pass rewrites in place and returns 0
+#waiting for targets, so multi-target X spells re-entered with the cost
+#already resolved, re-added X ({2}{B} -> {4}{B}), failed the
+#affordability re-check and silently died. DRIVE: X menu FIRST (choice
+#N = X), THEN the graveyard target clicks - the old parked witness
+#clicked targets into the open X menu. Multi-target graveyard choosers
+#were never broken (toggle fills 2/2 fine).
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{B}
+hand:soul strings
+graveyard:grizzly bears,hill giant,darksteel citadel
+[PLAYER2]
+[DO]
+soul strings
+choice 2
+grizzly bears
+hill giant
+goto firstmain
+goto firstmain
+choice 1
+goto firstmain
+choice 1
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:grizzly bears,hill giant
+graveyard:darksteel citadel,soul strings
+[PLAYER2]
+[END]

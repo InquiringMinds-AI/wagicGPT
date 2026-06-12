@@ -466,12 +466,22 @@ int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
     //////the announced value.While an activated ability is on the stack, any X in   //////
     //////its activation cost equals the announced value.                            //////
     ///////////////////////////////////////////////////////////////////////////////////////
-    if (card->setX > -1)
+    //Only resolve X into the cost while the cost still CARRIES an X: the
+    //announce pass rewrites the card's cost in place and then returns 0
+    //waiting for targets, so a multi-target X spell re-enters here with
+    //setX still announced and the cost already resolved - re-adding X
+    //made {2}{B} into {4}{B}, failed the affordability re-check below and
+    //silently killed the cast (Soul Strings, <2>creature|mygraveyard).
+    if (card->setX > -1 && (cost->hasX() || cost->hasSpecificX()))
     {
+        //setX holds the announced TOTAL mana going into the X part (the
+        //announce menu indexes by total: chalice {X}{X} choice 2 = X1) and
+        //ManaCost stores X as a FLAG (ManaCost::x() sets cost[NB_Colors]=1
+        //regardless of symbol count), so the total is added exactly ONCE.
         ManaCost * Xcost = NEW ManaCost();
         Xcost->copy(cost);
         Xcost->add(Constants::MTG_COLOR_ARTIFACT, card->setX);
-        Xcost->remove(7, 1); //remove the X
+        Xcost->remove(7, 1); //clear the X flag
         int discountx = 0; //Try to calculate the correct cost reduction for X.
         if(card->getReducedManaCost()->getManaSymbols(Constants::MTG_COLOR_ARTIFACT) > 0){
             MTGCard * tmpcard = MTGCollection()->getCardByName(card->name);

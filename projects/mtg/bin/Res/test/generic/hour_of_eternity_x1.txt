@@ -1,5 +1,5 @@
 #Hour of Eternity at X=1 - the normal-path counterfactual for the X=0
-#fixes: targeting, exile and the 4/4 zombie copy all still work. choice 1
+#fixes: targeting, exile and the 4/4 zombie copy all still work. choice 2
 #= X=1 on the <prexx> menu (indexes by X value); bears is exiled and its
 #token copy (asserted by name) hits the battlefield.
 [INIT]
@@ -11,7 +11,7 @@ graveyard:grizzly bears
 [PLAYER2]
 [DO]
 hour of eternity
-choice 1
+choice 2
 grizzly bears
 goto firstmain
 goto firstmain

@@ -200,7 +200,11 @@ void WParsedInt::init(string s, Spell * spell, MTGCardInstance * card)
         //cast still let you exile a target.
         if (card->setX > -1)
         {
-            intValue = card->setX;
+            //setX holds the announced TOTAL into the X part (the announce
+            //menu indexes by total - chalice {X}{X} choice 2 = X1; same
+            //convention as the "xx"/"halfpaid" keywords below): halve it
+            //for the per-X value.
+            intValue = card->setX / 2;
         }
         else
         {

@@ -1,0 +1,34 @@
+#Chill Haunting (#1085): choose-one by graveyard size; the exile-2 mode
+#targets the opponent creature (-2/-2) and grants the controller an
+#ability\$! exile picker over <2>creature|mygraveyard. ZERO engine
+#change - the old park just lacked the granted picker's must-may accept
+#(choice 0 BEFORE the graveyard clicks, the notaTarget protocol).
+#Multi-target graveyard choosers fill fine.
+# https://github.com/WagicProject/wagic/issues/1085
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:chill haunting
+graveyard:walking corpse,juggernaut
+manapool:{1}{B}
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+chill haunting
+choice 1
+grizzly bears
+goto firstmain
+choice 0
+walking corpse
+juggernaut
+goto firstmain
+goto secondmain
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+graveyard:chill haunting
+exile:walking corpse,juggernaut
+[PLAYER2]
+graveyard:grizzly bears
+[END]
