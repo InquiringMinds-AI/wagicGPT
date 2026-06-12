@@ -1,0 +1,28 @@
+#Valorous Stance - an if-then-choice family spot-check (the ~2600
+#primitive lines made live by the && -before-this()/May-menu-gate round):
+#modal instant, mode 1 is if-gated on a toughness>=4 creature existing
+#(cantargetcard). Cast -> target click -> choice 1 = the gated Destroy
+#mode; the spider (2/4) dies. Passed FIRST TRY on the standard drive -
+#the family machinery holds for unseen members.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{1}{W}
+hand:valorous stance
+[PLAYER2]
+inplay:giant spider
+[DO]
+valorous stance
+giant spider
+goto firstmain
+choice 1
+goto firstmain
+goto firstmain
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+graveyard:valorous stance
+[PLAYER2]
+graveyard:giant spider
+[END]

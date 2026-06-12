@@ -1,9 +1,10 @@
 #Collected Conjuring (#1085): exile the top six, cast up to two mv<=3
-#sorceries from among them free. Revived by the castcard-family rounds;
-#briefly benched when the threaded suite failed to run its cast, then
-#UN-BENCHED same day: the threaded failure was collateral from a
-#since-fixed round (castMethod / GIA teardown era) - re-tested green
-#inside the full threaded registry.
+#sorceries from among them free. The CARD WORKS (passes solo 2/2 and
+#passed one full threaded run) but is INTERMITTENT in the threaded
+#suite: consecutive identical full runs went green then red (the cast
+#simply never runs on the red runs - library stays 6). Thread-schedule
+#dependent: a true F-family flake, BENCHED until suite-path
+#unification. Flakiness data: 2026-06-11 threaded pass@909, fail@910.
 # https://github.com/WagicProject/wagic/issues/1085
 [INIT]
 FIRSTMAIN
