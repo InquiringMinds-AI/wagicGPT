@@ -31,3 +31,15 @@ graveyard:entrapment maneuver
 [PLAYER2]
 graveyard:grizzly bears
 [END]
+#RE-MAPPED 2026-06-11 (post 24 engine rounds): the cast NEVER STACKS -
+#'yes' on the offerinterruptonphase:attackers window produces no visible
+#window, the myr clicks land but no cast follows the entrapment click
+#(no 'Action added to stack'), and the granted-picker choice 0s find no
+#menu. This is the documented 'opponent's-combat instant-cast harness
+#gap' (also referenced from world_at_war's old park): interrupting at
+#the opponent's ATTACK DECLARATION is not drivable - the counter-
+#interrupt vocabulary interrupts STACK items, and an attack declaration
+#stacks nothing. F-family / harness meta-round material, not a card
+#bug. When castable, the remaining drive is known: choice 0 (mode) /
+#choice 0 (granted picker's must-may) / attacker click (tc-owner
+#handover routes P2's pick), per the watchers/notaTarget protocol.
