@@ -7232,7 +7232,7 @@ MTGAbility * AbilityFactory::getManaReduxAbility(string s, int id, Spell *, MTGC
     return NEW AAlterCost(observer, id, card, target, amount, color);
 }
 
-vector<void*> MTGAbility::deletedpointers;
+thread_local vector<void*> MTGAbility::deletedpointers;
 
 MTGAbility::MTGAbility(const MTGAbility& a): ActionElement(a)
 {

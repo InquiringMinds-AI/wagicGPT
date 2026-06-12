@@ -186,7 +186,13 @@ public:
     virtual ostream& toString(ostream& out) const;
     virtual int addToGame();
     virtual int removeFromGame();
-    static vector<void *> deletedpointers;
+    //thread_local: ~IfThenAbility pushes here from EVERY suite worker
+    //thread concurrently; a plain static raced (push_back reallocation
+    //vs find iteration) and corrupted the heap - one source of the
+    //threaded suite's random std::length_error / double-free aborts.
+    //Ability trees never cross threads, so per-thread lists preserve
+    //the double-delete-guard semantics exactly.
+    static thread_local vector<void *> deletedpointers;
 
     /*Poor man's casting */
     /* Todo replace that crap with dynamic casting */

@@ -155,11 +155,18 @@ public:
         boost::mutex::scoped_lock lock(instance->mMutex);
         return instance->subtypesList.find(id);
     };
-    static const vector<string>& getValuesById() {
+    //Return BY VALUE: these used to return a reference, so the lock
+    //released before the caller's copy ran - racing the next thread's
+    //locked sort/erase mutation of the same vector. That was the
+    //long-standing random heap corruption in the threaded suite (the
+    //'weird crash here. rarely.' in Damage::resolve's prowl check, the
+    //early-combat double-free family). The copy now constructs under
+    //the lock.
+    static vector<string> getValuesById() {
         boost::mutex::scoped_lock lock(instance->mMutex);
         return instance->subtypesList.getValuesById();
     };
-    static const vector<string>& getCreatureValuesById() {
+    static vector<string> getCreatureValuesById() {
         boost::mutex::scoped_lock lock(instance->mMutex);
         return instance->subtypesList.getCreatureValuesById();
     };
