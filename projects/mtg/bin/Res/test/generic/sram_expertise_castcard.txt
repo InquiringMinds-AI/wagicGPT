@@ -1,0 +1,30 @@
+#Sram's Expertise: 3 servo tokens + free castcard(normal) of a mv<=3 card
+#from MY hand - the castcard family confirmed revived by the
+#opponent-chooser round (sen_triplets precedent). Driving: choice 0 (may)
+#-> my-hand click -> choice 0 (cast menu). manapool {0} proves
+#castcard(normal) charged nothing (pay()'s job - madness precedent).
+#Token note: token names are NOT matchable in assert zone lists - count
+#them with * wildcards alongside the named real cards.
+[INIT]
+firstmain
+[PLAYER1]
+manapool:{2}{W}{W}
+hand:sram's expertise,grizzly bears
+[PLAYER2]
+[DO]
+sram's expertise
+goto firstmain
+goto firstmain
+choice 0
+grizzly bears
+choice 0
+goto firstmain
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:sram's expertise
+inplay:grizzly bears,*,*,*
+manapool:{0}
+[PLAYER2]
+[END]
