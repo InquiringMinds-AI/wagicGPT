@@ -237,12 +237,20 @@ void AIPlayerGPT::resolveEndpoint()
         try
         {
             json models = json::parse(body);
+            //A real /v1/models reply carries a non-empty "data" array.
+            //An auth error or unrelated JSON ({"error":"Unauthorized"})
+            //parses fine but is NOT a usable endpoint - reject it so a
+            //bad/missing key falls through to the next candidate (or to
+            //the honest "no endpoint reachable" message) instead of being
+            //accepted with an empty model and silently failing every call.
+            if (!models.contains("data") || !models["data"].is_array() || models["data"].empty())
+                continue;
             mEndpoint = candidates[i];
             if (const char * model = getenv("WAGIC_GPT_MODEL"))
                 mModel = model;
             else if (!mConfigModel.empty())
                 mModel = mConfigModel;
-            else if (models.contains("data") && !models["data"].empty())
+            else
                 mModel = models["data"][0]["id"].get<string>();
             return;
         }
