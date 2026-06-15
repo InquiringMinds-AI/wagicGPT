@@ -15,6 +15,7 @@
 
 #include <cstdlib>
 #include <sstream>
+#include <fstream>
 
 using json = nlohmann::json;
 
@@ -36,11 +37,37 @@ struct GptConfig
     GptConfig() : thinking(-1), hints(-1), maxTokens(-1) {}
 };
 
+//Read a GPT asset, private copy first. The SDL build collapses
+//JFileSystem's user and system roots onto Res/ (no ~/.Wagic shadow like
+//the Qt build), so a config kept OUT of the tracked Res tree has to be
+//read directly: try $HOME/.Wagic/ai/gpt/<filename> first (the documented
+//private location for endpoints/keys), then fall back to the bundled Res
+//copy through JFileSystem. Returns "" when neither exists.
+string readGptAsset(const char * filename)
+{
+    if (const char * home = getenv("HOME"))
+    {
+        string path = string(home) + "/.Wagic/ai/gpt/" + filename;
+        std::ifstream f(path.c_str(), std::ios::binary);
+        if (f)
+        {
+            std::ostringstream ss;
+            ss << f.rdbuf();
+            string c = ss.str();
+            if (!c.empty())
+                return c;
+        }
+    }
+    string content;
+    JFileSystem::GetInstance()->readIntoString(string("ai/gpt/") + filename, content);
+    return content;
+}
+
 GptConfig loadGptConfig()
 {
     GptConfig cfg;
-    string content;
-    if (!JFileSystem::GetInstance()->readIntoString("ai/gpt/endpoints.txt", content))
+    string content = readGptAsset("endpoints.txt");
+    if (content.empty())
         return cfg;
     std::istringstream stream(content);
     string line;
@@ -326,10 +353,11 @@ void AIPlayerGPT::buildSystemPrompt()
     string guideBlock = guide.empty() ? string("") : ("STRATEGY GUIDE FOR YOUR DECK:\n" + guide);
 
     //The prompt is a user-editable runtime file (Res/ai/gpt/system_prompt.txt,
-    //shadowed by ~/.Wagic/ai/gpt/system_prompt.txt) so players can tune it
-    //without rebuilding; see Res/ai/gpt/README.txt for the placeholders.
-    string tmpl;
-    if (JFileSystem::GetInstance()->readIntoString("ai/gpt/system_prompt.txt", tmpl) && !tmpl.empty())
+    //or a private $HOME/.Wagic/ai/gpt/system_prompt.txt that takes
+    //precedence) so players can tune it without rebuilding; see
+    //Res/ai/gpt/README.txt for the placeholders.
+    string tmpl = readGptAsset("system_prompt.txt");
+    if (!tmpl.empty())
     {
         replaceAllOccurrences(tmpl, "{MY_DECK}", myDeck);
         replaceAllOccurrences(tmpl, "{OPPONENT_DECK}", oppDeck);
