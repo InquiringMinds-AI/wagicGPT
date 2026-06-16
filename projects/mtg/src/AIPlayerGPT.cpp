@@ -9,6 +9,8 @@
 #include "Damage.h"
 #include "PhaseRing.h"
 #include "JFileSystem.h"
+#include "MTGAbility.h"
+#include "CardDescriptor.h"
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -220,7 +222,7 @@ string zoneDesc(MTGGameZone * z)
 } //namespace
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mLastAskChoice(-1), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -704,6 +706,154 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     RankingContainer::iterator it = ranking.begin();
     std::advance(it, choice - 1);
     return &(it->first);
+}
+
+int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
+{
+    //"Only one valid action": no decision to make, no model call.
+    if (options.empty())
+        return -1;
+    if (options.size() == 1)
+        return 0;
+    if (mEndpoint.empty())
+        return -1; //no endpoint: caller falls back to the heuristic
+
+    if (mMessages.empty() || mMessages[0].first != "system")
+        buildSystemPrompt();
+
+    std::ostringstream user;
+    if (!mEventLog.empty())
+        user << "Events since your last decision:\n" << mEventLog << "\n";
+    user << serializeGameState();
+    user << "\n" << decision << "\n";
+    for (size_t i = 0; i < options.size(); i++)
+        user << (i + 1) << ". " << options[i] << "\n";
+    user << "\nReply with ONLY the number of your choice.";
+    string userMsg = user.str();
+
+    //Own last-prompt cache: combat is polled every AI tick, so avoid
+    //re-querying the model for an identical board. Does not touch the
+    //priority cache (mLastUserMsg/mLastChoice) used by chooseOrderedAction.
+    if (userMsg == mLastAskMsg)
+        return (mLastAskChoice >= 1 && mLastAskChoice <= (int) options.size()) ? mLastAskChoice - 1 : -1;
+
+    mMessages.push_back(std::make_pair(string("user"), userMsg));
+    string content = requestCompletion();
+    int choice = parseChoice(content, (int) options.size());
+    if (content.empty())
+        mMessages.pop_back();
+    else
+        mMessages.push_back(std::make_pair(string("assistant"), content));
+    while (mMessages.size() > 41)
+        mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
+
+    mEventLog.clear();
+    mLastAskMsg = userMsg;
+    mLastAskChoice = choice;
+    DebugTrace("AIPlayerGPT: " << decision << " -> chose " << choice << " of " << options.size());
+
+    return (choice >= 1) ? choice - 1 : -1; //0 or parse-fail: defer to caller
+}
+
+int AIPlayerGPT::chooseAttackers()
+{
+    if (mEndpoint.empty())
+        return AIPlayerBaka::chooseAttackers();
+
+    //Every creature that can legally attack is an opposed decision: attack
+    //or hold. Already-declared attackers drop out of the candidate set, so
+    //repeated ticks converge; held creatures simply never get clicked and
+    //the phase advances when priority passes (no clickstream => pass).
+    CardDescriptor cd;
+    cd.init();
+    cd.setType("creature");
+    MTGCardInstance * card = NULL;
+    while ((card = cd.nextmatch(game->inPlay, card)))
+    {
+        if (card->isAttacker() || !card->canAttack())
+            continue;
+
+        std::ostringstream q;
+        q << "Combat: declare attackers. Attack with " << card->name
+          << " (" << card->power << "/" << card->toughness << ")?";
+        vector<string> opts;
+        opts.push_back("Hold " + card->name + " back");
+        opts.push_back("Attack with " + card->name);
+        int pick = askModel(q.str(), opts);
+        if (pick != 1)
+            continue; //hold, or model deferred -> do not attack with this one
+
+        if (card->attackCost)
+        {
+            MTGAbility * a = observer->mLayers->actionLayer()->getAbility(MTGAbility::ATTACK_COST);
+            doAbility(a, card);
+            observer->cardClick(card, MTGAbility::ATTACK_COST);
+        }
+        observer->cardClick(card, MTGAbility::MTG_ATTACK_RULE);
+    }
+    return 1;
+}
+
+int AIPlayerGPT::chooseBlockers()
+{
+    if (mEndpoint.empty())
+        return AIPlayerBaka::chooseBlockers();
+    if (observer->currentPlayer == this) //never block on my own turn (Baka guard)
+        return 0;
+
+    vector<MTGCardInstance *> attackers;
+    CardDescriptor ca;
+    ca.init();
+    ca.setType("creature");
+    MTGCardInstance * a = NULL;
+    while ((a = ca.nextmatch(opponent()->game->inPlay, a)))
+        if (a->isAttacker())
+            attackers.push_back(a);
+    if (attackers.empty())
+        return 1;
+
+    CardDescriptor cb;
+    cb.init();
+    cb.setType("creature");
+    cb.unsecureSetTapped(-1);
+    MTGCardInstance * blk = NULL;
+    while ((blk = cb.nextmatch(game->inPlay, blk)))
+    {
+        if (blk->defenser || !blk->canBlock()) //already blocking, or cannot
+            continue;
+
+        vector<MTGCardInstance *> legal;
+        for (size_t j = 0; j < attackers.size(); j++)
+            if (blk->canBlock(attackers[j]))
+                legal.push_back(attackers[j]);
+        if (legal.empty())
+            continue; //nothing this creature can block -> no decision
+
+        std::ostringstream q;
+        q << "Combat: declare blockers. Which attacker should " << blk->name
+          << " (" << blk->power << "/" << blk->toughness << ") block?";
+        vector<string> opts;
+        opts.push_back("Do not block with " + blk->name);
+        for (size_t j = 0; j < legal.size(); j++)
+        {
+            std::ostringstream o;
+            o << "Block " << legal[j]->name << " (" << legal[j]->power << "/" << legal[j]->toughness << ")";
+            opts.push_back(o.str());
+        }
+        int pick = askModel(q.str(), opts);
+        if (pick <= 0)
+            continue; //do-not-block, or model deferred
+
+        MTGCardInstance * chosen = legal[pick - 1];
+        //Clicking the block rule cycles this creature's defenser through its
+        //legal attackers (and NULL); click until it lands on the chosen one.
+        //Bounded so an unexpected cycle can never spin forever.
+        int guard = (int) attackers.size() + 2;
+        observer->cardClick(blk, MTGAbility::MTG_BLOCK_RULE);
+        while (blk->defenser != chosen && guard-- > 0)
+            observer->cardClick(blk, MTGAbility::MTG_BLOCK_RULE);
+    }
+    return 1;
 }
 
 #endif //WITH_GPT_AI

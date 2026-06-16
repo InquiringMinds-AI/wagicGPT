@@ -58,8 +58,20 @@ public:
 
 protected:
     virtual const OrderedAIAction * chooseOrderedAction(RankingContainer& ranking);
+    //Combat declarations are opposed choices too: route each creature's
+    //attack / block decision through the model (heuristic when no endpoint).
+    virtual int chooseAttackers();
+    virtual int chooseBlockers();
 
 private:
+    //Ask the model to choose among options (0-based result, -1 to defer to
+    //the heuristic). No model call when there is one option or none - that
+    //is the "only one valid action" case. Has its own last-prompt cache so
+    //it never disturbs chooseOrderedAction's priority cache.
+    int askModel(const string& decision, const vector<string>& options);
+    string mLastAskMsg;
+    int mLastAskChoice;
+
     //Probe candidate endpoints (env override, then Spark vLLM, then local
     //llama.cpp) and remember the first one that answers /v1/models.
     void resolveEndpoint();
