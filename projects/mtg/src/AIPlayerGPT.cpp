@@ -650,8 +650,27 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     user << "\nWhich action do you take? Reply with ONLY the number (0 = pass).";
 
     string userMsg = user.str();
+    bool unchanged = (userMsg == mLastUserMsg);
+
+    //Deadlock breaker: priority is decided every AI tick. If the game state
+    //is unchanged since our last decision AND that decision was to TAKE an
+    //action, the action did not progress the game (it was a no-op, or the
+    //engine could not complete it). Repeating it loops forever while the AI
+    //never passes priority - so the queued phase change never resolves and
+    //the game freezes (silently, since the cached path made no model call).
+    //The heuristic avoids this by passing when nothing is worth doing; the
+    //model can name a dead action. So on an unchanged state we pass once,
+    //yielding priority; a real state change then earns a fresh decision.
+    if (unchanged && mLastChoice > 0)
+    {
+        DebugTrace("AIPlayerGPT: state unchanged after action " << mLastChoice
+                   << "; passing priority to avoid a loop");
+        mLastChoice = 0;
+        return NULL;
+    }
+
     int choice;
-    if (userMsg == mLastUserMsg)
+    if (unchanged)
     {
         //Nothing changed since the model last answered: reuse the decision
         //instead of paying another round trip this AI tick.
