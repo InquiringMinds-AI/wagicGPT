@@ -698,11 +698,20 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         DebugTrace("AIPlayerGPT: model chose " << choice << " of " << index);
     }
 
+    //Log every outcome (the cached paths were previously silent, which hid
+    //a freeze): phase, whether the state was cached, and what we return.
     if (choice < 0) //transport/parse failure: defer to the heuristic
+    {
+        DebugTrace("AIPlayerGPT[ph" << phase << "]: defer to heuristic (cached=" << unchanged << ")");
         return AIPlayerBaka::chooseOrderedAction(ranking);
+    }
     if (choice == 0) //deliberate pass
+    {
+        DebugTrace("AIPlayerGPT[ph" << phase << "]: pass priority (cached=" << unchanged << ")");
         return NULL;
+    }
 
+    DebugTrace("AIPlayerGPT[ph" << phase << "]: take action " << choice << "/" << index << " (cached=" << unchanged << ")");
     RankingContainer::iterator it = ranking.begin();
     std::advance(it, choice - 1);
     return &(it->first);
@@ -757,7 +766,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
 
 int AIPlayerGPT::chooseAttackers()
 {
-    if (mEndpoint.empty())
+    //Only drive the declare-attackers step; anywhere else, stay out of the way.
+    if (mEndpoint.empty() || observer->getCurrentGamePhase() != MTG_PHASE_COMBATATTACKERS)
         return AIPlayerBaka::chooseAttackers();
 
     //Every creature that can legally attack is an opposed decision: attack
@@ -796,7 +806,8 @@ int AIPlayerGPT::chooseAttackers()
 
 int AIPlayerGPT::chooseBlockers()
 {
-    if (mEndpoint.empty())
+    //Only drive the declare-blockers step; anywhere else, stay out of the way.
+    if (mEndpoint.empty() || observer->getCurrentGamePhase() != MTG_PHASE_COMBATBLOCKERS)
         return AIPlayerBaka::chooseBlockers();
     if (observer->currentPlayer == this) //never block on my own turn (Baka guard)
         return 0;
