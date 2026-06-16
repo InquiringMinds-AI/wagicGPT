@@ -615,6 +615,18 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (!ranking.size() || mEndpoint.empty())
         return AIPlayerBaka::chooseOrderedAction(ranking);
 
+    //Combat declaration (attacker/blocker assignment) is a multi-step,
+    //order-sensitive interaction driven by the combat state machine, not a
+    //single ranked pick. Routing it through the model leaves combat
+    //half-declared and soft-locks the blockers step (the model returning an
+    //out-of-range / unparseable answer mid-declaration is enough). The LLM
+    //seam was scoped to main-phase plays and priority; leave the combat
+    //phases to the heuristic, which declares combat without locking.
+    int phase = observer->getCurrentGamePhase();
+    if (phase == MTG_PHASE_COMBATATTACKERS || phase == MTG_PHASE_COMBATBLOCKERS
+        || phase == MTG_PHASE_COMBATDAMAGE)
+        return AIPlayerBaka::chooseOrderedAction(ranking);
+
     if (mMessages.empty() || mMessages[0].first != "system")
         buildSystemPrompt();
 
