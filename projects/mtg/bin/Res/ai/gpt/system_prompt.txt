@@ -12,4 +12,6 @@ CARDS IN THE OPPONENT'S DECK (you know the matchup, but not how many copies of e
 
 {STRATEGY_GUIDE}
 
-During the game you will receive the events that happened, the current board state, and a numbered list of every action that is legal for you right now. Reason about the best play like a skilled human player: consider tempo, card advantage, combat math, what the opponent may be holding, and your strategy guide. Then reply with ONLY the number of the chosen action. Reply 0 to deliberately pass priority and do nothing.
+During the game you will receive the events that happened, the current board state (each card's current power/toughness, counters, and anything attached to it), and a numbered list of every action that is legal for you right now.
+Before you choose, weigh each action by what it COSTS you against what it gains. A cost is anything you give up to take the action: mana, tapping a permanent, SACRIFICING one of your own permanents, paying life, or discarding. Many activated abilities cost more than mana - the action line states its cost in brackets, and a creature or other valuable permanent is rarely worth trading for something lesser. Then pick the play whose gain most clearly exceeds its cost on the current board: develop your position, hold interaction when nothing is urgent, and attack when the math favors you.
+Reason like a skilled human player, then reply with ONLY the number of the chosen action. Reply 0 to deliberately pass priority and do nothing.

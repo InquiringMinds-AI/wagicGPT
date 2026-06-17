@@ -11,6 +11,9 @@
 #include "JFileSystem.h"
 #include "MTGAbility.h"
 #include "CardDescriptor.h"
+#include "ManaCost.h"
+#include "ExtraCost.h"
+#include "Counters.h"
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -170,6 +173,31 @@ string httpRequest(const string& url, const string& postBody, long timeoutMs, co
     return response;
 }
 
+//The auras/equipment attached to a permanent. There is no forward list, so
+//find them the way the engine does (cf. MTGCardInstance::hasTotemArmor):
+//every attachment carries a reverse pointer (auraParent) to its host.
+void describeAttachments(std::ostringstream& out, MTGCardInstance * host)
+{
+    GameObserver * obs = host->getObserver();
+    if (!obs)
+        return;
+    bool first = true;
+    for (int p = 0; p < 2; p++)
+    {
+        MTGGameZone * bf = obs->players[p]->game->battlefield;
+        for (int x = 0; x < bf->nb_cards; x++)
+        {
+            MTGCardInstance * att = bf->cards[x];
+            if (att->auraParent != host)
+                continue;
+            out << (first ? " {attached: " : ", ") << att->getDisplayName();
+            first = false;
+        }
+    }
+    if (!first)
+        out << "}";
+}
+
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus)
 {
     bool first = true;
@@ -184,9 +212,34 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         if (cost && cost->getConvertedCost())
             out << " {" << cost->toString() << "}";
         if (card->isCreature())
+        {
             out << " (" << card->power << "/" << card->toughness << ")";
+            //Surface the live delta the static decklist text cannot carry: a
+            //creature pumped, counter'd, enchanted or equipped is no longer
+            //its printed stats. Only meaningful in play (withStatus).
+            if (withStatus && (card->power != card->basepower || card->toughness != card->basetoughness))
+                out << " (printed " << card->basepower << "/" << card->basetoughness << ")";
+        }
         if (withStatus)
         {
+            if (card->counters && card->counters->mCount)
+            {
+                out << " [counters:";
+                for (size_t c = 0; c < card->counters->counters.size(); c++)
+                {
+                    Counter * ct = card->counters->counters[c];
+                    if (!ct || ct->nb <= 0)
+                        continue;
+                    out << " " << ct->nb << "x ";
+                    if (!ct->name.empty() && ct->name != " ")
+                        out << ct->name;
+                    else
+                        out << (ct->power >= 0 ? "+" : "") << ct->power << "/"
+                            << (ct->toughness >= 0 ? "+" : "") << ct->toughness;
+                }
+                out << "]";
+            }
+            describeAttachments(out, card);
             if (card->isTapped())
                 out << " [tapped]";
             if (card->isAttacker())
@@ -377,10 +430,16 @@ void AIPlayerGPT::buildSystemPrompt()
             << oppDeck << "\n";
     if (!guideBlock.empty())
         sys << guideBlock << "\n";
-    sys << "\nDuring the game you will receive the events that happened, the current board state, and a "
-           "numbered list of every action that is legal for you right now. Reason about the best play like "
-           "a skilled human player: consider tempo, card advantage, combat math, what the opponent may be "
-           "holding, and your strategy guide. Then reply with ONLY the number of the chosen action. "
+    sys << "\nDuring the game you will receive the events that happened, the current board state (each card's "
+           "current power/toughness, counters, and anything attached to it), and a numbered list of every "
+           "action that is legal for you right now.\n"
+           "Before you choose, weigh each action by what it COSTS you against what it gains. A cost is anything "
+           "you give up to take the action: mana, tapping a permanent, SACRIFICING one of your own permanents, "
+           "paying life, or discarding. Many activated abilities cost more than mana - the action line states "
+           "its cost in brackets, and a creature or other valuable permanent is rarely worth trading for "
+           "something lesser. Then pick the play whose gain most clearly exceeds its cost on the current board: "
+           "develop your position, hold interaction when nothing is urgent, and attack when the math favors you.\n"
+           "Reason like a skilled human player, then reply with ONLY the number of the chosen action. "
            "Reply 0 to deliberately pass priority and do nothing.";
 
     mMessages.insert(mMessages.begin(), std::make_pair(string("system"), sys.str()));
@@ -550,6 +609,39 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         out << " targeting " << action.target->getDisplayName();
     else if (action.playerAbilityTarget || action.player)
         out << " targeting a player";
+
+    //Localize the cost onto the action itself. The menu text describes the
+    //EFFECT ("Destroy target enchantment") but never the price, so a sacrifice
+    //ability reads as free unless the cost is stated here: mana from the cost's
+    //string, plus every extra cost's human render string ("Sacrifice <card>",
+    //"Pay 2 life"). This is the connective tissue that was missing - the model
+    //had the rules text in its briefing but not the cost beside the choice.
+    if (action.ability && action.ability->getCost())
+    {
+        ManaCost * c = action.ability->getCost();
+        std::ostringstream cost;
+        bool any = false;
+        if (c->getConvertedCost())
+        {
+            cost << c->toString();
+            any = true;
+        }
+        if (c->extraCosts)
+        {
+            for (size_t i = 0; i < c->extraCosts->costs.size(); i++)
+            {
+                ExtraCost * ec = c->extraCosts->costs[i];
+                if (!ec || ec->mCostRenderString.empty())
+                    continue;
+                if (any)
+                    cost << ", ";
+                cost << ec->mCostRenderString;
+                any = true;
+            }
+        }
+        if (any)
+            out << " [cost: " << cost.str() << "]";
+    }
     return out.str();
 }
 
