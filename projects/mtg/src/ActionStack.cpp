@@ -1268,7 +1268,15 @@ bool ActionStack::CheckUserInput(JButton inputKey)
         }
         else if (observer->isInterrupting)
         {
-            if (JGE_BTN_SEC == key)
+            //End the interruption (pass priority) on the interrupt button
+            //(JGE_BTN_SEC = middle-click / 'k') OR on the "pass / next phase"
+            //gesture (trigger = right-click by default). Previously only
+            //JGE_BTN_SEC worked, so a player who right-clicked - which means
+            //"next phase" everywhere else and is the natural "pass priority"
+            //gesture - had no way out of an interrupt window they had nothing
+            //to play in, and the game soft-locked. The offer branch above
+            //already treats `trigger` as decline/pass; mirror it here.
+            if (JGE_BTN_SEC == key || trigger == key)
             {
                 if(observer->mExtraPayment)
                 {
