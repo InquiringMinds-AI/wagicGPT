@@ -559,7 +559,10 @@ string AIPlayerGPT::requestCompletion()
     for (size_t i = 0; i < mMessages.size(); i++)
         messages.push_back({{"role", mMessages[i].first}, {"content", mMessages[i].second}});
 
-    long maxTokens = mThinking ? 2048 : 64;
+    //A bare number needs almost nothing, but the model sometimes prefaces
+    //it with a short justification; give enough room that the number is not
+    //truncated away (which parsed as "no choice" and held creatures back).
+    long maxTokens = mThinking ? 2048 : 200;
     if (mMaxTokens > 0)
         maxTokens = mMaxTokens;
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
@@ -593,22 +596,38 @@ string AIPlayerGPT::requestCompletion()
 
 int AIPlayerGPT::parseChoice(const string& content, int optionCount)
 {
-    //Drop any inline think block, then take the LAST integer in the reply
-    //("...so the best play is 3" parses as 3).
+    //Drop any inline think block first.
     string text = content;
     size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
         text = text.substr(thinkEnd + 8);
 
-    size_t end = text.find_last_of("0123456789");
-    if (end == string::npos)
-        return -1;
-    size_t start = end;
-    while (start > 0 && isdigit(text[start - 1]))
-        start--;
-    int choice = atoi(text.substr(start, end - start + 1).c_str());
-    if (choice < 0 || choice > optionCount)
-        return -1;
+    //Scan every integer and keep the LAST one that is a VALID option
+    //[0, optionCount]. Taking the last digit blindly (the old behavior)
+    //failed whenever the model echoed a power/toughness like "(2/4)" or
+    //the option text, because the trailing "4" was out of range and the
+    //whole decision parsed as -1 - which silently held creatures back.
+    //Ignoring out-of-range numbers reads the real choice out of a noisy
+    //reply instead.
+    int choice = -1;
+    size_t i = 0;
+    while (i < text.size())
+    {
+        if (isdigit((unsigned char) text[i]))
+        {
+            size_t j = i;
+            while (j < text.size() && isdigit((unsigned char) text[j]))
+                j++;
+            int n = atoi(text.substr(i, j - i).c_str());
+            if (n >= 0 && n <= optionCount)
+                choice = n;
+            i = j;
+        }
+        else
+        {
+            i++;
+        }
+    }
     return choice;
 }
 
