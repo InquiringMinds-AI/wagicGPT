@@ -125,6 +125,51 @@ const char * kRulesPrimer =
     "favorably, hold instant-speed interaction for the opponent's threats, and attack when the math favors "
     "you. Think about what the opponent's untapped lands and hand size let them do in response.\n";
 
+//General strategy priors, mirrored from Res/ai/gpt/system_prompt.txt so the
+//compiled fallback (used only when that asset is missing) carries the same
+//guidance. Priors, not laws - they bias the model's reasoning without
+//scripting the choice.
+const char * kStrategyPriors =
+    "STRATEGY (priors to reason from, not absolute rules):\n"
+    "- The only goal is to win before the opponent does. Judge every play by whether it moves you toward "
+    "winning faster than it helps the opponent - not by whether it draws a card, kills a creature, or gains "
+    "life in isolation.\n"
+    "- Decide who is the beatdown. From the two decklists and the board, work out who wins if nothing "
+    "changes: compare each side's clock - how many turns of attacks to deal the opponent's remaining life. "
+    "The side that wins that race has the advantage and should play to control: trade, remove threats, "
+    "preserve life, don't overcommit. The side that would LOSE the race must be the aggressor: deploy "
+    "threats, attack, and force the opponent to react before the game reaches the state they lose. This "
+    "role can flip mid-game as the board changes.\n"
+    "- Two resources decide most games: cards and mana (tempo). Prefer the cheaper option for the same "
+    "effect, and cards that do more than one thing. A threat left alive is a problem every turn; an answer "
+    "only stops one thing once - so when you are behind on cards you cannot keep trading one-for-one "
+    "forever. As the aggressor, weight tempo (develop, attack); as the controller, weight cards (trade "
+    "efficiently, answer the key threats).\n"
+    "- Act at the latest useful moment. Hold instants, removal, and tricks until you must use them or until "
+    "the opponent's turn or end step - waiting costs nothing and gives you information. Play a land before "
+    "your spells for mana flexibility. When you expect the opponent to hold an answer, prefer committing a "
+    "lesser threat before your best card. Pass priority (choose 0) whenever there is nothing worth doing "
+    "right now.\n"
+    "- Control the opponent through the information you show them. They see your untapped mana, your "
+    "attacks, and your board; your hand stays hidden unless a card reveals it. Leaving mana open represents "
+    "an instant (counter, trick, removal) and can deter an attack or push the opponent into a worse line "
+    "even when you hold nothing. Make some plays for their effect on what the opponent believes, not only "
+    "their direct board effect - and back the representation with the real card when you have it, so the "
+    "bluff stays credible.\n"
+    "- Combat is arithmetic. Before attacking, check whether enough damage gets through to matter, and "
+    "whether the opponent's untapped mana threatens a trick or removal that turns the attack into a blowout "
+    "- assume the relevant trick unless the board says otherwise. Attacking taps your creatures: do not tap "
+    "out into a lethal swing back. When blocking, prefer trades that kill a creature worth more than the one "
+    "you lose, or that cost you nothing; take the damage when your blockers are worth more alive than the "
+    "life saved; chump-block only to buy a turn you genuinely need. Only race if you win the race.\n"
+    "- Don't overcommit into a likely sweeper when you are ahead on board - keep reinforcements in hand and "
+    "make the opponent find it. But don't over-respect answers either: if you only win in the world where "
+    "the opponent lacks the answer, play as though they do.\n"
+    "- Common errors to avoid: playing the wrong role; racing a faster opponent; tapping out when you "
+    "needed interaction held up; firing removal or tricks too early or at the wrong target; overextending "
+    "into a sweeper; leading with your best threat into open mana; sloppy combat math (missing lethal, "
+    "making bad trades, forgetting the opponent's trick).\n";
+
 size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * userp)
 {
     static_cast<string *>(userp)->append(static_cast<char *>(contents), size * nmemb);
@@ -430,6 +475,7 @@ void AIPlayerGPT::buildSystemPrompt()
             << oppDeck << "\n";
     if (!guideBlock.empty())
         sys << guideBlock << "\n";
+    sys << "\n" << kStrategyPriors;
     sys << "\nDuring the game you will receive the events that happened, the current board state (each card's "
            "current power/toughness, counters, and anything attached to it), and a numbered list of every "
            "action that is legal for you right now.\n"
