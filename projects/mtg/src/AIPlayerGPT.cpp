@@ -783,6 +783,35 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
     return (choice >= 1) ? choice - 1 : -1; //0 or parse-fail: defer to caller
 }
 
+MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * type)
+{
+    //Let the heuristic do the hard part: pick a castable card and set up the
+    //mana payment (gotPayments / payAlternative). Then let the model veto a
+    //play that the board makes bad. Returning NULL on a veto is the same as
+    //the heuristic finding nothing to play, so no payment state is consumed.
+    MTGCardInstance * proposed = AIPlayerBaka::FindCardToPlay(pMana, type);
+    if (!proposed || mEndpoint.empty())
+        return proposed;
+
+    std::ostringstream q;
+    q << "Your heuristic proposes to play " << proposed->name;
+    if (proposed->getManaCost() && proposed->getManaCost()->getConvertedCost())
+        q << " (" << proposed->getManaCost()->toString() << ")";
+    q << ". Given the whole board, is this a good play right now?";
+    vector<string> opts;
+    opts.push_back("Hold " + proposed->name + " - do not play it now");
+    opts.push_back("Play " + proposed->name);
+    int pick = askModel(q.str(), opts);
+
+    if (pick == 0) //the model judged this a bad play
+    {
+        DebugTrace("AIPlayerGPT: vetoed playing " << proposed->name);
+        gotPayments.clear(); //drop the heuristic's payment plan for this card
+        return NULL;
+    }
+    return proposed; //play it (pick 1), or defer to the heuristic (-1)
+}
+
 int AIPlayerGPT::chooseAttackers()
 {
     //Only drive the declare-attackers step; anywhere else, stay out of the way.

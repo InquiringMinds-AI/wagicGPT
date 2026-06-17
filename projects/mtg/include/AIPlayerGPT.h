@@ -62,6 +62,9 @@ protected:
     //attack / block decision through the model (heuristic when no endpoint).
     virtual int chooseAttackers();
     virtual int chooseBlockers();
+    //The heuristic proposes which card to cast/play; let the model veto a
+    //bad play (e.g. dropping a land into four Ankh of Mishra).
+    virtual MTGCardInstance * FindCardToPlay(ManaCost * potentialMana, const char * type);
 
 private:
     //Ask the model to choose among options (0-based result, -1 to defer to
