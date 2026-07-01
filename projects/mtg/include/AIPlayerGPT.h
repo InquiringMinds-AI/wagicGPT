@@ -53,27 +53,51 @@ public:
     //true when the player launched the game with WAGIC_AI=gpt
     static bool isEnabled();
 
+    //Adds the mulligan decision (the engine has no AI mulligan path at all -
+    //the heuristic always keeps) before delegating to the base loop.
+    virtual int computeActions();
+
     //feeds the game narrative to the agent transcript
     virtual int receiveEvent(WEvent * event);
 
 protected:
     virtual const OrderedAIAction * chooseOrderedAction(RankingContainer& ranking);
+    //Deck hint scripts must not pre-empt the model's ranked decision.
+    virtual int selectHintAbility();
+    //Menus are decisions too: modal (choose-one) spells, may-prompts and X
+    //announcements all route through the model, with the heuristic as the
+    //fallback for anything unparseable.
+    virtual int selectMenuOption();
     //Combat declarations are opposed choices too: route each creature's
     //attack / block decision through the model (heuristic when no endpoint).
     virtual int chooseAttackers();
     virtual int chooseBlockers();
-    //The heuristic proposes which card to cast/play; let the model veto a
-    //bad play (e.g. dropping a land into four Ankh of Mishra).
+    //Card play is the model's choice. For lands the heuristic proposes and
+    //the model may veto (dropping a land is nearly always right); for spells
+    //the model picks freely among every castable card - the heuristic's
+    //legality/payment machinery then validates and prices the pick via
+    //AIPlayerBaka::aiForcedCandidate.
     virtual MTGCardInstance * FindCardToPlay(ManaCost * potentialMana, const char * type);
+    //Spell/ability targeting: the model picks the target(s) among the legal
+    //set; the clicks reuse the engine's own click helpers so the mechanics
+    //stay identical to the heuristic path. checkOnly probes and forced
+    //targets are mechanics, not decisions - those go straight to the base.
+    virtual int chooseTarget(TargetChooser * tc = NULL, Player * forceTarget = NULL, MTGCardInstance * chosenCard = NULL, bool checkonly = false);
 
 private:
     //Ask the model to choose among options (0-based result, -1 to defer to
     //the heuristic). No model call when there is one option or none - that
-    //is the "only one valid action" case. Has its own last-prompt cache so
-    //it never disturbs chooseOrderedAction's priority cache.
+    //is the "only one valid action" case. Answers are cached by full prompt
+    //(a map, not a single slot: several distinct questions repeat every AI
+    //tick - land veto + card choice, one ask per creature in combat - and a
+    //one-slot cache would re-fire the HTTP call for each on every tick).
     int askModel(const string& decision, const vector<string>& options);
-    string mLastAskMsg;
-    int mLastAskChoice;
+    std::map<string, int> mAskCache;
+
+    //Can this card plausibly be paid for right now? Cheap pre-filter for the
+    //model's casting menu; the authoritative check is the forced
+    //AIPlayerBaka::FindCardToPlay validation pass.
+    bool roughlyPayable(MTGCardInstance * card, ManaCost * pMana);
 
     //Probe candidate endpoints (env override, then Spark vLLM, then local
     //llama.cpp) and remember the first one that answers /v1/models.

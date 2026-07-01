@@ -104,6 +104,11 @@ class AIPlayerBaka: public AIPlayer{
 
     int payAlternative;
     MTGCardInstance * nextCardToPlay;
+    //When set, FindCardToPlay examines ONLY this card: every other candidate
+    //is skipped and the play-chance roll always passes. This lets a subclass
+    //pick the card itself (e.g. an LLM choice) while the full legality /
+    //restriction / payment machinery still validates and prices the pick.
+    MTGCardInstance * aiForcedCandidate;
     MTGCardInstance * activateCombo();
     TargetChooser * GetComboTc(GameObserver * observer, TargetChooser * tc = NULL);
     AIHints * hints;

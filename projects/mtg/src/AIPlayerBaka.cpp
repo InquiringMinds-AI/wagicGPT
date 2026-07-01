@@ -2770,6 +2770,8 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
     //canplayfromgraveyard
     while ((card = cd.nextmatch(game->graveyard, card)))
     {
+        if (aiForcedCandidate && card != aiForcedCandidate)
+            continue;
         bool hasFlashback = false;
 
         if(card->getManaCost())
@@ -2955,7 +2957,7 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
                 //FORCEABILITY tests: any card worth playing at all is played,
                 //so scripted AI tests don't depend on the (process-global,
                 //thread-shared) rand() stream. Deliberate zeros still skip.
-                if (forceBestAbilityUse && shouldPlayPercentage > 0)
+                if ((forceBestAbilityUse || aiForcedCandidate) && shouldPlayPercentage > 0)
                     chance = 0;
                 if (chance > shouldPlayPercentage)
                     continue;
@@ -2974,6 +2976,8 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
     card = NULL; // fixed bug causing AI never play a card there are one or more cards in graveyard or other zones...
     while ((card = cd.nextmatch(game->exile, card)) && card->has(Constants::CANPLAYFROMEXILE))
     {
+        if (aiForcedCandidate && card != aiForcedCandidate)
+            continue;
         if (!CanHandleCost(card->getManaCost(),card))
             continue;
 
@@ -3120,7 +3124,7 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
             //FORCEABILITY tests: any card worth playing at all is played,
             //so scripted AI tests don't depend on the (process-global,
             //thread-shared) rand() stream. Deliberate zeros still skip.
-            if (forceBestAbilityUse && shouldPlayPercentage > 0)
+            if ((forceBestAbilityUse || aiForcedCandidate) && shouldPlayPercentage > 0)
                 chance = 0;
             if (chance > shouldPlayPercentage)
                 continue;
@@ -3138,6 +3142,8 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
     card = NULL; // fixed bug causing AI never play a card there are one or more cards in exile or other zones...
     while ((card = cd.nextmatch(game->commandzone, card)))
     {
+        if (aiForcedCandidate && card != aiForcedCandidate)
+            continue;
         if (!CanHandleCost(card->getManaCost(),card))
             continue;
 
@@ -3255,7 +3261,7 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
             //FORCEABILITY tests: any card worth playing at all is played,
             //so scripted AI tests don't depend on the (process-global,
             //thread-shared) rand() stream. Deliberate zeros still skip.
-            if (forceBestAbilityUse && shouldPlayPercentage > 0)
+            if ((forceBestAbilityUse || aiForcedCandidate) && shouldPlayPercentage > 0)
                 chance = 0;
             if (chance > shouldPlayPercentage)
                 continue;
@@ -3273,6 +3279,8 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
     card = NULL; // fixed bug causing AI never play a card there are one or more cards in exile or other zones...
     while ((card = cd.nextmatch(game->hand, card)))
     {
+        if (aiForcedCandidate && card != aiForcedCandidate)
+            continue;
         int localpayAlternative = NONE;
 
         if (!CanHandleCost(card->getManaCost(),card))
@@ -3477,7 +3485,7 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
             //FORCEABILITY tests: any card worth playing at all is played,
             //so scripted AI tests don't depend on the (process-global,
             //thread-shared) rand() stream. Deliberate zeros still skip.
-            if (forceBestAbilityUse && shouldPlayPercentage > 0)
+            if ((forceBestAbilityUse || aiForcedCandidate) && shouldPlayPercentage > 0)
                 chance = 0;
             if (chance > shouldPlayPercentage)
                 continue;
@@ -4477,6 +4485,7 @@ AIPlayer(observer, file, fileSmall, deck)
 {
 
     nextCardToPlay = NULL;
+    aiForcedCandidate = NULL;
     stats = NULL;
 
     //Initialize "AIHints" system

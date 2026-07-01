@@ -14,6 +14,8 @@
 #include "ManaCost.h"
 #include "ExtraCost.h"
 #include "Counters.h"
+#include "ActionLayer.h"
+#include "AllAbilities.h"
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -21,6 +23,8 @@
 #include <cstdlib>
 #include <sstream>
 #include <fstream>
+#include <set>
+#include <algorithm>
 
 using json = nlohmann::json;
 
@@ -317,10 +321,32 @@ string zoneDesc(MTGGameZone * z)
     return z->getName();
 }
 
+//One targetable thing, described for the model's target menu.
+string describeTarget(Player * me, Targetable * t)
+{
+    std::ostringstream o;
+    if (Player * p = dynamic_cast<Player *>(t))
+    {
+        o << (p == me ? "Yourself" : "The opponent") << " (player, life " << p->life << ")";
+        return o.str();
+    }
+    MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(t);
+    if (!c)
+        return "(unknown)";
+    o << c->getDisplayName();
+    if (c->isCreature())
+        o << " (" << c->power << "/" << c->toughness << ")";
+    if (c->currentZone)
+        o << " [" << (c->controller() == me ? "your " : "opponent's ") << zoneDesc(c->currentZone) << "]";
+    if (c->isTapped())
+        o << " [tapped]";
+    return o.str();
+}
+
 } //namespace
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mLastAskChoice(-1), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -774,17 +800,30 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (!ranking.size() || mEndpoint.empty())
         return AIPlayerBaka::chooseOrderedAction(ranking);
 
-    //Combat declaration (attacker/blocker assignment) is a multi-step,
-    //order-sensitive interaction driven by the combat state machine, not a
-    //single ranked pick. Routing it through the model leaves combat
-    //half-declared and soft-locks the blockers step (the model returning an
-    //out-of-range / unparseable answer mid-declaration is enough). The LLM
-    //seam was scoped to main-phase plays and priority; leave the combat
-    //phases to the heuristic, which declares combat without locking.
-    int phase = observer->getCurrentGamePhase();
-    if (phase == MTG_PHASE_COMBATATTACKERS || phase == MTG_PHASE_COMBATBLOCKERS
-        || phase == MTG_PHASE_COMBATDAMAGE)
+    //Combat declaration (attacker/blocker assignment and its costs) is a
+    //multi-step, order-sensitive state machine driven by the dedicated
+    //chooseAttackers/chooseBlockers seams, not a single ranked pick - the
+    //model naming one of those entries mid-cycle leaves combat half-declared
+    //and soft-locks the step. Filter the declaration mechanics out of the
+    //model's menu, but DO offer everything else even during combat phases:
+    //instants and activated abilities in combat are exactly the "hold
+    //interaction, act at the latest useful moment" plays the strategy
+    //priors call for, and the old blanket phase guard silenced them.
+    vector<const OrderedAIAction *> candidates;
+    for (RankingContainer::iterator it = ranking.begin(); it != ranking.end(); ++it)
+    {
+        MTGAbility * ab = it->first.ability;
+        int t = ab ? ab->aType : (int) MTGAbility::UNKNOWN;
+        if (t == MTGAbility::MTG_ATTACK_RULE || t == MTGAbility::MTG_BLOCK_RULE
+            || t == MTGAbility::ATTACK_COST || t == MTGAbility::BLOCK_COST)
+            continue;
+        candidates.push_back(&(it->first));
+    }
+    //Nothing but declaration mechanics: the heuristic ranking drives those.
+    if (candidates.empty())
         return AIPlayerBaka::chooseOrderedAction(ranking);
+
+    int phase = observer->getCurrentGamePhase();
 
     if (mMessages.empty() || mMessages[0].first != "system")
         buildSystemPrompt();
@@ -795,13 +834,13 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     user << serializeGameState();
     user << "\nYour legal actions:\n";
     int index = 0;
-    for (RankingContainer::iterator it = ranking.begin(); it != ranking.end(); ++it)
+    for (size_t c = 0; c < candidates.size(); c++)
     {
         index++;
-        user << index << ". " << describeAction(it->first);
+        user << index << ". " << describeAction(*candidates[c]);
         if (mShowHints)
         {
-            OrderedAIAction action = it->first; //copy: getEfficiency() is not const
+            OrderedAIAction action = *candidates[c]; //copy: getEfficiency() is not const
             user << " (heuristic score " << action.getEfficiency() << ")";
         }
         user << "\n";
@@ -869,9 +908,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     }
 
     DebugTrace("AIPlayerGPT[ph" << phase << "]: take action " << choice << "/" << index << " (cached=" << unchanged << ")");
-    RankingContainer::iterator it = ranking.begin();
-    std::advance(it, choice - 1);
-    return &(it->first);
+    return candidates[choice - 1];
+}
+
+int AIPlayerGPT::selectHintAbility()
+{
+    //Deck hint scripts pre-empt the ranked seam (they push a scripted action
+    //before selectAbility builds the menu), which silently takes the
+    //decision away from the model. With a live endpoint the same abilities
+    //still reach the model through the ranking; without one, keep the hints
+    //(they are part of the Baka experience the fallback promises).
+    if (!mEndpoint.empty())
+        return 0;
+    return AIPlayerBaka::selectHintAbility();
 }
 
 int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
@@ -897,11 +946,14 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
     user << "\nReply with ONLY the number of your choice.";
     string userMsg = user.str();
 
-    //Own last-prompt cache: combat is polled every AI tick, so avoid
-    //re-querying the model for an identical board. Does not touch the
-    //priority cache (mLastUserMsg/mLastChoice) used by chooseOrderedAction.
-    if (userMsg == mLastAskMsg)
-        return (mLastAskChoice >= 1 && mLastAskChoice <= (int) options.size()) ? mLastAskChoice - 1 : -1;
+    //Prompt-keyed answer cache: the same questions are re-polled every AI
+    //tick until the game state moves on, and several distinct questions can
+    //alternate within one tick. Identical prompt => identical answer, with
+    //no repeated HTTP round trip. Does not touch the priority cache
+    //(mLastUserMsg/mLastChoice) used by chooseOrderedAction.
+    std::map<string, int>::iterator cached = mAskCache.find(userMsg);
+    if (cached != mAskCache.end())
+        return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
 
     mMessages.push_back(std::make_pair(string("user"), userMsg));
     string content = requestCompletion();
@@ -914,40 +966,393 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
         mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
 
     mEventLog.clear();
-    mLastAskMsg = userMsg;
-    mLastAskChoice = choice;
+    mAskCache[userMsg] = choice;
     DebugTrace("AIPlayerGPT: " << decision << " -> chose " << choice << " of " << options.size());
 
     return (choice >= 1) ? choice - 1 : -1; //0 or parse-fail: defer to caller
 }
 
+bool AIPlayerGPT::roughlyPayable(MTGCardInstance * card, ManaCost * pMana)
+{
+    ManaCost * cost = card->getManaCost();
+    if (!cost)
+        return true;
+    if (!cost->getConvertedCost() && !cost->extraCosts)
+        return true;
+    if (pMana->canAfford(cost, card->has(Constants::ANYTYPEOFMANA)))
+        return true;
+    if (cost->getAlternative() && pMana->canAfford(cost->getAlternative(), 0))
+        return true;
+    if (cost->getMorph() && pMana->canAfford(cost->getMorph(), 0))
+        return true;
+    if (cost->getFlashback() && pMana->canAfford(cost->getFlashback(), 0))
+        return true;
+    if (cost->getRetrace() && pMana->canAfford(cost->getRetrace(), 0))
+        return true;
+    //specific-producer payments (e.g. sac-for-mana rocks) that potential
+    //mana does not cover
+    if (canPayMana(card, cost, card->has(Constants::ANYTYPEOFMANA)).size())
+        return true;
+    return false;
+}
+
 MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * type)
 {
-    //Let the heuristic do the hard part: pick a castable card and set up the
-    //mana payment (gotPayments / payAlternative). Then let the model veto a
-    //play that the board makes bad. Returning NULL on a veto is the same as
-    //the heuristic finding nothing to play, so no payment state is consumed.
-    MTGCardInstance * proposed = AIPlayerBaka::FindCardToPlay(pMana, type);
-    if (!proposed || mEndpoint.empty())
-        return proposed;
+    //No endpoint, or a scripted combo is mid-execution: heuristic as-is.
+    if (mEndpoint.empty() || comboCards.size())
+        return AIPlayerBaka::FindCardToPlay(pMana, type);
 
-    std::ostringstream q;
-    q << "Your heuristic proposes to play " << proposed->name;
-    if (proposed->getManaCost() && proposed->getManaCost()->getConvertedCost())
-        q << " (" << proposed->getManaCost()->toString() << ")";
-    q << ". Given the whole board, is this a good play right now?";
-    vector<string> opts;
-    opts.push_back("Hold " + proposed->name + " - do not play it now");
-    opts.push_back("Play " + proposed->name);
-    int pick = askModel(q.str(), opts);
-
-    if (pick == 0) //the model judged this a bad play
+    //Lands: the heuristic proposes (dropping a land is nearly always right),
+    //the model keeps its veto (e.g. a land into four Ankh of Mishra).
+    if (!strcmp(type, "land"))
     {
-        DebugTrace("AIPlayerGPT: vetoed playing " << proposed->name);
-        gotPayments.clear(); //drop the heuristic's payment plan for this card
+        MTGCardInstance * proposed = AIPlayerBaka::FindCardToPlay(pMana, type);
+        if (!proposed)
+            return NULL;
+
+        std::ostringstream q;
+        q << "Land drop: play " << proposed->name << " now?";
+        vector<string> opts;
+        opts.push_back("Hold " + proposed->name + " - do not play it now");
+        opts.push_back("Play " + proposed->name);
+        int pick = askModel(q.str(), opts);
+        if (pick == 0)
+        {
+            DebugTrace("AIPlayerGPT: vetoed playing " << proposed->name);
+            gotPayments.clear(); //drop the heuristic's payment plan for this card
+            return NULL;
+        }
+        return proposed; //play it (pick 1), or defer to the heuristic (-1)
+    }
+
+    //Spells: one free choice across every castable card, whatever type rung
+    //of the heuristic's cast ladder we were called for. computeActions stops
+    //at the first rung that returns a card, so answering the whole question
+    //here means a single model call per casting window.
+    //type=="" is the instant/interrupt window: computeActions will discard
+    //anything that is not instant-speed, so only offer what can actually go.
+    bool instantWindow = !*type;
+
+    vector<MTGCardInstance *> candidates;
+    vector<string> opts;
+    opts.push_back("Cast nothing right now");
+    std::set<string> seen; //same name+zone = same decision; list it once
+
+    struct ZoneScan { MTGGameZone * zone; const char * label; };
+    ZoneScan scans[] = {
+        { game->hand, "" },
+        { game->graveyard, " [from your graveyard]" },
+        { game->exile, " [from exile]" },
+        { game->commandzone, " [from your command zone]" },
+    };
+    for (size_t s = 0; s < sizeof(scans) / sizeof(scans[0]); s++)
+    {
+        MTGGameZone * zone = scans[s].zone;
+        for (int i = 0; i < zone->nb_cards; i++)
+        {
+            MTGCardInstance * card = zone->cards[i];
+            if (card->isLand())
+                continue; //the land rung handles those
+            if (instantWindow
+                && !card->hasType(Subtypes::TYPE_INSTANT) && !card->has(Constants::FLASH)
+                && !card->has(Constants::ASFLASH))
+                continue;
+            if (zone == game->graveyard
+                && !card->has(Constants::CANPLAYFROMGRAVEYARD) && !card->has(Constants::TEMPFLASHBACK)
+                && !(card->getManaCost() && card->getManaCost()->getFlashback())
+                && !(card->getManaCost() && card->getManaCost()->getRetrace()))
+                continue;
+            if (zone == game->exile && !card->has(Constants::CANPLAYFROMEXILE))
+                continue;
+            if (card->hasType(Subtypes::TYPE_LEGENDARY) && game->inPlay->findByName(card->name))
+                continue;
+            if (game->playRestrictions->canPutIntoZone(card, game->stack) == PlayRestriction::CANT_PLAY)
+                continue;
+            if (!roughlyPayable(card, pMana))
+                continue;
+            string key = card->getDisplayName() + scans[s].label;
+            if (!seen.insert(key).second)
+                continue;
+
+            std::ostringstream o;
+            o << "Cast " << card->getDisplayName();
+            if (card->getManaCost() && card->getManaCost()->getConvertedCost())
+                o << " {" << card->getManaCost()->toString() << "}";
+            if (card->isCreature())
+                o << " (" << card->power << "/" << card->toughness << ")";
+            o << scans[s].label;
+            candidates.push_back(card);
+            opts.push_back(o.str());
+        }
+    }
+
+    //Nothing castable: only one outcome, no model call.
+    if (candidates.empty())
+        return NULL;
+
+    int pick = askModel("Casting decision: which card do you cast now, if any?", opts);
+    if (pick < 0) //model deferred or endpoint failed: heuristic decides
+        return AIPlayerBaka::FindCardToPlay(pMana, type);
+    if (pick == 0) //"cast nothing": hold everything this window
+    {
+        DebugTrace("AIPlayerGPT: chose to cast nothing");
         return NULL;
     }
-    return proposed; //play it (pick 1), or defer to the heuristic (-1)
+
+    //Validate and price the pick with the heuristic's own machinery: with
+    //aiForcedCandidate set, AIPlayerBaka::FindCardToPlay examines only this
+    //card, runs the full legality/restriction/target checks, and leaves
+    //gotPayments / payAlternative set for exactly this play.
+    MTGCardInstance * chosen = candidates[pick - 1];
+    aiForcedCandidate = chosen;
+    MTGCardInstance * validated = AIPlayerBaka::FindCardToPlay(pMana, "*");
+    aiForcedCandidate = NULL;
+    if (validated)
+    {
+        DebugTrace("AIPlayerGPT: casting " << validated->name << " (model's pick"
+                   << (validated == chosen ? ")" : " via combo hint)"));
+        return validated;
+    }
+    //The cheap menu filter let through something the real machinery rejects
+    //(cast restriction, no legal target, unpayable kicker...). Fall back to
+    //the heuristic's own pick rather than burning another model call.
+    DebugTrace("AIPlayerGPT: model chose " << chosen->name
+               << " but it fails validation; deferring to heuristic");
+    gotPayments.clear();
+    return AIPlayerBaka::FindCardToPlay(pMana, type);
+}
+
+int AIPlayerGPT::computeActions()
+{
+    //Mulligan: the engine offers it to humans through the game menu and the
+    //heuristic AI simply never mulligans. The window predicate mirrors the
+    //GUI's (GameStateDuel): the AI's own first turn, nothing developed yet.
+    //Each distinct hand is asked about once (prompt-keyed cache); a mulligan
+    //redraws the hand, which changes the prompt and earns a fresh ask.
+    if (!mEndpoint.empty()
+        && ((observer->turn == 0 && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN)
+            || (observer->turn == 1 && observer->getCurrentGamePhase() < MTG_PHASE_DRAW))
+        && observer->currentPlayer == this && observer->currentlyActing() == this
+        && game->hand->nb_cards > 0 && game->inPlay->nb_cards == 0
+        && game->graveyard->nb_cards == 0 && game->exile->nb_cards == exiledBySerum)
+    {
+        std::ostringstream q;
+        q << "Mulligan decision: you are on " << game->hand->nb_cards
+          << " cards. Keep this opening hand, or mulligan (shuffle it back and draw one fewer)?";
+        vector<string> opts;
+        opts.push_back("Keep this hand");
+        opts.push_back("Mulligan");
+        int pick = askModel(q.str(), opts);
+        if (pick == 1)
+        {
+            DebugTrace("AIPlayerGPT: taking a mulligan at " << game->hand->nb_cards << " cards");
+            observer->Mulligan(this);
+            return 1;
+        }
+        //keep (0), or defer/failure (-1): play on
+    }
+    return AIPlayerBaka::computeActions();
+}
+
+int AIPlayerGPT::selectMenuOption()
+{
+    if (mEndpoint.empty())
+        return AIPlayerBaka::selectMenuOption();
+    ActionLayer * object = observer->mLayers->actionLayer();
+    if (!object->menuObject)
+        return AIPlayerBaka::selectMenuOption();
+
+    MTGCardInstance * ctx = object->currentActionCard;
+
+    if (object->abilitiesMenu->isMultipleChoice && ctx)
+    {
+        MenuAbility * currentMenu = NULL;
+        for (size_t m = object->mObjects.size() - 1; m > 0; m--)
+        {
+            MenuAbility * ability = dynamic_cast<MenuAbility *>(object->mObjects[m]);
+            if (ability && ability->triggered)
+            {
+                currentMenu = ability;
+                break;
+            }
+        }
+        if (!currentMenu || currentMenu->abilities.empty())
+            return AIPlayerBaka::selectMenuOption();
+
+        //X announcement: the menu's buttons ARE the X values, so the pick
+        //index is the X value itself (the heuristic always dumped all mana).
+        if (dynamic_cast<AAWhatsX *>(currentMenu->abilities[0]))
+        {
+            int maxX = manaPool->getConvertedCost()
+                       - currentMenu->abilities[0]->source->getManaCost()->getConvertedCost();
+            if (maxX < 0)
+                return AIPlayerBaka::selectMenuOption();
+            int shown = maxX > 20 ? 20 : maxX; //bound the menu for huge pools
+            vector<string> opts;
+            for (int x = 0; x <= shown; x++)
+            {
+                std::ostringstream o;
+                o << "X = " << x;
+                opts.push_back(o.str());
+            }
+            int pick = askModel("Announce the value of X for " + ctx->getDisplayName()
+                                + " (you can afford up to the largest listed value):", opts);
+            if (pick < 0)
+                return AIPlayerBaka::selectMenuOption();
+            return pick;
+        }
+
+        vector<string> opts;
+        for (size_t mk = 0; mk < currentMenu->abilities.size(); mk++)
+            opts.push_back(currentMenu->abilities[mk]->getMenuText());
+        int pick = askModel("Choose one mode for " + ctx->getDisplayName() + ":", opts);
+        if (pick < 0)
+            return AIPlayerBaka::selectMenuOption();
+        return pick;
+    }
+
+    //Regular menu: items with GetId() > 0 map to action-layer abilities;
+    //the trailing cancel item (when the menu is cancellable) is the decline.
+    vector<string> opts;
+    vector<int> indices;
+    for (unsigned int k = 0; k < object->abilitiesMenu->mObjects.size(); k++)
+    {
+        if (object->abilitiesMenu->mObjects[k]->GetId() <= 0)
+            continue;
+        MTGAbility * ab = (MTGAbility *) object->mObjects[object->abilitiesMenu->mObjects[k]->GetId()];
+        opts.push_back(ab ? ab->getMenuText() : string("(option)"));
+        indices.push_back((int) k);
+    }
+    if (opts.empty())
+        return AIPlayerBaka::selectMenuOption();
+    bool canDecline = !object->checkCantCancel();
+    if (canDecline)
+        opts.push_back("Decline - do nothing");
+    //One real option and no way to decline: only one outcome, no model call.
+    if (opts.size() == 1)
+        return indices[0];
+    string decision = ctx ? ("Choose an option for " + ctx->getDisplayName() + ":")
+                          : string("A choice is required - choose an option:");
+    int pick = askModel(decision, opts);
+    if (pick < 0)
+        return AIPlayerBaka::selectMenuOption();
+    if (canDecline && pick == (int) opts.size() - 1)
+        return -1; //computeActions reacts to -1 by clicking the cancel item
+    return indices[pick];
+}
+
+int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCardInstance * chosenCard, bool checkOnly)
+{
+    //checkOnly is a castability probe (no clicks, no decision) and
+    //forceTarget a scripted redirection - both are mechanics for the base.
+    if (mEndpoint.empty() || checkOnly || forceTarget)
+        return AIPlayerBaka::chooseTarget(_tc, forceTarget, chosenCard, checkOnly);
+
+    if (observer->currentlyActing() != this)
+        return 0;
+    TargetChooser * tc = _tc ? _tc : observer->getCurrentTargetChooser();
+    if (!tc || !tc->source || tc->maxtargets < 1)
+        return 0;
+    if (tc->Owner != observer->currentlyActing())
+        return AIPlayerBaka::chooseTarget(_tc, forceTarget, chosenCard, checkOnly); //base has recovery for this
+
+    bool multi = (tc->maxtargets != 1);
+    bool unlimited = (tc->maxtargets == TargetChooser::UNLITMITED_TARGETS);
+    if (multi)
+        tc->initTargets(); //fresh selection, mirroring the heuristic path
+
+    //Multi-target selection runs as a sequence of single picks: each round
+    //asks for one more target (with a "Done" escape once the minimum is
+    //satisfiable), so the reply stays a single reliable number instead of a
+    //free-form list. Prompt-keyed caching keeps repeated polling cheap.
+    vector<Targetable *> picks;
+    for (;;)
+    {
+        vector<Targetable *> targets;
+        vector<string> opts;
+        int stopOffset = 0;
+        bool mayStop = multi && !picks.empty() && !tc->targetMin;
+        if (mayStop)
+        {
+            opts.push_back("Done - no further targets");
+            stopOffset = 1;
+        }
+
+        for (int i = 0; i < 2; i++)
+        {
+            Player * p = observer->players[i];
+            if (tc->canTarget((Targetable *) p) && !tc->alreadyHasTarget(p)
+                && std::find(picks.begin(), picks.end(), (Targetable *) p) == picks.end())
+            {
+                targets.push_back(p);
+                opts.push_back(describeTarget(this, p));
+            }
+            MTGPlayerCards * pz = p->game;
+            MTGGameZone * zones[] = { pz->hand, pz->library, pz->inPlay, pz->graveyard, pz->stack, pz->exile, pz->commandzone, pz->sideboard, pz->reveal };
+            for (int j = 0; j < 9; j++)
+            {
+                MTGGameZone * zone = zones[j];
+                for (int k = 0; k < zone->nb_cards && targets.size() < 40; k++)
+                {
+                    MTGCardInstance * t = zone->cards[k];
+                    if (!tc->canTarget(t) || tc->alreadyHasTarget(t))
+                        continue;
+                    if (std::find(picks.begin(), picks.end(), (Targetable *) t) != picks.end())
+                        continue;
+                    targets.push_back(t);
+                    opts.push_back(describeTarget(this, t));
+                }
+            }
+        }
+        if (targets.empty())
+            break;
+
+        std::ostringstream q;
+        q << "Choose ";
+        if (!multi)
+            q << "the target";
+        else
+        {
+            q << "target " << (picks.size() + 1);
+            if (!unlimited)
+                q << " of " << (tc->targetMin ? "exactly " : "up to ") << tc->maxtargets;
+        }
+        q << " for " << tc->source->getDisplayName();
+
+        int pick = askModel(q.str(), opts);
+        if (pick < 0)
+        {
+            //Model deferred (or transport failed). With nothing selected the
+            //heuristic can own the whole decision; mid-selection of an
+            //exact-N chooser it must too (a partial set would strand the
+            //spell), while an "up to N" selection can simply stop here.
+            if (picks.empty() || tc->targetMin)
+                return AIPlayerBaka::chooseTarget(_tc, forceTarget, chosenCard, checkOnly);
+            break;
+        }
+        if (mayStop && pick == 0)
+            break;
+        picks.push_back(targets[pick - stopOffset]);
+        if (!multi)
+            break;
+        if (!unlimited && (int) picks.size() >= tc->maxtargets)
+            break;
+        if (unlimited && picks.size() >= 12)
+            break; //sanity bound for "any number of targets"
+    }
+
+    if (picks.empty())
+        return AIPlayerBaka::chooseTarget(_tc, forceTarget, chosenCard, checkOnly);
+
+    DebugTrace("AIPlayerGPT: targeting with " << tc->source->getDisplayName()
+               << " -> " << picks.size() << " target(s), first: "
+               << describeTarget(this, picks[0]));
+    //Reuse the engine's own click paths so the mechanics (source-first
+    //ordering, player clicks, card-batch click, clickstream flushing) stay
+    //byte-identical to the heuristic player's.
+    if (!multi)
+        return clickSingleTarget(tc, picks, chosenCard);
+    return clickMultiTarget(tc, picks);
 }
 
 int AIPlayerGPT::chooseAttackers()
