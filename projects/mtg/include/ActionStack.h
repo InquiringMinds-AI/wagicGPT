@@ -229,6 +229,14 @@ public:
     Interruptible * getAt(int id);
     void cancelInterruptOffer(InterruptDecision cancelMode = DONT_INTERRUPT, bool log = true);
     void endOfInterruption(bool log = true);
+    //Keep an open interrupt offer to `who` from timing out: an asynchronous
+    //decision maker (the LLM player) can need longer than the configured
+    //interrupt seconds to answer.
+    void extendInterruptOffer(Player * who, float seconds = 2.0f)
+    {
+        if (askIfWishesToInterrupt == who && timer >= 0 && timer < seconds)
+            timer = seconds;
+    }
     Interruptible * getLatest(int state);
     Player * askIfWishesToInterrupt;
     int garbageCollect();

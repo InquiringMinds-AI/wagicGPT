@@ -42,6 +42,7 @@
 #include "AIPlayerBaka.h"
 
 #include <utility>
+#include <memory>
 
 class WEvent;
 
@@ -54,8 +55,18 @@ public:
     static bool isEnabled();
 
     //Adds the mulligan decision (the engine has no AI mulligan path at all -
-    //the heuristic always keeps) before delegating to the base loop.
+    //the heuristic always keeps) and menu handling that can wait on an
+    //in-flight model call, before delegating to the base loop.
     virtual int computeActions();
+
+    //Model calls are asynchronous: the HTTP round trip runs on a worker
+    //thread while the game loop keeps rendering. Act is the base loop with
+    //one insertion - while a call is in flight the AI neither acts NOR
+    //passes (an empty clickstream normally commits a pass/decline), and the
+    //interrupt-offer timer is kept alive so a slow model cannot time out of
+    //its response window. Render draws the "thinking" indicator.
+    virtual int Act(float dt);
+    virtual void Render();
 
     //feeds the game narrative to the agent transcript
     virtual int receiveEvent(WEvent * event);
@@ -113,8 +124,30 @@ private:
     string describeAction(const OrderedAIAction& action);
     string describeEvent(WEvent * event);
 
-    //POST the transcript; returns assistant content, empty on any error.
-    string requestCompletion();
+    //Decision seams return this while the model call for their prompt is
+    //still in flight. Callers unwind for the current tick and re-poll on the
+    //next one; the flow is deterministic while the AI neither acts nor
+    //passes, so the same seam re-reaches the same prompt and consumes the
+    //answer when it lands.
+    static const int kChoicePending = -2;
+
+    //Async completion: state shared with the worker thread. The worker owns
+    //a shared_ptr copy, so a game that ends mid-request cannot leave the
+    //thread writing into freed memory.
+    struct AsyncState;
+    std::shared_ptr<AsyncState> mAsyncState;
+    float mThinkTime; //seconds the current request has been in flight (for the indicator)
+
+    //True while a request is in flight whose answer has not been consumed.
+    bool asyncBusy() const;
+    //Poll the async slot for this exact prompt: starts the request when the
+    //slot is idle. Returns kChoicePending while in flight, 0 with the reply
+    //content once done. A finished answer for a DIFFERENT prompt (stale
+    //state drift) is dropped and the new request started.
+    int pollCompletion(const string& userMsg, string& content);
+    //Serialize the chat request (transcript + the pending user message) for
+    //the worker thread; built on the game thread, mMessages never shared.
+    string buildRequestBody(const string& userMsg);
     //Extract the chosen action number from a model reply; -1 if unusable.
     static int parseChoice(const string& content, int optionCount);
 

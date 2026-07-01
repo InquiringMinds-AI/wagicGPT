@@ -16,6 +16,9 @@
 #include "Counters.h"
 #include "ActionLayer.h"
 #include "AllAbilities.h"
+#include "ActionStack.h"
+#include "WFont.h"
+#include "WResourceManager.h"
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -25,6 +28,8 @@
 #include <fstream>
 #include <set>
 #include <algorithm>
+#include <thread>
+#include <mutex>
 
 using json = nlohmann::json;
 
@@ -345,8 +350,84 @@ string describeTarget(Player * me, Targetable * t)
 
 } //namespace
 
+//State shared between the game thread and the HTTP worker. The worker owns
+//a shared_ptr copy: if the game (and this player) is destroyed while a
+//request is still running, the worker finishes writing into memory that
+//only it still references, then frees it.
+struct AIPlayerGPT::AsyncState
+{
+    std::mutex mtx;
+    int status;      //0 idle, 1 in flight, 2 done (answer not yet consumed)
+    string prompt;   //the userMsg the in-flight/done request was built for
+    string response; //raw HTTP body once status == 2
+    AsyncState() : status(0) {}
+};
+
+bool AIPlayerGPT::asyncBusy() const
+{
+    std::lock_guard<std::mutex> g(mAsyncState->mtx);
+    return mAsyncState->status == 1;
+}
+
+int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
+{
+    {
+        std::lock_guard<std::mutex> g(mAsyncState->mtx);
+        if (mAsyncState->status == 1)
+            return kChoicePending; //one request at a time; whatever asked, wait
+        if (mAsyncState->status == 2)
+        {
+            if (mAsyncState->prompt == userMsg)
+            {
+                string body = mAsyncState->response;
+                mAsyncState->status = 0;
+                mAsyncState->response.clear();
+                content.clear();
+                if (!body.empty())
+                {
+                    try
+                    {
+                        json reply = json::parse(body);
+                        content = reply["choices"][0]["message"]["content"].get<string>();
+                    }
+                    catch (json::exception&)
+                    {
+                        content.clear();
+                    }
+                }
+                return 0;
+            }
+            //An answer for a prompt the game state has moved past (should
+            //not happen while the AI neither acts nor passes; drop safely).
+            DebugTrace("AIPlayerGPT: dropping stale async answer");
+            mAsyncState->status = 0;
+            mAsyncState->response.clear();
+        }
+    }
+
+    //Idle: build the request on the game thread (mMessages is not shared
+    //with the worker) and launch the round trip in the background.
+    string requestBody = buildRequestBody(userMsg);
+    string url = mEndpoint + "/v1/chat/completions";
+    string key = mApiKey;
+    std::shared_ptr<AsyncState> state = mAsyncState;
+    {
+        std::lock_guard<std::mutex> g(state->mtx);
+        state->status = 1;
+        state->prompt = userMsg;
+        state->response.clear();
+    }
+    std::thread([state, url, requestBody, key]() {
+        string body = httpRequest(url, requestBody, 120000, key);
+        std::lock_guard<std::mutex> g(state->mtx);
+        state->status = 2;
+        state->response = body;
+    }).detach();
+    return kChoicePending;
+}
+
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -717,11 +798,14 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
     return out.str();
 }
 
-string AIPlayerGPT::requestCompletion()
+string AIPlayerGPT::buildRequestBody(const string& userMsg)
 {
     json messages = json::array();
     for (size_t i = 0; i < mMessages.size(); i++)
         messages.push_back({{"role", mMessages[i].first}, {"content", mMessages[i].second}});
+    //The pending user message rides in the request only; it joins the real
+    //transcript together with the assistant reply at consumption time.
+    messages.push_back({{"role", "user"}, {"content", userMsg}});
 
     //A bare number needs almost nothing, but the model sometimes prefaces
     //it with a short justification; give enough room that the number is not
@@ -743,19 +827,7 @@ string AIPlayerGPT::requestCompletion()
     //or not. Matters: qwen3.6 thinks by default (~6x decision latency).
     request["chat_template_kwargs"] = {{"enable_thinking", mThinking}};
 
-    string body = httpRequest(mEndpoint + "/v1/chat/completions", request.dump(), 120000, mApiKey);
-    if (body.empty())
-        return "";
-
-    try
-    {
-        json reply = json::parse(body);
-        return reply["choices"][0]["message"]["content"].get<string>();
-    }
-    catch (json::exception&)
-    {
-        return "";
-    }
+    return request.dump();
 }
 
 int AIPlayerGPT::parseChoice(const string& content, int optionCount)
@@ -876,13 +948,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     }
     else
     {
-        mMessages.push_back(std::make_pair(string("user"), userMsg));
-        string content = requestCompletion();
+        string content;
+        if (pollCompletion(userMsg, content) == kChoicePending)
+        {
+            //Round trip in flight: no action this tick. The Act override
+            //keeps the empty clickstream from being committed as a pass.
+            return NULL;
+        }
         choice = parseChoice(content, index);
-        if (content.empty())
-            mMessages.pop_back(); //transport failure: keep transcript clean
-        else
+        if (!content.empty())
+        {
+            mMessages.push_back(std::make_pair(string("user"), userMsg));
             mMessages.push_back(std::make_pair(string("assistant"), content));
+        }
         //Window the transcript: keep the system prompt plus the most recent
         //20 exchanges; old states are superseded by the snapshot we resend.
         while (mMessages.size() > 41)
@@ -955,13 +1033,18 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
     if (cached != mAskCache.end())
         return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
 
-    mMessages.push_back(std::make_pair(string("user"), userMsg));
-    string content = requestCompletion();
+    string content;
+    if (pollCompletion(userMsg, content) == kChoicePending)
+        return kChoicePending; //callers unwind this tick and re-poll
+
     int choice = parseChoice(content, (int) options.size());
-    if (content.empty())
-        mMessages.pop_back();
-    else
+    if (!content.empty())
+    {
+        //user and assistant join the transcript together at consumption, so
+        //a failed round trip can never leave a half exchange behind
+        mMessages.push_back(std::make_pair(string("user"), userMsg));
         mMessages.push_back(std::make_pair(string("assistant"), content));
+    }
     while (mMessages.size() > 41)
         mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
 
@@ -1016,6 +1099,11 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         opts.push_back("Hold " + proposed->name + " - do not play it now");
         opts.push_back("Play " + proposed->name);
         int pick = askModel(q.str(), opts);
+        if (pick == kChoicePending)
+        {
+            gotPayments.clear(); //nothing plays this tick; re-poll next tick
+            return NULL;
+        }
         if (pick == 0)
         {
             DebugTrace("AIPlayerGPT: vetoed playing " << proposed->name);
@@ -1091,6 +1179,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         return NULL;
 
     int pick = askModel("Casting decision: which card do you cast now, if any?", opts);
+    if (pick == kChoicePending)
+        return NULL; //no cast this tick; the answer is consumed on a later poll
     if (pick < 0) //model deferred or endpoint failed: heuristic decides
         return AIPlayerBaka::FindCardToPlay(pMana, type);
     if (pick == 0) //"cast nothing": hold everything this window
@@ -1124,6 +1214,32 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
 
 int AIPlayerGPT::computeActions()
 {
+    //Menus must be intercepted here: the base loop reacts to
+    //selectMenuOption's return in the same tick, and its contract has no
+    //"not yet" value (negative = click the cancel item). While the menu
+    //decision's model call is in flight we simply do nothing and re-poll;
+    //once decided, mirror the base reaction exactly.
+    if (!mEndpoint.empty() && observer->currentlyActing() == this)
+    {
+        ActionLayer * object = observer->mLayers->actionLayer();
+        if (object->menuObject)
+        {
+            int doThis = selectMenuOption();
+            if (doThis == kChoicePending)
+                return 1;
+            if (doThis >= 0)
+            {
+                if (object->abilitiesMenu->isMultipleChoice)
+                    observer->mLayers->actionLayer()->ButtonPressedOnMultipleChoice(doThis);
+                else
+                    observer->mLayers->actionLayer()->doReactTo(doThis);
+            }
+            else if (doThis < 0 || object->checkCantCancel())
+                observer->mLayers->actionLayer()->doReactTo(object->abilitiesMenu->mObjects.size() - 1);
+            return 1;
+        }
+    }
+
     //Mulligan: the engine offers it to humans through the game menu and the
     //heuristic AI simply never mulligans. The window predicate mirrors the
     //GUI's (GameStateDuel): the AI's own first turn, nothing developed yet.
@@ -1143,6 +1259,8 @@ int AIPlayerGPT::computeActions()
         opts.push_back("Keep this hand");
         opts.push_back("Mulligan");
         int pick = askModel(q.str(), opts);
+        if (pick == kChoicePending)
+            return 1; //decision in flight; poll again next tick
         if (pick == 1)
         {
             DebugTrace("AIPlayerGPT: taking a mulligan at " << game->hand->nb_cards << " cards");
@@ -1152,6 +1270,116 @@ int AIPlayerGPT::computeActions()
         //keep (0), or defer/failure (-1): play on
     }
     return AIPlayerBaka::computeActions();
+}
+
+//The base Act, with the async insertions. The base is monolithic: after
+//computeActions it interprets an empty clickstream as "nothing to do" and
+//COMMITS a pass (cancelInterruptOffer / userRequestNextGamePhase). While a
+//model call is in flight the AI must do neither - not act, not pass - so
+//the game loop keeps running (and rendering) until the answer lands and the
+//re-polled flow consumes it.
+int AIPlayerGPT::Act(float dt)
+{
+    if (mEndpoint.empty())
+        return AIPlayerBaka::Act(dt);
+
+    if (asyncBusy())
+    {
+        mThinkTime += dt;
+        //Keep a pending interrupt offer from timing out while the model is
+        //still deciding whether to respond.
+        observer->mLayers->stackLayer()->extendInterruptOffer(this);
+        return 0;
+    }
+    mThinkTime = 0;
+
+    //--- base AIPlayerBaka::Act body, with the post-computeActions check ---
+    if (!(observer->currentlyActing() == this))
+        return 0;
+
+    oldGamePhase = observer->getCurrentGamePhase();
+
+    if (mFastTimerMode)
+        timer -= dt * 3;
+    else
+        timer -= dt;
+    if (timer > 0)
+        return 0;
+    initTimer();
+
+    if (combatDamages())
+        return 0;
+    interruptIfICan();
+
+    if (!(observer->currentlyActing() == this))
+    {
+        DebugTrace("Cannot interrupt");
+        return 0;
+    }
+    if (clickstream.empty())
+        computeActions();
+    if (clickstream.empty())
+    {
+        //A model call started during computeActions: the decision is not
+        //made yet, so neither pass priority nor decline the interrupt.
+        if (asyncBusy())
+            return 0;
+        if (observer->isInterrupting == this)
+        {
+            if (observer->mExtraPayment && observer->mExtraPayment->source->controller() == this)
+            {
+                ExtraManaCost * check = dynamic_cast<ExtraManaCost *>(observer->mExtraPayment->costs[0]);
+                if (check)
+                {
+                    vector<MTGAbility *> CostToPay = canPayMana(observer->mExtraPayment->source, check->costToPay, check->source->has(Constants::ANYTYPEOFMANAABILITY));
+                    if (CostToPay.size())
+                    {
+                        payTheManaCost(check->costToPay, check->source->has(Constants::ANYTYPEOFMANAABILITY), check->source, CostToPay);
+                    }
+                    else
+                    {
+                        observer->mExtraPayment->action->CheckUserInput(JGE_BTN_SEC);
+                        observer->mExtraPayment = NULL;
+                    }
+                }
+                return 0;
+            }
+            observer->mLayers->stackLayer()->cancelInterruptOffer();
+        }
+        else
+        {
+            if (observer->currentActionPlayer == this)
+                observer->userRequestNextGamePhase();
+        }
+    }
+    else
+    {
+        while (clickstream.size())
+        {
+            AIAction * action = clickstream.front();
+            action->Act();
+            SAFE_DELETE(action);
+            clickstream.pop();
+        }
+    }
+    return 1;
+}
+
+void AIPlayerGPT::Render()
+{
+    AIPlayerBaka::Render();
+    //The visible answer to "is it frozen or thinking?": a small animated
+    //line whenever this player's model call is in flight.
+    if (mEndpoint.empty() || !asyncBusy())
+        return;
+    WFont * font = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
+    if (!font)
+        return;
+    char buf[48];
+    int dots = 1 + ((int) (mThinkTime * 2)) % 3;
+    sprintf(buf, "opponent is thinking%.*s", dots, "...");
+    font->SetColor(ARGB(220, 255, 255, 200));
+    font->DrawString(buf, SCREEN_WIDTH / 2, 2, JGETEXT_CENTER);
 }
 
 int AIPlayerGPT::selectMenuOption()
@@ -1197,6 +1425,8 @@ int AIPlayerGPT::selectMenuOption()
             }
             int pick = askModel("Announce the value of X for " + ctx->getDisplayName()
                                 + " (you can afford up to the largest listed value):", opts);
+            if (pick == kChoicePending)
+                return kChoicePending;
             if (pick < 0)
                 return AIPlayerBaka::selectMenuOption();
             return pick;
@@ -1206,6 +1436,8 @@ int AIPlayerGPT::selectMenuOption()
         for (size_t mk = 0; mk < currentMenu->abilities.size(); mk++)
             opts.push_back(currentMenu->abilities[mk]->getMenuText());
         int pick = askModel("Choose one mode for " + ctx->getDisplayName() + ":", opts);
+        if (pick == kChoicePending)
+            return kChoicePending;
         if (pick < 0)
             return AIPlayerBaka::selectMenuOption();
         return pick;
@@ -1234,6 +1466,8 @@ int AIPlayerGPT::selectMenuOption()
     string decision = ctx ? ("Choose an option for " + ctx->getDisplayName() + ":")
                           : string("A choice is required - choose an option:");
     int pick = askModel(decision, opts);
+    if (pick == kChoicePending)
+        return kChoicePending;
     if (pick < 0)
         return AIPlayerBaka::selectMenuOption();
     if (canDecline && pick == (int) opts.size() - 1)
@@ -1320,6 +1554,8 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         q << " for " << tc->source->getDisplayName();
 
         int pick = askModel(q.str(), opts);
+        if (pick == kChoicePending)
+            return 1; //chooser stays open; earlier picks re-derive from cache next tick
         if (pick < 0)
         {
             //Model deferred (or transport failed). With nothing selected the
@@ -1381,6 +1617,8 @@ int AIPlayerGPT::chooseAttackers()
         opts.push_back("Hold " + card->name + " back");
         opts.push_back("Attack with " + card->name);
         int pick = askModel(q.str(), opts);
+        if (pick == kChoicePending)
+            return 1; //declared attackers stand; the rest re-poll next tick
         if (pick != 1)
             continue; //hold, or model deferred -> do not attack with this one
 
@@ -1443,6 +1681,8 @@ int AIPlayerGPT::chooseBlockers()
             opts.push_back(o.str());
         }
         int pick = askModel(q.str(), opts);
+        if (pick == kChoicePending)
+            return 1; //committed blocks stand; the rest re-poll next tick
         if (pick <= 0)
             continue; //do-not-block, or model deferred
 
