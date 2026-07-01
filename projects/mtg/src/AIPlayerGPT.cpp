@@ -19,6 +19,8 @@
 #include "ActionStack.h"
 #include "WFont.h"
 #include "WResourceManager.h"
+#include "GuiCombat.h"
+#include "DuelLayers.h"
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -1122,6 +1124,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     bool instantWindow = !*type;
 
     vector<MTGCardInstance *> candidates;
+    vector<bool> candidateUsesAlt; //cast this entry with its alternative cost
     vector<string> opts;
     opts.push_back("Cast nothing right now");
     std::set<string> seen; //same name+zone = same decision; list it once
@@ -1162,15 +1165,48 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (!seen.insert(key).second)
                 continue;
 
+            //A card affordable BOTH normally and through its alternative
+            //cost (evoke vs hardcast, Force-of-Will-style pitches) is two
+            //different plays: list each mode so the model chooses it
+            //explicitly. Alternative casting only exists on the hand path.
+            ManaCost * cost = card->getManaCost();
+            bool normalOk = cost
+                && (pMana->canAfford(cost, card->has(Constants::ANYTYPEOFMANA))
+                    || canPayMana(card, cost, card->has(Constants::ANYTYPEOFMANA)).size());
+            bool altOk = zone == game->hand && cost && cost->getAlternative()
+                && (pMana->canAfford(cost->getAlternative(), 0)
+                    || canPayMana(card, cost->getAlternative(), 0).size());
+
             std::ostringstream o;
             o << "Cast " << card->getDisplayName();
-            if (card->getManaCost() && card->getManaCost()->getConvertedCost())
-                o << " {" << card->getManaCost()->toString() << "}";
+            if (cost && cost->getConvertedCost())
+                o << " {" << cost->toString() << "}";
             if (card->isCreature())
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << scans[s].label;
-            candidates.push_back(card);
-            opts.push_back(o.str());
+
+            if (normalOk || !altOk)
+            {
+                candidates.push_back(card);
+                candidateUsesAlt.push_back(false);
+                opts.push_back(o.str());
+            }
+            if (altOk)
+            {
+                std::ostringstream oa;
+                oa << "Cast " << card->getDisplayName() << " with its ";
+                if (!cost->getAlternative()->alternativeName.empty())
+                    oa << cost->getAlternative()->alternativeName << " cost";
+                else
+                    oa << "alternative cost";
+                oa << " {" << cost->getAlternative()->toString() << "}";
+                if (card->isCreature())
+                    oa << " (" << card->power << "/" << card->toughness << ")";
+                oa << scans[s].label;
+                candidates.push_back(card);
+                candidateUsesAlt.push_back(true);
+                opts.push_back(oa.str());
+            }
         }
     }
 
@@ -1195,8 +1231,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     //gotPayments / payAlternative set for exactly this play.
     MTGCardInstance * chosen = candidates[pick - 1];
     aiForcedCandidate = chosen;
+    aiForcedAlternative = candidateUsesAlt[pick - 1];
     MTGCardInstance * validated = AIPlayerBaka::FindCardToPlay(pMana, "*");
     aiForcedCandidate = NULL;
+    aiForcedAlternative = false;
     if (validated)
     {
         DebugTrace("AIPlayerGPT: casting " << validated->name << " (model's pick"
@@ -1210,6 +1248,71 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                << " but it fails validation; deferring to heuristic");
     gotPayments.clear();
     return AIPlayerBaka::FindCardToPlay(pMana, type);
+}
+
+int AIPlayerGPT::orderBlockers()
+{
+    if (mEndpoint.empty())
+        return AIPlayerBaka::orderBlockers();
+    if (!(ORDER == observer->combatStep && observer->currentPlayer == this))
+        return 0;
+
+    //Damage is assigned lethal-first down each attacker's blockers vector
+    //(GuiCombat::autoaffectDamage), so ordering damage = permuting that
+    //vector before assignment. Sequential single picks, like the target
+    //seam: each round asks which blocker is dealt damage next. Every ask is
+    //prompt-cached, so the re-polling while a call is in flight replays the
+    //already-decided prefix for free.
+    GuiCombat * gc = observer->mLayers->combatLayer();
+    for (size_t a = 0; a < gc->attackers.size(); a++)
+    {
+        AttackerDamaged * atk = gc->attackers[a];
+        if (!atk->card || atk->card->controller() != this || atk->blockers.size() < 2)
+            continue;
+
+        vector<DefenserDamaged *> ordered;
+        vector<DefenserDamaged *> remaining = atk->blockers;
+        bool deferred = false;
+        while (remaining.size() > 1)
+        {
+            std::ostringstream q;
+            q << "Combat damage order: your attacker " << atk->card->getDisplayName()
+              << " (" << atk->card->power << "/" << atk->card->toughness << ")"
+              << (atk->card->has(Constants::TRAMPLE) ? " with trample" : "")
+              << (atk->card->has(Constants::DEATHTOUCH) ? " with deathtouch" : "")
+              << " is blocked by " << atk->blockers.size()
+              << " creatures. Damage is assigned in order, up to each blocker's toughness. "
+              << "Choose the blocker dealt damage in position " << (ordered.size() + 1) << ".";
+            vector<string> opts;
+            for (size_t b = 0; b < remaining.size(); b++)
+            {
+                std::ostringstream o;
+                o << remaining[b]->card->getDisplayName()
+                  << " (" << remaining[b]->card->power << "/" << remaining[b]->card->toughness << ")";
+                opts.push_back(o.str());
+            }
+            int pick = askModel(q.str(), opts);
+            if (pick == kChoicePending)
+                return 1; //stay in the ORDER step; re-poll next tick
+            if (pick < 0)
+            {
+                deferred = true; //keep the declaration order
+                break;
+            }
+            ordered.push_back(remaining[pick]);
+            remaining.erase(remaining.begin() + pick);
+        }
+        if (!deferred && ordered.size())
+        {
+            ordered.push_back(remaining[0]);
+            atk->blockers = ordered;
+            DebugTrace("AIPlayerGPT: damage order for " << atk->card->getDisplayName()
+                       << " set, first: " << ordered[0]->card->getDisplayName());
+        }
+    }
+
+    observer->userRequestNextGamePhase();
+    return 1;
 }
 
 int AIPlayerGPT::computeActions()
@@ -1415,7 +1518,7 @@ int AIPlayerGPT::selectMenuOption()
                        - currentMenu->abilities[0]->source->getManaCost()->getConvertedCost();
             if (maxX < 0)
                 return AIPlayerBaka::selectMenuOption();
-            int shown = maxX > 20 ? 20 : maxX; //bound the menu for huge pools
+            int shown = maxX > 50 ? 50 : maxX; //bound the menu for degenerate pools
             vector<string> opts;
             for (int x = 0; x <= shown; x++)
             {

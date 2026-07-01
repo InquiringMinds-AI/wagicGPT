@@ -3335,12 +3335,15 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
         int hasX = card->getManaCost()->hasX();
         gotPayments.clear();
         ManaCost* manaToPay = card->getManaCost();
-        if((!pMana->canAfford(card->getManaCost(),0) || card->getManaCost()->getKicker()))
+        //The forced candidate may come with an explicit payment-mode choice:
+        //cast via the alternative cost even though the normal cost is payable.
+        bool forceAlt = (aiForcedCandidate == card) && aiForcedAlternative && card->getManaCost()->getAlternative();
+        if(!forceAlt && (!pMana->canAfford(card->getManaCost(),0) || card->getManaCost()->getKicker()))
             gotPayments = canPayMana(card,card->getManaCost(),card->has(Constants::ANYTYPEOFMANA));
         bool hasConvoke = false; //Fix a crash when AI try to pay convoke cost.
         bool hasOffering = card->basicAbilities[Constants::OFFERING]; //Fix a hang when AI try to pay emerge cost.
         bool hasDelve = false; //Fix a hang when AI try to pay delve cost.
-        if(card->getManaCost()->getAlternative() && !gotPayments.size() && !pMana->canAfford(card->getManaCost(),0) && !card->getManaCost()->getKicker()){ //Now AI can cast cards using alternative cost.
+        if(card->getManaCost()->getAlternative() && (forceAlt || (!gotPayments.size() && !pMana->canAfford(card->getManaCost(),0) && !card->getManaCost()->getKicker()))){ //Now AI can cast cards using alternative cost.
             ManaCost * extra = card->getManaCost()->getAlternative(); 
             if(extra->extraCosts){
                 for(unsigned int i = 0; i < extra->extraCosts->costs.size() && !hasConvoke && !hasOffering && !hasDelve; i++){
@@ -4486,6 +4489,7 @@ AIPlayer(observer, file, fileSmall, deck)
 
     nextCardToPlay = NULL;
     aiForcedCandidate = NULL;
+    aiForcedAlternative = false;
     stats = NULL;
 
     //Initialize "AIHints" system

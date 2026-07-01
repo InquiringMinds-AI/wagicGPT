@@ -89,6 +89,11 @@ protected:
     //legality/payment machinery then validates and prices the pick via
     //AIPlayerBaka::aiForcedCandidate.
     virtual MTGCardInstance * FindCardToPlay(ManaCost * potentialMana, const char * type);
+    //Combat damage ordering: when one of our attackers is blocked by more
+    //than one creature, damage is assigned lethal-first down the blockers
+    //vector - the model chooses that order (the heuristic's own version is
+    //a no-op that accepts declaration order).
+    virtual int orderBlockers();
     //Spell/ability targeting: the model picks the target(s) among the legal
     //set; the clicks reuse the engine's own click helpers so the mechanics
     //stay identical to the heuristic path. checkOnly probes and forced

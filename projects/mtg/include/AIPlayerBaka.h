@@ -109,6 +109,10 @@ class AIPlayerBaka: public AIPlayer{
     //pick the card itself (e.g. an LLM choice) while the full legality /
     //restriction / payment machinery still validates and prices the pick.
     MTGCardInstance * aiForcedCandidate;
+    //With aiForcedCandidate set: cast it with its ALTERNATIVE cost even when
+    //the normal cost is payable (the chooser picked the mode explicitly,
+    //e.g. evoke over hardcast).
+    bool aiForcedAlternative;
     MTGCardInstance * activateCombo();
     TargetChooser * GetComboTc(GameObserver * observer, TargetChooser * tc = NULL);
     AIHints * hints;
