@@ -3149,6 +3149,53 @@ public:
     }
 };
 
+//Evoke (upstream #1129): "sacrificed when it enters" is a triggered ability,
+//not an immediate action. Added at ETB in place of directly resolving the
+//alternative-cost self-sacrifice, this puts itself on the stack on its first
+//Update so both players get a priority window to respond (e.g. flicker the
+//creature). At resolution the sacrifice only happens if the evoked instance
+//itself is still on the battlefield - a card that left and came back is a
+//new object, so the trigger fizzles and the creature survives.
+class AEvokeSacrifice: public InstantAbility
+{
+public:
+    MTGAbility * payload; //owned
+    AEvokeSacrifice(GameObserver* observer, int _id, MTGCardInstance * _source, MTGAbility * _payload) :
+        InstantAbility(observer, _id, _source), payload(_payload)
+    {
+        target = _payload->target;
+    }
+    void Update(float)
+    {
+        if (!init)
+        {
+            init = 1;
+            fireAbility();
+        }
+    }
+    int resolve()
+    {
+        MTGCardInstance * card = dynamic_cast<MTGCardInstance *>(target);
+        if (card && card->isInPlay(game))
+            payload->resolve();
+        return 1;
+    }
+    const string getMenuText()
+    {
+        return "Sacrifice (Evoke)";
+    }
+    AEvokeSacrifice * clone() const
+    {
+        AEvokeSacrifice * a = NEW AEvokeSacrifice(*this);
+        a->payload = payload ? payload->clone() : NULL;
+        return a;
+    }
+    ~AEvokeSacrifice()
+    {
+        SAFE_DELETE(payload);
+    }
+};
+
 //this generic ability assumes that what is added will take care of its own removel.
 class GenericAbilityMod: public InstantAbility, public NestedAbility
 {

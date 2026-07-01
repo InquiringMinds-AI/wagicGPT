@@ -6610,8 +6610,31 @@ int AbilityFactory::magicText(int id, Spell * spell, MTGCardInstance * card, int
             }
             if (a->oneShot)
             {
-                a->resolve();
-                delete (a);
+                //Evoke (upstream #1129): the alternative-cost self-sacrifice is a
+                //triggered ability, not an immediate action - hand it to a wrapper
+                //that fires through the stack so players can respond (a flickered
+                //creature is a new object and the sacrifice fizzles).
+                AASacrificeCard * evokeSac = dynamic_cast<AASacrificeCard *>(a);
+                MTGCardInstance * enteringCard = card ? card : (spell ? spell->source : NULL);
+                bool sacrificesSelf = false;
+                if (evokeSac && enteringCard)
+                {
+                    //the parsed target is the battlefield instance, spell->source the
+                    //stack-time one - same card, different links of the ->next chain
+                    for (MTGCardInstance * c = enteringCard; c; c = c->next)
+                        if (a->target == (Targetable *) c)
+                            sacrificesSelf = true;
+                }
+                if (evokeSac && !evokeSac->isExploited && sacrificesSelf
+                    && spell && spell->FullfilledAlternateCost(ManaCost::MANA_PAID_WITH_ALTERNATIVE))
+                {
+                    observer->addObserver(NEW AEvokeSacrifice(observer, id, enteringCard, a));
+                }
+                else
+                {
+                    a->resolve();
+                    delete (a);
+                }
             }
             else
             {

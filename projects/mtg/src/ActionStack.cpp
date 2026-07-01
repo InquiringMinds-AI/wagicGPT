@@ -738,7 +738,7 @@ int ActionStack::addAbility(MTGAbility * ability)
         == options[Options::INTERRUPTMYABILITIES].number)
     {
         if((observer->gameType() == GAME_TYPE_MOMIR && ability->aType == MTGAbility::FORCED_TOKEN_CREATOR)||
-            (dynamic_cast<GenericTargetAbility *>(ability) && ability->canBeInterrupted && !observer->OpenedDisplay && !observer->players[0]->game->reveal->cards.size()))//test interrupt...
+            ((dynamic_cast<GenericTargetAbility *>(ability) || dynamic_cast<AEvokeSacrifice *>(ability)) && ability->canBeInterrupted && !observer->OpenedDisplay && !observer->players[0]->game->reveal->cards.size()))//test interrupt...
             interruptDecision[0] = NOT_DECIDED;
         else
             interruptDecision[0] = DONT_INTERRUPT;

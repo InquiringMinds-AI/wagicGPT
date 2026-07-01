@@ -1,0 +1,33 @@
+#Upstream issue #1129: Evoke creatures were sacrificed immediately when they
+#entered, instead of via a triggered ability that uses the stack. That stole
+#the window to respond -- e.g. flickering the creature with Ephemerate to save
+#it for a second ETB. Here P1 evokes Mulldrifter, then in response to the
+#evoke-sacrifice trigger casts Ephemerate targeting it. Correct rules: the
+#Mulldrifter is exiled+returned (a new object), the sacrifice trigger has no
+#legal target, and the creature SURVIVES on the battlefield.
+# https://github.com/WagicProject/wagic/issues/1129
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:mulldrifter,ephemerate
+library:runeclaw bear,runeclaw bear,runeclaw bear,runeclaw bear,runeclaw bear,runeclaw bear
+manapool:{2}{U}{W}
+[PLAYER2]
+[DO]
+mulldrifter
+no
+no
+yes
+ephemerate
+mulldrifter
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:mulldrifter
+exile:ephemerate
+graveyard:
+hand:*,*,*,*
+library:runeclaw bear,runeclaw bear
+[PLAYER2]
+[END]

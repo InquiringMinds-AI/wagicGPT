@@ -164,6 +164,7 @@ int TestSuiteAI::Act(float)
 
     if (observer->mLayers->stackLayer()->askIfWishesToInterrupt == this)
     {
+        DebugTrace("TESTSUITE interrupt-ask for player " << ((this == observer->players[0]) ? 0 : 1) << " pending='" << action << "' latest=" << observer->mLayers->stackLayer()->getLatest(NOT_RESOLVED) << " [" << suite->filename << "]");
         if (action.compare("no") != 0 && action.compare("yes") != 0)
         {
             observer->mLayers->stackLayer()->cancelInterruptOffer();
