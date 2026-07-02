@@ -1,6 +1,9 @@
 #include "PrecompiledHeader.h"
 
 #include "GameObserver.h"
+#ifdef WITH_GPT_AI
+#include "GptConfig.h"
+#endif
 #include "CardGui.h"
 #include "Damage.h"
 #include "Rules.h"
@@ -1425,6 +1428,13 @@ void GameObserver::ButtonPressed(PlayGuiObject * target)
         else
         {
             bool showopponenthand = (opponentHand->zone && opponentHand->zone->owner->opponent()->game->battlefield->nb_cards && opponentHand->zone->owner->opponent()->game->battlefield->hasAbility(Constants::SHOWOPPONENTHAND))?true:false;
+#ifdef WITH_GPT_AI
+            //Evaluation peek (config peek=1 / WAGIC_GPT_PEEK): open the AI's
+            //hand on click without a Telepathy effect, so a human can judge
+            //the choices the AI is picking from.
+            if (gptPeekOpponentHand())
+                showopponenthand = true;
+#endif
             bool showcontrollerhand = (opponentHand->zone && opponentHand->zone->owner->game->battlefield->nb_cards && opponentHand->zone->owner->game->battlefield->hasAbility(Constants::SHOWCONTROLLERHAND))?true:false;
             TargetChooser * _tc = this->getCurrentTargetChooser();
             if ((_tc && _tc->targetsZone(opponentHand->zone)) || showopponenthand || showcontrollerhand)

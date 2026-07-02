@@ -6,6 +6,9 @@
 #include "Trash.h"
 #include "GuiHand.h"
 #include "OptionItem.h"
+#ifdef WITH_GPT_AI
+#include "GptConfig.h"
+#endif
 
 const float GuiHand::ClosedRowX = 459;
 const float GuiHand::LeftRowX = 420;
@@ -85,6 +88,13 @@ void GuiHandOpponent::Render()
         (*it)->x = x;
         (*it)->y = 2;
         (*it)->zoom = 0.3f;
+#ifdef WITH_GPT_AI
+        //Evaluation peek (config peek=1 / WAGIC_GPT_PEEK): draw the AI's
+        //hand face-up so a human can judge the choices it is picking from.
+        if (gptPeekOpponentHand())
+            (*it)->Render();
+        else
+#endif
         (*it)->Render(quad.get());
         if(cards.size() > 12)
             x += 240/cards.size();

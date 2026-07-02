@@ -42,6 +42,11 @@ public:
                               //once, when a new endpoint is set up. Consent
                               //also enables the local decision log so the
                               //data exists to contribute.
+    int peek;                 //0/1: evaluation aid - the opponent-hand zone
+                              //widget opens face-up on click without needing
+                              //a Telepathy-style effect, so a human can see
+                              //what the AI is choosing from. Config/env only
+                              //(like translog); not surfaced in the GUI.
 
     GptSettings();
 
@@ -62,6 +67,11 @@ public:
 //Read a GPT runtime asset by name ("endpoints.txt", "system_prompt.txt"):
 //user copy first, bundled Res copy as fallback. "" when neither exists.
 std::string gptReadAsset(const char * filename);
+
+//Evaluation peek (config peek=1, or WAGIC_GPT_PEEK env override): reveal
+//the opponent's hand on click. Cached after the first call - flipping it
+//takes a restart, which is fine for a debugging aid.
+bool gptPeekOpponentHand();
 
 //Provider presets: stable OpenAI-compatible base URLs. Index 0 is "Custom".
 struct GptPreset
