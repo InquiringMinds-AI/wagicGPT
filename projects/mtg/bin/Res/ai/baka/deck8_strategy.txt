@@ -25,9 +25,13 @@ THE GROUND CREW (how you survive to get there):
   BLOCKERS. Cast them early, keep them home. Scimitar is your only flier -
   save it to block fliers unless the coast is truly clear.
 - Obsianus Golem (4/6) and Clockwork Beast (7/4) hold the ground mid-game.
-  Note the Beast shrinks by one +1/+0 counter each time it attacks and
-  taps to wind back up - attack with it only when the hit matters; it is
-  at its best sitting home as a 7/4 wall.
+  The Beast loses a +1/+0 counter at end of ANY combat it fights in -
+  attacking OR blocking (it always hits at full current power first, the
+  counter comes off after). So it is a deterrent while untapped, not a
+  free wall: every block costs a counter, and winding it back up ({X},{T}
+  during your upkeep, max 7) needs it untapped and spare mana. Commit it
+  to combat only when the damage matters; prefer Living Wall (regenerates)
+  and Obsianus Golem for routine blocks.
 - Master of Etherium is the finisher: it is X/X for your artifact count and
   pumps your other artifact creatures +1/+1. Play it AFTER the board is
   developed, not on curve into removal. With Vises, Mines, Towers, and
