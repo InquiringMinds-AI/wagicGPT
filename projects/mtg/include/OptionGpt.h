@@ -35,7 +35,6 @@ public:
 
     GptSettings cfg;     //working copy the rows bind to
     GptSettings loadedCfg; //snapshot for only-write-when-changed
-    int showKey;         //GUI-only toggle: render the API key in clear
 };
 
 //On/off row bound to an int flag.
@@ -66,18 +65,20 @@ protected:
 };
 
 //Free-text row: OK opens the on-screen keyboard editing the bound string
-//in place. Optionally masked (API keys) unless *maskOff is nonzero.
+//in place. Secrets render masked except a short identifying tail - the
+//full value is visible only while it is being typed (the keyboard shows
+//its buffer in clear); once confirmed it can never be displayed again.
 class OptionGptText: public WGuiItem
 {
 public:
-    OptionGptText(string * bind, string label, string emptyText = "", int * maskOff = NULL);
+    OptionGptText(string * bind, string label, string emptyText = "", bool secret = false);
     virtual void Render();
     virtual void updateValue();
 
 protected:
     string * mBind;
     string mEmptyText;
-    int * mMaskOff; //NULL = never masked; else masked while *mMaskOff == 0
+    bool mSecret;
 };
 
 //Provider preset row: cycles the curated endpoint list, writing the URL

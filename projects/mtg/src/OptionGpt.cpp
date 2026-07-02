@@ -27,7 +27,7 @@ void drawValue(WFont * font, const string& value, float x, float y, float width)
 //--- the tab ---------------------------------------------------------------
 
 GptOptionsList::GptOptionsList()
-    : WGuiList("GPT"), showKey(0)
+    : WGuiList("GPT")
 {
     cfg = GptSettings::load();
     if (cfg.urls.empty())
@@ -42,8 +42,7 @@ GptOptionsList::GptOptionsList()
     Add(NEW OptionGptPreset(&cfg));
     Add(NEW OptionGptText(&cfg.urls[0], "Endpoint URL"));
     Add(NEW OptionGptText(&cfg.model, "Model", "(auto-detect)"));
-    Add(NEW OptionGptText(&cfg.key, "API key", "(none)", &showKey));
-    Add(NEW OptionGptBool(&showKey, "Show API key"));
+    Add(NEW OptionGptText(&cfg.key, "API key", "(none)", true));
     Add(NEW OptionGptBool(&cfg.thinking, "Thinking mode (stronger, slower)"));
     Add(NEW OptionGptBool(&cfg.hints, "Heuristic hints in prompt"));
     Add(NEW OptionGptNumber(&cfg.timeoutSecs, "Call timeout (seconds)", 15, 300, 15));
@@ -134,8 +133,8 @@ void OptionGptNumber::updateValue()
         *mBind = mMin;
 }
 
-OptionGptText::OptionGptText(string * bind, string label, string emptyText, int * maskOff)
-    : WGuiItem(label), mBind(bind), mEmptyText(emptyText), mMaskOff(maskOff)
+OptionGptText::OptionGptText(string * bind, string label, string emptyText, bool secret)
+    : WGuiItem(label), mBind(bind), mEmptyText(emptyText), mSecret(secret)
 {
 }
 
@@ -146,8 +145,16 @@ void OptionGptText::Render()
     font->DrawString(_(displayValue).c_str(), x + 2, y + 3);
     if (mBind->empty())
         drawValue(font, mEmptyText, x, y, width);
-    else if (mMaskOff && !*mMaskOff)
-        drawValue(font, string(MIN(mBind->size(), (size_t) 24), '*'), x, y, width);
+    else if (mSecret)
+    {
+        //Identify-not-expose: the majority of the secret stays masked; the
+        //trailing characters let the owner recognize WHICH key is set. Keys
+        //too short for a safe tail render fully masked.
+        string shown(MIN(mBind->size(), (size_t) 16), '*');
+        if (mBind->size() > 12)
+            shown += mBind->substr(mBind->size() - 4);
+        drawValue(font, shown, x, y, width);
+    }
     else
         drawValue(font, *mBind, x, y, width);
 }
