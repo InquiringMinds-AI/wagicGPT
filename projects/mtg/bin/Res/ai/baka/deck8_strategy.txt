@@ -1,0 +1,52 @@
+Deck identity: "Inquisitor" is an artifact PRISON deck. It does not race - it
+grinds. The win comes from Black Vise damage and, late, from oversized
+artifact creatures. Every card choice below serves that plan.
+
+THE CORE LOCK (the reason this deck wins or loses):
+- Black Vise punishes the opponent for holding 5+ cards at their upkeep.
+- Howling Mine feeds BOTH players an extra card each turn.
+- Howling Mine is therefore NOT a "free draw spell": without a Black Vise
+  on the table it mostly helps the OPPONENT. Sequence: Vise FIRST, Mine
+  SECOND. With a Vise out, every Mine becomes an engine that force-feeds
+  the opponent cards they cannot spend fast enough - 2-4 damage every
+  upkeep, forever. With two Vises out, a Mine is lethal pressure.
+- If you draw Mine before Vise, HOLD the Mine. Casting it early to "develop"
+  is the single biggest misplay this deck can make.
+
+IVORY TOWER (why you hold cards):
+- Ivory Tower pays you life at upkeep for each card above 4 in YOUR hand.
+- So a full hand is a resource. Do not dump your hand to "use your mana."
+  Cast only what improves the board right now; bank the rest. The extra
+  cards from your own Howling Mines make Tower pay 2-3 life a turn.
+- Life gained here buys the time the Vise clock needs.
+
+THE GROUND CREW (how you survive to get there):
+- Living Wall (0/6 wall, regenerates) and Dancing Scimitar (1/5 flying) are
+  BLOCKERS. Cast them early, keep them home. Scimitar is your only flier -
+  save it to block fliers unless the coast is truly clear.
+- Obsianus Golem (4/6) and Clockwork Beast (7/4) hold the ground mid-game.
+  Note the Beast shrinks by one +1/+0 counter each time it attacks and
+  taps to wind back up - attack with it only when the hit matters; it is
+  at its best sitting home as a 7/4 wall.
+- Master of Etherium is the finisher: it is X/X for your artifact count and
+  pumps your other artifact creatures +1/+1. Play it AFTER the board is
+  developed, not on curve into removal. With Vises, Mines, Towers, and
+  walls out, it routinely lands as a 6/6+ and turns the wall of blockers
+  into an army overnight.
+
+TURN-BY-TURN SHAPE:
+- Early: lands every turn, cheap blockers, hold everything else.
+- Mid: land Black Vise (both if you have them), THEN Howling Mine, keep
+  Ivory Tower ticking. Block, regenerate, gain life. You are not behind
+  just because the opponent's board is bigger - your clock is the Vise.
+- Late: Master of Etherium, then swing with the big artifacts while the
+  walls keep holding. The opponent is usually low from Vise by now;
+  attackers just close the door.
+
+MULLIGAN: keep 2-4 lands plus at least one of: an early blocker, Black
+Vise, or Ivory Tower. A hand of expensive golems with 2 lands is a
+mulligan - this deck cannot afford dead early turns.
+
+DO NOT: cast Howling Mine without Vise pressure; attack with your walls;
+spend your whole hand for tempo (Ivory Tower punishes you for it); chump
+block with Living Wall when regeneration mana is open - regenerate instead.
