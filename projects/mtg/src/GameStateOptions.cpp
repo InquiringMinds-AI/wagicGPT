@@ -434,7 +434,9 @@ void GameStateOptions::ButtonPressed(int controllerId, int controlId)
     {
         if (gptTab)
             gptTab->setTelemetryConsent(controlId == GameStateOptionsConst::kTelemetryYesID ? 1 : 0);
-        SAFE_DELETE(telemetryMenu);
+        //Do NOT delete telemetryMenu here: this callback runs from inside
+        //its own Update(). Leaving SHOW_TELEMETRY_CONSENT hides it; it is
+        //freed in End() or replaced on the next ask.
         mState = SAVE; //resume the save that triggered the ask
     }
 #endif
