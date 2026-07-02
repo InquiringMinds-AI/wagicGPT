@@ -237,6 +237,18 @@ public:
             OnKeyPressed(Event->key);
             break;
 
+        case SDL_TEXTINPUT:
+            //Typed characters for the text-entry capture (on-screen
+            //keyboard). ASCII only: the game's bitmap fonts and config
+            //values (URLs, model names, keys) have no wider needs.
+            if (g_engine->TextInputActive())
+            {
+                for (const char * c = Event->text.text; *c; ++c)
+                    if (*c >= 0x20 && *c <= 0x7E)
+                        g_engine->PushTextChar(*c);
+            }
+            break;
+
         case SDL_MOUSEMOTION:
             OnMouseMoved(Event->motion);
             break;
@@ -459,6 +471,22 @@ void SdlApp::OnUpdate()
 		cerr << oor.what();
 	}
 
+	//Keep SDL's text-input state in sync with the engine's capture flag
+	//(SDL3 via sdl2-compat delivers SDL_TEXTINPUT only while started; on
+	//platforms with a soft keyboard this also summons/dismisses it).
+	{
+		static bool sdlTextInputOn = false;
+		bool want = g_engine && g_engine->TextInputActive();
+		if (want != sdlTextInputOn)
+		{
+			if (want)
+				SDL_StartTextInput();
+			else
+				SDL_StopTextInput();
+			sdlTextInputOn = want;
+		}
+	}
+
 	if(g_engine)
 		g_engine->Render();
 
@@ -467,6 +495,24 @@ void SdlApp::OnUpdate()
 
 void SdlApp::OnKeyPressed(const SDL_KeyboardEvent& event)
 {
+	//Text-entry capture (the on-screen keyboard is open and a physical
+	//keyboard is present): keys become typed characters instead of game
+	//buttons, so text entry never fights the game's key bindings.
+	//Printable characters arrive through SDL_TEXTINPUT; only the edit
+	//controls are taken from the raw key events here.
+	if (g_engine->TextInputActive())
+	{
+		if (event.type == SDL_KEYDOWN)
+		{
+			if (event.keysym.sym == SDLK_BACKSPACE)
+				g_engine->PushTextChar('\b');
+			else if (event.keysym.sym == SDLK_RETURN || event.keysym.sym == SDLK_KP_ENTER)
+				g_engine->PushTextChar('\n');
+			else if (event.keysym.sym == SDLK_ESCAPE)
+				g_engine->PushTextChar(0x1b);
+		}
+		return;
+	}
 	if (event.type == SDL_KEYDOWN)
 	{
 		g_engine->HoldKey_NoRepeat((LocalKeySym)event.keysym.sym);

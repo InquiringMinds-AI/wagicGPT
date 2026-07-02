@@ -9,6 +9,9 @@ class GameApp;
 class WGuiTabMenu;
 class SimpleMenu;
 class SimplePad;
+#ifdef WITH_GPT_AI
+class GptOptionsList;
+#endif
 
 struct KeybGrabber
 {
@@ -22,11 +25,19 @@ private:
     {
         SHOW_OPTIONS,
         SHOW_OPTIONS_MENU,
-        SAVE
+        SAVE,
+        SHOW_TELEMETRY_CONSENT
     };
     float timer;
     bool mReload;
     KeybGrabber* grabber;
+#ifdef WITH_GPT_AI
+    //Telemetry consent: asked once, on saving with a newly set-up endpoint
+    //(never re-asked after a decision). Owned by this screen because modal
+    //menus live at the screen level.
+    GptOptionsList * gptTab;
+    SimpleMenu * telemetryMenu;
+#endif
 
 public:
     SimpleMenu * optionsMenu;

@@ -44,6 +44,8 @@ public:
     void Render();
     void Update(float dt);
     void pressKey(unsigned char id);
+    //Insert any printable character as typed (physical-keyboard entry).
+    void typeChar(char c);
     void CancelEdit();
     
     SimplePad();

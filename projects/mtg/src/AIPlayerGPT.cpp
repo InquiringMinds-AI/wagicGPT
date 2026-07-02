@@ -33,6 +33,8 @@
 #include <algorithm>
 #include <thread>
 #include <mutex>
+#include <sys/stat.h>
+#include <ctime>
 
 using json = nlohmann::json;
 
@@ -310,7 +312,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mTransSeq(0), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -328,6 +330,24 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
         mTimeoutMs = 5000;
     mThinking = getenv("WAGIC_GPT_THINKING") ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
     mShowHints = getenv("WAGIC_GPT_HINTS") ? envFlag("WAGIC_GPT_HINTS") : (cfg.hints == 1);
+    //Telemetry consent implies local decision logging: the log IS the data
+    //a future contribution/upload mechanism would share.
+    bool translog = getenv("WAGIC_GPT_TRANSLOG") ? envFlag("WAGIC_GPT_TRANSLOG")
+                                                 : (cfg.translog == 1 || cfg.telemetry == 1);
+    if (translog)
+    {
+        if (const char * home = getenv("HOME"))
+        {
+            string dir = string(home) + "/.Wagic";
+            mkdir(dir.c_str(), 0755);
+            dir += "/ai"; mkdir(dir.c_str(), 0755);
+            dir += "/gpt"; mkdir(dir.c_str(), 0755);
+            dir += "/logs"; mkdir(dir.c_str(), 0755);
+            std::ostringstream p;
+            p << dir << "/" << time(NULL) << "-" << deckfileSmall << "-" << (void *) this << ".jsonl";
+            mTransLogPath = p.str();
+        }
+    }
     resolveEndpoint();
     if (mEndpoint.empty())
     {
@@ -353,6 +373,24 @@ void AIPlayerGPT::setNotice(const string& text, float seconds)
 {
     mNotice = text;
     mNoticeTicks = (int) (seconds * 60); //decremented per rendered frame
+}
+
+void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount)
+{
+    if (mTransLogPath.empty())
+        return;
+    json rec = {
+        {"seq", mTransSeq++},
+        {"kind", kind},
+        {"model", mModel},
+        {"prompt", userMsg},
+        {"reply", reply},
+        {"choice", choice},
+        {"options", optionCount},
+    };
+    std::ofstream f(mTransLogPath.c_str(), std::ios::app);
+    if (f)
+        f << rec.dump() << "\n";
 }
 
 void AIPlayerGPT::resolveEndpoint()
@@ -861,6 +899,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         mEventLog.clear();
         mLastUserMsg = userMsg;
         mLastChoice = choice;
+        writeTransLog("priority", userMsg, content, choice, index);
         DebugTrace("AIPlayerGPT: model chose " << choice << " of " << index);
     }
 
@@ -944,6 +983,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
 
     mEventLog.clear();
     mAskCache[userMsg] = choice;
+    writeTransLog("ask", userMsg, content, choice, (int) options.size());
     DebugTrace("AIPlayerGPT: " << decision << " -> chose " << choice << " of " << options.size());
 
     return (choice >= 1) ? choice - 1 : -1; //0 or parse-fail: defer to caller

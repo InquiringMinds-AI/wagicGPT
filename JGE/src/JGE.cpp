@@ -347,6 +347,7 @@ bool JGE::GetLeftClickCoordinates(int& x, int& y)
 JGE::JGE()
 {
     mApp = NULL;
+    mTextInputActive = false;
 #if defined (WIN32) || defined (LINUX) || defined (VITA)
     strcpy(mDebuggingMsg, "");
     mCurrentMusic = NULL;

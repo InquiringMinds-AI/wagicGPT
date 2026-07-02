@@ -17,6 +17,9 @@ namespace GameStateOptionsConst
     const int kBackToMainMenuID = 2;
     const int kNewProfileID = 4;
     const int kReloadID = 5;
+    const int kTelemetryYesID = 6;
+    const int kTelemetryNoID = 7;
+    const int kTelemetryMenuID = -103;
 }
 
 static std::string kBgFile = "";
@@ -24,6 +27,10 @@ static std::string kBgFile = "";
 GameStateOptions::GameStateOptions(GameApp* parent) :
     GameState(parent, "options"), mReload(false), grabber(NULL), optionsMenu(NULL), optionsTabs(NULL)
 {
+#ifdef WITH_GPT_AI
+    gptTab = NULL;
+    telemetryMenu = NULL;
+#endif
 }
 
 GameStateOptions::~GameStateOptions()
@@ -97,7 +104,8 @@ void GameStateOptions::Start()
 
 #ifdef WITH_GPT_AI
     //LLM opponent configuration (and future transformer-backed features).
-    optionsTabs->Add(NEW GptOptionsList());
+    gptTab = NEW GptOptionsList();
+    optionsTabs->Add(gptTab);
 #endif
 
     optionsList = NEW WGuiList("User");
@@ -169,6 +177,10 @@ void GameStateOptions::End()
     JRenderer::GetInstance()->EnableVSync(false);
     SAFE_DELETE(optionsTabs);
     SAFE_DELETE(optionsMenu);
+#ifdef WITH_GPT_AI
+    gptTab = NULL; //owned (and deleted) by optionsTabs
+    SAFE_DELETE(telemetryMenu);
+#endif
     kBgFile = ""; //Reset the chosen background.
 }
 
@@ -238,6 +250,12 @@ void GameStateOptions::Update(float dt)
         case SHOW_OPTIONS_MENU:
             optionsMenu->Update(dt);
             break;
+#ifdef WITH_GPT_AI
+        case SHOW_TELEMETRY_CONSENT:
+            if (telemetryMenu)
+                telemetryMenu->Update(dt);
+            break;
+#endif
         }
     if (mReload)
     {
@@ -331,29 +349,41 @@ void GameStateOptions::Render()
         "Please support this project with donations at  Wagic Discord",
     };
 
-    WFont * mFont = WResourceManager::Instance()->GetWFont(Fonts::MAGIC_FONT);
-    mFont->SetColor(ARGB(255,200,200,200));
-    mFont->SetScale(1.0);
-    float startpos = 272 - timer;
-    float pos = startpos;
-    int size = sizeof(CreditsText) / sizeof(CreditsText[0]);
-
-    for (int i = 0; i < size; i++)
+    //The credits scroller belongs to the Credits tab (an empty list it
+    //shows through) - drawing it under every tab bleeds text into the row
+    //gaps of the sparser ones.
+    WGuiBase * currentTab = optionsTabs ? optionsTabs->Current() : NULL;
+    if (currentTab && currentTab->getDisplay() == "Credits")
     {
-        pos = startpos + 20 * i;
-        if (pos > -20 && pos < SCREEN_HEIGHT + 20)
-        {
-            mFont->DrawString(CreditsText[i], SCREEN_WIDTH / 2, pos, JGETEXT_CENTER);
-        }
-    }
+        WFont * mFont = WResourceManager::Instance()->GetWFont(Fonts::MAGIC_FONT);
+        mFont->SetColor(ARGB(255,200,200,200));
+        mFont->SetScale(1.0);
+        float startpos = 272 - timer;
+        float pos = startpos;
+        int size = sizeof(CreditsText) / sizeof(CreditsText[0]);
 
-    if (pos < -20)
-        timer = 0;
+        for (int i = 0; i < size; i++)
+        {
+            pos = startpos + 20 * i;
+            if (pos > -20 && pos < SCREEN_HEIGHT + 20)
+            {
+                mFont->DrawString(CreditsText[i], SCREEN_WIDTH / 2, pos, JGETEXT_CENTER);
+            }
+        }
+
+        if (pos < -20)
+            timer = 0;
+    }
 
     optionsTabs->Render();
 
     if (mState == SHOW_OPTIONS_MENU)
         optionsMenu->Render();
+
+#ifdef WITH_GPT_AI
+    if (mState == SHOW_TELEMETRY_CONSENT && telemetryMenu)
+        telemetryMenu->Render();
+#endif
 
     if (options.keypadActive())
         options.keypadRender();
@@ -366,6 +396,22 @@ void GameStateOptions::ButtonPressed(int controllerId, int controlId)
         switch (controlId)
         {
         case GameStateOptionsConst::kSaveAndBackToMainMenuID:
+#ifdef WITH_GPT_AI
+            //Telemetry consent negotiation: on saving a newly set-up
+            //endpoint (and only if never decided), ask before persisting.
+            //Full disclosure of what is collected lives in the GPT tab.
+            if (gptTab && gptTab->wantsTelemetryConsent())
+            {
+                SAFE_DELETE(telemetryMenu);
+                telemetryMenu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(),
+                    GameStateOptionsConst::kTelemetryMenuID, this, Fonts::MENU_FONT, 50, 130,
+                    "Contribute anonymized game data?");
+                telemetryMenu->Add(GameStateOptionsConst::kTelemetryYesID, "Yes, help improve the AI");
+                telemetryMenu->Add(GameStateOptionsConst::kTelemetryNoID, "No thanks");
+                mState = SHOW_TELEMETRY_CONSENT;
+                break;
+            }
+#endif
             mState = SAVE;
             break;
             //Set Audio volume
@@ -383,6 +429,15 @@ void GameStateOptions::ButtonPressed(int controllerId, int controlId)
             mReload = true;
             break;
         }
+#ifdef WITH_GPT_AI
+    else if (controllerId == GameStateOptionsConst::kTelemetryMenuID)
+    {
+        if (gptTab)
+            gptTab->setTelemetryConsent(controlId == GameStateOptionsConst::kTelemetryYesID ? 1 : 0);
+        SAFE_DELETE(telemetryMenu);
+        mState = SAVE; //resume the save that triggered the ask
+    }
+#endif
     else
         optionsTabs->ButtonPressed(controllerId, controlId);
 }

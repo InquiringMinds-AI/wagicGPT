@@ -151,6 +151,13 @@ private:
     int mNoticeTicks;
     void setNotice(const string& text, float seconds);
 
+    //Decision-transcript dump (config translog=1 / WAGIC_GPT_TRANSLOG):
+    //one JSONL record per consumed decision - prompt-tuning raw material
+    //and, accumulated, training data for a small shippable policy model.
+    string mTransLogPath; //empty = disabled
+    int mTransSeq;
+    void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount);
+
     //True while a request is in flight whose answer has not been consumed.
     bool asyncBusy() const;
     //Poll the async slot for this exact prompt: starts the request when the

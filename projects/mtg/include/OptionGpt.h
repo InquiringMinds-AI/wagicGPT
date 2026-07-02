@@ -35,6 +35,32 @@ public:
 
     GptSettings cfg;     //working copy the rows bind to
     GptSettings loadedCfg; //snapshot for only-write-when-changed
+
+    //Telemetry consent negotiation: asked once, on saving with a newly
+    //set-up endpoint, never re-asked after a decision. The modal itself is
+    //owned by GameStateOptions (screen-level menus live there).
+    bool wantsTelemetryConsent() const
+    {
+        return cfg.enabled && cfg.telemetry < 0
+            && (cfg.urls != loadedCfg.urls || !loadedCfg.enabled);
+    }
+    void setTelemetryConsent(int decision)
+    {
+        cfg.telemetry = decision;
+    }
+};
+
+//Tri-state consent row: "not decided" until the user answers (or clicks it),
+//then Yes/No, freely changeable afterwards.
+class OptionGptConsent: public WGuiItem
+{
+public:
+    OptionGptConsent(int * bind, string label);
+    virtual void Render();
+    virtual void updateValue();
+
+protected:
+    int * mBind;
 };
 
 //On/off row bound to an int flag.

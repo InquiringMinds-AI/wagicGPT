@@ -33,6 +33,15 @@ public:
     int hints;                //-1 unset, else 0/1
     long maxTokens;           //-1/0 unset = built-in default
     int timeoutSecs;          //per-call HTTP timeout for model completions
+    int translog;             //0/1: dump every decision (prompt+reply) to
+                              //~/.Wagic/ai/gpt/logs/*.jsonl - prompt-tuning
+                              //raw material, and future training data for a
+                              //small shippable policy model
+    int telemetry;            //-1 never asked, 0 declined, 1 consented:
+                              //contribute anonymized game decisions. Asked
+                              //once, when a new endpoint is set up. Consent
+                              //also enables the local decision log so the
+                              //data exists to contribute.
 
     GptSettings();
 

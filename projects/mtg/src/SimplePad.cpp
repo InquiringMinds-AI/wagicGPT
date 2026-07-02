@@ -202,6 +202,16 @@ void SimplePad::pressKey(unsigned char key)
 
 }
 
+void SimplePad::typeChar(char c)
+{
+    //Any printable character, exactly as typed - unlike the virtual pad's
+    //A-Z/0-9 keys, this covers the ':' '/' '-' '_' a URL or API key needs.
+    string input(1, c);
+    if (cursor < buffer.size())
+        cursor++;
+    buffer.insert(cursor, input);
+}
+
 void SimplePad::CancelEdit()
 {
 #ifdef IOS
@@ -226,6 +236,26 @@ void SimplePad::MoveSelection(unsigned char moveto)
 void SimplePad::Update(float)
 {
     JGE * mEngine = JGE::GetInstance();
+
+    //Directly typed characters (physical keyboard while the pad is open).
+    char typed;
+    while (mEngine->PopTextChar(typed))
+    {
+        if (typed == '\n')
+        {
+            Finish();
+            return;
+        }
+        if (typed == 0x1b)
+        {
+            CancelEdit();
+            return;
+        }
+        if (typed == '\b')
+            pressKey(KPD_DEL);
+        else if (typed >= 0x20 && typed <= 0x7E)
+            typeChar(typed);
+    }
 
     int x, y, n = selected;
     unsigned int minDistance = -1;
@@ -315,6 +345,10 @@ void SimplePad::Start(string value, string * _dest)
     //Clear input buffer.
     JGE * mEngine = JGE::GetInstance();
     mEngine->ResetInput();
+    //A physical keyboard, when present, types directly into this pad: the
+    //engine captures typed characters and suspends key-to-button mapping
+    //until the pad closes (d-pad/gamepad driving is unaffected).
+    mEngine->EnableTextInput(true);
 }
 
 string SimplePad::Finish()
@@ -324,6 +358,7 @@ string SimplePad::Finish()
     //Clear input buffer.
     JGE * mEngine = JGE::GetInstance();
     mEngine->ResetInput();
+    mEngine->EnableTextInput(false);
 
     //Return result.
     if (bCanceled)

@@ -152,6 +152,9 @@ class JGE
   float mDeltaTime;
   bool mDebug;
   bool mPaused;
+  //text-entry capture state (see EnableTextInput)
+  bool mTextInputActive;
+  std::string mTypedChars;
   char mDebuggingMsg[256];
   bool mCriticalAssert;
   const char *mAssertFile;
@@ -337,6 +340,37 @@ class JGE
   void HoldKey_NoRepeat(const JButton);
   void ReleaseKey(const LocalKeySym);
   void ReleaseKey(const JButton);
+
+  //////////////////////////////////////////////////////////////////////////
+  /// Text-entry capture. While enabled, platform layers route typed
+  /// characters here INSTEAD of mapping keyboard keys to game buttons -
+  /// the on-screen keyboard (SimplePad) turns this on so a physical
+  /// keyboard can type directly without fighting the game's key bindings.
+  /// Control characters used: '\b' backspace, '\n' confirm, 0x1b cancel.
+  //////////////////////////////////////////////////////////////////////////
+  void EnableTextInput(bool enable)
+  {
+      mTextInputActive = enable;
+      if (!enable)
+          mTypedChars.clear();
+  }
+  bool TextInputActive() const
+  {
+      return mTextInputActive;
+  }
+  void PushTextChar(char c)
+  {
+      if (mTypedChars.size() < 64)
+          mTypedChars += c;
+  }
+  bool PopTextChar(char& c)
+  {
+      if (mTypedChars.empty())
+          return false;
+      c = mTypedChars[0];
+      mTypedChars.erase(0, 1);
+      return true;
+  }
 
   //////////////////////////////////////////////////////////////////////////
   /// Mouse events

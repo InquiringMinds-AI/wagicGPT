@@ -47,6 +47,11 @@ GptOptionsList::GptOptionsList()
     Add(NEW OptionGptBool(&cfg.hints, "Heuristic hints in prompt"));
     Add(NEW OptionGptNumber(&cfg.timeoutSecs, "Call timeout (seconds)", 15, 300, 15));
     Add(NEW OptionGptTest(&cfg));
+    Add(NEW OptionGptConsent(&cfg.telemetry, "Contribute anonymized game data"));
+    //Full disclosure for the consent above (and its save-time ask):
+    WDecoStyled * disc = NEW WDecoStyled(NEW WGuiHeader("Telemetry shares only in-game decisions: board states, choices, model replies. Never keys or personal data."));
+    disc->mStyle = WDecoStyled::DS_STYLE_ALERT;
+    Add(disc);
     WDecoStyled * note = NEW WDecoStyled(NEW WGuiHeader("Applies to the next duel. Environment variables override."));
     note->mStyle = WDecoStyled::DS_STYLE_ALERT;
     Add(note);
@@ -131,6 +136,25 @@ void OptionGptNumber::updateValue()
         *mBind = mZeroText.size() ? 0 : mMin;
     else if (*mBind < mMin && !(mZeroText.size() && *mBind == 0))
         *mBind = mMin;
+}
+
+OptionGptConsent::OptionGptConsent(int * bind, string label)
+    : WGuiItem(label), mBind(bind)
+{
+}
+
+void OptionGptConsent::Render()
+{
+    WFont * font = WResourceManager::Instance()->GetWFont(Fonts::OPTION_FONT);
+    font->SetColor(getColor(WGuiColor::TEXT));
+    font->DrawString(_(displayValue).c_str(), x + 2, y + 3);
+    const char * v = (*mBind < 0) ? "(not decided)" : (*mBind ? "Yes" : "No");
+    drawValue(font, v, x, y, width);
+}
+
+void OptionGptConsent::updateValue()
+{
+    *mBind = (*mBind == 1) ? 0 : 1;
 }
 
 OptionGptText::OptionGptText(string * bind, string label, string emptyText, bool secret)

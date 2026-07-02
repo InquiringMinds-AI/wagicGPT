@@ -18,7 +18,7 @@ using std::string;
 using std::vector;
 
 GptSettings::GptSettings()
-    : enabled(0), thinking(-1), hints(-1), maxTokens(-1), timeoutSecs(120)
+    : enabled(0), thinking(-1), hints(-1), maxTokens(-1), timeoutSecs(120), translog(0), telemetry(-1)
 {
 }
 
@@ -225,6 +225,8 @@ GptSettings GptSettings::load()
         else if (k == "hints") cfg.hints = (v != "0" && v != "off") ? 1 : 0;
         else if (k == "maxtokens") cfg.maxTokens = atol(v.c_str());
         else if (k == "timeout") cfg.timeoutSecs = atoi(v.c_str());
+        else if (k == "translog") cfg.translog = (v != "0" && v != "off") ? 1 : 0;
+        else if (k == "telemetry") cfg.telemetry = (v != "0" && v != "off") ? 1 : 0;
     }
     if (cfg.timeoutSecs < 5)
         cfg.timeoutSecs = 5;
@@ -265,6 +267,10 @@ bool GptSettings::save() const
     if (maxTokens > 0)
         f << "maxtokens=" << maxTokens << "\n";
     f << "timeout=" << timeoutSecs << "\n";
+    if (translog)
+        f << "translog=1\n";
+    if (telemetry >= 0)
+        f << "telemetry=" << telemetry << "\n";
     return f.good();
 }
 
@@ -272,7 +278,7 @@ bool GptSettings::operator==(const GptSettings& o) const
 {
     return enabled == o.enabled && urls == o.urls && model == o.model && key == o.key
         && thinking == o.thinking && hints == o.hints && maxTokens == o.maxTokens
-        && timeoutSecs == o.timeoutSecs;
+        && timeoutSecs == o.timeoutSecs && translog == o.translog && telemetry == o.telemetry;
 }
 
 string GptSettings::primaryUrl() const
