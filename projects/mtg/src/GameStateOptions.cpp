@@ -4,6 +4,9 @@
 #include "GameStateMenu.h"
 #include "GameApp.h"
 #include "OptionItem.h"
+#ifdef WITH_GPT_AI
+#include "OptionGpt.h"
+#endif
 #include "SimpleMenu.h"
 #include "SimplePad.h"
 #include "Translate.h"
@@ -91,6 +94,11 @@ void GameStateOptions::Start()
     optionsList->Add(NEW OptionInteger(Options::TRANSITIONS, "Disable screen transitions"));
     optionsList->Add(NEW OptionInteger(Options::OSD, "Display InGame extra information"));
     optionsTabs->Add(optionsList);
+
+#ifdef WITH_GPT_AI
+    //LLM opponent configuration (and future transformer-backed features).
+    optionsTabs->Add(NEW GptOptionsList());
+#endif
 
     optionsList = NEW WGuiList("User");
     optionsList->Add(NEW WGuiHeader("User Options"));

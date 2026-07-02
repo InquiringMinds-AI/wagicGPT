@@ -3,6 +3,7 @@
 #ifdef WITH_GPT_AI
 
 #include "AIPlayerGPT.h"
+#include "GptConfig.h"
 #include "GameObserver.h"
 #include "MTGDefinitions.h"
 #include "WEvent.h"
@@ -37,79 +38,6 @@ using json = nlohmann::json;
 
 namespace
 {
-
-//Runtime configuration, user-editable: Res/ai/gpt/endpoints.txt, shadowed
-//by the per-user copy (~/.Wagic/ai/gpt/endpoints.txt) so private endpoints
-//and keys never have to live in a tracked file. Environment variables
-//override file values. No endpoints are compiled in beyond localhost.
-struct GptConfig
-{
-    vector<string> urls;
-    string model;
-    string key;
-    int thinking;  // -1 unset
-    int hints;     // -1 unset
-    long maxTokens; // -1 unset
-    GptConfig() : thinking(-1), hints(-1), maxTokens(-1) {}
-};
-
-//Read a GPT asset, private copy first. The SDL build collapses
-//JFileSystem's user and system roots onto Res/ (no ~/.Wagic shadow like
-//the Qt build), so a config kept OUT of the tracked Res tree has to be
-//read directly: try $HOME/.Wagic/ai/gpt/<filename> first (the documented
-//private location for endpoints/keys), then fall back to the bundled Res
-//copy through JFileSystem. Returns "" when neither exists.
-string readGptAsset(const char * filename)
-{
-    if (const char * home = getenv("HOME"))
-    {
-        string path = string(home) + "/.Wagic/ai/gpt/" + filename;
-        std::ifstream f(path.c_str(), std::ios::binary);
-        if (f)
-        {
-            std::ostringstream ss;
-            ss << f.rdbuf();
-            string c = ss.str();
-            if (!c.empty())
-                return c;
-        }
-    }
-    string content;
-    JFileSystem::GetInstance()->readIntoString(string("ai/gpt/") + filename, content);
-    return content;
-}
-
-GptConfig loadGptConfig()
-{
-    GptConfig cfg;
-    string content = readGptAsset("endpoints.txt");
-    if (content.empty())
-        return cfg;
-    std::istringstream stream(content);
-    string line;
-    while (std::getline(stream, line))
-    {
-        size_t hash = line.find('#');
-        if (hash != string::npos)
-            line = line.substr(0, hash);
-        size_t eq = line.find('=');
-        if (eq == string::npos)
-            continue;
-        string k = line.substr(0, eq);
-        string v = line.substr(eq + 1);
-        k.erase(0, k.find_first_not_of(" \t")); k.erase(k.find_last_not_of(" \t\r") + 1);
-        v.erase(0, v.find_first_not_of(" \t")); v.erase(v.find_last_not_of(" \t\r") + 1);
-        if (v.empty())
-            continue;
-        if (k == "url") cfg.urls.push_back(v);
-        else if (k == "model") cfg.model = v;
-        else if (k == "key") cfg.key = v;
-        else if (k == "thinking") cfg.thinking = (v != "0" && v != "off") ? 1 : 0;
-        else if (k == "hints") cfg.hints = (v != "0" && v != "off") ? 1 : 0;
-        else if (k == "maxtokens") cfg.maxTokens = atol(v.c_str());
-    }
-    return cfg;
-}
 
 void replaceAllOccurrences(string& text, const string& token, const string& value)
 {
@@ -180,54 +108,6 @@ const char * kStrategyPriors =
     "needed interaction held up; firing removal or tricks too early or at the wrong target; overextending "
     "into a sweeper; leading with your best threat into open mana; sloppy combat math (missing lethal, "
     "making bad trades, forgetting the opponent's trick).\n";
-
-size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * userp)
-{
-    static_cast<string *>(userp)->append(static_cast<char *>(contents), size * nmemb);
-    return size * nmemb;
-}
-
-//Returns response body, or empty string on any transport error.
-string httpRequest(const string& url, const string& postBody, long timeoutMs, const string& bearer)
-{
-    CURL * curl = curl_easy_init();
-    if (!curl)
-        return "";
-
-    string response;
-    struct curl_slist * headers = NULL;
-
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlWriteToString);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2500L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeoutMs);
-    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-    if (!bearer.empty())
-        headers = curl_slist_append(headers, ("Authorization: Bearer " + bearer).c_str());
-    if (!postBody.empty())
-    {
-        headers = curl_slist_append(headers, "Content-Type: application/json");
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postBody.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)postBody.size());
-    }
-    if (headers)
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-    CURLcode res = curl_easy_perform(curl);
-    long httpCode = 0;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
-
-    if (headers)
-        curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-
-    if (res != CURLE_OK || httpCode != 200)
-        return "";
-    return response;
-}
 
 //The auras/equipment attached to a permanent. There is no forward list, so
 //find them the way the engine does (cf. MTGCardInstance::hasTotemArmor):
@@ -419,8 +299,9 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         state->prompt = userMsg;
         state->response.clear();
     }
-    std::thread([state, url, requestBody, key]() {
-        string body = httpRequest(url, requestBody, 120000, key);
+    long timeoutMs = mTimeoutMs;
+    std::thread([state, url, requestBody, key, timeoutMs]() {
+        string body = gptHttpPost(url, requestBody, timeoutMs, key);
         std::lock_guard<std::mutex> g(state->mtx);
         state->status = 2;
         state->response = body;
@@ -429,30 +310,49 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
-    GptConfig cfg = loadGptConfig();
+    GptSettings cfg = GptSettings::load();
     mConfigUrls = cfg.urls;
     mConfigModel = cfg.model;
     mMaxTokens = cfg.maxTokens;
     mApiKey = cfg.key;
+    mTimeoutMs = 1000L * cfg.timeoutSecs;
     if (const char * key = getenv("WAGIC_GPT_KEY"))
         mApiKey = key;
+    if (const char * to = getenv("WAGIC_GPT_TIMEOUT"))
+        mTimeoutMs = 1000L * atol(to);
+    if (mTimeoutMs < 5000)
+        mTimeoutMs = 5000;
     mThinking = getenv("WAGIC_GPT_THINKING") ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
     mShowHints = getenv("WAGIC_GPT_HINTS") ? envFlag("WAGIC_GPT_HINTS") : (cfg.hints == 1);
     resolveEndpoint();
     if (mEndpoint.empty())
+    {
         fprintf(stderr, "AIPlayerGPT: no LLM endpoint reachable, falling back to Baka heuristics for every decision\n");
+        setNotice("no LLM endpoint reachable - the heuristic AI is playing", 12.0f);
+    }
     else
         fprintf(stderr, "AIPlayerGPT: using %s (model %s)\n", mEndpoint.c_str(), mModel.c_str());
 }
 
 bool AIPlayerGPT::isEnabled()
 {
+    //The environment overrides in both directions (WAGIC_AI=gpt forces the
+    //LLM opponent on, any other value forces it off); without it, the GPT
+    //options tab's master switch (enabled= in the config file) decides.
     const char * mode = getenv("WAGIC_AI");
-    return mode && string(mode) == "gpt";
+    if (mode && *mode)
+        return string(mode) == "gpt";
+    return GptSettings::load().enabled == 1;
+}
+
+void AIPlayerGPT::setNotice(const string& text, float seconds)
+{
+    mNotice = text;
+    mNoticeTicks = (int) (seconds * 60); //decremented per rendered frame
 }
 
 void AIPlayerGPT::resolveEndpoint()
@@ -467,33 +367,17 @@ void AIPlayerGPT::resolveEndpoint()
 
     for (size_t i = 0; i < candidates.size(); i++)
     {
-        string body = httpRequest(candidates[i] + "/v1/models", "", 4000, mApiKey);
-        if (body.empty())
+        string firstModel;
+        if (!gptProbeEndpoint(candidates[i], mApiKey, firstModel))
             continue;
-        try
-        {
-            json models = json::parse(body);
-            //A real /v1/models reply carries a non-empty "data" array.
-            //An auth error or unrelated JSON ({"error":"Unauthorized"})
-            //parses fine but is NOT a usable endpoint - reject it so a
-            //bad/missing key falls through to the next candidate (or to
-            //the honest "no endpoint reachable" message) instead of being
-            //accepted with an empty model and silently failing every call.
-            if (!models.contains("data") || !models["data"].is_array() || models["data"].empty())
-                continue;
-            mEndpoint = candidates[i];
-            if (const char * model = getenv("WAGIC_GPT_MODEL"))
-                mModel = model;
-            else if (!mConfigModel.empty())
-                mModel = mConfigModel;
-            else
-                mModel = models["data"][0]["id"].get<string>();
-            return;
-        }
-        catch (json::exception&)
-        {
-            continue;
-        }
+        mEndpoint = candidates[i];
+        if (const char * model = getenv("WAGIC_GPT_MODEL"))
+            mModel = model;
+        else if (!mConfigModel.empty())
+            mModel = mConfigModel;
+        else
+            mModel = firstModel;
+        return;
     }
 }
 
@@ -565,7 +449,7 @@ void AIPlayerGPT::buildSystemPrompt()
     //or a private $HOME/.Wagic/ai/gpt/system_prompt.txt that takes
     //precedence) so players can tune it without rebuilding; see
     //Res/ai/gpt/README.txt for the placeholders.
-    string tmpl = readGptAsset("system_prompt.txt");
+    string tmpl = gptReadAsset("system_prompt.txt");
     if (!tmpl.empty())
     {
         replaceAllOccurrences(tmpl, "{MY_DECK}", myDeck);
@@ -827,7 +711,11 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //Qwen-style thinking toggle. Unknown-field-tolerant providers
     //(OpenRouter etc.) ignore this; local vLLM/llama.cpp honor it, keyed
     //or not. Matters: qwen3.6 thinks by default (~6x decision latency).
-    request["chat_template_kwargs"] = {{"enable_thinking", mThinking}};
+    //The official OpenAI API is the exception: it REJECTS unknown top-level
+    //parameters with a 400, which would silently degrade every decision to
+    //the heuristic - omit the field there.
+    if (mEndpoint.find("api.openai.com") == string::npos)
+        request["chat_template_kwargs"] = {{"enable_thinking", mThinking}};
 
     return request.dump();
 }
@@ -963,6 +851,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             mMessages.push_back(std::make_pair(string("user"), userMsg));
             mMessages.push_back(std::make_pair(string("assistant"), content));
         }
+        else
+            setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
         //Window the transcript: keep the system prompt plus the most recent
         //20 exchanges; old states are superseded by the snapshot we resend.
         while (mMessages.size() > 41)
@@ -1047,6 +937,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
         mMessages.push_back(std::make_pair(string("user"), userMsg));
         mMessages.push_back(std::make_pair(string("assistant"), content));
     }
+    else
+        setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
     while (mMessages.size() > 41)
         mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
 
@@ -1471,12 +1363,20 @@ int AIPlayerGPT::Act(float dt)
 void AIPlayerGPT::Render()
 {
     AIPlayerBaka::Render();
+    WFont * font = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
+    if (!font)
+        return;
+    //Transient notices: endpoint unreachable at duel start, a reply that
+    //failed or timed out. Frame-decayed so no game-thread timer is needed.
+    if (mNoticeTicks > 0)
+    {
+        mNoticeTicks--;
+        font->SetColor(ARGB(230, 255, 190, 120));
+        font->DrawString(mNotice.c_str(), SCREEN_WIDTH / 2, 12, JGETEXT_CENTER);
+    }
     //The visible answer to "is it frozen or thinking?": a small animated
     //line whenever this player's model call is in flight.
     if (mEndpoint.empty() || !asyncBusy())
-        return;
-    WFont * font = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
-    if (!font)
         return;
     char buf[48];
     int dots = 1 + ((int) (mThinkTime * 2)) % 3;

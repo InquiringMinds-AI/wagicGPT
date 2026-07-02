@@ -142,6 +142,14 @@ private:
     struct AsyncState;
     std::shared_ptr<AsyncState> mAsyncState;
     float mThinkTime; //seconds the current request has been in flight (for the indicator)
+    long mTimeoutMs;  //per-call HTTP timeout (config timeout= / WAGIC_GPT_TIMEOUT)
+
+    //Transient in-duel notice ("no endpoint reachable", "model timed out"),
+    //drawn by Render for a few seconds. Frame-based decay: Render runs per
+    //frame, Act does not run for both players every tick.
+    string mNotice;
+    int mNoticeTicks;
+    void setNotice(const string& text, float seconds);
 
     //True while a request is in flight whose answer has not been consumed.
     bool asyncBusy() const;

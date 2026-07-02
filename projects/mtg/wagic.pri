@@ -61,6 +61,8 @@ SOURCES += \
         src/AIPlayer.cpp\
         src/AIPlayerBaka.cpp\
         src/AIPlayerGPT.cpp\
+        src/GptConfig.cpp\
+        src/OptionGpt.cpp\
         src/AIStats.cpp\
         src/AllAbilities.cpp\
         src/CardDescriptor.cpp\
@@ -180,6 +182,8 @@ HEADERS  += \
         include/AIHints.h\
         include/AIPlayerBaka.h\
         include/AIPlayerGPT.h\
+        include/GptConfig.h\
+        include/OptionGpt.h\
         include/AIPlayerBakaB.h\
         include/DeckEditorMenu.h\
         include/WResourceManagerImpl.h\
