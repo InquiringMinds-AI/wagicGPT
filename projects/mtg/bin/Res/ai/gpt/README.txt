@@ -33,7 +33,16 @@ endpoints.txt
         url=...           candidate endpoint, repeatable; probed in order,
                           first /v1/models answer wins
         model=...         served model name; omit to auto-detect
-        key=...           bearer token for keyed endpoints
+        key=...           bearer token for keyed endpoints. Saved by the
+                          GUI as key=obf1:<blob>, scrambled against a
+                          per-install random salt (the keysalt file next
+                          to this one) so the config file never shows the
+                          key in the clear on a stream or screenshot.
+                          This is obfuscation, not encryption. Plaintext
+                          key= values also work and are migrated to the
+                          scrambled form the next time the GUI saves.
+                          Configs copied to another machine need the key
+                          re-entered (the salt does not travel).
         thinking=0/1      Qwen-style thinking toggle (stronger, slower)
         hints=0/1         include heuristic scores in the prompt
         maxtokens=N       completion budget override

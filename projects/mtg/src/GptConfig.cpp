@@ -12,6 +12,7 @@
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
+#include <cstring>
 
 using std::string;
 using std::vector;
@@ -20,6 +21,159 @@ GptSettings::GptSettings()
     : enabled(0), thinking(-1), hints(-1), maxTokens(-1), timeoutSecs(120)
 {
 }
+
+namespace
+{
+//--- API key at-rest obfuscation -------------------------------------------
+//NOT encryption (this is open source; the algorithm is public): the goal is
+//that the config file never contains the key in the clear, so someone
+//scrolling their files on a stream or screenshot leaks nothing readable.
+//The key is XORed against a per-install random salt kept in a SEPARATE
+//file (keysalt, mode 0600) - the config file alone is not decodable even
+//with this code in hand. Cost: configs copied to another machine need the
+//key re-entered.
+
+const char * kObfPrefix = "obf1:";
+const size_t kSaltBytes = 32;
+
+const char kB64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+string b64encode(const string& in)
+{
+    string out;
+    int val = 0, bits = -6;
+    for (size_t i = 0; i < in.size(); i++)
+    {
+        val = (val << 8) + (unsigned char) in[i];
+        bits += 8;
+        while (bits >= 0)
+        {
+            out += kB64[(val >> bits) & 0x3F];
+            bits -= 6;
+        }
+    }
+    if (bits > -6)
+        out += kB64[((val << 8) >> (bits + 8)) & 0x3F];
+    while (out.size() % 4)
+        out += '=';
+    return out;
+}
+
+string b64decode(const string& in)
+{
+    int T[256];
+    for (int i = 0; i < 256; i++) T[i] = -1;
+    for (int i = 0; i < 64; i++) T[(unsigned char) kB64[i]] = i;
+    string out;
+    int val = 0, bits = -8;
+    for (size_t i = 0; i < in.size(); i++)
+    {
+        int c = T[(unsigned char) in[i]];
+        if (c == -1)
+            break; //padding or garbage
+        val = (val << 6) + c;
+        bits += 6;
+        if (bits >= 0)
+        {
+            out += (char) ((val >> bits) & 0xFF);
+            bits -= 8;
+        }
+    }
+    return out;
+}
+
+string saltPath()
+{
+    const char * home = getenv("HOME");
+    if (!home)
+        return "";
+    return string(home) + "/.Wagic/ai/gpt/keysalt";
+}
+
+string loadOrCreateSalt()
+{
+    string path = saltPath();
+    if (path.empty())
+        return "";
+    {
+        std::ifstream f(path.c_str(), std::ios::binary);
+        if (f)
+        {
+            std::ostringstream ss;
+            ss << f.rdbuf();
+            if (ss.str().size() >= kSaltBytes)
+                return ss.str().substr(0, kSaltBytes);
+        }
+    }
+    //First use: create the per-install salt.
+    string salt;
+    std::ifstream ur("/dev/urandom", std::ios::binary);
+    if (ur)
+    {
+        char buf[kSaltBytes];
+        ur.read(buf, kSaltBytes);
+        if (ur.gcount() == (std::streamsize) kSaltBytes)
+            salt.assign(buf, kSaltBytes);
+    }
+    if (salt.empty())
+    {
+        //Weak fallback; still beats plaintext for the shoulder-surf case.
+        for (size_t i = 0; i < kSaltBytes; i++)
+            salt += (char) (rand() & 0xFF);
+    }
+    //The directory chain may not exist yet on a first run.
+    const char * home = getenv("HOME");
+    if (home)
+    {
+        string dir = string(home) + "/.Wagic";
+        mkdir(dir.c_str(), 0755);
+        dir += "/ai"; mkdir(dir.c_str(), 0755);
+        dir += "/gpt"; mkdir(dir.c_str(), 0755);
+    }
+    std::ofstream f(path.c_str(), std::ios::binary | std::ios::trunc);
+    if (f)
+    {
+        f.write(salt.data(), salt.size());
+        f.close();
+        chmod(path.c_str(), 0600);
+    }
+    return salt;
+}
+
+string xorWithSalt(const string& data, const string& salt)
+{
+    if (salt.empty())
+        return data;
+    string out = data;
+    for (size_t i = 0; i < out.size(); i++)
+        out[i] = out[i] ^ salt[i % salt.size()];
+    return out;
+}
+
+string obfuscateKey(const string& plain)
+{
+    if (plain.empty())
+        return "";
+    string salt = loadOrCreateSalt();
+    if (salt.empty())
+        return plain; //no HOME: store as-is rather than lose the key
+    return string(kObfPrefix) + b64encode(xorWithSalt(plain, salt));
+}
+
+string deobfuscateKey(const string& stored)
+{
+    if (stored.compare(0, strlen(kObfPrefix), kObfPrefix) != 0)
+        return stored; //legacy/hand-entered plaintext keys keep working
+    string salt = loadOrCreateSalt();
+    string plain = xorWithSalt(b64decode(stored.substr(strlen(kObfPrefix))), salt);
+    //A blob that decodes to non-printable bytes means the salt is gone or
+    //foreign (config copied between installs): treat as no key.
+    for (size_t i = 0; i < plain.size(); i++)
+        if ((unsigned char) plain[i] < 0x20 || (unsigned char) plain[i] > 0x7E)
+            return "";
+    return plain;
+}
+} //namespace
 
 string gptReadAsset(const char * filename)
 {
@@ -74,6 +228,7 @@ GptSettings GptSettings::load()
     }
     if (cfg.timeoutSecs < 5)
         cfg.timeoutSecs = 5;
+    cfg.key = deobfuscateKey(cfg.key);
     return cfg;
 }
 
@@ -102,7 +257,7 @@ bool GptSettings::save() const
     if (!model.empty())
         f << "model=" << model << "\n";
     if (!key.empty())
-        f << "key=" << key << "\n";
+        f << "key=" << obfuscateKey(key) << "\n";
     if (thinking >= 0)
         f << "thinking=" << thinking << "\n";
     if (hints >= 0)
