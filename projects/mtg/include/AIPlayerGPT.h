@@ -151,6 +151,12 @@ private:
     int mNoticeTicks;
     void setNotice(const string& text, float seconds);
 
+    //Turn whose combat already had its bundled blocking declaration - the
+    //whole combat is decided in ONE model reply, so once executed nothing
+    //more may be asked this turn (leftover no-block creatures would
+    //otherwise re-prompt against the changed board).
+    int mBlocksDoneTurn;
+
     //Decision-transcript dump (config translog=1 / WAGIC_GPT_TRANSLOG):
     //one JSONL record per consumed decision - prompt-tuning raw material
     //and, accumulated, training data for a small shippable policy model.

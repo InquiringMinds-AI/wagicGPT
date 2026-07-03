@@ -312,7 +312,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mTransSeq(0), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mTransSeq(0), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -1676,6 +1676,46 @@ int AIPlayerGPT::chooseAttackers()
     return 1;
 }
 
+//Scan a bundled-blocking reply for "B<i>:A<j>" / "B<i>:none" pairs (any of
+//": - > =" or spaces as separator). Unmentioned or malformed blockers stay
+//out of combat. Returns how many well-formed pairs were found - zero means
+//the reply is unusable and the caller falls back to the heuristic.
+static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out)
+{
+    out.assign(nBlockers, 0); //0 = no block; else attacker number
+    int pairs = 0;
+    for (size_t i = 0; i < content.size(); i++)
+    {
+        if (content[i] != 'B' && content[i] != 'b')
+            continue;
+        size_t j = i + 1;
+        if (j >= content.size() || !isdigit(content[j]))
+            continue;
+        int b = 0;
+        while (j < content.size() && isdigit(content[j]))
+            b = b * 10 + (content[j++] - '0');
+        while (j < content.size() && (content[j] == ':' || content[j] == '-' || content[j] == '>'
+                                      || content[j] == '=' || content[j] == ' '))
+            j++;
+        int a = -1; //-1 malformed; 0 none; else attacker number
+        if (j < content.size() && (content[j] == 'A' || content[j] == 'a') && j + 1 < content.size()
+            && isdigit(content[j + 1]))
+        {
+            a = 0;
+            for (size_t k = j + 1; k < content.size() && isdigit(content[k]); k++)
+                a = a * 10 + (content[k] - '0');
+        }
+        else if (content.compare(j, 4, "none") == 0 || content.compare(j, 4, "None") == 0
+                 || content.compare(j, 4, "NONE") == 0)
+            a = 0;
+        if (a < 0 || b < 1 || b > (int) nBlockers || a > (int) nAttackers)
+            continue;
+        out[b - 1] = a;
+        pairs++;
+    }
+    return pairs;
+}
+
 int AIPlayerGPT::chooseBlockers()
 {
     //Only drive the declare-blockers step; anywhere else, stay out of the way.
@@ -1683,6 +1723,8 @@ int AIPlayerGPT::chooseBlockers()
         return AIPlayerBaka::chooseBlockers();
     if (observer->currentPlayer == this) //never block on my own turn (Baka guard)
         return 0;
+    if (mBlocksDoneTurn == observer->turn)
+        return 1; //this combat's assignment was already declared
 
     vector<MTGCardInstance *> attackers;
     CardDescriptor ca;
@@ -1695,6 +1737,9 @@ int AIPlayerGPT::chooseBlockers()
     if (attackers.empty())
         return 1;
 
+    //Collect every creature that could block something, with its legal set.
+    vector<MTGCardInstance *> blockers;
+    vector<vector<MTGCardInstance *> > legal;
     CardDescriptor cb;
     cb.init();
     cb.setType("creature");
@@ -1702,42 +1747,92 @@ int AIPlayerGPT::chooseBlockers()
     MTGCardInstance * blk = NULL;
     while ((blk = cb.nextmatch(game->inPlay, blk)))
     {
-        if (blk->defenser || !blk->canBlock()) //already blocking, or cannot
+        if (blk->defenser || !blk->canBlock())
             continue;
-
-        vector<MTGCardInstance *> legal;
+        vector<MTGCardInstance *> l;
         for (size_t j = 0; j < attackers.size(); j++)
             if (blk->canBlock(attackers[j]))
-                legal.push_back(attackers[j]);
-        if (legal.empty())
-            continue; //nothing this creature can block -> no decision
+                l.push_back(attackers[j]);
+        if (l.empty())
+            continue;
+        blockers.push_back(blk);
+        legal.push_back(l);
+    }
+    if (blockers.empty())
+        return 1;
 
-        std::ostringstream q;
-        q << "Combat: declare blockers. Which attacker should " << blk->name
-          << " (" << blk->power << "/" << blk->toughness << ") block?";
-        vector<string> opts;
-        opts.push_back("Do not block with " + blk->name);
-        for (size_t j = 0; j < legal.size(); j++)
-        {
-            std::ostringstream o;
-            o << "Block " << legal[j]->name << " (" << legal[j]->power << "/" << legal[j]->toughness << ")";
-            opts.push_back(o.str());
-        }
-        int pick = askModel(q.str(), opts);
-        if (pick == kChoicePending)
-            return 1; //committed blocks stand; the rest re-poll next tick
-        if (pick <= 0)
-            continue; //do-not-block, or model deferred
+    //ONE bundled decision for the whole combat. Sequential per-blocker asks
+    //cannot coordinate (each one's local best answer piled every wall onto
+    //the same attacker), identical attacker names were indistinguishable,
+    //and N blockers cost N round trips. Labels disambiguate; the model
+    //answers with the full assignment map in a single reply.
+    if (mMessages.empty() || mMessages[0].first != "system")
+        buildSystemPrompt();
+    std::ostringstream user;
+    if (!mEventLog.empty())
+        user << "Events since your last decision:\n" << mEventLog << "\n";
+    user << serializeGameState();
+    user << "\nCombat: declare blockers for this whole combat in ONE decision.\nAttackers:\n";
+    for (size_t j = 0; j < attackers.size(); j++)
+        user << "A" << (j + 1) << ". " << attackers[j]->name
+             << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")\n";
+    user << "Your available blockers (with the attackers each may legally block):\n";
+    for (size_t i = 0; i < blockers.size(); i++)
+    {
+        user << "B" << (i + 1) << ". " << blockers[i]->name
+             << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ") - may block";
+        for (size_t j = 0; j < legal[i].size(); j++)
+            for (size_t k = 0; k < attackers.size(); k++)
+                if (attackers[k] == legal[i][j])
+                    user << (j ? "," : "") << " A" << (k + 1);
+        user << "\n";
+    }
+    user << "Blockers you do not mention stay out of combat. Several blockers may"
+            " gang-block one attacker.\nReply with ONLY the assignments,"
+            " comma-separated, e.g. \"B1:A2, B3:A1, B2:none\".";
+    string userMsg = user.str();
 
-        MTGCardInstance * chosen = legal[pick - 1];
+    string content;
+    if (pollCompletion(userMsg, content) == kChoicePending)
+        return 1; //decision in flight; nothing declared yet, re-poll next tick
+
+    vector<int> pick;
+    int pairs = content.empty() ? 0 : parseBlockAssignments(content, blockers.size(), attackers.size(), pick);
+    if (!content.empty())
+    {
+        mMessages.push_back(std::make_pair(string("user"), userMsg));
+        mMessages.push_back(std::make_pair(string("assistant"), content));
+    }
+    while (mMessages.size() > 41)
+        mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
+    mEventLog.clear();
+    writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size());
+
+    if (pairs == 0)
+    {
+        //Unusable reply: the heuristic declares this combat instead.
+        setNotice("model reply failed - the heuristic blocks", 5.0f);
+        mBlocksDoneTurn = observer->turn;
+        return AIPlayerBaka::chooseBlockers();
+    }
+
+    for (size_t i = 0; i < blockers.size(); i++)
+    {
+        if (pick[i] < 1)
+            continue;
+        MTGCardInstance * chosen = attackers[pick[i] - 1];
+        if (!blockers[i]->canBlock(chosen))
+            continue; //model assigned an illegal block: that blocker stays home
         //Clicking the block rule cycles this creature's defenser through its
         //legal attackers (and NULL); click until it lands on the chosen one.
         //Bounded so an unexpected cycle can never spin forever.
         int guard = (int) attackers.size() + 2;
-        observer->cardClick(blk, MTGAbility::MTG_BLOCK_RULE);
-        while (blk->defenser != chosen && guard-- > 0)
-            observer->cardClick(blk, MTGAbility::MTG_BLOCK_RULE);
+        observer->cardClick(blockers[i], MTGAbility::MTG_BLOCK_RULE);
+        while (blockers[i]->defenser != chosen && guard-- > 0)
+            observer->cardClick(blockers[i], MTGAbility::MTG_BLOCK_RULE);
     }
+    mBlocksDoneTurn = observer->turn;
+    DebugTrace("AIPlayerGPT: declared blocks from " << pairs << " assignment(s) in one reply");
     return 1;
 }
 
