@@ -1794,6 +1794,10 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
             a = 0;
         if (a < 0 || b < 1 || b > (int) nBlockers || a > (int) nAttackers)
             continue;
+        if (out[b - 1] != 0)
+            continue; //first assignment wins: a creature blocks at most one
+                      //attacker, so ignore a later "B1:A3" after "B1:A1"
+                      //(the model occasionally double-assigns one blocker).
         out[b - 1] = a;
         pairs++;
     }
@@ -1871,9 +1875,10 @@ int AIPlayerGPT::chooseBlockers()
                     user << (j ? "," : "") << " A" << (k + 1);
         user << "\n";
     }
-    user << "Blockers you do not mention stay out of combat. Several blockers may"
-            " gang-block one attacker.\nReply with ONLY the assignments,"
-            " comma-separated, e.g. \"B1:A2, B3:A1, B2:none\".";
+    user << "Assign each blocker to AT MOST ONE attacker (a creature cannot block"
+            " two attackers), but several DIFFERENT blockers may gang-block the same"
+            " attacker. Blockers you do not mention stay out of combat.\nReply with"
+            " ONLY the assignments, comma-separated, e.g. \"B1:A2, B3:A1, B2:none\".";
     string userMsg = user.str();
 
     string content;
