@@ -27,6 +27,7 @@ URL="http://100.116.136.74:8011"
 MODEL="qwen35"
 KEY=""
 THINKING=0
+JOBS=1   # concurrent game instances (each is a full AI-vs-AI game)
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -36,10 +37,18 @@ while [ $# -gt 0 ]; do
         -u) URL="$2"; shift 2;;
         -m) MODEL="$2"; shift 2;;
         -k) KEY="$2"; shift 2;;
+        -j) JOBS="$2"; shift 2;;
         --thinking) THINKING=1; shift;;
         *) echo "unknown arg: $1" >&2; exit 2;;
     esac
 done
+# Games are inference-latency-bound (~1 game / 15-20 min each), so throughput
+# comes from running games CONCURRENTLY. Spark serves max-num-seqs 16 requests
+# and its memory is flat under load (KV is pre-allocated), so up to ~8 games
+# (16 requests, 2 players each) saturate the batch without risk; beyond that,
+# requests just queue. Cap accordingly.
+[ "$JOBS" -gt 8 ] && { echo "capping -j to 8 (Spark max-num-seqs 16 = ~8 games)"; JOBS=8; }
+[ "$JOBS" -lt 1 ] && JOBS=1
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"   # projects/mtg
 BIN="$HERE/bin/wagic"
@@ -69,34 +78,40 @@ fi
 
 echo "== selfplay harness =="
 echo "  binary : $BIN"
-echo "  target : $GAMES games (cap ${TIMEOUT_S}s)"
+echo "  target : $GAMES games (cap ${TIMEOUT_S}s), $JOBS concurrent"
 echo "  model  : $MODEL @ $URL (thinking=$THINKING)"
 echo "  outdir : $OUTDIR"
 
 cd "$HERE/bin"
-WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}" SDL_VIDEODRIVER=wayland SDL_AUDIODRIVER=dummy \
-    WAGIC_SELFPLAY=1 WAGIC_AI=gpt \
-    WAGIC_GPT_URL="$URL" WAGIC_GPT_MODEL="$MODEL" WAGIC_GPT_KEY="$KEY" \
-    WAGIC_GPT_THINKING="$THINKING" WAGIC_GPT_TRANSLOG=1 \
-    ./wagic > "$OUTDIR/wagic-stdout.log" 2>&1 &
-GAMEPID=$!
-trap 'kill $GAMEPID 2>/dev/null' EXIT INT TERM
+PIDS=()
+for j in $(seq 1 "$JOBS"); do
+    WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}" SDL_VIDEODRIVER=wayland SDL_AUDIODRIVER=dummy \
+        WAGIC_SELFPLAY=1 WAGIC_AI=gpt \
+        WAGIC_GPT_URL="$URL" WAGIC_GPT_MODEL="$MODEL" WAGIC_GPT_KEY="$KEY" \
+        WAGIC_GPT_THINKING="$THINKING" WAGIC_GPT_TRANSLOG=1 \
+        ./wagic > "$OUTDIR/wagic-stdout-$j.log" 2>&1 &
+    PIDS+=($!)
+    sleep 2   # stagger startup so instances don't race the GL/profiling init
+done
+kill_all() { for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null; done; }
+trap kill_all EXIT INT TERM
 
 # Each game creates 2 new translog files (one per AIPlayerGPT). Stop at the
-# target, the time cap, or if the game process dies.
+# target, the time cap, or if all instances die.
 START=$(date +%s)
 target_files=$(( GAMES * 2 ))
 while :; do
     sleep 15
-    if ! kill -0 "$GAMEPID" 2>/dev/null; then echo "game process exited early"; break; fi
+    ALIVE=0; for p in "${PIDS[@]}"; do kill -0 "$p" 2>/dev/null && ALIVE=$(( ALIVE + 1 )); done
+    if [ "$ALIVE" -eq 0 ]; then echo "all game instances exited early"; break; fi
     NEW=$(comm -13 "$BEFORE_LIST" <(ls "$LOGDIR"/*.jsonl 2>/dev/null | sort) | wc -l)
     EL=$(( $(date +%s) - START ))
-    echo "  ... ${EL}s: $NEW new translog files (~$(( NEW / 2 )) games)"
+    echo "  ... ${EL}s: $NEW new translog files (~$(( NEW / 2 )) games), $ALIVE/$JOBS instances alive"
     [ "$NEW" -ge "$target_files" ] && { echo "reached target"; break; }
     [ "$EL" -ge "$TIMEOUT_S" ] && { echo "hit time cap"; break; }
 done
 
-kill "$GAMEPID" 2>/dev/null; wait "$GAMEPID" 2>/dev/null
+kill_all; wait 2>/dev/null
 trap - EXIT INT TERM
 
 # Harvest this run's logs.
