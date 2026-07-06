@@ -312,7 +312,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mTransSeq(0), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mTransSeq(0), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -1634,45 +1634,129 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     return clickMultiTarget(tc, picks);
 }
 
+//Scan a bundled-attacker reply for the set of attackers to send: "A<n>"
+//tokens (or bare numbers) in [1..nAttackers]. Returns >0 = that many named,
+//0 = an explicit decline (a "none/hold/pass" keyword with no numbers), and
+//-1 = unusable (empty or no signal at all -> caller falls back to Baka).
+//The 0/-1 split matters: attacking with nobody is a legitimate choice, so
+//"none" must NOT trigger the heuristic override the way a garbled reply does.
+static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out)
+{
+    out.assign(nAttackers, false);
+    int named = 0;
+    for (size_t i = 0; i < content.size(); i++)
+    {
+        //Accept "A3" or a bare "3"; skip digits that are part of a P/T echo
+        //like "2/2" by ignoring a number immediately preceded/followed by '/'.
+        char prev = (i > 0) ? content[i - 1] : ' ';
+        bool aPrefixed = (content[i] == 'A' || content[i] == 'a')
+                         && i + 1 < content.size() && isdigit(content[i + 1]);
+        //A bare number, but not one glued to a letter or the tail of a "2/2".
+        bool bareStart = isdigit(content[i]) && !isalnum(prev) && prev != '/';
+        if (!aPrefixed && !bareStart)
+            continue;
+        size_t j = aPrefixed ? i + 1 : i;
+        int n = 0;
+        while (j < content.size() && isdigit(content[j]))
+            n = n * 10 + (content[j++] - '0');
+        if (j < content.size() && content[j] == '/')
+            continue; //a "3/3" power echo, not an attacker index
+        if (n >= 1 && n <= (int) nAttackers && !out[n - 1])
+        {
+            out[n - 1] = true;
+            named++;
+        }
+        i = j; //advance past the number
+    }
+    if (named > 0)
+        return named;
+    //No numbers: distinguish an explicit decline from a garbled reply.
+    string lower;
+    for (size_t i = 0; i < content.size() && i < 200; i++)
+        lower += (char) tolower(content[i]);
+    if (lower.find("none") != string::npos || lower.find("hold") != string::npos
+        || lower.find("no attack") != string::npos || lower.find("nobody") != string::npos
+        || lower.find("pass") != string::npos || lower.find("don't attack") != string::npos)
+        return 0; //explicit "attack with nobody" - valid, not a fallback
+    return -1; //unusable
+}
+
 int AIPlayerGPT::chooseAttackers()
 {
     //Only drive the declare-attackers step; anywhere else, stay out of the way.
     if (mEndpoint.empty() || observer->getCurrentGamePhase() != MTG_PHASE_COMBATATTACKERS)
         return AIPlayerBaka::chooseAttackers();
+    if (mAttacksDoneTurn == observer->turn)
+        return 1; //this turn's attack was already declared in one reply
 
-    //Every creature that can legally attack is an opposed decision: attack
-    //or hold. Already-declared attackers drop out of the candidate set, so
-    //repeated ticks converge; held creatures simply never get clicked and
-    //the phase advances when priority passes (no clickstream => pass).
+    //Collect every creature that could attack this turn.
+    vector<MTGCardInstance *> attackers;
     CardDescriptor cd;
     cd.init();
     cd.setType("creature");
     MTGCardInstance * card = NULL;
     while ((card = cd.nextmatch(game->inPlay, card)))
+        if (!card->isAttacker() && card->canAttack())
+            attackers.push_back(card);
+    if (attackers.empty())
+        return 1;
+
+    //ONE bundled decision for the whole attack. Per-creature asks decided
+    //each attacker in isolation (a bad line for alpha strikes and racing)
+    //and cost N round trips; the model now plans the attack as a whole.
+    if (mMessages.empty() || mMessages[0].first != "system")
+        buildSystemPrompt();
+    std::ostringstream user;
+    if (!mEventLog.empty())
+        user << "Events since your last decision:\n" << mEventLog << "\n";
+    user << serializeGameState();
+    user << "\nCombat: declare ALL attackers for this turn in ONE decision.\n"
+            "Your creatures that can attack:\n";
+    for (size_t j = 0; j < attackers.size(); j++)
+        user << "A" << (j + 1) << ". " << attackers[j]->name
+             << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")\n";
+    user << "Reply with ONLY the numbers of the attackers you send, comma-separated"
+            " (e.g. \"A1, A3\"), or \"none\" to attack with nobody this turn.";
+    string userMsg = user.str();
+
+    string content;
+    if (pollCompletion(userMsg, content) == kChoicePending)
+        return 1; //decision in flight; nothing declared yet, re-poll next tick
+
+    vector<bool> send;
+    int result = content.empty() ? -1 : parseAttackerSet(content, attackers.size(), send);
+    if (!content.empty())
     {
-        if (card->isAttacker() || !card->canAttack())
+        mMessages.push_back(std::make_pair(string("user"), userMsg));
+        mMessages.push_back(std::make_pair(string("assistant"), content));
+    }
+    while (mMessages.size() > 41)
+        mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
+    mEventLog.clear();
+    writeTransLog("attackers", userMsg, content, result, (int) attackers.size());
+
+    if (result < 0)
+    {
+        //Unusable reply: the heuristic declares this turn's attack instead.
+        setNotice("model reply failed - the heuristic attacks", 5.0f);
+        mAttacksDoneTurn = observer->turn;
+        return AIPlayerBaka::chooseAttackers();
+    }
+
+    for (size_t j = 0; j < attackers.size(); j++)
+    {
+        if (!send[j] || !attackers[j]->canAttack())
             continue;
-
-        std::ostringstream q;
-        q << "Combat: declare attackers. Attack with " << card->name
-          << " (" << card->power << "/" << card->toughness << ")?";
-        vector<string> opts;
-        opts.push_back("Hold " + card->name + " back");
-        opts.push_back("Attack with " + card->name);
-        int pick = askModel(q.str(), opts);
-        if (pick == kChoicePending)
-            return 1; //declared attackers stand; the rest re-poll next tick
-        if (pick != 1)
-            continue; //hold, or model deferred -> do not attack with this one
-
-        if (card->attackCost)
+        if (attackers[j]->attackCost)
         {
             MTGAbility * a = observer->mLayers->actionLayer()->getAbility(MTGAbility::ATTACK_COST);
-            doAbility(a, card);
-            observer->cardClick(card, MTGAbility::ATTACK_COST);
+            doAbility(a, attackers[j]);
+            observer->cardClick(attackers[j], MTGAbility::ATTACK_COST);
         }
-        observer->cardClick(card, MTGAbility::MTG_ATTACK_RULE);
+        observer->cardClick(attackers[j], MTGAbility::MTG_ATTACK_RULE);
     }
+    mAttacksDoneTurn = observer->turn;
+    DebugTrace("AIPlayerGPT: declared attack (" << result << " of " << attackers.size() << ") in one reply");
     return 1;
 }
 

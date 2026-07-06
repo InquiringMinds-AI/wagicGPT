@@ -157,6 +157,11 @@ private:
     //otherwise re-prompt against the changed board).
     int mBlocksDoneTurn;
 
+    //Same for the bundled attacker declaration: the whole attack is decided
+    //in ONE reply, so the seam commits once per turn's combat and does not
+    //re-prompt the creatures it chose to hold.
+    int mAttacksDoneTurn;
+
     //Decision-transcript dump (config translog=1 / WAGIC_GPT_TRANSLOG):
     //one JSONL record per consumed decision - prompt-tuning raw material
     //and, accumulated, training data for a small shippable policy model.
