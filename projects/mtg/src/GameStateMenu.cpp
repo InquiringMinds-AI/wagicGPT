@@ -633,6 +633,28 @@ void GameStateMenu::Update(float dt)
                 break;
             }
 #endif
+            //Headless self-play harness: WAGIC_SELFPLAY=1 boots straight into
+            //an AI-vs-AI demo (both CPU players; with WAGIC_AI=gpt they are
+            //AIPlayerGPT), skipping all menu navigation so games run in bulk
+            //for prompt/strategy testing without driving the GUI. GameStateDuel
+            //completes the setup (endless tournament, both decks, play) when it
+            //sees the same env var; an external harness harvests the decision
+            //translogs and controls how many games run.
+            {
+                static bool autoSelfPlayTried = false;
+                if (!autoSelfPlayTried && getenv("WAGIC_SELFPLAY"))
+                {
+                    autoSelfPlayTried = true;
+                    fprintf(stderr, "WAGIC_SELFPLAY: auto-launching AI-vs-AI demo\n");
+                    hasChosenGameType = true;
+                    mParent->gameType = GAME_TYPE_DEMO;
+                    mParent->rules = Rules::getRulesByFilename("classic.txt");
+                    mParent->players[0] = PLAYER_TYPE_CPU;
+                    mParent->players[1] = PLAYER_TYPE_CPU;
+                    currentState = MENU_STATE_MAJOR_DUEL;
+                    break;
+                }
+            }
             if (!scrollerSet)
                 fillScroller();
             ensureMGuiController();

@@ -222,7 +222,22 @@ void GameStateDuel::Start()
         // only reset "Played Games" and "Victories" info if we didn't come here from within a match
         tournament->Start();
 
-        if (tournament->getOpLevel()< OPLEVEL_NEXT_GAME)
+        if (getenv("WAGIC_SELFPLAY"))
+        {
+            //Headless self-play: skip the "how many games" + deck-choice menus
+            //and boot straight into an endless AI-vs-AI demo. This replicates
+            //the MENUITEM_ENDLESSDEMO handler (enable endless, load both random
+            //AI decks) and jumps to DUEL_STATE_PLAY, whose entry calls
+            //game->startGame(). See the WAGIC_SELFPLAY hook in GameStateMenu.
+            tournament->enableTournamantMode(TOURNAMENTMODES_ENDLESS);
+            game->loadPlayer(0, mParent->players[0], tournament->getDeckNumber(0), premadeDeck);
+            game->loadPlayer(1, mParent->players[1], tournament->getDeckNumber(1), premadeDeck);
+            setAISpeed();
+            createDeckMenu = false;
+            SAFE_DELETE(deckmenu);
+            setGamePhase(DUEL_STATE_PLAY);
+        }
+        else if (tournament->getOpLevel()< OPLEVEL_NEXT_GAME)
             setGamePhase(DUEL_STATE_PREPARE_CNOGMENU);
         else
         {
