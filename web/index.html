@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>wagicGPT — board viewer</title>
+  <link rel="stylesheet" href="css/board.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>wagicGPT</h1>
+    <span class="sub">board viewer</span>
+    <span class="spacer"></span>
+    <label class="sub" for="fixture-picker">position</label>
+    <select id="fixture-picker"></select>
+    <button id="reload" title="re-render current position">↻ reload</button>
+    <span id="status"></span>
+  </header>
+
+  <main id="board"><!-- rendered from a BoardState document --></main>
+
+  <!-- classic scripts, load order matters; no bundler, opens from file:// -->
+  <script src="js/schema.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/connection.js"></script>
+  <script src="js/controls.js"></script>
+  <!-- fixtures self-register into the connection registry -->
+  <script src="fixtures/nightmare-mirror-attackers.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
