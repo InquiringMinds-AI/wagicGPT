@@ -230,8 +230,17 @@ void GameStateDuel::Start()
             //AI decks) and jumps to DUEL_STATE_PLAY, whose entry calls
             //game->startGame(). See the WAGIC_SELFPLAY hook in GameStateMenu.
             tournament->enableTournamantMode(TOURNAMENTMODES_ENDLESS);
-            game->loadPlayer(0, mParent->players[0], tournament->getDeckNumber(0), premadeDeck);
-            game->loadPlayer(1, mParent->players[1], tournament->getDeckNumber(1), premadeDeck);
+            //Matchup override: the harness pins a specific pairing via
+            //WAGIC_SELFPLAY_DECK0/1 (deck NUMBERS -> ai/baka/deck<N>.txt, see
+            //AIPlayer.cpp createAIPlayer). Unset -> the endless-demo default.
+            const char * d0env = getenv("WAGIC_SELFPLAY_DECK0");
+            const char * d1env = getenv("WAGIC_SELFPLAY_DECK1");
+            int selfplayD0 = d0env ? atoi(d0env) : tournament->getDeckNumber(0);
+            int selfplayD1 = d1env ? atoi(d1env) : tournament->getDeckNumber(1);
+            if (d0env || d1env)
+                fprintf(stderr, "WAGIC_SELFPLAY: matchup deck%d vs deck%d\n", selfplayD0, selfplayD1);
+            game->loadPlayer(0, mParent->players[0], selfplayD0, premadeDeck);
+            game->loadPlayer(1, mParent->players[1], selfplayD1, premadeDeck);
             setAISpeed();
             createDeckMenu = false;
             SAFE_DELETE(deckmenu);
@@ -844,6 +853,19 @@ void GameStateDuel::Update(float dt)
 
         if (game->didWin())
         {
+            //One-shot self-play: the harness runs ONE game per process, so on
+            //game-over emit the winner (for win-rate) and exit cleanly. The
+            //translog is durable per-decision (AIPlayerGPT opens/append/closes
+            //each write), so nothing is lost. Skips all endless/tournament
+            //restart logic below. Unset WAGIC_SELFPLAY_ONESHOT -> unchanged.
+            if (getenv("WAGIC_SELFPLAY") && getenv("WAGIC_SELFPLAY_ONESHOT"))
+            {
+                int selfplayWinner = game->didWin(game->players[0]) ? 0
+                                   : (game->didWin(game->players[1]) ? 1 : -1);
+                fprintf(stderr, "WAGIC_SELFPLAY_RESULT winner=%d\n", selfplayWinner);
+                fflush(stderr);
+                exit(0);
+            }
             //the following section will be called only in a classic or demo gamemode and if a tournament or match with more than one game is activ
             if ( (mParent->gameType == GAME_TYPE_COMMANDER || mParent->gameType == GAME_TYPE_CLASSIC || mParent->gameType == GAME_TYPE_DEMO) && mParent->players[1] == PLAYER_TYPE_CPU && (tournament->isTournament() || tournament->getGamesToPlay()>1 ))
             {
