@@ -1,0 +1,86 @@
+Deck identity: this is a BLUE-RED SPELLSLINGER TEMPO deck. You do not have big
+creatures. You win by chipping the opponent to 0 with Guttersnipe pings and
+small token attackers, while your cheap counters and bounce spells stop
+anything scary. Almost every spell you own is an INSTANT you cast on the
+OPPONENT'S turn. Your two payoff creatures turn each of those spells into extra
+damage and extra bodies. Play patiently, but DO cast your spells - a hand of
+held counters that never fire just loses to the clock.
+
+THE ENGINE (this is how you win - get a payoff down, then chain cheap spells):
+- Young Pyromancer (1R, 2/1): every instant or sorcery you cast makes a 1/1
+  red Elemental token.
+- Guttersnipe (2R, 2/2): every instant or sorcery you cast deals 2 damage to
+  the opponent - this is your main way to close the game.
+- SEQUENCE: play Young Pyromancer or Guttersnipe FIRST, then start casting your
+  counters, Downsize, card-draw, and bounce. With Guttersnipe out, a 1-mana
+  Downsize also deals 2 to the face; a Counterspell also deals 2. With
+  Pyromancer out, each of those also leaves a 1/1 behind. Once a payoff is on
+  the board, your "reactive" spells are also your offense - cast them freely.
+- Prism Ring: when it enters, CHOOSE BLUE. Most of your spells are blue, so
+  blue gains you the most life. (Do not choose red.)
+
+WHO IS THE BEATDOWN:
+- Against slow / big / control decks: YOU are the beatdown. Land Guttersnipe
+  and Young Pyromancer early, protect them with counters, and grind the
+  opponent down 2 at a time. Do not just sit back - you have no late-game
+  bomb, so you must be applying pressure.
+- Against aggressive decks (lots of small fast creatures, Hellrider, affinity):
+  YOU are the control. Survive first. Deploy Young Pyromancer / Guttersnipe /
+  tokens as BLOCKERS and actually block. Use Aetherize, Hydrolash, and Downsize
+  to blunt their attacks. Counter their most dangerous creature. Stabilize,
+  then let Guttersnipe close.
+
+YOUR SPELLS AND WHEN TO CAST THEM:
+- Counterspell (UU) / Dissipate (1UU) / Essence Scatter (1U): HOLD these. Only
+  cast a counter when the opponent actually casts a spell you want to stop, in
+  response to it. Essence Scatter can ONLY counter a creature spell. NEVER cast
+  a counter when nothing is on the stack (e.g. on an end step with no target) -
+  that just throws the card away. Leave the mana up and wait.
+- Downsize (U): a DEFENSIVE combat trick - target attacker gets -4/-0 (less
+  power) this turn. It does NOT kill anything and does nothing outside combat.
+  Cast it ONLY when the opponent has DECLARED ATTACKERS, on their biggest
+  attacker, to save your life or your blocker. Overload (2U) gives EVERY
+  attacker -4/-0 - use that to fog a wide attack. Do NOT cast Downsize on your
+  own main phase or into an empty board.
+- Aetherize (3U): return ALL attacking creatures to hand. This is a blowout -
+  hold it until the opponent commits a big attack, then cast it during their
+  declare-attackers step to erase the whole swing and set them back turns. Do
+  not let attacks through while sitting on Aetherize.
+- Hydrolash (2U): attacking creatures get -2/-0 AND you draw a card. A cheap
+  fog that replaces itself - cast it when the opponent alpha-strikes.
+- Cyclonic Rift (1U, or overload 6U): early, bounce one problem permanent if
+  you must. But the DREAM is the overload: at 7 mana, return EVERY nonland the
+  opponent controls to their hand at instant speed. Hold Rift for the overload
+  when the game is grindy and you can blow them out - it is your best card.
+- Artificer's Epiphany (2U): draw 2 at instant speed. You control artifacts
+  (Prism Ring, Elixir), so you usually avoid the discard - keep a Prism Ring or
+  Elixir on the board before firing it. Cast on the opponent's end step.
+- Opportunity (4UU): draw 4. Cast at the end of the opponent's turn when you
+  have nothing better to do with the mana.
+- Elixir of Immortality (1, then 2 + tap): gain 5 life and recycle your
+  graveyard. Use it against aggro to buy turns, or late to avoid decking.
+
+TIMING RULES (this deck lives at instant speed):
+- On YOUR turn: play a land, cast a payoff creature (Pyromancer/Guttersnipe) or
+  a needed permanent, and otherwise PASS with mana up.
+- On the OPPONENT'S turn: this is when you act. Counter their spell, Downsize or
+  Aetherize their attack, or cast card-draw on their end step.
+- Leave your interaction mana untapped. Open blue mana represents a counter and
+  makes the opponent play scared even when you are bluffing.
+
+DO NOT (these are real mistakes seen with this deck):
+- Do NOT fire Downsize, counters, or other reactive spells into an empty board
+  / on your own main phase / on an end step with no target. Hold them.
+- Do NOT hold Aetherize while the opponent attacks you for big chunks - use it.
+- Do NOT durdle. Casting Prism Rings and passing turn after turn while your life
+  drops loses the game. Deploy a payoff and pressure, or interact - do one.
+- Do NOT decline every block while an aggro deck beats you down. Block with your
+  tokens and 2/x creatures; chump if you must to survive.
+- Do NOT choose red for Prism Ring - choose BLUE.
+- Do NOT waste Cyclonic Rift single-target early if you can hold it for the
+  overload blowout.
+
+MULLIGAN: keep 2-4 lands with at least one blue source and some action - ideally
+a payoff (Young Pyromancer / Guttersnipe) or cheap interaction (a counter,
+Downsize). A hand of only lands and Prism Rings with no threats or answers is a
+mulligan.

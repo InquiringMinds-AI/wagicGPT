@@ -1,0 +1,60 @@
+# AI Opponent Redesign — What We Need To Solve
+Working notes, 2026-07-06. Design anchor for the DEFERRED LLM-opponent-feature work.
+(Direction as of this date: squash NON-LLM engine bugs FIRST; this doc is the LLM-opponent track, addressed after.)
+
+## Core diagnosis (the unifying frame)
+`AIPlayerGPT extends AIPlayerBaka` — the LLM was **grafted** onto the heuristic AI's decision plumbing, which was built for **deterministic logic operating on internal state it never had to externalize**. There is no interface designed for a *reasoning* AI. Every "representation" finding below is a symptom of that graft, not an isolated bug.
+
+## The target: an AI decision interface (a DecisionRequest -> Action contract)
+Mirror image of the **BoardState contract** we built for the `web/` frontend (which decoupled render from game logic). The AI side needs its analog: the engine emits a self-contained **DecisionRequest**; the agent returns an **Action**. This decouples the AI's decision interface from Baka's heuristic internals; any AI (heuristic OR LLM) consumes the same contract.
+
+The contract must provide:
+- **Self-contained decision context** — the deciding fact is ON each option (effect, current magnitude, benefit-not-just-cost). No recall from a far-away deck blob.
+- **Rules-valid action sets only** — no illegal casts / targetless targeted spells in the set.
+- **Free choice, not veto** — the agent picks the action; the heuristic isn't pre-choosing it.
+- **No heuristic-internal leakage** — Baka's efficiency scores are not the agent's business.
+- **Compact, correct history** — current state sent fresh once + what *happened* + the agent's own prior decisions/plan; NOT a stack of stale full board snapshots.
+
+## Work list (prioritized)
+
+### P0 — History / prompt representation  [VERIFIED in code 2026-07-06]
+Current impl (`AIPlayerGPT.cpp`): a **windowed conversation transcript**. `buildRequestBody` (728-732) sends system + the running `(decision-prompt, reply)` pairs + the current prompt. After each reply the prompt+reply are appended (889-890). Window (896-897): `while (mMessages.size() > 41) erase(begin+1, begin+3)` = keep system + the most recent **20 exchanges**. Each historical "user" turn is a **full board serialization**; the code's own comment (895) admits "old states are superseded by the snapshot we resend." So up to ~20 STALE full snapshots stack ahead of the current one -> attention dilution for a weak model, token bloat, and an unstable prefix that defeats prefix caching. **FIX:** send current state fresh once + a compact history (events + own decisions/plan), not full stale re-dumps. This is a first-class contract decision: separate CURRENT decision context from a COMPACT running history (they are currently conflated).
+
+### P1 — Decision presentation  [highest leverage, lowest risk; the biggest play-quality lever found]
+Option lines hide the deciding fact -> the weak model picks near-arbitrarily. FIX in `serializeGameState` / `describeAction`:
+- Target options carry the card's **effect / role tag** (threat/removal/counter/ramp/draw/land). Bare names -> arbitrary discard/removal picks (deck133: stripped a mana rock + mana dork over a card-advantage engine).
+- State-computed payoffs carry **current magnitude** (Gray Merchant "drains 2 now"; X-spells; "for each" effects; overrun).
+- Sacrifice-for-value actions show **BENEFIT not just cost** (fetch crack shows only `[cost: Life,Tap,Sacrifice]` -> qwen reads pure downside, never cracks; deck135).
+- **Equipment attachment** on the board line (which creature it's on / equipped flag) — currently invisible, can't tell a working Cranial Plating from a spare (deck110).
+- **Artifact-count / metalcraft** status line (deck110).
+- **Static/keyword abilities** on the board line (Bloodghast "can't block"; deck133) — lower priority.
+
+### P2 — Rules-valid action sets  [ENGINE CORRECTNESS — may belong in the NON-LLM track]
+- **ILLEGAL CASTS OFFERED (bug).** Targeted spells with no legal target offered as legal (Go for the Throat vs all-artifact board; Essence Scatter on empty stack; Downsize into creatureless board). MTG rule 601.2c: a spell that REQUIRES a target can't be cast with no legal target; spells with NO target or "up to N" CAN. ⚠ Do NOT over-filter — casting a legally-castable spell for ANOTHER CARD'S TRIGGER (Guttersnipe/Young Pyromancer/prowess/storm) is legitimate; never block a spell just because its own effect looks null. Fix the rules engine's legal-move set (affects Baka too, not just GPT).
+- **BLANK effect-name target prompt (bug).** `"Choose the target for "` with the `{name}` never substituted, offering only the caster's own creatures (game 1783314190 rec 17). Template-substitution failure; trace the emitting seam.
+
+### P3 — Free-choice card play  [BREAKS THE GRAFT — load-bearing]
+`FindCardToPlay` is **propose-then-veto**: Baka chooses the card, the LLM only approves/holds. Card **selection** is Baka's -> on the decks Baka most fumbles, the LLM is capped no matter how good the guide is. The full free-choice card-play rewrite removes this. (NOTE: in the pool7 corpus the finishers WERE offered — Rakdos's Return offered 76x, qwen passed — so THAT passivity was real qwen behavior, not Baka hiding cards; but veto-only remains the structural ceiling.)
+
+### P4 — Prompt hygiene / cleanups
+- **Drop the `(heuristic score N)` leak** (`mShowHints`). Baka's currency in the reasoning model's prompt is a crutch/anchor; removing it dissolves the hints confound at the ROOT (not just via a `HINTS=0` flag).
+- **De-dup identical option lines** (fetch -> 9 byte-identical basics; deck133/135).
+- **Normalize mana-cost rendering**: options show `{{1}{u}}` (double-brace lowercase) vs the taught `{2}{R}` (deck131).
+- **Collapse event-log phase-spam** (`Phase: ---` placeholders, untap->draw runs; deck131/133/135).
+- **Option ordering**: put the usually-correct option FIRST and traps LAST (self-burn target listed second), and do NOT list "pass/Hold" first — the model favors option 1 (positional anchoring: Prism Ring always picked option 3; "Hold" first likely drives the 82% pass; deck131/140/109).
+- **Skip the model call when only "pass" is legal** (wasted inference; games are inference-bound; deck135/109).
+- **Normalize inconsistent verbs** for the same action (fetch: "search basic land" vs "Put in Play"; deck135).
+
+## Methodology
+- Future test corpora: **`WAGIC_GPT_HINTS=0`** — strip Baka's scores so we measure qwen+guide, not qwen-following-Baka.
+- Migration = **strangler pattern**: move ONE decision seam onto the clean contract at a time; suite 915 as the net. NOT a big-bang rewrite. Same approach as the parked engine/render-decoupling note, aimed at the AI interface.
+- The guides are real and worth keeping, but a guide **cannot repair an interface that hides the deciding fact** — P1 (and P0) come before pouring more effort into guide wording.
+
+## What the strategy-design process produced (staged, NOT promoted to live Res/)
+Under `projects/mtg/strategy-design/`:
+- `wave2/general-strategy.txt` — the NEW general guide (passivity fix; instant-vs-non-instant timing with 2nd-main default; bluffing paragraph cut; choose-by-impact; complete-synergies; answers-vs-reach; lethal-check; reworded cost paragraph). ~31 lines.
+- `wave2/strategy-writing-skill.md` — the unified strategy-writing skill (incl. "instantiate, don't restate").
+- `wave1/deckN/strategy.txt` (7) — first-draft per-deck guides (44/135/140/131/110/109/133).
+- `archive/wave1-skills/` (7) — the divergent per-deck skills, wave-one designs.
+- `wave1/deckN/{general-suggestions,findings}.md` — inputs + the findings backlog.
+Promote to `bin/Res/ai/gpt/system_prompt.txt` + `deckN_strategy.txt` only AFTER user review (`git add -f` for Res; NO AI-attribution). ⚠ These were generated with hints ON / veto-only card-play, so re-validate under `HINTS=0` once P-items land.

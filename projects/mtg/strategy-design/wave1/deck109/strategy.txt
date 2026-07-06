@@ -1,0 +1,77 @@
+Deck identity: MONO-RED AGGRO (RDW), "Hellrider." You have cheap hasty creatures
+and direct-damage burn, and no way to grind - you win by dealing 20 fast and
+running the opponent out of life before turn 6-8. You are the BEATDOWN in almost
+every matchup. Your job is to kill the opponent, NOT to trade evenly, not to
+durdle, not to survive. Every point of damage matters.
+
+THE #1 RULE - BURN IS DAMAGE, NOT REMOVAL. THROW IT AT THE FACE.
+- Pillar of Flame ({R}, 2 dmg) and Searing Spear ({1}{R}, 3 dmg) are your REACH -
+  the last few points that finish a game the creatures started. DEFAULT: aim every
+  burn spell at THE OPPONENT (their face).
+- Point burn at a CREATURE only for one of these reasons:
+    (a) it is a blocker, and killing it lets MORE total damage through this turn
+        than the burn's face value (e.g. remove the one blocker so your team of
+        attackers connects), OR
+    (b) it gains the opponent life, or it is a blocker bigger than every creature
+        you have and is stopping ALL your attacks.
+  Otherwise, FACE.
+- DO NOT hoard burn. Sitting on Pillar/Searing Spear turn after turn while the
+  opponent stays alive is the single worst thing this deck does. If you are not
+  killing a blocker with it, cast it at the opponent's face THIS turn. Never end a
+  game with unused burn in hand.
+- Pillar of Flame EXILES what it kills. Use Pillar (not Searing Spear) on creatures
+  that come back from the graveyard (e.g. Bloodghast).
+- Searing Spear is an instant: you may also fire it on the opponent's turn or in
+  combat (kill a blocker, or finish them at end of turn). Pillar is a sorcery - only
+  on your own main phase.
+
+ATTACK EVERY TURN WITH EVERYTHING.
+- Declare every creature that can attack, every turn. Do not hold creatures back to
+  block - you are the aggressor and you win by dealing damage, not saving it.
+- Your creatures have haste (Ash Zealot, Legion Loyalist, Hellrider) or grow by
+  attacking (Stromkirk Noble) - swing the turn they land.
+- Trading a small attacker into a blocker is FINE when you are ahead on the race:
+  you are spending a cheap creature to push damage or clear the way. Don't flinch
+  from attacks just because a creature might die.
+
+LETHAL CHECK - do this before combat every turn once the opponent is low:
+  damage that connects = (power of your unblocked attackers)
+                       + (1 for EACH attacker, if Hellrider is in play)
+                       + (2 per Pillar and 3 per Searing Spear you can cast at face)
+  If that total >= opponent's life, GO FOR IT: attack with everyone and fire all
+  burn at the face. Do not leave lethal on the table holding cards "for later."
+
+KEY CARDS - HOW TO USE THEM:
+- Hellrider ({2}{R}{R}, 3/3 haste): whenever ANY creature you control attacks, it
+  pings the opponent 1. This makes GOING WIDE lethal - each attacker deals 1 to the
+  face EVEN IF IT IS BLOCKED. With Hellrider out, attack with every creature and
+  every token; the 1-per-attacker adds up fast. This is your best payoff - protect
+  it and attack alongside it.
+- Krenko's Command ({1}{R}): makes two 1/1 goblins. Great with Hellrider (2 extra
+  face pings per attack) and with Legion Loyalist (a 3rd/4th body for Battalion).
+- Legion Loyalist ({R}, 1/1 haste): BATTALION - when it and 2+ other creatures
+  attack together, your whole team gains first strike + trample and can't be blocked
+  by tokens. So when you have 3+ attackers, ATTACK WIDE to turn this on - it wins
+  combats and pushes trample damage through blockers.
+- Stromkirk Noble ({R}, 1/1): can't be blocked by Humans, and gets a +1/+1 counter
+  every time it hits the opponent. Attack with it EVERY turn - it snowballs into a
+  huge unblockable threat. Prioritize keeping it alive.
+- Rakdos Cackler ({B/R}) and Gore-House Chainwalker ({1}{R}): UNLEASH - when asked,
+  ALWAYS take the +1/+1 counter (enter as a 2/2 / 3/2). You are the beatdown and
+  don't need them to block; the extra power matters. (Only decline the counter if
+  you genuinely need that creature as a blocker to avoid losing - rare.)
+- Ash Zealot ({R}{R}, 2/2 first strike, haste): attack the turn it lands; first
+  strike means it wins fights against 2-toughness-or-less blockers for free.
+- Boros Reckoner ({R}{R}{R} castable, 3/3): whenever it's dealt damage it deals that
+  much to any target - opponents hate blocking it, so attack freely. You can pay {R}
+  to give it first strike in combat. A strong, sticky attacker.
+
+MULLIGAN: keep almost any hand with 2-4 lands and at least one or two cheap plays
+(a 1- or 2-drop, or burn). This deck floods the board fast, so a hand light on lands
+but full of 1-drops is often fine. Mulligan only hands with 0-1 land or all lands.
+
+DO NOT:
+- Hold burn in hand while the opponent stays alive - fire it at the face.
+- Leave creatures home "to block" - you are the aggressor; attack.
+- Decline Unleash - take the counter.
+- Play the control game or try to trade evenly - you lose the long game; race.

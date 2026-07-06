@@ -1,0 +1,85 @@
+Deck identity: mono-black midrange. You attack from TWO angles at once - strip
+their HAND with discard, kill their creatures with cheap removal - while your
+own black permanents pile up "devotion" (each {B} in a permanent's mana cost)
+for one big payoff: Gray Merchant of Asphodel. You grind the opponent out of
+resources, drain their life, and win late. You are not a fast deck; you are the
+deck that still has cards when theirs run out.
+
+WHO YOU ARE BY MATCHUP (decide this first, every game):
+- vs AGGRO / BURN (lots of cheap creatures, direct-damage spells): YOU ARE THE
+  CONTROL. Survive. Kill their creatures with removal, drain life back with Gray
+  Merchant, wall the board with Phyrexian Obliterator. Do NOT just chip in with
+  one small attacker while they race you - stabilize first.
+- vs CONTROL (counterspells, card draw, few creatures): YOU ARE THE BEATDOWN.
+  Strip their counters and removal with discard, jam your threats, and ATTACK.
+  Do not sit back and durdle - a control deck beats you if the game goes long.
+- vs MIDRANGE / other creature decks: grind. Trade one-for-one, remove their
+  best threat, and win with Gray Merchant's drain plus Phyrexian Arena's cards.
+
+GRAY MERCHANT OF ASPHODEL - your payoff. It drains the opponent for your
+devotion to black (count the {B} symbols in the mana costs of YOUR permanents;
+LANDS DO NOT COUNT) and you gain that much life.
+- RULE: NEVER cast Gray Merchant as your only black permanent - that drains for
+  just 2. Build a black board FIRST (Bloodghast BB, Geralf's BBB, Obliterator
+  BBBB, the Lilianas, Yawgmoth all add pips), THEN cast it for a 5+ drain.
+- A big Gray Merchant swings the life totals and wins the race against aggro.
+- Late game, use Liliana the Last Hope's -2 to return Gray Merchant to hand and
+  drain them a second time.
+
+DISCARD (Thoughtseize, Inquisition of Kozilek, Collective Brutality) - cast it
+EARLY, turn 1 if you can, before they get to use the card. When you choose which
+card to take, TAKE THE MOST DANGEROUS CARD YOU CANNOT ANSWER LATER:
+- vs control: take COUNTERSPELLS, SWEEPERS, and card-draw ENGINES so your
+  threats resolve.
+- vs aggro: take BURN aimed at your face (you have removal for their creatures,
+  but nothing for burn to the face) and their strongest creature.
+- NEVER strip their weakest card. A mana rock or mana dork (things like
+  Astrolabe, Boreal Druid) or a tiny vanilla creature is almost never the right
+  take when a sweeper, counter, bomb, or burn spell is in their hand.
+- Inquisition only takes a card of mana value 3 or less. Thoughtseize takes
+  anything but costs you 2 life - don't Thoughtseize when you are low vs aggro.
+
+FATAL PUSH - an INSTANT. Destroys a creature of mana value 2 or less (4 or less
+if one of your permanents left play this turn - a cracked fetchland or a dying
+Bloodghast enables this). HOLD IT. Do not fire it on your own main phase unless
+you have to. Wait for their scariest cheap creature, or their attack step.
+
+YOUR THREATS:
+- Bloodghast (2/1) CAN'T BLOCK, and returns from your graveyard every time you
+  play a land. Haste only when the opponent is at 10 or less. It is a relentless
+  attacker and free devotion/sacrifice fodder that always comes back - it is
+  also your BEST card to discard to Collective Brutality's escalate or Yawgmoth
+  (you get it back with a land drop). Never rely on it to block.
+- Geralf's Messenger (3/3) enters tapped, drains 2 when it enters, and has
+  undying (comes back bigger when it dies - draining 2 AGAIN). Perfect fodder
+  for Yawgmoth: sacrifice it, it returns, drains again.
+- Phyrexian Obliterator (5/5 trample, costs BBBB = 4 devotion by itself).
+  Whenever anything damages it, that source's controller sacrifices that many
+  permanents. Opponents cannot profitably block it or burn it. Drop it vs aggro
+  as a wall they cannot remove and a fast clock.
+
+YOUR ENGINES:
+- Yawgmoth, Thran Physician: pay 1 life + sacrifice another creature to put a
+  -1/-1 counter on a creature and draw a card. Strong removal + card draw, but
+  ONLY with fodder (Bloodghast, Geralf's, tokens). Do NOT cast it when you have
+  no other creature to feed it - it does nothing.
+- Liliana of the Veil: +1 makes BOTH players discard (use it when their hand is
+  better than yours). -2 forces a player to sacrifice a creature - use it to
+  kill a threat too big for Fatal Push.
+- Liliana, the Last Hope: +1 gives a creature -2/-1 - kills X/1s and shrinks
+  attackers, excellent vs aggro and tokens. -2 returns a creature (rebuy Gray
+  Merchant). Protect her loyalty with +1 when under attack.
+- Phyrexian Arena: draws you an extra card each turn for 1 life. Great in the
+  grind; go easy on it when you are low vs aggro.
+
+SEQUENCING:
+- Play a land BEFORE your spells (it also returns Bloodghast).
+- Early: land + discard their best card, or hold cheap removal.
+- Mid: deploy black threats, remove theirs, build devotion.
+- Late: Gray Merchant for a big drain, then attack to close. Rebuy it with
+  Liliana if the game grinds on.
+
+DO NOT: cast Gray Merchant with no other black permanents out; strip their
+weakest card with discard when a game-swinging one is there; fire Fatal Push
+early or at sorcery speed when you could hold it; cast Yawgmoth with no fodder;
+race a faster aggro deck instead of removing their creatures and draining life.

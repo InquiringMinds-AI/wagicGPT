@@ -1,0 +1,74 @@
+Deck identity: "Etched Affinity" is a fast URB artifact-aggro deck. Almost
+every card is an artifact, so your creatures come down for free or nearly
+free and your cheap payoffs get huge. You are the BEATDOWN in nearly every
+matchup: dump artifacts, EQUIP Cranial Plating, and kill the opponent by
+turn 4-6. Play fast and pressure their life total. Only shift to defense if
+you are clearly getting raced and have no equipped attacker.
+
+#1 RULE - EQUIP CRANIAL PLATING. THIS WINS THE GAME.
+Cranial Plating gives the creature it is attached to +1/+0 for EACH artifact
+you control - usually +4 or +5. An UNEQUIPPED Plating sitting on the
+battlefield does NOTHING. Casting Plating is only step one; you MUST then
+equip it.
+- When you see a priority action "Equip with Cranial Plating targeting X
+  [cost: {1}]", TAKE IT. Equipping is almost always your best play. Do not
+  pass (0) while a Plating is unequipped and you have {1} open.
+- To equip you need {1} of mana untapped, so DO NOT TAP OUT. Every turn,
+  leave one land untapped so you can equip.
+- ONE equipped Plating is plenty. Do NOT cast a second or third Plating just
+  to "use mana" - a spare copy in play is a dead card. Cast creatures
+  instead, or hold the Plating and keep mana up to equip the first one.
+- Equip Plating onto your best carrier, in this order:
+  1. Etched Champion (with 3+ artifacts it has protection from all colors -
+     colored decks CANNOT block or kill it, so it is an unstoppable beater).
+  2. A flyer - Vault Skirge or Ornithopter - evasion the opponent can't block.
+  3. Signal Pest (can't be blocked except by fliers/reach - also evasive).
+  A pumped evasive creature ends the game in 2-3 swings.
+
+DEPLOY CREATURES EVERY TURN. You cannot win with no board.
+Your cheap threats: Memnite (0 mana 1/1), Ornithopter (0 mana 0/2 flier),
+Signal Pest (1 mana), Vault Skirge (1 mana flier lifelink), Steel Overseer
+(2), Etched Champion (3), Master of Etherium (3). Play out your creatures
+early and often. A hand full of Platings and burn with no creatures is a
+LOSS - get bodies down first, THEN equip and attack.
+
+KEY CARDS:
+- Signal Pest: ALWAYS attack with it, even at 0 power. Its battle cry pumps
+  every OTHER attacker +1/+0, and it can't be blocked except by fliers. It
+  is free damage and free team pump - never hold it back.
+- Steel Overseer: TAP IT every one of your turns ({T}: +1/+1 counter on all
+  your artifact creatures). The counters are permanent and stack, so an
+  Overseer that lives 2-3 turns snowballs your whole team. Protect it.
+- Master of Etherium: its power/toughness = your artifact count, AND it gives
+  your other artifact creatures +1/+1. A game-ending anthem + body. Cast it
+  once your board is developed.
+- Mox Opal: with 3+ artifacts it taps for any color. Free mana - use it to
+  cast an extra spell or to keep a land open for equipping.
+- Thoughtcast: draw 2, and affinity makes it cost as little as {U}. Cast it
+  to refuel when your hand is nearly empty. Don't cast it if you'd rather be
+  equipping or attacking this turn.
+- Galvanic Blast: 2 damage, but 4 damage with metalcraft (3+ artifacts),
+  which you almost always have. It is your reach and removal - HOLD it. Point
+  it at the OPPONENT'S FACE for the kill, or kill a blocker in the way of
+  your equipped attacker. NEVER target yourself. Don't burn a small creature
+  early when you could save 4 to the face.
+
+METALCRAFT: controlling 3+ artifacts turns on Galvanic Blast (4 dmg), Etched
+Champion (protection), and Mox Opal (mana). Darksteel Citadel is an artifact
+LAND and counts. You reach 3 artifacts almost immediately - assume metalcraft
+is ON.
+
+COMBAT: attack every turn you can profitably. You are the aggressor. Send
+evasive creatures (fliers, Signal Pest, protected Etched Champion) in freely -
+they rarely get blocked. Don't attack with a 0-power creature that has no
+Plating and no battle cry benefit (a lone unequipped Ornithopter does nothing).
+
+MISTAKES TO AVOID (seen in real games with this deck):
+- Casting Cranial Plating and NEVER equipping it - the single biggest way this
+  deck loses. Equip it.
+- Tapping out so you have no {1} left to equip. Keep a land open.
+- Casting a 2nd/3rd Plating instead of a creature - redundant Platings are
+  dead cards. Develop threats.
+- Firing Galvanic Blast early at a small creature instead of holding 4 damage
+  for the face or a key blocker.
+- Sitting back passively - this deck races and wins the race. Attack.
