@@ -1,0 +1,25 @@
+# PLAIN(grant subfamily): Casting of Bones — enchanted creature dies: draw 3, then discard.
+# CS-012-relevant part (trigger payload draw:3) WORKS. Pre-existing card infidelity
+# (not a trigger fizzle): the discard is a transforms-granted activatable, never forced,
+# and the transformed aura stays on the battlefield instead of going to the graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears
+hand:casting of bones,terror
+manapool:{3}{B}{B}
+library:forest,forest,forest
+[PLAYER2]
+[DO]
+casting of bones
+grizzly bears
+terror
+grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:casting of bones
+hand:forest,forest,forest
+graveyard:grizzly bears,terror
+[PLAYER2]
+[END]

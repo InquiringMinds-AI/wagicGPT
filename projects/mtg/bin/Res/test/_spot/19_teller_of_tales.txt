@@ -1,0 +1,21 @@
+# MAY: Teller of Tales — cast Spirit/Arcane: may tap target creature (also has untap line).
+# Accept the tap on Grizzly Bears, decline the second menu.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:teller of tales,grizzly bears
+hand:kami of ancient law
+manapool:{1}{W}
+[PLAYER2]
+[DO]
+kami of ancient law
+choice 0
+grizzly bears
+choice 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:teller of tales,grizzly bears,kami of ancient law
+tappedinplay:1
+[PLAYER2]
+[END]

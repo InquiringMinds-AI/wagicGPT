@@ -1,0 +1,21 @@
+# MAY: Cloudhoof Kirin (mc=2 line) — cast 2-mv Spirit: may mill 2 target player.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:cloudhoof kirin
+hand:kami of ancient law
+manapool:{1}{W}
+[PLAYER2]
+library:forest,forest
+[DO]
+kami of ancient law
+choice 0
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:cloudhoof kirin,kami of ancient law
+manapool:{0}
+[PLAYER2]
+graveyard:forest,forest
+[END]

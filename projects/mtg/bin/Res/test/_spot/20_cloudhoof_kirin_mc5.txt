@@ -1,0 +1,21 @@
+# MAY: Cloudhoof Kirin (mc=5 line) — cast 5-mv Spirit (Teller of Tales): may mill 5.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:cloudhoof kirin
+hand:teller of tales
+manapool:{3}{U}{U}
+[PLAYER2]
+library:forest,forest,forest,forest,forest
+[DO]
+teller of tales
+choice 0
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:cloudhoof kirin,teller of tales
+manapool:{0}
+[PLAYER2]
+graveyard:forest,forest,forest,forest,forest
+[END]

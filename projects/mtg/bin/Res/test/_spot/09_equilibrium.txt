@@ -1,0 +1,22 @@
+# PLAIN(pay-gated): Equilibrium — cast a creature: pay {1} to bounce target creature.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:equilibrium
+hand:grizzly bears
+manapool:{2}{G}
+[PLAYER2]
+inplay:raging goblin
+[DO]
+grizzly bears
+choice 0
+choice 0
+raging goblin
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:equilibrium,grizzly bears
+manapool:{0}
+[PLAYER2]
+hand:raging goblin
+[END]

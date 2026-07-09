@@ -1,0 +1,26 @@
+# MAY: Jace's Erasure — whenever you draw: may mill 1 target player. Divination = 2 triggers.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:jace's erasure
+hand:divination
+manapool:{2}{U}
+library:mountain,mountain
+[PLAYER2]
+library:forest,forest
+[DO]
+divination
+choice 0
+p2
+choice 0
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:jace's erasure
+hand:mountain,mountain
+graveyard:divination
+manapool:{0}
+[PLAYER2]
+graveyard:forest,forest
+[END]

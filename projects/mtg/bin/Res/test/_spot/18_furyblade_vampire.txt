@@ -1,0 +1,19 @@
+# MAY: Furyblade Vampire — @each my combatbegins (hand>0): may discard a card (+3/0 ueot).
+# Discard reaching the graveyard proves the targeted may-payload ran.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:furyblade vampire
+hand:forest
+[PLAYER2]
+[DO]
+goto combatbegins
+choice 0
+forest
+[ASSERT]
+combatbegins
+[PLAYER1]
+inplay:furyblade vampire
+graveyard:forest
+[PLAYER2]
+[END]

@@ -743,6 +743,16 @@ int TestSuite::loadNext()
 #else
         thread_count = 4;
 #endif
+        //WAGIC_TESTSUITE_THREADS=1 runs the suite single-threaded (main
+        //thread only) - the discriminator for the threaded-flake family
+        //(CS-007/CS-017): a test that fails multi-threaded but is clean
+        //single-threaded is a race, not a game bug.
+        if (const char * tcount = getenv("WAGIC_TESTSUITE_THREADS"))
+        {
+            int n = atoi(tcount);
+            if (n >= 1 && n <= 64)
+                thread_count = (size_t)n;
+        }
         for(size_t i = 0; i < (thread_count-1); i++)
             mWorkerThread.push_back(new boost::thread(ThreadProc, this));
     }
@@ -828,7 +838,25 @@ void TestSuite::ThreadProc(void* inParam)
                 theGame->initGame();
 
                 while(!theGame->observer->didWin())
+                {
                     theGame->observer->Update(counter++);
+                    //A game that cannot end (infinite trigger loop, wedged
+                    //modal state) used to spin this worker forever: the run
+                    //then hung at join time, or the test silently vanished
+                    //from the final accounting (CS-010). Legit tests finish
+                    //in a few thousand updates; the cap is ~200x that so it
+                    //only ever fires on a genuine runaway - which must be
+                    //REPORTED AS A FAILURE, never dropped.
+                    if (counter > 1000000.0f)
+                    {
+                        char buf[4096];
+                        sprintf(buf, "<h3>%s</h3>", filename.c_str());
+                        theGame->Log(buf);
+                        theGame->Log("<span class=\"error\">==Test timed out (game never ended)==</span><br />");
+                        theGame->handleResults(false, 1);
+                        break;
+                    }
+                }
             }
             else
             {

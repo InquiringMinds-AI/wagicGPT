@@ -1,0 +1,24 @@
+# MAY: Glissa, the Traitor (MBS 214072) — opp creature dies: may return artifact gy->hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:214072
+graveyard:darksteel ingot
+hand:shock
+manapool:{R}
+[PLAYER2]
+inplay:raging goblin
+[DO]
+shock
+raging goblin
+choice 0
+darksteel ingot
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:214072
+hand:darksteel ingot
+graveyard:shock
+[PLAYER2]
+graveyard:raging goblin
+[END]

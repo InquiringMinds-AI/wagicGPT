@@ -1,0 +1,22 @@
+# MAY: Extractor Demon — another creature leaves bf: may mill 2 target player.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:extractor demon,raging goblin
+hand:shock
+manapool:{R}
+[PLAYER2]
+library:forest,forest
+[DO]
+shock
+raging goblin
+choice 0
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:extractor demon
+graveyard:raging goblin,shock
+[PLAYER2]
+graveyard:forest,forest
+[END]

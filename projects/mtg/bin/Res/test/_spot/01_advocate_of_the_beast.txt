@@ -1,0 +1,22 @@
+# PLAIN: Advocate of the Beast — @each my end: counter(1/1) on target Beast.
+# Tusker 3/3 +1/+1 = 4/4 survives Lightning Bolt (a plain 3/3 dies).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:advocate of the beast,kalonian tusker,mountain
+hand:lightning bolt
+[PLAYER2]
+[DO]
+goto end
+choice 0
+kalonian tusker
+mountain
+lightning bolt
+kalonian tusker
+[ASSERT]
+endofturn
+[PLAYER1]
+inplay:advocate of the beast,kalonian tusker,mountain
+graveyard:lightning bolt
+[PLAYER2]
+[END]

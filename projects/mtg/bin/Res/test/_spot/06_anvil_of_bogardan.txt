@@ -1,0 +1,32 @@
+# PLAIN(grant subfamily): Anvil of Bogardan — @each my draw: draw 1 then discard (menu).
+# Both players' lines fire on their own draw steps.
+[INIT]
+SECONDMAIN
+[PLAYER1]
+inplay:anvil of bogardan
+hand:forest
+library:mountain,mountain
+[PLAYER2]
+hand:island
+library:swamp,swamp
+[DO]
+goto upkeep
+goto draw
+choice 0
+island
+goto end
+goto upkeep
+goto draw
+choice 0
+forest
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:anvil of bogardan
+hand:mountain,mountain
+graveyard:forest
+[PLAYER2]
+hand:swamp,swamp
+graveyard:island
+[END]

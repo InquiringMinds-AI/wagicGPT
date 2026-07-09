@@ -1,0 +1,21 @@
+# MAY: Dire Undercurrents — blue creature ETBs under your control: may target player draws 1.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:dire undercurrents
+hand:mirran spy
+manapool:{2}{U}
+library:mountain
+[PLAYER2]
+[DO]
+mirran spy
+choice 0
+p1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:dire undercurrents,mirran spy
+hand:mountain
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,22 @@
+# PLAIN: Orc Sureshot — @movedTo(other creature|myBattlefield): target opp creature -1/-1 ueot.
+# 1/1 goblin becomes 0/0 and dies.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:orc sureshot
+hand:grizzly bears
+manapool:{1}{G}
+[PLAYER2]
+inplay:raging goblin
+[DO]
+grizzly bears
+choice 0
+raging goblin
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:orc sureshot,grizzly bears
+manapool:{0}
+[PLAYER2]
+graveyard:raging goblin
+[END]
