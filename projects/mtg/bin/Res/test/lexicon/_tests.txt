@@ -306,3 +306,4 @@ lexicon/trigger_coinflipped_branch.txt
 lexicon/trigger_phasedin_draws.txt
 lexicon/trigger_energized_targeted_counter.txt
 lexicon/trigger_landfall_targeted_damage.txt
+lexicon/mana_chosen_color_persists.txt

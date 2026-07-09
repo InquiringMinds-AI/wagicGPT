@@ -1,5 +1,9 @@
 # Coldsteel Heart chooses a color as it enters. After it untaps on its
 # controller's next turn, its mana ability must use the stored chosen color.
+# PROTOCOL: casting opens TWO menus (accept the as-enters choice, then the
+# color pick - choice 0 twice = green). At the later activation the consumed
+# 'Choose a color' item STILL occupies menu slot 0 (engine wart, see CS-020
+# in docs/card-script-potential-issues.md), so the mana ability is choice 1.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -9,12 +13,13 @@ manapool:{2}
 [DO]
 coldsteel heart
 choice 0
+choice 0
 goto end
 goto firstmain
 goto end
 goto firstmain
 coldsteel heart
-choice 0
+choice 1
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]

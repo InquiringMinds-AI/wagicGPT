@@ -1,5 +1,12 @@
 # {n} returns an unblocked attacker as the Ninjutsu cost, then puts Ninja of
 # the Deep Hours onto the battlefield tapped and attacking.
+# STATE (2026-07-09, CS-004b): still failing - instrumentation shows the
+# autohand ninjutsu ability IS parsed and registered at [INIT] (zone-change
+# event -> GenericActivatedAbility wrapping ANinja, oneShot=0, addToGame'd)
+# but by the blockers-step click nothing ninja-sourced reacts in the action
+# layer - it is de-registered or dead in between. Next probe: instrument
+# GenericActivatedAbility::testDestroy for this ability to catch the reap.
+# Also observed: mObjects can hold entries with DANGLING source pointers.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
@@ -14,7 +21,7 @@ Raging Goblin
 next
 Ninja of the Deep Hours
 Raging Goblin
-Ninja of the Deep Hours
+next
 next
 choice 0
 next
