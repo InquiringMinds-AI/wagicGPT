@@ -1,0 +1,23 @@
+# Fabrication Module: gaining energy triggers @energizedof, whose targeted
+# payload puts a +1/+1 counter on the chosen creature. The 3/3 bears then
+# survive a Shock that would kill an uncountered 2/2.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:fabrication module,grizzly bears
+hand:shock
+manapool:{4}{R}
+[PLAYER2]
+[DO]
+fabrication module
+grizzly bears
+shock
+grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:fabrication module,grizzly bears
+graveyard:shock
+manapool:{0}
+[PLAYER2]
+[END]
