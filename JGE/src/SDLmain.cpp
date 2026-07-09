@@ -103,6 +103,31 @@ extern "C" jstring Java_org_libsdl_app_SDLActivity_getResourceUrl(
 #endif
 
 
+//WAGIC_FASTCLOCK: decouple game time from wall time for bulk (headless)
+//runs. The game paces itself in real seconds -- the AI acts at most every
+//~0.07s of dt (AIPlayerBaka::Act) -- so a demo game costs ~20 wall minutes
+//no matter the CPU. In fast-clock mode every tick feeds a FIXED dt (default
+//0.1s, >= the AI throttle, so the AI may act every tick) and the event wait
+//shrinks 10ms -> 1ms. Real waits (model inference) still dominate where they
+//exist; the artificial padding is what disappears. Value = game-seconds per
+//tick; anything unparseable or out of (0,10) falls back to the default.
+static float fastClockDt()
+{
+    static float cached = -2.0f;
+    if (cached == -2.0f)
+    {
+        const char * v = getenv("WAGIC_FASTCLOCK");
+        if (!v || !*v)
+            cached = -1.0f; //off
+        else
+        {
+            float parsed = (float)atof(v);
+            cached = (parsed > 0.0f && parsed < 10.0f) ? parsed : 0.1f;
+        }
+    }
+    return cached;
+}
+
 class SdlApp
 {
 public: /* For easy interfacing with JGE static functions */
@@ -138,7 +163,7 @@ public:
         {
             if (g_engine)
             {
-                for (int x = 0; x < 5 && SDL_WaitEventTimeout(&Event, 10); ++x)
+                for (int x = 0; x < 5 && SDL_WaitEventTimeout(&Event, fastClockDt() > 0 ? 1 : 10); ++x)
                 {
                     if(!g_engine->IsPaused())
                         OnEvent(&Event);
@@ -461,10 +486,14 @@ void SdlApp::OnUpdate()
 		SDL_PushEvent(&event);
 	}
 
+	//Fast clock: feed a fixed game-time step instead of wall time (see
+	//fastClockDt above). Real elapsed time still drives IsDone/tick counts.
+	float dtSec = (fastClockDt() > 0) ? fastClockDt() : (float)dt / 1000.0f;
+
 	try
 	{
-		g_engine->SetDelta((float)dt / 1000.0f);
-		g_engine->Update((float)dt / 1000.0f);
+		g_engine->SetDelta(dtSec);
+		g_engine->Update(dtSec);
 	}
 	catch(out_of_range& oor)
 	{

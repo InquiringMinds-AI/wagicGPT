@@ -12,6 +12,10 @@
 #   - WAGIC_HEADLESS=1 runs each game with no window and no GL context at all:
 #     no display, no GPU, no compositor involved. (This replaced the old
 #     hidden-Hyprland-workspace trick.)
+#   - WAGIC_FASTCLOCK strips the demo's real-time pacing (the AI otherwise
+#     acts at most ~14 times/sec of wall time): each engine tick gets a fixed
+#     game-time step, so games are bound by real work (inference) instead of
+#     padding. On by default here; --realtime disables it.
 # Because each game is its own short-lived process, the harness controls the
 # matchup schedule directly: it builds the round-robin pairing list (each pair
 # once per -r repetition), shuffles it, and runs JOBS games concurrently,
@@ -45,6 +49,7 @@ URL="http://100.116.136.74:8081"   # Spark production port (8011 = serve.sh dev 
 MODEL="qwen35"
 KEY=""
 THINKING=0
+FASTCLOCK=0.1   # game-seconds per engine tick; 0 = real-time pacing
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -58,6 +63,7 @@ while [ $# -gt 0 ]; do
         -m) MODEL="$2"; shift 2;;
         -k) KEY="$2"; shift 2;;
         --thinking) THINKING=1; shift;;
+        --realtime) FASTCLOCK=0; shift;;
         *) echo "unknown arg: $1" >&2; exit 2;;
     esac
 done
@@ -104,7 +110,7 @@ echo "== selfplay harness (matchups) =="
 echo "  pool   : $POOL"
 echo "  games  : $NGAMES ($(( ${#DECKS[@]} * (${#DECKS[@]} - 1) / 2 )) pairings x $REPS reps), $JOBS concurrent"
 echo "  model  : $MODEL @ $URL (thinking=$THINKING)"
-echo "  caps   : ${TOTAL_CAP_S}s total, ${GAME_TIMEOUT_S}s/game"
+echo "  caps   : ${TOTAL_CAP_S}s total, ${GAME_TIMEOUT_S}s/game (fastclock=$FASTCLOCK)"
 echo "  outdir : $OUTDIR"
 
 cd "$HERE/bin"
@@ -115,8 +121,10 @@ run_one_game() {
     local d0="$1" d2="$2"
     local gstart; gstart=$(date +%s)
     local elog="$OUTDIR/game-${d0}v${d2}-${gstart}.stderr"
+    local fastclock_env=()
+    [ "$FASTCLOCK" != "0" ] && fastclock_env=(WAGIC_FASTCLOCK="$FASTCLOCK")
     timeout "${GAME_TIMEOUT_S}s" env \
-        WAGIC_HEADLESS=1 \
+        WAGIC_HEADLESS=1 "${fastclock_env[@]}" \
         WAGIC_SELFPLAY=1 WAGIC_SELFPLAY_ONESHOT=1 \
         WAGIC_SELFPLAY_DECK0="$d0" WAGIC_SELFPLAY_DECK1="$d2" \
         WAGIC_AI=gpt WAGIC_GPT_URL="$URL" WAGIC_GPT_MODEL="$MODEL" WAGIC_GPT_KEY="$KEY" \

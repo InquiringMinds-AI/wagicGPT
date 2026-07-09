@@ -45,6 +45,19 @@ Option lines hide the deciding fact -> the weak model picks near-arbitrarily. FI
 - **Skip the model call when only "pass" is legal** (wasted inference; games are inference-bound; deck135/109).
 - **Normalize inconsistent verbs** for the same action (fetch: "search basic land" vs "Put in Play"; deck135).
 
+## Pacing principle for GUI/UX work  [user directive, 2026-07-09]
+The engine paces itself with real-time padding (the AI act throttle in
+`AIPlayerBaka::Act` — max ~14 actions/sec — plus animations and transitions).
+When the opponent is a model, every padding must work to **hide inference
+latency, not extend it**: fire the model call at the earliest moment the
+decision is knowable and let the pacing/animation run CONCURRENT with the
+in-flight request, so the padding absorbs latency the player would otherwise
+feel. Never sequence padding after the reply. (The "opponent is thinking..."
+notice is the existing example of the right shape; audit the act-throttle and
+any transition timers for the wrong shape — throttle-then-ask serializes
+padding + inference.) For testing, `WAGIC_FASTCLOCK` strips this padding
+entirely — headless corpora are bound by real work only.
+
 ## Methodology
 - Future test corpora: **`WAGIC_GPT_HINTS=0`** — strip Baka's scores so we measure qwen+guide, not qwen-following-Baka.
 - Migration = **strangler pattern**: move ONE decision seam onto the clean contract at a time; suite 915 as the net. NOT a big-bang rewrite. Same approach as the parked engine/render-decoupling note, aimed at the AI interface.
