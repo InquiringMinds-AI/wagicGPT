@@ -256,6 +256,7 @@ public:
     bool crew;
     TapTargetCost(TargetChooser *_tc = NULL, bool crew = false);
     virtual int isPaymentSet();
+    virtual int canPay();
     virtual int doPay();
     virtual TapTargetCost * clone() const;
 };
@@ -265,6 +266,7 @@ class UnTapTargetCost : public ExtraCost
 public:
     UnTapTargetCost(TargetChooser *_tc = NULL);
     virtual int isPaymentSet();
+    virtual int canPay();
     virtual int doPay();
     virtual UnTapTargetCost * clone() const;
 };

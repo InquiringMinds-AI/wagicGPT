@@ -307,3 +307,6 @@ lexicon/trigger_phasedin_draws.txt
 lexicon/trigger_energized_targeted_counter.txt
 lexicon/trigger_landfall_targeted_damage.txt
 lexicon/mana_chosen_color_persists.txt
+cost_untap_crackleburr.txt
+cost_untap_gate_untapped.txt
+cost_ninjutsu_return_attacker.txt

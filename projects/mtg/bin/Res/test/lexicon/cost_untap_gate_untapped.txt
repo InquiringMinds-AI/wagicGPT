@@ -1,0 +1,28 @@
+# CS-002 engine fix regression: with NO tapped creatures, Crackleburr's
+# untap-cost ability must not react (UnTapTargetCost::canPay requires a
+# tapped candidate the chooser accepts). Before the fix the activation was
+# offered, silently ate the target clicks, and never committed. The clicks
+# below all fall dead; state and mana must be unchanged.
+# Residual (documented in the ledger): per-cost canPay cannot count SIBLING
+# requirements - "Deal 3 Damage" still reacts here because Crackleburr
+# itself is one untapped red creature, though the cost needs two.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:crackleburr,merfolk of the pearl trident,coral eel
+manapool:{U}{U}
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+crackleburr
+merfolk of the pearl trident
+coral eel
+grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:crackleburr,merfolk of the pearl trident,coral eel
+manapool:{U}{U}
+[PLAYER2]
+inplay:grizzly bears
+[END]

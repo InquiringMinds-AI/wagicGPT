@@ -1136,6 +1136,13 @@ void TestSuiteGame::initGame()
                         Spell * spell = NEW Spell(observer, copy);
                         spell->resolve();
                         if (!summoningSickness && (size_t)p->game->inPlay->nb_cards > k) p->game->inPlay->cards[k]->summoningSickness = 0;
+                        //[INIT] tappedinplay:N taps the first N battlefield cards (no
+                        //triggers - setup state, not a game action). In [ASSERT] the
+                        //same key is the tapped-count expectation.
+                        TestSuiteAI * initPlayer = initState.players[i];
+                        if (initPlayer->expectedTappedInPlay > 0 && k < (size_t)initPlayer->expectedTappedInPlay
+                            && (size_t)p->game->inPlay->nb_cards > k)
+                            p->game->inPlay->cards[k]->tap(true);
                         delete spell;
                     }
                     else

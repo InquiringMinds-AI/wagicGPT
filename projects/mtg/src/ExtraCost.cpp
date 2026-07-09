@@ -842,6 +842,30 @@ int TapTargetCost::isPaymentSet()
     return 0;
 }
 
+int TapTargetCost::canPay()
+{
+    //base ExtraCost::canPay() always says 1, which offers the activation as
+    //legal even when no valid untapped candidate exists - the player (or AI)
+    //then enters a target-selection dead-end that can never commit (CS-002
+    //family). Payable = at least one untapped candidate the chooser accepts.
+    if (!tc || !source)
+        return 1;
+    GameObserver * g = source->getObserver();
+    if (!g)
+        return 1;
+    for (int i = 0; i < 2; i++)
+    {
+        MTGGameZone * z = g->players[i]->game->inPlay;
+        for (int k = 0; k < z->nb_cards; k++)
+        {
+            MTGCardInstance * c = z->cards[k];
+            if (c && !c->isTapped() && !(crew && c->has(Constants::CANTCREW)) && tc->canTarget(c))
+                return 1;
+        }
+    }
+    return 0;
+}
+
 int TapTargetCost::doPay()
 {
     MTGCardInstance * _target = (MTGCardInstance *) target;
@@ -900,6 +924,29 @@ int UnTapTargetCost::isPaymentSet()
     }
     if (target)
         return 1;
+    return 0;
+}
+
+int UnTapTargetCost::canPay()
+{
+    //mirror of TapTargetCost::canPay - payable only if a tapped candidate
+    //the chooser accepts exists (CS-002: Crackleburr's untap costs were
+    //offered with zero tapped blue creatures and silently never committed)
+    if (!tc || !source)
+        return 1;
+    GameObserver * g = source->getObserver();
+    if (!g)
+        return 1;
+    for (int i = 0; i < 2; i++)
+    {
+        MTGGameZone * z = g->players[i]->game->inPlay;
+        for (int k = 0; k < z->nb_cards; k++)
+        {
+            MTGCardInstance * c = z->cards[k];
+            if (c && c->isTapped() && tc->canTarget(c))
+                return 1;
+        }
+    }
     return 0;
 }
 
