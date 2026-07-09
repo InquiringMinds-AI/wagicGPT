@@ -1,0 +1,22 @@
+# An artifact creature can block intimidate regardless of color.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:academy raider
+[PLAYER2]
+inplay:ornithopter
+life:20
+[DO]
+academy raider
+next
+ornithopter
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:academy raider
+[PLAYER2]
+inplay:ornithopter
+life:20
+[END]

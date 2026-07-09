@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:84370
+[PLAYER2]
+inplay:tolarian academy,grizzly bears
+life:20
+[DO]
+84370
+next
+grizzly bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:84370
+[PLAYER2]
+inplay:tolarian academy,grizzly bears
+life:13
+[END]

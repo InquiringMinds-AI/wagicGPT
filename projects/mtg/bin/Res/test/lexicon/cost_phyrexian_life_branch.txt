@@ -1,0 +1,22 @@
+# With no white mana, {p(W)} pays two life; {T} taps the source and the
+# ability taps its target.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Blinding Souleater
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Blinding Souleater
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Blinding Souleater
+tappedinplay:1
+life:18
+[PLAYER2]
+inplay:Grizzly Bears
+tappedinplay:1
+[END]

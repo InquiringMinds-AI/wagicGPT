@@ -1,0 +1,19 @@
+# {saclands} sacrifices every land controlled by the payer, including the
+# tapped source land, before creating Urami.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Tomb of Urami,Swamp,Island
+manapool:{2}{B}{B}
+[PLAYER2]
+[DO]
+Tomb of Urami
+choice 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Tomb of Urami,Swamp,Island
+inplay:*
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,26 @@
+# Suspend pays the alternate cost, exiles the spell with a time counter,
+# removes it at the next upkeep, then casts the spell without its mana cost.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:rift bolt
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+rift bolt
+choice 1
+goto end
+goto upkeep
+goto end
+goto upkeep
+next
+p2
+[ASSERT]
+UPKEEP
+[PLAYER1]
+graveyard:rift bolt
+manapool:{0}
+[PLAYER2]
+life:17
+[END]

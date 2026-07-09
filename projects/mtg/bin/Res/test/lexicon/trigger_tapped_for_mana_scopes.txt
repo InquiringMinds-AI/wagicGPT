@@ -1,0 +1,25 @@
+# @tappedformana must fire for both controller and opponent zone scopes,
+# once for each land tapped for mana. Manabarbs contains both trigger lines.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+life:20
+inplay:manabarbs,forest
+[PLAYER2]
+life:20
+inplay:island
+[DO]
+forest
+goto end
+goto firstmain
+island
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:19
+inplay:manabarbs,forest
+[PLAYER2]
+life:19
+inplay:island
+manapool:{U}
+[END]

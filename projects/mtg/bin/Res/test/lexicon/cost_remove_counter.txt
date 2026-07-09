@@ -1,0 +1,22 @@
+# Deathbringer Thoctar first receives a +1/+1 counter from another creature's
+# death, then {C(1/1,-1)} removes it to deal a second point of damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Deathbringer Thoctar,Mogg Fanatic
+[PLAYER2]
+life:20
+[DO]
+Mogg Fanatic
+p2
+choice 0
+Deathbringer Thoctar
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Deathbringer Thoctar
+graveyard:Mogg Fanatic
+[PLAYER2]
+life:18
+[END]

@@ -1,0 +1,18 @@
+# {T} taps the source as a cost before its targeted effect resolves.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Prodigal Sorcerer
+[PLAYER2]
+life:20
+[DO]
+Prodigal Sorcerer
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Prodigal Sorcerer
+tappedinplay:1
+[PLAYER2]
+life:19
+[END]

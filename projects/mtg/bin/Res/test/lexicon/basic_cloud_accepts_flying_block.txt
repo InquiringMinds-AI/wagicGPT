@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:suntail hawk
+[PLAYER2]
+inplay:cloud sprite
+life:20
+[DO]
+suntail hawk
+next
+cloud sprite
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:suntail hawk
+[PLAYER2]
+graveyard:cloud sprite
+life:20
+[END]

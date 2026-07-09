@@ -1,0 +1,19 @@
+# opponentzones recognizes an opposing permanent ability as the targeting
+# source. Mossdog gets a +1/+1 counter before one damage resolves and survives.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Prodigal Sorcerer,Fervor
+[PLAYER2]
+inplay:Mossdog
+[DO]
+Prodigal Sorcerer
+Mossdog
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Prodigal Sorcerer,Fervor
+tappedinplay:1
+[PLAYER2]
+inplay:Mossdog
+[END]

@@ -1,0 +1,26 @@
+# Two creatures can block menace; combat is blocked and the 2/3 attacker dies.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:alley strangler
+[PLAYER2]
+inplay:grizzly bears,hill giant
+life:20
+[DO]
+alley strangler
+next
+grizzly bears
+hill giant
+next
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:alley strangler
+[PLAYER2]
+inplay:hill giant
+graveyard:grizzly bears
+life:20
+[END]

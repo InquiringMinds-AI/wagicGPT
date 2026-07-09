@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:benthic behemoth
+[PLAYER2]
+inplay:island,grizzly bears
+life:20
+[DO]
+benthic behemoth
+next
+grizzly bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:benthic behemoth
+[PLAYER2]
+inplay:island,grizzly bears
+life:13
+[END]

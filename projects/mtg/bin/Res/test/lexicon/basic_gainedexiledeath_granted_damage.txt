@@ -1,0 +1,21 @@
+# gainedexiledeath granted by an effect exiles the lethally damaged creature.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Synthetic Gained Exile Death Spell
+manapool:{1}{R}
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Lexicon Synthetic Gained Exile Death Spell
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Synthetic Gained Exile Death Spell
+manapool:{0}
+life:20
+[PLAYER2]
+exile:Grizzly Bears
+life:20
+[END]

@@ -1,0 +1,20 @@
+# @tokencreated fires once per token event, not once per creating spell.
+# Dragon Fodder creates two Goblins, so Mirkwood Bats drains two life.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:mirkwood bats
+hand:dragon fodder
+manapool:{1}{R}
+[PLAYER2]
+life:20
+[DO]
+dragon fodder
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:mirkwood bats,*,*
+graveyard:dragon fodder
+[PLAYER2]
+life:18
+[END]

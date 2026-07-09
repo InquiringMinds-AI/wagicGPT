@@ -1,0 +1,28 @@
+# Village Messenger transforms at the next upkeep. @transformed on the
+# attached Heirloom flips it into Ashmouth Blade, making the 2/2 attacker 5/5.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:neglected heirloom,village messenger
+manapool:{1}
+[PLAYER2]
+life:20
+[DO]
+neglected heirloom
+village messenger
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto attackers
+village messenger
+next
+next
+[ASSERT]
+COMBATDAMAGE
+[PLAYER1]
+inplay:ashmouth blade,moonrise intruder
+manapool:{0}
+[PLAYER2]
+life:15
+[END]

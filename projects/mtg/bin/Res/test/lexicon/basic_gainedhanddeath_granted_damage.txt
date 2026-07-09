@@ -1,0 +1,21 @@
+# gainedhanddeath granted by an effect moves the lethally damaged creature to hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Synthetic Gained Hand Death Spell
+manapool:{1}{R}
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Lexicon Synthetic Gained Hand Death Spell
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Synthetic Gained Hand Death Spell
+manapool:{0}
+life:20
+[PLAYER2]
+hand:Grizzly Bears
+life:20
+[END]

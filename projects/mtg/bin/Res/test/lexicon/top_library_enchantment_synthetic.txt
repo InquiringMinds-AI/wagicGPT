@@ -1,0 +1,18 @@
+# canplayenchantmentlibrarytop lets an enchantment be cast from the top of library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Top Enchantment Permission
+library:Glorious Anthem
+manapool:{1}{W}{W}
+[PLAYER2]
+[DO]
+Glorious Anthem
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Top Enchantment Permission,Glorious Anthem
+manapool:{0}
+[PLAYER2]
+life:20
+[END]

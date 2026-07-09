@@ -1,0 +1,23 @@
+# Flicker must exile and return the same permanent, retriggering its ETB once.
+# Test setup processes the Monk's initial ETB (+2), then Flicker returns it for
+# exactly one additional ETB (+2); it remains on the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Flicker
+inplay:Venerable Monk
+manapool:{1}{W}
+life:20
+[PLAYER2]
+[DO]
+Flicker
+Venerable Monk
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Venerable Monk
+graveyard:Flicker
+manapool:{0}
+life:24
+[PLAYER2]
+[END]

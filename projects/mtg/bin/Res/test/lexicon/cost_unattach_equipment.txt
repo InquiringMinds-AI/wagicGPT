@@ -1,0 +1,28 @@
+# {unattach} detaches Blinding Powder as a cost and grants its former bearer
+# combat-damage prevention for the turn. The 2/2 survives blocking a 3/3.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Blinding Powder
+inplay:Grizzly Bears,Fervor
+manapool:{3}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Blinding Powder
+Blinding Powder
+Grizzly Bears
+Grizzly Bears
+goto attackers
+Grizzly Bears
+next
+Hill Giant
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Blinding Powder,Grizzly Bears,Fervor
+manapool:{0}
+[PLAYER2]
+inplay:Hill Giant
+[END]

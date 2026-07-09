@@ -1,0 +1,22 @@
+# Wagic's {i} snow cost requires mana produced by a snow permanent. One
+# Snow-Covered Island and one ordinary Island pay Adarkar Windform's {1}{i}.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Adarkar Windform,Snow-Covered Island,Island
+[PLAYER2]
+inplay:Serra Angel
+[DO]
+Snow-Covered Island
+Island
+Adarkar Windform
+Serra Angel
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Adarkar Windform,Snow-Covered Island,Island
+tappedinplay:2
+manapool:{0}
+[PLAYER2]
+inplay:Serra Angel
+[END]

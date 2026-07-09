@@ -1,0 +1,34 @@
+# Delve exiles five graveyard cards to pay Become Immense's five generic mana;
+# the remaining {G} is paid normally and the +6/+6 effect resolves.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Become Immense
+graveyard:Forest,Island,Mountain,Plains,Swamp
+inplay:Grizzly Bears,Fervor
+manapool:{G}
+[PLAYER2]
+life:20
+[DO]
+Become Immense
+choice 1
+Forest
+Island
+Mountain
+Plains
+Swamp
+Become Immense
+Grizzly Bears
+goto attackers
+Grizzly Bears
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Fervor
+graveyard:Become Immense
+exile:Forest,Island,Mountain,Plains,Swamp
+manapool:{0}
+[PLAYER2]
+life:12
+[END]

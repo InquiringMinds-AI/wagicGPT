@@ -1,0 +1,26 @@
+# Improvise taps seven artifacts to pay seven generic mana and casts the
+# Barricade Breaker without spending mana.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Barricade Breaker
+inplay:Ornithopter,Mox Pearl,Mox Emerald,Mox Jet,Mox Ruby,Mox Sapphire,Gold Myr
+[PLAYER2]
+[DO]
+Barricade Breaker
+choice 1
+Ornithopter
+Mox Pearl
+Mox Emerald
+Mox Jet
+Mox Ruby
+Mox Sapphire
+Gold Myr
+Barricade Breaker
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Barricade Breaker,Ornithopter,Mox Pearl,Mox Emerald,Mox Jet,Mox Ruby,Mox Sapphire,Gold Myr
+tappedinplay:7
+[PLAYER2]
+[END]

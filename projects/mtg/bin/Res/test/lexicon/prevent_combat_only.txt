@@ -1,0 +1,28 @@
+# Fog prevents combat damage only. Shock still deals two noncombat damage,
+# while two unblocked attackers deal none during the protected combat.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:fog,shock
+inplay:raging goblin,grizzly bears
+manapool:{G}{R}
+[PLAYER2]
+life:20
+[DO]
+fog
+shock
+p2
+goto attackers
+raging goblin
+grizzly bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:fog,shock
+inplay:raging goblin,grizzly bears
+[PLAYER2]
+life:18
+[END]

@@ -1,0 +1,22 @@
+# {s2g(target)} moves an opponent-owned exiled card to that opponent's
+# graveyard as an additional spell cost, then the spell deals lethal damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:processor assault
+manapool:{1}{R}
+[PLAYER2]
+exile:forest
+inplay:grizzly bears
+[DO]
+processor assault
+forest
+grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:processor assault
+manapool:{0}
+[PLAYER2]
+graveyard:forest,grizzly bears
+[END]

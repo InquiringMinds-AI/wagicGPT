@@ -1,0 +1,20 @@
+# Retrace casts from the graveyard, discards a land as an additional cost,
+# pays the printed retrace mana cost, and leaves the sorcery in the graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:forest
+graveyard:call the skybreaker
+manapool:{5}{U}{R}
+[PLAYER2]
+[DO]
+call the skybreaker
+forest
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:call the skybreaker,forest
+manapool:{0}
+inplay:elemental
+[PLAYER2]
+[END]

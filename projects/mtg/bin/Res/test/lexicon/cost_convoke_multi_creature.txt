@@ -1,0 +1,31 @@
+# Convoke taps ten creatures for the ten generic mana in Autochthon Wurm's
+# cost; its colored remainder is paid normally.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Autochthon Wurm
+inplay:Grizzly Bears,Hill Giant,Eager Cadet,Llanowar Elves,Raging Goblin,Gold Myr,Silver Myr,Iron Myr,Copper Myr,Leaden Myr
+manapool:{G}{G}{G}{W}{W}
+[PLAYER2]
+[DO]
+Autochthon Wurm
+choice 1
+Grizzly Bears
+Hill Giant
+Eager Cadet
+Llanowar Elves
+Raging Goblin
+Gold Myr
+Silver Myr
+Iron Myr
+Copper Myr
+Leaden Myr
+Autochthon Wurm
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Autochthon Wurm,Grizzly Bears,Hill Giant,Eager Cadet,Llanowar Elves,Raging Goblin,Gold Myr,Silver Myr,Iron Myr,Copper Myr,Leaden Myr
+tappedinplay:10
+manapool:{0}
+[PLAYER2]
+[END]

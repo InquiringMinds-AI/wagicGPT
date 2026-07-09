@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:121154
+[PLAYER2]
+inplay:snow-covered swamp,grizzly bears
+life:20
+[DO]
+121154
+next
+grizzly bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:121154
+[PLAYER2]
+inplay:snow-covered swamp,grizzly bears
+life:18
+[END]

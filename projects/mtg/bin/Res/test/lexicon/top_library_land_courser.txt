@@ -1,0 +1,17 @@
+# canplaylandlibrarytop lets Courser play a land from the top of library and triggers landfall life gain.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Courser of Kruphix
+library:Forest
+[PLAYER2]
+[DO]
+Forest
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Courser of Kruphix,Forest
+life:21
+[PLAYER2]
+life:20
+[END]

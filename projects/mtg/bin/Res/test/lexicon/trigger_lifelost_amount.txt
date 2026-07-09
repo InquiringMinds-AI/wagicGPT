@@ -1,0 +1,24 @@
+# @lifelostfoeof binds the opponent's life-loss event and `thatmuch` amount.
+# One Bolt causes exactly three life gain without a reciprocal trigger loop.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:exquisite blood
+hand:lightning bolt
+manapool:{R}
+life:20
+[PLAYER2]
+life:20
+[DO]
+lightning bolt
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:exquisite blood
+graveyard:lightning bolt
+life:23
+manapool:{0}
+[PLAYER2]
+life:17
+[END]

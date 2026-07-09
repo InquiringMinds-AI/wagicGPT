@@ -1,0 +1,20 @@
+# Mark of Asylum prevents noncombat damage only to its controller's
+# creatures. Pyroclasm spares Grizzly Bears but kills the opponent's Bear.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:mark of asylum,grizzly bears
+hand:pyroclasm
+manapool:{1}{R}
+[PLAYER2]
+inplay:runeclaw bear
+[DO]
+pyroclasm
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:mark of asylum,grizzly bears
+graveyard:pyroclasm
+[PLAYER2]
+graveyard:runeclaw bear
+[END]

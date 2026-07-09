@@ -1,0 +1,32 @@
+# {h(target)} returns the selected land as a cost. The payload grants trample,
+# distinguished by one excess combat damage through a 2/2 blocker.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:407666,forest,hill giant
+manapool:{R}{G}
+[PLAYER2]
+inplay:grizzly bears
+life:20
+[DO]
+407666
+forest
+hill giant
+next
+next
+hill giant
+next
+grizzly bears
+next
+next
+next
+[ASSERT]
+COMBATENDS
+[PLAYER1]
+hand:forest
+inplay:407666,hill giant
+manapool:{0}
+[PLAYER2]
+graveyard:grizzly bears
+life:19
+[END]

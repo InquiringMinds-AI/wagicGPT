@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:grizzly bears
+[PLAYER2]
+inplay:cloud sprite
+life:20
+[DO]
+grizzly bears
+next
+cloud sprite
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:grizzly bears
+[PLAYER2]
+inplay:cloud sprite
+life:18
+[END]

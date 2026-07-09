@@ -1,0 +1,19 @@
+# Colored mana cannot satisfy {C}; the spell must remain uncast.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Spatial Contortion
+manapool:{1}{U}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Spatial Contortion
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Spatial Contortion
+manapool:{1}{U}
+[PLAYER2]
+inplay:Hill Giant
+[END]

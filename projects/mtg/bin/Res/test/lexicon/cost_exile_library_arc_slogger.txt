@@ -1,0 +1,22 @@
+# Ten {l2e} costs exile exactly ten library cards before dealing damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Arc-Slogger
+library:Forest,Island,Mountain,Plains,Swamp,Grizzly Bears,Hill Giant,Gold Myr,Silver Myr,Iron Myr,Ornithopter
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+Arc-Slogger
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Arc-Slogger
+library:Forest
+exile:Island,Mountain,Plains,Swamp,Grizzly Bears,Hill Giant,Gold Myr,Silver Myr,Iron Myr,Ornithopter
+manapool:{0}
+[PLAYER2]
+life:18
+[END]

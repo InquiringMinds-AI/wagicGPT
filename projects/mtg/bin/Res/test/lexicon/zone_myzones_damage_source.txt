@@ -1,0 +1,22 @@
+# myzones recognizes the controller's resolving instant as the damage source.
+# Blaze Commando creates two Soldiers when Shock damages the opponent.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Blaze Commando
+hand:Shock
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+Shock
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Blaze Commando,*,*
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+life:18
+[END]

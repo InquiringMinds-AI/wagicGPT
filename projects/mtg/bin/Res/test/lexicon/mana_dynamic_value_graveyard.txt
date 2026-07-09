@@ -1,0 +1,29 @@
+# Circular Logic computes {value:type:*:opponentgraveyard}=2. The spell's
+# controller pays exactly two remaining mana, so Bad Moon resolves.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Bad Moon
+graveyard:Forest,Island
+manapool:{3}{B}
+[PLAYER2]
+hand:Circular Logic
+manapool:{2}{U}
+[DO]
+Bad Moon
+no
+yes
+Circular Logic
+Bad Moon
+endinterruption
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Bad Moon
+graveyard:Forest,Island
+manapool:{0}
+[PLAYER2]
+graveyard:Circular Logic
+manapool:{0}
+[END]

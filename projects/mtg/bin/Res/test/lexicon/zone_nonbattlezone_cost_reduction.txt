@@ -1,0 +1,21 @@
+# Arcane Melee's nonbattlezone lord includes an instant/sorcery in hand.
+# Divination's {2}{U} cost is reduced to {U} and draws two cards.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Arcane Melee
+hand:Divination
+library:Forest,Island
+manapool:{U}
+[PLAYER2]
+[DO]
+Divination
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Arcane Melee
+hand:Forest,Island
+graveyard:Divination
+manapool:{0}
+[PLAYER2]
+[END]

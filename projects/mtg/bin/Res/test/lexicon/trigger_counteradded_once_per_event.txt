@@ -1,0 +1,20 @@
+# Evolve puts one +1/+1 counter on Fathom Mage. Its @counteradded trigger
+# must draw exactly one card for that event.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:fathom mage
+hand:grizzly bears
+library:forest
+manapool:{1}{G}
+[PLAYER2]
+[DO]
+grizzly bears
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:fathom mage,grizzly bears
+hand:forest
+[PLAYER2]
+[END]

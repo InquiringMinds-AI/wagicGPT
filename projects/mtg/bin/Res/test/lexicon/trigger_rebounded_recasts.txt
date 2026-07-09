@@ -1,0 +1,24 @@
+# Rebound exiles a hand-cast spell, then offers the free cast at its
+# controller's next upkeep. The second Summons creates a second token and
+# resolves to the graveyard rather than exiling again.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:ojutai's summons
+manapool:{3}{U}{U}
+[PLAYER2]
+[DO]
+ojutai's summons
+goto end
+goto upkeep
+goto end
+goto upkeep
+choice 0
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:*,*
+graveyard:ojutai's summons
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,19 @@
+# Four {m} costs mill exactly four cards before returning the source.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Rot Farm Skeleton
+library:Forest,Island,Mountain,Plains,Swamp
+manapool:{2}{B}{G}
+[PLAYER2]
+[DO]
+Rot Farm Skeleton
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Rot Farm Skeleton
+graveyard:Island,Mountain,Plains,Swamp
+library:Forest
+manapool:{0}
+[PLAYER2]
+[END]

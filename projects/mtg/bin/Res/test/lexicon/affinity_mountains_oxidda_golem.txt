@@ -1,0 +1,17 @@
+# affinitymountains reduces Oxidda Golem's generic cost by one per Mountain.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain,Mountain
+hand:Oxidda Golem
+manapool:{1}
+[PLAYER2]
+[DO]
+Oxidda Golem
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain,Mountain,Oxidda Golem
+manapool:{0}
+[PLAYER2]
+[END]

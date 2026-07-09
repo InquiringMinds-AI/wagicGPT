@@ -1,0 +1,27 @@
+# Emerge sacrifices a mana-value-six creature, reducing Abundant Maw's
+# {6}{B} emerge cost to {B}; its cast trigger drains the opponent for three.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Abundant Maw
+inplay:Craw Wurm
+manapool:{B}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Abundant Maw
+choice 1
+Craw Wurm
+Abundant Maw
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Abundant Maw
+graveyard:Craw Wurm
+manapool:{0}
+life:23
+[PLAYER2]
+life:17
+[END]

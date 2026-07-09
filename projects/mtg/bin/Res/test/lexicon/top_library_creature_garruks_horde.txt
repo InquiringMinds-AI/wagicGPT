@@ -1,0 +1,18 @@
+# canplaycreaturelibrarytop lets Garruk's Horde cast a creature from the top of library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Garruk's Horde
+library:Grizzly Bears
+manapool:{1}{G}
+[PLAYER2]
+[DO]
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Garruk's Horde,Grizzly Bears
+manapool:{0}
+[PLAYER2]
+life:20
+[END]

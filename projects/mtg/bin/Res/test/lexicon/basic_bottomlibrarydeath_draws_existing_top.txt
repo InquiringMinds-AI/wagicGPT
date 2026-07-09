@@ -1,0 +1,25 @@
+# bottomlibrarydeath moves the dying creature below existing library cards.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Bottom Library Death, Archivist
+hand:Wrecking Ball
+library:Forest
+manapool:{2}{R}{B}
+[PLAYER2]
+[DO]
+Wrecking Ball
+Lexicon Synthetic Bottom Library Death
+Archivist
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Archivist
+hand:Forest
+library:Lexicon Synthetic Bottom Library Death
+graveyard:Wrecking Ball
+manapool:{0}
+life:20
+[PLAYER2]
+life:20
+[END]

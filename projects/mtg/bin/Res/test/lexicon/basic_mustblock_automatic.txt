@@ -1,0 +1,20 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:raging goblin
+[PLAYER2]
+inplay:razorgrass screen
+life:20
+[DO]
+raging goblin
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:raging goblin
+[PLAYER2]
+graveyard:razorgrass screen
+life:20
+[END]

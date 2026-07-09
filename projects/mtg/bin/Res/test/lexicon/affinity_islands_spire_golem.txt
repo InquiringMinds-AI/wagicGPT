@@ -1,0 +1,17 @@
+# affinityislands reduces Spire Golem's generic cost by one per Island.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Island,Island,Island,Island
+hand:Spire Golem
+manapool:{2}
+[PLAYER2]
+[DO]
+Spire Golem
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Island,Island,Island,Island,Spire Golem
+manapool:{0}
+[PLAYER2]
+[END]

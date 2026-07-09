@@ -1,0 +1,17 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:bonded construct
+[PLAYER2]
+life:20
+[DO]
+bonded construct
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:bonded construct
+[PLAYER2]
+life:20
+[END]

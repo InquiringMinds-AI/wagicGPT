@@ -1,0 +1,22 @@
+# A creature carrying cantblock cannot be declared as a blocker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:raging goblin
+[PLAYER2]
+inplay:ashenmoor gouger
+life:20
+[DO]
+raging goblin
+next
+ashenmoor gouger
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:raging goblin
+[PLAYER2]
+inplay:ashenmoor gouger
+life:19
+[END]

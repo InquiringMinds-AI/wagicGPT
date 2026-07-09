@@ -1,0 +1,25 @@
+# Commune with Lava grants canplayfromexile uent. A card exiled this turn
+# remains playable during the controller's next turn, beyond ordinary UEOT.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Commune with Lava
+library:Ornithopter
+manapool:{1}{R}{R}
+[PLAYER2]
+[DO]
+Commune with Lava
+choice 1
+goto end
+goto firstmain
+goto end
+goto firstmain
+Ornithopter
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ornithopter
+graveyard:Commune with Lava
+manapool:{0}
+[PLAYER2]
+[END]

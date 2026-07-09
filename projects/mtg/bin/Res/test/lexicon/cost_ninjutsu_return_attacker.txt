@@ -1,0 +1,30 @@
+# {n} returns an unblocked attacker as the Ninjutsu cost, then puts Ninja of
+# the Deep Hours onto the battlefield tapped and attacking.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+hand:Ninja of the Deep Hours
+library:Forest
+inplay:Raging Goblin
+manapool:{1}{U}
+[PLAYER2]
+life:20
+[DO]
+Raging Goblin
+next
+Ninja of the Deep Hours
+Raging Goblin
+Ninja of the Deep Hours
+next
+choice 0
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Ninja of the Deep Hours
+tappedinplay:1
+hand:Raging Goblin,Forest
+manapool:{0}
+[PLAYER2]
+life:18
+[END]

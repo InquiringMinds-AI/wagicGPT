@@ -1,0 +1,22 @@
+# Rat offering sacrifices Ravenous Rats and reduces Patron of the Nezumi's
+# {5}{B}{B} cost by the Rat's {1}{B}, leaving {4}{B}.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Patron of the Nezumi
+inplay:Ravenous Rats
+manapool:{4}{B}
+[PLAYER2]
+[DO]
+Patron of the Nezumi
+choice 1
+Ravenous Rats
+Patron of the Nezumi
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Patron of the Nezumi
+graveyard:Ravenous Rats
+manapool:{0}
+[PLAYER2]
+[END]

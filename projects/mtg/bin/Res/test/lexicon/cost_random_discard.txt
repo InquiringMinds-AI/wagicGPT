@@ -1,0 +1,27 @@
+# Apathy teaches its enchanted creature a my-upkeep-only {d}:untap ability.
+# With one card in hand the random discard is deterministic.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Apathy,Forest
+inplay:Hill Giant
+tappedinplay:1
+manapool:{U}
+[PLAYER2]
+[DO]
+Apathy
+Hill Giant
+goto end
+goto upkeep
+goto end
+goto upkeep
+Hill Giant
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Apathy,Hill Giant
+tappedinplay:0
+graveyard:Forest
+manapool:{0}
+[PLAYER2]
+[END]

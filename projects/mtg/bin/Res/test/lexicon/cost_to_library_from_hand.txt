@@ -1,0 +1,18 @@
+# {s2l(target)} moves the selected hand card to the library as a cost before
+# returning Leashling to hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:forest
+inplay:leashling
+[PLAYER2]
+[DO]
+leashling
+forest
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:leashling
+library:forest
+[PLAYER2]
+[END]

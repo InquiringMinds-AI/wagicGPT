@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:grizzly bears
+[PLAYER2]
+inplay:spitfire handler
+life:20
+[DO]
+grizzly bears
+next
+spitfire handler
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:grizzly bears
+[PLAYER2]
+inplay:spitfire handler
+life:18
+[END]

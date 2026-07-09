@@ -1,0 +1,28 @@
+# Bestow uses its alternate cost and resolves as an Aura attached to the
+# selected creature, granting the scripted power/toughness modification.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:baleful eidolon
+inplay:grizzly bears
+manapool:{4}{B}
+[PLAYER2]
+[DO]
+baleful eidolon
+choice 1
+grizzly bears
+next
+next
+grizzly bears
+next
+next
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:baleful eidolon,grizzly bears
+manapool:{0}
+[PLAYER2]
+life:17
+[END]

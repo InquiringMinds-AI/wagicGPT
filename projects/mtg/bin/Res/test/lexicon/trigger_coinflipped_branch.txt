@@ -1,0 +1,21 @@
+# Puppet's Verdict flips a coin. Either result must execute exactly one
+# @coinflipped branch: destroy the 2-power Bear or the 3-power Hill Giant.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:puppet's verdict
+inplay:grizzly bears,hill giant
+library:forest
+manapool:{1}{R}{R}
+[PLAYER2]
+[DO]
+puppet's verdict
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:*
+graveyard:puppet's verdict,*
+library:forest
+manapool:{0}
+[PLAYER2]
+[END]

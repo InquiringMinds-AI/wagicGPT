@@ -1,0 +1,16 @@
+# canplayartifactlibrarytop lets an artifact be cast from the top of library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Top Artifact Permission
+library:Ornithopter
+[PLAYER2]
+[DO]
+Ornithopter
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Top Artifact Permission,Ornithopter
+[PLAYER2]
+life:20
+[END]

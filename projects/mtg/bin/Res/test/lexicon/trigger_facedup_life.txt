@@ -1,0 +1,21 @@
+# Mastery manifests a creature, then @facedup fires when that permanent is
+# turned face up and gains life equal to the one creature on the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:mastery of the unseen
+library:grizzly bears
+manapool:{4}{W}{G}
+life:20
+[PLAYER2]
+[DO]
+mastery of the unseen
+grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:mastery of the unseen,grizzly bears
+life:21
+manapool:{0}
+[PLAYER2]
+[END]

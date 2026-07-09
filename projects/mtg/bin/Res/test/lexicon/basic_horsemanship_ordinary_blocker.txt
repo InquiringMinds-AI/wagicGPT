@@ -1,0 +1,22 @@
+# A creature without horsemanship cannot block the horsemanship attacker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:barbarian general
+[PLAYER2]
+inplay:grizzly bears
+life:20
+[DO]
+barbarian general
+next
+grizzly bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:barbarian general
+[PLAYER2]
+inplay:grizzly bears
+life:17
+[END]

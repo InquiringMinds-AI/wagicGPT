@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:fogwalker
+[PLAYER2]
+inplay:raging goblin
+life:20
+[DO]
+fogwalker
+next
+raging goblin
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:fogwalker
+[PLAYER2]
+graveyard:raging goblin
+life:20
+[END]

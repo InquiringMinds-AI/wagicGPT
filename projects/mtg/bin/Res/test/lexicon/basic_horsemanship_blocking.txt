@@ -1,0 +1,23 @@
+# An ordinary creature cannot block horsemanship, while another horsemanship
+# creature can; both combatants then die to lethal damage.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:barbarian general
+[PLAYER2]
+inplay:10712
+life:20
+[DO]
+barbarian general
+next
+10712
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:barbarian general
+[PLAYER2]
+graveyard:10712
+life:20
+[END]

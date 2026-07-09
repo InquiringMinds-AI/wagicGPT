@@ -1,0 +1,20 @@
+# canplayinstantsorcerylibrarytop lets an instant be cast from the top of library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Top Instant Sorcery Permission
+library:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Shock
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Top Instant Sorcery Permission
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+life:18
+[END]

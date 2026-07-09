@@ -1,0 +1,32 @@
+# Protean Hydra enters with three +1/+1 counters. Shock is prevented and
+# removes two counters; @counterremoved schedules two counters per removal at
+# the next end step, so the Hydra later attacks as a 5/5 instead of a 1/1.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:protean hydra,shock
+manapool:{3}{G}{R}
+[PLAYER2]
+life:20
+[DO]
+protean hydra
+choice 3
+shock
+protean hydra
+goto end
+goto firstmain
+goto end
+goto firstmain
+goto attackers
+protean hydra
+next
+next
+[ASSERT]
+COMBATDAMAGE
+[PLAYER1]
+inplay:protean hydra
+graveyard:shock
+manapool:{0}
+[PLAYER2]
+life:15
+[END]

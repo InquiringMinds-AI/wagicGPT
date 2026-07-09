@@ -1,0 +1,150 @@
+# Test-only card definitions loaded with WAGIC_TEST_PRIMITIVES_FILE.
+# IDs 2100000000-2100000999 are reserved for this file family.
+[card]
+id=2100000000
+name=Lexicon Synthetic Vanilla
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+text=Test-only primitive used to verify isolated card injection.
+[/card]
+[card]
+id=2100000001
+name=Lexicon Synthetic Snowland Walker
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=snowlandwalk
+text=Test-only primitive for generic snow landwalk.
+[/card]
+[card]
+id=2100000002
+name=Lexicon Synthetic Desertland Walker
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=desertlandwalk
+text=Test-only primitive for canonical desertlandwalk.
+[/card]
+[card]
+id=2100000003
+name=Lexicon Synthetic Bottom Library Death
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=bottomlibrarydeath
+text=Test-only primitive for bottom-library death replacement.
+[/card]
+[card]
+id=2100000004
+name=Lexicon Synthetic Hand Death
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=handdeath
+text=Test-only primitive for hand death replacement.
+[/card]
+[card]
+id=2100000005
+name=Lexicon Synthetic Inplay Death
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=inplaydeath
+text=Test-only primitive for untapped battlefield return on death.
+[/card]
+[card]
+id=2100000006
+name=Lexicon Synthetic Inplay Tap Death
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=inplaytapdeath
+text=Test-only primitive for tapped battlefield return on death.
+[/card]
+[card]
+id=2100000007
+name=Lexicon Synthetic Gained Hand Death Spell
+rarity=C
+mana={1}{R}
+type=Instant
+target=creature
+auto=transforms((,newability[gainedhanddeath],newability[damage:3])) ueot
+text=Test-only primitive that grants gainedhanddeath before lethal damage.
+[/card]
+[card]
+id=2100000008
+name=Lexicon Synthetic Gained Exile Death Spell
+rarity=C
+mana={1}{R}
+type=Instant
+target=creature
+auto=transforms((,newability[gainedexiledeath],newability[damage:3])) ueot
+text=Test-only primitive that grants gainedexiledeath before lethal damage.
+[/card]
+[card]
+id=2100000009
+name=Lexicon Synthetic Top Any Permission
+rarity=C
+mana={1}
+type=Enchantment
+abilities=showfromtoplibrary,canplayfromlibrarytop
+text=Test-only primitive for playing any top-library card.
+[/card]
+[card]
+id=2100000010
+name=Lexicon Synthetic Top Instant Sorcery Permission
+rarity=C
+mana={1}
+type=Enchantment
+abilities=showfromtoplibrary,canplayinstantsorcerylibrarytop
+text=Test-only primitive for casting instant or sorcery cards from the top of library.
+[/card]
+[card]
+id=2100000011
+name=Lexicon Synthetic Top Artifact Permission
+rarity=C
+mana={1}
+type=Enchantment
+abilities=showfromtoplibrary,canplayartifactlibrarytop
+text=Test-only primitive for casting artifact cards from the top of library.
+[/card]
+[card]
+id=2100000012
+name=Lexicon Synthetic Top Aura Equipment Permission
+rarity=C
+mana={1}
+type=Enchantment
+abilities=showfromtoplibrary,canplayauraequiplibrarytop
+text=Test-only primitive for casting Aura and Equipment cards from the top of library.
+[/card]
+[card]
+id=2100000013
+name=Lexicon Synthetic Top Enchantment Permission
+rarity=C
+mana={1}
+type=Enchantment
+abilities=showfromtoplibrary,canplayenchantmentlibrarytop
+text=Test-only primitive for casting enchantment cards from the top of library.
+[/card]

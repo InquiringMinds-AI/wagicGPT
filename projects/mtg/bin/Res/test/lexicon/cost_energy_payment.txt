@@ -1,0 +1,21 @@
+# Aether Chaser receives two energy on entry, then {e:2} consumes that energy
+# when its attack trigger creates exactly one Servo.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Aether Chaser
+[PLAYER2]
+life:20
+[DO]
+goto attackers
+Aether Chaser
+next
+choice 0
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Aether Chaser,*
+[PLAYER2]
+life:18
+[END]

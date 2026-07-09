@@ -1,0 +1,21 @@
+# handdeath moves the destroyed creature to its owner's hand instead of graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Hand Death
+hand:Wrecking Ball
+manapool:{2}{R}{B}
+[PLAYER2]
+[DO]
+Wrecking Ball
+Lexicon Synthetic Hand Death
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Synthetic Hand Death
+graveyard:Wrecking Ball
+manapool:{0}
+life:20
+[PLAYER2]
+life:20
+[END]

@@ -1,0 +1,18 @@
+# Defender cannot be declared as an attacker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:benevolent ancestor
+[PLAYER2]
+life:20
+[DO]
+benevolent ancestor
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:benevolent ancestor
+[PLAYER2]
+life:20
+[END]

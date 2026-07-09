@@ -1,0 +1,22 @@
+# One creature cannot legally block a menace attacker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:alley strangler
+[PLAYER2]
+inplay:grizzly bears
+life:20
+[DO]
+alley strangler
+next
+grizzly bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:alley strangler
+[PLAYER2]
+inplay:grizzly bears
+life:18
+[END]

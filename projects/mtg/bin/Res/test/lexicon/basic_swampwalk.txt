@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:anaconda
+[PLAYER2]
+inplay:swamp,grizzly bears
+life:20
+[DO]
+anaconda
+next
+grizzly bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:anaconda
+[PLAYER2]
+inplay:swamp,grizzly bears
+life:17
+[END]

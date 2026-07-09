@@ -1,0 +1,23 @@
+# Red mana cannot contribute to {X:white}. With only red mana, the activation
+# falls back to legal X=0: Atalya taps, but red mana is not spent and no life
+# is gained.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:22964,Fervor
+manapool:{R}{R}{R}
+life:20
+[PLAYER2]
+[DO]
+22964
+choice 1
+choice 3
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:22964,Fervor
+tappedinplay:1
+manapool:{R}{R}{R}
+life:20
+[PLAYER2]
+[END]

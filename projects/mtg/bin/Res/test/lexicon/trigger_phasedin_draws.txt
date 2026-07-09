@@ -1,0 +1,25 @@
+# Teferi's Imp phases out on one controller untap and phases in on the next.
+# On the following phase-in, @phasedin must draw exactly once.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:teferi's imp
+hand:forest
+library:island
+[PLAYER2]
+[DO]
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto end
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:teferi's imp
+hand:forest,island
+[PLAYER2]
+[END]

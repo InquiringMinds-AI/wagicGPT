@@ -1,0 +1,23 @@
+# {crew(target)} taps the selected creature as a cost and turns the Vehicle
+# into a creature UEOT. Shock can then legally target the 3/3 Copter.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Smuggler's Copter,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Smuggler's Copter
+Grizzly Bears
+Shock
+Smuggler's Copter
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Smuggler's Copter,Grizzly Bears
+tappedinplay:1
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+[END]

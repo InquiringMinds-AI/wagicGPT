@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:aura gnarlid
+[PLAYER2]
+inplay:raging goblin
+life:20
+[DO]
+aura gnarlid
+next
+raging goblin
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:aura gnarlid
+[PLAYER2]
+inplay:raging goblin
+life:18
+[END]

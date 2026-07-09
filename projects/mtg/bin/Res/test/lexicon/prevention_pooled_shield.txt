@@ -1,0 +1,25 @@
+# prevent:N is one pooled, one-shot shield. Conservator prevents the first
+# two damage from Shock, then the exhausted shield must not reduce Bolt.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+life:20
+inplay:conservator
+hand:shock,lightning bolt
+manapool:{3}{R}{R}
+[PLAYER2]
+[DO]
+conservator
+p1
+shock
+p1
+lightning bolt
+p1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:17
+inplay:conservator
+graveyard:shock,lightning bolt
+[PLAYER2]
+[END]

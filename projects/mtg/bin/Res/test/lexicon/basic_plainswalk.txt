@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:boggart arsonists
+[PLAYER2]
+inplay:plains,grizzly bears
+life:20
+[DO]
+boggart arsonists
+next
+grizzly bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:boggart arsonists
+[PLAYER2]
+inplay:plains,grizzly bears
+life:18
+[END]

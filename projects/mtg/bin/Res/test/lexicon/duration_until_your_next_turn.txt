@@ -1,0 +1,27 @@
+# Dovin's -3/-0 uynt effect suppresses Hill Giant's first attack, survives the
+# opponent's intervening turn, then expires before its controller's next turn.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Dovin Baan,Hill Giant,Fervor
+[PLAYER2]
+life:20
+[DO]
+Dovin Baan
+choice 0
+Hill Giant
+goto attackers
+Hill Giant
+goto end
+goto attackers
+goto end
+goto attackers
+Hill Giant
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Dovin Baan,Hill Giant,Fervor
+[PLAYER2]
+life:17
+[END]

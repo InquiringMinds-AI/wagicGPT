@@ -1,0 +1,24 @@
+# {d(target)} discards the selected card (not a random card) before the taught
+# tap ability draws its replacement.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:prophetic ravings,forest
+library:island
+inplay:grizzly bears
+manapool:{R}
+[PLAYER2]
+[DO]
+prophetic ravings
+grizzly bears
+grizzly bears
+forest
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:island
+graveyard:forest
+inplay:prophetic ravings,grizzly bears
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,24 @@
+# prevent:N lasts only for the turn in which it is created. An unused
+# Conservator shield must not prevent Copper Tablet's damage on later turns.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+life:20
+inplay:conservator,copper tablet
+manapool:{3}
+[PLAYER2]
+[DO]
+conservator
+p1
+goto end
+goto upkeep
+goto end
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+life:19
+inplay:conservator,copper tablet
+[PLAYER2]
+life:19
+[END]

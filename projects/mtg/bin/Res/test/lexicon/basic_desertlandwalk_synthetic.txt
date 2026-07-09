@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:lexicon synthetic desertland walker
+[PLAYER2]
+inplay:desert,grizzly bears
+life:20
+[DO]
+lexicon synthetic desertland walker
+next
+grizzly bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:lexicon synthetic desertland walker
+[PLAYER2]
+inplay:desert,grizzly bears
+life:18
+[END]

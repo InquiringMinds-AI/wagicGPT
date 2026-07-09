@@ -1,0 +1,17 @@
+# {S} moves the source to its graveyard as a cost before damage resolves.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mogg Fanatic
+[PLAYER2]
+life:20
+[DO]
+Mogg Fanatic
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Mogg Fanatic
+[PLAYER2]
+life:19
+[END]

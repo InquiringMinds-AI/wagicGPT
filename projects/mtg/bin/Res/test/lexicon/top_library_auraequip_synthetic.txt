@@ -1,0 +1,18 @@
+# canplayauraequiplibrarytop lets Equipment be cast from the top of library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Top Aura Equipment Permission
+library:Bonesplitter
+manapool:{1}
+[PLAYER2]
+[DO]
+Bonesplitter
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Top Aura Equipment Permission,Bonesplitter
+manapool:{0}
+[PLAYER2]
+life:20
+[END]

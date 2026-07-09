@@ -1,0 +1,22 @@
+# A green nonartifact creature cannot block the red intimidate attacker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:academy raider
+[PLAYER2]
+inplay:grizzly bears
+life:20
+[DO]
+academy raider
+next
+grizzly bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:academy raider
+[PLAYER2]
+inplay:grizzly bears
+life:19
+[END]

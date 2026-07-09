@@ -1,0 +1,13 @@
+# Diagnostic witnesses blocked by harness behavior or otherwise unclassified.
+lexicon/cost_emerge_reduction.txt
+lexicon/cost_subtype_offering.txt
+lexicon/cost_ninjutsu_return_attacker.txt
+lexicon/mana_dynamic_value_graveyard.txt
+lexicon/cost_suspend_one_casts.txt
+lexicon/mana_chosen_color_persists.txt
+lexicon/trigger_phasedin_draws.txt
+lexicon/trigger_coinflipped_branch.txt
+lexicon/basic_defender_rejects_attack.txt
+lexicon/basic_horsemanship_blocking.txt
+lexicon/basic_skulk_accepts_equal_power.txt
+lexicon/basic_islandhome_accepts_defending_island.txt

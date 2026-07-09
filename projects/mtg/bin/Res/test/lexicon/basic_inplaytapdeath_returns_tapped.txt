@@ -1,0 +1,22 @@
+# inplaytapdeath returns the destroyed creature to the battlefield tapped.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Inplay Tap Death
+hand:Wrecking Ball
+manapool:{2}{R}{B}
+[PLAYER2]
+[DO]
+Wrecking Ball
+Lexicon Synthetic Inplay Tap Death
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Inplay Tap Death
+tappedinplay:1
+graveyard:Wrecking Ball
+manapool:{0}
+life:20
+[PLAYER2]
+life:20
+[END]

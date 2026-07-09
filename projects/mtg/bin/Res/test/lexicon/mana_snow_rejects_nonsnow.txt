@@ -1,0 +1,20 @@
+# Two ordinary blue mana provide enough total mana but no snow-source marker,
+# so {1}{i} cannot be paid and the ability must not activate.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Adarkar Windform
+manapool:{U}{U}
+[PLAYER2]
+inplay:Serra Angel
+[DO]
+Adarkar Windform
+Serra Angel
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Adarkar Windform
+manapool:{U}{U}
+[PLAYER2]
+inplay:Serra Angel
+[END]

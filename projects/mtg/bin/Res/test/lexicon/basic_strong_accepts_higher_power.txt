@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:aura gnarlid
+[PLAYER2]
+inplay:hill giant
+life:20
+[DO]
+aura gnarlid
+next
+hill giant
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:aura gnarlid
+[PLAYER2]
+inplay:hill giant
+life:20
+[END]

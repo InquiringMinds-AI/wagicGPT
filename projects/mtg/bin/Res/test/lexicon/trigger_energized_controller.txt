@@ -1,0 +1,24 @@
+# Casting Aether Chaser grants two energy. Territorial Gorger's
+# @energizedof(player) listener gives it +2/+2, so it attacks as a 4/4.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:aether chaser
+inplay:territorial gorger,concordant crossroads
+manapool:{1}{R}
+[PLAYER2]
+[DO]
+aether chaser
+next
+next
+territorial gorger
+next
+next
+[ASSERT]
+COMBATDAMAGE
+[PLAYER1]
+inplay:aether chaser,territorial gorger,concordant crossroads
+manapool:{0}
+[PLAYER2]
+life:16
+[END]

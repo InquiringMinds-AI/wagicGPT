@@ -22,7 +22,7 @@ next
 [ASSERT]
 COMBATEND
 [PLAYER1]
-graveyard:Hill Giant
+inplay:Hill Giant
 [PLAYER2]
 inplay:Brushwagg
 [END]

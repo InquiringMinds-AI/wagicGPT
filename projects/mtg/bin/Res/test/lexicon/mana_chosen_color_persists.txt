@@ -1,0 +1,24 @@
+# Coldsteel Heart chooses a color as it enters. After it untaps on its
+# controller's next turn, its mana ability must use the stored chosen color.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:coldsteel heart
+manapool:{2}
+[PLAYER2]
+[DO]
+coldsteel heart
+choice 0
+goto end
+goto firstmain
+goto end
+goto firstmain
+coldsteel heart
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:coldsteel heart
+manapool:{G}
+[PLAYER2]
+[END]

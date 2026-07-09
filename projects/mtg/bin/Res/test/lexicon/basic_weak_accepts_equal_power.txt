@@ -1,0 +1,21 @@
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:raging goblin
+[PLAYER2]
+inplay:spitfire handler
+life:20
+[DO]
+raging goblin
+next
+spitfire handler
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:raging goblin
+[PLAYER2]
+graveyard:spitfire handler
+life:20
+[END]

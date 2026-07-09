@@ -1,0 +1,20 @@
+# {C} accepts true colorless mana. Spatial Contortion resolves and its
+# +3/-3 effect kills a 3-toughness creature.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Spatial Contortion
+manapool:{1}{C}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Spatial Contortion
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Spatial Contortion
+manapool:{0}
+[PLAYER2]
+graveyard:Hill Giant
+[END]
