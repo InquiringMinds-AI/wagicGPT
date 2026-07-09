@@ -17358,7 +17358,8 @@ type=Sorcery
 [card]
 name=Casting of Bones
 target=creature
-auto=@movedto(graveyard) from(mytgt|Battlefield):draw:3 && transforms((,newability[target(*|myhand) reject])) forever
+auto=@movedto(graveyard) from(mytgt|Battlefield):reject notaTarget(*|myhand)
+auto=@movedto(graveyard) from(mytgt|Battlefield):draw:3
 text=Enchant creature -- When enchanted creature is put into a graveyard, draw three cards, then discard one of them.
 mana={2}{B}
 type=Enchantment

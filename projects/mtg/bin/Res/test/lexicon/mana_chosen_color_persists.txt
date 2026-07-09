@@ -1,9 +1,9 @@
-# Coldsteel Heart chooses a color as it enters. After it untaps on its
-# controller's next turn, its mana ability must use the stored chosen color.
-# PROTOCOL: casting opens TWO menus (accept the as-enters choice, then the
-# color pick - choice 0 twice = green). At the later activation the consumed
-# 'Choose a color' item STILL occupies menu slot 0 (engine wart, see CS-020
-# in docs/card-script-potential-issues.md), so the mana ability is choice 1.
+# {chosencolor}: Coldsteel Heart's chosen color persists across turns and
+# the granted {T}: add {chosencolor} produces it. Cast protocol: choice 0
+# twice (accept as-enters choice, then color pick; 0 = green).
+# CS-020 regression: the later activation is a DIRECT click - no menu. If a
+# stale "Choose a color" chooser ever persists again it would open a menu
+# here, eat the following commands, and fail this test.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -19,7 +19,6 @@ goto firstmain
 goto end
 goto firstmain
 coldsteel heart
-choice 1
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
