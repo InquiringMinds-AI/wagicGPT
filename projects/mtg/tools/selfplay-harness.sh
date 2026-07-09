@@ -9,8 +9,9 @@
 #   - WAGIC_SELFPLAY_ONESHOT=1 makes each process play EXACTLY ONE game, print
 #     "WAGIC_SELFPLAY_RESULT winner=N" (0/1/-1), and exit cleanly. The translog
 #     is durable per-decision, so nothing is lost.
-#   - The window is parked on a hidden Hyprland special workspace (real GPU, no
-#     compositor throttle) so nothing shows on the user's display.
+#   - WAGIC_HEADLESS=1 runs each game with no window and no GL context at all:
+#     no display, no GPU, no compositor involved. (This replaced the old
+#     hidden-Hyprland-workspace trick.)
 # Because each game is its own short-lived process, the harness controls the
 # matchup schedule directly: it builds the round-robin pairing list (each pair
 # once per -r repetition), shuffles it, and runs JOBS games concurrently,
@@ -40,7 +41,7 @@ JOBS=8
 TOTAL_CAP_S=86400        # 24h overall wall cap
 GAME_TIMEOUT_S=2400      # 40 min per game (games run ~28 min; margin for stalls)
 OUTDIR=""
-URL="http://100.116.136.74:8011"
+URL="http://100.116.136.74:8081"   # Spark production port (8011 = serve.sh dev default)
 MODEL="qwen35"
 KEY=""
 THINKING=0
@@ -99,11 +100,6 @@ NGAMES=$(wc -l < "$JOBFILE")
 BEFORE_LIST="$(mktemp)"
 ls "$LOGDIR"/*.jsonl 2>/dev/null | sort > "$BEFORE_LIST"
 
-# Park the game hidden on a special workspace.
-SIG="$(ls -t /run/user/1000/hypr/ 2>/dev/null | head -1)"
-[ -n "$SIG" ] && HYPRLAND_INSTANCE_SIGNATURE="$SIG" hyprctl keyword windowrule \
-    "workspace special:selfplay silent, class:^(wagic)$" >/dev/null 2>&1
-
 echo "== selfplay harness (matchups) =="
 echo "  pool   : $POOL"
 echo "  games  : $NGAMES ($(( ${#DECKS[@]} * (${#DECKS[@]} - 1) / 2 )) pairings x $REPS reps), $JOBS concurrent"
@@ -120,7 +116,7 @@ run_one_game() {
     local gstart; gstart=$(date +%s)
     local elog="$OUTDIR/game-${d0}v${d2}-${gstart}.stderr"
     timeout "${GAME_TIMEOUT_S}s" env \
-        WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}" SDL_VIDEODRIVER=wayland SDL_AUDIODRIVER=dummy \
+        WAGIC_HEADLESS=1 \
         WAGIC_SELFPLAY=1 WAGIC_SELFPLAY_ONESHOT=1 \
         WAGIC_SELFPLAY_DECK0="$d0" WAGIC_SELFPLAY_DECK1="$d2" \
         WAGIC_AI=gpt WAGIC_GPT_URL="$URL" WAGIC_GPT_MODEL="$MODEL" WAGIC_GPT_KEY="$KEY" \
@@ -141,7 +137,7 @@ while read -r d0 d1; do
     # Throttle to JOBS concurrent.
     while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n 2>/dev/null || sleep 2; done
     run_one_game "$d0" "$d1" &
-    sleep 2   # stagger startup so instances don't race GL/profiling init
+    sleep 2   # stagger startup so the card-DB loads don't thundering-herd
     done_ct=$((done_ct+1))
     echo "  launched $done_ct/$NGAMES: deck$d0 vs deck$d1  ($(jobs -rp | wc -l) running, $(( $(date +%s)-START ))s elapsed)"
 done < "$JOBFILE"

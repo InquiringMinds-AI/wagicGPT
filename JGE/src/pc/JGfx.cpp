@@ -41,10 +41,23 @@ extern "C" {
 #endif
 #endif
 
+#include <cstdlib>
+
+// WAGIC_HEADLESS: run the full game loop with no window and no GL context
+// (test suite / self-play on a machine with no display). CPU-side work --
+// image decode, buffers, dimensions -- proceeds unchanged so game logic sees
+// real data; only the GL touches are skipped. JTexture::mTexId stays -1, so
+// the destructor's existing guard already skips glDeleteTextures.
+static inline bool jgeHeadless()
+{
+    static const bool headless = (getenv("WAGIC_HEADLESS") != NULL);
+    return headless;
+}
+
 #ifdef _DEBUG
 #define checkGlError()            \
 {                                 \
-	GLenum glError = glGetError();  \
+	GLenum glError = jgeHeadless() ? 0 : glGetError();  \
 	if(glError != 0)                \
 	printf("%s : %u : GLerror is %u\n", __FUNCTION__, __LINE__, glError); \
 }
@@ -380,6 +393,7 @@ JTexture::~JTexture()
 
 void JTexture::UpdateBits(int x, int y, int width, int height, PIXEL_TYPE* bits)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     JRenderer::GetInstance()->BindTexture(this);
     glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, bits);
@@ -751,6 +765,8 @@ void JRenderer::InitRenderer()
 
     mCurrentRenderMode = MODE_UNKNOWN;
 
+    if (jgeHeadless()) return;
+
 
 #if (defined GL_ES_VERSION_2_0) || (defined GL_VERSION_2_0)
 #ifdef FORCE_GL2
@@ -827,6 +843,7 @@ void JRenderer::InitRenderer()
 
 void JRenderer::DestroyRenderer()
 {
+    if (jgeHeadless()) return;
     checkGlError();
 #if (defined GL_ES_VERSION_2_0) || (defined GL_VERSION_2_0)
     // Delete program object
@@ -837,6 +854,7 @@ void JRenderer::DestroyRenderer()
 
 void JRenderer::BeginScene()
 {
+    if (jgeHeadless()) return;
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);		// Clear Screen And Depth Buffer
 #if (!defined GL_ES_VERSION_2_0) && (!defined GL_VERSION_2_0)
     glLoadIdentity ();											// Reset The Modelview Matrix
@@ -864,6 +882,7 @@ void JRenderer::BeginScene()
 
 void JRenderer::EndScene()
 {
+    if (jgeHeadless()) return;
 #ifdef VITA
     vita_real_glDisableClientState(GL_COLOR_ARRAY);
     vita_real_glDisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -876,6 +895,7 @@ void JRenderer::EndScene()
 
 void JRenderer::BindTexture(JTexture *tex)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     if (tex && mCurrentTex != tex->mTexId)
     {
@@ -911,6 +931,7 @@ void JRenderer::BindTexture(JTexture *tex)
 
 void JRenderer::EnableTextureFilter(bool flag)
 {
+    if (jgeHeadless()) return;
     if (flag)
         mCurrentTextureFilter = TEX_FILTER_LINEAR;
     else
@@ -951,6 +972,7 @@ void JRenderer::FlushQuadBatch()
 
 void JRenderer::RenderQuad(JQuad* quad, float xo, float yo, float angle, float xScale, float yScale)
 {
+    if (jgeHeadless()) return;
     checkGlError();
 
     //yo = SCREEN_HEIGHT-yo-1;//-(quad->mHeight);
@@ -1183,6 +1205,7 @@ void JRenderer::RenderQuad(JQuad* quad, float xo, float yo, float angle, float x
 
 void JRenderer::RenderQuad(JQuad* quad, VertexColor* pt)
 {
+    if (jgeHeadless()) return;
     checkGlError();
 
     for (int i=0;i<4;i++)
@@ -1317,6 +1340,7 @@ void JRenderer::RenderQuad(JQuad* quad, VertexColor* pt)
 
 void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
 
     y = SCREEN_HEIGHT_F - y - height;
@@ -1424,6 +1448,7 @@ void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE
 
 void JRenderer::DrawRect(float x, float y, float width, float height, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
 
     y = SCREEN_HEIGHT_F - y - height;
@@ -1520,6 +1545,7 @@ void JRenderer::DrawRect(float x, float y, float width, float height, PIXEL_TYPE
 
 void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE* colors)
 {
+    if (jgeHeadless()) return;
     JColor col[4];
     for (int i=0;i<4;i++)
         col[i].color = colors[i];
@@ -1529,6 +1555,7 @@ void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE
 
 void JRenderer::FillRect(float x, float y, float width, float height, JColor* colors)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     y = SCREEN_HEIGHT_F - y - height;
 
@@ -1623,6 +1650,7 @@ void JRenderer::FillRect(float x, float y, float width, float height, JColor* co
 
 void JRenderer::DrawLine(float x1, float y1, float x2, float y2, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     //	glLineWidth (mLineWidth);
     JColor col;
@@ -1699,6 +1727,7 @@ void JRenderer::DrawLine(float x1, float y1, float x2, float y2, PIXEL_TYPE colo
 
 void JRenderer::Plot(float x, float y, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     glDisable(GL_TEXTURE_2D);
 #if (!defined GL_ES_VERSION_2_0) && (!defined GL_VERSION_2_0) && (!defined GL_VERSION_ES_CM_1_1) && (!defined GL_OES_VERSION_1_1)
@@ -1720,6 +1749,7 @@ void JRenderer::Plot(float x, float y, PIXEL_TYPE color)
 
 void JRenderer::PlotArray(float *x, float *y, int count, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     glDisable(GL_TEXTURE_2D);
 #if (!defined GL_ES_VERSION_2_0) && (!defined GL_VERSION_2_0) && (!defined GL_VERSION_ES_CM_1_1) && (!defined GL_OES_VERSION_1_1)
@@ -1743,6 +1773,7 @@ void JRenderer::PlotArray(float *x, float *y, int count, PIXEL_TYPE color)
 
 void JRenderer::ScreenShot(const char* filename __attribute__((unused)))
 {
+    if (jgeHeadless()) return;
 
 }
 
@@ -2548,6 +2579,14 @@ void JRenderer::TransferTextureToGLContext(JTexture& inTexture)
 {
     if (inTexture.mBuffer != NULL)
     {
+        if (jgeHeadless())
+        {
+            //The decoded pixels exist only to feed the GL upload; free them
+            //and leave mTexId at -1 so teardown never touches GL either.
+            delete [] inTexture.mBuffer;
+            inTexture.mBuffer = NULL;
+            return;
+        }
         GLuint texid;
         checkGlError();
         glGenTextures(1, &texid);
@@ -2610,6 +2649,17 @@ JTexture* JRenderer::CreateTexture(int width, int height, int mode __attribute__
 
     if (tex)
     {
+        if (jgeHeadless())
+        {
+            //Callers (fonts, menus) only need valid dimensions; pixel writes
+            //arrive through UpdateBits, which is a headless no-op.
+            tex->mFilter = TEX_FILTER_LINEAR;
+            tex->mWidth = width;
+            tex->mHeight = height;
+            tex->mTexWidth = width;
+            tex->mTexHeight = height;
+            return tex;
+        }
         int size = width * height * sizeof(PIXEL_TYPE);			// RGBA
         BYTE* buffer = new BYTE[size];
         if (buffer)
@@ -2660,6 +2710,7 @@ void JRenderer::EnableVSync(bool flag __attribute__((unused)))
 
 void JRenderer::ClearScreen(PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     static PIXEL_TYPE previousColor = RGBA(0xFF, 0xFF, 0xFF, 0xFF);
     if (previousColor != color)
@@ -2680,6 +2731,7 @@ void JRenderer::ClearScreen(PIXEL_TYPE color)
 
 void JRenderer::SetTexBlend(int src, int dest)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     if (src != mCurrTexBlendSrc || dest != mCurrTexBlendDest)
     {
@@ -2694,6 +2746,7 @@ void JRenderer::SetTexBlend(int src, int dest)
 
 void JRenderer::SetTexBlendSrc(int src)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     if (src != mCurrTexBlendSrc)
     {
@@ -2706,6 +2759,7 @@ void JRenderer::SetTexBlendSrc(int src)
 
 void JRenderer::SetTexBlendDest(int dest)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     if (dest != mCurrTexBlendDest)
     {
@@ -2718,6 +2772,7 @@ void JRenderer::SetTexBlendDest(int dest)
 
 void JRenderer::Enable2D()
 {
+    if (jgeHeadless()) return;
     checkGlError();
     if (mCurrentRenderMode == MODE_2D)
         return;
@@ -2770,6 +2825,7 @@ void JRenderer::Enable3D()
 
 void JRenderer::SetClip(int x, int y, int width, int height)
 {
+    if (jgeHeadless()) return;
     if (width <= 0 || height <= 0)
     {
         // Reset to full screen
@@ -2830,6 +2886,7 @@ void JRenderer::PopMatrix()
 
 void JRenderer::RenderTriangles(JTexture* texture, Vertex3D *vertices, int start, int count)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     if (texture)
         BindTexture(texture);
@@ -2925,6 +2982,7 @@ void JRenderer::SetFOV(float fov)
 
 void JRenderer::FillPolygon(float* x, float* y, int count, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     JColor col;
     col.color = color;
@@ -3026,6 +3084,7 @@ void JRenderer::FillPolygon(float* x, float* y, int count, PIXEL_TYPE color)
 
 void JRenderer::DrawPolygon(float* x, float* y, int count, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     JColor col;
     col.color = color;
@@ -3142,6 +3201,7 @@ void JRenderer::DrawPolygon(float* x, float* y, int count, PIXEL_TYPE color)
 
 void JRenderer::DrawLine(float x1, float y1, float x2, float y2, float lineWidth, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     float dy=y2-y1;
     float dx=x2-x1;
     if(dy==0 && dx==0)
@@ -3170,6 +3230,7 @@ void JRenderer::DrawLine(float x1, float y1, float x2, float y2, float lineWidth
 
 void JRenderer::DrawCircle(float x, float y, float radius, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     JColor col;
     col.color = color;
@@ -3280,6 +3341,7 @@ void JRenderer::DrawCircle(float x, float y, float radius, PIXEL_TYPE color)
 
 void JRenderer::FillCircle(float x, float y, float radius, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     JColor col;
     col.color = color;
@@ -3402,6 +3464,7 @@ void JRenderer::FillCircle(float x, float y, float radius, PIXEL_TYPE color)
 
 void JRenderer::DrawPolygon(float x, float y, float size, int count, float startingAngle, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     JColor col;
     col.color = color;
@@ -3517,6 +3580,7 @@ void JRenderer::DrawPolygon(float x, float y, float size, int count, float start
 
 void JRenderer::FillPolygon(float x, float y, float size, int count, float startingAngle, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
     checkGlError();
     JColor col;
     col.color = color;
@@ -3661,6 +3725,7 @@ void JRenderer::SetImageFilter(JImageFilter* imageFilter)
 
 void JRenderer::DrawRoundRect(float x, float y, float w, float h, float radius, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
 #ifdef VITA
 {   // own scope so locals/statics don't collide with the desktop-path block below
     // Vita: sample the corner arcs every 10 degrees (36 vertices) instead of
@@ -3911,6 +3976,7 @@ void JRenderer::DrawRoundRect(float x, float y, float w, float h, float radius, 
 
 void JRenderer::FillRoundRect(float x, float y, float w, float h, float radius, PIXEL_TYPE color)
 {
+    if (jgeHeadless()) return;
 #ifdef VITA
 {   // own scope so locals/statics don't collide with the desktop-path block below
     // Vita: triangle-fan with center + 36 perimeter samples (10-deg steps) +

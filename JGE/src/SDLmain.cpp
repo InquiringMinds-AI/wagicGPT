@@ -487,6 +487,10 @@ void SdlApp::OnUpdate()
 		}
 	}
 
+	//Headless: nothing to draw and no window to swap (see OnInit).
+	if (!window)
+		return;
+
 	if(g_engine)
 		g_engine->Render();
 
@@ -697,7 +701,28 @@ bool SdlApp::OnInit()
 {
 	int window_w, window_h;
 
-	if(SDL_Init(SDL_INIT_EVERYTHING) < 0) 
+	//WAGIC_HEADLESS: no window, no GL context. SDL's dummy video driver
+	//satisfies init on a machine with no display; every GL touch is skipped
+	//inside JGfx.cpp under the same flag, and the game loop (Update) is
+	//renderer-free, so logic - test suite, self-play - runs unchanged.
+	if (getenv("WAGIC_HEADLESS"))
+	{
+		setenv("SDL_VIDEODRIVER", "dummy", 1);
+		setenv("SDL_AUDIODRIVER", "dummy", 1);
+		if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
+		{
+			return false;
+		}
+		JGECreateDefaultBindings();
+		if (!InitGame())
+		{
+			cerr << "Could not init the game\n";
+			return false;
+		}
+		return true;
+	}
+
+	if(SDL_Init(SDL_INIT_EVERYTHING) < 0)
 	{
 		return false;
 	}
