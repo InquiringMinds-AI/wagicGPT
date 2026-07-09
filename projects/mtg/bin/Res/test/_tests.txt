@@ -1009,3 +1009,5 @@ generic/evoke_flicker_i1129.txt
 lexicon/cost_mill_rot_farm_skeleton.txt
 lexicon/basic_horsemanship_blocking.txt
 lexicon/basic_skulk_accepts_equal_power.txt
+lexicon/basic_islandhome_accepts_defending_island.txt
+lexicon/data_ice_lim_dul_resolves.txt

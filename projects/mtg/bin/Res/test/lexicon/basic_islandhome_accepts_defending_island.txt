@@ -9,6 +9,7 @@ life:20
 dandan
 next
 next
+next
 [ASSERT]
 COMBATEND
 [PLAYER1]

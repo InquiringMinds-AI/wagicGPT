@@ -74,11 +74,18 @@ int Rules::getMTGId(string cardName)
     return 0;
 }
 
-MTGCardInstance * Rules::getCardByMTGId(GameObserver* g, int mtgid)
+MTGCardInstance * Rules::getCardByMTGId(GameObserver* g, int mtgid, Player * preferred)
 {
     for (int i = 0; i < 2; i++)
     {
+        //A caller loading one player's zones must find THAT player's copy:
+        //the global first-match order (all of player 0's zones, then player
+        //1's) otherwise returns an already-placed same-id card belonging to
+        //the other player - e.g. a basic land both sides start with - and
+        //the subsequent putInZone from this player's library returns NULL.
         Player * p = g->players[i];
+        if (preferred)
+            p = (i == 0) ? preferred : g->players[(g->players[0] == preferred) ? 1 : 0];
         MTGGameZone * zones[] = { p->game->library, p->game->hand, p->game->inPlay, p->game->graveyard, p->game->exile, p->game->commandzone, p->game->sideboard };
         for (int j = 0; j < 7; j++)
         {
@@ -870,13 +877,18 @@ void Rules::initGame(GameObserver *g, bool currentPlayerSet)
             MTGGameZone * zone = playerZones[j];
             for (size_t k = 0; k < loadedPlayerZones[j]->cards.size(); k++)
             {
-                MTGCardInstance * card = getCardByMTGId(g, loadedPlayerZones[j]->cards[k]->getId());
+                MTGCardInstance * card = getCardByMTGId(g, loadedPlayerZones[j]->cards[k]->getId(), p);
                 if (card && zone != p->game->library)
                 {
                     if (zone == p->game->inPlay)
                     {
                         //MTGCardInstance * copy = p->game->putInZone(card, p->game->library, p->game->stack);
                         MTGCardInstance * copy = zone->owner->game->putInZone(card, p->game->library, p->game->stack);
+                        if (!copy)
+                        {
+                            LOG ("RULES ERROR, could not move card to stack\n");
+                            continue;
+                        }
                         Spell * spell = NEW Spell(g, copy);
                         spell->resolve();
                         delete spell;

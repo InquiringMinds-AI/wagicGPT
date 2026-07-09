@@ -1,0 +1,13 @@
+# ICE 2466 must resolve to the Legions of Lim-Dul primitive (CS-016).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:2466
+[PLAYER2]
+[DO]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:2466
+[PLAYER2]
+[END]

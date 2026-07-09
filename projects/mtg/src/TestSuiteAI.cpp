@@ -1093,13 +1093,18 @@ void TestSuiteGame::initGame()
             MTGGameZone * zone = playerZones[j];
             for (size_t k = 0; k < loadedPlayerZones[j]->cards.size(); k++)
             {
-                MTGCardInstance * card = Rules::getCardByMTGId(observer, loadedPlayerZones[j]->cards[k]->getId());
+                MTGCardInstance * card = Rules::getCardByMTGId(observer, loadedPlayerZones[j]->cards[k]->getId(), p);
                 if (card && zone != p->game->library)
                 {
                     if (zone == p->game->inPlay)
                     {
                         //MTGCardInstance * copy = p->game->putInZone(card, p->game->library, p->game->stack);
                         MTGCardInstance * copy = zone->owner->game->putInZone(card, p->game->library, p->game->stack);
+                        if (!copy)
+                        {
+                            LOG ("TESTSUITE ERROR, could not move card to stack\n");
+                            continue;
+                        }
                         Spell * spell = NEW Spell(observer, copy);
                         spell->resolve();
                         if (!summoningSickness && (size_t)p->game->inPlay->nb_cards > k) p->game->inPlay->cards[k]->summoningSickness = 0;

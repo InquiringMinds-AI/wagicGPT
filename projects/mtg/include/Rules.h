@@ -86,7 +86,9 @@ public:
     vector<string> extraRules;
     RulesState initState;
     static int getMTGId(string name);
-    static MTGCardInstance * getCardByMTGId(GameObserver* observer, int mtgid);
+    //preferred: search that player's zones first - a caller loading one
+    //player's zones needs that player's copy of a same-id card (basic lands).
+    static MTGCardInstance * getCardByMTGId(GameObserver* observer, int mtgid, Player * preferred = NULL);
 
 };
 

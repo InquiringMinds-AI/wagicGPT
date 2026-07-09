@@ -712,7 +712,7 @@ id=2465
 rarity=U
 [/card]
 [card]
-primitive=Legions of Lim-Dûl
+primitive=Legions of Lim-Dul
 id=2466
 rarity=C
 [/card]
@@ -727,12 +727,12 @@ id=2468
 rarity=U
 [/card]
 [card]
-primitive=Lim-Dûl's Cohort
+primitive=Lim-Dul's Cohort
 id=2469
 rarity=C
 [/card]
 [card]
-primitive=Lim-Dûl's Hex
+primitive=Lim-Dul's Hex
 id=2470
 rarity=U
 [/card]
@@ -782,7 +782,7 @@ id=2479
 rarity=C
 [/card]
 [card]
-primitive=Oath of Lim-Dûl
+primitive=Oath of Lim-Dul
 id=2480
 rarity=R
 [/card]
@@ -997,7 +997,7 @@ id=2634
 rarity=C
 [/card]
 [card]
-primitive=Márton Stromgald
+primitive=Marton Stromgald
 id=2635
 rarity=R
 [/card]
