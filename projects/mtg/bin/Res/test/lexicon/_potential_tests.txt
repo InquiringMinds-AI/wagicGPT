@@ -2,4 +2,3 @@
 lexicon/cost_emerge_reduction.txt
 lexicon/cost_subtype_offering.txt
 lexicon/cost_suspend_one_casts.txt
-lexicon/basic_defender_rejects_attack.txt

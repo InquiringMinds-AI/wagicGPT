@@ -1,0 +1,27 @@
+# Defender / illegal-attacker click during attacker declaration: clicking a
+# vanilla defender (Wall of Stone) is a no-op - it must NOT clear the already
+# declared legal attacker or wedge the phase. Goblin connects for 1.
+# NOTE (CS-013 lesson): the original repro used Benevolent Ancestor, whose
+# {T}: prevent:1 target(anytarget) activated ability reacted to the click and
+# ARMED ITS TARGET CHOOSER - blocking phase advance. That was the card's own
+# ability working, not an attack-rule bug. Vanilla creatures for combat tests.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:raging goblin,wall of stone
+[PLAYER2]
+life:20
+[DO]
+raging goblin
+wall of stone
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:raging goblin,wall of stone
+tappedinplay:1
+[PLAYER2]
+life:19
+[END]

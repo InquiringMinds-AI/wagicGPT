@@ -1,18 +1,20 @@
-# Defender cannot be declared as an attacker.
+# Defender cannot be declared as an attacker (vanilla defender - see
+# combat_illegal_attacker_click_noop.txt for why not Benevolent Ancestor:
+# its own {T}: prevent ability reacts to the click and arms a chooser).
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:benevolent ancestor
+inplay:wall of stone
 [PLAYER2]
 life:20
 [DO]
-benevolent ancestor
+wall of stone
 next
 next
 [ASSERT]
 SECONDMAIN
 [PLAYER1]
-inplay:benevolent ancestor
+inplay:wall of stone
 [PLAYER2]
 life:20
 [END]
