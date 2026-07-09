@@ -62,6 +62,11 @@ entirely — headless corpora are bound by real work only.
 Any engine path gated "for the human" (`ishuman` restrictions, human-only menus) must be
 re-evaluated for the LLM opponent: does it have access, and should it? Those gates encode
 Baka's limitations, not the game's rules. First instance: emerge/offering casts (CS-003).
+Second instance (CS-017, 2026-07-09): the gates also live in CARD DATA — e.g. Cytoplast
+Manipulator's graft lines carry `compare(ishuman)~equalto~0,compare(genrandN)~equalto~0`
+restrictions: for any non-human player (including AIPlayerGPT) the graft counter-move is
+decided by a DICE ROLL baked into the script, and the LLM never sees the choice. Sweep the
+primitives for `ishuman`/`genrand` gates when building the P2/P3 action surface.
 
 ## Methodology
 - Future test corpora: **`WAGIC_GPT_HINTS=0`** — strip Baka's scores so we measure qwen+guide, not qwen-following-Baka.

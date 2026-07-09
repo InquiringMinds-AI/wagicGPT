@@ -2711,7 +2711,7 @@ MTGCardInstance * AAConjure::makeCard()
     string newName = cardNamed;
     if(newName.find(";")){//if it's a list of cards we choose one randomly (e.g. Tome of the Infinite)
         vector<string> names = split(newName, ';');
-        newName = names.at(std::rand() % names.size());
+        newName = names.at((source && source->getObserver() ? source->getObserver()->getRandomGenerator()->random() : std::rand()) % names.size());
     }
     MTGCardInstance * card = NULL;
     MTGCard * cardData = MTGCollection()->getCardByName(newName, source->setId);
@@ -10412,7 +10412,7 @@ void AACastCard::Update(float dt)
         if(cardNamed.find("randomcard") != string::npos){ //cast a random card from collection.
             MTGCard *rndCard = NULL;
             while(!rndCard || rndCard->data->isLand())
-                rndCard = MTGCollection()->getCardById(MTGCollection()->ids.at(std::rand() % (MTGCollection()->ids).size()));
+                rndCard = MTGCollection()->getCardById(MTGCollection()->ids.at((source && source->getObserver() ? source->getObserver()->getRandomGenerator()->random() : std::rand()) % (MTGCollection()->ids).size()));
             cardNamed = rndCard->data->name;
         }
         if (cardNamed.find("imprintedcard") != string::npos)
