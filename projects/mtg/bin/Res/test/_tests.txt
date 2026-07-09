@@ -1020,3 +1020,5 @@ lexicon/mana_chosen_color_persists.txt
 lexicon/cost_untap_crackleburr.txt
 lexicon/cost_untap_gate_untapped.txt
 lexicon/cost_ninjutsu_return_attacker.txt
+lexicon/mana_dynamic_value_graveyard.txt
+lexicon/mana_dynamic_value_graveyard_empty.txt

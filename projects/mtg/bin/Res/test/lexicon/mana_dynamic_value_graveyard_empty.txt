@@ -1,0 +1,30 @@
+# Circular Logic self-count regression: the CL caster's graveyard is EMPTY
+# and CL is still on the stack while resolving, so the pay amount is 0 -
+# the engine must not count CL itself. Payer keeps the floating {1}.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Bad Moon
+graveyard:Forest,Island
+manapool:{3}{B}
+[PLAYER2]
+hand:Circular Logic
+manapool:{2}{U}
+[DO]
+Bad Moon
+no
+yes
+Circular Logic
+Bad Moon
+endinterruption
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Bad Moon
+graveyard:Forest,Island
+manapool:{1}
+[PLAYER2]
+graveyard:Circular Logic
+manapool:{0}
+[END]

@@ -1,13 +1,16 @@
-# Circular Logic computes {value:type:*:opponentgraveyard}=2. The spell's
-# controller pays exactly two remaining mana, so Bad Moon resolves.
+# Circular Logic: "counter unless its controller pays {1} for each card in
+# YOUR graveyard" - your = the CL CASTER's graveyard (p2 here). The granted
+# pay-ability rides on the TARGET spell, so the primitive's
+# {value:type:*:opponentgraveyard} (payer's opponent = caster) is the right
+# zone. p2 graveyard = 2 -> pay exactly 2; Bad Moon resolves.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
 hand:Bad Moon
-graveyard:Forest,Island
-manapool:{3}{B}
+manapool:{4}{B}
 [PLAYER2]
 hand:Circular Logic
+graveyard:Forest,Island
 manapool:{2}{U}
 [DO]
 Bad Moon
@@ -21,9 +24,8 @@ choice 0
 FIRSTMAIN
 [PLAYER1]
 inplay:Bad Moon
-graveyard:Forest,Island
 manapool:{0}
 [PLAYER2]
-graveyard:Circular Logic
+graveyard:Forest,Island,Circular Logic
 manapool:{0}
 [END]
