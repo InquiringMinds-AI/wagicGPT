@@ -1,0 +1,21 @@
+# Akoum Hellkite landfall: the @movedTo targeted trigger must acquire its
+# target (forced-choice menu, then target click) and deal 2 for a Mountain.
+# Regression for the targeted-trigger-payload fix (CS-012 family).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:akoum hellkite
+hand:mountain
+[PLAYER2]
+life:20
+[DO]
+mountain
+choice 0
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:akoum hellkite,mountain
+[PLAYER2]
+life:18
+[END]

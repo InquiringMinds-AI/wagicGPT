@@ -58,6 +58,11 @@ any transition timers for the wrong shape — throttle-then-ask serializes
 padding + inference.) For testing, `WAGIC_FASTCLOCK` strips this padding
 entirely — headless corpora are bound by real work only.
 
+## The ishuman lens  [user directive, 2026-07-09]
+Any engine path gated "for the human" (`ishuman` restrictions, human-only menus) must be
+re-evaluated for the LLM opponent: does it have access, and should it? Those gates encode
+Baka's limitations, not the game's rules. First instance: emerge/offering casts (CS-003).
+
 ## Methodology
 - Future test corpora: **`WAGIC_GPT_HINTS=0`** — strip Baka's scores so we measure qwen+guide, not qwen-following-Baka.
 - Migration = **strangler pattern**: move ONE decision seam onto the clean contract at a time; suite 915 as the net. NOT a big-bang rewrite. Same approach as the parked engine/render-decoupling note, aimed at the AI interface.

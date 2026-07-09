@@ -10,6 +10,7 @@ manapool:{4}{R}
 [PLAYER2]
 [DO]
 fabrication module
+choice 0
 grizzly bears
 shock
 grizzly bears

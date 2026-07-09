@@ -8474,6 +8474,26 @@ int GenericTriggeredAbility::resolve()
         setTriggerTargets(targets.front(), ability);
         targets.pop();
     }
+    //A targeted payload has no target-acquisition step of its own: firing it
+    //directly resolves against an empty chooser and the effect fizzles (the
+    //Spell flow chooses targets at cast time; this trigger flow never asks).
+    //Route it through MayAbility(must) - the engine's interactive-trigger
+    //machinery, the same path the parser builds for "may target(...)"
+    //payloads and the suspend cast-on-zero uses - so the controller picks
+    //the target. TriggerTargetChooser payloads (event-supplied targets) and
+    //targetter-less choosers (notatarget) keep their existing behavior.
+    if (TargetAbility * ta = dynamic_cast<TargetAbility *>(ability))
+    {
+        TargetChooser * atc = ta->getActionTc();
+        if (atc && atc->targetter && !dynamic_cast<TriggerTargetChooser *>(atc) && !atc->getNbTargets())
+        {
+            if (!atc->validTargetsExist() || atc->maxtargets == 0)
+                return 1; //no legal target: the triggered ability does nothing
+            MayAbility * ma = NEW MayAbility(game, game->mLayers->actionLayer()->getMaxId(), ability->clone(), source, true);
+            ma->addToGame();
+            return 1;
+        }
+    }
     if (ability->oneShot)
         return ability->resolve();
     MTGAbility * clone = ability->clone();

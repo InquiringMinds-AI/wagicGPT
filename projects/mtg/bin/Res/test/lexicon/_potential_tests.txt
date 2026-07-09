@@ -6,4 +6,3 @@ lexicon/mana_dynamic_value_graveyard.txt
 lexicon/cost_suspend_one_casts.txt
 lexicon/mana_chosen_color_persists.txt
 lexicon/basic_defender_rejects_attack.txt
-lexicon/trigger_energized_targeted_counter.txt
