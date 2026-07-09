@@ -126,6 +126,60 @@ const char * kReplyProtocol =
     "changed. Never write a fragment like \"continue as before\". Keep the plan CONCISE - a few "
     "sentences of intent, not an analysis.\n";
 
+//The card's rules text, single-line and bounded, for option/target lines:
+//the deciding fact belongs ON the choice, not in a distant deck blob (the
+//model picked discard/removal targets near-arbitrarily from bare names).
+string cardTextSnippet(MTGCardInstance * card, size_t maxLen)
+{
+    string text = card->text;
+    for (size_t i = 0; i < text.size(); i++)
+        if (text[i] == '\n')
+            text[i] = ' ';
+    if (text.size() > maxLen)
+    {
+        size_t cut = text.rfind(' ', maxLen);
+        text = text.substr(0, (cut == string::npos || cut < maxLen / 2) ? maxLen : cut) + "...";
+    }
+    return text;
+}
+
+//The set keyword abilities (flying, first strike, can't block...) - the
+//LIVE effective set, including granted/lost ones printed text cannot show.
+string keywordList(MTGCardInstance * card)
+{
+    std::ostringstream out;
+    bool first = true;
+    for (int j = 0; j < Constants::NB_BASIC_ABILITIES; j++)
+    {
+        if (!card->basicAbilities[j])
+            continue;
+        out << (first ? "" : ", ") << Constants::MTGBasicAbilities[j];
+        first = false;
+    }
+    return out.str();
+}
+
+//Primary type for non-creature option/target lines (a discard pick needs
+//to know a bare name is a sorcery vs a land).
+string typeTag(MTGCardInstance * card)
+{
+    if (card->isCreature())
+        return "";
+    if (card->isLand())
+        return "land";
+    if (card->hasType(Subtypes::TYPE_ARTIFACT))
+        return "artifact";
+    if (card->hasType(Subtypes::TYPE_ENCHANTMENT))
+        return "enchantment";
+    if (card->hasType(Subtypes::TYPE_PLANESWALKER))
+        return "planeswalker";
+    if (card->hasType(Subtypes::TYPE_INSTANT))
+        return "instant";
+    if (card->hasType(Subtypes::TYPE_SORCERY))
+        return "sorcery";
+    return "";
+}
+
 //The auras/equipment attached to a permanent. There is no forward list, so
 //find them the way the engine does (cf. MTGCardInstance::hasTotemArmor):
 //every attachment carries a reverse pointer (auraParent) to its host.
@@ -163,7 +217,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         out << card->getDisplayName();
         ManaCost * cost = card->getManaCost();
         if (cost && cost->getConvertedCost())
-            out << " {" << cost->toString() << "}";
+            out << " " << cost->toString(); //toString carries its own braces
         if (card->isCreature())
         {
             out << " (" << card->power << "/" << card->toughness << ")";
@@ -173,8 +227,23 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             if (withStatus && (card->power != card->basepower || card->toughness != card->basetoughness))
                 out << " (printed " << card->basepower << "/" << card->basetoughness << ")";
         }
+        else
+        {
+            //a bare name does not say what it IS (lands excepted: the name does)
+            string tag = typeTag(card);
+            if (!tag.empty() && tag != "land")
+                out << " [" << tag << "]";
+        }
         if (withStatus)
         {
+            //the LIVE keyword set - granted/lost abilities the decklist
+            //text cannot show (Bloodghast "can't block", taught flying...)
+            if (card->isCreature())
+            {
+                string kw = keywordList(card);
+                if (!kw.empty())
+                    out << " [" << kw << "]";
+            }
             if (card->counters && card->counters->mCount)
             {
                 out << " [counters:";
@@ -239,11 +308,27 @@ string describeTarget(Player * me, Targetable * t)
         return "(unknown)";
     o << c->getDisplayName();
     if (c->isCreature())
+    {
         o << " (" << c->power << "/" << c->toughness << ")";
+        string kw = keywordList(c);
+        if (!kw.empty())
+            o << " [" << kw << "]";
+    }
+    else
+    {
+        string tag = typeTag(c);
+        if (!tag.empty())
+            o << " [" << tag << "]";
+    }
     if (c->currentZone)
         o << " [" << (c->controller() == me ? "your " : "opponent's ") << zoneDesc(c->currentZone) << "]";
     if (c->isTapped())
         o << " [tapped]";
+    //The deciding fact rides on the option: a discard or removal pick from
+    //bare names is a coin flip for the model.
+    string txt = cardTextSnippet(c, 110);
+    if (!txt.empty())
+        o << " - \"" << txt << "\"";
     return o.str();
 }
 
@@ -461,7 +546,7 @@ string AIPlayerGPT::describeDeckCards(Player * p, bool withCounts)
         out << it->first;
         ManaCost * cost = card->getManaCost();
         if (cost && cost->getConvertedCost())
-            out << " {" << cost->toString() << "}";
+            out << " " << cost->toString();
         if (card->isCreature())
             out << " (" << card->power << "/" << card->toughness << ")";
         string text = card->text;
@@ -630,6 +715,15 @@ string AIPlayerGPT::consumePlan(const string& content)
             //like an instruction fragment)
             size_t dot = plan.rfind(". ", 1600);
             plan = plan.substr(0, (dot != string::npos && dot > 400) ? dot + 1 : 1600);
+        }
+        //A reply cut off by max_tokens leaves a mid-word stump ("...value
+        //by sac", observed live); trim back to the last complete sentence.
+        char last = plan.empty() ? '.' : plan[plan.size() - 1];
+        if (last != '.' && last != '!' && last != '?')
+        {
+            size_t dot = plan.find_last_of(".!?");
+            if (dot != string::npos && dot > plan.size() / 2)
+                plan = plan.substr(0, dot + 1);
         }
         mCurrentPlan = plan;
     }
@@ -820,7 +914,8 @@ string AIPlayerGPT::serializeGameState()
     out << "Phase: " << observer->getCurrentGamePhaseName();
     out << " | It is " << (observer->currentPlayer == this ? "your" : "the opponent's") << " turn.\n";
     out << "Your life: " << this->life << " | Opponent life: " << (opp ? opp->life : 0) << "\n";
-    out << "Mana in your pool: " << this->getManaPool()->toString() << "\n";
+    string pool = this->getManaPool()->toString();
+    out << "Mana in your pool: " << (pool.empty() ? "(none)" : pool) << "\n";
 
     out << "Your hand: ";
     describeZoneCards(out, game->hand, false);
@@ -832,6 +927,17 @@ string AIPlayerGPT::serializeGameState()
         describeZoneCards(out, opp->game->inPlay, true);
         out << "\nOpponent hand size: " << opp->game->hand->nb_cards
             << " | Opponent library: " << opp->game->library->nb_cards << " cards";
+        //Artifact counts feed metalcraft/affinity-style decisions and are
+        //tedious to re-count from the board lines.
+        int myArtifacts = 0, oppArtifacts = 0;
+        for (int i = 0; i < game->inPlay->nb_cards; i++)
+            if (game->inPlay->cards[i]->hasType(Subtypes::TYPE_ARTIFACT))
+                myArtifacts++;
+        for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
+            if (opp->game->inPlay->cards[i]->hasType(Subtypes::TYPE_ARTIFACT))
+                oppArtifacts++;
+        if (myArtifacts || oppArtifacts)
+            out << "\nArtifacts in play: you " << myArtifacts << " | opponent " << oppArtifacts;
         if (!mKnownOppHand.empty())
         {
             out << "\nCards you have seen in the opponent's hand: ";
@@ -894,6 +1000,19 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         }
         if (any)
             out << " [cost: " << cost.str() << "]";
+    }
+
+    //The BENEFIT, not just the cost: menu texts like "Put in Play" (a
+    //fetchland crack) read as pure downside next to their [cost: ...] -
+    //the model never cracked a fetch. The source card's rules text states
+    //what the activation is actually FOR.
+    MTGCardInstance * src = action.click ? action.click
+                                         : (action.ability ? action.ability->source : NULL);
+    if (src)
+    {
+        string txt = cardTextSnippet(src, 140);
+        if (!txt.empty())
+            out << " {card text: \"" << txt << "\"}";
     }
     return out.str();
 }
@@ -1009,10 +1128,20 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     std::ostringstream tail;
     tail << "Your legal actions:\n";
     int index = 0;
+    //De-dup identical option lines: a fetchland offers one action per
+    //fetchable copy in the library (observed: 13 byte-identical "Put in
+    //Play" lines) - from the model's seat they are ONE decision. Keep the
+    //first candidate of each rendered line.
+    vector<const OrderedAIAction *> shown;
+    std::set<string> seenLines;
     for (size_t c = 0; c < candidates.size(); c++)
     {
+        string line = describeAction(*candidates[c]);
+        if (!seenLines.insert(line).second)
+            continue;
+        shown.push_back(candidates[c]);
         index++;
-        tail << index << ". " << describeAction(*candidates[c]);
+        tail << index << ". " << line;
         if (mShowHints)
         {
             OrderedAIAction action = *candidates[c]; //copy: getEfficiency() is not const
@@ -1069,7 +1198,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (content.empty())
             setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
-            narrateDecision("You: " + describeAction(*candidates[choice - 1]));
+            narrateDecision("You: " + describeAction(*shown[choice - 1]));
 
         mLastAskKey = askKey;
         mLastChoice = choice;
@@ -1091,7 +1220,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     }
 
     DebugTrace("AIPlayerGPT[ph" << phase << "]: take action " << choice << "/" << index << " (cached=" << unchanged << ")");
-    return candidates[choice - 1];
+    return shown[choice - 1];
 }
 
 int AIPlayerGPT::selectHintAbility()
@@ -1282,7 +1411,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             std::ostringstream o;
             o << "Cast " << card->getDisplayName();
             if (cost && cost->getConvertedCost())
-                o << " {" << cost->toString() << "}";
+                o << " " << cost->toString();
             if (card->isCreature())
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << scans[s].label;
@@ -1301,7 +1430,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     oa << cost->getAlternative()->alternativeName << " cost";
                 else
                     oa << "alternative cost";
-                oa << " {" << cost->getAlternative()->toString() << "}";
+                oa << " " << cost->getAlternative()->toString();
                 if (card->isCreature())
                     oa << " (" << card->power << "/" << card->toughness << ")";
                 oa << scans[s].label;
@@ -1392,6 +1521,9 @@ int AIPlayerGPT::orderBlockers()
                 std::ostringstream o;
                 o << remaining[b]->card->getDisplayName()
                   << " (" << remaining[b]->card->power << "/" << remaining[b]->card->toughness << ")";
+                string kw = keywordList(remaining[b]->card);
+                if (!kw.empty())
+                    o << " [" << kw << "]";
                 opts.push_back(o.str());
             }
             int pick = askModel(q.str(), opts);
@@ -1883,8 +2015,14 @@ int AIPlayerGPT::chooseAttackers()
     tail << "Combat: declare ALL attackers for this turn in ONE decision.\n"
             "Your creatures that can attack:\n";
     for (size_t j = 0; j < attackers.size(); j++)
+    {
         tail << "A" << (j + 1) << ". " << attackers[j]->name
-             << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")\n";
+             << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
+        string kw = keywordList(attackers[j]);
+        if (!kw.empty())
+            tail << " [" << kw << "]";
+        tail << "\n";
+    }
     tail << "Reply with the numbers of the attackers you send, comma-separated"
             " (e.g. \"A1, A3\"), or \"none\" to attack with nobody this turn."
             " Then your PLAN: line.";
@@ -2029,13 +2167,23 @@ int AIPlayerGPT::chooseBlockers()
     std::ostringstream tail;
     tail << "Combat: declare blockers for this whole combat in ONE decision.\nAttackers:\n";
     for (size_t j = 0; j < attackers.size(); j++)
+    {
         tail << "A" << (j + 1) << ". " << attackers[j]->name
-             << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")\n";
+             << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
+        string kw = keywordList(attackers[j]);
+        if (!kw.empty())
+            tail << " [" << kw << "]";
+        tail << "\n";
+    }
     tail << "Your available blockers (with the attackers each may legally block):\n";
     for (size_t i = 0; i < blockers.size(); i++)
     {
         tail << "B" << (i + 1) << ". " << blockers[i]->name
-             << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ") - may block";
+             << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ")";
+        string kw = keywordList(blockers[i]);
+        if (!kw.empty())
+            tail << " [" << kw << "]";
+        tail << " - may block";
         for (size_t j = 0; j < legal[i].size(); j++)
             for (size_t k = 0; k < attackers.size(); k++)
                 if (attackers[k] == legal[i][j])

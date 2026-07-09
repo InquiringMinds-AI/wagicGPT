@@ -29,7 +29,16 @@ already-flipped id) - turn ownership must read observer->currentPlayer.
 Original finding (kept for context):
 Current impl (`AIPlayerGPT.cpp`): a **windowed conversation transcript**. `buildRequestBody` (728-732) sends system + the running `(decision-prompt, reply)` pairs + the current prompt. After each reply the prompt+reply are appended (889-890). Window (896-897): `while (mMessages.size() > 41) erase(begin+1, begin+3)` = keep system + the most recent **20 exchanges**. Each historical "user" turn is a **full board serialization**; the code's own comment (895) admits "old states are superseded by the snapshot we resend." So up to ~20 STALE full snapshots stack ahead of the current one -> attention dilution for a weak model, token bloat, and an unstable prefix that defeats prefix caching. **FIX:** send current state fresh once + a compact history (events + own decisions/plan), not full stale re-dumps. This is a first-class contract decision: separate CURRENT decision context from a COMPACT running history (they are currently conflated).
 
-### P1 — Decision presentation  [highest leverage, lowest risk; the biggest play-quality lever found]
+### P1 — Decision presentation  [MOSTLY SHIPPED 2026-07-09; state-computed magnitudes remain]
+Shipped: rules-text snippet on target options AND on activated-ability action lines (the
+benefit rides the option - fetch shows its search text next to [cost]); type tags on
+non-creature targets/board lines; LIVE keyword set (granted/lost) on board lines, combat
+declaration lines, and damage-order options; artifact counts in the state block; identical
+option lines DE-DUPED (fetch: 13 -> 1); mana single-brace fix ({{1}{u}} was a wrapper bug);
+empty pool renders "(none)"; truncated plans trimmed to the last complete sentence.
+REMAINING (needs dynamic evaluation machinery): state-computed payoff magnitudes (Gray
+Merchant "drains N now", X-spells, "for each" effects).
+Original finding (kept for context):
 Option lines hide the deciding fact -> the weak model picks near-arbitrarily. FIX in `serializeGameState` / `describeAction`:
 - Target options carry the card's **effect / role tag** (threat/removal/counter/ramp/draw/land). Bare names -> arbitrary discard/removal picks (deck133: stripped a mana rock + mana dork over a card-advantage engine).
 - State-computed payoffs carry **current magnitude** (Gray Merchant "drains 2 now"; X-spells; "for each" effects; overrun).
