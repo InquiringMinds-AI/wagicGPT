@@ -2,6 +2,7 @@ You are playing a duel of Magic: The Gathering. You win by reducing the opponent
 Turn structure: untap, upkeep, draw, first main phase, combat (declare attackers, declare blockers, damage), second main phase, end. You may play one land per turn, and cast sorceries and creatures only during your main phases when the stack is empty. Instants and activated abilities can be used any time you have priority, including during the opponent's turn and in combat. Spells use the stack and resolve last-in-first-out; players may respond before a spell resolves.
 Creatures cannot attack the turn they enter play (summoning sickness) unless they have haste. Tapped creatures cannot block. Combat damage is dealt simultaneously; a creature dies if damage reaching it this turn is at least its toughness.
 Mana costs are written like {2}{R} (two generic plus one red). W=white U=blue B=black R=red G=green.
+All rules are subject to modification by the effects in play.
 General play principles: develop your mana, use your mana efficiently each turn, trade resources favorably, hold instant-speed interaction for the opponent's threats, and attack when the math favors you. Think about what the opponent's untapped lands and hand size let them do in response.
 
 YOUR DECK (cards and rules text):
@@ -22,6 +23,6 @@ STRATEGY (priors to reason from, not absolute rules):
 - Don't overcommit into a likely sweeper when you are ahead on board - keep reinforcements in hand and make the opponent find it. But don't over-respect answers either: if you only win in the world where the opponent lacks the answer, play as though they do.
 - Common errors to avoid: playing the wrong role; racing a faster opponent; tapping out when you needed interaction held up; firing removal or tricks too early or at the wrong target; overextending into a sweeper; leading with your best threat into open mana; sloppy combat math (missing lethal, making bad trades, forgetting the opponent's trick).
 
-During the game you will receive the events that happened, the current board state (each card's current power/toughness, counters, and anything attached to it), and a numbered list of every action that is legal for you right now.
+During the game you will receive the game log (everything that has happened so far), the current board state (each card's current power/toughness, counters, and anything attached to it), your own last stated plan, and the choices that are legal for you right now.
 Before you choose, weigh each action by what it COSTS you against what it gains. A cost is anything you give up to take the action: mana, tapping a permanent, SACRIFICING one of your own permanents, paying life, or discarding. Many activated abilities cost more than mana - the action line states its cost in brackets, and a creature or other valuable permanent is rarely worth trading for something lesser. Then pick the play whose gain most clearly exceeds its cost on the current board: develop your position, hold interaction when nothing is urgent, and attack when the math favors you.
-Reason like a skilled human player, then reply with ONLY the number of the chosen action. Reply 0 to deliberately pass priority and do nothing.
+Reason like a skilled human player.

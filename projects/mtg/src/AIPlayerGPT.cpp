@@ -62,6 +62,7 @@ const char * kRulesPrimer =
     "creatures cannot block. Combat damage is dealt simultaneously; a creature dies if damage reaching it "
     "this turn is at least its toughness.\n"
     "Mana costs are written like {2}{R} (two generic plus one red). W=white U=blue B=black R=red G=green.\n"
+    "All rules are subject to modification by the effects in play.\n"
     "General play principles: develop your mana, use your mana efficiently each turn, trade resources "
     "favorably, hold instant-speed interaction for the opponent's threats, and attack when the math favors "
     "you. Think about what the opponent's untapped lands and hand size let them do in response.\n";
@@ -110,6 +111,20 @@ const char * kStrategyPriors =
     "needed interaction held up; firing removal or tricks too early or at the wrong target; overextending "
     "into a sweeper; leading with your best threat into open mana; sloppy combat math (missing lethal, "
     "making bad trades, forgetting the opponent's trick).\n";
+
+//The reply protocol is appended in code AFTER the (user-editable) system
+//prompt template, so a stale or hand-edited template cannot silently drop
+//the contract the parsers and the plan carry-forward depend on.
+const char * kReplyProtocol =
+    "\nHOW TO REPLY (every decision):\n"
+    "First give your choice, in exactly the format the decision asks for (usually a single number).\n"
+    "Then, on a new line, write PLAN: followed by your complete game plan from here on.\n"
+    "Nothing you write is kept except that PLAN line. At your next decision you will see only the "
+    "game log, the current board, your last PLAN line, and the new choices - your reasoning and "
+    "your earlier plans will have dropped out of context. So every PLAN must be complete and "
+    "self-contained: state your full current plan, or your full revised plan if the situation "
+    "changed. Never write a fragment like \"continue as before\". Keep the plan CONCISE - a few "
+    "sentences of intent, not an analysis.\n";
 
 //The auras/equipment attached to a permanent. There is no forward list, so
 //find them the way the engine does (cf. MTGCardInstance::hasTotemArmor):
@@ -289,8 +304,8 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         }
     }
 
-    //Idle: build the request on the game thread (mMessages is not shared
-    //with the worker) and launch the round trip in the background.
+    //Idle: build the request on the game thread (the prompt members are not
+    //shared with the worker) and launch the round trip in the background.
     string requestBody = buildRequestBody(userMsg);
     string url = mEndpoint + "/v1/chat/completions";
     string key = mApiKey;
@@ -312,7 +327,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mTransSeq(0), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mTransSeq(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -493,7 +508,7 @@ void AIPlayerGPT::buildSystemPrompt()
         replaceAllOccurrences(tmpl, "{MY_DECK}", myDeck);
         replaceAllOccurrences(tmpl, "{OPPONENT_DECK}", oppDeck);
         replaceAllOccurrences(tmpl, "{STRATEGY_GUIDE}", guideBlock);
-        mMessages.insert(mMessages.begin(), std::make_pair(string("system"), tmpl));
+        mSystemPrompt = tmpl + kReplyProtocol;
         return;
     }
 
@@ -507,32 +522,142 @@ void AIPlayerGPT::buildSystemPrompt()
     if (!guideBlock.empty())
         sys << guideBlock << "\n";
     sys << "\n" << kStrategyPriors;
-    sys << "\nDuring the game you will receive the events that happened, the current board state (each card's "
-           "current power/toughness, counters, and anything attached to it), and a numbered list of every "
-           "action that is legal for you right now.\n"
+    sys << "\nDuring the game you will receive the game log (everything that has happened so far), the current "
+           "board state (each card's current power/toughness, counters, and anything attached to it), your own "
+           "last stated plan, and the choices that are legal for you right now.\n"
            "Before you choose, weigh each action by what it COSTS you against what it gains. A cost is anything "
            "you give up to take the action: mana, tapping a permanent, SACRIFICING one of your own permanents, "
            "paying life, or discarding. Many activated abilities cost more than mana - the action line states "
            "its cost in brackets, and a creature or other valuable permanent is rarely worth trading for "
            "something lesser. Then pick the play whose gain most clearly exceeds its cost on the current board: "
            "develop your position, hold interaction when nothing is urgent, and attack when the math favors you.\n"
-           "Reason like a skilled human player, then reply with ONLY the number of the chosen action. "
-           "Reply 0 to deliberately pass priority and do nothing.";
+           "Reason like a skilled human player.\n";
+    sys << kReplyProtocol;
 
-    mMessages.insert(mMessages.begin(), std::make_pair(string("system"), sys.str()));
+    mSystemPrompt = sys.str();
+}
+
+string AIPlayerGPT::assemblePrompt(const string& tail)
+{
+    std::ostringstream u;
+    if (!mNarration.empty())
+        u << "GAME LOG (everything that has happened so far):\n" << mNarration << "\n";
+    u << "--- CURRENT SITUATION ---\n" << serializeGameState();
+    if (!mCurrentPlan.empty())
+        u << "\nYOUR PLAN (as you last stated it): " << mCurrentPlan << "\n";
+    u << "\n" << tail;
+    return u.str();
+}
+
+void AIPlayerGPT::appendNarration(const string& line)
+{
+    if (line.empty())
+        return;
+    if (!mPendingPhase.empty())
+    {
+        mNarration += "- " + mPendingPhase + "\n";
+        mPendingPhase.clear();
+    }
+    mNarration += "- " + line + "\n";
+    //Bound a runaway narrative (very long games, degenerate combos); keep
+    //the tail, cut on a line boundary. The narration is otherwise
+    //append-only, which is what keeps the prompt prefix cacheable.
+    if (mNarration.size() > 24000)
+    {
+        size_t nl = mNarration.find('\n', mNarration.size() - 20000);
+        if (nl != string::npos)
+            mNarration = "(...earlier events trimmed...)\n" + mNarration.substr(nl + 1);
+    }
+}
+
+void AIPlayerGPT::narrateDecision(const string& line)
+{
+    appendNarration(line);
+}
+
+string AIPlayerGPT::consumePlan(const string& content)
+{
+    //Drop any inline think block first (same as parseChoice).
+    string text = content;
+    size_t thinkEnd = text.rfind("</think>");
+    if (thinkEnd != string::npos)
+        text = text.substr(thinkEnd + 8);
+
+    //Find the "PLAN:" marker, case-insensitive; the colon is required so
+    //prose like "I plan to attack" before the choice cannot truncate it.
+    size_t pos = string::npos;
+    for (size_t i = 0; i + 5 <= text.size(); i++)
+    {
+        if (tolower((unsigned char) text[i]) == 'p' && tolower((unsigned char) text[i + 1]) == 'l'
+            && tolower((unsigned char) text[i + 2]) == 'a' && tolower((unsigned char) text[i + 3]) == 'n'
+            && text[i + 4] == ':')
+        {
+            pos = i;
+            break;
+        }
+    }
+    if (pos == string::npos)
+        return text; //no plan stated: keep the previous one
+
+    string plan = text.substr(pos + 5);
+    size_t s = plan.find_first_not_of(" \t\r\n");
+    size_t e = plan.find_last_not_of(" \t\r\n");
+    if (s != string::npos)
+    {
+        plan = plan.substr(s, e - s + 1);
+        if (plan.size() > 1600)
+        {
+            //bound a runaway plan; cut at a sentence boundary when one
+            //exists (a mid-sentence stump re-fed every decision reads
+            //like an instruction fragment)
+            size_t dot = plan.rfind(". ", 1600);
+            plan = plan.substr(0, (dot != string::npos && dot > 400) ? dot + 1 : 1600);
+        }
+        mCurrentPlan = plan;
+    }
+    return text.substr(0, pos);
 }
 
 int AIPlayerGPT::receiveEvent(WEvent * event)
 {
     int result = AIPlayerBaka::receiveEvent(event);
+
+    //Phase changes never enter the narration on their own: they park in the
+    //pending marker and only get written as the header of the next real
+    //line (appendNarration) - empty phases leave no trace. A change of TURN
+    //is the exception: its header is written unconditionally, so the
+    //narration is always contextually clear about whose turn it is.
+    if (WEventPhaseChange * pe = dynamic_cast<WEventPhaseChange *>(event))
+    {
+        if (pe->to)
+        {
+            //Turn ownership comes from observer->currentPlayer, NOT from
+            //pe->to->player: the ring builds the next turn's Phase objects
+            //against a player id that has already flipped at the EOT step,
+            //so their ->player is the WRONG side from turn 2 on (observed
+            //live: every label inverted after turn 1). The engine's own
+            //rules all read currentPlayer for the same reason. currentPlayer
+            //and turn are flipped together (nextPlayer), so the pair is
+            //coherent by the time the new turn's phase events fire.
+            if (observer->currentPlayer != mNarratedTurnOwner || observer->turn != mNarratedTurnNumber)
+            {
+                mNarratedTurnOwner = observer->currentPlayer;
+                mNarratedTurnNumber = observer->turn;
+                mPendingPhase.clear();
+                std::ostringstream t;
+                t << "=== Turn " << (observer->turn + 1) << " - "
+                  << (observer->currentPlayer == this ? "YOUR turn" : "opponent's turn") << " ===";
+                mNarration += t.str() + "\n";
+            }
+            //the turn header carries the owner; the marker only needs the phase
+            mPendingPhase = string("Phase: ") + Constants::MTGPhaseNames[pe->to->id];
+        }
+        return result;
+    }
+
     string line = describeEvent(event);
     if (!line.empty())
-    {
-        mEventLog += "- " + line + "\n";
-        //Bound runaway narrative (e.g. long combos); keep the tail.
-        if (mEventLog.size() > 6000)
-            mEventLog = "(...earlier events trimmed...)\n" + mEventLog.substr(mEventLog.size() - 5000);
-    }
+        appendNarration(line);
     return result;
 }
 
@@ -616,14 +741,7 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         return out.str();
     }
 
-    if (WEventPhaseChange * e = dynamic_cast<WEventPhaseChange *>(event))
-    {
-        if (!e->to || !e->to->player)
-            return "";
-        out << "Phase: " << Constants::MTGPhaseNames[e->to->id]
-            << " (" << (e->to->player == this ? "your" : "opponent's") << " turn)";
-        return out.str();
-    }
+    //(phase changes are handled in receiveEvent: lazy marker + turn header)
 
     if (WEventCounters * e = dynamic_cast<WEventCounters *>(event))
     {
@@ -724,17 +842,19 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 
 string AIPlayerGPT::buildRequestBody(const string& userMsg)
 {
+    //Exactly two messages, always: the per-duel head and the assembled
+    //decision tail. No transcript - the narration inside the user message
+    //carries the history, and its append-only front keeps the prefix
+    //cacheable across the whole game.
     json messages = json::array();
-    for (size_t i = 0; i < mMessages.size(); i++)
-        messages.push_back({{"role", mMessages[i].first}, {"content", mMessages[i].second}});
-    //The pending user message rides in the request only; it joins the real
-    //transcript together with the assistant reply at consumption time.
+    messages.push_back({{"role", "system"}, {"content", mSystemPrompt}});
     messages.push_back({{"role", "user"}, {"content", userMsg}});
 
-    //A bare number needs almost nothing, but the model sometimes prefaces
-    //it with a short justification; give enough room that the number is not
-    //truncated away (which parsed as "no choice" and held creatures back).
-    long maxTokens = mThinking ? 2048 : 200;
+    //Room for the choice plus the mandatory complete PLAN restatement; a
+    //truncated reply parsed as "no choice" and held creatures back (and a
+    //qwen plan runs long despite the brevity instruction - observed 512
+    //cutting one mid-sentence).
+    long maxTokens = mThinking ? 2048 : 1024;
     if (mMaxTokens > 0)
         maxTokens = mMaxTokens;
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
@@ -825,30 +945,31 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
 
     int phase = observer->getCurrentGamePhase();
 
-    if (mMessages.empty() || mMessages[0].first != "system")
+    if (mSystemPrompt.empty())
         buildSystemPrompt();
 
-    std::ostringstream user;
-    if (!mEventLog.empty())
-        user << "Events since your last decision:\n" << mEventLog << "\n";
-    user << serializeGameState();
-    user << "\nYour legal actions:\n";
+    std::ostringstream tail;
+    tail << "Your legal actions:\n";
     int index = 0;
     for (size_t c = 0; c < candidates.size(); c++)
     {
         index++;
-        user << index << ". " << describeAction(*candidates[c]);
+        tail << index << ". " << describeAction(*candidates[c]);
         if (mShowHints)
         {
             OrderedAIAction action = *candidates[c]; //copy: getEfficiency() is not const
-            user << " (heuristic score " << action.getEfficiency() << ")";
+            tail << " (heuristic score " << action.getEfficiency() << ")";
         }
-        user << "\n";
+        tail << "\n";
     }
-    user << "\nWhich action do you take? Reply with ONLY the number (0 = pass).";
+    tail << "\nWhich action do you take? Reply with the number (0 = pass priority), then your PLAN: line.";
 
-    string userMsg = user.str();
-    bool unchanged = (userMsg == mLastUserMsg);
+    //The dedupe/deadlock key is board state + question, NOT the assembled
+    //prompt: consuming an answer appends to the narration and updates the
+    //plan, and a full-prompt key would read that as a state change.
+    string askKey = serializeGameState() + tail.str();
+    string userMsg = assemblePrompt(tail.str());
+    bool unchanged = (askKey == mLastAskKey);
 
     //Deadlock breaker: priority is decided every AI tick. If the game state
     //is unchanged since our last decision AND that decision was to TAKE an
@@ -883,21 +1004,16 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //keeps the empty clickstream from being committed as a pass.
             return NULL;
         }
-        choice = parseChoice(content, index);
-        if (!content.empty())
-        {
-            mMessages.push_back(std::make_pair(string("user"), userMsg));
-            mMessages.push_back(std::make_pair(string("assistant"), content));
-        }
-        else
+        //The plan is split off BEFORE choice parsing: plan prose is full of
+        //numbers that would otherwise misparse as the chosen action.
+        string decisionPart = consumePlan(content);
+        choice = parseChoice(decisionPart, index);
+        if (content.empty())
             setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
-        //Window the transcript: keep the system prompt plus the most recent
-        //20 exchanges; old states are superseded by the snapshot we resend.
-        while (mMessages.size() > 41)
-            mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
+        else if (choice >= 1 && choice <= index)
+            narrateDecision("You: " + describeAction(*candidates[choice - 1]));
 
-        mEventLog.clear();
-        mLastUserMsg = userMsg;
+        mLastAskKey = askKey;
         mLastChoice = choice;
         writeTransLog("priority", userMsg, content, choice, index);
         DebugTrace("AIPlayerGPT: model chose " << choice << " of " << index);
@@ -932,7 +1048,7 @@ int AIPlayerGPT::selectHintAbility()
     return AIPlayerBaka::selectHintAbility();
 }
 
-int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
+int AIPlayerGPT::askModel(const string& decision, const vector<string>& options, bool narrateChoice)
 {
     //"Only one valid action": no decision to make, no model call.
     if (options.empty())
@@ -942,47 +1058,43 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options)
     if (mEndpoint.empty())
         return -1; //no endpoint: caller falls back to the heuristic
 
-    if (mMessages.empty() || mMessages[0].first != "system")
+    if (mSystemPrompt.empty())
         buildSystemPrompt();
 
-    std::ostringstream user;
-    if (!mEventLog.empty())
-        user << "Events since your last decision:\n" << mEventLog << "\n";
-    user << serializeGameState();
-    user << "\n" << decision << "\n";
+    std::ostringstream tail;
+    tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
-        user << (i + 1) << ". " << options[i] << "\n";
-    user << "\nReply with ONLY the number of your choice.";
-    string userMsg = user.str();
+        tail << (i + 1) << ". " << options[i] << "\n";
+    tail << "\nReply with the number of your choice, then your PLAN: line.";
+    string tailStr = tail.str();
 
-    //Prompt-keyed answer cache: the same questions are re-polled every AI
-    //tick until the game state moves on, and several distinct questions can
-    //alternate within one tick. Identical prompt => identical answer, with
-    //no repeated HTTP round trip. Does not touch the priority cache
-    //(mLastUserMsg/mLastChoice) used by chooseOrderedAction.
-    std::map<string, int>::iterator cached = mAskCache.find(userMsg);
+    //State-plus-question answer cache: the same questions are re-polled
+    //every AI tick until the game state moves on, and several distinct
+    //questions can alternate within one tick. The key excludes the
+    //narration and the plan (see the header) so that consuming one answer
+    //cannot invalidate another already given for this same state - the
+    //earlier picks of a multi-target selection re-derive from this cache.
+    string askKey = serializeGameState() + tailStr;
+    std::map<string, int>::iterator cached = mAskCache.find(askKey);
     if (cached != mAskCache.end())
         return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
 
+    string userMsg = assemblePrompt(tailStr);
     string content;
     if (pollCompletion(userMsg, content) == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
 
-    int choice = parseChoice(content, (int) options.size());
-    if (!content.empty())
-    {
-        //user and assistant join the transcript together at consumption, so
-        //a failed round trip can never leave a half exchange behind
-        mMessages.push_back(std::make_pair(string("user"), userMsg));
-        mMessages.push_back(std::make_pair(string("assistant"), content));
-    }
-    else
+    //Plan split BEFORE choice parsing: plan prose is full of numbers.
+    string decisionPart = consumePlan(content);
+    int choice = parseChoice(decisionPart, (int) options.size());
+    if (content.empty())
         setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
-    while (mMessages.size() > 41)
-        mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
+    else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
+        //first line of the question only: multi-line asks (damage order)
+        //would bloat a narration that persists all game
+        narrateDecision(decision.substr(0, decision.find('\n')) + " -> " + options[choice - 1]);
 
-    mEventLog.clear();
-    mAskCache[userMsg] = choice;
+    mAskCache[askKey] = choice;
     writeTransLog("ask", userMsg, content, choice, (int) options.size());
     DebugTrace("AIPlayerGPT: " << decision << " -> chose " << choice << " of " << options.size());
 
@@ -1032,7 +1144,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         vector<string> opts;
         opts.push_back("Hold " + proposed->name + " - do not play it now");
         opts.push_back("Play " + proposed->name);
-        int pick = askModel(q.str(), opts);
+        int pick = askModel(q.str(), opts, false); //the play narrates itself as a zone event
         if (pick == kChoicePending)
         {
             gotPayments.clear(); //nothing plays this tick; re-poll next tick
@@ -1146,7 +1258,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     if (candidates.empty())
         return NULL;
 
-    int pick = askModel("Casting decision: which card do you cast now, if any?", opts);
+    //no narration: a cast narrates itself as zone events, "nothing" is a non-action
+    int pick = askModel("Casting decision: which card do you cast now, if any?", opts, false);
     if (pick == kChoicePending)
         return NULL; //no cast this tick; the answer is consumed on a later poll
     if (pick < 0) //model deferred or endpoint failed: heuristic decides
@@ -1293,12 +1406,13 @@ int AIPlayerGPT::computeActions()
         vector<string> opts;
         opts.push_back("Keep this hand");
         opts.push_back("Mulligan");
-        int pick = askModel(q.str(), opts);
+        int pick = askModel(q.str(), opts, false); //keep = non-action; a taken mulligan narrates below
         if (pick == kChoicePending)
             return 1; //decision in flight; poll again next tick
         if (pick == 1)
         {
             DebugTrace("AIPlayerGPT: taking a mulligan at " << game->hand->nb_cards << " cards");
+            narrateDecision("You took a mulligan");
             observer->Mulligan(this);
             return 1;
         }
@@ -1704,35 +1818,28 @@ int AIPlayerGPT::chooseAttackers()
     //ONE bundled decision for the whole attack. Per-creature asks decided
     //each attacker in isolation (a bad line for alpha strikes and racing)
     //and cost N round trips; the model now plans the attack as a whole.
-    if (mMessages.empty() || mMessages[0].first != "system")
+    if (mSystemPrompt.empty())
         buildSystemPrompt();
-    std::ostringstream user;
-    if (!mEventLog.empty())
-        user << "Events since your last decision:\n" << mEventLog << "\n";
-    user << serializeGameState();
-    user << "\nCombat: declare ALL attackers for this turn in ONE decision.\n"
+    std::ostringstream tail;
+    tail << "Combat: declare ALL attackers for this turn in ONE decision.\n"
             "Your creatures that can attack:\n";
     for (size_t j = 0; j < attackers.size(); j++)
-        user << "A" << (j + 1) << ". " << attackers[j]->name
+        tail << "A" << (j + 1) << ". " << attackers[j]->name
              << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")\n";
-    user << "Reply with ONLY the numbers of the attackers you send, comma-separated"
-            " (e.g. \"A1, A3\"), or \"none\" to attack with nobody this turn.";
-    string userMsg = user.str();
+    tail << "Reply with the numbers of the attackers you send, comma-separated"
+            " (e.g. \"A1, A3\"), or \"none\" to attack with nobody this turn."
+            " Then your PLAN: line.";
+    string userMsg = assemblePrompt(tail.str());
 
     string content;
     if (pollCompletion(userMsg, content) == kChoicePending)
         return 1; //decision in flight; nothing declared yet, re-poll next tick
 
+    //Plan split BEFORE the attacker-set parse: numbers (and words like
+    //"hold") in the plan prose must not read as attack declarations.
+    string decisionPart = consumePlan(content);
     vector<bool> send;
-    int result = content.empty() ? -1 : parseAttackerSet(content, attackers.size(), send);
-    if (!content.empty())
-    {
-        mMessages.push_back(std::make_pair(string("user"), userMsg));
-        mMessages.push_back(std::make_pair(string("assistant"), content));
-    }
-    while (mMessages.size() > 41)
-        mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
-    mEventLog.clear();
+    int result = content.empty() ? -1 : parseAttackerSet(decisionPart, attackers.size(), send);
     writeTransLog("attackers", userMsg, content, result, (int) attackers.size());
 
     if (result < 0)
@@ -1743,6 +1850,7 @@ int AIPlayerGPT::chooseAttackers()
         return AIPlayerBaka::chooseAttackers();
     }
 
+    string declared;
     for (size_t j = 0; j < attackers.size(); j++)
     {
         if (!send[j] || !attackers[j]->canAttack())
@@ -1754,7 +1862,10 @@ int AIPlayerGPT::chooseAttackers()
             observer->cardClick(attackers[j], MTGAbility::ATTACK_COST);
         }
         observer->cardClick(attackers[j], MTGAbility::MTG_ATTACK_RULE);
+        declared += (declared.empty() ? "" : ", ") + attackers[j]->name;
     }
+    narrateDecision(declared.empty() ? string("You declared no attackers this turn")
+                                     : ("You declared attackers: " + declared));
     mAttacksDoneTurn = observer->turn;
     DebugTrace("AIPlayerGPT: declared attack (" << result << " of " << attackers.size() << ") in one reply");
     return 1;
@@ -1854,47 +1965,40 @@ int AIPlayerGPT::chooseBlockers()
     //the same attacker), identical attacker names were indistinguishable,
     //and N blockers cost N round trips. Labels disambiguate; the model
     //answers with the full assignment map in a single reply.
-    if (mMessages.empty() || mMessages[0].first != "system")
+    if (mSystemPrompt.empty())
         buildSystemPrompt();
-    std::ostringstream user;
-    if (!mEventLog.empty())
-        user << "Events since your last decision:\n" << mEventLog << "\n";
-    user << serializeGameState();
-    user << "\nCombat: declare blockers for this whole combat in ONE decision.\nAttackers:\n";
+    std::ostringstream tail;
+    tail << "Combat: declare blockers for this whole combat in ONE decision.\nAttackers:\n";
     for (size_t j = 0; j < attackers.size(); j++)
-        user << "A" << (j + 1) << ". " << attackers[j]->name
+        tail << "A" << (j + 1) << ". " << attackers[j]->name
              << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")\n";
-    user << "Your available blockers (with the attackers each may legally block):\n";
+    tail << "Your available blockers (with the attackers each may legally block):\n";
     for (size_t i = 0; i < blockers.size(); i++)
     {
-        user << "B" << (i + 1) << ". " << blockers[i]->name
+        tail << "B" << (i + 1) << ". " << blockers[i]->name
              << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ") - may block";
         for (size_t j = 0; j < legal[i].size(); j++)
             for (size_t k = 0; k < attackers.size(); k++)
                 if (attackers[k] == legal[i][j])
-                    user << (j ? "," : "") << " A" << (k + 1);
-        user << "\n";
+                    tail << (j ? "," : "") << " A" << (k + 1);
+        tail << "\n";
     }
-    user << "Assign each blocker to AT MOST ONE attacker (a creature cannot block"
+    tail << "Assign each blocker to AT MOST ONE attacker (a creature cannot block"
             " two attackers), but several DIFFERENT blockers may gang-block the same"
             " attacker. Blockers you do not mention stay out of combat.\nReply with"
-            " ONLY the assignments, comma-separated, e.g. \"B1:A2, B3:A1, B2:none\".";
-    string userMsg = user.str();
+            " the assignments, comma-separated, e.g. \"B1:A2, B3:A1, B2:none\"."
+            " Then your PLAN: line.";
+    string userMsg = assemblePrompt(tail.str());
 
     string content;
     if (pollCompletion(userMsg, content) == kChoicePending)
         return 1; //decision in flight; nothing declared yet, re-poll next tick
 
+    //Plan split BEFORE the assignment parse: a "B2" or bare numbers in the
+    //plan prose must not read as block assignments.
+    string decisionPart = consumePlan(content);
     vector<int> pick;
-    int pairs = content.empty() ? 0 : parseBlockAssignments(content, blockers.size(), attackers.size(), pick);
-    if (!content.empty())
-    {
-        mMessages.push_back(std::make_pair(string("user"), userMsg));
-        mMessages.push_back(std::make_pair(string("assistant"), content));
-    }
-    while (mMessages.size() > 41)
-        mMessages.erase(mMessages.begin() + 1, mMessages.begin() + 3);
-    mEventLog.clear();
+    int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick);
     writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size());
 
     if (pairs == 0)
@@ -1905,6 +2009,7 @@ int AIPlayerGPT::chooseBlockers()
         return AIPlayerBaka::chooseBlockers();
     }
 
+    string declared;
     for (size_t i = 0; i < blockers.size(); i++)
     {
         if (pick[i] < 1)
@@ -1919,7 +2024,10 @@ int AIPlayerGPT::chooseBlockers()
         observer->cardClick(blockers[i], MTGAbility::MTG_BLOCK_RULE);
         while (blockers[i]->defenser != chosen && guard-- > 0)
             observer->cardClick(blockers[i], MTGAbility::MTG_BLOCK_RULE);
+        declared += (declared.empty() ? "" : "; ") + blockers[i]->name + " blocks " + chosen->name;
     }
+    narrateDecision(declared.empty() ? string("You declared no blockers")
+                                     : ("You declared blockers: " + declared));
     mBlocksDoneTurn = observer->turn;
     DebugTrace("AIPlayerGPT: declared blocks from " << pairs << " assignment(s) in one reply");
     return 1;

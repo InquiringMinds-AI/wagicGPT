@@ -8,17 +8,22 @@
  *  actions, the choice among them is delegated to an OpenAI-compatible
  *  chat-completions endpoint instead of the efficiency heuristic.
  *
- *  The player is a persistent agent, not a stateless picker:
- *  - The system prompt, built once per duel, contains a rules/flow primer,
- *    both decks' card names and rules text (own deck with counts, the
- *    opponent's without, like a player who knows the matchup), and an
- *    optional user-written strategy guide for the AI's deck
- *    (<deckfile>_strategy.txt next to the deck, e.g. ai/baka/deck1_strategy.txt).
- *  - Game events (cards played, damage, life, phases...) accumulate via
- *    receiveEvent() and are fed to the model as the game's narrative, so
- *    it can reason about what the human did, not just the current board.
- *  - The whole game is one chat transcript: every decision sees the
- *    conversation so far (windowed to bound context growth).
+ *  The player is a persistent agent, not a stateless picker. Every request
+ *  is exactly two messages, head and tail:
+ *  - HEAD (system, built once per duel): a rules/flow primer, both decks'
+ *    card names and rules text (own deck with counts, the opponent's
+ *    without, like a player who knows the matchup), an optional
+ *    user-written strategy guide for the AI's deck
+ *    (<deckfile>_strategy.txt next to the deck, e.g. ai/baka/deck1_strategy.txt),
+ *    and the reply protocol.
+ *  - TAIL (user, rebuilt per decision): the game narration (events via
+ *    receiveEvent() plus the model's own past decisions, append-only, as
+ *    if narrating the game), then ONE fresh board serialization, the
+ *    model's last stated PLAN line, and the legal choices. There is no
+ *    chat transcript: old board snapshots never stack up (they diluted
+ *    attention and defeated prefix caching), and the model is told its
+ *    reasoning is dropped - each reply must restate its complete plan,
+ *    of which only the most recent is carried forward.
  *
  *  Opt-in at launch, never default:
  *      WAGIC_AI=gpt              enable the GPT opponent
@@ -103,11 +108,19 @@ protected:
 private:
     //Ask the model to choose among options (0-based result, -1 to defer to
     //the heuristic). No model call when there is one option or none - that
-    //is the "only one valid action" case. Answers are cached by full prompt
-    //(a map, not a single slot: several distinct questions repeat every AI
-    //tick - land veto + card choice, one ask per creature in combat - and a
-    //one-slot cache would re-fire the HTTP call for each on every tick).
-    int askModel(const string& decision, const vector<string>& options);
+    //is the "only one valid action" case. Answers are cached by board state
+    //plus question (a map, not a single slot: several distinct questions
+    //repeat every AI tick - land veto + card choice, one ask per creature in
+    //combat - and a one-slot cache would re-fire the HTTP call for each on
+    //every tick). The key deliberately excludes the narration and the plan:
+    //consuming one answer updates both, and a full-prompt key would then
+    //miss on the re-poll of a question already answered this state (e.g.
+    //the earlier picks of a multi-target selection) and re-ask it.
+    //narrateChoice: false for asks whose outcome is already visible as
+    //events (land drop, casting - the zone changes narrate themselves) or
+    //whose "no" answer is a non-action; true for choices that leave no
+    //event trace (targets, modes, X values, damage order).
+    int askModel(const string& decision, const vector<string>& options, bool narrateChoice = true);
     std::map<string, int> mAskCache;
 
     //Can this card plausibly be paid for right now? Cheap pre-filter for the
@@ -128,6 +141,21 @@ private:
     string serializeGameState();
     string describeAction(const OrderedAIAction& action);
     string describeEvent(WEvent * event);
+
+    //Assemble the user message: narration head, one fresh board snapshot,
+    //the carried plan, then the decision-specific tail (question + options
+    //+ reply format).
+    string assemblePrompt(const string& tail);
+    //Append one line to the game narration (the model's own decisions join
+    //the event narrative so the story stays complete without a transcript).
+    void narrateDecision(const string& line);
+    //Bound-checked narration append; flushes the pending phase marker first.
+    void appendNarration(const string& line);
+    //Split a reply at its "PLAN:" marker: stores the (complete, per the
+    //protocol) plan into mCurrentPlan and returns the decision part, which
+    //is the ONLY text the choice parsers may see - plan prose is full of
+    //numbers that would misparse as option indices.
+    string consumePlan(const string& content);
 
     //Decision seams return this while the model call for their prompt is
     //still in flight. Callers unwind for the current tick and re-poll on the
@@ -176,8 +204,8 @@ private:
     //content once done. A finished answer for a DIFFERENT prompt (stale
     //state drift) is dropped and the new request started.
     int pollCompletion(const string& userMsg, string& content);
-    //Serialize the chat request (transcript + the pending user message) for
-    //the worker thread; built on the game thread, mMessages never shared.
+    //Serialize the chat request (system prompt + the pending user message)
+    //for the worker thread; built on the game thread, nothing shared.
     string buildRequestBody(const string& userMsg);
     //Extract the chosen action number from a model reply; -1 if unusable.
     static int parseChoice(const string& content, int optionCount);
@@ -193,15 +221,32 @@ private:
     string mConfigModel;
     long mMaxTokens; // -1 = use the built-in/thinking-dependent default
 
-    //chat transcript: (role, content); [0] is the system prompt once built
-    vector<std::pair<string, string> > mMessages;
-    string mEventLog; //narrative accumulated since the last decision
+    //the per-duel head of every request; empty until first built
+    string mSystemPrompt;
+    //append-only game narration: every noteworthy event plus the model's
+    //own consumed decisions, as if narrating the game (bounded, tail kept)
+    string mNarration;
+    //Phase changes are narrated LAZILY: a phase change only updates this
+    //marker (overwriting the last one), and the marker joins the narration
+    //when a real event or decision lands in that phase - phases in which
+    //nothing happened never enter the narration. TURN changes are the
+    //exception: a turn header is always written, so it is contextually
+    //clear whose turn it is when other things happen.
+    string mPendingPhase;
+    Player * mNarratedTurnOwner;
+    int mNarratedTurnNumber;
+    //the model's last stated PLAN line - the ONLY reply text carried
+    //forward (the protocol tells it so, and to restate the plan in full)
+    string mCurrentPlan;
     //Cards the opponent revealed that are now in their hand: public info a
     //human would remember. Tracked by name (instances are recreated on zone
     //moves), decremented when a card of that name leaves the hand.
     std::map<string, int> mKnownOppHand;
-    //Avoid re-querying the model every AI tick while nothing changed.
-    string mLastUserMsg;
+    //Avoid re-querying the model every AI tick while nothing changed. Keyed
+    //by board state + question (not the full prompt) for the same reason as
+    //mAskCache: taking an action narrates it, and a full-prompt key would
+    //read that as "state changed" and defeat the deadlock breaker.
+    string mLastAskKey;
     int mLastChoice;
 };
 
