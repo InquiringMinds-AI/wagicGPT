@@ -3486,7 +3486,8 @@ subtype=Aura
 [/card]
 [card]
 name=Ancestral Vision
-auto=target(player) draw:3
+target=player
+auto=draw:3
 text=Ancestral Vision is blue. -- Suspend 4 - {U} (Rather than cast this card from your hand, pay {U} and exile it with four time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, cast it without paying its mana cost.) -- Target player draws three cards.
 mana={0}
 color=blue
@@ -74257,7 +74258,8 @@ toughness=2
 [/card]
 [card]
 name=Mindstab
-auto=target(player) ability$!name(discard 3 cards) target(<3>*|myhand) reject!$ targetedplayer
+target=player
+auto=ability$!name(discard 3 cards) target(<3>*|myhand) reject!$ targetedplayer
 suspend(4)={B}
 text=Target player discards three cards. -- Suspend 4 - {B} (Rather than cast this card from your hand, you may pay {B} and exile it with four time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, cast it without paying its mana cost.)
 mana={5}{B}
@@ -87573,7 +87575,8 @@ type=Instant
 [/card]
 [card]
 name=Plunder
-auto=target(*[land;artifact]) destroy
+target=*[land;artifact]
+auto=destroy
 text=Destroy target artifact or land. -- Suspend 4 - {1}{R} (Rather than cast this card from your hand, you may pay {1}{R} and exile it with four time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, cast it without paying its mana cost.)
 mana={4}{R}
 suspend(4)={1}{R}
@@ -95256,7 +95259,8 @@ type=Sorcery
 [/card]
 [card]
 name=Rift Bolt
-auto=target(anytarget) damage:3
+target=anytarget
+auto=damage:3
 text=Rift Bolt deals 3 damage to any target. -- Suspend 1 - {R} (Rather than cast this card from your hand, you may pay {R} and exile it with a time counter on it. At the beginning of your upkeep, remove a time counter. When the last is removed, cast it without paying its mana cost.)
 mana={2}{R}
 suspend(1)={R}

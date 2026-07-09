@@ -1,0 +1,21 @@
+# Rift Bolt scripted with the standard target= idiom must cast normally
+# from hand: target chosen via the cast-mode menu (choice 0) then p2.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:rift bolt
+manapool:{2}{R}
+[PLAYER2]
+life:20
+[DO]
+rift bolt
+choice 0
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:rift bolt
+manapool:{0}
+[PLAYER2]
+life:17
+[END]

@@ -1,5 +1,11 @@
 # Suspend pays the alternate cost, exiles the spell with a time counter,
 # removes it at the next upkeep, then casts the spell without its mana cost.
+# STATE (2026-07-09): engine verified by breakpoint - the upkeep tick fires
+# and the cast-on-zero trigger runs (Counters.cpp); Rift Bolt now carries the
+# standard target= idiom so the delayed cast can request its target. What
+# remains unsolved is this DRIVER protocol: the target-chooser +
+# alternative-cost-menu interplay wedges the scripted clicks (several
+# orderings tried). Needs the click sequence confirmed in the GUI first.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -14,7 +20,8 @@ goto end
 goto upkeep
 goto end
 goto upkeep
-next
+choice 0
+p2
 p2
 [ASSERT]
 UPKEEP
