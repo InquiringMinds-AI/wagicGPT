@@ -1,21 +1,24 @@
+# Skulk rejects only GREATER power: an equal-power blocker may block.
+# Furtive Homunculus is vanilla skulk (no ETB) so setup stays clean.
+# 2/1 skulk attacks, 2/2 blocks: mutual lethal, both die, no face damage.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:fogwalker
+inplay:furtive homunculus
 [PLAYER2]
-inplay:raging goblin
+inplay:grizzly bears
 life:20
 [DO]
-fogwalker
+furtive homunculus
 next
-raging goblin
+grizzly bears
 next
 next
 [ASSERT]
 COMBATEND
 [PLAYER1]
-inplay:fogwalker
+graveyard:furtive homunculus
 [PLAYER2]
-graveyard:raging goblin
+graveyard:grizzly bears
 life:20
 [END]

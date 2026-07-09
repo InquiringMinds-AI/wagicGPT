@@ -8,6 +8,4 @@ lexicon/mana_chosen_color_persists.txt
 lexicon/trigger_phasedin_draws.txt
 lexicon/trigger_coinflipped_branch.txt
 lexicon/basic_defender_rejects_attack.txt
-lexicon/basic_horsemanship_blocking.txt
-lexicon/basic_skulk_accepts_equal_power.txt
 lexicon/basic_islandhome_accepts_defending_island.txt

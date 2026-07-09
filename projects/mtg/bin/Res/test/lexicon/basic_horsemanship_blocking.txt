@@ -1,5 +1,7 @@
 # An ordinary creature cannot block horsemanship, while another horsemanship
 # creature can; both combatants then die to lethal damage.
+# Cao Ren's ETB ("you lose 3 life") fires when INIT places him, so the
+# defender sits at 17 before combat; the block prevents further loss.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
@@ -19,5 +21,5 @@ COMBATEND
 graveyard:barbarian general
 [PLAYER2]
 graveyard:10712
-life:20
+life:17
 [END]
