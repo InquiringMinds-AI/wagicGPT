@@ -771,7 +771,13 @@ void WParsedInt::init(string s, Spell * spell, MTGCardInstance * card)
         intValue = 0;
         WParsedInt * value = NEW WParsedInt(s.substr(7).c_str(), NULL, card);
         if(value){
-            intValue = std::rand() % value->getValue();
+            //per-observer generator, NOT std::rand(): the global stream made
+            //genrand-gated card lines nondeterministic under the threaded
+            //suite and immune to a fixture's seed directive (CS-017)
+            if (card && card->getObserver())
+                intValue = card->getObserver()->getRandomGenerator()->random() % value->getValue();
+            else
+                intValue = std::rand() % value->getValue();
             SAFE_DELETE(value);
         }
     }

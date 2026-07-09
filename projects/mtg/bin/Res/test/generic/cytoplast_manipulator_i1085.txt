@@ -2,6 +2,12 @@
 #{U},{T}: gain control of target creature with a +1/+1 counter -
 #Battlegrowth marks the opponent's bears, the Manipulator steals them.
 # https://github.com/WagicProject/wagic/issues/1085
+# seed PINNED (CS-017): the card's graft lines carry genrandN restrictions
+# (community AI heuristics IN the card script - e.g. 1-in-20 chance to move
+# a counter to an opponent creature on ETB). The bears' INIT placement fires
+# that trigger; on unlucky rolls a may-menu opened and desynced this script.
+# genrand now draws from the seeded per-observer RNG, so seed 1 = no roll.
+seed 1
 [INIT]
 FIRSTMAIN
 [PLAYER1]
