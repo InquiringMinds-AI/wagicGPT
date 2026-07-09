@@ -933,9 +933,64 @@ ExileTargetCost::ExileTargetCost(TargetChooser *_tc)
 {
 }
 
+//How many cards this exile cost must collect. The 16 ordinary E(sel|zone) users
+//exile exactly one (a card needing several stacks separate single costs); they
+//are not X-spells, so source->setX == -1 -> 1. The lone variable-count user,
+//Skeletal Scrying's E(<prex>...), exiles the announced X, and it is the ONLY
+//X-spell with an E() cost today, so setX > -1 unambiguously means "exile X".
+//We read setX directly rather than tc->maxtargets, which is captured at
+//chooser-creation time before X is announced (the stale-X bug) and is unreliable.
+int ExileTargetCost::requiredExiles()
+{
+    if (source && source->setX > -1)
+        return source->setX;
+    return 1;
+}
+
+//Sync the chooser's capacity to the announced X before it starts accepting
+//clicks. Without this the <prex> chooser keeps its stale creation-time
+//maxtargets (0 or a pool-derived guess): a 0-capacity chooser reports
+//"complete from birth" and refuses every click, so the exile never happens.
+//Only touched for X-spells (setX > -1); the 16 fixed single-target costs keep
+//their maxtargets == 1 and the exact legacy path.
+int ExileTargetCost::setPayment(MTGCardInstance * card)
+{
+    if (tc && source && source->setX > -1)
+        tc->maxtargets = source->setX;
+    return ExtraCost::setPayment(card);
+}
+
+int ExileTargetCost::isPaymentSet()
+{
+    int needed = requiredExiles();
+    if (needed <= 0)
+        return 1; //X=0: nothing to exile, cost trivially met
+    if (needed == 1)
+        return (target != NULL); //single-target: byte-identical to legacy
+    return (tc && tc->getNbTargets() >= needed);
+}
+
 int ExileTargetCost::doPay()
 {
+    if (requiredExiles() >= 2)
+    {
+        //multi-target: exile every card the chooser accumulated, not just the
+        //last one that landed in target.
+        vector<Targetable*> targetlist = tc->getTargetsFrom();
+        for (vector<Targetable*>::iterator it = targetlist.begin(); it != targetlist.end(); ++it)
+        {
+            MTGCardInstance * tCard = dynamic_cast<MTGCardInstance*>(*it);
+            if (!tCard)
+                continue;
+            source->storedCard = tCard->createSnapShot();
+            tCard->controller()->game->putInExile(tCard);
+        }
+        target = NULL;
+        tc->initTargets();
+        return 1;
+    }
 
+    //single-target (needed == 1): legacy path, unchanged.
     if (target)
     {
         source->storedCard = target->createSnapShot();
@@ -945,7 +1000,7 @@ int ExileTargetCost::doPay()
             tc->initTargets();
         return 1;
     }
-    return 0;
+    return (requiredExiles() <= 0) ? 1 : 0; //X=0 pays trivially, exiling nothing
 }
 
 //Bounce as cost

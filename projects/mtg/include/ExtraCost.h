@@ -274,6 +274,9 @@ class ExileTargetCost : public ExtraCost
 {
 public:
   ExileTargetCost(TargetChooser *_tc = NULL);
+  int requiredExiles();
+  virtual int setPayment(MTGCardInstance * card);
+  virtual int isPaymentSet();
   virtual int doPay();
   virtual ExileTargetCost * clone() const;
 };
