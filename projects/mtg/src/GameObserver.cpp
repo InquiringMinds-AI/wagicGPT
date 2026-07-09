@@ -271,6 +271,7 @@ void GameObserver::nextGamePhase()
     {
     case MTG_PHASE_UNTAP:
         DebugTrace("Untap Phase -------------   Turn " << turn );
+        phasingPhase();
         untapPhase();
         break;
     case MTG_PHASE_COMBATBLOCKERS:
@@ -896,30 +897,9 @@ void GameObserver::gameStateBasedEffects()
                 card->isMorphed = false;
                 card->morphed = false;
             }
-            //////////////////////////
-            //handles phasing events//
-            //////////////////////////
-            if(card->has(Constants::PHASING)&& mCurrentGamePhase == MTG_PHASE_UNTAP && currentPlayer == card->controller() && card->phasedTurn != turn && !card->isPhased)
-            {
-                card->isPhased = true;
-                card->phasedTurn = turn;
-                if(card->view)
-                    card->view->alpha = 50;
-                card->initAttackersDefensers();
-                //add event phases out here
-                WEvent * evphaseout = NEW WEventCardPhasesOut(card, turn);
-                receiveEvent(evphaseout);
-            }
-            else if((card->has(Constants::PHASING) || card->isPhased)&& mCurrentGamePhase == MTG_PHASE_UNTAP && currentPlayer == card->controller() && card->phasedTurn != turn)
-            {
-                card->isPhased = false;
-                card->phasedTurn = turn;
-                if(card->view)
-                    card->view->alpha = 255;
-                //add event phases in here
-                WEvent * evphasein = NEW WEventCardPhasesIn(card);
-                receiveEvent(evphasein);
-            }
+            //(phasing flips now happen synchronously in phasingPhase(), called
+            //as the untap step begins - see nextGamePhase. Only the attachment
+            //phase-sync below stays in this per-tick pass.)
             if (card->target && isInPlay(card->target) && (card->hasSubtype(Subtypes::TYPE_EQUIPMENT) || card->hasSubtype(Subtypes::TYPE_AURA)))
             {
                 card->isPhased = card->target->isPhased;
@@ -1805,6 +1785,45 @@ void GameObserver::cleanupPhase()
 {
     currentPlayer->cleanupPhase();
     opponent()->cleanupPhase();
+}
+
+//Phasing flips exactly once per turn, synchronously as the untap step
+//begins (CR 702.26) and BEFORE untapAll, so a card that phases in still
+//untaps this turn. The old implementation polled mCurrentGamePhase ==
+//MTG_PHASE_UNTAP from the per-tick state pass; the untap step can transit
+//within a single tick, so the poll usually missed the window and a
+//phased-out card never phased back in.
+void GameObserver::phasingPhase()
+{
+    for (int i = 0; i < 2; i++)
+    {
+        MTGGameZone * zone = players[i]->game->inPlay;
+        for (int j = zone->nb_cards - 1; j >= 0; j--)
+        {
+            MTGCardInstance * card = zone->cards[j];
+            if (currentPlayer != card->controller() || card->phasedTurn == turn)
+                continue;
+            if (card->has(Constants::PHASING) && !card->isPhased)
+            {
+                card->isPhased = true;
+                card->phasedTurn = turn;
+                if (card->view)
+                    card->view->alpha = 50;
+                card->initAttackersDefensers();
+                WEvent * evphaseout = NEW WEventCardPhasesOut(card, turn);
+                receiveEvent(evphaseout);
+            }
+            else if (card->has(Constants::PHASING) || card->isPhased)
+            {
+                card->isPhased = false;
+                card->phasedTurn = turn;
+                if (card->view)
+                    card->view->alpha = 255;
+                WEvent * evphasein = NEW WEventCardPhasesIn(card);
+                receiveEvent(evphasein);
+            }
+        }
+    }
 }
 
 void GameObserver::untapPhase()

@@ -128,6 +128,7 @@ class GameObserver{
   void addObserver(MTGAbility * observer);
   bool removeObserver(ActionElement * observer);
   void startGame(GameType, Rules * rules);
+  void phasingPhase();
   void untapPhase();
   MTGCardInstance * isCardWaiting(){ return cardWaitingForTargets; }
   int isInPlay(MTGCardInstance *  card);
