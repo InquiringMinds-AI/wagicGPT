@@ -89773,7 +89773,7 @@ type=Artifact
 [/card]
 [card]
 name=Puppet's Verdict
-auto=all(*[zpos=1]|mylibrary) transforms((,newability[@coinflipped(this|mylibrary) once:if compare(lastflipresult)~equalto~compare(lastflipchoice) then all(creature[power<=2]) destroy else all(creature[power>=3]) destroy],newability[name(Filp a coin) flipacoin winability donothing winabilityend loseability donothing loseabilityend flipend])) oneshot
+auto=flipacoin winability all(creature[power<=2]) destroy winabilityend loseability all(creature[power>=3]) destroy loseabilityend flipend
 text=Flip a coin. If you win the flip, destroy all creatures with power 2 or less. If you lose the flip, destroy all creatures with power 3 or greater.
 mana={1}{R}{R}
 type=Instant
