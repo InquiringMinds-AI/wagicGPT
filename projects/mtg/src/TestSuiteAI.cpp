@@ -657,6 +657,17 @@ TestSuite::TestSuite(const char * filename)
     startTime = JGEGetTime();
     endTime = startTime;
     std::string contents;
+    const char * testPrimitivesFile = getenv("WAGIC_TEST_PRIMITIVES_FILE");
+    if (getenv("WAGIC_TESTSUITE") && testPrimitivesFile && testPrimitivesFile[0])
+    {
+        string error;
+        if (!MTGCollection()->loadTestPrimitives(testPrimitivesFile, error))
+        {
+            fprintf(stderr, "WAGIC_TEST_PRIMITIVES_FILE: %s\n", error.c_str());
+            exit(EXIT_FAILURE);
+        }
+        fprintf(stderr, "WAGIC_TEST_PRIMITIVES_FILE: loaded %s\n", testPrimitivesFile);
+    }
     if (JFileSystem::GetInstance()->readIntoString(filename, contents))
     {
         std::stringstream stream(contents);

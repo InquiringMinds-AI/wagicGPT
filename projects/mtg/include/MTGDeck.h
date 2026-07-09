@@ -127,6 +127,7 @@ public:
 
 #ifdef TESTSUITE
     void prefetchCardNameCache();
+    bool loadTestPrimitives(const string& configFile, string& error);
 #endif
 
     MTGCard * getCardByName(string name, int forcedSetId = -1);

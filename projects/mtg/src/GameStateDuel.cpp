@@ -208,7 +208,8 @@ void GameStateDuel::Start()
 
 #ifdef TESTSUITE
     SAFE_DELETE(testSuite);
-    testSuite = NEW TestSuite("test/_tests.txt");
+    const char * testSuiteFile = getenv("WAGIC_TESTSUITE_FILE");
+    testSuite = NEW TestSuite(testSuiteFile && testSuiteFile[0] ? testSuiteFile : "test/_tests.txt");
 #endif
 
     setGamePhase(DUEL_STATE_CHOOSE_DECK1);

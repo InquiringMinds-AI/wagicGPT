@@ -12,6 +12,7 @@
 #include "DeckManager.h"
 #include <iomanip>
 #include "AbilityParser.h"
+#include <set>
 
 #if defined (WIN32) || defined (LINUX)
 #include <time.h>
@@ -791,6 +792,164 @@ MTGCard * MTGAllCards::_(int index)
 }
 
 #ifdef TESTSUITE
+bool MTGAllCards::loadTestPrimitives(const string& configFile, string& error)
+{
+    static const int firstTestId = 2100000000;
+    static const int lastTestId = 2100000999;
+    std::string contents;
+    if (!JFileSystem::GetInstance()->readIntoString(configFile, contents))
+    {
+        error = "cannot read '" + configFile + "'";
+        return false;
+    }
+
+    std::set<int> fileIds;
+    std::set<string> fileNames;
+    std::set<string> productionNames;
+    for (map<int, MTGCard *>::const_iterator it = collection.begin(); it != collection.end(); ++it)
+    {
+        if (!it->second || !it->second->data)
+            continue;
+        string name = it->second->data->name;
+        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+        productionNames.insert(name);
+    }
+    for (map<string, CardPrimitive *>::const_iterator it = primitives.begin(); it != primitives.end(); ++it)
+    {
+        if (!it->second)
+            continue;
+        string name = it->second->name;
+        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+        productionNames.insert(name);
+    }
+
+    bool inCard = false;
+    bool sawCard = false;
+    int cardLine = 0;
+    int id = 0;
+    string name;
+    std::stringstream stream(contents);
+    string line;
+    int lineNumber = 0;
+    while (std::getline(stream, line))
+    {
+        ++lineNumber;
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line.erase(line.size() - 1);
+        if (line.empty() || line[0] == '#')
+            continue;
+        if (line == "[card]")
+        {
+            if (inCard)
+            {
+                error = "nested [card] at line " + to_string(lineNumber);
+                return false;
+            }
+            inCard = true;
+            sawCard = true;
+            cardLine = lineNumber;
+            id = 0;
+            name.clear();
+            continue;
+        }
+        if (line == "[/card]")
+        {
+            if (!inCard)
+            {
+                error = "unmatched [/card] at line " + to_string(lineNumber);
+                return false;
+            }
+            if (id < firstTestId || id > lastTestId)
+            {
+                error = "card beginning at line " + to_string(cardLine) +
+                    " requires id= in reserved range 2100000000-2100000999";
+                return false;
+            }
+            if (name.empty())
+            {
+                error = "card beginning at line " + to_string(cardLine) + " requires name=";
+                return false;
+            }
+            string lowerName = name;
+            std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+            if (!fileIds.insert(id).second)
+            {
+                error = "duplicate test id " + to_string(id);
+                return false;
+            }
+            if (!fileNames.insert(lowerName).second)
+            {
+                error = "duplicate test name '" + name + "'";
+                return false;
+            }
+            if (collection.find(id) != collection.end())
+            {
+                error = "test id " + to_string(id) + " collides with a production card";
+                return false;
+            }
+            if (productionNames.find(lowerName) != productionNames.end())
+            {
+                error = "test name '" + name + "' collides with a production card";
+                return false;
+            }
+            inCard = false;
+            continue;
+        }
+        if (!inCard)
+        {
+            error = "content outside [card] block at line " + to_string(lineNumber);
+            return false;
+        }
+        size_t separator = line.find('=');
+        if (separator == string::npos || !separator)
+        {
+            error = "malformed field at line " + to_string(lineNumber);
+            return false;
+        }
+        string key = line.substr(0, separator);
+        string value = line.substr(separator + 1);
+        if (key == "id")
+        {
+            char * end = NULL;
+            long parsed = strtol(value.c_str(), &end, 10);
+            if (value.empty() || !end || *end || parsed <= 0 || parsed > INT_MAX || id)
+            {
+                error = "invalid or duplicate id= at line " + to_string(lineNumber);
+                return false;
+            }
+            id = static_cast<int>(parsed);
+        }
+        else if (key == "name")
+        {
+            if (value.empty() || !name.empty())
+            {
+                error = "empty or duplicate name= at line " + to_string(lineNumber);
+                return false;
+            }
+            name = value;
+        }
+    }
+    if (inCard)
+    {
+        error = "unterminated [card] block beginning at line " + to_string(cardLine);
+        return false;
+    }
+    if (!sawCard)
+    {
+        error = "file contains no [card] blocks";
+        return false;
+    }
+
+    int oldTotal = total_cards;
+    load(configFile, MTGSets::INTERNAL_SET);
+    if (total_cards - oldTotal != static_cast<int>(fileIds.size()))
+    {
+        error = "existing primitive loader rejected one or more validated cards";
+        return false;
+    }
+    return true;
+}
+
 void MTGAllCards::prefetchCardNameCache()
 {
     map<int, MTGCard *>::iterator it;
