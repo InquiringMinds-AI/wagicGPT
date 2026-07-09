@@ -127,6 +127,9 @@ public:
     int forceDestroy;
     int forcedAlive;
     bool canBeInterrupted;
+    //a trigger-granted interaction (e.g. the phasedoutbonus discard chooser)
+    //may be answered while its source is phased out - it is not an activation
+    bool clickableWhilePhased;
     ManaCost* alternative;
     ManaCost* BuyBack;
     ManaCost* FlashBack;

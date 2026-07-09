@@ -260,15 +260,34 @@ WEventCardPhasesOut::WEventCardPhasesOut(MTGCardInstance * card, int turn) :
     if(card->getPhasedOutAbility().size())
     {
         AbilityFactory af(card->getObserver());
-        MTGAbility * a = af.parseMagicLine(card->getPhasedOutAbility(), card->getObserver()->mLayers->actionLayer()->getMaxId(), NULL, card->clone());
-        MTGAbility * poA = a->clone();
-        SAFE_DELETE(a);
-        poA->oneShot = true;
-        poA->canBeInterrupted = false;
-        MTGAbility *gatg = NEW GenericAddToGame(card->getObserver(), card->getObserver()->mLayers->actionLayer()->getMaxId(), card,NULL,poA->clone());
-        SAFE_DELETE(poA);
-        gatg->fireAbility();
-        //SAFE_DELETE(gatg);
+        MTGAbility * a = af.parseMagicLine(card->getPhasedOutAbility(), card->getObserver()->mLayers->actionLayer()->getMaxId(), NULL, card);
+        if (!a)
+            return;
+        if (MayAbility * poMay = dynamic_cast<MayAbility *>(a))
+        {
+            //the source is phased out when this menu/chooser runs; exempt the
+            //whole interaction chain from the activation isPhased gate
+            poMay->clickableWhilePhased = true;
+            if (poMay->ability)
+                poMay->ability->clickableWhilePhased = true;
+            //An interactive phase-out ability (the parser wraps a bare chooser
+            //payload like "reject notaTarget(...)" in MayAbility(must)) manages
+            //its own menu and lifetime; forcing oneShot+resolve() on it does
+            //nothing and the ability silently never fired (CS-018).
+            a->canBeInterrupted = false;
+            a->addToGame();
+        }
+        else
+        {
+            MTGAbility * poA = a->clone();
+            SAFE_DELETE(a);
+            poA->oneShot = true;
+            poA->canBeInterrupted = false;
+            MTGAbility *gatg = NEW GenericAddToGame(card->getObserver(), card->getObserver()->mLayers->actionLayer()->getMaxId(), card,NULL,poA->clone());
+            SAFE_DELETE(poA);
+            gatg->fireAbility();
+            //SAFE_DELETE(gatg);
+        }
     }
 }
 

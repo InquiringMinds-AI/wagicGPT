@@ -7271,6 +7271,7 @@ MTGAbility::MTGAbility(const MTGAbility& a): ActionElement(a)
     forceDestroy = a.forceDestroy;
     forcedAlive = a.forcedAlive;
     canBeInterrupted = a.canBeInterrupted;
+    clickableWhilePhased = a.clickableWhilePhased;
 
     //costs get copied, and will be deleted in the destructor
     mCost = a.mCost ? NEW ManaCost(a.mCost) : NULL;
@@ -7303,6 +7304,7 @@ MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * card) :
     aType = MTGAbility::UNKNOWN;
     mCost = NULL;
     forceDestroy = 0;
+    clickableWhilePhased = false;
     forcedAlive = 0;
     oneShot = 0;
     canBeInterrupted = true;
@@ -7317,6 +7319,7 @@ MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * _source
     aType = MTGAbility::UNKNOWN;
     mCost = NULL;
     forceDestroy = 0;
+    clickableWhilePhased = false;
     forcedAlive = 0;
     oneShot = 0;
     canBeInterrupted = true;
@@ -7480,7 +7483,7 @@ ActivatedAbility::ActivatedAbility(GameObserver* observer, int id, MTGCardInstan
 
 int ActivatedAbility::isReactingToClick(MTGCardInstance * card, ManaCost * mana)
 {        
-    if(card->isPhased)
+    if(card->isPhased && !clickableWhilePhased)
         return 0;
     Player * player = game->currentlyActing();
     int cPhase = game->getCurrentGamePhase();
@@ -7803,6 +7806,7 @@ int TargetAbility::reactToTargetClick(Targetable * object)
 
 int TargetAbility::reactToClick(MTGCardInstance * card)
 {
+
     if (!waitingForAnswer)
     {
         if (isReactingToClick(card))

@@ -1,8 +1,8 @@
 # Teferi's Imp phases out on one controller untap and phases in on the next.
-# On the following phase-in, @phasedin must draw exactly once.
-# KNOWN LIMITATION (CS-018): the phase-OUT discard (phasedoutbonus) does not
-# fire, so the forest stays in hand; per Oracle the final hand would be the
-# island only. Update this expectation when CS-018 is fixed.
+# Phase-OUT: phasedoutbonus forces a discard (menu: choice 0, click the card).
+# Phase-IN: @phasedin draws exactly once.
+# Oracle-correct final state: forest discarded at phase-out, island drawn at
+# phase-in -> hand = island only.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -15,6 +15,8 @@ goto end
 goto upkeep
 goto end
 goto upkeep
+choice 0
+forest
 goto end
 goto upkeep
 goto end
@@ -23,6 +25,7 @@ goto upkeep
 UPKEEP
 [PLAYER1]
 inplay:teferi's imp
-hand:forest,island
+hand:island
+graveyard:forest
 [PLAYER2]
 [END]
