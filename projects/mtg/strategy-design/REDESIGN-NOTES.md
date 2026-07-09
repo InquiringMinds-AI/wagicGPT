@@ -47,7 +47,20 @@ Option lines hide the deciding fact -> the weak model picks near-arbitrarily. FI
 - **Artifact-count / metalcraft** status line (deck110).
 - **Static/keyword abilities** on the board line (Bloodghast "can't block"; deck133) — lower priority.
 
-### P2 — Rules-valid action sets  [ENGINE CORRECTNESS — may belong in the NON-LLM track]
+### P2 — Rules-valid action sets  [PARTIAL 2026-07-09: GPT-seam 601.2c filter + blank-template fallback shipped]
+Shipped at the GPT contract seam (strangler step): FindCardToPlay's cast menu now drops
+spells that REQUIRE a target when none exists (mandatory single target with zero candidates;
+exactly-N with fewer than N) - "up to N", untargeted, and any-target spells untouched.
+Validated with probe decks: removal offered 16/16 with creatures present, never offered
+creatureless (and no model call fires when the only castable was filtered). Blank
+"Choose the target for " prompt: tc->source is a NAMELESS fake card for granted/inner
+abilities (Liliana +1 discard); prompt now falls back to the waiting action element's menu
+text ("discard"), else "this effect" (fallback path not yet observed live - watch corpora).
+REMAINING (engine-level, non-LLM track candidates): 601.2c in MTGPutInPlayRule itself
+(humans + Baka still get offered illegal casts - verified: the rule checks mana/timing only);
+sibling-requirement canPay (Crackleburr, CS-002 residual); ishuman/genrand card-data gates
+(CS-017) + emerge/offering ishuman gate (CS-003) -> route to the interactive path for GPT.
+Original finding (kept for context):
 - **ILLEGAL CASTS OFFERED (bug).** Targeted spells with no legal target offered as legal (Go for the Throat vs all-artifact board; Essence Scatter on empty stack; Downsize into creatureless board). MTG rule 601.2c: a spell that REQUIRES a target can't be cast with no legal target; spells with NO target or "up to N" CAN. ⚠ Do NOT over-filter — casting a legally-castable spell for ANOTHER CARD'S TRIGGER (Guttersnipe/Young Pyromancer/prowess/storm) is legitimate; never block a spell just because its own effect looks null. Fix the rules engine's legal-move set (affects Baka too, not just GPT).
 - **BLANK effect-name target prompt (bug).** `"Choose the target for "` with the `{name}` never substituted, offering only the caster's own creatures (game 1783314190 rec 17). Template-substitution failure; trace the emitting seam.
 

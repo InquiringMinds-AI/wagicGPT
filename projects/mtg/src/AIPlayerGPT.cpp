@@ -1392,6 +1392,28 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 continue;
             if (!roughlyPayable(card, pMana))
                 continue;
+            //Rules-valid action set (MTG 601.2c): a spell that REQUIRES a
+            //target cannot legally be cast with none available - offering
+            //it wastes a model call AND the failed validation hands the
+            //whole cast decision to the heuristic. Untargeted spells pass
+            //untouched, and a castable spell with a null-looking effect
+            //stays offered (casting for another card's trigger is
+            //legitimate play).
+            {
+                TargetChooserFactory tcf(observer);
+                TargetChooser * tc = tcf.createTargetChooser(card);
+                if (tc)
+                {
+                    bool castable = true;
+                    if (tc->maxtargets == 1 && !tc->validTargetsExist())
+                        castable = false; //mandatory single target, none exist
+                    if (tc->targetMin && !tc->validTargetsExist(tc->maxtargets))
+                        castable = false; //"exactly N" with fewer than N
+                    SAFE_DELETE(tc);
+                    if (!castable)
+                        continue;
+                }
+            }
             string key = card->getDisplayName() + scans[s].label;
             if (!seen.insert(key).second)
                 continue;
@@ -1889,6 +1911,19 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         if (targets.empty())
             break;
 
+        //Granted/inner abilities ride a nameless fake card - Liliana's "+1:
+        //each player discards" chooser rendered 'Choose the target for '
+        //(blank). The waiting action element's menu text names the effect.
+        string effectName = tc->source->getDisplayName();
+        if (effectName.empty())
+        {
+            MTGAbility * waiting = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+            if (waiting)
+                effectName = waiting->getMenuText();
+            if (effectName.empty())
+                effectName = "this effect";
+        }
+
         std::ostringstream q;
         q << "Choose ";
         if (!multi)
@@ -1899,7 +1934,7 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             if (!unlimited)
                 q << " of " << (tc->targetMin ? "exactly " : "up to ") << tc->maxtargets;
         }
-        q << " for " << tc->source->getDisplayName();
+        q << " for " << effectName;
 
         int pick = askModel(q.str(), opts);
         if (pick == kChoicePending)
