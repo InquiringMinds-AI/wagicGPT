@@ -113,7 +113,6 @@ generic/archghoul_zombie_dies_i1085.txt
 generic/arcums_weathervane_i1085.txt
 generic/athreos_shroud_veiled_coin_i1085.txt
 generic/azor_lockout_i1085.txt
-generic/bag_of_holding_i1085.txt
 generic/battletide_alchemist_i1085.txt
 generic/betrayal_of_flesh_i1085.txt
 generic/bounty_of_the_luxa_i1085.txt
@@ -158,13 +157,11 @@ generic/imprisoned_in_the_moon_i1085.txt
 generic/jaddi_lifestrider_i1085.txt
 generic/infernal_darkness_i1085.txt
 generic/krovikan_plague_i1085.txt
-generic/livewire_lash_i1085.txt
 generic/memory_leak_i1085.txt
 generic/living_death_i1085.txt
 generic/memorys_journey_i1085.txt
 generic/loreseekers_stone_i1085.txt
 generic/island_sanctuary_i1085.txt
-generic/mobilized_district_i1085.txt
 generic/necrologia_i1085.txt
 generic/mwonvuli_beast_tracker_i1085.txt
 generic/misdirection_i1085.txt
@@ -178,12 +175,10 @@ generic/necropotence_i1085.txt
 generic/nightveil_specter_i1085.txt
 generic/of_one_mind_i1085.txt
 generic/oni_possession_i1085.txt
-generic/open_into_wonder_i1085.txt
 generic/out_of_time_i1085.txt
 generic/prohibit_i1085.txt
 generic/phyrexian_ingester_i1085.txt
 generic/pariahs_shield_i1085.txt
-generic/puffer_extract_i1085.txt
 generic/red_elemental_blast_i1085.txt
 generic/riptide_mangler_i1085.txt
 generic/run_ashore_i1085.txt
@@ -265,12 +260,10 @@ generic/serum_powder_leyline_i979.txt
 generic/serum_powder_window_i979.txt
 generic/entomb_eot_crash_i1120.txt
 generic/kraul_whipcracker_i1136.txt
-generic/arcane_denial_i1126.txt
 generic/kathari_bomber_sacrifice_i1146.txt
 generic/defense_of_heart_double_i1128.txt
 generic/gulf_squid_i1131.txt
 generic/proliferate_shroud_i1130.txt
-generic/populate_zektar_i1145.txt
 death_grasp.txt
 ai/goblin_artillery.txt
 ai/death_wind_self_target_i1085.txt
@@ -320,16 +313,11 @@ generic/m10_blockers2.txt
 generic/must1.txt
 generic/must2.txt
 generic/nofizzle.txt
-generic/oneblocker.txt
 generic/persist.txt
 generic/persist2.txt
 generic/persist3.txt
 generic/phases.txt
 generic/preventalldamage.txt
-generic/rampage.txt
-generic/rampage2.txt
-generic/rampage3.txt
-generic/rampage_vs_first_strike.txt
 generic/regenerate.txt
 generic/regenerate_wither_i146.txt
 generic/sacrifice.txt
@@ -679,7 +667,6 @@ invigorate#2.txt
 ironclaw_orcs.txt
 iron_will_i270.txt
 ivy_elemental.txt
-jodahs_avenger.txt
 juggernaut.txt
 jump.txt
 juniper_order_ranger.txt
@@ -706,8 +693,6 @@ kraken_eye4.txt
 kudzu.txt
 kudzu2.txt
 kudzu_i168.txt
-Lethargy_Trap.txt
-Lethargy_Trap2.txt
 leveler.txt
 leyline_of_the_void.txt
 lhurgoyf.txt
@@ -810,7 +795,6 @@ PTswitch.txt
 PT_M15_errata.txt
 PT_M15_errata2.txt
 pygmy_troll.txt
-pyknite_i426.txt
 pyroclasm.txt
 quick_sliver_FORCEDALIVE.txt
 quilled_sliver.txt
@@ -900,7 +884,6 @@ solfatara.txt
 soulblast.txt
 souls_attendant_i489.txt
 soul's grace_POWERLIFEGAIN.txt
-spark_elemental.txt
 spectral_shield_CANTBETARGETOF.txt
 spell_rupture.txt
 spell_rupture_2.txt
@@ -969,17 +952,14 @@ unwilling_recruit.txt
 urzas_lands.txt
 urzas_lands2.txt
 urzas_mine_i287.txt
-[at]Vampired#1.txt
 vampire_bats.txt
 vampiric_link.txt
 vanishing.txt
 vendetta_TOUGHNESSLIFELOSS.txt
 vesuva_landlimit_i718.txt
-vine_dryad.txt
 volcanic_eruption.txt
 walking_wall.txt
 wall_of_diffusion.txt
-wall_of_diffusion2.txt
 warren_instigator.txt
 welkin_hawk.txt
 whispers_of_the_muse.txt
