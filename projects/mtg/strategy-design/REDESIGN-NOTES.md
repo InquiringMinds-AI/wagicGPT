@@ -17,7 +17,16 @@ The contract must provide:
 
 ## Work list (prioritized)
 
-### P0 — History / prompt representation  [VERIFIED in code 2026-07-06]
+### P0 — History / prompt representation  [SHIPPED 2026-07-09, commits 9192b0c30+]
+Implemented as head/tail: static system prompt + one user message = append-only game
+NARRATION (turn headers always; lazy phase markers; events + own decisions; opening hand
+collapsed to one line; tokens narrate as "created ->"), then ONE fresh board, the model's
+last PLAN line, and the legal choices. Reply protocol: choice then PLAN:, model told all
+else drops from context (complete-plan restatement required). Ask/dedupe caches keyed by
+state+question so narration growth can't thrash them. Gotcha for posterity:
+WEventPhaseChange->to->player is INVERTED from turn 2 on (ring builds next turn against an
+already-flipped id) - turn ownership must read observer->currentPlayer.
+Original finding (kept for context):
 Current impl (`AIPlayerGPT.cpp`): a **windowed conversation transcript**. `buildRequestBody` (728-732) sends system + the running `(decision-prompt, reply)` pairs + the current prompt. After each reply the prompt+reply are appended (889-890). Window (896-897): `while (mMessages.size() > 41) erase(begin+1, begin+3)` = keep system + the most recent **20 exchanges**. Each historical "user" turn is a **full board serialization**; the code's own comment (895) admits "old states are superseded by the snapshot we resend." So up to ~20 STALE full snapshots stack ahead of the current one -> attention dilution for a weak model, token bloat, and an unstable prefix that defeats prefix caching. **FIX:** send current state fresh once + a compact history (events + own decisions/plan), not full stale re-dumps. This is a first-class contract decision: separate CURRENT decision context from a COMPACT running history (they are currently conflated).
 
 ### P1 — Decision presentation  [highest leverage, lowest risk; the biggest play-quality lever found]

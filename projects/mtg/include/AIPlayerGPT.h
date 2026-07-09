@@ -235,6 +235,15 @@ private:
     string mPendingPhase;
     Player * mNarratedTurnOwner;
     int mNarratedTurnNumber;
+    //The opening deal is collapsed to ONE line ("Your opening hand (7):
+    //...") instead of seven draw lines: own library->hand moves buffer here
+    //until the first flush (first prompt or first other narrated line), and
+    //a taken mulligan re-opens the buffer for the redraw. The opponent's
+    //hidden deal/mulligan churn during the mulligan window is not narrated
+    //at all.
+    vector<string> mOpeningHand;
+    bool mDealDone;
+    void flushOpeningHand();
     //the model's last stated PLAN line - the ONLY reply text carried
     //forward (the protocol tells it so, and to restate the plan in full)
     string mCurrentPlan;

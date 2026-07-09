@@ -327,7 +327,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mTransSeq(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mTransSeq(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -537,9 +537,26 @@ void AIPlayerGPT::buildSystemPrompt()
     mSystemPrompt = sys.str();
 }
 
+void AIPlayerGPT::flushOpeningHand()
+{
+    if (mDealDone && mOpeningHand.empty())
+        return;
+    if (!mOpeningHand.empty())
+    {
+        std::ostringstream o;
+        o << "- Your opening hand (" << mOpeningHand.size() << " cards): ";
+        for (size_t i = 0; i < mOpeningHand.size(); i++)
+            o << (i ? "; " : "") << mOpeningHand[i];
+        mNarration += o.str() + "\n";
+        mOpeningHand.clear();
+    }
+    mDealDone = true;
+}
+
 string AIPlayerGPT::assemblePrompt(const string& tail)
 {
     std::ostringstream u;
+    flushOpeningHand();
     if (!mNarration.empty())
         u << "GAME LOG (everything that has happened so far):\n" << mNarration << "\n";
     u << "--- CURRENT SITUATION ---\n" << serializeGameState();
@@ -553,6 +570,7 @@ void AIPlayerGPT::appendNarration(const string& line)
 {
     if (line.empty())
         return;
+    flushOpeningHand(); //the deal precedes whatever is being narrated
     if (!mPendingPhase.empty())
     {
         mNarration += "- " + mPendingPhase + "\n";
@@ -622,6 +640,31 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
 {
     int result = AIPlayerBaka::receiveEvent(event);
 
+    //Opening deal & mulligans: collapse own draws into the buffered
+    //opening-hand line, and keep the opponent's hidden deal/mulligan churn
+    //("puts a card into their hand/library" x7) out of the narration.
+    if (WEventZoneChange * z = dynamic_cast<WEventZoneChange *>(event))
+    {
+        if (z->card && z->to)
+        {
+            if (!mDealDone && z->from == game->library && z->to == game->hand)
+            {
+                mOpeningHand.push_back(z->card->getDisplayName());
+                return result;
+            }
+            if (!mDealDone && z->from == game->hand && z->to == game->library)
+            {
+                mOpeningHand.clear(); //mulligan shuffle-back
+                return result;
+            }
+            bool mulliganWindow = (observer->turn == 0)
+                || (observer->turn == 1 && observer->getCurrentGamePhase() < MTG_PHASE_DRAW);
+            if (mulliganWindow && z->to->owner && z->to->owner != this
+                && (z->to == z->to->owner->game->hand || z->to == z->to->owner->game->library))
+                return result;
+        }
+    }
+
     //Phase changes never enter the narration on their own: they park in the
     //pending marker and only get written as the header of the next real
     //line (appendNarration) - empty phases leave no trace. A change of TURN
@@ -641,6 +684,8 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
             //coherent by the time the new turn's phase events fire.
             if (observer->currentPlayer != mNarratedTurnOwner || observer->turn != mNarratedTurnNumber)
             {
+                if (mNarratedTurnOwner) //not before the game's first turn header
+                    flushOpeningHand(); //the deal belongs to turn 1, before this header
                 mNarratedTurnOwner = observer->currentPlayer;
                 mNarratedTurnNumber = observer->turn;
                 mPendingPhase.clear();
@@ -667,8 +712,21 @@ string AIPlayerGPT::describeEvent(WEvent * event)
 
     if (WEventZoneChange * e = dynamic_cast<WEventZoneChange *>(event))
     {
-        if (!e->card || !e->from || !e->to)
+        if (!e->card || !e->to)
             return "";
+        //No origin zone = the card was CREATED (a token, a conjured copy):
+        //putInZone rewrites from = previousZone, which is NULL for a card
+        //that never was anywhere. Dropping these hid every token from the
+        //narration (Krenko's Command resolved and Goblins just appeared).
+        if (!e->from)
+        {
+            out << (e->to->owner == this ? "Your " : "Opponent's ")
+                << e->card->getDisplayName();
+            if (e->card->isCreature())
+                out << " (" << e->card->power << "/" << e->card->toughness << ")";
+            out << ": created -> " << zoneDesc(e->to);
+            return out.str();
+        }
         Player * owner = e->to->owner;
         bool mine = (owner == this);
         string toName = e->to->getName();
@@ -1413,6 +1471,7 @@ int AIPlayerGPT::computeActions()
         {
             DebugTrace("AIPlayerGPT: taking a mulligan at " << game->hand->nb_cards << " cards");
             narrateDecision("You took a mulligan");
+            mDealDone = false; //re-open the opening-hand collapse for the redraw
             observer->Mulligan(this);
             return 1;
         }
