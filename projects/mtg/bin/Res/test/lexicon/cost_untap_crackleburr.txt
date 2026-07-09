@@ -1,0 +1,27 @@
+# {q}/{q(target)} untap costs: a tapped Crackleburr untaps itself and two
+# tapped blue creatures as the cost, bouncing the opposing creature.
+# STATE (2026-07-09, CS-002): deterministic reproducer - the activation does
+# not commit (mana unspent, no bounce) with the crew-shaped click protocol
+# (source, cost-target, cost-target, spell-target). Same select-without-commit
+# shape as ninjutsu (CS-004b); likely the same extra-cost/layer lifecycle seam.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:crackleburr,merfolk of the pearl trident,coral eel
+tappedinplay:3
+manapool:{U}{U}
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+crackleburr
+merfolk of the pearl trident
+coral eel
+grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:crackleburr,merfolk of the pearl trident,coral eel
+manapool:{0}
+[PLAYER2]
+hand:grizzly bears
+[END]
