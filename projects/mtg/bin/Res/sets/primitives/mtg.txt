@@ -96866,7 +96866,7 @@ toughness=5
 [card]
 name=Rot Farm Skeleton
 abilities=cantblock
-autograveyard={2}{B}{G}{m}{m}{m}{m}:all(this) moveTo(myBattlefield) asSorcery
+autograveyard={2}{B}{G}{m}{m}{m}{m}:moveTo(myBattlefield) asSorcery
 text=Rot Farm Skeleton can't block. -- {2}{B}{G}, Put the top four cards of your library into your graveyard: Return Rot Farm Skeleton from your graveyard to the battlefield. Activate this ability only any time you could cast a sorcery.
 mana={2}{B}{G}
 type=Creature

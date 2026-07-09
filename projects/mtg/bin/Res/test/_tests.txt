@@ -1006,3 +1006,4 @@ generic/jack_in_the_mox_i1085.txt
 generic/cytoplast_manipulator_i1085.txt
 generic/entrapment_maneuver_i1085.txt
 generic/evoke_flicker_i1129.txt
+lexicon/cost_mill_rot_farm_skeleton.txt

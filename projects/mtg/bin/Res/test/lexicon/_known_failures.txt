@@ -1,3 +1,2 @@
 # Conformance witnesses for confirmed failures. These are intentionally kept
 # out of _tests.txt so the green registry remains useful for regression runs.
-lexicon/cost_mill_rot_farm_skeleton.txt

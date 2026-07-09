@@ -296,3 +296,4 @@ CDA#2.txt
 twinstrike.txt
 twinstrike2.txt
 twinstrike3.txt
+lexicon/cost_mill_rot_farm_skeleton.txt
