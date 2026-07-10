@@ -64,7 +64,16 @@ Original finding (kept for context):
 - **ILLEGAL CASTS OFFERED (bug).** Targeted spells with no legal target offered as legal (Go for the Throat vs all-artifact board; Essence Scatter on empty stack; Downsize into creatureless board). MTG rule 601.2c: a spell that REQUIRES a target can't be cast with no legal target; spells with NO target or "up to N" CAN. ⚠ Do NOT over-filter — casting a legally-castable spell for ANOTHER CARD'S TRIGGER (Guttersnipe/Young Pyromancer/prowess/storm) is legitimate; never block a spell just because its own effect looks null. Fix the rules engine's legal-move set (affects Baka too, not just GPT).
 - **BLANK effect-name target prompt (bug).** `"Choose the target for "` with the `{name}` never substituted, offering only the caster's own creatures (game 1783314190 rec 17). Template-substitution failure; trace the emitting seam.
 
-### P3 — Free-choice card play  [BREAKS THE GRAFT — load-bearing]
+### P3 — Free-choice card play  [RE-SCOPED 2026-07-09: spell side ALREADY free-choice in code]
+Reality check against the code: FindCardToPlay's SPELL side already offers one free choice
+across every castable card (hand/graveyard/exile/commandzone, alt-costs listed as separate
+modes), validated via aiForcedCandidate. Remaining veto/graft surface: (a) LANDS stay
+propose-then-veto (deliberate - dropping a land is nearly always right; Play listed first
+since P4); (b) validation-failure fallback hands the whole cast to Baka (rarer now that the
+601.2c filter removes the targetless-pick cause); (c) the full DecisionRequest->Action
+contract (decoupling decisions from clickstream / the duplicated Act body) = the
+architectural end-state, a dedicated refactor, not a queue item.
+Original finding (kept for context):
 `FindCardToPlay` is **propose-then-veto**: Baka chooses the card, the LLM only approves/holds. Card **selection** is Baka's -> on the decks Baka most fumbles, the LLM is capped no matter how good the guide is. The full free-choice card-play rewrite removes this. (NOTE: in the pool7 corpus the finishers WERE offered — Rakdos's Return offered 76x, qwen passed — so THAT passivity was real qwen behavior, not Baka hiding cards; but veto-only remains the structural ceiling.)
 
 ### P4 — Prompt hygiene / cleanups  [SHIPPED 2026-07-09 except skip-when-only-pass + verb normalization]
