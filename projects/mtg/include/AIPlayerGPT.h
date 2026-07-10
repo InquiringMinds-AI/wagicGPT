@@ -59,6 +59,15 @@ public:
     //true when the player launched the game with WAGIC_AI=gpt
     static bool isEnabled();
 
+    //Card-data "ishuman" gates route this player onto the interactive
+    //lines (menus/choosers the decision seams answer) instead of the
+    //heuristic dice-roll lines - but only while an endpoint is live; the
+    //Baka fallback needs the heuristic lines intact.
+    virtual bool isInteractiveAI() const
+    {
+        return !mEndpoint.empty();
+    }
+
     //Adds the mulligan decision (the engine has no AI mulligan path at all -
     //the heuristic always keeps) and menu handling that can wait on an
     //in-flight model call, before delegating to the base loop.

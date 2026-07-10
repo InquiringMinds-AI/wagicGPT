@@ -118,6 +118,16 @@ public:
         return 0;
     }
 
+    //An AI that can answer interactive prompts (menus, target choosers)
+    //like a human. Card data gates decisions on "ishuman" to route AI
+    //players onto dice-roll heuristic lines instead of interactive ones -
+    //an LLM player must take the interactive path (those gates encode the
+    //heuristic AI's limits, not the game's rules).
+    virtual bool isInteractiveAI() const
+    {
+        return false;
+    }
+
     bool isHuman()
     {
         return (playMode == MODE_HUMAN);

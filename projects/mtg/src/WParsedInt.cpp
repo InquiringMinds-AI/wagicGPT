@@ -1468,7 +1468,11 @@ void WParsedInt::extendedParse(string s, Spell * spell, MTGCardInstance * card)
     {
         intValue = 0;
         if (s == "ishuman")
-            intValue = (card->controller()->isAI())?0:1;
+            //An interactive AI (the LLM opponent) takes the human path:
+            //card-data ishuman gates exist to keep menus/choosers away
+            //from the heuristic AI (routing it onto dice-roll lines) -
+            //an AI that answers menus must not be routed with them.
+            intValue = (card->controller()->isAI() && !card->controller()->isInteractiveAI())?0:1;
         else if (s == "mycolnum") {
             for (int i = Constants::MTG_COLOR_GREEN; i <= Constants::MTG_COLOR_WHITE; ++i){
                 if(card->hasColor(i))

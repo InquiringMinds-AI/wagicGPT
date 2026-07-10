@@ -89,7 +89,14 @@ any transition timers for the wrong shape — throttle-then-ask serializes
 padding + inference.) For testing, `WAGIC_FASTCLOCK` strips this padding
 entirely — headless corpora are bound by real work only.
 
-## The ishuman lens  [user directive, 2026-07-09]
+## The ishuman lens  [user directive, 2026-07-09 — MECHANISM SHIPPED same day]
+SHIPPED: `Player::isInteractiveAI()` (default false; AIPlayerGPT returns true while an
+endpoint is live) + the single card-data evaluation site (WParsedInt "ishuman") now treats
+an interactive AI as human. ALL ~151 ishuman gates in the primitives route the GPT player
+onto the interactive lines in one move: emerge/offering/entwine alternative casts (CS-003)
+AND the genrand dice-roll trigger lines (CS-017). Validated live: Aquastrand Spider's graft
+may-menu (previously ishuman==0 + genrand2 dice) reached the model as a real choice.
+Baka fallback keeps the dice lines (gate requires a live endpoint); suite unaffected.
 Any engine path gated "for the human" (`ishuman` restrictions, human-only menus) must be
 re-evaluated for the LLM opponent: does it have access, and should it? Those gates encode
 Baka's limitations, not the game's rules. First instance: emerge/offering casts (CS-003).
