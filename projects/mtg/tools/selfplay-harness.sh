@@ -83,11 +83,20 @@ mkdir -p "$OUTDIR"
 RESULTS="$OUTDIR/results.tsv"
 printf "deck0\tdeck1\twinner\tstart_epoch\n" > "$RESULTS"
 
-# Endpoint reachability (fail fast rather than run Baka-fallback games).
-if ! curl -s -m 6 "$URL/v1/models" | grep -q "$MODEL"; then
-    echo "WARN: $MODEL not reachable at $URL/v1/models - games would fall back to the heuristic AI." >&2
-    echo "      (proceeding anyway; ctrl-C to abort)" >&2
+# Endpoint reachability (fail HARD rather than burn a corpus of silent
+# Baka-fallback games - that already happened once). Latency matters too: the
+# in-game probe allows 20s, but a slow /v1/models means a struggling server.
+PROBE_OUT="$(curl -s -m 20 -w '\n%{time_total}' "$URL/v1/models")"
+PROBE_TIME="${PROBE_OUT##*$'\n'}"
+if ! printf '%s' "$PROBE_OUT" | grep -q "$MODEL"; then
+    echo "FATAL: $MODEL not reachable at $URL/v1/models - every game would fall back to the heuristic AI. Aborting." >&2
+    exit 1
 fi
+case "$PROBE_TIME" in
+    0.*|1.*) : ;;
+    *) echo "WARN: $URL/v1/models answered in ${PROBE_TIME}s - the server is struggling; expect probe fallbacks under concurrency." >&2;;
+esac
+echo "  probe  : $MODEL ok at $URL (${PROBE_TIME}s)"
 
 # Build the round-robin pairing schedule (each unordered pair once per rep),
 # then shuffle so coverage is even if we hit the time cap early.

@@ -5326,6 +5326,18 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         string extraTransforms = "";
         string transformsParamsString = "";
         transformsParamsString.append(storedString);//the string between found and real end is removed at start.
+        if (transformsParamsString.empty())
+        {
+            //A raw line can carry a second "transforms((...))" whose parameters were
+            //never stashed into storedString (the pre-pass stores only the first, and
+            //the first consumer erases it). Read the parameters straight from s; if
+            //there are none, bail out instead of indexing an empty split.
+            size_t inlineEnd = s.find("))", found);
+            if (inlineEnd != string::npos && inlineEnd > found + 12)
+                transformsParamsString = s.substr(found + 12, inlineEnd - (found + 12));
+            if (transformsParamsString.empty())
+                return NULL;
+        }
         
         found = transformsParamsString.find("transforms(("); // Try to handle transforms ability inside transforms keyword.
         if (found != string::npos && extraTransforms.empty())

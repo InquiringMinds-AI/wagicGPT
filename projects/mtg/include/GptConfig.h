@@ -90,7 +90,7 @@ std::string gptHttpPost(const std::string& url, const std::string& body, long ti
 
 //Probe url + "/v1/models". True when the endpoint answers with a usable
 //model list; modelOut receives the first advertised model id.
-bool gptProbeEndpoint(const std::string& url, const std::string& key, std::string& modelOut, long timeoutMs = 4000);
+bool gptProbeEndpoint(const std::string& url, const std::string& key, std::string& modelOut, long timeoutMs = 20000);
 
 #endif //WITH_GPT_AI
 
