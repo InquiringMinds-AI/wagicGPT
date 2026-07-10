@@ -67,7 +67,15 @@ Original finding (kept for context):
 ### P3 — Free-choice card play  [BREAKS THE GRAFT — load-bearing]
 `FindCardToPlay` is **propose-then-veto**: Baka chooses the card, the LLM only approves/holds. Card **selection** is Baka's -> on the decks Baka most fumbles, the LLM is capped no matter how good the guide is. The full free-choice card-play rewrite removes this. (NOTE: in the pool7 corpus the finishers WERE offered — Rakdos's Return offered 76x, qwen passed — so THAT passivity was real qwen behavior, not Baka hiding cards; but veto-only remains the structural ceiling.)
 
-### P4 — Prompt hygiene / cleanups
+### P4 — Prompt hygiene / cleanups  [SHIPPED 2026-07-09 except skip-when-only-pass + verb normalization]
+Shipped: hints leak removed at the ROOT (member, env var, config key, GUI row all gone -
+the confound no longer exists in any configuration); option ordering fixed (land veto lists
+Play FIRST, cast menu lists "Cast nothing" LAST, multi-target "Done" goes LAST); de-dup,
+mana normalization, phase-collapse landed earlier with P0/P1. Live-verified vs local
+llama.cpp: 0 hint leaks, Play-first picked 6/6. NOT done: skip-model-call-when-only-pass
+(single-candidate priority asks still call; measure first), verb normalization (the P1
+card-text snippet largely dissolves it).
+Original list (kept for context):
 - **Drop the `(heuristic score N)` leak** (`mShowHints`). Baka's currency in the reasoning model's prompt is a crutch/anchor; removing it dissolves the hints confound at the ROOT (not just via a `HINTS=0` flag).
 - **De-dup identical option lines** (fetch -> 9 byte-identical basics; deck133/135).
 - **Normalize mana-cost rendering**: options show `{{1}{u}}` (double-brace lowercase) vs the taught `{2}{R}` (deck131).

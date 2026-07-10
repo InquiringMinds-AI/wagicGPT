@@ -11,7 +11,6 @@
 #   model=<id>      model id (default: first id the endpoint reports)
 #   key=<token>     bearer token sent to the endpoint
 #   thinking=1      enable thinking on local Qwen-style servers
-#   hints=1         include the heuristic AI's scores in the prompt
 #   maxtokens=<n>   completion token budget
 #
 # Environment variables (WAGIC_GPT_URL, WAGIC_GPT_MODEL, WAGIC_GPT_KEY,

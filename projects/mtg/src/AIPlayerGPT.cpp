@@ -429,7 +429,6 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     if (mTimeoutMs < 5000)
         mTimeoutMs = 5000;
     mThinking = getenv("WAGIC_GPT_THINKING") ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
-    mShowHints = getenv("WAGIC_GPT_HINTS") ? envFlag("WAGIC_GPT_HINTS") : (cfg.hints == 1);
     //Telemetry consent implies local decision logging: the log IS the data
     //a future contribution/upload mechanism would share.
     bool translog = getenv("WAGIC_GPT_TRANSLOG") ? envFlag("WAGIC_GPT_TRANSLOG")
@@ -1141,13 +1140,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             continue;
         shown.push_back(candidates[c]);
         index++;
-        tail << index << ". " << line;
-        if (mShowHints)
-        {
-            OrderedAIAction action = *candidates[c]; //copy: getEfficiency() is not const
-            tail << " (heuristic score " << action.getEfficiency() << ")";
-        }
-        tail << "\n";
+        tail << index << ". " << line << "\n";
     }
     tail << "\nWhich action do you take? Reply with the number (0 = pass priority), then your PLAN: line.";
 
@@ -1328,22 +1321,25 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
 
         std::ostringstream q;
         q << "Land drop: play " << proposed->name << " now?";
+        //The usually-correct option comes FIRST: the model favors option 1
+        //(positional anchoring), and playing the land is nearly always
+        //right - "Hold" listed first was training it to miss land drops.
         vector<string> opts;
-        opts.push_back("Hold " + proposed->name + " - do not play it now");
         opts.push_back("Play " + proposed->name);
+        opts.push_back("Hold " + proposed->name + " - do not play it now");
         int pick = askModel(q.str(), opts, false); //the play narrates itself as a zone event
         if (pick == kChoicePending)
         {
             gotPayments.clear(); //nothing plays this tick; re-poll next tick
             return NULL;
         }
-        if (pick == 0)
+        if (pick == 1)
         {
             DebugTrace("AIPlayerGPT: vetoed playing " << proposed->name);
             gotPayments.clear(); //drop the heuristic's payment plan for this card
             return NULL;
         }
-        return proposed; //play it (pick 1), or defer to the heuristic (-1)
+        return proposed; //play it (pick 0), or defer to the heuristic (-1)
     }
 
     //Spells: one free choice across every castable card, whatever type rung
@@ -1356,8 +1352,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
 
     vector<MTGCardInstance *> candidates;
     vector<bool> candidateUsesAlt; //cast this entry with its alternative cost
-    vector<string> opts;
-    opts.push_back("Cast nothing right now");
+    vector<string> opts; //"Cast nothing" is appended LAST (positional
+                         //anchoring: the model favors option 1, and
+                         //nothing-first likely drove the pass rate)
     std::set<string> seen; //same name+zone = same decision; list it once
 
     struct ZoneScan { MTGGameZone * zone; const char * label; };
@@ -1466,6 +1463,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     //Nothing castable: only one outcome, no model call.
     if (candidates.empty())
         return NULL;
+    opts.push_back("Cast nothing right now"); //the decline goes LAST
 
     //no narration: a cast narrates itself as zone events, "nothing" is a non-action
     int pick = askModel("Casting decision: which card do you cast now, if any?", opts, false);
@@ -1473,7 +1471,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         return NULL; //no cast this tick; the answer is consumed on a later poll
     if (pick < 0) //model deferred or endpoint failed: heuristic decides
         return AIPlayerBaka::FindCardToPlay(pMana, type);
-    if (pick == 0) //"cast nothing": hold everything this window
+    if (pick == (int) candidates.size()) //"cast nothing": hold everything this window
     {
         DebugTrace("AIPlayerGPT: chose to cast nothing");
         return NULL;
@@ -1483,9 +1481,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     //aiForcedCandidate set, AIPlayerBaka::FindCardToPlay examines only this
     //card, runs the full legality/restriction/target checks, and leaves
     //gotPayments / payAlternative set for exactly this play.
-    MTGCardInstance * chosen = candidates[pick - 1];
+    MTGCardInstance * chosen = candidates[pick];
     aiForcedCandidate = chosen;
-    aiForcedAlternative = candidateUsesAlt[pick - 1];
+    aiForcedAlternative = candidateUsesAlt[pick];
     MTGCardInstance * validated = AIPlayerBaka::FindCardToPlay(pMana, "*");
     aiForcedCandidate = NULL;
     aiForcedAlternative = false;
@@ -1874,13 +1872,9 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     {
         vector<Targetable *> targets;
         vector<string> opts;
-        int stopOffset = 0;
+        //"Done" goes LAST (after the real targets): the model favors option
+        //1, and an early-listed escape biased multi-target picks short.
         bool mayStop = multi && !picks.empty() && !tc->targetMin;
-        if (mayStop)
-        {
-            opts.push_back("Done - no further targets");
-            stopOffset = 1;
-        }
 
         for (int i = 0; i < 2; i++)
         {
@@ -1910,6 +1904,8 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         }
         if (targets.empty())
             break;
+        if (mayStop)
+            opts.push_back("Done - no further targets");
 
         //Granted/inner abilities ride a nameless fake card - Liliana's "+1:
         //each player discards" chooser rendered 'Choose the target for '
@@ -1949,9 +1945,9 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 return AIPlayerBaka::chooseTarget(_tc, forceTarget, chosenCard, checkOnly);
             break;
         }
-        if (mayStop && pick == 0)
+        if (mayStop && pick == (int) targets.size())
             break;
-        picks.push_back(targets[pick - stopOffset]);
+        picks.push_back(targets[pick]);
         if (!multi)
             break;
         if (!unlimited && (int) picks.size() >= tc->maxtargets)

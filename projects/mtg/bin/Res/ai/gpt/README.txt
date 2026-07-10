@@ -44,7 +44,6 @@ endpoints.txt
                           Configs copied to another machine need the key
                           re-entered (the salt does not travel).
         thinking=0/1      Qwen-style thinking toggle (stronger, slower)
-        hints=0/1         include heuristic scores in the prompt
         maxtokens=N       completion budget override
         timeout=N         per-call HTTP timeout in seconds
 

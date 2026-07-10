@@ -33,7 +33,6 @@ GptOptionsList::GptOptionsList()
     if (cfg.urls.empty())
         cfg.urls.push_back("http://127.0.0.1:8080");
     if (cfg.thinking < 0) cfg.thinking = 0;
-    if (cfg.hints < 0) cfg.hints = 0;
     if (cfg.maxTokens < 0) cfg.maxTokens = 0;
     loadedCfg = cfg;
 
@@ -44,7 +43,6 @@ GptOptionsList::GptOptionsList()
     Add(NEW OptionGptText(&cfg.model, "Model", "(auto-detect)"));
     Add(NEW OptionGptText(&cfg.key, "API key", "(none)", true));
     Add(NEW OptionGptBool(&cfg.thinking, "Thinking mode (stronger, slower)"));
-    Add(NEW OptionGptBool(&cfg.hints, "Heuristic hints in prompt"));
     Add(NEW OptionGptNumber(&cfg.timeoutSecs, "Call timeout (seconds)", 15, 300, 15));
     Add(NEW OptionGptTest(&cfg));
     Add(NEW OptionGptConsent(&cfg.telemetry, "Contribute anonymized game data"));
@@ -78,7 +76,6 @@ void GptOptionsList::Reload()
     if (fresh.urls.empty())
         fresh.urls.push_back("http://127.0.0.1:8080");
     if (fresh.thinking < 0) fresh.thinking = 0;
-    if (fresh.hints < 0) fresh.hints = 0;
     if (fresh.maxTokens < 0) fresh.maxTokens = 0;
     cfg = fresh;
     loadedCfg = fresh;

@@ -31,7 +31,6 @@
  *      WAGIC_GPT_KEY=<key>       bearer token (OpenRouter / any keyed endpoint)
  *      WAGIC_GPT_MODEL=<id>      model id (default: first id from /v1/models)
  *      WAGIC_GPT_THINKING=1      enable thinking on local Qwen-style servers
- *      WAGIC_GPT_HINTS=1         include Baka heuristic scores in the prompt
  *      WAGIC_GPT_MAXTOKENS=<n>   completion budget override
  *
  *  Compiled only when WITH_GPT_AI is defined (Linux SDL build); on any
@@ -223,7 +222,6 @@ private:
     string mModel;
     string mApiKey;
     bool mThinking;
-    bool mShowHints;
     //from ai/gpt/endpoints.txt (the per-user copy shadows the shipped one);
     //environment variables override these
     vector<string> mConfigUrls;
