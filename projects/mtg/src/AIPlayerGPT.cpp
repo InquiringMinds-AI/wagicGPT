@@ -143,6 +143,65 @@ string cardTextSnippet(MTGCardInstance * card, size_t maxLen)
     return text;
 }
 
+//State-computed payoff magnitudes: cards like Gray Merchant carry their
+//payoff as a live expression in the auto= script ("lifeleech:
+//-type:manab:mybattlefield" = devotion to black). Static rules text
+//cannot say what that is worth NOW, so evaluate the expression on the
+//current board - with the same WParsedInt the resolution will use - and
+//put the number on the option. Only dynamic (non-numeric) amounts are
+//annotated: plain numbers are already in the rules text, "x" is
+//unknowable before announcement, and "rand" would draw from the game
+//RNG just by being rendered.
+string dynamicMagnitudes(MTGCardInstance * card)
+{
+    static const struct { const char * key; const char * label; bool absValue; } kVerbs[] = {
+        { "lifeleech:", "drains", true },
+        { "damage:", "damage", true },
+        { "life:", "life", false },
+        { "draw:", "draws", true },
+        { "prevent:", "prevents", true },
+    };
+    string text = card->magicText;
+    for (size_t i = 0; i < text.size(); i++)
+        text[i] = (char) tolower((unsigned char) text[i]);
+    std::ostringstream out;
+    std::set<string> seen;
+    int count = 0;
+    for (size_t v = 0; v < sizeof(kVerbs) / sizeof(kVerbs[0]) && count < 3; v++)
+    {
+        size_t pos = 0;
+        while (count < 3 && (pos = text.find(kVerbs[v].key, pos)) != string::npos)
+        {
+            size_t start = pos + strlen(kVerbs[v].key);
+            pos = start;
+            size_t end = text.find_first_of(" \t\r\n", start); //the parser slices amounts at whitespace too
+            string expr = text.substr(start, end == string::npos ? string::npos : end - start);
+            if (expr.empty())
+                continue;
+            bool numeric = true;
+            for (size_t k = (expr[0] == '-' || expr[0] == '+') ? 1 : 0; k < expr.size(); k++)
+                if (!isdigit((unsigned char) expr[k]))
+                {
+                    numeric = false;
+                    break;
+                }
+            if (numeric || expr == "x" || expr == "-x" || expr.find("rand") != string::npos)
+                continue;
+            if (!seen.insert(string(kVerbs[v].key) + expr).second)
+                continue;
+            WParsedInt val(expr, NULL, card);
+            int n = val.getValue();
+            if (kVerbs[v].absValue)
+                n = abs(n);
+            out << (count ? ", " : "") << kVerbs[v].label << " " << n;
+            count++;
+        }
+    }
+    if (count)
+        return " {right now: " + out.str() + "}";
+    return "";
+}
+
 //The set keyword abilities (flying, first strike, can't block...) - the
 //LIVE effective set, including granted/lost ones printed text cannot show.
 string keywordList(MTGCardInstance * card)
@@ -1012,6 +1071,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         string txt = cardTextSnippet(src, 140);
         if (!txt.empty())
             out << " {card text: \"" << txt << "\"}";
+        out << dynamicMagnitudes(src);
     }
     return out.str();
 }
@@ -1434,6 +1494,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (card->isCreature())
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << scans[s].label;
+            o << dynamicMagnitudes(card);
 
             if (normalOk || !altOk)
             {

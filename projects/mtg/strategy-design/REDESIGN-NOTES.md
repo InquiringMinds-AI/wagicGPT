@@ -36,8 +36,13 @@ non-creature targets/board lines; LIVE keyword set (granted/lost) on board lines
 declaration lines, and damage-order options; artifact counts in the state block; identical
 option lines DE-DUPED (fetch: 13 -> 1); mana single-brace fix ({{1}{u}} was a wrapper bug);
 empty pool renders "(none)"; truncated plans trimmed to the last complete sentence.
-REMAINING (needs dynamic evaluation machinery): state-computed payoff magnitudes (Gray
-Merchant "drains N now", X-spells, "for each" effects).
+MAGNITUDES SHIPPED TOO (2026-07-09, later): dynamic (non-numeric) amount expressions after
+known effect verbs (lifeleech/damage/life/draw/prevent) in the card's auto= script are
+evaluated at menu time with the engine's own WParsedInt and annotated on cast/action lines
+as "{right now: drains N}". Guards: static numbers skipped (already in rules text), "x"
+skipped (unknowable pre-announcement), "rand" skipped (rendering would draw from the game
+RNG). Live-verified: Gray Merchant's cast option tracked devotion 0 -> 3 -> 5 across a
+probe game. X-spells stay covered by the X-announcement menu.
 Original finding (kept for context):
 Option lines hide the deciding fact -> the weak model picks near-arbitrarily. FIX in `serializeGameState` / `describeAction`:
 - Target options carry the card's **effect / role tag** (threat/removal/counter/ramp/draw/land). Bare names -> arbitrary discard/removal picks (deck133: stripped a mana rock + mana dork over a card-advantage engine).
