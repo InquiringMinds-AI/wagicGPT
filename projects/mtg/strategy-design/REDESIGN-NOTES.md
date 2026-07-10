@@ -1,6 +1,12 @@
 # AI Opponent Redesign — What We Need To Solve
-Working notes, 2026-07-06. Design anchor for the DEFERRED LLM-opponent-feature work.
-(Direction as of this date: squash NON-LLM engine bugs FIRST; this doc is the LLM-opponent track, addressed after.)
+Working notes, 2026-07-06. Design anchor for the LLM-opponent-feature work.
+
+**STATUS 2026-07-09: the P0-P4 queue is SHIPPED or dispositioned** (each section carries its
+own status line). Remaining tail: sibling-cost canPay + engine-wide 601.2c (engine track),
+skip-call-when-only-pass (measure first), decision pre-fetch + the DecisionRequest->Action
+contract (the architectural end-state). NEXT: fresh hints-free selfplay corpus over the locked
+7-deck pool with the new stack -> cold-check decision quality -> wave2 guide review +
+revalidation (section at bottom).
 
 ## Core diagnosis (the unifying frame)
 `AIPlayerGPT extends AIPlayerBaka` — the LLM was **grafted** onto the heuristic AI's decision plumbing, which was built for **deterministic logic operating on internal state it never had to externalize**. There is no interface designed for a *reasoning* AI. Every "representation" finding below is a symptom of that graft, not an isolated bug.
