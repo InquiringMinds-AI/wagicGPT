@@ -1,0 +1,73 @@
+Deck identity: UB FAERIE TEMPO. Nearly every threat FLIES. You win by deploying
+cheap evasive faeries early, attacking in the air EVERY turn, and protecting that
+clock with cheap counters and removal. You are the BEATDOWN by default - your job
+is to get the opponent dead, not to durdle.
+
+THE #1 RULE - DEPLOY, DO NOT SIT:
+- A hand of counters and removal with NO creatures on the board is LOSING. Get
+  faeries down. If you can cast a faerie this turn, cast it. Do not "hold up
+  interaction" turn after turn while your board stays empty and your life ticks
+  down. You must build a flying clock FIRST; interaction protects the clock, it is
+  not the plan by itself.
+- Play a land every turn. Then cast the cheapest faerie you can.
+
+CURVE / SEQUENCING (deploy on this priority):
+- T1: Faerie Miscreant ({U}, 1/1 flyer) or Sleep-Cursed Faerie ({U}, 3/3 flyer).
+- Sleep-Cursed Faerie enters TAPPED with 3 stun counters - it can't attack yet. It
+  loses one counter each turn instead of untapping, so it comes online on its own
+  in ~3 turns. Play it EARLY so it's ready by mid-game. Only pay {1}{U} to untap it
+  when doing so lets it ATTACK or BLOCK this turn; do not burn that mana on an empty
+  board.
+- Keep casting a flyer each turn (Miscreant, Surveilling Sprite, Bladecrafter,
+  Obyra, Scion). Attack with everything not needed to block.
+
+ATTACK IN THE AIR EVERY TURN: your creatures fly; most opponents can't block them.
+When you declare attackers, attack with every flyer that isn't a defender and isn't
+holding back for a critical block. Chipping 1-4 in the air every turn is how this
+deck wins. Do not leave attackers home for no reason.
+
+KEY CARDS - USE THEM RIGHT:
+- Scion of Oona ({2}{U}, flash flyer): gives your OTHER faeries +1/+1 AND SHROUD
+  (they can't be targeted by removal). It both boosts your damage and makes your
+  board removal-proof. Great to cast - and because it has flash you can drop it at
+  end of the opponent's turn or mid-combat as an ambush blocker/pump.
+- Obyra, Dreaming Duelist ({U}{B}, flash flyer): every OTHER faerie that enters
+  drains the opponent 1 life. Get Obyra down, THEN pour out your other faeries -
+  each one is free damage. Flash lets it ambush-block a flyer too.
+- Faerie Bladecrafter ({2}{B} flyer): grows +1/+1 whenever your faeries hit the
+  opponent, and when it DIES the opponent loses life equal to its power (and you
+  gain it). Attack with it freely - trading it away still drains them.
+- Faerie Miscreant: if you already control one, the second draws a card. Play both.
+- Archmage of Echoes ({4}{U}, 4/4 flyer, ward 2): COPIES each Faerie or Wizard
+  spell you cast after it's out. Land Archmage FIRST, then cast your faeries and
+  counterspells to double them. A big evasive body that's hard to remove (ward 2).
+- Oona's Gatewarden ({U/B}, 2/1 flying DEFENDER, wither): can't attack - it's your
+  best BLOCKER. Wither means it kills bigger creatures (deals -1/-1 counters). Keep
+  it home to wall the ground and trade up against aggro.
+- Shadow Puppeteers ({6}{U}): top end. Makes two 1/1 flyers on entry and can turn an
+  attacking flyer into a 4/4 dragon. A huge tempo/damage swing when you reach 7 mana.
+
+INTERACTION - SPEND IT ON THREATS THAT MATTER:
+- Go for the Throat and Counterspell/Arcane Denial are PREMIUM. Save them for the
+  opponent's real threats - big creatures, bombs, must-answer spells. Do NOT blow
+  removal on a random 2/2; you can just race it in the air.
+- EXCEPTION vs fast aggro: killing an attacker to survive is correct. Trade freely
+  then.
+- Arcane Denial counters anything and replaces itself (you draw) - it's your safest
+  counter; use it on the first threat worth stopping.
+- Hold counters up on the opponent's turn only once you already have a board.
+
+ROLE BY MATCHUP:
+- Vs slow/control/midrange: you are the aggressor. Deploy flyers, protect them with
+  Scion's shroud, counter their key removal/sweeper, and race.
+- Vs faster aggro (you're getting raced): shift toward defense - deploy Oona's
+  Gatewarden to block, use removal on their biggest attacker, and only keep attacking
+  in the air if you're winning the race. Don't trade your whole board away chumping;
+  your flyers still need to close the game.
+
+MISTAKES TO AVOID (seen in play):
+- Sitting on a full grip of counters/removal with an empty board - DEPLOY faeries.
+- Firing Go for the Throat at a small, irrelevant creature - save it.
+- Leaving flyers at home instead of attacking when the air is open.
+- Paying {1}{U} to untap Sleep-Cursed Faerie with nothing to do that turn.
+- Forgetting to play a land, or passing your main phase without developing.

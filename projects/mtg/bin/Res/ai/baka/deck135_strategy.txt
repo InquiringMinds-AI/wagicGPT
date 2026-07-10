@@ -1,0 +1,111 @@
+Deck identity: "Modern Snow" is a base-GREEN tempo-value deck splashing blue and
+white. It wins by deploying cheap, efficient snow creatures that REPLACE THEMSELVES
+with cards (Ice-Fang Coatl, Ohran Viper), grinding the opponent out on card
+advantage, and closing with Abominable Treefolk. You are PROACTIVE: develop your
+board and attack. This is NOT a durdle deck - do something almost every turn.
+
+=======================================================================
+RULE #1 - CRACK YOUR FETCHLANDS. THIS IS THE MOST IMPORTANT LINE.
+=======================================================================
+Prismatic Vista, Flooded Strand, Misty Rainforest, and Windswept Heath are
+FETCHLANDS. They produce NO MANA on their own. They are useless until you
+SACRIFICE them to fetch a real land.
+- The turn you play a fetchland, IMMEDIATELY choose the action that reads
+  "search basic land ..." or "Put in Play with <fetchland> targeting
+  Snow-Covered ___". Its cost line says [cost: Life, Tap, Sacrifice] - paying
+  that life and sacrificing the fetch is THE ENTIRE POINT. Always do it.
+- NEVER pass (0) while you have an uncracked fetchland and an empty mana pool.
+  A fetch left on the battlefield is a wasted land drop and leaves you unable
+  to cast anything. Leaving fetches uncracked is the single biggest way this
+  deck loses - it screws yourself out of all your mana.
+- What to fetch: Snow-Covered FOREST by default (you need green mana most).
+  Fetch Snow-Covered ISLAND when you need blue (for Ice-Fang Coatl, Search for
+  Azcanta, or especially Force of Negation which needs {U}{U}). You rarely need
+  Snow-Covered Plains. Every snow basic you fetch also grows your snow count,
+  which powers the whole deck (see below).
+
+=======================================================================
+DEVELOP EVERY TURN - do not pass with mana and castable cards.
+=======================================================================
+Each of your turns: play a land (crack fetches), then SPEND YOUR MANA - cast a
+creature, cast Arcum's Astrolabe, or fire a card-draw spell. Only choose "Cast
+nothing / pass" when you are deliberately holding mana up for Force of Negation
+or to flash in Ice-Fang Coatl on the opponent's turn. Sitting with untapped
+lands and spells in hand is a misplay unless you are bluffing interaction.
+
+SNOW IS THE ENGINE. The more snow permanents you control (snow lands, Arcum's
+Astrolabe, snow creatures), the better everything gets:
+- Abominable Treefolk's power/toughness = your snow permanent count.
+- Ice-Fang Coatl gains deathtouch with 3+ OTHER snow permanents.
+- Scrying Sheets and Glacial Revelation reward snow.
+So fetch snow basics, ramp with Into the North (fetches a snow land), and cast
+Arcum's Astrolabe on sight.
+
+=======================================================================
+KEY CARDS (roughly in order of how often they decide the game):
+=======================================================================
+- ARCUM'S ASTROLABE {1}: Cast it on sight, every copy. It draws a card when it
+  enters (so it's FREE - it replaces itself), taps for any color to fix your
+  mana, and counts as a snow permanent. There is almost never a reason to hold it.
+- ICE-FANG COATL {G}{U}: 1/1 flyer with FLASH that draws a card on entry. Prefer
+  to cast it at the END of the opponent's turn (flash) so you keep mana up for
+  Force of Negation and get information first. Cast it on your own turn only if
+  you need the blocker/attacker right now. With 3+ other snow permanents it has
+  deathtouch - then it blocks and kills anything.
+- OHRAN VIPER {1}{G}{G}: your value engine and a wall no one wants to touch. When
+  it deals combat damage to a PLAYER you draw a card; when it damages a CREATURE
+  that creature is destroyed. So opponents hate blocking it and hate being hit by
+  it. Attack with it for cards; block bigger creatures with it to kill them. Do
+  not trade it away cheaply.
+- ABOMINABLE TREEFOLK {2}{G}{U}: your finisher and stabilizer. It's a trampler
+  whose size equals your snow count (usually 5-8). When it enters it TAPS and
+  FREEZES an opponent's creature (that creature won't untap next turn) - use this
+  to tap their best blocker before you swing, or their best attacker when you're
+  defending. Cast it once you have a healthy pile of snow permanents.
+- INTO THE NORTH {1}{G}: ramp + fixing. Fetches a snow land onto the battlefield.
+  Cast it early to accelerate a turn ahead and grow your snow count.
+- GLACIAL REVELATION {2}{G} / SEARCH FOR AZCANTA {1}{U} / SCRYING SHEETS: card
+  advantage. Use them to refuel and out-grind the opponent. (Glacial Revelation
+  only keeps SNOW cards from what it reveals.)
+- BOREAL DRUID {G}: turn-1 mana dork. Play it early to ramp.
+- ICEHIDE GOLEM {1}: cheap 2/2 snow body. Play it to apply early pressure and add
+  to your snow count.
+- DIAMOND FAERIE {2}{G}{W}{U}: 3/3 flyer that can pump ALL your snow creatures
+  +1/+1 (repeatable, needs mana). Use its pump to win a combat or push a lethal
+  alpha strike.
+- FORCE OF NEGATION {1}{U}{U}: counters NONCREATURE spells only. On the OPPONENT'S
+  turn you can cast it for free by exiling a blue card from hand. Hold it for
+  their most dangerous noncreature spell - a board wipe, removal aimed at your
+  key creature, burn to your face when you're low, or a planeswalker. Countering
+  a burn spell or a forced-sacrifice spell is fine; just remember the free mode
+  costs you the Force AND a blue card, so don't spend it on something trivial.
+- GELID SHACKLES {W}: cheap aura. Put it on a key blocker to push your damage
+  through, or on a key attacker to neuter it.
+
+=======================================================================
+ROLE - who is the beatdown:
+=======================================================================
+- DEFAULT you are the proactive value deck: deploy threats, attack, draw cards,
+  and win with better cards over time.
+- VS AGGRO (mono-red, fast small creatures): shift to defense. Ohran Viper and a
+  deathtouch Ice-Fang Coatl are premium blockers - use them to trade UP. Hold
+  Force of Negation for their burn. Stabilize behind Abominable Treefolk, keep
+  your card engines running, and protect your life total. Don't tap out your
+  blockers into a swing-back.
+- VS CONTROL / slow decks: be the aggressor. Land threats, protect them with
+  Force of Negation, and never stop drawing cards.
+
+COMBAT: your flyers (Ice-Fang Coatl, Diamond Faerie) and Ohran Viper want to
+attack for value - swing when it's safe and profitable. Before attacking, check
+the opponent's untapped mana for a trick. When blocking, use deathtouch/Viper to
+kill bigger creatures; take the damage when your creature is worth more alive.
+
+=======================================================================
+MISTAKES TO AVOID (observed in real games with this deck):
+=======================================================================
+- DO NOT leave a fetchland uncracked. Crack it the turn you play it. (This lost
+  whole games - fetches sat unused and the deck made no mana and cast nothing.)
+- DO NOT pass your turn with open mana and castable spells in hand. Develop.
+- DO NOT hold Arcum's Astrolabe - it's a free card, cast it.
+- DO NOT dump Ice-Fang Coatl on your own main phase if you can flash it at the
+  end of the opponent's turn instead (unless you need the body immediately).

@@ -1,0 +1,93 @@
+Deck identity: "Wipe Them Out" is an RBW CONTROL deck. It has almost no
+creatures. You survive with SWEEPERS, grind card advantage, then win with a
+few unstoppable finishers. You are ALWAYS the control player early and mid:
+never race, kill their creatures, protect your life total, and win slowly.
+
+THE #1 RULE (this is where the deck loses): ACT. DO NOT just play a land and
+pass every turn. This deck carries 14 board wipes (4 Pyroclasm, 4 Wrath of
+God, 4 Damnation, 2 Black Sun's Zenith) - you cannot run out. Holding them
+in hand while the opponent builds a board is the losing line. When the
+opponent has creatures that can hurt you, FIRE A SWEEPER. When the board is
+clear and you are stable, DEPLOY an engine or a finisher. Passing with a hand
+full of answers and threats is the main mistake to avoid.
+
+WHICH SWEEPER TO CAST (match it to the board):
+- Opponent has ONE creature (of any size): cast Cruel Edict ({1}{B}) - they
+  sacrifice it. Cheapest answer. Best against a single big or hard-to-kill
+  threat. Do NOT Edict into a board of many creatures (they sac their worst).
+- Opponent has 2+ creatures, all with toughness 2 or less (tokens, 1/1s,
+  2/1s, 2/2s): cast Pyroclasm ({1}{R}) - 2 damage to all. Your cheapest mass
+  sweep. Pyroclasm does NOTHING to toughness-3+ creatures - do not waste it
+  on a big creature.
+- Opponent has 2+ creatures and any of them has toughness 3+: cast Wrath of
+  God or Damnation - destroys ALL creatures. This is the real board wipe.
+- Board too big/resilient for the above, or creatures with protection or
+  indestructible: cast Black Sun's Zenith ({X}{B}{B}) for X = the largest
+  toughness on board. It puts -1/-1 counters on every creature (kills through
+  protection and indestructible), and it SHUFFLES BACK INTO YOUR LIBRARY -
+  you will draw it again, so spend it freely.
+- NEVER chain two sweepers on one board. One correct sweeper clears it. If
+  Pyroclasm won't kill everything, skip it and use Wrath/Damnation instead.
+
+WHEN TO SWEEP: cast a sweeper as soon as the opponent's board can kill you in
+about two turns, OR whenever they commit 2+ creatures. You have redundant
+sweepers, so sweep PROACTIVELY - do not wait for a perfect blowout. It is
+fine to wipe two creatures with one card because you have more wipes coming.
+Cast sweepers in your own main phase (they are sorceries).
+
+HOW YOU WIN (you MUST do this - the deck has no other clock):
+- Staff of Nin ({6}): DEPLOY IT the moment you are stable and can afford it.
+  It draws you an extra card EVERY upkeep (this is how you out-grind them) and
+  pings 1 damage to any target each turn - that ping kills 1-toughness tokens
+  (Signal Pest, Ornithopter, Goblins, Elemental tokens) and slowly burns the
+  opponent's life. This is your engine. Never leave it in hand once the board
+  is clear.
+- Rakdos's Return ({X}{B}{R}): deals X damage to the opponent AND makes them
+  discard X. Cast it for the BIGGEST X your lands allow. Mid-game it strips
+  their hand; late it is a finisher to the face. A big Rakdos's Return often
+  ends the game.
+- Blightsteel Colossus ({12}): your fastest kill. It is an 11/11 with
+  trample, INFECT, and indestructible, and it reshuffles instead of dying -
+  nothing removes it. One unblocked swing deals 11 infect = 10 poison = the
+  opponent is DEAD. It auto-attacks once in play, so your only job is to CAST
+  it. Cast it once you reach 12 mana and are stable; it closes any game.
+- Venser's Journal ({5}): gain life for each card in hand at upkeep + no max
+  hand size. Good against aggro to buy time once you are stable. Lower
+  priority than Staff of Nin.
+- Elixir of Immortality ({2},{T}): gain 5 life and shuffle your graveyard
+  back into your library. Use it LATE to buy back spent sweepers/finishers or
+  when running low on cards. It is not an early play - do not cast it turn 1
+  just because it is cheap.
+- Lightmine Field ({2}{W}{W}): when creatures attack, each attacker takes
+  damage equal to the number of attackers. Deploy it against go-wide token or
+  weenie decks - it makes their alpha strike suicidal. Near-free for you since
+  you have almost no creatures.
+
+MATCHUP ROLE:
+- Vs aggro / go-wide (tokens, weenies): you are the control deck hard. Sweep
+  early and often (Pyroclasm, Lightmine Field), stabilize your life, then
+  grind with Staff of Nin. Do not hoard - their pressure is why you sweep now.
+- Vs a big-creature / artifact deck (e.g. affinity with Cranial Plating,
+  Etched Champion): use Cruel Edict and Black Sun's Zenith on the key threat,
+  Wrath/Damnation to clear multiples. Watch for one creature suddenly getting
+  huge (equipment/pump) - kill the carrier with Edict or shrink it with BSZ
+  BEFORE it connects. This is the deck that punishes durdling fastest.
+- Vs another slow/control deck: card advantage and recursion (Staff draws,
+  BSZ reshuffle, Elixir recycle) mean you win the long game - but you still
+  have to DEPLOY a finisher (Staff, then Rakdos's Return or Blightsteel) to
+  actually close. A stalled board at equal life is a game you are supposed to
+  win, so make a threat.
+
+SEQUENCING:
+- Play a land EVERY turn.
+- Hold your sweeper until their turn is not needed - sweepers are sorceries,
+  cast them on your main phase; just do not skip casting them.
+- Once the board is clear and safe, spend your mana each turn on an engine
+  (Staff of Nin) or a finisher. Do not sit with an open hand doing nothing.
+
+DO NOT: pass your whole turn with sweepers and threats in hand; hold all 14
+sweepers "for later" while the opponent develops; cast Pyroclasm into a
+toughness-3+ creature; chain two sweepers on one board; Cruel Edict into a
+wide board; leave Staff of Nin, Rakdos's Return, or Blightsteel Colossus
+rotting in hand when you can afford them; durdle a 20-20 game forever instead
+of deploying a finisher.
