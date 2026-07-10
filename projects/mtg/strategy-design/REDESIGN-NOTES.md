@@ -98,7 +98,15 @@ Original list (kept for context):
 - **Skip the model call when only "pass" is legal** (wasted inference; games are inference-bound; deck135/109).
 - **Normalize inconsistent verbs** for the same action (fetch: "search basic land" vs "Put in Play"; deck135).
 
-## Pacing principle for GUI/UX work  [user directive, 2026-07-09]
+## Pacing principle for GUI/UX work  [user directive, 2026-07-09 — AUDITED same day]
+AUDIT RESULT: the act throttle is timer=0.1s (0.07 fast mode) per decision cycle, so the
+throttle-then-ask serialization costs <=0.1s against multi-second inference - negligible,
+and the engine warns going lower skips phases. The async worker already runs rendering/
+animation CONCURRENT with the in-flight request ("opponent is thinking..."), which is the
+directive's core shape. No throttle surgery warranted. The REAL future lever is decision
+PRE-FETCH - fire the ask for a decision that is already knowable before the engine's tick
+reaches the AI (e.g. during the player's action resolution or transition animations) -
+which belongs with the DecisionRequest contract work (P3 end-state).
 The engine paces itself with real-time padding (the AI act throttle in
 `AIPlayerBaka::Act` — max ~14 actions/sec — plus animations and transitions).
 When the opponent is a model, every padding must work to **hide inference
