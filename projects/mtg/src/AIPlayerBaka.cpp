@@ -1,6 +1,7 @@
 #include "PrecompiledHeader.h"
 
 #include "AIPlayerBaka.h"
+#include "DecisionContract.h"
 #include "ManaEngine.h"
 #include "CardDescriptor.h"
 #include "AIStats.h"
@@ -3516,7 +3517,48 @@ int AIPlayerBaka::computeActions()
                         gotPayments.clear();
                     }
                 } else {
-                    if(payTheManaCost(nextCardToPlay->getManaCost(),nextCardToPlay->has(Constants::ANYTYPEOFMANA),nextCardToPlay,gotPayments))
+                    //c5a: plain casts (hand zone, normal cost, no extra
+                    //costs/X/kicker) are validated and payment-planned by
+                    //the contract manager; the clicks stay on the AI
+                    //clickstream's one-per-tick cadence (see the
+                    //planCastSpell header note on the ability-GC latent
+                    //double-destroy). Everything else (and any cast the
+                    //manager declines) keeps the legacy path below.
+                    bool committed = false;
+                    {
+                        BakaManaPolicy castPolicy(this);
+                        ManaCost * castMana = getPotentialMana(nextCardToPlay);
+                        DecisionRequest castReq;
+                        if (castMana)
+                            castMana->add(this->getManaPool());
+                        if (castMana && DecisionManager::buildCastSpell(this, castPolicy, castMana, false, castReq))
+                        {
+                            DecisionAction castAct;
+                            for (size_t ci = 0; ci < castReq.casts.size(); ci++)
+                                if (castReq.casts[ci].card == nextCardToPlay && !castReq.casts[ci].viaAlternative)
+                                {
+                                    castAct.choice = (int) ci;
+                                    vector<MTGAbility*> castProducers;
+                                    if (DecisionManager::planCastSpell(castReq, castAct, castPolicy, castProducers))
+                                    {
+                                        for (size_t pk = 0; pk < castProducers.size(); pk++)
+                                        {
+                                            if (AManaProducer * amp = dynamic_cast<AManaProducer*>(castProducers[pk]))
+                                                clickstream.push(NEW AIAction(this, amp, amp->source));
+                                            else if (GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(castProducers[pk]))
+                                                clickstream.push(NEW AIAction(this, gmp, gmp->source));
+                                        }
+                                        clickstream.push(NEW AIAction(this, nextCardToPlay));
+                                        committed = true;
+                                    }
+                                    break;
+                                }
+                        }
+                        delete castMana;
+                        if (committed)
+                            gotPayments.clear();
+                    }
+                    if(!committed && payTheManaCost(nextCardToPlay->getManaCost(),nextCardToPlay->has(Constants::ANYTYPEOFMANA),nextCardToPlay,gotPayments))
                     {
                         AIAction * a = NEW AIAction(this, nextCardToPlay);
                         clickstream.push(a);

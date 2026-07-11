@@ -141,6 +141,24 @@ public:
     //(Baka-as-policy), when payment planning rides ManaEngine end to end.
     static bool buildCastSpell(Player * p, ManaEngine::ManaPolicy & policy, ManaCost * pMana,
                                bool instantSpeedOnly, DecisionRequest & req);
+
+    //c5a: validate and plan the commit of a chosen cast (act.choice indexes
+    //req.casts) for the PLAIN case only - hand zone, normal cost, no extra
+    //costs / X / kicker. Re-validates against a fresh build (the same
+    //card+variant must still be offered) and plans payment via ManaEngine
+    //with the caller's policy. Fills `producers` with the producer
+    //abilities to activate, in order, before clicking the card. Returns
+    //false when the cast is outside the plain case or no longer legal -
+    //the caller keeps its legacy commit path for those.
+    //DELIBERATELY NO CLICKS HERE: the engine's ability-GC sweep has a
+    //latent double-destroy (ALord::removed -> removeObserver cascade,
+    //SIGSEGV observed 2026-07-11) that a synchronous click burst can
+    //trigger by changing which abilities co-die in one ActionLayer::Update
+    //sweep. Cast commits must keep the AI clickstream's one-click-per-tick
+    //cadence until that GC bug is fixed; the consumer enqueues the clicks.
+    static bool planCastSpell(const DecisionRequest & req, const DecisionAction & act,
+                              ManaEngine::ManaPolicy & policy,
+                              std::vector<MTGAbility*> & producers);
 };
 
 #endif

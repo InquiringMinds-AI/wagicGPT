@@ -264,6 +264,18 @@ suite-green:
 
 ## 4. Risks / open questions
 
+- **Latent ability-GC double-destroy (observed 2026-07-11, SIGSEGV core
+  on file):** `ActionLayer::Update`'s garbage sweep can recurse -
+  `ListMaintainerAbility::destroy -> ALord::removed -> removeObserver ->
+  moveToGarbage -> ATransformer::destroy` - and crash when a lord and its
+  transformer co-die in one sweep. Exposed by c5a's first (synchronous
+  click burst) shape; nondeterministic. The AI clickstream's
+  one-click-per-tick cadence keeps it dormant, which is why planCastSpell
+  deliberately returns a plan instead of clicking. A future human-facing
+  synchronous applier (or any batching of zone-changing clicks) needs this
+  fixed first: the sweep must defer nested removeFromGame calls the way
+  removeMenu defers menu destruction.
+
 - `nextGamePhase` recursion + `PhaseRing` are old and central; the suite
   (1002+4) plus probe decks are the safety net. Expect test fixtures that
   encode current phase semantics to need review rather than blind preservation.

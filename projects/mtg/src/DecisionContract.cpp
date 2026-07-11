@@ -350,3 +350,55 @@ bool DecisionManager::buildCastSpell(Player * p, ManaEngine::ManaPolicy & policy
     req.casts = LegalActionsOracle::legalCasts(p, policy, pMana, instantSpeedOnly);
     return !req.casts.empty();
 }
+
+bool DecisionManager::planCastSpell(const DecisionRequest & req, const DecisionAction & act,
+                                    ManaEngine::ManaPolicy & policy,
+                                    std::vector<MTGAbility*> & producers)
+{
+    producers.clear();
+    if (act.choice < 0 || act.choice >= (int) req.casts.size())
+        return false;
+    const LegalActionsOracle::Cast & pick = req.casts[act.choice];
+    MTGCardInstance * card = pick.card;
+    Player * p = req.player;
+
+    //c5a plain-case fences: hand zone, normal cost, no extra costs / X /
+    //kicker. Everything else keeps the caller's legacy commit path (the
+    //fences retreat with c5b/c5c as those decisions join the contract).
+    if (pick.viaAlternative || !pick.zoneLabel.empty())
+        return false;
+    if (!p->game->hand->hasCard(card))
+        return false;
+    ManaCost * cost = card->getManaCost();
+    if (!cost || cost->extraCosts || cost->hasX() || cost->getKicker())
+        return false;
+
+    //staleness gate: the same card+variant must still be a legal cast
+    ManaCost * pMana = ManaEngine::potentialMana(p, policy, card);
+    if (!pMana)
+        return false;
+    pMana->add(p->getManaPool());
+    DecisionRequest live;
+    bool offered = false;
+    if (buildCastSpell(p, policy, pMana, false, live))
+        for (size_t i = 0; !offered && i < live.casts.size(); i++)
+            offered = live.casts[i].card == card && !live.casts[i].viaAlternative;
+    delete pMana;
+    if (!offered)
+        return false;
+
+    int anytype = card->has(Constants::ANYTYPEOFMANA);
+    if (!p->getManaPool()->canAfford(cost, anytype))
+    {
+        std::vector<MTGAbility*> plan = ManaEngine::planPayment(p, policy, card, cost, anytype);
+        if (plan.empty())
+            return false;
+        //validate the whole plan - a partial payment would float mana for
+        //nothing (only producer shapes the click layer knows how to drive)
+        for (size_t k = 0; k < plan.size(); k++)
+            if (!dynamic_cast<AManaProducer*>(plan[k]) && !dynamic_cast<GenericActivatedAbility*>(plan[k]))
+                return false;
+        producers = plan;
+    }
+    return true;
+}
