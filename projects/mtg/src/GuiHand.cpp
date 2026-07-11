@@ -6,6 +6,7 @@
 #include "Trash.h"
 #include "GuiHand.h"
 #include "OptionItem.h"
+#include "ActionLayer.h"
 #ifdef WITH_GPT_AI
 #include "GptConfig.h"
 #endif
@@ -104,7 +105,7 @@ void GuiHandOpponent::Render()
 }
 
 GuiHandSelf::GuiHandSelf(GameObserver* observer, MTGHand* hand) :
-    GuiHand(observer, hand), state(Closed), backpos(ClosedX, SCREEN_HEIGHT - 250, 1.0, 0, 255)
+    GuiHand(observer, hand), state(Closed), backpos(ClosedX, SCREEN_HEIGHT - 250, 1.0, 0, 255), mCastableRefresh(0)
 {
     limitor = NEW HandLimitor(this);
     if (OptionHandDirection::HORIZONTAL == options[Options::HANDDIRECTION].number)
@@ -224,6 +225,22 @@ void GuiHandSelf::Update(float dt)
 {
     backpos.Update(dt);
     GuiHand::Update(dt);
+
+    //Castability display: refresh which hand cards the engine would react
+    //to right now. The rules layer's isReactingToClick is the same check a
+    //real click goes through, so the display can never lie.
+    mCastableRefresh -= dt;
+    if (mCastableRefresh <= 0)
+    {
+        mCastableRefresh = 0.25f;
+        mCastable.clear();
+        for (vector<CardView*>::iterator it = cards.begin(); it != cards.end(); ++it)
+        {
+            MTGCardInstance * c = (*it)->card;
+            if (c)
+                mCastable[c] = observer->mLayers->actionLayer()->isReactingToClick(c) != 0;
+        }
+    }
 }
 
 void GuiHandSelf::Render()
@@ -248,7 +265,18 @@ void GuiHandSelf::Render()
     backpos.Render(back.get());
     if (OptionClosedHand::VISIBLE == options[Options::CLOSEDHAND].number || state == Open)
         for (vector<CardView*>::iterator it = cards.begin(); it != cards.end(); ++it)
+        {
+            //Uncastable cards render dimmed. The cap is applied only for
+            //this draw call (alpha restored after) so animations and the
+            //open/close events keep owning the real value.
+            MTGCardInstance * c = (*it)->card;
+            std::map<MTGCardInstance*, bool>::iterator known = mCastable.find(c);
+            float saved = (*it)->alpha;
+            if (known != mCastable.end() && !known->second && saved > 140)
+                (*it)->alpha = 140;
             (*it)->Render();
+            (*it)->alpha = saved;
+        }
 }
 
 float GuiHandSelf::LeftBoundary()

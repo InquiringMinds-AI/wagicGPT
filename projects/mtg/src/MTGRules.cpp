@@ -2,6 +2,7 @@
 
 #include "CardSelector.h"
 #include "MTGRules.h"
+#include "ManaEngine.h"
 #include "Translate.h"
 #include "Subtypes.h"
 #include "Credits.h"
@@ -384,6 +385,21 @@ int MTGPutInPlayRule::isReactingToClick(MTGCardInstance * card, ManaCost *)
             }
             return 1;//play if you can afford too.
         }
+        //Auto-tap (non-AI players): the card is castable when the pool PLUS
+        //free untapped producers can cover it - the actual taps happen in
+        //reactToClick. AI players keep exact legacy semantics (their payment
+        //plans pre-fill the pool before the click). Known limitation: the
+        //sunburst pool-color adjustment above only runs on the manual path.
+        if (!player->isAI())
+        {
+            ManaEngine::FreeProducerPolicy freePolicy;
+            ManaCost * potential = ManaEngine::potentialMana(player, freePolicy, card);
+            potential->add(playerMana);
+            bool affordable = potential->canAfford(cost, card->has(Constants::ANYTYPEOFMANA)) != 0;
+            delete potential;
+            if (affordable)
+                return 1;
+        }
     }
     return 0;//dont play if you cant afford it.
 }
@@ -393,6 +409,24 @@ int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
     if (!isReactingToClick(card))
         return 0;
     Player * player = game->currentlyActing();
+    //Auto-tap for non-AI players: fill the pool from free untapped producers
+    //before the payment machinery runs. Pool mana is consumed first, the plan
+    //only covers the remainder, and tapping stops the moment the pool covers
+    //the cost. Known limitation: X costs stop at the base cost - tap extra
+    //lands manually for a bigger X (the decision-contract rework owns this).
+    if (!player->isAI() && card->getManaCost()
+        && !player->getManaPool()->canAfford(card->getManaCost(), card->has(Constants::ANYTYPEOFMANA)))
+    {
+        ManaEngine::FreeProducerPolicy freePolicy;
+        vector<MTGAbility*> autoTapPlan = ManaEngine::planPayment(player, freePolicy, card,
+            card->getManaCost(), card->has(Constants::ANYTYPEOFMANA));
+        for (size_t tap = 0; tap < autoTapPlan.size(); tap++)
+        {
+            if (player->getManaPool()->canAfford(card->getManaCost(), card->has(Constants::ANYTYPEOFMANA)))
+                break;
+            game->cardClick(autoTapPlan[tap]->source, autoTapPlan[tap]);
+        }
+    }
     ManaCost * cost = card->getManaCost();
     ManaCost * playerMana = player->getManaPool();
     ///////announce X cost///////
