@@ -102,6 +102,11 @@ public:
     void serumMulligan();
     bool hasPossibleAttackers();
     bool noPossibleAttackers();
+    //Engine game-over hook, called once the duel's outcome is decided
+    //(GameStateDuel's didWin transition). Idempotent by contract - the
+    //transition frame can repeat. Base: nothing; AIPlayerGPT closes its
+    //decision translog with a "gameend" record.
+    virtual void gameEnded() {}
     bool DeadLifeState(bool check = false);
     ManaCost * doesntEmpty;
     ManaCost * poolDoesntEmpty;

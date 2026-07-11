@@ -5,6 +5,7 @@
 #include "AIPlayerGPT.h"
 #include "LegalActions.h"
 #include "DecisionContract.h"
+#include <chrono>
 #include "GptConfig.h"
 #include "GameObserver.h"
 #include "MTGDefinitions.h"
@@ -405,6 +406,7 @@ struct AIPlayerGPT::AsyncState
     int status;      //0 idle, 1 in flight, 2 done (answer not yet consumed)
     string prompt;   //the userMsg the in-flight/done request was built for
     string response; //raw HTTP body once status == 2
+    std::chrono::steady_clock::time_point started; //request launch time
     AsyncState() : status(0) {}
 };
 
@@ -425,6 +427,8 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             if (mAsyncState->prompt == userMsg)
             {
                 string body = mAsyncState->response;
+                mLastLatencyMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - mAsyncState->started).count();
                 mAsyncState->status = 0;
                 mAsyncState->response.clear();
                 content.clear();
@@ -461,6 +465,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         state->status = 1;
         state->prompt = userMsg;
         state->response.clear();
+        state->started = std::chrono::steady_clock::now();
     }
     long timeoutMs = mTimeoutMs;
     std::thread([state, url, requestBody, key, timeoutMs]() {
@@ -473,7 +478,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mTransSeq(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -535,7 +540,8 @@ void AIPlayerGPT::setNotice(const string& text, float seconds)
     mNoticeTicks = (int) (seconds * 60); //decremented per rendered frame
 }
 
-void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount)
+void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
+                                const string& chosenText, const char * fallback)
 {
     if (mTransLogPath.empty())
         return;
@@ -547,6 +553,45 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         {"reply", reply},
         {"choice", choice},
         {"options", optionCount},
+        {"turn", observer->turn},
+        {"phase", observer->getCurrentGamePhaseName()},
+        {"my_life", life},
+        {"opp_life", opponent() ? opponent()->life : 0},
+        {"latency_ms", mLastLatencyMs},
+    };
+    mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
+    if (!chosenText.empty())
+        rec["chosen_text"] = chosenText;
+    if (fallback)
+        rec["fallback"] = fallback;
+    std::ofstream f(mTransLogPath.c_str(), std::ios::app);
+    if (f)
+        f << rec.dump() << "\n";
+}
+
+void AIPlayerGPT::gameEnded()
+{
+    logGameEnd();
+}
+
+void AIPlayerGPT::logGameEnd()
+{
+    //Idempotent: the game-over transition frame can repeat before the state
+    //machine moves on, and only ONE gameend record may close the file.
+    if (mGameEndLogged || mTransLogPath.empty())
+        return;
+    mGameEndLogged = true;
+    bool iWon = observer->didWin(this);
+    bool oppWon = opponent() ? observer->didWin(opponent()) : false;
+    json rec = {
+        {"seq", mTransSeq++},
+        {"kind", "gameend"},
+        {"model", mModel},
+        {"won", iWon},
+        {"draw", !iWon && !oppWon},
+        {"turn", observer->turn},
+        {"my_life", life},
+        {"opp_life", opponent() ? opponent()->life : 0},
     };
     std::ofstream f(mTransLogPath.c_str(), std::ios::app);
     if (f)
@@ -1273,7 +1318,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
 
         mLastAskKey = askKey;
         mLastChoice = choice;
-        writeTransLog("priority", userMsg, content, choice, index);
+        {
+            const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : "unparsed_reply");
+            string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
+                          : (choice == 0 ? string("pass") : string());
+            writeTransLog("priority", userMsg, content, choice, index, chosen, fb);
+        }
         DebugTrace("AIPlayerGPT: model chose " << choice << " of " << index);
     }
 
@@ -1353,7 +1403,12 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
         narrateDecision(decision.substr(0, decision.find('\n')) + " -> " + options[choice - 1]);
 
     mAskCache[askKey] = choice;
-    writeTransLog("ask", userMsg, content, choice, (int) options.size());
+    {
+        bool valid = choice >= 1 && choice <= (int) options.size();
+        const char * fb = valid ? NULL : (content.empty() ? "empty_reply" : "unparsed_reply");
+        writeTransLog("ask", userMsg, content, choice, (int) options.size(),
+                      valid ? options[choice - 1] : string(), fb);
+    }
     DebugTrace("AIPlayerGPT: " << decision << " -> chose " << choice << " of " << options.size());
 
     return (choice >= 1) ? choice - 1 : -1; //0 or parse-fail: defer to caller
@@ -2063,11 +2118,12 @@ int AIPlayerGPT::chooseAttackers()
     string decisionPart = consumePlan(content);
     vector<bool> send;
     int result = content.empty() ? -1 : parseAttackerSet(decisionPart, attackers.size(), send);
-    writeTransLog("attackers", userMsg, content, result, (int) attackers.size());
 
     if (result < 0)
     {
         //Unusable reply: the heuristic declares this turn's attack instead.
+        writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
+                      "", content.empty() ? "empty_reply" : "unparsed_reply");
         setNotice("model reply failed - the heuristic attacks", 5.0f);
         mAttacksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseAttackers();
@@ -2092,6 +2148,8 @@ int AIPlayerGPT::chooseAttackers()
         declared += (declared.empty() ? "" : ", ") + attackers[j]->name;
     }
     DecisionManager::applyDeclareAttackers(req, act);
+    writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
+                  declared.empty() ? string("no attackers") : declared, NULL);
     narrateDecision(declared.empty() ? string("You declared no attackers this turn")
                                      : ("You declared attackers: " + declared));
     mAttacksDoneTurn = observer->turn;
@@ -2211,11 +2269,12 @@ int AIPlayerGPT::chooseBlockers()
     string decisionPart = consumePlan(content);
     vector<int> pick;
     int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick);
-    writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size());
 
     if (pairs == 0)
     {
         //Unusable reply: the heuristic declares this combat instead.
+        writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
+                      "", content.empty() ? "empty_reply" : "unparsed_reply");
         setNotice("model reply failed - the heuristic blocks", 5.0f);
         mBlocksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseBlockers();
@@ -2236,6 +2295,8 @@ int AIPlayerGPT::chooseBlockers()
         declared += (declared.empty() ? "" : "; ") + blockers[i]->name + " blocks " + chosen->name;
     }
     DecisionManager::applyDeclareBlockers(req, act);
+    writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
+                  declared.empty() ? string("no blockers") : declared, NULL);
     narrateDecision(declared.empty() ? string("You declared no blockers")
                                      : ("You declared blockers: " + declared));
     mBlocksDoneTurn = observer->turn;

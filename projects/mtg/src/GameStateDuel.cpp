@@ -854,6 +854,12 @@ void GameStateDuel::Update(float dt)
 
         if (game->didWin())
         {
+            //The outcome is decided: give each player its game-over hook
+            //(idempotent - this transition frame can repeat). AIPlayerGPT
+            //closes its decision translog with the "gameend" record here.
+            for (int gi = 0; gi < 2; gi++)
+                if (game->players[gi])
+                    game->players[gi]->gameEnded();
             //One-shot self-play: the harness runs ONE game per process, so on
             //game-over emit the winner (for win-rate) and exit cleanly. The
             //translog is durable per-decision (AIPlayerGPT opens/append/closes

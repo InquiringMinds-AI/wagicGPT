@@ -84,6 +84,10 @@ public:
     //feeds the game narrative to the agent transcript
     virtual int receiveEvent(WEvent * event);
 
+    //Engine game-over hook (Player::gameEnded): closes the translog with
+    //the "gameend" record.
+    virtual void gameEnded();
+
 protected:
     virtual const OrderedAIAction * chooseOrderedAction(RankingContainer& ranking);
     //Deck hint scripts must not pre-empt the model's ranked decision.
@@ -202,7 +206,18 @@ private:
     //and, accumulated, training data for a small shippable policy model.
     string mTransLogPath; //empty = disabled
     int mTransSeq;
-    void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount);
+    //Every record carries game context (turn/phase/life), the last round
+    //trip's latency, the chosen option as TEXT (indexes rot, text does
+    //not), and - when the heuristic answered instead - the fallback reason
+    //(c2: the silent choice:-1 class becomes attributable).
+    long mLastLatencyMs; //-1 = no round trip behind this record (cache/reuse)
+    void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
+                       const string& chosenText = "", const char * fallback = NULL);
+    //One "gameend" record per duel: result + final life + turn count. The
+    //per-decision records alone cannot say who WON - win-rate and timeout
+    //adjudication both need it in the same file.
+    bool mGameEndLogged;
+    void logGameEnd();
 
     //True while a request is in flight whose answer has not been consumed.
     bool asyncBusy() const;
