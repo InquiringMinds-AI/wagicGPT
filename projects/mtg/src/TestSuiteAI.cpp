@@ -175,6 +175,60 @@ int TestSuiteAI::Act(float)
     //braided multi-worker suite log (grep "\[<testfile>\]").
     DebugTrace("TESTSUITE command: " << action << " [" << suite->filename << "]");
 
+    //A pending decision menu whose answer the script does not provide:
+    //under engine-owned priority a pending menu HOLDS the game (correctly -
+    //its controller is deciding), so a script that ignores it would now
+    //DEADLOCK where it used to dangle harmlessly. Mirror the interrupt-ask
+    //convention below: if the next command is not a menu answer, apply the
+    //suite default - decline when the menu is cancelable (Cancel is the
+    //last item), take the first option when the choice is mandatory - and
+    //re-queue the command.
+    {
+        ActionLayer * al = observer->mLayers->actionLayer();
+        if (al->menuObject && al->abilitiesMenu && al->abilitiesMenu->mObjects.size()
+            && action.find("choice ") == string::npos)
+        {
+            //Mana abilities pierce menus in the engine (a pending X-payment
+            //may need mana floated while its menu waits - flameblast_dragon).
+            //Mirror that rule: a command that resolves to an in-play card
+            //with a mana producer falls through to the normal click path
+            //instead of triggering the default.
+            bool pierce = false;
+            //Keyword commands can never be mana clicks - skip the card
+            //lookup (its miss path dumps the whole board to the log).
+            bool keyword = action == "" || action == "next" || action == "eot" || action == "yes"
+                || action == "no" || action == "human" || action == "ai" || action == "endinterruption"
+                || action.find("goto") != string::npos || action.find("reveal") != string::npos
+                || action.find("p1") != string::npos || action.find("p2") != string::npos;
+            MTGCardInstance * manaCard = keyword ? NULL : getCard(action);
+            if (manaCard && manaCard->controller()
+                && manaCard->controller()->game->inPlay->hasCard(manaCard) && !manaCard->isTapped())
+            {
+                for (size_t mi = 0; mi < al->manaObjects.size(); mi++)
+                {
+                    AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility *)al->manaObjects[mi]);
+                    if (amp && amp->source == manaCard)
+                    {
+                        DebugTrace("TESTSUITE menu pierce: mana producer '" << action
+                                   << "' [" << suite->filename << "]");
+                        pierce = true;
+                        break;
+                    }
+                }
+            }
+            if (!pierce)
+            {
+                int last = (int)al->abilitiesMenu->mObjects.size() - 1;
+                bool cancelable = al->abilitiesMenu->mObjects[last]->GetId() == kCancelMenuID;
+                DebugTrace("TESTSUITE menu default: " << (cancelable ? "cancel" : "first option")
+                           << " pending='" << action << "' [" << suite->filename << "]");
+                al->doReactTo(cancelable ? last : 0);
+                suite->currentAction--;
+                return 1;
+            }
+        }
+    }
+
     if (observer->mLayers->stackLayer()->askIfWishesToInterrupt == this)
     {
         DebugTrace("TESTSUITE interrupt-ask for player " << ((this == observer->players[0]) ? 0 : 1) << " pending='" << action << "' latest=" << observer->mLayers->stackLayer()->getLatest(NOT_RESOLVED) << " [" << suite->filename << "]");

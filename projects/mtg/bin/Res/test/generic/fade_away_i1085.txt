@@ -3,6 +3,10 @@
 #TWO-STAGE: choice 1 (decline) -> choice 0 (the must-may wrap of "sacrifice
 #notaTarget(...)") -> click the victim. Rides the pay[[ grant fix; the old
 #single-choice driving predated the menu existing at all.
+#2026-07-11: menu answers moved to directly follow the cast - the granted
+#pay menu arms on the settle tick right after resolution; the old
+#intervening gotos hit the harness menu-default, which picked "pay" with
+#an empty pool and wedged phase advance behind the unpayable payment.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -12,10 +16,7 @@ manapool:{2}{U}
 [PLAYER2]
 [DO]
 fade away
-goto firstmain
-goto firstmain
 choice 1
-goto firstmain
 choice 0
 grizzly bears
 goto secondmain

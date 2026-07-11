@@ -21,10 +21,7 @@ soul strings
 choice 2
 grizzly bears
 hill giant
-goto firstmain
-goto firstmain
 choice 1
-goto firstmain
 choice 1
 goto firstmain
 goto firstmain

@@ -10,8 +10,6 @@ inplay:grizzly bears,hill giant
 [PLAYER2]
 [DO]
 jaddi lifestrider
-goto firstmain
-goto firstmain
 choice 0
 grizzly bears
 hill giant

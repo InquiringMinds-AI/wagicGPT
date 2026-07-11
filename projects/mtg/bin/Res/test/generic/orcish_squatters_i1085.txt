@@ -21,10 +21,7 @@ goto attackers
 orcish squatters
 next
 next
-goto blockers
-goto blockers
 choice 0
-goto blockers
 darksteel citadel
 goto end
 goto end

@@ -20,7 +20,6 @@ goto end
 goto upkeep
 goto upkeep
 527526
-goto upkeep
 choice 1
 goto upkeep
 goto firstmain

@@ -19,7 +19,6 @@ next
 next
 #firstmain
 Mox Pearl
-Hunting Grounds
 choice 0
 Enormous Baloth
 [ASSERT]

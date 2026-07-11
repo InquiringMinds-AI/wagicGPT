@@ -14,13 +14,8 @@ hand:shock,shock
 [DO]
 shock
 grizzly bears
-goto firstmain
-goto firstmain
 choice 0
-goto firstmain
-goto firstmain
 choice 0
-goto firstmain
 grizzly bears
 goto firstmain
 goto firstmain

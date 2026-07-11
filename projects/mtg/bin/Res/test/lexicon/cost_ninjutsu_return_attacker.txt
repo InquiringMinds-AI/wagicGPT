@@ -22,6 +22,7 @@ Island
 Mountain
 Ninja of the Deep Hours
 Raging Goblin
+choice 0
 endinterruption
 next
 choice 0

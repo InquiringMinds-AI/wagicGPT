@@ -14,8 +14,6 @@ hand:shock
 library:eager cadet,eager cadet
 [DO]
 true-name nemesis
-goto firstmain
-goto firstmain
 choice 1
 goto firstmain
 goto firstmain

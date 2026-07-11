@@ -11,15 +11,9 @@ library:millstone,gold myr,silver myr
 inplay:grizzly bears
 [DO]
 mystic confluence
-goto firstmain
-goto firstmain
 choice 0
 grizzly bears
-goto firstmain
-goto firstmain
 choice 1
-goto firstmain
-goto firstmain
 choice 1
 goto firstmain
 goto firstmain

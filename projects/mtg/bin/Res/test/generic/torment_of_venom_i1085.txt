@@ -11,8 +11,6 @@ inplay:hill giant
 [DO]
 torment of venom
 hill giant
-goto firstmain
-goto firstmain
 choice 1
 goto firstmain
 goto firstmain

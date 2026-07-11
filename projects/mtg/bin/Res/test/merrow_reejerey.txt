@@ -10,7 +10,6 @@ manapool:{B}{B}{B}{U}
 inplay:Wall of Blossoms
 [DO]
 Coral Merfolk
-Merrow Reejerey
 choice 0
 Wall of Blossoms
 Death Stroke

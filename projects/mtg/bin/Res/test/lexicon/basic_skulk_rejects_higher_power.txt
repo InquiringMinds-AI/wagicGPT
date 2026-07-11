@@ -6,10 +6,11 @@ inplay:fogwalker
 inplay:grizzly bears
 life:20
 [DO]
+choice 0
+grizzly bears
 fogwalker
 next
 grizzly bears
-next
 next
 [ASSERT]
 COMBATDAMAGE

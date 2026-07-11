@@ -4,6 +4,9 @@
 #counters survives through the upkeep where a 3-counter one is already
 #sacrificed. NOTE: goto no-ops when already in the target phase, hence
 #the end/upkeep pairs - each pair advances exactly one upkeep.
+#Post-priority-redesign: turn draws are no longer eaten during the goto
+#ladder (the old draw-eating quirk is gone), so P1 ends with 5 cards in
+#hand (4 turn draws + Steady Progress's draw) and 1 in library.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -41,7 +44,7 @@ UPKEEP
 [PLAYER1]
 inplay:Blastoderm
 graveyard:Steady Progress
-hand:*
-library:*,*,*,*,*
+hand:*,*,*,*,*
+library:*
 [PLAYER2]
 [END]

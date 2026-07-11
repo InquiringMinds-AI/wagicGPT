@@ -13,8 +13,6 @@ library:silver myr
 [DO]
 memory's journey
 p1
-goto firstmain
-goto firstmain
 choice 0
 millstone
 juggernaut

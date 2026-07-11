@@ -3,8 +3,13 @@
 #bears are sacrificed and the aura follows. Rides BOTH of today's engine
 #fixes (pay[[ grant guard; ATeach::removed no longer destroy()s a granted
 #ability that was already garbage-collected when the source dies from its own
-#granted sacrifice - that teardown crashed pre-fix). The library wildcard:
-#the upkeep pay-menu eats the T3 draw step (known quirk, unasserted).
+#granted sacrifice - that teardown crashed pre-fix). Under the redesigned
+#priority/menu lifecycle the old quirk ("the upkeep pay-menu eats the T3 draw
+#step") is GONE - the draw now correctly happens, so P1 ends with 1 card in
+#hand and 1 in library. The pay-menu is answered with an explicit choice 1
+#(decline -> sacrifice) plus a second choice 1 for the re-armed follow-up
+#menu (letting the harness default pick "pay" would wedge an unpayable
+#payment flow).
 [INIT]
 firstmain
 [PLAYER1]
@@ -22,7 +27,10 @@ goto firstmain
 goto end
 goto firstmain
 goto end
-goto upkeep
+next
+next
+next
+choice 1
 choice 1
 goto firstmain
 goto firstmain
@@ -30,7 +38,8 @@ goto firstmain
 FIRSTMAIN
 [PLAYER1]
 graveyard:grizzly bears,pendrell flux
-library:*,*
+library:*
+hand:*
 [PLAYER2]
 hand:*
 library:darksteel citadel

@@ -1,4 +1,10 @@
 #Testing Mortician Beetle vs Phyrexian Denouncer
+# 2026-07-11: choice 0 moved to directly follow the Denouncer activation.
+# The Beetle's may-menu (sac trigger, LIFO above the Denouncer ability)
+# arms on the settle tick right after the activation; the old script's
+# intervening "next" hit the harness menu-default and cancelled the
+# +1/+1 counter, so the 0/0 Beetle died to the -1/-1 (SBA) and dealt no
+# combat damage.
 [INIT]
 combatattackers
 [PLAYER1]
@@ -13,8 +19,8 @@ next
 209126
 choice 1
 209108
-next
 choice 0
+next
 next
 next
 eot

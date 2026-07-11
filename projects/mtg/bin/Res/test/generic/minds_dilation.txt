@@ -24,9 +24,7 @@ goto firstmain
 iron myr
 shock
 p1
-goto firstmain
 choice 0
-goto firstmain
 choice 0
 goto firstmain
 goto firstmain

@@ -12,11 +12,7 @@ library:juggernaut,gold myr
 [DO]
 tormenting voice
 millstone
-goto firstmain
-goto firstmain
 choice 0
-goto firstmain
-goto firstmain
 choice 0
 goto firstmain
 goto firstmain

@@ -11,7 +11,6 @@ life:20
 life:20
 [DO]
 next
-Dawn of the Dead
 choice 0
 Grizzly Bears
 next

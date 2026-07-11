@@ -26,8 +26,6 @@ copper myr
 iron myr
 leaden myr
 hill giant
-goto firstmain
-goto firstmain
 choice 0
 endinterruption
 goto firstmain

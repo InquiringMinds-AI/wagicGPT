@@ -13,8 +13,6 @@ hand:sram's expertise,grizzly bears
 [PLAYER2]
 [DO]
 sram's expertise
-goto firstmain
-goto firstmain
 choice 0
 grizzly bears
 choice 0

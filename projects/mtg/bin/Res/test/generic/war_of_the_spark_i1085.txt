@@ -10,13 +10,8 @@ hand:war of the spark,walking corpse
 [PLAYER2]
 [DO]
 war of the spark
-goto firstmain
-goto firstmain
 choice 1
-goto firstmain
 walking corpse
-goto firstmain
-goto firstmain
 choice 0
 goto firstmain
 goto firstmain

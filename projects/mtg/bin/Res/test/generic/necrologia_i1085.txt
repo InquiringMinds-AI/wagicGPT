@@ -9,8 +9,6 @@ library:millstone,juggernaut,gold myr,silver myr
 [PLAYER2]
 [DO]
 necrologia
-goto firstmain
-goto firstmain
 choice 2
 goto firstmain
 goto firstmain

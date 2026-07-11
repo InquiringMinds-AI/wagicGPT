@@ -3,6 +3,9 @@
 # Phase-IN: @phasedin draws exactly once.
 # Oracle-correct final state: forest discarded at phase-out, island drawn at
 # phase-in -> hand = island only.
+# 2026-07-11: the phase-out upkeep is entered via goto end + stepped next so
+# choice 0 is pending when the forced-discard menu arms (a goto walk landing
+# on it fired the harness menu-default and wedged the discard selection).
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -14,7 +17,9 @@ library:island
 goto end
 goto upkeep
 goto end
-goto upkeep
+next
+next
+next
 choice 0
 forest
 goto end

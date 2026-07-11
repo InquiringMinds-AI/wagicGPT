@@ -18,13 +18,8 @@ graveyard:hill giant,darksteel citadel
 [PLAYER2]
 [DO]
 vengeful rebirth
-goto firstmain
-goto firstmain
 choice 2
-goto firstmain
 hill giant
-goto firstmain
-goto firstmain
 choice 0
 p2
 goto firstmain

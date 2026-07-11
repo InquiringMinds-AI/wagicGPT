@@ -12,7 +12,9 @@ ojutai's summons
 goto end
 goto upkeep
 goto end
-goto upkeep
+next
+next
+next
 choice 0
 [ASSERT]
 UPKEEP

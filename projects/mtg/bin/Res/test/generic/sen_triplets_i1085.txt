@@ -18,12 +18,11 @@ library:millstone,millstone
 goto end
 goto upkeep
 goto end
-goto upkeep
-goto upkeep
+next
+next
+next
 choice 0
-goto upkeep
 grizzly bears
-goto upkeep
 choice 0
 goto upkeep
 goto upkeep

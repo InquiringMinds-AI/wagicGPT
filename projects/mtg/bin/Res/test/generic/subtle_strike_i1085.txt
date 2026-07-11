@@ -11,11 +11,8 @@ hand:subtle strike,shock
 inplay:eager cadet
 [DO]
 subtle strike
-goto firstmain
-goto firstmain
 choice 0
 eager cadet
-goto firstmain
 choice 0
 grizzly bears
 goto firstmain

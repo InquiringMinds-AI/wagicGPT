@@ -8,6 +8,10 @@
 #opponent-hand click discards. The myr is tapped DURING the damage step;
 #floated mana survives within the step. Life 18 proves the 2-power hit;
 #bears in graveyard (not hand) proves the reject leg hit the revealed card.
+#Choreography (menu-default era): choice 0 x3 walks may/choose-one/pay
+#menus back-to-back; the myr is tapped INSIDE the mExtraPayment flow
+#(not a menuObject, so the harness default cannot cancel it), then
+#choice 0 confirms and the hand click picks the discard.
 [INIT]
 firstmain
 [PLAYER1]
@@ -20,10 +24,10 @@ goto attackers
 hollow specter
 next
 next
+choice 0
+choice 0
+choice 0
 leaden myr
-choice 0
-choice 0
-choice 0
 choice 0
 grizzly bears
 goto end

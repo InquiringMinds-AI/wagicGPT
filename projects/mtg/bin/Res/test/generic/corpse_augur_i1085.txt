@@ -15,8 +15,6 @@ manapool:{R}
 [DO]
 shock
 corpse augur
-goto firstmain
-goto firstmain
 choice 1
 goto secondmain
 goto secondmain
