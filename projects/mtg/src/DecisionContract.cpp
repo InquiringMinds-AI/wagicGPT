@@ -341,3 +341,12 @@ void DecisionManager::applyChooseTarget(const DecisionRequest & req, const Decis
     }
     tc->attemptsToFill++;
 }
+
+bool DecisionManager::buildCastSpell(Player * p, ManaEngine::ManaPolicy & policy, ManaCost * pMana,
+                                     bool instantSpeedOnly, DecisionRequest & req)
+{
+    req.kind = DecisionRequest::CAST_SPELL;
+    req.player = p;
+    req.casts = LegalActionsOracle::legalCasts(p, policy, pMana, instantSpeedOnly);
+    return !req.casts.empty();
+}

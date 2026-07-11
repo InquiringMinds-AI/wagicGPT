@@ -1479,11 +1479,16 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                          //anchoring: the model favors option 1, and
                          //nothing-first likely drove the pass rate)
 
-    //The legal cast set comes from the oracle (zone gates, legendary rule,
-    //play restrictions, affordability, 601.2c target validity); this seam
-    //only renders it for the model.
+    //The legal cast set comes from the contract (oracle-backed: zone gates,
+    //legendary rule, play restrictions, affordability, 601.2c target
+    //validity); this seam only renders it for the model. The APPLY side of
+    //a cast still rides Baka's pricing machinery below (aiForcedCandidate)
+    //until c5 moves payment+clickstream into the manager.
     GptManaPolicy policy(this);
-    vector<LegalActionsOracle::Cast> casts = LegalActionsOracle::legalCasts(this, policy, pMana, instantWindow);
+    DecisionRequest castReq;
+    if (!DecisionManager::buildCastSpell(this, policy, pMana, instantWindow, castReq))
+        return NULL; //nothing castable: only one outcome, no model call
+    const vector<LegalActionsOracle::Cast> & casts = castReq.casts;
     for (size_t ci = 0; ci < casts.size(); ci++)
     {
         MTGCardInstance * card = casts[ci].card;

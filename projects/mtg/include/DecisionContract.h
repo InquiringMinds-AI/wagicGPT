@@ -5,6 +5,8 @@
 #include <utility>
 #include <vector>
 
+#include "LegalActions.h"
+
 class GameObserver;
 class MTGCardInstance;
 class Player;
@@ -38,6 +40,7 @@ public:
         CHOOSE_MODE,   //"choose one" modal (MenuAbility::abilities[])
         ANNOUNCE_X,    //X announcement (AAWhatsX; option index == X value)
         CHOOSE_TARGET, //an open TargetChooser needs its target(s)
+        CAST_SPELL,    //a casting window: which legal cast (if any) to make
     };
     Kind kind;
     Player * player;
@@ -63,6 +66,9 @@ public:
     MTGCardInstance * sourceCard;
     int targetMin;
     int maxTargets;
+    //CAST_SPELL: the oracle's legal cast set (card + zone + cost variant);
+    //declining (casting nothing) is always legal at a casting window
+    std::vector<LegalActionsOracle::Cast> casts;
 
     DecisionRequest() : player(NULL), contextCard(NULL), canDecline(false),
                         sourceCard(NULL), targetMin(0), maxTargets(0) {}
@@ -124,6 +130,17 @@ public:
     static bool buildChooseTarget(Player * p, TargetChooser * tc, DecisionRequest & req);
     static void applyChooseTarget(const DecisionRequest & req, const DecisionAction & act,
                                   bool skipCardClick = false);
+
+    //Casts (c4, issuance half). buildCastSpell wraps the oracle's
+    //legalCasts as a typed request; false when nothing is castable (the
+    //only outcome is passing - no decision exists). There is deliberately
+    //NO applyCastSpell yet: committing a cast means payment planning plus
+    //the put-in-play clickstream, which today lives in AIPlayerBaka's
+    //pricing machinery (aiForcedCandidate validation, gotPayments,
+    //payAlternative). That apply moves into the manager with c5
+    //(Baka-as-policy), when payment planning rides ManaEngine end to end.
+    static bool buildCastSpell(Player * p, ManaEngine::ManaPolicy & policy, ManaCost * pMana,
+                               bool instantSpeedOnly, DecisionRequest & req);
 };
 
 #endif
