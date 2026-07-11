@@ -98,6 +98,16 @@ class AIPlayerBaka: public AIPlayer{
     virtual vector<MTGAbility*> canPaySunBurst(ManaCost * mCost = NULL);
 
     virtual MTGCardInstance * chooseCard(TargetChooser * tc, MTGCardInstance * source, int random = 0);
+    //The COMMIT choice for an extra-cost target (what to sacrifice/tap/
+    //discard to pay a cost) - split from chooseCard because chooseCard is
+    //also a cheap existence PROBE (CanHandleCost, hot on every potential-
+    //mana enumeration) that a decision-making override must never turn
+    //into a model call. Returning NULL means "no choice yet"; the payment
+    //attempt aborts for this tick (the async decision pattern).
+    virtual MTGCardInstance * chooseCostTarget(TargetChooser * tc, MTGCardInstance * source)
+    {
+        return chooseCard(tc, source);
+    }
     virtual int selectMenuOption();
 
     virtual AIStats * getStats();

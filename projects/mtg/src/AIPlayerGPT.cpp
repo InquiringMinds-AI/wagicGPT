@@ -1891,6 +1891,43 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     return 0;
 }
 
+MTGCardInstance * AIPlayerGPT::chooseCostTarget(TargetChooser * tc, MTGCardInstance * source)
+{
+    if (mEndpoint.empty() || !tc)
+        return AIPlayerBaka::chooseCostTarget(tc, source);
+
+    DecisionRequest req;
+    if (!DecisionManager::buildChooseTarget(this, tc, req))
+        return AIPlayerBaka::chooseCostTarget(tc, source);
+
+    //cost targets are cards; mirror chooseCard's exclusions (never the
+    //spell being paid for, never the chooser's own source)
+    vector<MTGCardInstance *> cands;
+    vector<string> opts;
+    for (size_t i = 0; i < req.targetCandidates.size(); i++)
+    {
+        MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(req.targetCandidates[i]);
+        if (!c || c == source || c == tc->source)
+            continue;
+        cands.push_back(c);
+        opts.push_back(describeTarget(this, c));
+    }
+    if (cands.empty())
+        return AIPlayerBaka::chooseCostTarget(tc, source);
+    if (cands.size() == 1)
+        return cands[0]; //only one legal payment - no model call
+
+    string what = source ? source->getDisplayName()
+                         : (tc->source ? tc->source->getDisplayName() : string("this spell"));
+    int pick = askModel("Choose what to pay for " + what
+                        + "'s additional cost (it will be consumed):", opts);
+    if (pick == kChoicePending)
+        return NULL; //payment attempt aborts this tick; re-polled next tick
+    if (pick < 0 || pick >= (int) cands.size())
+        return AIPlayerBaka::chooseCostTarget(tc, source);
+    return cands[pick];
+}
+
 int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCardInstance * chosenCard, bool checkOnly)
 {
     //checkOnly is a castability probe (no clicks, no decision) and

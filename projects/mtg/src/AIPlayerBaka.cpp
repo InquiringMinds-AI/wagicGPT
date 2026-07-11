@@ -1403,11 +1403,19 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
                 ec->costs[i]->setSource(target);
                 if(!ec->costs[i]->tc->countValidTargets())
                     return false;
-                MTGCardInstance * costTarget = chooseCard(ec->costs[i]->tc,target);
+                //chooseCostTarget is the DECISION seam (model-overridable);
+                //NULL = no choice yet or none possible - abort this tick's
+                //attempt rather than feed NULL into tryToSetPayment (which
+                //would false-match an unset cost target).
+                MTGCardInstance * costTarget = chooseCostTarget(ec->costs[i]->tc,target);
+                if (!costTarget)
+                    return false;
                 int checkTarget = 0;
                 while (ec->tryToSetPayment(costTarget))
                 {
-                    costTarget = chooseCard(ec->costs[i]->tc,target);
+                    costTarget = chooseCostTarget(ec->costs[i]->tc,target);
+                    if (!costTarget)
+                        return false;
                     if(checkTarget == 20)
                         return false;
                     checkTarget++;

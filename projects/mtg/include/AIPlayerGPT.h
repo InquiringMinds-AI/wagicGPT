@@ -119,6 +119,13 @@ protected:
     //stay identical to the heuristic path. checkOnly probes and forced
     //targets are mechanics, not decisions - those go straight to the base.
     virtual int chooseTarget(TargetChooser * tc = NULL, Player * forceTarget = NULL, MTGCardInstance * chosenCard = NULL, bool checkonly = false);
+    //Extra-cost targets (what to sacrifice/tap/discard to pay a cost) are
+    //decisions too - the base picks the FIRST legal candidate, which is
+    //blind (sacrificing the best creature as readily as the worst). Rides
+    //the CHOOSE_TARGET contract build over the cost's own chooser; NULL
+    //while the model call is in flight aborts the payment attempt for the
+    //tick (payTheManaCost re-reaches it on the next poll).
+    virtual MTGCardInstance * chooseCostTarget(TargetChooser * tc, MTGCardInstance * source);
 
 private:
     //Ask the model to choose among options (0-based result, -1 to defer to
