@@ -169,6 +169,34 @@ Consumers/producers:
   run a validation corpus; compare cast-nothing rate, offered-vs-taken,
   window counts, timeout rate against matchups-20260709-220729.
 
+### 2.3.1 W3c implementation plan (concretized 2026-07-11, post-W3b)
+
+W3b landed the issuance half for combat: `GameObserver::pendingCombatDecision`
+decides WHEN a declaration is due; the AI consults it instead of branch luck.
+W3c builds the answer half — typed requests and actions — in increments, each
+suite-green:
+
+- **c1 — contract types + combat through the contract.** `DecisionRequest`
+  (kind, player, typed options) and `Action` structs; an engine-side
+  `DecisionManager` that issues requests from the existing pendency
+  computations and APPLIES answers itself (the click choreography moves
+  INSIDE the manager — consumers stop knowing about defenser-cycling).
+  Baka's combat heuristics become option scorers returning an attacker set /
+  block map; GPT's bundled combat asks map 1:1 onto the request.
+- **c2 — per-decision fallback + native logging.** A failed policy answer
+  (timeout, parse, illegal) reroutes THAT request to the heuristic policy;
+  the translog records the request/answer pair natively, with a fallback
+  reason field (kills the silent choice:-1 class).
+- **c3 — modal choices / X announcement / menus** (`selectMenuOption` seam)
+  through the contract; MenuAbility lifetime owned by the manager (the
+  proper fix for the menu-zombie class the suite currently defaults around).
+- **c4 — casts and targets** (the big one: `FindCardToPlay`/`chooseTarget`
+  seams become request kinds; the oracle's legalCasts is already the options
+  enumeration).
+- **c5 — Baka-as-policy shrink**: delete the mirrored Act duplication, the
+  4,600-line loop reduces to scorers over contract options; ships as the
+  offline/instant opponent option per the user's decision.
+
 ## 4. Risks / open questions
 
 - `nextGamePhase` recursion + `PhaseRing` are old and central; the suite
