@@ -3,6 +3,7 @@
 #ifdef WITH_GPT_AI
 
 #include "AIPlayerGPT.h"
+#include "LegalActions.h"
 #include "GptConfig.h"
 #include "GameObserver.h"
 #include "MTGDefinitions.h"
@@ -972,8 +973,24 @@ string AIPlayerGPT::serializeGameState()
     out << "Phase: " << observer->getCurrentGamePhaseName();
     out << " | It is " << (observer->currentPlayer == this ? "your" : "the opponent's") << " turn.\n";
     out << "Your life: " << this->life << " | Opponent life: " << (opp ? opp->life : 0) << "\n";
+    //Honest mana line: the pool being empty between actions is normal (the
+    //engine taps lands automatically); what the player can actually spend is
+    //the potential of its untapped producers. The old "Mana in your pool:
+    //(none)" line was the model's #1 source of false can't-pay beliefs.
     string pool = this->getManaPool()->toString();
-    out << "Mana in your pool: " << (pool.empty() ? "(none)" : pool) << "\n";
+    ManaCost * potential = getPotentialMana();
+    int sources = potential ? potential->getConvertedCost() : 0;
+    string colors = potential ? potential->toString() : "";
+    SAFE_DELETE(potential);
+    out << "Mana available: ";
+    if (sources)
+        out << colors << " from " << sources << " untapped source" << (sources > 1 ? "s" : "")
+            << " (tapped automatically when you cast)";
+    else
+        out << "(no untapped sources)";
+    if (!pool.empty())
+        out << " | Already in pool: " << pool;
+    out << "\n";
 
     out << "Your hand: ";
     describeZoneCards(out, game->hand, false);
@@ -1341,28 +1358,18 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     return (choice >= 1) ? choice - 1 : -1; //0 or parse-fail: defer to caller
 }
 
-bool AIPlayerGPT::roughlyPayable(MTGCardInstance * card, ManaCost * pMana)
+namespace
 {
-    ManaCost * cost = card->getManaCost();
-    if (!cost)
-        return true;
-    if (!cost->getConvertedCost() && !cost->extraCosts)
-        return true;
-    if (pMana->canAfford(cost, card->has(Constants::ANYTYPEOFMANA)))
-        return true;
-    if (cost->getAlternative() && pMana->canAfford(cost->getAlternative(), 0))
-        return true;
-    if (cost->getMorph() && pMana->canAfford(cost->getMorph(), 0))
-        return true;
-    if (cost->getFlashback() && pMana->canAfford(cost->getFlashback(), 0))
-        return true;
-    if (cost->getRetrace() && pMana->canAfford(cost->getRetrace(), 0))
-        return true;
-    //specific-producer payments (e.g. sac-for-mana rocks) that potential
-    //mana does not cover
-    if (canPayMana(card, cost, card->has(Constants::ANYTYPEOFMANA)).size())
-        return true;
-    return false;
+    //Willingness policy for the oracle: same as the inherited heuristic's
+    //(canHandleCost may pre-choose extra-cost payments).
+    class GptManaPolicy : public ManaEngine::ManaPolicy
+    {
+    public:
+        GptManaPolicy(AIPlayerBaka * _ai) : ai(_ai) {}
+        int canHandle(MTGAbility * producer) { return ai->canHandleCost(producer); }
+    private:
+        AIPlayerBaka * ai;
+    };
 }
 
 MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * type)
@@ -1415,110 +1422,42 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     vector<string> opts; //"Cast nothing" is appended LAST (positional
                          //anchoring: the model favors option 1, and
                          //nothing-first likely drove the pass rate)
-    std::set<string> seen; //same name+zone = same decision; list it once
 
-    struct ZoneScan { MTGGameZone * zone; const char * label; };
-    ZoneScan scans[] = {
-        { game->hand, "" },
-        { game->graveyard, " [from your graveyard]" },
-        { game->exile, " [from exile]" },
-        { game->commandzone, " [from your command zone]" },
-    };
-    for (size_t s = 0; s < sizeof(scans) / sizeof(scans[0]); s++)
+    //The legal cast set comes from the oracle (zone gates, legendary rule,
+    //play restrictions, affordability, 601.2c target validity); this seam
+    //only renders it for the model.
+    GptManaPolicy policy(this);
+    vector<LegalActionsOracle::Cast> casts = LegalActionsOracle::legalCasts(this, policy, pMana, instantWindow);
+    for (size_t ci = 0; ci < casts.size(); ci++)
     {
-        MTGGameZone * zone = scans[s].zone;
-        for (int i = 0; i < zone->nb_cards; i++)
+        MTGCardInstance * card = casts[ci].card;
+        ManaCost * cost = card->getManaCost();
+        std::ostringstream o;
+        if (!casts[ci].viaAlternative)
         {
-            MTGCardInstance * card = zone->cards[i];
-            if (card->isLand())
-                continue; //the land rung handles those
-            if (instantWindow
-                && !card->hasType(Subtypes::TYPE_INSTANT) && !card->has(Constants::FLASH)
-                && !card->has(Constants::ASFLASH))
-                continue;
-            if (zone == game->graveyard
-                && !card->has(Constants::CANPLAYFROMGRAVEYARD) && !card->has(Constants::TEMPFLASHBACK)
-                && !(card->getManaCost() && card->getManaCost()->getFlashback())
-                && !(card->getManaCost() && card->getManaCost()->getRetrace()))
-                continue;
-            if (zone == game->exile && !card->has(Constants::CANPLAYFROMEXILE))
-                continue;
-            if (card->hasType(Subtypes::TYPE_LEGENDARY) && game->inPlay->findByName(card->name))
-                continue;
-            if (game->playRestrictions->canPutIntoZone(card, game->stack) == PlayRestriction::CANT_PLAY)
-                continue;
-            if (!roughlyPayable(card, pMana))
-                continue;
-            //Rules-valid action set (MTG 601.2c): a spell that REQUIRES a
-            //target cannot legally be cast with none available - offering
-            //it wastes a model call AND the failed validation hands the
-            //whole cast decision to the heuristic. Untargeted spells pass
-            //untouched, and a castable spell with a null-looking effect
-            //stays offered (casting for another card's trigger is
-            //legitimate play).
-            {
-                TargetChooserFactory tcf(observer);
-                TargetChooser * tc = tcf.createTargetChooser(card);
-                if (tc)
-                {
-                    bool castable = true;
-                    if (tc->maxtargets == 1 && !tc->validTargetsExist())
-                        castable = false; //mandatory single target, none exist
-                    if (tc->targetMin && !tc->validTargetsExist(tc->maxtargets))
-                        castable = false; //"exactly N" with fewer than N
-                    SAFE_DELETE(tc);
-                    if (!castable)
-                        continue;
-                }
-            }
-            string key = card->getDisplayName() + scans[s].label;
-            if (!seen.insert(key).second)
-                continue;
-
-            //A card affordable BOTH normally and through its alternative
-            //cost (evoke vs hardcast, Force-of-Will-style pitches) is two
-            //different plays: list each mode so the model chooses it
-            //explicitly. Alternative casting only exists on the hand path.
-            ManaCost * cost = card->getManaCost();
-            bool normalOk = cost
-                && (pMana->canAfford(cost, card->has(Constants::ANYTYPEOFMANA))
-                    || canPayMana(card, cost, card->has(Constants::ANYTYPEOFMANA)).size());
-            bool altOk = zone == game->hand && cost && cost->getAlternative()
-                && (pMana->canAfford(cost->getAlternative(), 0)
-                    || canPayMana(card, cost->getAlternative(), 0).size());
-
-            std::ostringstream o;
             o << "Cast " << card->getDisplayName();
             if (cost && cost->getConvertedCost())
                 o << " " << cost->toString();
             if (card->isCreature())
                 o << " (" << card->power << "/" << card->toughness << ")";
-            o << scans[s].label;
+            o << casts[ci].zoneLabel;
             o << dynamicMagnitudes(card);
-
-            if (normalOk || !altOk)
-            {
-                candidates.push_back(card);
-                candidateUsesAlt.push_back(false);
-                opts.push_back(o.str());
-            }
-            if (altOk)
-            {
-                std::ostringstream oa;
-                oa << "Cast " << card->getDisplayName() << " with its ";
-                if (!cost->getAlternative()->alternativeName.empty())
-                    oa << cost->getAlternative()->alternativeName << " cost";
-                else
-                    oa << "alternative cost";
-                oa << " " << cost->getAlternative()->toString();
-                if (card->isCreature())
-                    oa << " (" << card->power << "/" << card->toughness << ")";
-                oa << scans[s].label;
-                candidates.push_back(card);
-                candidateUsesAlt.push_back(true);
-                opts.push_back(oa.str());
-            }
         }
+        else
+        {
+            o << "Cast " << card->getDisplayName() << " with its ";
+            if (!cost->getAlternative()->alternativeName.empty())
+                o << cost->getAlternative()->alternativeName << " cost";
+            else
+                o << "alternative cost";
+            o << " " << cost->getAlternative()->toString();
+            if (card->isCreature())
+                o << " (" << card->power << "/" << card->toughness << ")";
+            o << casts[ci].zoneLabel;
+        }
+        candidates.push_back(card);
+        candidateUsesAlt.push_back(casts[ci].viaAlternative);
+        opts.push_back(o.str());
     }
 
     //Nothing castable: only one outcome, no model call.

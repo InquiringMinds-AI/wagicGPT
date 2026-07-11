@@ -61,6 +61,7 @@ SOURCES += \
         src/AIPlayer.cpp\
         src/AIPlayerBaka.cpp\
         src/ManaEngine.cpp\
+        src/LegalActions.cpp\
         src/AIPlayerGPT.cpp\
         src/GptConfig.cpp\
         src/OptionGpt.cpp\
@@ -183,6 +184,7 @@ HEADERS  += \
         include/AIHints.h\
         include/AIPlayerBaka.h\
         include/ManaEngine.h\
+        include/LegalActions.h\
         include/AIPlayerGPT.h\
         include/GptConfig.h\
         include/OptionGpt.h\

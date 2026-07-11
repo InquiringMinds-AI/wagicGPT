@@ -134,7 +134,6 @@ private:
     //Can this card plausibly be paid for right now? Cheap pre-filter for the
     //model's casting menu; the authoritative check is the forced
     //AIPlayerBaka::FindCardToPlay validation pass.
-    bool roughlyPayable(MTGCardInstance * card, ManaCost * pMana);
 
     //Probe candidate endpoints (env override, then Spark vLLM, then local
     //llama.cpp) and remember the first one that answers /v1/models.
