@@ -190,6 +190,30 @@ suite-green:
 - **c3 — modal choices / X announcement / menus** (`selectMenuOption` seam)
   through the contract; MenuAbility lifetime owned by the manager (the
   proper fix for the menu-zombie class the suite currently defaults around).
+  Investigation findings (2026-07-11, full map in the session record):
+  - **The zombie is structural**: menus belong to `source->controller()`,
+    but both AI Act paths gate on `currentlyActing()` — a menu arming for
+    the non-acting seat has NO answerer, and the W3a hold then freezes the
+    game (`ActionStack.cpp` menu hold + `AIPlayerBaka::Act` head gate).
+    Fix shape: while a menu is pending, the acting seat passes to the
+    menu's controller (the same pattern as the BLOCKERS defender swap in
+    `GameObserver::Update`), so its owner's policy/UI answers; seat
+    returns on answer.
+  - **Greedy X auto-complete** is `MenuAbility::Update`'s ExtraManaCost
+    poll (`AllAbilities.cpp:7609-7631`): fires at minimal affordability,
+    reading X from the pool at that tick — affects humans too, worked
+    around fixture-side today. Real fix: explicit confirm (answer-time X)
+    instead of affordability polling.
+  - **Lifecycle**: `removeMenu` deferred-destroy + `testDestroy` sweep is
+    the codebase's own delete-in-callback guard — the manager must keep
+    that discipline; `menuObject`/`currentActionCard` are raw pointers
+    with no zone-change invalidation (dangle class, queued).
+  - Request kinds map: may yes/no (Cancel = no), choose-one mode
+    (`MenuAbility::abilities[]`, text via `getMenuText()`), X announcement
+    (`AAWhatsX` per affordable X), pay[[/kicker (single-slot
+    `mExtraPayment`). Option sets must be SNAPSHOTTED at request build -
+    the destructor frees unchosen options and the pool mutates while the
+    hold keeps the game paused.
 - **c4 — casts and targets** (the big one: `FindCardToPlay`/`chooseTarget`
   seams become request kinds; the oracle's legalCasts is already the options
   enumeration).
