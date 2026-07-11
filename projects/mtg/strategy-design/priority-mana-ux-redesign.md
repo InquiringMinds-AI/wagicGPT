@@ -1,6 +1,12 @@
 # Priority, Mana & Castability UX Redesign
 
-**Status**: DESIGN (2026-07-10) — investigation complete, not yet implemented.
+**Status**: BUILDING (2026-07-10) — user mandate: full mechanism replacement in
+one campaign, NO interim patches or light fixes on the old system ("we need to
+fix the mechanism, or when we do, all of that other work will need to be
+revised"). Everything downstream — PC frontend with PC-native UX, the PSP
+frontend, the LLM UX, the strategy guides — consumes the revised mechanism.
+The DecisionRequest→Action contract is therefore the FRONTEND-AGNOSTIC gameplay
+API: PC UI, PSP UI, and AI policies are peer consumers of one decision stream.
 **Origin**: wave-3 strategy revision revealed that guide content was being spent
 compensating for platform flaws. User direction: fix priority passing / phase
 stepping, mana selection, and castability indication at the engine+UX layer, for
