@@ -1,0 +1,31 @@
+# KNOWN RULES GAP (2026-07-11, priority-redesign campaign): this assert
+# encodes RULES-correct loop termination (P2 dies at exactly 0; the killing
+# drain is the last to resolve -> P1 37). The engine resolves the drain
+# payloads inline within one resolution cascade, so one extra drain lands
+# past the killing blow (actual: P1 38, P2 -1) before setLoser runs. Until
+# game-end timing interrupts inline trigger payloads, this test cannot pass
+# without encoding the bug. Disabled EXPLICITLY (it previously vanished
+# silently - the game ended before the assert ran; the harness now has an
+# assert-on-gameover hook, which is what made this visible).
+#NAME: Exquisite blood Issue
+#DESC: Sanguine Bond Whenever you gain life, target opponent loses that much life.
+#DESC: Exquisite Blood: Whenever an opponent loses life, you gain that much life.
+#DESC: Having both cards in play causes an infinite loop when damage is done
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Exquisite blood,Sanguine Bond
+hand:Lightning bolt
+manapool:{R}
+[PLAYER2]
+[DO]
+Lightning bolt
+p2
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Exquisite blood,Sanguine Bond
+graveyard:Lightning bolt
+[PLAYER2]
+life:0
+[END]

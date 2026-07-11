@@ -15,6 +15,7 @@ goto attackers
 next
 choice 0
 hill giant
+endinterruption
 goto blockers
 goto blockers
 grizzly bears

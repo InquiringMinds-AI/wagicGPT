@@ -2,7 +2,7 @@
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:grizzly bears, tundra, bayou, volcanic island, badlands
+inplay:grizzly bears, plateau, taiga, volcanic island, badlands
 hand:Blind with Anger
 [PLAYER2]
 hand:act of treason
@@ -36,27 +36,25 @@ next
 next
 next
 yes
-no
-tundra
-choice 1
-bayou
-choice 1
-badlands
-choice 1
+plateau
+choice 0
+taiga
+choice 0
 volcanic island
-choice 1
+choice 0
+badlands
+choice 0
 Blind with Anger
 grizzly bears
 #player 1 gains control grizzly bears, so previous battlefield will be player 2
 # if grizzly bear is returned in player 2 then its a bug but when it return to player 1 its ok
 endinterruption
-next
-next
+goto untap
 [ASSERT]
 UNTAP
 [PLAYER1]
 life:18
-inplay:grizzly bears, tundra, bayou, volcanic island, badlands
+inplay:grizzly bears, plateau, taiga, volcanic island, badlands
 graveyard:blind with anger
 [PLAYER2]
 inplay:mountain,plains,swamp

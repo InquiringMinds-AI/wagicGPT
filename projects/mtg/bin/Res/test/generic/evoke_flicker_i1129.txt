@@ -15,8 +15,6 @@ manapool:{2}{U}{W}
 [PLAYER2]
 [DO]
 mulldrifter
-no
-no
 yes
 ephemerate
 mulldrifter

@@ -12,7 +12,6 @@ manapool:{B}{B}
 hand:Last Gasp
 [DO]
 Tundra Wolves
-no
 yes
 Last Gasp
 Soul Warden

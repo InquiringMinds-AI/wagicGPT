@@ -9,7 +9,6 @@ hand:Memory Lapse
 manapool:{1}{U}
 [DO]
 bad moon
-no
 yes
 Memory Lapse
 bad moon

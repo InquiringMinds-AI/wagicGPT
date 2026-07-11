@@ -4,23 +4,23 @@ firstmain
 [player1]
 manapool:{G}{G}
 inplay:mountain
-hand:grizzly bears,raging golblin
+hand:grizzly bears,raging goblin
 [player2]
 inplay:plains
 hand:Silence
 [do]
 Grizzly Bears
-no
 yes
 plains
 Silence
-endofinterruption
+endinterruption
 mountain
 Raging goblin
 [assert]
 firstmain
 [player1]
 inplay:mountain,Grizzly bears
+hand:raging goblin
 manapool:{R}
 [player2]
 inplay:plains

@@ -1,9 +1,16 @@
 #Testing Kor Spiritdancer (keyword:auras).
+# 2026-07-11: gave P1 a library. Spiritdancer's cast trigger draws a card per
+# Aura cast; with the original EMPTY library the first draw decked P1 out and
+# the game ended before the assert ran - this test has silently VANISHED from
+# the suite accounting for as long as the assert-on-gameover hook did not
+# exist (it never actually validated anything). Library + drawn-cards assert
+# make it a real test of its actual subject: +2/+2 per attached Aura.
 #Kor Spiritdancer gets +2/+2 for each Aura attached to it.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
 hand:Rancor,Eternal Warrior
+library:plains,plains
 inplay:Kor Spiritdancer
 manapool:{G}{R}
 life:20
@@ -29,6 +36,7 @@ next
 COMBATEND
 [PLAYER1]
 inplay:Rancor,Kor Spiritdancer,Eternal Warrior
+hand:plains,plains
 manapool:{0}
 life:20
 [PLAYER2]

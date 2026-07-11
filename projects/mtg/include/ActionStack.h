@@ -238,7 +238,17 @@ public:
             timer = seconds;
     }
     Interruptible * getLatest(int state);
+    //The stack object the current priority round refers to. When the top
+    //of the stack changes (new spell/trigger/phase item), decisions reset
+    //and one tick passes before anyone can pass or anything resolves -
+    //giving triggered-ability placement and state-based actions their
+    //window between resolutions.
+    Interruptible * mPriorityOn;
     Player * askIfWishesToInterrupt;
+    //Priority auto-pass: whether a response window should be OFFERED to p
+    //for the given unresolved stack action, or silently passed. Replaces
+    //the old push-time interruptDecision seeding.
+    bool wouldOfferWindow(Player * p, Interruptible * action);
     int garbageCollect();
     int addAction(Interruptible * interruptible);
     Spell * addSpell(MTGCardInstance* card, TargetChooser * tc, ManaCost * mana, int payResult, int storm, bool forcedinterrupt = false);

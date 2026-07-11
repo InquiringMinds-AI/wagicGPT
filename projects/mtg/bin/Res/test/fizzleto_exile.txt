@@ -9,7 +9,6 @@ hand:Dissipate
 manapool:{1}{U}{U}
 [DO]
 bad moon
-no
 yes
 Dissipate
 bad moon

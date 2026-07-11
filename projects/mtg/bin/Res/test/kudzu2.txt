@@ -22,6 +22,7 @@ next
 1391
 choice 0
 1386
+endinterruption
 1308
 [ASSERT]
 FIRSTMAIN

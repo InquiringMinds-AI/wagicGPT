@@ -13,7 +13,6 @@ hand:Demystify
 manapool:{W}
 [DO]
 174936
-no
 yes
 Demystify
 249662

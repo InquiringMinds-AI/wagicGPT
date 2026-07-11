@@ -14,7 +14,6 @@ graveyard:Forest,Island
 manapool:{2}{U}
 [DO]
 Bad Moon
-no
 yes
 Circular Logic
 Bad Moon

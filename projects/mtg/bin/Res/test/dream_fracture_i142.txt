@@ -17,7 +17,6 @@ library:Swamp,Air Elemental
 manapool:{U}{U}{U}
 [DO]
 Grizzly Bears
-no
 yes
 Dream Fracture
 Grizzly Bears

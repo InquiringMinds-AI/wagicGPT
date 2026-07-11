@@ -35,6 +35,7 @@ TestSuiteAI::TestSuiteAI(TestSuiteGame *tsGame, int playerId) :
     suite = tsGame;
     timer = 0;
     aiActCounter = 1.0f;
+    mAssertPhaseArmed = false;
     expectedTappedInPlay = -1;
     playMode = MODE_TEST_SUITE;
     this->deckName = "Test Suite AI";
@@ -135,7 +136,19 @@ int TestSuiteAI::Act(float)
             observer->players[i]->getManaPool()->copy(suite->initState.players[i]->getManaPool());
     }
 
-    if (playMode == MODE_AI && suite->aiMaxCalls)
+    //[AI] tests: once the game has LEFT the [ASSERT] phase and come back to
+    //it, freeze the AI there and let the script's end-of-test action assert.
+    //The fixtures' AICALLS numbers were hand-tuned to the OLD priority
+    //model's calls-per-phase-boundary economics (every boundary rode the
+    //stack and cost interrupt-answer calls); with engine-owned priority the
+    //same budget carries the game PAST the asserted phase. The declared
+    //assert phase is the fixture's intent - stop there; AICALLS stays a cap
+    //on total AI work, not a pacing constant.
+    if (playMode == MODE_AI && observer->getCurrentGamePhase() != suite->endState.phase)
+        mAssertPhaseArmed = true;
+    bool atAssertPhase = mAssertPhaseArmed && observer->getCurrentGamePhase() == suite->endState.phase;
+
+    if (playMode == MODE_AI && suite->aiMaxCalls && !atAssertPhase)
     {
         //Per-instance, not function-local static: the static was shared by
         //every worker thread (unsynchronized writes) and grew across all
@@ -196,7 +209,17 @@ int TestSuiteAI::Act(float)
     else if (action.compare("ai") == 0)
     {
         DebugTrace("TESTSUITE Switching to AI");
-        playMode = MODE_AI;
+        //BOTH seats go AI. Under the engine-owned priority model the
+        //non-acting seat legitimately receives update ticks (e.g. the
+        //defender when combat flips to BLOCKERS); if that seat stayed a
+        //script-reader it would run the script off its end mid-combat and
+        //assert at the wrong phase. An [AI] test hands the WHOLE game to
+        //the AI - the shared AICALLS budget already caps total AI work.
+        //(The old priority model masked this: its blanket AI-vs-AI stack
+        //windows kept isInterrupting latched on the acting player, so the
+        //other seat never got a tick.)
+        observer->players[0]->playMode = MODE_AI;
+        observer->players[1]->playMode = MODE_AI;
         return 1;
     }
     else if (action.compare("next") == 0 || action.find("goto") != string::npos)
@@ -434,6 +457,7 @@ int TestSuiteGame::Log(const char * text)
 
 void TestSuiteGame::assertGame()
 {
+    mAsserted = true;
     mMutex.lock();
     //compare the game state with the results
     char result[4096];
@@ -710,6 +734,7 @@ TestSuite::TestSuite(const char * filename)
 
 int TestSuite::loadNext()
 {
+    mAsserted = false; //fresh test: its assert has not run yet
     endTime = JGEGetTime();
     summoningSickness = 0;
     seed = 0;
@@ -857,6 +882,12 @@ void TestSuite::ThreadProc(void* inParam)
                         break;
                     }
                 }
+                //The game can end BY ITSELF (a lethal trigger loop drains a
+                //player) before the script reaches its end-of-actions
+                //assert - the test then used to vanish from the accounting.
+                //Assert the declared end state against the finished game.
+                if (!theGame->mAsserted && counter <= 1000000.0f)
+                    theGame->assertGame();
             }
             else
             {
@@ -1064,13 +1095,13 @@ TestSuiteGame::~TestSuiteGame()
 }
 
 TestSuiteGame::TestSuiteGame(TestSuite* testsuite)
-    : summoningSickness(0), forceAbility(false), gameType(GAME_TYPE_CLASSIC), timerLimit(0),
+    : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(0),
       currentAction(0), observer(0), testsuite(testsuite)
 {
 }
 
 TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
-    : summoningSickness(0), forceAbility(false), gameType(GAME_TYPE_CLASSIC), timerLimit(FAST_TEST),
+    : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(FAST_TEST),
       currentAction(0), observer(0), testsuite(testsuite)
 {
     filename = _filename;

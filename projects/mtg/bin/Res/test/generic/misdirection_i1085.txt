@@ -13,7 +13,6 @@ hand:misdirection
 [DO]
 shock
 p2
-no
 yes
 misdirection
 choice 0

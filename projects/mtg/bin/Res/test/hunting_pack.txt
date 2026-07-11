@@ -11,6 +11,9 @@ life:20
 Mox Emerald
 Ornithopter
 Hunting Pack
+goto firstmain
+goto firstmain
+goto firstmain
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]

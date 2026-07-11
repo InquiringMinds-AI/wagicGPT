@@ -11,7 +11,6 @@ inplay:hill giant,1393,1392
 mountain
 lightning bolt
 hill giant
-no
 yes
 1392
 1393

@@ -10,7 +10,6 @@ manapool:{1}{U}
 library:island
 [DO]
 bad moon
-no
 yes
 Remand
 bad moon

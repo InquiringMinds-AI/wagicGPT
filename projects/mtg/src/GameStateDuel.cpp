@@ -946,6 +946,12 @@ void GameStateDuel::Update(float dt)
 #ifdef TESTSUITE
             if (mParent->players[1] == PLAYER_TYPE_TESTSUITE)
             {
+                //A game that ended BY ITSELF (e.g. a lethal trigger loop
+                //draining a player) never reaches the script's
+                //end-of-actions assert - run it now against the finished
+                //game so the test is counted instead of vanishing.
+                if (!testSuite->mAsserted)
+                    testSuite->assertGame();
                 if (testSuite->loadNext())
                 {
                     loadTestSuitePlayers();

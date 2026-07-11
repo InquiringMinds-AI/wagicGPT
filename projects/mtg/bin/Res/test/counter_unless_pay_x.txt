@@ -11,7 +11,6 @@ hand:syncopate
 manapool:{3}{U}
 [DO]
 think twice
-no
 yes
 syncopate
 choice 3

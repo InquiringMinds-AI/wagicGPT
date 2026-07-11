@@ -1,23 +1,31 @@
 #Uyo, Silent Prophet (#1085; set id 376565): {2} + bounce two lands - copy
-#target instant/sorcery on the stack. Shock at the opponent, respond with
-#Uyo copying it, copy also at the opponent: 4 total damage (life 16), both
-#lands in hand.
+#target instant/sorcery on the stack. Under the redesigned priority model a
+#player is never offered a window on their OWN spell (auto-yield unless the
+#INTERRUPTMYSPELLS option is on, which the test harness cannot set), so the
+#old "shock, hold priority, copy your own shock" line is unscriptable.
+#Re-choreographed: P1 casts Grizzly Bears; P2 responds with Shock at P1;
+#P1 responds to P2's Shock with Uyo, bouncing both lands, copying the Shock
+#and pointing the copy at P2. Copy hits P2 for 2 (life 18), original hits
+#P1 for 2 (life 18), both lands in hand - same Uyo mechanics proven.
 [INIT]
 firstmain
 [PLAYER1]
-manapool:{2}{R}
+manapool:{G}{G}{2}
 inplay:376565,darksteel citadel,ancient den
-hand:shock
+hand:grizzly bears
 [PLAYER2]
+manapool:{R}
+hand:shock
 [DO]
+grizzly bears
+yes
 shock
-p2
+p1
 yes
 376565
 darksteel citadel
 ancient den
 shock
-goto firstmain
 choice 0
 p2
 endinterruption
@@ -26,9 +34,12 @@ goto firstmain
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-graveyard:shock
-inplay:376565
+inplay:376565,grizzly bears
 hand:darksteel citadel,ancient den
+life:18
+manapool:{0}
 [PLAYER2]
-life:16
+graveyard:shock
+life:18
+manapool:{0}
 [END]

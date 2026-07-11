@@ -11,7 +11,6 @@ manapool:{W}
 [DO]
 fists of ironwood
 grizzly bears
-no
 yes
 swords to plowshares
 grizzly bears

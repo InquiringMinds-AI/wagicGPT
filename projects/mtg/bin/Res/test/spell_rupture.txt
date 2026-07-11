@@ -12,7 +12,6 @@ hand:spell rupture
 manapool:{1}{U}
 [DO]
 bad moon
-no
 yes
 spell rupture
 bad moon

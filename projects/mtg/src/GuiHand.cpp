@@ -6,7 +6,7 @@
 #include "Trash.h"
 #include "GuiHand.h"
 #include "OptionItem.h"
-#include "ActionLayer.h"
+#include "LegalActions.h"
 #ifdef WITH_GPT_AI
 #include "GptConfig.h"
 #endif
@@ -226,19 +226,21 @@ void GuiHandSelf::Update(float dt)
     backpos.Update(dt);
     GuiHand::Update(dt);
 
-    //Castability display: refresh which hand cards the engine would react
-    //to right now. The rules layer's isReactingToClick is the same check a
-    //real click goes through, so the display can never lie.
+    //Castability display: refresh which hand cards could legally be played
+    //right now. Uses the PURE oracle - probing the rules layer's
+    //isReactingToClick from here both mutates state (Leyline auto-resolve)
+    //and drags non-reentrant parse paths into the threaded test suite.
     mCastableRefresh -= dt;
-    if (mCastableRefresh <= 0)
+    if (mCastableRefresh <= 0 && hand && hand->owner)
     {
         mCastableRefresh = 0.25f;
         mCastable.clear();
+        std::set<MTGCardInstance*> ok = LegalActionsOracle::castableForDisplay(hand->owner);
         for (vector<CardView*>::iterator it = cards.begin(); it != cards.end(); ++it)
         {
             MTGCardInstance * c = (*it)->card;
             if (c)
-                mCastable[c] = observer->mLayers->actionLayer()->isReactingToClick(c) != 0;
+                mCastable[c] = ok.count(c) != 0;
         }
     }
 }

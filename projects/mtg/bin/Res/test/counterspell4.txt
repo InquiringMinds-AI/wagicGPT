@@ -9,7 +9,6 @@ hand:counterspell (RV)
 manapool:{U}{U}
 [DO]
 bad moon
-no
 yes
 counterspell (RV)
 bad moon

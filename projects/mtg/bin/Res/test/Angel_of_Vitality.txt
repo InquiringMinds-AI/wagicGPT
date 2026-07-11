@@ -8,14 +8,10 @@ manapool:{1}{W}
 [PLAYER2]
 [DO]
 Savannah Sage
-next
-#attack
-next
+goto attackers
 Angel of Vitality
 next
-#damage
-next
-#end
+goto end
 eot
 #untap
 [ASSERT]

@@ -37,20 +37,14 @@ int ActionLayer::removeFromGame(ActionElement * e)
         return 0; //Should not happen, it means we deleted thesame object twice?
     AbilityFactory af(observer);
 
-    MTGAbility * a = dynamic_cast<MTGAbility*>(e);
-    if (a != NULL)
-    {
-        MTGAbility * toCheck = af.getCoreAbility(a);
-        AManaProducer * manaObject = dynamic_cast<AManaProducer*>(toCheck);
-        if(manaObject)
+    //Unconditionally purge the manaObjects index (see GuiLayer::Remove for
+    //the dangling-pointer failure the conditional purge caused).
+    for (size_t k = 0; k < manaObjects.size(); k++)
+        if (manaObjects[k] == e)
         {
-            for (size_t i = 0; i < manaObjects.size(); i++)
-                if (manaObjects[i] == e)
-                {
-                    manaObjects.erase(manaObjects.begin() + i);
-                }
+            manaObjects.erase(manaObjects.begin() + k);
+            break;
         }
-    }
     mObjects.erase(mObjects.begin() + i);
     return 1;
 }

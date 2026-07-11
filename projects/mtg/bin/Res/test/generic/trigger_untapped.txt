@@ -11,18 +11,10 @@ life:20
 [DO]
 thundermare
 vitalize
-next
-#begin
-next
-#attackers
+goto attackers
 wake thrasher
 next
-#blockers
-next
-#damage
-next
-#end combat
-next
+goto secondmain
 [ASSERT]
 SECONDMAIN
 [PLAYER1]

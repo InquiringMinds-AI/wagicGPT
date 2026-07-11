@@ -6,6 +6,7 @@
 #include "AllAbilities.h"
 #include "TargetChooser.h"
 #include "PlayRestrictions.h"
+#include "ActionStack.h"
 
 bool LegalActionsOracle::payable(Player * p, ManaEngine::ManaPolicy & policy, MTGCardInstance * card, ManaCost * pMana)
 {
@@ -128,4 +129,94 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
     }
 
     return result;
+}
+
+namespace
+{
+    bool isWrappedManaProducer(MTGAbility * a)
+    {
+        if (dynamic_cast<AManaProducer*>(a))
+            return true;
+        if (GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(a))
+        {
+            if (dynamic_cast<AManaProducer*>(gmp->ability))
+                return true;
+            if (AForeach * fmp = dynamic_cast<AForeach*>(gmp->ability))
+                if (dynamic_cast<AManaProducer*>(fmp->ability))
+                    return true;
+        }
+        return false;
+    }
+}
+
+bool LegalActionsOracle::hasInstantResponse(Player * p)
+{
+    GameObserver * g = p->getObserver();
+    ManaEngine::FreeProducerPolicy freePolicy;
+    ManaCost * pMana = ManaEngine::potentialMana(p, freePolicy, NULL);
+    pMana->add(p->getManaPool());
+
+    bool any = !legalCasts(p, freePolicy, pMana, true).empty();
+
+    for (size_t i = 1; !any && i < g->mLayers->actionLayer()->mObjects.size(); i++)
+    {
+        MTGAbility * a = (MTGAbility *) g->mLayers->actionLayer()->mObjects[i];
+        ActivatedAbility * aa = dynamic_cast<ActivatedAbility*>(a);
+        if (!aa || !aa->source)
+            continue;
+        if (aa->source->controller() != p)
+            continue;
+        if (aa->source->isPhased)
+            continue;
+        if (isWrappedManaProducer(aa))
+            continue; //making mana is not a response
+        //instant-speed usability only: phase- and sorcery-scoped
+        //activations are not responses at a priority window
+        if (aa->restrictions == MTGAbility::PLAYER_TURN_ONLY && g->currentPlayer != p)
+            continue;
+        if (aa->restrictions == MTGAbility::OPPONENT_TURN_ONLY && g->currentPlayer == p)
+            continue;
+        if (aa->restrictions != MTGAbility::NO_RESTRICTION && aa->restrictions != MTGAbility::PLAYER_TURN_ONLY
+            && aa->restrictions != MTGAbility::OPPONENT_TURN_ONLY)
+            continue;
+        if (aa->needsTapping && (aa->source->isTapped() || aa->source->hasSummoningSickness()))
+            continue;
+        ManaCost * cost = aa->getCost();
+        if (cost && cost->getConvertedCost() && !pMana->canAfford(cost, 0))
+            continue;
+        any = true;
+    }
+    delete pMana;
+    return any;
+}
+
+std::set<MTGCardInstance*> LegalActionsOracle::castableForDisplay(Player * p)
+{
+    std::set<MTGCardInstance*> out;
+    GameObserver * g = p->getObserver();
+    int phase = g->getCurrentGamePhase();
+    bool sorcerySpeed = g->currentPlayer == p
+        && (phase == MTG_PHASE_FIRSTMAIN || phase == MTG_PHASE_SECONDMAIN)
+        && g->mLayers->stackLayer()->count(0, NOT_RESOLVED) == 0;
+
+    ManaEngine::FreeProducerPolicy freePolicy;
+    ManaCost * pMana = ManaEngine::potentialMana(p, freePolicy, NULL);
+    pMana->add(p->getManaPool());
+    vector<Cast> casts = legalCasts(p, freePolicy, pMana, !sorcerySpeed);
+    delete pMana;
+    for (size_t i = 0; i < casts.size(); i++)
+        if (casts[i].zoneLabel.empty()) //display covers the hand only
+            out.insert(casts[i].card);
+
+    if (sorcerySpeed)
+    {
+        for (int i = 0; i < p->game->hand->nb_cards; i++)
+        {
+            MTGCardInstance * card = p->game->hand->cards[i];
+            if (card->isLand()
+                && p->game->playRestrictions->canPutIntoZone(card, p->game->inPlay) != PlayRestriction::CANT_PLAY)
+                out.insert(card);
+        }
+    }
+    return out;
 }

@@ -68,6 +68,10 @@ public:
     void ResetManapools();
     void initGame();
     void assertGame();
+    //set once assertGame has run - lets the runner auto-assert when the
+    //game ends by itself (lethal trigger loop) before the script's
+    //end-of-actions assert is reached
+    bool mAsserted;
     MTGPlayerCards * buildDeck(Player* player, int playerId);
     GameType getGameType() { return gameType; };
     string getNextAction();
@@ -134,6 +138,7 @@ private:
     MTGCardInstance * getCard(string action);
     float timer;
     float aiActCounter; //dt fed to AIPlayerBaka::Act in [AI] tests (was a thread-shared function static)
+    bool mAssertPhaseArmed; //[AI] tests: game has left the [ASSERT] phase at least once
     TestSuiteGame * suite;
 
 public:

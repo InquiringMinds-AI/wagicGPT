@@ -9,7 +9,6 @@ hand:Undermine
 manapool:{U}{U}{B}
 [DO]
 Bad Moon
-no
 yes
 Undermine
 Bad Moon

@@ -13,7 +13,6 @@ manapool:{U}{U}
 [DO]
 Wreak Havoc
 Island
-no
 yes
 Counterspell
 Wreak Havoc

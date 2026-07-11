@@ -13,7 +13,6 @@ hand:Absorb
 manapool:{W}{U}{U}
 [DO]
 Great Sable Stag
-no
 yes
 Absorb
 Great Sable Stag

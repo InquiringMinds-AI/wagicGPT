@@ -10,7 +10,6 @@ inplay:136210
 Mountain
 Lightning Bolt
 136210
-no
 yes
 136210
 choice 0

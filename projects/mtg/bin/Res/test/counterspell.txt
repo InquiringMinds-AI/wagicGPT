@@ -9,7 +9,6 @@ hand:1196
 manapool:{U}{U}
 [DO]
 1144
-no
 yes
 1196
 1144

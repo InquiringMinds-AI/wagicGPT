@@ -8,14 +8,10 @@ manapool:{1}{W}{W}
 [PLAYER2]
 [DO]
 Angel of Vitality
-next
-#attack
-next
+goto attackers
 Angel of Vitality
 next
-#damage
-next
-#end
+goto end
 eot
 #untap
 [ASSERT]

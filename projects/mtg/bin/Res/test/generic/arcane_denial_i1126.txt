@@ -15,7 +15,6 @@ library:Rod of Ruin,Howling Mine,Icy Manipulator
 life:20
 [DO]
 Grizzly Bears
-no
 yes
 Arcane Denial
 Grizzly Bears

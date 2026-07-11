@@ -5,20 +5,70 @@
 #include "GameObserver.h"
 #include "AllAbilities.h"
 #include "ManaCostHybrid.h"
+#include "ExtraCost.h"
 
 int ManaEngine::FreeProducerPolicy::canHandle(MTGAbility * producer)
 {
     //Auto-activation on a player's behalf is only safe for producers whose
-    //activation carries no extra cost (nothing to sacrifice/discard/choose).
+    //activation carries no REAL extra cost (nothing to sacrifice/discard/
+    //choose). Tapping/untapping the source itself is how a mana ability
+    //works, not a cost to protect the player from - a plain {T} parses as
+    //a TapCost ExtraCost, so an all-or-nothing extraCosts check would
+    //reject every basic land.
     ManaCost * cost = producer->getCost();
-    if (!cost)
+    if (!cost || !cost->extraCosts)
         return 1;
-    return cost->extraCosts ? 0 : 1;
+    for (size_t i = 0; i < cost->extraCosts->costs.size(); i++)
+    {
+        ExtraCost * ec = cost->extraCosts->costs[i];
+        if (!dynamic_cast<TapCost*>(ec) && !dynamic_cast<UnTapCost*>(ec))
+            return 0;
+    }
+    return 1;
+}
+
+
+namespace
+{
+    //Player-parameterized replica of AManaProducer::isReactingToClick.
+    //The real method evaluates game->currentlyActing(), which is the WRONG
+    //subject when the engine probes a non-acting responder (priority
+    //windows) or renders castability. checkCost=false mirrors the one
+    //legacy call site that passed the producer's own cost as the pool.
+    bool producerUsable(Player * p, AManaProducer * amp, MTGCardInstance * card, bool checkCost)
+    {
+        MTGCardInstance * source = amp->source;
+        if (card != source)
+            return false;
+        if (amp->castRestriction.size())
+        {
+            AbilityFactory af(p->getObserver());
+            if (!af.parseCastRestrictions(card, card->controller(), amp->castRestriction))
+                return false;
+        }
+        if (amp->tap && (source->isTapped() || source->hasSummoningSickness()))
+            return false;
+        if (!p->game->inPlay->hasCard(source))
+            return false;
+        if (!(source->hasType(Subtypes::TYPE_LAND) || !amp->tap || !source->hasSummoningSickness()))
+            return false;
+        if (source->isPhased)
+            return false;
+        if (checkCost)
+        {
+            ManaCost * cost = amp->getCost();
+            if (cost && !(p->getManaPool()->canAfford(cost, card->has(Constants::ANYTYPEOFMANAABILITY))
+                          && (!cost->extraCosts || cost->extraCosts->canPay())))
+                return false;
+        }
+        return true;
+    }
 }
 
 ManaCost * ManaEngine::potentialMana(Player * p, ManaPolicy & policy, MTGCardInstance * target)
 {
     ManaCost * result = NEW ManaCost();
+
     map<MTGCardInstance *, bool> used;
     for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
     { 
@@ -45,7 +95,7 @@ ManaCost * ManaEngine::potentialMana(Player * p, ManaPolicy & policy, MTGCardIns
             MTGCardInstance * card = amp->source;
             if (card == target)
                 used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
-            if (!used[card] && amp->isReactingToClick(card) && amp->output->getConvertedCost() == 1)
+            if (!used[card] && producerUsable(p, amp, card, true) && amp->output->getConvertedCost() == 1)
             {//ai can't use cards which produce more than 1 converted while using the old pMana method.
                 result->add(amp->output);
                 used[card] = true;
@@ -105,7 +155,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                     MTGCardInstance * card = amp->source;
                     if (card == target)
                         used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
-                    if (!used[card] && amp->isReactingToClick(card) && amp->output->getConvertedCost() >= 1)
+                    if (!used[card] && producerUsable(p, amp, card, true) && amp->output->getConvertedCost() >= 1)
                     {
                         if(!(result->canAfford(cost,0)))//if we got to this point we should be filling colorless mana requirements.
                         {
@@ -147,7 +197,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                 }
             }
         }
-        else if (amp && policy.canHandle(amp) && amp->isReactingToClick(amp->source,amp->getCost()))
+        else if (amp && policy.canHandle(amp) && producerUsable(p, amp, amp->source, false))
         {
             for (int k = Constants::NB_Colors-1; k > 0 ; k--)//go backwards.
             {
@@ -156,7 +206,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                     MTGCardInstance * card = amp->source;
                     if (card == target)
                         used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
-                    if (!used[card] && amp->isReactingToClick(card) && amp->output->getConvertedCost() >= 1)
+                    if (!used[card] && producerUsable(p, amp, card, true) && amp->output->getConvertedCost() >= 1)
                     {
                         ManaCost * check = NEW ManaCost();
                         check->add(k,cost->getCost(k));
@@ -201,7 +251,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                         MTGCardInstance * card = amp->source;
                         if (card == target)
                             used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
-                        if (!used[card] && amp->isReactingToClick(card) && amp->output->getConvertedCost() >= 1)
+                        if (!used[card] && producerUsable(p, amp, card, true) && amp->output->getConvertedCost() >= 1)
                         {
                             ManaCost * check = NEW ManaCost();
                             check->add(foundColor1?hybridCost->color1:hybridCost->color2,foundColor1?hybridCost->value1:hybridCost->value2);
@@ -278,7 +328,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
             AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
             if (amp && policy.canHandle(amp))
             {
-                if (!used[amp->source] && amp->isReactingToClick(amp->source) && amp->output->getConvertedCost() >= 1)
+                if (!used[amp->source] && producerUsable(p, amp, amp->source, true) && amp->output->getConvertedCost() >= 1)
                 {
                     payments.push_back(amp);
                 }

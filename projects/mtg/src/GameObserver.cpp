@@ -1,6 +1,7 @@
 #include "PrecompiledHeader.h"
 
 #include "GameObserver.h"
+#include "LegalActions.h"
 #ifdef WITH_GPT_AI
 #include "GptConfig.h"
 #endif
@@ -349,12 +350,20 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
         //displays, it makes no sense that you travel through 4 or 5 phases with library or grave still open.
     }*/
     Phase * cPhaseOld = phaseRing->getCurrentPhase();
+    //Priority at phase boundaries (auto-pass with stops): a window is
+    //created when the step is a forced stop (combat sub-steps, the
+    //per-phase interrupt option, the per-player stop phase) or when the
+    //NON-acting player could actually respond right now
+    //(LegalActionsOracle::hasInstantResponse). Everyone else auto-passes
+    //and the phase advances directly - no window, no wasted decision.
+    //(Replaces the old blanket opponent()->isAI() window.)
+    Player * phaseResponder = (currentlyActing() == players[0]) ? players[1] : players[0];
     if (allowInterrupt && ((cPhaseOld->id == MTG_PHASE_COMBATBLOCKERS && combatStep == ORDER)
         || (cPhaseOld->id == MTG_PHASE_COMBATBLOCKERS && combatStep == TRIGGERS)
         || (cPhaseOld->id == MTG_PHASE_COMBATDAMAGE)
-        || opponent()->isAI() 
         || options[Options::optionInterrupt(mCurrentGamePhase)].number
         || currentPlayer->offerInterruptOnPhase - 1 == mCurrentGamePhase
+        || LegalActionsOracle::hasInstantResponse(phaseResponder)
     ))
     {
         mLayers->stackLayer()->AddNextGamePhase();

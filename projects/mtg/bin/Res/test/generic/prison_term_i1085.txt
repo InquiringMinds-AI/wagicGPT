@@ -29,6 +29,7 @@ hill giant
 goto firstmain
 goto firstmain
 choice 0
+endinterruption
 goto firstmain
 goto firstmain
 goto attackers

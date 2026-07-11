@@ -1,6 +1,7 @@
 #ifndef _LEGALACTIONS_H_
 #define _LEGALACTIONS_H_
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -48,6 +49,21 @@ public:
     //flashback / retrace, plus specific-producer payment plans).
     static bool payable(Player * p, ManaEngine::ManaPolicy & policy,
                         MTGCardInstance * card, ManaCost * pMana);
+
+    //TRUE when p could actually RESPOND at a priority window right now: an
+    //instant-speed legal cast, or a usable non-mana activated ability.
+    //Pure (no state mutation). Deliberately PERMISSIVE on abilities (extra
+    //costs are not target-validated): a spurious window costs one
+    //auto-answered decision; a missed window costs a game. This is the
+    //auto-pass predicate of the priority engine.
+    static bool hasInstantResponse(Player * p);
+
+    //The castability display set: every card in p's hand a click could
+    //legally play right now (spells via legalCasts; lands when a land drop
+    //is available at sorcery speed). PURE - unlike the rules layer's
+    //isReactingToClick walk, which mutates (Leyline auto-resolution) and is
+    //not safe to probe from rendering code.
+    static std::set<MTGCardInstance*> castableForDisplay(Player * p);
 };
 
 #endif

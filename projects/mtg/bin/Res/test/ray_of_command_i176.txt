@@ -15,7 +15,6 @@ manapool:{U}{U}{U}{U}
 [DO]
 Boa Constrictor
 Lightning Elemental
-no
 yes
 Ray of Command
 Boa Constrictor

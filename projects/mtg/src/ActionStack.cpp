@@ -4,6 +4,7 @@ The Action Stack contains all information for Game Events that can be interrupte
 #include "PrecompiledHeader.h"
 
 #include "ActionStack.h"
+#include "LegalActions.h"
 #include "CardGui.h"
 #include "Damage.h"
 #include "GameObserver.h"
@@ -734,19 +735,9 @@ int ActionStack::addAbility(MTGAbility * ability)
 {
     StackAbility * stackAbility = NEW StackAbility(observer, mObjects.size(), ability);
     int result = addAction(stackAbility);
-    if (!observer->players[0]->isAI() && ability->source->controller() == observer->players[0] && 0
-        == options[Options::INTERRUPTMYABILITIES].number)
-    {
-        if((observer->gameType() == GAME_TYPE_MOMIR && ability->aType == MTGAbility::FORCED_TOKEN_CREATOR)||
-            ((dynamic_cast<GenericTargetAbility *>(ability) || dynamic_cast<AEvokeSacrifice *>(ability)) && ability->canBeInterrupted && !observer->OpenedDisplay && !observer->players[0]->game->reveal->cards.size()))//test interrupt...
-            interruptDecision[0] = NOT_DECIDED;
-        else
-            interruptDecision[0] = DONT_INTERRUPT;
-    }
-    if (observer->OpenedDisplay && observer->players[0]->game->reveal->cards.size())
-    {
-        interruptDecision[0] = DONT_INTERRUPT;
-    }
+    //Priority: no push-time suppression - whether each player is offered a
+    //window is decided at offer time by wouldOfferWindow() (auto-pass with
+    //stops), from a NOT_DECIDED start.
     return result;
 }
 
@@ -782,6 +773,7 @@ int ActionStack::AddNextGamePhase()
     addAction(next);
     int playerId = (observer->currentActionPlayer == observer->players[1]) ? 1 : 0;
     interruptDecision[playerId] = DONT_INTERRUPT;
+    mPriorityOn = next; //bound at push: the requester's pass IS the request
     return 1;
 }
 
@@ -844,13 +836,10 @@ Spell * ActionStack::addSpell(MTGCardInstance * _source, TargetChooser * tc, Man
     }
     Spell * spell = NEW Spell(observer, mObjects.size(), _source, tc, mana, payResult);
     addAction(spell);
-    if (!observer->players[0]->isAI() && _source->controller() == observer->players[0] && 0 == options[Options::INTERRUPTMYSPELLS].number)
-    {
-        if(forcedinterrupt)
-            interruptDecision[0] = INTERRUPT;
-        else
-            interruptDecision[0] = DONT_INTERRUPT;
-    }
+    //Priority: push-time suppression removed (offer-time auto-pass decides);
+    //forcedinterrupt still pre-commits the human to respond.
+    if (forcedinterrupt && !observer->players[0]->isAI() && _source->controller() == observer->players[0])
+        interruptDecision[0] = INTERRUPT;
     return spell;
 }
 
@@ -866,6 +855,7 @@ Interruptible * ActionStack::getAt(int id)
 ActionStack::ActionStack(GameObserver* game)
     : GuiLayer(game), currentTutorial(0)
 {
+    mPriorityOn = NULL;
     for (int i = 0; i < 2; i++)
         interruptDecision[i] = NOT_DECIDED;
     askIfWishesToInterrupt = NULL;
@@ -915,6 +905,7 @@ int ActionStack::resolve()
 
     if (!action)
         return 0;
+    mPriorityOn = NULL; //next stack top binds a fresh priority round
 
     DebugTrace("Resolving Action on stack: " << action->getDisplayName());
     if (action->resolve())
@@ -1059,17 +1050,46 @@ int ActionStack::receiveEventPlus(WEvent * event)
     return result;
 }
 
+bool ActionStack::wouldOfferWindow(Player * p, Interruptible * action)
+{
+    //Own casts/abilities auto-yield by default; the INTERRUPTMY* options
+    //opt back in to being offered windows on your own actions.
+    if (action && action->source && action->source->controller() == p)
+    {
+        if (action->type == ACTION_SPELL && !options[Options::INTERRUPTMYSPELLS].number)
+            return false;
+        if (action->type == ACTION_ABILITY && !options[Options::INTERRUPTMYABILITIES].number)
+            return false;
+    }
+    //UI modality: a human mid-display/reveal cannot answer a window.
+    if (!p->isAI() && (observer->OpenedDisplay || p->game->reveal->cards.size()))
+        return false;
+    //The universal priority rule: a window exists iff the player could
+    //actually respond right now. Everyone else auto-passes silently.
+    return LegalActionsOracle::hasInstantResponse(p);
+}
+
 void ActionStack::Update(float dt)
 {
+    //The game ends IMMEDIATELY when a player is dead (rule 104): stop
+    //resolving stack objects - without this, a lethal trigger loop resolves
+    //one extra iteration past the killing blow (life -1 / an extra drain).
+    if (observer->didWin())
+        return;
+
     //This is a hack to avoid updating the stack while tuto messages are being shown
     //Ideally, the tuto messages should be moved to a layer above this one
     //No need for Tuto when no human in game
     if (getCurrentTutorial() && (observer->players[0]->isHuman() || observer->players[1]->isHuman() ) )
         return;
 
+    //A pending decision menu (kicker/X/mode/resolution-time choice) holds
+    //the priority round for EVERY controller - the old human-only gate let
+    //testsuite/AI games settle passes and resolve the spell before its
+    //controller's scripted/policy answer arrived (Prohibit resolving
+    //targetless, Mystic Confluence wedging mid-modes).
     if (observer->mLayers->actionLayer()->menuObject)// || observer->LPWeffect) //test fix for hang for both legendary with action/reveal
-        if(observer->players[0]->isHuman() || observer->players[1]->isHuman())
-            return;//dont do any of this if a menuobject exist.
+        return;//dont do any of this if a menuobject exists.
 
     askIfWishesToInterrupt = NULL;
     //modal = 0;
@@ -1133,6 +1153,34 @@ void ActionStack::Update(float dt)
                     currentPlayerId = 1;
                     otherPlayerId = 0;
                 }
+                if (currentSpell != mPriorityOn)
+                {
+                    //A NEW stack object holds the top: bind a fresh priority
+                    //round to it and let one tick pass before anyone passes
+                    //or anything resolves. That tick is when triggered
+                    //abilities enter the stack and state-based actions are
+                    //applied - resolving in the same tick lets spells "jump"
+                    //their triggers (bushido never fires, Chalice counters
+                    //nothing, a dead Soul Warden still gains life).
+                    mPriorityOn = currentSpell;
+                    for (int di = 0; di < 2; di++)
+                        if (interruptDecision[di] != DONT_INTERRUPT_ALL)
+                            interruptDecision[di] = NOT_DECIDED;
+                }
+                else
+                {
+                //Auto-pass settles within THIS tick: a silent pass must not
+                //consume frames, or resolution timing becomes wall-clock
+                //sensitive (scripted/suite play desyncs, and real play adds
+                //frames of dead time per stack item).
+                if (interruptDecision[currentPlayerId] == NOT_DECIDED
+                    && !wouldOfferWindow(observer->players[currentPlayerId], currentSpell))
+                    interruptDecision[currentPlayerId] = DONT_INTERRUPT;
+                if (interruptDecision[currentPlayerId] == DONT_INTERRUPT
+                    && interruptDecision[otherPlayerId] == NOT_DECIDED
+                    && !wouldOfferWindow(observer->players[otherPlayerId], currentSpell))
+                    interruptDecision[otherPlayerId] = DONT_INTERRUPT;
+
                 if (interruptDecision[currentPlayerId] == NOT_DECIDED)
                 {
                     askIfWishesToInterrupt = observer->players[currentPlayerId];
@@ -1160,6 +1208,7 @@ void ActionStack::Update(float dt)
                     {
                         resolve();
                     }
+                }
                 }
             }
         }

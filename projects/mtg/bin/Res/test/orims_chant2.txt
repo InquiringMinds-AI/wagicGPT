@@ -20,12 +20,11 @@ next
 #main
 mountain
 raging goblin
-no
 yes
 plains
 Orim's chant
 p2
-endofinterruption
+endinterruption
 swamp
 forest
 grizzly bears

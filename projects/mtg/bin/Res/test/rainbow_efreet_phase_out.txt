@@ -9,7 +9,6 @@ inplay:rainbow efreet,1394,1392
 [DO]
 lightning bolt
 rainbow efreet
-no
 yes
 1394
 1392

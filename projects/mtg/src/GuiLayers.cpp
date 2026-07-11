@@ -49,21 +49,19 @@ void GuiLayer::Add(JGuiObject *object)
 int GuiLayer::Remove(JGuiObject *object)
 {
 
-    AbilityFactory af(observer);
-    MTGAbility * a = dynamic_cast<MTGAbility*>(object);
-    
-    if (a != NULL)
-    {
-        AManaProducer * manaObject = dynamic_cast<AManaProducer*>(af.getCoreAbility(a));
-        if(manaObject)
+    //Unconditionally purge the manaObjects index. The old code re-derived
+    //"is this a mana producer" via getCoreAbility at REMOVAL time - if the
+    //ability's core resolved differently than when it was added (e.g. a
+    //permanent un-transforming), the entry was never erased and the index
+    //kept a dangling pointer that any later potential-mana scan
+    //dynamic_cast'ed. (Likely one face of the historical flaky selfplay
+    //heap corruption.)
+    for (size_t i = 0; i < manaObjects.size(); i++)
+        if (manaObjects[i] == object)
         {
-            for (size_t i = 0; i < manaObjects.size(); i++)
-                if (manaObjects[i] == object)
-                {
-                    manaObjects.erase(manaObjects.begin() + i);
-                }
+            manaObjects.erase(manaObjects.begin() + i);
+            break;
         }
-    }
     for (size_t i = 0; i < mObjects.size(); i++)
         if (mObjects[i] == object)
         {
