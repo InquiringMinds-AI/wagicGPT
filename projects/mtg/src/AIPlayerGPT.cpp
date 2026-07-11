@@ -4,6 +4,7 @@
 
 #include "AIPlayerGPT.h"
 #include "LegalActions.h"
+#include "DecisionContract.h"
 #include "GptConfig.h"
 #include "GameObserver.h"
 #include "MTGDefinitions.h"
@@ -2025,17 +2026,11 @@ int AIPlayerGPT::chooseAttackers()
     if (mAttacksDoneTurn == observer->turn)
         return 1; //this turn's attack was already declared in one reply
 
-    //Collect every creature that could attack this turn.
-    vector<MTGCardInstance *> attackers;
-    CardDescriptor cd;
-    cd.init();
-    cd.setType("creature");
-    MTGCardInstance * card = NULL;
-    while ((card = cd.nextmatch(game->inPlay, card)))
-        if (!card->isAttacker() && card->canAttack())
-            attackers.push_back(card);
-    if (attackers.empty())
+    //The engine's request carries the legal candidates (contract c1).
+    DecisionRequest req;
+    if (!DecisionManager::buildDeclareAttackers(this, req))
         return 1;
+    vector<MTGCardInstance *> & attackers = req.candidates;
 
     //ONE bundled decision for the whole attack. Per-creature asks decided
     //each attacker in isolation (a bad line for alpha strikes and racing)
@@ -2078,6 +2073,10 @@ int AIPlayerGPT::chooseAttackers()
         return AIPlayerBaka::chooseAttackers();
     }
 
+    //Answer through the contract: the manager applies the declaration.
+    //Attack-COST creatures still need the policy to pre-pay mana (see the
+    //contract header) before the apply.
+    DecisionAction act;
     string declared;
     for (size_t j = 0; j < attackers.size(); j++)
     {
@@ -2089,9 +2088,10 @@ int AIPlayerGPT::chooseAttackers()
             doAbility(a, attackers[j]);
             observer->cardClick(attackers[j], MTGAbility::ATTACK_COST);
         }
-        observer->cardClick(attackers[j], MTGAbility::MTG_ATTACK_RULE);
+        act.attackers.push_back(attackers[j]);
         declared += (declared.empty() ? "" : ", ") + attackers[j]->name;
     }
+    DecisionManager::applyDeclareAttackers(req, act);
     narrateDecision(declared.empty() ? string("You declared no attackers this turn")
                                      : ("You declared attackers: " + declared));
     mAttacksDoneTurn = observer->turn;
@@ -2153,40 +2153,14 @@ int AIPlayerGPT::chooseBlockers()
     if (mBlocksDoneTurn == observer->turn)
         return 1; //this combat's assignment was already declared
 
-    vector<MTGCardInstance *> attackers;
-    CardDescriptor ca;
-    ca.init();
-    ca.setType("creature");
-    MTGCardInstance * a = NULL;
-    while ((a = ca.nextmatch(opponent()->game->inPlay, a)))
-        if (a->isAttacker())
-            attackers.push_back(a);
-    if (attackers.empty())
+    //The engine's request carries the attackers and each available
+    //blocker's legal set (contract c1).
+    DecisionRequest req;
+    if (!DecisionManager::buildDeclareBlockers(this, req))
         return 1;
-
-    //Collect every creature that could block something, with its legal set.
-    vector<MTGCardInstance *> blockers;
-    vector<vector<MTGCardInstance *> > legal;
-    CardDescriptor cb;
-    cb.init();
-    cb.setType("creature");
-    cb.unsecureSetTapped(-1);
-    MTGCardInstance * blk = NULL;
-    while ((blk = cb.nextmatch(game->inPlay, blk)))
-    {
-        if (blk->defenser || !blk->canBlock())
-            continue;
-        vector<MTGCardInstance *> l;
-        for (size_t j = 0; j < attackers.size(); j++)
-            if (blk->canBlock(attackers[j]))
-                l.push_back(attackers[j]);
-        if (l.empty())
-            continue;
-        blockers.push_back(blk);
-        legal.push_back(l);
-    }
-    if (blockers.empty())
-        return 1;
+    vector<MTGCardInstance *> & attackers = req.attackers;
+    vector<MTGCardInstance *> & blockers = req.blockers;
+    vector<vector<MTGCardInstance *> > & legal = req.legalPerBlocker;
 
     //ONE bundled decision for the whole combat. Sequential per-blocker asks
     //cannot coordinate (each one's local best answer piled every wall onto
@@ -2247,6 +2221,9 @@ int AIPlayerGPT::chooseBlockers()
         return AIPlayerBaka::chooseBlockers();
     }
 
+    //Answer through the contract: the manager owns the defenser-cycling
+    //choreography and re-validates each assignment.
+    DecisionAction act;
     string declared;
     for (size_t i = 0; i < blockers.size(); i++)
     {
@@ -2255,15 +2232,10 @@ int AIPlayerGPT::chooseBlockers()
         MTGCardInstance * chosen = attackers[pick[i] - 1];
         if (!blockers[i]->canBlock(chosen))
             continue; //model assigned an illegal block: that blocker stays home
-        //Clicking the block rule cycles this creature's defenser through its
-        //legal attackers (and NULL); click until it lands on the chosen one.
-        //Bounded so an unexpected cycle can never spin forever.
-        int guard = (int) attackers.size() + 2;
-        observer->cardClick(blockers[i], MTGAbility::MTG_BLOCK_RULE);
-        while (blockers[i]->defenser != chosen && guard-- > 0)
-            observer->cardClick(blockers[i], MTGAbility::MTG_BLOCK_RULE);
+        act.blocks.push_back(std::make_pair(blockers[i], chosen));
         declared += (declared.empty() ? "" : "; ") + blockers[i]->name + " blocks " + chosen->name;
     }
+    DecisionManager::applyDeclareBlockers(req, act);
     narrateDecision(declared.empty() ? string("You declared no blockers")
                                      : ("You declared blockers: " + declared));
     mBlocksDoneTurn = observer->turn;
