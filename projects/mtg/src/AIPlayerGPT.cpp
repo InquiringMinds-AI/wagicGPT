@@ -1911,6 +1911,7 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     //satisfiable), so the reply stays a single reliable number instead of a
     //free-form list. Prompt-keyed caching keeps repeated polling cheap.
     vector<Targetable *> picks;
+    DecisionRequest req; //the last round's request carries the offered set for apply
     for (;;)
     {
         vector<Targetable *> targets;
@@ -1919,31 +1920,20 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         //1, and an early-listed escape biased multi-target picks short.
         bool mayStop = multi && !picks.empty() && !tc->targetMin;
 
-        for (int i = 0; i < 2; i++)
+        //Candidate enumeration comes from the contract; this seam only
+        //renders it and excludes this selection round's earlier picks.
+        DecisionRequest round;
+        if (DecisionManager::buildChooseTarget(this, tc, round))
         {
-            Player * p = observer->players[i];
-            if (tc->canTarget((Targetable *) p) && !tc->alreadyHasTarget(p)
-                && std::find(picks.begin(), picks.end(), (Targetable *) p) == picks.end())
+            for (size_t i = 0; i < round.targetCandidates.size(); i++)
             {
-                targets.push_back(p);
-                opts.push_back(describeTarget(this, p));
+                Targetable * t = round.targetCandidates[i];
+                if (std::find(picks.begin(), picks.end(), t) != picks.end())
+                    continue;
+                targets.push_back(t);
+                opts.push_back(describeTarget(this, t));
             }
-            MTGPlayerCards * pz = p->game;
-            MTGGameZone * zones[] = { pz->hand, pz->library, pz->inPlay, pz->graveyard, pz->stack, pz->exile, pz->commandzone, pz->sideboard, pz->reveal };
-            for (int j = 0; j < 9; j++)
-            {
-                MTGGameZone * zone = zones[j];
-                for (int k = 0; k < zone->nb_cards && targets.size() < 40; k++)
-                {
-                    MTGCardInstance * t = zone->cards[k];
-                    if (!tc->canTarget(t) || tc->alreadyHasTarget(t))
-                        continue;
-                    if (std::find(picks.begin(), picks.end(), (Targetable *) t) != picks.end())
-                        continue;
-                    targets.push_back(t);
-                    opts.push_back(describeTarget(this, t));
-                }
-            }
+            req = round;
         }
         if (targets.empty())
             break;
@@ -2005,12 +1995,14 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     DebugTrace("AIPlayerGPT: targeting with " << tc->source->getDisplayName()
                << " -> " << picks.size() << " target(s), first: "
                << describeTarget(this, picks[0]));
-    //Reuse the engine's own click paths so the mechanics (source-first
-    //ordering, player clicks, card-batch click, clickstream flushing) stay
-    //byte-identical to the heuristic player's.
-    if (!multi)
-        return clickSingleTarget(tc, picks, chosenCard);
-    return clickMultiTarget(tc, picks);
+    //The manager owns the click choreography (source-first ordering,
+    //player clicks, card batch with done/autoChoice) and re-validates the
+    //picks against the live chooser. chosenCard preserves the historical
+    //"card already clicked upstream" suppression for single card targets.
+    DecisionAction act;
+    act.targets = picks;
+    DecisionManager::applyChooseTarget(req, act, chosenCard != NULL);
+    return 1;
 }
 
 //Scan a bundled-attacker reply for the set of attackers to send: "A<n>"

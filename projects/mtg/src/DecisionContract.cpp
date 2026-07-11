@@ -7,6 +7,7 @@
 #include "GameObserver.h"
 #include "MTGAbility.h"
 #include "Player.h"
+#include "TargetChooser.h"
 
 bool DecisionManager::buildDeclareAttackers(Player * p, DecisionRequest & req)
 {
@@ -218,4 +219,125 @@ void DecisionManager::applyMenuChoice(const DecisionRequest & req, const Decisio
     //can't-cancel menu the same key clicks the last real option (the
     //engine's own convention - an answer must always land)
     object->doReactTo((int) object->abilitiesMenu->mObjects.size() - 1);
+}
+
+bool DecisionManager::buildChooseTarget(Player * p, TargetChooser * tc, DecisionRequest & req)
+{
+    if (!tc || !tc->source)
+        return false;
+    GameObserver * g = p->getObserver();
+
+    req.kind = DecisionRequest::CHOOSE_TARGET;
+    req.player = p;
+    req.sourceCard = tc->source;
+    req.targetMin = tc->targetMin ? 1 : 0;
+    req.maxTargets = tc->maxtargets;
+    req.targetCandidates.clear();
+
+    for (int i = 0; i < 2; i++)
+    {
+        Player * pl = g->players[i];
+        if (tc->canTarget((Targetable *) pl) && !tc->alreadyHasTarget(pl))
+            req.targetCandidates.push_back(pl);
+        MTGPlayerCards * pz = pl->game;
+        MTGGameZone * zones[] = { pz->hand, pz->library, pz->inPlay, pz->graveyard,
+                                  pz->stack, pz->exile, pz->commandzone, pz->sideboard, pz->reveal };
+        for (int j = 0; j < 9; j++)
+        {
+            MTGGameZone * zone = zones[j];
+            for (int k = 0; k < zone->nb_cards && req.targetCandidates.size() < 40; k++)
+            {
+                MTGCardInstance * t = zone->cards[k];
+                if (!tc->canTarget(t) || tc->alreadyHasTarget(t))
+                    continue;
+                req.targetCandidates.push_back(t);
+            }
+        }
+    }
+    return !req.targetCandidates.empty();
+}
+
+void DecisionManager::applyChooseTarget(const DecisionRequest & req, const DecisionAction & act,
+                                        bool skipCardClick)
+{
+    GameObserver * g = req.player->getObserver();
+    TargetChooser * tc = g->getCurrentTargetChooser();
+    //the chooser must still be the one the request described; a closed or
+    //replaced chooser drops the answer (the consumer re-asks on fresh state)
+    if (!tc || tc->source != req.sourceCard)
+        return;
+
+    //re-validate: only offered, still-legal, not-yet-chosen, non-duplicate
+    //picks survive
+    std::vector<Targetable*> picks;
+    for (size_t i = 0; i < act.targets.size(); i++)
+    {
+        Targetable * t = act.targets[i];
+        if (!t || tc->alreadyHasTarget(t) || !tc->canTarget(t))
+            continue;
+        bool offered = false;
+        for (size_t j = 0; !offered && j < req.targetCandidates.size(); j++)
+            offered = req.targetCandidates[j] == t;
+        bool dup = false;
+        for (size_t j = 0; !dup && j < picks.size(); j++)
+            dup = picks[j] == t;
+        if (offered && !dup)
+            picks.push_back(t);
+    }
+    if (picks.empty())
+        return;
+
+    //Single-target chooser: one click commits it. skipCardClick preserves
+    //the historical chosenCard semantics (card already clicked upstream;
+    //player targets still click).
+    if (req.maxTargets == 1)
+    {
+        if (MTGCardInstance * card = dynamic_cast<MTGCardInstance *>(picks[0]))
+        {
+            if (!skipCardClick)
+                g->cardClick(card);
+        }
+        else if (Player * pl = dynamic_cast<Player *>(picks[0]))
+            g->cardClick(NULL, pl);
+        return;
+    }
+
+    //Multi-target choreography (moved from AIPlayer::clickMultiTarget /
+    //AIAction::clickMultiAct): the source's own confirming click first,
+    //then player targets, then the card batch with done/autoChoice set on
+    //the final click so the chooser closes. No shuffle: a contract
+    //consumer's pick order is deliberate.
+    std::vector<Targetable*>::iterator ite = picks.begin();
+    while (ite != picks.end())
+    {
+        MTGCardInstance * card = dynamic_cast<MTGCardInstance *>(*ite);
+        if (card && card == tc->source)
+        {
+            g->cardClick(card);
+            ite = picks.erase(ite);
+            continue;
+        }
+        if (Player * pl = dynamic_cast<Player *>(*ite))
+        {
+            g->cardClick(NULL, pl);
+            ite = picks.erase(ite);
+            continue;
+        }
+        ++ite;
+    }
+    if (picks.empty())
+        return; //players/source only - the chooser fills through those clicks
+    for (int k = 0; k < (int) picks.size() && k < tc->maxtargets; k++)
+    {
+        if (MTGCardInstance * card = dynamic_cast<MTGCardInstance *>(picks[k]))
+        {
+            if (k + 1 == (int) picks.size())
+            {
+                tc->done = true;
+                tc->autoChoice = false;
+            }
+            g->cardClick(card);
+        }
+    }
+    tc->attemptsToFill++;
 }

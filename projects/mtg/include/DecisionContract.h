@@ -8,6 +8,8 @@
 class GameObserver;
 class MTGCardInstance;
 class Player;
+class Targetable;
+class TargetChooser;
 
 /*
  * DecisionRequest / DecisionAction - the frontend-agnostic gameplay
@@ -35,6 +37,7 @@ public:
         CHOOSE_MENU,   //regular action-layer menu (may yes/no, pay/kicker, ability pick)
         CHOOSE_MODE,   //"choose one" modal (MenuAbility::abilities[])
         ANNOUNCE_X,    //X announcement (AAWhatsX; option index == X value)
+        CHOOSE_TARGET, //an open TargetChooser needs its target(s)
     };
     Kind kind;
     Player * player;
@@ -52,8 +55,17 @@ public:
     std::vector<int> menuIndices;
     MTGCardInstance * contextCard;
     bool canDecline;
+    //CHOOSE_TARGET: the chooser's currently-legal candidates (players and
+    //cards across all zones, capped), the source card, and the selection
+    //bounds (targetMin: a minimum must be met before stopping; maxTargets
+    //straight from the chooser, TargetChooser::UNLITMITED_TARGETS included)
+    std::vector<Targetable*> targetCandidates;
+    MTGCardInstance * sourceCard;
+    int targetMin;
+    int maxTargets;
 
-    DecisionRequest() : player(NULL), contextCard(NULL), canDecline(false) {}
+    DecisionRequest() : player(NULL), contextCard(NULL), canDecline(false),
+                        sourceCard(NULL), targetMin(0), maxTargets(0) {}
 };
 
 class DecisionAction
@@ -67,6 +79,8 @@ public:
     //menu family: index into optionTexts (ANNOUNCE_X: the X value itself);
     //-1 = decline (CHOOSE_MENU with canDecline)
     int choice;
+    //CHOOSE_TARGET: the chosen target(s), in chosen order
+    std::vector<Targetable*> targets;
 
     DecisionAction() : choice(-1) {}
 };
@@ -98,6 +112,18 @@ public:
     //real option (the engine's own convention for that key).
     static bool buildMenuChoice(Player * p, DecisionRequest & req);
     static void applyMenuChoice(const DecisionRequest & req, const DecisionAction & act);
+
+    //Targets (c4). buildChooseTarget enumerates the chooser's live legal
+    //candidates (false when none exist); applyChooseTarget re-validates
+    //every pick against the LIVE chooser (stale or illegal picks drop) and
+    //performs the click choreography the AI base classes used to own:
+    //source-first confirming click, player clicks, then the card batch
+    //with done/autoChoice set on the final click. skipCardClick preserves
+    //the historical chosenCard semantics (the card was already clicked by
+    //the caller; only player targets still need a click).
+    static bool buildChooseTarget(Player * p, TargetChooser * tc, DecisionRequest & req);
+    static void applyChooseTarget(const DecisionRequest & req, const DecisionAction & act,
+                                  bool skipCardClick = false);
 };
 
 #endif
