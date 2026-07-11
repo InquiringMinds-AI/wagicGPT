@@ -10,11 +10,14 @@ mana and any castable spell, casting it is almost always right. Do NOT pick
 "Cast nothing right now" while a draw spell, a payoff creature, Prism Ring, or
 Elixir of Immortality is castable. In particular:
 - Artificer's Epiphany (2U, draw 2) and Opportunity (4UU, draw 4): cast them on
-  YOUR OWN main phase the turn you can afford them. Do NOT save them for the
-  opponent's turn - you almost never get a window there, and they rot in hand.
-  These find your Guttersnipes; the deck cannot win without drawing cards.
-- You will NOT be punished for tapping out. Your counterspells almost never get
-  a chance to be cast anyway (see below), so open mana is wasted mana.
+  YOUR OWN main phase the turn you can afford them. Do NOT hoard them for a
+  "better" turn - held draw finds nothing, and with Guttersnipe out the cast
+  itself is 2 damage. These find your Guttersnipes; the deck cannot win
+  without drawing cards.
+- Tapping out to develop your engine is usually right for THIS deck: its
+  spells want to be cast proactively (each one is Guttersnipe damage), so
+  keep counterspell mana open only when you hold a counter AND expect a
+  spell worth stopping this turn cycle.
 
 THE ENGINE - order matters:
 - Guttersnipe (2R, 2/2): every instant/sorcery YOU cast deals 2 damage to the
@@ -42,13 +45,15 @@ LETHAL CHECK each turn: (total power of your attackers) + (2 per instant you
 can cast this turn per Guttersnipe on your battlefield). If that is >= the
 opponent's life, attack with everyone and cast every instant you can pay for.
 
-REACTIVE SPELLS - the truth about this deck: you are almost never offered a
-window to cast spells on the opponent's turn, so counters and fogs usually
-cannot do their job. Treat them accordingly:
-- Counterspell / Dissipate / Essence Scatter: cast one ONLY when your legal
-  actions show an opponent spell actually on the stack. That chance is rare -
-  never keep mana open waiting for it, and never count these cards as your
-  plan. They are the LAST cards in your hand to matter.
+REACTIVE SPELLS - when the opponent casts a spell and you can pay for a
+response, the game opens a window and asks you. The question is never whether
+you will get the chance - it is whether the reaction beats casting the same
+card proactively for Guttersnipe damage:
+- Counterspell / Dissipate / Essence Scatter: cast one when an opponent spell
+  on the stack is genuinely worth stopping - removal aimed at your Guttersnipe
+  or Young Pyromancer, or a threat that beats you. Counter ONLY threats to
+  your engine; against everything else, develop instead. These are support
+  cards, never your plan.
 - Downsize / Hydrolash / Aetherize: use during combat when you are actually
   being attacked, if offered. Otherwise: with Guttersnipe on your battlefield,
   it is GOOD to cast Downsize at any opponent creature on your own turn - the
