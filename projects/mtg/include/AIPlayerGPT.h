@@ -49,6 +49,8 @@
 #include <memory>
 
 class WEvent;
+class DecisionRequest;
+class DecisionAction;
 
 class AIPlayerGPT : public AIPlayerBaka
 {
@@ -94,8 +96,9 @@ protected:
     virtual int selectHintAbility();
     //Menus are decisions too: modal (choose-one) spells, may-prompts and X
     //announcements all route through the model, with the heuristic as the
-    //fallback for anything unparseable.
-    virtual int selectMenuOption();
+    //fallback for anything unparseable. Since c3 they ride the
+    //DecisionRequest contract (chooseMenuAction below); the base
+    //selectMenuOption stays the heuristic policy.
     //Combat declarations are opposed choices too: route each creature's
     //attack / block decision through the model (heuristic when no endpoint).
     virtual int chooseAttackers();
@@ -134,6 +137,13 @@ private:
     //event trace (targets, modes, X values, damage order).
     int askModel(const string& decision, const vector<string>& options, bool narrateChoice = true);
     std::map<string, int> mAskCache;
+
+    //Answer a menu-family DecisionRequest (CHOOSE_MENU / CHOOSE_MODE /
+    //ANNOUNCE_X): ask the model over the snapshotted options, fall back to
+    //the heuristic policy (base selectMenuOption, mapped into option space)
+    //when the model defers. Returns kChoicePending while in flight, else 0
+    //with `act` filled for DecisionManager::applyMenuChoice.
+    int chooseMenuAction(const DecisionRequest & req, DecisionAction & act);
 
     //Can this card plausibly be paid for right now? Cheap pre-filter for the
     //model's casting menu; the authoritative check is the forced

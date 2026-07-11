@@ -1630,17 +1630,27 @@ int AIPlayerGPT::computeActions()
 {
     //Menus must be intercepted here: the base loop reacts to
     //selectMenuOption's return in the same tick, and its contract has no
-    //"not yet" value (negative = click the cancel item). While the menu
-    //decision's model call is in flight we simply do nothing and re-poll;
-    //once decided, mirror the base reaction exactly.
+    //"not yet" value. Since c3 the menu rides the DecisionRequest contract:
+    //the manager snapshots the options, the model (or the heuristic
+    //fallback) picks in option space, and the manager applies the clicks.
+    //While the model call is in flight we do nothing and re-poll.
     if (!mEndpoint.empty() && observer->currentlyActing() == this)
     {
         ActionLayer * object = observer->mLayers->actionLayer();
         if (object->menuObject)
         {
-            int doThis = selectMenuOption();
-            if (doThis == kChoicePending)
+            DecisionRequest req;
+            if (DecisionManager::buildMenuChoice(this, req))
+            {
+                DecisionAction act;
+                if (chooseMenuAction(req, act) == kChoicePending)
+                    return 1;
+                DecisionManager::applyMenuChoice(req, act);
                 return 1;
+            }
+            //no answerable shape (e.g. X no longer affordable): the
+            //heuristic click path, exactly as before the contract
+            int doThis = AIPlayerBaka::selectMenuOption();
             if (doThis >= 0)
             {
                 if (object->abilitiesMenu->isMultipleChoice)
@@ -1648,7 +1658,7 @@ int AIPlayerGPT::computeActions()
                 else
                     observer->mLayers->actionLayer()->doReactTo(doThis);
             }
-            else if (doThis < 0 || object->checkCantCancel())
+            else
                 observer->mLayers->actionLayer()->doReactTo(object->abilitiesMenu->mObjects.size() - 1);
             return 1;
         }
@@ -1806,97 +1816,74 @@ void AIPlayerGPT::Render()
     font->DrawString(buf, SCREEN_WIDTH / 2, 2, JGETEXT_CENTER);
 }
 
-int AIPlayerGPT::selectMenuOption()
+int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & act)
 {
-    if (mEndpoint.empty())
-        return AIPlayerBaka::selectMenuOption();
-    ActionLayer * object = observer->mLayers->actionLayer();
-    if (!object->menuObject)
-        return AIPlayerBaka::selectMenuOption();
+    MTGCardInstance * ctx = req.contextCard;
 
-    MTGCardInstance * ctx = object->currentActionCard;
-
-    if (object->abilitiesMenu->isMultipleChoice && ctx)
+    if (req.kind == DecisionRequest::ANNOUNCE_X)
     {
-        MenuAbility * currentMenu = NULL;
-        for (size_t m = object->mObjects.size() - 1; m > 0; m--)
-        {
-            MenuAbility * ability = dynamic_cast<MenuAbility *>(object->mObjects[m]);
-            if (ability && ability->triggered)
-            {
-                currentMenu = ability;
-                break;
-            }
-        }
-        if (!currentMenu || currentMenu->abilities.empty())
-            return AIPlayerBaka::selectMenuOption();
-
-        //X announcement: the menu's buttons ARE the X values, so the pick
-        //index is the X value itself (the heuristic always dumped all mana).
-        if (dynamic_cast<AAWhatsX *>(currentMenu->abilities[0]))
-        {
-            int maxX = manaPool->getConvertedCost()
-                       - currentMenu->abilities[0]->source->getManaCost()->getConvertedCost();
-            if (maxX < 0)
-                return AIPlayerBaka::selectMenuOption();
-            int shown = maxX > 50 ? 50 : maxX; //bound the menu for degenerate pools
-            vector<string> opts;
-            for (int x = 0; x <= shown; x++)
-            {
-                std::ostringstream o;
-                o << "X = " << x;
-                opts.push_back(o.str());
-            }
-            int pick = askModel("Announce the value of X for " + ctx->getDisplayName()
-                                + " (you can afford up to the largest listed value):", opts);
-            if (pick == kChoicePending)
-                return kChoicePending;
-            if (pick < 0)
-                return AIPlayerBaka::selectMenuOption();
-            return pick;
-        }
-
-        vector<string> opts;
-        for (size_t mk = 0; mk < currentMenu->abilities.size(); mk++)
-            opts.push_back(currentMenu->abilities[mk]->getMenuText());
-        int pick = askModel("Choose one mode for " + ctx->getDisplayName() + ":", opts);
+        //option index IS the X value (the heuristic always dumped all mana)
+        int pick = askModel("Announce the value of X for "
+                            + (ctx ? ctx->getDisplayName() : string("this spell"))
+                            + " (you can afford up to the largest listed value):", req.optionTexts);
         if (pick == kChoicePending)
             return kChoicePending;
         if (pick < 0)
-            return AIPlayerBaka::selectMenuOption();
-        return pick;
+            pick = AIPlayerBaka::selectMenuOption(); //heuristic: max affordable X
+        if (pick >= (int) req.optionTexts.size())
+            pick = (int) req.optionTexts.size() - 1;
+        act.choice = pick < 0 ? 0 : pick;
+        return 0;
     }
 
-    //Regular menu: items with GetId() > 0 map to action-layer abilities;
-    //the trailing cancel item (when the menu is cancellable) is the decline.
-    vector<string> opts;
-    vector<int> indices;
-    for (unsigned int k = 0; k < object->abilitiesMenu->mObjects.size(); k++)
+    if (req.kind == DecisionRequest::CHOOSE_MODE)
     {
-        if (object->abilitiesMenu->mObjects[k]->GetId() <= 0)
-            continue;
-        MTGAbility * ab = (MTGAbility *) object->mObjects[object->abilitiesMenu->mObjects[k]->GetId()];
-        opts.push_back(ab ? ab->getMenuText() : string("(option)"));
-        indices.push_back((int) k);
+        int pick = askModel("Choose one mode for "
+                            + (ctx ? ctx->getDisplayName() : string("this spell")) + ":", req.optionTexts);
+        if (pick == kChoicePending)
+            return kChoicePending;
+        if (pick < 0)
+            pick = AIPlayerBaka::selectMenuOption(); //heuristic: same index space
+        if (pick < 0 || pick >= (int) req.optionTexts.size())
+            pick = 0;
+        act.choice = pick;
+        return 0;
     }
-    if (opts.empty())
-        return AIPlayerBaka::selectMenuOption();
-    bool canDecline = !object->checkCantCancel();
-    if (canDecline)
+
+    //CHOOSE_MENU
+    vector<string> opts = req.optionTexts;
+    if (req.canDecline)
         opts.push_back("Decline - do nothing");
     //One real option and no way to decline: only one outcome, no model call.
     if (opts.size() == 1)
-        return indices[0];
+    {
+        act.choice = 0;
+        return 0;
+    }
     string decision = ctx ? ("Choose an option for " + ctx->getDisplayName() + ":")
                           : string("A choice is required - choose an option:");
     int pick = askModel(decision, opts);
     if (pick == kChoicePending)
         return kChoicePending;
     if (pick < 0)
-        return AIPlayerBaka::selectMenuOption();
-    if (canDecline && pick == (int) opts.size() - 1)
-        return -1; //computeActions reacts to -1 by clicking the cancel item
-    return indices[pick];
+    {
+        //heuristic fallback: base selectMenuOption picks in SimpleMenu item
+        //space; map its pick back into option space
+        int k = AIPlayerBaka::selectMenuOption();
+        act.choice = req.canDecline ? -1 : 0;
+        for (size_t i = 0; i < req.menuIndices.size(); i++)
+            if (req.menuIndices[i] == k)
+            {
+                act.choice = (int) i;
+                break;
+            }
+        return 0;
+    }
+    if (req.canDecline && pick == (int) opts.size() - 1)
+        act.choice = -1; //applyMenuChoice clicks the cancel item
+    else
+        act.choice = pick;
+    return 0;
 }
 
 int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCardInstance * chosenCard, bool checkOnly)
