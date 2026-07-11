@@ -60,6 +60,7 @@ SOURCES += \
         src/AIMomirPlayer.cpp\
         src/AIPlayer.cpp\
         src/AIPlayerBaka.cpp\
+        src/ManaEngine.cpp\
         src/AIPlayerGPT.cpp\
         src/GptConfig.cpp\
         src/OptionGpt.cpp\
@@ -181,6 +182,7 @@ HEADERS  += \
         include/ModRules.h\
         include/AIHints.h\
         include/AIPlayerBaka.h\
+        include/ManaEngine.h\
         include/AIPlayerGPT.h\
         include/GptConfig.h\
         include/OptionGpt.h\

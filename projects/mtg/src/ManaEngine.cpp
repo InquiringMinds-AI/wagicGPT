@@ -1,0 +1,295 @@
+#include "PrecompiledHeader.h"
+
+#include "ManaEngine.h"
+#include "Player.h"
+#include "GameObserver.h"
+#include "AllAbilities.h"
+#include "ManaCostHybrid.h"
+
+int ManaEngine::FreeProducerPolicy::canHandle(MTGAbility * producer)
+{
+    //Auto-activation on a player's behalf is only safe for producers whose
+    //activation carries no extra cost (nothing to sacrifice/discard/choose).
+    ManaCost * cost = producer->getCost();
+    if (!cost)
+        return 1;
+    return cost->extraCosts ? 0 : 1;
+}
+
+ManaCost * ManaEngine::potentialMana(Player * p, ManaPolicy & policy, MTGCardInstance * target)
+{
+    ManaCost * result = NEW ManaCost();
+    map<MTGCardInstance *, bool> used;
+    for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
+    { 
+        //Make sure we can use the ability
+        MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
+        AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
+        GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(a);
+        if(gmp && policy.canHandle(gmp))
+        {
+            //skip for each mana producers.
+            AForeach * fmp = dynamic_cast<AForeach*>(gmp->ability);
+            if(fmp)
+            {
+                amp = dynamic_cast<AManaProducer*> (fmp->ability);
+                if(amp)
+                {
+                    used[fmp->source] = true;
+                    continue;
+                }
+            }
+        }
+        if (amp && policy.canHandle(amp))
+        {
+            MTGCardInstance * card = amp->source;
+            if (card == target)
+                used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
+            if (!used[card] && amp->isReactingToClick(card) && amp->output->getConvertedCost() == 1)
+            {//ai can't use cards which produce more than 1 converted while using the old pMana method.
+                result->add(amp->output);
+                used[card] = true;
+            }
+        }
+    }
+    return result;
+}
+
+vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTGCardInstance * target, ManaCost * cost, int anytypeofmana)
+{
+    if(!cost || (cost && !cost->getConvertedCost()) || !target)
+        return vector<MTGAbility*>();
+    map<MTGCardInstance*, bool> usedCards;
+
+    return planPayment(p, policy, target, cost, anytypeofmana, usedCards, false);
+}
+
+vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTGCardInstance * target, ManaCost * _cost, int anytypeofmana, map<MTGCardInstance*,bool> &used, bool searchingAgain)
+{
+    ManaCost * cost = _cost;
+
+    if(!cost->getConvertedCost())
+        return vector<MTGAbility*>();
+    ManaCost * result = NEW ManaCost();
+
+    vector<MTGAbility*>payments = vector<MTGAbility*>();
+    if (p->getManaPool()->getConvertedCost())
+    {
+        //adding the current manapool if any.
+        result->add(p->getManaPool());
+    }
+
+    if(anytypeofmana){
+        int convertedC = cost->getConvertedCost();
+        cost = NEW ManaCost(ManaCost::parseManaCost("{0}", NULL, target));
+        for (int jj = 0; jj < convertedC; jj++)
+            cost->add(Constants::MTG_COLOR_ARTIFACT, 1);
+    }
+
+    int needColorConverted = cost->getConvertedCost() - int(cost->getCost(0)+cost->getCost(7));
+    int fullColor = 0;
+    for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
+    {
+        MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
+        AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
+        if(amp && (amp->getCost() && amp->getCost()->extraCosts && !amp->getCost()->extraCosts->canPay()))
+            continue;
+        if((fullColor == needColorConverted || cost->hasColor(0) || cost->hasColor(7)) && result->getConvertedCost() < cost->getConvertedCost()) // Fixed a bug on colorless mana calculation for AI.
+        {
+            if((cost->hasColor(0) || cost->hasColor(7)) && amp)//find colorless after color mana.
+            {
+                if(result->canAfford(cost,0))
+                    continue;
+                if (policy.canHandle(amp))
+                {
+                    MTGCardInstance * card = amp->source;
+                    if (card == target)
+                        used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
+                    if (!used[card] && amp->isReactingToClick(card) && amp->output->getConvertedCost() >= 1)
+                    {
+                        if(!(result->canAfford(cost,0)))//if we got to this point we should be filling colorless mana requirements.
+                        {
+                            payments.push_back(amp);
+                            result->add(amp->output);
+                            used[card] = true;
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+        GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(a);
+        if(gmp && policy.canHandle(gmp))
+        {
+            //for each mana producers.
+            AForeach * fmp = dynamic_cast<AForeach*>(gmp->ability);
+            if(fmp)
+            {
+                amp = dynamic_cast<AManaProducer*> (fmp->ability);
+                if(amp)
+                {
+                    MTGCardInstance * fecard = gmp->source;
+                    if (fecard == target)
+                        used[fecard] = true; //http://code.google.com/p/wagic/issues/detail?id=76
+                    if(gmp->getCost() && gmp->getCost()->getConvertedCost() > 0)
+                    {//ai stil can't use cabal coffers and mana abilities which require mana payments effectively;
+                        used[fecard];
+                        continue;
+                    }
+                    if (!used[fecard] && gmp->isReactingToClick(fecard) && amp->output->getConvertedCost() >= 1 && (cost->getConvertedCost() > 1 || cost->hasX()))//wasteful to tap a potential big mana source for a single mana.
+                    {
+                        int outPut = fmp->checkActivation();
+                        for(int k = 0;k < outPut;k++)
+                            result->add(amp->output);
+                        payments.push_back(gmp);
+                        used[fecard] = true;
+                    }
+                }
+            }
+        }
+        else if (amp && policy.canHandle(amp) && amp->isReactingToClick(amp->source,amp->getCost()))
+        {
+            for (int k = Constants::NB_Colors-1; k > 0 ; k--)//go backwards.
+            {
+                if (cost->hasColor(k) && amp->output->hasColor(k) && result->getCost(k) < cost->getCost(k))
+                {
+                    MTGCardInstance * card = amp->source;
+                    if (card == target)
+                        used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
+                    if (!used[card] && amp->isReactingToClick(card) && amp->output->getConvertedCost() >= 1)
+                    {
+                        ManaCost * check = NEW ManaCost();
+                        check->add(k,cost->getCost(k));
+                        ManaCost * checkResult = NEW ManaCost();
+                        checkResult->add(k,result->getCost(k));
+                        if(!(checkResult->canAfford(check,0)))
+                        {
+                            payments.push_back(amp);
+                            result->add(k,amp->output->getCost(k));
+                            used[card] = true;
+                            fullColor++;
+                        }
+                        SAFE_DELETE(check);
+                        SAFE_DELETE(checkResult);
+                    }
+                }
+            }
+        }
+    }
+    ManaCostHybrid * hybridCost;
+    hybridCost = cost->getHybridCost(0);
+    if(hybridCost)
+    {
+        int hyb = 0;
+        while ((hybridCost = cost->getHybridCost(hyb)) != NULL)
+        {
+            //here we try to find one of the colors in the hybrid cost, it is done 1 at a time unfortunately
+            //{rw}{ub} would be 2 runs of this.90% of the time ai finds it's hybrid in pMana check.
+            bool foundColor1 = false;
+            bool foundColor2 = false;
+            for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
+            {
+                MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
+                AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
+                if (amp && policy.canHandle(amp))
+                {
+                    foundColor1 = amp->output->hasColor(hybridCost->color1)?true:false;
+                    foundColor2 = amp->output->hasColor(hybridCost->color2)?true:false;
+                    if ((foundColor1 && result->getCost(hybridCost->color1) < hybridCost->value1)||
+                        (foundColor2 && result->getCost(hybridCost->color2) < hybridCost->value2))
+                    {
+                        MTGCardInstance * card = amp->source;
+                        if (card == target)
+                            used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
+                        if (!used[card] && amp->isReactingToClick(card) && amp->output->getConvertedCost() >= 1)
+                        {
+                            ManaCost * check = NEW ManaCost();
+                            check->add(foundColor1?hybridCost->color1:hybridCost->color2,foundColor1?hybridCost->value1:hybridCost->value2);
+                            ManaCost * checkResult = NEW ManaCost();
+                            checkResult->add(foundColor1?hybridCost->color1:hybridCost->color2,result->getCost(foundColor1?hybridCost->color1:hybridCost->color2));
+                            if(((foundColor1 && !foundColor2)||(!foundColor1 && foundColor2)) &&!(checkResult->canAfford(check,0)))
+                            {
+                                payments.push_back(amp);
+                                result->add(foundColor1?hybridCost->color1:hybridCost->color2,amp->output->getCost(foundColor1?hybridCost->color1:hybridCost->color2));
+                                used[card] = true;
+                                fullColor++;
+                            }
+                            SAFE_DELETE(check);
+                            SAFE_DELETE(checkResult);
+                        }
+                    }
+                }
+            }
+            hyb++;
+        }
+    }
+    else if(!hybridCost && result->getConvertedCost())
+    {
+        ManaCost * check = NEW ManaCost();
+        ManaCost * checkResult = NEW ManaCost();
+        for (int k = 1; k < Constants::NB_Colors; k++)
+        {
+            check->add(k,cost->getCost(k));
+            checkResult->add(k,result->getCost(k));
+            if(!(checkResult->canAfford(check,0)))
+            {
+                SAFE_DELETE(check);
+                SAFE_DELETE(checkResult);
+                SAFE_DELETE(result);
+                payments.clear();
+                return payments;//we didn't meet one of the color cost requirements.
+            }
+        }
+        if(cost->getKicker() && !searchingAgain)
+        {
+
+            ManaCost * withKickerCost= NEW ManaCost(cost->getKicker());
+            vector<MTGAbility*>kickerPayment;
+            bool keepLooking = true;
+            while(keepLooking)
+            {
+                kickerPayment = planPayment(p, policy, target, withKickerCost, target->has(Constants::ANYTYPEOFMANA), used, true);
+                if(kickerPayment.size())
+                {
+                    for(unsigned int w = 0;w < kickerPayment.size();++w)
+                    {
+                        if(used[kickerPayment[w]->source])
+                        {
+                            payments.push_back(kickerPayment[w]);
+                        }
+                    }
+                    keepLooking = cost->getKicker()->isMulti;
+                }
+                else
+                    keepLooking = false;
+            }
+            SAFE_DELETE(withKickerCost);
+        }
+        SAFE_DELETE(check);
+        SAFE_DELETE(checkResult);
+    }
+    if(cost->hasX())
+    {
+        //if we decided to play an "x" ability/card, lets go all out, these effects tend to be game winners.
+        //add the rest of the mana.
+        for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
+        { 
+            MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
+            AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
+            if (amp && policy.canHandle(amp))
+            {
+                if (!used[amp->source] && amp->isReactingToClick(amp->source) && amp->output->getConvertedCost() >= 1)
+                {
+                    payments.push_back(amp);
+                }
+            }
+        }
+    }
+    if(!result->canAfford(cost,0))
+        payments.clear();
+    SAFE_DELETE(result);
+    if(anytypeofmana)
+        SAFE_DELETE(cost);
+    return payments;
+}
+
