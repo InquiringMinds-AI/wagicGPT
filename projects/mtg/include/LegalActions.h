@@ -64,6 +64,17 @@ public:
     //isReactingToClick walk, which mutates (Leyline auto-resolution) and is
     //not safe to probe from rendering code.
     static std::set<MTGCardInstance*> castableForDisplay(Player * p);
+
+    //Combat declaration sets (W3b). Pure predicates the engine consults to
+    //decide whether a declare-attackers / declare-blockers decision even
+    //EXISTS for a player - an empty set means the step auto-advances
+    //instead of asking anyone.
+    //hasLegalAttacker: any creature of p's that canAttack() right now.
+    static bool hasLegalAttacker(Player * p);
+    //hasLegalBlock: any creature of the defender's that canBlock() AND can
+    //legally block at least one currently-declared attacker. Only
+    //meaningful during the blockers step (attackers already declared).
+    static bool hasLegalBlock(Player * defender);
 };
 
 #endif

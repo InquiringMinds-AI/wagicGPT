@@ -220,3 +220,32 @@ std::set<MTGCardInstance*> LegalActionsOracle::castableForDisplay(Player * p)
     }
     return out;
 }
+
+bool LegalActionsOracle::hasLegalAttacker(Player * p)
+{
+    //The engine already owns this predicate (the phase auto-skip uses it);
+    //the oracle is the naming authority, not a second implementation.
+    return p->hasPossibleAttackers();
+}
+
+bool LegalActionsOracle::hasLegalBlock(Player * defender)
+{
+    GameObserver * g = defender->getObserver();
+    Player * attackerP = g->currentPlayer;
+    if (attackerP == defender)
+        return false;
+    MTGGameZone * mine = defender->game->inPlay;
+    for (int i = 0; i < mine->nb_cards; i++)
+    {
+        MTGCardInstance * blocker = mine->cards[i];
+        if (!blocker || blocker->isPhased || !blocker->canBlock())
+            continue;
+        MTGCardInstance * attacker = NULL;
+        while ((attacker = attackerP->game->inPlay->getNextAttacker(attacker)))
+        {
+            if (blocker->canBlock(attacker))
+                return true;
+        }
+    }
+    return false;
+}

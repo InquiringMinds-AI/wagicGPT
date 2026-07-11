@@ -3389,6 +3389,27 @@ int AIPlayerBaka::computeActions()
             return 1;
     }
 
+    //Engine-issued combat decisions (W3b): the ENGINE decides when a
+    //declaration is due (right phase/step, stack settled - attack triggers
+    //resolve BEFORE blocks - nothing else in flight, legal set non-empty).
+    //Consulted ahead of the branch maze below, whose reach conditions
+    //(zero NOT_RESOLVED on the stack, isInterrupting not latched) silently
+    //dropped block decisions for years. The choosers themselves converge:
+    //re-invocation on later ticks is a no-op once the declaration stands.
+    switch (observer->pendingCombatDecision(this))
+    {
+    case GameObserver::COMBAT_DECISION_ATTACKERS:
+        chooseAttackers();
+        return 1;
+    case GameObserver::COMBAT_DECISION_BLOCKERS:
+        chooseBlockers();
+        selectAbility(); //parity with the old blockers case: the defender
+                         //may still activate abilities after declaring
+        return 1;
+    default:
+        break;
+    }
+
 #ifndef AI_CHANGE_TESTING
     static bool findingCard = false;
     //this guard is put in place to prevent Ai from
@@ -3711,14 +3732,13 @@ int AIPlayerBaka::computeActions()
             }
         case MTG_PHASE_COMBATATTACKERS:
             {
-                if(observer->currentPlayer == this)//only on my turns.
-                    chooseAttackers();
+                //declaration is engine-issued now (pendingCombatDecision
+                //consult at the top of this function)
                 break;
             }
         case MTG_PHASE_COMBATBLOCKERS:
             {
-                if(observer->currentPlayer != this)//only on my opponents turns.
-                    chooseBlockers();
+                //declaration engine-issued; abilities still selectable
                 selectAbility();
                 break;
             }

@@ -318,6 +318,42 @@ void GameObserver::nextCombatStep()
     }
 }
 
+GameObserver::CombatDecision GameObserver::pendingCombatDecision(Player * p)
+{
+    //No combat decision exists while anything else is in flight: an
+    //unsettled stack (attack triggers must RESOLVE before blocks are
+    //declared), an open menu, a live target chooser, or a pending extra
+    //payment. The stack gate is what kills the historical silent
+    //blocker-skip: the decision is deferred, not dropped.
+    if (mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED))
+        return COMBAT_DECISION_NONE;
+    if (mLayers->actionLayer()->menuObject)
+        return COMBAT_DECISION_NONE;
+    if (getCurrentTargetChooser())
+        return COMBAT_DECISION_NONE;
+    if (mExtraPayment)
+        return COMBAT_DECISION_NONE;
+    if (mCurrentGamePhase == MTG_PHASE_COMBATATTACKERS)
+    {
+        if (p != currentPlayer)
+            return COMBAT_DECISION_NONE;
+        if (!LegalActionsOracle::hasLegalAttacker(p))
+            return COMBAT_DECISION_NONE;
+        return COMBAT_DECISION_ATTACKERS;
+    }
+    if (mCurrentGamePhase == MTG_PHASE_COMBATBLOCKERS && combatStep == BLOCKERS)
+    {
+        if (p == currentPlayer)
+            return COMBAT_DECISION_NONE;
+        if (!currentPlayer->game->inPlay->getNextAttacker(NULL))
+            return COMBAT_DECISION_NONE;
+        if (!LegalActionsOracle::hasLegalBlock(p))
+            return COMBAT_DECISION_NONE;
+        return COMBAT_DECISION_BLOCKERS;
+    }
+    return COMBAT_DECISION_NONE;
+}
+
 void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
 {
     if(log) {
@@ -1138,6 +1174,21 @@ void GameObserver::gameStateBasedEffects()
             || ((mCurrentGamePhase == MTG_PHASE_CLEANUP) && (currentPlayer->game->hand->nb_cards < 8))))
             userRequestNextGamePhase();
     }
+    //W3b: the defending HUMAN's empty blockers step auto-advances - no
+    //legal block exists, so there is no declaration to make. Gated on a
+    //settled stack (attack triggers still resolving keep the step alive)
+    //and same skip levels as the attacker-side skips above. The advance
+    //goes through userRequestNextGamePhase, so a priority window still
+    //opens when the defender holds an instant-speed response.
+    if ((skipLevel == Constants::ASKIP_SAFE || skipLevel == Constants::ASKIP_FULL)
+        && mCurrentGamePhase == MTG_PHASE_COMBATBLOCKERS && combatStep == BLOCKERS
+        && currentPlayer->isAI() && !opponent()->isAI() && !isInterrupting
+        && !mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
+        && !mLayers->actionLayer()->menuObject && !targetChooser
+        && currentPlayer->game->inPlay->getNextAttacker(NULL)
+        && !LegalActionsOracle::hasLegalBlock(opponent()))
+        userRequestNextGamePhase();
+
     if (skipLevel == Constants::ASKIP_FULL)
     {
         if ((opponent()->isAI() && !(isInterrupting)) && (mCurrentGamePhase == MTG_PHASE_UPKEEP

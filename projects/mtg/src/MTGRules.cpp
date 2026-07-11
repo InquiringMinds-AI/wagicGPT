@@ -2597,6 +2597,12 @@ int MTGBlockRule::receiveEvent(WEvent *e)
 
 int MTGBlockRule::isReactingToClick(MTGCardInstance * card, ManaCost *)
 {
+    //Attack triggers RESOLVE before blocks are declared (rules order):
+    //while anything sits unresolved on the stack there is no block
+    //declaration to make yet, for the human exactly as for the AI (the
+    //engine's pendingCombatDecision applies the same gate).
+    if (game->mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED))
+        return 0;
     if (currentPhase == MTG_PHASE_COMBATBLOCKERS && !game->isInterrupting
         && card->controller() != game->currentPlayer
         )

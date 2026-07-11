@@ -103,6 +103,17 @@ class GameObserver{
   const string& getCurrentGamePhaseName();
   const string& getNextGamePhaseName();
   void nextCombatStep();
+  //Engine-issued combat decisions (W3b): the engine, not AI branch luck,
+  //decides when a declaration is due. NONE while the stack is unsettled
+  //(attack triggers resolve BEFORE blocks are declared) or any menu /
+  //target chooser / extra payment is pending.
+  enum CombatDecision
+  {
+      COMBAT_DECISION_NONE,
+      COMBAT_DECISION_ATTACKERS, //p is the active player at declare-attackers with a legal attacker
+      COMBAT_DECISION_BLOCKERS,  //p is the defender at the blockers step with a legal block
+  };
+  CombatDecision pendingCombatDecision(Player * p);
   void userRequestNextGamePhase(bool allowInterrupt = true, bool log = true);
   void cleanupPhase();
   void nextPlayer();
