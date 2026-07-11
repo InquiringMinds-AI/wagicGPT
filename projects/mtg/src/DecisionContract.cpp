@@ -123,6 +123,32 @@ namespace
         }
         return NULL;
     }
+
+    //ActionLayer::currentActionCard is a raw pointer with no zone-change
+    //invalidation (the known dangle class): a token that dies while its
+    //menu is armed is deleted for real, and the stale pointer's vtable
+    //slot reads 0 - calling getDisplayName() on it jumps to address zero
+    //(SIGSEGV observed live 2026-07-11, core 3266478). Hand the card out
+    //only when the game still knows it - POINTER COMPARISON ONLY, no
+    //deref. Garbage-parked instances (normal zone moves) are valid memory
+    //and stay usable.
+    MTGCardInstance * validatedCardPointer(GameObserver * g, MTGCardInstance * card)
+    {
+        if (!card)
+            return NULL;
+        for (int i = 0; i < 2; i++)
+        {
+            MTGPlayerCards * pz = g->players[i]->game;
+            MTGGameZone * zones[] = { pz->hand, pz->library, pz->inPlay, pz->graveyard,
+                                      pz->stack, pz->exile, pz->commandzone, pz->sideboard,
+                                      pz->reveal, pz->garbage, pz->garbageLastTurn };
+            for (int j = 0; j < 11; j++)
+                for (int k = 0; k < zones[j]->nb_cards; k++)
+                    if (zones[j]->cards[k] == card)
+                        return card;
+        }
+        return NULL;
+    }
 }
 
 bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
@@ -133,7 +159,9 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
         return false;
 
     req.player = p;
-    req.contextCard = object->currentActionCard;
+    //validated: consumers render contextCard's name into prompts; a stale
+    //pointer must become NULL (generic prompt text), never a deref
+    req.contextCard = validatedCardPointer(g, object->currentActionCard);
     req.optionTexts.clear();
     req.menuIndices.clear();
     req.canDecline = false;
