@@ -982,6 +982,7 @@ momir/overcost.txt
 #AI Tests
 ########################
 ai/proliferate_simple.txt
+ai/menu_cross_seat_answer.txt
 generic/hollow_specter_i1085.txt
 generic/world_at_war_i1085.txt
 generic/heartless_act_choice.txt

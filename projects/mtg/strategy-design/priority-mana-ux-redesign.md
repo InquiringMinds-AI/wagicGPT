@@ -191,14 +191,19 @@ suite-green:
   through the contract; MenuAbility lifetime owned by the manager (the
   proper fix for the menu-zombie class the suite currently defaults around).
   Investigation findings (2026-07-11, full map in the session record):
-  - **The zombie is structural**: menus belong to `source->controller()`,
-    but both AI Act paths gate on `currentlyActing()` — a menu arming for
-    the non-acting seat has NO answerer, and the W3a hold then freezes the
-    game (`ActionStack.cpp` menu hold + `AIPlayerBaka::Act` head gate).
-    Fix shape: while a menu is pending, the acting seat passes to the
-    menu's controller (the same pattern as the BLOCKERS defender swap in
-    `GameObserver::Update`), so its owner's policy/UI answers; seat
-    returns on answer.
+  - **The no-answerer zombie was FALSIFIED empirically** (2026-07-11): a
+    cross-seat menu (AI casts Fade Away, the pay menu arms for the
+    NON-acting AI) is answered fine on the pre-change binary — because
+    every menu-arming path already hands the seat over via
+    `setIsInterrupting(source->controller())` (May/MenuAbility::Update),
+    and `currentlyActing()` returns the interrupter. A speculative
+    seat-swap fix was built, proven redundant by counterfactual, and
+    REVERTED. The property is pinned by `ai/menu_cross_seat_answer.txt`
+    (guards the isInterrupting handoff through the W3c migration).
+    The REAL residual zombie faces: an unpayable `mExtraPayment`
+    commitment pins `testDestroy` at 0 forever (the pendrell/fade_away
+    wedge class — suite-defaulted today), and `menuObject` /
+    `currentActionCard` dangling on zone change or game end.
   - **Greedy X auto-complete** is `MenuAbility::Update`'s ExtraManaCost
     poll (`AllAbilities.cpp:7609-7631`): fires at minimal affordability,
     reading X from the pool at that tick — affects humans too, worked

@@ -1,0 +1,47 @@
+# c3 zombie-class pin: a decision menu arming for the NON-acting seat gets
+# answered. P1 (AI, no creatures) casts Fade Away on its own main phase; the
+# granted "sacrifice unless you pay {1}" menu arms for P2 - the seat that is
+# NOT acting. Before the menu-owner seat swap (GameObserver::Update), both AI
+# Act paths gated on currentlyActing(), so nobody could answer and the menu
+# hold froze the game to the 1M-update timeout. Post-fix the acting seat
+# passes to the menu's controller and P2's heuristic answers (pay with the
+# Mind Stone or decline-and-sacrifice; with this SEED the heuristic PAYS,
+# so the bears and the (tapped) Mind Stone both remain).
+# The 'no' lines are inert filler: the script pump pulls one command per
+# ~40 ticks and END-OF-SCRIPT asserts immediately, so the filler buys the
+# AI the ticks it needs to cast, answer the menu, and reach ENDOFTURN.
+FORCEABILITY
+AICALLS 40
+SEED 12345
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+manapool:{2}{U}
+hand:fade away
+[PLAYER2]
+inplay:grizzly bears,mind stone
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+graveyard:fade away
+[PLAYER2]
+inplay:grizzly bears,mind stone
+tappedinplay:1
+[END]
