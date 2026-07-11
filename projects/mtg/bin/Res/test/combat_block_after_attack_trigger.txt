@@ -1,0 +1,29 @@
+# W3b regression pin: an attack trigger RESOLVES before blocks are
+# declared, and the block decision is DEFERRED (not dropped) while the
+# trigger sits on the stack. Benalish Veteran attacks (trigger: +1/+1
+# ueot -> 3/3); Centaur Courser (3/3) blocks it after the trigger
+# settles. Both die ONLY if both properties hold: pump unresolved ->
+# Courser survives (2 damage vs 3 toughness); block dropped (the old
+# NOT_RESOLVED silent-skip) -> no deaths and P2 takes 3.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:benalish veteran
+[PLAYER2]
+inplay:centaur courser
+[DO]
+goto attackers
+benalish veteran
+next
+centaur courser
+benalish veteran
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+graveyard:benalish veteran
+[PLAYER2]
+graveyard:centaur courser
+life:20
+[END]
