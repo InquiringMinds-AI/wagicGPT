@@ -1,0 +1,30 @@
+#c3 unpayable-commitment release pin. Fade Away's granted menu is answered
+#with "pay {1}" (choice 0) when the pool is EMPTY (the cast consumed it) and
+#no producer exists - a payment no sequence of clicks can ever complete.
+#Pre-fix this pinned MenuAbility::testDestroy at 0 and blocked phase advance
+#behind WaitForExtraPayment forever (the pendrell/fade_away wedge class,
+#previously only dodged by re-choreographing fixtures to never pick pay).
+#Post-fix MenuAbility::Update detects the mana leg is uncoverable even by
+#pool + every untapped producer and resolves as the unpaid branch (the
+#JGE_BTN_SEC cancel semantics): the decline ability fires, arming the
+#must-sacrifice wrap (choice 0) and the victim click, and the menu closes.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears
+hand:fade away
+manapool:{2}{U}
+[PLAYER2]
+[DO]
+fade away
+choice 0
+choice 0
+grizzly bears
+goto secondmain
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+graveyard:fade away,grizzly bears
+[PLAYER2]
+[END]

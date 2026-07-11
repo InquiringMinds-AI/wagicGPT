@@ -2,6 +2,7 @@
 #include "AllAbilities.h"
 #include "Translate.h"
 #include "MTGRules.h"
+#include "ManaEngine.h"
 
 //display a text animation, this is not a real ability.
 MTGEventText::MTGEventText(GameObserver* observer, int _id, MTGCardInstance * card, string textToShow) :
@@ -7627,7 +7628,58 @@ void MenuAbility::Update(float dt)
             processAbility();
             return;
         }
-
+        else if (toPay->extraCosts == game->mExtraPayment)
+        {
+            //Unpayable commitment release: the player chose "pay" but the mana
+            //leg cannot be covered even by pool + every untapped producer, so
+            //no sequence of clicks can ever complete the payment and the hold
+            //would pin testDestroy (and phase advance) forever. Resolve as the
+            //unpaid branch - the same semantics as the JGE_BTN_SEC cancel -
+            //and close the menu for good.
+            ManaCost * manaLeg = NULL;
+            for (size_t ec = 0; !manaLeg && ec < game->mExtraPayment->costs.size(); ec++)
+                if (ExtraManaCost * emc = dynamic_cast<ExtraManaCost *>(game->mExtraPayment->costs[ec]))
+                    manaLeg = emc->costToPay;
+            if (manaLeg && !source->controller()->getManaPool()->canAfford(manaLeg, source->has(Constants::ANYTYPEOFMANAABILITY)))
+            {
+                //judge "could possibly pay" permissively (ANY producer, even
+                //ones with extra activation costs) so the release only fires
+                //when the payment is truly hopeless
+                struct AnyProducerPolicy : ManaEngine::ManaPolicy
+                {
+                    int canHandle(MTGAbility *) { return 1; }
+                } anyPolicy;
+                ManaCost * pMana = ManaEngine::potentialMana(source->controller(), anyPolicy, NULL);
+                pMana->add(source->controller()->getManaPool());
+                bool coverable = pMana->canAfford(manaLeg, source->has(Constants::ANYTYPEOFMANAABILITY));
+                delete pMana;
+                if (!coverable)
+                {
+                    for (size_t ec = 0; ec < game->mExtraPayment->costs.size(); ec++)
+                        if (game->mExtraPayment->costs[ec]->tc)
+                            game->mExtraPayment->costs[ec]->tc->initTargets();
+                    game->mExtraPayment = NULL;
+                    if (abilities.size() > 1)
+                    {
+                        //re-route the choice onto the unpaid branch and let the
+                        //menu's own decline machinery run it (must-may wrap vs
+                        //one-shot, processed/removeMenu, interrupt-offer cancel)
+                        SAFE_DELETE(mClone);
+                        mClone = abilities[1]->clone();
+                        processAbility();
+                    }
+                    else
+                    {
+                        processed = true;
+                        this->forceDestroy = 1;
+                        removeMenu = true;
+                        if (source->controller() == game->isInterrupting)
+                            game->mLayers->stackLayer()->cancelInterruptOffer(ActionStack::DONT_INTERRUPT, false);
+                    }
+                    return;
+                }
+            }
+        }
     }
     if (!triggered && !object->menuObject && !object->getCurrentTargetChooser())
     {

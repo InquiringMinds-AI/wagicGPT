@@ -213,6 +213,7 @@ generic/sorcerous_spyglass_i1085.txt
 generic/nim_deathmantle_i1085.txt
 generic/pendrell_flux_i1085.txt
 generic/fade_away_i1085.txt
+generic/fade_away_unpayable_pay.txt
 generic/purging_scythe_i1085.txt
 generic/rats_feast_i1085.txt
 generic/soul_charmer_i1085.txt
