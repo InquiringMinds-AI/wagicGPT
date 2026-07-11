@@ -225,6 +225,42 @@ suite-green:
 - **c5 — Baka-as-policy shrink**: delete the mirrored Act duplication, the
   4,600-line loop reduces to scorers over contract options; ships as the
   offline/instant opponent option per the user's decision.
+  Concretization (2026-07-11, from reading the commit machinery):
+  - **The cast COMMIT is a repeated five-line stanza** in Baka's
+    computeActions (~3486-3525, once per cost variant):
+    `payTheManaCost(<variant cost>) -> clickstream.push(AIAction(this, card))
+    -> gotPayments.clear()`. The card click routes through the rules'
+    isReactingToClick walk; each RULE sets card->paymenttype itself, and
+    when several play methods exist the engine arms the play-method MENU -
+    which is ALREADY contract-routed (CHOOSE_MENU). So applyCastSpell does
+    NOT need variant-dispatch click logic: payment clicks + one card click,
+    and the variant choice rides the menu request that arms.
+  - **payTheManaCost embeds two POLICY decisions in mechanics**: extra-cost
+    targets via chooseCard (what to sacrifice/discard for a producer or
+    cost), and X = dump-the-whole-pool. These must become request kinds /
+    policy callbacks before the mechanics can be shared.
+  - **Increments**:
+    - **c5a — applyCastSpell for the plain case**: re-validate via a fresh
+      buildCastSpell (the (card, viaAlternative) pair must still be
+      offered); payment = ManaEngine::planPayment with the caller's policy,
+      plan -> producer clicks (g->cardClick(source, producerAbility),
+      mirroring payTheManaCost's AManaProducer/GenericActivatedAbility
+      handling); then the card click. Casts whose selected cost carries
+      extraCosts or X return false - the consumer keeps the legacy path
+      (GPT: aiForcedCandidate; Baka: payTheManaCost) for those. GPT
+      consumes first, Baka after.
+    - **c5b — extra-cost targets as decisions**: the ExtraCost tc rides
+      CHOOSE_TARGET (build from the cost's tc instead of the game's
+      current chooser); kills the chooseCard policy embed and the
+      remaining aiForcedCandidate dependency.
+    - **c5c — ladder to scorer**: Baka's FindCardToPlay per-type rungs
+      (~700 lines, 4-5 near-duplicates) become one scorer over req.casts
+      with type-priority as weights; the hint/combo machinery stays as a
+      pre-pass that can short-circuit the scorer.
+    - **c5d — Act de-duplication endgame**: with casts, menus, targets and
+      combat all contract-routed, AIPlayerGPT::Act's mirrored base body
+      collapses to the async-gate + contract consumption; AIPlayerBaka
+      becomes one policy implementation of the same consumer shape.
 
 ## 4. Risks / open questions
 
