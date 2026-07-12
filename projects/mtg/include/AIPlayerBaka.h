@@ -165,6 +165,12 @@ class AIPlayerBaka: public AIPlayer{
     AIPlayerBaka(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck = NULL);
     AIHint * comboHint;
     virtual int Act(float dt);
+    //W3c/c5d: TRUE while a decision is still being made out-of-band (an
+    //async model call in flight). While it holds, Act neither acts nor
+    //commits the empty-clickstream pass/decline - it is consulted at Act
+    //entry (with the frame dt) and again after computeActions (dt 0, a
+    //call may have just started). Baka decides synchronously: never holds.
+    virtual bool decisionPending(float dt) { (void) dt; return false; }
     void initTimer();
     virtual int computeActions();
     virtual void Render();

@@ -267,10 +267,15 @@ suite-green:
       the interrupt-window search ("") now enumerates instant-speed casts
       instead of discarding a sorcery winner, and duplicate same-name
       cards collapse to one candidate (one dice roll instead of N).
-    - **c5d — Act de-duplication endgame**: with casts, menus, targets and
-      combat all contract-routed, AIPlayerGPT::Act's mirrored base body
-      collapses to the async-gate + contract consumption; AIPlayerBaka
-      becomes one policy implementation of the same consumer shape.
+    - **c5d — Act de-duplication endgame** (DONE): AIPlayerGPT::Act's
+      mirrored base body is deleted. The async gate is a policy hook now -
+      `AIPlayerBaka::decisionPending(float dt)` (base: always false),
+      consulted by the ONE base Act at entry (frame dt: think-time
+      accounting + extendInterruptOffer while a model call is in flight)
+      and again after computeActions (dt 0: a call may have just started;
+      neither pass priority nor decline the interrupt until it lands).
+      The old maintenance rule "mirror Baka's Act in GPT on every
+      upstream change" is retired.
 
 ## 4. Risks / open questions
 

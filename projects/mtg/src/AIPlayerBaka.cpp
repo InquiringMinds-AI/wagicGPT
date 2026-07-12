@@ -3971,6 +3971,11 @@ AIPlayer(observer, file, fileSmall, deck)
 
 int AIPlayerBaka::Act(float dt)
 {
+    //an out-of-band decision (async model call) is still in flight:
+    //neither act nor pass until it lands (no-op for Baka itself)
+    if (decisionPending(dt))
+        return 0;
+
     if (!(observer->currentlyActing() == this))
     {
         return 0;
@@ -4006,6 +4011,10 @@ int AIPlayerBaka::Act(float dt)
         computeActions();
     if (clickstream.empty())
     {
+        //a decision started during computeActions and is not made yet:
+        //neither pass priority nor decline the interrupt
+        if (decisionPending(0))
+            return 0;
         if (observer->isInterrupting == this)
         {
             if(observer->mExtraPayment && observer->mExtraPayment->source->controller() == this)

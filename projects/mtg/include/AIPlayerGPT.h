@@ -75,12 +75,12 @@ public:
     virtual int computeActions();
 
     //Model calls are asynchronous: the HTTP round trip runs on a worker
-    //thread while the game loop keeps rendering. Act is the base loop with
-    //one insertion - while a call is in flight the AI neither acts NOR
+    //thread while the game loop keeps rendering. The base Act consults
+    //decisionPending - while a call is in flight the AI neither acts NOR
     //passes (an empty clickstream normally commits a pass/decline), and the
     //interrupt-offer timer is kept alive so a slow model cannot time out of
     //its response window. Render draws the "thinking" indicator.
-    virtual int Act(float dt);
+    virtual bool decisionPending(float dt);
     virtual void Render();
 
     //feeds the game narrative to the agent transcript

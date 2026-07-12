@@ -1709,91 +1709,23 @@ int AIPlayerGPT::computeActions()
 //model call is in flight the AI must do neither - not act, not pass - so
 //the game loop keeps running (and rendering) until the answer lands and the
 //re-polled flow consumes it.
-int AIPlayerGPT::Act(float dt)
+bool AIPlayerGPT::decisionPending(float dt)
 {
+    //c5d: the async gate is a policy hook now - the base AIPlayerBaka::Act
+    //consults it at entry and again after computeActions, so the mirrored
+    //Act body this class used to carry is gone.
     if (mEndpoint.empty())
-        return AIPlayerBaka::Act(dt);
-
+        return false;
     if (asyncBusy())
     {
         mThinkTime += dt;
         //Keep a pending interrupt offer from timing out while the model is
         //still deciding whether to respond.
         observer->mLayers->stackLayer()->extendInterruptOffer(this);
-        return 0;
+        return true;
     }
     mThinkTime = 0;
-
-    //--- base AIPlayerBaka::Act body, with the post-computeActions check ---
-    if (!(observer->currentlyActing() == this))
-        return 0;
-
-    oldGamePhase = observer->getCurrentGamePhase();
-
-    if (mFastTimerMode)
-        timer -= dt * 3;
-    else
-        timer -= dt;
-    if (timer > 0)
-        return 0;
-    initTimer();
-
-    if (combatDamages())
-        return 0;
-    interruptIfICan();
-
-    if (!(observer->currentlyActing() == this))
-    {
-        DebugTrace("Cannot interrupt");
-        return 0;
-    }
-    if (clickstream.empty())
-        computeActions();
-    if (clickstream.empty())
-    {
-        //A model call started during computeActions: the decision is not
-        //made yet, so neither pass priority nor decline the interrupt.
-        if (asyncBusy())
-            return 0;
-        if (observer->isInterrupting == this)
-        {
-            if (observer->mExtraPayment && observer->mExtraPayment->source->controller() == this)
-            {
-                ExtraManaCost * check = dynamic_cast<ExtraManaCost *>(observer->mExtraPayment->costs[0]);
-                if (check)
-                {
-                    vector<MTGAbility *> CostToPay = canPayMana(observer->mExtraPayment->source, check->costToPay, check->source->has(Constants::ANYTYPEOFMANAABILITY));
-                    if (CostToPay.size())
-                    {
-                        payTheManaCost(check->costToPay, check->source->has(Constants::ANYTYPEOFMANAABILITY), check->source, CostToPay);
-                    }
-                    else
-                    {
-                        observer->mExtraPayment->action->CheckUserInput(JGE_BTN_SEC);
-                        observer->mExtraPayment = NULL;
-                    }
-                }
-                return 0;
-            }
-            observer->mLayers->stackLayer()->cancelInterruptOffer();
-        }
-        else
-        {
-            if (observer->currentActionPlayer == this)
-                observer->userRequestNextGamePhase();
-        }
-    }
-    else
-    {
-        while (clickstream.size())
-        {
-            AIAction * action = clickstream.front();
-            action->Act();
-            SAFE_DELETE(action);
-            clickstream.pop();
-        }
-    }
-    return 1;
+    return false;
 }
 
 void AIPlayerGPT::Render()
