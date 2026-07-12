@@ -83,6 +83,13 @@ public:
     //through GameObserver::cardClick so events/animations stay identical
     //to manual taps. No-op when the pool already covers the cost.
     static void autoTapForCost(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana);
+
+    //Largest X the player could announce for an X-bearing cost (CR 601.2b),
+    //judged permissively against pool + every untapped producer (ANY
+    //producer - overstating only risks an unpayable announcement, which the
+    //payment machinery releases). Specific-X costs ({X:red}) are bounded by
+    //that color's availability. Capped at 20, the engine's own X-menu bound.
+    static int maxAnnounceableX(Player * p, ManaCost * baseWithX, int anytypeofmana);
 };
 
 #endif

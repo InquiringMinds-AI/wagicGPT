@@ -425,3 +425,26 @@ void ManaEngine::autoTapForCost(Player * p, MTGCardInstance * target, ManaCost *
         p->getObserver()->cardClick(picks[i]->source, picks[i]);
     }
 }
+
+int ManaEngine::maxAnnounceableX(Player * p, ManaCost * baseWithX, int anytypeofmana)
+{
+    if (!p || !baseWithX)
+        return 0;
+    struct AnyProducerPolicy : ManaPolicy
+    {
+        int canHandle(MTGAbility *) { return 1; }
+    } anyPolicy;
+    ManaCost * potential = potentialMana(p, anyPolicy, NULL);
+    potential->add(p->getManaPool());
+    int avail;
+    if (baseWithX->xColor > 0 && !anytypeofmana)
+        avail = potential->getCost(baseWithX->xColor) - baseWithX->getCost(baseWithX->xColor);
+    else
+        avail = potential->getConvertedCost() - baseWithX->getConvertedCost();
+    delete potential;
+    if (avail < 0)
+        avail = 0;
+    if (avail > 20)
+        avail = 20;
+    return avail;
+}

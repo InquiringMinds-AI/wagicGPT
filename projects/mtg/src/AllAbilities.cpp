@@ -7582,6 +7582,9 @@ MayAbility(observer, _id,NULL,_source,must), must(must),abilities(abilities),who
     vector<ManaCost*>optionalCost = vector<ManaCost*>();
     toPay = NULL;
     processed = false;
+    announcing = false;
+    announceChoice = -1;
+    announceCost = NULL;
 }
 
 bool MenuAbility::CheckUserInput(JButton key)
@@ -7592,10 +7595,14 @@ bool MenuAbility::CheckUserInput(JButton key)
         {
             //the user cancelled the paidability. fireAbility() on the second menu item.
             //paidability will always occupy the abilities[0]; in the vector.
-            if(abilities.size() > 1)
+            //(after an X-announcement swap the original options live in
+            //retiredOptions - the AAWhatsX entries in abilities[] are not
+            //fireable branches)
+            vector<MTGAbility*> & opts = retiredOptions.size() ? retiredOptions : abilities;
+            if(opts.size() > 1)
             {
-                abilities[1]->target = abilities[0]->target;
-                abilities[1]->fireAbility();
+                opts[1]->target = opts[0]->target;
+                opts[1]->fireAbility();
             }
         }
         return false;
@@ -7613,9 +7620,13 @@ void MenuAbility::Update(float dt)
         {
             if (game->mExtraPayment->costs.size())
             {
-                if (game->mExtraPayment->costs[0]->costToPay)
+                ManaCost * diff = game->mExtraPayment->costs[0]->costToPay;
+                //Only derive X from the pool when the cost still CARRIES an
+                //X (legacy path). Announced payments arrive here with a
+                //concrete cost and source->X already set at announcement -
+                //the pool diff would clobber it back to the float excess.
+                if (diff && (diff->hasX() || diff->hasSpecificX()))
                 {
-                    ManaCost * diff = game->mExtraPayment->costs[0]->costToPay;
                     ManaCost * c = source->controller()->getManaPool()->Diff(diff);
                     source->X = c->getCost(Constants::NB_Colors);
                     delete c;
@@ -7659,17 +7670,22 @@ void MenuAbility::Update(float dt)
                         if (game->mExtraPayment->costs[ec]->tc)
                             game->mExtraPayment->costs[ec]->tc->initTargets();
                     game->mExtraPayment = NULL;
-                    if (abilities.size() > 1)
+                    //after an X-announcement swap the original options live in
+                    //retiredOptions; the unpaid branch must come from THERE,
+                    //not from the AAWhatsX entries now occupying abilities[]
+                    vector<MTGAbility*> & opts = retiredOptions.size() ? retiredOptions : abilities;
+                    if (opts.size() > 1)
                     {
                         //re-route the choice onto the unpaid branch and let the
                         //menu's own decline machinery run it (must-may wrap vs
                         //one-shot, processed/removeMenu, interrupt-offer cancel)
                         SAFE_DELETE(mClone);
-                        mClone = abilities[1]->clone();
+                        mClone = opts[1]->clone();
                         processAbility();
                     }
                     else
                     {
+                        SAFE_DELETE(mClone);
                         processed = true;
                         this->forceDestroy = 1;
                         removeMenu = true;
@@ -7720,6 +7736,8 @@ const string MenuAbility::getMenuText()
 
 int MenuAbility::testDestroy()
 {
+    if (announcing) //the X round is pending; the choice click force-set removeMenu
+        return 0;
     if (game->mExtraPayment)
         return 0;
     if (!removeMenu)
@@ -7741,8 +7759,11 @@ int MenuAbility::processAbility()
         return 0;
     if(processed)
         return 0;
-    if(abilities[0])
-    mClone->target = abilities[0]->target;
+    //after an X-announcement swap abilities[0] is an AAWhatsX menu entry;
+    //the paid ability whose target we must inherit is in retiredOptions
+    MTGAbility * head = retiredOptions.size() ? retiredOptions[0] : abilities[0];
+    if(head)
+        mClone->target = head->target;
     if(MayAbility * toCheck = dynamic_cast<MayAbility*>(mClone))
     {
         toCheck->must = true;
@@ -7772,6 +7793,45 @@ int MenuAbility::reactToChoiceClick(Targetable * object,int choice,int control)
         return 0;
     if(!abilities.size()||!triggered)
         return 0;
+    if (announcing)
+    {
+        //Round 2 of an X-bearing pay[[: the displayed options are the X
+        //values (index == X). Out of range = the cancel item - the player
+        //backed out of paying entirely; decline cleanly.
+        announcing = false;
+        if (choice < 0 || choice >= int(abilities.size()))
+        {
+            SAFE_DELETE(mClone);
+            processed = true;
+            this->forceDestroy = 1;
+            removeMenu = true;
+            if (source->controller() == game->isInterrupting)
+                game->mLayers->stackLayer()->cancelInterruptOffer(ActionStack::DONT_INTERRUPT, false);
+            return 0;
+        }
+        source->X = choice; //payload X (damage:X ...) reads the announced value
+        ManaCost * concrete = NEW ManaCost(announceCost);
+        int xCol = concrete->xColor;
+        concrete->remove(Constants::NB_Colors, 1); //clear the X flag
+        concrete->xColor = -1;
+        if (xCol > 0)
+            concrete->add(xCol, choice);
+        else
+            concrete->add(Constants::MTG_COLOR_ARTIFACT, choice);
+        toPay = NEW ManaCost();
+        if (announceChoice >= 0 && announceChoice < int(optionalCosts.size())
+            && optionalCosts[announceChoice] && optionalCosts[announceChoice]->extraCosts)
+            toPay->extraCosts = optionalCosts[announceChoice]->extraCosts->clone();
+        toPay->addExtraCost(NEW ExtraManaCost(concrete));
+        toPay->setExtraCostsAction(this, source);
+        game->mExtraPayment = toPay->extraCosts;
+        //the announcement made the cost concrete - pay it for a human the
+        //same way casting does (AI players run their own payment planner)
+        if (!source->controller()->isAI())
+            ManaEngine::autoTapForCost(source->controller(), source, concrete,
+                                       source->has(Constants::ANYTYPEOFMANAABILITY));
+        return 0;
+    }
     for(int i = 0;i < int(abilities.size());i++)
     {
 
@@ -7781,6 +7841,25 @@ int MenuAbility::reactToChoiceClick(Targetable * object,int choice,int control)
             SAFE_DELETE(abilities[i]);
         if (mClone && !toPay && optionalCosts.size() && i < int(optionalCosts.size()) && optionalCosts[i])//paidability only supports the first ability as paid for now.
         {
+            if (optionalCosts[i]->hasX() || optionalCosts[i]->hasSpecificX())
+            {
+                //CR 601.2b: X is announced as part of choosing to pay, not
+                //derived from whatever floats when the pool first covers the
+                //minimum (the old greedy poll made a deliberate X unreachable
+                //- tap-order dependent). Swap the menu to an explicit X round;
+                //the next click IS the X.
+                announceChoice = i;
+                announceCost = NEW ManaCost(optionalCosts[i]);
+                int maxX = ManaEngine::maxAnnounceableX(source->controller(), announceCost,
+                                                        source->has(Constants::ANYTYPEOFMANAABILITY));
+                retiredOptions.swap(abilities);
+                for (int x = 0; x <= maxX; x++)
+                    abilities.push_back(NEW AAWhatsX(game, game->mLayers->actionLayer()->getMaxId(), source, source, x, NULL));
+                announcing = true;
+                //(the caller force-sets removeMenu after we return; the
+                //announcing guard in testDestroy is what keeps us alive)
+                return 0;
+            }
             toPay = NEW ManaCost();
             if (optionalCosts[i]->extraCosts)
                 toPay->extraCosts = optionalCosts[i]->extraCosts->clone();
@@ -7805,6 +7884,12 @@ MenuAbility * MenuAbility::clone() const
 {
     MenuAbility * a = NEW MenuAbility(*this);
     a->canBeInterrupted = false;
+    //announcement state is per-instance flow state, never inherited (the
+    //copy ctor would alias announceCost and the retired options)
+    a->announcing = false;
+    a->announceChoice = -1;
+    a->announceCost = NULL;
+    a->retiredOptions.clear();
     if(abilities.size())
     {
         for(int i = 0;i < int(abilities.size());i++)
@@ -7836,6 +7921,17 @@ MenuAbility::~MenuAbility()
     }
     else
         SAFE_DELETE(ability);
+    for(int i = 0;i < int(retiredOptions.size());i++)
+    {
+        if(retiredOptions[i])
+        {
+            AASetColorChosen * chooseA = dynamic_cast<AASetColorChosen *>(retiredOptions[i]);
+            if(chooseA && chooseA->abilityAltered)
+                SAFE_DELETE(chooseA->abilityAltered);
+            SAFE_DELETE(retiredOptions[i]);
+        }
+    }
+    SAFE_DELETE(announceCost);
     SAFE_DELETE(toPay);
     //SAFE_DELETE(mClone);//crash fix with generated castcard with pay ability
     if(mClone)

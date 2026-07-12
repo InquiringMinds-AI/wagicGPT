@@ -1933,6 +1933,14 @@ public:
     ManaCost * toPay;
     vector<MTGAbility*>abilities;
     vector<ManaCost*>optionalCosts;
+    //Answer-time X announcement (CR 601.2b) for X-bearing pay[[ costs:
+    //choosing "pay" swaps the menu to an explicit X round (AAWhatsX options,
+    //index == X) instead of the old greedy poll that locked X to whatever
+    //happened to float when the pool first covered the minimum.
+    bool announcing;
+    int announceChoice;                //abilities/optionalCosts index committed to pay
+    ManaCost * announceCost;           //the X-bearing pay cost (owned copy)
+    vector<MTGAbility*>retiredOptions; //round-1 options displaced by the X swap
     Player * who;
     string newNameString;
     MenuAbility(GameObserver* observer, int _id, Targetable * target, MTGCardInstance * _source, bool must = false, vector<MTGAbility*>abilities = vector<MTGAbility*>(),Player * who = NULL,string _newName = "");

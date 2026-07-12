@@ -174,6 +174,22 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
 
         if (dynamic_cast<AAWhatsX *>(menu->abilities[0]))
         {
+            if (menu->announcing && menu->announceCost)
+            {
+                //pay[[{X}]] announcement round: the menu already enumerates
+                //the affordable X range (pool + producers, bounded at build
+                //time); option index == X value. The pool-based computation
+                //below assumes the cast flow's pre-floated payment and would
+                //report "no announceable X" here, where the pool is empty.
+                for (size_t x = 0; x < menu->abilities.size(); x++)
+                {
+                    std::ostringstream o;
+                    o << "X = " << x;
+                    req.optionTexts.push_back(o.str());
+                }
+                req.kind = DecisionRequest::ANNOUNCE_X;
+                return true;
+            }
             //X announcement: the menu's buttons ARE the X values; option
             //index == X value. maxX < 0 means the pool no longer covers
             //the base cost - no announceable X, let the caller fall back.

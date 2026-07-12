@@ -2475,6 +2475,21 @@ int AIPlayerBaka::selectMenuOption()
                 {
                     if (dynamic_cast<AAWhatsX*>(currentMenu->abilities[0]))
                     {
+                        if (currentMenu->announcing && currentMenu->announceCost)
+                        {
+                            //pay[[{X}]] announcement round: options enumerate the
+                            //affordable range (index == X); announce the biggest X
+                            //the pool + producers cover. The pool-based legacy
+                            //formula below assumes the cast flow, where payment
+                            //was already floated - here the pool is still empty.
+                            int mx = ManaEngine::maxAnnounceableX(this, currentMenu->announceCost,
+                                        currentMenu->source ? currentMenu->source->has(Constants::ANYTYPEOFMANAABILITY) : 0);
+                            if (mx > int(currentMenu->abilities.size()) - 1)
+                                mx = int(currentMenu->abilities.size()) - 1;
+                            if (mx < 0)
+                                mx = 0;
+                            return mx;
+                        }
                         int potent = manaPool->getConvertedCost();
                         int aftercost = potent - currentMenu->abilities[0]->source->getManaCost()->getConvertedCost();
                         return  aftercost;

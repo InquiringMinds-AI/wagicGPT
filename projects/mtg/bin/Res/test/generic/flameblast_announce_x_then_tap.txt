@@ -1,0 +1,34 @@
+#Answer-time X pin (greedy-X fix): announce X FIRST, tap mana AFTER.
+#Under the old MenuAbility::Update greedy poll this was impossible - an
+#empty pool afforded {X:red} at X=0 the instant "pay" was chosen, so the
+#trigger resolved for 0 before any mana could be tapped. Now choosing the
+#pay mode opens the X menu (bounded by pool + untapped producers), the
+#announced X makes the cost concrete, and the payment waits for the pool
+#to cover it. Cascade: choice 0 pay / choice 1 announce X=1 / tap both
+#myrs (mana clicks pierce the pending payment; {X=1}{R} needs 2 mana) /
+#choice 0 inner must-may / p2. 5 combat + 1 ability damage = life 14.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:flameblast dragon,iron myr,leaden myr
+[PLAYER2]
+[DO]
+goto attackers
+flameblast dragon
+next
+choice 0
+choice 1
+iron myr
+leaden myr
+choice 0
+p2
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:flameblast dragon,iron myr,leaden myr
+tappedinplay:3
+[PLAYER2]
+life:14
+[END]
