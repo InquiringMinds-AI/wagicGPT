@@ -7,6 +7,7 @@
 #include "GuiHand.h"
 #include "OptionItem.h"
 #include "LegalActions.h"
+#include "ManaEngine.h"
 #ifdef WITH_GPT_AI
 #include "GptConfig.h"
 #endif
@@ -230,17 +231,39 @@ void GuiHandSelf::Update(float dt)
     //right now. Uses the PURE oracle - probing the rules layer's
     //isReactingToClick from here both mutates state (Leyline auto-resolve)
     //and drags non-reentrant parse paths into the threaded test suite.
+    //The verdicts land on the CARD (castableNow) and render in
+    //CardGui::Render, so they show no matter which layer draws the card
+    //(CardSelector re-renders the focused card on top of this layer).
     mCastableRefresh -= dt;
     if (mCastableRefresh <= 0 && hand && hand->owner)
     {
         mCastableRefresh = 0.25f;
-        mCastable.clear();
         std::set<MTGCardInstance*> ok = LegalActionsOracle::castableForDisplay(hand->owner);
+        MTGCardInstance * focused = NULL;
         for (vector<CardView*>::iterator it = cards.begin(); it != cards.end(); ++it)
         {
             MTGCardInstance * c = (*it)->card;
-            if (c)
-                mCastable[c] = ok.count(c) != 0;
+            if (!c)
+                continue;
+            c->castableNow = ok.count(c) ? 1 : -1;
+            if ((*it)->mHasFocus)
+                focused = c;
+        }
+        //Tap preview: mark the producers the auto-tap plan would activate
+        //for the focused hand card (rendered as a border on the
+        //battlefield cards, cleared every refresh).
+        Player * p = hand->owner;
+        MTGGameZone * bf = p->game->inPlay;
+        for (int i = 0; i < bf->nb_cards; i++)
+            bf->cards[i]->willPayForFocused = 0;
+        if (focused && focused->castableNow == 1 && focused->getManaCost()
+            && !p->getManaPool()->canAfford(focused->getManaCost(), focused->has(Constants::ANYTYPEOFMANA)))
+        {
+            vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(p, focused,
+                focused->getManaCost(), focused->has(Constants::ANYTYPEOFMANA));
+            for (size_t i = 0; i < picks.size(); i++)
+                if (picks[i]->source)
+                    picks[i]->source->willPayForFocused = 1;
         }
     }
 }
@@ -267,35 +290,9 @@ void GuiHandSelf::Render()
     backpos.Render(back.get());
     if (OptionClosedHand::VISIBLE == options[Options::CLOSEDHAND].number || state == Open)
         for (vector<CardView*>::iterator it = cards.begin(); it != cards.end(); ++it)
-        {
-            //Castability display. Two signals, both chosen to SURVIVE CARD
-            //ART: castable cards get a highlight border drawn BEHIND the
-            //card (it sticks out past the art like the other borders),
-            //uncastable cards render dimmed. The dim caps actA - the value
-            //the art quad is actually drawn with - NOT the animation target
-            //`alpha` (capping that around one draw call never reached the
-            //screen: CardGui::Render reads actA, which only follows `alpha`
-            //across Update ticks).
-            MTGCardInstance * c = (*it)->card;
-            std::map<MTGCardInstance*, bool>::iterator known = mCastable.find(c);
-            bool knownCastable = known != mCastable.end() && known->second;
-            bool knownUncastable = known != mCastable.end() && !known->second;
-            if (knownCastable && state == Open && hand && hand->owner && hand->owner->getObserver())
-            {
-                JQuadPtr glow = hand->owner->getObserver()->getResourceManager()->GetQuad("white");
-                if (glow)
-                {
-                    glow->SetColor(ARGB(200, 250, 205, 60));
-                    JRenderer::GetInstance()->RenderQuad(glow.get(), (*it)->actX, (*it)->actY, (*it)->actT,
-                                                         (30 * (*it)->actZ + 1) / 16, 43 * (*it)->actZ / 16);
-                }
-            }
-            float saved = (*it)->actA;
-            if (knownUncastable && saved > 120)
-                (*it)->actA = 120;
             (*it)->Render();
-            (*it)->actA = saved;
-        }
+    //castability signals render in CardGui::Render (castableNow), so they
+    //survive card art AND the CardSelector's re-render of the focused card
 }
 
 float GuiHandSelf::LeftBoundary()

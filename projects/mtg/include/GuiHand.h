@@ -68,7 +68,6 @@ protected:
     //at full strength, the rest dimmed. Refreshed on a short timer (the
     //check walks the rules/abilities layer).
     float mCastableRefresh;
-    std::map<MTGCardInstance*, bool> mCastable;
 
 public:
     GuiHandSelf(GameObserver* observer, MTGHand* hand);

@@ -196,7 +196,12 @@ bool LegalActionsOracle::hasInstantResponse(Player * p)
 {
     GameObserver * g = p->getObserver();
     ManaEngine::FreeProducerPolicy freePolicy;
-    ManaCost * pMana = ManaEngine::potentialMana(p, freePolicy, NULL);
+    //PERMISSIVE potential: strict potentialMana counts one ability per
+    //card, so a dual land only ever offered its FIRST color and payable
+    //responses were invisible - a missed window costs a game, a spurious
+    //one costs a single auto-answered ask (this predicate's documented
+    //bias).
+    ManaCost * pMana = ManaEngine::potentialManaPermissive(p, freePolicy);
     pMana->add(p->getManaPool());
 
     bool any = !legalCasts(p, freePolicy, pMana, true).empty();

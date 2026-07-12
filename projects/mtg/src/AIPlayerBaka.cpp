@@ -4041,7 +4041,26 @@ int AIPlayerBaka::Act(float dt)
         else
         {
             if (observer->currentActionPlayer == this)//if im not the action player why would i requestnextphase?
-                observer->userRequestNextGamePhase();
+            {
+                //Human-paced blockers: while a HUMAN defender still has a
+                //legal block to declare, the attacking AI must not push the
+                //game past the blockers step - block clicks only react while
+                //the game SITS there with a settled stack, so the AI's
+                //request was silently ending combat before the human could
+                //block (live-observed: pump your blocker in the attack
+                //window, then never get to block with it). The defender
+                //advances the phase when done. AI or blockless defenders
+                //keep the engine-paced flow (pendingCombatDecision / the
+                //W3b empty-block auto-skip).
+                Player * defender = observer->currentPlayer == this ? opponent() : NULL;
+                bool humanBlockHold = defender && !defender->isAI()
+                    && observer->getCurrentGamePhase() == MTG_PHASE_COMBATBLOCKERS
+                    && observer->combatStep == BLOCKERS
+                    && !observer->mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
+                    && LegalActionsOracle::hasLegalBlock(defender);
+                if (!humanBlockHold)
+                    observer->userRequestNextGamePhase();
+            }
         }
     }
     else

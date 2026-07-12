@@ -344,40 +344,84 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
 }
 
 
+ManaCost * ManaEngine::potentialManaPermissive(Player * p, ManaPolicy & policy)
+{
+    ManaCost * result = NEW ManaCost();
+    for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
+    {
+        MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
+        AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
+        if (amp && policy.canHandle(amp) && producerUsable(p, amp, amp->source, true)
+            && amp->output->getConvertedCost() >= 1)
+            result->add(amp->output);
+    }
+    return result;
+}
+
+vector<MTGAbility*> ManaEngine::selectAutoTapProducers(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana)
+{
+    vector<MTGAbility*> picks;
+    if (!cost || !cost->getConvertedCost())
+        return picks;
+    ManaCost * sim = NEW ManaCost(p->getManaPool());
+    if (sim->canAfford(cost, anytypeofmana))
+    {
+        delete sim;
+        return picks;
+    }
+    FreeProducerPolicy freePolicy;
+    vector<MTGAbility*> plan = planPayment(p, freePolicy, target, cost, anytypeofmana);
+    //Two passes over the plan: producers whose single-color output pays a
+    //COLORED symbol the simulated pool does not cover yet go first, generic
+    //fillers after. The raw plan is layer-ordered and can front-load
+    //wrong-color fillers - consuming it blindly overpaid ({1}{G} tapping
+    //two Mountains before the Forest, floating the extra red).
+    bool covered = false;
+    for (int pass = 0; pass < 2 && !covered; pass++)
+    {
+        for (size_t i = 0; i < plan.size() && !covered; i++)
+        {
+            if (!plan[i])
+                continue;
+            if (sim->canAfford(cost, anytypeofmana))
+            {
+                covered = true;
+                continue;
+            }
+            AManaProducer * amp = dynamic_cast<AManaProducer *>(plan[i]);
+            if (pass == 0)
+            {
+                int color = 0;
+                if (amp && amp->output)
+                    for (int k = 1; k < Constants::NB_Colors && !color; k++)
+                        if (amp->output->getCost(k))
+                            color = k;
+                if (!color || sim->getCost(color) >= cost->getCost(color))
+                    continue; //not a still-needed colored symbol; retry as filler
+            }
+            picks.push_back(plan[i]);
+            if (amp && amp->output)
+                sim->add(amp->output);
+            else
+                sim->add(Constants::MTG_COLOR_ARTIFACT, 1); //wrapped producer: approximate
+            plan[i] = NULL; //selected; never pick a producer twice
+        }
+    }
+    delete sim;
+    return picks;
+}
+
 void ManaEngine::autoTapForCost(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana)
 {
     if (!cost || !cost->getConvertedCost())
         return;
     if (p->getManaPool()->canAfford(cost, anytypeofmana))
         return;
-    FreeProducerPolicy freePolicy;
-    vector<MTGAbility*> plan = planPayment(p, freePolicy, target, cost, anytypeofmana);
-    //Two passes over the plan: producers whose single-color output pays a
-    //COLORED symbol the pool does not cover yet go first, generic fillers
-    //after. The raw plan is layer-ordered and can front-load wrong-color
-    //fillers - clicking it blindly overpaid ({1}{G} tapping two Mountains
-    //before the Forest, floating the extra red).
-    for (int pass = 0; pass < 2; pass++)
+    vector<MTGAbility*> picks = selectAutoTapProducers(p, target, cost, anytypeofmana);
+    for (size_t i = 0; i < picks.size(); i++)
     {
-        for (size_t i = 0; i < plan.size(); i++)
-        {
-            if (!plan[i])
-                continue;
-            if (p->getManaPool()->canAfford(cost, anytypeofmana))
-                return;
-            if (pass == 0)
-            {
-                AManaProducer * amp = dynamic_cast<AManaProducer *>(plan[i]);
-                int color = 0;
-                if (amp && amp->output)
-                    for (int k = 1; k < Constants::NB_Colors && !color; k++)
-                        if (amp->output->getCost(k))
-                            color = k;
-                if (!color || p->getManaPool()->getCost(color) >= cost->getCost(color))
-                    continue; //not a still-needed colored symbol; retry as filler
-            }
-            p->getObserver()->cardClick(plan[i]->source, plan[i]);
-            plan[i] = NULL; //activated; never click a producer twice
-        }
+        if (p->getManaPool()->canAfford(cost, anytypeofmana))
+            break;
+        p->getObserver()->cardClick(picks[i]->source, picks[i]);
     }
 }

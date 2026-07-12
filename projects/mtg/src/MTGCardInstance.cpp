@@ -71,6 +71,8 @@ MTGCardInstance::MTGCardInstance(MTGCard * card, MTGPlayerCards * arg_belongs_to
     LKItoughness = toughness;
     forcedBorderA = 0;
     forcedBorderB = 0;
+    castableNow = 0;
+    willPayForFocused = 0;
     myconvertedcost = getManaCost()->getConvertedCost();
     revealedLast = NULL;
     MadnessPlay = false;

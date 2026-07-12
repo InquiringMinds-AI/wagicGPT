@@ -246,7 +246,14 @@ void CardGui::Render()
     }
     if (quad)
     {
-        quad->SetColor(ARGB(static_cast<unsigned char>(actA),255,255,255));
+        //castability dim: a hand card its owner cannot play right now
+        //renders faded (castableNow is refreshed by GuiHandSelf::Update
+        //and only ever set on the owner's hand cards)
+        float renderA = actA;
+        if (game && card->castableNow < 0 && card->controller()
+            && card->controller()->game->hand->hasCard(card))
+            renderA = actA * 0.45f;
+        quad->SetColor(ARGB(static_cast<unsigned char>(renderA),255,255,255));
         //fake border...
         JQuadPtr fakeborder;
         JQuadPtr highlightborder;
@@ -281,6 +288,23 @@ void CardGui::Render()
             if (card && card->forcedBorderB && highlightborder)
             {
                 highlightborder->SetColor(ARGB(95,0,245,0));
+                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+            }
+            //castability glow: GOLD border behind a hand card its owner
+            //could legally play right now (drawn here so it shows with
+            //card art AND when another layer re-renders the card)
+            if (card && card->castableNow > 0 && highlightborder && card->controller()
+                && card->controller()->game->hand->hasCard(card))
+            {
+                highlightborder->SetColor(ARGB(220,250,205,60));
+                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+            }
+            //tap preview: BLUE border on the battlefield producers the
+            //auto-tap plan would activate for the focused hand card
+            if (card && card->willPayForFocused && highlightborder && card->controller()
+                && card->controller()->game->inPlay->hasCard(card))
+            {
+                highlightborder->SetColor(ARGB(200,80,170,255));
                 renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
             }
             if(card->myPair && card->myPair->isInPlay(game) && highlightborder)

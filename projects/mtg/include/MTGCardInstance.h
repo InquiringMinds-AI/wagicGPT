@@ -304,6 +304,11 @@ public:
     bool StackIsEmptyandSorcerySpeed();
     int forcedBorderA;
     int forcedBorderB;
+    //display-only flags, refreshed by GuiHandSelf::Update - rendered by
+    //CardGui::Render so they show regardless of which layer draws the card
+    int castableNow;      //hand card the owner could legally play right now
+    int willPayForFocused;//battlefield producer the auto-tap plan would tap
+                          //for the currently focused hand card
     int myconvertedcost;
     ManaCost * computeNewCost(MTGCardInstance * card,ManaCost * oldCost, ManaCost * refCost,bool noTrinisphere = false, bool bestow = false);
     int countTrini;

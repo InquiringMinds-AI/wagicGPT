@@ -60,12 +60,26 @@ public:
                                                 ManaCost * cost, int anytypeofmana,
                                                 std::map<MTGCardInstance*, bool> & used, bool searchingAgain);
 
-    //Auto-tap on a human's behalf: activate free untapped producers until
-    //the player's POOL covers `cost`, and no further. Producers whose
-    //single-color output the cost still needs as a COLORED symbol are
-    //activated first, generic fillers after - planPayment's raw list is
+    //PERMISSIVE potential: every color every untapped producer could make,
+    //counting EACH ability of a card (a dual land contributes both colors).
+    //potentialMana's one-ability-per-card semantics can HIDE payable casts
+    //(the "dual-land second-color hole") - wrong for the priority-window
+    //predicate, where a missed window costs a game and overcounting the
+    //total only risks a spurious auto-answered ask. Caller owns the result.
+    static ManaCost * potentialManaPermissive(Player * p, ManaPolicy & policy);
+
+    //The producers auto-tap WOULD activate to pay `cost` from the current
+    //pool: producers whose single-color output pays a still-uncovered
+    //COLORED symbol first, generic fillers after, stopping the moment the
+    //simulated pool covers the cost - planPayment's raw list is
     //layer-ordered and can front-load wrong-color fillers, which overpaid
-    //(a {1}{G} cost tapping two Mountains before the Forest). Clicks route
+    //(a {1}{G} cost tapping two Mountains before the Forest). Pure: no
+    //clicks. Empty when the pool already covers the cost.
+    static std::vector<MTGAbility*> selectAutoTapProducers(Player * p, MTGCardInstance * target,
+                                                           ManaCost * cost, int anytypeofmana);
+
+    //Auto-tap on a human's behalf: activate selectAutoTapProducers' picks
+    //until the player's POOL covers `cost`, and no further. Clicks route
     //through GameObserver::cardClick so events/animations stay identical
     //to manual taps. No-op when the pool already covers the cost.
     static void autoTapForCost(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana);
