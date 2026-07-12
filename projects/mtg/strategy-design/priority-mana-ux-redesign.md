@@ -1,6 +1,14 @@
 # Priority, Mana & Castability UX Redesign
 
-**Status**: BUILDING (2026-07-10) — user mandate: full mechanism replacement in
+**Status**: BUILT (2026-07-12) — all waves (W1a/W1b/W2/W3a/W3b/W3c/W4) and all
+contract increments (c1-c5d) are landed, validated (suite 1007+5/0, selfplay
+corpora, GPT live games) and user-accepted after two live-play fix rounds
+(auto-tap for casts AND abilities with exact payment, card-level castability
+display + tap preview, human-paced blockers, permissive response windows,
+phase-skip automation on by default). Remaining work is the residuals queue in
+the anchor memory (auto-pass/window tuning per the user's live feel, greedy-X
+answer-time, dangle surface, 16-thread churn, ability-GC sweep) — not campaign
+structure. Original mandate (2026-07-10): full mechanism replacement in
 one campaign, NO interim patches or light fixes on the old system ("we need to
 fix the mechanism, or when we do, all of that other work will need to be
 revised"). Everything downstream — PC frontend with PC-native UX, the PSP
