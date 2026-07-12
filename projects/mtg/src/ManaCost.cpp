@@ -1214,6 +1214,11 @@ string ManaCost::toString()
         {
             if ( i == Constants::MTG_COLOR_ARTIFACT)
                 oss << "{" << getCost(i) << "}";
+            else if (i == Constants::NB_Colors)
+                //the X slot shares its index with MTG_COLOR_LAND's color
+                //char, so {x} costs used to render as a bogus "{l}"
+                for (int xCount = 0; xCount < getCost(i); xCount++ )
+                    oss << "{x}";
             else
                 for (int colorCount = 0; colorCount < getCost(i); colorCount++ )
                     oss << "{" << Constants::MTGColorChars[i] << "}";
