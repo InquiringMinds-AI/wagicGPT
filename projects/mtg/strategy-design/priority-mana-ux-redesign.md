@@ -253,10 +253,20 @@ suite-green:
       CHOOSE_TARGET (build from the cost's tc instead of the game's
       current chooser); kills the chooseCard policy embed and the
       remaining aiForcedCandidate dependency.
-    - **c5c — ladder to scorer**: Baka's FindCardToPlay per-type rungs
-      (~700 lines, 4-5 near-duplicates) become one scorer over req.casts
-      with type-priority as weights; the hint/combo machinery stays as a
-      pre-pass that can short-circuit the scorer.
+    - **c5c — ladder to scorer** (DONE): Baka's FindCardToPlay per-type
+      rungs (~790 lines, 4 near-duplicate zone scans) are one evaluation
+      loop over the oracle's legalCasts + a new legalLandPlays; the type
+      parameter accepts a comma-separated priority list (rank-dominant,
+      converted cost within a rank) so computeActions' default ladder is
+      a single call. The oracle owns the rules half (zone gates, legendary,
+      play restrictions, affordability, 601.2c); the loop owns policy
+      (combo hints, residual gates, cost-variant choice feeding the
+      gotPayments/payAlternative side-channel, shouldPlayPercentage, cast
+      restrictions, dice). Deliberate fixes riding along: the exile scan's
+      && early-stop, the count<6 off-by-one that made "battle" unreachable,
+      the interrupt-window search ("") now enumerates instant-speed casts
+      instead of discarding a sorcery winner, and duplicate same-name
+      cards collapse to one candidate (one dice roll instead of N).
     - **c5d — Act de-duplication endgame**: with casts, menus, targets and
       combat all contract-routed, AIPlayerGPT::Act's mirrored base body
       collapses to the async-gate + contract consumption; AIPlayerBaka

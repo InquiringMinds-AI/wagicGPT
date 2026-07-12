@@ -131,6 +131,49 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
     return result;
 }
 
+vector<LegalActionsOracle::Cast> LegalActionsOracle::legalLandPlays(Player * p)
+{
+    vector<LegalActionsOracle::Cast> result;
+    std::set<string> seen;
+
+    struct ZoneScan { MTGGameZone * zone; const char * label; };
+    ZoneScan scans[] = {
+        { p->game->hand, "" },
+        { p->game->graveyard, " [from your graveyard]" },
+        { p->game->exile, " [from exile]" },
+        { p->game->commandzone, " [from your command zone]" },
+    };
+    for (size_t s = 0; s < sizeof(scans) / sizeof(scans[0]); s++)
+    {
+        MTGGameZone * zone = scans[s].zone;
+        for (int i = 0; i < zone->nb_cards; i++)
+        {
+            MTGCardInstance * card = zone->cards[i];
+            if (!card->isLand())
+                continue;
+            if (zone == p->game->graveyard
+                && !card->has(Constants::CANPLAYFROMGRAVEYARD) && !card->has(Constants::TEMPFLASHBACK))
+                continue;
+            if (zone == p->game->exile && !card->has(Constants::CANPLAYFROMEXILE))
+                continue;
+            if (card->hasType(Subtypes::TYPE_LEGENDARY) && p->game->inPlay->findByName(card->name))
+                continue;
+            if (p->game->playRestrictions->canPutIntoZone(card, p->game->inPlay) == PlayRestriction::CANT_PLAY)
+                continue;
+            string key = card->getDisplayName() + scans[s].label;
+            if (!seen.insert(key).second)
+                continue;
+            LegalActionsOracle::Cast c;
+            c.card = card;
+            c.zoneLabel = scans[s].label;
+            c.viaAlternative = false;
+            c.normalPayable = true;
+            result.push_back(c);
+        }
+    }
+    return result;
+}
+
 namespace
 {
     bool isWrappedManaProducer(MTGAbility * a)

@@ -45,6 +45,13 @@ public:
     static std::vector<Cast> legalCasts(Player * p, ManaEngine::ManaPolicy & policy,
                                         ManaCost * pMana, bool instantSpeedOnly);
 
+    //Every land p could put onto the battlefield right now: zone gates
+    //(hand always; graveyard/exile/command need the matching playfrom
+    //ability), the legendary rule, and play restrictions against the
+    //battlefield (which carry the lands-per-turn count). Lands are not
+    //casts, so legalCasts excludes them; this is their enumeration.
+    static std::vector<Cast> legalLandPlays(Player * p);
+
     //Payability across every cost variant (normal / alternative / morph /
     //flashback / retrace, plus specific-producer payment plans).
     static bool payable(Player * p, ManaEngine::ManaPolicy & policy,
