@@ -27,10 +27,20 @@ int ActionLayer::removeFromGame(ActionElement * e)
     if (i == -1)
         return 0;
 
+    //The cascade circled back to an element already mid-destroy higher up
+    //this call stack (mutual lord/grant death in one sweep): running
+    //destroy() again would double-destroy it. The outer call owns the
+    //removal; this request is a no-op.
+    for (size_t k = 0; k < mDestroying.size(); k++)
+        if (mDestroying[k] == e)
+            return 0;
+
     if (isWaitingForAnswer() == e)
         setCurrentWaitingAction(NULL);
     assert(e);
+    mDestroying.push_back(e);
     e->destroy();
+    mDestroying.pop_back();
 
     i = getIndexOf(e); //the destroy event might have changed the contents of mObjects, so we get the index again
     if (i == -1)

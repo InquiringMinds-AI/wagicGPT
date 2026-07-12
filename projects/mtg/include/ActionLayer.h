@@ -27,6 +27,17 @@ public:
     SimpleMenu * abilitiesTriggered;
     MTGCardInstance * currentActionCard;
     int stuffHappened;
+    //destroy()-in-progress stack: an element's destroy() can cascade into
+    //more removals (a lord's destroy removes the abilities it granted -
+    //ALord::removed -> removeObserver -> removeFromGame again). When the
+    //cascade circles back to an element already mid-destroy (mutual
+    //lord/grant death in one sweep), running destroy() a second time is
+    //the double-destroy crash class - the outer call owns the removal.
+    //NOTE deferring nested removals wholesale is UNSAFE here: registration
+    //and ownership are decoupled (a parent's destructor deletes children
+    //that are still registered), so a deferred element can be freed while
+    //it still sits in mObjects (teardown crash, core 4068495).
+    vector<ActionElement *> mDestroying;
     virtual void Render();
     virtual void Update(float dt);
     bool CheckUserInput(JButton key);

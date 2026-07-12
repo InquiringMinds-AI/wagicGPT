@@ -134,20 +134,9 @@ namespace
     //and stay usable.
     MTGCardInstance * validatedCardPointer(GameObserver * g, MTGCardInstance * card)
     {
-        if (!card)
-            return NULL;
-        for (int i = 0; i < 2; i++)
-        {
-            MTGPlayerCards * pz = g->players[i]->game;
-            MTGGameZone * zones[] = { pz->hand, pz->library, pz->inPlay, pz->graveyard,
-                                      pz->stack, pz->exile, pz->commandzone, pz->sideboard,
-                                      pz->reveal, pz->garbage, pz->garbageLastTurn };
-            for (int j = 0; j < 11; j++)
-                for (int k = 0; k < zones[j]->nb_cards; k++)
-                    if (zones[j]->cards[k] == card)
-                        return card;
-        }
-        return NULL;
+        //shared implementation - the walk now lives on GameObserver so the
+        //engine (ATransformer::destroy) can use it too
+        return g->validateCardPointer(card);
     }
 }
 

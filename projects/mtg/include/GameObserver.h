@@ -143,6 +143,14 @@ class GameObserver{
   bool AffinityNeedsUpdate;
   void addObserver(MTGAbility * observer);
   bool removeObserver(ActionElement * observer);
+  //Validate a possibly-stale MTGCardInstance pointer by POINTER COMPARISON
+  //(no deref) against every zone the game still tracks, including the
+  //garbage zones (normal zone moves park instances there - valid memory).
+  //Returns the pointer when the game still knows it, NULL otherwise.
+  //Really-deleted instances (dead tokens) come back NULL - the raw-pointer
+  //dangle class (currentActionCard core 3266478, ATransformer target core
+  //3151670).
+  MTGCardInstance * validateCardPointer(MTGCardInstance * card);
   void startGame(GameType, Rules * rules);
   void phasingPhase();
   void untapPhase();

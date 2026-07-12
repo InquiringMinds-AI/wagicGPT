@@ -8585,10 +8585,19 @@ int ATransformer::destroy()
         return 0;
         
     MTGCardInstance * _target = (MTGCardInstance *) target;
+    //target is a raw pointer with no zone-change invalidation: a token
+    //that died while this transformer was alive is deleted for real, and
+    //walking ->next below reads freed memory (SIGSEGV core 3151670,
+    //reached through a lord/transformer co-death in one sweep). A card
+    //the game no longer tracks has nothing to revert - skip.
+    if (_target && !game->validateCardPointer(_target))
+        return 0;
     if (_target)
     {
         while (_target->next)
             _target = _target->next;
+        if (!game->validateCardPointer(_target))
+            return 0;
         list<int>::iterator it;
         
         if (!remove)
