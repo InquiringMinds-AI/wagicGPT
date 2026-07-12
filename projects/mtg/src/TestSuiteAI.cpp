@@ -478,6 +478,10 @@ void TestSuiteGame::handleResults(bool wasAI, int error)
 void TestSuite::initGame(GameObserver* g)
 {
     observer = g;
+    //main-thread suite path: the observer is GameStateDuel's, not the
+    //TestSuiteGame constructor's - flag it here too so the ASPHASES
+    //auto-skips stay off for scripted cadences
+    g->mSuiteGame = true;
     //The first test runs slowly, the other ones run faster.
     //This way a human can see what happens when testing a specific file,
     // or go faster when it comes to the whole test suite.
@@ -1160,6 +1164,7 @@ TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
 {
     filename = _filename;
     observer = new GameObserver();
+    observer->mSuiteGame = true; //keep ASPHASES auto-skips off even after `ai` flips playModes
 
     initState.cleanup(this);
     endState.cleanup(this);

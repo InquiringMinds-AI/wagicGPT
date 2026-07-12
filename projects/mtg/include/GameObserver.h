@@ -78,6 +78,11 @@ class GameObserver{
   vector<list<Phase*> >gameTurn;
   int cancelCurrentAction();
   ExtraCosts * mExtraPayment;
+  //TRUE for games driven by the test-suite harness. Scripted fixtures
+  //encode exact phase cadences, so the ASPHASES auto-skips must stay off
+  //even after the `ai` command flips both players to MODE_AI (the old
+  //playMode==MODE_TEST_SUITE check stops seeing them at that point).
+  bool mSuiteGame;
   int oldGamePhase;
   TargetChooser * targetChooser;
   CardDisplay * OpenedDisplay;

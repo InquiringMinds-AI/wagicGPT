@@ -59,6 +59,16 @@ public:
     static std::vector<MTGAbility*> planPayment(Player * p, ManaPolicy & policy, MTGCardInstance * target,
                                                 ManaCost * cost, int anytypeofmana,
                                                 std::map<MTGCardInstance*, bool> & used, bool searchingAgain);
+
+    //Auto-tap on a human's behalf: activate free untapped producers until
+    //the player's POOL covers `cost`, and no further. Producers whose
+    //single-color output the cost still needs as a COLORED symbol are
+    //activated first, generic fillers after - planPayment's raw list is
+    //layer-ordered and can front-load wrong-color fillers, which overpaid
+    //(a {1}{G} cost tapping two Mountains before the Forest). Clicks route
+    //through GameObserver::cardClick so events/animations stay identical
+    //to manual taps. No-op when the pool already covers the cost.
+    static void autoTapForCost(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana);
 };
 
 #endif

@@ -505,6 +505,11 @@ GameOption * GameOptions::get(int optionID)
         case Options::ASPHASES:
             goEnum = NEW GameOptionEnum();
             goEnum->def = OptionASkipPhase::getInstance();
+            //First-launch default: the options menu advertises phase-skip
+            //automation as on, but an unset option read 0 (Off) - every
+            //auto-skip (untap/draw/combat-begin/empty attackers/...) was
+            //dead until the user saved the options screen once.
+            goEnum->number = Constants::ASKIP_SAFE;
             go = goEnum;
             break;
         case Options::FIRSTPLAYER:

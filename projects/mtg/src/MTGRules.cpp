@@ -417,15 +417,9 @@ int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
     if (!player->isAI() && card->getManaCost()
         && !player->getManaPool()->canAfford(card->getManaCost(), card->has(Constants::ANYTYPEOFMANA)))
     {
-        ManaEngine::FreeProducerPolicy freePolicy;
-        vector<MTGAbility*> autoTapPlan = ManaEngine::planPayment(player, freePolicy, card,
-            card->getManaCost(), card->has(Constants::ANYTYPEOFMANA));
-        for (size_t tap = 0; tap < autoTapPlan.size(); tap++)
-        {
-            if (player->getManaPool()->canAfford(card->getManaCost(), card->has(Constants::ANYTYPEOFMANA)))
-                break;
-            game->cardClick(autoTapPlan[tap]->source, autoTapPlan[tap]);
-        }
+        //colored needs first, then generic fillers, stop at coverage -
+        //the raw plan order overpaid (see ManaEngine::autoTapForCost)
+        ManaEngine::autoTapForCost(player, card, card->getManaCost(), card->has(Constants::ANYTYPEOFMANA));
     }
     ManaCost * cost = card->getManaCost();
     ManaCost * playerMana = player->getManaPool();

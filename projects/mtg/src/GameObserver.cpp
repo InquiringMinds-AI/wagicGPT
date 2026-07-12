@@ -113,6 +113,7 @@ GameObserver::GameObserver(WResourceManager *output, JGE* input)
     connectRule = false;
     LPWeffect = false;
     mLoading = false;
+    mSuiteGame = false;
     mLayers = NULL;
     mTrash = new Trash();
     mDeckManager = new DeckManager();
@@ -1159,7 +1160,7 @@ void GameObserver::gameStateBasedEffects()
     }
 
     //Auto skip Phases
-    int skipLevel = (currentPlayer->playMode == Player::MODE_TEST_SUITE || mLoading) ? Constants::ASKIP_NONE
+    int skipLevel = (currentPlayer->playMode == Player::MODE_TEST_SUITE || mSuiteGame || mLoading) ? Constants::ASKIP_NONE
         : options[Options::ASPHASES].number;
     bool noattackers = currentPlayer->noPossibleAttackers();
     bool nodiaochan = (currentPlayer->game->battlefield->countByAlias(10544)<1)?true:false;

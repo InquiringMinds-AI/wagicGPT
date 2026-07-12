@@ -343,3 +343,41 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
     return payments;
 }
 
+
+void ManaEngine::autoTapForCost(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana)
+{
+    if (!cost || !cost->getConvertedCost())
+        return;
+    if (p->getManaPool()->canAfford(cost, anytypeofmana))
+        return;
+    FreeProducerPolicy freePolicy;
+    vector<MTGAbility*> plan = planPayment(p, freePolicy, target, cost, anytypeofmana);
+    //Two passes over the plan: producers whose single-color output pays a
+    //COLORED symbol the pool does not cover yet go first, generic fillers
+    //after. The raw plan is layer-ordered and can front-load wrong-color
+    //fillers - clicking it blindly overpaid ({1}{G} tapping two Mountains
+    //before the Forest, floating the extra red).
+    for (int pass = 0; pass < 2; pass++)
+    {
+        for (size_t i = 0; i < plan.size(); i++)
+        {
+            if (!plan[i])
+                continue;
+            if (p->getManaPool()->canAfford(cost, anytypeofmana))
+                return;
+            if (pass == 0)
+            {
+                AManaProducer * amp = dynamic_cast<AManaProducer *>(plan[i]);
+                int color = 0;
+                if (amp && amp->output)
+                    for (int k = 1; k < Constants::NB_Colors && !color; k++)
+                        if (amp->output->getCost(k))
+                            color = k;
+                if (!color || p->getManaPool()->getCost(color) >= cost->getCost(color))
+                    continue; //not a still-needed colored symbol; retry as filler
+            }
+            p->getObserver()->cardClick(plan[i]->source, plan[i]);
+            plan[i] = NULL; //activated; never click a producer twice
+        }
+    }
+}

@@ -268,16 +268,33 @@ void GuiHandSelf::Render()
     if (OptionClosedHand::VISIBLE == options[Options::CLOSEDHAND].number || state == Open)
         for (vector<CardView*>::iterator it = cards.begin(); it != cards.end(); ++it)
         {
-            //Uncastable cards render dimmed. The cap is applied only for
-            //this draw call (alpha restored after) so animations and the
-            //open/close events keep owning the real value.
+            //Castability display. Two signals, both chosen to SURVIVE CARD
+            //ART: castable cards get a highlight border drawn BEHIND the
+            //card (it sticks out past the art like the other borders),
+            //uncastable cards render dimmed. The dim caps actA - the value
+            //the art quad is actually drawn with - NOT the animation target
+            //`alpha` (capping that around one draw call never reached the
+            //screen: CardGui::Render reads actA, which only follows `alpha`
+            //across Update ticks).
             MTGCardInstance * c = (*it)->card;
             std::map<MTGCardInstance*, bool>::iterator known = mCastable.find(c);
-            float saved = (*it)->alpha;
-            if (known != mCastable.end() && !known->second && saved > 140)
-                (*it)->alpha = 140;
+            bool knownCastable = known != mCastable.end() && known->second;
+            bool knownUncastable = known != mCastable.end() && !known->second;
+            if (knownCastable && state == Open && hand && hand->owner && hand->owner->getObserver())
+            {
+                JQuadPtr glow = hand->owner->getObserver()->getResourceManager()->GetQuad("white");
+                if (glow)
+                {
+                    glow->SetColor(ARGB(200, 250, 205, 60));
+                    JRenderer::GetInstance()->RenderQuad(glow.get(), (*it)->actX, (*it)->actY, (*it)->actT,
+                                                         (30 * (*it)->actZ + 1) / 16, 43 * (*it)->actZ / 16);
+                }
+            }
+            float saved = (*it)->actA;
+            if (knownUncastable && saved > 120)
+                (*it)->actA = 120;
             (*it)->Render();
-            (*it)->alpha = saved;
+            (*it)->actA = saved;
         }
 }
 

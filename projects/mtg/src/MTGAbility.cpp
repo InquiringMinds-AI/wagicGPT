@@ -2,6 +2,7 @@
 
 #include "MTGAbility.h"
 #include "ManaCost.h"
+#include "ManaEngine.h"
 #include "MTGGameZones.h"
 #include "AllAbilities.h"
 #include "Damage.h"
@@ -7616,7 +7617,22 @@ int ActivatedAbility::isReactingToClick(MTGCardInstance * card, ManaCost * mana)
         if (!mana)
             mana = player->getManaPool();
         if (!mana->canAfford(cost,card->has(Constants::ANYTYPEOFMANAABILITY)))
-            return 0;
+        {
+            //Auto-tap (non-AI): the ability stays clickable when the pool
+            //PLUS free untapped producers cover its mana cost - mirrors the
+            //casting rule; the taps happen in reactToClick. Explicit-mana
+            //probes (AI oracles pass their potential pool) keep exact
+            //legacy semantics.
+            if (player->isAI() || mana != player->getManaPool())
+                return 0;
+            ManaEngine::FreeProducerPolicy freePolicy;
+            ManaCost * potential = ManaEngine::potentialMana(player, freePolicy, card);
+            potential->add(player->getManaPool());
+            bool affordable = potential->canAfford(cost, card->has(Constants::ANYTYPEOFMANAABILITY)) != 0;
+            delete potential;
+            if (!affordable)
+                return 0;
+        }
         if (!cost->canPayExtra())
             return 0;
         return 1;
@@ -7649,6 +7665,10 @@ int ActivatedAbility::reactToClick(MTGCardInstance * card)
                 return 0;
             }
         }
+        //Auto-tap (non-AI): cover the ability's mana cost from free
+        //untapped producers before the pool payment below.
+        if (!player->isAI())
+            ManaEngine::autoTapForCost(player, source, cost, source->has(Constants::ANYTYPEOFMANAABILITY));
         ManaCost * previousManaPool = NEW ManaCost(player->getManaPool());
         cost->doPayExtra(); // Bring here brefore the normal payment to solve Snow Mana payment bug.
         game->currentlyActing()->getManaPool()->pay(cost);
@@ -7686,6 +7706,10 @@ int ActivatedAbility::reactToTargetClick(Targetable * object)
                 return 0;
             }
         }
+        //Auto-tap (non-AI): cover the ability's mana cost from free
+        //untapped producers before the pool payment below.
+        if (!player->isAI())
+            ManaEngine::autoTapForCost(player, source, cost, source->has(Constants::ANYTYPEOFMANAABILITY));
         ManaCost * previousManaPool = NEW ManaCost(player->getManaPool());
         cost->doPayExtra(); // Bring here brefore the normal payment to solve Snow Mana payment bug.
         game->currentlyActing()->getManaPool()->pay(cost);
