@@ -1,0 +1,89 @@
+Deck identity: UB FAERIE TEMPO. Nearly every creature FLIES. You win by casting
+faeries EVERY turn and attacking in the air EVERY turn. You are the BEATDOWN in
+every matchup: your job is to get the opponent dead before turn 10, not to sit
+on a hand of spells.
+
+THE #1 RULE - CAST A CREATURE EVERY TURN. NO EXCEPTIONS:
+- On EVERY one of your turns: play a land, then CAST A CREATURE if any "Cast"
+  option shows a creature. If the engine OFFERS "Cast X", the cost IS payable -
+  Oona's Gatewarden {U/B} casts off a single Island OR Swamp.
+- Scion of Oona and Obyra have flash, but treat them as NORMAL creatures: cast
+  them in your main phase.
+- CAST ARCHMAGE OF ECHOES the first turn you have 5 mana. It is a 4/4 flying,
+  ward-2 threat that copies every faerie you cast after it. Board first,
+  counters with leftovers.
+
+THE ENGINE - HOW YOU ACTUALLY KILL:
+- Obyra, Dreaming Duelist ({U}{B} 2/2 flash flyer): every OTHER faerie that
+  enters drains the opponent 1. Cast Obyra early, then every faerie is damage.
+- Archmage of Echoes ({4}{U} 4/4 flyer, ward 2): copies each Faerie or Wizard
+  CREATURE spell you cast (it does not copy instants). Archmage + any faerie =
+  two bodies, and two Obyra drains.
+- Faerie Bladecrafter ({2}{B} 2/2 flyer): gets a +1/+1 counter whenever your
+  faeries hit the opponent, and when it DIES the opponent loses life equal to
+  its power (you gain that much). Cast it and ATTACK with it every turn. The
+  "{right now: life -2}" note on its Cast option is the OPPONENT'S life loss if
+  it dies - a bonus for you, never a cost. Always cast it.
+
+ATTACK EVERY TURN: your flyers are usually unblockable. Attack with EVERY
+creature except Oona's Gatewarden (defender, can't attack) and anything needed
+to block a lethal swing back. LETHAL CHECK each combat: total power of your
+untapped flyers + 1 per faerie you can still cast with Obyra out; if that is
+>= opponent life, attack with everyone and cast the faeries.
+
+COUNTERSPELLS - THE OPTION ITSELF IS THE SIGNAL:
+- The engine offers "Cast Counterspell" or "Cast Arcane Denial" ONLY when an
+  opponent spell is on the stack RIGHT NOW waiting to resolve. When you see
+  that option on the opponent's turn, a spell IS pending - the thought "there
+  is no spell on the stack to counter" is ALWAYS FALSE in that moment. The
+  pending spell is the LAST game-log line that says "Opponent's X: hand ->
+  stack" with no "stack ->" line after it. That X is what your counter stops.
+- When a counter option appears, COUNTER the pending spell if it is any of:
+  Master of Etherium, Cranial Plating, Guttersnipe, Young Pyromancer, Steel
+  Overseer, any creature or equipment while your life is 12 or less, or any
+  spell costing 4+ mana. These cheap cards are the actual killers - a 2-mana
+  Master of Etherium becomes a 9/5.
+- LET RESOLVE and keep your mana: mana artifacts (Mox Opal), Elixir of
+  Immortality, Prism Ring, and small utility spells while your life is 13+.
+- Casting your creatures on your own turn ALWAYS comes before holding counter
+  mana. Counters are for the mana left over.
+- Go for the Throat: destroys any NONARTIFACT creature. Fire it the turn you
+  see their best attacker - especially creatures that GROW (+1/+1 counters:
+  Stromkirk Noble, Steel Overseer). It cannot hit artifact creatures (Master
+  of Etherium, Ornithopter, Vault Skirge) - against those, counter instead.
+
+WHEN YOU ARE BEING RACED (opponent has dealt you 6+ damage by turn 6): keep
+attacking - you still win by racing - and spend EVERY reactive card at the
+first legal moment: Go for the Throat their biggest nonartifact attacker,
+counter every creature and equipment per the list above, and block with
+Oona's Gatewarden every combat (2 toughness of wither shrinks what it blocks).
+At 10 life or less, spend ALL interaction NOW on whatever is hitting you.
+
+CARD NOTES:
+- Sleep-Cursed Faerie ({U} 3/3 flyer, ward 2): enters tapped with 3 stun
+  counters and wakes up by itself in 3 turns. Cast it turn 1-2 and let it wake.
+  Pay the {1}{U} untap AT MOST ONCE per turn, and ONLY in your Main Phase 1 on
+  a turn it will attack THIS combat. The same untap prompt also appears in
+  Upkeep and on the opponent's turn - in those windows always pass; paying
+  there is wasted mana and it will still be offered in Main Phase 1.
+- Faerie Miscreant ({U} 1/1 flyer): the second copy draws a card - cast both.
+- Oona's Gatewarden ({U/B} 2/1 flying defender, wither): best blocker; wither
+  shrinks what it blocks. Cast it turn 1 off ANY land; it can never attack.
+- Scion of Oona ({2}{U} 1/1 flash flyer): other faeries get +1/+1 and shroud.
+  Cast before attacking to pump the team.
+- Shadow Puppeteers ({6}{U} 4/4 flyer, ward 2): makes two 1/1 flyers on entry.
+  When asked, ALWAYS say YES to turning an attacking flyer into a 4/4 dragon.
+
+MULLIGAN: keep ANY hand with 2-4 lands and at least one creature. Also KEEP
+3+ lands with removal/counters and no creature - half your deck is cheap
+flyers, you will draw them; a 6-card hand is worse than a slow 7. Ship only
+0-1 land or 5+ land hands.
+
+THREE SITUATIONS THAT DECIDED PAST GAMES - THE CORRECT PLAY:
+- A counter option appears on the opponent's turn while your hand holds
+  counters: a spell IS pending - counter it per the list above. (Games were
+  lost with all four counters still in hand while killers resolved.)
+- The Sleep-Cursed Faerie untap prompt appears in Upkeep or on the opponent's
+  turn: pass. Pay it once, in your Main Phase 1, on a turn it attacks.
+- A creature is castable: cast it. Archmage of Echoes always hits the
+  battlefield the first turn 5 mana is available.

@@ -1,0 +1,75 @@
+Deck identity: BLUE-RED SPELLSLINGER with a small kill package. You win when
+Guttersnipe or Young Pyromancer is on the battlefield and you cast spells and
+attack every single turn. The deck has TWO GEARS, and one visible fact picks
+the gear each turn - is a Guttersnipe or Young Pyromancer on your battlefield,
+or in your cast list right now?
+- YES -> RACE GEAR: cast the payoff first, then your other spells, and attack
+  with every creature. Every turn in this gear deals damage.
+- NO -> DIG GEAR: you still cast every turn - draw spells to FIND a payoff,
+  Prism Ring or Elixir with spare mana, a counter at the right target. A dig
+  turn ends with your mana spent and cards drawn. Switch to RACE GEAR the
+  first turn a payoff creature appears in your cast list.
+
+THE #1 RULE - YOUR CREATURES ATTACK. THEY DO THEIR BLOCKING BY RACING.
+- When the game asks you to DECLARE ATTACKERS, name EVERY creature in the
+  list: Guttersnipe, every Young Pyromancer, every Elemental token. Count the
+  list; your reply names all of them. Sending one attacker while three sit
+  home is how this deck loses winnable games. Keep a creature home only when
+  the opponent's untapped creatures could kill you on the swing back.
+- When the game asks you to DECLARE BLOCKERS, your answer is "no blockers":
+  take the damage and keep your creatures alive for your own attack - a
+  creature that dies blocking is damage missing from your race every later
+  turn. The one exception: when the incoming attack would put you at 0 (add
+  the attackers' power, compare to your life), chump-block with an Elemental
+  token first, Young Pyromancer second. Guttersnipe stays alive in every
+  case - it is your kill condition, and a 2/2 blocking trade is never worth it.
+
+CAST A SPELL EVERY TURN. If you have unused mana and any castable spell,
+casting it is your action this main phase - each cast is Guttersnipe damage
+and a Pyromancer token.
+- Artificer's Epiphany (2U, draw 2) and Opportunity (4UU, draw 4): cast them
+  on YOUR main phase the turn you can afford them. They find your
+  Guttersnipes; the deck cannot win without drawing cards, and with
+  Guttersnipe out the cast itself is 2 damage.
+- Tapping out to develop is right for this deck. Keep counter mana open only
+  when you hold a counter AND expect a spell worth stopping this turn cycle.
+
+THE ENGINE - order matters:
+- Guttersnipe (2R, 2/2): every instant/sorcery YOU cast deals 2 damage to the
+  opponent. This is your kill. CAST IT THE TURN YOU CAN.
+- Young Pyromancer (1R, 2/1): every instant/sorcery YOU cast makes a 1/1
+  Elemental token.
+- Cast the payoff creature FIRST, then your other spells the same turn - a
+  spell cast before the creature lands makes no token and no damage.
+- With Guttersnipe out, EVERY spell is 2 to the face: Epiphany is "draw 2,
+  deal 2"; Downsize at any opponent creature is 2 damage. Spend spare mana on
+  a cheap instant every turn Guttersnipe is out.
+
+LANDS - play the MOUNTAIN first. Whenever a Mountain and an Island are both
+in your hand, choose "Play Mountain" until you have two Mountains on the
+battlefield; Islands after that. Your payoff creatures both need red.
+
+LETHAL CHECK each turn: (total power of your attackers) + (2 per instant you
+can cast this turn per Guttersnipe on your battlefield). If that reaches the
+opponent's life, attack with everyone and cast every instant you can pay for.
+
+REACTIVE SPELLS - when a response is possible the game opens a window and
+asks you; the choice is whether the reaction beats casting the same card
+proactively for Guttersnipe damage:
+- Counterspell (UU) / Dissipate (1UU) / Essence Scatter (1U): point these at
+  removal aimed at Guttersnipe or Young Pyromancer, and at a threat that
+  beats you on its own. Let everything else resolve and develop instead -
+  these are support cards, never your plan.
+- Downsize (U) / Hydrolash (2U) / Aetherize (3U): fire them during combat
+  when you are actually being attacked. With Guttersnipe on the battlefield,
+  Downsize at any opponent creature on your own turn is also a fine 2 damage.
+- Cyclonic Rift (1U): bounce the opponent's single best permanent when it
+  slows their attack. Overload (6U) when their board has 3+ nonland permanents.
+- Prism Ring ({1}): cast it turn 1, choose BLUE.
+- Elixir of Immortality ({1} artifact): cast it early with leftover mana - as
+  an artifact it stops Artificer's Epiphany making you discard. Activate
+  ({2},tap: gain 5) when you are below 12 life.
+
+MULLIGAN: keep 2-4 lands plus a payoff creature or a draw spell. Mulligan a
+hand whose only action is a red creature with no Mountain, and any hand that
+is only counters and Downsizes.

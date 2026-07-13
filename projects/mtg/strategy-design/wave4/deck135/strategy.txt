@@ -1,0 +1,94 @@
+Deck identity: "Modern Snow" is a base-GREEN snow tempo-value deck splashing blue
+and white. You win by casting a snow creature every turn AND attacking every turn:
+Ohran Viper and Ice-Fang Coatl draw you cards while they hit, Abominable Treefolk
+(power = your snow permanent count, trample) and Diamond Faerie (3/3 flying, pumps
+the team) finish. Every game you have won, you attacked nearly every turn. Every
+game you have lost or timed out, you sat back "waiting" while the opponent's life
+never moved. Attacking IS this deck's defense, card-draw, and win condition.
+
+=======================================================================
+RULE #1 - DECLARE AN ATTACKER EVERY TURN. Run this check, then swing.
+=======================================================================
+When the Attackers list appears, pick attackers with this check - it takes one
+line of math per creature:
+- A creature attacks if ANY of these is true: (a) the opponent has no untapped
+  creature that can block it, (b) it survives the biggest blocker (its toughness
+  > blocker's power), or (c) it trades up (kills something bigger or draws you a
+  card). Ohran Viper passes (c) EVERY time: any creature that blocks it is
+  destroyed at end of combat, and if it hits the player you draw a card.
+- Declaring "no attackers" is allowed ONLY when every listed attacker dies for
+  zero gain. "The opponent might block" is not a reason - blocks feed Viper and
+  Coatl's deathtouch.
+- OPPONENT HAS LIGHTMINE FIELD ("deals damage to each attacker equal to the
+  number of attackers"): you still attack - with exactly ONE creature whose
+  toughness is 2 or more. One attacker means 1 damage total: Ohran Viper (1/3)
+  takes 1, lives at 1/2, and still draws you a card when it connects. Abominable
+  Treefolk and Diamond Faerie also attack solo through it easily. Do the math
+  (attackers = damage to each), send the survivor, every single turn.
+- AT 10 LIFE OR LESS, run the swing-back sum BEFORE declaring: add the power of
+  every opponent creature that could attack you next turn. Keep enough blockers
+  home that you survive that total; the rest still attack.
+
+=======================================================================
+RULE #2 - A LISTED CAST IS YOURS TO TAKE. DIAMOND FAERIE ESPECIALLY.
+=======================================================================
+The action list only ever offers spells you CAN pay for right now, on a turn you
+CAN cast them. So when "Cast Diamond Faerie" is in your list, casting it IS your
+turn - a 3/3 flyer that ends games ({1} + one snow mana: ALL your snow creatures
+get +1/+1). You have skipped this exact cast 22 times in one game and lost.
+These two thoughts are ALWAYS FALSE when a Cast option is listed, never act on
+them: "I have no mana" (the engine already checked - you can pay) and "it is the
+opponent's turn / wrong phase" (sorcery-speed casts are only offered on YOUR
+main phase). Same rule for Abominable Treefolk, Ohran Viper, Ice-Fang Coatl,
+Icehide Golem, and Arcum's Astrolabe: if a creature or Astrolabe is in the cast
+list, casting one BEATS "Cast nothing". If an option is still in your list, it
+has NOT been done yet - believe the list, not your remembered plan.
+
+MANA (this is solved - spend two decisions on it, not the game):
+- Your FIRST land search that can take Snow-Covered ISLAND takes it (Flooded
+  Strand, Misty Rainforest, Prismatic Vista, Into the North can; Windswept Heath
+  cannot - it takes Snow-Covered Forest). ONE Island, or one Arcum's Astrolabe
+  in play, is ENOUGH blue: after that, every fetch takes Snow-Covered FOREST and
+  your turns go to casting creatures and attacking. You only own 2 Islands -
+  hunting a second one is how you durdled a game away at 20 opponent life.
+- Crack fetchlands the turn you play them: when you see "search basic land ..."
+  or "Put in Play with <fetch> ... [cost: Life, Tap, Sacrifice]", take it -
+  the life and sacrifice ARE the card working.
+- Cast EVERY Arcum's Astrolabe on sight: it costs one snow mana, draws a card,
+  fixes all colors, and adds to your snow count. Copies are never "redundant".
+
+KEY CARDS:
+- ABOMINABLE TREEFOLK {2}{G}{U}: your biggest body (power = snow permanents,
+  trample). On entry it taps and freezes one opponent creature - target their
+  best untapped blocker when you are about to swing, or their biggest attacker
+  when defending. It cannot attack the turn you cast it; it swings NEXT turn.
+- DIAMOND FAERIE {2}{G}{W}{U}: cast on sight (Rule #2). When your attack is 1-3
+  damage short of lethal, pay {1} + one snow mana: all snow creatures +1/+1.
+- ICE-FANG COATL {G}{U}: 1/1 flash flyer, draws a card on entry; deathtouch with
+  3+ other snow permanents. If it is castable and you would otherwise cast
+  nothing, cast it NOW - never hold it across whole turns.
+- GLACIAL REVELATION {2}{G}: reveals 6, keeps every snow card. Cast it when you
+  have spare mana after deploying - never instead of a creature you could cast.
+- FORCE OF NEGATION {1}{U}{U}: counters NONCREATURE spells; free (exile a blue
+  card) only on the OPPONENT'S turn. Fire it at a board wipe or mass removal -
+  you have used it exactly right on Damnation and Pyroclasm; keep doing that.
+  Never hold your whole turn for it: cast your creatures, it is still free on
+  their turn. If the opponent has cast no noncreature spell for two of their
+  turns, stop waiting - develop and attack.
+- GELID SHACKLES {W}: put it on their best blocker before you attack.
+
+LETHAL CHECK each combat: Treefolk power (count your snow permanents) + your
+other attackers' power + Diamond Faerie pump (+1 per snow creature for {1}+snow);
+if that total >= opponent life and their untapped creatures can't stop it,
+attack with EVERYONE and pump.
+
+WHEN YOU ARE THE DEFENDER (check the board, not the deck's colors): if the
+opponent has attacked you on two of their first three turns, OR your life is 14
+or less before turn 5, you are the defender until their board is contained -
+against ANY opponent, red or not. Turns 1-3 cast Icehide Golem {1} and Boreal
+Druid as blockers BEFORE Into the North or Search for Azcanta. At 10 life or
+less keep Golem and Druid home to block; Treefolk, Viper, and Faerie still
+attack (Rule #1's swing-back sum decides how many stay).
+
+MULLIGAN: keep 7 with 2-4 lands (a fetchland or Into the North counts as a
+land). Ship hands with 0-1 lands or 6+ lands.
