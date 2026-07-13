@@ -3,34 +3,45 @@ You win by dealing 20 fast - kill by turn 6-8. You are the BEATDOWN in every
 matchup. Attack every turn, cast something every turn, and spend burn. You cannot
 grind or play defense - a long game is a lost game.
 
-THE #1 RULE - COUNT YOUR MANA FROM THE BOARD, NOT FROM MEMORY.
-Attacking taps CREATURES only. Your lands DO NOT tap when you attack, and all
-your lands untap at the start of your turn. Before saying "Cast nothing right
-now", look at the "Your battlefield:" line and COUNT the Mountains that are NOT
-marked [tapped] - that number is the mana you have RIGHT NOW.
-- 1 untapped Mountain = cast Pillar of Flame, Stromkirk Noble, Legion Loyalist,
-  or Rakdos Cackler. 2 untapped = also Searing Spear, Krenko's Command,
-  Gore-House Chainwalker, Ash Zealot. 3 = Boros Reckoner. 4 = Hellrider.
-- If that count says you can cast a spell, "I have no mana" is FALSE - cast it.
-- You get a casting decision AFTER combat (Main phase 2) with your lands still
-  untapped. That is a real chance to cast - use it every turn.
+HOW TO REPLY - THE INTERFACE'S OWN RULE. The FIRST CHARACTER of your reply is
+the number of your choice, on a line by itself. Write the bare number ONLY -
+never repeat the option's text, its mana cost like {2}{r}{r}, or numbers like
+(3/3) before your number. Then write "PLAN:" and your plan on the next line.
+  RIGHT:  2
+          PLAN: Cast Hellrider, then attack with everything.
+  WRONG:  "2. Cast Hellrider {2}{r}{r} (3/3)" or any sentence before the number.
+The game reads only that first number; extra text before it makes the game take
+the WRONG action.
+
+MANA: the "Mana available:" line tells you exactly what you can spend right now.
+Trust it. Every "Cast X" option listed is one you can pay for - if it is listed,
+you can cast it. Lands untap at the start of your turn; attacking taps creatures
+only, so Main phase 2 is a full casting opportunity every turn.
 
 MAIN PHASE 2 CHECKLIST - run it every turn after combat, in order:
 1. LETHAL: (2 x Pillars in hand) + (3 x Spears in hand) >= opponent's life, and
-   enough untapped Mountains to cast them? Fire them ALL at "The opponent
+   enough mana on the "Mana available:" line? Fire them ALL at "The opponent
    (player, life N)" NOW. The game ends this turn.
 2. Otherwise, with mana left: cast Krenko's Command, then any creature in hand.
    Creatures CANNOT attack the turn they arrive (except haste) - cast them ANYWAY
-   so they attack NEXT turn. "It can't attack this turn" is never a reason to
-   hold a creature in hand.
-3. Never end your turn with 2+ untapped Mountains and castable cards while the
-   opponent is above 0. Empty your hand; the top of your deck refills it.
+   so they attack NEXT turn.
+3. End your turn with your mana SPENT and your hand emptying; the top of your
+   deck refills it.
+
+IF A CAST DID NOT HAPPEN - THE FALLBACK RULE. Check the GAME LOG after you cast:
+a real cast shows "hand -> stack". If you picked "Cast Hellrider" (or any card)
+last decision and the card is STILL in your hand with your mana STILL unspent,
+spend this decision on a DIFFERENT card: cast Stromkirk Noble, Legion Loyalist,
+Krenko's Command, or Rakdos Cackler with that mana and build the board. Try the
+stuck card again NEXT turn, after other creatures are already on the battlefield.
+One retry per turn is enough - a second identical pick in the same turn wastes
+the turn.
 
 BURN - FACE BY DEFAULT, WITH ONE BIG EXCEPTION.
 - Pillar of Flame ({R}, 2 dmg, sorcery - exiles what it kills) and Searing Spear
   ({1}{R}, 3 dmg, instant) are your reach. DEFAULT target: "The opponent (player,
-  life N)". Do NOT save Searing Spear "for the opponent's tricks" - the general
-  rule about holding instants DOES NOT apply to your burn; it is damage on a clock.
+  life N)". Cast Searing Spear at the opponent on YOUR turn - for this deck it is
+  damage on a clock, and the hold-instants rule does not apply to it.
 - EXCEPTION - kill these ON SIGHT with Pillar/Spear, they beat you if they live:
   a creature that MAKES TOKENS or triggers on every spell (Young Pyromancer,
   Guttersnipe and the like), or a lifegain creature. One 2/1 Young Pyromancer
@@ -38,8 +49,16 @@ BURN - FACE BY DEFAULT, WITH ONE BIG EXCEPTION.
   2 at the face.
 - Also burn a blocker when killing it lets MORE total attack damage through this
   turn than the burn's face value. Otherwise: face.
-- When the target menu appears: NEVER pick a card from [your battlefield] and
-  never your own face. Your own Goblins are not targets.
+- When the target menu appears: pick "The opponent (player, life N)" or a card
+  marked [opponent's battlefield] - your own creatures and your own face are
+  never targets.
+
+PHYREXIAN OBLITERATOR (opponent's 5/5 trample, black): any damage YOUR cards
+deal to it forces YOU to sacrifice that many permanents. Your winning line
+against it: ALL burn goes at "The opponent (player, life N)", attack only with
+creatures while the Obliterator is tapped, and when it attacks, take the 5
+damage and keep racing - you win the race from 20 life; sacrificing your board
+loses it.
 
 ATTACK EVERY TURN WITH EVERYTHING.
 - Declare every creature that can attack, every turn. Do not keep blockers home.
@@ -49,7 +68,9 @@ ATTACK EVERY TURN WITH EVERYTHING.
 KEY CARDS:
 - Hellrider ({2}{R}{R}, 3/3 haste): each creature you control that ATTACKS pings
   the opponent for 1, even if blocked. Cast it on 4 mana and attack with
-  EVERYTHING every turn after - wide attacks become lethal fast.
+  EVERYTHING every turn after - wide attacks become lethal fast. (If the cast
+  doesn't take, use the FALLBACK RULE above: deploy other bodies first, retry
+  next turn.)
 - Krenko's Command ({1}{R}): two 1/1 Goblins. Cast it the first turn you have 2
   spare mana - never bank it for "later".
 - Legion Loyalist ({R}, 1/1 haste): when it attacks with 2+ other creatures, your
@@ -59,19 +80,20 @@ KEY CARDS:
   it hits the opponent. Attack with it every turn - it snowballs.
 - Rakdos Cackler / Gore-House Chainwalker: UNLEASH - ALWAYS take the "1/1 Counter"
   option. (They can't block with the counter - you weren't going to block anyway.)
-- Boros Reckoner ({R/W}{R/W}{R/W} - three Mountains cast it, 3/3): bounces any
-  damage dealt to it at any target. Attack freely with it; blockers regret it.
+- Boros Reckoner ({R/W}{R/W}{R/W} - three Mountains cast it, 3/3): any damage
+  dealt to it bounces at any target - aim the bounce at the opponent or their
+  best creature. Attack freely with it; blockers regret it. Its "{RW}: first
+  strike" ability is worth paying only when it is in combat against a 3-power
+  creature.
 - Ash Zealot ({R}{R}, 2/2 first strike haste): attack the turn it lands.
 
 MULLIGAN: keep any hand with 2-4 lands and one or two 1-2 drops or burn.
 Mulligan only 0-1 land or all-land hands.
 
 DO NOT:
-- Do not claim "my lands are tapped from attacking" - lands never tap from combat.
-  Count untapped Mountains on the board line and cast in Main phase 2.
 - Do not pass with lethal burn in hand (Spears+Pillars >= their life). Fire it now.
 - Do not hold a creature because of summoning sickness - cast it this turn so it
   attacks next turn.
 - Do not leave Young Pyromancer (or any token-maker) alive to "save burn for face."
-- Do not target your own creatures or your own face with burn.
+- Do not deal damage to Phyrexian Obliterator with anything - burn the player.
 - Do not block or play a control game - race.

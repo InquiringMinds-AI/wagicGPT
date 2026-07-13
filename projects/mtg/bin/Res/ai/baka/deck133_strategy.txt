@@ -1,84 +1,83 @@
 Deck identity: mono-black DEVOTION AGGRO. You win by casting a black creature
-EVERY turn, attacking with it, and finishing with Gray Merchant of Asphodel's
-life drain. You are the beatdown in nearly every game. Only flip vs faster
-all-in aggro/burn: remove their creatures first - but STILL cast your own
-creature every turn (Phyrexian Obliterator walls them).
+every turn, attacking when the way is clear, and finishing with Gray Merchant
+of Asphodel's life drain - the drain is your only damage that ignores blockers
+and flyers, so every game plans toward it.
 
-#1 RULE - CAST A SPELL EVERY TURN. YOU ALWAYS HAVE THE MANA.
-The action list only offers spells you CAN pay for RIGHT NOW - the game taps
-your lands automatically when you pick one. "Mana in your pool: (none)" is the
-NORMAL resting state and does NOT mean you cannot cast; your untapped lands ARE
-your mana. NEVER reply "I have no mana" when the list offers a cast.
-On each of YOUR main phases: if any creature or planeswalker of yours is in the
-options, CAST ONE. Choose "Cast nothing" ONLY when the sole castable card is
-Fatal Push. Last run you picked "Cast nothing" 76 of 101 times and died with a
-full hand of creatures - that habit alone lost every game.
+CAST A SPELL EVERY TURN - YOU ALWAYS HAVE THE MANA. Every cast the list offers
+is already paid for; the game taps your lands automatically. Choose your action
+FROM THE NUMBERED LIST ONLY: before you write your plan, check that the card
+you intend to cast appears in the list. If it does not, it is not castable
+right now - cast the best creature that IS listed, and say so in your plan.
 
-DEPLOY CURVE (follow literally; substitute the closest creature you hold):
+ROLE CHECK - run it every turn, straight off the board:
+- BEATDOWN (their board is empty, or your creatures are bigger): deploy the
+  curve below and attack with everything.
+- DEFENDER (their creatures are hitting you - your life is falling while
+  theirs is not - or they have flyers you cannot block): win the defensive
+  way, the exact line that won you the burn matchup last run:
+  1. Fatal Push or Liliana of the Veil -2 on their best attacker.
+  2. Cast PHYREXIAN OBLITERATOR and BLOCK with it. Damaging it forces that
+     player to sacrifice that many permanents, so blocking with it eats
+     their attacker AND their board - it is your wall.
+  3. Protect your life total: play a Swamp and a creature instead of
+     Thoughtseize (2 life) or Phyrexian Arena (1 life every turn).
+  4. Close with Gray Merchant's drain - no attack needed.
+  You still cast a creature every turn in BOTH roles.
+
+DEPLOY CURVE (substitute the closest creature you hold):
 - Turn 1: land + Thoughtseize or Inquisition of Kozilek.
-- Turn 2: land + CAST BLOODGHAST.
-- Turn 3: land + CAST GERALF'S MESSENGER (enters tapped, drains 2 on arrival).
-- Turn 4: land + CAST PHYREXIAN OBLITERATOR.
-- Turn 5+: GRAY MERCHANT, then keep casting whatever the list offers.
-Casting two spells in one turn is GOOD when the list offers both.
+- Turn 2: land + Bloodghast.
+- Turn 3: land + Geralf's Messenger (enters tapped, drains 2 on arrival).
+- Turn 4: land + Phyrexian Obliterator.
+- Turn 5+: Gray Merchant, then keep casting whatever the list offers.
+Two spells in one turn is GOOD when the list offers both.
 
-GRAY MERCHANT KILL CHECK (run every turn it is in hand): drain = 2 (its own
-{B}{B}) + 2 per Bloodghast + 3 per Geralf's Messenger + 4 per Obliterator
-+ 2 per Yawgmoth + 2 per each Liliana + 2 per Phyrexian Arena on YOUR
-battlefield (lands add 0). If drain >= opponent's life, CAST IT NOW - you win
-on the spot, no attack needed. Otherwise cast it once drain reaches 4+ (you
-also GAIN that much life - it swings races by double the number).
+GRAY MERCHANT OF ASPHODEL {3}{B}{B}: cast him the same turn you reach 5 mana
+and every time he is in the list - he is the finisher AND the stabilizer
+(you gain the life they lose). Drain = 2 (his own {B}{B}) + 2 per Bloodghast
++ 3 per Geralf's Messenger + 4 per Obliterator + 2 per Yawgmoth + 2 per each
+Liliana + 2 per Phyrexian Arena on YOUR battlefield (lands add 0). Run this
+sum every turn he is in hand: if drain >= opponent's life, cast him NOW and
+win on the spot. Liliana, the Last Hope -2 returns a dead Gray Merchant to
+hand - recast him for a second drain.
 
-BLOODGHAST - CAST IT FROM YOUR HAND. Landfall only returns it from the
-GRAVEYARD; a Bloodghast in hand does nothing until cast. Once it has died,
-every land you play rebuys it free - so attack with it recklessly and discard
-or sacrifice it happily (Yawgmoth fodder, Collective Brutality escalate). It
-CAN'T BLOCK, and it has haste while the opponent is at 10 or less.
+DISCARD (Thoughtseize {B}, Inquisition {B} - mana value 3 or less only):
+these are TURN 1-3 spells, at their best while the opponent's hand is 2+
+cards. Take, in order: sweeper > counterspell > their best creature > burn.
+From turn 4 on, and any turn the opponent's hand shows 0-1 cards, your mana
+belongs to creatures - cast the creature and keep the discard spell for a
+turn with mana to spare. Thoughtseize costs YOU 2 life: when defending,
+choose Inquisition or a creature over it.
 
-ATTACK EVERY TURN with every untapped creature. Obliterator (5/5 trample) is
-safe to attack AND to block with: any damage to it forces that player to
-sacrifice that many permanents, so no one can fight it profitably. Geralf's
-Messenger trades happily - undying returns it bigger and it drains 2 again.
-NEVER write "I will attack next turn" while declaring no attackers - the
-attack happens THIS turn.
-
-FETCHLANDS (Polluted Delta, Bloodstained Mire, Verdant Catacombs, Marsh
-Flats): the moment "Put in Play ... targeting Snow-Covered Swamp" appears,
-TAKE IT. The 1 life is the card working. Never end a turn with an uncracked
-fetchland - last run you stalled on 2 lands refusing to "waste life".
+BLOODGHAST {B}{B} (2/1): cast it from your hand - landfall only returns it
+from the GRAVEYARD, and it rebuys FREE off every land you play once it has
+died. It CANNOT BLOCK, so as defender its jobs are: +2 devotion for the
+drain, Yawgmoth sacrifice fodder, and Collective Brutality escalate fuel.
+Attack with it when you are the beatdown (haste when opponent is at 10 or
+less); as defender, attacks that just trade into their blockers can wait -
+Gray Merchant does that damage through the air.
 
 FATAL PUSH (instant, {B}): kills a creature of mana value 2 or less - 4 or
 less if a permanent of yours left play this turn (cracked fetch, dead
-Bloodghast). Best fired on THEIR turn at their best cheap creature, but if a
-creature is hitting you every turn, fire it on your own main - removal rotting
-in hand is worse than sorcery-speed removal. Holding Push must NEVER stop you
-casting your creature.
+Bloodghast). Fire it at their best cheap attacker; on your own main is fine
+if it is hitting you every turn. Holding Push never stops your creature cast.
 
-DISCARD (Thoughtseize {B}, Inquisition {B} - mana value 3 or less only): cast
-turn 1. Take, in order: sweeper > counterspell > their best creature > burn.
-Never take a land, mana producer, or their weakest card. Thoughtseize costs
-you 2 life - prefer Inquisition when you are at 10 or less vs aggro/burn.
+FETCHLANDS (Polluted Delta, Bloodstained Mire, Verdant Catacombs, Marsh
+Flats): crack the moment "Put in Play... targeting Snow-Covered Swamp"
+appears - the 1 life is the card working, and it turns Fatal Push on.
 
-COLLECTIVE BRUTALITY {1}{B}: cast it, don't hoard it (0 casts last run). Take
-their instant/sorcery, or "opponent loses 2 life and you gain 2". Escalate by
-discarding Bloodghast - your next land drop returns it.
-
-YAWGMOTH: cast only with another creature out. Then each turn: pay 1 life,
-sacrifice Bloodghast or Geralf's Messenger (both come back), put the -1/-1
-counter on THEIR creature, draw a card.
+YAWGMOTH: cast with another creature out, then each turn: pay 1 life,
+sacrifice Bloodghast or Geralf's Messenger (both come back), -1/-1 counter
+on THEIR creature, draw a card. You piloted this perfectly last run - keep it.
+GERALF'S MESSENGER trades happily: undying returns it bigger, drains 2 again.
+COLLECTIVE BRUTALITY {1}{B}: take their instant/sorcery or "opponent loses 2
+life"; escalate by discarding Bloodghast - your next land returns it.
 LILIANA OF THE VEIL: -2 kills a threat too big for Fatal Push.
-LILIANA, THE LAST HOPE: +1 kills their 1-toughness creature; -2 returns a dead
-Gray Merchant to hand - recast it for a second drain.
+LILIANA, THE LAST HOPE: +1 kills their 1-toughness creature.
 
-MULLIGAN: keep 2-4 lands with a discard spell or any creature; ship 0-1 land
-and 6+ land hands.
+ATTACK with every untapped creature when you are the beatdown. Obliterator
+(5/5 trample) attacks AND blocks safely - no one can fight it profitably.
 
-DO NOT (every one observed last run):
-- Do NOT pick "Cast nothing" because "Mana in your pool: (none)" - every
-  offered cast is affordable; this misreading lost you all six games.
-- Do NOT skip casting Bloodghast "because landfall returns it" - it returns
-  only from the graveyard, and it never reaches the graveyard uncast.
-- Do NOT sit at low life holding a full hand "hoping they can't kill you" -
-  cast Obliterator/Messenger as walls and drain back with Gray Merchant.
-- Do NOT decline to crack a fetchland to save 1 life.
-- Do NOT pass combat planning to "next turn" - attack now.
+MULLIGAN: keep 2-4 lands with a creature, or a discard spell AND a creature.
+Ship 0-1 land hands, 6+ land hands, and hands that are all discard spells
+with no creature - discard alone never wins.

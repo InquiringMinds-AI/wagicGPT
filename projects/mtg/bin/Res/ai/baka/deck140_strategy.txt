@@ -1,83 +1,86 @@
 Deck identity: "Wipe Them Out" is an RBW CONTROL deck: 14 board wipes, almost
-no creatures, and three win conditions (Staff of Nin, Rakdos's Return,
-Blightsteel Colossus). You are always the control player: sweep their
-creatures, then DEPLOY a finisher and kill them. This deck has no other
-clock - a game where you never deploy a finisher is a game you lose.
+no creatures, three win conditions (Rakdos's Return, Staff of Nin, Blightsteel
+Colossus). You win BY DOING, every turn: sweep their creatures, deploy a
+finisher, then spend your reach at their FACE until they are dead. A game
+where you only sweep and never damage the opponent is a game you lose.
 
-THE #1 RULE - IF A "Cast <card>" OPTION IS LISTED, YOU CAN PAY FOR IT.
-The game ONLY offers spells you can afford right now. Lands tap by themselves
-when you cast - you never tap lands as a separate step, and "Mana in your
-pool: (none)" is the normal resting state, NOT a lack of mana. Lands on your
-battlefield without the [tapped] tag are untapped and ready. NEVER pick "Cast
-nothing" with the excuse "I have no mana" / "my lands are tapped" / "I must
-tap lands first" - that excuse is always false when a cast is offered. Trust
-the CURRENT battlefield over your last PLAN: if your plan says your lands are
-tapped but the board shows no [tapped], the plan is stale - ignore it.
+THE #1 RULE - THE X MENU: ALWAYS PICK THE LAST OPTION.
+When you cast Rakdos's Return or Black Sun's Zenith, the game asks you to
+"Announce the value of X" with a numbered list like:
+  1. X = 0
+  2. X = 1
+  3. X = 2
+The reply you send is the OPTION number, NOT the X value. Option 1 is always
+X = 0 - the spell does nothing. The biggest X is always the LAST line.
+Procedure: reply with the number of the LAST line. Check before sending: the
+line you picked must literally read "X = <the biggest number shown>". If
+your plan says "X=3", the correct reply is the option number of the line
+reading "X = 3" (that is option 4), never the digit 3 itself.
 
-THE #2 RULE - WHEN YOU ARE SAFE, DEPLOY A THREAT. Every turn the opponent has
-no creatures (or creatures too small to kill you within two turns), you MUST
-cast a threat or engine. Take the FIRST of these that appears in the options:
- 1. Cast Blightsteel Colossus {12} - it ends the game (see below).
- 2. Cast Staff of Nin {6} - your card engine and repeating damage.
- 3. Cast Rakdos's Return - vs an opponent with no creatures this IS your
-    kill (see below - it does NOT deal 0 damage).
- 4. Cast Lightmine Field {2}{W}{W} - only if the opponent's deck attacks
-    with creatures; skip it vs a creatureless deck.
+RAKDOS'S RETURN IS YOUR KILL SPELL - RUN THIS CHECK EVERY TURN IT IS IN HAND:
+it deals X damage to the opponent AND they discard X cards. Your X = (your
+untapped lands) minus 2. If that X >= the opponent's life, cast it NOW - you
+win this turn. Even when not lethal, cast it once you have 6+ lands: 4+
+damage plus emptying their hand is your best play against an opponent with
+no creatures. It deals 0 only if X = 0 (see THE #1 RULE).
+
+WHEN YOU ARE SAFE, DEPLOY - every turn the opponent has no creatures (or only
+creatures too small to kill you within two turns), cast the FIRST of these
+that appears in your options:
+ 1. Cast Blightsteel Colossus {12} - 11/11 trample infect, indestructible;
+    it attacks by itself, one unblocked hit is 10+ poison = dead opponent.
+    Your ONLY job is to cast it when offered.
+ 2. Cast Rakdos's Return - see the check above.
+ 3. Cast Staff of Nin {6} - a card every upkeep plus a ping every turn;
+    your repeating clock.
+ 4. Cast Lightmine Field {2}{w}{w} - only vs a deck that attacks; skip it
+    vs a creatureless deck.
  5. Cast Venser's Journal {5} - life every upkeep; best vs aggro.
- 6. Cast Elixir of Immortality {1} - cast it with spare mana any turn; it
-    just sits in play until you activate it later.
-"Cast nothing" is allowed ONLY when every offered spell is a sweeper or Cruel
-Edict AND the opponent has no creatures. "I will stabilize first and deploy
-later" is the losing thought - with no opponent creatures you ARE stable NOW,
-and "later" never comes. Deploying does not stop you from sweeping next turn.
+ 6. Cast Elixir of Immortality {1} - cast with spare mana; activate later
+    ({2},{T}: gain 5 life) when below 10 life or your library is under 10.
+With no opponent creatures you are stable NOW - deploying does not stop you
+from sweeping next turn.
 
-RAKDOS'S RETURN - YOU CHOOSE X. Its cost is {X}{B}{R}. Cast it, and when the
-game asks you to pick a number for X, pick the LARGEST number offered. It
-deals X damage to the opponent AND makes them discard X cards - with 8 lands
-that is about 5 damage plus their whole hand. It deals 0 only if you choose
-0. Never skip it saying "it deals 0 damage."
-BLACK SUN'S ZENITH is also an X spell: choose X = the largest toughness among
-their creatures. It kills through indestructible and protection, and it
-shuffles back into your library, so spend it freely.
-
-ONCE YOUR PERMANENTS ARE IN PLAY, ACTIVATE THEM:
-- Staff of Nin: EVERY turn take its "{T}: deals 1 damage" option - kill a
-  1-toughness creature if they have one, otherwise hit the opponent's face.
-- Elixir of Immortality: activate ({2},{T}: gain 5 life, shuffle graveyard
-  into library) when you are below 10 life or your library is under 10 cards.
+STAFF OF NIN IN PLAY - take its "Deal 1 Damage" option EVERY turn:
+- Target the OPPONENT (the player) by default; every face ping is progress.
+- Target a creature ONLY if its toughness is 1 (shown as x/1) - 1 damage
+  kills it. Guttersnipe is 2/2: pinging it does NOTHING and wastes your
+  clock. Ping 1/1 tokens or x/1 creatures; otherwise ALWAYS the face.
 
 WHICH SWEEPER (only when the opponent HAS creatures - match the board):
-- Exactly ONE creature: Cruel Edict {1}{B} - they sacrifice it.
-- 2+ creatures, ALL toughness 2 or less: Pyroclasm {1}{R}.
-- 2+ creatures, any toughness 3+: Wrath of God {2}{W}{W} or Damnation
-  {2}{B}{B} - destroys everything.
-- Indestructible / protection / regeneration problem: Black Sun's Zenith.
+- Exactly ONE creature: Cruel Edict {1}{b} - they sacrifice it.
+- 2+ creatures, ALL toughness 2 or less: Pyroclasm {1}{r}.
+- 2+ creatures, any toughness 3+: Wrath of God {2}{w}{w} or Damnation
+  {2}{b}{b} - destroys everything.
+- Indestructible / protection / regeneration: Black Sun's Zenith - pick the
+  LAST X option (THE #1 RULE); X at or above their biggest toughness kills
+  everything, and it shuffles back into your library, so spend it freely.
 Sweep as soon as they have 2+ creatures, or any board that kills you within
-two turns. One sweeper per board; you carry 14, so never save them "for
-later" while you take damage.
+two turns. You carry 14 sweepers - one per board, never saved "for later"
+while you take damage.
 
-BLIGHTSTEEL COLOSSUS {12}: 11/11 trample, infect, indestructible, reshuffles
-instead of dying. One unblocked hit is 10+ poison = the opponent is dead. It
-attacks by itself once in play - your ONLY job is to cast it when offered.
+INTERFACE FACTS (true every turn): every "Cast" option listed is already
+affordable - lands tap by themselves and "Mana in your pool: (none)" is
+normal. NEVER pick "Cast nothing" with the excuse "I have no mana" or "my
+lands are tapped" - that excuse is always false when a cast is offered.
+Trust the CURRENT battlefield over your last PLAN. "Cast nothing" is allowed
+ONLY when every offered spell is a sweeper or Cruel Edict AND the opponent
+has no creatures.
 
-LANDS: play a land EVERY turn. Never pick "Hold <land>" - holding a land
-back gains you nothing, ever.
-
-MULLIGAN: keep ANY hand with 2, 3, or 4 lands. Never mulligan because of
-"too many sweepers" - sweepers are what this deck does.
+LANDS: play a land EVERY turn; never pick "Hold <land>".
+MULLIGAN: keep ANY hand with 2, 3, or 4 lands. Never mulligan for "too many
+sweepers" - sweepers are what this deck does.
 
 OVERRIDE of the general strategy: you have NO instants - never pass your
-turn to "keep mana open for interaction"; nothing in your deck is cast on
-the opponent's turn. Cast your sorceries, artifacts, and enchantments on
-your own main phase, every single turn there is a legal target or a threat
-to deploy.
+turn to "keep mana open"; nothing in your deck casts on the opponent's turn.
+Cast on your own main phase, every single turn.
 
 DO NOT (each of these lost or stalled a real game):
-- Decline an offered cast claiming you have no mana (you died at 3 life with
-  Damnation offered three turns in a row).
-- Pass turn after turn with Staff of Nin or Rakdos's Return castable because
-  "the board is clear" - a clear board is exactly when you deploy.
-- Say "Rakdos's Return deals 0 damage" - you choose X when you cast it.
-- Hold Elixir of Immortality in hand all game "for later."
-- Hold a land drop to "keep hand size" - hand size is not a resource here.
-- Mulligan a hand with 2+ lands and sweepers.
+- On every X menu, run THE #1 RULE: pick the LAST line and confirm it reads
+  "X = <the biggest number shown>" (replying "1", or replying your planned
+  X value as the answer, blanked four kill spells in real games).
+- Staff of Nin pings go to the opponent's FACE unless the target's
+  toughness is 1 (Guttersnipe is 2/2 and survives the ping).
+- A clear board is exactly when you deploy - cast Rakdos's Return or Staff
+  of Nin the first turn it is offered, never "later".
+- An offered cast is always payable - cast it; "I have no mana" is false.

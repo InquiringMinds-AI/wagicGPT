@@ -1,78 +1,92 @@
 Deck identity: "Etched Affinity" is a fast artifact-aggro deck. Your cards cost
-0-3 mana. You are the BEATDOWN in every matchup: dump your whole hand onto the
-battlefield in the first few turns, equip Cranial Plating, attack every turn,
-and finish with Galvanic Blast. Kill by turn 5-6. A turn where you cast nothing
-is a lost turn.
+0-3 mana. Dump your whole hand onto the battlefield in the first few turns,
+equip Cranial Plating ONCE, attack every turn, and finish with Galvanic Blast.
+Kill by turn 5-6. A turn where you cast nothing is a lost turn. You are the
+beatdown by default; against another fast attack deck, see THE RACE below.
 
-#1 RULE - IF "Cast X" IS IN YOUR OPTIONS, YOU CAN PAY FOR IT. CAST IT.
-The game only lists actions you can legally pay RIGHT NOW - it checks your
-mana for you and taps your lands automatically when you cast. "Mana in your
-pool: (none)" is NORMAL and does NOT mean you lack mana; untapped lands ARE
-your mana. Do not reason about colors or whether you "can produce" mana - the
-list already did that.
-- NEVER pick "Cast nothing right now" while a creature, your first Cranial
-  Plating, or Thoughtcast is on the list. Pick the creature.
-- Memnite and Ornithopter cost {0} - literally free. Cast them the moment you
-  see them, always.
-- Act NOW, not next turn. If your plan says "cast X", pick the number that
-  casts X in THIS reply. "I will do it next turn" repeated every turn is how
-  this deck loses.
-- It is fine to tap out to deploy creatures. Board presence beats saved mana.
+#1 RULE - EQUIP CRANIAL PLATING EXACTLY ONCE, THEN LEAVE THE EQUIP LINE ALONE.
+The game keeps offering "Equip with Cranial Plating" every turn even after the
+Plating is attached. Taking it again is paying {1} for nothing. Run this check
+BEFORE any Equip line:
+1. Read the target creature's stats on YOUR battlefield. Two power numbers -
+   like "Etched Champion (6/2) (printed 2/2)" - mean a bonus is ALREADY on it:
+   the Plating is attached, the equip is DONE. Spend that mana on a creature
+   or a Blast instead, then attack.
+2. One power number - like "(2/2)" or "(0/1)" - means no Plating on it. Equip
+   it now if it is your best carrier.
+3. Take at most ONE Equip in a whole turn. After one Equip, every further
+   Equip line this turn is a re-offer of work already done - your remaining
+   mana belongs to creatures and Blasts.
+Equip again in a later turn only when your equipped creature DIED or a strictly
+better carrier arrived. The "attach with Cranial Plating [cost: {b}{b}]" line
+is a black-mana copy of the same thing - the {1} Equip is always the one to take.
 
-THE ENGINE - CRANIAL PLATING:
-Plating gives its creature +1/+0 for EACH artifact you control (usually +4 or
-more). Sequence:
-1. CAST Cranial Plating the first turn it appears in your options - even if
-   you cannot equip the same turn. It must be on the battlefield first.
-2. Next priority you see "Equip with Cranial Plating targeting X [cost: {1}]",
-   TAKE IT once.
-3. Equip ONCE. If your creature's power already shows the bonus - e.g.
-   "Memnite (5/1) (printed 1/1)" - the Plating is ALREADY attached: do NOT
-   equip it again, pass (0). Re-equipping the same creature wastes your mana
-   every turn.
-4. Ignore the "attach with Cranial Plating [cost: {b}{b}]" line - it is a
-   worse copy of the {1} Equip. Never pay {B}{B} for it.
-Best carrier order: 1) Etched Champion (protection from all colors with 3+
-artifacts - they cannot block or kill it), 2) Vault Skirge or Ornithopter
-(fliers), 3) Signal Pest, 4) Memnite. One equipped Plating wins; do not cast
-a 2nd copy while the 1st is unequipped.
+CASTING: every "Cast X" in your options is fully payable right now - the game
+taps your lands for you, and "Mana in your pool: (none)" is normal. The thought
+"I have no mana for this" is always false when the cast is listed. Memnite and
+Ornithopter cost {0} - cast them the moment you see them, always. Cast a
+creature every turn one is listed; it is fine to tap out.
 
-ATTACK EVERY TURN with every creature. Signal Pest always attacks even at 0
-power - battle cry gives every OTHER attacker +1/+0 and it can't be blocked
-except by fliers/reach. Etched Champion with 3+ artifacts is unblockable by
-colored creatures - always send it.
+THE ENGINE - CRANIAL PLATING gives its creature +1/+0 for EACH artifact you
+control (your artifact count is shown on the board - usually +4 or more).
+1. CAST Cranial Plating the first turn it appears - even if you cannot equip
+   the same turn. One copy on the battlefield is enough; cast a creature
+   before a 2nd Plating when you can only afford one of them.
+2. EQUIP it with your first spare {1} - same turn if you can, otherwise the
+   very next turn. An unattached Plating adds nothing but its artifact count.
+3. Then run rule #1: one equip, done, attack.
+Carrier order: 1) Etched Champion (with 3+ artifacts it has protection from
+all colors - colored creatures cannot block or kill it), 2) Vault Skirge or
+Ornithopter (fliers), 3) Signal Pest, 4) Memnite.
 
-LETHAL CHECK - run this every turn:
+THE RACE - when the opponent is also fast aggro (red decks with Rakdos
+Cackler, Ash Zealot, Legion Loyalist, Goblin tokens, Hellrider), win by going
+WIDER, not taller: cast EVERY creature in your hand before spending mana on
+Equip lines - two bodies beat one +4 bonus; they add damage AND can block.
+Keep attacking, but when their attack on you would drop you to 8 life or
+less, block with every creature you do not need for your own lethal next
+turn - chump-blocking to stay alive wins the race.
+
+ATTACK EVERY TURN with every creature - including the turn after your best
+attacker died: send the rest and rebuild. Signal Pest always attacks even at
+0 power (battle cry gives every OTHER attacker +1/+0, and only fliers/reach
+can block it). Etched Champion with 3+ artifacts walks past colored blockers
+- always send it. One exception: if the opponent controls Lightmine Field
+(it damages each attacker by the number of attackers), attack with ONLY
+Etched Champion or your single equipped creature.
+
+LETHAL CHECK - run it every turn:
 damage = total power of your attackers (+1 each if Signal Pest attacks too)
        + 4 per Galvanic Blast in hand (metalcraft: 3+ artifacts = 4 damage).
 If damage >= opponent's life: attack with everyone and fire every Blast at
-the opponent's face. When the opponent is at 8 or less, ALWAYS point your
-Blasts at their face - never save them. Earlier, Blast may kill a blocker
-stopping your equipped attacker; otherwise hold it - but holding it past
-opponent-at-8 is a misplay.
+the opponent's face. When the opponent is at 8 or less, Blasts always go to
+the face. Earlier, a Blast may kill a blocker stopping your equipped attacker.
 
 OTHER KEY CARDS:
-- Steel Overseer: take "Counter with Steel Overseer [cost: Tap]" EVERY one of
-  your turns - permanent +1/+1 counters on all your artifact creatures.
-- Master of Etherium: power = your artifact count and it pumps your whole
-  team +1/+1. Cast it on sight.
-- Thoughtcast: affinity means it costs as little as {U}. Cast it whenever you
+- Steel Overseer: take "Counter with Steel Overseer [cost: Tap]" in Main
+  Phase 1 EVERY turn it is untapped - permanent +1/+1 counters on ALL your
+  artifact creatures beat one 1/1 attack. Skip the tap only when Overseer
+  itself must attack for lethal THIS turn.
+- Master of Etherium: power = your artifact count, and it pumps your other
+  artifact creatures +1/+1. Cast it on sight.
+- Thoughtcast: affinity - it usually costs just {U}. Cast it whenever you
   have 2 or fewer other cards worth casting - refuel, do not hoard it.
-- Mox Opal / Darksteel Citadel / Glimmervoid: lands and free mana that also
-  count as artifacts for metalcraft (3+ artifacts). You hit metalcraft almost
-  immediately - assume it is ON.
+- Mox Opal / Darksteel Citadel / Glimmervoid: free mana and lands; Mox Opal
+  and Citadel also count as artifacts - you hit metalcraft (3+ artifacts)
+  almost immediately, assume it is ON. A "Cast Card Normally with Mox Opal"
+  or "Play Land with Mox Opal" line just makes mana with Mox Opal - your
+  creatures and spells come first.
 
-MULLIGAN: keep 2+ lands and 2+ creatures. Ship hands with 0-1 land or no
-creatures.
+MULLIGAN: keep 2+ lands and 2+ creatures (Mox Opal counts as a land here).
+Ship hands with 0-1 land or no creatures.
 
 DO NOT (all seen in real games with this deck):
-- Do NOT pick "Cast nothing" because you think you have no mana or the wrong
-  colors. If the cast is listed, you can pay it. This single error lost games
-  from 20 life with a full hand.
-- Do NOT hold Cranial Plating in hand for "next turn" - it sat uncast for 10+
-  turns while 0-power creatures attacked for nothing. Cast it NOW.
-- Do NOT re-equip a creature that already has the Plating attached.
-- Do NOT skip a 4-damage Galvanic Blast at the face when the opponent is at 8
-  or less "to keep mana for equipping" - the Blast is the win.
-- Do NOT describe casting a spell in your plan and then pick the "Cast
-  nothing" number. Your chosen number must match your plan.
+- Do NOT take an Equip line targeting a creature that already shows two power
+  numbers like "(6/2) (printed 2/2)" - that Plating is attached; the mana
+  belongs to creatures and Blasts.
+- Do NOT spend turns on one creature + equip while holding castable creatures
+  - the games this deck lost, it attacked with ONE creature while the
+  opponent built five.
+- Do NOT stop declaring attackers because your equipped creature died - the
+  game this deck timed out, it stopped attacking on turn 4 with creatures in
+  play.
