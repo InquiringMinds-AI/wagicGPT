@@ -1066,6 +1066,11 @@ bool ActionStack::wouldOfferWindow(Player * p, Interruptible * action)
         return false;
     //The universal priority rule: a window exists iff the player could
     //actually respond right now. Everyone else auto-passes silently.
+    //NOTE (wave-5, verified by probe runs): this gate is honest - a seat that
+    //tapped out on its own turn stays tapped through the opponent's next turn
+    //and gets NO window on the opponent's casts. "Died with counters in hand"
+    //is therefore usually a mana-discipline leak (guide layer), not a missing
+    //window: keep counter mana untapped or the window never exists.
     return LegalActionsOracle::hasInstantResponse(p);
 }
 

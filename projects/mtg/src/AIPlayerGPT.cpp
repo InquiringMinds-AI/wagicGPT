@@ -1019,6 +1019,55 @@ string AIPlayerGPT::serializeGameState()
     out << "Phase: " << observer->getCurrentGamePhaseName();
     out << " | It is " << (observer->currentPlayer == this ? "your" : "the opponent's") << " turn.\n";
     out << "Your life: " << this->life << " | Opponent life: " << (opp ? opp->life : 0) << "\n";
+
+    //The stack, top-first. Pending spells/abilities were previously invisible
+    //in the situation block: the model saw "Cast Counterspell" offered but not
+    //WHAT it could counter, and read post-cast game-log lines as already
+    //resolved (wave-4 E1). Phase-transition plumbing is skipped as noise.
+    {
+        ActionStack * stack = observer->mLayers->stackLayer();
+        std::vector<string> items;
+        for (size_t i = 0; i < stack->mObjects.size(); i++)
+        {
+            Interruptible * it = (Interruptible *) stack->mObjects[i];
+            if (!it || it->state != NOT_RESOLVED)
+                continue;
+            if (it->type != ACTION_SPELL && it->type != ACTION_ABILITY)
+                continue; //phase steps / damage plumbing, not respondable objects
+            std::ostringstream line;
+            Player * ctrl = it->source ? it->source->controller() : NULL;
+            line << (ctrl == this ? "your " : (ctrl ? "opponent's " : ""))
+                 << it->getDisplayName()
+                 << (it->type == ACTION_SPELL ? " [spell]" : " [triggered/activated ability]");
+            if (it->type == ACTION_SPELL)
+            {
+                Spell * sp = (Spell *) it;
+                std::ostringstream tgt;
+                bool first = true;
+                for (Targetable * t = sp->getNextTarget(); t; t = sp->getNextTarget(t))
+                {
+                    tgt << (first ? "" : ", ");
+                    first = false;
+                    if (MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(t))
+                        tgt << c->getDisplayName();
+                    else if (Player * pl = dynamic_cast<Player *>(t))
+                        tgt << (pl == this ? "you" : "opponent");
+                    else
+                        tgt << "something";
+                }
+                if (!first)
+                    line << " targeting " << tgt.str();
+            }
+            items.push_back(line.str());
+        }
+        if (!items.empty())
+        {
+            out << "ON THE STACK, waiting to resolve (top resolves FIRST - you can respond now):\n";
+            int n = 1;
+            for (int i = (int) items.size() - 1; i >= 0; i--, n++)
+                out << "  " << n << (n == 1 ? " (top): " : ": ") << items[i] << "\n";
+        }
+    }
     //Honest mana line: the pool being empty between actions is normal (the
     //engine taps lands automatically); what the player can actually spend is
     //the potential of its untapped producers. The old "Mana in your pool:
@@ -1535,6 +1584,35 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (card->isCreature())
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << casts[ci].zoneLabel;
+        }
+        //A response option offered because of pending stack objects names what
+        //it can hit ("Cast Counterspell {u}{u} - can target on the stack:
+        //Master of Etherium"): the offer used to be a bare cast line and the
+        //model could not tell WHY the window opened (wave-4 E2). Cheap: only
+        //stack-zone-targeting cards ever append anything.
+        {
+            TargetChooserFactory tcf(observer);
+            TargetChooser * tc = tcf.createTargetChooser(card);
+            if (tc)
+            {
+                std::ostringstream hits;
+                bool firstHit = true;
+                for (int pi = 0; pi < 2; pi++)
+                {
+                    MTGGameZone * sz = observer->players[pi]->game->stack;
+                    if (!tc->targetsZone(sz))
+                        continue;
+                    for (int zi = 0; zi < sz->nb_cards; zi++)
+                        if (tc->canTarget(sz->cards[zi]))
+                        {
+                            hits << (firstHit ? "" : ", ") << sz->cards[zi]->getDisplayName();
+                            firstHit = false;
+                        }
+                }
+                SAFE_DELETE(tc);
+                if (!firstHit)
+                    o << " - can target on the stack: " << hits.str();
+            }
         }
         candidates.push_back(card);
         candidateUsesAlt.push_back(casts[ci].viaAlternative);
