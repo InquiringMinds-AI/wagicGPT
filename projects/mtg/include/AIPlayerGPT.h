@@ -229,7 +229,8 @@ private:
     //(c2: the silent choice:-1 class becomes attributable).
     long mLastLatencyMs; //-1 = no round trip behind this record (cache/reuse)
     void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
-                       const string& chosenText = "", const char * fallback = NULL);
+                       const string& chosenText = "", const char * fallback = NULL,
+                       const std::vector<string> * optionTexts = NULL);
     //One "gameend" record per duel: result + final life + turn count. The
     //per-decision records alone cannot say who WON - win-rate and timeout
     //adjudication both need it in the same file.

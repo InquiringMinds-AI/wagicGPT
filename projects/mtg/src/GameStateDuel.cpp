@@ -869,7 +869,11 @@ void GameStateDuel::Update(float dt)
             {
                 int selfplayWinner = game->didWin(game->players[0]) ? 0
                                    : (game->didWin(game->players[1]) ? 1 : -1);
-                fprintf(stderr, "WAGIC_SELFPLAY_RESULT winner=%d\n", selfplayWinner);
+                fprintf(stderr, "WAGIC_SELFPLAY_RESULT winner=%d life0=%d life1=%d turn=%d\n",
+                        selfplayWinner,
+                        game->players[0] ? game->players[0]->life : 0,
+                        game->players[1] ? game->players[1]->life : 0,
+                        game->turn);
                 fflush(stderr);
                 exit(0);
             }

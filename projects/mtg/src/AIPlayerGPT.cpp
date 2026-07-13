@@ -324,6 +324,11 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 out << "]";
             }
             describeAttachments(out, card);
+            //the forward direction too: the equipment/aura itself names its
+            //current host, so "is this already attached?" is answerable from
+            //either end of the relationship
+            if (card->auraParent)
+                out << " [attached to: " << card->auraParent->getDisplayName() << "]";
             if (card->isTapped())
                 out << " [tapped]";
             if (card->isAttacker())
@@ -541,7 +546,7 @@ void AIPlayerGPT::setNotice(const string& text, float seconds)
 }
 
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
-                                const string& chosenText, const char * fallback)
+                                const string& chosenText, const char * fallback, const vector<string> * optionTexts)
 {
     if (mTransLogPath.empty())
         return;
@@ -564,6 +569,10 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["chosen_text"] = chosenText;
     if (fallback)
         rec["fallback"] = fallback;
+    //the exact option strings, when the seam has them as a list (ask /
+    //priority) - offered-vs-taken tallies without re-parsing the prompt
+    if (optionTexts)
+        rec["options_text"] = *optionTexts;
     std::ofstream f(mTransLogPath.c_str(), std::ios::app);
     if (f)
         f << rec.dump() << "\n";
@@ -1135,7 +1144,17 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
     if (action.click)
         out << " with " << action.click->getDisplayName();
     if (action.target)
+    {
         out << " targeting " << action.target->getDisplayName();
+        //Re-attaching to the current host is rules-legal but changes nothing.
+        //The board line's cue (two power numbers / {attached:}) proved
+        //insufficient at range - the pilot read it and re-equipped anyway
+        //(wave-5 deck110: 15 of 35 equips were no-ops). Say it AT the option.
+        MTGCardInstance * moved = action.click ? action.click
+                                               : (action.ability ? action.ability->source : NULL);
+        if (moved && moved->auraParent == action.target)
+            out << " (ALREADY attached to it - this would change NOTHING)";
+    }
     else if (action.playerAbilityTarget || action.player)
         out << " targeting a player";
 
@@ -1316,14 +1335,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (mSystemPrompt.empty())
         buildSystemPrompt();
 
+    //Turn ownership stamped ON the header: the phase line sits far above
+    //the option list and the pilot sometimes answered as if it were the
+    //other player's turn (wave-4/5 reviewers, 3 seats).
     std::ostringstream tail;
-    tail << "Your legal actions:\n";
+    tail << "Your legal actions (" << observer->getCurrentGamePhaseName()
+         << (observer->currentPlayer == this ? ", YOUR turn" : ", opponent's turn") << "):\n";
     int index = 0;
     //De-dup identical option lines: a fetchland offers one action per
     //fetchable copy in the library (observed: 13 byte-identical "Put in
     //Play" lines) - from the model's seat they are ONE decision. Keep the
     //first candidate of each rendered line.
     vector<const OrderedAIAction *> shown;
+    vector<string> shownLines; //ordered option texts, for the translog
     std::set<string> seenLines;
     for (size_t c = 0; c < candidates.size(); c++)
     {
@@ -1331,6 +1355,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (!seenLines.insert(line).second)
             continue;
         shown.push_back(candidates[c]);
+        shownLines.push_back(line);
         index++;
         tail << index << ". " << line << "\n";
     }
@@ -1391,7 +1416,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : "unparsed_reply");
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
                           : (choice == 0 ? string("pass") : string());
-            writeTransLog("priority", userMsg, content, choice, index, chosen, fb);
+            writeTransLog("priority", userMsg, content, choice, index, chosen, fb, &shownLines);
         }
         DebugTrace("AIPlayerGPT: model chose " << choice << " of " << index);
     }
@@ -1476,7 +1501,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
         bool valid = choice >= 1 && choice <= (int) options.size();
         const char * fb = valid ? NULL : (content.empty() ? "empty_reply" : "unparsed_reply");
         writeTransLog("ask", userMsg, content, choice, (int) options.size(),
-                      valid ? options[choice - 1] : string(), fb);
+                      valid ? options[choice - 1] : string(), fb, &options);
     }
     DebugTrace("AIPlayerGPT: " << decision << " -> chose " << choice << " of " << options.size());
 
@@ -1625,7 +1650,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     opts.push_back("Cast nothing right now"); //the decline goes LAST
 
     //no narration: a cast narrates itself as zone events, "nothing" is a non-action
-    int pick = askModel("Casting decision: which card do you cast now, if any?", opts, false);
+    int pick = askModel(string("Casting decision (") + observer->getCurrentGamePhaseName()
+                        + (observer->currentPlayer == this ? ", YOUR turn" : ", opponent's turn")
+                        + "): which card do you cast now, if any?", opts, false);
     if (pick == kChoicePending)
         return NULL; //no cast this tick; the answer is consumed on a later poll
     if (pick < 0) //model deferred or endpoint failed: heuristic decides

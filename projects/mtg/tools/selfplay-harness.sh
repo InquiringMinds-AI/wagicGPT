@@ -81,7 +81,7 @@ mkdir -p "$LOGDIR"
 [ -n "$OUTDIR" ] || OUTDIR="$HOME/.Wagic/ai/gpt/selfplay-runs/matchups-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$OUTDIR"
 RESULTS="$OUTDIR/results.tsv"
-printf "deck0\tdeck1\twinner\tstart_epoch\n" > "$RESULTS"
+printf "deck0\tdeck1\twinner\tlife0\tlife1\tturn\tstart_epoch\n" > "$RESULTS"
 
 # Endpoint reachability (fail HARD rather than burn a corpus of silent
 # Baka-fallback games - that already happened once). Latency matters too: the
@@ -139,9 +139,14 @@ run_one_game() {
         WAGIC_AI=gpt WAGIC_GPT_URL="$URL" WAGIC_GPT_MODEL="$MODEL" WAGIC_GPT_KEY="$KEY" \
         WAGIC_GPT_THINKING="$THINKING" WAGIC_GPT_TRANSLOG=1 \
         ./wagic > "$elog" 2>&1
-    local winner; winner=$(grep -oE 'WAGIC_SELFPLAY_RESULT winner=(-?[0-9]+)' "$elog" | grep -oE '\-?[0-9]+$' | tail -1)
+    local resline; resline=$(grep -E 'WAGIC_SELFPLAY_RESULT winner=' "$elog" | tail -1)
+    local winner life0 life1 turn
+    winner=$(echo "$resline" | grep -oE 'winner=-?[0-9]+' | cut -d= -f2)
+    life0=$(echo "$resline"  | grep -oE 'life0=-?[0-9]+'  | cut -d= -f2)
+    life1=$(echo "$resline"  | grep -oE 'life1=-?[0-9]+'  | cut -d= -f2)
+    turn=$(echo "$resline"   | grep -oE 'turn=-?[0-9]+'   | cut -d= -f2)
     [ -z "$winner" ] && winner="timeout"
-    printf "%s\t%s\t%s\t%s\n" "$d0" "$d2" "$winner" "$gstart" >> "$RESULTS"
+    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$d0" "$d2" "$winner" "${life0:--}" "${life1:--}" "${turn:--}" "$gstart" >> "$RESULTS"
 }
 
 trap 'echo "stopping..."; kill $(jobs -p) 2>/dev/null' INT TERM
