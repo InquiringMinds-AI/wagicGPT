@@ -777,6 +777,14 @@ void GameObserver::gameStateBasedEffects()
         players[d]->DeadLifeState();
     }
     ////////////////////////////////////
+    //Loss by life/poison is decision-independent: do not let the pending-
+    //menu / target-chooser / reveal early-returns below starve the
+    //check=true pass further down - a lifeleech kill that resolved into
+    //an armed ask left the loser at -10 life issuing decisions for turns
+    //(wave-4 corpus, deck140v133 run 230636 seq58-61). DeadLifeState is
+    //idempotent; the full state-effects pass still runs on clean ticks.
+    for (int i = 0; i < 2; i++)
+        players[i]->DeadLifeState(true);
     //i think this must be limited to reveal display only but we can make an auto close like on android after a targetchooser...
     //lets see so far... adding this fixes some cards that rely on card count in hand or library or any zone the needs constant card count...
     if (OpenedDisplay && (players[0]->game->reveal->cards.size() || players[1]->game->reveal->cards.size()))

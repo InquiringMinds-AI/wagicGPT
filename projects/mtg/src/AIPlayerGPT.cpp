@@ -1185,15 +1185,32 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount)
     if (thinkEnd != string::npos)
         text = text.substr(thinkEnd + 8);
 
-    //Scan every integer and keep the LAST one that is a VALID option
-    //[0, optionCount]. Taking the last digit blindly (the old behavior)
-    //failed whenever the model echoed a power/toughness like "(2/4)" or
-    //the option text, because the trailing "4" was out of range and the
-    //whole decision parsed as -1 - which silently held creatures back.
-    //Ignoring out-of-range numbers reads the real choice out of a noisy
-    //reply instead.
-    int choice = -1;
+    //The reply contract puts the chosen option number FIRST. Prefer an
+    //in-range integer at the HEAD of the text ("N", "N.", "N)" - leading
+    //whitespace tolerated). Keeping the LAST in-range integer (the
+    //previous behavior) let echoed option text hijack the choice: a mana
+    //cost {2}{r}{r}, a stat (3/3) or a prose life total that happened to
+    //be in range outvoted the model's leading number (8 desyncs across 5
+    //corpus games, one thrown-away exact-lethal). Fallback when the head
+    //is not a number: the FIRST in-range integer anywhere - never the
+    //last; the tail is where echoed stats and prose numbers live. The
+    //in-range guard itself stays: taking the trailing digit blindly (the
+    //oldest behavior) parsed "(2/4)" echoes as -1 and silently held
+    //creatures back.
     size_t i = 0;
+    while (i < text.size() && isspace((unsigned char) text[i]))
+        i++;
+    if (i < text.size() && isdigit((unsigned char) text[i]))
+    {
+        size_t j = i;
+        while (j < text.size() && isdigit((unsigned char) text[j]))
+            j++;
+        int n = atoi(text.substr(i, j - i).c_str());
+        if (n >= 0 && n <= optionCount)
+            return n;
+    }
+    int choice = -1;
+    i = 0;
     while (i < text.size())
     {
         if (isdigit((unsigned char) text[i]))
@@ -1203,7 +1220,10 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount)
                 j++;
             int n = atoi(text.substr(i, j - i).c_str());
             if (n >= 0 && n <= optionCount)
+            {
                 choice = n;
+                break;
+            }
             i = j;
         }
         else
@@ -1265,7 +1285,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         index++;
         tail << index << ". " << line << "\n";
     }
-    tail << "\nWhich action do you take? Reply with the number (0 = pass priority), then your PLAN: line.";
+    tail << "\nWhich action do you take? Reply with ONLY the number first (0 = pass priority) - the number must be the first character of your reply, with no option text before it - then your PLAN: line.";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
@@ -1373,7 +1393,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
         tail << (i + 1) << ". " << options[i] << "\n";
-    tail << "\nReply with the number of your choice, then your PLAN: line.";
+    tail << "\nReply with ONLY the number of your choice first - the number must be the first character of your reply, with no option text before it - then your PLAN: line.";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -1759,13 +1779,26 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
 
     if (req.kind == DecisionRequest::ANNOUNCE_X)
     {
-        //option index IS the X value (the heuristic always dumped all mana)
+        //option index IS the X value, and presenting X = 0 as option 1 set
+        //an index/value trap: the model computed the X it wanted in its
+        //plan, then replied that VALUE as the option number - one off in
+        //its own disfavor every time (15/17 corpus X announcements landed
+        //below the model's stated intent, four blanked to X = 0 - a
+        //thrown-away Black Sun's Zenith among them). Present the options
+        //LARGEST FIRST at the ask and map the pick back: the best X is
+        //option 1, and a value-as-index slip now lands near the top
+        //instead of at zero. The contract's index==X invariant and the
+        //other consumers are untouched - this is presentation only.
+        vector<string> shown(req.optionTexts.rbegin(), req.optionTexts.rend());
         int pick = askModel("Announce the value of X for "
                             + (ctx ? ctx->getDisplayName() : string("this spell"))
-                            + " (you can afford up to the largest listed value):", req.optionTexts);
+                            + " (every listed value is affordable; option 1 is the LARGEST X)."
+                            + " Reply with the OPTION number, not the X value:", shown);
         if (pick == kChoicePending)
             return kChoicePending;
-        if (pick < 0)
+        if (pick >= 0 && pick < (int) shown.size())
+            pick = (int) req.optionTexts.size() - 1 - pick; //shown space -> index==X space
+        else if (pick < 0)
             pick = AIPlayerBaka::selectMenuOption(); //heuristic: max affordable X
         if (pick >= (int) req.optionTexts.size())
             pick = (int) req.optionTexts.size() - 1;
