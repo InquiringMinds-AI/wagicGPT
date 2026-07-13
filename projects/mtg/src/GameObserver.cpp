@@ -566,8 +566,8 @@ MTGCardInstance * GameObserver::validateCardPointer(MTGCardInstance * card)
         MTGPlayerCards * pz = players[i]->game;
         MTGGameZone * zones[] = { pz->hand, pz->library, pz->inPlay, pz->graveyard,
                                   pz->stack, pz->exile, pz->commandzone, pz->sideboard,
-                                  pz->reveal, pz->garbage, pz->garbageLastTurn };
-        for (int j = 0; j < 11; j++)
+                                  pz->reveal, pz->garbage, pz->garbageLastTurn, pz->temp };
+        for (int j = 0; j < 12; j++)
             for (int k = 0; k < zones[j]->nb_cards; k++)
                 if (zones[j]->cards[k] == card)
                     return card;
