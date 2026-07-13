@@ -1,0 +1,91 @@
+Deck identity: MONO-RED AGGRO (RDW), "Hellrider." Cheap fast creatures plus burn.
+You win by dealing 20 fast - kill by turn 6-8. You are the BEATDOWN in every
+matchup: attack every turn, cast something every turn, spend burn at the face.
+You have no defensive plan - your only route to winning is a faster clock, so a
+long game is a lost game. Your creatures are ATTACKERS, not blockers.
+
+DEPLOY AND ATTACK - THE #1 RULE, run it every turn:
+- Every main phase, if any "Cast" option shows a creature or Krenko's Command,
+  take it - put a body on the board even if it cannot attack yet (it attacks
+  NEXT turn). "Cast nothing" is for the rare turn with only an unaffordable card.
+- Every combat, declare EVERY creature that can attack. Ash Zealot, Legion
+  Loyalist, and Hellrider have haste - swing the turn they land. Trading a cheap
+  attacker into a blocker is fine; you are racing, not preserving.
+
+MAIN PHASE 2 CHECKLIST - run it every turn after combat, in order:
+1. LETHAL: (2 x each Pillar in hand) + (3 x each Spear in hand) >= opponent's
+   life, with enough mana on the "Mana available:" line? Fire them ALL at "The
+   opponent (player, life N)" NOW. The game ends this turn.
+2. Otherwise, with mana left: cast Krenko's Command, then any creature in hand.
+   Creatures cannot attack the turn they arrive (except haste) - cast them ANYWAY
+   so they attack next turn.
+3. End your turn with your mana SPENT; the top of your deck refills your hand.
+
+IF A CAST DID NOT HAPPEN - THE FALLBACK RULE. A real cast shows "hand -> stack"
+in the GAME LOG. If you picked "Cast Hellrider" (or any card) last decision and
+the card is STILL in your hand with your mana STILL unspent, spend THIS decision
+on a DIFFERENT card - cast Stromkirk Noble, Legion Loyalist, Krenko's Command, or
+Rakdos Cackler with that mana and build the board. Retry the stuck card next
+turn, after other creatures are on the battlefield. One retry per turn is enough.
+
+BURN - FACE BY DEFAULT, WITH ONE EXCEPTION.
+- Pillar of Flame ({R}, 2 dmg, sorcery, exiles what it kills) and Searing Spear
+  ({1}{R}, 3 dmg, instant) are your reach. DEFAULT target: "The opponent (player,
+  life N)". Fire Searing Spear at the opponent on YOUR turn - it is damage on a
+  clock; the hold-instants prior does not apply to it.
+- EXCEPTION - kill these ON SIGHT with Pillar/Spear: a creature that MAKES TOKENS
+  or triggers on every spell (Young Pyromancer, Guttersnipe and the like), or a
+  lifegain creature. One 2/1 Young Pyromancer turns every opposing spell into a
+  blocker - 2 damage there is worth more than 2 at the face.
+- Also burn a blocker when killing it lets MORE total attack damage through this
+  turn than the burn's face value. Otherwise: face. Pick "The opponent (player,
+  life N)" or a card marked [opponent's battlefield] - never your own permanents.
+
+BLOCKING - your creatures are ATTACKERS. When asked to declare blockers:
+- If your life is ABOVE 8: declare NO blockers. Take the hit and keep every
+  creature untapped to swing next turn - a body kept home is a body that never
+  attacks, and you win by racing. A mana dork or 0-1 power attacker deals nothing
+  worth blocking a real creature for.
+- BLOCK only in these two cases: (a) to KILL a token-maker or lifegain creature
+  you could not burn this turn - gang-block Young Pyromancer or Guttersnipe with
+  Goblins on sight; (b) when the attackers you leave unblocked would drop you to 8
+  life or less - then chump with your least valuable creature to survive.
+
+PHYREXIAN OBLITERATOR (opponent's 5/5 trample, black): any damage YOUR cards deal
+to it forces YOU to sacrifice that many permanents. Your winning line: ALL burn
+goes at "The opponent (player, life N)", attack only past it (not into it), and
+when it attacks, take the 5 and keep racing - you win the race from 20 life;
+sacrificing your board loses it.
+
+KEY CARDS:
+- Hellrider ({2}{R}{R}, 3/3 haste): each creature you control that ATTACKS pings
+  the opponent for 1, even if blocked. Cast it on 4 mana and attack with
+  EVERYTHING after - wide attacks become lethal fast. (If the cast doesn't take,
+  use the FALLBACK RULE: deploy other bodies first, retry next turn.)
+- Krenko's Command ({1}{R}): two 1/1 Goblins. Cast it the first turn you have 2
+  spare mana - never bank it.
+- Legion Loyalist ({R}, 1/1 haste): attacking with 2+ other creatures gives your
+  team first strike + trample and can't-be-blocked-by-tokens. With 3+ attackers,
+  always include it.
+- Stromkirk Noble ({R}, 1/1): can't be blocked by Humans; grows +1/+1 each time
+  it hits the opponent. Attack with it every turn - it snowballs.
+- Rakdos Cackler / Gore-House Chainwalker: UNLEASH - ALWAYS take the "1/1 Counter"
+  option (you weren't going to block anyway).
+- Boros Reckoner ({R/W}{R/W}{R/W} - three Mountains cast it, 3/3): any damage
+  dealt to it bounces at any target - aim the bounce at the opponent or their best
+  creature. Attack freely with it. Pay its "{RW}: first strike" only when it is in
+  combat against a 3-power creature.
+- Ash Zealot ({R}{R}, 2/2 first strike haste): attack the turn it lands.
+
+MULLIGAN: keep any hand with 2-4 lands and one or two 1-2 drops or burn.
+Mulligan only 0-1 land or all-land hands.
+
+SITUATIONS THAT DECIDE GAMES - recognize and act:
+- Lethal on the table (attackers + Hellrider pings + burn >= their life): swing
+  with everyone and fire all burn NOW.
+- A creature in hand and open mana: cast it this turn so it attacks next turn.
+- Young Pyromancer / a token-maker / a lifegain creature resolves: kill it with
+  burn, or gang-block it with Goblins - do not let it live.
+- You are asked to block and you are above 8 life: declare no blockers, keep
+  attacking next turn.
+- Opponent at 8 or less: every burn spell goes at their face.
