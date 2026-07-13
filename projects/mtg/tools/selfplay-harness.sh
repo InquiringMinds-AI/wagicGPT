@@ -132,7 +132,7 @@ run_one_game() {
     local elog="$OUTDIR/game-${d0}v${d2}-${gstart}.stderr"
     local fastclock_env=()
     [ "$FASTCLOCK" != "0" ] && fastclock_env=(WAGIC_FASTCLOCK="$FASTCLOCK")
-    timeout "${GAME_TIMEOUT_S}s" env \
+    timeout -k 10 "${GAME_TIMEOUT_S}s" env \
         WAGIC_HEADLESS=1 "${fastclock_env[@]}" \
         WAGIC_SELFPLAY=1 WAGIC_SELFPLAY_ONESHOT=1 \
         WAGIC_SELFPLAY_DECK0="$d0" WAGIC_SELFPLAY_DECK1="$d2" \
