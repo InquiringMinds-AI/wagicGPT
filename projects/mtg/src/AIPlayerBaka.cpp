@@ -2690,7 +2690,13 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
         if (card->hasType(Subtypes::TYPE_BATTLE) && card->types.size() > 0 && game->inPlay->hasTypeSpecificInt(Subtypes::TYPE_BATTLE,card->types[1]))
             continue;
 
-        if(hints && hints->HintSaysItsForCombo(observer,card))
+        //Combo-hold hints are TIMING scaffolding for the heuristic ("hold
+        //Pyroclasm until 2+ small creatures"). An explicit model pick
+        //(aiForcedCandidate) already carries its own timing judgment - the
+        //hint must not silently veto it, or the pick no-ops while the menu
+        //keeps offering the card (wave-4/5 "cast no-op": Hellrider on an
+        //empty board, Pyroclasm rejected 111 times in one corpus).
+        if(hints && card != aiForcedCandidate && hints->HintSaysItsForCombo(observer,card))
         {
             if(hints->canWeCombo(observer,card,this))
             {
@@ -2915,7 +2921,7 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
         DebugTrace(" AI wants to play card." << endl
             << "- Next card to play: " << (nextCardToPlay ? nextCardToPlay->name : "None" ) << endl );
 
-        if(hints && hints->HintSaysItsForCombo(observer,nextCardToPlay))
+        if(hints && nextCardToPlay != aiForcedCandidate && hints->HintSaysItsForCombo(observer,nextCardToPlay))
         {
             DebugTrace(" AI wants to play a card that belongs to a combo.");
             nextCardToPlay = NULL;
