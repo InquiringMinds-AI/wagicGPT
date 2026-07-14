@@ -1,0 +1,119 @@
+Deck identity: UB FAERIE TEMPO. Every creature FLIES. You win by casting a faerie
+EVERY turn and attacking in the air EVERY turn - get them dead before turn 10. You
+are the BEATDOWN in every matchup. Against a control deck that keeps wiping your
+board (Wrath of God, Pyroclasm) or bouncing it (Cyclonic Rift), countering that
+sweeper IS your attack - a resolved sweeper erases the clock you just built.
+
+THE #1 RULE - CAST A CREATURE EVERY TURN:
+- On EVERY one of your turns: play a land, then CAST A CREATURE if any "Cast"
+  option shows a creature. If the engine OFFERS "Cast X", the cost IS payable -
+  Oona's Gatewarden {u/b} casts off a single Island OR Swamp.
+- Scion of Oona and Obyra have flash, but cast them in your main phase like any
+  other creature.
+- CAST ARCHMAGE OF ECHOES the first turn you have 5 mana - a 4/4 flying ward-2
+  threat that copies every Faerie you cast after it. Board first, counters with
+  leftover mana.
+
+THE ENGINE - HOW YOU KILL:
+- Obyra, Dreaming Duelist ({u}{b} 2/2 flash flyer): whenever ANOTHER Faerie enters
+  under your control, the opponent loses 1. Every creature in this deck is a Faerie,
+  so after Obyra is out every creature you cast, every token, and every Archmage
+  copy drains 1. Cast Obyra early.
+- Archmage of Echoes ({4}{u} 4/4 flyer, ward 2): copies each Faerie or Wizard you
+  cast (it copies permanents/creatures, not instants). Archmage + any faerie = two
+  bodies and, with Obyra out, two drains.
+- Faerie Bladecrafter ({2}{b} 2/2 flyer): gets a +1/+1 counter each turn your
+  faeries hit the opponent, and when it DIES the opponent loses life equal to its
+  power and you gain that much. The "{right now: life -2}" on its Cast option is the
+  OPPONENT'S loss when it later dies - a bonus for you, never a cost. Always cast it.
+
+ATTACK EVERY TURN: your flyers are usually unblockable. Attack with EVERY creature
+except Oona's Gatewarden (defender). LETHAL CHECK: total power of your untapped
+flyers + 1 per faerie you can still cast with Obyra out; if >= opponent life, attack
+with everyone and cast the faeries.
+
+BLOCKING - YOUR FLYERS ARE YOUR CLOCK, NEVER CHUMP THEM:
+- When your life is 9 or more, decline blocks with your attackers - Faerie Miscreant,
+  Scion of Oona, Surveilling Sprite, every flyer are your clock and your anthem, and
+  a 2-power attacker at high life is not worth one of them. Take the damage and keep
+  attacking.
+- Oona's Gatewarden is your ONLY blocker: defender (never attacks) with wither, so
+  blocking with it puts -1/-1 counters on the attacker for free. Block an incoming
+  attacker with Oona's Gatewarden whenever it is on your battlefield.
+- When your life is 8 or less, chump the biggest attacker with your least valuable
+  body - a Surveilling Sprite draws you a card when it dies - to stay out of lethal
+  range. Do NOT block Phyrexian Obliterator: any damage dealt to it makes YOU
+  sacrifice permanents.
+
+COUNTERS - READ THE STACK, HOLD THE MANA:
+- When spells are waiting to resolve, the CURRENT SITUATION shows an "ON THE STACK"
+  section naming each pending spell, its controller, and its targets, and your
+  counter option names what it can hit ("Cast Counterspell - can target on the
+  stack: ..."). Read those lines and counter the named spell when it is any of, in
+  this order:
+   1. A BOARD SWEEPER - Wrath of God, Pyroclasm, Black Sun's Zenith, Cyclonic Rift.
+      These erase every creature you deployed; countering one is your whole turn.
+   2. An ARTIFACT creature or equipment you cannot Go for the Throat - Master of
+      Etherium, Etched Champion, Cranial Plating, Steel Overseer.
+   3. A growing engine - Young Pyromancer, Guttersnipe.
+   4. Any creature or equipment while your life is 12 or less, or any spell costing
+      4+ mana.
+- Counters are for the list above ONLY. LET RESOLVE and keep your mana for: mana
+  rocks and cantrips (Mox Opal, Arcum's Astrolabe), Elixir of Immortality, Prism
+  Ring, land searches (Into the North), and small utility spells. Never spend a
+  counter on a 1-2 mana cantrip or mana rock - Arcane Denial draws THEM two cards,
+  so it is worth far more than the one card an Astrolabe replaces.
+- A counter can only be USED when the game opens a window, and it opens one only
+  while you can PAY {U}{U}: if you tap out on your own turn, no window opens on the
+  opponent's turn and the counter rots in your hand. When you are holding a
+  Counterspell or Arcane Denial for the opponent's turn, LEAVE two blue sources
+  untapped - deploy the rest of your hand with your other mana.
+- When you decide to counter, your reply NUMBER must be the Cast Counterspell or
+  Cast Arcane Denial line. If your PLAN says "counter it," pick that number - not
+  "Cast nothing."
+- Casting your creatures on your own turn ALWAYS comes before holding counter mana.
+
+GO FOR THE THROAT ({1}{b}): destroys any NONARTIFACT creature. Fire it on their
+best attacker, especially ones that grow (Stromkirk Noble, Abominable Treefolk). It
+CANNOT hit artifact creatures (Master of Etherium, Memnite, Icehide Golem, Vault
+Skirge) and CANNOT hit enchantments (Lightmine Field), planeswalkers, or lands. If
+the opponent has NO nonartifact creature on their battlefield, Go for the Throat has
+no target even though "Cast Go for the Throat" is listed - do NOT pick it (it does
+nothing): cast a creature, or hold and counter instead.
+
+CARD NOTES:
+- Sleep-Cursed Faerie ({u} 3/3 flyer, ward 2): enters tapped with 3 stun counters
+  and wakes on its own in 3 turns. Cast it turn 1-2 and let it wake for free. Pay
+  the {1}{u} untap only in your Main Phase 1 on a turn it will attack this combat;
+  pass every untap prompt in Upkeep, combat, and the opponent's turn.
+- Surveilling Sprite ({1}{u} 1/1 flyer): draws you a card when it dies - a fine
+  chump-blocker at 8 life or less, and its entry drains 1 with Obyra out. Cast it as a body.
+- Faerie Miscreant ({u} 1/1 flyer): the second copy draws a card - cast both.
+- Oona's Gatewarden ({u/b} 2/1 flying defender, wither): your best blocker; wither
+  shrinks what it blocks. Cast it turn 1 off ANY land. It can never attack, but it
+  IS a creature and a Faerie (its entry drains 1 with Obyra out).
+- Scion of Oona ({2}{u} 1/1 flash flyer): other faeries get +1/+1 and shroud - cast
+  before attacking to pump the team. Keep it attacking; do not trade it away blocking.
+- Shadow Puppeteers ({6}{u} 4/4 flyer): makes two 1/1 flying Faerie Rogues on entry
+  (each drains 1 with Obyra out). Always say YES to turning an attacking flyer into a
+  4/4 dragon.
+
+MULLIGAN: keep ANY hand with 2-4 lands and at least one creature - and Oona's
+Gatewarden and Sleep-Cursed Faerie COUNT as your creature. Ship a hand that has no
+castable creature, or one whose lands cannot cast its spells (e.g. all Swamps with a
+blue-heavy hand), or 0-1 or 5+ lands. A cheap flyer plus lands beats a hand of
+counters and removal - you will draw the flyers.
+
+SITUATIONS THAT DECIDED GAMES - THE CORRECT PLAY:
+- A pending spell shows in ON THE STACK and a Counterspell/Arcane Denial option names
+  it: counter it per the priority list, and make your reply number the counter line,
+  never "Cast nothing." (vs140 and vs110 were WON this way - countering Pyroclasm,
+  Wrath of God, and Etched Champion.)
+- The opponent casts a board sweeper (Wrath of God, Pyroclasm, Black Sun's Zenith,
+  Cyclonic Rift): counter it - it is worth more than any single creature.
+- A creature is castable on your turn: cast it. Archmage of Echoes hits the board
+  the first turn you have 5 mana.
+- An attacker comes at you and you are at 9+ life: take it, keep your flyers attacking
+  - only Oona's Gatewarden blocks.
+- Your opening has Oona's Gatewarden or Sleep-Cursed Faerie plus 2-4 lands: KEEP it -
+  that is your creature.
