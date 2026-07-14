@@ -326,9 +326,18 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             describeAttachments(out, card);
             //the forward direction too: the equipment/aura itself names its
             //current host, so "is this already attached?" is answerable from
-            //either end of the relationship
-            if (card->auraParent)
-                out << " [attached to: " << card->auraParent->getDisplayName() << "]";
+            //either end of the relationship. Equipment keeps its host in
+            //target (excluded from auraParent by the engine); auras in
+            //auraParent.
+            {
+                MTGCardInstance * host = NULL;
+                if (card->hasType(Subtypes::TYPE_EQUIPMENT) || card->hasType("fortification"))
+                    host = card->target;
+                else if (card->auraParent)
+                    host = card->auraParent;
+                if (host)
+                    out << " [attached to: " << host->getDisplayName() << "]";
+            }
             if (card->isTapped())
                 out << " [tapped]";
             if (card->isAttacker())
@@ -1150,10 +1159,21 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         //The board line's cue (two power numbers / {attached:}) proved
         //insufficient at range - the pilot read it and re-equipped anyway
         //(wave-5 deck110: 15 of 35 equips were no-ops). Say it AT the option.
+        //Host lookup is type-split: EQUIPMENT keeps its host in target (the
+        //engine excludes it from auraParent - cf. the TYPE_EQUIPMENT carve-outs
+        //in GameObserver's enchantment upkeep); auras use auraParent.
         MTGCardInstance * moved = action.click ? action.click
                                                : (action.ability ? action.ability->source : NULL);
-        if (moved && moved->auraParent == action.target)
-            out << " (ALREADY attached to it - this would change NOTHING)";
+        if (moved)
+        {
+            MTGCardInstance * host = NULL;
+            if (moved->hasType(Subtypes::TYPE_EQUIPMENT) || moved->hasType("fortification"))
+                host = moved->target;
+            else if (moved->hasSubtype(Subtypes::TYPE_AURA))
+                host = moved->auraParent ? moved->auraParent : moved->target;
+            if (host && host == action.target)
+                out << " (ALREADY attached to it - this would change NOTHING)";
+        }
     }
     else if (action.playerAbilityTarget || action.player)
         out << " targeting a player";
