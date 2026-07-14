@@ -32,18 +32,25 @@ except Oona's Gatewarden (defender). LETHAL CHECK: total power of your untapped
 flyers + 1 per faerie you can still cast with Obyra out; if >= opponent life, attack
 with everyone and cast the faeries.
 
-BLOCKING - YOUR FLYERS ARE YOUR CLOCK, NEVER CHUMP THEM:
-- When your life is 9 or more, decline blocks with your attackers - Faerie Miscreant,
-  Scion of Oona, Surveilling Sprite, every flyer are your clock and your anthem, and
-  a 2-power attacker at high life is not worth one of them. Take the damage and keep
+BLOCKING - ONLY OONA'S GATEWARDEN BLOCKS; YOUR FLYERS ARE YOUR CLOCK:
+- NEVER block Phyrexian Obliterator, at ANY life total - not even when you are
+  desperate and low. Any damage dealt to it makes YOU sacrifice that many
+  permanents, so blocking it with a 2/2 costs you 2 permanents AND the blocker for
+  nothing. Take the trample damage instead; find it and kill it with Go for the
+  Throat, never with a block.
+- Oona's Gatewarden is your designated blocker: defender (never attacks) with wither,
+  so blocking with it puts -1/-1 counters on the attacker for free. Block an incoming
+  attacker with Oona's Gatewarden whenever it is on your battlefield - EXCEPT
+  Phyrexian Obliterator (even Gatewarden's wither damage triggers the sacrifice).
+- When your life is 9 or more, every OTHER creature stays home from blocking and
+  keeps attacking - Faerie Miscreant, Scion of Oona, Surveilling Sprite, Faerie
+  Bladecrafter, every flyer are your clock and your anthem. Do NOT block even to kill
+  a small or 0-power attacker: a 2-power (or 0-power) attacker at high life is not
+  worth one of your flyers or halting Bladecrafter's growth. Take the damage and keep
   attacking.
-- Oona's Gatewarden is your ONLY blocker: defender (never attacks) with wither, so
-  blocking with it puts -1/-1 counters on the attacker for free. Block an incoming
-  attacker with Oona's Gatewarden whenever it is on your battlefield.
-- When your life is 8 or less, chump the biggest attacker with your least valuable
-  body - a Surveilling Sprite draws you a card when it dies - to stay out of lethal
-  range. Do NOT block Phyrexian Obliterator: any damage dealt to it makes YOU
-  sacrifice permanents.
+- When your life is 8 or less, chump the biggest attacker - EXCEPT Phyrexian
+  Obliterator - with your least valuable body (a Surveilling Sprite draws you a card
+  when it dies) to stay out of lethal range.
 
 COUNTERS - READ THE STACK, HOLD THE MANA:
 - When spells are waiting to resolve, the CURRENT SITUATION shows an "ON THE STACK"
@@ -55,14 +62,16 @@ COUNTERS - READ THE STACK, HOLD THE MANA:
       These erase every creature you deployed; countering one is your whole turn.
    2. An ARTIFACT creature or equipment you cannot Go for the Throat - Master of
       Etherium, Etched Champion, Cranial Plating, Steel Overseer.
-   3. A growing engine - Young Pyromancer, Guttersnipe.
+   3. A growing engine - Young Pyromancer, Guttersnipe, Gray Merchant of Asphodel.
    4. Any creature or equipment while your life is 12 or less, or any spell costing
       4+ mana.
 - Counters are for the list above ONLY. LET RESOLVE and keep your mana for: mana
   rocks and cantrips (Mox Opal, Arcum's Astrolabe), Elixir of Immortality, Prism
-  Ring, land searches (Into the North), and small utility spells. Never spend a
-  counter on a 1-2 mana cantrip or mana rock - Arcane Denial draws THEM two cards,
-  so it is worth far more than the one card an Astrolabe replaces.
+  Ring, land searches (Into the North), one-mana discard (Inquisition of Kozilek,
+  Thoughtseize), and small utility spells. Never spend a counter on a 1-2 mana
+  cantrip, mana rock, or discard spell - Arcane Denial draws THEM two cards, so it is
+  worth far more than the one card such a spell trades with. If your PLAN says "let
+  it resolve," your reply number must be "Cast nothing," never the counter option.
 - A counter can only be USED when the game opens a window, and it opens one only
   while you can PAY {U}{U}: if you tap out on your own turn, no window opens on the
   opponent's turn and the counter rots in your hand. When you are holding a
@@ -73,13 +82,17 @@ COUNTERS - READ THE STACK, HOLD THE MANA:
   "Cast nothing."
 - Casting your creatures on your own turn ALWAYS comes before holding counter mana.
 
-GO FOR THE THROAT ({1}{b}): destroys any NONARTIFACT creature. Fire it on their
-best attacker, especially ones that grow (Stromkirk Noble, Abominable Treefolk). It
-CANNOT hit artifact creatures (Master of Etherium, Memnite, Icehide Golem, Vault
-Skirge) and CANNOT hit enchantments (Lightmine Field), planeswalkers, or lands. If
-the opponent has NO nonartifact creature on their battlefield, Go for the Throat has
-no target even though "Cast Go for the Throat" is listed - do NOT pick it (it does
-nothing): cast a creature, or hold and counter instead.
+GO FOR THE THROAT ({1}{b}): destroys any NONARTIFACT creature. Your BEST target is
+Phyrexian Obliterator - a 5/5 trampler you can never block, and the card that beats
+you in the black matchup. It is nonartifact, so Go for the Throat CAN kill it.
+Against a black opponent, HOLD Go for the Throat for Phyrexian Obliterator - do NOT
+spend it on Bloodghast (a 2/2 that returns from the graveyard every time they play a
+land, so killing it only delays it one turn). Otherwise fire it on their best growing
+attacker (Stromkirk Noble, Abominable Treefolk). It CANNOT hit artifact creatures
+(Master of Etherium, Memnite, Icehide Golem, Vault Skirge), enchantments (Lightmine
+Field), planeswalkers, or lands. If the opponent has NO nonartifact creature on their
+battlefield, Go for the Throat has no target even though "Cast Go for the Throat" is
+listed - do NOT pick it (it does nothing): cast a creature, or hold and counter instead.
 
 CARD NOTES:
 - Sleep-Cursed Faerie ({u} 3/3 flyer, ward 2): enters tapped with 3 stun counters
@@ -107,10 +120,13 @@ counters and removal - you will draw the flyers.
 SITUATIONS THAT DECIDED GAMES - THE CORRECT PLAY:
 - A pending spell shows in ON THE STACK and a Counterspell/Arcane Denial option names
   it: counter it per the priority list, and make your reply number the counter line,
-  never "Cast nothing." (vs140 and vs110 were WON this way - countering Pyroclasm,
-  Wrath of God, and Etched Champion.)
+  never "Cast nothing." (vs140 and vs110 were WON this way - countering Black Sun's
+  Zenith, Cyclonic Rift, Master of Etherium, and Etched Champion.)
 - The opponent casts a board sweeper (Wrath of God, Pyroclasm, Black Sun's Zenith,
   Cyclonic Rift): counter it - it is worth more than any single creature.
+- The opponent has Phyrexian Obliterator: kill it with Go for the Throat (held for
+  exactly this) and NEVER block it - a block feeds its sacrifice punisher and loses
+  your board. This is how you beat the black matchup.
 - A creature is castable on your turn: cast it. Archmage of Echoes hits the board
   the first turn you have 5 mana.
 - An attacker comes at you and you are at 9+ life: take it, keep your flyers attacking

@@ -4,25 +4,15 @@ equip Cranial Plating, attack every turn, and finish with Galvanic Blast.
 Kill by turn 5-6. A turn where you cast nothing is a lost turn. You are the
 beatdown by default; against another fast attack deck, see THE RACE below.
 
-#1 RULE - EQUIP EACH CRANIAL PLATING ONCE ONTO YOUR BEST CARRIER, THEN LEAVE
-THE EQUIP LINE ALONE. The game keeps offering "Equip with Cranial Plating"
-every turn even after the Plating is attached. Taking it again is paying {1}
-for nothing. Run this check BEFORE any Equip line:
-1. Read the carrier's power. When your last Equip made its power JUMP (e.g.
-   Steel Overseer 2/2 -> 8/2), that Plating is now attached - the equip is
-   DONE. Two power numbers - like "Etched Champion (6/2) (printed 2/2)" - mean
-   a bonus is ALREADY on it. Spend that mana on a creature or a Blast, then
-   attack.
-2. One power number - like "(2/2)" or "(0/1)" - means no Plating on it. Equip
-   your best carrier now.
-3. Equip ONCE PER Cranial Plating you control - usually ONE equip a turn, at
-   most TWO on a turn you have cast two Platings (attach each to the same best
-   carrier; its power jumps twice). After the carrier's power reflects all your
-   Platings, every further Equip line is a re-offer of work already done - your
-   remaining mana belongs to creatures and Blasts.
-Equip again in a later turn only when your equipped creature DIED or a strictly
-better carrier arrived. The "attach with Cranial Plating [cost: {b}{b}]" line
-is a black-mana copy of the same thing - the {1} Equip is always the one to take.
+#1 RULE - EQUIP EACH CRANIAL PLATING ONCE, THEN LEAVE THE EQUIP LINE ALONE.
+The game re-offers "Equip with Cranial Plating" every turn even after it is
+attached. An equip option tagged "(ALREADY attached to it - this would change
+NOTHING)" is a wasted {1} - NEVER take it. Spend that mana on a creature or a
+Blast, then attack. Equip each Cranial Plating you control ONCE (two equips in
+one turn ONLY when you cast two Platings - attach each to your best carrier;
+its power jumps twice). Equip again in a later turn only when your equipped
+creature DIED or a strictly better carrier arrived. (Two power numbers - like
+"Etched Champion (6/2) (printed 2/2)" - also mean a Plating is already on it.)
 
 CASTING: every "Cast X" in your options is fully payable right now - the game
 taps your lands for you, and "Mana in your pool: (none)" is normal. The thought
@@ -105,8 +95,9 @@ MULLIGAN: keep 2+ lands and 2+ creatures (Mox Opal counts as a land here).
 Ship hands with 0-1 land or no creatures.
 
 DECIDING SITUATIONS (recognize -> play):
-- The carrier already shows two power numbers like "(6/2) (printed 2/2)": the
-  Plating is attached - spend the mana on another creature or a Blast and attack.
+- An Equip line is tagged "(ALREADY attached... change NOTHING)" or the
+  carrier shows two power numbers like "(6/2) (printed 2/2)": the Plating is
+  attached - spend the mana on another creature or a Blast and attack.
 - You hold castable creatures and an Equip line: cast the creatures first - two
   bodies beat one +4 bonus; the games this deck loses, it rode one creature
   while the opponent built five.

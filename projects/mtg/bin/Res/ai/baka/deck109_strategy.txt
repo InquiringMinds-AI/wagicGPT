@@ -7,7 +7,12 @@ long game is a lost game. Your creatures are ATTACKERS, not blockers.
 DEPLOY AND ATTACK - THE #1 RULE, run it every turn:
 - Every main phase, if any "Cast" option shows a creature or Krenko's Command,
   take it - put a body on the board even if it cannot attack yet (it attacks
-  NEXT turn). "Cast nothing" is for the rare turn with only an unaffordable card.
+  NEXT turn). "Cast nothing" is for the rare turn when your ONLY castable option
+  is an unaffordable card - NEVER pick it while a creature is in your Cast list.
+  Even when you cannot assemble lethal or afford your bomb (a second Hellrider,
+  Boros Reckoner) this turn, cast the biggest listed body instead: a 2/2 or 3/3
+  now is damage next turn. Do not decline a listed creature because you are
+  fixated on a card you cannot pay for - a stalled hand loses the race.
 - Every combat, declare EVERY creature that can attack. Ash Zealot, Legion
   Loyalist, and Hellrider have haste - swing the turn they land. Trading a cheap
   attacker into a blocker is fine; you are racing, not preserving.
@@ -50,6 +55,17 @@ goes at "The opponent (player, life N)", attack only past it (not into it), and
 when it attacks, take the 5 and keep racing - you win the race from 20 life;
 sacrificing your board loses it.
 
+EVASIVE / UNTOUCHABLE BOARDS (faerie flyers, protection-from-red artifact creatures):
+Some opponents (a UB faeries deck of flyers with SHROUD; an affinity deck with an
+Etched Champion that has PROTECTION FROM RED) present a board you CANNOT block
+(they fly over your ground creatures) and CANNOT burn (shroud/pro-red rejects your
+targeting - the engine won't even offer them as burn targets). Do NOT wait to find
+an answer; you have none. Your ONLY route is to race their FACE faster: play a land
+and deploy a body EVERY turn without exception, send EVERY burn spell at "The
+opponent (player, life N)", and swing with everything. If you fall behind on life
+against these boards, keep racing - trying to interact is a wasted turn you cannot
+afford.
+
 KEY CARDS:
 - Hellrider ({2}{R}{R}, 3/3 haste): each creature you control that ATTACKS pings
   the opponent for 1, even if blocked. Cast it the first turn you have 4 mana and
@@ -75,7 +91,8 @@ Mulligan only 0-1 land or all-land hands.
 SITUATIONS THAT DECIDE GAMES - recognize and act:
 - Lethal on the table (attackers + Hellrider pings + burn >= their life): swing
   with everyone and fire all burn NOW.
-- A creature in hand and open mana: cast it this turn so it attacks next turn.
+- A creature in hand and open mana: cast it this turn so it attacks next turn -
+  even if you cannot afford your bomb or assemble lethal, deploy the biggest body.
 - Young Pyromancer / a token-maker / a lifegain creature resolves: kill it with
   burn, or gang-block it with Goblins - do not let it live.
 - You are asked to block and you are above 8 life: declare no blockers, keep
