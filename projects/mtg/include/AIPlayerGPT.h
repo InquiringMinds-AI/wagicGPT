@@ -218,6 +218,15 @@ private:
     //re-prompt the creatures it chose to hold.
     int mAttacksDoneTurn;
 
+    //Priority-window decline memory: an activation line the model has
+    //pass-declined TWICE in the same turn stops being offered for the rest
+    //of that turn (a held fetch-crack was re-asked at 44-97 windows per
+    //game - each a model call once any event changed the board). Two
+    //declines keep a fresh look every turn plus one re-look; the map
+    //clears on turn change. Keyed by rendered option line.
+    std::map<string, int> mPassDeclineCount;
+    int mPassDeclineTurn;
+
     //Decision-transcript dump (config translog=1 / WAGIC_GPT_TRANSLOG):
     //one JSONL record per consumed decision - prompt-tuning raw material
     //and, accumulated, training data for a small shippable policy model.
@@ -228,6 +237,7 @@ private:
     //not), and - when the heuristic answered instead - the fallback reason
     //(c2: the silent choice:-1 class becomes attributable).
     long mLastLatencyMs; //-1 = no round trip behind this record (cache/reuse)
+    void ensureGameStartRecord();
     void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                        const string& chosenText = "", const char * fallback = NULL,
                        const std::vector<string> * optionTexts = NULL);
@@ -235,6 +245,11 @@ private:
     //per-decision records alone cannot say who WON - win-rate and timeout
     //adjudication both need it in the same file.
     bool mGameEndLogged;
+    bool mGameStartLogged; //header record emitted (lazily, first write)
+    size_t mNarrationLogged; //narration length already emitted to the translog
+                             //(each record carries the delta = the events that
+                             //landed since the previous record, so a consumed
+                             //cast's OUTCOME is machine-readable - wave-7 7b)
     void logGameEnd();
 
     //True while a request is in flight whose answer has not been consumed.

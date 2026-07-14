@@ -196,6 +196,30 @@ string dynamicMagnitudes(MTGCardInstance * card)
             int n = val.getValue();
             if (kVerbs[v].absValue)
                 n = abs(n);
+            //Cast-option magnitudes evaluate with the source still in hand,
+            //so a mybattlefield devotion count misses the caster's OWN pips
+            //(Gray Merchant rendered "drains 10" when 12 would resolve -
+            //4/4 across waves; the pilot hand-recounted and erred). Add the
+            //card's own colored symbols exactly when the expression is a
+            //bare my-battlefield mana-symbol count and the card - itself a
+            //permanent - has not joined that battlefield yet: that is what
+            //resolution's WParsedInt will see.
+            {
+                size_t manaPos = expr.find("type:mana");
+                if (kVerbs[v].absValue && manaPos != string::npos
+                    && expr.find(":mybattlefield") != string::npos
+                    && expr.find("othertype") == string::npos
+                    && manaPos + 9 < expr.size()
+                    && !card->controller()->game->inPlay->hasCard(card)
+                    && (card->isCreature() || card->hasType(Subtypes::TYPE_ARTIFACT)
+                        || card->hasType(Subtypes::TYPE_ENCHANTMENT)
+                        || card->hasType(Subtypes::TYPE_PLANESWALKER)))
+                {
+                    int colorIdx = ManaCost::parseManaSymbol(expr[manaPos + 9]);
+                    if (colorIdx > 0 && card->getManaCost())
+                        n += card->getManaCost()->getCost(colorIdx);
+                }
+            }
             out << (count ? ", " : "") << kVerbs[v].label << " " << n;
             count++;
         }
@@ -338,8 +362,12 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 if (host)
                     out << " [attached to: " << host->getDisplayName() << "]";
             }
+            //A tapped creature reads as harmless and the pilot builds plans
+            //on that (wave-7 deck140 collapse: "tapped = no threat" bridged
+            //a sweeper-hold it should never have satisfied). Name the truth
+            //at the flag: it untaps and attacks again next turn.
             if (card->isTapped())
-                out << " [tapped]";
+                out << (card->isCreature() ? " [tapped - untaps and can attack next turn]" : " [tapped]");
             if (card->isAttacker())
                 out << " [attacking]";
             else if (card->isDefenser())
@@ -492,7 +520,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -554,11 +582,37 @@ void AIPlayerGPT::setNotice(const string& text, float seconds)
     mNoticeTicks = (int) (seconds * 60); //decremented per rendered frame
 }
 
+//One header record per seat log: decks, names, and a game_id BOTH seats
+//share (the observer's address) - reviewers previously paired seat logs by
+//filename epoch arithmetic, which broke on harvested copies (wave-7 7d).
+void AIPlayerGPT::ensureGameStartRecord()
+{
+    if (mGameStartLogged || mTransLogPath.empty())
+        return;
+    mGameStartLogged = true;
+    std::ostringstream gid;
+    gid << (void *) observer;
+    json rec = {
+        {"seq", mTransSeq++},
+        {"kind", "gamestart"},
+        {"model", mModel},
+        {"game_id", gid.str()},
+        {"my_deck", deckFileSmall},
+        {"my_deck_name", deckName},
+        {"opp_deck", opponent() ? opponent()->deckFileSmall : ""},
+        {"opp_deck_name", opponent() ? opponent()->deckName : ""},
+    };
+    std::ofstream f(mTransLogPath.c_str(), std::ios::app);
+    if (f)
+        f << rec.dump() << "\n";
+}
+
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                                 const string& chosenText, const char * fallback, const vector<string> * optionTexts)
 {
     if (mTransLogPath.empty())
         return;
+    ensureGameStartRecord();
     json rec = {
         {"seq", mTransSeq++},
         {"kind", kind},
@@ -574,6 +628,14 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         {"latency_ms", mLastLatencyMs},
     };
     mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
+    //Narration delta: the game events that landed since the previous
+    //record. A consumed cast's outcome (resolved/countered/died) shows up
+    //here on the NEXT record - machine-readable without re-parsing prompts.
+    if (mNarration.size() > mNarrationLogged)
+    {
+        rec["events"] = mNarration.substr(mNarrationLogged);
+        mNarrationLogged = mNarration.size();
+    }
     if (!chosenText.empty())
         rec["chosen_text"] = chosenText;
     if (fallback)
@@ -598,6 +660,7 @@ void AIPlayerGPT::logGameEnd()
     //machine moves on, and only ONE gameend record may close the file.
     if (mGameEndLogged || mTransLogPath.empty())
         return;
+    ensureGameStartRecord();
     mGameEndLogged = true;
     bool iWon = observer->didWin(this);
     bool oppWon = opponent() ? observer->didWin(opponent()) : false;
@@ -1107,11 +1170,23 @@ string AIPlayerGPT::serializeGameState()
 
     out << "Your hand: ";
     describeZoneCards(out, game->hand, false);
-    out << "\nYour battlefield: ";
+    //Surfaced creature COUNTS: a cluttered board line studded with
+    //artifacts and [tapped] flags gets miscounted (wave-7 deck140: every
+    //sweeper mistiming stood on a wrong creature tally). An integer at the
+    //header is the representation the per-deck workarounds stood in for.
+    int myCreatures = 0, oppCreatures = 0;
+    for (int i = 0; i < game->inPlay->nb_cards; i++)
+        if (game->inPlay->cards[i]->isCreature())
+            myCreatures++;
+    if (opp)
+        for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
+            if (opp->game->inPlay->cards[i]->isCreature())
+                oppCreatures++;
+    out << "\nYour battlefield (creatures: " << myCreatures << "): ";
     describeZoneCards(out, game->inPlay, true);
     if (opp)
     {
-        out << "\nOpponent battlefield: ";
+        out << "\nOpponent battlefield (creatures: " << oppCreatures << "): ";
         describeZoneCards(out, opp->game->inPlay, true);
         out << "\nOpponent hand size: " << opp->game->hand->nb_cards
             << " | Opponent library: " << opp->game->library->nb_cards << " cards";
@@ -1369,15 +1444,32 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     vector<const OrderedAIAction *> shown;
     vector<string> shownLines; //ordered option texts, for the translog
     std::set<string> seenLines;
+    if (mPassDeclineTurn != observer->turn)
+    {
+        mPassDeclineCount.clear();
+        mPassDeclineTurn = observer->turn;
+    }
     for (size_t c = 0; c < candidates.size(); c++)
     {
         string line = describeAction(*candidates[c]);
         if (!seenLines.insert(line).second)
             continue;
+        //Twice pass-declined this turn: the model has said "hold" enough -
+        //stop re-asking every window (the held-fetch tax; see header).
+        std::map<string, int>::iterator dc = mPassDeclineCount.find(line);
+        if (dc != mPassDeclineCount.end() && dc->second >= 2)
+            continue;
         shown.push_back(candidates[c]);
         shownLines.push_back(line);
         index++;
         tail << index << ". " << line << "\n";
+    }
+    //Every distinct action is suppressed as already-declined: pass without
+    //another model call (that IS the model's standing answer this turn).
+    if (!index)
+    {
+        DebugTrace("AIPlayerGPT[ph" << phase << "]: all actions pass-declined this turn; passing");
+        return NULL;
     }
     tail << "\nWhich action do you take? Reply with ONLY the number first (0 = pass priority) - the number must be the first character of your reply, with no option text before it - then your PLAN: line.";
 
@@ -1432,6 +1524,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
 
         mLastAskKey = askKey;
         mLastChoice = choice;
+        //A fresh deliberate pass declines every offered line (cached
+        //replays of the same window don't re-count - one look, one vote).
+        if (choice == 0)
+            for (size_t s = 0; s < shownLines.size(); s++)
+                mPassDeclineCount[shownLines[s]]++;
         {
             const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : "unparsed_reply");
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
@@ -1548,35 +1645,61 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     if (mEndpoint.empty() || comboCards.size())
         return AIPlayerBaka::FindCardToPlay(pMana, type);
 
-    //Lands: the heuristic proposes (dropping a land is nearly always right),
-    //the model keeps its veto (e.g. a land into four Ankh of Mishra).
+    //Lands: enumerate every DISTINCT playable land as its own option. The
+    //old shape (heuristic proposes ONE land, model keeps a veto) never
+    //co-offered two land types, so guide rules like "play Mountain before
+    //Island" were unexecutable whenever the heuristic's pick came first in
+    //hand order (wave-7 deck131 finding: 0 of ~150 land decisions showed
+    //two Play options). legalLandPlays already dedups by display name, so
+    //four Mountains render as one "Play Mountain" line.
     if (!strcmp(type, "land"))
     {
-        MTGCardInstance * proposed = AIPlayerBaka::FindCardToPlay(pMana, type);
-        if (!proposed)
+        vector<LegalActionsOracle::Cast> lands = LegalActionsOracle::legalLandPlays(this);
+        if (lands.empty())
             return NULL;
 
-        std::ostringstream q;
-        q << "Land drop: play " << proposed->name << " now?";
-        //The usually-correct option comes FIRST: the model favors option 1
-        //(positional anchoring), and playing the land is nearly always
-        //right - "Hold" listed first was training it to miss land drops.
+        //Play options FIRST (the model favors option 1, and playing a land
+        //is nearly always right - decline goes LAST, house ordering rule).
         vector<string> opts;
-        opts.push_back("Play " + proposed->name);
-        opts.push_back("Hold " + proposed->name + " - do not play it now");
+        for (size_t li = 0; li < lands.size(); li++)
+            opts.push_back("Play " + lands[li].card->getDisplayName() + lands[li].zoneLabel);
+        opts.push_back(lands.size() == 1
+                       ? "Hold " + lands[0].card->getDisplayName() + " - do not play it now"
+                       : "Play no land right now");
+
+        std::ostringstream q;
+        if (lands.size() == 1)
+            q << "Land drop: play " << lands[0].card->getDisplayName() << " now?";
+        else
+            q << "Land drop: which land do you play now, if any?";
         int pick = askModel(q.str(), opts, false); //the play narrates itself as a zone event
         if (pick == kChoicePending)
         {
             gotPayments.clear(); //nothing plays this tick; re-poll next tick
             return NULL;
         }
-        if (pick == 1)
+        if (pick == (int) lands.size())
         {
-            DebugTrace("AIPlayerGPT: vetoed playing " << proposed->name);
-            gotPayments.clear(); //drop the heuristic's payment plan for this card
+            DebugTrace("AIPlayerGPT: held the land drop");
+            gotPayments.clear();
             return NULL;
         }
-        return proposed; //play it (pick 0), or defer to the heuristic (-1)
+        if (pick < 0) //model deferred or endpoint failed: heuristic decides
+            return AIPlayerBaka::FindCardToPlay(pMana, type);
+
+        //Validate the pick with the heuristic's own machinery (residual
+        //gates, dice, payment state) - same pattern as the cast seam below.
+        MTGCardInstance * chosenLand = lands[pick].card;
+        aiForcedCandidate = chosenLand;
+        MTGCardInstance * validated = AIPlayerBaka::FindCardToPlay(pMana, type);
+        aiForcedCandidate = NULL;
+        if (validated)
+            return validated;
+        DebugTrace("AIPlayerGPT: model chose land " << chosenLand->name
+                   << " but it fails validation; deferring to heuristic");
+        writeTransLog("defer", "", "", -1, 0, chosenLand->name, "deferred_to_heuristic");
+        gotPayments.clear();
+        return AIPlayerBaka::FindCardToPlay(pMana, type);
     }
 
     //Spells: one free choice across every castable card, whatever type rung
@@ -1704,6 +1827,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     //the heuristic's own pick rather than burning another model call.
     DebugTrace("AIPlayerGPT: model chose " << chosen->name
                << " but it fails validation; deferring to heuristic");
+    writeTransLog("defer", "", "", -1, 0, chosen->name, "deferred_to_heuristic");
     gotPayments.clear();
     return AIPlayerBaka::FindCardToPlay(pMana, type);
 }
@@ -2339,7 +2463,25 @@ int AIPlayerGPT::chooseBlockers()
     if (mSystemPrompt.empty())
         buildSystemPrompt();
     std::ostringstream tail;
-    tail << "Combat: declare blockers for this whole combat in ONE decision.\nAttackers:\n";
+    tail << "Combat: declare blockers for this whole combat in ONE decision.\n";
+    //The lethal arithmetic, done FOR the model (wave-6/7: reflexive
+    //blocking at high life and missed must-blocks at low life are the same
+    //miscount - 3 guises across 5 seats; routed to representation, not
+    //core prose). Phrased conditionally: an attacker may be hitting a
+    //planeswalker, so the sum is an upper bound on face damage.
+    {
+        int incoming = 0;
+        for (size_t j = 0; j < attackers.size(); j++)
+            if (attackers[j]->power > 0)
+                incoming += attackers[j]->power;
+        tail << "Your life: " << life << ". Unblocked, these attackers deal up to "
+             << incoming << " - you would be at " << (life - incoming)
+             << (life - incoming <= 0
+                 ? " - LETHAL if it all connects: block enough to survive."
+                 : " - NOT lethal: block only where the trade favors you; taking damage while ahead is often correct.")
+             << "\n";
+    }
+    tail << "Attackers:\n";
     for (size_t j = 0; j < attackers.size(); j++)
     {
         tail << "A" << (j + 1) << ". " << attackers[j]->name
@@ -2347,6 +2489,14 @@ int AIPlayerGPT::chooseBlockers()
         string kw = keywordList(attackers[j]);
         if (!kw.empty())
             tail << " [" << kw << "]";
+        //Punisher rider: an attacker whose text does something WHEN BLOCKED
+        //(sacrifice your blocker, damage you, pump itself) is a trap the
+        //bare name hides - surface the text at the line that decides.
+        string txt = attackers[j]->text;
+        for (size_t ti = 0; ti < txt.size(); ti++)
+            txt[ti] = (char) tolower((unsigned char) txt[ti]);
+        if (txt.find("block") != string::npos)
+            tail << " {text: " << cardTextSnippet(attackers[j], 160) << "}";
         tail << "\n";
     }
     tail << "Your available blockers (with the attackers each may legally block):\n";
