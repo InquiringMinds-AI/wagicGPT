@@ -8,15 +8,18 @@ grind their face to 0 with your reach.
 SWEEP TRIGGER - THIS IS THE RULE THAT DECIDES YOUR GAMES.
 The opponent's battlefield line prints its creature count for you, like
 "Opponent battlefield (creatures: 2)". That number is C - you do not have to count.
-- If C is 1 or more, and (your life is 16 or less OR they attacked you last turn),
-  CAST A SWEEPER THIS TURN. Do not wait. Pick the first sweeper you can PAY for now
-  (see WHICH SWEEPER). Casting nothing here is how you lose.
+- If C is 1 or more, and (your life is 16 or LOWER - 16 itself counts, so at exactly 16
+  you sweep - OR they have attacked you on any recent turn), CAST A SWEEPER THIS TURN.
+  Do not wait. Pick the first sweeper you can PAY for now (see WHICH SWEEPER). Casting
+  nothing here is how you lose.
 - If C is 0 (only lands/artifacts/enchantments), holding the sweeper is correct -
   deploy a finisher instead (see DEPLOY WHEN SAFE).
 C already counts every creature that matters, so do not talk yourself out of a sweep:
 - A TAPPED creature is still counted in C (it shows "[tapped - untaps and can attack
   next turn]"). It untaps and swings again, and your sorcery-speed sweeper kills it on
-  YOUR main phase the same. Tapped is NEVER a reason to wait.
+  YOUR main phase the same. Tapped is NEVER a reason to wait - and "it isn't attacking
+  THIS turn" is NOT a reason to hold either: a tapped creature already hit you last turn
+  and attacks again next turn, so kill it now on your main phase.
 - ARTIFACTS on the board do not lower C and do not shield a creature. If C is 1+, your
   sweeper still kills every creature - cast it.
 - SHROUD / "can't be targeted" does NOT stop a sweeper. Pyroclasm, Wrath of God,
@@ -33,8 +36,9 @@ one "favorite" sweeper is uncastable; another one is almost always payable):
   pick option 1 (biggest X); X at/above their biggest toughness kills everything, and it
   shuffles back, so spend X freely. But only cast Black Sun's Zenith when the biggest X you
   can AFFORD is at least the toughness you need dead - a smaller X leaves the creature alive
-  and wastes the whole turn; if X would fall short, cast Wrath or Damnation instead (they
-  kill any toughness).
+  and wastes the whole turn; if X would fall short AND a Wrath or Damnation is offered, cast
+  that instead (they kill any toughness). If no other sweeper is offered, cast the biggest
+  Black Sun's Zenith you can - partial removal still beats casting nothing.
 If you have no RED, Pyroclasm is out - use Wrath (white), Damnation (black), or Black
 Sun's Zenith (black) instead. You carry 14 sweepers - one per real creature board.
 
@@ -65,7 +69,8 @@ small to kill you within two turns), cast the FIRST of these that appears, that 
     lifegain/high-life decks you can never out-damage. Cast it the turn you reach 12 mana.
  3. Lightmine Field {2}{w}{w} - vs any deck that ATTACKS YOU, deploy this on sight: it
     damages EVERY attacking creature each combat, punishing go-wide aggro your one-shot
-    sweepers cannot keep up with. Skip it vs a creatureless deck.
+    sweepers cannot keep up with. Skip it vs a creatureless deck, and do not deploy a
+    second copy while one is already on the battlefield.
  4. Venser's Journal {5} - gain life per card in hand each upkeep; a SURVIVAL tool vs
     aggro/lifegain to keep you alive to deploy Blightsteel, NOT a win condition.
  5. Elixir of Immortality {1} - cast with spare mana; activate ({2},{T}: gain 5) below
@@ -83,8 +88,9 @@ OVERRIDE of the general strategy: you have NO instants - never pass to "keep man
 nothing casts on the opponent's turn. Cast on your own main phase every turn.
 
 DECIDING SITUATIONS (recognize these - they decide your games):
-- Opponent shows "(creatures: 1)" or more and you are at 16 or less (or were attacked) ->
-  cast a payable sweeper THIS turn; tapped/artifacts/shroud are NOT reasons to wait.
+- Opponent shows "(creatures: 1)" or more and you are at 16 or LOWER (16 counts) or were
+  attacked recently -> cast a payable sweeper THIS turn; tapped/artifacts/shroud are NOT
+  reasons to wait, and "it isn't attacking this turn" is not a reason to wait.
 - Opponent board is "(creatures: 0)" -> hold sweepers; deploy Staff, Blightsteel,
   Venser's Journal, or Lightmine Field.
 - A deck is ATTACKING you every turn -> deploy Lightmine Field; sweep their creatures;

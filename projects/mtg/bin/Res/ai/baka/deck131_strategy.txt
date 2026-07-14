@@ -28,7 +28,7 @@ DEPLOY THE PAYOFFS - curve them out as fast as red mana allows:
 - Young Pyromancer ({1}{R}, 2/1): every instant/sorcery YOU cast makes a 1/1 Elemental
   token. Cast it the turn you can. A swarm of Elemental tokens is a real second win path
   on its own - if Guttersnipe never shows up, Young Pyromancer plus its tokens can still
-  race the game out (that is exactly how the last win closed: opp 20 -> dead on a token
+  race the game out (that is how this deck's fastest wins close: opp 20 -> dead on a token
   swarm, no Guttersnipe on board all game).
 - Cast the payoff creature FIRST, then your other spells the same turn - a spell cast
   before the creature lands makes no token and no damage.

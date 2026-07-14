@@ -67,20 +67,33 @@ COUNTERS - READ THE STACK, HOLD THE MANA:
   this order:
    1. A BOARD SWEEPER - Wrath of God, Pyroclasm, Black Sun's Zenith, Cyclonic Rift,
       Damnation. These erase every creature you deployed; countering one is your whole turn.
-   2. An ARTIFACT creature or equipment you cannot Go for the Throat - Master of
-      Etherium, Etched Champion, Cranial Plating, Steel Overseer.
+   2. An ARTIFACT creature or equipment you CANNOT Go for the Throat - Master of
+      Etherium, Etched Champion, Cranial Plating, Steel Overseer. These are the
+      threats you have NO removal for, so a counter is your ONLY answer - counter
+      them ON SIGHT, do NOT "deal with it later," because there is no later. Steel
+      Overseer pumps their WHOLE artifact board +1/+1 EVERY turn it lives; the longer
+      it sits the more it grows past your clock. A "slow" artifact you can't remove is
+      not safe to ignore - it is exactly why this line exists.
    3. A growing engine - Young Pyromancer, Guttersnipe, Gray Merchant of Asphodel,
-      Geralf's Messenger, or a bounce-your-attackers spell (Hydrolash).
+      Geralf's Messenger, or a bounce-your-attackers spell (Hydrolash), or an
+      attacker-hosing enchantment (Lightmine Field).
    4. Any creature or equipment while your life is 12 or less, or any spell costing
       4+ mana.
 - Counters are for the list above ONLY. LET RESOLVE and keep your mana for: mana
-  rocks and cantrips (Mox Opal, Arcum's Astrolabe), Elixir of Immortality, Prism
-  Ring, land searches (Into the North), one-mana discard (Inquisition of Kozilek,
-  Thoughtseize), Bloodghast and other recursive small bodies, and small utility
-  spells. Never spend a counter on a 1-2 mana cantrip, mana rock, or discard spell -
-  Arcane Denial draws THEM two cards, so it is worth far more than the one card such
-  a spell trades with. If your PLAN says "let it resolve," your reply number must be
-  "Cast nothing," never the counter option.
+  rocks and cantrips (Mox Opal, Arcum's Astrolabe, Thoughtcast), Elixir of
+  Immortality, Prism Ring, land searches (Into the North), one-mana discard
+  (Inquisition of Kozilek, Thoughtseize), Bloodghast and other recursive small
+  bodies, and small utility spells. Never spend a counter on a 1-2 mana cantrip,
+  mana rock, or discard spell - Arcane Denial draws THEM two cards, so it is worth
+  far more than the one card such a spell trades with.
+- LET CHEAP BURN TO YOUR FACE RESOLVE AND RACE - Galvanic Blast, Searing Spear,
+  Lightning Bolt, Cruel Edict. Do NOT spend a counter to save a few life at high
+  life: at 15+ life, taking 2-4 damage is far cheaper than an Arcane Denial that
+  hands THEM two cards, and your clock kills them first. Counter burn only when it
+  is lethal or near-lethal (you are already in its kill range). A Cruel Edict when
+  you have no creature on the battlefield does NOTHING - let it resolve.
+- If your PLAN says "let it resolve," your reply number must be "Cast nothing,"
+  never the counter option.
 - A counter can only be USED when the game opens a window, and it opens one only
   while you can PAY {U}{U}: if you tap out on your own turn, no window opens on the
   opponent's turn and the counter rots in your hand. When you are holding a
@@ -97,11 +110,14 @@ you in the black matchup. It is nonartifact, so Go for the Throat CAN kill it.
 Against a black opponent, HOLD Go for the Throat for Phyrexian Obliterator - do NOT
 spend it on Bloodghast (a 2/2 that returns from the graveyard every time they play a
 land, so killing it only delays it one turn). Otherwise fire it on their best growing
-attacker (Stromkirk Noble, Abominable Treefolk). It CANNOT hit artifact creatures
-(Master of Etherium, Memnite, Icehide Golem, Vault Skirge), enchantments (Lightmine
-Field), planeswalkers, or lands. If the opponent has NO nonartifact creature on their
-battlefield, Go for the Throat has no target even though "Cast Go for the Throat" is
-listed - do NOT pick it (it does nothing): cast a creature, or hold and counter instead.
+attacker (Stromkirk Noble, Gore-House Chainwalker, Abominable Treefolk, Ice-Fang
+Coatl). It CANNOT hit artifact creatures (Master of Etherium, Memnite, Icehide Golem,
+Vault Skirge, Ornithopter, Steel Overseer), enchantments (Lightmine Field),
+planeswalkers, or lands. If the opponent has NO nonartifact creature on their
+battlefield, Go for the Throat has no useful target even though "Cast Go for the
+Throat" is listed - and the option will say "the only legal targets are YOUR OWN
+right now," meaning it could only hit your OWN faeries. Do NOT pick it (never destroy
+your own creature): cast a creature, or hold and counter instead.
 
 CARD NOTES:
 - Sleep-Cursed Faerie ({u} 3/3 flyer, ward 2): enters tapped with 3 stun counters
@@ -130,13 +146,24 @@ SITUATIONS THAT DECIDED GAMES - THE CORRECT PLAY:
 - A pending spell shows in ON THE STACK and a Counterspell/Arcane Denial option names
   it: counter it per the priority list, and make your reply number the counter line,
   never "Cast nothing." (vs140, vs131, and vs110 were WON this way - countering
-  Damnation, Cyclonic Rift, Hydrolash, Master of Etherium, and Etched Champion.)
+  Damnation, Cyclonic Rift, Hydrolash, Master of Etherium, Etched Champion, Lightmine
+  Field, Young Pyromancer, Abominable Treefolk.)
+- The opponent (affinity) casts an artifact engine you cannot remove - Steel Overseer,
+  Master of Etherium, Cranial Plating, Etched Champion: counter it ON SIGHT. It is not
+  "slow" - it is unanswerable and it grows their board every turn. Meanwhile a cheap
+  burn spell to your face (Galvanic Blast, Searing Spear) at 15+ life: LET IT RESOLVE
+  and take it, keep your counter for the engine, and race. Spending a counter on the
+  burn while the growing artifact resolves is how you lose the affinity game.
 - A cheap spell (land search, mana rock, one-mana discard, a recursive Bloodghast, a
-  0/2 Ornithopter) is on the stack: let it resolve and keep your counter - your reply
-  number is "Cast nothing." Wasting a counter on it hands the opponent value.
+  0/2 Ornithopter, a whiffing Cruel Edict with no creature to take) is on the stack:
+  let it resolve and keep your counter - your reply number is "Cast nothing."
+  Wasting a counter on it hands the opponent value.
 - The opponent has Phyrexian Obliterator: kill it with Go for the Throat (held for
   exactly this) and NEVER block it - a block feeds its sacrifice punisher and loses
   your board. This is how you beat the black matchup.
+- Go for the Throat is listed but says "the only legal targets are YOUR OWN right now":
+  the opponent has no creature you can destroy - do NOT cast it into your own faerie.
+  Cast a creature or hold and counter instead; your reply number is "Cast nothing."
 - A creature is castable on your turn: cast it. Archmage of Echoes hits the board
   the first turn you have 5 mana.
 - An attacker comes at you and you are at 9+ life: take it, keep your flyers attacking
