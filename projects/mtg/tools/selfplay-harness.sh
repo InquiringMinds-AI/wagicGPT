@@ -146,6 +146,48 @@ run_one_game() {
     life1=$(echo "$resline"  | grep -oE 'life1=-?[0-9]+'  | cut -d= -f2)
     turn=$(echo "$resline"   | grep -oE 'turn=-?[0-9]+'   | cut -d= -f2)
     [ -z "$winner" ] && winner="timeout"
+    if [ "$winner" = "timeout" ]; then
+        # Adjudicate from the seat translogs' final records (wave-7 ledger 7a):
+        # fill life/turn so control-mirror timeouts don't need manual
+        # reconstruction. The gamestart header's opp_deck disambiguates
+        # concurrent games that share a deck.
+        local adj
+        adj=$(python3 - "$LOGDIR" "$d0" "$d2" "$gstart" <<'PYEOF' 2>/dev/null
+import json, glob, os, sys
+logdir, d0, d2, gstart = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
+def last_state(mine, other):
+    cand = []
+    for f in glob.glob(os.path.join(logdir, "*-ai_baka_deck%s-*.jsonl" % mine)):
+        try:
+            ep = int(os.path.basename(f).split('-')[0])
+        except ValueError:
+            continue
+        if not (gstart - 2 <= ep <= gstart + 300):
+            continue
+        try:
+            recs = [json.loads(l) for l in open(f) if l.strip()]
+        except Exception:
+            continue
+        if not recs:
+            continue
+        gs = next((r for r in recs if r.get('kind') == 'gamestart'), None)
+        if gs and ("deck%s" % other) not in (gs.get('opp_deck') or ''):
+            continue
+        cand.append(recs[-1])
+    return max(cand, key=lambda r: r.get('seq', 0)) if cand else None
+a = last_state(d0, d2)
+if a:
+    print(a.get('my_life', '-'), a.get('opp_life', '-'), a.get('turn', '-'))
+else:
+    b = last_state(d2, d0)
+    if b:
+        print(b.get('opp_life', '-'), b.get('my_life', '-'), b.get('turn', '-'))
+    else:
+        print('- - -')
+PYEOF
+)
+        read -r life0 life1 turn <<< "$adj"
+    fi
     printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$d0" "$d2" "$winner" "${life0:--}" "${life1:--}" "${turn:--}" "$gstart" >> "$RESULTS"
 }
 
