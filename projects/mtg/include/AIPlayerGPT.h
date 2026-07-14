@@ -45,6 +45,7 @@
 
 #include "AIPlayerBaka.h"
 
+#include <set>
 #include <utility>
 #include <memory>
 
@@ -226,6 +227,18 @@ private:
     //clears on turn change. Keyed by rendered option line.
     std::map<string, int> mPassDeclineCount;
     int mPassDeclineTurn;
+
+    //Cast-seam livelock breaker (the priority seam's no-progress pass,
+    //mirrored): a consumed cast pick that leaves the board byte-identical
+    //did not execute (an unexecutable menu entry - e.g. a restricted cast
+    //mode - or an engine no-op). The cached ask would replay it every tick
+    //forever (135v133 wedged at turn 2 for 2400s, 903k re-picks). Suppress
+    //that option line for the turn and re-ask over the remaining options -
+    //self-healing when a sibling entry (the legal alternative mode) exists.
+    string mLastCastBoard;
+    string mLastCastLine;
+    std::set<string> mStuckCastLines;
+    int mStuckCastTurn;
 
     //Decision-transcript dump (config translog=1 / WAGIC_GPT_TRANSLOG):
     //one JSONL record per consumed decision - prompt-tuning raw material

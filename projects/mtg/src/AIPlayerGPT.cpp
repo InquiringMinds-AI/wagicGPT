@@ -520,7 +520,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -1726,6 +1726,26 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     if (!DecisionManager::buildCastSpell(this, policy, pMana, instantWindow, castReq))
         return NULL; //nothing castable: only one outcome, no model call
     const vector<LegalActionsOracle::Cast> & casts = castReq.casts;
+
+    //Livelock breaker (see header): a consumed cast pick that left the
+    //board byte-identical did not execute - suppress that option line for
+    //the turn so the re-ask decides over the remaining entries instead of
+    //replaying the cached pick every tick.
+    if (mStuckCastTurn != observer->turn)
+    {
+        mStuckCastLines.clear();
+        mStuckCastTurn = observer->turn;
+    }
+    string boardNow = serializeGameState();
+    if (!mLastCastLine.empty())
+    {
+        if (boardNow == mLastCastBoard)
+        {
+            DebugTrace("AIPlayerGPT: cast pick made no progress, suppressing: " << mLastCastLine);
+            mStuckCastLines.insert(mLastCastLine);
+        }
+        mLastCastLine.clear(); //progress or suppression: either way, consumed
+    }
     for (size_t ci = 0; ci < casts.size(); ci++)
     {
         MTGCardInstance * card = casts[ci].card;
@@ -1782,6 +1802,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     o << " - can target on the stack: " << hits.str();
             }
         }
+        if (mStuckCastLines.count(o.str()))
+            continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
         candidateUsesAlt.push_back(casts[ci].viaAlternative);
         opts.push_back(o.str());
@@ -1820,6 +1842,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     {
         DebugTrace("AIPlayerGPT: casting " << validated->name << " (model's pick"
                    << (validated == chosen ? ")" : " via combo hint)"));
+        mLastCastBoard = boardNow; //livelock breaker: next entry compares
+        mLastCastLine = opts[pick];
         return validated;
     }
     //The cheap menu filter let through something the real machinery rejects

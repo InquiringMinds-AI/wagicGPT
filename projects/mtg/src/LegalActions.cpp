@@ -107,7 +107,29 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
                 && (pMana->canAfford(cost->getAlternative(), 0)
                     || ManaEngine::planPayment(p, policy, card, cost->getAlternative(), 0).size());
 
-            if (normalOk || !altOk)
+            //Cast restrictions gate WHICH modes are legal (Arcum's
+            //Astrolabe: restriction=never + other={i} = alternative-only).
+            //They used to live only in FindCardToPlay's policy dance, so
+            //the menu offered unexecutable modes - the model picking one
+            //re-cast into a silent no-op every tick (the 135v133 turn-2
+            //livelock, 903k re-picks of the same entry). Gate each ENTRY
+            //on its own restriction set, as the engine does at cast time.
+            //normalEntry stays the representative for flashback/morph
+            //pricing (payable() passed with neither flag), like before.
+            bool normalEntry = (normalOk || !altOk);
+            {
+                AbilityFactory af(p->getObserver());
+                if (normalEntry && card->getRestrictions().size()
+                    && !af.parseCastRestrictions(card, p, card->getRestrictions()))
+                    normalEntry = false;
+                if (altOk && card->getOtherRestrictions().size()
+                    && !af.parseCastRestrictions(card, p, card->getOtherRestrictions()))
+                    altOk = false;
+                if (!normalEntry && !altOk)
+                    continue;
+            }
+
+            if (normalEntry)
             {
                 LegalActionsOracle::Cast c;
                 c.card = card;
@@ -122,7 +144,12 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
                 c.card = card;
                 c.zoneLabel = scans[s].label;
                 c.viaAlternative = true;
-                c.normalPayable = normalOk;
+                //When the normal MODE is restricted away (no normal entry),
+                //the alternative must compete on its own: consumers use
+                //normalPayable to prefer normal pricing, and a true here
+                //with no normal entry would leave the card uncastable for
+                //the heuristic (alternative-only cards like Astrolabe).
+                c.normalPayable = normalOk && normalEntry;
                 result.push_back(c);
             }
         }
