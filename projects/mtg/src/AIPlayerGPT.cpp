@@ -1797,6 +1797,31 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             firstHit = false;
                         }
                 }
+                //Own-targets-only warning: a mandatory-target removal
+                //spell whose only legal targets are the CASTER's own
+                //permanents is offered legally (601.2c satisfied - you may
+                //destroy your own creature) but reads as a trap from a
+                //bare cast line (deck44 wave-8: GFTT offered with only its
+                //own Faerie legal; the pilot correctly declined but paid a
+                //reasoning tax every window). Say it at the option.
+                if (tc->maxtargets == 1)
+                {
+                    int ownT = 0, oppT = 0;
+                    for (int pi = 0; pi < 2; pi++)
+                    {
+                        Player * pp = observer->players[pi];
+                        MTGGameZone * zz[] = { pp->game->inPlay, pp->game->graveyard, pp->game->hand, pp->game->exile, pp->game->commandzone };
+                        for (int zi = 0; zi < 5; zi++)
+                            if (tc->targetsZone(zz[zi]))
+                                for (int cj = 0; cj < zz[zi]->nb_cards; cj++)
+                                    if (tc->canTarget(zz[zi]->cards[cj]))
+                                        (zz[zi]->cards[cj]->controller() == this ? ownT : oppT)++;
+                        if (tc->canTarget(pp))
+                            (pp == this ? ownT : oppT)++;
+                    }
+                    if (ownT && !oppT)
+                        o << " - the only legal targets are YOUR OWN right now";
+                }
                 SAFE_DELETE(tc);
                 if (!firstHit)
                     o << " - can target on the stack: " << hits.str();
@@ -2514,12 +2539,18 @@ int AIPlayerGPT::chooseBlockers()
         if (!kw.empty())
             tail << " [" << kw << "]";
         //Punisher rider: an attacker whose text does something WHEN BLOCKED
-        //(sacrifice your blocker, damage you, pump itself) is a trap the
-        //bare name hides - surface the text at the line that decides.
+        //or WHEN DEALT DAMAGE (sacrifice permanents, damage you, pump
+        //itself) is a trap the bare name hides - surface the text at the
+        //line that decides. "block" alone missed the damage-trigger class:
+        //Phyrexian Obliterator's "deals damage to" rider stayed hidden and
+        //deck109 blocked into it (wave-8).
         string txt = attackers[j]->text;
         for (size_t ti = 0; ti < txt.size(); ti++)
             txt[ti] = (char) tolower((unsigned char) txt[ti]);
-        if (txt.find("block") != string::npos)
+        if (txt.find("block") != string::npos
+            || txt.find("deals damage") != string::npos
+            || txt.find("dealt damage") != string::npos
+            || txt.find("deals combat damage") != string::npos)
             tail << " {text: " << cardTextSnippet(attackers[j], 160) << "}";
         tail << "\n";
     }
