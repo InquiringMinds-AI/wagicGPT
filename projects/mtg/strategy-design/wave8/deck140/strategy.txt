@@ -1,0 +1,98 @@
+Deck identity: "Wipe Them Out" is an RBW CONTROL deck: 14 board wipes, almost no
+creatures, three finishers (Rakdos's Return, Staff of Nin, Blightsteel Colossus).
+You out-survive every deck in this pool - the ONLY way you lose is by never closing,
+or by letting creatures sit and grow while you HOLD a sweeper you could have cast.
+You win BY DOING every turn: kill their creatures on sight, deploy a finisher, then
+grind their face to 0 with your reach.
+
+SWEEP TRIGGER - THIS IS THE RULE THAT DECIDES YOUR GAMES.
+The opponent's battlefield line prints its creature count for you, like
+"Opponent battlefield (creatures: 2)". That number is C - you do not have to count.
+- If C is 1 or more, and (your life is 16 or less OR they attacked you last turn),
+  CAST A SWEEPER THIS TURN. Do not wait. Pick the first sweeper you can PAY for now
+  (see WHICH SWEEPER). Casting nothing here is how you lose.
+- If C is 0 (only lands/artifacts/enchantments), holding the sweeper is correct -
+  deploy a finisher instead (see DEPLOY WHEN SAFE).
+C already counts every creature that matters, so do not talk yourself out of a sweep:
+- A TAPPED creature is still counted in C (it shows "[tapped - untaps and can attack
+  next turn]"). It untaps and swings again, and your sorcery-speed sweeper kills it on
+  YOUR main phase the same. Tapped is NEVER a reason to wait.
+- ARTIFACTS on the board do not lower C and do not shield a creature. If C is 1+, your
+  sweeper still kills every creature - cast it.
+- SHROUD / "can't be targeted" does NOT stop a sweeper. Pyroclasm, Wrath of God,
+  Damnation, and Black Sun's Zenith hit ALL creatures without targeting - shroud does
+  nothing to them. Cruel Edict also works (it makes the PLAYER sacrifice, it does not
+  target the creature). Shroud only stops single-target spells you do not run.
+
+WHICH SWEEPER - cast the FIRST ONE YOU CAN PAY FOR (do not pass the turn because your
+one "favorite" sweeper is uncastable; another one is almost always payable):
+- Exactly ONE creature: Cruel Edict {1}{b} (black) - they sacrifice it.
+- 2+ creatures, ALL toughness 2 or less: Pyroclasm {1}{r} (needs RED).
+- 2+ creatures, any toughness 3+: Wrath of God {2}{w}{w} (white) or Damnation {2}{b}{b} (black).
+- Indestructible / regeneration / one huge creature: Black Sun's Zenith {b}{b}{x} (black) -
+  pick option 1 (biggest X); X at/above their biggest toughness kills everything, and it
+  shuffles back, so spend X freely. But only cast Black Sun's Zenith when the biggest X you
+  can AFFORD is at least the toughness you need dead - a smaller X leaves the creature alive
+  and wastes the whole turn; if X would fall short, cast Wrath or Damnation instead (they
+  kill any toughness).
+If you have no RED, Pyroclasm is out - use Wrath (white), Damnation (black), or Black
+Sun's Zenith (black) instead. You carry 14 sweepers - one per real creature board.
+
+THE #1 RULE - RAKDOS'S RETURN IS YOUR ONE KILL SHOT. HOLD IT; DO NOT CHIP WITH IT.
+You have only two Rakdos's Return and it is your only burst reach (X damage to the
+opponent's FACE, plus they discard X). The general prompt says "send burn at the face" -
+that does NOT apply to Rakdos's Return.
+- FIRE IT (option 1, biggest X) only when it is LETHAL. EVERY turn it is in hand:
+  X = (your untapped lands) minus 2; if X is at or above the opponent's life, cast it
+  NOW, pick option 1 - you win this turn. Staff of Nin pings them down, so this arrives.
+- Otherwise HOLD it. A below-lethal Rakdos's Return is a legal "Cast nothing" - holding
+  the kill shot is correct, not a passed turn. Do not fire it for a small X even if it
+  sits at option 1.
+- The ONLY below-lethal fire: the opponent has 3+ cards in hand AND is attacking you -
+  then the discard earns it.
+
+THE X MENU (Rakdos's Return, Black Sun's Zenith): the menu lists the BIGGEST X FIRST.
+Pick OPTION 1; confirm the line reads the biggest number shown. (Black Sun's Zenith's
+biggest X is free - it shuffles back into your library.)
+
+DEPLOY WHEN SAFE - every turn the opponent has C = 0 creatures (or only creatures too
+small to kill you within two turns), cast the FIRST of these that appears, that turn:
+ 1. Staff of Nin {6} - draws a card AND pings 1 every upkeep; your repeating clock.
+    Cast it the first turn you can afford it.
+ 2. Blightsteel Colossus {12} - 11/11 trample INFECT, indestructible; attacks by itself,
+    one unblocked hit = 11 poison = dead. Its infect ignores the opponent's LIFE TOTAL
+    and any LIFEGAIN (Prism Ring, lifelink) - so Blightsteel is your ONLY answer to
+    lifegain/high-life decks you can never out-damage. Cast it the turn you reach 12 mana.
+ 3. Lightmine Field {2}{w}{w} - vs any deck that ATTACKS YOU, deploy this on sight: it
+    damages EVERY attacking creature each combat, punishing go-wide aggro your one-shot
+    sweepers cannot keep up with. Skip it vs a creatureless deck.
+ 4. Venser's Journal {5} - gain life per card in hand each upkeep; a SURVIVAL tool vs
+    aggro/lifegain to keep you alive to deploy Blightsteel, NOT a win condition.
+ 5. Elixir of Immortality {1} - cast with spare mana; activate ({2},{T}: gain 5) below
+    10 life or when your library is under 10 cards.
+(Rakdos's Return is NOT on this list - it is your kill shot, held per THE #1 RULE.)
+
+STAFF OF NIN: take "Deal 1 Damage" EVERY turn at the OPPONENT's FACE. Hit a creature only
+if its toughness is shown as 1; toughness 2+ survives the ping and wastes your clock.
+
+LANDS: play a land EVERY turn; never pick "Hold <land>".
+MULLIGAN: keep ANY hand with 2, 3, or 4 lands. Never mulligan for "too many sweepers" -
+sweepers are what this deck does.
+
+OVERRIDE of the general strategy: you have NO instants - never pass to "keep mana open";
+nothing casts on the opponent's turn. Cast on your own main phase every turn.
+
+DECIDING SITUATIONS (recognize these - they decide your games):
+- Opponent shows "(creatures: 1)" or more and you are at 16 or less (or were attacked) ->
+  cast a payable sweeper THIS turn; tapped/artifacts/shroud are NOT reasons to wait.
+- Opponent board is "(creatures: 0)" -> hold sweepers; deploy Staff, Blightsteel,
+  Venser's Journal, or Lightmine Field.
+- A deck is ATTACKING you every turn -> deploy Lightmine Field; sweep their creatures;
+  it is fine to keep sweeping one board after another.
+- The opponent gains life or sits at high life you can't out-damage -> deploy Blightsteel;
+  its infect poison ignores their life total.
+- Your untapped lands minus 2 is at or above the opponent's life and Rakdos's Return is
+  in hand -> cast it, pick option 1 (biggest X), win this turn.
+- Rakdos's Return is below lethal and your only other play is a sweeper on an empty
+  board -> pick "Cast nothing" and hold both; the lethal turn comes from Staff pings.
+- Staff of Nin resolves "Deal 1 Damage" -> send it at the opponent's face.
