@@ -1,0 +1,138 @@
+Deck identity: mono-black DEVOTION MIDRANGE. You win by casting a black creature
+every turn, removing what races you, and finishing with Gray Merchant of
+Asphodel's life drain - the drain is your only damage that ignores blockers and
+flyers, AND it gains you that much life, so it is both your finisher and your
+panic button. Half your games you win by BEATS instead (recurring Bloodghasts +
+Phyrexian Obliterator) when Gray Merchant does not arrive - that is normal. Vs a
+control/counter deck the beats ARE the win: discard buys the tempo, Phyrexian
+Obliterator closes it, and Gray Merchant can still be countered by a topdeck - so
+keep attacking, do not wait for the drain.
+
+CAST SOMETHING EVERY TURN, BUT RANK BY IMPACT - YOU ALWAYS HAVE THE MANA. Every
+cast the list offers is already paid for; the game taps your lands automatically.
+Each turn, take the highest thing on this list that is offered:
+  1. Gray Merchant when it wins OR saves you (see its block below). If it does
+     NEITHER right now (N+2 is less than the opponent's life AND your own life is
+     above 10), do NOT cast him yet - take a creature/Obliterator from lower on
+     this list to build devotion; a bigger drain a turn later wins more, and a
+     small Merchant into an open-mana control deck just gets countered.
+  2. Remove a creature that is attacking you (Fatal Push; Collective Brutality
+     -2/-2; Liliana of the Veil -2).
+  3. Cast a creature/threat (Obliterator, Geralf's Messenger, Bloodghast).
+  4. Inquisition of Kozilek - FREE, cast it whenever it is your best remaining
+     play to strip a threat or a burn spell.
+  5. Thoughtseize - costs YOU 2 life. Cast it only turns 1-3, or later ONLY to
+     take a specific card you can SEE will kill you (a sweeper, a burn spell, a
+     bomb). If the opponent's hand shows 0 cards, or holds nothing that threatens
+     you, DO NOT cast Thoughtseize - its 2 life is a race you lose. Prefer
+     Inquisition or a creature.
+Choose FROM THE NUMBERED LIST ONLY: before you write a plan, confirm the card
+you name appears in the list. If it does not, cast the best card that IS listed.
+
+ROLE CHECK - run it every turn, straight off the board and life totals:
+- BEATDOWN (their board is empty, or your creatures are bigger): deploy the
+  curve below and attack with everything.
+- DEFENDER (your life is falling while theirs is not, or they have flyers or an
+  unkillable creature you cannot block): your job is REMOVAL + WALL + DRAIN, the
+  line that won you the Faerie matchup AND the red-burn matchup last run:
+  1. Kill their attacker: Fatal Push, or Collective Brutality's "creature gets
+     -2/-2" mode, or Liliana of the Veil -2.
+  2. Cast PHYREXIAN OBLITERATOR (5/5 trample) and BLOCK with it - damaging it
+     forces that player to sacrifice that many permanents, so it eats their
+     attacker AND their board. It is your wall.
+  3. Protect your life: play a Swamp and a creature instead of Thoughtseize
+     (2 life); skip Phyrexian Arena (1 life/turn); crack a fetch only on a turn
+     you need the land.
+  4. Close - or stabilize - with the Gray Merchant drain (no attack needed).
+  You still cast a creature every turn in BOTH roles.
+
+VS RED/BURN AGGRO (Pillar of Flame, Searing Spear, Legion Loyalist, Goblins):
+strip their BURN with your turn-1/2 discard first (a burn spell taken is damage
+removed from YOUR face), Fatal Push their haste creature, use Collective
+Brutality's -2/-2 mode as removal on their attacker, then block with Geralf's
+Messenger (undying = a repeatable wall) and go WIDE with your recurring
+Bloodghasts. You do not need Gray Merchant to win this - beats close it. If they
+go WIDE with many small creatures (a Goblin swarm), discard barely helps: your
+answer is PHYREXIAN OBLITERATOR as a wall and Collective Brutality -2/-2, not
+more discard - land a body fast, an edict only removes one of them.
+
+GRAY MERCHANT OF ASPHODEL {3}{B}{B}: he is your finisher AND your stabilizer -
+you gain the life the opponent loses. The option shows "{right now: drains N}",
+but that N does NOT yet count Gray Merchant himself: the REAL drain is N + 2. Use
+ONLY that shown number + 2 - do NOT try to count your own devotion by hand, you
+will miscount; the option already did the counting for you.
+EVERY turn he is in the list, cast him NOW if EITHER holds:
+  - N + 2 >= the opponent's life  ->  you win this turn, cast him and win.
+  - your own life is 10 or less    ->  you gain N + 2 life; cast him to survive
+    (do NOT spend that mana on removal instead - stabilizing beats one kill).
+If NEITHER holds, WAIT (impact-list rule 1) - cast a creature instead and drain
+bigger later. Liliana, the Last Hope -2 returns a dead Gray Merchant to hand -
+recast for a second drain (you did exactly this last run).
+
+DEPLOY CURVE (substitute the closest creature you hold):
+- Turn 1: land + Thoughtseize or Inquisition of Kozilek.
+- Turn 2: land + Bloodghast.
+- Turn 3: land + Geralf's Messenger (enters, drains 2; undying returns it bigger).
+- Turn 4: land + Phyrexian Obliterator.
+- Turn 5+: keep casting a threat every turn by IMPACT (Obliterator, Geralf's,
+  Bloodghast, Yawgmoth). Cast Gray Merchant only when he wins or saves you.
+Two spells in one turn is GOOD when the list offers both.
+
+BLOODGHAST {B}{B} (2/1): cast it from hand - landfall returns it only from the
+GRAVEYARD, free off every land you play once it has died. It CANNOT BLOCK - as
+defender its jobs are +2 devotion for the drain, Yawgmoth fodder, and Collective
+Brutality escalate fuel. It gains haste when the opponent is at 10 or less.
+Attack with it when you are the beatdown; as defender, an attack that just trades
+into a blocker can wait - Gray Merchant does that damage through the air.
+
+FATAL PUSH (instant, {B}): destroys a creature of mana value 2 or less - 4 or
+less if a permanent of yours left play this turn (cracked fetch, dead Bloodghast).
+Fire it at the creature actually attacking you, not a harmless 0/2 or a mana dork.
+It cannot hit a creature of mana value 3+ unless your revolt is on, so crack a
+fetch first if you need the bigger kill. Holding Push never stops your creature cast.
+
+COLLECTIVE BRUTALITY {1}{B}: has a "target creature gets -2/-2" mode - that is
+your creature REMOVAL, use it on their attacker when you are defending or racing
+aggro (it kills toughness-2 creatures and shrinks bigger ones for the block).
+Other modes: take an instant/sorcery from their hand, or "opponent loses 2, you
+gain 2". Escalate by discarding Bloodghast - your next land returns it.
+
+LILIANA OF THE VEIL -2: this is a SACRIFICE (edict), not targeted - the opponent
+picks which creature dies, so it is best when they have ONE creature (their
+attacker). It removes only ONE creature, so it is weak against a wide token board.
+Because it is a sacrifice, it kills creatures you cannot target - including
+protection-from-black or hexproof creatures like Etched Champion.
+
+FETCHLANDS (Polluted Delta, Bloodstained Mire, Verdant Catacombs, Marsh Flats):
+crack the moment "Put in Play... targeting Snow-Covered Swamp" appears - the 1
+life is the card working, and it turns Fatal Push's revolt on. When defending and
+low on life, crack only on a turn you actually need the land.
+
+YAWGMOTH: cast with another creature out, then each turn: pay 1 life, sacrifice
+Bloodghast or Geralf's Messenger (both come back), -1/-1 counter on THEIR
+creature, draw a card. You piloted this perfectly last run - keep it.
+GERALF'S MESSENGER: undying returns it bigger and drains 2 again.
+PHYREXIAN ARENA: 1 life every upkeep for a card - skip casting it when defending.
+
+ATTACK with every untapped creature when you are the beatdown. Obliterator
+(5/5 trample) attacks AND blocks safely - no one fights it profitably.
+
+MULLIGAN: keep 2-4 lands with a creature, or a discard spell AND a creature.
+Ship 0-1 land hands, 6+ land hands, and hands that are all discard spells with no
+creature - discard alone never wins, and a hand of only discard + one land is a
+ship against fast aggro.
+
+DECIDING SITUATIONS (recognize -> play):
+- Your life is falling while theirs holds -> you are the DEFENDER: remove their
+  attacker and land Obliterator; stop casting discard.
+- You are at 10 or less and Gray Merchant is listed -> cast him to gain N+2 life,
+  not removal.
+- The opponent's hand shows 0 cards (or nothing that kills you) -> cast a creature
+  or Inquisition, NOT Thoughtseize; its 2 life is not worth an empty hand.
+- Gray Merchant is listed but N+2 < their life and your life is above 10 -> cast a
+  creature to build devotion; drain bigger next turn.
+- Their creature has protection from black / is unkillable by Push -> Liliana of
+  the Veil -2 (a sacrifice) removes it; or block/trade around it.
+- They flood the board with small creatures -> Phyrexian Obliterator as a wall and
+  Collective Brutality -2/-2, not more discard; an edict removes only one.
+- N+2 >= their life on the Gray Merchant option -> cast him, you win now.

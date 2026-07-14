@@ -1,0 +1,116 @@
+Deck identity: BLUE-RED SPELLSLINGER. You kill TWO ways, and the FIRST is the one to
+lean on: with Guttersnipe on your battlefield, every instant or sorcery you cast deals
+2 to the opponent's face - no attack needed. The second is attacking with your
+creatures. Pick your gear each turn from one visible fact - is a Guttersnipe or Young
+Pyromancer on your battlefield, or in your cast list right now?
+- YES -> RACE GEAR: deploy the payoff, then chain spells and attack every turn. Every
+  turn in this gear deals damage.
+- NO -> DIG GEAR: cast a DRAW spell (Artificer's Epiphany, Opportunity) to find a
+  payoff, or a counter at a target worth stopping. A dig turn ends with cards drawn and
+  your mana spent on finding threats - not on lifegain. Switch to RACE GEAR the first
+  turn a payoff creature appears in your cast list.
+
+THE #1 RULE - WITH GUTTERSNIPE ON YOUR BATTLEFIELD, CAST A SPELL EVERY TURN. Each
+instant or sorcery you cast is 2 damage to their face, so the CAST ITSELF is the payoff
+- you do not need a good target for it.
+- On YOUR main phase with Guttersnipe out, cast any of these for 2 damage even if they
+  do nothing else: Artificer's Epiphany (draw 2, deal 2), Opportunity (draw 4, deal 2),
+  Hydrolash, Aetherize (deal 2 even with no attackers to bounce), and Downsize or
+  Cyclonic Rift pointed at any opponent permanent. If any of these is in your cast list,
+  CAST IT - the "Cast nothing" option is wrong while Guttersnipe is out.
+- The general rule "do not fire a reaction with no target" is OFF while Guttersnipe is
+  on your battlefield: with Guttersnipe out there is no such thing as a wasted spell,
+  because the 2 damage is the point. Chain until your mana is gone.
+
+DEPLOY THE PAYOFFS - curve them out as fast as red mana allows:
+- Guttersnipe ({2}{R}, 2/2): every instant/sorcery YOU cast deals 2 to the opponent.
+  This is your kill. CAST IT THE TURN YOU CAN.
+- Young Pyromancer ({1}{R}, 2/1): every instant/sorcery YOU cast makes a 1/1 Elemental
+  token. Cast it the turn you can.
+- Cast the payoff creature FIRST, then your other spells the same turn - a spell cast
+  before the creature lands makes no token and no damage.
+
+YOUR PROVEN WIN LINE (repeat it - it won the last two mirror-ish races):
+1. Mulligan any opening hand with no Mountain (unless it has a draw spell). 2. Get Young
+Pyromancer down as early as red allows, then Guttersnipe. 3. With Guttersnipe out, cast
+one spell every turn (Cyclonic Rift/Downsize/Aetherize at any target = 2 to the face),
+then attack with EVERY creature, and answer "no blockers" on defense. 4. If your first
+payoff is answered, hold counters and keep casting to grind out a SECOND Guttersnipe -
+double Guttersnipe is 4 to the face per spell and closes even a slow game (that is
+exactly how the last win ended: opp 5 -> 1 -> dead while you stayed above 5).
+
+LANDS - GET A MOUNTAIN DOWN AS EARLY AS THE MENU LETS YOU. Both win conditions are red
+(Guttersnipe {2}{R}, Young Pyromancer {1}{R}); a turn without red is a turn your creature
+cannot come. HOW THE LAND MENU WORKS (read this - it is not obvious): the game offers your
+lands ONE AT A TIME as "Play <that land>" or "Hold <that land>". It does NOT show you a
+"Play Mountain vs Play Island" choice. So when it offers "Play Island / Hold Island" and
+you STILL HAVE A MOUNTAIN IN YOUR HAND that has not been offered yet, choose HOLD ISLAND -
+keep declining Islands until it offers "Play Mountain", then play the Mountain. Play an
+Island only after a Mountain is on the battlefield, or when no Mountain is left in your
+hand. (If it keeps re-offering only Islands and never the Mountain, take the Island rather
+than skip your land drop entirely - a land in play beats no land.)
+
+MULLIGAN - LOOK FOR THE WORD "Mountain" IN YOUR HAND LIST.
+- If the word "Mountain" appears ANYWHERE in your opening hand, that hand HAS a red source:
+  KEEP it whenever it also has a payoff creature (Young Pyromancer/Guttersnipe) or a draw
+  spell. A hand with a Mountain and a Young Pyromancer is ALWAYS a keep - do not mulligan it.
+  (Miscounting a hand that shows "Mountain" as "zero Mountains" and shipping it is a real
+  mistake this deck has made - the fix is to read the list, not count from memory.)
+- Mulligan ONLY when NO "Mountain" appears in the hand list at all. Both your win conditions
+  are red; a hand with no red source cannot cast a single threat. This OVERRIDES the general
+  "keep any hand with 2-5 lands" rule: three Islands plus a Young Pyromancer is a KEEP by
+  land count but a MULLIGAN for THIS deck, because the threat is uncastable. The thought "I
+  will keep this and cast my creature once I draw a Mountain" is a TRAP - off 8 Mountains in
+  60 cards you often never draw the red.
+- The ONE no-Mountain KEEP: a hand holding Artificer's Epiphany OR Opportunity (a draw spell
+  to dig for red) with enough blue lands to cast it this turn or next. Ship a no-Mountain
+  hand that is only counters and Downsizes.
+
+YOUR CREATURES ATTACK. THEY DO THEIR BLOCKING BY RACING.
+- When the game asks you to DECLARE ATTACKERS, name EVERY creature in the list:
+  Guttersnipe, every Young Pyromancer, every Elemental token. Count the list; your reply
+  names all of them. Keep a creature home only when the opponent's untapped creatures
+  could kill you on the swing back.
+- When the game asks you to DECLARE BLOCKERS, your answer is "no blockers": take the
+  damage and keep your creatures alive for your own attack - a creature that dies
+  blocking is damage missing from your race every later turn. The one exception: when the
+  incoming attack would put you at 0 (add the attackers' power, compare to your life),
+  chump-block with an Elemental token first, Young Pyromancer second.
+- NEVER block with Guttersnipe. It is your only reach - the game is unwinnable without it,
+  so it stays alive in EVERY case, even to save several life. Take the hit instead; if you
+  are truly about to die, chump with an Elemental or Young Pyromancer, never Guttersnipe.
+
+REACTIVE SPELLS - support cards, not your plan (except as Guttersnipe fuel, above):
+- Counterspell ({U}{U}) / Dissipate ({1}{U}{U}) / Essence Scatter ({1}{U}): point these
+  at removal aimed at Guttersnipe or Young Pyromancer, and at a threat that beats you on
+  its own. Let the rest resolve and develop instead.
+- Downsize ({U}) / Hydrolash ({2}{U}) / Aetherize ({3}{U}): fire during combat when you
+  are actually being attacked - and any time as Guttersnipe fuel.
+- Cyclonic Rift ({1}{U}): bounce the opponent's single best permanent (Overload {6}{U}
+  when their board has 3+ nonland permanents) - and it is Guttersnipe fuel too.
+
+DRAW spells win this deck - it cannot win without finding its payoffs. Cast Artificer's
+Epiphany and Opportunity on YOUR main phase the turn you can afford them.
+
+PRISM RING / ELIXIR are lifegain only - they do NOT advance your clock. Cast a creature,
+a draw spell, or (with Guttersnipe out) any spell FIRST. Play Prism Ring or Elixir only
+with leftover mana on a turn you have nothing better to cast, never over a threat and
+never in the first turns of a race. Elixir also stops Artificer's Epiphany making you
+discard; activate it ({2},tap: gain 5) only when you are below 12 life.
+
+LETHAL CHECK each turn: (total power of your unblocked attackers) + (2 per instant or
+sorcery you can still cast this turn, per Guttersnipe on your battlefield). If that
+reaches the opponent's life, attack with everyone and cast every spell you can pay for.
+
+DECIDING SITUATIONS (recognize -> play):
+- No "Mountain" in your opening hand and no draw spell -> Mulligan; a no-red hand cannot
+  cast your threats. But if the word "Mountain" IS in the hand, KEEP - do not misread it.
+- The land menu offers "Play Island" while a Mountain sits unplayed in your hand -> Hold
+  the Island; keep holding until it offers "Play Mountain", then play the Mountain.
+- Guttersnipe is on your battlefield and a spell is castable -> cast the spell; it is 2
+  to their face this turn.
+- You drew no creature -> cast a draw spell to find one; that IS your turn's action.
+- Your first payoff was answered -> keep casting to find a SECOND Guttersnipe/Pyromancer;
+  hold counters for their removal, and win with the payoff you rebuild, not with combat.
+- Your creatures are being blocked or removed and the opponent's life is not moving ->
+  stop relying on combat and win with Guttersnipe: keep it alive and chain spells.
