@@ -2685,10 +2685,20 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
             continue;
         if (card->has(Constants::TREASON) && observer->getCurrentGamePhase() != MTG_PHASE_FIRSTMAIN)
             continue;
-        if (card->hasType(Subtypes::TYPE_PLANESWALKER) && card->types.size() > 0 && game->inPlay->hasTypeSpecificInt(Subtypes::TYPE_PLANESWALKER,card->types[1]))
-            continue;
-        if (card->hasType(Subtypes::TYPE_BATTLE) && card->types.size() > 0 && game->inPlay->hasTypeSpecificInt(Subtypes::TYPE_BATTLE,card->types[1]))
-            continue;
+        //Same-subtype planeswalker/battle dupes: a stale-rules POLICY gate
+        //(the 2017 rules change retired planeswalker-subtype uniqueness; the
+        //engine's own MTGNewLegend enforces the modern by-NAME legend rule,
+        //so a second different Liliana is a legal, often correct cast). An
+        //explicit model pick must not be vetoed by it - the oracle offered
+        //the cast, and a silent veto re-offers forever (wave-7: Liliana of
+        //the Veil rejected 4x while Liliana, the Last Hope was in play).
+        if (card != aiForcedCandidate)
+        {
+            if (card->hasType(Subtypes::TYPE_PLANESWALKER) && card->types.size() > 0 && game->inPlay->hasTypeSpecificInt(Subtypes::TYPE_PLANESWALKER,card->types[1]))
+                continue;
+            if (card->hasType(Subtypes::TYPE_BATTLE) && card->types.size() > 0 && game->inPlay->hasTypeSpecificInt(Subtypes::TYPE_BATTLE,card->types[1]))
+                continue;
+        }
 
         //Combo-hold hints are TIMING scaffolding for the heuristic ("hold
         //Pyroclasm until 2+ small creatures"). An explicit model pick
@@ -2764,7 +2774,27 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
             TargetChooserFactory tcf(observer);
             TargetChooser * tc = tcf.createTargetChooser(card);
             int shouldPlayPercentage = 0;
-            if (tc)
+            if (tc && card == aiForcedCandidate)
+            {
+                //Model pick: validate targets by LEGALITY (both players,
+                //the oracle's own 601.2c check), not the policy probe below
+                //- chooseTarget picks ONE preferred player (opponent, for a
+                //bad effect) and scans only that player's zones, so Fatal
+                //Push with the only cmc<=2 creature on the CASTER's board
+                //was offered by the oracle then rejected here forever
+                //(wave-6/7 no-legal-target loop). The GPT target seam
+                //chooses from the full legal set once the cast commits.
+                bool castable = true;
+                if (tc->maxtargets == 1 && !tc->validTargetsExist())
+                    castable = false;
+                if (tc->targetMin && !tc->validTargetsExist(tc->maxtargets))
+                    castable = false;
+                SAFE_DELETE(tc);
+                if (!castable)
+                    continue;
+                shouldPlayPercentage = 90;
+            }
+            else if (tc)
             {
                 int hasTarget = chooseTarget(tc,NULL,NULL,true);
                 if(
