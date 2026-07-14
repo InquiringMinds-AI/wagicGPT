@@ -49,7 +49,11 @@ WIDER, not taller: cast EVERY creature in your hand before spending mana on
 Equip lines - two bodies beat one +4 bonus; they add damage AND can block.
 Keep attacking, but when their attack on you would drop you to 8 life or
 less, block with every creature you do not need for your own lethal next
-turn - chump-blocking to stay alive wins the race.
+turn - chump-blocking to stay alive wins the race. AT 8 LIFE OR LESS you must
+KEEP a blocker back: a creature can only block if it is UNTAPPED, and attacking
+taps it - so do NOT attack with a creature you are counting on to block the
+swing back. If this turn's attack is not lethal, leave your best blocker home
+untapped; send only the creatures you do not need on defense.
 
 ATTACK EVERY TURN with every creature - including the turn after your best
 attacker died: send the rest and rebuild. Signal Pest always attacks even at
@@ -69,6 +73,16 @@ damage = total power of your attackers (+1 each if Signal Pest attacks too)
 If damage >= opponent's life: attack with everyone and fire every Blast at
 the opponent's face. When the opponent is at 8 or less, Blasts always go to
 the face. Earlier, a Blast may kill a blocker stopping your equipped attacker.
+
+PLAYING AROUND COUNTERS - when the opponent's deck has blue (counterspells,
+Arcane Denial, Faerie Miscreant fliers), do NOT lead with your one big threat
+into their open mana. Deploy your CHEAP bodies first and go WIDE: Memnite,
+Ornithopter, Signal Pest, Vault Skirge, Cranial Plating - a 1-for-1 counter
+that eats a {0} Memnite is a bad trade for them, and a wide board beats one
+countered bomb. Save Master of Etherium and a naked Etched Champion for a turn
+you can follow another threat behind them, so a single counter never stops
+your clock. Keep casting every turn - going wide IS how this deck beats
+counters; never hold your hand back waiting for a "safe" window.
 
 OTHER KEY CARDS:
 - Steel Overseer: take "Counter with Steel Overseer [cost: Tap]" in Main
@@ -96,6 +110,11 @@ DECIDING SITUATIONS (recognize -> play):
 - You hold castable creatures and an Equip line: cast the creatures first - two
   bodies beat one +4 bonus; the games this deck loses, it rode one creature
   while the opponent built five.
+- The opponent's deck has blue and you hold one big threat plus cheap bodies:
+  cast the cheap bodies first and go wide; do not walk Master of Etherium or a
+  lone Etched Champion into open counter mana.
+- You are at 8 life or less against a fast attacker: keep your best blocker
+  home untapped this combat unless your attack is lethal right now.
 - Your equipped creature died: keep declaring attackers with the rest and
   rebuild - the game this deck timed out, it stopped attacking with creatures
   still in play.

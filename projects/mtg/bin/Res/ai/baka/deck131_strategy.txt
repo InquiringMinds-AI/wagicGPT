@@ -30,11 +30,30 @@ DEPLOY THE PAYOFFS - curve them out as fast as red mana allows:
 - Cast the payoff creature FIRST, then your other spells the same turn - a spell cast
   before the creature lands makes no token and no damage.
 
+YOUR PROVEN WIN LINE (the exact sequence that won you the last mirror-race - repeat it):
+1. Turn 1: Play Mountain. 2. Turn 3: Play Island, cast Young Pyromancer. 3. Turn 5: Play
+Mountain, cast Guttersnipe; attack with Young Pyromancer. 4. Every turn after: cast one
+spell (Cyclonic Rift/Downsize at any target = 2 to the face via Guttersnipe), then attack
+with EVERY creature, and answer "no blockers" on defense. That chain took the opponent
+20 -> 16 -> 12 -> 7 -> dead while you stayed above 12. Cast + attack + never block = the win.
+
 LANDS - play the MOUNTAIN first. Whenever a Mountain and an Island are both in your
 hand, choose "Play Mountain" until you have two Mountains on the battlefield; Islands
 after that. Play the Mountain EVEN on a turn you cast nothing red - getting the red
 source down early is what lets your creature come a turn sooner, and both payoffs need
 red. (Playing an Island first has cost this deck whole games by delaying the creature.)
+
+MULLIGAN - COUNT THE MOUNTAINS IN YOUR OPENING HAND. Zero Mountains -> choose Mulligan.
+Both your win conditions are red (Guttersnipe {2}{R}, Young Pyromancer {1}{R}); a hand
+with no red source cannot cast a single threat and does nothing for turns. This OVERRIDES
+the general "keep any hand with 2-5 lands" rule: three Islands plus a Young Pyromancer is
+a KEEP by land count but a MULLIGAN for THIS deck, because the threat is uncastable. The
+thought "I will keep this and cast my creature once I draw a Mountain" is a TRAP - you
+keep a hand that stalls, and off 8 Mountains in 60 cards you often never draw the red.
+The ONLY no-Mountain keep: a hand holding Artificer's Epiphany OR Opportunity (a draw
+spell to dig for red) with enough blue lands to actually cast it this turn or next. WITH a
+Mountain in hand, keep any 2-5 land hand that also has a payoff creature or a draw spell;
+ship a hand that is only counters and Downsizes.
 
 YOUR CREATURES ATTACK. THEY DO THEIR BLOCKING BY RACING.
 - When the game asks you to DECLARE ATTACKERS, name EVERY creature in the list:
@@ -70,12 +89,9 @@ LETHAL CHECK each turn: (total power of your unblocked attackers) + (2 per insta
 sorcery you can still cast this turn, per Guttersnipe on your battlefield). If that
 reaches the opponent's life, attack with everyone and cast every spell you can pay for.
 
-MULLIGAN: keep 2-4 lands with at least ONE Mountain (red source) plus a payoff creature
-or a draw spell. A hand with no Mountain cannot deploy your red threats - mulligan it
-unless it holds a draw spell to dig for one. Also mulligan a hand that is only counters
-and Downsizes.
-
 DECIDING SITUATIONS (recognize -> play):
+- Your opening hand has zero Mountains and no draw spell -> Mulligan; a no-red hand cannot
+  cast your threats.
 - Guttersnipe is on your battlefield and a spell is castable -> cast the spell; it is 2
   to their face this turn.
 - It is turn 1 and you hold a Mountain -> play the Mountain, so your creature is castable

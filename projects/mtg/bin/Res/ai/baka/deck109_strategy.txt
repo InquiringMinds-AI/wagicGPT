@@ -14,19 +14,12 @@ DEPLOY AND ATTACK - THE #1 RULE, run it every turn:
 
 MAIN PHASE 2 CHECKLIST - run it every turn after combat, in order:
 1. LETHAL: (2 x each Pillar in hand) + (3 x each Spear in hand) >= opponent's
-   life, with enough mana on the "Mana available:" line? Fire them ALL at "The
+   life, with enough on the "Mana available:" line? Fire them ALL at "The
    opponent (player, life N)" NOW. The game ends this turn.
 2. Otherwise, with mana left: cast Krenko's Command, then any creature in hand.
    Creatures cannot attack the turn they arrive (except haste) - cast them ANYWAY
    so they attack next turn.
 3. End your turn with your mana SPENT; the top of your deck refills your hand.
-
-IF A CAST DID NOT HAPPEN - THE FALLBACK RULE. A real cast shows "hand -> stack"
-in the GAME LOG. If you picked "Cast Hellrider" (or any card) last decision and
-the card is STILL in your hand with your mana STILL unspent, spend THIS decision
-on a DIFFERENT card - cast Stromkirk Noble, Legion Loyalist, Krenko's Command, or
-Rakdos Cackler with that mana and build the board. Retry the stuck card next
-turn, after other creatures are on the battlefield. One retry per turn is enough.
 
 BURN - FACE BY DEFAULT, WITH ONE EXCEPTION.
 - Pillar of Flame ({R}, 2 dmg, sorcery, exiles what it kills) and Searing Spear
@@ -59,9 +52,8 @@ sacrificing your board loses it.
 
 KEY CARDS:
 - Hellrider ({2}{R}{R}, 3/3 haste): each creature you control that ATTACKS pings
-  the opponent for 1, even if blocked. Cast it on 4 mana and attack with
-  EVERYTHING after - wide attacks become lethal fast. (If the cast doesn't take,
-  use the FALLBACK RULE: deploy other bodies first, retry next turn.)
+  the opponent for 1, even if blocked. Cast it the first turn you have 4 mana and
+  attack with EVERYTHING after - wide attacks become lethal fast.
 - Krenko's Command ({1}{R}): two 1/1 Goblins. Cast it the first turn you have 2
   spare mana - never bank it.
 - Legion Loyalist ({R}, 1/1 haste): attacking with 2+ other creatures gives your

@@ -1,25 +1,28 @@
 Deck identity: "Modern Snow" is a base-GREEN snow tempo deck splashing blue and
 white. You win by putting a real CREATURE on the board almost every turn and
 attacking with it: Ohran Viper and Ice-Fang Coatl draw you cards as they hit,
-Abominable Treefolk (power = your snow permanents, trample) and Icehide Golem add
-bodies. Your fetches, Arcum's Astrolabe, Search for Azcanta, and Glacial
-Revelation are FUEL that helps you cast creatures - they are not a turn's play by
-themselves. Every game you have won, real creatures hit the board and kept
-attacking; every game you have lost, you spent your turns ramping and digging
-while your creatures sat in hand and the opponent's life never moved.
+Abominable Treefolk (power = your snow permanents, trample) is your one big
+finisher, Icehide Golem adds an early body. Your fetches, Arcum's Astrolabe,
+Search for Azcanta, Glacial Revelation, and Into the North are FUEL that helps
+you cast creatures - they are not a turn's play by themselves. Every game you win,
+real creatures hit the board and keep attacking; every game you lose, your
+creatures sit in hand while the opponent's life never moves.
 
 =======================================================================
 RULE #1 - EACH MAIN PHASE, DEPLOY A CREATURE BEFORE SPENDING MANA ON ANYTHING ELSE.
 =======================================================================
 Run this over your cast list every main phase and stop at the first you can take:
-1. If any of Icehide Golem, Ohran Viper, Ice-Fang Coatl, Abominable Treefolk, or
-   Diamond Faerie is a Cast option, cast it THIS turn. A creature in the list
-   ALWAYS beats "Cast nothing," a fetch, an Astrolabe, a Search, or a Glacial
-   Revelation.
+1. If any of Icehide Golem, Ohran Viper, Ice-Fang Coatl, or Abominable Treefolk is
+   a Cast option, cast it THIS turn. A creature in the list ALWAYS beats "Cast
+   nothing," a fetch, an Astrolabe, a Search, or a Glacial Revelation.
 2. Only after a creature is cast (or none is castable) do you spend leftover mana
-   on Astrolabe / a fetch crack / Glacial Revelation.
+   on Astrolabe / a fetch crack / Glacial Revelation / Into the North.
 The thought "I will develop next turn, first I set up mana and card draw" is the
 losing thought - the value cards only help you cast creatures; the creatures win.
+DO NOT skip a creature in your list because you believe you already have lethal on
+board next turn: read your OWN battlefield line first - if a creature is not
+printed there, it is NOT in play, and every turn you add another body is a turn
+closer to winning.
 
 =======================================================================
 RULE #2 - DECLARE AN ATTACKER EVERY TURN YOU HAVE ONE THAT PROFITS.
@@ -50,8 +53,10 @@ MANA (solved - two decisions, not your game):
 - Your first search that can take Snow-Covered ISLAND takes it. ONE Island, or one
   Astrolabe in play, is ENOUGH blue - after that every fetch and Into the North
   takes Snow-Covered Forest and your turns go to creatures. You own only 2 Islands.
-- Crack a fetch the first time its option appears - the 1 life and sacrifice ARE
-  the card working.
+- Crack a fetch the first time its option appears, then MOVE ON - the 1 life and
+  sacrifice ARE the card working. Do not re-pick a fetch-crack you already took: if
+  the same "search/Put in Play with <fetch>" line reappears, your land already
+  resolved - pass and spend the turn on a creature.
 
 KEY CARDS (grounded in engine text):
 - ICEHIDE GOLEM {1}: a 2/2 for one mana, your cheapest real body - best turn-2
@@ -60,31 +65,45 @@ KEY CARDS (grounded in engine text):
   defense. Deploy and swing it freely.
 - ICE-FANG COATL {g}{u} (1/1 flash flying): ETB draws a card; deathtouch with 3+
   other snow permanents. Cast as a normal creature to build your board; save the
-  flash for a surprise block only when defending.
-- ABOMINABLE TREEFOLK {2}{g}{u}: power = your snow permanents (usually 5-7),
-  trample; ETB taps and freezes one opponent creature. Freeze their best blocker
-  the turn you swing, or their biggest attacker on defense. It attacks NEXT turn.
-- DIAMOND FAERIE {2}{g}{w}{u} (3/3 flying): needs a WHITE source - cast it the
-  turn you can pay G, W, and U. Its pump (+1/+1 to snow creatures) lasts only
-  until end of turn: use it in combat to push the last points of lethal.
+  flash for a surprise block only when defending. Needs GREEN and BLUE - if it is
+  in the list, you can pay; if it is NOT, you are short a color, so fetch toward it.
+- ABOMINABLE TREEFOLK {2}{g}{u}: your finisher - power = your snow permanents
+  (usually 5-7), trample; ETB taps and freezes one opponent creature. This is the
+  body that actually closes games; cast it the first turn it appears, freeze their
+  best blocker, and swing next turn. Small creatures alone will not race - land
+  Treefolk.
+- FORCE OF NEGATION {1}{u}{u}: counters NONCREATURE spells, free on the OPPONENT'S
+  turn (exile a blue card). It costs you TWO cards (Force + the exiled blue one), so
+  spend it ONLY on a board wipe (Damnation, Pyroclasm) or a spell that would kill
+  your ONLY threat on board. Against fast aggro, do NOT exile a blue creature you
+  still need to cast just to stop a single small burn or token spell - take the hit
+  and keep developing. Cast your creatures anyway - Force is still free on their turn.
 - GELID SHACKLES {w}: on the opponent's best blocker before you attack, or their
   best attacker to shut it off on defense.
-- FORCE OF NEGATION {1}{u}{u}: counters NONCREATURE spells, free on the OPPONENT'S
-  turn (exile a blue card). Fire it at a board wipe (Damnation, Pyroclasm). Cast
-  your creatures anyway - it is still free on their turn.
-- ASTROLABE / SEARCH FOR AZCANTA / GLACIAL REVELATION: card advantage, not
-  threats. Cast them with mana LEFT OVER after a creature, never instead of one.
+- DIAMOND FAERIE {2}{g}{w}{u} (3/3 flying): needs G, W, AND U at once - you rarely
+  assemble it, so do NOT plan around it. If it ever appears in your list, cast it and
+  use its end-of-turn team pump in combat to push the last points of lethal.
+- ASTROLABE / SEARCH FOR AZCANTA / GLACIAL REVELATION / INTO THE NORTH: card
+  advantage and fixing, not threats. Cast them with mana LEFT OVER after a creature,
+  never instead of one.
 
-LETHAL CHECK each combat: Treefolk power (snow permanent count) + other attackers'
-power + Diamond Faerie pump (+1 per snow creature); if that >= opponent life and
-their untapped creatures can't stop it, attack with everyone and pump.
+LETHAL CHECK each combat: count ONLY the creatures printed on YOUR battlefield line
+and offered in the Attackers list - never a creature you merely planned to have.
+Treefolk power (snow permanent count) + other attackers' power; if that >= opponent
+life and their untapped creatures can't stop it, attack with everyone. If your only
+body is a 2/2 Golem, you are NOT at lethal - keep casting creatures.
 
 MULLIGAN: keep 7 with 2-4 lands (a fetch or Into the North counts) AND at least
-one creature or a way to find one. Ship 0-1 or 6+ lands, or zero creatures.
+one creature or a way to find one. Ship 0-1 or 6+ lands, or zero creatures. A hand
+whose only creatures are Ice-Fang Coatl / Ohran Viper with no green source is a
+mulligan - you need to make G plus a second color early.
 
 DECIDING SITUATIONS (recognize -> play):
 - A creature AND a fetch/Astrolabe/Search are both in your list -> cast the
   creature this turn; the value card waits for leftover mana.
+- Your plan says you have lethal but your battlefield line shows only a small body
+  -> the big creature is NOT in play; cast the creature in your list now and keep
+  building - a planned Treefolk you never cast deals zero damage.
 - Opponent is racing you (two attacks by turn 3, or your life under 14 early) ->
   deploy Golem/Viper as blockers and hold them home, Shackles their best attacker,
   before any fetch or dig.
@@ -92,5 +111,7 @@ DECIDING SITUATIONS (recognize -> play):
   a connect draws a card.
 - 5+ snow permanents and Abominable Treefolk castable -> cast it, freeze their
   best creature, swing next turn.
+- A fetch-crack line you already used reappears -> pass it; the land resolved,
+  spend the turn on a creature.
 - Only Boreal Druid could attack and you have spells to cast -> hold the Druid for
   mana and cast a creature instead.
