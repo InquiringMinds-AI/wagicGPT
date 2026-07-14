@@ -42,12 +42,19 @@ BLOCKING - ONLY OONA'S GATEWARDEN BLOCKS; YOUR FLYERS ARE YOUR CLOCK:
   so blocking with it puts -1/-1 counters on the attacker for free. Block an incoming
   attacker with Oona's Gatewarden whenever it is on your battlefield - EXCEPT
   Phyrexian Obliterator (even Gatewarden's wither damage triggers the sacrifice).
+- When more than one attacker is coming, send Gatewarden into the GROWING or most
+  dangerous one its wither can KILL - against mono-red block Stromkirk Noble (a 1/1
+  that puts a +1/+1 counter on itself every time it connects), not the bigger body.
+  Wither does NOTHING through FIRST STRIKE: Ash Zealot ({r}{r} 2/2 first strike)
+  deals its damage first and kills Gatewarden before the -1/-1 counters land, so
+  blocking a first-striker wastes Gatewarden for zero - block a non-first-strike
+  attacker instead.
 - When your life is 9 or more, every OTHER creature stays home from blocking and
   keeps attacking - Faerie Miscreant, Scion of Oona, Surveilling Sprite, Faerie
-  Bladecrafter, every flyer are your clock and your anthem. Do NOT block even to kill
-  a small or 0-power attacker: a 2-power (or 0-power) attacker at high life is not
-  worth one of your flyers or halting Bladecrafter's growth. Take the damage and keep
-  attacking.
+  Bladecrafter, Archmage of Echoes, every flyer are your clock and your anthem. Do
+  NOT block even to kill a small or 0-power attacker: a 2-power (or 0-power) attacker
+  at high life is not worth one of your flyers or halting Bladecrafter's or
+  Archmage's growth. Take the damage and keep attacking.
 - When your life is 8 or less, chump the biggest attacker - EXCEPT Phyrexian
   Obliterator - with your least valuable body (a Surveilling Sprite draws you a card
   when it dies) to stay out of lethal range.
@@ -58,20 +65,22 @@ COUNTERS - READ THE STACK, HOLD THE MANA:
   counter option names what it can hit ("Cast Counterspell - can target on the
   stack: ..."). Read those lines and counter the named spell when it is any of, in
   this order:
-   1. A BOARD SWEEPER - Wrath of God, Pyroclasm, Black Sun's Zenith, Cyclonic Rift.
-      These erase every creature you deployed; countering one is your whole turn.
+   1. A BOARD SWEEPER - Wrath of God, Pyroclasm, Black Sun's Zenith, Cyclonic Rift,
+      Damnation. These erase every creature you deployed; countering one is your whole turn.
    2. An ARTIFACT creature or equipment you cannot Go for the Throat - Master of
       Etherium, Etched Champion, Cranial Plating, Steel Overseer.
-   3. A growing engine - Young Pyromancer, Guttersnipe, Gray Merchant of Asphodel.
+   3. A growing engine - Young Pyromancer, Guttersnipe, Gray Merchant of Asphodel,
+      Geralf's Messenger, or a bounce-your-attackers spell (Hydrolash).
    4. Any creature or equipment while your life is 12 or less, or any spell costing
       4+ mana.
 - Counters are for the list above ONLY. LET RESOLVE and keep your mana for: mana
   rocks and cantrips (Mox Opal, Arcum's Astrolabe), Elixir of Immortality, Prism
   Ring, land searches (Into the North), one-mana discard (Inquisition of Kozilek,
-  Thoughtseize), and small utility spells. Never spend a counter on a 1-2 mana
-  cantrip, mana rock, or discard spell - Arcane Denial draws THEM two cards, so it is
-  worth far more than the one card such a spell trades with. If your PLAN says "let
-  it resolve," your reply number must be "Cast nothing," never the counter option.
+  Thoughtseize), Bloodghast and other recursive small bodies, and small utility
+  spells. Never spend a counter on a 1-2 mana cantrip, mana rock, or discard spell -
+  Arcane Denial draws THEM two cards, so it is worth far more than the one card such
+  a spell trades with. If your PLAN says "let it resolve," your reply number must be
+  "Cast nothing," never the counter option.
 - A counter can only be USED when the game opens a window, and it opens one only
   while you can PAY {U}{U}: if you tap out on your own turn, no window opens on the
   opponent's turn and the counter rots in your hand. When you are holding a
@@ -120,16 +129,18 @@ counters and removal - you will draw the flyers.
 SITUATIONS THAT DECIDED GAMES - THE CORRECT PLAY:
 - A pending spell shows in ON THE STACK and a Counterspell/Arcane Denial option names
   it: counter it per the priority list, and make your reply number the counter line,
-  never "Cast nothing." (vs140 and vs110 were WON this way - countering Black Sun's
-  Zenith, Cyclonic Rift, Master of Etherium, and Etched Champion.)
-- The opponent casts a board sweeper (Wrath of God, Pyroclasm, Black Sun's Zenith,
-  Cyclonic Rift): counter it - it is worth more than any single creature.
+  never "Cast nothing." (vs140, vs131, and vs110 were WON this way - countering
+  Damnation, Cyclonic Rift, Hydrolash, Master of Etherium, and Etched Champion.)
+- A cheap spell (land search, mana rock, one-mana discard, a recursive Bloodghast, a
+  0/2 Ornithopter) is on the stack: let it resolve and keep your counter - your reply
+  number is "Cast nothing." Wasting a counter on it hands the opponent value.
 - The opponent has Phyrexian Obliterator: kill it with Go for the Throat (held for
   exactly this) and NEVER block it - a block feeds its sacrifice punisher and loses
   your board. This is how you beat the black matchup.
 - A creature is castable on your turn: cast it. Archmage of Echoes hits the board
   the first turn you have 5 mana.
 - An attacker comes at you and you are at 9+ life: take it, keep your flyers attacking
-  - only Oona's Gatewarden blocks.
+  - only Oona's Gatewarden blocks, and it goes into the growing/killable attacker,
+  never into a first-striker (wither does nothing through first strike).
 - Your opening has Oona's Gatewarden or Sleep-Cursed Faerie plus 2-4 lands: KEEP it -
   that is your creature.

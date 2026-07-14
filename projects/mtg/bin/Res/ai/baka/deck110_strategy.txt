@@ -21,7 +21,11 @@ Ornithopter cost {0} - cast them the moment you see them, always. Cast a
 creature every turn one is listed; it is fine to tap out.
 
 THE ENGINE - CRANIAL PLATING gives its creature +1/+0 for EACH artifact you
-control (your artifact count is shown on the board - usually +4 or more). It
+control. READ the board line "Artifacts in play: you N" - that N is EXACTLY the
+Plating bonus, and metalcraft is ON when N is 3 or more. That number already
+counts Mox Opal, Darksteel Citadel and your artifact creatures, and already
+EXCLUDES Glimmervoid - trust it, do NOT hand-count (hand-counting keeps
+mis-adding Glimmervoid and basic lands and over-states the total). Plating
 adds POWER only, never toughness.
 1. CAST Cranial Plating the first turn it appears - even if you cannot equip
    the same turn. One copy on the battlefield is enough; cast a creature
@@ -29,9 +33,9 @@ adds POWER only, never toughness.
 2. EQUIP it with your first spare {1} - same turn if you can, otherwise the
    very next turn. An unattached Plating adds nothing but its artifact count.
 3. Then run rule #1: equip each Plating once, done, attack.
-Carrier order: 1) Etched Champion (with 3+ artifacts it has protection from
-all colors - colored creatures cannot block or kill it), 2) Vault Skirge or
-Ornithopter (fliers), 3) Signal Pest, 4) Memnite.
+Carrier order: 1) Etched Champion (with "Artifacts in play: you" at 3+ it has
+protection from all colors - colored creatures cannot block or kill it),
+2) Vault Skirge or Ornithopter (fliers), 3) Signal Pest, 4) Memnite.
 
 THE RACE - when the opponent is also fast aggro (red decks with Rakdos
 Cackler, Ash Zealot, Legion Loyalist, Goblin tokens, Hellrider), win by going
@@ -59,7 +63,8 @@ with a creature whose toughness is greater than the Lightmine damage.
 
 LETHAL CHECK - run it every turn:
 damage = total power of your attackers (+1 each if Signal Pest attacks too)
-       + 4 per Galvanic Blast in hand (metalcraft: 3+ artifacts = 4 damage).
+       + 4 per Galvanic Blast in hand (metalcraft = "Artifacts in play: you N"
+         shows 3 or more; then each Blast deals 4).
 If damage >= opponent's life: attack with everyone and fire every Blast at
 the opponent's face. When the opponent is at 8 or less, Blasts always go to
 the face. Earlier, a Blast may kill a blocker stopping your equipped attacker.
@@ -85,11 +90,13 @@ OTHER KEY CARDS:
 - Thoughtcast: affinity - it usually costs just {U}. Cast it whenever you
   have 2 or fewer other cards worth casting - refuel, do not hoard it.
 - Mox Opal / Darksteel Citadel / Glimmervoid: free mana and lands; Mox Opal
-  and Citadel also count as artifacts - you hit metalcraft (3+ artifacts)
-  almost immediately, assume it is ON. (Glimmervoid is a LAND, not an
-  artifact - it does not count.) A "Cast Card Normally with Mox Opal" or
-  "Play Land with Mox Opal" line just makes mana with Mox Opal - your
-  creatures and spells come first.
+  and Citadel also count as artifacts - you hit metalcraft ("Artifacts in
+  play: you" 3+) almost immediately, assume it is ON. The "Artifacts in play:
+  you N" count already leaves Glimmervoid OUT (it is a land) - so trust that N
+  and never re-add Glimmervoid or a basic land when reasoning about metalcraft
+  or Plating power. A "Cast Card Normally with Mox Opal" or "Play Land with
+  Mox Opal" line just makes mana with Mox Opal - your creatures and spells
+  come first.
 
 MULLIGAN: keep 2+ lands and 2+ creatures (Mox Opal counts as a land here).
 Ship hands with 0-1 land or no creatures.
@@ -111,3 +118,5 @@ DECIDING SITUATIONS (recognize -> play):
   still in play.
 - The opponent has Lightmine Field: hold your creatures home and send Galvanic
   Blast at their face - your creatures die to it for nothing.
+- Judging metalcraft, Plating power, or Master of Etherium's power: read
+  "Artifacts in play: you N" and use N directly - do not recount the board.

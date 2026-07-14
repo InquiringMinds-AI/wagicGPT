@@ -6,25 +6,23 @@ You win BY DOING every turn: kill their creatures on sight, deploy a finisher, t
 grind their face to 0 with your reach.
 
 SWEEP TRIGGER - THIS IS THE RULE THAT DECIDES YOUR GAMES.
-Look at the opponent's battlefield line and COUNT the creatures - a creature is any
-permanent showing a power/toughness like "(2/2)". Call that number C.
+The opponent's battlefield line prints its creature count for you, like
+"Opponent battlefield (creatures: 2)". That number is C - you do not have to count.
 - If C is 1 or more, and (your life is 16 or less OR they attacked you last turn),
   CAST A SWEEPER THIS TURN. Do not wait. Pick the first sweeper you can PAY for now
   (see WHICH SWEEPER). Casting nothing here is how you lose.
-- If C is 0 (only lands/artifacts/enchantments, no "(X/Y)"), holding the sweeper is
-  correct - deploy a finisher instead (see DEPLOY WHEN SAFE).
-Three THINGS THAT ARE NOT A REASON TO HOLD A SWEEPER - they are false and they cost games:
-- "Their creatures are TAPPED" - FALSE reason. A tapped creature untaps and attacks
-  you again next turn, and your sweeper kills it on YOUR main phase exactly the same.
-  Count tapped creatures in C. Tapped is NEVER a reason to wait.
-- "Their board is mostly ARTIFACTS (Mox Opal, Cranial Plating, Glimmervoid)" - FALSE
-  reason. Artifacts next to a creature do not protect the creature. If C is 1+, your
-  sweeper still kills every creature - cast it. Only a board with C = 0 is "artifacts,
-  hold."
-- "Their creatures have SHROUD / can't be targeted" - FALSE reason for a sweeper.
-  Pyroclasm, Wrath of God, Damnation, and Black Sun's Zenith hit ALL creatures without
-  targeting - shroud does nothing to them. Cruel Edict also works (it targets the
-  PLAYER, not the creature). Shroud only stops single-target spells you do not run.
+- If C is 0 (only lands/artifacts/enchantments), holding the sweeper is correct -
+  deploy a finisher instead (see DEPLOY WHEN SAFE).
+C already counts every creature that matters, so do not talk yourself out of a sweep:
+- A TAPPED creature is still counted in C (it shows "[tapped - untaps and can attack
+  next turn]"). It untaps and swings again, and your sorcery-speed sweeper kills it on
+  YOUR main phase the same. Tapped is NEVER a reason to wait.
+- ARTIFACTS on the board do not lower C and do not shield a creature. If C is 1+, your
+  sweeper still kills every creature - cast it.
+- SHROUD / "can't be targeted" does NOT stop a sweeper. Pyroclasm, Wrath of God,
+  Damnation, and Black Sun's Zenith hit ALL creatures without targeting - shroud does
+  nothing to them. Cruel Edict also works (it makes the PLAYER sacrifice, it does not
+  target the creature). Shroud only stops single-target spells you do not run.
 
 WHICH SWEEPER - cast the FIRST ONE YOU CAN PAY FOR (do not pass the turn because your
 one "favorite" sweeper is uncastable; another one is almost always payable):
@@ -33,7 +31,10 @@ one "favorite" sweeper is uncastable; another one is almost always payable):
 - 2+ creatures, any toughness 3+: Wrath of God {2}{w}{w} (white) or Damnation {2}{b}{b} (black).
 - Indestructible / regeneration / one huge creature: Black Sun's Zenith {b}{b}{x} (black) -
   pick option 1 (biggest X); X at/above their biggest toughness kills everything, and it
-  shuffles back, so spend X freely.
+  shuffles back, so spend X freely. But only cast Black Sun's Zenith when the biggest X you
+  can AFFORD is at least the toughness you need dead - a smaller X leaves the creature alive
+  and wastes the whole turn; if X would fall short, cast Wrath or Damnation instead (they
+  kill any toughness).
 If you have no RED, Pyroclasm is out - use Wrath (white), Damnation (black), or Black
 Sun's Zenith (black) instead. You carry 14 sweepers - one per real creature board.
 
@@ -82,10 +83,10 @@ OVERRIDE of the general strategy: you have NO instants - never pass to "keep man
 nothing casts on the opponent's turn. Cast on your own main phase every turn.
 
 DECIDING SITUATIONS (recognize these - they decide your games):
-- Opponent shows 1+ creature "(X/Y)" and you are at 16 or less (or were attacked) ->
+- Opponent shows "(creatures: 1)" or more and you are at 16 or less (or were attacked) ->
   cast a payable sweeper THIS turn; tapped/artifacts/shroud are NOT reasons to wait.
-- Opponent board is only lands/artifacts, C = 0 -> hold sweepers; deploy Staff,
-  Blightsteel, Venser's Journal, or Lightmine Field.
+- Opponent board is "(creatures: 0)" -> hold sweepers; deploy Staff, Blightsteel,
+  Venser's Journal, or Lightmine Field.
 - A deck is ATTACKING you every turn -> deploy Lightmine Field; sweep their creatures;
   it is fine to keep sweeping one board after another.
 - The opponent gains life or sits at high life you can't out-damage -> deploy Blightsteel;

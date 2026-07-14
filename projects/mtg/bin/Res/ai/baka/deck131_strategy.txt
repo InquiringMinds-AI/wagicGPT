@@ -26,45 +26,47 @@ DEPLOY THE PAYOFFS - curve them out as fast as red mana allows:
 - Guttersnipe ({2}{R}, 2/2): every instant/sorcery YOU cast deals 2 to the opponent.
   This is your kill. CAST IT THE TURN YOU CAN.
 - Young Pyromancer ({1}{R}, 2/1): every instant/sorcery YOU cast makes a 1/1 Elemental
-  token. Cast it the turn you can.
+  token. Cast it the turn you can. A swarm of Elemental tokens is a real second win path
+  on its own - if Guttersnipe never shows up, Young Pyromancer plus its tokens can still
+  race the game out (that is exactly how the last win closed: opp 20 -> dead on a token
+  swarm, no Guttersnipe on board all game).
 - Cast the payoff creature FIRST, then your other spells the same turn - a spell cast
   before the creature lands makes no token and no damage.
 
-YOUR PROVEN WIN LINE (repeat it - it won the last two mirror-ish races):
-1. Mulligan any opening hand with no Mountain (unless it has a draw spell). 2. Get Young
-Pyromancer down as early as red allows, then Guttersnipe. 3. With Guttersnipe out, cast
-one spell every turn (Cyclonic Rift/Downsize/Aetherize at any target = 2 to the face),
-then attack with EVERY creature, and answer "no blockers" on defense. 4. If your first
-payoff is answered, hold counters and keep casting to grind out a SECOND Guttersnipe -
-double Guttersnipe is 4 to the face per spell and closes even a slow game (that is
-exactly how the last win ended: opp 5 -> 1 -> dead while you stayed above 5).
+YOUR PROVEN WIN LINE (repeat it):
+1. Keep any opening hand that has the word "Mountain" in it plus a payoff creature or a
+   draw spell (see MULLIGAN). 2. Get Young Pyromancer down as early as red allows, then
+   Guttersnipe. 3. Chain spells and attack with EVERY creature every turn; answer "no
+   blockers" on defense. With Guttersnipe out, every spell is 2 to the face; with Young
+   Pyromancer out, every spell is another 1/1 attacker - either engine wins if you keep
+   the creature alive and keep casting. 4. If your first payoff is answered, keep casting
+   to grind out a SECOND payoff, and hold counters for their removal - win with the
+   engine you rebuild, not with a single creature.
 
-LANDS - GET A MOUNTAIN DOWN AS EARLY AS THE MENU LETS YOU. Both win conditions are red
+LANDS - PLAY A MOUNTAIN AS SOON AS ONE IS OFFERED. Both win conditions are red
 (Guttersnipe {2}{R}, Young Pyromancer {1}{R}); a turn without red is a turn your creature
-cannot come. HOW THE LAND MENU WORKS (read this - it is not obvious): the game offers your
-lands ONE AT A TIME as "Play <that land>" or "Hold <that land>". It does NOT show you a
-"Play Mountain vs Play Island" choice. So when it offers "Play Island / Hold Island" and
-you STILL HAVE A MOUNTAIN IN YOUR HAND that has not been offered yet, choose HOLD ISLAND -
-keep declining Islands until it offers "Play Mountain", then play the Mountain. Play an
-Island only after a Mountain is on the battlefield, or when no Mountain is left in your
-hand. (If it keeps re-offering only Islands and never the Mountain, take the Island rather
-than skip your land drop entirely - a land in play beats no land.)
+cannot come. When the land menu offers BOTH "Play Mountain" and "Play Island" in the same
+list, choose PLAY MOUNTAIN - always, no matter which one is listed first. Play an Island
+only when no Mountain is offered.
 
-MULLIGAN - LOOK FOR THE WORD "Mountain" IN YOUR HAND LIST.
-- If the word "Mountain" appears ANYWHERE in your opening hand, that hand HAS a red source:
-  KEEP it whenever it also has a payoff creature (Young Pyromancer/Guttersnipe) or a draw
-  spell. A hand with a Mountain and a Young Pyromancer is ALWAYS a keep - do not mulligan it.
-  (Miscounting a hand that shows "Mountain" as "zero Mountains" and shipping it is a real
-  mistake this deck has made - the fix is to read the list, not count from memory.)
-- Mulligan ONLY when NO "Mountain" appears in the hand list at all. Both your win conditions
-  are red; a hand with no red source cannot cast a single threat. This OVERRIDES the general
-  "keep any hand with 2-5 lands" rule: three Islands plus a Young Pyromancer is a KEEP by
-  land count but a MULLIGAN for THIS deck, because the threat is uncastable. The thought "I
-  will keep this and cast my creature once I draw a Mountain" is a TRAP - off 8 Mountains in
-  60 cards you often never draw the red.
-- The ONE no-Mountain KEEP: a hand holding Artificer's Epiphany OR Opportunity (a draw spell
-  to dig for red) with enough blue lands to cast it this turn or next. Ship a no-Mountain
-  hand that is only counters and Downsizes.
+MULLIGAN - a two-step gate. Do STEP 1 first; it can send the hand back on its own.
+- STEP 1 (red-source gate, decides on its own): read your opening hand list. If the word
+  "Mountain" does NOT appear anywhere in it AND the hand has no Artificer's Epiphany and
+  no Opportunity, MULLIGAN - full stop. It does not matter that the hand has a Young
+  Pyromancer, a Guttersnipe, counters, or good lands: both your win conditions are red,
+  and a hand with no red source and no way to dig for one cannot cast a single threat.
+  The thought "I'll keep this and cast my creature once I draw a Mountain" is a TRAP - off
+  8 Mountains in 60 cards you often never draw the red. (The ONE exception is already in
+  the gate: a hand with Artificer's Epiphany OR Opportunity - a draw spell to dig for red -
+  and enough blue lands to cast it this turn or next may be kept.)
+- STEP 2 (keep-side, only for hands that PASSED step 1): a hand that HAS a Mountain in its
+  list is a KEEP whenever it also has a payoff creature (Young Pyromancer/Guttersnipe) or a
+  draw spell. Read the list, do not count from memory: if you see "Mountain" printed in the
+  hand, that hand HAS red - do not misread it as "zero Mountains" and ship a keeper. A hand
+  with a Mountain and a Young Pyromancer is a clear keep.
+- This OVERRIDES the general "keep any hand with 2-5 lands" rule in BOTH directions: three
+  Islands plus a Young Pyromancer is a KEEP by land count but a MULLIGAN here (no red), and
+  a two-Mountain hand that looks land-light is still a KEEP (it has red).
 
 YOUR CREATURES ATTACK. THEY DO THEIR BLOCKING BY RACING.
 - When the game asks you to DECLARE ATTACKERS, name EVERY creature in the list:
@@ -84,6 +86,11 @@ REACTIVE SPELLS - support cards, not your plan (except as Guttersnipe fuel, abov
 - Counterspell ({U}{U}) / Dissipate ({1}{U}{U}) / Essence Scatter ({1}{U}): point these
   at removal aimed at Guttersnipe or Young Pyromancer, and at a threat that beats you on
   its own. Let the rest resolve and develop instead.
+  - A BOARD WIPE counts as removal aimed at Guttersnipe. Guttersnipe is a 2/2, so any
+    spell on the stack that "deals 2 (or more) damage to ALL creatures" (for example
+    Pyroclasm) KILLS it - 2 damage is lethal to a 2-toughness creature. When such a spell
+    is on the stack and you can counter it, COUNTER IT to save your reach; do not let it
+    resolve believing Guttersnipe survives.
 - Downsize ({U}) / Hydrolash ({2}{U}) / Aetherize ({3}{U}): fire during combat when you
   are actually being attacked - and any time as Guttersnipe fuel.
 - Cyclonic Rift ({1}{U}): bounce the opponent's single best permanent (Overload {6}{U}
@@ -104,11 +111,13 @@ reaches the opponent's life, attack with everyone and cast every spell you can p
 
 DECIDING SITUATIONS (recognize -> play):
 - No "Mountain" in your opening hand and no draw spell -> Mulligan; a no-red hand cannot
-  cast your threats. But if the word "Mountain" IS in the hand, KEEP - do not misread it.
-- The land menu offers "Play Island" while a Mountain sits unplayed in your hand -> Hold
-  the Island; keep holding until it offers "Play Mountain", then play the Mountain.
+  cast your threats, no matter what else it holds. But if the word "Mountain" IS in the
+  hand, KEEP a hand that also has a payoff or a draw spell - do not misread it.
+- The land menu offers both "Play Mountain" and "Play Island" -> Play the Mountain.
 - Guttersnipe is on your battlefield and a spell is castable -> cast the spell; it is 2
   to their face this turn.
+- A board wipe (deals 2+ to all creatures) is on the stack and you have a counter ->
+  counter it; it kills your 2/2 Guttersnipe.
 - You drew no creature -> cast a draw spell to find one; that IS your turn's action.
 - Your first payoff was answered -> keep casting to find a SECOND Guttersnipe/Pyromancer;
   hold counters for their removal, and win with the payoff you rebuild, not with combat.

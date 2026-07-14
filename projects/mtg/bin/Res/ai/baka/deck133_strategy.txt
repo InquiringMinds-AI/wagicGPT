@@ -12,10 +12,10 @@ CAST SOMETHING EVERY TURN, BUT RANK BY IMPACT - YOU ALWAYS HAVE THE MANA. Every
 cast the list offers is already paid for; the game taps your lands automatically.
 Each turn, take the highest thing on this list that is offered:
   1. Gray Merchant when it wins OR saves you (see its block below). If it does
-     NEITHER right now (N+2 is less than the opponent's life AND your own life is
-     above 10), do NOT cast him yet - take a creature/Obliterator from lower on
-     this list to build devotion; a bigger drain a turn later wins more, and a
-     small Merchant into an open-mana control deck just gets countered.
+     NEITHER right now (the shown drain N is less than the opponent's life AND
+     your own life is above 10), do NOT cast him yet - take a creature/Obliterator
+     from lower on this list to build devotion; a bigger drain a turn later wins
+     more, and a small Merchant into an open-mana control deck just gets countered.
   2. Remove a creature that is attacking you (Fatal Push; Collective Brutality
      -2/-2; Liliana of the Veil -2).
   3. Cast a creature/threat (Obliterator, Geralf's Messenger, Bloodghast).
@@ -57,13 +57,14 @@ answer is PHYREXIAN OBLITERATOR as a wall and Collective Brutality -2/-2, not
 more discard - land a body fast, an edict only removes one of them.
 
 GRAY MERCHANT OF ASPHODEL {3}{B}{B}: he is your finisher AND your stabilizer -
-you gain the life the opponent loses. The option shows "{right now: drains N}",
-but that N does NOT yet count Gray Merchant himself: the REAL drain is N + 2. Use
-ONLY that shown number + 2 - do NOT try to count your own devotion by hand, you
-will miscount; the option already did the counting for you.
+you gain the life the opponent loses. The option shows "{right now: drains N}" -
+that N is the FINAL drain: it ALREADY counts Gray Merchant's own devotion. Use
+that shown number DIRECTLY - do NOT add anything to it, and do NOT try to count
+your own devotion by hand, you will miscount; the option already did the counting
+for you.
 EVERY turn he is in the list, cast him NOW if EITHER holds:
-  - N + 2 >= the opponent's life  ->  you win this turn, cast him and win.
-  - your own life is 10 or less    ->  you gain N + 2 life; cast him to survive
+  - N >= the opponent's life  ->  you win this turn, cast him and win.
+  - your own life is 10 or less  ->  you gain N life; cast him to survive
     (do NOT spend that mana on removal instead - stabilizing beats one kill).
 If NEITHER holds, WAIT (impact-list rule 1) - cast a creature instead and drain
 bigger later. Liliana, the Last Hope -2 returns a dead Gray Merchant to hand -
@@ -125,14 +126,14 @@ ship against fast aggro.
 DECIDING SITUATIONS (recognize -> play):
 - Your life is falling while theirs holds -> you are the DEFENDER: remove their
   attacker and land Obliterator; stop casting discard.
-- You are at 10 or less and Gray Merchant is listed -> cast him to gain N+2 life,
+- You are at 10 or less and Gray Merchant is listed -> cast him to gain N life,
   not removal.
 - The opponent's hand shows 0 cards (or nothing that kills you) -> cast a creature
   or Inquisition, NOT Thoughtseize; its 2 life is not worth an empty hand.
-- Gray Merchant is listed but N+2 < their life and your life is above 10 -> cast a
+- Gray Merchant is listed but N < their life and your life is above 10 -> cast a
   creature to build devotion; drain bigger next turn.
 - Their creature has protection from black / is unkillable by Push -> Liliana of
   the Veil -2 (a sacrifice) removes it; or block/trade around it.
 - They flood the board with small creatures -> Phyrexian Obliterator as a wall and
   Collective Brutality -2/-2, not more discard; an edict removes only one.
-- N+2 >= their life on the Gray Merchant option -> cast him, you win now.
+- N >= their life on the Gray Merchant option -> cast him, you win now.
