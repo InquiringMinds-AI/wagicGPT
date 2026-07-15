@@ -1,0 +1,33 @@
+FORCEABILITY
+AICALLS 30
+SEED 12345
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:bad moon
+manapool:{1}{B}
+[PLAYER2]
+hand:Force of Negation,Dissipate
+manapool:{1}
+[DO]
+bad moon
+yes
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+exile:bad moon
+[PLAYER2]
+graveyard:Force of Negation
+exile:Dissipate
+[END]
