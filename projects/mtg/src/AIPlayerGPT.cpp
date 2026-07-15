@@ -964,6 +964,13 @@ string AIPlayerGPT::consumePlan(const string& content)
         //labeled) is still the decision.
         if (answerStart != string::npos)
             return text.substr(answerStart, answerEnd - answerStart);
+        //No label AND no plan: a compliant legacy reply is a short bare
+        //answer; a multi-KB text here is a truncated formless ramble, and
+        //scanning it for integers is how a quoted "option 1" cast the
+        //spell the reasoning had just condemned (wave-10: two seats, one
+        //self-Fatal-Push). Rambles parse as FAIL - the heuristic answers.
+        if (text.size() > 300)
+            return string();
         return text;
     }
 
@@ -1018,6 +1025,10 @@ string AIPlayerGPT::consumePlan(const string& content)
     //the legacy head-first shape: the head is the decision.
     size_t head = text.find_first_not_of(" \t\r\n");
     if (head != string::npos && pos == head)
+        return string();
+    //Same ramble guard as above: a legacy head is a short answer line, not
+    //pages of prose ahead of a PLAN: marker.
+    if (pos > 300)
         return string();
     return text.substr(0, pos);
 }
@@ -1518,6 +1529,16 @@ static bool isFetchCrackLine(const string& line)
         || line.find("search basic land with") != string::npos;
 }
 
+//The decline/consume key for a fetch line: the fetch's identity WITHOUT its
+//" targeting <land>" tail. The proposed target flips as the board changes,
+//which minted a fresh map key per window and let a chosen-but-unresolved
+//crack re-ask three times (wave-10 deck44 s5-s7: one crack, three windows).
+static string fetchLineKey(const string& line)
+{
+    size_t t = line.find(" targeting ");
+    return (t == string::npos) ? line : line.substr(0, t);
+}
+
 const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranking)
 {
     if (!ranking.size() || mEndpoint.empty())
@@ -1582,8 +1603,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //every window was the #1 control-deck decision driver); other lines
         //keep the two-decline allowance since their value genuinely moves
         //within a turn.
-        std::map<string, int>::iterator dc = mPassDeclineCount.find(line);
-        if (dc != mPassDeclineCount.end() && dc->second >= (isFetchCrackLine(line) ? 1 : 2))
+        bool fetchLine = isFetchCrackLine(line);
+        std::map<string, int>::iterator dc = mPassDeclineCount.find(fetchLine ? fetchLineKey(line) : line);
+        if (dc != mPassDeclineCount.end() && dc->second >= (fetchLine ? 1 : 2))
             continue;
         shown.push_back(candidates[c]);
         shownLines.push_back(line);
@@ -1649,11 +1671,13 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         {
             narrateDecision("You: " + describeAction(*shown[choice - 1]));
             //Consume-on-choose: a taken land fetch is done for the turn -
-            //an identical line (a second copy of the same fetch) re-asking
-            //at the next window is churn, not a decision (deck133's
-            //single-option re-ask multiplier). Next turn re-offers.
+            //an identical line (a second copy of the same fetch, or the
+            //same crack re-proposed at a different land) re-asking at the
+            //next window is churn, not a decision (deck133's single-option
+            //re-ask multiplier; deck44's target-flip re-ask). Next turn
+            //re-offers.
             if (isFetchCrackLine(shownLines[choice - 1]))
-                mPassDeclineCount[shownLines[choice - 1]] = 2;
+                mPassDeclineCount[fetchLineKey(shownLines[choice - 1])] = 2;
         }
 
         mLastAskKey = askKey;
@@ -1662,7 +1686,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //replays of the same window don't re-count - one look, one vote).
         if (choice == 0)
             for (size_t s = 0; s < shownLines.size(); s++)
-                mPassDeclineCount[shownLines[s]]++;
+                mPassDeclineCount[isFetchCrackLine(shownLines[s])
+                                  ? fetchLineKey(shownLines[s]) : shownLines[s]]++;
         {
             const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : "unparsed_reply");
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
@@ -1968,7 +1993,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                 tNames << (tShown++ ? ", " : "") << (pp == this ? "you" : "the opponent");
                         }
                     }
-                    if (ownT && !oppT)
+                    if (ownT && !oppT && firstHit)
                         o << " - the only legal targets are YOUR OWN right now";
                     else if (ownT + oppT > 0)
                     {
@@ -1976,8 +2001,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         if (ownT + oppT > tShown)
                             o << " (+" << (ownT + oppT - tShown) << " more)";
                     }
-                    else
+                    else if (firstHit)
                         o << " - NO legal target right now";
+                    //else: the spell's targets live on the STACK - the
+                    //stack line appended below names them; claiming "NO
+                    //legal target" over an occupied stack contradicted the
+                    //counterspell offers it decorated (wave-10, 2 seats).
                 }
                 //A hand-attack discard spell against a thin hand: the fact
                 //that decides ("their hand is nearly/completely empty")
