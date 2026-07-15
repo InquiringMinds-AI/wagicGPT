@@ -187,6 +187,15 @@ else:
 PYEOF
 )
         read -r life0 life1 turn <<< "$adj"
+        # Adjudicate the cap by life (wave-9 ledger #4): every wave-9 timeout
+        # was a latency-starved control mirror that was AHEAD or even at the
+        # cap - "timeout" as an undifferentiated loss made the win table lie.
+        # The ahead seat takes an adjudicated win; ties stay timeout/draw.
+        if [ -n "$life0" ] && [ -n "$life1" ] && [ "$life0" != "-" ] && [ "$life1" != "-" ]; then
+            if [ "$life0" -gt "$life1" ] 2>/dev/null; then winner="adj0"
+            elif [ "$life1" -gt "$life0" ] 2>/dev/null; then winner="adj1"
+            fi
+        fi
     fi
     printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$d0" "$d2" "$winner" "${life0:--}" "${life1:--}" "${turn:--}" "$gstart" >> "$RESULTS"
 }
@@ -231,7 +240,7 @@ for f in files:
 print(f"\n== harvested {len(files)} player-game logs, {n} decisions ==")
 for k, c in kinds.most_common(): print(f"  {k:10s} {c}")
 # win tally per deck
-wins = Counter(); games = Counter(); to = 0
+wins = Counter(); games = Counter(); to = 0; adj = 0
 for i, line in enumerate(open(res)):
     if i == 0: continue
     p = line.rstrip("\n").split("\t")
@@ -240,8 +249,10 @@ for i, line in enumerate(open(res)):
     games[d0]+=1; games[d1]+=1
     if w == "0": wins[d0]+=1
     elif w == "1": wins[d1]+=1
+    elif w == "adj0": wins[d0]+=1; adj += 1
+    elif w == "adj1": wins[d1]+=1; adj += 1
     else: to += 1
-print(f"\n== results ({sum(games.values())//2} games, {to} timeouts/draws) ==")
+print(f"\n== results ({sum(games.values())//2} games, {to} timeouts/draws, {adj} life-adjudicated at cap) ==")
 for d in sorted(games, key=lambda x:-(wins[x]/games[x] if games[x] else 0)):
     print(f"  deck{d:<4s} {wins[d]}/{games[d]} wins  ({100*wins[d]/games[d]:.0f}%)")
 print(f"\nlogs + results.tsv in: {out}")
