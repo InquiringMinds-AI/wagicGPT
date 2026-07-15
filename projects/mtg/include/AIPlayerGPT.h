@@ -276,7 +276,8 @@ private:
     //for the worker thread; built on the game thread, nothing shared.
     string buildRequestBody(const string& userMsg);
     //Extract the chosen action number from a model reply; -1 if unusable.
-    static int parseChoice(const string& content, int optionCount);
+    static int parseChoice(const string& content, int optionCount,
+                           const std::vector<string> * optionTexts = NULL);
 
     string mEndpoint; //base URL, empty if nothing answered
     string mModel;

@@ -1461,13 +1461,72 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     return request.dump();
 }
 
-int AIPlayerGPT::parseChoice(const string& content, int optionCount)
+int AIPlayerGPT::parseChoice(const string& content, int optionCount,
+                             const std::vector<string> * optionTexts)
 {
     //Drop any inline think block first.
     string text = content;
     size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
         text = text.substr(thinkEnd + 8);
+
+    //Name-echo reconciliation: the answer line carries the chosen option's
+    //name in parentheses ("CHOICE: 2 (Cast Fatal Push)"). When the plan
+    //fixates on a card that is not among the options, the trailing index
+    //mis-maps in BOTH directions - casting over a hold and holding over an
+    //offered cast (waves 10-11, 2 seats, ~1.3-1.9% of decisions, one
+    //wasted kill shot). The echo makes the intent checkable: an index
+    //whose option does not contain the echoed words remaps to the UNIQUE
+    //option that does (this also repairs out-of-range indices), and an
+    //echo matching nothing parses as FAIL - the heuristic answers, never
+    //an arbitrary cast.
+    int echoRemap = -1;
+    bool echoConflict = false;
+    if (optionTexts && !optionTexts->empty())
+    {
+        //the LAST "(...)" following a digit on the answer-ish tail
+        size_t close = text.rfind(')');
+        size_t open = (close == string::npos) ? string::npos : text.rfind('(', close);
+        if (open != string::npos && close != string::npos && close > open + 1)
+        {
+            string echo = text.substr(open + 1, close - open - 1);
+            //significant words: lowercase, length >= 4
+            vector<string> words;
+            string w;
+            for (size_t i = 0; i <= echo.size(); i++)
+            {
+                char c = (i < echo.size()) ? (char) tolower((unsigned char) echo[i]) : ' ';
+                if (isalnum((unsigned char) c))
+                    w += c;
+                else
+                {
+                    if (w.size() >= 4 && w != "cast" && w != "with" && w != "play")
+                        words.push_back(w);
+                    w.clear();
+                }
+            }
+            if (!words.empty())
+            {
+                int match = -1;
+                for (size_t o = 0; o < optionTexts->size(); o++)
+                {
+                    string low = (*optionTexts)[o];
+                    for (size_t i = 0; i < low.size(); i++)
+                        low[i] = (char) tolower((unsigned char) low[i]);
+                    bool all = true;
+                    for (size_t k = 0; k < words.size() && all; k++)
+                        all = low.find(words[k]) != string::npos;
+                    if (all)
+                    {
+                        if (match >= 0) { match = -1; echoConflict = true; break; } //not unique
+                        match = (int) o;
+                    }
+                }
+                if (match >= 0)
+                    echoRemap = match + 1; //1-based option number
+            }
+        }
+    }
 
     //The reply contract puts the chosen option number FIRST. Prefer an
     //in-range integer at the HEAD of the text ("N", "N.", "N)" - leading
@@ -1491,8 +1550,21 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount)
             j++;
         int n = atoi(text.substr(i, j - i).c_str());
         if (n >= 0 && n <= optionCount)
+        {
+            //A disagreeing unique name-echo outranks the index (the index
+            //is the observed failure mode; the name is the intent). A
+            //deliberate 0 (pass priority) is never remapped - it carries
+            //no option name of its own.
+            if (echoRemap > 0 && !echoConflict && n != 0 && echoRemap != n)
+                return echoRemap;
             return n;
+        }
+        //out-of-range index, but the echo names a real option: repair
+        if (echoRemap > 0 && !echoConflict)
+            return echoRemap;
     }
+    else if (echoRemap > 0 && !echoConflict)
+        return echoRemap; //non-numeric head, but the echo names the intent
     int choice = -1;
     i = 0;
     while (i < text.size())
@@ -1619,7 +1691,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         DebugTrace("AIPlayerGPT[ph" << phase << "]: all actions pass-declined this turn; passing");
         return NULL;
     }
-    tail << "\nWhich action do you take? Write your PLAN: line first, then on the last line CHOICE: followed by ONLY the number (0 = pass priority) - no option text on the answer line.";
+    tail << "\nWhich action do you take? Write your PLAN: line first, then on the last line CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 2 (Cast Fatal Push)\" or \"CHOICE: 0 (pass)\".";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
@@ -1664,7 +1736,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //The plan is split off BEFORE choice parsing: plan prose is full of
         //numbers that would otherwise misparse as the chosen action.
         string decisionPart = consumePlan(content);
-        choice = parseChoice(decisionPart, index);
+        choice = parseChoice(decisionPart, index, &shownLines);
         if (content.empty())
             setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
@@ -1743,7 +1815,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
         tail << (i + 1) << ". " << options[i] << "\n";
-    tail << "\nWrite your PLAN: line first, then on the last line CHOICE: followed by ONLY the number of your choice - no option text on the answer line.";
+    tail << "\nWrite your PLAN: line first, then on the last line CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 2 (Cast Fatal Push)\".";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -1764,7 +1836,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
 
     //Plan split BEFORE choice parsing: plan prose is full of numbers.
     string decisionPart = consumePlan(content);
-    int choice = parseChoice(decisionPart, (int) options.size());
+    int choice = parseChoice(decisionPart, (int) options.size(), &options);
     if (content.empty())
         setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
