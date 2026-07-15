@@ -120,14 +120,19 @@ const char * kStrategyPriors =
 //the contract the parsers and the plan carry-forward depend on.
 const char * kReplyProtocol =
     "\nHOW TO REPLY (every decision):\n"
-    "First give your choice, in exactly the format the decision asks for (usually a single number).\n"
-    "Then, on a new line, write PLAN: followed by your complete game plan from here on.\n"
+    "Think the decision through briefly if you need to - that scratch text is discarded.\n"
+    "Then, on a line starting with PLAN:, write your complete game plan from here on - CONCISE, a "
+    "few sentences of intent, not an analysis.\n"
+    "Then, on the LAST line of your reply, give your answer in exactly the format the decision asks "
+    "for, after its answer label (CHOICE: for numbered choices, ATTACK: for attack declarations, "
+    "BLOCKS: for block assignments). The answer line is your FINAL decision: if thinking it through "
+    "changes your mind, the answer line is where the changed decision lands. A reply without its "
+    "answer line is thrown away, so keep the thinking short enough to always reach it.\n"
     "Nothing you write is kept except that PLAN line. At your next decision you will see only the "
     "game log, the current board, your last PLAN line, and the new choices - your reasoning and "
     "your earlier plans will have dropped out of context. So every PLAN must be complete and "
     "self-contained: state your full current plan, or your full revised plan if the situation "
-    "changed. Never write a fragment like \"continue as before\". Keep the plan CONCISE - a few "
-    "sentences of intent, not an analysis.\n";
+    "changed. Never write a fragment like \"continue as before\".\n";
 
 //The card's rules text, single-line and bounded, for option/target lines:
 //the deciding fact belongs ON the choice, not in a distant deck blob (the
@@ -320,6 +325,16 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             if (!tag.empty() && tag != "land")
                 out << " [" << tag << "]";
         }
+        //Tag-completeness for artifacts (battlefield lines): the "Artifacts
+        //in play: you N" summary counts EVERY artifact, but the per-
+        //permanent tags used to mark only non-creature non-land artifacts -
+        //a pilot that re-derived the count from the lines got it wrong in
+        //BOTH directions (untagged artifact creatures/lands under-counted,
+        //Glimmervoid over-added; deck110 wave-9). Tag the cases typeTag
+        //cannot: artifact creatures and artifact lands.
+        if (withStatus && card->hasType(Subtypes::TYPE_ARTIFACT)
+            && (card->isCreature() || card->isLand()))
+            out << " [artifact]";
         if (withStatus)
         {
             //the LIVE keyword set - granted/lost abilities the decklist
@@ -330,7 +345,14 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 if (!kw.empty())
                     out << " [" << kw << "]";
             }
+            //Only open the bracket when a counter is actually present: a
+            //list whose entries all reached 0 rendered an empty
+            //"[counters:]" that reads like a glitch (deck44, waves 5-9).
+            bool anyCounter = false;
             if (card->counters && card->counters->mCount)
+                for (size_t c = 0; c < card->counters->counters.size() && !anyCounter; c++)
+                    anyCounter = card->counters->counters[c] && card->counters->counters[c]->nb > 0;
+            if (anyCounter)
             {
                 out << " [counters:";
                 for (size_t c = 0; c < card->counters->counters.size(); c++)
@@ -590,6 +612,17 @@ void AIPlayerGPT::ensureGameStartRecord()
     if (mGameStartLogged || mTransLogPath.empty())
         return;
     mGameStartLogged = true;
+    //Finalize the filename with the OPPONENT deck token now that the
+    //opponent exists (it does not at construction time): reviewers mapped
+    //game->file by cross-referencing results.tsv epochs, fragile on
+    //harvested copies (wave-9 ledger 5b). This runs before the first
+    //append, so the file has not been created yet under the old name.
+    if (opponent() && !opponent()->deckFileSmall.empty())
+    {
+        size_t dot = mTransLogPath.rfind(".jsonl");
+        if (dot != string::npos && mTransLogPath.find("-vs-") == string::npos)
+            mTransLogPath = mTransLogPath.substr(0, dot) + "-vs-" + opponent()->deckFileSmall + ".jsonl";
+    }
     std::ostringstream gid;
     gid << (void *) observer;
     json rec = {
@@ -872,6 +905,46 @@ string AIPlayerGPT::consumePlan(const string& content)
     if (thinkEnd != string::npos)
         text = text.substr(thinkEnd + 8);
 
+    //The reply contract puts the answer AFTER the plan, on a labeled final
+    //line (CHOICE:/ATTACK:/BLOCKS:). Head-first answers committed the
+    //choice token BEFORE the model reasoned in its PLAN; when the plan
+    //concluded a DIFFERENT option for the same window, the stale head
+    //stayed locked in (intent-collapse: 4 seats across waves 8-9, one
+    //game-losing false Keep). The answer label anchors the parse so plan
+    //prose full of numbers cannot hijack it - the reason head-first
+    //existed. Find the LAST label at a line start (a plan that quotes the
+    //protocol loses to the real trailing answer).
+    static const char * kAnswerLabels[] = { "CHOICE:", "ATTACK:", "BLOCKS:" };
+    size_t answerStart = string::npos, answerEnd = 0, labelLineStart = string::npos;
+    size_t lineStart = 0;
+    while (lineStart <= text.size())
+    {
+        size_t lineEnd = text.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (text[s] == ' ' || text[s] == '\t' || text[s] == '*' || text[s] == '#'))
+            s++; //tolerate markdown bullet/heading decoration on the label line
+        for (int li = 0; li < 3; li++)
+        {
+            size_t len = strlen(kAnswerLabels[li]);
+            if (end - s >= len)
+            {
+                bool match = true;
+                for (size_t k = 0; k < len && match; k++)
+                    match = (toupper((unsigned char) text[s + k]) == kAnswerLabels[li][k]);
+                if (match)
+                {
+                    answerStart = s + len;
+                    answerEnd = end;
+                    labelLineStart = lineStart;
+                }
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+
     //Find the "PLAN:" marker, case-insensitive; the colon is required so
     //prose like "I plan to attack" before the choice cannot truncate it.
     size_t pos = string::npos;
@@ -886,9 +959,20 @@ string AIPlayerGPT::consumePlan(const string& content)
         }
     }
     if (pos == string::npos)
-        return text; //no plan stated: keep the previous one
+    {
+        //No plan stated: keep the previous one. The answer segment (when
+        //labeled) is still the decision.
+        if (answerStart != string::npos)
+            return text.substr(answerStart, answerEnd - answerStart);
+        return text;
+    }
 
-    string plan = text.substr(pos + 5);
+    //The plan ends where a trailing answer label begins - the answer line
+    //must not be re-fed as plan text at the next decision.
+    size_t planEnd = (labelLineStart != string::npos && labelLineStart > pos)
+                     ? labelLineStart : string::npos;
+    string plan = (planEnd == string::npos) ? text.substr(pos + 5)
+                                            : text.substr(pos + 5, planEnd - (pos + 5));
     size_t s = plan.find_first_not_of(" \t\r\n");
     size_t e = plan.find_last_not_of(" \t\r\n");
     if (s != string::npos)
@@ -913,6 +997,28 @@ string AIPlayerGPT::consumePlan(const string& content)
         }
         mCurrentPlan = plan;
     }
+    //Labeled answer (the contract): the decision is the label line's
+    //remainder, wherever the label sits relative to the plan. An answer
+    //wrapped onto the next line ("CHOICE:\n2") leaves the label line
+    //empty - extend to the rest of the reply rather than failing.
+    if (answerStart != string::npos)
+    {
+        string ans = text.substr(answerStart, answerEnd - answerStart);
+        bool hasContent = false;
+        for (size_t k = 0; k < ans.size() && !hasContent; k++)
+            hasContent = isalnum((unsigned char) ans[k]) != 0;
+        if (!hasContent)
+            ans = text.substr(answerStart);
+        return ans;
+    }
+    //No label. A reply that LEADS with its plan followed the new contract
+    //but lost its answer line (max_tokens truncation) - return nothing
+    //parsable so the caller falls back, rather than letting plan prose
+    //integers hijack the choice. A reply that leads with something else is
+    //the legacy head-first shape: the head is the decision.
+    size_t head = text.find_first_not_of(" \t\r\n");
+    if (head != string::npos && pos == head)
+        return string();
     return text.substr(0, pos);
 }
 
@@ -1312,11 +1418,13 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     messages.push_back({{"role", "system"}, {"content", mSystemPrompt}});
     messages.push_back({{"role", "user"}, {"content", userMsg}});
 
-    //Room for the choice plus the mandatory complete PLAN restatement; a
-    //truncated reply parsed as "no choice" and held creatures back (and a
-    //qwen plan runs long despite the brevity instruction - observed 512
-    //cutting one mid-sentence).
-    long maxTokens = mThinking ? 2048 : 1024;
+    //Room for scratch reasoning + the complete PLAN + the trailing answer
+    //line. The answer-last contract makes truncation COSTLY (a cut reply
+    //loses the decision, not just plan tail): the first live game under
+    //1024 lost 13 of 24 decisions to mid-reasoning cuts at ~25s
+    //generations. Be generous; the protocol text carries the brevity
+    //pressure.
+    long maxTokens = 2048;
     if (mMaxTokens > 0)
         maxTokens = mMaxTokens;
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
@@ -1397,6 +1505,17 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount)
     return choice;
 }
 
+//A land-fetch activation, by its rendered option line (the same string the
+//de-dup and decline maps key on). These are the ability names the fetchland
+//scripts render ("Put in Play with Misty Rainforest targeting...", "search
+//basic land with Prismatic Vista") - 664 offers in the wave-9 corpus, the
+//top decision-count driver on control decks.
+static bool isFetchCrackLine(const string& line)
+{
+    return line.find("Put in Play with") != string::npos
+        || line.find("search basic land with") != string::npos;
+}
+
 const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranking)
 {
     if (!ranking.size() || mEndpoint.empty())
@@ -1454,10 +1573,15 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         string line = describeAction(*candidates[c]);
         if (!seenLines.insert(line).second)
             continue;
-        //Twice pass-declined this turn: the model has said "hold" enough -
-        //stop re-asking every window (the held-fetch tax; see header).
+        //Pass-declined this turn: the model has said "hold" enough - stop
+        //re-asking every window (the held-fetch tax; see header). A land
+        //fetch gets ONE ask per turn (196 of 216 fetch windows in the
+        //wave-9 corpus offered NOTHING else - a declined crack re-asked at
+        //every window was the #1 control-deck decision driver); other lines
+        //keep the two-decline allowance since their value genuinely moves
+        //within a turn.
         std::map<string, int>::iterator dc = mPassDeclineCount.find(line);
-        if (dc != mPassDeclineCount.end() && dc->second >= 2)
+        if (dc != mPassDeclineCount.end() && dc->second >= (isFetchCrackLine(line) ? 1 : 2))
             continue;
         shown.push_back(candidates[c]);
         shownLines.push_back(line);
@@ -1471,7 +1595,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         DebugTrace("AIPlayerGPT[ph" << phase << "]: all actions pass-declined this turn; passing");
         return NULL;
     }
-    tail << "\nWhich action do you take? Reply with ONLY the number first (0 = pass priority) - the number must be the first character of your reply, with no option text before it - then your PLAN: line.";
+    tail << "\nWhich action do you take? Write your PLAN: line first, then on the last line CHOICE: followed by ONLY the number (0 = pass priority) - no option text on the answer line.";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
@@ -1520,7 +1644,15 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (content.empty())
             setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
+        {
             narrateDecision("You: " + describeAction(*shown[choice - 1]));
+            //Consume-on-choose: a taken land fetch is done for the turn -
+            //an identical line (a second copy of the same fetch) re-asking
+            //at the next window is churn, not a decision (deck133's
+            //single-option re-ask multiplier). Next turn re-offers.
+            if (isFetchCrackLine(shownLines[choice - 1]))
+                mPassDeclineCount[shownLines[choice - 1]] = 2;
+        }
 
         mLastAskKey = askKey;
         mLastChoice = choice;
@@ -1584,7 +1716,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
         tail << (i + 1) << ". " << options[i] << "\n";
-    tail << "\nReply with ONLY the number of your choice first - the number must be the first character of your reply, with no option text before it - then your PLAN: line.";
+    tail << "\nWrite your PLAN: line first, then on the last line CHOICE: followed by ONLY the number of your choice - no option text on the answer line.";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -1803,10 +1935,17 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 //destroy your own creature) but reads as a trap from a
                 //bare cast line (deck44 wave-8: GFTT offered with only its
                 //own Faerie legal; the pilot correctly declined but paid a
-                //reasoning tax every window). Say it at the option.
+                //reasoning tax every window). Say it at the option. And
+                //when legal targets DO exist, NAME them (capped): a bare
+                //targeted cast line invited a fabricated "it has no legal
+                //target" belief over a perfectly legal opponent creature
+                //(deck44 wave-9 s54, a 900-char plan arguing itself out of
+                //its removal). The deciding fact rides the option.
                 if (tc->maxtargets == 1)
                 {
                     int ownT = 0, oppT = 0;
+                    std::ostringstream tNames;
+                    int tShown = 0;
                     for (int pi = 0; pi < 2; pi++)
                     {
                         Player * pp = observer->players[pi];
@@ -1815,12 +1954,51 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             if (tc->targetsZone(zz[zi]))
                                 for (int cj = 0; cj < zz[zi]->nb_cards; cj++)
                                     if (tc->canTarget(zz[zi]->cards[cj]))
+                                    {
                                         (zz[zi]->cards[cj]->controller() == this ? ownT : oppT)++;
+                                        if (tShown < 4)
+                                            tNames << (tShown++ ? ", " : "") << zz[zi]->cards[cj]->getDisplayName();
+                                    }
                         if (tc->canTarget(pp))
+                        {
                             (pp == this ? ownT : oppT)++;
+                            if (tShown < 4)
+                                tNames << (tShown++ ? ", " : "") << (pp == this ? "you" : "the opponent");
+                        }
                     }
                     if (ownT && !oppT)
                         o << " - the only legal targets are YOUR OWN right now";
+                    else if (ownT + oppT > 0)
+                    {
+                        o << " - legal targets right now: " << tNames.str();
+                        if (ownT + oppT > tShown)
+                            o << " (+" << (ownT + oppT - tShown) << " more)";
+                    }
+                    else
+                        o << " - NO legal target right now";
+                }
+                //A hand-attack discard spell against a thin hand: the fact
+                //that decides ("their hand is nearly/completely empty")
+                //is surfaced in the board summary and STILL fabricated
+                //over ("they may have a removal spell" at hand size 0,
+                //deck133 wave-9 vs131 s58) - the last rung is the option
+                //line itself.
+                {
+                    Player * oppP = this->opponent();
+                    if (oppP && tc->canTarget(oppP))
+                    {
+                        string lowText = card->text;
+                        for (size_t li = 0; li < lowText.size(); li++)
+                            lowText[li] = (char) tolower((unsigned char) lowText[li]);
+                        int oppHand = oppP->game->hand->nb_cards;
+                        if (lowText.find("discard") != string::npos && oppHand <= 2)
+                        {
+                            if (oppHand == 0)
+                                o << " - the opponent's hand is EMPTY: nothing to strip";
+                            else
+                                o << " - the opponent holds only " << oppHand << " card" << (oppHand > 1 ? "s" : "");
+                        }
+                    }
                 }
                 SAFE_DELETE(tc);
                 if (!firstHit)
@@ -2388,9 +2566,9 @@ int AIPlayerGPT::chooseAttackers()
             tail << " [" << kw << "]";
         tail << "\n";
     }
-    tail << "Reply with the numbers of the attackers you send, comma-separated"
-            " (e.g. \"A1, A3\"), or \"none\" to attack with nobody this turn."
-            " Then your PLAN: line.";
+    tail << "Write your PLAN: line first, then on the last line ATTACK: followed by"
+            " the attackers you send, comma-separated (e.g. \"ATTACK: A1, A3\"),"
+            " or \"ATTACK: none\" to attack with nobody this turn.";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -2562,6 +2740,12 @@ int AIPlayerGPT::chooseBlockers()
         string kw = keywordList(blockers[i]);
         if (!kw.empty())
             tail << " [" << kw << "]";
+        //A 0-power blocker kills nothing - it only absorbs damage. Wave-8:
+        //a 0-power blocker was thrown in front of a 0/2 Ornithopter, a
+        //block that neither killed nor saved anything (the [deals 0] gap
+        //in the blocker-seam lethal family).
+        if (blockers[i]->power <= 0)
+            tail << " [deals 0 - this block kills nothing, it only absorbs damage]";
         tail << " - may block";
         for (size_t j = 0; j < legal[i].size(); j++)
             for (size_t k = 0; k < attackers.size(); k++)
@@ -2571,9 +2755,9 @@ int AIPlayerGPT::chooseBlockers()
     }
     tail << "Assign each blocker to AT MOST ONE attacker (a creature cannot block"
             " two attackers), but several DIFFERENT blockers may gang-block the same"
-            " attacker. Blockers you do not mention stay out of combat.\nReply with"
-            " the assignments, comma-separated, e.g. \"B1:A2, B3:A1, B2:none\"."
-            " Then your PLAN: line.";
+            " attacker. Blockers you do not mention stay out of combat.\nWrite your"
+            " PLAN: line first, then on the last line BLOCKS: followed by the"
+            " assignments, comma-separated, e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\".";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
