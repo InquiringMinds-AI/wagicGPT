@@ -138,6 +138,7 @@ run_one_game() {
         WAGIC_SELFPLAY_DECK0="$d0" WAGIC_SELFPLAY_DECK1="$d2" \
         WAGIC_AI=gpt WAGIC_GPT_URL="$URL" WAGIC_GPT_MODEL="$MODEL" WAGIC_GPT_KEY="$KEY" \
         WAGIC_GPT_THINKING="$THINKING" WAGIC_GPT_TRANSLOG=1 \
+        WAGIC_GPT_TIMEOUT="${WAGIC_GPT_TIMEOUT:-240}" \
         ./wagic > "$elog" 2>&1
     local resline; resline=$(grep -E 'WAGIC_SELFPLAY_RESULT winner=' "$elog" | tail -1)
     local winner life0 life1 turn
