@@ -1404,10 +1404,22 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
                 if(!ec->costs[i]->tc->countValidTargets())
                     return false;
                 //chooseCostTarget is the DECISION seam (model-overridable);
-                //NULL = no choice yet or none possible - abort this tick's
-                //attempt rather than feed NULL into tryToSetPayment (which
-                //would false-match an unset cost target).
+                //NULL = no choice yet or none possible - feeding NULL into
+                //tryToSetPayment would false-match an unset cost target.
                 MTGCardInstance * costTarget = chooseCostTarget(ec->costs[i]->tc,target);
+                //The seam can be ASYNCHRONOUS: AIPlayerGPT issues a model call
+                //and returns NULL until it answers. But payTheManaCost is
+                //synchronous and its callers commit-or-abandon this tick, so an
+                //unanswered pick aborted the whole cast - the alternative-cost
+                //spell (Force of Negation via "exile a blue card") never went
+                //onto the stack and the countered spell resolved, while the
+                //cast re-offered every priority window (2 seats, corpus
+                //20260715). The which-card-to-exile choice is minor next to the
+                //already-made decision to cast; fall back to the synchronous
+                //heuristic so the extra cost is PAID this tick and the cast
+                //completes rather than looping forever.
+                if (!costTarget)
+                    costTarget = AIPlayerBaka::chooseCostTarget(ec->costs[i]->tc, target);
                 if (!costTarget)
                     return false;
                 int checkTarget = 0;
