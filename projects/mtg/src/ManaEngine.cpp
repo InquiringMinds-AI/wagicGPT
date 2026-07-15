@@ -138,6 +138,21 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
 
     int needColorConverted = cost->getConvertedCost() - int(cost->getCost(0)+cost->getCost(7));
     int fullColor = 0;
+    //Generic mana spends OFF-PIP sources first. The walk is layer-ordered
+    //(earliest-played lands first), so a {4}{u} cost used to swallow every
+    //blue source into its generic fill before anything else was considered,
+    //stranding exactly the colors a held reaction needs ("hold {u}{u} for
+    //the counterspell" was unexecutable; wave-11 deck44 vs131 s30). Pass 0
+    //lets the generic fill take only producers that pay NONE of the cost's
+    //colored pips, and only up to the generic amount itself (an off-color
+    //source that turns superfluous once the pips fill would be an overpay);
+    //pass 1 takes anything, as before. The colored/hybrid branches are
+    //guarded by used[] and result-vs-cost limits, so re-walking is a no-op
+    //for them.
+    int offColorFilled = 0;
+    int genericAmount = int(cost->getCost(0) + cost->getCost(7));
+    for (int pass = 0; pass < 2; pass++)
+    {
     for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
     {
         MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
@@ -150,6 +165,17 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
             {
                 if(result->canAfford(cost,0))
                     continue;
+                if (pass == 0)
+                {
+                    if (offColorFilled >= genericAmount)
+                        continue;
+                    bool onPip = false;
+                    for (int k = 1; k < Constants::NB_Colors && !onPip; k++)
+                        if (k != Constants::MTG_COLOR_ARTIFACT && cost->getCost(k) && amp->output->hasColor(k))
+                            onPip = true;
+                    if (onPip)
+                        continue; //keep it for the colored pips / pass 1
+                }
                 if (policy.canHandle(amp))
                 {
                     MTGCardInstance * card = amp->source;
@@ -162,6 +188,8 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                             payments.push_back(amp);
                             result->add(amp->output);
                             used[card] = true;
+                            if (pass == 0)
+                                offColorFilled++;
                         }
                     }
                 }
@@ -225,6 +253,10 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                 }
             }
         }
+    }
+    //pass 1 only runs when the off-color-first pass left the total short.
+    if (result->canAfford(cost, 0))
+        break;
     }
     ManaCostHybrid * hybridCost;
     hybridCost = cost->getHybridCost(0);
