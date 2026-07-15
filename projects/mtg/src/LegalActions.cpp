@@ -107,6 +107,30 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
                 && (pMana->canAfford(cost->getAlternative(), 0)
                     || ManaEngine::planPayment(p, policy, card, cost->getAlternative(), 0).size());
 
+            //A targeted EXTRA cost on the alternative (Force of Negation's
+            //"exile another blue card from hand", `other={E(other
+            //*[blue]|myhand)}`) is part of what makes the mode payable:
+            //MTG 601.2f-h, you may only choose the alternative cost if you
+            //CAN pay it. canAfford/planPayment above weigh only the mana
+            //part, so the mode was offered with no legal card to exile - the
+            //"other" targeter excludes the source, so with the source as the
+            //lone blue card in hand the payment finds nothing and the
+            //committed cast aborts silently, re-offered every window
+            //(corpus 20260715). Require every targeted extra cost of the
+            //alternative to have at least one legal target before offering.
+            if (altOk && cost->getAlternative()->extraCosts)
+            {
+                ExtraCosts * aec = cost->getAlternative()->extraCosts;
+                for (size_t ei = 0; altOk && ei < aec->costs.size(); ei++)
+                {
+                    if (!aec->costs[ei]->tc)
+                        continue;
+                    aec->costs[ei]->setSource(card);
+                    if (!aec->costs[ei]->tc->countValidTargets())
+                        altOk = false;
+                }
+            }
+
             //Cast restrictions gate WHICH modes are legal (Arcum's
             //Astrolabe: restriction=never + other={i} = alternative-only).
             //They used to live only in FindCardToPlay's policy dance, so

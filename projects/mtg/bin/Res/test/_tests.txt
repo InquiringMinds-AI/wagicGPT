@@ -270,6 +270,7 @@ ai/goblin_artillery.txt
 ai/death_wind_self_target_i1085.txt
 ai/force_of_negation_altcost.txt
 ai/force_of_negation_altcost_multiblue.txt
+ai/force_of_negation_altcost_noblue.txt
 
 ai/infect_self_target_i594.txt
 generic/devotion.txt

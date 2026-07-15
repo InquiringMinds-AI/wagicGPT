@@ -1,0 +1,41 @@
+# No-other-blue-card variant: P2 holds Force + a RED card (Shock), so the
+# only blue card in hand is Force itself. The "other" targeter in Force's
+# extra cost (other *[blue]|myhand) excludes the source, so there is NO
+# legal card to exile -> the alternative cost is UNPAYABLE and must not be
+# taken (MTG 601.2f-h). P2 cannot afford the normal {1}{U}{U} either, so
+# Force cannot be cast at all: bad moon RESOLVES (enters play), it is NOT
+# countered/exiled. Guards the corpus 20260715 offer-legality fix (an
+# alternative cost was offered with no legal extra-cost target, then the
+# committed cast aborted silently and re-offered forever).
+FORCEABILITY
+AICALLS 30
+SEED 12345
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:bad moon
+manapool:{1}{B}
+[PLAYER2]
+hand:Force of Negation,Shock
+manapool:{1}
+[DO]
+bad moon
+yes
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:bad moon
+[PLAYER2]
+hand:Force of Negation,Shock
+[END]

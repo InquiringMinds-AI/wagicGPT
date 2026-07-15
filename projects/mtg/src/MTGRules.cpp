@@ -966,6 +966,35 @@ int MTGAlternativeCostRule::isReactingToClick(MTGCardInstance * card, ManaCost *
             }
         }
 
+        //MTG 601.2f-h: an alternative cost may only be CHOSEN if it can be
+        //paid. A mandatory targeted extra cost (Force of Negation's
+        //other={E(other *[blue]|myhand)}, "exile another blue card") with no
+        //legal target makes the alternative unpayable, so the rule must NOT
+        //react: otherwise clicking the card offers the alternative mode (a
+        //cast-mode menu when the normal cost is also affordable, or the
+        //standalone alt-cost action) which then aborts, re-offered every
+        //window while the spell it should answer resolves (corpus 20260715).
+        //Convoke/Delve are OPTIONAL reductions and Offering has its own path
+        //above, so they are excluded from this "no target = unpayable" gate.
+        //Only gate the OFFER (no payment chosen yet); once the extra
+        //payment is set the cast is committed and mid-execution, and
+        //re-checking would abort a valid alt-cast whose lone target is now
+        //the chosen payment.
+        if (alternateManaCost->extraCosts && !alternateManaCost->isExtraPaymentSet())
+        {
+            for (unsigned int _egi = 0; _egi < alternateManaCost->extraCosts->costs.size(); _egi++)
+            {
+                ExtraCost * _eg = alternateManaCost->extraCosts->costs[_egi];
+                if (!_eg || !_eg->tc)
+                    continue;
+                if (dynamic_cast<Convoke*>(_eg) || dynamic_cast<Delve*>(_eg) || dynamic_cast<Offering*>(_eg))
+                    continue;
+                _eg->setSource(card);
+                if (!_eg->tc->countValidTargets())
+                    return 0;
+            }
+        }
+
         if (playerMana->canAfford(alternateManaCost,card->has(Constants::ANYTYPEOFMANA)))
         {
             return 1;

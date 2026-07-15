@@ -1633,6 +1633,24 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (t == MTGAbility::MTG_ATTACK_RULE || t == MTGAbility::MTG_BLOCK_RULE
             || t == MTGAbility::ATTACK_COST || t == MTGAbility::BLOCK_COST)
             continue;
+        //The alternative-cost RULE on a HAND card (Force of Negation's
+        //"exile a blue card") is a whole-spell cast, not a priority ability
+        //- and it is already offered, with its stack target and 601.2c/cost
+        //legality, by the CAST MENU (FindCardToPlay/legalCasts, viaAlternative).
+        //Surfaced here as a standalone ordered action it is a DEAD END for
+        //this seam: describeAction cannot express the spell's target, so a
+        //single click only arms the extra payment (reactToClick returns 0,
+        //nothing reaches the stack) and the action re-offers every window -
+        //the model narrates "exile a blue card ..." forever while the spell
+        //it should counter resolves (corpus 20260715 seq14+). Baka keeps its
+        //own multi-tick follow-through (its chooseOrderedAction still sees
+        //this entry), so pure-heuristic play is unchanged; only the GPT menu
+        //drops the redundant dead end. Graveyard/exile/library alternative
+        //casts (not offered by legalCasts' viaAlternative, hand-only) keep
+        //their standalone entry.
+        if (t == MTGAbility::ALTERNATIVE_COST && it->first.click
+            && game->hand->hasCard(it->first.click))
+            continue;
         candidates.push_back(&(it->first));
     }
     //Nothing but declaration mechanics: the heuristic ranking drives those.
