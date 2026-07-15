@@ -1421,10 +1421,12 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //Room for scratch reasoning + the complete PLAN + the trailing answer
     //line. The answer-last contract makes truncation COSTLY (a cut reply
     //loses the decision, not just plan tail): the first live game under
-    //1024 lost 13 of 24 decisions to mid-reasoning cuts at ~25s
-    //generations. Be generous; the protocol text carries the brevity
-    //pressure.
-    long maxTokens = 2048;
+    //1024 lost 13 of 24 decisions to mid-reasoning cuts, and the first
+    //full corpus under 2048 still lost 60/1369 (4.4%, median cut length
+    //~6.9k chars - long combat math plus some repetition loops). Be
+    //generous; the protocol text carries the brevity pressure, and the
+    //truncation guard turns any residual cut into a safe heuristic answer.
+    long maxTokens = 4096;
     if (mMaxTokens > 0)
         maxTokens = mMaxTokens;
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
