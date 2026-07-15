@@ -2801,6 +2801,29 @@ int AIPlayerGPT::chooseBlockers()
     vector<int> pick;
     int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick);
 
+    //A bare "BLOCKS: none" - the model's natural way to decline every
+    //block - carries no B<n> pair, and falling back on it handed the
+    //declaration to the heuristic, which BLOCKED (a fatal reach-trade
+    //against the pilot's own correct no-block decision, wave-11 deck131
+    //vs109). An explicit decline is a valid answer: declare no blockers.
+    if (pairs == 0 && !decisionPart.empty())
+    {
+        string low;
+        for (size_t i = 0; i < decisionPart.size() && i < 80; i++)
+            low += (char) tolower((unsigned char) decisionPart[i]);
+        if (low.find("none") != string::npos || low.find("no block") != string::npos)
+        {
+            DecisionAction none;
+            DecisionManager::applyDeclareBlockers(req, none);
+            writeTransLog("blockers", userMsg, content, 0, (int) blockers.size(),
+                          "no blockers", NULL);
+            narrateDecision("You declared no blockers");
+            mBlocksDoneTurn = observer->turn;
+            DebugTrace("AIPlayerGPT: explicit all-decline (no blockers) in one reply");
+            return 1;
+        }
+    }
+
     if (pairs == 0)
     {
         //Unusable reply: the heuristic declares this combat instead.
