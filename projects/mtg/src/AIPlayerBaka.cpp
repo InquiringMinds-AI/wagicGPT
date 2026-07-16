@@ -2435,13 +2435,27 @@ int AIPlayerBaka::chooseTarget(TargetChooser * _tc, Player * forceTarget,MTGCard
         //shoving 100 targets into potential, then selecting one of them at random.
     }
     if(checkOnly)return 0;//it wasn't an error if we couldn't find a target while checkonly
-    //Couldn't find any valid target,
+    //Couldn't find any valid target for the preferred player,
     //usually that's because we played a card that has bad side effects (ex: when X comes into play, return target land you own to your hand)
     //so we try again to choose a target in the other player's field...
-    int cancel = observer->cancelCurrentAction();
+    //
+    //OWNERSHIP (core 2623136): GameObserver::cancelCurrentAction() unconditionally
+    //SAFE_DELETEs observer->targetChooser - the spell-CAST chooser. For a cast, `tc`
+    //IS that chooser, so the old code (cancel here, then recurse with `tc`) was a
+    //use-after-free: the GPT seat declined Fatal Push's mandatory target -> Baka
+    //fallback -> empty preferred field -> the cancel freed `tc` -> the retry
+    //dereferenced the freed chooser in TargetsList::alreadyHasTarget -> SIGSEGV.
+    //Only the ability-layer waiting action is cleared here (no chooser teardown),
+    //so `tc` stays live for the opposite-field retry below. The full cancel that
+    //releases the casting chooser runs solely on the true give-up branch, once we
+    //are done using `tc`.
+    int cancel = observer->mLayers->actionLayer()->cancelCurrentAction();
     if (!cancel && !forceTarget)
         return chooseTarget(tc, target->opponent(), NULL, checkOnly);
-    //ERROR!!!
+    //ERROR!!! - already retried the opposite field (forceTarget set), or the
+    //ability-layer cancel took. Abandon the action for good; this releases the
+    //casting chooser (observer->targetChooser) too, and we no longer touch `tc`.
+    observer->cancelCurrentAction();
     DebugTrace("AIPLAYER: ERROR! AI needs to choose a target but can't decide!!!");
     return 1;
 }
