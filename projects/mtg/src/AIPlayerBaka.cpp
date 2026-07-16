@@ -3175,6 +3175,28 @@ int AIPlayerBaka::computeActions()
                 if (nextCardToPlay && game->playRestrictions->canPutIntoZone(nextCardToPlay, game->stack) == PlayRestriction::CANT_PLAY)
                     nextCardToPlay = NULL;
             }
+            //A response whose selected cast mode needs NO mana (Force of
+            //Negation's free "exile a blue card" alternative, and other
+            //extra-cost-only pitches) is payable on a fully tapped board, but
+            //ipotential above only tracks raw mana existence - so a zero-mana
+            //seat that legitimately holds the free counter never reached the
+            //cast branch below (corpus 20260716: (no untapped sources)
+            //correlated 3/3 with fizzled answered Force casts). FindCardToPlay
+            //(via the oracle's legalCasts) already proved this exact mode is
+            //payable - it only returns a card it can pay for, and legalCasts
+            //requires the alternative's targeted extra costs to have a legal
+            //target. Admit the mode when its MANA part is empty; everything
+            //that actually needs mana still rides the ipotential gate.
+            if (nextCardToPlay && !ipotential)
+            {
+                ManaCost * selCost = nextCardToPlay->getManaCost();
+                ManaCost * modeCost = selCost ?
+                    (payAlternative == OTHER ? selCost->getAlternative()
+                     : payAlternative == MORPH ? selCost->getMorph()
+                     : selCost) : NULL;
+                if (modeCost && !modeCost->getConvertedCost())
+                    ipotential = true;
+            }
             SAFE_DELETE (icurrentMana);
         }
         if (!nextCardToPlay)

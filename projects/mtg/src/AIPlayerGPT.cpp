@@ -16,6 +16,7 @@
 #include "MTGAbility.h"
 #include "CardDescriptor.h"
 #include "ManaCost.h"
+#include "ManaCostHybrid.h"
 #include "ExtraCost.h"
 #include "Counters.h"
 #include "ActionLayer.h"
@@ -1532,6 +1533,57 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                         match = (int) o;
                     }
                 }
+                //Fallback (option-subset-of-echo): the all-echo-words-in-
+                //option pass above misses a SUPERSTRING echo - the model
+                //named the card in FULLER detail than the offered option
+                //("Attack with Yawgmoth, Thran Physician" echoing the option
+                //"Attack with Yawgmoth"; deck133 vs140 s37 was wrongly ruled
+                //stale and downgraded to the heuristic). Reverse the
+                //containment: an option whose OWN significant words all appear
+                //in the echo is the intended pick (extra detail, not a
+                //different card). Unique match only - zero or multiple keep
+                //the no-match / conflict verdict, so a genuinely stale echo
+                //(none of its words subset any option) still routes to the
+                //heuristic.
+                if (match < 0 && !echoConflict)
+                {
+                    string echoLow = echo;
+                    for (size_t i = 0; i < echoLow.size(); i++)
+                        echoLow[i] = (char) tolower((unsigned char) echoLow[i]);
+                    for (size_t o = 0; o < optionTexts->size(); o++)
+                    {
+                        //significant words of THIS option (same rule as the
+                        //echo split above: lowercase, length >= 4, minus the
+                        //verb/decline filler)
+                        vector<string> ow;
+                        string t;
+                        const string& src = (*optionTexts)[o];
+                        for (size_t k = 0; k <= src.size(); k++)
+                        {
+                            char c = (k < src.size()) ? (char) tolower((unsigned char) src[k]) : ' ';
+                            if (isalnum((unsigned char) c))
+                                t += c;
+                            else
+                            {
+                                if (t.size() >= 4 && t != "cast" && t != "with" && t != "play"
+                                    && t != "pass" && t != "none" && t != "hold" && t != "done"
+                                    && t != "skip" && t != "decline" && t != "nobody")
+                                    ow.push_back(t);
+                                t.clear();
+                            }
+                        }
+                        if (ow.empty())
+                            continue; //no anchor words -> cannot subset-match
+                        bool all = true;
+                        for (size_t k = 0; k < ow.size() && all; k++)
+                            all = echoLow.find(ow[k]) != string::npos;
+                        if (all)
+                        {
+                            if (match >= 0) { match = -1; echoConflict = true; break; } //not unique
+                            match = (int) o;
+                        }
+                    }
+                }
                 if (match >= 0)
                     echoRemap = match + 1; //1-based option number
                 else if (!echoConflict)
@@ -1930,6 +1982,51 @@ namespace
     };
 }
 
+//Hybrid-pip affordability clarifier for a cast option line. Cross-seat the
+//model misreads hybrid mana pips and declines an OFFERED, payable cast - it
+//reads {u/b} as needing BOTH colors, or a colored pip as generic (deck109
+//{B/R}, deck17 {u/b} under-deployments, deck135 hallucinated {1}{g} decline,
+//deck21 {R/G}). The option list is already authoritative; the sanctioned fix
+//is REPRESENTATION - spell out, ONLY on costs that actually carry hybrid pips,
+//that each pip pays with EITHER of its colors and how small the real total is.
+//Non-hybrid costs get nothing (annotating every cost is noise, per the wave-15
+//synthesis ruling).
+static string hybridPipNote(ManaCost * c)
+{
+    if (!c)
+        return "";
+    vector<string> pips; //distinct color/color pips, first-seen order
+    for (unsigned int i = 0; ; i++)
+    {
+        ManaCostHybrid * h = c->getHybridCost(i);
+        if (!h)
+            break;
+        if (!h->color1 || !h->color2)
+            continue; //only true color/color pips (what renders as {x/y})
+        char lo1 = Constants::MTGColorChars[h->color1];
+        char lo2 = Constants::MTGColorChars[h->color2];
+        char hi1 = (char) toupper((unsigned char) lo1);
+        char hi2 = (char) toupper((unsigned char) lo2);
+        string desc = string("{") + lo1 + "/" + lo2 + "} pays with " + hi1 + " or " + hi2;
+        bool seen = false;
+        for (size_t k = 0; k < pips.size(); k++)
+            if (pips[k] == desc) { seen = true; break; }
+        if (!seen)
+            pips.push_back(desc);
+    }
+    if (pips.empty())
+        return "";
+    std::ostringstream note;
+    note << " [hybrid: ";
+    if (pips.size() == 1)
+        note << "each " << pips[0];
+    else
+        for (size_t k = 0; k < pips.size(); k++)
+            note << (k ? "; " : "") << pips[k];
+    note << " - total " << c->getConvertedCost() << " mana]";
+    return note.str();
+}
+
 MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * type)
 {
     //No endpoint, or a scripted combo is mid-execution: heuristic as-is.
@@ -2050,6 +2147,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (card->isCreature())
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << casts[ci].zoneLabel;
+            o << hybridPipNote(cost);
             o << dynamicMagnitudes(card);
         }
         else
@@ -2063,6 +2161,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (card->isCreature())
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << casts[ci].zoneLabel;
+            o << hybridPipNote(cost->getAlternative());
         }
         //A response option offered because of pending stack objects names what
         //it can hit ("Cast Counterspell {u}{u} - can target on the stack:
