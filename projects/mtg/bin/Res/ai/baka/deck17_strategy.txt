@@ -1,0 +1,85 @@
+Deck identity: UB FAERIE FLYERS. Almost every creature FLIES, and the opponent's ground
+creatures cannot block flyers. You win by putting a flyer on the board every turn and
+ATTACKING IN THE AIR every turn, pumped by your two anthem lords, until they are dead
+(usually by turn 10-13). Your walls (Oona's Gatewarden, Plumeveil) buy the time; your
+FLYERS + lords + Mahamoti Djinn + creatures you STEAL are the kill. You are the BEATDOWN
+whenever the opponent has no flyers - which is almost always.
+
+THE #1 RULE - YOUR MANA IS SIMPLE, NEVER AGONIZE OVER IT:
+- You have ONLY Islands, and EVERY spell in this deck casts off Islands alone. The hybrid
+  symbols {u/b} and {w/u} mean "pay with EITHER color" - you pay them ALL with blue from an
+  Island. You NEVER need a Swamp or a Plains. Wasp Lancer {u/b}{u/b}{u/b} = 3 mana, cast off
+  3 Islands. Glen Elendra Liege {1}{u/b}{u/b}{u/b} = 4 mana off 4 Islands. Plumeveil
+  {w/u}{w/u}{w/u} = 3 mana off 3 Islands. Oona's Gatewarden {u/b} = 1 mana off 1 Island.
+- The thought "I can't cast this, I have no black/white mana" is ALWAYS WRONG in this deck.
+  Each hybrid pip is ONE mana, not two. If a Cast option is listed, it is payable right now.
+- So when several creatures are offered, do not talk yourself out of the big one: cast the
+  BIGGEST flyer you can afford (Wasp Lancer 3/2 over Scion 1/1; Mahamoti 5/6 when you reach
+  6 mana). Do NOT deploy a 1/1 while a 3/2 is on the same menu.
+
+THE ENGINE - HOW YOU KILL:
+- Two ANTHEM LORDS. Glen Elendra Liege (2/3 flyer) gives EVERY other blue AND black creature
+  you control +1/+1. Scion of Oona (1/1 flash flyer) gives every other FAERIE +1/+1 AND
+  shroud. Get a lord down and your whole team grows; both lords stack. Cast them early.
+- Mahamoti Djinn ({4}{u}{u} 5/6 flyer) is your finisher - cast it the first turn you have 6
+  mana (6 Islands). Under a lord it is even bigger.
+- Faerie Swarm ({3}{u} flyer) enters as big as the number of blue permanents you control
+  (Islands count) - it is a 4/4+ by the mid-game. Cast it as a real body, attack with it.
+
+STEAL THEIR BEST CREATURE - Control Magic ({2}{u}{u}) x4 and Persuasion ({3}{u}{u}) x2:
+- These take PERMANENT control of a target creature - it removes their threat AND hands you
+  a body. You have SIX of them; they are your interaction, use them freely.
+- Cast one the turn the opponent has a creature worth taking: their biggest attacker, a bomb
+  you cannot race (Blightsteel Colossus, a Cranial-Plating-equipped flyer), or the blocker
+  standing in front of your lethal. DO NOT hoard them for "later" - a steal you saved all
+  game is a steal you wasted.
+- The option lists its legal targets. If it says "the only legal targets are YOUR OWN right
+  now", the opponent has nothing worth stealing - do NOT steal your own creature; cast a
+  flyer instead and your reply is that other option.
+
+ATTACK EVERY TURN - THIS IS WHERE GAMES ARE LOST:
+- Run this EVERY turn you have an untapped flyer: does the opponent have a creature with
+  FLYING or REACH? Almost never. If NO, ALL your flyers are unblockable - attack with EVERY
+  untapped flyer, every turn. Casting a body but not swinging is how this deck loses a game
+  it was winning (you let a lifegain opponent climb out of range while your flyers sat home).
+- "No attackers" is correct ONLY when every flyer you have is tapped or would die to a flying
+  blocker for no gain. A tapped or ground-only opponent is NOT a reason to hold back.
+- Your two DEFENDERS never attack (see below) - do not count them, do not name them as
+  attackers; declare only your real flyers.
+
+YOUR WALLS - OONA'S GATEWARDEN AND PLUMEVEIL ARE DEFENDERS, THEY NEVER ATTACK:
+- Oona's Gatewarden ({u/b} 2/1 flying defender, wither) and Plumeveil ({w/u}{w/u}{w/u} 4/4
+  flash flying defender) CANNOT attack - Defender forbids it. They are BLOCKERS only. Never
+  declare them as attackers and never plan lethal around them.
+- Use them to block. Plumeveil is a 4/4 flash flyer - a great wall you can even flash in
+  during the opponent's attack. Gatewarden has wither: whatever it blocks gets -1/-1 counters
+  (permanent shrink), so it trades up or grinds a big attacker down. Gatewarden is a 2/1 - it
+  dies to most blocks, so block with it when the -1/-1 shrink or the chump is worth it.
+
+BLOCKING NOTES:
+- Cloud Sprite (1/1 flyer) is special: it "can block ONLY creatures with flying." Your OTHER
+  flyers (Scion, Wasp Lancer, Liege, Mahamoti, etc.) can block ANYTHING, ground or air. Do
+  not waste a reply re-deriving this.
+- Block only where the trade favors you or you are getting low; while your life is high, take
+  the damage and keep your flyers attacking. Do NOT gang-block a harmless 0-power creature
+  (an Ornithopter deals 0 - let it through) and strip two attackers off your clock.
+
+MULLIGAN: keep any hand with 2-4 lands and at least one castable spell - and REMEMBER every
+Gatewarden, Cloud Sprite, Wasp Lancer, and Liege in your opener IS castable off Islands
+(they are hybrid). Do not ship a keepable hand believing you "can't cast" your hybrid cards.
+Ship only 0-1 or 6+ land hands, or a hand that is ALL walls/fatties with no early flyer.
+
+SITUATIONS THAT DECIDED GAMES - THE CORRECT PLAY:
+- A hybrid card is offered ({u/b} or {w/u}): it is payable off your Islands. Cast it - and
+  cast the biggest flyer on the menu, not the smallest. (vs44, vs135: casting Scion over the
+  offered Wasp Lancer left a 3/2 in hand for a 1/1 on board.)
+- The opponent has no flyer and you have untapped flyers: ATTACK with all of them, every
+  turn. (vs140 was lost sitting on unblockable flyers while the opponent gained to 64.)
+- The opponent plays a real threat (big attacker, a bomb, a Plating-equipped flyer): Control
+  Magic or Persuasion it NOW - do not save the steal. (vs21 stealing Boggart Ram-Gang and
+  vs44 stealing the blocker WON those games; a Persuasion held to turn 33 did nothing.)
+- A steal option says "the only legal targets are YOUR OWN right now": the opponent has
+  nothing to take - cast a flyer instead, do not steal your own creature.
+- Combat: only Oona's Gatewarden and Plumeveil block; your flyers stay home from blocking
+  and keep attacking while your life is high. Never declare a defender as an attacker.
+- You have 6 mana: cast Mahamoti Djinn (5/6 flyer) - your finisher, unblockable in the air.

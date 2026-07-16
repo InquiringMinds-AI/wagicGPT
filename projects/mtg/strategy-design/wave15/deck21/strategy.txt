@@ -1,0 +1,99 @@
+Deck identity: GOBLIN SWARM AGGRO (mono-Mountain). Cheap goblins that go WIDE, two
+anthems, and burn as reach. You win by dealing 20 fast - kill by turn 6-8. You are the
+BEATDOWN in every matchup: play a land, put a body on the board, and attack EVERY turn.
+You have no defensive plan and no removal for a big blocker - your only route to winning
+is a faster clock, so a long game is a lost game. Your creatures are ATTACKERS, not
+blockers.
+
+DEPLOY AND ATTACK - THE #1 RULE, run it every turn:
+- Every main phase, if any "Cast" option shows a creature, take it - put a body on the
+  board even if it cannot attack yet (it attacks NEXT turn). "Cast nothing" is only for
+  the rare turn when your ONLY castable option is a card you cannot pay for. NEVER pick
+  "Cast nothing" while a creature is in your Cast list. An empty board is no clock, and a
+  stalled hand loses the race.
+- Every combat, declare EVERY creature that can attack. Trading a cheap goblin into a
+  blocker is fine - you are racing, not preserving.
+
+BURN IS YOUR CLOCK - FACE BY DEFAULT. Lightning Bolt ({R}, instant, 3 dmg) and Volcanic
+Hammer ({1}{R}, SORCERY, 3 dmg) are 3 damage each at "The opponent (player, life N)".
+- NEVER HOLD burn "for interaction on the opponent's turn." That advice is for control
+  decks; it does not apply to you. Your burn is damage on a clock - fire it at the face on
+  YOUR turn. Volcanic Hammer is a sorcery and cannot be held anyway.
+- Burn KILLS a creature only if its toughness is 3 or LESS. Do NOT throw burn at a 4/4, a
+  6/6, or any big blocker - 3 damage does not shrink it and does not kill it; you just
+  waste the spell. Against a wall you cannot kill, send the burn to the FACE.
+- EXCEPTION - kill these creatures with burn ON SIGHT (they are worth more than 3 face
+  damage), as long as toughness is 3 or less: a lifegain creature (lifelink), a token- or
+  counter-maker / artifact engine (Steel Overseer and the like), or an evasive attacker
+  (a flyer) that is outracing you. Otherwise: face.
+
+SPARK ELEMENTAL ({R}, 3/1 trample haste) - it is SACRIFICED at end of turn. Treat it like
+a burn spell on legs: cast it in MAIN PHASE 1 (before combat) and swing with it that same
+turn for 3. If you cast it in Main phase 2, or hold it, it dies at end of turn WITHOUT ever
+attacking - a wasted card. Cast-and-swing, or do not cast it.
+
+WHO CAN ATTACK THE TURN IT LANDS (haste): Raging Goblin, Boggart Ram-Gang, Spark Elemental.
+EVERYTHING ELSE has summoning sickness and cannot attack the turn you cast it - including
+Goblin Gang Leader AND the two tokens it makes. Deploy those a turn AHEAD; do not count a
+just-cast non-haste creature in this turn's attack math.
+
+YOUR ANTHEMS AND LORDS - name their effect in every combat, and deploy BODIES first so the
+anthem has something to buff:
+- Bloodmark Mentor ({1}{R}, 1/1): your OTHER red creatures gain FIRST STRIKE. This wins
+  trades - a first-striking attacker kills a smaller-or-equal blocker BEFORE it deals
+  damage back, so your creature SURVIVES. When the Mentor is out, a blocked 3/1 kills a
+  2/2 and lives; it is not "both die."
+- Goblin King ({1}{R}{R}, 2/2): your other GOBLINS get +1/+1 and mountainwalk. (Goblins:
+  Raging Goblin, Boggart Ram-Gang, Scuzzback Scrapper, Goblin Gang Leader + its tokens,
+  Bloodmark Mentor. Mountainwalk = unblockable only if the opponent controls a Mountain -
+  rare, so treat it as a bonus, not a plan.)
+- Boartusk Liege ({1}{R/G}{R/G}{R/G}, 3/4 trample): your other RED and other GREEN
+  creatures get +1/+1. Your biggest team pump - cast it once you already have a wide board.
+- Orcish Oriflamme ({3}{R}, enchantment): your ATTACKING creatures get +1/+0 while they
+  attack. Free extra damage every swing.
+
+HYBRID {R/G} COSTS ARE PAID BY MOUNTAINS. You are mono-Mountain and have four hybrid cards:
+Scuzzback Scrapper {R/G} = 1 Mountain; Boggart Ram-Gang {R/G}{R/G}{R/G} = 3 Mountains;
+Boartusk Liege {1}{R/G}{R/G}{R/G} = 4 Mountains. If one of these is in your Cast list you
+CAN afford it with red mana - never decline it for "lacking green mana."
+
+GOBLIN GANG LEADER ({2}{R}{R}, 2/2): when it enters, make two 1/1 red Goblin tokens - three
+bodies for one card. None of them (Leader or tokens) can attack the turn they arrive; they
+swing next turn. Cast it a turn before you need the wide alpha strike.
+
+WITHER (Boggart Ram-Gang, Scuzzback Scrapper): the combat damage they deal to a creature is
+dealt as -1/-1 counters (it stays shrunk permanently). Useful chip against a big blocker
+over several turns, but do not build your plan around it - keep racing the face.
+
+BLOCKING - your creatures are ATTACKERS. Default: declare NO blockers. Take the hit and keep
+every creature untapped to swing next turn - a body kept home never attacks, and you win by
+racing. This holds even when your life is low but not lethal.
+- BLOCK only to (a) kill a token-maker or lifegain creature you could not burn, by
+  gang-blocking it with goblins, or (b) survive a swing that is otherwise LETHAL this turn -
+  then chump with your least valuable creature.
+- Do not trade your ONLY win condition (your last big attacker) into a deathtouch/large
+  blocker just to save a few life while you are ahead - keep the threat and keep racing.
+
+MATCHUPS YOU CANNOT "SOLVE" - RACE INSTEAD:
+- Walls of big or flying blockers (flying Defenders like Plumeveil 4/4, a faerie flyer
+  swarm, deathtouch creatures): you have no removal for a 4-toughness+ blocker and no
+  evasion. Do NOT waste turns or burn trying to break the wall. Keep deploying a goblin
+  every turn, send EVERY burn spell at the face, and win the LIFE race. If you cannot win
+  the race you lose - but interacting is a slower loss.
+- Lifegain / control that stabilizes (lifelink, life-gain artifacts): you must keep a board
+  and attack. Burn alone cannot outrace repeated lifegain. Never durdle to an empty board
+  throwing single burn spells - deploy creatures and swing; that is your only real damage.
+
+MULLIGAN: keep any hand with 2-4 lands and one or two cheap creatures or burn. Mulligan only
+0-1 land or all-land hands.
+
+SITUATIONS THAT DECIDE GAMES - recognize and act:
+- A creature in hand and open mana: cast it this turn so it attacks next turn - even a lone
+  1/1 is damage next turn. Never "Cast nothing" with a payable creature listed.
+- Spark Elemental in hand: cast it in Main phase 1 and swing for 3 - never hold it.
+- Opponent at 8 or less with no relevant blockers: send every burn spell at the face and
+  swing with everything - close it out.
+- Burn spell in hand, opponent's board is a 4/4+ or a wall you cannot kill: burn the FACE,
+  not the wall.
+- Lifegain or engine creature (toughness 3 or less) resolves: burn it or gang-block it -
+  do not let it stabilize them.
