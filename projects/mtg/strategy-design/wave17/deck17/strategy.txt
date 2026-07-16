@@ -1,0 +1,80 @@
+Deck identity: UB FAERIE FLYERS. Almost every creature FLIES, and most opponents' ground
+creatures cannot block flyers. You win by putting an ATTACKING flyer on the board every turn
+and swinging IN THE AIR every turn, pumped by your two anthem lords, until they are dead
+(usually by turn 8-13). You are the BEATDOWN. Your walls buy time; your FLYERS + lords +
+Mahamoti Djinn + creatures you STEAL are the kill.
+
+THE #1 RULE - YOUR MANA IS SIMPLE, NEVER AGONIZE OVER IT:
+- You have ONLY Islands, and EVERY spell casts off Islands alone. The hybrid symbols {u/b} and
+  {w/u} mean "pay with EITHER color" - you pay them ALL with blue from an Island. You NEVER need
+  a Swamp or a Plains. Each hybrid pip is ONE mana. Wasp Lancer {u/b}{u/b}{u/b} = 3 mana off 3
+  Islands. Glen Elendra Liege {1}{u/b}{u/b}{u/b} = 4 mana. Plumeveil {w/u}{w/u}{w/u} = 3 mana.
+  The cast line now spells this out for you: "[hybrid: each {u/b} pays with U or B - total N
+  mana]". Read the total; that is the cost. "I can't cast this, I have no black/white" is ALWAYS
+  WRONG here.
+- TRUST THE MENU, do not recount your mana from your Islands. The "Mana available: N" line and
+  the Cast list already subtract the mana you spent on any spell you cast EARLIER this same turn.
+  If a card you can normally afford is NOT in the Cast list, you have already tapped out - that
+  is correct, not a bug. Do not burn a long reply asking "why isn't X listed?"; cast from the
+  list you are given.
+
+DEPLOY THE BIGGEST ATTACKER YOU CAN AFFORD - AND WALLS ARE NOT ATTACKERS:
+- "Biggest flyer" means the biggest flyer THAT CAN ATTACK. Your two walls (Oona's Gatewarden,
+  Plumeveil) have Defender and CANNOT attack - they are never your "biggest flyer" for
+  development, even though Plumeveil is a 4/4. A 4/4 wall does not advance your clock; a 3/2 Wasp
+  Lancer does. When your turn's play is to develop, cast the biggest ATTACKING flyer offered
+  (Wasp Lancer 3/2 over Scion 1/1; Mahamoti 5/6 at 6 mana). Do NOT deploy a 1/1 while a 3/2
+  attacker is on the same menu.
+- Cast a WALL only when you actually need a blocker THIS turn (see racing, below) - not as your
+  development when you are trying to close a game. Casting two walls and swinging with a lone 1/1
+  is how you lose a race you could have won.
+
+THE ENGINE - HOW YOU KILL:
+- Two ANTHEM LORDS. Glen Elendra Liege (2/3 flyer) gives EVERY other blue AND black creature you
+  control +1/+1. Scion of Oona (1/1 flash flyer) gives every other FAERIE +1/+1 AND shroud. Both
+  stack; cast them early, your whole team grows.
+- Mahamoti Djinn ({4}{u}{u} 5/6 flyer) is your finisher - cast it the first turn you have 6 mana.
+- Faerie Swarm ({3}{u} flyer) enters as big as the number of blue permanents you control (Islands
+  count) - a 4/4+ by mid-game. Cast it as a real body and attack with it.
+
+STEAL THEIR BEST CREATURE - Control Magic ({2}{u}{u}) x4 + Persuasion ({3}{u}{u}) x2:
+- Six auras that take PERMANENT control of a target creature: they remove their threat AND hand
+  you a body. This is your best interaction - use it freely, do NOT hoard it.
+- Cast one the FIRST turn the opponent has a creature worth taking: their biggest attacker, a
+  bomb you cannot race, an anthem lord, or the blocker in front of your lethal. Stealing an
+  opponent's ANTHEM LORD (their Scion of Oona / Glen Elendra Liege) is a game-swinger - take it
+  the turn it is a legal target, do NOT cast another wall or hold the steal for "later." A steal
+  saved all game is a steal wasted (vs44: Control Magic on the opponent's Scion was offered at
+  turn 11 and 13, declined for a wall, cast too late at turn 15 on a 1/1 - and the game was lost).
+- If the option says "the only legal targets are YOUR OWN right now", the opponent has nothing to
+  take - cast an attacker instead, do not steal your own creature.
+
+ATTACK EVERY TURN - THIS IS WHERE GAMES ARE LOST:
+- Every turn you have an untapped flyer: does the opponent have FLYING or REACH? If NO, all your
+  flyers are unblockable - attack with EVERY untapped flyer, every turn. Casting a body but not
+  swinging is how this deck loses a game it was winning.
+- "No attackers" is correct ONLY when every flyer you have is tapped/summoning-sick or would die
+  to a flying blocker for no gain. The engine only lists creatures that CAN attack - send all of
+  them.
+
+WHEN THE OPPONENT ALSO FLIES OR GAINS LIFE - YOU ARE IN A RACE:
+- Some opponents DO have flyers (a faerie mirror) or gain life (lifelink). Here the "fly over an
+  empty sky" plan does not apply and passivity loses. RACE: build a WIDE attacking board (spend
+  mana on attackers, not walls), keep swinging every turn, and STEAL their best flyer or anthem
+  EARLY to break the parity. Do not tap out on walls and clock with a single creature while they
+  gain out of range or out-tempo you (vs110: two Plumeveils + a lone Cloud Sprite lost to Vault
+  Skirge lifelink; vs44: over-walled + late steal, out-raced in the mirror).
+
+YOUR WALLS (Gatewarden, Plumeveil) NEVER ATTACK - they are BLOCKERS only:
+- Oona's Gatewarden ({u/b} 2/1 flying defender, wither) and Plumeveil ({w/u}{w/u}{w/u} 4/4 flash
+  flying defender) have Defender and cannot attack. Never declare them as attackers, never plan
+  lethal around them. Block with them: Plumeveil is a great flash wall (even during the
+  opponent's attack); Gatewarden's wither puts -1/-1 counters on whatever it blocks.
+
+BLOCKING: Cloud Sprite (1/1) can block ONLY flyers; every OTHER flyer of yours blocks anything.
+Block only where the trade favors you or you are getting low; while your life is high, take the
+damage and keep attacking. Do not gang-block a harmless 0-power creature.
+
+MULLIGAN: keep any hand with 2-4 lands and at least one castable spell - and every Gatewarden,
+Cloud Sprite, Wasp Lancer, Liege in your opener IS castable off Islands (hybrid). Ship only 0-1
+or 6+ land hands, or an all-walls/fatties hand with no early attacker.
