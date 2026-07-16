@@ -1,0 +1,72 @@
+Deck identity: MONO-GREEN ENCHANTRESS. Your enchantments are a DRAW ENGINE and your auras are
+PUMP - none of them deal damage or destroy anything. You win one of two ways: (A) VOLTRON -
+stack pump auras onto ONE creature, give it TRAMPLE, and swing for a huge unblockable-through
+hit; or (B) GO WIDE - Fists-of-Ironwood Saproling tokens grown by Gaea's Anthem + Primal Rage.
+You usually kill by turn 8-13. Your mana is trivial - EVERY spell is green off your Forests
+(plus Birds/Druid dorks). There is never a mana problem to agonize over; if a Cast option is
+listed, it is payable now.
+
+THE #1 RULE - YOUR CARDS DRAW AND PUMP, THEY DO NOT KILL. NEVER cast an aura "to kill" or "to
+trade with" an opponent's creature - they only make bodies bigger. What each card ACTUALLY does:
+- Argothian Enchantress ({1}{g} 0/1, SHROUD): whenever you cast an enchantment spell, DRAW A
+  CARD. This is your engine. She is the most important card in the deck - cast her EARLY, and cast
+  her BEFORE you pour out your enchantments, so every enchantment after her refills your hand.
+- Yavimaya Enchantress ({2}{g} 2/2): gets +1/+1 for EACH enchantment on the battlefield (yours
+  AND the opponent's). In this deck she becomes a 5/5, 6/6, 7/7 fast - a real beater. Pump her.
+- Web ({g} AURA): enchanted creature gets +0/+2 AND REACH (can now block flyers). Cheap - a great
+  Argothian draw-trigger and a way to make a ground creature block fliers.
+- Fists of Ironwood ({1}{g} AURA): when it enters, make TWO 1/1 green Saproling tokens; the
+  enchanted creature gains TRAMPLE (no stat boost). The two tokens are the real payoff.
+- Blanchwood Armor ({2}{g} AURA): +1/+1 for EACH Forest you control. You run ~26 Forests, so this
+  is routinely +5/+5 or more. Your best single pump.
+- Ancestral Mask ({2}{g} AURA): +2/+2 for each OTHER enchantment on the battlefield. In a deck
+  full of enchantments this is enormous (it made a 0/1 Birds into a 9/10 in a game you won).
+- Primal Rage ({1}{g} ENCHANTMENT, no target): ALL your creatures have TRAMPLE. Global.
+- Gaea's Anthem ({1}{g}{g} ENCHANTMENT, no target): ALL your creatures get +1/+1. Global anthem.
+- Briar Patch ({1}{g}{g} ENCHANTMENT, no target): every creature that attacks YOU gets -1/-0.
+  Defensive - it shrinks the opponent's attackers, it does not help you attack.
+- Birds of Paradise ({g} 0/1 flying): mana dork, taps for any color. Druid of the Cowl ({1}{g}
+  1/3): mana dork for {g}. Canopy Spider ({1}{g} 1/3, REACH): a blocker that can block flyers.
+
+SEQUENCE THE ENGINE - CAST ARGOTHIAN ENCHANTRESS FIRST, THEN DUMP ENCHANTMENTS:
+- The turn you can, cast Argothian Enchantress. AFTER she is down, every enchantment you cast
+  (Web, Fists, Primal Rage, Gaea's Anthem, Blanchwood, Ancestral Mask, Briar Patch) draws you a
+  card. Casting your cheap enchantments BEFORE her throws away free cards - do not do it.
+- She has SHROUD: she cannot be targeted, so you can NEVER put your own auras on her, and the
+  opponent cannot remove her. Protect the engine - do not attack with her (she is a 0/1).
+
+AURA TARGETING - ALWAYS ENCHANT YOUR OWN CREATURE, NEVER THE OPPONENT'S:
+- Web, Fists, Blanchwood Armor and Ancestral Mask must target a creature. The list often offers
+  the opponent's creatures too - IGNORE them. Enchanting the opponent gives THEM the +stats/reach/
+  trample. Put every pump on YOUR creature.
+- If your ONLY legal target is an opponent's creature (you have no creature of your own yet), do
+  NOT cast the aura. Deploy a body first - a mana dork, Canopy Spider, Yavimaya, or make Saprolings
+  with Fists (Fists still makes its 2 tokens even when it must enchant an enemy, but prefer a real
+  creature). Best target for a big pump: Yavimaya Enchantress or a Saproling you intend to swing.
+
+YOUR WIN CONDITION - MAKE ONE BIG TRAMPLER AND ATTACK:
+- Pick one creature (Yavimaya, a Saproling, or a pumped dork), stack Blanchwood Armor / Ancestral
+  Mask / Gaea's Anthem on it, and make sure it has TRAMPLE (Primal Rage or Fists). A single 7/7+
+  trampler ends games - trample means it deals its excess through any blocker to the face.
+- When you have a large trampler and the opponent cannot block it profitably, that is LETHAL math -
+  do not re-derive the aura stack. TRUST the printed [X/Y] on your battlefield line and SWING.
+
+ATTACK EVERY TURN - DURDLING LOSES THIS DECK:
+- Your two clean losses were fast decks racing you while your board sat home under auras. Every
+  turn, attack with every creature that has real power and is not needed to block.
+- The "creatures that can attack" list is the exact set that is ELIGIBLE (summoning-sick creatures
+  are already excluded - do not count them). Declare from that list; do not agonize.
+- Do NOT attack with 0-power engine/dork creatures: Argothian Enchantress (0/1) and un-pumped
+  Birds of Paradise (0/1) deal 0 - keep them home. Your Saprolings, Yavimaya, and pumped creatures
+  are your attackers. Your creatures untap on your turn - if the list offers one, it can attack.
+- "No attackers" is correct ONLY when every creature with power is tapped or is your sole blocker
+  against lethal. Being at low life is not a reason to stop attacking if you can race or kill.
+
+SURVIVING AGGRO AND FLIERS WHILE THE ENGINE SETS UP:
+- Against faster decks (fliers, aggro) do not just race - stabilize. Canopy Spider (reach) and any
+  creature wearing Web (reach) can BLOCK FLYERS. Briar Patch shrinks every attacker against you.
+  Block to survive, keep drawing off Argothian, and out-card them into your big trampler.
+
+MULLIGAN: keep 2-4 lands (Forest / a dork counts) with at least one green spell. An opener with
+Argothian Enchantress or a mana dork plus a Forest is ideal. Ship 0-1 or 6+ land hands, or an
+all-expensive hand with no early play.
