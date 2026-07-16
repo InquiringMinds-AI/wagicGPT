@@ -1,0 +1,24 @@
+#Galvanic Blast metalcraft: with three or more artifacts it deals 4 damage
+#instead of 2 (Oracle). The primitive's conditional rider was a continuous
+#aslongas without oneshot, so it never fired on the resolving instant and
+#the Blast dealt a flat 2 in every game (wave-13 deck110 finding). A 3/3
+#dies to the metalcraft 4 but survives the base 2 (see the _base fixture).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:cathodion,cathodion,cathodion
+hand:galvanic blast
+manapool:{R}
+[PLAYER2]
+inplay:hill giant
+[DO]
+galvanic blast
+hill giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:cathodion,cathodion,cathodion
+graveyard:galvanic blast
+[PLAYER2]
+graveyard:hill giant
+[END]

@@ -1,0 +1,21 @@
+#Galvanic Blast without metalcraft (only two artifacts): base 2 damage,
+#a 3/3 survives. Guards the oneshot fix against over-firing.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:cathodion,cathodion
+hand:galvanic blast
+manapool:{R}
+[PLAYER2]
+inplay:hill giant
+[DO]
+galvanic blast
+hill giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:cathodion,cathodion
+graveyard:galvanic blast
+[PLAYER2]
+inplay:hill giant
+[END]

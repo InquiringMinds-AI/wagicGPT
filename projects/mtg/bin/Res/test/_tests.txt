@@ -1030,3 +1030,5 @@ lexicon/mana_dynamic_value_graveyard.txt
 lexicon/mana_dynamic_value_graveyard_empty.txt
 lexicon/basic_defender_rejects_attack.txt
 lexicon/combat_illegal_attacker_click_noop.txt
+galvanic_blast_metalcraft.txt
+galvanic_blast_base.txt
