@@ -276,8 +276,12 @@ private:
     //for the worker thread; built on the game thread, nothing shared.
     string buildRequestBody(const string& userMsg);
     //Extract the chosen action number from a model reply; -1 if unusable.
+    //staleEcho (out, optional) is set true when the name-echo parses to
+    //significant words that match NO offered option - a staleness signal
+    //that routes the answer to the heuristic instead of the raw index.
     static int parseChoice(const string& content, int optionCount,
-                           const std::vector<string> * optionTexts = NULL);
+                           const std::vector<string> * optionTexts = NULL,
+                           bool * staleEcho = NULL);
 
     string mEndpoint; //base URL, empty if nothing answered
     string mModel;

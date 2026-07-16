@@ -1462,8 +1462,10 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
 }
 
 int AIPlayerGPT::parseChoice(const string& content, int optionCount,
-                             const std::vector<string> * optionTexts)
+                             const std::vector<string> * optionTexts,
+                             bool * staleEcho)
 {
+    if (staleEcho) *staleEcho = false;
     //Drop any inline think block first.
     string text = content;
     size_t thinkEnd = text.rfind("</think>");
@@ -1482,6 +1484,7 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     //an arbitrary cast.
     int echoRemap = -1;
     bool echoConflict = false;
+    bool echoNoMatch = false;
     if (optionTexts && !optionTexts->empty())
     {
         //the LAST "(...)" following a digit on the answer-ish tail
@@ -1500,7 +1503,14 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                     w += c;
                 else
                 {
-                    if (w.size() >= 4 && w != "cast" && w != "with" && w != "play")
+                    //Decline/pass filler is NOT a card name: an echo of
+                    //"(pass)" / "(none)" / "(hold)" / "(done)" carries no
+                    //significant words, so it can never read as a stale
+                    //absent-echo (task constraint ii). Real card names never
+                    //reduce to these tokens.
+                    if (w.size() >= 4 && w != "cast" && w != "with" && w != "play"
+                        && w != "pass" && w != "none" && w != "hold" && w != "done"
+                        && w != "skip" && w != "decline" && w != "nobody")
                         words.push_back(w);
                     w.clear();
                 }
@@ -1524,6 +1534,8 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                 }
                 if (match >= 0)
                     echoRemap = match + 1; //1-based option number
+                else if (!echoConflict)
+                    echoNoMatch = true; //named words matched NO offered option
             }
         }
     }
@@ -1557,6 +1569,20 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             //no option name of its own.
             if (echoRemap > 0 && !echoConflict && n != 0 && echoRemap != n)
                 return echoRemap;
+            //Absent-echo staleness: the echo named significant words that
+            //match NO offered option (a parent-action echo at a target
+            //sub-menu, or a card cast earlier this turn after the option
+            //list shifted). The raw index would execute an unintended
+            //in-list card - game-losing twice this corpus (deck133 forbidden
+            //Thoughtseize, deck140 dumped kill shot). Route to the heuristic
+            //instead. A deliberate 0 (decline/pass) carries no card name and
+            //is never treated as stale. A multi-option echo (echoConflict)
+            //and a no-significant-word echo ("(pass)") keep index-wins.
+            if (echoNoMatch && n != 0)
+            {
+                if (staleEcho) *staleEcho = true;
+                return -1;
+            }
             return n;
         }
         //out-of-range index, but the echo names a real option: repair
@@ -1565,6 +1591,11 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     }
     else if (echoRemap > 0 && !echoConflict)
         return echoRemap; //non-numeric head, but the echo names the intent
+    //Real replies begin "CHOICE: N ...", so the head is non-numeric and the
+    //index is resolved by the trailing scan below. Staleness is applied to
+    //that resolved index (a positive index only - a resolved 0 is a
+    //deliberate decline and is never stale), so the branch cannot preempt a
+    //CHOICE: 0 before its index is known.
     int choice = -1;
     i = 0;
     while (i < text.size())
@@ -1586,6 +1617,15 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
         {
             i++;
         }
+    }
+    //Absent-echo staleness on the trailing-scan index (the common path for
+    //real "CHOICE: N (...)" replies). A resolved 0 is a deliberate decline
+    //and is exempt; a positive index whose echo named no offered option is
+    //stale -> defer to the heuristic.
+    if (echoNoMatch && choice > 0)
+    {
+        if (staleEcho) *staleEcho = true;
+        return -1;
     }
     return choice;
 }
@@ -1754,7 +1794,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //The plan is split off BEFORE choice parsing: plan prose is full of
         //numbers that would otherwise misparse as the chosen action.
         string decisionPart = consumePlan(content);
-        choice = parseChoice(decisionPart, index, &shownLines);
+        bool staleEcho = false;
+        choice = parseChoice(decisionPart, index, &shownLines, &staleEcho);
         if (content.empty())
             setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
@@ -1779,7 +1820,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 mPassDeclineCount[isFetchCrackLine(shownLines[s])
                                   ? fetchLineKey(shownLines[s]) : shownLines[s]]++;
         {
-            const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : "unparsed_reply");
+            const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : (staleEcho ? "stale_echo" : "unparsed_reply"));
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
                           : (choice == 0 ? string("pass") : string());
             writeTransLog("priority", userMsg, content, choice, index, chosen, fb, &shownLines);
@@ -1854,7 +1895,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
 
     //Plan split BEFORE choice parsing: plan prose is full of numbers.
     string decisionPart = consumePlan(content);
-    int choice = parseChoice(decisionPart, (int) options.size(), &options);
+    bool staleEcho = false;
+    int choice = parseChoice(decisionPart, (int) options.size(), &options, &staleEcho);
     if (content.empty())
         setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
@@ -1865,7 +1907,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     mAskCache[askKey] = choice;
     {
         bool valid = choice >= 1 && choice <= (int) options.size();
-        const char * fb = valid ? NULL : (content.empty() ? "empty_reply" : "unparsed_reply");
+        const char * fb = valid ? NULL : (content.empty() ? "empty_reply" : (staleEcho ? "stale_echo" : "unparsed_reply"));
         writeTransLog("ask", userMsg, content, choice, (int) options.size(),
                       valid ? options[choice - 1] : string(), fb, &options);
     }
@@ -2615,7 +2657,8 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
 //-1 = unusable (empty or no signal at all -> caller falls back to Baka).
 //The 0/-1 split matters: attacking with nobody is a legitimate choice, so
 //"none" must NOT trigger the heuristic override the way a garbled reply does.
-static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out)
+static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
+                            const vector<string> * optionNames = NULL)
 {
     out.assign(nAttackers, false);
     int named = 0;
@@ -2642,6 +2685,65 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
             named++;
         }
         i = j; //advance past the number
+    }
+    //Name->index reconcile (mirrors parseChoice's echo philosophy). The
+    //A-index scan silently DROPPED any name token in a mixed reply
+    //("ATTACK: A1, Rakdos Cackler" declared only A1 - deck109 lost 6
+    //declarations across 3 games), and a pure-name reply ("ATTACK: Hellrider")
+    //parsed to nothing -> heuristic. Split the reply on commas/newlines; each
+    //segment's significant words (lowercase, len>=4, minus protocol filler)
+    //select the UNIQUE listed attacker whose name contains ALL of them. A
+    //unique match UNIONS in; zero or multiple matches drop (respecting
+    //eligibility - optionNames holds only the legal candidates). A-index
+    //segments carry no significant words and are skipped.
+    if (optionNames)
+    {
+        size_t start = 0;
+        for (size_t s = 0; s <= content.size(); s++)
+        {
+            if (s != content.size() && content[s] != ',' && content[s] != '\n')
+                continue;
+            string seg = content.substr(start, s - start);
+            start = s + 1;
+            vector<string> words;
+            string w;
+            for (size_t k = 0; k <= seg.size(); k++)
+            {
+                char c = (k < seg.size()) ? (char) tolower((unsigned char) seg[k]) : ' ';
+                if (isalnum((unsigned char) c))
+                    w += c;
+                else
+                {
+                    if (w.size() >= 4 && w != "attack" && w != "with" && w != "cast"
+                        && w != "play" && w != "none" && w != "hold" && w != "pass"
+                        && w != "nobody")
+                        words.push_back(w);
+                    w.clear();
+                }
+            }
+            if (words.empty())
+                continue;
+            int match = -1;
+            for (size_t o = 0; o < optionNames->size() && o < nAttackers; o++)
+            {
+                string low = (*optionNames)[o];
+                for (size_t k = 0; k < low.size(); k++)
+                    low[k] = (char) tolower((unsigned char) low[k]);
+                bool all = true;
+                for (size_t k = 0; k < words.size() && all; k++)
+                    all = low.find(words[k]) != string::npos;
+                if (all)
+                {
+                    if (match >= 0) { match = -1; break; } //not unique -> drop
+                    match = (int) o;
+                }
+            }
+            if (match >= 0 && !out[match])
+            {
+                out[match] = true;
+                named++;
+            }
+        }
     }
     if (named > 0)
         return named;
@@ -2700,7 +2802,12 @@ int AIPlayerGPT::chooseAttackers()
     //"hold") in the plan prose must not read as attack declarations.
     string decisionPart = consumePlan(content);
     vector<bool> send;
-    int result = content.empty() ? -1 : parseAttackerSet(decisionPart, attackers.size(), send);
+    vector<string> attackerNames;
+    attackerNames.reserve(attackers.size());
+    for (size_t j = 0; j < attackers.size(); j++)
+        attackerNames.push_back(attackers[j]->name);
+    int result = content.empty() ? -1
+                 : parseAttackerSet(decisionPart, attackers.size(), send, &attackerNames);
 
     if (result < 0)
     {
