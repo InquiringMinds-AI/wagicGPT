@@ -4,6 +4,7 @@
 
 #include "AIPlayerGPT.h"
 #include "LegalActions.h"
+#include "GptPlanCaveat.h"
 #include "DecisionContract.h"
 #include <chrono>
 #include "GptConfig.h"
@@ -866,7 +867,27 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
         u << "GAME LOG (everything that has happened so far):\n" << mNarration << "\n";
     u << "--- CURRENT SITUATION ---\n" << serializeGameState();
     if (!mCurrentPlan.empty())
+    {
         u << "\nYOUR PLAN (as you last stated it): " << mCurrentPlan << "\n";
+        //Item-1: the carried plan preserves intent across decisions, but when
+        //the state has advanced past it (a card it planned to cast is already
+        //cast, the menu changed) it re-injects STALE intent - the model then
+        //executes a leftover plan against the wrong option (a self-Galvanic-
+        //Blast on its own just-cast Steel Overseer, deck110-vs-deck21). When
+        //the plan's AFFIRMATIVELY named card-actions have ALL fallen off the
+        //current options, append a caveat so the model re-derives. Light-touch
+        //(not a drop) so a plan that legitimately looks ahead to a future
+        //action is only nudged. Vocabulary = names in the caster's own zones.
+        std::vector<string> myNames;
+        MTGGameZone * zs[] = { game->library, game->hand, game->inPlay, game->graveyard };
+        for (int z = 0; z < 4; z++)
+            for (int i = 0; i < zs[z]->nb_cards; i++)
+                myNames.push_back(zs[z]->cards[i]->getDisplayName());
+        if (gptcaveat::planActionsStale(mCurrentPlan, tail, myNames))
+            u << "(note: the actions your plan names are no longer among the options available "
+                 "right now - the game state has advanced past that plan; re-derive your choice "
+                 "from the current board and the options below.)\n";
+    }
     u << "\n" << tail;
     return u.str();
 }
@@ -2139,6 +2160,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         MTGCardInstance * card = casts[ci].card;
         ManaCost * cost = card->getManaCost();
         std::ostringstream o;
+        bool suppressSelfHarm = false; //Item-3: own-only detrimental cast
         if (!casts[ci].viaAlternative)
         {
             o << "Cast " << card->getDisplayName();
@@ -2225,7 +2247,28 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         }
                     }
                     if (ownT && !oppT && firstHit)
+                    {
                         o << " - the only legal targets are YOUR OWN right now";
+                        //Item-3: a MANDATORY-target spell whose only legal
+                        //targets are friendly, and whose effect the engine
+                        //classifies as detrimental, can only harm the caster's
+                        //own board. The pilot declines it ~30/31 times but the
+                        //residual RESOLVES a self-destroy (deck44 wave-16 s21
+                        //self-Go-for-the-Throat on its own Faerie Miscreant).
+                        //Make it structurally unavailable in the GPT cast menu.
+                        //Scoped to GPT option assembly only: Baka's scorer
+                        //already declines these; the human UI is untouched. The
+                        //engine's classifier is the arbiter, so a self-target
+                        //it rates GOOD/DONTKNOW (sac synergies, combat tricks -
+                        //also usually costs, not targets) is NOT cut. Mandatory-
+                        //ness: this block is already the maxtargets==1 case,
+                        //which the 601.2c filter above treats as a mandatory
+                        //single target (tc->targetMin is a bool that only marks
+                        //multi-target "exactly N" choosers - NOT single-target
+                        //spells, so it must not gate here).
+                        if (effectBadOrGood(card, MODE_TARGET, tc) == BAKA_EFFECT_BAD)
+                            suppressSelfHarm = true;
+                    }
                     else if (ownT + oppT > 0)
                     {
                         o << " - legal targets right now: " << tNames.str();
@@ -2267,6 +2310,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     o << " - can target on the stack: " << hits.str();
             }
         }
+        if (suppressSelfHarm)
+            continue; //Item-3: own-only detrimental cast; not offered to the model
         if (mStuckCastLines.count(o.str()))
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);

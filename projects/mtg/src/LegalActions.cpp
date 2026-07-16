@@ -140,7 +140,24 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
             //on its own restriction set, as the engine does at cast time.
             //normalEntry stays the representative for flashback/morph
             //pricing (payable() passed with neither flag), like before.
-            bool normalEntry = (normalOk || !altOk);
+            //
+            //The OLD proxy "normalOk || !altOk" silently re-admitted the
+            //printed-cost mode whenever the alternative was knocked out - its
+            //MANA affordable but its extra-cost TARGET missing. Force of
+            //Negation with a blue-less hand and only {g} in the pool is the
+            //case: payable() (line 20) passed on the alternative's {0} mana
+            //alone, the extra-cost check above set altOk=false (no blue card
+            //to exile), and "!altOk" then re-offered the unpayable {1}{U}{U}
+            //hardcast - chosen, then silently deferred/fizzled (deck135
+            //wave-16 s8/s16). Gate the normal entry on a mode that is ACTUALLY
+            //payable ignoring the alternative: the printed cost (normalOk
+            //already weighs canAfford/planPayment) or a non-alternative
+            //special mode (flashback/morph/retrace, which payable() accepts
+            //but normalOk does not separately track). A null-cost card is free.
+            bool normalEntry = normalOk || !cost
+                || (cost->getMorph() && pMana->canAfford(cost->getMorph(), 0))
+                || (cost->getFlashback() && pMana->canAfford(cost->getFlashback(), 0))
+                || (cost->getRetrace() && pMana->canAfford(cost->getRetrace(), 0));
             {
                 AbilityFactory af(p->getObserver());
                 if (normalEntry && card->getRestrictions().size()
