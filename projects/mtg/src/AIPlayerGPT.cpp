@@ -1578,7 +1578,26 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                         //verb/decline filler)
                         vector<string> ow;
                         string t;
-                        const string& src = (*optionTexts)[o];
+                        //E-49a (deck21 s4): a PLAYER-target option carries the
+                        //volatile "(player, life N)" suffix (describeTarget:
+                        //"The opponent (player, life 20)"). Its words "player"
+                        //and "life" are absent from an echo that names the
+                        //spell+target ("Cast Lightning Bolt targeting The
+                        //opponent"), so the option-subset test failed and a
+                        //CORRECT answer was wrongly downgraded to stale_echo.
+                        //Strip that suffix before extracting the option's anchor
+                        //words - life is not identifying. Scoped to this exact
+                        //pattern; index-wins and the uniqueness guard are intact.
+                        string src = (*optionTexts)[o];
+                        {
+                            size_t pl = src.find("(player, life ");
+                            if (pl != string::npos)
+                            {
+                                size_t close = src.find(')', pl);
+                                if (close != string::npos)
+                                    src.erase(pl, close - pl + 1);
+                            }
+                        }
                         for (size_t k = 0; k <= src.size(); k++)
                         {
                             char c = (k < src.size()) ? (char) tolower((unsigned char) src[k]) : ' ';
@@ -1762,6 +1781,20 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //casts (not offered by legalCasts' viaAlternative, hand-only) keep
         //their standalone entry.
         if (t == MTGAbility::ALTERNATIVE_COST && it->first.click
+            && game->hand->hasCard(it->first.click))
+            continue;
+        //A normal cast-from-hand / land play (MTGPutInPlayRule, PUT_INTO_PLAY)
+        //surfaced as a priority ordered action is a DEAD END for this seam,
+        //exactly like the alternative-cost rule above: a single click only
+        //arms it and nothing reaches the stack, so the option re-offers every
+        //window. E6 (deck110 wave-17): a second Mox Opal held in hand rendered
+        //"Cast Card Normally with Mox Opal {its own reminder text}" as the SOLE
+        //priority option and looped as the seat's #1 fallback driver. The
+        //dedicated cast menu (FindCardToPlay/buildCastSpell) and land menu
+        //(legalLandPlays) already own every hand play, so drop the redundant
+        //dead end here. Scoped to HAND cards so an exotic normal-cast from
+        //library/graveyard/exile the cast menu may not enumerate is preserved.
+        if (t == MTGAbility::PUT_INTO_PLAY && it->first.click
             && game->hand->hasCard(it->first.click))
             continue;
         candidates.push_back(&(it->first));
@@ -2160,7 +2193,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         MTGCardInstance * card = casts[ci].card;
         ManaCost * cost = card->getManaCost();
         std::ostringstream o;
-        bool suppressSelfHarm = false; //Item-3: own-only detrimental cast
+        bool suppressCast = false; //own-only detrimental OR opponent-only beneficial
         if (!casts[ci].viaAlternative)
         {
             o << "Cast " << card->getDisplayName();
@@ -2267,13 +2300,32 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         //multi-target "exactly N" choosers - NOT single-target
                         //spells, so it must not gate here).
                         if (effectBadOrGood(card, MODE_TARGET, tc) == BAKA_EFFECT_BAD)
-                            suppressSelfHarm = true;
+                            suppressCast = true;
                     }
                     else if (ownT + oppT > 0)
                     {
                         o << " - legal targets right now: " << tNames.str();
                         if (ownT + oppT > tShown)
                             o << " (+" << (ownT + oppT - tShown) << " more)";
+                        //Item-3 (wave-17 E-49c): the MIRROR of the own-only
+                        //bad-effect cut above. A beneficial cast whose only
+                        //legal targets are OPPONENT-controlled can only help
+                        //the opponent - the pilot never wants it and loops
+                        //hunting for a use (deck49 Goblin War Paint {1}{R}
+                        //+2/+2+haste offered with only enemy creatures legal:
+                        //two ~13k-token fatal loops, deck17 s18 + deck135 s22).
+                        //Same "never-useful, so don't offer" justification as
+                        //the bad side. Conservative GATE: opponent-only (no own
+                        //target), single-target, AND the classifier POSITIVELY
+                        //rates the effect GOOD - a DONTKNOW/BAD cast (all
+                        //removal/burn targets the opponent and rates BAD) keeps
+                        //its "legal targets right now" annotation and is NOT
+                        //cut. Baka's own targeting proves the classifier rates
+                        //pump/haste auras GOOD (it sends them at OWN creatures),
+                        //so a GOOD cast with no own target is genuinely useless.
+                        if (oppT && !ownT && firstHit
+                            && effectBadOrGood(card, MODE_TARGET, tc) == BAKA_EFFECT_GOOD)
+                            suppressCast = true;
                     }
                     else if (firstHit)
                         o << " - NO legal target right now";
@@ -2310,8 +2362,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     o << " - can target on the stack: " << hits.str();
             }
         }
-        if (suppressSelfHarm)
-            continue; //Item-3: own-only detrimental cast; not offered to the model
+        if (suppressCast)
+            continue; //own-only detrimental OR opponent-only beneficial cast; not offered
         if (mStuckCastLines.count(o.str()))
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
@@ -2743,17 +2795,30 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 effectName = "this effect";
         }
 
+        //Target sub-menus reached the model as a bare "Choose ... for X" line
+        //that read like a phase or cast decision, owning most of the corpus's
+        //fallbacks: the pilot answered with an attack PLAN ("Choose the target
+        //for Web" -> out-of-range CHOICE: 0, deck62 N1), echoed the SPELL name
+        //as its pick instead of the target (deck49 E-49b, all 7 stale_echoes),
+        //or invented "Cast nothing" on a mandatory chooser (deck135 s4). Frame
+        //the step explicitly: name the pending spell/ability, state it is a
+        //TARGET pick for something already on the stack (not a cast/phase step),
+        //and tell the model to answer with the TARGET's name. Representation
+        //only - the offered set and the apply path are unchanged.
         std::ostringstream q;
-        q << "Choose ";
+        q << "TARGET CHOICE for " << effectName
+          << " (this spell/ability is already on the stack and needs a target - "
+          << "it is NOT a cast or phase step). Pick ";
         if (!multi)
-            q << "the target";
+            q << "the ONE target it will affect";
         else
         {
             q << "target " << (picks.size() + 1);
             if (!unlimited)
                 q << " of " << (tc->targetMin ? "exactly " : "up to ") << tc->maxtargets;
         }
-        q << " for " << effectName;
+        q << " from the list below, and answer with the chosen TARGET's name (not \""
+          << effectName << "\")";
 
         int pick = askModel(q.str(), opts);
         if (pick == kChoicePending)
@@ -3129,7 +3194,8 @@ int AIPlayerGPT::chooseBlockers()
             " two attackers), but several DIFFERENT blockers may gang-block the same"
             " attacker. Blockers you do not mention stay out of combat.\nWrite your"
             " PLAN: line first, then on the last line BLOCKS: followed by the"
-            " assignments, comma-separated, e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\".";
+            " assignments, comma-separated, e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\","
+            " or exactly \"BLOCKS: none\" to block with nobody this turn.";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -3152,7 +3218,8 @@ int AIPlayerGPT::chooseBlockers()
         string low;
         for (size_t i = 0; i < decisionPart.size() && i < 80; i++)
             low += (char) tolower((unsigned char) decisionPart[i]);
-        if (low.find("none") != string::npos || low.find("no block") != string::npos)
+        if (low.find("none") != string::npos || low.find("no block") != string::npos
+            || low.find("no assignment") != string::npos)
         {
             DecisionAction none;
             DecisionManager::applyDeclareBlockers(req, none);
