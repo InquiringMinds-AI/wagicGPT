@@ -1722,6 +1722,47 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     return choice;
 }
 
+int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
+                                     const std::vector<string> * optionTexts)
+{
+    //Decode-time repeat-loops spiral a phrase 60-100x and truncate; the
+    //model usually states a tentative "CHOICE: N (name)" BEFORE the loop
+    //(deck135 wave-18 HARNESS#2). Walk every line, keep the LAST one whose
+    //CHOICE: label re-parses to a valid, offered option through the normal
+    //parseChoice (so echo + staleness protection still apply - a stale line
+    //re-parses to -1 and is skipped, never used).
+    int salvaged = -1;
+    size_t lineStart = 0;
+    while (lineStart <= content.size())
+    {
+        size_t lineEnd = content.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? content.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (content[s] == ' ' || content[s] == '\t'
+                           || content[s] == '*' || content[s] == '#' || content[s] == '-'))
+            s++; //tolerate markdown/list decoration before the label
+        if (end - s >= 7)
+        {
+            static const char * kLabel = "CHOICE:";
+            bool m = true;
+            for (int k = 0; k < 7 && m; k++)
+                m = (toupper((unsigned char) content[s + k]) == kLabel[k]);
+            if (m)
+            {
+                string line = content.substr(s + 7, end - (s + 7));
+                bool st = false;
+                int c = parseChoice(line, optionCount, optionTexts, &st);
+                if (c >= 0)
+                    salvaged = c; //keep the last well-formed, offered choice
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    return salvaged;
+}
+
 //A land-fetch activation, by its rendered option line (the same string the
 //de-dup and decline maps key on). These are the ability names the fetchland
 //scripts render ("Put in Play with Misty Rainforest targeting...", "search
@@ -1902,6 +1943,17 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         string decisionPart = consumePlan(content);
         bool staleEcho = false;
         choice = parseChoice(decisionPart, index, &shownLines, &staleEcho);
+        //Repeat-loop salvage: an unparsed (NOT stale, NOT empty) reply may be
+        //a decode spiral that stated a valid CHOICE before degenerating.
+        if (choice < 0 && !staleEcho && !content.empty())
+        {
+            int sal = salvageLoopedChoice(content, index, &shownLines);
+            if (sal >= 0)
+            {
+                DebugTrace("AIPlayerGPT: salvaged looped CHOICE " << sal << " of " << index);
+                choice = sal;
+            }
+        }
         if (content.empty())
             setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
@@ -2003,6 +2055,17 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     string decisionPart = consumePlan(content);
     bool staleEcho = false;
     int choice = parseChoice(decisionPart, (int) options.size(), &options, &staleEcho);
+    //Repeat-loop salvage (see chooseOrderedAction): recover a valid CHOICE
+    //stated before a decode spiral; never overrides a stale_echo verdict.
+    if (choice < 0 && !staleEcho && !content.empty())
+    {
+        int sal = salvageLoopedChoice(content, (int) options.size(), &options);
+        if (sal >= 0)
+        {
+            DebugTrace("AIPlayerGPT: salvaged looped CHOICE " << sal << " of " << options.size());
+            choice = sal;
+        }
+    }
     if (content.empty())
         setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
@@ -2078,6 +2141,58 @@ static string hybridPipNote(ManaCost * c)
         for (size_t k = 0; k < pips.size(); k++)
             note << (k ? "; " : "") << pips[k];
     note << " - total " << c->getConvertedCost() << " mana]";
+    return note.str();
+}
+
+//Name the card(s) an EXTRA cost on an alternative cast will consume from
+//hand. Force of Negation's free "exile a blue card" pitch auto-selected the
+//caster's only blue card (its finisher, Abominable Treefolk) with nothing on
+//the option line naming it, so the model committed to the counter believing
+//it was pitching a different card (deck135 wave-18 #1d). Surface the actual
+//pitch target; warn when it is the sole eligible card, and flag the >1 case
+//(the engine currently auto-picks synchronously before the model can choose
+//- documented as the deeper routing gap). Enumerates from the cost's own
+//TargetChooser over the caster's hand (the pitch case; other zones no-op).
+static string pitchCostNote(MTGCardInstance * card, ManaCost * altCost)
+{
+    if (!card || !altCost || !altCost->extraCosts)
+        return "";
+    Player * p = card->controller();
+    if (!p || !p->game || !p->game->hand)
+        return "";
+    std::ostringstream note;
+    ExtraCosts * aec = altCost->extraCosts;
+    for (size_t i = 0; i < aec->costs.size(); i++)
+    {
+        ExtraCost * ec = aec->costs[i];
+        if (!ec || !ec->tc)
+            continue;
+        ec->setSource(card);
+        vector<MTGCardInstance *> cands;
+        MTGGameZone * hand = p->game->hand;
+        for (int z = 0; z < hand->nb_cards; z++)
+        {
+            MTGCardInstance * c = hand->cards[z];
+            if (c == card)
+                continue; //the "other" targeter already excludes the source
+            if (ec->tc->canTarget(c))
+                cands.push_back(c);
+        }
+        if (cands.empty())
+            continue;
+        if (cands.size() == 1)
+            note << " (this exiles your ONLY eligible card, " << cands[0]->getDisplayName()
+                 << " - you will lose it)";
+        else
+        {
+            note << " (auto-exiles ONE of: ";
+            for (size_t k = 0; k < cands.size() && k < 6; k++)
+                note << (k ? ", " : "") << cands[k]->getDisplayName();
+            if (cands.size() > 6)
+                note << ", ...";
+            note << " - the engine picks for you here)";
+        }
+    }
     return note.str();
 }
 
@@ -2216,6 +2331,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << casts[ci].zoneLabel;
             o << hybridPipNote(cost->getAlternative());
+            //Name the card an exile/pitch extra cost will consume, so a free
+            //alt-cast cannot silently eat the deck's finisher unseen (#1d).
+            o << pitchCostNote(card, cost->getAlternative());
         }
         //A response option offered because of pending stack objects names what
         //it can hit ("Cast Counterspell {u}{u} - can target on the stack:
@@ -2840,10 +2958,132 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     return 1;
 }
 
+//Significant name-words of a reply SEGMENT (lowercase, len>=4, minus the
+//combat/protocol filler) - the tokens that select a named creature. Shared
+//by the block name->label reconciler; mirrors parseAttackerSet's inline
+//split and parseChoice's echo split.
+static void significantWords(const string& seg, vector<string>& words)
+{
+    string w;
+    for (size_t k = 0; k <= seg.size(); k++)
+    {
+        char c = (k < seg.size()) ? (char) tolower((unsigned char) seg[k]) : ' ';
+        if (isalnum((unsigned char) c))
+            w += c;
+        else
+        {
+            if (w.size() >= 4 && w != "attack" && w != "with" && w != "cast"
+                && w != "play" && w != "none" && w != "hold" && w != "pass"
+                && w != "nobody" && w != "block" && w != "blocks")
+                words.push_back(w);
+            w.clear();
+        }
+    }
+}
+
+//The UNIQUE listed name whose lowercased form contains ALL the given words,
+//optionally restricted to a set of allowed indices. -1 on zero OR multiple
+//matches (ambiguity - e.g. duplicate creature names - drops the assignment,
+//never guesses; the known gang-block disambiguation guard).
+static int uniqueNameMatch(const vector<string>& words, const vector<string>& names,
+                           size_t limit, const vector<int> * allowed = NULL)
+{
+    if (words.empty())
+        return -1;
+    int match = -1;
+    for (size_t o = 0; o < names.size() && o < limit; o++)
+    {
+        if (allowed)
+        {
+            bool ok = false;
+            for (size_t a = 0; a < allowed->size(); a++)
+                if ((*allowed)[a] == (int) o) { ok = true; break; }
+            if (!ok)
+                continue;
+        }
+        string low = names[o];
+        for (size_t k = 0; k < low.size(); k++)
+            low[k] = (char) tolower((unsigned char) low[k]);
+        bool all = true;
+        for (size_t k = 0; k < words.size() && all; k++)
+            all = low.find(words[k]) != string::npos;
+        if (all)
+        {
+            if (match >= 0)
+                return -1; //not unique
+            match = (int) o;
+        }
+    }
+    return match;
+}
+
+//A terse, NAIVE single-block combat-trade preview: what happens if this ONE
+//blocker blocks this ONE attacker, alone. The model keeps re-deriving
+//first-strike / deathtouch / trample math it distrusts (deck35 wave-18: an
+//11k-char loop re-computed a rendered P/T until it emitted an unparseable
+//reply); handing it the outcome removes the surface it re-derives. Ignores
+//gang-blocks, pump, damage prevention and regeneration - the section header
+//hedges "before other blockers/tricks". Perspective: 'you' = the AI (the
+//blocking side). Empty string when there is nothing decisive to say.
+static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * attacker)
+{
+    int bp = blocker->power  > 0 ? blocker->power  : 0;
+    int ap = attacker->power > 0 ? attacker->power : 0;
+    int bt = blocker->toughness;
+    int at = attacker->toughness;
+    bool bDeath = blocker->basicAbilities[Constants::DEATHTOUCH]
+               || blocker->basicAbilities[Constants::WITHER]
+               || blocker->basicAbilities[Constants::INFECT];
+    bool aDeath = attacker->basicAbilities[Constants::DEATHTOUCH]
+               || attacker->basicAbilities[Constants::WITHER]
+               || attacker->basicAbilities[Constants::INFECT];
+    bool bFirst = blocker->basicAbilities[Constants::FIRSTSTRIKE]
+               || blocker->basicAbilities[Constants::DOUBLESTRIKE];
+    bool aFirst = attacker->basicAbilities[Constants::FIRSTSTRIKE]
+               || attacker->basicAbilities[Constants::DOUBLESTRIKE];
+    bool bIndest = blocker->basicAbilities[Constants::INDESTRUCTIBLE];
+    bool aIndest = attacker->basicAbilities[Constants::INDESTRUCTIBLE];
+    bool aTrample = attacker->basicAbilities[Constants::TRAMPLE];
+
+    //Base lethality (before first-strike ordering): does X's damage kill Y?
+    bool aKillsB = (ap > 0) && !bIndest && (aDeath || ap >= bt);
+    bool bKillsA = (bp > 0) && !aIndest && (bDeath || bp >= at);
+    //First strike / double strike ordering: a one-sided first striker that
+    //kills its foe removes that foe before it can deal (the survivor's later
+    //normal-step damage lands on a dead creature).
+    if (aFirst && !bFirst && aKillsB)
+        bKillsA = false;
+    else if (bFirst && !aFirst && bKillsA)
+        aKillsB = false;
+
+    std::ostringstream o;
+    if (aKillsB && bKillsA)
+        o << "both die";
+    else if (bKillsA && !aKillsB)
+        o << "you kill it, your blocker lives";
+    else if (aKillsB && !bKillsA)
+        o << "your blocker dies, attacker lives";
+    else
+        o << "neither dies";
+    //Trample-through to your face (attacker assigns lethal to the blocker,
+    //rest carries over) - only when the attacker actually deals (not killed
+    //first by a one-sided first-strike blocker).
+    if (aTrample && !(bFirst && !aFirst && bKillsA))
+    {
+        int lethalToB = aDeath ? 1 : (bt > 0 ? bt : 0);
+        int through = ap - lethalToB;
+        if (through > 0)
+            o << ", " << through << " tramples to your face";
+    }
+    return o.str();
+}
+
 //Scan a bundled-attacker reply for the set of attackers to send: "A<n>"
 //tokens (or bare numbers) in [1..nAttackers]. Returns >0 = that many named,
-//0 = an explicit decline (a "none/hold/pass" keyword with no numbers), and
-//-1 = unusable (empty or no signal at all -> caller falls back to Baka).
+//0 = an explicit decline (a "none/hold/pass" keyword with no numbers) OR a
+//declaration that named only INELIGIBLE creatures (the eligible subset is
+//empty -> ATTACK: none, not a heuristic fallback; deck62 N2), and
+//-1 = unusable (empty or no name/number signal at all -> caller falls back).
 //The 0/-1 split matters: attacking with nobody is a legitimate choice, so
 //"none" must NOT trigger the heuristic override the way a garbled reply does.
 static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
@@ -2851,6 +3091,7 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
 {
     out.assign(nAttackers, false);
     int named = 0;
+    bool sawNamedContent = false; //the reply named creature(s), eligible or not
     for (size_t i = 0; i < content.size(); i++)
     {
         //Accept "A3" or a bare "3"; skip digits that are part of a P/T echo
@@ -2912,6 +3153,7 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
             }
             if (words.empty())
                 continue;
+            sawNamedContent = true; //the model listed a named creature here
             int match = -1;
             for (size_t o = 0; o < optionNames->size() && o < nAttackers; o++)
             {
@@ -2944,6 +3186,15 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
         || lower.find("no attack") != string::npos || lower.find("nobody") != string::npos
         || lower.find("pass") != string::npos || lower.find("don't attack") != string::npos)
         return 0; //explicit "attack with nobody" - valid, not a fallback
+    //The reply NAMED attacker(s) but NONE resolved to an eligible candidate
+    //(all summoning-sick / absent from the A-list, or ambiguous duplicates).
+    //The faithful reading of "attack with the eligible subset" is an EMPTY
+    //set -> ATTACK: none, NOT a heuristic override that may swing at will
+    //(deck62 N2: vs14 s21, vs21 s12 both named summoning-sick creatures; the
+    //correct answer was ATTACK: none). optionNames scopes this to a real
+    //attacker-declaration reply; consumePlan already nulls formless rambles.
+    if (sawNamedContent)
+        return 0;
     return -1; //unusable
 }
 
@@ -3040,7 +3291,23 @@ int AIPlayerGPT::chooseAttackers()
 //": - > =" or spaces as separator). Unmentioned or malformed blockers stay
 //out of combat. Returns how many well-formed pairs were found - zero means
 //the reply is unusable and the caller falls back to the heuristic.
-static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out)
+//
+//When blockerNames/attackerNames are supplied, a SECOND pass resolves a
+//block written with creature NAMES ("BLOCKS: Memnite: Boggart Ram-Gang",
+//"Ornithopter blocks Dragonmaster Outcast") back to its B#/A# labels - the
+//exact analogue of the shipped ATTACK name->index reconcile and the CHOICE:
+//name-echo. A legal, correctly-shaped name-form block was previously dropped
+//WHOLE -> unparsed -> the heuristic made a different, sometimes game-losing
+//block (deck110 vs21 s18: a 9/1 chumped into a 1/1 wither, game lost by 2).
+//Each comma/newline segment splits at a ':'/'blocks' separator into a
+//blocker phrase (left) and an attacker phrase (right); each resolves to the
+//UNIQUE matching name (attacker restricted to that blocker's legal set when
+//given). Ambiguous/no-match drops THAT assignment only; already-coded
+//assignments and the first-wins rule are respected.
+static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
+                                 const vector<string> * blockerNames = NULL,
+                                 const vector<string> * attackerNames = NULL,
+                                 const vector<vector<int> > * legalPerBlocker = NULL)
 {
     out.assign(nBlockers, 0); //0 = no block; else attacker number
     int pairs = 0;
@@ -3076,6 +3343,44 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                       //(the model occasionally double-assigns one blocker).
         out[b - 1] = a;
         pairs++;
+    }
+
+    //Name->label reconcile pass (opt-in via the name tables). Fills only
+    //blockers the coded scan left unassigned; never overrides a B#:A# pair.
+    if (blockerNames && attackerNames)
+    {
+        size_t start = 0;
+        for (size_t s = 0; s <= content.size(); s++)
+        {
+            if (s != content.size() && content[s] != ',' && content[s] != '\n')
+                continue;
+            string seg = content.substr(start, s - start);
+            start = s + 1;
+            //Find the blocker/attacker separator: ':' or the word "blocks".
+            string low;
+            for (size_t k = 0; k < seg.size(); k++)
+                low += (char) tolower((unsigned char) seg[k]);
+            size_t sep = string::npos, sepLen = 0;
+            size_t colon = seg.find(':');
+            size_t blk = low.find(" blocks ");
+            if (colon != string::npos) { sep = colon; sepLen = 1; }
+            if (blk != string::npos && (sep == string::npos || blk < sep)) { sep = blk; sepLen = 8; }
+            if (sep == string::npos)
+                continue; //no blocker:attacker structure in this segment
+            vector<string> leftWords, rightWords;
+            significantWords(seg.substr(0, sep), leftWords);
+            significantWords(seg.substr(sep + sepLen), rightWords);
+            int bMatch = uniqueNameMatch(leftWords, *blockerNames, nBlockers);
+            if (bMatch < 0 || out[bMatch] != 0)
+                continue; //no unique blocker, or already assigned by a code
+            const vector<int> * allowed = (legalPerBlocker && (size_t) bMatch < legalPerBlocker->size())
+                                          ? &(*legalPerBlocker)[bMatch] : NULL;
+            int aMatch = uniqueNameMatch(rightWords, *attackerNames, nAttackers, allowed);
+            if (aMatch < 0)
+                continue; //ambiguous / unmatched attacker -> drop this one only
+            out[bMatch] = aMatch + 1;
+            pairs++;
+        }
     }
     return pairs;
 }
@@ -3130,6 +3435,10 @@ int AIPlayerGPT::chooseBlockers()
     {
         tail << "A" << (j + 1) << ". " << attackers[j]->name
              << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
+        //POWER is the damage number, not toughness. The model misread a
+        //Saproling "(2/4)" as dealing 4 (deck35 wave-18 G1); state the damage
+        //explicitly at the line that decides.
+        tail << " deals " << (attackers[j]->power > 0 ? attackers[j]->power : 0);
         string kw = keywordList(attackers[j]);
         if (!kw.empty())
             tail << " [" << kw << "]";
@@ -3149,7 +3458,8 @@ int AIPlayerGPT::chooseBlockers()
             tail << " {text: " << cardTextSnippet(attackers[j], 160) << "}";
         tail << "\n";
     }
-    tail << "Your available blockers (with the attackers each may legally block):\n";
+    tail << "Your available blockers (with, for each attacker it may block, the"
+            " naive 1-on-1 trade - before other blockers, pump or combat tricks):\n";
     for (size_t i = 0; i < blockers.size(); i++)
     {
         tail << "B" << (i + 1) << ". " << blockers[i]->name
@@ -3167,7 +3477,14 @@ int AIPlayerGPT::chooseBlockers()
         for (size_t j = 0; j < legal[i].size(); j++)
             for (size_t k = 0; k < attackers.size(); k++)
                 if (attackers[k] == legal[i][j])
+                {
                     tail << (j ? "," : "") << " A" << (k + 1);
+                    //The computed trade rides the B#:A# pairing so there is
+                    //nothing left to re-derive (block-outcome annotation).
+                    string trade = combatBlockOutcome(blockers[i], attackers[k]);
+                    if (!trade.empty())
+                        tail << " (" << trade << ")";
+                }
         tail << "\n";
     }
     tail << "Assign each blocker to AT MOST ONE attacker (a creature cannot block"
@@ -3185,8 +3502,26 @@ int AIPlayerGPT::chooseBlockers()
     //Plan split BEFORE the assignment parse: a "B2" or bare numbers in the
     //plan prose must not read as block assignments.
     string decisionPart = consumePlan(content);
+    //Name tables for the block name->label reconcile (mirror of the shipped
+    //ATTACK reconcile): the display names as shown in the B#/A# labels, plus
+    //each blocker's legal attacker index set so an ambiguous attacker name
+    //can be pinned to the one it may actually block.
+    vector<string> blockerNames, attackerNames;
+    blockerNames.reserve(blockers.size());
+    attackerNames.reserve(attackers.size());
+    for (size_t j = 0; j < blockers.size(); j++)
+        blockerNames.push_back(blockers[j]->name);
+    for (size_t j = 0; j < attackers.size(); j++)
+        attackerNames.push_back(attackers[j]->name);
+    vector<vector<int> > legalIdx(blockers.size());
+    for (size_t i = 0; i < blockers.size(); i++)
+        for (size_t j = 0; j < legal[i].size(); j++)
+            for (size_t k = 0; k < attackers.size(); k++)
+                if (attackers[k] == legal[i][j])
+                    legalIdx[i].push_back((int) k);
     vector<int> pick;
-    int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick);
+    int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick,
+                                                             &blockerNames, &attackerNames, &legalIdx);
 
     //A bare "BLOCKS: none" - the model's natural way to decline every
     //block - carries no B<n> pair, and falling back on it handed the

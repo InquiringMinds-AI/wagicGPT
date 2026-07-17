@@ -283,6 +283,14 @@ private:
                            const std::vector<string> * optionTexts = NULL,
                            bool * staleEcho = NULL);
 
+    //Salvage a decode-time repeat-loop reply: when the normal parse fails,
+    //scan the raw reply for the LAST well-formed "CHOICE: N (name)" line
+    //(one the model stated before spiraling) and re-parse it through the
+    //same echo/staleness checks. Returns the 1-based choice or -1. Never
+    //bypasses stale_echo protection (a stale line re-parses to -1 here too).
+    static int salvageLoopedChoice(const string& content, int optionCount,
+                                   const std::vector<string> * optionTexts = NULL);
+
     string mEndpoint; //base URL, empty if nothing answered
     string mModel;
     string mApiKey;
