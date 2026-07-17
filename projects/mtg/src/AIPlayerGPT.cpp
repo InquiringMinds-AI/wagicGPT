@@ -2193,7 +2193,6 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         MTGCardInstance * card = casts[ci].card;
         ManaCost * cost = card->getManaCost();
         std::ostringstream o;
-        bool suppressCast = false; //own-only detrimental OR opponent-only beneficial
         if (!casts[ci].viaAlternative)
         {
             o << "Cast " << card->getDisplayName();
@@ -2282,50 +2281,33 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     if (ownT && !oppT && firstHit)
                     {
                         o << " - the only legal targets are YOUR OWN right now";
-                        //Item-3: a MANDATORY-target spell whose only legal
-                        //targets are friendly, and whose effect the engine
-                        //classifies as detrimental, can only harm the caster's
-                        //own board. The pilot declines it ~30/31 times but the
-                        //residual RESOLVES a self-destroy (deck44 wave-16 s21
-                        //self-Go-for-the-Throat on its own Faerie Miscreant).
-                        //Make it structurally unavailable in the GPT cast menu.
-                        //Scoped to GPT option assembly only: Baka's scorer
-                        //already declines these; the human UI is untouched. The
-                        //engine's classifier is the arbiter, so a self-target
-                        //it rates GOOD/DONTKNOW (sac synergies, combat tricks -
-                        //also usually costs, not targets) is NOT cut. Mandatory-
-                        //ness: this block is already the maxtargets==1 case,
-                        //which the 601.2c filter above treats as a mandatory
-                        //single target (tc->targetMin is a bool that only marks
-                        //multi-target "exactly N" choosers - NOT single-target
-                        //spells, so it must not gate here).
+                        //Owner ruling (2026-07-16): a legal play is never
+                        //hidden on a strategy judgment - strange cards make
+                        //normally-nonsensical lines correct (heroic, cast
+                        //triggers, death-trigger value, aura-count scaling).
+                        //The classifier's verdict rides the option line as a
+                        //warning; the model decides.
                         if (effectBadOrGood(card, MODE_TARGET, tc) == BAKA_EFFECT_BAD)
-                            suppressCast = true;
+                            o << " (warning: this would harm your own side - only"
+                                 " correct if you are deliberately triggering"
+                                 " something)";
                     }
                     else if (ownT + oppT > 0)
                     {
                         o << " - legal targets right now: " << tNames.str();
                         if (ownT + oppT > tShown)
                             o << " (+" << (ownT + oppT - tShown) << " more)";
-                        //Item-3 (wave-17 E-49c): the MIRROR of the own-only
-                        //bad-effect cut above. A beneficial cast whose only
-                        //legal targets are OPPONENT-controlled can only help
-                        //the opponent - the pilot never wants it and loops
-                        //hunting for a use (deck49 Goblin War Paint {1}{R}
-                        //+2/+2+haste offered with only enemy creatures legal:
-                        //two ~13k-token fatal loops, deck17 s18 + deck135 s22).
-                        //Same "never-useful, so don't offer" justification as
-                        //the bad side. Conservative GATE: opponent-only (no own
-                        //target), single-target, AND the classifier POSITIVELY
-                        //rates the effect GOOD - a DONTKNOW/BAD cast (all
-                        //removal/burn targets the opponent and rates BAD) keeps
-                        //its "legal targets right now" annotation and is NOT
-                        //cut. Baka's own targeting proves the classifier rates
-                        //pump/haste auras GOOD (it sends them at OWN creatures),
-                        //so a GOOD cast with no own target is genuinely useless.
+                        //Owner ruling (2026-07-16): same as the own-side case
+                        //above - annotate, never hide. A beneficial cast with
+                        //only opponent-side targets is usually futile (deck49
+                        //War Paint loops) but not always (aura-count payoffs,
+                        //cast triggers), so the warning carries the fact and
+                        //the model decides.
                         if (oppT && !ownT && firstHit
                             && effectBadOrGood(card, MODE_TARGET, tc) == BAKA_EFFECT_GOOD)
-                            suppressCast = true;
+                            o << " (warning: every legal target is the OPPONENT's -"
+                                 " this would help their side unless you are"
+                                 " deliberately triggering something)";
                     }
                     else if (firstHit)
                         o << " - NO legal target right now";
@@ -2362,8 +2344,6 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     o << " - can target on the stack: " << hits.str();
             }
         }
-        if (suppressCast)
-            continue; //own-only detrimental OR opponent-only beneficial cast; not offered
         if (mStuckCastLines.count(o.str()))
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
