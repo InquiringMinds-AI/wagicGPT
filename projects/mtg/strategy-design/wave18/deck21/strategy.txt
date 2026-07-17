@@ -1,0 +1,139 @@
+Deck identity: GOBLIN SWARM AGGRO (mono-Mountain). Cheap goblins that go WIDE, two
+anthems, and burn as reach. You win by dealing 20 fast - kill by turn 6-8. You are the
+BEATDOWN in every matchup: play a land, put a body on the board, and attack EVERY turn.
+You have no defensive plan and no removal for a big blocker - your only route to winning
+is a faster clock, so a long game is a lost game. Your creatures are ATTACKERS, not
+blockers.
+
+DEPLOY AND ATTACK - THE #1 RULE, run it every turn:
+- Every main phase, if any "Cast" option shows a creature, take it - put a body on the
+  board even if it cannot attack yet (it attacks NEXT turn). "Cast nothing" is only for
+  the rare turn when your ONLY castable option is a card you cannot pay for. NEVER pick
+  "Cast nothing" while a creature is in your Cast list. An empty board is no clock, and a
+  stalled hand loses the race.
+- Every combat, declare EVERY creature that can attack. Trading a cheap goblin into a
+  blocker is fine - you are racing, not preserving.
+
+BURN IS YOUR CLOCK - FACE BY DEFAULT. Lightning Bolt ({R}, instant, 3 dmg) and Volcanic
+Hammer ({1}{R}, SORCERY, 3 dmg) are 3 damage each at "The opponent (player, life N)".
+- NEVER HOLD burn "for interaction on the opponent's turn." That advice is for control
+  decks; it does not apply to you. Your burn is damage on a clock - fire it at the face on
+  YOUR turn. Volcanic Hammer is a sorcery and cannot be held anyway.
+- Burn KILLS a creature only if its toughness is 3 or LESS. Do NOT throw burn at a 4/4, a
+  6/6, or any big blocker - 3 damage does not shrink it and does not kill it; you just
+  waste the spell. Against a wall you cannot kill, send the burn to the FACE. (Watch the
+  numbers: a "6/1" is 6 POWER but 1 TOUGHNESS - your 3-damage burn DOES kill it. Toughness
+  is the SECOND number; that is the one burn has to beat.)
+- EXCEPTION - spend burn to KILL a creature (toughness 3 or less) when it is worth more to
+  you dead than 3 face damage. Kill on sight:
+    * a lifegain creature (lifelink);
+    * an ENGINE that makes a new creature or token every turn (Steel Overseer, a
+      dragon/token maker, and the like) - kill it EARLY, even a bare 1/1, BEFORE it comes
+      online. Do NOT wait for it to "do something first": a 1/1 that will spawn bodies or
+      pump every turn is worth a burn now, because once it starts you cannot catch up. "No
+      immediate advantage" is a trap - the advantage is that it never gets to fire.
+  And - THE RACE-MATH EXCEPTION, read it carefully because it is easy to get wrong:
+    You have NO blockers, so every UNBLOCKABLE attacker (a FLYER) deals ITS POWER to you
+    EVERY remaining turn - you cannot stop it any other way. The cost to you is that
+    flyer's POWER times the turns left. Over a race that lasts several turns, an unanswered
+    1/1 flyer (power 1) costs you MORE life than the 3 a burn spell deals to the face - so
+    it is worth a burn. So when you are racing a flying deck and CANNOT win in the next
+    turn or two, spend ONE burn EARLY to kill a small flyer (POWER 1 or more, toughness 3
+    or less). Do it while the burn still reaches: enemy flyers get pumped out of burn range
+    fast (anthem lords and +1/+1 counters turn a 1/1 into a 3/3, a 2/2 into a 6/6 over a
+    few turns). An early kill or none - once it is a 4-toughness flyer, burn is wasted on
+    it and you go face.
+    POWER FLOOR - do NOT burn a 0-POWER flyer. A 0/1 or 0/X flyer (a mana dork like Birds
+    of Paradise) deals ZERO combat damage - its race cost is 0 power times any turns = 0.
+    It is NOT a clock on you; ignore it and send the burn at the FACE. (If it is also a
+    mana engine you want gone, that is the ENGINE bullet above, not this race-math one -
+    but a lone 0-power flyer with no engine text is never worth your burn.)
+  Do NOT over-apply this: it is ONE early burn on the most persistent small flyer that
+  actually deals damage, not your whole hand. In a race you can WIN in the next turn or
+  two, ignore the flyers and go face.
+
+SPARK ELEMENTAL ({R}, 3/1 trample haste) - it is SACRIFICED at end of turn. Treat it like
+a burn spell on legs: cast it in MAIN PHASE 1 (before combat) and swing with it that same
+turn for 3. If you cast it in Main phase 2, or hold it, it dies at end of turn WITHOUT ever
+attacking - a wasted card. Cast-and-swing, or do not cast it.
+
+WHO CAN ATTACK THE TURN IT LANDS (haste): Raging Goblin, Boggart Ram-Gang, Spark Elemental.
+EVERYTHING ELSE has summoning sickness and cannot attack the turn you cast it - including
+Goblin Gang Leader AND the two tokens it makes. Deploy those a turn AHEAD; do not count a
+just-cast non-haste creature in this turn's attack math.
+
+YOUR ANTHEMS AND LORDS - name their effect in every combat, and deploy BODIES first so the
+anthem has something to buff (an anthem with no creatures out does nothing - never cast one
+into an empty board):
+- Bloodmark Mentor ({1}{R}, 1/1): your OTHER red creatures gain FIRST STRIKE. This wins
+  trades - a first-striking attacker kills a smaller-or-equal blocker BEFORE it deals
+  damage back, so your creature SURVIVES. When the Mentor is out, a blocked 3/1 kills a
+  2/2 and lives; it is not "both die."
+- Goblin King ({1}{R}{R}, 2/2): your other GOBLINS get +1/+1 and mountainwalk. (Goblins:
+  Raging Goblin, Boggart Ram-Gang, Scuzzback Scrapper, Goblin Gang Leader + its tokens,
+  Bloodmark Mentor. Mountainwalk = unblockable only if the opponent controls a Mountain -
+  rare, so treat it as a bonus, not a plan.)
+- Boartusk Liege ({1}{R/G}{R/G}{R/G}, 3/4 trample): your other RED and other GREEN
+  creatures get +1/+1. Your biggest team pump - cast it once you already have a wide board.
+- Orcish Oriflamme ({3}{R}, enchantment): your ATTACKING creatures get +1/+0 while they
+  attack. Free extra damage every swing - but useless with no attackers, so deploy first.
+
+HYBRID {R/G} COSTS ARE PAID BY MOUNTAINS. You are mono-Mountain; Scuzzback Scrapper,
+Boggart Ram-Gang, and Boartusk Liege all cost {R/G} pips that a Mountain pays. If one is in
+your Cast list you CAN afford it with red mana - never decline it for "lacking green mana."
+(The cast option now spells this out with a "[hybrid: each {r/g} pays with R...]" note.)
+
+GOBLIN GANG LEADER ({2}{R}{R}, 2/2): when it enters, make two 1/1 red Goblin tokens - three
+bodies for one card. None of them (Leader or tokens) can attack the turn they arrive; they
+swing next turn. Cast it a turn before you need the wide alpha strike.
+
+WITHER (Boggart Ram-Gang, Scuzzback Scrapper): the combat damage they deal to a creature is
+dealt as -1/-1 counters (it stays shrunk permanently). Useful chip against a big blocker
+over several turns, but do not build your plan around it - keep racing the face.
+
+BLOCKING - your creatures are ATTACKERS. Default: declare NO blockers. Take the hit and keep
+every creature untapped to swing next turn - a body kept home never attacks, and you win by
+racing. This holds even when your life is low but not lethal. (The engine auto-attacks and
+auto-declines blocks for you; it only asks you to block when a swing would be LETHAL.)
+- BLOCK only to (a) kill a token-maker or lifegain creature you could not burn, by
+  gang-blocking it with goblins, or (b) survive a swing that is otherwise LETHAL this turn -
+  then chump with your least valuable creature (against a TRAMPLER, gang-block with enough
+  toughness that little tramples through, and expect to lose those blockers).
+- Do not trade your ONLY win condition (your last big attacker) into a deathtouch/large
+  blocker just to save a few life while you are ahead - keep the threat and keep racing.
+
+MATCHUPS YOU CANNOT "SOLVE" - RACE INSTEAD:
+- Walls of BIG or high-toughness blockers (Plumeveil 4/4, deathtouch creatures, a giant
+  enchanted trampler, an artifact creature pumped huge by Cranial Plating): you have no
+  removal for a 4-toughness+ body and no evasion. Do NOT waste turns or burn trying to break
+  the wall. Keep deploying a goblin every turn, send every burn spell at the FACE, and win
+  the LIFE race. If you cannot win the race you lose - but interacting is a slower loss.
+- A SMALL-FLYER swarm (1/1 and 2/2 faeries you CANNOT block) is DIFFERENT from a big wall.
+  You still go face by default, BUT because you cannot block them and cannot win instantly,
+  each flyer THAT HAS POWER is unblockable damage every turn - so spend ONE burn EARLY to
+  pick off the most persistent small flyer (power 1+) while your burn still kills it (see the
+  RACE-MATH EXCEPTION above). Then resume burning the face. Do not chip burn at flyers you
+  cannot kill (toughness 4+), and do not waste burn on a 0-power flyer - those go face.
+- Lifegain / control that stabilizes (lifelink, life-gain artifacts): you must keep a board
+  and attack. Burn alone cannot outrace repeated lifegain. Never durdle to an empty board
+  throwing single burn spells - deploy creatures and swing; that is your only real damage.
+
+MULLIGAN: keep any hand with 2-4 lands and one or two cheap creatures or burn. Mulligan only
+0-1 land or all-land hands.
+
+SITUATIONS THAT DECIDE GAMES - recognize and act:
+- A creature in hand and open mana: cast it this turn so it attacks next turn - even a lone
+  1/1 is damage next turn. Never "Cast nothing" with a payable creature listed.
+- Spark Elemental in hand: cast it in Main phase 1 and swing for 3 - never hold it.
+- Opponent at 8 or less with no relevant blockers: send every burn spell at the face and
+  swing with everything - close it out.
+- Burn spell in hand, opponent's board is a 4/4+ or a wall you cannot kill: burn the FACE,
+  not the wall.
+- Lifegain or engine creature (toughness 3 or less) resolves: burn it or gang-block it -
+  do not let it stabilize them. A creature that spawns a body or token EVERY turn is an
+  engine - kill it early even at 1/1, do not wait for it to "do something" first.
+- Racing a FLYING deck you cannot beat in a turn or two: kill the most persistent small
+  flyer that HAS POWER (power 1+, toughness 3 or less) with ONE early burn, then go back to
+  the face. A 1/1 flyer you cannot block costs you 1 life every turn of a long race - that
+  beats 3 to the face. A 0-POWER flyer (a mana dork like Birds of Paradise) costs you 0 -
+  leave it alone and burn the face.
