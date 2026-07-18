@@ -1,0 +1,19 @@
+# lifeleech makes the controller gain the life lost by the target.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifeleech Effect Witness
+life:10
+[PLAYER2]
+life:20
+[DO]
+Lexicon Lifeleech Effect Witness
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifeleech Effect Witness
+life:13
+[PLAYER2]
+life:17
+[END]

@@ -1,0 +1,18 @@
+# mypoolsave preserves only this controller's green mana through a phase
+# change. This is a dedicated witness, not the generic poolsave fixture.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Mypoolsave Effect Witness
+manapool:{G}
+[PLAYER2]
+[DO]
+Lexicon Mypoolsave Effect Witness
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Mypoolsave Effect Witness
+manapool:{G}
+[PLAYER2]
+[END]

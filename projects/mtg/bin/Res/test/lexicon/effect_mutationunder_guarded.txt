@@ -1,0 +1,18 @@
+# The parser's mutationunder implementation reads the altermutationcounter
+# split; keeping the documented operation in the same gameplay line supplies
+# that split while still exercising mutationunder without a parser crash.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Mutation Under Guarded Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Mutation Under Guarded Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Mutation Under Guarded Witness
+life:21
+[PLAYER2]
+[END]

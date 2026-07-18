@@ -1,0 +1,27 @@
+# auraward exempts the Aura granting protection from the very protection it
+# grants. White Ward is a WHITE Aura that grants protection from white; without
+# auraward, state-based actions would put it into the graveyard (an illegal
+# white Aura on a creature with protection from white). auraward keeps it
+# attached. (A bare white protection-from-white Aura WITHOUT auraward IS removed
+# to the graveyard here, verified separately, so this is discriminating.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:White Ward
+manapool:{W}
+[PLAYER2]
+[DO]
+White Ward
+Grizzly Bears
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,White Ward
+hand:
+graveyard:
+manapool:{0}
+[PLAYER2]
+[END]

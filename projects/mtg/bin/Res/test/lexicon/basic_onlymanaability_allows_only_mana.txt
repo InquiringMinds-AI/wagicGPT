@@ -1,0 +1,19 @@
+# onlymanaability permits a mana ability while suppressing the card's
+# non-mana activated ability.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon OnlyManaAbility Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon OnlyManaAbility Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon OnlyManaAbility Witness
+tappedinplay:1
+manapool:{G}
+[PLAYER2]
+life:20
+[END]

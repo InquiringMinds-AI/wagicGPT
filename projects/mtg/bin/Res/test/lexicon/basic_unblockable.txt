@@ -1,0 +1,24 @@
+# An unblockable creature must connect even when the defender controls a
+# legal blocker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Aether Figment
+[PLAYER2]
+inplay:grizzly bears
+life:20
+[DO]
+Aether Figment
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Aether Figment
+tappedinplay:1
+[PLAYER2]
+inplay:grizzly bears
+life:19
+[END]

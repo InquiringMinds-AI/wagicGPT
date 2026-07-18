@@ -1,0 +1,17 @@
+# structural if true branch changes life.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon If Wrapper Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon If Wrapper Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon If Wrapper Witness
+life:22
+[PLAYER2]
+[END]
+

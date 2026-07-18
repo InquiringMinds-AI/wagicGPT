@@ -1,0 +1,21 @@
+# An attacker declared alone emits the attackedalone event.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Attackedalone Trigger Witness
+life:20
+[PLAYER2]
+[DO]
+goto attackers
+Lexicon Attackedalone Trigger Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Attackedalone Trigger Witness
+life:21
+[PLAYER2]
+life:18
+[END]

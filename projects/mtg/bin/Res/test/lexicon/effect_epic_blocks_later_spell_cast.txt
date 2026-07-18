@@ -1,0 +1,26 @@
+# epic marks the player so a later spell cannot be cast (stays in hand with its
+# mana unspent). The witness's {0}:epic ability is activated from the
+# battlefield, then Shock is attempted: with epic active Shock must remain
+# uncast.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Epic Effect Witness
+hand:Shock
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+Lexicon Epic Effect Witness
+Shock
+p2
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Epic Effect Witness
+hand:Shock
+manapool:{R}
+[PLAYER2]
+life:20
+[END]

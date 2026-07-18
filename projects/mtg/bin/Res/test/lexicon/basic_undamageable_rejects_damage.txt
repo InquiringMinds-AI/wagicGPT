@@ -1,0 +1,22 @@
+# Undamageable prevents Shock from destroying a 2/2 creature.
+# The active player casts Shock at the opponent's witness.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Shock
+manapool:{R}
+[PLAYER2]
+inplay:Lexicon Undamageable Witness
+life:20
+[DO]
+Shock
+Lexicon Undamageable Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+inplay:Lexicon Undamageable Witness
+life:20
+[END]

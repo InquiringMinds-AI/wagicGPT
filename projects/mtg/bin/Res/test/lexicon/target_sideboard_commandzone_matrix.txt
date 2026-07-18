@@ -1,0 +1,38 @@
+# Exercises both-side, controller-side, and opponent-side sideboard and
+# command-zone selectors through real moves into hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Matrix Sideboard Source,Lexicon Matrix Command Source,Lexicon Matrix My Sideboard Source,Lexicon Matrix My Command Source
+sideboard:Lexicon Matrix Sideboard Target,Lexicon Matrix My Sideboard Target
+commandzone:Lexicon Matrix Command Target,Lexicon Matrix My Command Target
+[PLAYER2]
+inplay:Lexicon Matrix Opponent Sideboard Source,Lexicon Matrix Opponent Command Source
+sideboard:Lexicon Matrix Opponent Sideboard Target
+commandzone:Lexicon Matrix Opponent Command Target
+[DO]
+Lexicon Matrix Sideboard Source
+Lexicon Matrix Sideboard Target
+Lexicon Matrix Command Source
+Lexicon Matrix Command Target
+Lexicon Matrix My Sideboard Source
+Lexicon Matrix My Sideboard Target
+Lexicon Matrix My Command Source
+Lexicon Matrix My Command Target
+Lexicon Matrix Opponent Sideboard Source
+Lexicon Matrix Opponent Sideboard Target
+Lexicon Matrix Opponent Command Source
+Lexicon Matrix Opponent Command Target
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Matrix Sideboard Source,Lexicon Matrix Command Source,Lexicon Matrix My Sideboard Source,Lexicon Matrix My Command Source
+hand:Lexicon Matrix Sideboard Target,Lexicon Matrix Command Target,Lexicon Matrix My Sideboard Target,Lexicon Matrix My Command Target
+sideboard:
+commandzone:
+[PLAYER2]
+inplay:Lexicon Matrix Opponent Sideboard Source,Lexicon Matrix Opponent Command Source
+hand:Lexicon Matrix Opponent Sideboard Target,Lexicon Matrix Opponent Command Target
+sideboard:
+commandzone:
+[END]

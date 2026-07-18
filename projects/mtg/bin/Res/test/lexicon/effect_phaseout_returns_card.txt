@@ -1,0 +1,18 @@
+# phaseout removes a permanent from the battlefield for the phase and it
+# returns on the next phase-in event.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Phaseout Effect Witness,Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon Phaseout Effect Witness
+Grizzly Bears
+goto end
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Phaseout Effect Witness,Grizzly Bears
+[PLAYER2]
+[END]

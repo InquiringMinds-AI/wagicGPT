@@ -1,0 +1,29 @@
+# @proliferateof fires when the controller proliferates.
+# PLAYER1 casts a real proliferate spell (Steady Progress) and selects PLAYER2's
+# poison via the chooser (p2); the proliferate resolution fires @proliferateof on
+# PLAYER1's witness (life 21) and adds a poison counter to PLAYER2.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Proliferated Trigger Witness
+hand:Steady Progress
+manapool:{2}{U}
+library:Forest,Forest
+[PLAYER2]
+poisoncount:1
+[DO]
+Steady Progress
+no
+p2
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Proliferated Trigger Witness
+graveyard:Steady Progress
+hand:*
+library:*
+life:21
+[PLAYER2]
+poisoncount:2
+[END]

@@ -1,0 +1,23 @@
+# Flanking gives a nonflanking blocker -1/-1 when it blocks.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Benalish Cavalry
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Benalish Cavalry
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Benalish Cavalry
+tappedinplay:1
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]

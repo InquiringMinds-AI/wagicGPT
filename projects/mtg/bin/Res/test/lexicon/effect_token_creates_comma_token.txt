@@ -1,0 +1,14 @@
+# The comma-delimited token effect creates a persistent creature token.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Token Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Token Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Token Effect Witness,*
+[PLAYER2]
+[END]

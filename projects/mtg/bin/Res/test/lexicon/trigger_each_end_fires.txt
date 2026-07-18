@@ -1,0 +1,15 @@
+# @each my end fires at every matching end step.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Each End Trigger Witness
+[PLAYER2]
+[DO]
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Each End Trigger Witness
+life:21
+[PLAYER2]
+[END]

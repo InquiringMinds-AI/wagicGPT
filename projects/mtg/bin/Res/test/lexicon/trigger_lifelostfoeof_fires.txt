@@ -1,0 +1,16 @@
+# @lifelostfoeof fires for life lost by the source's opponent.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifelostfoeof Trigger Witness,Lexicon Opponent Life Loss Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Opponent Life Loss Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifelostfoeof Trigger Witness,Lexicon Opponent Life Loss Effect Witness
+life:21
+[PLAYER2]
+life:19
+[END]

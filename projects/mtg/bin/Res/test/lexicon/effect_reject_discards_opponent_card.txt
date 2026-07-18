@@ -1,0 +1,18 @@
+# reject discards the selected card from the opponent's hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Reject Effect Witness
+[PLAYER2]
+hand:Forest
+[DO]
+Lexicon Reject Effect Witness
+Forest
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Reject Effect Witness
+[PLAYER2]
+graveyard:Forest
+hand:
+[END]

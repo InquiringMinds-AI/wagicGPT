@@ -1,0 +1,18 @@
+# Knight Watch uses _KNIGHTTOKEN_ twice. The two Knight tokens remain after
+# the sorcery resolves.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Knight Watch
+manapool:{4}{W}
+[PLAYER2]
+[DO]
+Knight Watch
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Knight Watch
+inplay:*,*
+manapool:{0}
+[PLAYER2]
+[END]

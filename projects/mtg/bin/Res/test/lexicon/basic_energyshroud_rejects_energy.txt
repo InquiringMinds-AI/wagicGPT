@@ -1,0 +1,17 @@
+# energyshroud prevents an energy counter from being added to its controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Energy Shroud Witness
+hand:Aether Chaser
+manapool:{1}{R}
+[PLAYER2]
+[DO]
+Aether Chaser
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Energy Shroud Witness,Aether Chaser
+life:20
+[PLAYER2]
+[END]

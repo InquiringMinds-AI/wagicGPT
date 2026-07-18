@@ -1,0 +1,16 @@
+# Eternalize activates from the graveyard and creates a transformed 4/4 black
+# Zombie copy rather than returning the original card.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Eternalize Macro Witness
+[PLAYER2]
+[DO]
+Lexicon Eternalize Macro Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+exile:Lexicon Eternalize Macro Witness
+inplay:*
+[PLAYER2]
+[END]

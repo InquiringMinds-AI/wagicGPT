@@ -1,0 +1,21 @@
+# tap(noevent) taps the opposing permanent but does not fire the witness's
+# @tapped(mytgt) trigger.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Noevent Tap Effect Witness
+life:20
+[PLAYER2]
+inplay:Forest
+[DO]
+Lexicon Noevent Tap Effect Witness
+Forest
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Noevent Tap Effect Witness
+life:20
+[PLAYER2]
+tappedinplay:1
+inplay:Forest
+[END]

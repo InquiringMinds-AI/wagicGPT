@@ -1,0 +1,19 @@
+# twoboast allows the same permanent to perform Boast twice in a turn.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Two Boast Witness
+[PLAYER2]
+[DO]
+goto attackers
+Lexicon Two Boast Witness
+goto secondmain
+Lexicon Two Boast Witness
+Lexicon Two Boast Witness
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Lexicon Two Boast Witness
+life:22
+[PLAYER2]
+[END]

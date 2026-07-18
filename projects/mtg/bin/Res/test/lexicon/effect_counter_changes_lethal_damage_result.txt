@@ -1,0 +1,21 @@
+# counter(1/1) makes a 2/2 survive a later two-damage Shock.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Counter Witness
+Grizzly Bears
+Shock
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Witness,Grizzly Bears
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,44 @@
+# foresthome lets the creature attack only while the DEFENDING player controls
+# a Forest; the controller must also keep a Forest or the creature is
+# sacrificed, so both players are given a Forest and only the defender's Forest
+# is varied across the two cases.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Gorilla Pack,Forest
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Gorilla Pack
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Gorilla Pack,Forest
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[END]
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Gorilla Pack,Forest
+[PLAYER2]
+inplay:Forest
+life:20
+[DO]
+Gorilla Pack
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Gorilla Pack,Forest
+tappedinplay:1
+[PLAYER2]
+inplay:Forest
+life:17
+[END]

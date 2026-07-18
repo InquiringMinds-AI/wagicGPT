@@ -1,0 +1,17 @@
+# daybound transforms the front face when its controller casts no spells for
+# the turn and the next turn begins at night.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ballista Watcher
+[PLAYER2]
+[DO]
+goto end
+goto end
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ballista Wielder
+[PLAYER2]
+[END]

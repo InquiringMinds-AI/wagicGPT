@@ -1,0 +1,20 @@
+# moverandom chooses from the requested source zone. With one candidate the
+# random choice is deterministic and the zone transition is observable.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Fossil Find
+graveyard:Grizzly Bears
+manapool:{R}{G}
+[PLAYER2]
+[DO]
+Fossil Find
+goto end
+[ASSERT]
+END
+[PLAYER1]
+hand:Grizzly Bears
+graveyard:Fossil Find
+manapool:{0}
+[PLAYER2]
+[END]

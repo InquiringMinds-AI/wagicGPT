@@ -1,0 +1,17 @@
+# opponentcommandplay includes the opponent's battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opponent Command Play Zone Witness
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Lexicon Opponent Command Play Zone Witness
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opponent Command Play Zone Witness
+[PLAYER2]
+exile:Hill Giant
+[END]

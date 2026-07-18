@@ -1,0 +1,23 @@
+# hasreplicate turns the kicker payment on Gigadrowse into a copy that can
+# choose a second target.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Gigadrowse
+manapool:{U}{U}
+[PLAYER2]
+inplay:Grizzly Bears,Hill Giant
+[DO]
+Gigadrowse
+choice 1
+Grizzly Bears
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Gigadrowse
+manapool:{0}
+[PLAYER2]
+inplay:Grizzly Bears,Hill Giant
+tappedinplay:2
+[END]

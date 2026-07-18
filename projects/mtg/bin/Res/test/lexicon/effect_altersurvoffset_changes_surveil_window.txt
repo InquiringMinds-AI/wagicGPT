@@ -1,0 +1,26 @@
+# altersurvoffset raises the controller's surveil offset (the Enhanced
+# Surveillance count that widens a later surveil window). A surveil driven
+# without scripted bin choices keeps every card on top, so the widened window
+# is not observable through the library; instead a comma-less sensor witness
+# reads the offset back: its life gain only fires once the offset reaches one,
+# proving the alter landed. The surveil trigger witness additionally confirms
+# a surveil still resolves (its @surveiled life gain) while the offset is set.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Alter Surveil Effect Witness,Lexicon Surveiled Trigger Witness,Lexicon Surveil Offset Sensor Witness
+library:Forest,Island,Mountain
+life:20
+[PLAYER2]
+[DO]
+Lexicon Alter Surveil Effect Witness
+Lexicon Surveiled Trigger Witness
+Lexicon Surveil Offset Sensor Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Alter Surveil Effect Witness,Lexicon Surveiled Trigger Witness,Lexicon Surveil Offset Sensor Witness
+life:22
+library:Forest,Island,Mountain
+[PLAYER2]
+[END]

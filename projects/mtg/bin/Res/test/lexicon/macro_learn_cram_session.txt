@@ -1,0 +1,22 @@
+# Cram Session learns a Lesson from the sideboard and retains its four-life
+# effect, proving the macro's sideboard branch.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Cram Session
+sideboard:Introduction to Prophecy
+manapool:{1}{G}
+life:20
+[PLAYER2]
+[DO]
+Cram Session
+choice 0
+Introduction to Prophecy
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Introduction to Prophecy
+graveyard:Cram Session
+life:24
+[PLAYER2]
+[END]

@@ -1,0 +1,21 @@
+# @combatdamageof fires for combat damage to the source's controller.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Grizzly Bears
+[PLAYER2]
+inplay:Lexicon Combatdamageof Trigger Witness
+life:20
+[DO]
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Grizzly Bears
+[PLAYER2]
+inplay:Lexicon Combatdamageof Trigger Witness
+life:19
+[END]

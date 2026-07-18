@@ -1,0 +1,23 @@
+# grant supplies a temporary +1/+1 to a targeted creature; the granted
+# toughness is observed because the creature survives a lethal Shock.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Grant Effect Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Grant Effect Witness
+Grizzly Bears
+no
+Shock
+Grizzly Bears
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Grant Effect Witness,Grizzly Bears
+graveyard:Shock
+[PLAYER2]
+[END]

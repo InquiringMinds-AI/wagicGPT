@@ -1,0 +1,19 @@
+# Doomed Traveler uses _SPIRITTOKEN_ through its death trigger. Wrath of God
+# kills the Traveler and the Spirit token remains.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Doomed Traveler
+hand:Wrath of God
+manapool:{2}{W}{W}
+[PLAYER2]
+[DO]
+Wrath of God
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Doomed Traveler,Wrath of God
+inplay:*
+manapool:{0}
+[PLAYER2]
+[END]

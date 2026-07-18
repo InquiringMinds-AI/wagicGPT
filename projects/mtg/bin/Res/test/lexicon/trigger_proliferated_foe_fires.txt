@@ -1,0 +1,30 @@
+# @proliferatefoeof fires when the opponent proliferates.
+# The proliferate event is attributed to the proliferating permanent's CONTROLLER,
+# so the foe (PLAYER2) must be the one who proliferates. PLAYER2 owns a {0} proliferate
+# effect and activates it on its own turn; that fires @proliferatefoeof on PLAYER1's
+# witness (life 21). PLAYER2 needs a library so its turn-2 draw isn't from empty.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Proliferated Foe Trigger Witness
+[PLAYER2]
+inplay:Lexicon Foe Proliferate Effect Witness
+library:Forest,Forest
+[DO]
+goto end
+goto upkeep
+next
+next
+Lexicon Foe Proliferate Effect Witness
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Proliferated Foe Trigger Witness
+life:21
+[PLAYER2]
+inplay:Lexicon Foe Proliferate Effect Witness
+hand:*
+library:*
+[END]

@@ -1,0 +1,20 @@
+# becomes changes a creature to 4/4, allowing it to survive a Lightning Bolt.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Becomes Effect Witness,Grizzly Bears
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Becomes Effect Witness
+Grizzly Bears
+Lightning Bolt
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Becomes Effect Witness,Grizzly Bears
+graveyard:Lightning Bolt
+[PLAYER2]
+[END]

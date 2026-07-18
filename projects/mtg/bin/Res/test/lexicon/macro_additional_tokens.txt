@@ -1,0 +1,20 @@
+# Each token macro resolves a concrete token-producing action. The wildcard
+# assertions count the six created permanents without depending on token ids.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Angel Token Macro Witness,Lexicon Detective Token Macro Witness,Lexicon Eldrazi Scion Macro Witness,Lexicon Eldrazi Spawn Macro Witness,Lexicon Human Knight Token Macro Witness,Lexicon Vehicle Token Macro Witness
+[PLAYER2]
+[DO]
+Lexicon Angel Token Macro Witness
+Lexicon Detective Token Macro Witness
+Lexicon Eldrazi Scion Macro Witness
+Lexicon Eldrazi Spawn Macro Witness
+Lexicon Human Knight Token Macro Witness
+Lexicon Vehicle Token Macro Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Angel Token Macro Witness,Lexicon Detective Token Macro Witness,Lexicon Eldrazi Scion Macro Witness,Lexicon Eldrazi Spawn Macro Witness,Lexicon Human Knight Token Macro Witness,Lexicon Vehicle Token Macro Witness,*,*,*,*,*,*
+[PLAYER2]
+[END]

@@ -1,0 +1,20 @@
+# Bound by Moonsilver's canttransform prevents an enchanted permanent from
+# transforming even when a transform effect would otherwise flip it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Transform Witness
+hand:Bound by Moonsilver
+manapool:{2}{W}
+[PLAYER2]
+[DO]
+Bound by Moonsilver
+Lexicon Transform Witness
+Lexicon Transform Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Transform Witness,Bound by Moonsilver
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,21 @@
+# A perpetual lifelink grant applied while the card is in hand remains on the
+# card after it is cast onto the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Perpetual Lifelink Grant Witness
+hand:Grizzly Bears
+manapool:{1}{G}
+[PLAYER2]
+[DO]
+Lexicon Perpetual Lifelink Grant Witness
+Grizzly Bears
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Perpetual Lifelink Grant Witness,Grizzly Bears
+manapool:{0}
+ability:Grizzly Bears|perpetuallifelink
+[PLAYER2]
+[END]

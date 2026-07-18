@@ -1,0 +1,19 @@
+# dungeoncompleted is observable through the basic-ability restriction in a
+# gameplay move: the flagged sideboard card can be returned to hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Dungeon Flag Selector Witness
+sideboard:Lexicon Dungeon Flag Witness
+[PLAYER2]
+[DO]
+Lexicon Dungeon Flag Selector Witness
+Lexicon Dungeon Flag Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Dungeon Flag Selector Witness
+hand:Lexicon Dungeon Flag Witness
+sideboard:
+[PLAYER2]
+[END]

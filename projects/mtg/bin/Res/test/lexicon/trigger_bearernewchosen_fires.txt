@@ -1,0 +1,19 @@
+# @bearernewchosen fires when a different Ring-bearer is selected.
+# The Ring must be in play so the bearer-change equip machinery marks the change.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:The Ring,Lexicon Ringbearer Effect Witness,Lexicon Bearer New Chosen Trigger Witness,Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon Ringbearer Effect Witness
+Grizzly Bears
+Lexicon Ringbearer Effect Witness
+Lexicon Bearer New Chosen Trigger Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:The Ring,Lexicon Ringbearer Effect Witness,Lexicon Bearer New Chosen Trigger Witness,Grizzly Bears
+life:21
+[PLAYER2]
+[END]

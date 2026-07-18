@@ -1,0 +1,17 @@
+# @producedmana fires when a land actually produces mana.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Produced Mana Trigger Witness,Forest
+life:20
+[PLAYER2]
+[DO]
+Forest
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Produced Mana Trigger Witness,Forest
+life:21
+[PLAYER2]
+[END]

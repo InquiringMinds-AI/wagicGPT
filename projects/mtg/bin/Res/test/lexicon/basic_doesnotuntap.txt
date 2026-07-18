@@ -1,0 +1,21 @@
+# doesnotuntap persists through the controller's next untap step.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Chained Brute
+tappedinplay:1
+[PLAYER2]
+[DO]
+goto end
+next
+goto end
+next
+next
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Chained Brute
+tappedinplay:1
+[PLAYER2]
+[END]

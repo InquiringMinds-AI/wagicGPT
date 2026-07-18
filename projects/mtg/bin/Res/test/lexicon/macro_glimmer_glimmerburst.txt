@@ -1,0 +1,19 @@
+# Glimmerburst uses _GLIMMERTOKEN_ after drawing two cards.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Glimmerburst
+library:Forest,Island
+manapool:{3}{U}
+[PLAYER2]
+[DO]
+Glimmerburst
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Glimmerburst
+hand:Forest,Island
+inplay:*
+manapool:{0}
+[PLAYER2]
+[END]

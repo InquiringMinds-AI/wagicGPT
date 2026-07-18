@@ -1,0 +1,26 @@
+# Stack-zone target grammar is exercised through the same zone event that
+# powers the engine's cast triggers. The P2 witness observes P1's stack as
+# opponentstack.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Contemplation
+hand:Shock
+manapool:{R}
+[PLAYER2]
+inplay:Lexicon Opponent Stack Trigger Witness
+life:20
+[DO]
+Shock
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Contemplation
+graveyard:Shock
+life:21
+manapool:{0}
+[PLAYER2]
+inplay:Lexicon Opponent Stack Trigger Witness
+life:19
+[END]

@@ -1,0 +1,17 @@
+# @shuffledfoeof fires when the opponent shuffles their library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Shuffled Foe Trigger Witness,Lexicon Foe Shuffle Effect Witness
+[PLAYER2]
+library:Grizzly Bears,Hill Giant
+[DO]
+Lexicon Foe Shuffle Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Shuffled Foe Trigger Witness,Lexicon Foe Shuffle Effect Witness
+life:21
+[PLAYER2]
+library:*,*
+[END]

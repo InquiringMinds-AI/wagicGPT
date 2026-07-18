@@ -1,0 +1,16 @@
+# Blood Moon is lord(land[-basic]): it only affects NONBASIC lands, stripping
+# their abilities and making them Mountains, so a nonbasic land produces red.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Blood Moon,Lexicon Nonbasic Blue Land Witness
+[PLAYER2]
+[DO]
+Lexicon Nonbasic Blue Land Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Blood Moon,Lexicon Nonbasic Blue Land Witness
+manapool:{R}
+[PLAYER2]
+[END]

@@ -1,0 +1,21 @@
+# UEOT installs the nested end-step trigger. It fires at the controller's end
+# step (turn 1), gaining one life. The opponent's following end step is not the
+# controller's "my end", so no further life is gained within this window.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon UEOT Effect Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon UEOT Effect Witness
+goto end
+goto firstmain
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon UEOT Effect Witness
+life:21
+[PLAYER2]
+[END]

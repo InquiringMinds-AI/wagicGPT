@@ -1,0 +1,17 @@
+# wingame records the targeted player as the winner.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Win Game Witness
+[PLAYER2]
+[DO]
+Lexicon Win Game Witness
+p1
+goto firstmain
+[ASSERT]
+gameover:p2
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Win Game Witness
+[PLAYER2]
+[END]

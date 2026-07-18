@@ -1,0 +1,21 @@
+# The card-block fields that feed gameplay dispatch are exercised together:
+# color/type/subtype and power/toughness load the card, and its auto/target
+# fields (auto={0}:damage:2 target(player)) drive an actionable ability. The
+# damage is an ACTIVATED ability, not an on-cast effect, so the witness is in
+# play and its ability is activated targeting player 2: 2 damage, life 20 -> 18.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Field Dispatch Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon Field Dispatch Witness
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Field Dispatch Witness
+[PLAYER2]
+life:18
+[END]

@@ -1,0 +1,16 @@
+# @damaged fires for any damage dealt to a matching player.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Damaged Trigger Witness,Lexicon Opponent Damage Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Opponent Damage Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Damaged Trigger Witness,Lexicon Opponent Damage Effect Witness
+life:21
+[PLAYER2]
+life:19
+[END]

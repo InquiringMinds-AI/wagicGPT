@@ -1,0 +1,29 @@
+# Sultai Ascendancy uses _SURVEIL2_ at the beginning of the controller's upkeep.
+# The script advances to player 0's own upkeep on turn 3, where surveil 2 looks
+# at the top two library cards; selecting both for "put in graveyard" should
+# move them there and leave the third on top.
+# ENGINE-BLOCKED (surveil-selection): the reveal's "put in graveyard" option
+# strands the revealed cards in the temp zone; they never reach the graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Sultai Ascendancy
+library:Hill Giant,Juggernaut,Millstone
+[PLAYER2]
+[DO]
+goto end
+goto upkeep
+goto end
+goto upkeep
+Millstone
+revealok
+Juggernaut
+revealok
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Sultai Ascendancy
+graveyard:Millstone,Juggernaut
+library:Hill Giant
+[PLAYER2]
+[END]

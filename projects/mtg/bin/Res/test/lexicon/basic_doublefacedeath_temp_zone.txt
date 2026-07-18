@@ -1,0 +1,24 @@
+# Both the native and granted double-faced-death flags route a dying
+# permanent to the private temp zone instead of the graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Double Face Death Witness,Lexicon Gained Double Face Death Witness
+hand:Shock,Shock
+manapool:{R}{R}
+[PLAYER2]
+[DO]
+Shock
+Lexicon Double Face Death Witness
+Shock
+Lexicon Gained Double Face Death Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Shock,Shock
+temp:Lexicon Double Face Death Witness,Lexicon Gained Double Face Death Witness
+inplay:
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

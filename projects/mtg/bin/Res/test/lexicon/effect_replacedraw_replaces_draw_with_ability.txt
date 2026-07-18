@@ -1,0 +1,18 @@
+# replacedraw installs a replacement that skips the controller's draw.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Replace Draw Witness
+library:Island
+[PLAYER2]
+[DO]
+goto draw
+choice 0
+[ASSERT]
+DRAW
+[PLAYER1]
+inplay:Lexicon Replace Draw Witness
+library:Island
+hand:
+[PLAYER2]
+[END]

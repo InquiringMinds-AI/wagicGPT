@@ -1,0 +1,16 @@
+# @lifeof fires for life gained by the source's controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifeof Trigger Witness,Lexicon Life Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Life Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifeof Trigger Witness,Lexicon Life Effect Witness
+life:22
+[PLAYER2]
+life:19
+[END]

@@ -1,0 +1,23 @@
+# Ram Through uses _PUNCH_: the selected controller creature deals damage equal
+# to its power to the opposing creature -- a ONE-SIDED fight, so Grizzly Bears
+# (power 2) kills the 2/2 Runeclaw Bear yet takes no damage back and survives.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Ram Through
+manapool:{1}{G}
+[PLAYER2]
+inplay:Runeclaw Bear
+[DO]
+Ram Through
+Grizzly Bears
+Runeclaw Bear
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+graveyard:Ram Through
+[PLAYER2]
+graveyard:Runeclaw Bear
+[END]

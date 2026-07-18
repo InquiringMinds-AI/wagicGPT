@@ -1,0 +1,20 @@
+# affinitycontrollercreatures counts only creatures controlled by the caster.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Lexicon Affinity Controller Creatures Witness
+manapool:{2}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Lexicon Affinity Controller Creatures Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Lexicon Affinity Controller Creatures Witness
+hand:
+manapool:{0}
+[PLAYER2]
+inplay:Hill Giant
+[END]

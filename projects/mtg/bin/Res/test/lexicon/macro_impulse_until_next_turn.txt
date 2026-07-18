@@ -1,0 +1,18 @@
+# Alania's Pathmaker uses the until-end-of-next-turn impulse macro on entry.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Alania's Pathmaker
+library:Forest,Island
+manapool:{3}{R}
+[PLAYER2]
+[DO]
+Alania's Pathmaker
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Alania's Pathmaker
+exile:Island
+library:Forest
+[PLAYER2]
+[END]

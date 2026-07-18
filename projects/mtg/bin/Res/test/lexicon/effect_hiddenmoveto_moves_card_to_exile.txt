@@ -1,0 +1,18 @@
+# hiddenmoveto moves the selected permanent to exile through the hidden-zone
+# movement path.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Hidden Move Effect Witness,Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon Hidden Move Effect Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Hidden Move Effect Witness
+exile:Grizzly Bears
+necroed:grizzly bears
+[PLAYER2]
+[END]

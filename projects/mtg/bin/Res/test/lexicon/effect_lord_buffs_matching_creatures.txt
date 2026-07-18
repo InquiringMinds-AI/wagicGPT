@@ -1,0 +1,24 @@
+# lord grants a continuous +1/+1 modifier to matching creatures, so the Bear
+# trades with a Hill Giant it could not otherwise kill.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lord Effect Witness,Grizzly Bears
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Lexicon Lord Effect Witness
+goto attackers
+Grizzly Bears
+next
+Hill Giant
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Lord Effect Witness
+graveyard:Grizzly Bears
+[PLAYER2]
+graveyard:Hill Giant
+[END]

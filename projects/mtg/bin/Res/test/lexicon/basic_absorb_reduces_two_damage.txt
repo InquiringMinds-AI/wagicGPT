@@ -1,0 +1,22 @@
+# Absorb prevents one point of damage, leaving a 2/2 alive after Shock.
+# The active player casts Shock at the opponent's witness.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Shock
+manapool:{R}
+[PLAYER2]
+inplay:Lexicon Absorb Witness
+life:20
+[DO]
+Shock
+Lexicon Absorb Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+inplay:Lexicon Absorb Witness
+life:20
+[END]

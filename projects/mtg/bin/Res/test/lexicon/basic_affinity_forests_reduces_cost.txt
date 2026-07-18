@@ -1,0 +1,18 @@
+# affinityforests reduces an artifact's generic cost for each Forest controlled.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest
+hand:Lexicon Affinity Forests Witness
+manapool:{0}
+[PLAYER2]
+[DO]
+Lexicon Affinity Forests Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest,Lexicon Affinity Forests Witness
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

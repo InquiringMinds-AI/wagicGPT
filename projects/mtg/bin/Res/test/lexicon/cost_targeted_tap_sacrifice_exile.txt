@@ -1,0 +1,26 @@
+# Targeted tap, sacrifice, and exile costs must pay by changing the selected
+# permanent's zone/state before the ability's life-gain effect resolves.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Target Tap Cost Witness,Lexicon Target Sacrifice Cost Witness,Lexicon Target Exile Cost Witness,Grizzly Bears,Hill Giant
+graveyard:Lexicon Synthetic Vanilla
+life:20
+[PLAYER2]
+[DO]
+Lexicon Target Tap Cost Witness
+Grizzly Bears
+Lexicon Target Sacrifice Cost Witness
+Hill Giant
+Lexicon Target Exile Cost Witness
+Lexicon Synthetic Vanilla
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Target Tap Cost Witness,Lexicon Target Sacrifice Cost Witness,Lexicon Target Exile Cost Witness,Grizzly Bears
+tappedinplay:1
+graveyard:Hill Giant
+exile:Lexicon Synthetic Vanilla
+life:23
+[PLAYER2]
+[END]

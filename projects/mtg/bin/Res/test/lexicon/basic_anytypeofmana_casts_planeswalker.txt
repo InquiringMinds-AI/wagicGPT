@@ -1,0 +1,18 @@
+# anytypeofmana lets Oath of Nissa's controller spend green mana to cast a
+# planeswalker with blue symbols.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Oath of Nissa,Jace Beleren
+manapool:{G}{G}{G}{G}
+[PLAYER2]
+[DO]
+Oath of Nissa
+Jace Beleren
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Oath of Nissa,Jace Beleren
+manapool:{0}
+[PLAYER2]
+[END]

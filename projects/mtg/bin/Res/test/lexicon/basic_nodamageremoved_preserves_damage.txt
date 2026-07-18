@@ -1,0 +1,29 @@
+# nodamageremoved keeps marked damage through cleanup, so a second spell on a
+# later turn kills a creature that would otherwise have survived (damage from
+# the first spell would normally be removed at end-of-turn cleanup).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Patient Zero,Mountain,Mountain
+hand:Shock,Shock
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Mountain
+Shock
+Hill Giant
+goto end
+goto firstmain
+goto end
+goto firstmain
+Mountain
+Shock
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Patient Zero,Mountain,Mountain
+graveyard:Shock,Shock
+[PLAYER2]
+graveyard:Hill Giant
+[END]

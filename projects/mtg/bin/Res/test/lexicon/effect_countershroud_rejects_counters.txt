@@ -1,0 +1,18 @@
+# countershroud prevents a targeted creature from receiving a counter.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Countershroud Effect Witness,Lexicon Remove Single Counter Effect Witness,Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon Countershroud Effect Witness
+Grizzly Bears
+Lexicon Remove Single Counter Effect Witness
+choice 0
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Countershroud Effect Witness,Lexicon Remove Single Counter Effect Witness,Grizzly Bears
+[PLAYER2]
+[END]

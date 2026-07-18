@@ -1,0 +1,21 @@
+# @foretold fires when a foretell card is exiled face-down from its controller's hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Foretold Trigger Witness
+hand:Doomskar
+manapool:{2}
+life:20
+[PLAYER2]
+[DO]
+Doomskar
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Foretold Trigger Witness
+exile:Doomskar
+life:21
+manapool:{0}
+[PLAYER2]
+[END]

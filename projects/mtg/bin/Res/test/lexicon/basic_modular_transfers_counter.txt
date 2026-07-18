@@ -1,0 +1,21 @@
+# modular transfers an Arcbound Worker's +1/+1 counter to an artifact
+# creature when the Worker dies.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Arcbound Worker,Ornithopter
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Shock
+Arcbound Worker
+choice 0
+Ornithopter
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Arcbound Worker,Shock
+inplay:Ornithopter
+[PLAYER2]
+[END]

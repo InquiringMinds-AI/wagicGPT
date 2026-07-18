@@ -1,0 +1,16 @@
+# _MANAOFANYCOLOR_ exposes its first color branch as a mana-pool assertion.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Any Color Macro Witness
+[PLAYER2]
+[DO]
+Lexicon Any Color Macro Witness
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Any Color Macro Witness
+manapool:{W}
+[PLAYER2]
+[END]

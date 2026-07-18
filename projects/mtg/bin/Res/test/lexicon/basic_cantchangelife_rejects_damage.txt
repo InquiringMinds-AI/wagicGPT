@@ -1,0 +1,21 @@
+# cantchangelife prevents damage from changing the controller's life total.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Change Life Witness
+hand:Lightning Bolt
+manapool:{R}
+life:20
+[PLAYER2]
+[DO]
+Lightning Bolt
+p1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Change Life Witness
+graveyard:Lightning Bolt
+life:20
+manapool:{0}
+[PLAYER2]
+[END]

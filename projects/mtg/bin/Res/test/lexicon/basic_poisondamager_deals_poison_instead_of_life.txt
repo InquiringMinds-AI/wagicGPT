@@ -1,0 +1,22 @@
+# poisondamager converts combat damage to a player into poison counters.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Poison Damager Witness
+[PLAYER2]
+life:20
+poisoncount:0
+[DO]
+Lexicon Poison Damager Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Poison Damager Witness
+tappedinplay:1
+[PLAYER2]
+life:20
+poisoncount:2
+[END]

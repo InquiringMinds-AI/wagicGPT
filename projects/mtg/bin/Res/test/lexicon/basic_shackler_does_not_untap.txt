@@ -1,0 +1,16 @@
+# shackler prevents the permanent from untapping during the untap step.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Shackler Witness
+tappedinplay:1
+[PLAYER2]
+[DO]
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Lexicon Shackler Witness
+tappedinplay:1
+[PLAYER2]
+[END]

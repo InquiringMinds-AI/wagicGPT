@@ -1,0 +1,23 @@
+# Lure forces all able creatures to block the creature with lure, even when
+# the defender is given no block command by the script.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Elvish Bard
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Elvish Bard
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Elvish Bard
+tappedinplay:1
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]

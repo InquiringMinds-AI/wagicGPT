@@ -1,0 +1,17 @@
+# opponentrestrictedcastingzone includes the opponent's hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opponent Restricted Casting Zone Witness
+[PLAYER2]
+hand:Hill Giant
+[DO]
+Lexicon Opponent Restricted Casting Zone Witness
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opponent Restricted Casting Zone Witness
+[PLAYER2]
+exile:Hill Giant
+[END]

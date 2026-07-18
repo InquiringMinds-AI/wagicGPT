@@ -1,0 +1,19 @@
+# Recover sees the creature move from the battlefield to the graveyard and
+# returns it to hand after accepting its zero-cost recovery payment.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Recover Macro Witness
+hand:Wrath of God
+manapool:{2}{W}{W}
+[PLAYER2]
+[DO]
+Wrath of God
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Recover Macro Witness
+graveyard:Wrath of God
+[PLAYER2]
+[END]

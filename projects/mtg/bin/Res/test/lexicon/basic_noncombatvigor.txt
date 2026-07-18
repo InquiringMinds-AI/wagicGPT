@@ -1,0 +1,20 @@
+# noncombatvigor applies to Shock, while combat damage is handled separately.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Stormwild Capridor
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Shock
+Stormwild Capridor
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Stormwild Capridor
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+[END]

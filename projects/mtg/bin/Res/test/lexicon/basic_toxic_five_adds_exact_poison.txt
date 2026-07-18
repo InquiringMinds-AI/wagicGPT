@@ -1,0 +1,21 @@
+# poisonfivetoxic adds exactly 5 poison counters.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Toxic Five Witness
+[PLAYER2]
+life:20
+poisoncount:0
+[DO]
+Lexicon Toxic Five Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Toxic Five Witness
+[PLAYER2]
+life:19
+poisoncount:5
+[END]

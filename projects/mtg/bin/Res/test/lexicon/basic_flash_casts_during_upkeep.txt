@@ -1,0 +1,17 @@
+# Flash allows a creature to be cast during the upkeep, outside the normal
+# creature-casting window.
+[INIT]
+UPKEEP
+[PLAYER1]
+hand:Lexicon Flash Witness
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Flash Witness
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Lexicon Flash Witness
+manapool:{0}
+[PLAYER2]
+[END]

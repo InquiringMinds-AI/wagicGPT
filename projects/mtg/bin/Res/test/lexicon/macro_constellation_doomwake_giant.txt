@@ -1,0 +1,20 @@
+# Doomwake Giant uses _CONSTELLATION_. Casting Rancor adds an enchantment and
+# the opposing 1/1 dies to the resulting -1/-1 trigger.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Doomwake Giant
+hand:Rancor
+manapool:{G}
+[PLAYER2]
+inplay:Elvish Mystic
+[DO]
+Rancor
+Doomwake Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Doomwake Giant,Rancor
+[PLAYER2]
+graveyard:Elvish Mystic
+[END]

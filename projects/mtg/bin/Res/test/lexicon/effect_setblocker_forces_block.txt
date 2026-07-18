@@ -1,0 +1,25 @@
+# setblocker forces the selected creature into the source's blocking slot.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Setblocker Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Lexicon Setblocker Effect Witness
+Grizzly Bears
+next
+next
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Setblocker Effect Witness
+tappedinplay:1
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]

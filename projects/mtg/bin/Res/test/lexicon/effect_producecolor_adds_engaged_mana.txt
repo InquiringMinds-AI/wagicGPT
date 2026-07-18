@@ -1,0 +1,16 @@
+# producecolor adds an extra green mana when the source's mana ability is
+# engaged.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Producecolor Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Producecolor Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Producecolor Effect Witness
+manapool:{G}{G}
+[PLAYER2]
+[END]

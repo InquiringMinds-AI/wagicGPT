@@ -1,0 +1,19 @@
+# Echo offers its zero-cost payment at the next upkeep; accepting it keeps the
+# creature on the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Echo Macro Witness
+manapool:{0}
+[PLAYER2]
+[DO]
+Lexicon Echo Macro Witness
+goto end
+goto upkeep
+choice 0
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Lexicon Echo Macro Witness
+[PLAYER2]
+[END]

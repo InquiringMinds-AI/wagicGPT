@@ -1,0 +1,33 @@
+# Each rolld<N> form emits the die event exactly once. The witness exposes six
+# activated die-roll abilities (d4, d6, d8, d10, d12, d20); clicking it arms an
+# ability-selection menu that must be answered with choice N to pick each one.
+# Every roll fires the @dierolled trigger for +1 life, so rolling all six
+# distinct dice raises life from 20 to 26.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Die Family Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Die Family Witness
+choice 0
+Lexicon Die Family Witness
+choice 1
+Lexicon Die Family Witness
+choice 2
+Lexicon Die Family Witness
+choice 3
+Lexicon Die Family Witness
+choice 4
+Lexicon Die Family Witness
+choice 5
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Die Family Witness
+life:26
+[PLAYER2]
+[END]

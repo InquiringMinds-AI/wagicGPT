@@ -1,0 +1,28 @@
+# Wither deals combat damage as -1/-1 counters. Rustrazor Butcher (1/2, first
+# strike + wither) hits Grizzly Bears with a -1/-1 counter in the first-strike
+# step, permanently dropping it to 1/1, so the reduced-power Grizzly can no
+# longer kill the Butcher when it strikes back. A plain first-striker would die
+# to the 2/2's full-power swing.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Rustrazor Butcher
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Rustrazor Butcher
+next
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Rustrazor Butcher
+tappedinplay:1
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[END]

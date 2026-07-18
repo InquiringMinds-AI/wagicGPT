@@ -1,21 +1,22 @@
+# swampwalk makes a creature unblockable while the defending player controls a Swamp.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:anaconda
+inplay:Lexicon Swampwalk Witness
 [PLAYER2]
-inplay:swamp,grizzly bears
+inplay:Swamp,Grizzly Bears
 life:20
 [DO]
-anaconda
+Lexicon Swampwalk Witness
 next
-grizzly bears
+Grizzly Bears
 next
 next
 [ASSERT]
 COMBATEND
 [PLAYER1]
-inplay:anaconda
+inplay:Lexicon Swampwalk Witness
 [PLAYER2]
-inplay:swamp,grizzly bears
-life:17
+inplay:Swamp,Grizzly Bears
+life:18
 [END]

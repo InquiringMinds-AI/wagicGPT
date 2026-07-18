@@ -1,0 +1,17 @@
+# shackle takes control of an opposing creature while the source stays tapped;
+# the witness taps ({T}) to activate, so control persists.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Shackle Effect Witness
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Lexicon Shackle Effect Witness
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Shackle Effect Witness,Hill Giant
+[PLAYER2]
+[END]

@@ -1,0 +1,15 @@
+# Every macro defined in the shipped _macros.txt registry is invoked by the
+# synthetic primitive. This is a parser/expansion witness; stable gameplay
+# semantics remain covered by the focused macro-backed scenarios where they
+# are observable.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Macro Catalog
+[PLAYER2]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Macro Catalog
+[PLAYER2]
+[END]

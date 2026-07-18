@@ -1,0 +1,17 @@
+# @poisonedfoeof fires when the opponent receives poison counters.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Poisoned Foe Trigger Witness,Lexicon Foe Poison Effect Witness
+[PLAYER2]
+poisoncount:0
+[DO]
+Lexicon Foe Poison Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Poisoned Foe Trigger Witness,Lexicon Foe Poison Effect Witness
+life:21
+[PLAYER2]
+poisoncount:1
+[END]

@@ -1,0 +1,25 @@
+# Simian Sling's reconfigure action attaches the artifact creature to a Bear.
+# The resulting +1/+1 changes the unblocked combat result from two to three.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Simian Sling
+inplay:Grizzly Bears
+manapool:{2}{R}
+[PLAYER2]
+life:20
+[DO]
+Simian Sling
+Simian Sling
+Grizzly Bears
+goto attackers
+Grizzly Bears
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Grizzly Bears,Simian Sling
+[PLAYER2]
+life:17
+[END]

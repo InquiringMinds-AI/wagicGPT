@@ -1,0 +1,21 @@
+# hasotherkicker exposes the non-mana alternate kicker cost on Arctic Merfolk.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Arctic Merfolk
+inplay:Grizzly Bears
+manapool:{1}{U}
+[PLAYER2]
+[DO]
+Arctic Merfolk
+choice 1
+Grizzly Bears
+Arctic Merfolk
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Arctic Merfolk
+hand:Grizzly Bears
+manapool:{0}
+[PLAYER2]
+[END]

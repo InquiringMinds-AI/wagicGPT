@@ -1,0 +1,23 @@
+# Big Score uses _TREASURE_ twice after its additional discard cost. The two
+# artifact tokens are observed alongside the spell's draw.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Big Score,Grizzly Bears
+library:Forest,Island,Mountain
+manapool:{3}{R}
+[PLAYER2]
+[DO]
+Big Score
+choice 0
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Big Score,Grizzly Bears
+inplay:*,*
+hand:Island,Mountain
+library:Forest
+manapool:{0}
+[PLAYER2]
+[END]

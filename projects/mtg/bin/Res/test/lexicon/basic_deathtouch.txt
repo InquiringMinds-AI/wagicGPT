@@ -1,0 +1,23 @@
+# Deathtouch makes one point of combat damage lethal to a creature.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:stinkweed imp
+[PLAYER2]
+inplay:ornithopter
+life:20
+[DO]
+stinkweed imp
+next
+ornithopter
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:stinkweed imp
+tappedinplay:1
+[PLAYER2]
+graveyard:ornithopter
+life:20
+[END]

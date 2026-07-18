@@ -1,0 +1,22 @@
+# return(...) blinks the target and applies counter(1/1) when it returns.
+# The resulting 3/3 survives Shock, proving the nested return ability ran.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Return Effect Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Return Effect Witness
+Grizzly Bears
+Shock
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Return Effect Witness,Grizzly Bears
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+[END]

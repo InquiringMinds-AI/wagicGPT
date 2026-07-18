@@ -1,0 +1,25 @@
+# Dakmor Salvage's dredge= field replaces a draw: at the controller's draw step
+# the player chooses to dredge instead, milling the top two library cards and
+# returning Dakmor Salvage from the graveyard to hand. The dredge chooser
+# targets a graveyard card that has dredge (Dakmor, chosen over Golgari Thug).
+# The turn-one draw is skipped, so the dredge is taken on the controller's
+# second draw step, reached by crossing the opponent's turn.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Dakmor Salvage,Golgari Thug,Lexicon Dredgeable Target Witness
+library:Forest,Island
+[PLAYER2]
+[DO]
+goto draw
+goto secondmain
+goto draw
+choice 0
+Dakmor Salvage
+[ASSERT]
+DRAW
+[PLAYER1]
+hand:Dakmor Salvage
+graveyard:Golgari Thug,Lexicon Dredgeable Target Witness,Forest,Island
+[PLAYER2]
+[END]

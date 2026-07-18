@@ -1,0 +1,21 @@
+# Vigor replaces damage to itself with +1/+1 counters, so Lightning Bolt does
+# not destroy the 1/1 creature.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Phytohydra
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+[DO]
+Lightning Bolt
+Phytohydra
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Phytohydra
+graveyard:Lightning Bolt
+manapool:{0}
+[PLAYER2]
+[END]

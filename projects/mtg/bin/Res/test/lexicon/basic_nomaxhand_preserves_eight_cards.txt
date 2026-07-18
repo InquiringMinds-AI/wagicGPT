@@ -1,0 +1,16 @@
+# Graceful Adept's nomaxhand lets more than seven cards survive cleanup.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Graceful Adept
+hand:Forest,Island,Mountain,Plains,Swamp,Grizzly Bears,Hill Giant,Raging Goblin
+[PLAYER2]
+[DO]
+goto cleanup
+[ASSERT]
+CLEANUP
+[PLAYER1]
+inplay:Graceful Adept
+hand:Forest,Island,Mountain,Plains,Swamp,Grizzly Bears,Hill Giant,Raging Goblin
+[PLAYER2]
+[END]

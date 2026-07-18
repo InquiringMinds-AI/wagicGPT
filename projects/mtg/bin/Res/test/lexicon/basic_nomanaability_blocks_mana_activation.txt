@@ -1,0 +1,16 @@
+# nomanaability blocks a mana ability rather than merely a normal activation.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon NoManaAbility Witness
+[PLAYER2]
+[DO]
+Lexicon NoManaAbility Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon NoManaAbility Witness
+tappedinplay:0
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,19 @@
+# affinityopponentcreatures counts creatures controlled by the opponent.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Affinity Opponent Creatures Witness
+manapool:{2}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Lexicon Affinity Opponent Creatures Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Affinity Opponent Creatures Witness
+hand:
+manapool:{0}
+[PLAYER2]
+inplay:Hill Giant
+[END]

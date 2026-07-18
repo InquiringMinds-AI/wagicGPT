@@ -1,0 +1,20 @@
+# Afterlife Insurance installs _AFTERLIFETOKEN_ on the creature, then Wrath
+# of God kills it and leaves the generated Spirit on the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Afterlife Insurance,Wrath of God
+manapool:{1}{W}{2}{W}{W}
+[PLAYER2]
+[DO]
+Afterlife Insurance
+Wrath of God
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Grizzly Bears,Afterlife Insurance,Wrath of God
+inplay:*
+manapool:{0}
+[PLAYER2]
+[END]

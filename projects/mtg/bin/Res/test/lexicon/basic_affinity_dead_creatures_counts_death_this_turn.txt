@@ -1,0 +1,22 @@
+# affinityalldeadcreatures counts a creature that died earlier in this turn.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Shock,Lexicon Affinity Dead Creatures Witness
+manapool:{2}{R}
+[PLAYER2]
+inplay:Lexicon Party Cleric
+[DO]
+Shock
+Lexicon Party Cleric
+Lexicon Affinity Dead Creatures Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Affinity Dead Creatures Witness
+graveyard:Shock
+hand:
+manapool:{0}
+[PLAYER2]
+graveyard:Lexicon Party Cleric
+[END]

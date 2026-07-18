@@ -1,0 +1,23 @@
+# frozen prevents the targeted permanent from untapping at its next untap step.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Frozen Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears
+tappedinplay:1
+[DO]
+Lexicon Frozen Effect Witness
+Grizzly Bears
+goto end
+next
+next
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Lexicon Frozen Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears
+tappedinplay:1
+[END]

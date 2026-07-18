@@ -1,0 +1,32 @@
+# imprint exiles the chosen instant and the activated copy can resolve without
+# moving the imprinted card out of exile. Isochron Scepter's imprint is an ETB
+# ability, so the Scepter is CAST in [DO] (pre-placing via INIT skips ETB).
+# Scepter is an artifact (no summoning sickness on {T}), so it can be activated
+# the same turn: cast {2}, imprint Shock (choice 0 accepts the may, then pick
+# Shock), then {2}{T} copies Shock at player 2 (deals 2, life 20 -> 18). Shock
+# stays in exile. Total mana {4}.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Isochron Scepter,Shock
+manapool:{4}
+[PLAYER2]
+life:20
+[DO]
+Isochron Scepter
+choice 0
+Shock
+no
+Isochron Scepter
+p2
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Isochron Scepter
+exile:Shock
+hand:
+manapool:{0}
+[PLAYER2]
+life:18
+[END]

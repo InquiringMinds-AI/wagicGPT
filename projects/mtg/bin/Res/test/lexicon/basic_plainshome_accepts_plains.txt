@@ -1,0 +1,25 @@
+# plainshome (landhome): the witness attacks when the DEFENDER controls a
+# Plains, and it is not sacrificed because its CONTROLLER also controls a
+# Plains. It attacks as a 2/2 for 2 damage. (Attacking combat needs three
+# nexts to reach Combat ends.)
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Plainshome Witness,Plains
+[PLAYER2]
+inplay:Plains,Grizzly Bears
+life:20
+[DO]
+Lexicon Plainshome Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Plainshome Witness,Plains
+tappedinplay:1
+[PLAYER2]
+inplay:Plains,Grizzly Bears
+life:18
+[END]

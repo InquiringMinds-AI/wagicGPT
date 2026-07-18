@@ -1,0 +1,16 @@
+# Prosperity Tycoon uses _MERCENARYTOKEN_ on entry.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Prosperity Tycoon
+manapool:{3}{W}
+[PLAYER2]
+[DO]
+Prosperity Tycoon
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Prosperity Tycoon,*
+manapool:{0}
+[PLAYER2]
+[END]

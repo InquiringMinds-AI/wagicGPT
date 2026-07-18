@@ -1,0 +1,27 @@
+# Metadata flags are loaded onto live cards in the zones where the engine uses
+# them. The custom ability assertions are gameplay-state checks, not catalog
+# loading: the cards are initialized, a phase advances, and each flag remains
+# attached to the in-game card.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Hiddenface Metadata Witness,Lexicon Own Top Reveal Witness,Lexicon Opponent Top Reveal Witness,Lexicon Opponent Hand Reveal Witness,Lexicon Controller Hand Reveal Witness
+commandzone:Lexicon Commander Eligibility Witness,Lexicon Conspiracy Metadata Witness,Lexicon Background Partner Witness
+[PLAYER2]
+[DO]
+next
+[ASSERT]
+COMBATBEGIN
+[PLAYER1]
+inplay:Lexicon Hiddenface Metadata Witness,Lexicon Own Top Reveal Witness,Lexicon Opponent Top Reveal Witness,Lexicon Opponent Hand Reveal Witness,Lexicon Controller Hand Reveal Witness
+commandzone:Lexicon Commander Eligibility Witness,Lexicon Conspiracy Metadata Witness,Lexicon Background Partner Witness
+ability:lexicon hiddenface metadata witness|hiddenface
+ability:lexicon own top reveal witness|showfromtoplibrary
+ability:lexicon opponent top reveal witness|showopponenttoplibrary
+ability:lexicon opponent hand reveal witness|showopponenthand
+ability:lexicon controller hand reveal witness|showcontrollerhand
+ability:lexicon commander eligibility witness|canbecommander
+ability:lexicon conspiracy metadata witness|isconspiracy
+ability:lexicon background partner witness|backgroundpartner
+[PLAYER2]
+[END]

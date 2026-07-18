@@ -1,0 +1,27 @@
+# Swift Reckoning's spellmastery condition lets its sorcery be cast during
+# upkeep (as though it had flash) when two or more instant/sorcery cards are in
+# the graveyard. It destroys a target TAPPED creature, so the target is a
+# tapped Grizzly Bears the opponent controls. Casting it at instant speed and
+# resolving the destruction proves spell mastery is active.
+[INIT]
+UPKEEP
+[PLAYER1]
+graveyard:Shock,Lava Dart
+hand:Swift Reckoning
+manapool:{1}{W}
+[PLAYER2]
+inplay:Grizzly Bears
+tappedinplay:1
+[DO]
+Swift Reckoning
+Grizzly Bears
+no
+[ASSERT]
+UPKEEP
+[PLAYER1]
+graveyard:Shock,Lava Dart,Swift Reckoning
+hand:
+manapool:{0}
+[PLAYER2]
+graveyard:Grizzly Bears
+[END]

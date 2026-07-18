@@ -1,0 +1,24 @@
+# cantlifelose allows a player to remain in the game below zero life.
+# The active player casts the bolt at Phyrexian Unlife's controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Phyrexian Unlife
+life:1
+[DO]
+Lightning Bolt
+p2
+goto firstmain
+[ASSERT]
+gameover:none
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lightning Bolt
+manapool:{0}
+[PLAYER2]
+inplay:Phyrexian Unlife
+life:-2
+[END]

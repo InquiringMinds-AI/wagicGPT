@@ -1,0 +1,19 @@
+# Devastating Summons uses _REDELEMENTALTOKEN_ when one land is sacrificed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain
+hand:Devastating Summons
+manapool:{R}
+[PLAYER2]
+[DO]
+Devastating Summons
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Devastating Summons,Mountain
+inplay:*,*
+manapool:{0}
+[PLAYER2]
+[END]

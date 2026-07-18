@@ -1,0 +1,23 @@
+# protectionfromcoloredspells rejects a colored spell as a target. Shock (a
+# colored spell) cannot target the witness, so it is uncastable at it and stays
+# in hand with its {R} unspent (uncastable != cast-and-fizzled); the witness is
+# unharmed. Clicking the illegal target then cancelling avoids the runaway goto.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Shock
+manapool:{R}
+[PLAYER2]
+inplay:Lexicon Colored Spell Protection Witness
+[DO]
+Shock
+Lexicon Colored Spell Protection Witness
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Shock
+manapool:{R}
+[PLAYER2]
+inplay:Lexicon Colored Spell Protection Witness
+[END]

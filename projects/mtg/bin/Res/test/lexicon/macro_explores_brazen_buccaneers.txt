@@ -1,0 +1,20 @@
+# Brazen Buccaneers uses _EXPLORES_ on entry. A land on top is moved to hand
+# by the macro's land branch.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Brazen Buccaneers
+library:Forest
+manapool:{3}{R}
+[PLAYER2]
+[DO]
+Brazen Buccaneers
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Brazen Buccaneers
+hand:Forest
+manapool:{0}
+[PLAYER2]
+[END]

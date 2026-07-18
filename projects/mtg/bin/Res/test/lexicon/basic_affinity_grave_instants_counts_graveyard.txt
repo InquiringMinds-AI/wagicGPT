@@ -1,0 +1,19 @@
+# affinitygraveinstsorc counts instants and sorceries in the caster's graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Shock
+hand:Lexicon Affinity Grave Instants Witness
+manapool:{2}
+[PLAYER2]
+[DO]
+Lexicon Affinity Grave Instants Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Affinity Grave Instants Witness
+graveyard:Shock
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

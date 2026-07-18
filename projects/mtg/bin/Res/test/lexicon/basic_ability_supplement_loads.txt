@@ -1,0 +1,14 @@
+# The production-card semantic fixtures cover many of these abilities; this
+# companion primitive keeps the remaining keyword spellings in an explicit
+# registered abilities-field load witness.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Basic Ability Supplement
+[PLAYER2]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Basic Ability Supplement
+[PLAYER2]
+[END]

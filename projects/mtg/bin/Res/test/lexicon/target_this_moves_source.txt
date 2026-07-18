@@ -1,0 +1,16 @@
+# this selects the source card itself; the ability needs a target-selection
+# click on the source after the activation click.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon This Target Witness
+[PLAYER2]
+[DO]
+Lexicon This Target Witness
+Lexicon This Target Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+exile:Lexicon This Target Witness
+[PLAYER2]
+[END]

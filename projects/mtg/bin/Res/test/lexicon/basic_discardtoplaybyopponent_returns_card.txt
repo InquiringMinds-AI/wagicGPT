@@ -1,0 +1,18 @@
+# discardtoplaybyopponent puts a card discarded by an opponent directly onto
+# the battlefield instead of into its owner's graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Discard Creature Witness
+[PLAYER2]
+hand:Loxodon Smiter
+[DO]
+Lexicon Discard Creature Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Discard Creature Witness
+[PLAYER2]
+inplay:Loxodon Smiter
+graveyard:
+[END]

@@ -1,0 +1,22 @@
+# A `may` wrapper makes an effect optional; accepting it applies the effect.
+# The witness is a Sorcery whose effect is `may life:2 controller`; casting it
+# and accepting the may prompt with `choice 0` gains 2 life: life 20 -> 22.
+# (`may` is a spell/triggered-context wrapper, not an activated-ability form, so
+# the witness is a cast Sorcery rather than an artifact with {0}:may.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon May Wrapper Witness
+manapool:{0}
+[PLAYER2]
+[DO]
+Lexicon May Wrapper Witness
+choice 0
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon May Wrapper Witness
+life:22
+[PLAYER2]
+[END]

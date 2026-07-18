@@ -1,0 +1,24 @@
+# Forestwalk makes a creature unblockable while the defending player
+# controls a Forest.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Boggart Loggers
+[PLAYER2]
+inplay:forest,grizzly bears
+life:20
+[DO]
+Boggart Loggers
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Boggart Loggers
+tappedinplay:1
+[PLAYER2]
+inplay:forest,grizzly bears
+life:18
+[END]

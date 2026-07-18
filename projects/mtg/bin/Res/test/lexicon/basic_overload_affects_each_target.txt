@@ -1,0 +1,20 @@
+# overload replaces Blustersquall's single target with each opposing creature.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Blustersquall
+manapool:{3}{U}
+[PLAYER2]
+inplay:Grizzly Bears,Hill Giant
+[DO]
+Blustersquall
+choice 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Blustersquall
+manapool:{0}
+[PLAYER2]
+inplay:Grizzly Bears,Hill Giant
+tappedinplay:2
+[END]

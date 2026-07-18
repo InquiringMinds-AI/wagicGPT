@@ -1,0 +1,15 @@
+# meld combines Gisela and Bruna into Brisela; the resulting card's
+# meldfrom declaration is also exercised by the same gameplay transition.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Gisela, the Broken Blade,Bruna, the Fading Light
+[PLAYER2]
+[DO]
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Brisela, Voice of Nightmares
+[PLAYER2]
+[END]

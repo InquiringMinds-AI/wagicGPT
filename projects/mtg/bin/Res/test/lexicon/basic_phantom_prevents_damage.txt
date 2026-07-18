@@ -1,0 +1,20 @@
+# Phantom prevents damage and remains on the battlefield after a lethal Shock.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Phantom Tiger
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Shock
+Phantom Tiger
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Phantom Tiger
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+[END]

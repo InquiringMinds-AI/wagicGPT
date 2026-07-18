@@ -1,0 +1,27 @@
+# Academy Raider uses _DISCARD&DRAW_ after combat damage: discard the known
+# hand card, then draw the next library card. (choice 0 answers the "may"
+# prompt that arms on the combat-damage tick.)
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Academy Raider
+hand:Grizzly Bears
+library:Forest
+[PLAYER2]
+life:20
+[DO]
+Academy Raider
+next
+next
+choice 0
+Grizzly Bears
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Academy Raider
+hand:Forest
+graveyard:Grizzly Bears
+[PLAYER2]
+life:19
+[END]

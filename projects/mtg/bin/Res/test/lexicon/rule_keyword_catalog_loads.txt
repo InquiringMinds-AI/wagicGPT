@@ -1,0 +1,14 @@
+# Parser-contract witness for the engine-rule keywords installed by the card
+# script parser. These rules are global/framework behaviors, so loading the
+# synthetic primitive is the stable assertion available here.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Rule Catalog
+[PLAYER2]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Rule Catalog
+[PLAYER2]
+[END]

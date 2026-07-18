@@ -1,0 +1,44 @@
+# phasing: a creature with phasing phases OUT before its controller's untap
+# step and phases back IN one untap boundary later. Breezekeeper enters on
+# turn 1 (phased in); on the controller's next untap (turn 3) it should be
+# phased out and thus unable to attack, so an attack attempt deals no damage
+# and combat ends with the opponent still at 20.
+#
+# ENGINE-BLOCKED: the PHASING basic ability is UNIMPLEMENTED in this engine.
+#   - GameObserver::phasingPhase() is declared (GameObserver.h:155) but has no
+#     definition and is never called.
+#   - The untap step (MTGInPlay::untapAll, MTGGameZones.cpp:1396) never toggles
+#     isPhased, and no observer is created for Constants::PHASING in the
+#     basic-ability setup (MTGAbility.cpp ~7188, unlike landhome/modular).
+#   - Even the phaseout EFFECT (AAPhaseOut::resolve, AllAbilities.cpp:2474)
+#     only sets isPhased and leaves the card in the inPlay zone, so phasing has
+#     no zone-count observable at all.
+# Because phasing never fires, Breezekeeper is never phased out; on this engine
+# the attack step simply produces no attacker at turn 3 and combat overshoots
+# to the End phase. The fixture therefore fails on the phase assert and stands
+# as the regression witness for the missing phasing implementation.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Breezekeeper
+[PLAYER2]
+life:20
+[DO]
+goto end
+goto firstmain
+goto end
+goto firstmain
+goto end
+goto firstmain
+goto combatattackers
+Breezekeeper
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Breezekeeper
+[PLAYER2]
+life:20
+[END]

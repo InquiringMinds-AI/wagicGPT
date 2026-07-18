@@ -1,0 +1,24 @@
+# Ivory Mask makes its controller an illegal player target, so the active
+# player's bolt cannot be cast: it stays in hand with its mana unspent.
+# (No trailing goto - the uncastable spell must not be left hanging in
+# targeting mode, which would loop the game forever.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Ivory Mask
+life:20
+[DO]
+Lightning Bolt
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Ivory Mask
+life:20
+[END]

@@ -1,0 +1,20 @@
+# Feral Incarnation uses _BEASTTOKEN_ three times. Its three generated tokens
+# remain on the battlefield after the sorcery resolves. (choice 0 dismisses the
+# Convoke cast menu so the spell is paid entirely from the mana pool.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Feral Incarnation
+manapool:{8}{G}
+[PLAYER2]
+[DO]
+Feral Incarnation
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Feral Incarnation
+inplay:*,*,*
+manapool:{0}
+[PLAYER2]
+[END]

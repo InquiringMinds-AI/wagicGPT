@@ -1,21 +1,22 @@
+# mountainwalk makes a creature unblockable while the defending player controls a Mountain.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:canyon wildcat
+inplay:Lexicon Mountainwalk Witness
 [PLAYER2]
-inplay:mountain,grizzly bears
+inplay:Mountain,Grizzly Bears
 life:20
 [DO]
-canyon wildcat
+Lexicon Mountainwalk Witness
 next
-grizzly bears
+Grizzly Bears
 next
 next
 [ASSERT]
 COMBATEND
 [PLAYER1]
-inplay:canyon wildcat
+inplay:Lexicon Mountainwalk Witness
 [PLAYER2]
-inplay:mountain,grizzly bears
+inplay:Mountain,Grizzly Bears
 life:18
 [END]

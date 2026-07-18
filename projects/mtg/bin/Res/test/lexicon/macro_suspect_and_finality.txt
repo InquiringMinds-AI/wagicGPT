@@ -1,0 +1,24 @@
+# Suspect marks the witness (menace, can't block); Finality's replacement
+# exiles the marked creature when Wrath of God would destroy it. Both witnesses
+# are activated, then Wrath destroys the board: the Finality witness is exiled
+# by its replacement while the Suspect witness dies normally.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Suspect Macro Witness,Lexicon Finality Macro Witness
+hand:Wrath of God
+manapool:{2}{W}{W}
+[PLAYER2]
+[DO]
+Lexicon Suspect Macro Witness
+Lexicon Finality Macro Witness
+Wrath of God
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Suspect Macro Witness,Wrath of God
+exile:Lexicon Finality Macro Witness
+[PLAYER2]
+[END]

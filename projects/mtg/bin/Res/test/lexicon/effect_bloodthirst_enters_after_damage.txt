@@ -1,0 +1,26 @@
+# Bloodthirst is checked when the creature enters, based on damage dealt to the
+# opponent earlier in the turn: the +1/+1 counter lets Blood Ogre (base 2/2)
+# survive a Shock that would kill it without the counter.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Shock,Shock,Blood Ogre
+manapool:{2}{R}{R}{R}
+[PLAYER2]
+life:20
+[DO]
+Shock
+p2
+Blood Ogre
+Shock
+Blood Ogre
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Blood Ogre
+graveyard:Shock,Shock
+manapool:{0}
+[PLAYER2]
+life:18
+[END]

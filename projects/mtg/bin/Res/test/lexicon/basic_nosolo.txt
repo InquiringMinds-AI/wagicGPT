@@ -1,0 +1,17 @@
+# nosolo prevents a creature from attacking alone.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Nosolo Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon Nosolo Witness
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Nosolo Witness
+[PLAYER2]
+life:20
+[END]

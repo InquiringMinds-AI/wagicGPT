@@ -1,0 +1,22 @@
+# strong prevents a lower-power creature from blocking.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Strong Witness
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Lexicon Strong Witness
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Strong Witness
+[PLAYER2]
+inplay:Grizzly Bears
+life:17
+[END]

@@ -1,0 +1,18 @@
+# affinitybasiclandtypes counts distinct basic land types, not land cards.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Island
+hand:Lexicon Affinity Basic Types Witness
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Affinity Basic Types Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Island,Lexicon Affinity Basic Types Witness
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

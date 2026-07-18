@@ -1,0 +1,22 @@
+# Platinum Emperion prevents damage from changing its controller's life
+# total. The active player casts the bolt at the Emperion's controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Platinum Emperion
+life:20
+[DO]
+Lightning Bolt
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lightning Bolt
+manapool:{0}
+[PLAYER2]
+inplay:Platinum Emperion
+life:20
+[END]

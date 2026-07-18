@@ -1,0 +1,21 @@
+# countershroud prevents a permanent from receiving counters. The suite has no
+# direct counter/P-T assertion, so the rejection is observed through survival: a
+# -1/-1 counter aimed at the 1/1 countershroud witness is rejected, so it stays 1/1
+# and lives. (A plain 1/1 given the same -1/-1 becomes 0/0 and dies, confirming the
+# counter source works.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Shroud Witness,Lexicon Minus Counter Witness A15
+[PLAYER2]
+[DO]
+Lexicon Minus Counter Witness A15
+Lexicon Counter Shroud Witness
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Shroud Witness,Lexicon Minus Counter Witness A15
+[PLAYER2]
+[END]

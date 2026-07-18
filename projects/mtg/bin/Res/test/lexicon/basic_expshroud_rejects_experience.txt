@@ -1,0 +1,24 @@
+# expshroud prevents an experience counter from being added to its controller.
+# Meren gives its controller an experience counter when a creature dies; the
+# paired @experiencedof witness would gain 1 life on that counter. With expshroud
+# the counter is prevented, so the experienced trigger never fires and life stays 20.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Experience Shroud Witness,Lexicon Experienced Trigger Witness,Meren of Clan Nel Toth,Grizzly Bears
+hand:Wrecking Ball
+manapool:{2}{B}{R}
+[PLAYER2]
+[DO]
+Wrecking Ball
+Grizzly Bears
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Experience Shroud Witness,Lexicon Experienced Trigger Witness,Meren of Clan Nel Toth
+graveyard:Wrecking Ball,Grizzly Bears
+life:20
+[PLAYER2]
+[END]

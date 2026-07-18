@@ -1,0 +1,18 @@
+# replacescry makes a scry event draw the same number of cards instead.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Replacescry Witness
+library:Forest,Island
+manapool:{0}
+[PLAYER2]
+[DO]
+Lexicon Replacescry Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Replacescry Witness
+hand:Island
+library:Forest
+[PLAYER2]
+[END]

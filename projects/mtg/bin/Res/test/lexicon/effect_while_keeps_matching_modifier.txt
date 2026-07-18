@@ -1,0 +1,28 @@
+# while(outnumbered) grants +1/+1 only while the opponent controls at least
+# four more creatures. Player 0 has one creature (the witness) and the opponent
+# has five, so outnumbered holds: after activating the ability the witness
+# attacks as a 2/2 and deals two damage instead of one. (choice 0 picks "attack"
+# from the click menu the witness's activated ability would otherwise open.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon While Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears
+life:20
+[DO]
+Lexicon While Effect Witness
+goto attackers
+Lexicon While Effect Witness
+choice 0
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon While Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears
+life:18
+[END]

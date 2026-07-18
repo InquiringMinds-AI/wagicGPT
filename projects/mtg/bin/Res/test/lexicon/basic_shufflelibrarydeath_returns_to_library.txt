@@ -1,0 +1,22 @@
+# Legacy Weapon's shufflelibrarydeath replacement returns it to its owner's
+# library when it is destroyed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Legacy Weapon
+hand:Disenchant
+manapool:{1}{W}
+library:Forest
+[PLAYER2]
+[DO]
+Disenchant
+Legacy Weapon
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Disenchant
+library:Forest,Legacy Weapon
+inplay:
+manapool:{0}
+[PLAYER2]
+[END]

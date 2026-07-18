@@ -1,0 +1,19 @@
+# Aerial Caravan exercises the one-turn impulse-draw macro and exiles the
+# library's top card as the observable result.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Aerial Caravan
+library:Forest,Island
+manapool:{1}{U}{U}
+[PLAYER2]
+[DO]
+Aerial Caravan
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Aerial Caravan
+exile:Island
+library:Forest
+[PLAYER2]
+[END]

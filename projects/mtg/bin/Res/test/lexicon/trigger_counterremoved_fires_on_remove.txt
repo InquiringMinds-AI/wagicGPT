@@ -1,0 +1,21 @@
+# @counterremoved and @totalcounterremoved fire when a matching counter is removed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Removed Trigger Witness,Grizzly Bears
+life:20
+[PLAYER2]
+[DO]
+Lexicon Counter Removed Trigger Witness
+choice 0
+Grizzly Bears
+Lexicon Counter Removed Trigger Witness
+choice 1
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Removed Trigger Witness,Grizzly Bears
+life:22
+[PLAYER2]
+[END]

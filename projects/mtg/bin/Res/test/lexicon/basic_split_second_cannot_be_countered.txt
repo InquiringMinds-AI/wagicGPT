@@ -1,0 +1,26 @@
+# split second: while Quagnoth is on the stack the opponent cannot cast
+# Counterspell at all. The Counterspell is therefore uncastable - it stays in
+# the opponent's hand with its mana unspent - and Quagnoth resolves onto the
+# battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Quagnoth
+manapool:{5}{G}
+[PLAYER2]
+hand:Counterspell
+manapool:{U}{U}
+[DO]
+Quagnoth
+yes
+Counterspell
+Quagnoth
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Quagnoth
+[PLAYER2]
+hand:Counterspell
+manapool:{U}{U}
+[END]

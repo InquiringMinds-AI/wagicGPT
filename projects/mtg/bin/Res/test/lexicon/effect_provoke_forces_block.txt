@@ -1,0 +1,26 @@
+# provoke untaps the chosen opposing creature and forces it to block the source.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Provoke Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears
+tappedinplay:1
+life:20
+[DO]
+Lexicon Provoke Effect Witness
+Grizzly Bears
+next
+next
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Provoke Effect Witness
+tappedinplay:1
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]

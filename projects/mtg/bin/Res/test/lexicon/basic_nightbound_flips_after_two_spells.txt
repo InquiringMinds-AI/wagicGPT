@@ -1,0 +1,21 @@
+# nightbound transforms the back face to day after its controller casts two
+# spells during a turn.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ballista Wielder
+hand:Lexicon Synthetic Vanilla,Lexicon Synthetic Vanilla
+manapool:{1}{1}
+[PLAYER2]
+[DO]
+Lexicon Synthetic Vanilla
+Lexicon Synthetic Vanilla
+goto end
+goto end
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ballista Watcher
+[PLAYER2]
+[END]

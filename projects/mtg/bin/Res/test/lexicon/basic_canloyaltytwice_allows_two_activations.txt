@@ -1,0 +1,17 @@
+# canloyaltytwice permits two loyalty activations in the same turn.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Loyalty Twice Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Loyalty Twice Witness
+Lexicon Loyalty Twice Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Loyalty Twice Witness
+life:22
+[PLAYER2]
+[END]

@@ -1,0 +1,22 @@
+# Toxic 1 adds one poison counter in addition to combat damage.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Blightbelly Rat
+[PLAYER2]
+life:20
+poisoncount:0
+[DO]
+Blightbelly Rat
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Blightbelly Rat
+tappedinplay:1
+[PLAYER2]
+life:18
+poisoncount:1
+[END]

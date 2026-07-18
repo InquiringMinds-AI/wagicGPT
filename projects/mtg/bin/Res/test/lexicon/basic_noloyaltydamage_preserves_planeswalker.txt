@@ -1,0 +1,24 @@
+# noloyaltydamage prevents damage from removing loyalty counters, so a Shock
+# aimed at the protected planeswalker still resolves (goes to the graveyard,
+# mana spent) but leaves the planeswalker in play with its loyalty intact.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Spark Rupture,Jace Beleren
+hand:Shock
+library:Forest
+manapool:{R}
+[PLAYER2]
+[DO]
+Shock
+Jace Beleren
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Spark Rupture,Jace Beleren
+graveyard:Shock
+library:Forest
+manapool:{0}
+[PLAYER2]
+[END]

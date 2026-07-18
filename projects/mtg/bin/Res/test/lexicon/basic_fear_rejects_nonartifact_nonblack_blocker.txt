@@ -1,0 +1,23 @@
+# Fear cannot be blocked by an ordinary nonartifact, nonblack creature.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Dross Golem
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Dross Golem
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Dross Golem
+tappedinplay:1
+[PLAYER2]
+inplay:Grizzly Bears
+life:17
+[END]

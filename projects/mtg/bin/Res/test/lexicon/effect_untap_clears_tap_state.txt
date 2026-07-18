@@ -1,0 +1,17 @@
+# untap clears the targeted permanent's tapped state.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Lexicon Untap Effect Witness
+tappedinplay:1
+[PLAYER2]
+[DO]
+Lexicon Untap Effect Witness
+Forest
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Lexicon Untap Effect Witness
+tappedinplay:0
+[PLAYER2]
+[END]

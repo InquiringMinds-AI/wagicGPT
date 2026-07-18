@@ -1,0 +1,20 @@
+# Harnessed Lightning grants energy, selects the parameterized two-damage
+# branch, and kills the targeted 2/2 creature.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Harnessed Lightning
+manapool:{1}{R}
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Harnessed Lightning
+Grizzly Bears
+choice 2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Harnessed Lightning
+[PLAYER2]
+graveyard:Grizzly Bears
+[END]

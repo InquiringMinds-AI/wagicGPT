@@ -1,0 +1,22 @@
+# islandhome permits an attack while the defending player controls an Island.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:dandan,island
+[PLAYER2]
+inplay:island
+life:20
+[DO]
+dandan
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:dandan,island
+tappedinplay:1
+[PLAYER2]
+inplay:island
+life:16
+[END]

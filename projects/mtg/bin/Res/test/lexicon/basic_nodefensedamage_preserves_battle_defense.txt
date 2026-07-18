@@ -1,0 +1,23 @@
+# nodefensedamage lets a creature damage a Battle without removing defense.
+# The Battle remaining on the battlefield is the gameplay assertion; without
+# the keyword, the single attacker defeats Invasion of Zendikar.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon No Defense Damage Witness
+[PLAYER2]
+inplay:Invasion of Zendikar
+[DO]
+Lexicon No Defense Damage Witness
+Invasion of Zendikar
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon No Defense Damage Witness
+[PLAYER2]
+inplay:Invasion of Zendikar
+life:20
+[END]

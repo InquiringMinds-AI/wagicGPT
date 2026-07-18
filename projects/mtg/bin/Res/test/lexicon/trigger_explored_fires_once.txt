@@ -1,0 +1,20 @@
+# @explored fires when the source explores. (explores emits the explored
+# event; it does not itself reveal or move library cards.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Explored Trigger Witness
+library:Forest
+life:20
+[PLAYER2]
+[DO]
+Lexicon Explored Trigger Witness
+Lexicon Explored Trigger Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Explored Trigger Witness
+library:Forest
+life:21
+[PLAYER2]
+[END]

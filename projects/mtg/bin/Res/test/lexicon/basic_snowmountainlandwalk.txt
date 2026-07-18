@@ -1,0 +1,22 @@
+# snowmountainlandwalk makes a creature unblockable while the defending player controls a Snow-Covered Mountain.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Snowmountainlandwalk Witness
+[PLAYER2]
+inplay:Snow-Covered Mountain,Grizzly Bears
+life:20
+[DO]
+Lexicon Snowmountainlandwalk Witness
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Snowmountainlandwalk Witness
+[PLAYER2]
+inplay:Snow-Covered Mountain,Grizzly Bears
+life:18
+[END]

@@ -1,0 +1,30 @@
+# removesinglecountertype removes one counter of the selected type, leaving
+# the creature alive (a +1/+1 counter still on it) through damage that would
+# otherwise be lethal to its base toughness.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Remove Single Counter Effect Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Remove Single Counter Effect Witness
+choice 0
+Grizzly Bears
+Lexicon Remove Single Counter Effect Witness
+choice 0
+Grizzly Bears
+Lexicon Remove Single Counter Effect Witness
+choice 1
+Grizzly Bears
+Shock
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Remove Single Counter Effect Witness,Grizzly Bears
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+[END]

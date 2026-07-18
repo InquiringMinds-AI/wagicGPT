@@ -1,0 +1,27 @@
+# Graveyard Shovel uses ability$ to create a nested ability whose
+# abilitycontroller target is the activating player. A creature in the
+# opponent's graveyard proves the conditional life gain and exile move.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Graveyard Shovel
+manapool:{2}
+life:20
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[DO]
+Graveyard Shovel
+p2
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Graveyard Shovel
+tappedinplay:1
+life:22
+manapool:{0}
+[PLAYER2]
+exile:Grizzly Bears
+life:20
+[END]

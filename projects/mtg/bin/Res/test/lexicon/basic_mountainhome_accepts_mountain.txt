@@ -1,0 +1,25 @@
+# mountainhome (landhome): the witness attacks when the DEFENDER controls a
+# Mountain, and it is not sacrificed because its CONTROLLER also controls a
+# Mountain. It attacks as a 2/2 for 2 damage. (Attacking combat needs three
+# nexts to reach Combat ends.)
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Mountainhome Witness,Mountain
+[PLAYER2]
+inplay:Mountain,Grizzly Bears
+life:20
+[DO]
+Lexicon Mountainhome Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Mountainhome Witness,Mountain
+tappedinplay:1
+[PLAYER2]
+inplay:Mountain,Grizzly Bears
+life:18
+[END]

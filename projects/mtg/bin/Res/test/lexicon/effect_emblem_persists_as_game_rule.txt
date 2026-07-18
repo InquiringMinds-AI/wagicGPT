@@ -1,0 +1,23 @@
+# The emblem trigger is attached to ExtraRules and remains active across a full
+# turn cycle. The controller's own end step is reached twice (turn 1 and turn
+# 3), so the emblem gains two life -- proving it persists as a game rule.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Emblem Effect Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Emblem Effect Witness
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Emblem Effect Witness
+life:22
+[PLAYER2]
+[END]

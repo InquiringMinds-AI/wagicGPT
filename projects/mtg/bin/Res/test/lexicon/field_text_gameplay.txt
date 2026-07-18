@@ -1,0 +1,18 @@
+# The text field is attached to a permanent that also resolves a gameplay
+# ability; the assertion checks the live card's display text after resolution.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Text Field Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Text Field Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Text Field Witness
+life:21
+cardtext:lexicon text field witness|Lexicon text field witness
+[PLAYER2]
+[END]

@@ -1,0 +1,20 @@
+# cantregen prevents a regeneration ability from saving the creature from a
+# subsequent destroy effect.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Regenerate Witness
+hand:Wrecking Ball
+manapool:{2}{R}{B}{B}
+[PLAYER2]
+[DO]
+Lexicon Cant Regenerate Witness
+Wrecking Ball
+Lexicon Cant Regenerate Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Cant Regenerate Witness,Wrecking Ball
+manapool:{0}
+[PLAYER2]
+[END]

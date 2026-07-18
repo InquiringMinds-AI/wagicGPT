@@ -1,0 +1,24 @@
+# changeling makes the witness a Goblin. It is a 1/1 base; being a Goblin it
+# gets +1/+1 from Goblin King AND +1/+1 from its own lord(goblin) (which is
+# not "other", so it self-applies), attacking as a 3/3 for 3 damage. If
+# changeling did not make it a Goblin neither lord would pump it (1 damage),
+# so life 17 is the changeling-on observation.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Changeling Witness,Goblin King
+[PLAYER2]
+life:20
+[DO]
+Lexicon Changeling Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Changeling Witness,Goblin King
+tappedinplay:1
+[PLAYER2]
+life:17
+[END]

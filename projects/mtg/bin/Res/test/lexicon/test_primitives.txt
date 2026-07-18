@@ -12,6 +12,214 @@ toughness=1
 text=Test-only primitive used to verify isolated card injection.
 [/card]
 [card]
+id=2100000022
+name=Lexicon Synthetic Macro Catalog
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=__CYCLING__({0})
+auto=__BASIC_LANDCYCLING__({0})
+auto=_DIES_ donothing
+auto=_TRAINING_
+auto=_PARTNER_
+auto=_GOAD_
+auto=_REBOUND_
+auto=_POPULATE_
+auto=_FEROCIOUS_ donothing
+auto=_ATTACKING_ donothing
+auto=_BLOCKED_ donothing
+auto=_HEROIC_ donothing
+auto=_VALIANT_ donothing
+auto=_RALLY_ donothing
+auto=_LANDFALL_ donothing
+auto=_ADDENDUM_ donothing
+auto=_CONSTELLATION_ donothing
+auto=_AMASSZOMBIE1_
+auto=_AMASSZOMBIE2_
+auto=_AMASSZOMBIE3_
+auto=_AMASSZOMBIE4_
+auto=_AMASSZOMBIE5_
+auto=_AMASSORC1_
+auto=_AMASSORC2_
+auto=_AMASSORC3_
+auto=_AMASSORC4_
+auto=_AMASSORC5_
+auto=_AMASSSLIVER1_
+auto=_AMASSSLIVER2_
+auto=_AMASSSLIVER3_
+auto=_AMASSSLIVER4_
+auto=_AMASSSLIVER5_
+auto=_SCRY1_
+auto=_SCRY2_
+auto=_SCRY3_
+auto=_SCRY4_
+auto=_SCRY5_
+auto=_FABRICATE_(1)
+auto=_ENRAGE_ donothing
+auto=_SECOND_DRAW_ donothing
+auto=_ADAPT1_
+auto=_ADAPT2_
+auto=_ADAPT3_
+auto=_ADAPT4_
+auto=_BATTALION_ donothing
+auto=_CHAMPION_(creature)
+auto=_METALCRAFT_ donothing
+auto=_ECHO_({1})
+auto=_THRESHOLD_ donothing
+auto=_SPLICEARCANE_ donothing
+auto=_RIPPLE_(1)
+auto=_RECOVER_({1})
+auto=_PROLIFERATE_
+auto=_SCAVENGE_(1)
+auto=_ASCEND_
+auto=_CITY'S_BLESSING_ donothing
+auto=_MONARCH_CONTROLLER_
+auto=_MONARCH_OPPONENT_
+auto=_INITIATIVE_CONTROLLER_
+auto=_INITIATIVE_OPPONENT_
+auto=_RINGTEMPTS_
+auto=_CASTHISTORIC_ donothing
+auto=_MENTOR_
+auto=_SURVEIL1_
+auto=_SURVEIL2_
+auto=_SURVEIL3_
+auto=_AFTERLIFETOKEN_
+auto=_LEARN_
+auto=_ADVENTURE_
+auto=_EXTORT_ donothing
+auto=_FORETELL_
+auto=_PLOT_
+auto=_PLOTCAST_
+auto=_LOOT_
+auto=_UNEARTH_
+auto=_IMPULSE_DRAW_
+auto=_IMPULSEUENT_
+auto=_WARD1_
+auto=_WARD2_
+auto=_WARD3_
+auto=_WARD4_
+auto=_WARD8_
+auto=_RENOWN_(1)
+auto=_BLINK_UEOT_
+auto=_CONNIVES_
+auto=_ETERNALIZE_
+auto=_EXPLORES_
+auto=_DISCARD&DRAW_
+auto=_PUNCH_
+auto=_FIGHT_
+auto=_MUST_BE_BLOCKD_
+auto=_SUSPECT_IT_
+auto=_FINALITY_COUNTER_
+auto=_HARNESSED_LIGHTNING_(1)
+auto=_ENLIST_
+auto=_MANAOFANYCOLOR_
+auto=_MANIFEST_DREAD_
+auto=_EERIE_ donothing
+auto=_CREW1_
+auto=_CREW2_
+auto=_CREW2COMPLEMENT_
+auto=_ENDURE1_
+auto=_ENDURE2_
+auto=_ENDURE3_
+auto=_ENDURE4_
+auto=_ENDURE5_
+auto=_ENDURE6_
+auto=_ENDURE7_
+auto=_ENDURE8_
+auto=_ENDURE9_
+auto=_ENDURE10_
+auto=_ENDURE11_
+auto=_ENDURE12_
+auto=_ENDURE13_
+auto=_ENDURE14_
+auto=_ENDURE15_
+auto=_ENDURE16_
+auto=_ENDURE17_
+auto=_ENDURE18_
+auto=_ENDURE19_
+auto=_ENDURE20_
+auto=_FLURRY_ donothing
+auto=_MOBILIZE_(1)
+auto=_ANGELTOKEN_
+auto=_BEASTTOKEN_
+auto=_BIRDTOKEN_
+auto=_OTTERTOKEN_
+auto=_CITIZENTOKEN_
+auto=_DETECTIVETOKEN_
+auto=_DRAGONTOKEN_
+auto=_ELDRAZISCION_
+auto=_ELDRAZISPAWN_
+auto=_ELEPHANTTOKEN_
+auto=_FISHTOKEN_
+auto=_GOBLINTOKEN_
+auto=_GNOMETOKEN_
+auto=_GLIMMERTOKEN_
+auto=_HUMANKNIGHTTOKEN_
+auto=_HUMANSOLDIERTOKEN_
+auto=_INSECTTOKEN_
+auto=_KNIGHTTOKEN_
+auto=_MERCENARYTOKEN_
+auto=_PHYREXIANMITETOKEN_
+auto=_RABBITTOKEN_
+auto=_REDELEMENTALTOKEN_
+auto=_SAPROLINGTOKEN_
+auto=_SERVOTOKEN_
+auto=_SOLDIERTOKEN_
+auto=_SPIRITTOKEN_
+auto=_SQUIRRELTOKEN_
+auto=_THOPTERTOKEN_
+auto=_WOLFTOKEN_
+auto=_WHITEVAMPIRE_
+auto=_ZOMBIETOKEN_
+auto=_BLOOD_
+auto=_CLUE_
+auto=_FOOD_
+auto=_TREASURE_
+auto=_VEHICLE_
+[/card]
+[card]
+id=2100000021
+name=Lexicon Synthetic Rule Catalog
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:bonusrule
+auto={0}:putinplayrule
+auto={0}:kickerrule
+auto={0}:alternativecostrule
+auto={0}:buybackrule
+auto={0}:flashbackrule
+auto={0}:bestowrule
+auto={0}:retracerule
+auto={0}:suspendrule
+auto={0}:morphrule
+auto={0}:payzerorule
+auto={0}:overloadrule
+auto={0}:attackrule
+auto={0}:attackcostrule
+auto={0}:blockrule
+auto={0}:blockcostrule
+auto={0}:soulbondrule
+auto={0}:dredgerule
+auto={0}:combattriggerrule
+auto={0}:legendrule
+auto={0}:planeswalkerrule
+auto={0}:planeswalkerdamage
+auto={0}:planeswalkerattack
+auto={0}:tokencleanuprule
+auto={0}:persistrule
+auto={0}:vampirerule
+auto={0}:unearthrule
+auto={0}:lifelinkrule
+auto={0}:deathtouchrule
+[/card]
+[card]
 id=2100000001
 name=Lexicon Synthetic Snowland Walker
 rarity=C
@@ -147,4 +355,5827 @@ mana={1}
 type=Enchantment
 abilities=showfromtoplibrary,canplayenchantmentlibrarytop
 text=Test-only primitive for casting enchantment cards from the top of library.
+[/card]
+[card]
+id=2100000014
+name=Lexicon Synthetic Basic Ability Catalog
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=first strike,double strike,banding,protection from green,protection from blue,protection from red,protection from black,protection from white,nofizzle,hexproof,reachshadow,foresthome,mountainhome,swamphome,plainshome,canattack,mustattack,cantregen,oneblocker,poisontoxic,poisontwotoxic,poisonthreetoxic,poisonfourtoxic,poisonfivetoxic,poisonsixtoxic,poisonseventoxic,poisoneighttoxic,poisonninetoxic,poisontentoxic,phantom,wilting,vigor,changeling,absorb,cantlose,cantlifelose,cantmilllose,storm,phasing,split second,affinityartifacts,affinityplains,affinityforests,affinityswamps,affinitygreencreatures,cantwin,nomaxhand,leyline,playershroud,controllershroud,poisonshroud,noactivatedability,notapability,nomanaability,onlymanaability,poisondamager,soulbond,nolegend,canplayfromgraveyard,canplayfromexile,tokenizer,mygraveexiler,oppgraveexiler,shufflelibrarydeath,offering,evadebigger,spellmastery,nolifegain,nolifegainopponent,auraward,madness,protectionfromcoloredspells,mygcreatureexiler,oppgcreatureexiler,zerocast,trinisphere,libraryeater,devoid,cantchangelife,combattoughness,cantpaylife,cantbesacrified,nosolo,mustblock,dethrone,overload,shackler,flyersonly,tempflashback,legendruleremove,canttransform,asflash,conduited,canblocktapped,oppnomaxhand,cantcrew,hiddenface,anytypeofmana,necroed,cantpwattack,canplayfromlibrarytop,canplaylandlibrarytop,canplaycreaturelibrarytop,canplayartifactlibrarytop,canplayinstantsorcerylibrarytop,showfromtoplibrary,showopponenttoplibrary,totemarmor,discardtoplaybyopponent,modular,mutate,adventure,mentor,prowess,nofizzle alternative,hasotherkicker,partner,canbecommander,cycling,foretell,anytypeofmanaability,boast,twoboast,replacescry,hasnokicker,undamageable,lifefaker,doublefacedeath,gaineddoublefacedeath,twodngtrg,nodngopp,nodngplr,canplayauraequiplibrarytop,counterdeath,dungeoncompleted,perpetuallifelink,perpetualdeathtouch,noncombatvigor,nomovetrigger,canloyaltytwice,showopponenthand,showcontrollerhand,hasreplicate,isprey,hasdisturb,daybound,nightbound,decayed,hasstrive,isconspiracy,hasaftermath,noentertrg,nodietrg,training,energyshroud,expshroud,countershroud,nonight,nodamageremoved,backgroundpartner,bottomlibrarydeath,noloyaltydamage,nodefensedamage,affinityallcreatures,affinitycontrollercreatures,affinityopponentcreatures,affinityalldeadcreatures,affinityparty,affinityenchantments,affinitybasiclandtypes,affinitytwobasiclandtypes,affinitygravecreatures,affinityattackingcreatures,affinitygraveinstsorc,eqpasinst,canloyaltyasinst,canplayenchantmentlibrarytop,affinitytwoalldeadcreatures,mytreason
+text=Test-only catalog ensuring every currently uncovered basic ability dispatches through the abilities field.
+[/card]
+[card]
+id=2100000015
+name=Lexicon Synthetic Card Field Catalog
+primitive=Lexicon Synthetic Vanilla
+rarity=C
+grade=Supported
+mana={1}
+color=red
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+text=Test-only card-block field parser witness.
+target=creature
+alias=2100000015
+abilities=flash
+auto=donothing
+autograveyard=donothing
+autohand=donothing
+autolibrary=donothing
+autoexile=donothing
+autocommandzone=donothing
+autoreveal=donothing
+autostack=donothing
+autosideboard=donothing
+anyzone=donothing
+otherrestriction=type(creature|battlefield)~morethan~0
+otherrestrictions=type(artifact|battlefield)~morethan~0
+restriction=compare(isflipped)~equalto~0
+kicker={1}
+other={2}
+flashback={3}
+facedown={2}
+buyback={4}
+bestow={5}
+retrace={6}
+suspend(1)={0}
+dredge=dredge(2)
+doublefaced=kamiflip
+backside=Lexicon Synthetic Vanilla
+modular=1
+partner=Test Partner
+aicode=donothing
+crewbonus=donothing
+phasedoutbonus=donothing
+[/card]
+[card]
+id=2100000016
+name=Lexicon Synthetic Cost Catalog
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={l}:donothing
+auto={eval(1)}:donothing
+auto={mycost}:donothing
+auto={myevictcost}:donothing
+auto={x}{x}:donothing
+auto={w}:donothing
+auto={u}:donothing
+auto={b}:donothing
+auto={r}:donothing
+auto={g}:donothing
+auto={0}:donothing
+auto={c}:donothing
+auto={x:green}:donothing
+auto={wb}:donothing
+auto={2r}:donothing
+auto={p(r)}:donothing
+auto={i}:donothing
+auto={value:1}:donothing
+auto={chosencolor}:donothing
+auto={t}:donothing
+auto={t(creature|mybattlefield)}:donothing
+auto={crew(creature|mybattlefield)}:donothing
+auto={q}:donothing
+auto={q(creature|mybattlefield)}:donothing
+auto={s}:donothing
+auto={s(creature|mybattlefield)}:donothing
+auto={s2l}:donothing
+auto={s2l(*|myhand)}:donothing
+auto={s2g}:donothing
+auto={s2g(*|opponentexile)}:donothing
+auto={saclands}:donothing
+auto={e}:donothing
+auto={e(creature|mygraveyard)}:donothing
+auto={e:2}:donothing
+auto={emerge}:donothing
+auto={h}:donothing
+auto={h(land|mybattlefield)}:donothing
+auto={l}:donothing
+auto={l:2}:donothing
+auto={l2e}:donothing
+auto={d}:donothing
+auto={discard(*|myhand)}:donothing
+auto={delve}:donothing
+auto={delve(*|mygraveyard)}:donothing
+auto={m}:donothing
+auto={n}:donothing
+auto={kgoblin}:donothing
+auto={kfox}:donothing
+auto={kmoonfolk}:donothing
+auto={krat}:donothing
+auto={ksnake}:donothing
+auto={convoke}:donothing
+auto={convoke(creature|mybattlefield)}:donothing
+auto={improvise}:donothing
+auto={improvise(artifact|mybattlefield)}:donothing
+auto={cycle}:donothing
+auto={c(1/1,-1)}:donothing
+auto={unattach}:donothing
+[/card]
+[card]
+id=2100000017
+name=Lexicon Synthetic Target Catalog
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:donothing target(*|mybattlefieldhand)
+auto={0}:donothing target(*|mycastingzone)
+auto={0}:donothing target(*|myrestrictedcastingzone)
+auto={0}:donothing target(*|mycommandplay)
+auto={0}:donothing target(*|myhandlibrary)
+auto={0}:donothing target(*|mygravelibrary)
+auto={0}:donothing target(*|mygraveexile)
+auto={0}:donothing target(*|myhandexilegrave)
+auto={0}:donothing target(*|opponentcastingzone)
+auto={0}:donothing target(*|opponentrestrictedcastingzone)
+auto={0}:donothing target(*|opponentcommandplay)
+auto={0}:donothing target(*|opponenthandlibrary)
+auto={0}:donothing target(*|opponentnonplaynonexile)
+auto={0}:donothing target(*|opponenthandexilegrave)
+auto={0}:donothing target(*|opponentgravelibrary)
+auto={0}:donothing target(*|opponentgraveexile)
+auto={0}:donothing target(*|mynonplaynonexile)
+auto={0}:donothing target(blockable)
+auto={0}:donothing target(pairable)
+auto={0}:donothing target(dredgeable)
+auto={0}:donothing target(children)
+auto={0}:donothing target(parents)
+auto={0}:donothing target(anytarget)
+auto={0}:donothing target(trigger)
+auto={0}:donothing target(mychild)
+auto={0}:donothing target(mytotem)
+auto={0}:donothing target(myeqp)
+auto={0}:donothing target(mycurses)
+auto={0}:donothing target(proliferation)
+auto={0}:donothing target(propagation)
+auto={0}:donothing target(sourcecard)
+auto={0}:donothing target(mysource)
+auto={0}:donothing target(trigger[to])
+auto={0}:donothing target(trigger[from])
+auto={0}:donothing target(controller)
+auto={0}:donothing target(opponent)
+auto={0}:donothing target(targetedplayer)
+auto={0}:donothing target(player)
+auto={0}:donothing target(abilitycontroller)
+auto={0}:donothing target(*|battlefield)
+auto={0}:donothing target(*|inplay)
+auto={0}:donothing target(*|graveyard)
+auto={0}:donothing target(*|hand)
+auto={0}:donothing target(*|library)
+auto={0}:donothing target(*|exile)
+auto={0}:donothing target(*|stack)
+auto={0}:donothing target(*|reveal)
+auto={0}:donothing target(*|sideboard)
+auto={0}:donothing target(*|commandzone)
+auto={0}:donothing target(*|mybattlefield)
+auto={0}:donothing target(*|opponentbattlefield)
+auto={0}:donothing target(*|ownergraveyard)
+auto={0}:donothing target(*|targetcontrollerhand)
+auto={0}:donothing target(*|ownerbattlefield)
+auto={0}:donothing target(*|targetownerlibrary)
+auto={0}:donothing target(*|targetownergraveyard)
+auto={0}:donothing target(*|targetcontrollerbattlefield)
+auto={0}:donothing target(*|nonbattlezone)
+auto={0}:donothing target(*|opponentzones)
+auto={0}:donothing target(*|myzones)
+auto={0}:donothing target(<3>creature|battlefield)
+auto={0}:donothing target(<anyamount>creature|battlefield)
+auto={0}:donothing target(<2>player)
+auto={0}:donothing target(<anyamount>player)
+auto={0}:donothing target(<upto:2>*|myzones)
+auto={0}:donothing target(<upto:prex>artifact|mygraveyard)
+auto={0}:donothing target(<prex>*|mygraveyard)
+auto={0}:donothing target(<prexx>*|mygraveyard)
+auto={0}:donothing target(this)
+auto={0}:donothing target(mytgt)
+auto={0}:donothing target(mytgtforced)
+auto={0}:donothing target(other creature|mybattlefield)
+auto={0}:donothing target(*[attacking]|battlefield)
+auto={0}:donothing target(*[blocking]|battlefield)
+auto={0}:donothing target(*[blocked]|battlefield)
+auto={0}:donothing target(*[tapped]|battlefield)
+auto={0}:donothing target(*[fresh]|battlefield)
+auto={0}:donothing target(*[recent]|battlefield)
+auto={0}:donothing target(*[modified]|battlefield)
+auto={0}:donothing target(*[damaged]|battlefield)
+auto={0}:donothing target(*[enchanted]|battlefield)
+auto={0}:donothing target(*[geared]|battlefield)
+auto={0}:donothing target(*[equipped]|battlefield)
+auto={0}:donothing target(*[attached]|battlefield)
+auto={0}:donothing target(*[token]|battlefield)
+auto={0}:donothing target(*[isflipped]|battlefield)
+auto={0}:donothing target(*[permanent]|battlefield)
+auto={0}:donothing target(*[leveler]|battlefield)
+auto={0}:donothing target(*[iscommander]|commandzone)
+auto={0}:donothing target(*[ringbearer]|battlefield)
+auto={0}:donothing target(*[foretold]|graveyard)
+auto={0}:donothing target(*[kicked]|stack)
+auto={0}:donothing target(*[haskicker]|stack)
+auto={0}:donothing target(*[hasconvoke]|stack)
+auto={0}:donothing target(*[hasflashback]|graveyard)
+auto={0}:donothing target(*[hasbackside]|battlefield)
+auto={0}:donothing target(*[hastoxic]|stack)
+auto={0}:donothing target(*[haspartner]|commandzone)
+auto={0}:donothing target(*[hasx]|stack)
+auto={0}:donothing target(*[discarded]|graveyard)
+auto={0}:donothing target(*[damager]|battlefield)
+auto={0}:donothing target(*[opponentdamager]|battlefield)
+auto={0}:donothing target(*[controllerdamager]|battlefield)
+auto={0}:donothing target(*[cmana]|battlefield)
+auto={0}:donothing target(*[manag]|battlefield)
+auto={0}:donothing target(*[manau]|battlefield)
+auto={0}:donothing target(*[manar]|battlefield)
+auto={0}:donothing target(*[manab]|battlefield)
+auto={0}:donothing target(*[manaw]|battlefield)
+auto={0}:donothing target(*[power>=1]|battlefield)
+auto={0}:donothing target(*[toughness>=1]|battlefield)
+auto={0}:donothing target(*[manacost>=1]|battlefield)
+auto={0}:donothing target(*[zpos=1]|mylibrary)
+auto={0}:donothing target(*[numofcols>=1]|battlefield)
+auto={0}:donothing target(*[counter{1/1}]|battlefield)
+auto={0}:donothing target(*[counter{any}]|battlefield)
+auto={0}:donothing target(*[counter{notany}]|battlefield)
+auto={0}:donothing target(*[white]|battlefield)
+auto={0}:donothing target(*[blue]|battlefield)
+auto={0}:donothing target(*[black]|battlefield)
+auto={0}:donothing target(*[red]|battlefield)
+auto={0}:donothing target(*[green]|battlefield)
+auto={0}:donothing target(*[artifact]|battlefield)
+auto={0}:donothing target(*[colorless]|battlefield)
+auto={0}:donothing target(*[multicolor]|battlefield)
+auto={0}:donothing target(*[chosencolor]|battlefield)
+auto={0}:donothing target(*[chosentype]|battlefield)
+auto={0}:donothing target(*[chosenname]|battlefield)
+auto={0}:donothing target(*[lastnamechosen]|battlefield)
+auto={0}:donothing target(*[evictname]|battlefield)
+auto={0}:donothing target(*[backname]|battlefield)
+auto={0}:donothing target(*[partname]|battlefield)
+auto={0}:donothing target(*[storedname]|battlefield)
+auto={0}:donothing target(*[preyname]|battlefield)
+auto={0}:donothing target(*[share!name!]|battlefield)
+auto={0}:donothing target(*[notshare!name!]|battlefield)
+auto={0}:donothing target(*[white;blue]|battlefield)
+auto={0}:donothing target(*[white&blue]|battlefield)
+auto={0}:donothing target(*[-black;-artifact]|battlefield)
+auto={0}:donothing target(*[manacost<=power]|battlefield)
+auto={0}:donothing target(<1>anytarget)
+auto={0}:donothing target(battle,creature|battlefield)
+auto={0}:donothing target(battle,creature,planeswalker|battlefield)
+auto={0}:donothing target(battle,planeswalker|battlefield)
+auto={0}:donothing target(battle,planeswalker,creature|battlefield)
+auto={0}:donothing target(creature,battle|battlefield)
+auto={0}:donothing target(creature,battle,planeswalker|battlefield)
+auto={0}:donothing target(creature,planeswalker|battlefield)
+auto={0}:donothing target(creature,planeswalker,battle|battlefield)
+auto={0}:donothing target(planeswalker,battle|battlefield)
+auto={0}:donothing target(planeswalker,battle,creature|battlefield)
+auto={0}:donothing target(planeswalker,creature|battlefield)
+auto={0}:donothing target(planeswalker,creature,battle|battlefield)
+auto={0}:donothing target(battle^creature|battlefield)
+auto={0}:donothing target(battle^creature^planeswalker|battlefield)
+auto={0}:donothing target(battle^planeswalker|battlefield)
+auto={0}:donothing target(battle^planeswalker^creature|battlefield)
+auto={0}:donothing target(creature^battle|battlefield)
+auto={0}:donothing target(creature^battle^planeswalker|battlefield)
+auto={0}:donothing target(creature^planeswalker|battlefield)
+auto={0}:donothing target(creature^planeswalker^battle|battlefield)
+auto={0}:donothing target(planeswalker^battle|battlefield)
+auto={0}:donothing target(planeswalker^battle^creature|battlefield)
+auto={0}:donothing target(planeswalker^creature|battlefield)
+auto={0}:donothing target(planeswalker^creature^battle|battlefield)
+[/card]
+[card]
+id=2100000018
+name=Lexicon Synthetic Trigger Catalog
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@producedmana(land|mybattlefield):donothing
+auto=@exerted(creature|mybattlefield):donothing
+auto=@combat(attacking) source(this):donothing
+auto=@combat(attackedalone) source(this):donothing
+auto=@combat(notblocked) source(this):donothing
+auto=@combat(blocked) source(this):donothing
+auto=@combat(blocking) source(this):donothing
+auto=@countermod(any):donothing
+auto=@totalcounteradded(any):donothing
+auto=@totalcounterremoved(any):donothing
+auto=@mutated(this):donothing
+auto=@boasted(this):donothing
+auto=@defeated(this):donothing
+auto=@surveiled(this):donothing
+auto=@foretold(this):donothing
+auto=@trained(this):donothing
+auto=@scryed(this):donothing
+auto=@ninjutsued(this):donothing
+auto=@explored(this):donothing
+auto=@exploited(this):donothing
+auto=@poisonedof(player):donothing
+auto=@poisonedof(player) plus(1):donothing
+auto=@energizedof(player) plus(2):donothing
+auto=@experiencedof(player) plus(3):donothing
+auto=@poisonedfoeof(player) plus(4):donothing
+auto=@energizedfoeof(player) plus(5):donothing
+auto=@proliferateof(player) duplicate(all):donothing
+auto=@proliferatefoeof(player) half(all):donothing
+auto=@poisonedfoeof(player):donothing
+auto=@energizedof(player):donothing
+auto=@energizedfoeof(player):donothing
+auto=@experiencedof(player):donothing
+auto=@experiencedfoeof(player):donothing
+auto=@proliferateof(player):donothing
+auto=@proliferatefoeof(player):donothing
+auto=@ringtemptedof(player):donothing
+auto=@ringtemptedfoeof(player):donothing
+auto=@becomesmonarchof(player):donothing
+auto=@becomesmonarchfoeof(player):donothing
+auto=@takeninitiativeof(player):donothing
+auto=@takeninitiativefoeof(player):donothing
+auto=@shuffledof(player):donothing
+auto=@shuffledfoeof(player):donothing
+auto=@drawn(player):donothing
+auto=@drawn(targetcontroller):donothing
+auto=@drawn(player) targetcontroller:donothing
+auto=@drawof(player):donothing
+auto=@drawfoeof(player):donothing
+auto=@lifed(player):donothing
+auto=@lifeof(player):donothing
+auto=@lifefoeof(player):donothing
+auto=@lifeloss(player):donothing
+auto=@lifelostof(player):donothing
+auto=@lifelostfoeof(player):donothing
+auto=@damaged(player):donothing
+auto=@damageof(player):donothing
+auto=@damagefoeof(player):donothing
+auto=@combatdamaged(player):donothing
+auto=@combatdamageof(player):donothing
+auto=@combatdamagefoeof(player):donothing
+auto=@noncombatdamaged(player):donothing
+auto=@noncombatdamageof(player):donothing
+auto=@noncombatdamagefoeof(player):donothing
+auto=@vampired(creature):donothing
+auto=@targeted(this):donothing
+auto=@untapped(this):donothing
+auto=@tapped(this):donothing
+auto=@tappedformana(this):donothing
+auto=@transformed(this):donothing
+auto=@facedup(this):donothing
+auto=@phasedin(this):donothing
+auto=@movedto(this|battlefield):donothing
+auto=@movedto(this|battlefield) suspended:donothing
+auto=@sacrificed(this):donothing
+auto=@discarded(this):donothing
+auto=@cycled(this):donothing
+auto=@tokencreated(this):donothing
+auto=@bearerchosen(this):donothing
+auto=@bearernewchosen(this):donothing
+auto=@dungeoncompleted(this) total(1):donothing
+auto=@dierolled(this) result(6):donothing
+auto=@coinflipped(this) result(won):donothing
+auto=@rebounded:donothing
+auto=@next upkeep:donothing
+auto=@each upkeep:donothing
+auto=@each beginofturn:donothing
+auto=@each untap:donothing
+auto=@each draw:donothing
+auto=@each firstmain:donothing
+auto=@each combatbegins:donothing
+auto=@each attackers:donothing
+auto=@each blockers:donothing
+auto=@each combatdamage:donothing
+auto=@each combatends:donothing
+auto=@each secondmain:donothing
+auto=@each end:donothing
+auto=@each cleanup:donothing
+auto=@each beforenextturn:donothing
+auto=@next end:donothing
+auto=@next opponent end:donothing
+auto=@each targetcontroller upkeep:donothing
+auto=@each targetedplayer upkeep:donothing
+auto=@each my firstmain sourcenottap:donothing
+auto=@each my firstmain sourcenottapped:donothing
+auto=@each my untap sourcetap:donothing
+auto=@each my end foelost(2):donothing
+auto=@combat(attacking) source(this) turnlimited:donothing
+auto=@combat(attacking) source(this) opponentpoisoned:donothing
+auto=@counteradded(any) except(this):donothing
+auto=@totalcounteradded(any) plus(1) duplicate(all) half(all) nocost:donothing
+auto=@movedto(this|battlefield):donothing dontremove
+[/card]
+[card]
+id=2100000019
+name=Lexicon Synthetic Effect Catalog
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+backside=Lexicon Synthetic Vanilla
+auto={0}:conjure cards(Grizzly Bears) zone(myhand)
+auto={0}:moverandom(*) from(mygraveyard) to(myhand)
+auto={0}:placefromthetop(1) target(*|mygraveyard)
+auto={0}:bottomoflibrary target(*|mygraveyard)
+auto={0}:imprint target(*|mygraveyard)
+auto={0}:haunt target(creature|opponentbattlefield)
+auto={0}:dotrain
+auto={0}:target(*[creature;land;artifact]) grant transforms((,newability[tap],newability[doesnotuntap])) grantend
+auto={0}:spellmover(hand) target(*|stack)
+auto={0}:reconfigure
+auto={0}:readytofight target(creature|mygraveyard)
+auto={0}:removefromcombat target(creature|battlefield)
+auto={0}:rolld4 4 winability donothing winabilityend loseability donothing loseabilityend rolld4end
+auto={0}:rolld6 6 winability donothing winabilityend loseability donothing loseabilityend rolld6end
+auto={0}:rolld8 8 winability donothing winabilityend loseability donothing loseabilityend rolld8end
+auto={0}:rolld10 10 winability donothing winabilityend loseability donothing loseabilityend rolld10end
+auto={0}:rolld12 12 winability donothing winabilityend loseability donothing loseabilityend rolld12end
+auto={0}:rolld20 20 winability donothing winabilityend loseability donothing loseabilityend rolld20end
+auto={0}:poolsave(green)
+auto={0}:replacedraw draw:1
+auto={0}:producecolor:green
+auto={0}:removemana(green)
+auto={0}:changecost(colorless:-1)
+auto={0}:modbenchant(green:1)
+auto={0}:forcefield
+auto={0}:epic
+auto={0}:explores target(creature|mybattlefield)
+auto={0}:meld(Lexicon Synthetic Vanilla)
+auto={0}:doubleside(backside)
+auto={0}:countertrack(1/1)
+auto={0}:duplicatecounters(all)
+auto={0}:removesinglecountertype(1)
+auto={0}:removeallcounters(all)
+auto={0}:provoke target(creature|opponentbattlefield)
+auto={0}:setblocker target(creature|opponentbattlefield)
+auto={0}:exert
+auto={0}:vanishing:1
+auto={0}:phasealter(add,combatphases,controller)
+auto={0}:cascade:1
+auto={0}:serumpowder
+auto={0}:ninjutsu
+auto={0}:readytofight target(creature|mygraveyard)
+auto={0}:removefromcombat target(creature|battlefield)
+auto={0}:shackle target(creature|opponentbattlefield)
+auto={0}:grant transforms((,newability[flying])) grantend target(creature|mybattlefield)
+auto={0}:(blink) target(creature|battlefield)
+auto={0}:(blink)ueot target(creature|battlefield)
+auto={0}:hand(blink)forsrc target(creature|battlefield)
+auto={0}:return(donothing) target(creature|battlefield)
+auto={0}:fizzleto(exile) target(*|stack)
+auto={0}:fizzle target(*|stack)
+auto={0}:ability$!donothing!$ controller
+auto={0}:token(Lexicon Token,Creature Lexicon Token,1/1,flying,white)
+auto={0}:create(Lexicon Token:creature lexicon token:1/1:white:flying)
+auto={0}:equip target(creature|mybattlefield)
+auto={0}:attach target(creature|mybattlefield)
+auto={0}:moveto(exile) target(*|battlefield)
+auto={0}:hiddenmoveto(exile) target(*|battlefield)
+auto={0}:moverandom(*) from(mygraveyard) to(myhand)
+auto={0}:placefromthetop(1) target(*|mygraveyard)
+auto={0}:bottomoflibrary target(*|mygraveyard)
+auto={0}:copy target(*|stack)
+auto={0}:imprint target(*|mygraveyard)
+auto={0}:haunt target(creature|opponentbattlefield)
+auto={0}:dotrain target(creature|mybattlefield)
+auto={0}:dynamicability<!mytgt toughnesslifegain srccontroller!>
+auto={0}:flipacoin winability donothing winabilityend loseability donothing loseabilityend flipend
+auto={0}:rolld6 6 winability donothing winabilityend loseability donothing loseabilityend rolld6end
+auto={0}:bury target(creature|opponentbattlefield)
+auto={0}:destroy target(creature|opponentbattlefield)
+auto={0}:sacrifice target(creature|mybattlefield)
+auto={0}:exploits target(creature|mybattlefield)
+auto={0}:reject target(*|opponenthand)
+auto={0}:resetdamage
+auto={0}:preventallcombatdamage ueot
+auto={0}:preventallnoncombatdamage ueot
+auto={0}:preventalldamage ueot
+auto={0}:fog
+auto={0}:prevent:1 target(anytarget)
+auto={0}:damage:1 target(anytarget)
+auto={0}:life:1 controller
+auto={0}:lifeleech:1 target(anytarget)
+auto={0}:lifeset:1 target(player)
+auto={0}:wingame target(player)
+auto={0}:alterpoison:1 controller
+auto={0}:alterenergy:1 controller
+auto={0}:alterexperience:1 controller
+auto={0}:completedungeon:1 controller
+auto={0}:alteryidarocount:1 controller
+auto={0}:theringtempts:1 controller
+auto={0}:becomesmonarch controller
+auto={0}:taketheinitiative controller
+auto={0}:altersurvoffset:1 controller
+auto={0}:alterdevoffset:1 controller
+auto={0}:altermutationcounter:1
+auto={0}:mutationover:1
+auto={0}:mutationunder:1
+auto={0}:doboast
+auto={0}:surveil target(creature|mybattlefield)
+auto={0}:explores target(creature|mybattlefield)
+auto={0}:becomesringbearer target(creature|mybattlefield)
+auto={0}:doforetell
+auto={0}:clone with(creature) addtype(construct) options()
+auto={0}:castcard(normal) target(*|mygraveyard)
+auto={0}:becomes(creature,1/1)
+auto={0}:remake(creature:1/1)
+auto={0}:transforms((,newability[flying]))
+auto={0}:flip(1/1)
+auto={0}:doubleside(Lexicon Synthetic Vanilla)
+auto={0}:morph
+auto={0}:manafaceup
+auto={0}:manifest
+auto={0}:meldfrom(Lexicon Synthetic Vanilla^Lexicon Synthetic Vanilla)
+auto={0}:meld(Lexicon Synthetic Vanilla)
+auto={0}:counter(1/1)
+auto={0}:countershroud(any)(creature|battlefield)
+auto={0}:countertrack(1/1)
+auto={0}:duplicatecounters(all)
+auto={0}:removesinglecountertype(1)
+auto={0}:removeallcounters(all)
+auto={0}:proliferate
+auto={0}:propagate
+auto={0}:loseabilities
+auto={0}:losesubtypesof(creature)
+auto={0}:losesatype(human)
+auto={0}:protection from(red)
+auto={0}:cantbetargetof(creature)
+auto={0}:cantbeblockedby(creature)
+auto={0}:cantbeblockerof(this)
+auto={0}:rampage(2/2,3)
+auto={0}:flanker
+auto={0}:bushido(1/1)
+auto={0}:spiritlink
+auto={0}:combatspiritlink
+auto={0}:provoke target(creature|opponentbattlefield)
+auto={0}:setblocker target(creature|opponentbattlefield)
+auto={0}:exert
+auto={0}:evolve
+auto={0}:bloodthirst:1
+auto={0}:vanishing:1
+auto={0}:fading:1
+auto={0}:regenerate target(creature|mybattlefield)
+auto={0}:swap target(creature|battlefield)
+auto={0}:exchangelife target(player)
+auto={0}:bstw target(creature|mybattlefield)
+auto={0}:tap target(permanent|battlefield)
+auto={0}:tap(noevent) target(permanent|battlefield)
+auto={0}:untap target(permanent|battlefield)
+auto={0}:frozen target(permanent|battlefield)
+auto={0}:freeze target(permanent|battlefield)
+auto={0}:phaseout target(permanent|battlefield)
+auto={0}:phasealter(add,combatphases,controller)
+auto={0}:steal target(creature|opponentbattlefield)
+auto={0}:block target(creature|opponentbattlefield)
+auto={0}:connect target(creature|battlefield)
+auto={0}:connectrule
+auto={0}:retarget target(creature|mybattlefield)
+auto={0}:newtarget target(creature|mybattlefield)
+auto={0}:rehook target(creature|mybattlefield)
+auto={0}:newhook target(equipment|mybattlefield)
+auto={0}:mutateover target(creature|mybattlefield)
+auto={0}:mutateunder target(creature|mybattlefield)
+auto={0}:draw:1 controller
+auto={0}:discard:1 opponent
+auto={0}:shuffle
+auto={0}:deplete:1 opponent
+auto={0}:colordeplete:1 opponent
+auto={0}:ingest:1 opponent
+auto={0}:cascade:1
+auto={0}:maxlevel:1
+auto={0}:reveal:1 revealend
+auto={0}:scry:1 scryend
+auto={0}:hmodifer:1 opponent
+auto={0}:sethand:1 controller
+auto={0}:turns:+1 controller
+auto={0}:count(creature|battlefield)
+auto={0}:countb(creature|battlefield)
+auto={0}:add{G}
+auto={0}:out{G}
+auto={0}:reduceto:1
+auto={0}:altercost(colorless,-1)
+auto={0}:affinity(artifact|battlefield)reduce(colorless:1)
+[/card]
+[card]
+id=2100000020
+name=Lexicon Synthetic Structural Catalog
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:tutorial(Lexicon tutorial)
+auto={0}:message(Lexicon message)
+auto={0}:if compare(isflipped)~equalto~0 then donothing
+auto={0}:ifnot compare(isflipped)~equalto~0 then donothing
+auto={0}:pay({0}) donothing
+auto={0}:pay[[{0}]] donothing
+auto={0}:may donothing
+auto={0}:choice donothing
+auto={0}:ueot 1/1
+auto={0}:activate donothing
+auto={0}:emblem donothing
+auto={0}:lord(creature) 1/1
+auto={0}:foreach(creature|battlefield) 1/1
+auto={0}:aslongas(creature|mybattlefield) 1/1
+auto={0}:teach(creature) vigilance
+auto={0}:all(creature|mybattlefield) 1/1
+auto={0}:this(counter{1/1}>0) 1/1
+auto={0}:thisforeach(counter{1/1}) 1/1
+auto={0}:while(restriction{outnumbered}) 1/1
+auto={0}:tap && untap
+auto={0}:soulbond 1/1
+auto={0}:poolsave(green)
+auto={0}:mypoolsave(red)
+auto={0}:opponentpoolsave(blue)
+auto={0}:replacedraw draw:1
+auto={0}:opponentreplacedraw draw:1
+auto={0}:attackcost:1
+auto={0}:attackpwcost:1
+auto={0}:blockcost:1
+auto={0}:1/1 cdaactive
+auto={0}:1/1 nonstatic
+auto={0}:removemana(green) forceclean
+auto={0}:add{G} doesntempty
+auto={0}:out{G} doesntempty
+auto={0}:flip(1/1) forcetype(creature) undocpy
+auto={0}:becomes(creature,1/1) forever
+auto={0}:newtarget target(creature|mybattlefield) untp fromplay
+auto={0}:castcard(normal named!:Lexicon Synthetic Vanilla:! kicked!:1:! costx!:1:!) target(*|mygraveyard)
+auto={0}:manifest withenchant
+auto={0}:proliferate noproftrg
+auto={0}:propagate noproftrg
+auto={0}:counter(1/1) notrg
+auto={0}:draw:1 noreplace controller
+auto={0}:fog oneshot
+auto={0}:produceextra:{G}
+auto={0}:transforms((setpower=1,settoughness=1,newability[flying]))
+auto={0}:transforms(())
+auto={0}:phasealter(add,combatphases,controller) nextphase
+auto={0}:phasealter(add,combatphases,controller after<main>)
+auto={0}:doubleside(Lexicon Synthetic Vanilla) forever
+auto={0}:becomes(creature,1/1) uynt
+auto={0}:becomes(creature,1/1) uent
+auto={0}:this(counter{1/1}>0) while 1/1
+auto={0}:token(Lexicon Living Weapon,Creature Lexicon Living Weapon,1/1,livingweapon,white)
+auto={0}:token(Lexicon Owner Token,Creature Lexicon Owner Token,1/1,white) owner
+auto={0}:name(Lexicon named ability) donothing
+auto={0}:notatarget(creature|battlefield) donothing
+auto={0}:chooseaname donothing chooseend
+auto={0}:chooseanameopp donothing chooseend
+auto={0}:activatechooseacolor add{chosencolor} activatechooseend
+auto={0}:activatechooseatype target(creature) becomes(removecreaturesubtypes) activatechooseend
+auto={0}:transforms((,newability[pay({0}) donothing]))
+auto={0}:ability$!name(reveal) reveal:1 revealend!$ controller
+auto={0}:ability$!reveal:1 revealend!$ controller
+auto={0}:phaseaction[upkeep once] donothing
+auto={0}:phaseactionmulti[upkeep] donothing
+auto={0}:upcost[{1}] sacrifice
+auto={0}:upcostmulti[{1}] sacrifice
+auto={0}:cumulativeupcost[{1}] sacrifice
+auto={0}:cumulativeupcostmulti[{1}] sacrifice
+auto={0}:mypoolsave(red) terminate
+auto={0}:imprint imprintedcard
+auto={0}:haunt haunted
+auto={0}:equip equipped target(creature|mybattlefield)
+auto={0}:donothing targetedplayer
+auto={0}:may activate donothing
+auto={0}:if compare(isflipped)~equalto~0 then donothing else donothing
+auto={0}:token(Lexicon Token,Creature Lexicon Token,1/1,tnum.2,white)
+auto={0}:donothing and!(life:1 controller)!
+auto={0}:becomes(creature,1/1) forcedalive
+auto={0}:transforms((,newability[reveal:1 revealend]))
+auto={0}:activatechooseatype target(creature) becomes(removecreaturesubtypes) activatechooseend nonwall
+auto={0}:restriction{{compare(isflipped)~equalto~0}} donothing
+auto={0}:donothing limit:1
+auto={0}:donothing limit^controller^1^
+[/card]
+[card]
+id=2100000023
+name=Lexicon Synthetic Basic Ability Supplement
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=vigilance,defender,unblockable,wither,persist,exalted,shadow,islandhome,cloud,cantattack,cantblock,doesnotuntap,indestructible,intimidate,deathtouch,horsemanship,infect,treason,unearth,nonbasiclandwalk,strong,weak,affinityislands,affinitymountains,sunburst,flanking,exiledeath,legendarylandwalk,snowforestlandwalk,snowplainslandwalk,snowmountainlandwalk,snowislandlandwalk,snowswamplandwalk,hydra,undying,lure,librarydeath,skulk,menace,threeblockers,gainedexiledeath,gainedhanddeath,retrace
+[/card]
+[card]
+id=2100000024
+name=Lexicon Shroud Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=shroud
+[/card]
+[card]
+id=2100000025
+name=Lexicon Hexproof Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=hexproof
+[/card]
+[card]
+id=2100000026
+name=Lexicon Indestructible Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=indestructible
+[/card]
+[card]
+id=2100000027
+name=Lexicon Protection Green Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=protection from green
+[/card]
+[card]
+id=2100000028
+name=Lexicon Protection Blue Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=protection from blue
+[/card]
+[card]
+id=2100000029
+name=Lexicon Protection Black Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=protection from black
+[/card]
+[card]
+id=2100000030
+name=Lexicon Protection White Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=protection from white
+[/card]
+[card]
+id=2100000031
+name=Lexicon Persist Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=persist
+[/card]
+[card]
+id=2100000032
+name=Lexicon Storm Filler
+rarity=C
+mana={0}
+type=Instant
+auto=donothing
+[/card]
+[card]
+id=2100000033
+name=Lexicon Storm Witness
+rarity=C
+mana={0}
+type=Instant
+abilities=storm
+auto=deplete:1 opponent
+[/card]
+[card]
+id=2100000034
+name=Lexicon Sunburst Witness
+rarity=C
+mana={2}
+type=Artifact
+abilities=sunburst
+auto=counter(0/0,sunburst,charge)
+auto={C(0/0,-1,charge)}:damage:1 target(player)
+[/card]
+[card]
+id=2100000035
+name=Lexicon Flash Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=flash
+[/card]
+[card]
+id=2100000036
+name=Lexicon Can Attack Override Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=defender,canattack
+[/card]
+[card]
+id=2100000037
+name=Lexicon Nofizzle Witness
+rarity=C
+mana={0}
+type=Sorcery
+abilities=nofizzle
+auto=life:-2 opponent
+[/card]
+[card]
+id=2100000038
+name=Lexicon Flyers Only Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=flyersonly
+[/card]
+[card]
+id=2100000039
+name=Lexicon Cant Regenerate Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=cantregen
+auto={B}:regenerate
+[/card]
+[card]
+id=2100000040
+name=Lexicon Cant Mill Lose Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=cantmilllose
+[/card]
+[card]
+id=2100000041
+name=Lexicon Win Game Witness
+rarity=C
+mana={0}
+type=Sorcery
+target=player
+auto=wingame
+[/card]
+[card]
+id=2100000042
+name=Lexicon Damage Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:damage:2 target(player)
+[/card]
+[card]
+id=2100000043
+name=Lexicon Life Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:life:2 controller
+[/card]
+[card]
+id=2100000044
+name=Lexicon Life Set Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:lifeset:7 controller
+[/card]
+[card]
+id=2100000045
+name=Lexicon Alter Poison Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:alterpoison:2 opponent
+[/card]
+[card]
+id=2100000046
+name=Lexicon Deplete Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:deplete:2 target(player)
+[/card]
+[card]
+id=2100000047
+name=Lexicon Ingest Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:ingest:2 target(player)
+[/card]
+[card]
+id=2100000048
+name=Lexicon Draw Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:draw:1 controller
+[/card]
+[card]
+id=2100000049
+name=Lexicon Discard Creature Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:discard:1 opponent
+[/card]
+[card]
+id=2100000050
+name=Lexicon Add Mana Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:add{G}
+[/card]
+[card]
+id=2100000051
+name=Lexicon Remove Mana Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:removemana({G})
+[/card]
+[card]
+id=2100000052
+name=Lexicon Wilting Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=wilting
+[/card]
+[card]
+id=2100000053
+name=Lexicon Absorb Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=absorb
+[/card]
+[card]
+id=2100000054
+name=Lexicon Undamageable Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=undamageable
+[/card]
+[card]
+id=2100000055
+name=Lexicon Graveyard Casting Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=canplayfromgraveyard
+[/card]
+[card]
+id=2100000056
+name=Lexicon Exile Casting Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=canplayfromexile
+[/card]
+[card]
+id=2100000057
+name=Lexicon Mountainhome Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=mountainhome
+[/card]
+[card]
+id=2100000058
+name=Lexicon Plainshome Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=plainshome
+[/card]
+[card]
+id=2100000059
+name=Lexicon Changeling Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=changeling
+auto=lord(goblin) 1/1
+[/card]
+[card]
+id=2100000060
+name=Lexicon Banding Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=banding
+[/card]
+[card]
+id=2100000061
+name=Lexicon NoActivated Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=noactivatedability
+auto={T}:damage:1 target(player)
+[/card]
+[card]
+id=2100000062
+name=Lexicon NoTapAbility Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=notapability
+auto={T}:damage:1 target(player)
+[/card]
+[card]
+id=2100000063
+name=Lexicon NoManaAbility Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=nomanaability
+auto={T}:add{G}
+[/card]
+[card]
+id=2100000064
+name=Lexicon OnlyManaAbility Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=onlymanaability
+auto={T}:add{G}
+auto={0}:damage:1 target(player)
+[/card]
+[card]
+id=2100000065
+name=Lexicon Affinity Green Creatures Witness
+rarity=C
+mana={2}{G}
+type=Artifact
+abilities=affinitygreencreatures
+[/card]
+[card]
+id=2100000066
+name=Lexicon Affinity All Creatures Witness
+rarity=C
+mana={3}
+type=Artifact
+abilities=affinityallcreatures
+[/card]
+[card]
+id=2100000067
+name=Lexicon Affinity Controller Creatures Witness
+rarity=C
+mana={3}
+type=Artifact
+abilities=affinitycontrollercreatures
+[/card]
+[card]
+id=2100000068
+name=Lexicon Affinity Opponent Creatures Witness
+rarity=C
+mana={3}
+type=Artifact
+abilities=affinityopponentcreatures
+[/card]
+[card]
+id=2100000069
+name=Lexicon Affinity Dead Creatures Witness
+rarity=C
+mana={3}
+type=Artifact
+abilities=affinityalldeadcreatures
+[/card]
+[card]
+id=2100000070
+name=Lexicon Affinity Party Witness
+rarity=C
+mana={3}
+type=Artifact
+abilities=affinityparty
+[/card]
+[card]
+id=2100000071
+name=Lexicon Affinity Enchantments Witness
+rarity=C
+mana={3}
+type=Artifact
+abilities=affinityenchantments
+[/card]
+[card]
+id=2100000072
+name=Lexicon Affinity Basic Types Witness
+rarity=C
+mana={3}
+type=Artifact
+abilities=affinitybasiclandtypes
+[/card]
+[card]
+id=2100000073
+name=Lexicon Affinity Two Basic Types Witness
+rarity=C
+mana={5}
+type=Artifact
+abilities=affinitytwobasiclandtypes
+[/card]
+[card]
+id=2100000074
+name=Lexicon Affinity Grave Creatures Witness
+rarity=C
+mana={3}
+type=Artifact
+abilities=affinitygravecreatures
+[/card]
+[card]
+id=2100000075
+name=Lexicon Affinity Attacking Creatures Witness
+rarity=C
+mana={3}
+type=Instant
+abilities=affinityattackingcreatures
+[/card]
+[card]
+id=2100000076
+name=Lexicon Affinity Grave Instants Witness
+rarity=C
+mana={3}
+type=Artifact
+abilities=affinitygraveinstsorc
+[/card]
+[card]
+id=2100000077
+name=Lexicon Affinity Two Dead Creatures Witness
+rarity=C
+mana={5}
+type=Artifact
+abilities=affinitytwoalldeadcreatures
+[/card]
+[card]
+id=2100000078
+name=Lexicon Party Cleric
+rarity=C
+mana={1}
+type=Creature
+subtype=Cleric
+power=1
+toughness=1
+[/card]
+[card]
+id=2100000079
+name=Lexicon Party Rogue
+rarity=C
+mana={1}
+type=Creature
+subtype=Rogue
+power=1
+toughness=1
+[/card]
+[card]
+id=2100000080
+name=Lexicon Party Warrior
+rarity=C
+mana={1}
+type=Creature
+subtype=Warrior
+power=1
+toughness=1
+[/card]
+[card]
+id=2100000081
+name=Lexicon Party Wizard
+rarity=C
+mana={1}
+type=Creature
+subtype=Wizard
+power=1
+toughness=1
+[/card]
+[card]
+id=2100000082
+name=Lexicon Colored Spell Protection Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=protectionfromcoloredspells
+[/card]
+[card]
+id=2100000083
+name=Lexicon Devoid Witness
+rarity=C
+mana={1}
+color=blue
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=devoid
+[/card]
+[card]
+id=2100000084
+name=Lexicon Zero Cast Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=zerocast
+[/card]
+[card]
+id=2100000085
+name=Lexicon Combat Toughness Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=3
+[/card]
+[card]
+id=2100000086
+name=Lexicon Bury Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:bury target(creature|opponentbattlefield)
+[/card]
+[card]
+id=2100000087
+name=Lexicon Destroy Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:destroy target(creature|opponentbattlefield)
+[/card]
+[card]
+id=2100000088
+name=Lexicon Sacrifice Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:sacrifice target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000089
+name=Lexicon Reject Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:reject target(*|opponenthand)
+[/card]
+[card]
+id=2100000090
+name=Lexicon Lifeleech Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:lifeleech:-3 opponent
+[/card]
+[card]
+id=2100000091
+name=Lexicon Tap Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:tap target(*)
+[/card]
+[card]
+id=2100000092
+name=Lexicon Untap Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:untap target(land)
+[/card]
+[card]
+id=2100000093
+name=Lexicon Freeze Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:freeze target(land)
+[/card]
+[card]
+id=2100000094
+name=Lexicon Steal Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:steal target(creature|opponentbattlefield)
+[/card]
+[card]
+id=2100000095
+name=Lexicon My Battlefield Hand Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|mybattlefieldhand)
+[/card]
+[card]
+id=2100000096
+name=Lexicon My Hand Library Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|myhandlibrary)
+[/card]
+[card]
+id=2100000097
+name=Lexicon My Grave Library Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|mygravelibrary)
+[/card]
+[card]
+id=2100000098
+name=Lexicon My Grave Exile Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|mygraveexile)
+[/card]
+[card]
+id=2100000099
+name=Lexicon My Hand Exile Grave Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|myhandexilegrave)
+[/card]
+[card]
+id=2100000100
+name=Lexicon Opponent Hand Library Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|opponenthandlibrary)
+[/card]
+[card]
+id=2100000101
+name=Lexicon Opponent Grave Library Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|opponentgravelibrary)
+[/card]
+[card]
+id=2100000102
+name=Lexicon Opponent Grave Exile Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|opponentgraveexile)
+[/card]
+[card]
+id=2100000103
+name=Lexicon Opponent Hand Exile Grave Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|opponenthandexilegrave)
+[/card]
+[card]
+id=2100000104
+name=Lexicon My Nonplay Nonexile Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|mynonplaynonexile)
+[/card]
+[card]
+id=2100000105
+name=Lexicon Opponent Nonplay Nonexile Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|opponentnonplaynonexile)
+[/card]
+[card]
+id=2100000106
+name=Lexicon Nonbattlezone Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:moveto(exile) target(*|nonbattlezone)
+[/card]
+[card]
+id=2100000107
+name=Lexicon My Creature Exiler Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=mygcreatureexiler
+[/card]
+[card]
+id=2100000108
+name=Lexicon Poison Damager Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=poisondamager
+[/card]
+[card]
+id=2100000109
+name=Lexicon Produced Mana Trigger Witness
+rarity=C
+mana={1}
+type=Enchantment
+auto=@producedmana(land|mybattlefield):life:1 controller
+[/card]
+[card]
+id=2100000110
+name=Lexicon Poolsave Effect Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=mypoolsave(green)
+[/card]
+[card]
+id=2100000111
+name=Lexicon Hydra Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Hydra
+power=2
+toughness=2
+abilities=hydra
+[/card]
+[card]
+id=2100000112
+name=Lexicon NoLegend Witness
+rarity=C
+mana={1}
+type=Legendary Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=nolegend
+[/card]
+[card]
+id=2100000113
+name=Lexicon Soulbond Witness
+rarity=C
+mana={2}{G}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=soulbond
+auto=soulbond 2/2
+[/card]
+[card]
+id=2100000114
+name=Lexicon Self Discard Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:reject target(*|myhand)
+[/card]
+[card]
+id=2100000115
+name=Lexicon Conjure Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:conjure cards(Grizzly Bears) zone(myhand)
+[/card]
+[card]
+id=2100000116
+name=Lexicon Bottom Library Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:bottomoflibrary target(*|mygraveyard)
+[/card]
+[card]
+id=2100000117
+name=Lexicon Counter Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:counter(1/1) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000118
+name=Lexicon Duplicate Counter Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:duplicatecounters(all) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000119
+name=Lexicon Toxic Four Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisonfourtoxic
+[/card]
+[card]
+id=2100000120
+name=Lexicon Toxic Five Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisonfivetoxic
+[/card]
+[card]
+id=2100000121
+name=Lexicon Toxic Six Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisonsixtoxic
+[/card]
+[card]
+id=2100000122
+name=Lexicon Toxic Seven Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisonseventoxic
+[/card]
+[card]
+id=2100000123
+name=Lexicon Toxic Eight Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisoneighttoxic
+[/card]
+[card]
+id=2100000124
+name=Lexicon Toxic Nine Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisonninetoxic
+[/card]
+[card]
+id=2100000125
+name=Lexicon Toxic Ten Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisontentoxic
+[/card]
+[card]
+id=2100000126
+name=Lexicon Reset Damage Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:resetdamage target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000127
+name=Lexicon Exchange Life Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:exchangelife opponent
+[/card]
+[card]
+id=2100000128
+name=Lexicon Swap Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:swap target(creature|opponentbattlefield)
+[/card]
+[card]
+id=2100000129
+name=Lexicon Swap Target Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=4
+toughness=1
+[/card]
+[card]
+id=2100000130
+name=Lexicon Replace Draw Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=replacedraw ability$!name(skip draw) donothing!$ controller
+[/card]
+[card]
+id=2100000131
+name=Lexicon Anyzone Gameplay Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+anyzone={0}:life:1 controller
+[/card]
+[card]
+id=2100000132
+name=Lexicon Primitive Alias Gameplay Witness
+primitive=Lexicon Life Effect Witness
+[/card]
+[card]
+id=2100000133
+name=Lexicon If Wrapper Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:if compare(lifetotal)~equalto~20 then life:2 controller else life:-2 controller
+[/card]
+[card]
+id=2100000134
+name=Lexicon IfNot Wrapper Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:ifnot compare(lifetotal)~equalto~20 then life:2 controller
+[/card]
+[card]
+id=2100000135
+name=Lexicon May Wrapper Witness
+rarity=C
+mana={0}
+type=Sorcery
+auto=may life:2 controller
+[/card]
+[card]
+id=2100000136
+name=Lexicon Modal Branch Witness
+rarity=C
+mana={1}
+type=Sorcery
+auto=choice name(gain) life:2 controller
+auto=choice name(loss) life:-2 controller
+[/card]
+[card]
+id=2100000137
+name=Lexicon And Wrapper Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:life:1 controller && life:1 controller
+[/card]
+[card]
+id=2100000138
+name=Lexicon Pay Wrapper Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:pay({0}) life:2 controller
+[/card]
+[card]
+id=2100000139
+name=Lexicon Shackler Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=shackler
+[/card]
+[card]
+id=2100000140
+name=Lexicon Affinity Plains Witness
+rarity=C
+mana={2}
+type=Artifact
+abilities=affinityplains
+[/card]
+[card]
+id=2100000141
+name=Lexicon Affinity Forests Witness
+rarity=C
+mana={2}
+type=Artifact
+abilities=affinityforests
+[/card]
+[card]
+id=2100000142
+name=Lexicon My Grave Exiler Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=mygraveexiler
+[/card]
+[card]
+id=2100000143
+name=Lexicon Opp Grave Exiler Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=oppgraveexiler
+[/card]
+[card]
+id=2100000144
+name=Lexicon Can Block Tapped Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=canblocktapped
+auto={T}:donothing
+[/card]
+[card]
+id=2100000145
+name=Lexicon Opponent No Max Hand Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=oppnomaxhand
+[/card]
+[card]
+id=2100000146
+name=Lexicon Cant Crew Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=cantcrew
+[/card]
+[card]
+id=2100000147
+name=Lexicon Energy Shroud Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=energyshroud
+auto=@energizedof(player):life:1 controller
+[/card]
+[card]
+id=2100000148
+name=Lexicon Experience Shroud Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=expshroud
+auto=@experiencedof(player):life:1 controller
+[/card]
+[card]
+id=2100000149
+name=Lexicon Counter Shroud Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=countershroud
+auto=@counteradded(any):life:1 controller
+auto={0}:counter(1/1) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000150
+name=Lexicon Proliferate Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:proliferate
+[/card]
+[card]
+id=2100000151
+name=Lexicon Propagate Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:propagate
+[/card]
+[card]
+id=2100000152
+name=Lexicon Grant Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={T}:target(creature) grant +1/+1 grantend
+[/card]
+[card]
+id=2100000153
+name=Lexicon Reduce To Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:reduceto:5 controller
+[/card]
+[card]
+id=2100000154
+name=Lexicon Ability Dollar Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:ability$!life:2 controller!$ controller
+[/card]
+[card]
+id=2100000155
+name=Lexicon And Dollar Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:life:1 controller and!(life:1 controller)!
+[/card]
+[card]
+id=2100000156
+name=Lexicon My Restricted Casting Zone Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:moveto(exile) target(*|myrestrictedcastingzone)
+[/card]
+[card]
+id=2100000157
+name=Lexicon My Command Play Zone Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:moveto(exile) target(*|mycommandplay)
+[/card]
+[card]
+id=2100000158
+name=Lexicon Opponent Restricted Casting Zone Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:moveto(exile) target(*|opponentrestrictedcastingzone)
+[/card]
+[card]
+id=2100000159
+name=Lexicon Opponent Command Play Zone Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:moveto(exile) target(*|opponentcommandplay)
+[/card]
+[card]
+id=2100000160
+name=Lexicon Poisoned Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@poisonedof(player):life:1 controller
+[/card]
+[card]
+id=2100000161
+name=Lexicon Experienced Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@experiencedof(player):life:1 controller
+[/card]
+[card]
+id=2100000162
+name=Lexicon Proliferated Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@proliferateof(player):life:1 controller
+[/card]
+[card]
+id=2100000163
+name=Lexicon Ring Tempted Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@ringtemptedof(player):life:1 controller
+auto={0}:theringtempts:1 controller
+[/card]
+[card]
+id=2100000164
+name=Lexicon Monarch Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@becomesmonarchof(player):life:1 controller
+auto={0}:becomesmonarch controller
+[/card]
+[card]
+id=2100000165
+name=Lexicon Initiative Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@takeninitiativeof(player):life:1 controller
+auto={0}:taketheinitiative controller
+[/card]
+[card]
+id=2100000166
+name=Lexicon Shuffled Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@shuffledof(player):life:1 controller
+auto={0}:shuffle controller
+[/card]
+[card]
+id=2100000167
+name=Lexicon Place From Top Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:placefromthetop(2) target(*|mygraveyard)
+[/card]
+[card]
+id=2100000168
+name=Lexicon Dotrain Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:dotrain target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000169
+name=Lexicon Ready To Fight Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:readytofight target(creature|mygraveyard)
+[/card]
+[card]
+id=2100000170
+name=Lexicon Remove From Combat Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:removefromcombat target(creature[attacking]|mybattlefield)
+[/card]
+[card]
+id=2100000171
+name=Lexicon This Target Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:moveto(exile) target(this)
+[/card]
+[card]
+id=2100000172
+name=Lexicon Source Card Target Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:moveto(exile) target(sourcecard)
+[/card]
+[card]
+id=2100000173
+name=Lexicon Islandwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=islandwalk
+[/card]
+[card]
+id=2100000174
+name=Lexicon Mountainwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=mountainwalk
+[/card]
+[card]
+id=2100000175
+name=Lexicon Swampwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=swampwalk
+[/card]
+[card]
+id=2100000176
+name=Lexicon Plainswalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=plainswalk
+[/card]
+[card]
+id=2100000177
+name=Lexicon Nonbasiclandwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=nonbasiclandwalk
+[/card]
+[card]
+id=2100000178
+name=Lexicon Legendarylandwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=legendarylandwalk
+[/card]
+[card]
+id=2100000179
+name=Lexicon Snowforestlandwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=snowforestlandwalk
+[/card]
+[card]
+id=2100000180
+name=Lexicon Snowplainslandwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=snowplainslandwalk
+[/card]
+[card]
+id=2100000181
+name=Lexicon Snowmountainlandwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=snowmountainlandwalk
+[/card]
+[card]
+id=2100000182
+name=Lexicon Snowislandlandwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=snowislandlandwalk
+[/card]
+[card]
+id=2100000183
+name=Lexicon Snowswamplandwalk Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=snowswamplandwalk
+[/card]
+[card]
+id=2100000184
+name=Lexicon Strong Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=3
+toughness=3
+abilities=strong
+[/card]
+[card]
+id=2100000185
+name=Lexicon Weak Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=weak
+[/card]
+[card]
+id=2100000186
+name=Lexicon Player Shroud Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=playershroud
+[/card]
+[card]
+id=2100000187
+name=Lexicon Poison Shroud Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisonshroud
+[/card]
+[card]
+id=2100000188
+name=Lexicon Nosolo Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=nosolo
+[/card]
+[card]
+id=2100000189
+name=Lexicon Mustblock Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=mustblock
+[/card]
+[card]
+id=2100000190
+name=Lexicon Cant Change Life Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=cantchangelife
+[/card]
+[card]
+id=2100000191
+name=Lexicon Toxic One Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisontoxic
+[/card]
+[card]
+id=2100000192
+name=Lexicon Toxic Two Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisontwotoxic
+[/card]
+[card]
+id=2100000193
+name=Lexicon Toxic Three Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=poisonthreetoxic
+[/card]
+[card]
+id=2100000194
+name=Lexicon Scry Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:scry:1 scryend
+[/card]
+[card]
+id=2100000851
+name=Lexicon Transform Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+doublefaced=kamiflip
+backside=Lexicon Synthetic Vanilla
+auto={0}:flip(backside)
+[/card]
+[card]
+id=2100000850
+name=Lexicon Replacescry Witness
+rarity=C
+mana={0}
+type=Artifact
+abilities=replacescry
+auto=@scryed(this):name(Draw cards instead of scry) draw:scryedcards controller
+auto={0}:scry:1 scrycore delayed dontshow donothing scrycoreend scryend
+[/card]
+[card]
+id=2100000195
+name=Lexicon Partner Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=partner
+partner=Lexicon Partner Mate
+auto=_PARTNER_
+[/card]
+[card]
+id=2100000196
+name=Lexicon Partner Mate
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+[/card]
+[card]
+id=2100000197
+name=Lexicon Boasted Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@boasted(this):life:1 controller
+auto={0}:doboast
+[/card]
+[card]
+id=2100000198
+name=Lexicon Surveiled Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@surveiled(this):life:1 controller
+auto={0}:surveil:1
+[/card]
+[card]
+id=2100000199
+name=Lexicon Trained Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@trained(this):life:1 controller
+auto=_TRAINING_
+[/card]
+[card]
+id=2100000200
+name=Lexicon Explored Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@explored(this):life:1 controller
+auto={0}:explores target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000201
+name=Lexicon Scryed Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@scryed(this):life:1 controller
+auto={0}:scry:1 scrycore delayed dontshow donothing scrycoreend scryend
+[/card]
+[card]
+id=2100000202
+name=Lexicon Foretold Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@foretold(*|myzones):life:1 controller
+[/card]
+[card]
+id=2100000203
+name=Lexicon Cycled Trigger Witness
+rarity=C
+mana={1}
+type=Instant
+abilities=cycling
+autohand=@cycled(this|hand):life:1 controller
+autohand={0}{cycle}:draw:1 controller
+[/card]
+[card]
+id=2100000204
+name=Lexicon Total Counter Added Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@totalcounteradded(1/1):life:1 controller
+auto={0}:counter(1/1) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000205
+name=Lexicon Counter Mod Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@countermod(1/1):life:1 controller
+auto={0}:counter(1/1) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000206
+name=Lexicon Counter Removed Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@counterremoved(1/1):life:1 controller
+auto=@totalcounterremoved(1/1):life:1 controller
+auto={0}:counter(1/1) target(creature|mybattlefield)
+auto={0}:removesinglecountertype(1) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000207
+name=Lexicon Clone Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:clone target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000208
+name=Lexicon Remove Single Counter Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:counter(1/1) target(creature|mybattlefield)
+auto={0}:removesinglecountertype(1) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000209
+name=Lexicon Remove All Counter Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:counter(1/1) target(creature|mybattlefield)
+auto={0}:removeallcounters(all) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000210
+name=Lexicon Ringbearer Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:becomesringbearer target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000211
+name=Lexicon Ringbearer Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@bearerchosen(this):life:1 controller
+[/card]
+[card]
+id=2100000212
+name=Lexicon Dungeon Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:completedungeon:1 controller
+[/card]
+[card]
+id=2100000213
+name=Lexicon Dungeon Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@dungeoncompleted(*|mysideboard) from(controller):life:1 controller
+[/card]
+[card]
+id=2100000214
+name=Lexicon Energy Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:alterenergy:1 controller
+auto=@energizedof(player):life:1 controller
+[/card]
+[card]
+id=2100000215
+name=Lexicon Experience Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:alterexperience:1 controller
+auto=@experiencedof(player):life:1 controller
+[/card]
+[card]
+id=2100000216
+name=Lexicon Poisoned Foe Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@poisonedfoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000217
+name=Lexicon Energized Foe Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@energizedfoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000218
+name=Lexicon Experienced Foe Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@experiencedfoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000219
+name=Lexicon Proliferated Foe Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@proliferatefoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000220
+name=Lexicon Ringtempted Foe Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@ringtemptedfoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000221
+name=Lexicon Monarch Foe Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@becomesmonarchfoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000222
+name=Lexicon Initiative Foe Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@takeninitiativefoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000223
+name=Lexicon Shuffled Foe Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=@shuffledfoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000224
+name=Lexicon Foe Poison Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:alterpoison:1 opponent
+[/card]
+[card]
+id=2100000225
+name=Lexicon Foe Energy Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:alterenergy:1 opponent
+[/card]
+[card]
+id=2100000226
+name=Lexicon Foe Experience Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:alterexperience:1 opponent
+[/card]
+[card]
+id=2100000227
+name=Lexicon Foe Proliferate Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:proliferate opponent
+[/card]
+[card]
+id=2100000228
+name=Lexicon Foe Ring Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:theringtempts:1 opponent
+[/card]
+[card]
+id=2100000229
+name=Lexicon Foe Monarch Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:becomesmonarch opponent
+[/card]
+[card]
+id=2100000230
+name=Lexicon Foe Initiative Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:taketheinitiative opponent
+[/card]
+[card]
+id=2100000231
+name=Lexicon Foe Shuffle Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:shuffle opponent
+[/card]
+[card]
+id=2100000232
+name=Lexicon Any Mana Ability Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=anytypeofmanaability
+auto={T}:add{G}
+auto={U}:life:1 controller
+[/card]
+[card]
+id=2100000233
+name=Lexicon Perpetual Lifelink Grant Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:transforms((,newability[perpetuallifelink])) target(creature|myhand) forever
+[/card]
+[card]
+id=2100000234
+name=Lexicon Perpetual Deathtouch Grant Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:transforms((,newability[perpetualdeathtouch])) target(creature|myhand) forever
+[/card]
+[card]
+id=2100000235
+name=Lexicon Lifed Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@lifed(player):life:-1 opponent
+[/card]
+[card]
+id=2100000236
+name=Lexicon Lifeof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@lifeof(player):life:-1 opponent
+[/card]
+[card]
+id=2100000237
+name=Lexicon Lifefoeof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@lifefoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000238
+name=Lexicon Lifeloss Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@lifeloss(player):life:1 controller
+[/card]
+[card]
+id=2100000239
+name=Lexicon Lifelostof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@lifelostof(player):life:1 controller
+[/card]
+[card]
+id=2100000240
+name=Lexicon Lifelostfoeof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@lifelostfoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000241
+name=Lexicon Damaged Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@damaged(player):life:1 controller
+[/card]
+[card]
+id=2100000242
+name=Lexicon Damageof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@damageof(player):life:1 controller
+[/card]
+[card]
+id=2100000243
+name=Lexicon Damagefoeof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@damagefoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000244
+name=Lexicon Combatdamaged Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@combatdamaged(player):life:1 controller
+[/card]
+[card]
+id=2100000245
+name=Lexicon Combatdamageof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@combatdamageof(player):life:1 controller
+[/card]
+[card]
+id=2100000246
+name=Lexicon Combatdamagefoeof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@combatdamagefoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000247
+name=Lexicon Noncombatdamaged Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@noncombatdamaged(player):life:1 controller
+[/card]
+[card]
+id=2100000248
+name=Lexicon Noncombatdamageof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@noncombatdamageof(player):life:1 controller
+[/card]
+[card]
+id=2100000249
+name=Lexicon Noncombatdamagefoeof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@noncombatdamagefoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000250
+name=Lexicon Drawn Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@drawn(player):life:1 controller
+[/card]
+[card]
+id=2100000251
+name=Lexicon Drawof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@drawof(player):life:1 controller
+[/card]
+[card]
+id=2100000252
+name=Lexicon Drawfoeof Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@drawfoeof(player):life:1 controller
+[/card]
+[card]
+id=2100000253
+name=Lexicon Each End Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@each my end:life:1 controller
+[/card]
+[card]
+id=2100000254
+name=Lexicon Next End Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@next end:life:1 controller
+[/card]
+[card]
+id=2100000255
+name=Lexicon Rebounded Trigger Witness
+rarity=C
+mana={0}
+type=Instant
+auto=donothing
+auto=_REBOUND_
+auto=@rebounded:life:1 controller
+[/card]
+[card]
+id=2100000256
+name=Lexicon Bearer New Chosen Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@bearernewchosen(this):life:1 controller
+[/card]
+[card]
+id=2100000257
+name=Lexicon Die Result Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+auto=@dierolled(this) result(6):life:1 controller
+[/card]
+[card]
+id=2100000258
+name=Lexicon Opponent Life Gain Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:life:1 opponent
+[/card]
+[card]
+id=2100000259
+name=Lexicon Opponent Life Loss Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:life:-1 opponent
+[/card]
+[card]
+id=2100000260
+name=Lexicon Controller Life Loss Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:life:-1 controller
+[/card]
+[card]
+id=2100000261
+name=Lexicon Opponent Draw Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:draw:1 opponent
+[/card]
+[card]
+id=2100000262
+name=Lexicon Opponent Damage Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:damage:1 opponent
+[/card]
+[card]
+id=2100000263
+name=Lexicon Die Trigger Any Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@dierolled(this):life:1 controller
+auto={0}:rolld6 6 winability donothing winabilityend loseability donothing loseabilityend rolld6end
+[/card]
+[card]
+id=2100000264
+name=Lexicon Exploited Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@exploited(creature|mybattlefield):life:1 controller
+[/card]
+[card]
+id=2100000265
+name=Lexicon Exploit Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:exploits target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000266
+name=Lexicon Ninjutsued Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@ninjutsued(*|mybattlefield):life:1 controller
+[/card]
+[card]
+id=2100000267
+name=Lexicon Defeated Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=@defeated(*|battlefield):life:1 controller
+[/card]
+[card]
+id=2100000268
+name=Lexicon Alter Yidaro Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:alteryidarocount:1 controller
+[/card]
+[card]
+id=2100000880
+name=Lexicon Yidaro Count Sensor Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:this(variable{pyidarocount}>=3) life:1 controller
+text=Test-only witness that reads back the accumulated yidaro cycling count.
+[/card]
+[card]
+id=2100000269
+name=Lexicon Alter Surveil Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:altersurvoffset:1 controller
+[/card]
+[card]
+id=2100000881
+name=Lexicon Surveil Offset Sensor Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:this(variable{psurveiloffset}>=1) life:1 controller
+text=Test-only witness that reads back the accumulated surveil offset.
+[/card]
+[card]
+id=2100000270
+name=Lexicon Alter Devotion Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:alterdevoffset:1 controller
+[/card]
+[card]
+id=2100000271
+name=Lexicon DoBoast Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@boasted(this):life:1 controller
+auto={0}:doboast
+[/card]
+[card]
+id=2100000272
+name=Lexicon Becomes Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:becomes(Creature,4/4) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000273
+name=Lexicon Remake Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:remake(Creature:4/4) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000274
+name=Lexicon Transforms Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:transforms((Creature,setpower=4,settoughness=4,newability[flying])) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000275
+name=Lexicon Flip Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:flip(Serra Angel) forcetype(Creature) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000276
+name=Lexicon Doubleside Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+doublefaced=kamiflip
+backside=Lexicon Synthetic Vanilla
+auto={0}:doubleside(backside)
+[/card]
+[card]
+id=2100000277
+name=Lexicon Morph Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:morph target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000278
+name=Lexicon Manafaceup Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:manafaceup target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000279
+name=Lexicon Meld Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:meld(Lexicon Synthetic Vanilla)
+[/card]
+[card]
+id=2100000280
+name=Lexicon Countershroud Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:countershroud(any)(creature|battlefield)
+[/card]
+[card]
+id=2100000281
+name=Lexicon Countertrack Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:countertrack(1/1)
+[/card]
+[card]
+id=2100000282
+name=Lexicon Lose Abilities Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:loseabilities target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000283
+name=Lexicon Lose Subtypes Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:losesubtypesof(creature) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000284
+name=Lexicon Lose A Type Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:losesatype(human) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000285
+name=Lexicon Cant Target Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:cantbetargetof(red) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000286
+name=Lexicon Cant Be Blocked By Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:cantbeblockedby(creature) target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000287
+name=Lexicon Cant Be Blocker Of Effect Witness
+rarity=C
+type=Creature
+abilities=mustattack
+power=3
+toughness=3
+mana={0}
+auto={0}:cantbeblockerof(this) target(creature|opponentbattlefield)
+[/card]
+[card]
+id=2100000288
+name=Lexicon Provoke Effect Witness
+rarity=C
+type=Creature
+abilities=mustattack
+power=3
+toughness=3
+mana={0}
+auto={0}:provoke target(creature|opponentbattlefield)
+[/card]
+[card]
+id=2100000289
+name=Lexicon Setblocker Effect Witness
+rarity=C
+type=Creature
+abilities=mustattack
+power=3
+toughness=3
+mana={0}
+auto={0}:setblocker target(creature|opponentbattlefield)
+[/card]
+[card]
+id=2100000290
+name=Lexicon Frozen Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:frozen target(creature|opponentbattlefield)
+[/card]
+[card]
+id=2100000291
+name=Lexicon Phaseout Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:phaseout target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000292
+name=Lexicon Phasealter Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:phasealter(add,combatphases,controller)
+[/card]
+[card]
+id=2100000293
+name=Lexicon Retarget Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:retarget target(*|stack)
+[/card]
+[card]
+id=2100000294
+name=Lexicon Rehook Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:rehook target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000295
+name=Lexicon Mutateover Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:mutateover target(creature|mybattlefield)
+[/card]
+[card]
+id=2100000296
+name=Lexicon Cascade Effect Witness
+rarity=C
+type=Sorcery
+mana={3}
+autostack=if casted(this) then cascade:plibrarycount
+[/card]
+[card]
+id=2100000297
+name=Lexicon Maxlevel Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:maxlevel:1
+[/card]
+[card]
+id=2100000298
+name=Lexicon Reveal Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:reveal:1 revealend
+[/card]
+[card]
+id=2100000299
+name=Lexicon Scry Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:scry:1 scryend
+[/card]
+[card]
+id=2100000300
+name=Lexicon Hand Modifier Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:hmodifer:1
+[/card]
+[card]
+id=2100000301
+name=Lexicon Set Hand Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:sethand:1
+[/card]
+[card]
+id=2100000302
+name=Lexicon Turns Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:turns:1
+[/card]
+[card]
+id=2100000303
+name=Lexicon Count Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:count(creature|mybattlefield)
+[/card]
+[card]
+id=2100000304
+name=Lexicon Countb Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:countb(creature|mybattlefield)
+[/card]
+[card]
+id=2100000305
+name=Lexicon Donothing Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:donothing
+[/card]
+[card]
+id=2100000306
+name=Lexicon Epic Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:epic
+[/card]
+[card]
+id=2100000307
+name=Lexicon Forcefield Effect Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:forcefield
+[/card]
+[card]
+id=2100000308
+name=Lexicon Producecolor Passive Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:producecolor:green
+[/card]
+[card]
+id=2100000309
+name=Lexicon Changecost Activated Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:changecost(colorless:-1)
+[/card]
+[card]
+id=2100000310
+name=Lexicon Modbenchant Activated Witness
+rarity=C
+type=Artifact
+mana={0}
+auto={0}:modbenchant(green:1)
+[/card]
+[card]
+id=2100000311
+name=Lexicon Field Dispatch Witness
+grade=Supported
+rarity=U
+color=red
+type=Creature
+subtype=Goblin
+power=2
+toughness=3
+text=Field dispatch gameplay witness
+target=player
+auto={0}:damage:2 target(player)
+[/card]
+[card]
+id=2100000312
+name=Lexicon Two Boast Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=boast,twoboast
+auto=@boasted(this):life:1 controller
+auto={0}:doboast
+[/card]
+[card]
+id=2100000313
+name=Lexicon Cant Planeswalker Attack Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=cantpwattack
+text=Test-only witness for attacks aimed at planeswalkers and battles.
+[/card]
+[card]
+id=2100000314
+name=Lexicon No Defense Damage Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=nodefensedamage
+text=Test-only witness for damage that does not remove battle defense.
+[/card]
+[card]
+id=2100000315
+name=Lexicon Opponent Pool Save Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=opponentpoolsave(green)
+text=Test-only witness for preserving an opponent's green mana.
+[/card]
+[card]
+id=2100000316
+name=Lexicon Opponent Replace Draw Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=opponentreplacedraw life:1 opponent
+text=Test-only witness for replacing an opponent's draw.
+[/card]
+[card]
+id=2100000317
+name=Lexicon Die Family Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@dierolled(this):life:1 controller
+auto={0}:rolld4 4 winability donothing winabilityend loseability donothing loseabilityend rolld4end
+auto={0}:rolld6 6 winability donothing winabilityend loseability donothing loseabilityend rolld6end
+auto={0}:rolld8 8 winability donothing winabilityend loseability donothing loseabilityend rolld8end
+auto={0}:rolld10 10 winability donothing winabilityend loseability donothing loseabilityend rolld10end
+auto={0}:rolld12 12 winability donothing winabilityend loseability donothing loseabilityend rolld12end
+auto={0}:rolld20 20 winability donothing winabilityend loseability donothing loseabilityend rolld20end
+text=Test-only witness for every supported die size.
+[/card]
+[card]
+id=2100000318
+name=Lexicon DoForetell Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@foretold(this):life:1 controller
+auto={0}:doforetell
+text=Test-only witness for the explicit doforetell effect.
+[/card]
+[card]
+id=2100000319
+name=Lexicon Loyalty Twice Witness
+rarity=C
+mana={0}
+type=Planeswalker
+subtype=Lexicon
+abilities=canloyaltytwice
+auto=counter(0/0,3,Loyalty)
+auto={C(0/0,1,Loyalty)}:life:1 controller
+text=Test-only planeswalker that can activate loyalty twice.
+[/card]
+[card]
+id=2100000320
+name=Lexicon Loyalty Instant Witness
+rarity=C
+mana={0}
+type=Planeswalker
+subtype=Lexicon
+abilities=canloyaltyasinst
+auto=counter(0/0,3,Loyalty)
+auto={C(0/0,1,Loyalty)}:life:1 controller
+text=Test-only planeswalker whose loyalty ability is usable as an instant.
+[/card]
+[card]
+id=2100000321
+name=Lexicon Haunt Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:haunt target(creature|opponentbattlefield)
+text=Test-only witness that marks a creature as prey through haunt.
+[/card]
+[card]
+id=2100000322
+name=Lexicon IsPrey Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@movedto(creature[isprey]|graveyard):life:1 controller
+text=Test-only witness for the isprey target restriction.
+[/card]
+[card]
+id=2100000323
+name=Lexicon No Move Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=nomovetrigger
+auto=@movedto(this|battlefield):life:1 controller
+text=Test-only witness for suppressing zone-change triggers.
+[/card]
+[card]
+id=2100000324
+name=Lexicon Dungeon Flag Witness
+rarity=C
+mana={0}
+type=Conspiracy
+abilities=dungeoncompleted
+text=Test-only card carrying the dungeoncompleted basic flag.
+[/card]
+[card]
+id=2100000325
+name=Lexicon Dungeon Flag Selector Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:moveto(hand) target(*[dungeoncompleted]|mysideboard)
+text=Test-only witness for targeting a completed dungeon card.
+[/card]
+[card]
+id=2100000326
+name=Lexicon Producecolor Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={T}:add{G}
+auto=producecolor:green
+text=Test-only witness for extra mana from a mana ability.
+[/card]
+[card]
+id=2100000327
+name=Lexicon Changecost Effect Witness
+rarity=C
+mana={0}
+type=Enchantment
+auto=lord(creature|myhand) changecost(colorless:-1)
+text=Test-only witness for the changecost spelling.
+[/card]
+[card]
+id=2100000328
+name=Lexicon Donothing Chain Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:donothing and!(life:1 controller)!
+text=Test-only witness that a no-op effect preserves its follow-up ability.
+[/card]
+[card]
+id=2100000329
+name=Lexicon Hidden Move Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:hiddenmoveto(exile) target(*|mybattlefield)
+text=Test-only witness for the hiddenmoveto effect.
+[/card]
+[card]
+id=2100000330
+name=Lexicon Countertrack Target Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:countertrack(1/1) target(creature|mybattlefield)
+text=Test-only witness for restoring a tracked counter when this source leaves.
+[/card]
+[card]
+id=2100000331
+name=Lexicon Newtarget Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:newtarget target(creature|mybattlefield)
+text=Test-only witness for refreshing a permanent with newtarget.
+[/card]
+[card]
+id=2100000332
+name=Lexicon Reveal Behavior Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:reveal:1 optionone name(Put Back) target(<1>*|reveal) moveto(ownerlibrary) optiononeend afterrevealed life:1 controller afterrevealedend revealend
+text=Test-only witness that completes a reveal and resolves its follow-up.
+[/card]
+[card]
+id=2100000333
+name=Lexicon Count Behavior Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:count(creature|mybattlefield) && draw:countedamount controller
+text=Test-only witness that uses count to set a later draw amount.
+[/card]
+[card]
+id=2100000334
+name=Lexicon Countb Behavior Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:countb(creature|opponentbattlefield) && draw:countedbamount controller
+text=Test-only witness that uses countb to set a later draw amount.
+[/card]
+[card]
+id=2100000336
+name=Lexicon Out Mana Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:out{G}
+text=Test-only witness for the out mana producer spelling.
+[/card]
+[card]
+id=2100000337
+name=Lexicon Doesntempty Mana Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:add{G} doesntempty
+text=Test-only witness for mana that survives a phase change.
+[/card]
+[card]
+id=2100000338
+name=Lexicon Token Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:token(Lexicon Token,Creature Lexicon Token,1/1,flying,white)
+text=Test-only witness for comma-delimited token creation.
+[/card]
+[card]
+id=2100000339
+name=Lexicon Shackle Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={T}:shackle target(creature|opponentbattlefield)
+text=Test-only witness for control-until-untap shackle behavior.
+[/card]
+[card]
+id=2100000340
+name=Lexicon Discarded Trigger Witness
+rarity=C
+mana={1}
+type=Instant
+abilities=cycling
+autohand=@discarded(this|hand):life:1 controller
+autohand={0}{cycle}:draw:1 controller
+text=Test-only witness for a discarded-card trigger.
+[/card]
+[card]
+id=2100000341
+name=Lexicon Discard Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:discard:1 opponent
+text=Test-only witness that discards an opposing hand card.
+[/card]
+[card]
+id=2100000342
+name=Lexicon Attackedalone Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+auto=@combat(attackedalone) source(this):life:1 controller
+text=Test-only witness for the attacked-alone combat event.
+[/card]
+[card]
+id=2100000343
+name=Lexicon Notblocked Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+auto=@combat(notblocked) source(this):life:1 controller
+text=Test-only witness for the unblocked combat event.
+[/card]
+[card]
+id=2100000344
+name=Lexicon Attach Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+subtype=Equipment
+auto={0}:attach target(creature|mybattlefield)
+auto=teach(creature) transforms((,newability[1/1]))
+text=Test-only witness for the unrestricted attach effect.
+[/card]
+[card]
+id=2100000345
+name=Lexicon Lord Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:lord(creature|mybattlefield) 1/1
+text=Test-only witness for a continuous lord modifier.
+[/card]
+[card]
+id=2100000346
+name=Lexicon Foreach Effect Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=foreach(creature|mybattlefield) 1/1
+text=Test-only witness for a count-scaled foreach modifier.
+[/card]
+[card]
+id=2100000347
+name=Lexicon This Effect Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto=this(variable{controllerlife}>0) 1/1
+text=Test-only witness for a source-card this condition.
+[/card]
+[card]
+id=2100000348
+name=Lexicon While Effect Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:while(restriction{outnumbered}) 1/1
+text=Test-only witness for a continuous while condition.
+[/card]
+[card]
+id=2100000349
+name=Lexicon UEOT Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:ueot @each my end:life:1 controller
+text=Test-only witness for an effect that expires at end of turn.
+[/card]
+[card]
+id=2100000350
+name=Lexicon Activate Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:activate @each my end:life:1 controller
+text=Test-only witness for adding a nested effect to the game.
+[/card]
+[card]
+id=2100000351
+name=Lexicon Emblem Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:emblem @each my end:life:1 controller forever dontremove
+text=Test-only witness for a game-wide emblem effect.
+[/card]
+[card]
+id=2100000352
+name=Lexicon Mypoolsave Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=mypoolsave(green)
+text=Test-only witness for preserving this controller's green mana.
+[/card]
+[card]
+id=2100000353
+name=Lexicon Return Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:(blink)return(counter(1/1)) target(creature|battlefield)
+text=Test-only witness for a blink return wrapper with a nested effect.
+[/card]
+[card]
+id=2100000354
+name=Lexicon Color Deplete Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:colordeplete:2 opponent
+text=Test-only witness for color-repeat milling.
+[/card]
+[card]
+id=2100000355
+name=Lexicon Name Deplete Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:namedeplete:2 opponent
+text=Test-only witness for name-repeat milling.
+[/card]
+[card]
+id=2100000356
+name=Lexicon Color Ingest Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:coloringest ingest:2 opponent
+text=Test-only witness for color-repeat ingest.
+[/card]
+[card]
+id=2100000357
+name=Lexicon Name Ingest Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:nameingest ingest:2 opponent
+text=Test-only witness for name-repeat ingest.
+[/card]
+[card]
+id=2100000358
+name=Lexicon Noevent Tap Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@tapped(mytgt):life:1 controller
+auto={0}:tap(noevent) target(land|opponentbattlefield)
+text=Test-only witness that taps without emitting a tap event.
+[/card]
+[card]
+id=2100000359
+name=Lexicon Affinity Effect Witness
+rarity=C
+mana={2}
+type=Artifact
+anyzone=affinity(artifact|mybattlefield) reduce({1})
+text=Test-only witness for target-chooser artifact affinity.
+[/card]
+[card]
+id=2100000360
+name=Lexicon Modbenchant Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=modbenchant(green:1) controller
+text=Test-only witness for increasing a green bestow cost.
+[/card]
+[card]
+id=2100000361
+name=Lexicon Connect Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:connect target(creature|mybattlefield)
+text=Test-only witness for associating a child with a parent.
+[/card]
+[card]
+id=2100000362
+name=Lexicon Connectrule Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=connectrule
+text=Test-only witness for parent-child cleanup rules.
+[/card]
+[card]
+id=2100000363
+name=Lexicon P T Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:1/1 target(creature|mybattlefield)
+text=Test-only witness for a generic power-toughness modifier.
+[/card]
+[card]
+id=2100000364
+name=Lexicon Lose A Type Behavior Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:losesatype(human) target(creature|mybattlefield)
+auto={0}:destroy target(human|mybattlefield)
+text=Test-only witness for removing Human so a later Human target fails.
+[/card]
+[card]
+id=2100000365
+name=Lexicon Alter Mutation Counter Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@mutated(this):life:1 controller
+auto={0}:ability$!altermutationcounter:1!$ controller
+text=Test-only witness for changing the mutation counter and emitting its event.
+[/card]
+[card]
+id=2100000366
+name=Lexicon White Mana Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={W}:life:1 controller
+[/card]
+[card]
+id=2100000367
+name=Lexicon Blue Mana Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={U}:life:1 controller
+[/card]
+[card]
+id=2100000368
+name=Lexicon Black Mana Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={B}:life:1 controller
+[/card]
+[card]
+id=2100000369
+name=Lexicon Red Mana Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={R}:life:1 controller
+[/card]
+[card]
+id=2100000370
+name=Lexicon Green Mana Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={G}:life:1 controller
+[/card]
+[card]
+id=2100000371
+name=Lexicon Generic Mana Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={2}:life:1 controller
+[/card]
+[card]
+id=2100000372
+name=Lexicon Life Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={l}:damage:1 opponent
+[/card]
+[card]
+id=2100000373
+name=Lexicon Block Effect Witness
+rarity=C
+mana={0}
+type=Creature
+power=4
+toughness=4
+auto={0}:block target(creature|opponentbattlefield)
+[/card]
+[card]
+id=2100000374
+name=Lexicon Target Tap Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={t(creature|mybattlefield)}:life:1 controller
+[/card]
+[card]
+id=2100000375
+name=Lexicon Target Sacrifice Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={s(creature|mybattlefield)}:life:1 controller
+[/card]
+[card]
+id=2100000376
+name=Lexicon Target Exile Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={e(creature|mygraveyard)}:life:1 controller
+[/card]
+[card]
+id=2100000377
+name=Lexicon Scry 2 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@scryed(this):life:1 controller
+auto={0}:_SCRY2_
+[/card]
+[card]
+id=2100000378
+name=Lexicon Scry 3 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@scryed(this):life:1 controller
+auto={0}:_SCRY3_
+[/card]
+[card]
+id=2100000379
+name=Lexicon Scry 4 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@scryed(this):life:1 controller
+auto={0}:_SCRY4_
+[/card]
+[card]
+id=2100000380
+name=Lexicon Scry 5 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@scryed(this):life:1 controller
+auto={0}:_SCRY5_
+[/card]
+[card]
+id=2100000381
+name=Lexicon Angel Token Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ANGELTOKEN_
+[/card]
+[card]
+id=2100000382
+name=Lexicon Detective Token Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_DETECTIVETOKEN_
+[/card]
+[card]
+id=2100000383
+name=Lexicon Eldrazi Scion Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ELDRAZISCION_
+[/card]
+[card]
+id=2100000384
+name=Lexicon Eldrazi Spawn Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ELDRAZISPAWN_
+[/card]
+[card]
+id=2100000385
+name=Lexicon Human Knight Token Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_HUMANKNIGHTTOKEN_
+[/card]
+[card]
+id=2100000386
+name=Lexicon Vehicle Token Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_VEHICLE_
+[/card]
+[card]
+id=2100000387
+name=Lexicon Zombie Amass 1 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSZOMBIE1_ && life:1 controller
+[/card]
+[card]
+id=2100000388
+name=Lexicon Zombie Amass 2 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSZOMBIE2_ && life:1 controller
+[/card]
+[card]
+id=2100000389
+name=Lexicon Zombie Amass 3 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSZOMBIE3_ && life:1 controller
+[/card]
+[card]
+id=2100000390
+name=Lexicon Zombie Amass 4 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSZOMBIE4_ && life:1 controller
+[/card]
+[card]
+id=2100000391
+name=Lexicon Zombie Amass 5 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSZOMBIE5_ && life:1 controller
+[/card]
+[card]
+id=2100000392
+name=Lexicon Orc Amass 1 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSORC1_ && life:1 controller
+[/card]
+[card]
+id=2100000393
+name=Lexicon Orc Amass 2 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSORC2_ && life:1 controller
+[/card]
+[card]
+id=2100000394
+name=Lexicon Orc Amass 3 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSORC3_ && life:1 controller
+[/card]
+[card]
+id=2100000395
+name=Lexicon Orc Amass 4 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSORC4_ && life:1 controller
+[/card]
+[card]
+id=2100000396
+name=Lexicon Orc Amass 5 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSORC5_ && life:1 controller
+[/card]
+[card]
+id=2100000397
+name=Lexicon Sliver Amass 1 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSSLIVER1_ && life:1 controller
+[/card]
+[card]
+id=2100000398
+name=Lexicon Sliver Amass 2 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSSLIVER2_ && life:1 controller
+[/card]
+[card]
+id=2100000399
+name=Lexicon Sliver Amass 3 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSSLIVER3_ && life:1 controller
+[/card]
+[card]
+id=2100000400
+name=Lexicon Sliver Amass 4 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSSLIVER4_ && life:1 controller
+[/card]
+[card]
+id=2100000401
+name=Lexicon Sliver Amass 5 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_AMASSSLIVER5_ && life:1 controller
+[/card]
+[card]
+id=2100000402
+name=Lexicon Fabricate Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:_FABRICATE_(2) && life:1 controller
+[/card]
+[card]
+id=2100000403
+name=Lexicon Second Draw Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=_SECOND_DRAW_life:1 controller
+[/card]
+[card]
+id=2100000404
+name=Lexicon Addendum Macro Witness
+rarity=C
+mana={0}
+type=Instant
+auto=_ADDENDUM_life:1 controller
+[/card]
+[card]
+id=2100000405
+name=Lexicon Threshold Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_THRESHOLD_life:1 controller
+[/card]
+[card]
+id=2100000406
+name=Lexicon Metalcraft Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_METALCRAFT_ life:1 controller
+[/card]
+[card]
+id=2100000407
+name=Lexicon Ascend Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ASCEND_ && life:1 controller
+[/card]
+[card]
+id=2100000408
+name=Lexicon Monarch Controller Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_MONARCH_CONTROLLER_ && life:1 controller
+[/card]
+[card]
+id=2100000409
+name=Lexicon Monarch Opponent Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_MONARCH_OPPONENT_ && life:1 controller
+[/card]
+[card]
+id=2100000410
+name=Lexicon Initiative Controller Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_INITIATIVE_CONTROLLER_ && life:1 controller
+[/card]
+[card]
+id=2100000411
+name=Lexicon Initiative Opponent Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_INITIATIVE_OPPONENT_ && life:1 controller
+[/card]
+[card]
+id=2100000412
+name=Lexicon Ring Tempts Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_RINGTEMPTS_ && life:1 controller
+[/card]
+[card]
+id=2100000413
+name=Lexicon Cast Historic Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=_CASTHISTORIC_life:1 controller
+[/card]
+[card]
+id=2100000414
+name=Lexicon Extort Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=_EXTORT_
+[/card]
+[card]
+id=2100000415
+name=Lexicon Historic Cast Card
+rarity=C
+mana={0}
+type=Legendary Artifact
+[/card]
+[card]
+id=2100000416
+name=Lexicon City Blessing Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_CITY'S_BLESSING_life:1 controller
+[/card]
+[card]
+id=2100000417
+name=Lexicon Endure 1 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE1_ && life:1 controller
+[/card]
+[card]
+id=2100000418
+name=Lexicon Endure 2 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE2_ && life:1 controller
+[/card]
+[card]
+id=2100000419
+name=Lexicon Endure 3 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE3_ && life:1 controller
+[/card]
+[card]
+id=2100000420
+name=Lexicon Endure 4 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE4_ && life:1 controller
+[/card]
+[card]
+id=2100000421
+name=Lexicon Endure 5 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE5_ && life:1 controller
+[/card]
+[card]
+id=2100000422
+name=Lexicon Endure 6 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE6_ && life:1 controller
+[/card]
+[card]
+id=2100000423
+name=Lexicon Endure 7 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE7_ && life:1 controller
+[/card]
+[card]
+id=2100000424
+name=Lexicon Endure 8 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE8_ && life:1 controller
+[/card]
+[card]
+id=2100000425
+name=Lexicon Endure 9 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE9_ && life:1 controller
+[/card]
+[card]
+id=2100000426
+name=Lexicon Endure 10 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE10_ && life:1 controller
+[/card]
+[card]
+id=2100000427
+name=Lexicon Endure 11 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE11_ && life:1 controller
+[/card]
+[card]
+id=2100000428
+name=Lexicon Endure 12 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE12_ && life:1 controller
+[/card]
+[card]
+id=2100000429
+name=Lexicon Endure 13 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE13_ && life:1 controller
+[/card]
+[card]
+id=2100000430
+name=Lexicon Endure 14 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE14_ && life:1 controller
+[/card]
+[card]
+id=2100000431
+name=Lexicon Endure 15 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE15_ && life:1 controller
+[/card]
+[card]
+id=2100000432
+name=Lexicon Endure 16 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE16_ && life:1 controller
+[/card]
+[card]
+id=2100000433
+name=Lexicon Endure 17 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE17_ && life:1 controller
+[/card]
+[card]
+id=2100000434
+name=Lexicon Endure 18 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE18_ && life:1 controller
+[/card]
+[card]
+id=2100000435
+name=Lexicon Endure 19 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE19_ && life:1 controller
+[/card]
+[card]
+id=2100000436
+name=Lexicon Endure 20 Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_ENDURE20_ && life:1 controller
+[/card]
+[card]
+id=2100000437
+name=Lexicon Any Color Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:_MANAOFANYCOLOR_
+[/card]
+[card]
+id=2100000438
+name=Lexicon Suspect Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto={0}:_SUSPECT_IT_
+[/card]
+[card]
+id=2100000439
+name=Lexicon Finality Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto={0}:_FINALITY_COUNTER_
+[/card]
+[card]
+id=2100000440
+name=Lexicon Flurry Macro Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=_FLURRY_life:1 controller
+[/card]
+[card]
+id=2100000441
+name=Lexicon Mobilize Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto=_MOBILIZE_(2)
+[/card]
+[card]
+id=2100000442
+name=Lexicon Basic Landcycling Macro Witness
+rarity=C
+mana={1}
+type=Instant
+autohand=__BASIC_LANDCYCLING__({0})
+[/card]
+[card]
+id=2100000443
+name=Lexicon Plot Macro Witness
+rarity=C
+mana={0}
+type=Sorcery
+auto=_PLOT_
+auto=_PLOTCAST_
+[/card]
+[card]
+id=2100000444
+name=Lexicon Echo Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto=_ECHO_({0})
+[/card]
+[card]
+id=2100000445
+name=Lexicon Recover Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto=_RECOVER_({0})
+[/card]
+[card]
+id=2100000446
+name=Lexicon Scavenge Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+autograveyard={E}:_SCAVENGE_(2)
+[/card]
+[card]
+id=2100000447
+name=Lexicon Eternalize Macro Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Cat
+power=2
+toughness=2
+autograveyard={E}:_ETERNALIZE_
+[/card]
+[card]
+id=2100000448
+name=Lexicon Eval Cost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={eval(1)}:life:1 controller
+[/card]
+[card]
+id=2100000449
+name=Lexicon Mycost Witness
+rarity=C
+mana={1}{G}
+type=Artifact
+auto={mycost}:life:1 controller
+[/card]
+[card]
+id=2100000450
+name=Lexicon Myevictcost Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=name(Imprint an instant) imprint target(instant|myhand)
+auto={myevictcost}:life:1 controller
+[/card]
+[card]
+id=2100000451
+name=Lexicon Goblin Offering Witness
+rarity=C
+other={kgoblin} name(Goblin Offering)
+otherrestriction=type(goblin|myBattlefield)~morethan~0
+abilities=offering
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=life:1 controller
+[/card]
+[card]
+id=2100000452
+name=Lexicon Fox Offering Witness
+rarity=C
+other={kfox} name(Fox Offering)
+otherrestriction=type(fox|myBattlefield)~morethan~0
+abilities=offering
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=life:1 controller
+[/card]
+[card]
+id=2100000453
+name=Lexicon Moonfolk Offering Witness
+rarity=C
+other={kmoonfolk} name(Moonfolk Offering)
+otherrestriction=type(moonfolk|myBattlefield)~morethan~0
+abilities=offering
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=life:1 controller
+[/card]
+[card]
+id=2100000454
+name=Lexicon Snake Offering Witness
+rarity=C
+other={ksnake} name(Snake Offering)
+otherrestriction=type(snake|myBattlefield)~morethan~0
+abilities=offering
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto=life:1 controller
+[/card]
+[card]
+id=2100000455
+name=Lexicon Offering Source
+rarity=C
+mana={0}
+type=Creature
+subtype=Goblin Fox Moonfolk Snake
+power=1
+toughness=1
+[/card]
+[card]
+id=2100000456
+name=Lexicon Dredgeable Target Witness
+rarity=C
+mana={0}
+type=Artifact
+autograveyard={0}:moveto(hand) target(dredgeable)
+[/card]
+[card]
+id=2100000457
+name=Lexicon Ward 1 Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto=_WARD1_
+[/card]
+[card]
+id=2100000458
+name=Lexicon Ward 2 Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto=_WARD2_
+[/card]
+[card]
+id=2100000459
+name=Lexicon Ward 3 Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto=_WARD3_
+[/card]
+[card]
+id=2100000460
+name=Lexicon Ward 4 Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto=_WARD4_
+[/card]
+[card]
+id=2100000461
+name=Lexicon Ward 8 Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto=_WARD8_
+[/card]
+[card]
+id=2100000462
+name=Lexicon Eerie Macro Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto=_EERIE_life:1 opponent
+[/card]
+[card]
+id=2100000463
+name=Lexicon Matrix Controller Target
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:damage:1 target(controller)
+[/card]
+[card]
+id=2100000464
+name=Lexicon Matrix Opponent Target
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:damage:1 target(opponent)
+[/card]
+[card]
+id=2100000465
+name=Lexicon Matrix Player Target
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:damage:1 target(player)
+[/card]
+[card]
+id=2100000466
+name=Lexicon Matrix Targeted Player Target
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:target(player) damage:1 target(targetedplayer)
+[/card]
+[card]
+id=2100000467
+name=Lexicon Matrix Ability Controller Target
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:damage:1 target(abilitycontroller)
+[/card]
+[card]
+id=2100000468
+name=Lexicon Matrix All Zone Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixall|*)
+[/card]
+[card]
+id=2100000469
+name=Lexicon Matrix Both Battlefield Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixbothbf|battlefield)
+[/card]
+[card]
+id=2100000470
+name=Lexicon Matrix Inplay Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixinplay|inplay)
+[/card]
+[card]
+id=2100000471
+name=Lexicon Matrix Graveyard Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixgrave|graveyard)
+[/card]
+[card]
+id=2100000472
+name=Lexicon Matrix Hand Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixhand|hand)
+[/card]
+[card]
+id=2100000473
+name=Lexicon Matrix Library Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixlibrary|library)
+[/card]
+[card]
+id=2100000474
+name=Lexicon Matrix Exile Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixexile|exile)
+[/card]
+[card]
+id=2100000475
+name=Lexicon Matrix Sideboard Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixside|sideboard)
+[/card]
+[card]
+id=2100000476
+name=Lexicon Matrix Command Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixcommand|commandzone)
+[/card]
+[card]
+id=2100000477
+name=Lexicon Matrix Opponent Battlefield Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixoppbf|opponentbattlefield)
+[/card]
+[card]
+id=2100000478
+name=Lexicon Matrix My Graveyard Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixmygrave|mygraveyard)
+[/card]
+[card]
+id=2100000479
+name=Lexicon Matrix Opponent Graveyard Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixoppgrave|opponentgraveyard)
+[/card]
+[card]
+id=2100000480
+name=Lexicon Matrix My Hand Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixmyhand|myhand)
+[/card]
+[card]
+id=2100000481
+name=Lexicon Matrix Opponent Hand Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixopphand|opponenthand)
+[/card]
+[card]
+id=2100000482
+name=Lexicon Matrix My Library Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixmylibrary|mylibrary)
+[/card]
+[card]
+id=2100000483
+name=Lexicon Matrix Opponent Library Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixopplibrary|opponentlibrary)
+[/card]
+[card]
+id=2100000484
+name=Lexicon Matrix My Exile Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixmyexile|myexile)
+[/card]
+[card]
+id=2100000485
+name=Lexicon Matrix Opponent Exile Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixoppexile|opponentexile)
+[/card]
+[card]
+id=2100000486
+name=Lexicon Matrix My Sideboard Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixmyside|mysideboard)
+[/card]
+[card]
+id=2100000487
+name=Lexicon Matrix Opponent Sideboard Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixoppside|opponentsideboard)
+[/card]
+[card]
+id=2100000488
+name=Lexicon Matrix My Command Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixmycommand|mycommandzone)
+[/card]
+[card]
+id=2100000489
+name=Lexicon Matrix Opponent Command Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixoppcommand|opponentcommandzone)
+[/card]
+[card]
+id=2100000490
+name=Lexicon Matrix Other Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(other creature|mybattlefield)
+[/card]
+[card]
+id=2100000491
+name=Lexicon Matrix Caret Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(exile) target(matrixcaret^artifact|mybattlefield)
+[/card]
+[card]
+id=2100000492
+name=Lexicon Matrix Other Target
+rarity=C
+mana={0}
+type=Creature
+subtype=MatrixOther
+power=1
+toughness=1
+[/card]
+[card]
+id=2100000493
+name=Lexicon Matrix Caret Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixCaret
+[/card]
+[card]
+id=2100000494
+name=Lexicon Matrix All Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixAll
+[/card]
+[card]
+id=2100000495
+name=Lexicon Matrix Battlefield Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixBothBF
+[/card]
+[card]
+id=2100000496
+name=Lexicon Matrix Inplay Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixInplay
+[/card]
+[card]
+id=2100000497
+name=Lexicon Matrix Graveyard Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixGrave
+[/card]
+[card]
+id=2100000498
+name=Lexicon Matrix Hand Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixHand
+[/card]
+[card]
+id=2100000499
+name=Lexicon Matrix Library Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixLibrary
+[/card]
+[card]
+id=2100000500
+name=Lexicon Matrix Exile Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixExile
+[/card]
+[card]
+id=2100000501
+name=Lexicon Matrix Sideboard Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixSide
+[/card]
+[card]
+id=2100000502
+name=Lexicon Matrix Command Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixCommand
+[/card]
+[card]
+id=2100000503
+name=Lexicon Matrix Opponent Battlefield Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixOppBF
+[/card]
+[card]
+id=2100000504
+name=Lexicon Matrix My Graveyard Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixMyGrave
+[/card]
+[card]
+id=2100000505
+name=Lexicon Matrix Opponent Graveyard Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixOppGrave
+[/card]
+[card]
+id=2100000506
+name=Lexicon Matrix My Hand Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixMyHand
+[/card]
+[card]
+id=2100000507
+name=Lexicon Matrix Opponent Hand Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixOppHand
+[/card]
+[card]
+id=2100000508
+name=Lexicon Matrix My Library Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixMyLibrary
+[/card]
+[card]
+id=2100000509
+name=Lexicon Matrix Opponent Library Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixOppLibrary
+[/card]
+[card]
+id=2100000510
+name=Lexicon Matrix My Exile Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixMyExile
+[/card]
+[card]
+id=2100000511
+name=Lexicon Matrix Opponent Exile Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixOppExile
+[/card]
+[card]
+id=2100000512
+name=Lexicon Matrix My Sideboard Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixMySide
+[/card]
+[card]
+id=2100000513
+name=Lexicon Matrix Opponent Sideboard Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixOppSide
+[/card]
+[card]
+id=2100000514
+name=Lexicon Matrix My Command Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixMyCommand
+[/card]
+[card]
+id=2100000515
+name=Lexicon Matrix Opponent Command Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixOppCommand
+[/card]
+[card]
+id=2100000516
+name=Lexicon My Target Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:damage:1 target(creature|opponentbattlefield) && damage:1 target(mytgt)
+[/card]
+[card]
+id=2100000517
+name=Lexicon My Forced Target Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:damage:1 target(creature|opponentbattlefield) && damage:1 target(mytgtforced)
+[/card]
+[card]
+id=2100000518
+name=Lexicon My Casting Zone Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixmycast|mycastingzone)
+[/card]
+[card]
+id=2100000519
+name=Lexicon Opponent Casting Zone Source
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:moveto(hand) target(matrixoppcast|opponentcastingzone)
+[/card]
+[card]
+id=2100000520
+name=Lexicon Any Target Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:damage:1 target(anytarget)
+[/card]
+[card]
+id=2100000521
+name=Lexicon Champion Macro Witness
+rarity=C
+mana={0}
+type=Creature
+subtype=Faerie
+power=2
+toughness=2
+auto=_CHAMPION_(creature)
+[/card]
+[card]
+id=2100000522
+name=Lexicon Splice Arcane Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=_SPLICEARCANE_
+[/card]
+[card]
+id=2100000523
+name=Lexicon Ripple Macro Witness
+rarity=C
+mana={0}
+type=Sorcery
+autostack=_RIPPLE_(1)
+[/card]
+[card]
+id=2100000524
+name=Lexicon Mutation Over Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto={0}:mutationover:1
+[/card]
+[card]
+id=2100000525
+name=Lexicon Mutation Under Witness
+rarity=C
+mana={0}
+type=Creature
+power=2
+toughness=2
+auto={0}:mutationunder:1
+[/card]
+[card]
+id=2100000526
+name=Lexicon My Casting Zone Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixMyCast
+[/card]
+[card]
+id=2100000527
+name=Lexicon Opponent Casting Zone Target
+rarity=C
+mana={0}
+type=Artifact
+subtype=MatrixOppCast
+[/card]
+[card]
+id=2100000528
+name=Lexicon Opponent Stack Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@movedTo(*|opponentstack):life:1 controller
+[/card]
+[card]
+id=2100000529
+name=Lexicon Opponent Reveal Trigger Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=@movedTo(*|opponentreveal):life:1 controller
+[/card]
+[card]
+id=2100000530
+name=Lexicon Two Dungeon Trigger Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=twodngtrg
+[/card]
+[card]
+id=2100000531
+name=Lexicon No Opponent Venture Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=nodngopp
+[/card]
+[card]
+id=2100000532
+name=Lexicon No Controller Venture Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=nodngplr
+[/card]
+[card]
+id=2100000533
+name=Lexicon Arcane Host
+rarity=C
+mana={0}
+type=Instant
+subtype=Arcane
+auto={0}:life:1 opponent
+[/card]
+[card]
+id=2100000534
+name=Lexicon Arcane Splice Card
+rarity=C
+mana={0}
+type=Instant
+subtype=Arcane
+auto={0}:life:1 opponent
+[/card]
+[card]
+id=2100000535
+name=Lexicon Double Face Death Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=doublefacedeath
+[/card]
+[card]
+id=2100000536
+name=Lexicon Gained Double Face Death Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=gaineddoublefacedeath
+[/card]
+[card]
+id=2100000537
+name=Lexicon Hiddenface Metadata Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=hiddenface
+[/card]
+[card]
+id=2100000538
+name=Lexicon Own Top Reveal Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=showfromtoplibrary
+[/card]
+[card]
+id=2100000539
+name=Lexicon Opponent Top Reveal Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=showopponenttoplibrary
+[/card]
+[card]
+id=2100000540
+name=Lexicon Commander Eligibility Witness
+rarity=C
+mana={0}
+type=Legendary Creature
+power=2
+toughness=2
+abilities=canbecommander
+[/card]
+[card]
+id=2100000541
+name=Lexicon Opponent Hand Reveal Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=showopponenthand
+[/card]
+[card]
+id=2100000542
+name=Lexicon Controller Hand Reveal Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+abilities=showcontrollerhand
+[/card]
+[card]
+id=2100000543
+name=Lexicon Conspiracy Metadata Witness
+rarity=C
+mana={0}
+type=Conspiracy
+abilities=isconspiracy
+[/card]
+[card]
+id=2100000544
+name=Lexicon Background Partner Witness
+rarity=C
+mana={0}
+type=Legendary Background
+abilities=backgroundpartner
+[/card]
+[card]
+id=2100000545
+name=Lexicon Tutorial Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:tutorial(Lexicon tutorial)
+[/card]
+[card]
+id=2100000546
+name=Lexicon Message Effect Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:message(Lexicon message)
+[/card]
+[card]
+id=2100000547
+name=Lexicon Mutation Under Guarded Witness
+rarity=C
+mana={0}
+type=Creature
+power=1
+toughness=1
+auto={0}:mutationunder:1 altermutationcounter:1 life:1 controller
+[/card]
+[card]
+id=2100000548
+name=Lexicon Text Field Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:life:1 controller
+text=Lexicon text field witness
+[/card]
+[card]
+id=2100000910
+name=Lexicon Cantattack Witness
+rarity=C
+type=Creature
+abilities=cantattack
+power=2
+toughness=2
+mana={0}
+[/card]
+[card]
+id=2100000549
+name=Lexicon CantBeSacrificed Witness
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=2
+toughness=2
+abilities=cantbesacrified
+text=Lexicon cantbesacrified witness
+[/card]
+[card]
+id=2100000550
+name=Lexicon Forced Sacrifice
+rarity=C
+mana={1}
+type=Sorcery
+auto=sacrifice notaTarget(creature|mybattlefield)
+text=Lexicon forced sacrifice witness
+[/card]
+[card]
+id=2100000970
+name=Lexicon Self Poison Effect Witness A15
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={0}:alterpoison:2 controller
+[/card]
+[card]
+id=2100000971
+name=Lexicon Opp G Creature Exiler Witness A15
+rarity=C
+mana={1}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+abilities=oppgcreatureexiler
+[/card]
+[card]
+id=2100000972
+name=Lexicon Emerge Witness A15
+rarity=C
+mana={8}
+other={emerge}{6}{B} name(Emerge)
+otherrestriction=type(creature|myBattlefield)~morethan~0
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+[/card]
+[card]
+id=2100000974
+name=Lexicon Minus Counter Witness A15
+rarity=C
+mana={0}
+type=Creature
+subtype=Construct
+power=1
+toughness=1
+auto={T}:counter(-1/-1) target(creature)
+[/card]
+[card]
+id=2100000930
+name=Lexicon Nonbasic Blue Land Witness
+rarity=C
+type=Land
+auto={T}:add{U}
+[/card]
+[card]
+id=2100000931
+name=Lexicon Battle Witness
+rarity=C
+mana={0}
+type=Battle
+auto=counter(0/0.1.Defense)
+[/card]
+[card]
+id=2100000932
+name=Lexicon Defense Remover Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:counter(0/0.-1.Defense) target(*[battle]|battlefield)
+[/card]
+[card]
+id=2100000610
+name=Lexicon Draw Helper Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:draw:1 controller
+text=Lexicon draw helper witness
+[/card]
+[card]
+id=2100000611
+name=Lexicon Room Enchantment Witness
+rarity=C
+mana={2}{U}
+type=Enchantment Room
+text=Lexicon room enchantment witness
 [/card]

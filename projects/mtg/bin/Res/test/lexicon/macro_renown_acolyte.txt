@@ -1,0 +1,26 @@
+# Acolyte of the Inferno (3/1, Renown 1) becomes renowned after the first
+# unblocked hit; on its next turn's combat the +1/+1 counter makes it a 4/2,
+# so the two combats deal 3 then 4 (P2: 20 -> 13). The opponent's turn is
+# crossed by a goto attackers / goto secondmain / goto attackers cycle.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Acolyte of the Inferno
+[PLAYER2]
+life:20
+[DO]
+goto attackers
+Acolyte of the Inferno
+goto secondmain
+goto attackers
+goto secondmain
+goto attackers
+Acolyte of the Inferno
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Acolyte of the Inferno
+[PLAYER2]
+life:13
+[END]

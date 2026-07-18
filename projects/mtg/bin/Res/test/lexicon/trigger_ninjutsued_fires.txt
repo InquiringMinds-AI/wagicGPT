@@ -1,0 +1,33 @@
+# @ninjutsued fires when a Ninja uses the ninjutsu cost. A vanilla ninja
+# (no combat-damage draw) and an empty library keep the outcome deterministic.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+hand:Ninja of the New Moon
+inplay:Raging Goblin,Swamp,Island,Mountain,Forest,Lexicon Ninjutsued Trigger Witness
+[PLAYER2]
+life:20
+[DO]
+Raging Goblin
+next
+next
+no
+yes
+Swamp
+Island
+Mountain
+Forest
+Ninja of the New Moon
+Raging Goblin
+choice 0
+endinterruption
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Ninja of the New Moon,Swamp,Island,Mountain,Forest,Lexicon Ninjutsued Trigger Witness
+hand:Raging Goblin
+life:21
+[PLAYER2]
+life:14
+[END]

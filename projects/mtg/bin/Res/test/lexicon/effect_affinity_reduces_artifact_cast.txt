@@ -1,0 +1,19 @@
+# affinity reduces the affinity card's OWN cost by one generic per matching
+# artifact on the battlefield. The witness costs {2}; with one artifact
+# (Millstone) already in play, its cost drops to {1}, so a {1} pool casts it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Millstone
+hand:Lexicon Affinity Effect Witness
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Affinity Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Millstone,Lexicon Affinity Effect Witness
+manapool:{0}
+[PLAYER2]
+[END]

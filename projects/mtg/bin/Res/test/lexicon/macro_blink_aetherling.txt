@@ -1,0 +1,18 @@
+# Aetherling uses _BLINK_UEOT_. Activating it exiles the source and returns it
+# under its owner's control at the next end step.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Aetherling
+manapool:{U}
+[PLAYER2]
+[DO]
+Aetherling
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Aetherling
+manapool:{0}
+[PLAYER2]
+[END]

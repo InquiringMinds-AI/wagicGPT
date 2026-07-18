@@ -1,0 +1,19 @@
+# Manifest Dread puts one of two revealed cards face down and the other into
+# the graveyard; both zones make the branch observable in the assertion.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Manifest Dread
+library:Forest,Island
+manapool:{1}{G}
+[PLAYER2]
+[DO]
+Manifest Dread
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:*
+inplay:*
+[PLAYER2]
+[END]

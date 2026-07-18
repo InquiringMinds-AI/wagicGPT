@@ -1,0 +1,24 @@
+# boast is available only after the creature attacks and changes its state.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Axgard Braggart
+manapool:{1}{W}
+[PLAYER2]
+life:20
+[DO]
+goto attackers
+Axgard Braggart
+goto secondmain
+Axgard Braggart
+choice 0
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Axgard Braggart
+tappedinplay:1
+manapool:{0}
+[PLAYER2]
+life:17
+[END]

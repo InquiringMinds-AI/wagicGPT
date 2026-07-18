@@ -1,0 +1,15 @@
+# @dierolled fires when the source rolls a die.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Die Trigger Any Witness
+[PLAYER2]
+[DO]
+Lexicon Die Trigger Any Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Die Trigger Any Witness
+life:21
+[PLAYER2]
+[END]

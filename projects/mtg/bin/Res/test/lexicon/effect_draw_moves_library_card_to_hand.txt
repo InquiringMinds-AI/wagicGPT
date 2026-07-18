@@ -1,0 +1,16 @@
+# draw:N moves cards from the controller's library to hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Draw Effect Witness
+library:Forest
+[PLAYER2]
+[DO]
+Lexicon Draw Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Draw Effect Witness
+hand:Forest
+[PLAYER2]
+[END]

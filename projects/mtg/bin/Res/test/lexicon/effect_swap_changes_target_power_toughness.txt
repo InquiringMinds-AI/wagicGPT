@@ -1,0 +1,23 @@
+# swap changes a 4/1 target into a 1/4 target, which survives Shock.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Swap Witness
+hand:Shock
+manapool:{R}
+[PLAYER2]
+inplay:Lexicon Swap Target Witness
+[DO]
+Lexicon Swap Witness
+Lexicon Swap Target Witness
+Shock
+Lexicon Swap Target Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Swap Witness
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+inplay:Lexicon Swap Target Witness
+[END]

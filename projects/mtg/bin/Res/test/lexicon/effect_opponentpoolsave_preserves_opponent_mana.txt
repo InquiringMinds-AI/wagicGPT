@@ -1,0 +1,16 @@
+# opponentpoolsave keeps the opponent's green mana across a phase change.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opponent Pool Save Witness
+[PLAYER2]
+manapool:{G}
+[DO]
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Opponent Pool Save Witness
+[PLAYER2]
+manapool:{G}
+[END]

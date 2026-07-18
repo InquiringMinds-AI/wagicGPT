@@ -1,21 +1,22 @@
+# nonbasiclandwalk makes a creature unblockable while the defending player controls a nonbasic land.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:dryad sophisticate
+inplay:Lexicon Nonbasiclandwalk Witness
 [PLAYER2]
-inplay:underground sea,grizzly bears
+inplay:Temple of the False God,Grizzly Bears
 life:20
 [DO]
-dryad sophisticate
+Lexicon Nonbasiclandwalk Witness
 next
-grizzly bears
+Grizzly Bears
 next
 next
 [ASSERT]
 COMBATEND
 [PLAYER1]
-inplay:dryad sophisticate
+inplay:Lexicon Nonbasiclandwalk Witness
 [PLAYER2]
-inplay:underground sea,grizzly bears
+inplay:Temple of the False God,Grizzly Bears
 life:18
 [END]

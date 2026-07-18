@@ -1,0 +1,26 @@
+# oppgcreatureexiler: an opponent's creature is exiled instead of going to their
+# graveyard when it would die. Real "Anafenza, the Foremost" has a card-data defect
+# that stops its oppgcreatureexiler bit from firing (its byte-identical clone and a
+# bare synthetic witness both exile correctly), so this keyword test uses a clean
+# synthetic witness. Wrecking Ball destroys PLAYER2's Grizzly Bears -> exile.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opp G Creature Exiler Witness A15
+hand:Wrecking Ball
+manapool:{2}{B}{R}
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Wrecking Ball
+Grizzly Bears
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Opp G Creature Exiler Witness A15
+graveyard:Wrecking Ball
+manapool:{0}
+[PLAYER2]
+exile:Grizzly Bears
+[END]

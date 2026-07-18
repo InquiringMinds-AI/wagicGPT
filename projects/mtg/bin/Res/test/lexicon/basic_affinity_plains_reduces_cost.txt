@@ -1,0 +1,18 @@
+# affinityplains reduces an artifact's generic cost for each Plains controlled.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Plains,Plains
+hand:Lexicon Affinity Plains Witness
+manapool:{0}
+[PLAYER2]
+[DO]
+Lexicon Affinity Plains Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Plains,Plains,Lexicon Affinity Plains Witness
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

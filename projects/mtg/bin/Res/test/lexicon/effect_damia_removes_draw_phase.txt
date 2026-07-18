@@ -1,0 +1,17 @@
+# phasealter(remove,draw,controller) removes the controller's draw phase, so
+# the untouched library card is never drawn and the draw step is skipped.
+[INIT]
+UPKEEP
+[PLAYER1]
+inplay:Dragon Appeasement
+library:Grizzly Bears
+[PLAYER2]
+[DO]
+next
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Dragon Appeasement
+library:Grizzly Bears
+[PLAYER2]
+[END]

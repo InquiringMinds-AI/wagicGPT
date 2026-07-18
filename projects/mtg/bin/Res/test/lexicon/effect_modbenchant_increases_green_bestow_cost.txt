@@ -1,0 +1,22 @@
+# modbenchant(green:1) on the controller increases the green portion of that
+# player's bestow costs by one. Leafcrown Dryad's bestow cost {3}{G} becomes
+# {3}{G}{G}, so a {3}{G}{G} pool exactly pays to bestow it onto Grizzly Bears.
+# (choice 1 selects the bestow cast mode from the click menu.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Modbenchant Effect Witness,Grizzly Bears
+hand:Leafcrown Dryad
+manapool:{3}{G}{G}
+[PLAYER2]
+[DO]
+Leafcrown Dryad
+choice 1
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Modbenchant Effect Witness,Grizzly Bears,Leafcrown Dryad
+manapool:{0}
+[PLAYER2]
+[END]

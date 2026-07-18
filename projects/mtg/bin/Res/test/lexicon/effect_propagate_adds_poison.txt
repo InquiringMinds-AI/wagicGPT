@@ -1,0 +1,23 @@
+# propagate (the all-counter proliferate variant) adds one more poison counter to a
+# player who already has poison. The synthetic witness's activated propagate cannot
+# drive the propagation chooser in the headless suite, so use a real card whose ETB
+# runs `target(propagation) propagate` (Maulfist Revolutionary). The `p2` click
+# selects PLAYER2 (covers both the propagate effect and the propagation chooser row).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Maulfist Revolutionary
+manapool:{1}{G}{G}
+[PLAYER2]
+poisoncount:1
+[DO]
+Maulfist Revolutionary
+p2
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Maulfist Revolutionary
+[PLAYER2]
+poisoncount:2
+[END]

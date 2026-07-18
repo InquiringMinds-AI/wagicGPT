@@ -1,0 +1,25 @@
+# canblocktapped allows a tapped creature to be selected as a blocker.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Can Block Tapped Witness
+[PLAYER2]
+inplay:Raging Goblin
+[DO]
+Lexicon Can Block Tapped Witness
+goto end
+goto firstmain
+goto attackers
+Raging Goblin
+goto blockers
+Lexicon Can Block Tapped Witness
+goto combatdamage
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Can Block Tapped Witness
+tappedinplay:1
+[PLAYER2]
+graveyard:Raging Goblin
+[END]

@@ -1,0 +1,15 @@
+# out{G} is an observable mana-producing effect.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Out Mana Witness
+[PLAYER2]
+[DO]
+Lexicon Out Mana Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Out Mana Witness
+manapool:{G}
+[PLAYER2]
+[END]

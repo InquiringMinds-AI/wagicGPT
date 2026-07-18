@@ -1,0 +1,16 @@
+# sourcecard selects the source card through the all-zones source chooser; the
+# ability needs a target-selection click on the source after activation.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Source Card Target Witness
+[PLAYER2]
+[DO]
+Lexicon Source Card Target Witness
+Lexicon Source Card Target Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+exile:Lexicon Source Card Target Witness
+[PLAYER2]
+[END]

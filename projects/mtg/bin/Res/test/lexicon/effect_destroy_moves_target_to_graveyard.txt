@@ -1,0 +1,17 @@
+# destroy moves the targeted creature to its graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Destroy Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Lexicon Destroy Effect Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Destroy Effect Witness
+[PLAYER2]
+graveyard:Grizzly Bears
+[END]

@@ -1,0 +1,15 @@
+# @lifelostof fires for life lost by the source's controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifelostof Trigger Witness,Lexicon Controller Life Loss Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Controller Life Loss Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifelostof Trigger Witness,Lexicon Controller Life Loss Effect Witness
+life:20
+[PLAYER2]
+[END]

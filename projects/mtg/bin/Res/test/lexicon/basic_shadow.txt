@@ -1,0 +1,23 @@
+# Shadow creatures can be blocked only by creatures with shadow.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Dauthi Horror
+[PLAYER2]
+inplay:grizzly bears
+life:20
+[DO]
+Dauthi Horror
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Dauthi Horror
+tappedinplay:1
+[PLAYER2]
+inplay:grizzly bears
+life:18
+[END]

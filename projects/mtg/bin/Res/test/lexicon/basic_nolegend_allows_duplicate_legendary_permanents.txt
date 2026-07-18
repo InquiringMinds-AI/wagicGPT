@@ -1,0 +1,19 @@
+# nolegend prevents the legend rule from moving a duplicate to the graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon NoLegend Witness
+hand:Lexicon NoLegend Witness
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon NoLegend Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon NoLegend Witness,Lexicon NoLegend Witness
+hand:
+graveyard:
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,19 @@
+# Parallel Lives' tokenizer ability doubles the two Goblins from Dragon Fodder.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Parallel Lives
+hand:Dragon Fodder
+manapool:{1}{R}
+[PLAYER2]
+[DO]
+Dragon Fodder
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Parallel Lives,*,*,*,*
+graveyard:Dragon Fodder
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,23 @@
+# alteryidarocount raises the controller's accumulated Yidaro cycling count.
+# Yidaro, Wandering Monster itself cannot appear in a comma-separated zone
+# list, so a comma-less sensor witness reads the count back: its activated
+# life gain only fires once the count reaches three, proving the three
+# increments landed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Alter Yidaro Effect Witness,Lexicon Yidaro Count Sensor Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Alter Yidaro Effect Witness
+Lexicon Alter Yidaro Effect Witness
+Lexicon Alter Yidaro Effect Witness
+Lexicon Yidaro Count Sensor Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Alter Yidaro Effect Witness,Lexicon Yidaro Count Sensor Witness
+life:21
+[PLAYER2]
+[END]

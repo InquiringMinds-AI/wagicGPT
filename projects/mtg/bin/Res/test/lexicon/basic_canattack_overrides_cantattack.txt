@@ -1,0 +1,23 @@
+# canattack overrides the defender restriction (per the engine, canAttack()
+# in MTGCardInstance.cpp:862 - CANATTACK only cancels DEFENSER, not the
+# CANTATTACK basic ability). The witness has defender + canattack, so it can
+# attack and deal 2 damage.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Can Attack Override Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon Can Attack Override Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Can Attack Override Witness
+tappedinplay:1
+[PLAYER2]
+life:18
+[END]

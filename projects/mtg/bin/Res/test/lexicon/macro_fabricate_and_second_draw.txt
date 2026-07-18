@@ -1,0 +1,23 @@
+# Fabricate's parameter is exercised through its token branch. The second-draw
+# trigger is exercised by drawing two cards in the same turn via a helper.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Fabricate Macro Witness,Lexicon Second Draw Macro Witness,Lexicon Draw Helper Witness
+library:Forest,Island,Mountain
+life:20
+[PLAYER2]
+[DO]
+Lexicon Fabricate Macro Witness
+choice 1
+Lexicon Draw Helper Witness
+Lexicon Draw Helper Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Fabricate Macro Witness,Lexicon Second Draw Macro Witness,Lexicon Draw Helper Witness,*,*
+hand:Mountain,Island
+library:Forest
+life:22
+[PLAYER2]
+[END]

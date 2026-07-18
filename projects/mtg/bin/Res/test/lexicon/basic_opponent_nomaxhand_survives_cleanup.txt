@@ -1,0 +1,28 @@
+# oppnomaxhand prevents the opponent's hand from being discarded at cleanup.
+# The discard-to-max-hand check only runs at the ACTIVE player's cleanup, so the
+# scenario crosses into PLAYER2's turn (draws 1) and back to PLAYER1's upkeep; by
+# then PLAYER2 has passed its own cleanup holding 9 cards (no trim to 7).
+# NOTE: PLAYER2 must control a permanent — the engine clears nomaxhandsize when a
+# player's own battlefield is empty (GameObserver.cpp:1151), so give it a land.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opponent No Max Hand Witness
+[PLAYER2]
+inplay:Forest
+hand:Grizzly Bears,Hill Giant,Forest,Island,Swamp,Mountain,Plains,Shock
+library:Forest,Forest,Forest,Forest,Forest
+[DO]
+goto end
+goto upkeep
+goto end
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Lexicon Opponent No Max Hand Witness
+[PLAYER2]
+inplay:Forest
+hand:Grizzly Bears,Hill Giant,Forest,Island,Swamp,Mountain,Plains,Shock,Forest
+library:Forest,Forest,Forest,Forest
+[END]

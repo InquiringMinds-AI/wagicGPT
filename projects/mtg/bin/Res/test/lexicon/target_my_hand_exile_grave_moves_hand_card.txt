@@ -1,0 +1,18 @@
+# myhandexilegrave includes a card in the controller's hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Hand Exile Grave Target Witness
+hand:Lexicon Synthetic Vanilla
+[PLAYER2]
+[DO]
+Lexicon My Hand Exile Grave Target Witness
+Lexicon Synthetic Vanilla
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Hand Exile Grave Target Witness
+exile:Lexicon Synthetic Vanilla
+hand:
+[PLAYER2]
+[END]

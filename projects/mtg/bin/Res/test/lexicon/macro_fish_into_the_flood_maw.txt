@@ -1,0 +1,25 @@
+# Into the Flood Maw uses _FISHTOKEN_ when its optional gift is paid: with the
+# gift promised (choice 0), the opponent should get a tapped 1/1 Fish token and
+# the targeted creature is returned to hand ({U} exactly funds the {U} cast).
+# ENGINE-BLOCKED (gift-alternative-null): the card's "alternative ... and!()!"
+# gift and "ifnot paid(alternative)" lines all parse to NULL, so the Fish token
+# is never created (the bounce still resolves).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Into the Flood Maw
+manapool:{U}
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Into the Flood Maw
+choice 0
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Into the Flood Maw
+[PLAYER2]
+hand:Grizzly Bears
+inplay:*
+[END]

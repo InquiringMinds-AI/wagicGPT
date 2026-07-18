@@ -1,0 +1,26 @@
+# cantbesacrified means the creature can't be sacrificed. A forced "sacrifice a
+# creature" effect (Lexicon Forced Sacrifice, copying Fleshbag Marauder's
+# `sacrifice notaTarget(creature|mybattlefield)` form) resolves against the
+# controller. Clicking the protected witness does NOT sacrifice it -- it stays
+# on the battlefield. (The same effect DOES sacrifice a vanilla Grizzly Bears
+# when clicked, verified separately, so this is not a no-op.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon CantBeSacrificed Witness
+hand:Lexicon Forced Sacrifice
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Forced Sacrifice
+Lexicon CantBeSacrificed Witness
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon CantBeSacrificed Witness
+graveyard:Lexicon Forced Sacrifice
+manapool:{0}
+[PLAYER2]
+[END]

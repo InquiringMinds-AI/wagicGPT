@@ -1,0 +1,22 @@
+# snowplainslandwalk makes a creature unblockable while the defending player controls a Snow-Covered Plains.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Snowplainslandwalk Witness
+[PLAYER2]
+inplay:Snow-Covered Plains,Grizzly Bears
+life:20
+[DO]
+Lexicon Snowplainslandwalk Witness
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Snowplainslandwalk Witness
+[PLAYER2]
+inplay:Snow-Covered Plains,Grizzly Bears
+life:18
+[END]

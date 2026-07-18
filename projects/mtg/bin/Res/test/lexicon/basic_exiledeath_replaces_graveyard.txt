@@ -1,0 +1,24 @@
+# Restock's exiledeath keyword exiles the spell after it resolves instead of
+# putting it into the graveyard. Restock targets TWO cards in the graveyard
+# (target=<2>*|mygraveyard), so two cards are seeded; both return to hand and
+# Restock itself is exiled.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Forest,Island
+hand:Restock
+manapool:{3}{G}{G}
+[PLAYER2]
+[DO]
+Restock
+Forest
+Island
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Forest,Island
+exile:Restock
+manapool:{0}
+[PLAYER2]
+[END]

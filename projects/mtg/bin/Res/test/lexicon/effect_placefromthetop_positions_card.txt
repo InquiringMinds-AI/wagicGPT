@@ -1,0 +1,20 @@
+# placefromthetop(2) moves a selected graveyard card to the second library
+# position, leaving the existing top card above it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Place From Top Witness
+graveyard:Grizzly Bears
+library:Hill Giant
+[PLAYER2]
+[DO]
+Lexicon Place From Top Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Place From Top Witness
+graveyard:
+library:Hill Giant,Grizzly Bears
+[PLAYER2]
+[END]

@@ -1,0 +1,25 @@
+# Flurry watches the second spell of the turn (controller gains 1 life);
+# Mobilize creates two battleready Warrior tokens as its source attacks, and
+# the haste tokens attack alongside it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Flurry Macro Witness,Lexicon Mobilize Macro Witness
+hand:Lexicon Historic Cast Card,Lexicon Synthetic Vanilla
+manapool:{1}
+[PLAYER2]
+life:20
+[DO]
+Lexicon Historic Cast Card
+Lexicon Synthetic Vanilla
+goto attackers
+Lexicon Mobilize Macro Witness
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Lexicon Flurry Macro Witness,Lexicon Mobilize Macro Witness,Lexicon Historic Cast Card,Lexicon Synthetic Vanilla,*,*
+life:21
+[PLAYER2]
+life:16
+[END]

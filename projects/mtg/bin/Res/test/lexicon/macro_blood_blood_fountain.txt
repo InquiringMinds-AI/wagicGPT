@@ -1,0 +1,16 @@
+# Blood Fountain uses _BLOOD_ when it enters the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Blood Fountain
+manapool:{B}
+[PLAYER2]
+[DO]
+Blood Fountain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Blood Fountain,*
+manapool:{0}
+[PLAYER2]
+[END]

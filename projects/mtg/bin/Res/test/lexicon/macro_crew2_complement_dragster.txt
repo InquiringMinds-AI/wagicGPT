@@ -1,0 +1,27 @@
+# Daredevil Dragster uses _CREW2COMPLEMENT_, which pays Crew 2 with TWO separate
+# creatures of power at least 1. The Dragster carries both _CREW2_ and
+# _CREW2COMPLEMENT_, so choice 1 picks the two-creature crew mode; the crewers
+# must have distinct names so each click taps a different creature. Both crewers
+# tap plus the attacking 4/4 Dragster = three tapped; it deals four damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Daredevil Dragster,Runeclaw Bear,Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+Daredevil Dragster
+choice 1
+Runeclaw Bear
+Grizzly Bears
+goto attackers
+Daredevil Dragster
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Daredevil Dragster,Runeclaw Bear,Grizzly Bears
+tappedinplay:3
+[PLAYER2]
+life:16
+[END]

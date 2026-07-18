@@ -1,0 +1,23 @@
+# attach uses its unrestricted equipment path to attach the witness to a Bear.
+# The attached +1/+1 is observed when the Bear attacks for three damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Attach Effect Witness,Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+Lexicon Attach Effect Witness
+Grizzly Bears
+goto attackers
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Attach Effect Witness,Grizzly Bears
+[PLAYER2]
+life:17
+[END]

@@ -1,0 +1,17 @@
+# count stores the number of matching creatures for a later effect.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Count Behavior Witness,Grizzly Bears,Grizzly Bears
+library:Forest,Island,Mountain
+[PLAYER2]
+[DO]
+Lexicon Count Behavior Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Count Behavior Witness,Grizzly Bears,Grizzly Bears
+hand:Island,Mountain
+library:Forest
+[PLAYER2]
+[END]

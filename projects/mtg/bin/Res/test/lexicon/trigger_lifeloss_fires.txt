@@ -1,0 +1,15 @@
+# @lifeloss fires for life lost by a player.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifeloss Trigger Witness,Lexicon Controller Life Loss Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Controller Life Loss Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifeloss Trigger Witness,Lexicon Controller Life Loss Effect Witness
+life:20
+[PLAYER2]
+[END]

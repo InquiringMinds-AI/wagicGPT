@@ -1,0 +1,22 @@
+# mustblock forces the creature to block an attacker when able.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Grizzly Bears
+[PLAYER2]
+inplay:Lexicon Mustblock Witness
+life:20
+[DO]
+Grizzly Bears
+next
+Lexicon Mustblock Witness
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:Grizzly Bears
+[PLAYER2]
+graveyard:Lexicon Mustblock Witness
+life:20
+[END]

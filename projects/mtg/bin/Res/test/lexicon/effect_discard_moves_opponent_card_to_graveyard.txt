@@ -1,0 +1,16 @@
+# discard:N moves the opponent's discarded card to that player's graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Discard Effect Witness
+[PLAYER2]
+hand:Forest
+[DO]
+Lexicon Discard Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Discard Effect Witness
+[PLAYER2]
+graveyard:Forest
+[END]

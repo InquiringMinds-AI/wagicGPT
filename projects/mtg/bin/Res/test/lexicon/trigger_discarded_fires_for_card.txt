@@ -1,0 +1,20 @@
+# @discarded(this|hand) fires when the card leaves hand as a discard. The
+# engine fires a card's own discard trigger through the cycling path (its only
+# real precedent is Complicate), so the witness cycles to discard itself.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Discarded Trigger Witness
+library:Grizzly Bears
+life:20
+[PLAYER2]
+[DO]
+Lexicon Discarded Trigger Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Discarded Trigger Witness
+hand:Grizzly Bears
+life:21
+[PLAYER2]
+[END]

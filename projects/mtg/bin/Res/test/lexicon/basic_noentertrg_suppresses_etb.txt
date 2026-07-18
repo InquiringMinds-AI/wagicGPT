@@ -1,0 +1,19 @@
+# noentertrg suppresses enter-the-battlefield triggers while Hushbringer is in play.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hushbringer
+hand:Venerable Monk
+manapool:{2}{W}
+life:20
+[PLAYER2]
+[DO]
+Venerable Monk
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hushbringer,Venerable Monk
+life:20
+manapool:{0}
+[PLAYER2]
+[END]

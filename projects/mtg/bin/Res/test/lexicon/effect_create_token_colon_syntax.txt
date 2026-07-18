@@ -1,0 +1,19 @@
+# Advent of the Wurm uses create(NAME:TYPES:P/T:...) rather than token(...); the
+# resolved Instant leaves one Wurm token on the battlefield and goes to the
+# graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Advent of the Wurm
+manapool:{1}{G}{G}{W}
+[PLAYER2]
+[DO]
+Advent of the Wurm
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:*
+graveyard:Advent of the Wurm
+manapool:{0}
+[PLAYER2]
+[END]

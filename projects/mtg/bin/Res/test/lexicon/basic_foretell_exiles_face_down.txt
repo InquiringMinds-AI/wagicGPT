@@ -1,0 +1,18 @@
+# foretell pays its hand ability and moves the card to exile face down.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Doomskar
+manapool:{2}
+[PLAYER2]
+[DO]
+Doomskar
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:
+exile:Doomskar
+manapool:{0}
+[PLAYER2]
+[END]

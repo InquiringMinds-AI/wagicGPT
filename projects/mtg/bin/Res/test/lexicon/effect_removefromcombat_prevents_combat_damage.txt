@@ -1,0 +1,20 @@
+# removefromcombat removes an attacking creature before combat damage, so the
+# defender takes none; the removed attacker collapses combat to its end.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Remove From Combat Effect Witness,Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+Grizzly Bears
+Lexicon Remove From Combat Effect Witness
+Grizzly Bears
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Remove From Combat Effect Witness,Grizzly Bears
+[PLAYER2]
+life:20
+[END]

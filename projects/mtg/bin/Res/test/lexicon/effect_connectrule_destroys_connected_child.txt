@@ -1,0 +1,22 @@
+# connect associates the witness with Grizzly Bears, and connectrule sends
+# the child to the graveyard when its battlefield parent dies.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Connectrule Effect Witness,Lexicon Connect Effect Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Connect Effect Witness
+Grizzly Bears
+Shock
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Connectrule Effect Witness
+graveyard:Lexicon Connect Effect Witness,Grizzly Bears,Shock
+manapool:{0}
+[PLAYER2]
+[END]

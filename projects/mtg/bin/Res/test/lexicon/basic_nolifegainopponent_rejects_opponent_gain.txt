@@ -1,0 +1,34 @@
+# nolifegainopponent: the controller's OPPONENTS can't gain life. The active
+# player casts Healing Salve's life-gain mode on itself while the opponent
+# controls Grima Wormtongue (which carries only nolifegainopponent); the gain
+# must be denied, so the active player's life stays 10.
+# (Carrier is Grima Wormtongue rather than "Erebos, God of the Dead" because a
+# comma-carrying name cannot appear in a comma-parsed zone list.)
+#
+# ENGINE-BLOCKED: the fixture is well-formed and the active player casts the
+# gain, but the opponent-scoped denial does not fire - the caster still gains
+# (life 10 -> 13). Sibling nolifegain (controller-scoped) works, so the fault
+# is specific to nolifegainopponent not applying to opponents' life-gain events.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Healing Salve
+manapool:{W}
+life:10
+[PLAYER2]
+inplay:Grima Wormtongue
+life:20
+[DO]
+Healing Salve
+choice 0
+p1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Healing Salve
+manapool:{0}
+life:10
+[PLAYER2]
+inplay:Grima Wormtongue
+life:20
+[END]

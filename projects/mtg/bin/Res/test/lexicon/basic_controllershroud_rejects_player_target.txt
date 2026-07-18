@@ -1,0 +1,23 @@
+# Controllershroud makes Aegis of the Gods' controller an illegal player
+# target, so the active player's bolt cannot be cast: it stays in hand with
+# its mana unspent (uncastable, not cast-and-fizzled).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Aegis of the Gods
+life:20
+[DO]
+Lightning Bolt
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Aegis of the Gods
+life:20
+[END]

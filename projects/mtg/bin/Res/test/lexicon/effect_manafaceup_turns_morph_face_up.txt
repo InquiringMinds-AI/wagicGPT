@@ -1,0 +1,35 @@
+# manafaceup turns a morphed creature face up. Exalted Angel is cast face down
+# as a 2/2 Morph, then manafaceup turns it face up, restoring its 4/5 body and
+# spiritlink. A freshly-cast creature is summoning sick, so its face-up
+# characteristics are exercised through a fight (Prey Upon) instead of an
+# attack: the 4/5 Angel deals four to Hill Giant (killing the 3/3) and
+# survives its three, and spiritlink gains its controller four life (20 -> 24).
+# A still-face-down 2/2 would instead die to Hill Giant and gain no life.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Manafaceup Effect Witness
+hand:Exalted Angel,Prey Upon
+manapool:{3}{G}
+life:20
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Exalted Angel
+choice 1
+Lexicon Manafaceup Effect Witness
+Exalted Angel
+Prey Upon
+Exalted Angel
+Hill Giant
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Manafaceup Effect Witness,Exalted Angel
+graveyard:Prey Upon
+life:24
+[PLAYER2]
+graveyard:Hill Giant
+[END]

@@ -1,0 +1,16 @@
+# sacrifice moves a controller-controlled creature to its graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Sacrifice Effect Witness,Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon Sacrifice Effect Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Sacrifice Effect Witness
+graveyard:Grizzly Bears
+[PLAYER2]
+[END]

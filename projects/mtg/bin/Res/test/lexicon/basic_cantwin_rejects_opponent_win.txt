@@ -1,0 +1,21 @@
+# Platinum Angel keeps its opponent from winning: the active player casts an
+# explicit win-the-game effect on itself while its opponent controls Platinum
+# Angel, so the win is denied and the game does not end.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Win Game Witness
+[PLAYER2]
+inplay:Platinum Angel
+[DO]
+Lexicon Win Game Witness
+p1
+goto firstmain
+[ASSERT]
+gameover:none
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Win Game Witness
+[PLAYER2]
+inplay:Platinum Angel
+[END]

@@ -1,0 +1,25 @@
+# affinitytwoalldeadcreatures applies a two-mana reduction for each creature
+# that died this turn. Pyroclasm kills two 1/1s, so {5} is reduced by 4 to {1}.
+# Funding exactly {2}{R} (Pyroclasm {1}{R} + reduced witness {1}) and observing
+# the cast proves the two-per-death reduction counted both deaths.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Pyroclasm,Lexicon Affinity Two Dead Creatures Witness
+manapool:{2}{R}
+[PLAYER2]
+inplay:Lexicon Party Cleric,Lexicon Party Rogue
+[DO]
+Pyroclasm
+no
+Lexicon Affinity Two Dead Creatures Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Affinity Two Dead Creatures Witness
+graveyard:Pyroclasm
+hand:
+manapool:{0}
+[PLAYER2]
+graveyard:Lexicon Party Cleric,Lexicon Party Rogue
+[END]

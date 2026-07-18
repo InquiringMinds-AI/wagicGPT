@@ -1,0 +1,24 @@
+# Platinum Angel's cantlose ability keeps the game state alive after its
+# controller is reduced below zero life. The active player casts the bolt.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Platinum Angel
+life:1
+[DO]
+Lightning Bolt
+p2
+goto firstmain
+[ASSERT]
+gameover:none
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lightning Bolt
+manapool:{0}
+[PLAYER2]
+inplay:Platinum Angel
+life:-2
+[END]

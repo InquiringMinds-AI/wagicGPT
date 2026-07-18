@@ -1,0 +1,18 @@
+# Bartered Cow uses _FOOD_ when it dies. Wrath of God supplies a gameplay
+# death event and the resulting Food token stays on the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Bartered Cow,Wrath of God
+manapool:{2}{W}{W}{3}{W}
+[PLAYER2]
+[DO]
+Bartered Cow
+Wrath of God
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Bartered Cow,Wrath of God
+inplay:*
+[PLAYER2]
+[END]

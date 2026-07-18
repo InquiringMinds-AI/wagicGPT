@@ -1,0 +1,17 @@
+# damage:N deals the requested damage to the selected player.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Damage Effect Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon Damage Effect Witness
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Damage Effect Witness
+[PLAYER2]
+life:18
+[END]

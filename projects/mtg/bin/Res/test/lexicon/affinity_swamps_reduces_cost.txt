@@ -1,0 +1,17 @@
+# affinityswamps reduces Dross Golem by one per Swamp controlled.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Swamp,Swamp,Swamp,Swamp
+hand:Dross Golem
+manapool:{1}
+[PLAYER2]
+[DO]
+Dross Golem
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Swamp,Swamp,Swamp,Swamp,Dross Golem
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,20 @@
+# A creature with cantattack cannot be declared as an attacker, so clicking it
+# during the declare-attackers step leaves it home and the opponent takes no
+# combat damage.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Cantattack Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon Cantattack Witness
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Lexicon Cantattack Witness
+[PLAYER2]
+life:20
+[END]

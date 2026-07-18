@@ -1,0 +1,21 @@
+# poisontoxic adds exactly one poison counter.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Toxic One Witness
+[PLAYER2]
+life:20
+poisoncount:0
+[DO]
+Lexicon Toxic One Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Toxic One Witness
+[PLAYER2]
+life:19
+poisoncount:1
+[END]

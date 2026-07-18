@@ -1,0 +1,16 @@
+# canplayfromexile permits the permanent itself to be cast from exile.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+exile:Lexicon Exile Casting Witness
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Exile Casting Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Exile Casting Witness
+manapool:{0}
+[PLAYER2]
+[END]

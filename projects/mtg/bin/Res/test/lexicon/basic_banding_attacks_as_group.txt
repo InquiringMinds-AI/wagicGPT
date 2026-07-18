@@ -1,0 +1,39 @@
+# A banding attacker (the 1/1 witness) and a non-banding attacker (2/2 Grizzly
+# Bears) attack as one band. A single blocker (Hill Giant, 3/3) blocking the
+# band should engage the whole band: both band members deal their damage to
+# Hill Giant (1+2 = 3, killing it), no attacker reaches the player (life 20),
+# and the attacking player assigns Hill Giant's 3 damage across the band
+# (killing both 1/1 and 2/2). The block is declared in the BLOCKERS step
+# (blocker then the attacker it blocks).
+#
+# ENGINE-BLOCKED: banding grouping is UNIMPLEMENTED. The band-partner pointer
+# MTGCardInstance::banding is only ever set to NULL and getNextPartner()
+# (MTGCardInstance.cpp:1562) is never called, so no band is ever formed. The
+# banding-sharing branches in getNextOpponent (lines 1745/1764) can never fire.
+# With no band, only the individually-blocked creature fights Hill Giant, Hill
+# Giant survives, and the other attacker hits the player (life 19). This fixture
+# asserts the banding-correct result and is the regression witness for the
+# missing banding implementation.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Banding Witness,Grizzly Bears
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+Lexicon Banding Witness
+Grizzly Bears
+next
+Hill Giant
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:Lexicon Banding Witness,Grizzly Bears
+[PLAYER2]
+graveyard:Hill Giant
+life:20
+[END]

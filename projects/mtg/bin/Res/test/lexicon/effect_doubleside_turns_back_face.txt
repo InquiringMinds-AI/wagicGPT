@@ -1,0 +1,14 @@
+# doubleside turns the source permanent to its configured back face.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Doubleside Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Doubleside Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Vanilla
+[PLAYER2]
+[END]

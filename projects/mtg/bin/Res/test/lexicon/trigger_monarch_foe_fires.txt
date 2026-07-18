@@ -1,0 +1,15 @@
+# @becomesmonarchfoeof fires when the opponent becomes monarch.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Monarch Foe Trigger Witness,Lexicon Foe Monarch Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Foe Monarch Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Monarch Foe Trigger Witness,Lexicon Foe Monarch Effect Witness
+life:21
+[PLAYER2]
+[END]

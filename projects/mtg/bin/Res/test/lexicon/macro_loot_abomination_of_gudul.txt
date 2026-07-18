@@ -1,0 +1,27 @@
+# Abomination of Gudul uses _LOOT_ after combat damage: draw the library card
+# then discard the pre-existing hand card. (choice 0 answers the "may" prompt
+# that arms on the combat-damage tick.)
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Abomination of Gudul
+hand:Grizzly Bears
+library:Forest
+[PLAYER2]
+life:20
+[DO]
+Abomination of Gudul
+next
+next
+choice 0
+Grizzly Bears
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Abomination of Gudul
+hand:Forest
+graveyard:Grizzly Bears
+[PLAYER2]
+life:17
+[END]

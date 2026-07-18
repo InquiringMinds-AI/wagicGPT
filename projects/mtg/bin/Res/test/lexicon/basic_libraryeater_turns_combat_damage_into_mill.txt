@@ -1,0 +1,23 @@
+# Undead Alchemist's libraryeater replacement turns Zombie combat damage into
+# milling and leaves the defending player's life unchanged.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Undead Alchemist
+[PLAYER2]
+library:Forest,Island,Mountain,Plains
+life:20
+[DO]
+Undead Alchemist
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Undead Alchemist
+tappedinplay:1
+[PLAYER2]
+graveyard:Forest,Island,Mountain,Plains
+life:20
+[END]

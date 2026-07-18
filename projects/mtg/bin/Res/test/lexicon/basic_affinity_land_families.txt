@@ -1,0 +1,22 @@
+# Existing production affinity cards cover three distinct land-family cost
+# reducers: Plains, Forests, and Swamps.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Plains,Plains,Forest,Forest,Swamp,Swamp
+hand:Razor Golem,Tangle Golem,Dross Golem
+manapool:{12}
+[PLAYER2]
+[DO]
+Razor Golem
+Tangle Golem
+Dross Golem
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Plains,Plains,Forest,Forest,Swamp,Swamp,Razor Golem,Tangle Golem,Dross Golem
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

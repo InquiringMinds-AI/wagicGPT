@@ -1,0 +1,26 @@
+# Appendage Amalgam uses _SURVEIL1_ when it attacks. Declaring it as an attacker
+# fires surveil 1, which reveals the top library card; selecting it for "put in
+# graveyard" should move it there and leave the other card on top.
+# ENGINE-BLOCKED (surveil-selection): the reveal's "put in graveyard" option
+# never moves the revealed card to the graveyard (it is stranded / left in the
+# library), so the graveyard/library counts stay wrong regardless of driver.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Appendage Amalgam
+library:Hill Giant,Juggernaut
+[PLAYER2]
+life:20
+[DO]
+Appendage Amalgam
+Juggernaut
+revealok
+[ASSERT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Appendage Amalgam
+graveyard:Juggernaut
+library:Hill Giant
+[PLAYER2]
+life:20
+[END]

@@ -1,0 +1,18 @@
+# Howl of the Night Pack uses _WOLFTOKEN_ once for each Forest.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest
+hand:Howl of the Night Pack
+manapool:{6}{G}
+[PLAYER2]
+[DO]
+Howl of the Night Pack
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Howl of the Night Pack
+inplay:Forest,Forest,*,*
+manapool:{0}
+[PLAYER2]
+[END]

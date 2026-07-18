@@ -1,0 +1,31 @@
+# Wilting makes damage dealt to the witness arrive as -1/-1 counters. The
+# active player deals 1 damage (Lava Dart) to its own 2/2 wilting witness,
+# which becomes a permanent 1/1 (one -1/-1 counter) rather than dying. It then
+# attacks for 1 (life 20 -> 19). Without wilting the 2/2 would still be a 2/2
+# and deal 2, so life 19 is the wilting observation (power was reduced by the
+# counter).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Wilting Witness
+hand:Lava Dart
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+Lava Dart
+Lexicon Wilting Witness
+goto combatattackers
+Lexicon Wilting Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Wilting Witness
+graveyard:Lava Dart
+tappedinplay:1
+[PLAYER2]
+life:19
+[END]

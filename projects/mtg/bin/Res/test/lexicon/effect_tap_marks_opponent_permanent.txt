@@ -1,0 +1,18 @@
+# tap taps the targeted opposing permanent.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Tap Effect Witness
+[PLAYER2]
+inplay:Forest
+[DO]
+Lexicon Tap Effect Witness
+Forest
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Tap Effect Witness
+[PLAYER2]
+inplay:Forest
+tappedinplay:1
+[END]

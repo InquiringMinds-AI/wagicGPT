@@ -1,0 +1,16 @@
+# alterpoison:N adds poison counters to the selected opponent.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Alter Poison Effect Witness
+[PLAYER2]
+poisoncount:0
+[DO]
+Lexicon Alter Poison Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Alter Poison Effect Witness
+[PLAYER2]
+poisoncount:2
+[END]

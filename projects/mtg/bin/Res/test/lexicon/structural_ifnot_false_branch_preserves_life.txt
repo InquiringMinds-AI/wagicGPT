@@ -1,0 +1,17 @@
+# structural ifnot false branch preserves life.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon IfNot Wrapper Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon IfNot Wrapper Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon IfNot Wrapper Witness
+life:20
+[PLAYER2]
+[END]
+

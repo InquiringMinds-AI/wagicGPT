@@ -1,0 +1,14 @@
+# Parser-contract witness for nested wrappers, duration modifiers, and
+# replacement/control-flow forms that are not reliably asserted through one
+# short gameplay scenario.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Structural Catalog
+[PLAYER2]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Structural Catalog
+[PLAYER2]
+[END]

@@ -1,0 +1,19 @@
+# affinitygravecreatures counts creature cards in the caster's graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Grizzly Bears
+hand:Lexicon Affinity Grave Creatures Witness
+manapool:{2}
+[PLAYER2]
+[DO]
+Lexicon Affinity Grave Creatures Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Affinity Grave Creatures Witness
+graveyard:Grizzly Bears
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,17 @@
+# Tutorial and message are UI effects, but they must still resolve without
+# wedging the headless gameplay suite. The source permanents remain in play
+# after each modal effect is dismissed by the test runner.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Tutorial Effect Witness,Lexicon Message Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Tutorial Effect Witness
+Lexicon Message Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Tutorial Effect Witness,Lexicon Message Effect Witness
+[PLAYER2]
+[END]

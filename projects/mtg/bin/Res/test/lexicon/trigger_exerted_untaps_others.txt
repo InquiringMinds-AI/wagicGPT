@@ -1,0 +1,23 @@
+# @exerted fires when Ahn-Crop Champion is exerted as it attacks and untaps
+# the other creature controlled by its controller.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Grizzly Bears,Ahn-Crop Champion
+tappedinplay:1
+[PLAYER2]
+life:20
+[DO]
+Ahn-Crop Champion
+next
+choice 0
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Grizzly Bears,Ahn-Crop Champion
+tappedinplay:1
+[PLAYER2]
+life:16
+[END]

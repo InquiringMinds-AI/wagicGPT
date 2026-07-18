@@ -1,0 +1,31 @@
+# Totem armor replaces destruction of the enchanted creature by destroying the
+# Aura and removing the damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Boar Umbra,Wrecking Ball
+inplay:Grizzly Bears
+manapool:{2}{G}{2}{B}{R}
+[PLAYER2]
+# ENGINE-BLOCKED: the engine correctly SAVES the creature but does NOT destroy
+# the Boar Umbra aura (the totem-armor shield is not consumed -- the Umbra stays
+# on the battlefield, leaving the creature permanently shielded). The [ASSERT]
+# below encodes the documented behavior (Umbra destroyed) as the regression
+# witness; it currently fails only on this residual engine defect.
+[DO]
+Boar Umbra
+Grizzly Bears
+no
+Wrecking Ball
+Grizzly Bears
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+graveyard:Boar Umbra,Wrecking Ball
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

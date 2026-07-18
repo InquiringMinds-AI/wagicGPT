@@ -1,0 +1,19 @@
+# hasdisturb makes the graveyard alternate (disturb) cast flip the card and
+# put the transformed back face onto the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Baithook Angler
+manapool:{1}{U}
+[PLAYER2]
+[DO]
+Baithook Angler
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hook-Haunt Drifter
+graveyard:
+manapool:{0}
+[PLAYER2]
+[END]

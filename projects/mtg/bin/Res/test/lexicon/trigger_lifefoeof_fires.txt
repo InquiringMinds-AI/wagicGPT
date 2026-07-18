@@ -1,0 +1,16 @@
+# @lifefoeof fires for life gained by the source's opponent.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifefoeof Trigger Witness,Lexicon Opponent Life Gain Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Opponent Life Gain Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lifefoeof Trigger Witness,Lexicon Opponent Life Gain Effect Witness
+life:21
+[PLAYER2]
+life:21
+[END]

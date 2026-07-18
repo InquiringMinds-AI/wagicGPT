@@ -1,0 +1,17 @@
+# hmodifer changes the controller's maximum hand size for cleanup.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Hand Modifier Effect Witness
+hand:Forest,Island,Mountain,Plains,Swamp,Grizzly Bears,Hill Giant,Raging Goblin
+[PLAYER2]
+[DO]
+Lexicon Hand Modifier Effect Witness
+goto cleanup
+[ASSERT]
+CLEANUP
+[PLAYER1]
+inplay:Lexicon Hand Modifier Effect Witness
+hand:Forest,Island,Mountain,Plains,Swamp,Grizzly Bears,Hill Giant,Raging Goblin
+[PLAYER2]
+[END]

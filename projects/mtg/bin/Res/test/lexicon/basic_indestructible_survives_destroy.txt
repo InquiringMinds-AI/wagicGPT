@@ -1,0 +1,20 @@
+# Indestructible prevents a destroy effect from moving the creature to the
+# graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Indestructible Witness
+hand:Wrecking Ball
+manapool:{2}{R}{B}
+[PLAYER2]
+[DO]
+Wrecking Ball
+Lexicon Indestructible Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Indestructible Witness
+graveyard:Wrecking Ball
+manapool:{0}
+[PLAYER2]
+[END]

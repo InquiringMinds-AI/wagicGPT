@@ -1,0 +1,16 @@
+# removemana(green) removes the selected color from the controller's pool.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Remove Mana Effect Witness
+manapool:{G}
+[PLAYER2]
+[DO]
+Lexicon Remove Mana Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Remove Mana Effect Witness
+manapool:{0}
+[PLAYER2]
+[END]

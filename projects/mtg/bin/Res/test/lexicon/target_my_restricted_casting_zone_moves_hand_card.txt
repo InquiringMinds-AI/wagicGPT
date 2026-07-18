@@ -1,0 +1,18 @@
+# myrestrictedcastingzone includes the controller's hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Restricted Casting Zone Witness
+hand:Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon My Restricted Casting Zone Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Restricted Casting Zone Witness
+hand:
+exile:Grizzly Bears
+[PLAYER2]
+[END]

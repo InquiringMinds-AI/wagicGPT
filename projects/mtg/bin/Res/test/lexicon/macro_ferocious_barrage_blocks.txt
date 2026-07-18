@@ -1,0 +1,25 @@
+# Barrage of Boulders uses _FEROCIOUS_. A power-4 creature makes the
+# opposing creature unable to block for the turn.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Craw Wurm,Runeclaw Bear
+hand:Barrage of Boulders
+manapool:{2}{R}
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Barrage of Boulders
+goto attackers
+Runeclaw Bear
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Craw Wurm,Runeclaw Bear
+graveyard:Barrage of Boulders
+[PLAYER2]
+inplay:Grizzly Bears
+life:18
+[END]

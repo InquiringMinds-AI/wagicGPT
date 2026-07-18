@@ -1,0 +1,26 @@
+# Akroan Skyguard uses _HEROIC_. Targeting it with Giant Growth produces the
+# heroic counter before combat, increasing the combat damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Akroan Skyguard
+hand:Giant Growth
+library:Forest
+manapool:{G}
+[PLAYER2]
+life:20
+[DO]
+Giant Growth
+Akroan Skyguard
+goto attackers
+Akroan Skyguard
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Akroan Skyguard
+graveyard:Giant Growth
+library:Forest
+[PLAYER2]
+life:15
+[END]

@@ -1,0 +1,18 @@
+# reduceto sets the controller's life total to the requested value.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Reduce To Effect Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Reduce To Effect Witness
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Reduce To Effect Witness
+life:5
+[PLAYER2]
+[END]

@@ -1,0 +1,16 @@
+# steal takes control of the targeted opposing creature.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Steal Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Lexicon Steal Effect Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Steal Effect Witness,Grizzly Bears
+[PLAYER2]
+[END]

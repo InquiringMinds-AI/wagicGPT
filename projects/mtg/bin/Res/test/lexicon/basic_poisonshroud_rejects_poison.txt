@@ -1,0 +1,23 @@
+# poisonshroud prevents poison counters from being placed on its controller.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Toxic Four Witness
+[PLAYER2]
+inplay:Lexicon Poison Shroud Witness
+life:20
+poisoncount:0
+[DO]
+Lexicon Toxic Four Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Toxic Four Witness
+[PLAYER2]
+inplay:Lexicon Poison Shroud Witness
+life:19
+poisoncount:0
+[END]

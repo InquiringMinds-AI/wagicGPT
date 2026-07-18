@@ -1,0 +1,20 @@
+# Bubbling Muck installs produceextra for the turn: tapping a Swamp yields
+# its normal mana plus an additional black mana.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Bubbling Muck
+inplay:Swamp
+manapool:{B}
+[PLAYER2]
+[DO]
+Bubbling Muck
+Swamp
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Swamp
+graveyard:Bubbling Muck
+manapool:{B}{B}
+[PLAYER2]
+[END]

@@ -1,0 +1,17 @@
+# Dynamic mana tokens and the bare one-life cost are parser-contract seams;
+# the synthetic card keeps them available without requiring an interactive
+# payment choreography.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Cost Catalog
+[PLAYER2]
+[DO]
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Cost Catalog
+[PLAYER2]
+[END]

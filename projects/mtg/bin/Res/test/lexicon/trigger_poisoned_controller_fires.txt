@@ -1,0 +1,26 @@
+# @poisonedof fires when the controller receives poison counters.
+# @poisonedof fires only for the CONTROLLER's own poison (opponent poison does not
+# fire it), so the effect must poison PLAYER1. The self-poison witness is cast (pays
+# {1}) then its {0} ability is activated to give PLAYER1 2 poison; that fires
+# @poisonedof on the trigger witness (life 21).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Poisoned Trigger Witness
+hand:Lexicon Self Poison Effect Witness A15
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Self Poison Effect Witness A15
+Lexicon Self Poison Effect Witness A15
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Poisoned Trigger Witness,Lexicon Self Poison Effect Witness A15
+life:21
+poisoncount:2
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,20 @@
+# legendruleremove lets Sakashima of a Thousand Faces keep a second legendary
+# copy under the same controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Sakashima of a Thousand Faces,Sakashima of a Thousand Faces
+manapool:{6}{U}{U}
+[PLAYER2]
+[DO]
+Sakashima of a Thousand Faces
+Sakashima of a Thousand Faces
+choice 0
+Sakashima of a Thousand Faces
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Sakashima of a Thousand Faces,Sakashima of a Thousand Faces
+hand:
+[PLAYER2]
+[END]

@@ -1,0 +1,33 @@
+# countertrack removes a matching counter while its source remains in play,
+# then restores it when that source leaves. Grizzly Bears is given a +1/+1
+# counter, countertrack removes it (tracking it on the artifact witness), and
+# Shatter destroys that artifact witness so the counter is restored. The
+# restored counter (Grizzly is 3/3 again) lets it survive Shock's two damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Witness,Lexicon Countertrack Target Witness,Grizzly Bears
+hand:Shatter,Shock
+manapool:{1}{R}{R}
+[PLAYER2]
+[DO]
+Lexicon Counter Witness
+Grizzly Bears
+no
+Lexicon Countertrack Target Witness
+Grizzly Bears
+no
+Shatter
+Lexicon Countertrack Target Witness
+no
+Shock
+Grizzly Bears
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Witness,Grizzly Bears
+graveyard:Lexicon Countertrack Target Witness,Shatter,Shock
+[PLAYER2]
+[END]

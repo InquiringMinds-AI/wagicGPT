@@ -1,0 +1,22 @@
+# cantpwattack rejects an attack declaration aimed at a planeswalker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Cant Planeswalker Attack Witness
+[PLAYER2]
+inplay:Jace Beleren
+[DO]
+Lexicon Cant Planeswalker Attack Witness
+Jace Beleren
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Cant Planeswalker Attack Witness
+tappedinplay:1
+[PLAYER2]
+inplay:Jace Beleren
+life:18
+[END]

@@ -1,0 +1,29 @@
+# Conditional macro witnesses are activated with their required board state.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Addendum Macro Witness
+inplay:Lexicon Threshold Macro Witness,Lexicon Metalcraft Macro Witness,Lexicon Ascend Macro Witness,Lexicon City Blessing Macro Witness,Lexicon Monarch Controller Macro Witness,Lexicon Monarch Opponent Macro Witness,Lexicon Initiative Controller Macro Witness,Lexicon Initiative Opponent Macro Witness,Lexicon Ring Tempts Macro Witness,Ornithopter,Ornithopter,Ornithopter,Forest,Island,Mountain,Plains,Swamp,Desert,Forest
+graveyard:Forest,Island,Mountain,Plains,Swamp,Desert,Forest
+life:20
+[PLAYER2]
+[DO]
+Lexicon Addendum Macro Witness
+Lexicon Threshold Macro Witness
+Lexicon Metalcraft Macro Witness
+Lexicon Ascend Macro Witness
+Lexicon City Blessing Macro Witness
+Lexicon Monarch Controller Macro Witness
+Lexicon Monarch Opponent Macro Witness
+Lexicon Initiative Controller Macro Witness
+Lexicon Initiative Opponent Macro Witness
+Lexicon Ring Tempts Macro Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Threshold Macro Witness,Lexicon Metalcraft Macro Witness,Lexicon Ascend Macro Witness,Lexicon City Blessing Macro Witness,Lexicon Monarch Controller Macro Witness,Lexicon Monarch Opponent Macro Witness,Lexicon Initiative Controller Macro Witness,Lexicon Initiative Opponent Macro Witness,Lexicon Ring Tempts Macro Witness,Ornithopter,Ornithopter,Ornithopter,Forest,Island,Mountain,Plains,Swamp,Desert,Forest,*,*
+graveyard:Forest,Island,Mountain,Plains,Swamp,Desert,Forest,Lexicon Addendum Macro Witness
+life:30
+[PLAYER2]
+inplay:*,*
+[END]

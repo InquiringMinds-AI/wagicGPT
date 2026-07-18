@@ -1,0 +1,13 @@
+# Parser-contract witness for trigger events that do not yet have a stable,
+# isolated gameplay protocol in the test harness.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Trigger Catalog
+[PLAYER2]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Trigger Catalog
+[PLAYER2]
+[END]

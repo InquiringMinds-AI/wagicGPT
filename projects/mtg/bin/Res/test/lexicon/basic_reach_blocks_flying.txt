@@ -1,0 +1,22 @@
+# Reach allows a non-flying creature to block a flyer.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:suntail hawk
+[PLAYER2]
+inplay:giant spider
+life:20
+[DO]
+suntail hawk
+next
+giant spider
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:suntail hawk
+[PLAYER2]
+inplay:giant spider
+life:20
+[END]

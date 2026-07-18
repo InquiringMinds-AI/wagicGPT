@@ -1,0 +1,33 @@
+# freeze taps a permanent and prevents it from untapping at the next untap.
+# The witness freezes the opponent's Forest, then the game advances (with `next`,
+# not a turn-crossing `goto` which would run away) all the way to player 2's
+# next turn. At player 2's upkeep the Forest is STILL tapped -- freeze skipped
+# its untap step. (An unfrozen tapped Forest untaps normally, verified as a
+# control, so the persistence is the freeze effect.)
+[INIT]
+UPKEEP
+[PLAYER1]
+inplay:Lexicon Freeze Effect Witness
+[PLAYER2]
+inplay:Forest
+[DO]
+Lexicon Freeze Effect Witness
+Forest
+next
+next
+next
+next
+next
+next
+next
+next
+next
+next
+[ASSERT]
+upkeep
+[PLAYER1]
+inplay:Lexicon Freeze Effect Witness
+[PLAYER2]
+inplay:Forest
+tappedinplay:1
+[END]

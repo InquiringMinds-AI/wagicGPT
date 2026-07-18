@@ -1,0 +1,24 @@
+# A Leyline in the opening hand begins the game on the battlefield (documented
+# behavior of the `leyline` keyword, lexicon index 78).
+# ENGINE-BLOCKED: the `leyline` keyword (Constants::LEYLINE = 78) is parsed into
+# basicAbilities but never referenced anywhere in game logic -- it is an
+# unimplemented keyword, so there is no start-in-play behavior to observe.
+# Additionally the test harness has no opening-hand/mulligan phase: INIT places
+# the card in hand only after the game has already reached its INIT phase, so
+# the opening-hand window has already passed. This fixture is retained as the
+# regression witness for if/when the keyword is implemented and the harness
+# grows an opening-hand model.
+[INIT]
+UPKEEP
+[PLAYER1]
+hand:Leyline of the Void
+[PLAYER2]
+[DO]
+no
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Leyline of the Void
+hand:
+[PLAYER2]
+[END]

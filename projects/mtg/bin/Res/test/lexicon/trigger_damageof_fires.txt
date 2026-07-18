@@ -1,0 +1,16 @@
+# @damageof fires when the source's controller is damaged.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Damageof Trigger Witness,Lexicon Damage Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Damage Effect Witness
+p1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Damageof Trigger Witness,Lexicon Damage Effect Witness
+life:19
+[PLAYER2]
+[END]

@@ -1,0 +1,19 @@
+# mypoolsave(green) is a static ability that keeps green mana in the pool when
+# the phase changes (mana normally empties between phases). Advancing one phase
+# with the witness in play leaves the {G} intact; a non-green color would drain
+# (verified separately), so the persistence is the poolsave effect.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Poolsave Effect Witness
+manapool:{G}
+[PLAYER2]
+[DO]
+next
+[ASSERT]
+combatbegins
+[PLAYER1]
+inplay:Lexicon Poolsave Effect Witness
+manapool:{G}
+[PLAYER2]
+[END]

@@ -1,0 +1,20 @@
+# Sauroform Hybrid uses _ADAPT4_; its adapted attack deals six damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Sauroform Hybrid
+manapool:{4}{G}{G}
+[PLAYER2]
+life:20
+[DO]
+Sauroform Hybrid
+goto attackers
+Sauroform Hybrid
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Sauroform Hybrid
+[PLAYER2]
+life:14
+[END]

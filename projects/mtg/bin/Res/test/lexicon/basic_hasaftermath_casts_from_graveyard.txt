@@ -1,0 +1,25 @@
+# hasaftermath permits the aftermath half to be cast from the graveyard and
+# exiles the split card after it resolves. Cast from the graveyard, Claim //
+# Fame uses its Fame flashback cost {1}{R}; Fame's effect targets a creature
+# on the battlefield (Grizzly Bears), and the card is exiled after resolving.
+# Walking Corpse (Claim's would-be return target) stays in the graveyard,
+# because from the graveyard only the aftermath (Fame) half is castable.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Claim // Fame,Walking Corpse
+inplay:Grizzly Bears
+manapool:{1}{R}
+[PLAYER2]
+[DO]
+Claim // Fame
+Grizzly Bears
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+graveyard:Walking Corpse
+exile:Claim // Fame
+[PLAYER2]
+[END]

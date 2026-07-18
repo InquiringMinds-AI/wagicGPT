@@ -1,0 +1,17 @@
+# @next end fires at the next matching end step and then self-destructs.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Next End Trigger Witness
+[PLAYER2]
+[DO]
+goto end
+goto firstmain
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Next End Trigger Witness
+life:21
+[PLAYER2]
+[END]

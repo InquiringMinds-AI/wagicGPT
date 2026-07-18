@@ -1,0 +1,18 @@
+# bury moves a target creature to its graveyard even when regeneration would
+# otherwise be available.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Bury Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Lexicon Bury Effect Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Bury Effect Witness
+[PLAYER2]
+graveyard:Grizzly Bears
+[END]

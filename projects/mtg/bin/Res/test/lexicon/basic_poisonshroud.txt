@@ -1,0 +1,25 @@
+# poisonshroud stops a protected player from receiving poison counters, so an
+# infect attacker that connects deals no poison.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Blackcleave Goblin
+[PLAYER2]
+inplay:Solemnity
+life:20
+poisoncount:0
+[DO]
+Blackcleave Goblin
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Blackcleave Goblin
+tappedinplay:1
+[PLAYER2]
+inplay:Solemnity
+life:20
+poisoncount:0
+[END]

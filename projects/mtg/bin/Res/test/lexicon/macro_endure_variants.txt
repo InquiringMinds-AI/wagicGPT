@@ -1,0 +1,57 @@
+# Every Endure parameter is invoked through its token branch. The life total
+# records one resolution for each numeric macro, while wildcards record the
+# twenty created Spirit permanents.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Endure 1 Macro Witness,Lexicon Endure 2 Macro Witness,Lexicon Endure 3 Macro Witness,Lexicon Endure 4 Macro Witness,Lexicon Endure 5 Macro Witness,Lexicon Endure 6 Macro Witness,Lexicon Endure 7 Macro Witness,Lexicon Endure 8 Macro Witness,Lexicon Endure 9 Macro Witness,Lexicon Endure 10 Macro Witness,Lexicon Endure 11 Macro Witness,Lexicon Endure 12 Macro Witness,Lexicon Endure 13 Macro Witness,Lexicon Endure 14 Macro Witness,Lexicon Endure 15 Macro Witness,Lexicon Endure 16 Macro Witness,Lexicon Endure 17 Macro Witness,Lexicon Endure 18 Macro Witness,Lexicon Endure 19 Macro Witness,Lexicon Endure 20 Macro Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Endure 1 Macro Witness
+choice 1
+Lexicon Endure 2 Macro Witness
+choice 1
+Lexicon Endure 3 Macro Witness
+choice 1
+Lexicon Endure 4 Macro Witness
+choice 1
+Lexicon Endure 5 Macro Witness
+choice 1
+Lexicon Endure 6 Macro Witness
+choice 1
+Lexicon Endure 7 Macro Witness
+choice 1
+Lexicon Endure 8 Macro Witness
+choice 1
+Lexicon Endure 9 Macro Witness
+choice 1
+Lexicon Endure 10 Macro Witness
+choice 1
+Lexicon Endure 11 Macro Witness
+choice 1
+Lexicon Endure 12 Macro Witness
+choice 1
+Lexicon Endure 13 Macro Witness
+choice 1
+Lexicon Endure 14 Macro Witness
+choice 1
+Lexicon Endure 15 Macro Witness
+choice 1
+Lexicon Endure 16 Macro Witness
+choice 1
+Lexicon Endure 17 Macro Witness
+choice 1
+Lexicon Endure 18 Macro Witness
+choice 1
+Lexicon Endure 19 Macro Witness
+choice 1
+Lexicon Endure 20 Macro Witness
+choice 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Endure 1 Macro Witness,Lexicon Endure 2 Macro Witness,Lexicon Endure 3 Macro Witness,Lexicon Endure 4 Macro Witness,Lexicon Endure 5 Macro Witness,Lexicon Endure 6 Macro Witness,Lexicon Endure 7 Macro Witness,Lexicon Endure 8 Macro Witness,Lexicon Endure 9 Macro Witness,Lexicon Endure 10 Macro Witness,Lexicon Endure 11 Macro Witness,Lexicon Endure 12 Macro Witness,Lexicon Endure 13 Macro Witness,Lexicon Endure 14 Macro Witness,Lexicon Endure 15 Macro Witness,Lexicon Endure 16 Macro Witness,Lexicon Endure 17 Macro Witness,Lexicon Endure 18 Macro Witness,Lexicon Endure 19 Macro Witness,Lexicon Endure 20 Macro Witness,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*
+life:40
+[PLAYER2]
+[END]

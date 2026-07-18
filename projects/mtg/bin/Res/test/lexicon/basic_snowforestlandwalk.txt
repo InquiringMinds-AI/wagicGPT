@@ -1,21 +1,22 @@
+# snowforestlandwalk makes a creature unblockable while the defending player controls a Snow-Covered Forest.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:rime dryad
+inplay:Lexicon Snowforestlandwalk Witness
 [PLAYER2]
-inplay:snow-covered forest,grizzly bears
+inplay:Snow-Covered Forest,Grizzly Bears
 life:20
 [DO]
-rime dryad
+Lexicon Snowforestlandwalk Witness
 next
-grizzly bears
+Grizzly Bears
 next
 next
 [ASSERT]
 COMBATEND
 [PLAYER1]
-inplay:rime dryad
+inplay:Lexicon Snowforestlandwalk Witness
 [PLAYER2]
-inplay:snow-covered forest,grizzly bears
-life:19
+inplay:Snow-Covered Forest,Grizzly Bears
+life:18
 [END]

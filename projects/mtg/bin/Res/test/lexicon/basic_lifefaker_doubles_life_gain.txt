@@ -1,0 +1,22 @@
+# lifefaker doubles a life gain from a normal life-gain event.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Alhammarret's Archive
+hand:Healing Salve
+manapool:{W}
+life:20
+[PLAYER2]
+[DO]
+Healing Salve
+choice 0
+p1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Alhammarret's Archive
+graveyard:Healing Salve
+life:26
+manapool:{0}
+[PLAYER2]
+[END]

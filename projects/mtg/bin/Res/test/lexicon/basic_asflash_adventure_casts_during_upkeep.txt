@@ -1,0 +1,21 @@
+# asflash permits an Adventure spell to be cast during upkeep.
+[INIT]
+UPKEEP
+[PLAYER1]
+hand:Bonecrusher Giant // Stomp
+manapool:{1}{R}
+[PLAYER2]
+life:20
+[DO]
+Bonecrusher Giant // Stomp
+choice 1
+p2
+[ASSERT]
+UPKEEP
+[PLAYER1]
+exile:Bonecrusher Giant // Stomp
+hand:
+manapool:{0}
+[PLAYER2]
+life:18
+[END]

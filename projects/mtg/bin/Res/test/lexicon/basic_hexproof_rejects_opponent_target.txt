@@ -1,0 +1,20 @@
+# Hexproof rejects a target chosen by an opponent, so the opponent's spell
+# cannot be cast at the creature and stays in hand with mana unspent.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Giant Growth
+manapool:{G}
+[PLAYER2]
+inplay:Lexicon Hexproof Witness
+[DO]
+Giant Growth
+Lexicon Hexproof Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Giant Growth
+manapool:{G}
+[PLAYER2]
+inplay:Lexicon Hexproof Witness
+[END]

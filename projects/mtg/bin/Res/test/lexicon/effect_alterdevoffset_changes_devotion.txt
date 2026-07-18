@@ -1,0 +1,19 @@
+# alterdevoffset contributes to devotion calculations used by Gray Merchant.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Altar of the Pantheon
+hand:Gray Merchant of Asphodel
+manapool:{3}{B}{B}
+[PLAYER2]
+life:20
+[DO]
+Gray Merchant of Asphodel
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Altar of the Pantheon,Gray Merchant of Asphodel
+life:23
+[PLAYER2]
+life:17
+[END]

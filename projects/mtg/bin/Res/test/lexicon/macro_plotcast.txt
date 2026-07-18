@@ -1,0 +1,24 @@
+# A plotted card is exiled on turn one, then cast from exile on a LATER turn at
+# sorcery speed. The witness is a Sorcery, so casting it from exile resolves it
+# to the graveyard. The opponent's turn is crossed with a goto secondmain /
+# goto firstmain cycle so the recast happens in the controller's own main phase.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Plot Macro Witness
+manapool:{0}
+[PLAYER2]
+[DO]
+Lexicon Plot Macro Witness
+goto secondmain
+goto firstmain
+goto secondmain
+goto firstmain
+Lexicon Plot Macro Witness
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Plot Macro Witness
+[PLAYER2]
+[END]

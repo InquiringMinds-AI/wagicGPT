@@ -1,0 +1,79 @@
+# Exercises player-target dispatch plus simple, prefixed, all-zone, other, and
+# caret target grammar with real state changes rather than catalog loading.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Matrix Controller Target,Lexicon Matrix Opponent Target,Lexicon Matrix Player Target,Lexicon Matrix Targeted Player Target,Lexicon Matrix All Zone Source,Lexicon Matrix Both Battlefield Source,Lexicon Matrix Inplay Source,Lexicon Matrix Graveyard Source,Lexicon Matrix Hand Source,Lexicon Matrix Library Source,Lexicon Matrix Exile Source,Lexicon Matrix Opponent Battlefield Source,Lexicon Matrix My Graveyard Source,Lexicon Matrix Opponent Graveyard Source,Lexicon Matrix My Hand Source,Lexicon Matrix Opponent Hand Source,Lexicon Matrix My Library Source,Lexicon Matrix Opponent Library Source,Lexicon Matrix My Exile Source,Lexicon Matrix Opponent Exile Source,Lexicon Matrix Other Source,Lexicon Matrix Caret Source,Lexicon Matrix Other Target,Lexicon Matrix Caret Target
+hand:Lexicon Matrix Hand Target,Lexicon Matrix All Target,Lexicon Matrix My Hand Target
+graveyard:Lexicon Matrix Graveyard Target,Lexicon Matrix My Graveyard Target
+library:Lexicon Matrix Library Target,Lexicon Matrix My Library Target
+exile:Lexicon Matrix Exile Target,Lexicon Matrix My Exile Target
+[PLAYER2]
+inplay:Lexicon Matrix Battlefield Target,Lexicon Matrix Inplay Target,Lexicon Matrix Opponent Battlefield Target
+hand:Lexicon Matrix Opponent Hand Target
+graveyard:Lexicon Matrix Opponent Graveyard Target
+library:Lexicon Matrix Opponent Library Target
+exile:Lexicon Matrix Opponent Exile Target
+[DO]
+Lexicon Matrix Controller Target
+p1
+Lexicon Matrix Opponent Target
+p2
+p2
+Lexicon Matrix Player Target
+p2
+Lexicon Matrix Targeted Player Target
+p2
+Lexicon Matrix All Zone Source
+Lexicon Matrix All Target
+Lexicon Matrix Both Battlefield Source
+Lexicon Matrix Battlefield Target
+Lexicon Matrix Inplay Source
+Lexicon Matrix Inplay Target
+Lexicon Matrix Graveyard Source
+Lexicon Matrix Graveyard Target
+Lexicon Matrix Hand Source
+Lexicon Matrix Hand Target
+Lexicon Matrix Library Source
+Lexicon Matrix Library Target
+Lexicon Matrix Exile Source
+Lexicon Matrix Exile Target
+Lexicon Matrix Opponent Battlefield Source
+Lexicon Matrix Opponent Battlefield Target
+Lexicon Matrix My Graveyard Source
+Lexicon Matrix My Graveyard Target
+Lexicon Matrix Opponent Graveyard Source
+Lexicon Matrix Opponent Graveyard Target
+Lexicon Matrix My Hand Source
+Lexicon Matrix My Hand Target
+Lexicon Matrix Opponent Hand Source
+Lexicon Matrix Opponent Hand Target
+Lexicon Matrix My Library Source
+Lexicon Matrix My Library Target
+Lexicon Matrix Opponent Library Source
+Lexicon Matrix Opponent Library Target
+Lexicon Matrix My Exile Source
+Lexicon Matrix My Exile Target
+Lexicon Matrix Opponent Exile Source
+Lexicon Matrix Opponent Exile Target
+Lexicon Matrix Other Source
+Lexicon Matrix Other Target
+Lexicon Matrix Caret Source
+Lexicon Matrix Caret Target
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+life:19
+graveyard:*,*
+library:*,*
+hand:*,*,*
+inplay:*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*
+exile:*,*
+[PLAYER2]
+life:18
+graveyard:*
+library:*
+hand:*
+inplay:*,*,*
+exile:*
+[END]

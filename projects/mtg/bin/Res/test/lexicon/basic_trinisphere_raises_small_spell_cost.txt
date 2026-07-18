@@ -1,0 +1,24 @@
+# Trinisphere makes a one-mana spell uncastable when only one mana is
+# available.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Trinisphere
+hand:Shock
+manapool:{R}
+[PLAYER2]
+life:20
+# Shock costs {3} under Trinisphere; with only {R} it is uncastable, so it
+# stays in hand with its mana unspent (uncastable != cast-and-fizzled).
+[DO]
+Shock
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Trinisphere
+hand:Shock
+manapool:{R}
+[PLAYER2]
+life:20
+[END]

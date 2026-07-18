@@ -1,0 +1,19 @@
+# hydra converts damage to removal of +1/+1 counters and survives with no counters.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Hydra Witness
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Shock
+Lexicon Hydra Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Hydra Witness
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+[END]

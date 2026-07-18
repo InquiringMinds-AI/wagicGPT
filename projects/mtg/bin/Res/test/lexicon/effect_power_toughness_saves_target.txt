@@ -1,0 +1,21 @@
+# The generic 1/1 modifier raises Grizzly Bears to 3/3, allowing it to survive
+# a two-damage Shock.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon P T Effect Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon P T Effect Witness
+Grizzly Bears
+Shock
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon P T Effect Witness,Grizzly Bears
+graveyard:Shock
+[PLAYER2]
+[END]

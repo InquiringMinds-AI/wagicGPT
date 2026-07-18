@@ -1,0 +1,23 @@
+# Toxic 2 gives a player two poison counters when the creature deals combat
+# damage to that player.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Marsh Viper
+[PLAYER2]
+life:20
+poisoncount:0
+[DO]
+Marsh Viper
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Marsh Viper
+tappedinplay:1
+[PLAYER2]
+life:19
+poisoncount:2
+[END]

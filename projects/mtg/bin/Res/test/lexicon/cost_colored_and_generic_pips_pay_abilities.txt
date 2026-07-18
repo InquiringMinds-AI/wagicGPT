@@ -1,0 +1,24 @@
+# Each colored pip and a generic mana cost resolves its one-life ability.
+# The six life gains prove that all six cost grammars both activate and pay.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon White Mana Cost Witness,Lexicon Blue Mana Cost Witness,Lexicon Black Mana Cost Witness,Lexicon Red Mana Cost Witness,Lexicon Green Mana Cost Witness,Lexicon Generic Mana Cost Witness
+manapool:{2}{W}{U}{B}{R}{G}
+life:20
+[PLAYER2]
+[DO]
+Lexicon White Mana Cost Witness
+Lexicon Blue Mana Cost Witness
+Lexicon Black Mana Cost Witness
+Lexicon Red Mana Cost Witness
+Lexicon Green Mana Cost Witness
+Lexicon Generic Mana Cost Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon White Mana Cost Witness,Lexicon Blue Mana Cost Witness,Lexicon Black Mana Cost Witness,Lexicon Red Mana Cost Witness,Lexicon Green Mana Cost Witness,Lexicon Generic Mana Cost Witness
+manapool:{0}
+life:26
+[PLAYER2]
+[END]

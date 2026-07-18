@@ -1,0 +1,17 @@
+# @totalcounteradded fires for the full counter-add event.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Total Counter Added Trigger Witness,Grizzly Bears
+life:20
+[PLAYER2]
+[DO]
+Lexicon Total Counter Added Trigger Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Total Counter Added Trigger Witness,Grizzly Bears
+life:21
+[PLAYER2]
+[END]

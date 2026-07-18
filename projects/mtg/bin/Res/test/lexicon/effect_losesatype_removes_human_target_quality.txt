@@ -1,0 +1,17 @@
+# After losesatype removes Human from Elite Vanguard, the second activated
+# ability can no longer target it as a Human and therefore does not destroy it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lose A Type Behavior Witness,Elite Vanguard
+[PLAYER2]
+[DO]
+Lexicon Lose A Type Behavior Witness
+Elite Vanguard
+Lexicon Lose A Type Behavior Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Lose A Type Behavior Witness,Elite Vanguard
+[PLAYER2]
+[END]

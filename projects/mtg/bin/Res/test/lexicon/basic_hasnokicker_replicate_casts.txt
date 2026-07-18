@@ -1,0 +1,23 @@
+# hasnokicker makes Gigadrowse's kicker-like payment replicate the spell;
+# resolving the payment against two targets is the gameplay assertion.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Gigadrowse
+manapool:{U}{U}
+[PLAYER2]
+inplay:Grizzly Bears,Hill Giant
+[DO]
+Gigadrowse
+choice 1
+Grizzly Bears
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Gigadrowse
+manapool:{0}
+[PLAYER2]
+inplay:Grizzly Bears,Hill Giant
+tappedinplay:2
+[END]

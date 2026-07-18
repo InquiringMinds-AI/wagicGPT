@@ -1,0 +1,26 @@
+# Disrupt Decorum uses _GOAD_ on every opposing creature. The opponent's
+# creature attacks on the following combat, making the goad requirement
+# observable as damage to the controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Disrupt Decorum
+manapool:{2}{R}{R}
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Disrupt Decorum
+goto end
+goto attackers
+Grizzly Bears
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+life:18
+graveyard:Disrupt Decorum
+[PLAYER2]
+inplay:Grizzly Bears
+tappedinplay:1
+[END]

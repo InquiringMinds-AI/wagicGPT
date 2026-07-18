@@ -1,0 +1,15 @@
+# @takeninitiativeof fires when the controller takes the initiative.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Initiative Trigger Witness
+[PLAYER2]
+[DO]
+Lexicon Initiative Trigger Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Initiative Trigger Witness
+life:21
+[PLAYER2]
+[END]

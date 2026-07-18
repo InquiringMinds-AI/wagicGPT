@@ -1,0 +1,27 @@
+# cantbeblockerof prevents the targeted opposing creature from blocking the
+# source creature, so a declared block is rejected and the attacker connects.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Be Blocker Of Effect Witness
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Lexicon Cant Be Blocker Of Effect Witness
+Grizzly Bears
+next
+next
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Cant Be Blocker Of Effect Witness
+tappedinplay:1
+[PLAYER2]
+inplay:Grizzly Bears
+life:17
+[END]

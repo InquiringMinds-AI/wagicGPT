@@ -1,0 +1,17 @@
+# Battle Screech uses _BIRDTOKEN_ twice.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Battle Screech
+manapool:{2}{W}{W}
+[PLAYER2]
+[DO]
+Battle Screech
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Battle Screech
+inplay:*,*
+manapool:{0}
+[PLAYER2]
+[END]

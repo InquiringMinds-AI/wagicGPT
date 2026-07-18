@@ -1,0 +1,20 @@
+# noactivatedability suppresses a non-mana activated ability: the witness's
+# {T}:damage ability cannot be used, so it stays untapped and deals no damage.
+# (Script does goto end, so assert the END phase it lands on.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon NoActivated Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon NoActivated Witness
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon NoActivated Witness
+tappedinplay:0
+[PLAYER2]
+life:20
+[END]

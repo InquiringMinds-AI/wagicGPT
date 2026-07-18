@@ -1,0 +1,20 @@
+# Shroud makes a creature an illegal target even for its controller's own
+# spell, so the spell cannot be cast and stays in hand with mana unspent.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Shroud Witness
+hand:Giant Growth
+manapool:{G}
+[PLAYER2]
+[DO]
+Giant Growth
+Lexicon Shroud Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Shroud Witness
+hand:Giant Growth
+manapool:{G}
+[PLAYER2]
+[END]

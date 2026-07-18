@@ -1,0 +1,19 @@
+# The three dungeon guard flags are live card abilities. Keep them on the
+# battlefield for the state assertion; the completedungeon engine behavior is
+# covered separately by effect_completedungeon_fires_completion_trigger.txt.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Two Dungeon Trigger Witness,Lexicon No Opponent Venture Witness,Lexicon No Controller Venture Witness
+[PLAYER2]
+[DO]
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Two Dungeon Trigger Witness,Lexicon No Opponent Venture Witness,Lexicon No Controller Venture Witness
+ability:lexicon two dungeon trigger witness|twodngtrg
+ability:lexicon no opponent venture witness|nodngopp
+ability:lexicon no controller venture witness|nodngplr
+[PLAYER2]
+[END]

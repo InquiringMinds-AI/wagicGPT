@@ -1,0 +1,17 @@
+# @countermod fires when a matching counter is added.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Mod Trigger Witness,Grizzly Bears
+life:20
+[PLAYER2]
+[DO]
+Lexicon Counter Mod Trigger Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Mod Trigger Witness,Grizzly Bears
+life:21
+[PLAYER2]
+[END]

@@ -1,21 +1,22 @@
+# snowswamplandwalk makes a creature unblockable while the defending player controls a Snow-Covered Swamp.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:121154
+inplay:Lexicon Snowswamplandwalk Witness
 [PLAYER2]
-inplay:snow-covered swamp,grizzly bears
+inplay:Snow-Covered Swamp,Grizzly Bears
 life:20
 [DO]
-121154
+Lexicon Snowswamplandwalk Witness
 next
-grizzly bears
+Grizzly Bears
 next
 next
 [ASSERT]
 COMBATEND
 [PLAYER1]
-inplay:121154
+inplay:Lexicon Snowswamplandwalk Witness
 [PLAYER2]
-inplay:snow-covered swamp,grizzly bears
+inplay:Snow-Covered Swamp,Grizzly Bears
 life:18
 [END]

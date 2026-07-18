@@ -1,0 +1,18 @@
+# anytypeofmanaability lets a green mana source pay a blue activated cost.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Any Mana Ability Witness,Forest
+manapool:{G}
+[PLAYER2]
+[DO]
+Lexicon Any Mana Ability Witness
+choice 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Any Mana Ability Witness,Forest
+life:21
+manapool:{0}
+[PLAYER2]
+[END]

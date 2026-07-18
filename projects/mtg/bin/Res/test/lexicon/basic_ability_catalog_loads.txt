@@ -1,0 +1,14 @@
+# Parser/loader witness for the basic abilities not otherwise isolated by a
+# production-card semantic fixture. Observable behavior is covered separately
+# where the test harness can express it without unconfirmed assertions.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Basic Ability Catalog
+[PLAYER2]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Basic Ability Catalog
+[PLAYER2]
+[END]

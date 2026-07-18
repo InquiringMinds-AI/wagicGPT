@@ -1,0 +1,32 @@
+# Grim Flayer uses _SURVEIL3_ after it deals combat damage. Surveil 3 should
+# reveal the top three library cards; selecting all three for "put in graveyard"
+# moves them there and leaves the fourth on top. The 2/2 deals two damage.
+# ENGINE-BLOCKED (surveil-selection): the reveal's "put in graveyard" option
+# strands the revealed cards in the temp zone; they never reach the graveyard.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Grim Flayer
+library:Hill Giant,Juggernaut,Millstone,Darksteel Citadel
+[PLAYER2]
+life:20
+[DO]
+Grim Flayer
+next
+next
+Darksteel Citadel
+revealok
+Millstone
+revealok
+Juggernaut
+revealok
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Grim Flayer
+graveyard:Juggernaut,Millstone,Darksteel Citadel
+library:Hill Giant
+[PLAYER2]
+life:18
+[END]

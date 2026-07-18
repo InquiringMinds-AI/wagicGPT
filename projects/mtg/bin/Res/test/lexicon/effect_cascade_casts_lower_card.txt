@@ -1,0 +1,20 @@
+# cascade casts the first lower-cost card revealed from the library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Cascade Effect Witness
+library:Ornithopter
+manapool:{3}
+[PLAYER2]
+[DO]
+Lexicon Cascade Effect Witness
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Cascade Effect Witness
+inplay:Ornithopter
+library:
+manapool:{0}
+[PLAYER2]
+[END]

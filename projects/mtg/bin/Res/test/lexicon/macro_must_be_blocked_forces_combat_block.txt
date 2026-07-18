@@ -1,0 +1,29 @@
+# Compelled Duel uses _MUST_BE_BLOCKD_ (and +3/+3): the buffed 5/5 Grizzly Bears
+# must be blocked by Hill Giant, which dies to five damage while the 5/5 Grizzly
+# survives the 3 damage back.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Compelled Duel
+manapool:{1}{G}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Compelled Duel
+Grizzly Bears
+goto attackers
+Grizzly Bears
+next
+Hill Giant
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Grizzly Bears
+graveyard:Compelled Duel
+[PLAYER2]
+graveyard:Hill Giant
+[END]

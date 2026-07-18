@@ -1,0 +1,14 @@
+# Load witness for the card-block field dispatcher. The individual fields are
+# intentionally exercised by a synthetic primitive because most are metadata
+# or zone-specific registrations rather than gameplay state.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Card Field Catalog
+[PLAYER2]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Card Field Catalog
+[PLAYER2]
+[END]

@@ -1,0 +1,16 @@
+# Daysquad Marshal uses _HUMANSOLDIERTOKEN_ on entry.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Daysquad Marshal
+manapool:{3}{W}
+[PLAYER2]
+[DO]
+Daysquad Marshal
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Daysquad Marshal,*
+manapool:{0}
+[PLAYER2]
+[END]

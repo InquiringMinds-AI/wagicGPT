@@ -1,0 +1,23 @@
+# tempflashback grants an instant in the graveyard a one-turn flashback
+# window, after which the spell is exiled.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Past in Flames
+graveyard:Shock
+manapool:{3}{R}{R}
+[PLAYER2]
+life:20
+[DO]
+Past in Flames
+Shock
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Past in Flames
+exile:Shock
+manapool:{0}
+[PLAYER2]
+life:18
+[END]

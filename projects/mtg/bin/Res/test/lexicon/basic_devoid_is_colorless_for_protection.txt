@@ -1,0 +1,24 @@
+# Devoid makes a normally blue permanent colorless, so protection from blue
+# does not prevent it from blocking or dealing combat damage.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Devoid Witness
+[PLAYER2]
+inplay:Lexicon Protection Blue Witness
+life:20
+[DO]
+Lexicon Devoid Witness
+next
+Lexicon Protection Blue Witness
+Lexicon Devoid Witness
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:Lexicon Devoid Witness
+[PLAYER2]
+graveyard:Lexicon Protection Blue Witness
+life:20
+[END]

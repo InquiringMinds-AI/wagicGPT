@@ -1,0 +1,16 @@
+# mycommandplay includes the controller's battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Command Play Zone Witness,Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon My Command Play Zone Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Command Play Zone Witness
+exile:Grizzly Bears
+[PLAYER2]
+[END]

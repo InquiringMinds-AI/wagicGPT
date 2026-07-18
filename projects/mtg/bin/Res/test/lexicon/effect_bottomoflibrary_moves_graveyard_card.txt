@@ -1,0 +1,18 @@
+# bottomoflibrary moves the selected graveyard card to the bottom of the library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Bottom Library Witness
+graveyard:Shock
+[PLAYER2]
+[DO]
+Lexicon Bottom Library Witness
+Shock
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Bottom Library Witness
+library:Shock
+graveyard:
+[PLAYER2]
+[END]

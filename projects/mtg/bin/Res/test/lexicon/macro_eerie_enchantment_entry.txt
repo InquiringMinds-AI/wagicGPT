@@ -1,0 +1,19 @@
+# _EERIE_ watches a Room enchantment entering under the controller (the only
+# form the macro observes) and resolves its payload (opponent gains 1 life).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Eerie Macro Witness
+hand:Lexicon Room Enchantment Witness
+manapool:{2}{U}
+[PLAYER2]
+life:20
+[DO]
+Lexicon Room Enchantment Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Eerie Macro Witness,Lexicon Room Enchantment Witness
+[PLAYER2]
+life:21
+[END]

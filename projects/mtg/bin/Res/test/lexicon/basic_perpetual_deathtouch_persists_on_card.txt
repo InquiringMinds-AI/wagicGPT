@@ -1,0 +1,32 @@
+# A perpetual deathtouch grant is applied to Grizzly Bears while it is in
+# hand, then Grizzly Bears is cast. Because the grant is perpetual it survives
+# the hand->battlefield zone change: when the cast Grizzly Bears is made to
+# fight Hill Giant (via Prey Upon), its two points of damage are lethal, so
+# the 3/3 Hill Giant is destroyed. Grizzly Bears also dies to Hill Giant's
+# three power.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Perpetual Deathtouch Grant Witness
+hand:Grizzly Bears,Prey Upon
+manapool:{1}{G}{G}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Lexicon Perpetual Deathtouch Grant Witness
+Grizzly Bears
+Grizzly Bears
+Grizzly Bears
+no
+Prey Upon
+Grizzly Bears
+Hill Giant
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Perpetual Deathtouch Grant Witness
+graveyard:Grizzly Bears,Prey Upon
+[PLAYER2]
+graveyard:Hill Giant
+[END]

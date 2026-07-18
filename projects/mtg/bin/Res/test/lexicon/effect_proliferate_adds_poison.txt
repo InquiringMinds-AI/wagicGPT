@@ -1,0 +1,27 @@
+# proliferate adds one more poison counter to a player who already has poison.
+# The synthetic witness's activated proliferate cannot drive the proliferation
+# chooser in the headless suite, so use a real proliferate spell (Steady Progress,
+# which resolves _PROLIFERATE_). The `p2` click selects PLAYER2 in the proliferation
+# chooser (covers both the proliferate effect and the proliferation chooser row).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Steady Progress
+manapool:{2}{U}
+library:Forest,Forest
+[PLAYER2]
+poisoncount:1
+[DO]
+Steady Progress
+no
+p2
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Steady Progress
+hand:*
+library:*
+[PLAYER2]
+poisoncount:2
+[END]

@@ -1,0 +1,28 @@
+# Daring Skyjek uses _BATTALION_. With two other attackers it gains flying,
+# allowing it to remain unblocked while the ground attacker is blocked.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Daring Skyjek,Runeclaw Bear,Grizzly Bears
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+Daring Skyjek
+Runeclaw Bear
+Grizzly Bears
+next
+Hill Giant
+Runeclaw Bear
+next
+next
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Daring Skyjek,Grizzly Bears
+graveyard:Runeclaw Bear
+[PLAYER2]
+inplay:Hill Giant
+life:15
+[END]

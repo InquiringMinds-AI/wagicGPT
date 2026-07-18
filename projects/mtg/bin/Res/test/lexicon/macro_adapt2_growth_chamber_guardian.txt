@@ -1,0 +1,20 @@
+# Growth-Chamber Guardian uses _ADAPT2_; its adapted attack deals four damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Growth-Chamber Guardian
+manapool:{2}{G}
+[PLAYER2]
+life:20
+[DO]
+Growth-Chamber Guardian
+goto attackers
+Growth-Chamber Guardian
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Growth-Chamber Guardian
+[PLAYER2]
+life:16
+[END]

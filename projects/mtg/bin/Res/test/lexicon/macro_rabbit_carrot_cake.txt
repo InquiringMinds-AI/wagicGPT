@@ -1,0 +1,20 @@
+# Carrot Cake uses _RABBITTOKEN_ on entry. The token and the accompanying
+# scry are both observable after casting the Food artifact.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Carrot Cake
+library:Forest
+manapool:{1}{W}
+[PLAYER2]
+[DO]
+Carrot Cake
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Carrot Cake,*
+library:Forest
+manapool:{0}
+[PLAYER2]
+[END]

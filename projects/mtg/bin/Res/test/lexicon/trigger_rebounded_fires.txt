@@ -1,0 +1,20 @@
+# @rebounded fires when a rebound spell reaches the controller's next upkeep.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Rebounded Trigger Witness
+[PLAYER2]
+[DO]
+Lexicon Rebounded Trigger Witness
+goto end
+goto upkeep
+goto end
+goto upkeep
+choice 0
+[ASSERT]
+UPKEEP
+[PLAYER1]
+exile:Lexicon Rebounded Trigger Witness
+life:21
+[PLAYER2]
+[END]

@@ -1,0 +1,18 @@
+# exchangelife swaps the controller's life total with the opponent's.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Exchange Life Witness
+life:5
+[PLAYER2]
+life:20
+[DO]
+Lexicon Exchange Life Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Exchange Life Witness
+life:20
+[PLAYER2]
+life:5
+[END]

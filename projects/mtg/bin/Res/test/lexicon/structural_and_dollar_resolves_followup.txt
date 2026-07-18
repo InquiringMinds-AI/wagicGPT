@@ -1,0 +1,16 @@
+# and!(...)! attaches a follow-up ability to the first effect.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon And Dollar Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon And Dollar Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon And Dollar Witness
+life:22
+[PLAYER2]
+[END]

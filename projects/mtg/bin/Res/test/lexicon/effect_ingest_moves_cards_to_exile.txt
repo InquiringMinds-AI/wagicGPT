@@ -1,0 +1,17 @@
+# ingest:N exiles the targeted player's milled cards.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Ingest Effect Witness
+[PLAYER2]
+library:Forest,Island
+[DO]
+Lexicon Ingest Effect Witness
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Ingest Effect Witness
+[PLAYER2]
+exile:Forest,Island
+[END]

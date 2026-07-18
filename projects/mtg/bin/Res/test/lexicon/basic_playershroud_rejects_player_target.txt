@@ -1,0 +1,21 @@
+# playershroud makes the controller an illegal player target.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Lexicon Player Shroud Witness
+life:20
+[DO]
+Lightning Bolt
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Lexicon Player Shroud Witness
+life:20
+[END]

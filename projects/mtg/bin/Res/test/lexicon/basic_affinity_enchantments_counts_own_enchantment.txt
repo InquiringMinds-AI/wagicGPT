@@ -1,0 +1,18 @@
+# affinityenchantments counts an enchantment on the caster's battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Fervor
+hand:Lexicon Affinity Enchantments Witness
+manapool:{2}
+[PLAYER2]
+[DO]
+Lexicon Affinity Enchantments Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Fervor,Lexicon Affinity Enchantments Witness
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

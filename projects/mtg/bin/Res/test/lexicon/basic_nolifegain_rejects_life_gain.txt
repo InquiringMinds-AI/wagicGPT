@@ -1,0 +1,26 @@
+# nolifegain prevents the CONTROLLER of Giant Cindermaw from gaining life.
+# The active player controls Cindermaw and casts Healing Salve's life-gain
+# mode on itself; the gain is denied so its life total stays 10.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Giant Cindermaw
+hand:Healing Salve
+manapool:{W}
+life:10
+[PLAYER2]
+life:20
+[DO]
+Healing Salve
+choice 0
+p1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Giant Cindermaw
+graveyard:Healing Salve
+manapool:{0}
+life:10
+[PLAYER2]
+life:20
+[END]

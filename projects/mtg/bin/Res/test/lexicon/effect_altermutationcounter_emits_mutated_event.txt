@@ -1,0 +1,17 @@
+# altermutationcounter is parsed through ability$ at resolution, increments
+# the source mutation state, and emits the @mutated event.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Alter Mutation Counter Effect Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Alter Mutation Counter Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Alter Mutation Counter Effect Witness
+life:21
+[PLAYER2]
+[END]

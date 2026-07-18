@@ -1,0 +1,24 @@
+# Argivian Cavalier (2/2) enlists a nonattacking Hill Giant (3 power), tapping
+# it to add its power to the attacking Cavalier for a five-damage hit (P2 -> 15).
+# From COMBATATTACKERS it takes three 'next' commands to land on COMBATEND
+# (attackers -> blockers -> damage -> end).
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Argivian Cavalier,Hill Giant
+[PLAYER2]
+life:20
+[DO]
+Argivian Cavalier
+Hill Giant
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Argivian Cavalier,Hill Giant
+tappedinplay:2
+[PLAYER2]
+life:15
+[END]

@@ -1,0 +1,23 @@
+# Double strike deals combat damage in both combat-damage steps.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Boros Swiftblade
+[PLAYER2]
+inplay:grizzly bears
+life:20
+[DO]
+Boros Swiftblade
+next
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:Boros Swiftblade
+[PLAYER2]
+graveyard:grizzly bears
+life:20
+[END]

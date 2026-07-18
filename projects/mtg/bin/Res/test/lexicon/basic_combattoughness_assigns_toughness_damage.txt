@@ -1,0 +1,22 @@
+# Doran's combattoughness makes each creature assign combat damage equal to its
+# toughness. The 1/3 witness attacks unblocked and should deal 3 (its
+# toughness) to the defending player: life 20 -> 17.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Doran, the Siege Tower,Lexicon Combat Toughness Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon Combat Toughness Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Doran, the Siege Tower,Lexicon Combat Toughness Witness
+tappedinplay:1
+[PLAYER2]
+life:17
+[END]

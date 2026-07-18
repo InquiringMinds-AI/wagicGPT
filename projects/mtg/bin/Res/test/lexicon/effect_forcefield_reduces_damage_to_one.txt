@@ -1,0 +1,25 @@
+# forcefield reduces damage dealt to its controller to one point. Both
+# witnesses are controlled by the active player (P1): the forcefield witness
+# sets P1's forcefield, then the dispatch witness deals two damage aimed at
+# P1. Because forcefield is active, P1 loses only one life (20 -> 19) instead
+# of two.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Forcefield Effect Witness,Lexicon Field Dispatch Witness
+life:20
+[PLAYER2]
+life:20
+[DO]
+Lexicon Forcefield Effect Witness
+Lexicon Field Dispatch Witness
+p1
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Forcefield Effect Witness,Lexicon Field Dispatch Witness
+life:19
+[PLAYER2]
+life:20
+[END]

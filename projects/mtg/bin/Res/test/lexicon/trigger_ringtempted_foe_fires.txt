@@ -1,0 +1,15 @@
+# @ringtemptedfoeof fires when the opponent is tempted by the Ring.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Ringtempted Foe Trigger Witness,Lexicon Foe Ring Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Foe Ring Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Ringtempted Foe Trigger Witness,Lexicon Foe Ring Effect Witness
+life:21
+[PLAYER2]
+[END]

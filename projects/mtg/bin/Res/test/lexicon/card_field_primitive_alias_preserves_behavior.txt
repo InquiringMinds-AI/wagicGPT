@@ -1,0 +1,26 @@
+# primitive= aliases a production definition without losing its behavior: the
+# alias witness references "Lexicon Life Effect Witness" (auto={0}:life:2
+# controller), so activating the alias should gain 2 life (20 -> 22).
+# ENGINE-BLOCKED: primitive= does not copy the referenced primitive's data when
+# loaded via a primitives file (the path the test harness uses). The alias card
+# ends up empty -- it inherits neither the base ability nor even its type/P-T.
+# Verified: pointing the alias at a main-DB card (Grizzly Bears) also fails to
+# make it a 2/2, so the alias never inherits anything here. primitive= is
+# documented for a set's _cards.dat, which the harness does not exercise, so
+# there is no in-harness path to a passing observation. Retained as the
+# regression witness for if setPrimitive-by-name is supported in this path.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Primitive Alias Gameplay Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Primitive Alias Gameplay Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Primitive Alias Gameplay Witness
+life:22
+[PLAYER2]
+[END]

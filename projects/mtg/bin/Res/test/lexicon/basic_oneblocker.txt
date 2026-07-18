@@ -1,0 +1,25 @@
+# oneblocker rejects a second blocker after the first legal blocker is chosen.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Stalking Tiger
+[PLAYER2]
+inplay:Grizzly Bears,Hill Giant
+life:20
+[DO]
+Stalking Tiger
+next
+Grizzly Bears
+Hill Giant
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Stalking Tiger
+tappedinplay:1
+[PLAYER2]
+inplay:Hill Giant
+graveyard:Grizzly Bears
+life:20
+[END]

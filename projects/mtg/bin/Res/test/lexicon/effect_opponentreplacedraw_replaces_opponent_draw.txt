@@ -1,0 +1,21 @@
+# opponentreplacedraw applies its nested effect to the opponent's draw.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opponent Replace Draw Witness
+[PLAYER2]
+library:Island
+life:20
+[DO]
+goto end
+goto draw
+choice 0
+[ASSERT]
+DRAW
+[PLAYER1]
+inplay:Lexicon Opponent Replace Draw Witness
+[PLAYER2]
+library:Island
+hand:
+life:21
+[END]

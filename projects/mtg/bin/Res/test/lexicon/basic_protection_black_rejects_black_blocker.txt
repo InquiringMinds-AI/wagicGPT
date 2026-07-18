@@ -1,0 +1,23 @@
+# Protection from black prevents a black creature from blocking.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Protection Black Witness
+[PLAYER2]
+inplay:Drudge Skeletons
+life:20
+[DO]
+Lexicon Protection Black Witness
+next
+Drudge Skeletons
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Protection Black Witness
+tappedinplay:1
+[PLAYER2]
+inplay:Drudge Skeletons
+life:18
+[END]

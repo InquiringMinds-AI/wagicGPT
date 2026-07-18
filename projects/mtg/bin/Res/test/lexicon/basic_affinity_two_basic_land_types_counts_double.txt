@@ -1,0 +1,18 @@
+# affinitytwobasiclandtypes applies two generic reduction per distinct type.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Island
+hand:Lexicon Affinity Two Basic Types Witness
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Affinity Two Basic Types Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Island,Lexicon Affinity Two Basic Types Witness
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

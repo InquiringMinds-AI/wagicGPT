@@ -1,0 +1,19 @@
+# Decayed creatures sacrifice themselves at the end of combat after attacking.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Zombie Dec
+[PLAYER2]
+life:20
+[DO]
+Zombie Dec
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:Zombie Dec
+[PLAYER2]
+life:18
+[END]

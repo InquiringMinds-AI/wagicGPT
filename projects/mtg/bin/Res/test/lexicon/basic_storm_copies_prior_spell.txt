@@ -1,0 +1,21 @@
+# Storm copies the spell once for the one spell cast before it (the Filler).
+# The witness and its one storm copy each mill one card from the opponent's
+# library (deplete:1 opponent), emptying P2's two-card library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Storm Filler,Lexicon Storm Witness
+[PLAYER2]
+library:Forest,Island
+life:20
+[DO]
+Lexicon Storm Filler
+Lexicon Storm Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Storm Filler,Lexicon Storm Witness
+[PLAYER2]
+graveyard:Forest,Island
+life:20
+[END]

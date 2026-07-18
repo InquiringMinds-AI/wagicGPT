@@ -1,0 +1,20 @@
+# affinityallcreatures counts creatures controlled by both players.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Lexicon Affinity All Creatures Witness
+manapool:{1}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Lexicon Affinity All Creatures Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Lexicon Affinity All Creatures Witness
+hand:
+manapool:{0}
+[PLAYER2]
+inplay:Hill Giant
+[END]

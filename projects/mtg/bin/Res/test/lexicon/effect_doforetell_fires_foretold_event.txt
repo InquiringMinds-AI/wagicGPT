@@ -1,0 +1,15 @@
+# doforetell performs the foretell event observed by @foretold.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon DoForetell Effect Witness
+[PLAYER2]
+[DO]
+Lexicon DoForetell Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+exile:Lexicon DoForetell Effect Witness
+life:21
+[PLAYER2]
+[END]

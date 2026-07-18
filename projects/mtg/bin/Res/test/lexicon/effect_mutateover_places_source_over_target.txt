@@ -1,0 +1,23 @@
+# Mutate Over places Archipelagore on top of a non-Human creature. Its
+# mutation trigger then taps a second creature, proving the stack was formed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Archipelagore
+inplay:Grizzly Bears,Hill Giant
+manapool:{5}{U}
+[PLAYER2]
+[DO]
+Archipelagore
+choice 0
+Grizzly Bears
+Archipelagore
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Archipelagore,Grizzly Bears,Hill Giant
+tappedinplay:1
+manapool:{0}
+[PLAYER2]
+[END]

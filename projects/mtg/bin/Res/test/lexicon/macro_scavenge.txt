@@ -1,0 +1,23 @@
+# Scavenge activates from the graveyard, adds two +1/+1 counters to a target,
+# and the enlarged creature's combat damage makes the counters observable.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Scavenge Macro Witness
+inplay:Lexicon Synthetic Vanilla
+[PLAYER2]
+life:20
+[DO]
+Lexicon Scavenge Macro Witness
+Lexicon Synthetic Vanilla
+goto attackers
+Lexicon Synthetic Vanilla
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Vanilla
+exile:Lexicon Scavenge Macro Witness
+[PLAYER2]
+life:17
+[END]

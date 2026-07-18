@@ -1,0 +1,18 @@
+# Call to the Feast uses _WHITEVAMPIRE_ three times to create lifelinking
+# Vampire tokens.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Call to the Feast
+manapool:{2}{W}{B}
+[PLAYER2]
+[DO]
+Call to the Feast
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Call to the Feast
+inplay:*,*,*
+manapool:{0}
+[PLAYER2]
+[END]

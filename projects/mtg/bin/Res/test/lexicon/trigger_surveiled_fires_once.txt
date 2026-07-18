@@ -1,0 +1,19 @@
+# @surveiled fires when the source resolves a surveil effect.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Surveiled Trigger Witness
+library:Forest,Island
+life:20
+[PLAYER2]
+[DO]
+Lexicon Surveiled Trigger Witness
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Surveiled Trigger Witness
+library:Forest,Island
+life:21
+[PLAYER2]
+[END]

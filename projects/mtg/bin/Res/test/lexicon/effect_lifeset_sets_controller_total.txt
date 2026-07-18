@@ -1,0 +1,16 @@
+# lifeset:N sets the controller's life total rather than adding to it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Life Set Effect Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Life Set Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Life Set Effect Witness
+life:7
+[PLAYER2]
+[END]

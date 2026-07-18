@@ -1,0 +1,31 @@
+# The fifteen Amass variants all resolve against a shared Army. Each witness
+# also gains one life, making every macro invocation independently observable.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Zombie Amass 1 Macro Witness,Lexicon Zombie Amass 2 Macro Witness,Lexicon Zombie Amass 3 Macro Witness,Lexicon Zombie Amass 4 Macro Witness,Lexicon Zombie Amass 5 Macro Witness,Lexicon Orc Amass 1 Macro Witness,Lexicon Orc Amass 2 Macro Witness,Lexicon Orc Amass 3 Macro Witness,Lexicon Orc Amass 4 Macro Witness,Lexicon Orc Amass 5 Macro Witness,Lexicon Sliver Amass 1 Macro Witness,Lexicon Sliver Amass 2 Macro Witness,Lexicon Sliver Amass 3 Macro Witness,Lexicon Sliver Amass 4 Macro Witness,Lexicon Sliver Amass 5 Macro Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Zombie Amass 1 Macro Witness
+Lexicon Zombie Amass 2 Macro Witness
+Lexicon Zombie Amass 3 Macro Witness
+Lexicon Zombie Amass 4 Macro Witness
+Lexicon Zombie Amass 5 Macro Witness
+Lexicon Orc Amass 1 Macro Witness
+Lexicon Orc Amass 2 Macro Witness
+Lexicon Orc Amass 3 Macro Witness
+Lexicon Orc Amass 4 Macro Witness
+Lexicon Orc Amass 5 Macro Witness
+Lexicon Sliver Amass 1 Macro Witness
+Lexicon Sliver Amass 2 Macro Witness
+Lexicon Sliver Amass 3 Macro Witness
+Lexicon Sliver Amass 4 Macro Witness
+Lexicon Sliver Amass 5 Macro Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Zombie Amass 1 Macro Witness,Lexicon Zombie Amass 2 Macro Witness,Lexicon Zombie Amass 3 Macro Witness,Lexicon Zombie Amass 4 Macro Witness,Lexicon Zombie Amass 5 Macro Witness,Lexicon Orc Amass 1 Macro Witness,Lexicon Orc Amass 2 Macro Witness,Lexicon Orc Amass 3 Macro Witness,Lexicon Orc Amass 4 Macro Witness,Lexicon Orc Amass 5 Macro Witness,Lexicon Sliver Amass 1 Macro Witness,Lexicon Sliver Amass 2 Macro Witness,Lexicon Sliver Amass 3 Macro Witness,Lexicon Sliver Amass 4 Macro Witness,Lexicon Sliver Amass 5 Macro Witness,*
+life:35
+[PLAYER2]
+[END]

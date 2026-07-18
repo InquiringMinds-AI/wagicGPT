@@ -1,0 +1,20 @@
+# Exalted gives a solo attacking creature +1/+1 until end of combat.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Akrasan Squire
+[PLAYER2]
+life:20
+[DO]
+Akrasan Squire
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Akrasan Squire
+tappedinplay:1
+[PLAYER2]
+life:18
+[END]

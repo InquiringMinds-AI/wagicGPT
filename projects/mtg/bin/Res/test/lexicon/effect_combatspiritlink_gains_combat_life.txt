@@ -1,0 +1,21 @@
+# combatspiritlink gains life from combat damage. Sunhome Enforcer supplies
+# the production primitive and attacks without a blocker.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Sunhome Enforcer
+life:20
+[PLAYER2]
+life:20
+[DO]
+goto attackers
+Sunhome Enforcer
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Sunhome Enforcer
+life:22
+[PLAYER2]
+life:18
+[END]

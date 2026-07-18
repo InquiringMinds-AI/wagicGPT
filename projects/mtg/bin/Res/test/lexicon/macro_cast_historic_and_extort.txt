@@ -1,0 +1,23 @@
+# Casting a historic (legendary) artifact fires _CASTHISTORIC_ (controller gains
+# 1 life); the same cast gives the Extort witness its trigger, and paying {W/B}
+# drains the opponent 1 and gains the controller 1. Net: P1 20 -> 22, P2 19.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cast Historic Macro Witness,Lexicon Extort Macro Witness
+hand:Lexicon Historic Cast Card
+manapool:{W}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Lexicon Historic Cast Card
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cast Historic Macro Witness,Lexicon Extort Macro Witness,Lexicon Historic Cast Card
+life:22
+[PLAYER2]
+life:19
+[END]

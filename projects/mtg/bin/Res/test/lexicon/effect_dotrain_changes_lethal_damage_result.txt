@@ -1,0 +1,28 @@
+# dotrain puts a training counter on an ATTACKING creature (AATrain requires
+# the target to be an attacker); the added +1/+1 lets the Bear survive a
+# lethal Shock and connect for three combat damage.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Dotrain Effect Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+Grizzly Bears
+Lexicon Dotrain Effect Witness
+Grizzly Bears
+Shock
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Dotrain Effect Witness,Grizzly Bears
+graveyard:Shock
+[PLAYER2]
+life:17
+[END]

@@ -1,0 +1,24 @@
+# Trample assigns excess combat damage to the defending player.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Duskdale Wurm
+[PLAYER2]
+inplay:grizzly bears
+life:20
+[DO]
+Duskdale Wurm
+next
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Duskdale Wurm
+tappedinplay:1
+[PLAYER2]
+graveyard:grizzly bears
+life:15
+[END]

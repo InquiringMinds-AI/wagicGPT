@@ -1,0 +1,16 @@
+# @noncombatdamageof fires for non-combat damage to the controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Noncombatdamageof Trigger Witness,Lexicon Damage Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Damage Effect Witness
+p1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Noncombatdamageof Trigger Witness,Lexicon Damage Effect Witness
+life:19
+[PLAYER2]
+[END]

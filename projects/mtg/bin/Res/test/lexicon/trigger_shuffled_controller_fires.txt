@@ -1,0 +1,17 @@
+# @shuffledof fires when the controller shuffles their library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Shuffled Trigger Witness
+library:Grizzly Bears,Hill Giant
+[PLAYER2]
+[DO]
+Lexicon Shuffled Trigger Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Shuffled Trigger Witness
+life:21
+library:*,*
+[PLAYER2]
+[END]

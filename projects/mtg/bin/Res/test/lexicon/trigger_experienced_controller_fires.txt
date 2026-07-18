@@ -1,0 +1,21 @@
+# @experiencedof fires when the controller receives an experience counter.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Experienced Trigger Witness,Meren of Clan Nel Toth,Grizzly Bears
+hand:Wrecking Ball
+manapool:{2}{B}{R}
+[PLAYER2]
+[DO]
+Wrecking Ball
+Grizzly Bears
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Experienced Trigger Witness,Meren of Clan Nel Toth
+graveyard:Wrecking Ball,Grizzly Bears
+life:21
+[PLAYER2]
+[END]

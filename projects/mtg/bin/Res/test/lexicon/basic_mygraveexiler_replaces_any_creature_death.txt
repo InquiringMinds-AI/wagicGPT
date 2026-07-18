@@ -1,0 +1,21 @@
+# mygraveexiler: the controller's cards exile instead of going to the graveyard.
+# So the dying Grizzly Bears AND the resolved Wrecking Ball both land in exile.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Grave Exiler Witness,Grizzly Bears
+hand:Wrecking Ball
+manapool:{2}{B}{R}
+[PLAYER2]
+[DO]
+Wrecking Ball
+Grizzly Bears
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon My Grave Exiler Witness
+exile:Grizzly Bears,Wrecking Ball
+manapool:{0}
+[PLAYER2]
+[END]

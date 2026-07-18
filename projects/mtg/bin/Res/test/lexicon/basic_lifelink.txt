@@ -1,0 +1,22 @@
+# Lifelink gains life equal to combat damage dealt.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Child of Night
+life:10
+[PLAYER2]
+life:20
+[DO]
+Child of Night
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Child of Night
+tappedinplay:1
+life:12
+[PLAYER2]
+life:18
+[END]

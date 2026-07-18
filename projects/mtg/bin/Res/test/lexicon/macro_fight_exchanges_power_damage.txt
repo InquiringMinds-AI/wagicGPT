@@ -1,0 +1,22 @@
+# Epic Confrontation uses _FIGHT_: the temporary P/T boost lets Grizzly Bears
+# win the power exchange against Hill Giant.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Epic Confrontation
+manapool:{1}{G}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Epic Confrontation
+Grizzly Bears
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+graveyard:Epic Confrontation
+[PLAYER2]
+graveyard:Hill Giant
+[END]

@@ -1,0 +1,19 @@
+# countb stores the number of matching opposing creatures for a later effect.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Countb Behavior Witness
+library:Forest,Island,Mountain
+[PLAYER2]
+inplay:Grizzly Bears,Grizzly Bears
+[DO]
+Lexicon Countb Behavior Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Countb Behavior Witness
+hand:Island,Mountain
+library:Forest
+[PLAYER2]
+inplay:Grizzly Bears,Grizzly Bears
+[END]

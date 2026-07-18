@@ -1,0 +1,25 @@
+# treason: Arc Runner (5/1, haste) is forced to attack the turn it is cast and
+# is sacrificed as the end step is crossed. Cast it, then advance past the end
+# step: it attacks for 5 (life 20 -> 15) and the treason sacrifice puts it in
+# the graveyard. We stop at the following turn's Upkeep (Cleanup is transient
+# and can't be landed on reliably).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Arc Runner
+manapool:{2}{R}
+[PLAYER2]
+life:20
+[DO]
+Arc Runner
+goto end
+next
+next
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+graveyard:Arc Runner
+[PLAYER2]
+life:15
+[END]

@@ -1,0 +1,21 @@
+# counterdeath returns a creature tapped with a +1/+1 counter after it dies.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Feign Death,Shock
+manapool:{B}{R}
+[PLAYER2]
+[DO]
+Feign Death
+Grizzly Bears
+Shock
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+tappedinplay:1
+graveyard:Feign Death,Shock
+[PLAYER2]
+[END]

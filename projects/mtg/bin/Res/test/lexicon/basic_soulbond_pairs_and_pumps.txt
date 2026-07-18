@@ -1,0 +1,31 @@
+# Druid's Familiar's soulbond pairs it with another creature; while paired each
+# gets +2/+2. Soulbond pairing fires only for a creature the rule OBSERVED
+# entering, so Druid's Familiar must be CAST in [DO] (pre-placing via INIT skips
+# the entry). The may-pair prompt is accepted with `choice 0`, then the pairable
+# Grizzly Bears is chosen. Grizzly (pre-placed, no summoning sickness) then
+# attacks as a 4/4: 4 combat damage, life 20 -> 16 (unpaired it would deal 2).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Druid's Familiar
+manapool:{3}{G}
+[PLAYER2]
+life:20
+[DO]
+Druid's Familiar
+choice 0
+Grizzly Bears
+next
+next
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Grizzly Bears,Druid's Familiar
+[PLAYER2]
+life:16
+[END]

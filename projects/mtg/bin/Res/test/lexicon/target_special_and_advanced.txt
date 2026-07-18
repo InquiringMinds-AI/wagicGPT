@@ -1,0 +1,41 @@
+# Direct behavior witnesses for current-target aliases, damageable targets,
+# casting-zone composites, and the remaining macro/effect cards.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Target Witness,Lexicon My Forced Target Witness,Lexicon Any Target Witness,Lexicon My Casting Zone Source,Lexicon Splice Arcane Witness
+graveyard:Lexicon My Casting Zone Target
+hand:Lexicon Champion Macro Witness,Lexicon Ripple Macro Witness,Lexicon Arcane Host,Lexicon Arcane Splice Card
+library:Lexicon Ripple Macro Witness
+[PLAYER2]
+inplay:Grizzly Bears,Hill Giant,Lexicon Opponent Reveal Trigger Witness
+graveyard:Lexicon Opponent Casting Zone Target
+life:20
+[DO]
+Lexicon My Target Witness
+Grizzly Bears
+Lexicon My Forced Target Witness
+Hill Giant
+Lexicon Any Target Witness
+p2
+Lexicon My Casting Zone Source
+Lexicon My Casting Zone Target
+Lexicon Champion Macro Witness
+choice 0
+Grizzly Bears
+Lexicon Splice Arcane Witness
+Lexicon Arcane Host
+Lexicon Ripple Macro Witness
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:*
+library:*
+hand:*,*,*,*
+inplay:*,*,*,*,*
+[PLAYER2]
+graveyard:*
+inplay:*,*,*
+life:20
+[END]

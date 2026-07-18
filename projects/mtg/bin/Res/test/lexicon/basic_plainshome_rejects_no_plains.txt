@@ -1,0 +1,24 @@
+# plainshome (landhome): the witness can attack only if the DEFENDER controls
+# a Plains, and is sacrificed only if its CONTROLLER controls no Plains. Here
+# the controller (P1) has a Plains (so it is NOT sacrificed) but the defender
+# (P2) has none, so the witness cannot attack. With no legal attacker the
+# combat steps auto-skip and two nexts land in Main phase 2.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Plainshome Witness,Plains
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Lexicon Plainshome Witness
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Lexicon Plainshome Witness,Plains
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[END]

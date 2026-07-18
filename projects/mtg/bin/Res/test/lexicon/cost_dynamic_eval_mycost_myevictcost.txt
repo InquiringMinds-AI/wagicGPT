@@ -1,0 +1,26 @@
+# The three dynamic mana-cost forms pay from observable resources: eval(1) pays
+# {1}, {mycost} pays the source's printed cost ({1}{G}), and {myevictcost} pays
+# the imprinted card's cost. Shock ({R}) is imprinted via the Myevictcost
+# witness's ETB, so its activation should cost {R}. Total spend: {2}{G}{R}.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Eval Cost Witness,Lexicon Mycost Witness
+hand:Lexicon Myevictcost Witness,Shock
+manapool:{2}{G}{R}
+life:20
+[PLAYER2]
+[DO]
+Lexicon Eval Cost Witness
+Lexicon Mycost Witness
+Lexicon Myevictcost Witness
+Shock
+Lexicon Myevictcost Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Eval Cost Witness,Lexicon Mycost Witness,Lexicon Myevictcost Witness
+exile:Shock
+life:23
+[PLAYER2]
+[END]

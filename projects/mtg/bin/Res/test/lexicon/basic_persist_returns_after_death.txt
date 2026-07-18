@@ -1,0 +1,19 @@
+# Persist returns a creature after its first death.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Persist Witness
+hand:Wrecking Ball
+manapool:{2}{R}{B}
+[PLAYER2]
+[DO]
+Wrecking Ball
+Lexicon Persist Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Persist Witness
+graveyard:Wrecking Ball
+manapool:{0}
+[PLAYER2]
+[END]

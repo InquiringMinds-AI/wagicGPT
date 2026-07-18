@@ -1,0 +1,16 @@
+# cantcrew prevents the permanent from being used to crew a Vehicle.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Crew Witness,Smuggler's Copter
+[PLAYER2]
+[DO]
+Smuggler's Copter
+Lexicon Cant Crew Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Crew Witness,Smuggler's Copter
+tappedinplay:0
+[PLAYER2]
+[END]

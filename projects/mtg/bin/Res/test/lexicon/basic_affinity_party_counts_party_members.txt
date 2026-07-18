@@ -1,0 +1,17 @@
+# affinityparty counts the four party creature classes.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Party Cleric,Lexicon Party Rogue,Lexicon Party Warrior,Lexicon Party Wizard
+hand:Lexicon Affinity Party Witness
+[PLAYER2]
+[DO]
+Lexicon Affinity Party Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Party Cleric,Lexicon Party Rogue,Lexicon Party Warrior,Lexicon Party Wizard,Lexicon Affinity Party Witness
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

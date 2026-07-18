@@ -1,0 +1,29 @@
+# resetdamage clears already-marked damage so accumulated damage does not kill.
+# A 3/3 Hill Giant takes 2 from the first Shock (survives), then resetdamage
+# clears the 2, then the second Shock deals 2 (survives again). Without the
+# reset the two Shocks would total 4 >= 3 and kill it, so its survival is the
+# resetdamage effect. (Grizzly Bears in the original could not survive even one
+# 2-damage Shock -- premise impossible; replaced with a 3/3 carrier.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Reset Damage Witness,Hill Giant
+hand:Shock,Shock
+manapool:{R}{R}
+[PLAYER2]
+[DO]
+Shock
+Hill Giant
+Lexicon Reset Damage Witness
+Hill Giant
+Shock
+Hill Giant
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Reset Damage Witness,Hill Giant
+graveyard:Shock,Shock
+manapool:{0}
+[PLAYER2]
+[END]

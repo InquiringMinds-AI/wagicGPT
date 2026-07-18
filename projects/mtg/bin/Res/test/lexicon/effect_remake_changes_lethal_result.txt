@@ -1,0 +1,21 @@
+# remake is the colon-delimited form of becomes and changes a creature to
+# 4/4, allowing it to survive a Lightning Bolt.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Remake Effect Witness,Grizzly Bears
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Remake Effect Witness
+Grizzly Bears
+Lightning Bolt
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Remake Effect Witness,Grizzly Bears
+graveyard:Lightning Bolt
+[PLAYER2]
+[END]

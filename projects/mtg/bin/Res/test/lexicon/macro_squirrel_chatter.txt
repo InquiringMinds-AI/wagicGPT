@@ -1,0 +1,17 @@
+# Chatter of the Squirrel uses _SQUIRRELTOKEN_.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Chatter of the Squirrel
+manapool:{G}
+[PLAYER2]
+[DO]
+Chatter of the Squirrel
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Chatter of the Squirrel
+inplay:*
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,23 @@
+# poisontentoxic adds exactly 10 poison counters when the creature deals combat
+# damage to a player (plus its 1 combat damage: life 20 -> 19). 10 poison is
+# lethal, which halts phase progression, so the observation is made at the
+# combat-damage step rather than COMBATEND (unreachable after the kill).
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Toxic Ten Witness
+[PLAYER2]
+life:20
+poisoncount:0
+[DO]
+Lexicon Toxic Ten Witness
+next
+next
+[ASSERT]
+combatdamage
+[PLAYER1]
+inplay:Lexicon Toxic Ten Witness
+[PLAYER2]
+life:19
+poisoncount:10
+[END]

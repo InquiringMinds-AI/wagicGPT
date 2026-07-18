@@ -1,0 +1,17 @@
+# Metrognome uses _GNOMETOKEN_ when its activated ability resolves.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Metrognome
+manapool:{4}
+[PLAYER2]
+[DO]
+Metrognome
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Metrognome,*
+tappedinplay:1
+manapool:{0}
+[PLAYER2]
+[END]

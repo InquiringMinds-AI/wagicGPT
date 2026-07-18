@@ -1,0 +1,25 @@
+# A creature with threeblockers cannot be blocked by only one or two
+# creatures.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Troll of Khazad-dum
+[PLAYER2]
+inplay:grizzly bears,hill giant
+life:20
+[DO]
+Troll of Khazad-dum
+next
+Grizzly Bears
+Hill Giant
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Troll of Khazad-dum
+tappedinplay:1
+[PLAYER2]
+inplay:grizzly bears,hill giant
+life:14
+[END]

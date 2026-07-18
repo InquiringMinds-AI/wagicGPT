@@ -1,0 +1,23 @@
+# reachshadow allows a non-shadow blocker to block a shadow attacker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Dauthi Horror
+[PLAYER2]
+inplay:Wall of Diffusion
+life:20
+[DO]
+Dauthi Horror
+next
+Wall of Diffusion
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Dauthi Horror
+tappedinplay:1
+[PLAYER2]
+inplay:Wall of Diffusion
+life:20
+[END]

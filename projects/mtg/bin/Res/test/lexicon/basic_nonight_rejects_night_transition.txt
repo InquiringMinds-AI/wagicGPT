@@ -1,0 +1,17 @@
+# nonight prevents the global day/night state from transforming a daybound
+# permanent during an otherwise empty turn.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Angel of Eternal Dawn,Ballista Watcher
+[PLAYER2]
+[DO]
+goto end
+goto end
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Angel of Eternal Dawn,Ballista Watcher
+[PLAYER2]
+[END]

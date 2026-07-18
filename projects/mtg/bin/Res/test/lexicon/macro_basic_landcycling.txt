@@ -1,0 +1,19 @@
+# Basic landcycling pays its cycling cost, searches for a basic land, and puts
+# that land into the controller's hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Basic Landcycling Macro Witness
+library:Forest,Island
+[PLAYER2]
+[DO]
+Lexicon Basic Landcycling Macro Witness
+Forest
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Forest
+graveyard:Lexicon Basic Landcycling Macro Witness
+library:Island
+[PLAYER2]
+[END]

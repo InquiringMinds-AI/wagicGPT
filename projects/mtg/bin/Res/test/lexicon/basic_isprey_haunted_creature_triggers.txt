@@ -1,0 +1,29 @@
+# isprey marks a creature haunted by another card and makes the prey
+# restriction match when that creature leaves the battlefield. The active
+# player (P1) haunts the opponent's Grizzly Bears, then destroys it with
+# Shock; because Grizzly Bears is now prey, the @movedto(creature[isprey])
+# trigger fires and P1 gains one life.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Haunt Effect Witness,Lexicon IsPrey Trigger Witness
+hand:Shock
+manapool:{R}
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Lexicon Haunt Effect Witness
+Grizzly Bears
+Shock
+Grizzly Bears
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Haunt Effect Witness,Lexicon IsPrey Trigger Witness
+graveyard:Shock
+life:21
+[PLAYER2]
+graveyard:Grizzly Bears
+[END]

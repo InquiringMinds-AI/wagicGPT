@@ -1,0 +1,23 @@
+# evadebigger prevents a higher-power creature from blocking.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Silumgar Assassin
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+Silumgar Assassin
+next
+Hill Giant
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Silumgar Assassin
+tappedinplay:1
+[PLAYER2]
+inplay:Hill Giant
+life:18
+[END]

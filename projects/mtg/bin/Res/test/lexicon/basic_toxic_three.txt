@@ -1,0 +1,22 @@
+# Toxic 3 is distinct from toxic 1/2 and adds three poison counters.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Glissa's Retriever
+[PLAYER2]
+life:20
+poisoncount:0
+[DO]
+Glissa's Retriever
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Glissa's Retriever
+tappedinplay:1
+[PLAYER2]
+life:14
+poisoncount:3
+[END]

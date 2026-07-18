@@ -1,0 +1,13 @@
+# Composite zones, quantity prefixes, and special whole-string choosers are
+# constructed while the synthetic primitive is loaded.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Target Catalog
+[PLAYER2]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Target Catalog
+[PLAYER2]
+[END]

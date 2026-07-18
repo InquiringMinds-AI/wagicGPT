@@ -1,0 +1,22 @@
+# cantbeblockedby prevents a sufficiently large blocker from blocking.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Amrou Kithkin
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+Amrou Kithkin
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Amrou Kithkin
+tappedinplay:1
+[PLAYER2]
+inplay:Hill Giant
+life:19
+[END]

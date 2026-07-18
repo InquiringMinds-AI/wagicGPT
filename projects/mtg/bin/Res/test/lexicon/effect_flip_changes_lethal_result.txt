@@ -1,0 +1,25 @@
+# flip transforms a creature into its named flip face, changing its body. The
+# flip witness turns Grizzly Bears (2/2) into Serra Angel (4/4); the enlarged
+# toughness is observed by its survival against a Lightning Bolt, which deals
+# only three damage. A 2/2 Grizzly Bears would have died to the bolt.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Flip Effect Witness,Grizzly Bears
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Flip Effect Witness
+Grizzly Bears
+no
+Lightning Bolt
+Serra Angel
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Flip Effect Witness,Serra Angel
+graveyard:Lightning Bolt
+[PLAYER2]
+[END]

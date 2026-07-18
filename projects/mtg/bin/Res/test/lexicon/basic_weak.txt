@@ -1,0 +1,22 @@
+# weak prevents the creature from blocking a higher-power attacker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Hill Giant
+[PLAYER2]
+inplay:Lexicon Weak Witness
+life:20
+[DO]
+Hill Giant
+next
+Lexicon Weak Witness
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Hill Giant
+[PLAYER2]
+inplay:Lexicon Weak Witness
+life:17
+[END]

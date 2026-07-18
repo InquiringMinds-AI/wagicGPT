@@ -1,0 +1,15 @@
+# conjure creates the named card in the requested zone.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Conjure Witness
+[PLAYER2]
+[DO]
+Lexicon Conjure Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Conjure Witness
+hand:Grizzly Bears
+[PLAYER2]
+[END]

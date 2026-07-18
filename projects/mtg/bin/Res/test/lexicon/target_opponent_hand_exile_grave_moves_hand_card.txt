@@ -1,0 +1,18 @@
+# opponenthandexilegrave includes a card in the opponent's hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opponent Hand Exile Grave Target Witness
+[PLAYER2]
+hand:Lexicon Synthetic Vanilla
+[DO]
+Lexicon Opponent Hand Exile Grave Target Witness
+Lexicon Synthetic Vanilla
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opponent Hand Exile Grave Target Witness
+[PLAYER2]
+exile:Lexicon Synthetic Vanilla
+hand:
+[END]

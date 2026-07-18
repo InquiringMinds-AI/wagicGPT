@@ -1,0 +1,15 @@
+# add{G} adds green mana to the controller's pool.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Add Mana Effect Witness
+[PLAYER2]
+[DO]
+Lexicon Add Mana Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Add Mana Effect Witness
+manapool:{G}
+[PLAYER2]
+[END]

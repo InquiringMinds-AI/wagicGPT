@@ -1,0 +1,22 @@
+# oppgraveexiler replaces an opponent creature's death with exile.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Opp Grave Exiler Witness
+hand:Wrecking Ball
+manapool:{2}{B}{R}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Wrecking Ball
+Hill Giant
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Opp Grave Exiler Witness
+graveyard:Wrecking Ball
+manapool:{0}
+[PLAYER2]
+exile:Hill Giant
+[END]

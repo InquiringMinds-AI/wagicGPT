@@ -1,0 +1,26 @@
+# Dethrone puts a +1/+1 counter on an attacker aimed at the highest-life player.
+# Enraged Revolutionary is 2/1; dethrone makes it 3/2, which survives a 1/1 blocker
+# it would otherwise die to as a 2/1 — so survival witnesses the counter.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Enraged Revolutionary
+life:10
+[PLAYER2]
+inplay:Raging Goblin
+life:20
+[DO]
+Enraged Revolutionary
+next
+Raging Goblin
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Enraged Revolutionary
+life:10
+[PLAYER2]
+graveyard:Raging Goblin
+life:20
+[END]

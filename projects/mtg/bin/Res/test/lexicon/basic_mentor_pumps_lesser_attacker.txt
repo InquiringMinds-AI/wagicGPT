@@ -1,0 +1,27 @@
+# Mentor puts a +1/+1 counter on a lesser-power attacking creature; the extra
+# point is observed as combat damage. Sunhome Stalwart (2/2) mentors the
+# attacking Eager Cadet (1/1 -> 2/2). Both attack unblocked: 2 + 2 = 4 damage.
+# The mentor trigger's target is selected by clicking Eager Cadet after the
+# attack step advances (the trigger resolves out of COMBATATTACKERS).
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Sunhome Stalwart,Eager Cadet
+[PLAYER2]
+life:20
+[DO]
+Eager Cadet
+Sunhome Stalwart
+next
+Eager Cadet
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Sunhome Stalwart,Eager Cadet
+tappedinplay:2
+[PLAYER2]
+life:16
+[END]

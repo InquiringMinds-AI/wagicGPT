@@ -1,0 +1,19 @@
+# @defeated fires when a Battle's defense is reduced to zero.
+# A synthetic Battle carries a defense counter; removing it drops defense to
+# zero, which the state-based check reports as a defeat.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Battle Witness,Lexicon Defense Remover Witness,Lexicon Defeated Trigger Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Defense Remover Witness
+Lexicon Battle Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Battle Witness,Lexicon Defense Remover Witness,Lexicon Defeated Trigger Witness
+life:21
+[PLAYER2]
+[END]

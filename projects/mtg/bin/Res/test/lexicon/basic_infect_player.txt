@@ -1,0 +1,23 @@
+# Infect deals combat damage to a player as poison counters rather than life
+# loss.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Blackcleave Goblin
+[PLAYER2]
+life:20
+poisoncount:0
+[DO]
+Blackcleave Goblin
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Blackcleave Goblin
+tappedinplay:1
+[PLAYER2]
+life:20
+poisoncount:2
+[END]

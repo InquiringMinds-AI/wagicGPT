@@ -1,0 +1,23 @@
+# mutate places Archipelagore over a non-Human creature and its mutation
+# trigger taps one additional creature.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Archipelagore
+inplay:Grizzly Bears,Hill Giant
+manapool:{5}{U}
+[PLAYER2]
+[DO]
+Archipelagore
+choice 1
+Grizzly Bears
+Archipelagore
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Archipelagore,Grizzly Bears,Hill Giant
+tappedinplay:1
+manapool:{0}
+[PLAYER2]
+[END]

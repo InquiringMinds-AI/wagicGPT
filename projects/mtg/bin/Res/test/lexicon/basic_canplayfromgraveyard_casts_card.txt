@@ -1,0 +1,17 @@
+# canplayfromgraveyard permits the permanent itself to be cast from the
+# graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Graveyard Casting Witness
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Graveyard Casting Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Graveyard Casting Witness
+manapool:{0}
+[PLAYER2]
+[END]

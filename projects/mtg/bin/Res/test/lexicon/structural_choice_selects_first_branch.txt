@@ -1,0 +1,25 @@
+# A modal `choice` spell offers its branches as a menu; selecting the first
+# branch resolves that branch. The witness is a modal Sorcery (branch 1 gains 2
+# life, branch 2 loses 2 life); casting it and answering the mode menu with
+# `choice 0` picks the first (gain) branch: life 20 -> 22.
+# NOTE: the witness was renamed from "...Choice Wrapper..." because the harness
+# parses any command containing the substring "choice " as a `choice N` command,
+# so a card whose name contains "choice " can never be clicked.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Modal Branch Witness
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Modal Branch Witness
+choice 0
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Modal Branch Witness
+life:22
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,17 @@
+# sethand replaces the controller's maximum hand size.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Set Hand Effect Witness
+hand:Forest,Forest
+[PLAYER2]
+[DO]
+Lexicon Set Hand Effect Witness
+goto cleanup
+[ASSERT]
+CLEANUP
+[PLAYER1]
+inplay:Lexicon Set Hand Effect Witness
+hand:Forest
+[PLAYER2]
+[END]

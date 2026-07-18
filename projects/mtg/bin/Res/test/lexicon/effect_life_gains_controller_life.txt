@@ -1,0 +1,16 @@
+# life:N gains life for the controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Life Effect Witness
+life:10
+[PLAYER2]
+[DO]
+Lexicon Life Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Life Effect Witness
+life:12
+[PLAYER2]
+[END]

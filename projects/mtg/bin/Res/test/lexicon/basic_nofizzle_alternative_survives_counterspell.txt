@@ -1,0 +1,29 @@
+# nofizzle alternative makes a spell uncounterable when its alternate cost is
+# paid. Exquisite Firecraft supplies the alternate-cost restriction.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Exquisite Firecraft
+graveyard:Shock,Shock
+manapool:{1}{R}{R}
+[PLAYER2]
+hand:Counterspell
+manapool:{U}{U}
+life:20
+[DO]
+Exquisite Firecraft
+choice 0
+p2
+yes
+Counterspell
+Exquisite Firecraft
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Exquisite Firecraft,Shock,Shock
+[PLAYER2]
+graveyard:Counterspell
+manapool:{0}
+life:16
+[END]

@@ -1,27 +1,26 @@
-# Emerge sacrifices a mana-value-six creature, reducing Abundant Maw's
-# {6}{B} emerge cost to {B}; its cast trigger drains the opponent for three.
+# Emerge sacrifices a creature and reduces the emerge cost by that creature's
+# mana value. Real Abundant Maw's emerge is gated by otherrestriction
+# `compare(ishuman)~morethan~0`, which is false for the test-suite's scripted
+# (heuristic-AI) seat, so its emerge can never be offered here. This uses a
+# synthetic emerge witness (emerge {6}{B}, gated only on controlling a creature):
+# sacrificing Craw Wurm (mana value 6) reduces {6}{B} to exactly {B}. Funding
+# only {B} proves the reduction — without it the cast could not pay.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
-hand:Abundant Maw
+hand:Lexicon Emerge Witness A15
 inplay:Craw Wurm
 manapool:{B}
-life:20
 [PLAYER2]
-life:20
 [DO]
-Abundant Maw
-choice 1
+Lexicon Emerge Witness A15
 Craw Wurm
-Abundant Maw
-choice 0
+no
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Abundant Maw
+inplay:Lexicon Emerge Witness A15
 graveyard:Craw Wurm
 manapool:{0}
-life:23
 [PLAYER2]
-life:17
 [END]

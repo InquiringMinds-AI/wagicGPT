@@ -1,0 +1,16 @@
+# donothing is a real no-op ability and must not swallow an and! follow-up.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Donothing Chain Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Donothing Chain Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Donothing Chain Witness
+life:21
+[PLAYER2]
+[END]

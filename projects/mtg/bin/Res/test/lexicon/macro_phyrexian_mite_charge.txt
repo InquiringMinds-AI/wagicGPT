@@ -1,0 +1,18 @@
+# Charge of the Mites uses _PHYREXIANMITETOKEN_ twice.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Charge of the Mites
+manapool:{2}{W}
+[PLAYER2]
+[DO]
+Charge of the Mites
+choice 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Charge of the Mites
+inplay:*,*
+manapool:{0}
+[PLAYER2]
+[END]

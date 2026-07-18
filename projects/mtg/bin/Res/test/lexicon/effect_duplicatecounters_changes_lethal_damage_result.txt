@@ -1,0 +1,24 @@
+# duplicatecounters doubles the seed +1/+1 counter, making a creature survive
+# three damage that would be lethal with only the seed counter.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Witness,Lexicon Duplicate Counter Witness,Grizzly Bears
+hand:Lightning Strike
+manapool:{1}{R}
+[PLAYER2]
+[DO]
+Lexicon Counter Witness
+Grizzly Bears
+Lexicon Duplicate Counter Witness
+Grizzly Bears
+Lightning Strike
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Counter Witness,Lexicon Duplicate Counter Witness,Grizzly Bears
+graveyard:Lightning Strike
+manapool:{0}
+[PLAYER2]
+[END]

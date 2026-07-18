@@ -1,0 +1,23 @@
+# Haste allows a creature cast this turn to attack immediately.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+Raging Goblin
+goto attackers
+Raging Goblin
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Raging Goblin
+tappedinplay:1
+[PLAYER2]
+life:19
+[END]

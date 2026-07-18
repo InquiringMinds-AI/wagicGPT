@@ -1,0 +1,20 @@
+# foreach scales its continuous modifier from the matching creature count:
+# with the witness plus a Bear it is +2/+2, so the 1/1 witness attacks for 3.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Foreach Effect Witness,Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+Lexicon Foreach Effect Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Foreach Effect Witness,Grizzly Bears
+[PLAYER2]
+life:17
+[END]

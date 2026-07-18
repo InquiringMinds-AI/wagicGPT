@@ -1,0 +1,23 @@
+# Discarding a madness card replaces the graveyard move and permits its
+# madness cost to be paid, putting Basking Rootwalla onto the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Self Discard Witness
+hand:Basking Rootwalla
+manapool:{0}
+[PLAYER2]
+[DO]
+Lexicon Self Discard Witness
+Basking Rootwalla
+choice 0
+Basking Rootwalla
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Self Discard Witness,Basking Rootwalla
+graveyard:
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,26 @@
+# cantbetargetof prevents a red spell from targeting the protected creature.
+# The witness grants cantbetargetof(red) to Grizzly Bears, so the red Shock
+# cannot legally choose it: Shock stays uncast in hand with its mana unspent
+# (uncastable, not cast-and-fizzled), and Grizzly Bears survives.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Target Effect Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Cant Target Effect Witness
+Grizzly Bears
+no
+Shock
+Grizzly Bears
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Target Effect Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[END]

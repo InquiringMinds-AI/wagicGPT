@@ -1,0 +1,20 @@
+# transforms changes a creature's type, power, and toughness and adds flying.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Transforms Effect Witness,Grizzly Bears
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Transforms Effect Witness
+Grizzly Bears
+Lightning Bolt
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Transforms Effect Witness,Grizzly Bears
+graveyard:Lightning Bolt
+[PLAYER2]
+[END]

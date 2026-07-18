@@ -1,0 +1,24 @@
+# affinityattackingcreatures sees an attacker while the instant is cast in
+# combat. Cost {3} reduced by the one attacker to {2}; funding exactly {2}
+# and observing the cast proves the reduction happened.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Raging Goblin
+hand:Lexicon Affinity Attacking Creatures Witness
+manapool:{2}
+[PLAYER2]
+life:20
+[DO]
+Raging Goblin
+Lexicon Affinity Attacking Creatures Witness
+no
+no
+[ASSERT]
+combatattackers
+[PLAYER1]
+inplay:Raging Goblin
+graveyard:Lexicon Affinity Attacking Creatures Witness
+[PLAYER2]
+life:20
+[END]

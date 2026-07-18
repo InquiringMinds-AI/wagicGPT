@@ -1,0 +1,23 @@
+# eqpasinst lets an Equipment's equip ability be activated outside a main
+# phase. The equipped Grizzly Bears attacks for four rather than two.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Forge Anew,Trusty Machete,Grizzly Bears
+manapool:{2}
+[PLAYER2]
+life:20
+[DO]
+Trusty Machete
+Grizzly Bears
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Forge Anew,Trusty Machete,Grizzly Bears
+[PLAYER2]
+life:16
+[END]

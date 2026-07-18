@@ -1,0 +1,20 @@
+# Witchbane Orb's enter-the-battlefield ability uses the mycurses chooser to
+# destroy a Curse attached to its controller.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Curse of the Pierced Heart,Witchbane Orb
+manapool:{1}{R}{4}
+[PLAYER2]
+[DO]
+Curse of the Pierced Heart
+p1
+Witchbane Orb
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Witchbane Orb
+graveyard:Curse of the Pierced Heart
+hand:
+[PLAYER2]
+[END]

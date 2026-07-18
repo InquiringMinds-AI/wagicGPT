@@ -1,0 +1,16 @@
+# doesntempty keeps mana produced by the effect when the phase changes.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Doesntempty Mana Witness
+[PLAYER2]
+[DO]
+Lexicon Doesntempty Mana Witness
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Lexicon Doesntempty Mana Witness
+manapool:{G}
+[PLAYER2]
+[END]

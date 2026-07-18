@@ -1,0 +1,22 @@
+# snowislandlandwalk makes a creature unblockable while the defending player controls a Snow-Covered Island.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Snowislandlandwalk Witness
+[PLAYER2]
+inplay:Snow-Covered Island,Grizzly Bears
+life:20
+[DO]
+Lexicon Snowislandlandwalk Witness
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Snowislandlandwalk Witness
+[PLAYER2]
+inplay:Snow-Covered Island,Grizzly Bears
+life:18
+[END]

@@ -1,0 +1,18 @@
+# Death by Dragons uses _DRAGONTOKEN_ for the controller's choice.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Death by Dragons
+manapool:{4}{R}{R}
+[PLAYER2]
+[DO]
+Death by Dragons
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Death by Dragons
+inplay:*
+manapool:{0}
+[PLAYER2]
+[END]

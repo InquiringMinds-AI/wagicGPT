@@ -1,0 +1,14 @@
+# Load witness for effect keywords whose interactive protocols are either
+# multi-stage or not yet represented by a stable assertion grammar. Every
+# entry is installed as an unactivated synthetic ability.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Effect Catalog
+[PLAYER2]
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Synthetic Effect Catalog
+[PLAYER2]
+[END]

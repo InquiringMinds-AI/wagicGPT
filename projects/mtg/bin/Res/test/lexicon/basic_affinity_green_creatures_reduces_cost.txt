@@ -1,0 +1,18 @@
+# affinitygreencreatures reduces the artifact by one for a green creature.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Llanowar Elves
+hand:Lexicon Affinity Green Creatures Witness
+manapool:{2}
+[PLAYER2]
+[DO]
+Lexicon Affinity Green Creatures Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Llanowar Elves,Lexicon Affinity Green Creatures Witness
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

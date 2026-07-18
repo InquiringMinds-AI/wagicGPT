@@ -1,21 +1,22 @@
+# islandwalk makes a creature unblockable while the defending player controls an Island.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:benthic behemoth
+inplay:Lexicon Islandwalk Witness
 [PLAYER2]
-inplay:island,grizzly bears
+inplay:Island,Grizzly Bears
 life:20
 [DO]
-benthic behemoth
+Lexicon Islandwalk Witness
 next
-grizzly bears
+Grizzly Bears
 next
 next
 [ASSERT]
 COMBATEND
 [PLAYER1]
-inplay:benthic behemoth
+inplay:Lexicon Islandwalk Witness
 [PLAYER2]
-inplay:island,grizzly bears
-life:13
+inplay:Island,Grizzly Bears
+life:18
 [END]

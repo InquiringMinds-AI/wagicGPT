@@ -1,0 +1,21 @@
+# poisontwotoxic adds exactly two poison counters.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Toxic Two Witness
+[PLAYER2]
+life:20
+poisoncount:0
+[DO]
+Lexicon Toxic Two Witness
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Lexicon Toxic Two Witness
+[PLAYER2]
+life:19
+poisoncount:2
+[END]

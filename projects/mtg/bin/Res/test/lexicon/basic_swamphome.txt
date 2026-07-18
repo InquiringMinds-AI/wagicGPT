@@ -1,0 +1,44 @@
+# swamphome is the Swamp counterpart: the creature attacks only while the
+# DEFENDING player controls a Swamp, and its controller must also keep a Swamp
+# or it is sacrificed, so both players are given a Swamp and only the defender's
+# Swamp is varied across the two cases.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Bog Serpent,Swamp
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Bog Serpent
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Bog Serpent,Swamp
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[END]
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Bog Serpent,Swamp
+[PLAYER2]
+inplay:Swamp
+life:20
+[DO]
+Bog Serpent
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Bog Serpent,Swamp
+tappedinplay:1
+[PLAYER2]
+inplay:Swamp
+life:15
+[END]

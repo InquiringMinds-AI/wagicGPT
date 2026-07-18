@@ -1,0 +1,24 @@
+# A nofizzle spell resolves even when an opponent counters it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Nofizzle Witness
+[PLAYER2]
+hand:Counterspell
+manapool:{U}{U}
+life:20
+[DO]
+Lexicon Nofizzle Witness
+yes
+Counterspell
+Lexicon Nofizzle Witness
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lexicon Nofizzle Witness
+[PLAYER2]
+graveyard:Counterspell
+manapool:{0}
+life:18
+[END]

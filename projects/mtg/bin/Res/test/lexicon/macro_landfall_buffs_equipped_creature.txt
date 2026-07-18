@@ -1,0 +1,26 @@
+# Adventuring Gear uses the _LANDFALL_ macro through teach(). After a Forest
+# enters, the equipped Bear receives the temporary +2/+2 and deals four.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Adventuring Gear,Grizzly Bears
+hand:Forest
+manapool:{1}
+[PLAYER2]
+life:20
+[DO]
+Adventuring Gear
+Grizzly Bears
+Forest
+goto attackers
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Adventuring Gear,Grizzly Bears,Forest
+[PLAYER2]
+life:16
+[END]

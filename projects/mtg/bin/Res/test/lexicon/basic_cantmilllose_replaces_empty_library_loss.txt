@@ -1,0 +1,25 @@
+# cantmilllose only PREVENTS the empty-library loss - it grants no win
+# (MTGPlayerCards::drawFromLibrary, MTGGameZones.cpp:325 simply returns when
+# the drawing player controls a cantmilllose permanent). The controller draws
+# from an empty library via Ancestral Recall and would normally lose, but the
+# witness keeps it in the game, so the game is not over.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Mill Lose Witness
+hand:Ancestral Recall
+manapool:{U}
+[PLAYER2]
+[DO]
+Ancestral Recall
+p1
+goto firstmain
+[ASSERT]
+gameover:none
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Cant Mill Lose Witness
+graveyard:Ancestral Recall
+manapool:{0}
+[PLAYER2]
+[END]

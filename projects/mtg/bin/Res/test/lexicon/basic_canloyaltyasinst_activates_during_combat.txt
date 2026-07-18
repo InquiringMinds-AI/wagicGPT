@@ -1,0 +1,16 @@
+# canloyaltyasinst permits a loyalty activation outside a main phase.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Loyalty Instant Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon Loyalty Instant Witness
+[ASSERT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Lexicon Loyalty Instant Witness
+life:21
+[PLAYER2]
+[END]

@@ -1,0 +1,18 @@
+# Caldaia Guardian uses _CITIZENTOKEN_ when it dies.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Caldaia Guardian
+hand:Wrath of God
+manapool:{2}{W}{W}
+[PLAYER2]
+[DO]
+Wrath of God
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Caldaia Guardian,Wrath of God
+inplay:*,*
+manapool:{0}
+[PLAYER2]
+[END]

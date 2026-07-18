@@ -1,0 +1,21 @@
+# mygcreatureexiler exiles the controller's creature when it would die.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Creature Exiler Witness,Grizzly Bears
+hand:Wrecking Ball
+manapool:{2}{B}{R}
+[PLAYER2]
+[DO]
+Wrecking Ball
+Grizzly Bears
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Creature Exiler Witness
+exile:Grizzly Bears
+graveyard:Wrecking Ball
+manapool:{0}
+[PLAYER2]
+[END]

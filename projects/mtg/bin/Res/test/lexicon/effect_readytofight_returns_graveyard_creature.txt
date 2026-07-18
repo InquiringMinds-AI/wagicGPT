@@ -1,0 +1,17 @@
+# readytofight returns a targeted creature card from the graveyard to play.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Ready To Fight Effect Witness
+graveyard:Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon Ready To Fight Effect Witness
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Ready To Fight Effect Witness,Grizzly Bears
+graveyard:
+[PLAYER2]
+[END]

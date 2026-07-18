@@ -1,0 +1,30 @@
+# removeallcounters clears ALL counters of the requested set, so a creature
+# built up with two +1/+1 counters drops back to its base toughness and dies
+# to damage a single remaining counter would have survived.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Remove All Counter Effect Witness,Grizzly Bears
+hand:Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Lexicon Remove All Counter Effect Witness
+choice 0
+Grizzly Bears
+Lexicon Remove All Counter Effect Witness
+choice 0
+Grizzly Bears
+Lexicon Remove All Counter Effect Witness
+choice 1
+Grizzly Bears
+Shock
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Remove All Counter Effect Witness
+graveyard:Shock,Grizzly Bears
+manapool:{0}
+[PLAYER2]
+[END]

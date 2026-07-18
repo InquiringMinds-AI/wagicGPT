@@ -1,0 +1,18 @@
+# The _SCRY5_ macro resolves a five-card scry and emits the scryed event.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Scry 5 Macro Witness
+library:Forest,Island,Mountain,Plains,Swamp,Desert
+life:20
+[PLAYER2]
+[DO]
+Lexicon Scry 5 Macro Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Scry 5 Macro Witness
+library:*,*,*,*,*,*
+life:21
+[PLAYER2]
+[END]

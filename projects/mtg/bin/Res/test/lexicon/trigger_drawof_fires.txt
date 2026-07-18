@@ -1,0 +1,17 @@
+# @drawof dynamically follows the source controller's draw events.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Drawof Trigger Witness,Lexicon Draw Effect Witness
+library:Grizzly Bears
+[PLAYER2]
+[DO]
+Lexicon Draw Effect Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Drawof Trigger Witness,Lexicon Draw Effect Witness
+life:21
+hand:Grizzly Bears
+[PLAYER2]
+[END]

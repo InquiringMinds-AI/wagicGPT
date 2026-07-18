@@ -1,0 +1,22 @@
+# partner's ETB ability can find the named partner from the library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Partner Witness
+library:Lexicon Partner Mate
+manapool:{1}
+[PLAYER2]
+[DO]
+Lexicon Partner Witness
+choice 0
+Lexicon Partner Mate
+choice 0
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Partner Witness
+hand:Lexicon Partner Mate
+library:
+manapool:{0}
+[PLAYER2]
+[END]

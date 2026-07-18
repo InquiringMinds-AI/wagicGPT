@@ -1,0 +1,15 @@
+# Plot's sorcery-speed doforetell path exiles the spell for later casting.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Plot Macro Witness
+manapool:{0}
+[PLAYER2]
+[DO]
+Lexicon Plot Macro Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+exile:Lexicon Plot Macro Witness
+[PLAYER2]
+[END]

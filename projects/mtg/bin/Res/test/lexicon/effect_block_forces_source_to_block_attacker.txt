@@ -1,0 +1,28 @@
+# The block effect makes this creature block the selected attacking creature.
+# On the opponent's turn Hill Giant attacks; the 4/4 Block Effect Witness is
+# forced to block it via its {0}:block target ability (target chosen with the
+# menu), so Hill Giant (3/3) dies in combat and the controller takes no damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Block Effect Witness
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+goto end
+goto attackers
+Hill Giant
+goto blockers
+Lexicon Block Effect Witness
+choice 0
+next
+next
+next
+next
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Block Effect Witness
+[PLAYER2]
+graveyard:Hill Giant
+[END]

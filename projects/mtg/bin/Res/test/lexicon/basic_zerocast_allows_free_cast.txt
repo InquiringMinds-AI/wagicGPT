@@ -1,0 +1,17 @@
+# zerocast permits the card to be cast with no mana available.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Zero Cast Witness
+manapool:{0}
+[PLAYER2]
+[DO]
+Lexicon Zero Cast Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Zero Cast Witness
+hand:
+manapool:{0}
+[PLAYER2]
+[END]

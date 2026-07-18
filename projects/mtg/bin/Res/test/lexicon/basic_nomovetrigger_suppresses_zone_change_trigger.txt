@@ -1,0 +1,17 @@
+# nomovetrigger suppresses the moved-to-battlefield event for the card that
+# carries it; the life trigger must not fire on entry.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon No Move Trigger Witness
+life:20
+[PLAYER2]
+[DO]
+Lexicon No Move Trigger Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon No Move Trigger Witness
+life:20
+[PLAYER2]
+[END]

@@ -1,0 +1,30 @@
+# hasstrive marks the multikicker cost as a per-additional-target Strive cost.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Aerial Formation
+inplay:Grizzly Bears,Hill Giant
+manapool:{2}{U}{2}{U}
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Aerial Formation
+choice 1
+Grizzly Bears
+Hill Giant
+Aerial Formation
+goto attackers
+Grizzly Bears
+Hill Giant
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Grizzly Bears,Hill Giant
+graveyard:Aerial Formation
+manapool:{0}
+[PLAYER2]
+inplay:Grizzly Bears
+life:13
+[END]

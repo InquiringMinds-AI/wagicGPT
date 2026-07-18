@@ -1,0 +1,17 @@
+# Artificer's Dragon uses _UNEARTH_ from the graveyard. The returned creature
+# is observable on the battlefield and consumes the printed unearth cost.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Artificer's Dragon
+manapool:{3}{R}{R}
+[PLAYER2]
+[DO]
+Artificer's Dragon
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Artificer's Dragon
+manapool:{0}
+[PLAYER2]
+[END]

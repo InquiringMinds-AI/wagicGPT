@@ -1,0 +1,18 @@
+# mygravelibrary includes a card in the controller's graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Grave Library Target Witness
+graveyard:Lexicon Synthetic Vanilla
+[PLAYER2]
+[DO]
+Lexicon My Grave Library Target Witness
+Lexicon Synthetic Vanilla
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon My Grave Library Target Witness
+exile:Lexicon Synthetic Vanilla
+graveyard:
+[PLAYER2]
+[END]

@@ -1,0 +1,28 @@
+# Agility enchants a creature and grants it flanking; a non-flanking blocker
+# then receives -1/-1, which is lethal to a 1/1 blocker.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Agility
+manapool:{1}{R}
+[PLAYER2]
+inplay:Raging Goblin
+life:20
+[DO]
+Agility
+Grizzly Bears
+goto attackers
+Grizzly Bears
+next
+Raging Goblin
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Grizzly Bears,Agility
+tappedinplay:1
+[PLAYER2]
+graveyard:Raging Goblin
+life:20
+[END]

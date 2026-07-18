@@ -1,0 +1,18 @@
+# nameingest ingest:2 repeats its batch: with four same-name cards it exiles
+# all four (two batches), not just the first batch of two.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Name Ingest Effect Witness
+[PLAYER2]
+library:Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears
+[DO]
+Lexicon Name Ingest Effect Witness
+p2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Name Ingest Effect Witness
+[PLAYER2]
+exile:Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears
+[END]

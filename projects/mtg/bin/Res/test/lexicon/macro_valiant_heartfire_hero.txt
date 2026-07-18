@@ -1,0 +1,26 @@
+# Heartfire Hero uses _VALIANT_. Targeting it with Giant Growth adds a +1/+1
+# counter, so the attacker deals five rather than four damage.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Heartfire Hero
+hand:Giant Growth
+library:Forest
+manapool:{G}
+[PLAYER2]
+life:20
+[DO]
+Giant Growth
+Heartfire Hero
+goto attackers
+Heartfire Hero
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Heartfire Hero
+graveyard:Giant Growth
+library:Forest
+[PLAYER2]
+life:15
+[END]

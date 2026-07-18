@@ -1,0 +1,21 @@
+# Benthic Biomancer uses _ADAPT1_; its adapted attack deals two damage rather
+# than its printed one.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Benthic Biomancer
+manapool:{1}{U}
+[PLAYER2]
+life:20
+[DO]
+Benthic Biomancer
+goto attackers
+Benthic Biomancer
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Benthic Biomancer
+[PLAYER2]
+life:18
+[END]

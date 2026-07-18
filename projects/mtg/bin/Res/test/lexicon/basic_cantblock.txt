@@ -1,0 +1,23 @@
+# A creature with cantblock cannot be declared as a blocker.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:raging goblin
+[PLAYER2]
+inplay:aesthir glider
+life:20
+[DO]
+raging goblin
+next
+aesthir glider
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:raging goblin
+tappedinplay:1
+[PLAYER2]
+inplay:aesthir glider
+life:19
+[END]

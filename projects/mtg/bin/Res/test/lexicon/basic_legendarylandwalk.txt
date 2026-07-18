@@ -1,21 +1,24 @@
+# legendarylandwalk makes a creature unblockable while the defending player controls a legendary land.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
-inplay:84370
+inplay:Lexicon Legendarylandwalk Witness
 [PLAYER2]
-inplay:tolarian academy,grizzly bears
+inplay:Hammerheim,Grizzly Bears
 life:20
 [DO]
-84370
+Lexicon Legendarylandwalk Witness
 next
-grizzly bears
+Grizzly Bears
+Lexicon Legendarylandwalk Witness
 next
 next
 [ASSERT]
 COMBATEND
 [PLAYER1]
-inplay:84370
+inplay:Lexicon Legendarylandwalk Witness
+tappedinplay:1
 [PLAYER2]
-inplay:tolarian academy,grizzly bears
-life:13
+inplay:Hammerheim,Grizzly Bears
+life:18
 [END]

@@ -1,0 +1,21 @@
+# Scuttlegator uses _ADAPT3_; adapting it removes defender for the turn and
+# allows the otherwise illegal attack.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Scuttlegator
+manapool:{6}{G}{U}
+[PLAYER2]
+life:20
+[DO]
+Scuttlegator
+goto attackers
+Scuttlegator
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Scuttlegator
+[PLAYER2]
+life:11
+[END]
