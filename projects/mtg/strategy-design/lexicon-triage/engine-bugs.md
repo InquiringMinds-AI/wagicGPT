@@ -21,16 +21,26 @@ REAL parse path (AbilityFactory::getAbilities with full game context, per-zone),
 emitting `VALIDATE-FAIL` records (`WAGIC_VALIDATE_OUT` for a file) and counted
 `VALIDATE-SKIP` categories; exit 1 on any failure. The by-design unpaid-alternative
 trace no longer wears an ERROR costume ("INFO ABILITYFACTORY: alternative not
-paid (by design)"). First corpus run: 68,020 entries / 144,759 lines / **222
-parse-NULL failures (~98 distinct cards)** in ~28s — full list in
-`validator-corpus-failures.tsv`. Headline candidates (parse-NULL, runtime impact
-unconfirmed): **all 10 Ravnica shocklands** (the pay-2-life ETB choice line),
-incomplete `lord(...)`/`foreach(...)` lines with no payload (Rhystic Study, Veil
-of Summer), Orim's Chant's kicker conditional, cost-embedded token/counter forms
-(Triskelavus, Giver of Runes). Bring-up also found and fixed a REAL engine crash:
-`trigger->castRestriction` written unconditionally when `parseTrigger` returned
-NULL (`@each combat restriction{...}` lines) — now guarded, falls through to the
-loud NULL path.
+paid (by design)"). First corpus run: 222 raw failures — TRIAGED 2026-07-18 (runtime-confirmed +
+isolation-tested per cluster): **71 of 222 are FALSE POSITIVES from a validator
+harness bug** — the validate loop reuses ONE AbilityFactory across all cards and
+its stored parse-state members (storedAbilityString/PayString/String/AndAbility)
+leak between cards, corrupting later parses; production constructs a fresh
+factory per card. THE SHOCKLANDS ARE FINE (Blood Crypt runtime-verified: pay-2 →
+untapped, decline → tapped) and so is the alternative-transforms cluster. FIX
+QUEUED: per-card factory/state reset in the validate loop (~4 lines,
+TestSuiteAI.cpp). GENUINE residue: 87 distinct lines / 151 rows — 2 FIXED
+(Will of the All-Hunter `__CYLCING__` typo; Turtleshell Changeling
+`twist`→`swap`, analogue-proven), a junk-stub tail (Tamiyo Collector "sorry cant
+code yet", two raw-prose lines — inert either way), ~50 fix-script candidates
+deferred to a proper Oracle-verify pass, and the FIX-PARSER grammar list:
+`if paid(kicker) then <global> all(...)` payloads, `@targeted ...
+|mycastingzone` pump family (the 4 Hero-of cards), `aslongas(type(*|zone)~cmp~N)`
+comparisons, cost-embedded `token(named)`/loyalty forms, and unimplemented
+keywords worth adding or rejecting loudly: `mobilize`, `giftcard`,
+`_impulsedraw_`, `pdrewcount`. Bring-up also found and fixed a REAL engine
+crash: `trigger->castRestriction` written unconditionally when `parseTrigger`
+returned NULL (`@each combat restriction{...}` lines) — now guarded.
 
 CALIBRATION NUANCE (adjusts items 2 and 5 below): a cold-parse validator catches
 lines that NEVER produce an ability (altermutationcounter ✓ caught). The

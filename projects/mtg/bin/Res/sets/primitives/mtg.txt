@@ -124887,7 +124887,7 @@ toughness=2
 [card]
 name=Turtleshell Changeling
 abilities=changeling
-auto={1}{U}:twist
+auto={1}{U}:swap
 text=Changeling (This card is every creature type at all times.) -- {1}{U}: Switch Turtleshell Changeling's power and toughness until end of turn.
 mana={3}{U}
 type=Creature

@@ -1,6 +1,4 @@
 VALIDATE-FAIL	Hero of the Games	571445	auto	@targeted(this) from(*[instant;sorcery;aura]|mycastingzone):1/0 all(creature|mybattlefield) ueot oneshot
-VALIDATE-FAIL	Diminishing Returns	15363	auto	ability$! moveto(mylibrary) all(*|myhand,mygraveyard) !$ controller
-VALIDATE-FAIL	Diminishing Returns	15363	auto	ability$! moveto(mylibrary) all(*|myhand,mygraveyard) !$ opponent
 VALIDATE-FAIL	Skeletonize	442138	auto	@movedto(mytgt|graveyard) from(battlefield):token(skeleton token)
 VALIDATE-FAIL	River Serpent	426768	auto	aslongas(type(*|mygraveyard)~lessthan~5) cantattack
 VALIDATE-FAIL	River Serpent	426768	auto	aslongas(type(*|mygraveyard)~lessthan~5) cantpwattack
@@ -11,32 +9,12 @@ VALIDATE-FAIL	Kitnap	668967	auto	teach(creature) giftcard
 VALIDATE-FAIL	Kitnap	668864	auto	teach(creature) giftcard
 VALIDATE-FAIL	Urza's Workshop	586470	auto	foreach(|mybattlefield)
 VALIDATE-FAIL	Urza's Workshop	588506	auto	foreach(|mybattlefield)
-VALIDATE-FAIL	Gix's Command	585730	auto	if type(creature|battlefield)~morethan~0 then choice name(put counters and destroy) name(put counters and destroy) target(creature|battlefield) transforms((,lifelink,newability[counter(1/1.2)],newability[destroy all(creature[power<=2]|battlefield)])) oneshot
 VALIDATE-FAIL	Heavenly Blademaster	450604	auto	thisforeach(aura) lord(other creature|mybattlefield) 1/1
 VALIDATE-FAIL	Saheeli, the Gifted	450645	auto	{c(0/0,-7,loyalty)}:name(-7: create a token for each artifact) clone all(artifact|mybattlefield) with(unearth)
 VALIDATE-FAIL	Rayami, First of the Fallen	470594	auto	aslongas(creature[protection from artifact;counter{0/0.1.blood}]|exile) protection from artifact
 VALIDATE-FAIL	Vraska the Unseen	470753	auto	{c(0/0,-7,loyalty)}:name(-7: create three 1/1 assassin) token(assassin token)*3
-VALIDATE-FAIL	Cataclysmic Gearhulk	482708	auto	if type(creature[-land]|mybattlefield)~morethan~1 then ability$!name(choose a creature) name(choose a creature) target(creature[-land]|mybattlefield) transforms((,newability[sacrifice all(other creature[-land]|mybattlefield)])) oneshot!$ controller
-VALIDATE-FAIL	Cataclysmic Gearhulk	482708	auto	if type(creature[-land]|opponentbattlefield)~morethan~1 then ability$!name(choose a creature) name(choose a creature) target(creature[-land]|mybattlefield) transforms((,newability[sacrifice all(other creature[-land]|mybattlefield)])) oneshot!$ opponent
-VALIDATE-FAIL	Cataclysmic Gearhulk	482708	auto	if type(artifact[-land]|mybattlefield)~morethan~1 then ability$!name(choose an artifact) name(choose an artifact) target(artifact[-land]|mybattlefield) transforms((,newability[sacrifice all(other artifact[-creature;-land]|mybattlefield)])) oneshot!$ controller
-VALIDATE-FAIL	Cataclysmic Gearhulk	482708	auto	if type(artifact[-land]|opponentbattlefield)~morethan~1 then ability$!name(choose an artifact) name(choose an artifact) target(artifact[-land]|mybattlefield) transforms((,newability[sacrifice all(other artifact[-creature;-land]|mybattlefield)])) oneshot!$ opponent
-VALIDATE-FAIL	Cataclysmic Gearhulk	482708	auto	if type(enchantment[-land]|mybattlefield)~morethan~1 then ability$!name(choose an enchantment) name(choose an enchantment) target(enchantment[-land]|mybattlefield) transforms((,newability[sacrifice all(other enchantment[-creature;-land]|mybattlefield)])) oneshot!$ controller
-VALIDATE-FAIL	Cataclysmic Gearhulk	482708	auto	if type(enchantment[-land]|opponentbattlefield)~morethan~1 then ability$!name(choose an enchantment) name(choose an enchantment) target(enchantment[-land]|mybattlefield) transforms((,newability[sacrifice all(other enchantment[-creature;-land]|mybattlefield)])) oneshot!$ opponent
-VALIDATE-FAIL	Cataclysmic Gearhulk	482708	auto	if type(planeswalker[-land]|mybattlefield)~morethan~1 then ability$!name(choose a planeswalker) name(choose a planeswalker) target(planeswalker[-land]|mybattlefield) transforms((,newability[sacrifice all(other planeswalker[-land]|mybattlefield)])) oneshot!$ controller
-VALIDATE-FAIL	Cataclysmic Gearhulk	482708	auto	if type(planeswalker[-land]|opponentbattlefield)~morethan~1 then ability$!name(choose a planeswalker) name(choose a planeswalker) target(planeswalker[-land]|mybattlefield) transforms((,newability[sacrifice all(other planeswalker[-land]|mybattlefield)])) oneshot!$ opponent
 VALIDATE-FAIL	Metallurgic Summonings	519157	auto	{3}{u}{u}{e}:moveto(hand) all(*[instant;sorcery]|mygraveyard) restriction{type(artifact|mybattlefield)~morethan~5}
 VALIDATE-FAIL	Beckoning Will-o'-Wisp	562893	auto	@each my combatbegins:name(lure the unwary) target(opponent)
-VALIDATE-FAIL	Raging Ravine	567727	auto	{2}{r}{g}:transforms((elemental creature,setpower=3,settoughness=3,red,green,newability[@combat(attacking) source(this):counter(1/1) all(this)])) ueot
-VALIDATE-FAIL	Blood Crypt	652030	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Breeding Pool	652031	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Godless Shrine	652032	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Hallowed Fountain	652033	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Overgrown Tomb	652034	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Sacred Foundry	652035	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Steam Vents	652036	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Stomping Ground	652037	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Temple Garden	652038	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Watery Grave	652039	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
 VALIDATE-FAIL	Triskelavus	446962	auto	{1}{c(1/1,-1)}:token(triskelavite token)
 VALIDATE-FAIL	Triskelavus	247519	auto	{1}{c(1/1,-1)}:token(triskelavite token)
 VALIDATE-FAIL	Heavenly Blademaster	622636	auto	thisforeach(aura) lord(other creature|mybattlefield) 1/1
@@ -53,8 +31,6 @@ VALIDATE-FAIL	Shanna, Sisay's Legacy	443092	auto	cantbetargetof(artifact,creatur
 VALIDATE-FAIL	Rampaging Ferocidon	676040	auto	@movedto(creature|mybattlefield) damage:1 controller
 VALIDATE-FAIL	Rampaging Ferocidon	676040	auto	@movedto(creature|opponentbattlefield) damage:1 opponent
 VALIDATE-FAIL	Diversion Specialist	673537	auto	{1}{s(other *[creature;enchantment]|mybattlefield)}:_impulsedraw_
-VALIDATE-FAIL	Kolaghan Skirmisher	394611	auto	alternative transforms((,haste,newability[@next end:moveto(hand) all(this)])) forever
-VALIDATE-FAIL	Reckless Imp	394661	auto	alternative transforms((,haste,newability[@next end:moveto(hand) all(this)])) forever
 VALIDATE-FAIL	Risen Executioner	394666	autograveyard	{2}{b}{b}:if type(creature|mygraveyard)~equalto~0 name(cast from graveyard) moveto(mybattlefield)
 VALIDATE-FAIL	Risen Executioner	394666	autograveyard	{2}{b}{b}:if type(creature|mygraveyard)~equalto~1 pay({1}) name(cast from graveyard) moveto(mybattlefield)
 VALIDATE-FAIL	Risen Executioner	394666	autograveyard	{2}{b}{b}:if type(creature|mygraveyard)~equalto~2 pay({2}) name(cast from graveyard) moveto(mybattlefield)
@@ -76,23 +52,9 @@ VALIDATE-FAIL	Risen Executioner	394666	autograveyard	{2}{b}{b}:if type(creature|
 VALIDATE-FAIL	Risen Executioner	394666	autograveyard	{2}{b}{b}:if type(creature|mygraveyard)~equalto~18 pay({18}) name(cast from graveyard) moveto(mybattlefield)
 VALIDATE-FAIL	Risen Executioner	394666	autograveyard	{2}{b}{b}:if type(creature|mygraveyard)~equalto~19 pay({19}) name(cast from graveyard) moveto(mybattlefield)
 VALIDATE-FAIL	Risen Executioner	394666	autograveyard	{2}{b}{b}:if type(creature|mygraveyard)~equalto~20 pay({20}) name(cast from graveyard) moveto(mybattlefield)
-VALIDATE-FAIL	Blood Crypt	405093	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Breeding Pool	405095	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Godless Shrine	405099	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Hallowed Fountain	405100	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Overgrown Tomb	405103	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Sacred Foundry	405106	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Steam Vents	405109	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Stomping Ground	405110	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Temple Garden	405112	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-FAIL	Watery Grave	405114	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
 VALIDATE-FAIL	Dropkick Bomber	677976	auto	@combatdamaged(player) from(this):
 VALIDATE-FAIL	Dropkick Bomber	677976	auto	@combatdamaged(creature) from(this):
 VALIDATE-FAIL	Archway Angel	680705	auto	life:thisforeach(gate|mybattlefield)*2
-VALIDATE-FAIL	Arcbond	391793	auto	target(creature) transforms((,newability[@damaged(this):damage:thatmuch all(other creature|battlefield)],newability[@damaged(this):damage:thatmuch all(player)])) ueot
-VALIDATE-FAIL	Goblin Heelcutter	391845	auto	alternative transforms((,haste,newability[@next end:moveto(hand) all(this)])) forever
-VALIDATE-FAIL	Mardu Shadowspear	391875	auto	alternative transforms((,haste,newability[@next end:moveto(hand) all(this)])) forever
-VALIDATE-FAIL	Mardu Strike Leader	391876	auto	alternative transforms((,haste,newability[@next end:moveto(hand) all(this)])) forever
 VALIDATE-FAIL	Ral's Staticaster	455608	auto	@combat(attacking) source(this):if type(planeswalker[ral]|mybattlefield)~morethan~0 then 1/0 foreach(*|hand) ueot
 VALIDATE-FAIL	Giver of Runes	296372	auto	{t}:name(protection from colorless) target(other creature|mybattlefield) protection from colorless
 VALIDATE-FAIL	Gideon's Defeat	430702	auto	if casted(this) then if type(gideon|opponentbattlefield)~morethan~0 life:5 controller
@@ -101,7 +63,6 @@ VALIDATE-FAIL	Wildfire Eternal	430798	auto	@combat(notblocked) source(this):targ
 VALIDATE-FAIL	Rhonas's Stalwart	430822	auto	@exerted(this):cantbeblockedby(power<=2) ueot
 VALIDATE-FAIL	Tenacious Hunter	430825	auto	aslongas(creature[counter(-1/-1)]|battlefield) vigilance
 VALIDATE-FAIL	Tenacious Hunter	430825	auto	aslongas(creature[counter(-1/-1)]|battlefield) deathtouch
-VALIDATE-FAIL	Will of the All-Hunter	479558	autohand	__cylcing__({2})
 VALIDATE-FAIL	Spinehorn Minotaur	296677	auto	restriction{compare(pdrewcount)~morethan~1} double strike ueot
 VALIDATE-FAIL	Zabaz, the Glimmerwasp	296798	auto	{r}:name(destroy artifact) target(artifact|mybattlefield)
 VALIDATE-FAIL	Tragic Lesson	597497	auto	choice d(*|myhand)
@@ -116,17 +77,12 @@ VALIDATE-FAIL	Hazardous Conditions	417755	auto	-2/-2 all(creature[counter{notany
 VALIDATE-FAIL	Metallurgic Summonings	417629	auto	{3}{u}{u}{e}:moveto(hand) all(*[instant;sorcery]|mygraveyard) restriction{type(artifact|mybattlefield)~morethan~5}
 VALIDATE-FAIL	Metallurgic Summonings	295556	auto	{3}{u}{u}{e}:moveto(hand) all(*[instant;sorcery]|mygraveyard) restriction{type(artifact|mybattlefield)~morethan~5}
 VALIDATE-FAIL	Hazardous Conditions	295695	auto	-2/-2 all(creature[counter{notany}]) ueot
-VALIDATE-FAIL	Turtleshell Changeling	145807	auto	{1}{u}:twist
 VALIDATE-FAIL	Rapacious Guest	620714	auto	lord(other creature|mybattlefield)
 VALIDATE-FAIL	Rapacious Guest	620309	auto	lord(other creature|mybattlefield)
 VALIDATE-FAIL	Rapacious Guest	636393	auto	lord(other creature|mybattlefield)
 VALIDATE-FAIL	Landroval, Horizon Witness	616851	auto	@each blockers restriction{type(creature[attacking]|mybattlefield)~morethan~1}:name(creature gains flying) name(creature gains flying) target(creature[-flying&attacking]|mybattlefield) flying ueot
 VALIDATE-FAIL	Mordor Trebuchet	616927	auto	@combat(attacking) source(*[goblin;orc]|mybattlefield) turnlimited:name(create construct) token(ballistic boulder) and!( transforms((,newability[readytofight],newability[@each my combatends:name(sacrifice construct) sacrifice])) forever )!
 VALIDATE-FAIL	There and Back Again	616981	auto	@counteradded(0/0,1,lore) from(this):this(counter{0/0.3.lore}) name(create smaug) name(create smaug) token(smaug)
-VALIDATE-FAIL	Frodo, Determined Hero	620102	auto	may name(attach equipment) target(equipment[manacost<=3]|mybattlefield) transforms((,newability[if cantargetcard(*[manacost>=2]|*) then rehook all(frodo^ determined hero|mybattlefield)])) oneshot
-VALIDATE-FAIL	Frodo, Determined Hero	620102	auto	@combat(attacking) source(this):may name(attach equipment) target(equipment[manacost<=3]|mybattlefield) transforms((,newability[if cantargetcard(*[manacost>=2]|*) then rehook all(frodo^ determined hero|mybattlefield)])) oneshot
-VALIDATE-FAIL	Frodo, Determined Hero	620198	auto	may name(attach equipment) target(equipment[manacost<=3]|mybattlefield) transforms((,newability[if cantargetcard(*[manacost>=2]|*) then rehook all(frodo^ determined hero|mybattlefield)])) oneshot
-VALIDATE-FAIL	Frodo, Determined Hero	620198	auto	@combat(attacking) source(this):may name(attach equipment) target(equipment[manacost<=3]|mybattlefield) transforms((,newability[if cantargetcard(*[manacost>=2]|*) then rehook all(frodo^ determined hero|mybattlefield)])) oneshot
 VALIDATE-FAIL	Landroval, Horizon Witness	636069	auto	@each blockers restriction{type(creature[attacking]|mybattlefield)~morethan~1}:name(creature gains flying) name(creature gains flying) target(creature[-flying&attacking]|mybattlefield) flying ueot
 VALIDATE-FAIL	Mordor Trebuchet	636145	auto	@combat(attacking) source(*[goblin;orc]|mybattlefield) turnlimited:name(create construct) token(ballistic boulder) and!( transforms((,newability[readytofight],newability[@each my combatends:name(sacrifice construct) sacrifice])) forever )!
 VALIDATE-FAIL	There and Back Again	636199	auto	@counteradded(0/0,1,lore) from(this):this(counter{0/0.3.lore}) name(create smaug) name(create smaug) token(smaug)
@@ -134,13 +90,10 @@ VALIDATE-FAIL	Molten Birth	370604	auto	flipacoin winability moveto(hand) all(thi
 VALIDATE-FAIL	Fell Specter	447232	auto	@discarded(*|opponenthand):life-2 opponent
 VALIDATE-FAIL	Goblin Bird-Grabber	466896	auto	{r}:restriction{type(creature[flying]|mybattlefield)~morethan~0}:flying ueot
 VALIDATE-FAIL	Veil of Summer	466952	auto	lord(*|mybattlefield) cantbetargetof(*[blue;black]) ueot
-VALIDATE-FAIL	Rhystic Study	293452	auto	@movedto(*|opponentstack):name(pay or draw) ability$!name(pay or draw) pay[[{1}]] name(pay 1 mana) donothing?draw:1 all(opponent)!$ opponent
 VALIDATE-FAIL	River Serpent	293457	auto	aslongas(type(*|mygraveyard)~lessthan~5) cantattack
 VALIDATE-FAIL	River Serpent	293457	auto	aslongas(type(*|mygraveyard)~lessthan~5) cantpwattack
-VALIDATE-FAIL	Reckless Imp	293733	auto	alternative transforms((,haste,newability[@next end:moveto(hand) all(this)])) forever
 VALIDATE-FAIL	Giver of Runes	463962	auto	{t}:name(protection from colorless) target(other creature|mybattlefield) protection from colorless
 VALIDATE-FAIL	Spinehorn Minotaur	464096	auto	restriction{compare(pdrewcount)~morethan~1} double strike ueot
-VALIDATE-FAIL	Treetop Ambusher	464135	auto	alternative transforms((,haste,newability[@next end:moveto(hand) all(this)])) forever
 VALIDATE-FAIL	Thrasta, Tempest's Roar	522254	auto	this(cantargetcard(*[fresh])) hexproof
 VALIDATE-FAIL	Zabaz, the Glimmerwasp	522319	auto	{r}:name(destroy artifact) target(artifact|mybattlefield)
 VALIDATE-FAIL	Thrasta, Tempest's Roar	525353	auto	this(cantargetcard(*[fresh])) hexproof
@@ -153,33 +106,15 @@ VALIDATE-FAIL	Orim's Chant	661048	auto	if paid(kicker) then cantattack all(creat
 VALIDATE-FAIL	Orim's Chant	661048	auto	if paid(kicker) then cantpwattack all(creature) ueot
 VALIDATE-FAIL	Ugin's Binding	661053	auto	whenever you castcolorless spell with mana value 7 or greater you may exile ugin's binding from your graveyard when you do return each nonland permanent you don't control to its owner's hand
 VALIDATE-FAIL	Galvanic Discharge	664410	auto	choose target creature or planeswalker you get {e}{e}{e} then you may pay any amount of {e} galvanic discharge deals that much damage to that permanent
-VALIDATE-FAIL	Mangara's Equity	3501	auto	choice name(choose black) transforms((,newability[@damageof(player) from(creature[black]|*):damage:thatmuch all(trigger[from])],newability[@damaged(creature[white]|mybattlefield) from(creature[black]|*):damage:thatmuch all(trigger[from])])) forever
-VALIDATE-FAIL	Mangara's Equity	3501	auto	choice name(choose red) transforms((,newability[@damageof(player) from(creature[red]|*):damage:thatmuch all(trigger[from])],newability[@damaged(creature[white]|mybattlefield) from(creature[red]|*):damage:thatmuch all(trigger[from])])) forever
 VALIDATE-FAIL	Case of the Shattered Pact	646565	auto	lord(creature|mybattlefield)
-VALIDATE-FAIL	Mortician Beetle	425903	auto	@sacrificed(creature):name(counter +1/+1) ability$!may counter(1/1) all(mysource)!$ controller
-VALIDATE-FAIL	Fractured Loyalty	48390	auto	teach(creature) transforms((,newability[@targeted(this) from(*|opponentzones):moveto(opponentbattlefield) all(this)]))
-VALIDATE-FAIL	Fractured Loyalty	48390	auto	teach(creature) transforms((,newability[@targeted(this) from(*|myzones):moveto(mybattlefield) all(this)]))
 VALIDATE-FAIL	Shanna, Sisay's Legacy	611364	auto	cantbetargetof(artifact,creature,enchantment[-auras],land,planeswalker|opponentbattlefield,opponentgraveyard)
-VALIDATE-FAIL	Cataclysmic Gearhulk	554164	auto	if type(creature[-land]|mybattlefield)~morethan~1 then ability$!name(choose a creature) name(choose a creature) target(creature[-land]|mybattlefield) transforms((,newability[sacrifice all(other creature[-land]|mybattlefield)])) oneshot!$ controller
-VALIDATE-FAIL	Cataclysmic Gearhulk	554164	auto	if type(creature[-land]|opponentbattlefield)~morethan~1 then ability$!name(choose a creature) name(choose a creature) target(creature[-land]|mybattlefield) transforms((,newability[sacrifice all(other creature[-land]|mybattlefield)])) oneshot!$ opponent
-VALIDATE-FAIL	Cataclysmic Gearhulk	554164	auto	if type(artifact[-land]|mybattlefield)~morethan~1 then ability$!name(choose an artifact) name(choose an artifact) target(artifact[-land]|mybattlefield) transforms((,newability[sacrifice all(other artifact[-creature;-land]|mybattlefield)])) oneshot!$ controller
-VALIDATE-FAIL	Cataclysmic Gearhulk	554164	auto	if type(artifact[-land]|opponentbattlefield)~morethan~1 then ability$!name(choose an artifact) name(choose an artifact) target(artifact[-land]|mybattlefield) transforms((,newability[sacrifice all(other artifact[-creature;-land]|mybattlefield)])) oneshot!$ opponent
-VALIDATE-FAIL	Cataclysmic Gearhulk	554164	auto	if type(enchantment[-land]|mybattlefield)~morethan~1 then ability$!name(choose an enchantment) name(choose an enchantment) target(enchantment[-land]|mybattlefield) transforms((,newability[sacrifice all(other enchantment[-creature;-land]|mybattlefield)])) oneshot!$ controller
-VALIDATE-FAIL	Cataclysmic Gearhulk	554164	auto	if type(enchantment[-land]|opponentbattlefield)~morethan~1 then ability$!name(choose an enchantment) name(choose an enchantment) target(enchantment[-land]|mybattlefield) transforms((,newability[sacrifice all(other enchantment[-creature;-land]|mybattlefield)])) oneshot!$ opponent
-VALIDATE-FAIL	Cataclysmic Gearhulk	554164	auto	if type(planeswalker[-land]|mybattlefield)~morethan~1 then ability$!name(choose a planeswalker) name(choose a planeswalker) target(planeswalker[-land]|mybattlefield) transforms((,newability[sacrifice all(other planeswalker[-land]|mybattlefield)])) oneshot!$ controller
-VALIDATE-FAIL	Cataclysmic Gearhulk	554164	auto	if type(planeswalker[-land]|opponentbattlefield)~morethan~1 then ability$!name(choose a planeswalker) name(choose a planeswalker) target(planeswalker[-land]|mybattlefield) transforms((,newability[sacrifice all(other planeswalker[-land]|mybattlefield)])) oneshot!$ opponent
-VALIDATE-FAIL	Bear Umbra	554196	auto	teach(creature) transforms((,newability[@combat(attacking) source(this):untap all(land|mybattlefield)]))
-VALIDATE-FAIL	Raging Ravine	554258	auto	{2}{r}{g}:transforms((elemental creature,setpower=3,settoughness=3,red,green,newability[@combat(attacking) source(this):counter(1/1) all(this)])) ueot
 VALIDATE-FAIL	Erebos's Titan	398584	auto	restriction{type(creature|opponentbattlefield)~lessthan~1}:indestructible
-VALIDATE-FAIL	Rhystic Study	24589	auto	@movedto(*|opponentstack):name(pay or draw) ability$!name(pay or draw) pay[[{1}]] name(pay 1 mana) donothing?draw:1 all(opponent)!$ opponent
-VALIDATE-FAIL	Shrouded Serpent	24595	auto	@combat(attacking) source(this):ability$!name(pay 4 mana) pay[[{4}]] donothing?unblockable all(mysource) ueot!$ opponent
 VALIDATE-FAIL	Orim's Chant	26852	auto	if paid(kicker) then cantattack all(creature) ueot
 VALIDATE-FAIL	Orim's Chant	26852	auto	if paid(kicker) then cantpwattack all(creature) ueot
 VALIDATE-FAIL	Dread Charge	4216	auto	lord(creature|mybattlefield) cantbeblockedby(creature[-black])
 VALIDATE-FAIL	Orim's Chant	52616	auto	if paid(kicker) then cantattack all(creature) ueot
 VALIDATE-FAIL	Orim's Chant	52616	auto	if paid(kicker) then cantpwattack all(creature) ueot
 VALIDATE-FAIL	Shanna, Sisay's Legacy	52795	auto	cantbetargetof(artifact,creature,enchantment[-auras],land,planeswalker|opponentbattlefield,opponentgraveyard)
-VALIDATE-FAIL	Watery Grave	53026	auto	ability$!name(choose one) choice name(pay 2 life) life:-2 _ choice name(tap) tap(noevent) all(mysource)!$ controller
 VALIDATE-FAIL	Wildfire Eternal	53036	auto	@combat(notblocked) source(this):target(*[instant;sorcery]|myhand) and!( activate castcard(normal) )!
 VALIDATE-FAIL	Saheeli, the Gifted	53426	auto	{c(0/0,-7,loyalty)}:name(-7: create a token for each artifact) clone all(artifact|mybattlefield) with(unearth)
 VALIDATE-FAIL	Heavenly Blademaster	53436	auto	thisforeach(aura) lord(other creature|mybattlefield) 1/1
@@ -188,7 +123,6 @@ VALIDATE-FAIL	Archway Angel	457147	auto	life:thisforeach(gate|mybattlefield)*2
 VALIDATE-FAIL	Lavafume Invoker	193624	auto	{8}:3/0 all(creature|mybattlefield) ueot
 VALIDATE-FAIL	Vraska the Unseen	290538	auto	{c(0/0,-7,loyalty)}:name(-7: create three 1/1 assassin) token(assassin token)*3
 VALIDATE-FAIL	Spell Syphon	153999	auto	*|stack
-VALIDATE-FAIL	Turn to Slag	209719	auto	transforms((,newability[damage:5],newability[destroy all(children)])) ueot
 VALIDATE-FAIL	Rampaging Ferocidon	642847	auto	@movedto(creature|mybattlefield) damage:1 controller
 VALIDATE-FAIL	Rampaging Ferocidon	642847	auto	@movedto(creature|opponentbattlefield) damage:1 opponent
 VALIDATE-FAIL	Dream Halls	5105	auto	{d(*|myhand)}: castcard(restricted) lord(*[share!color!][-land]|myhand) controller oneshot
@@ -211,13 +145,9 @@ VALIDATE-FAIL	Triskelavus	114919	auto	{1}{c(1/1,-1)}:token(triskelavite token)
 VALIDATE-FAIL	Molten Birth	456736	auto	flipacoin winability moveto(hand) all(this) winabilityend flipend
 VALIDATE-FAIL	Veiled Crocodile	5789	auto	aslongas(*|myhand) transforms((crocodile creature,setpower=4,settoughness=4)) forever all(this) <1
 VALIDATE-FAIL	Veiled Crocodile	5789	auto	aslongas(*|opponenthand) transforms((crocodile creature,setpower=4,settoughness=4)) forever all(this) <1
-VALIDATE-FAIL	Eye of Singularity	3711	auto	all(*[-basic]|battlefield) transforms((,newability[bury all(other *[share!name!])])) ueot
-VALIDATE-FAIL	Eye of Singularity	3711	auto	@movedto(*[-basic]|battlefield):all(trigger[to]) transforms((,newability[bury all(other *[share!name!])])) ueot
 VALIDATE-FAIL	Tamiyo, Collector of Tales	461147	auto	name(sorry cant code yet)
 VALIDATE-FAIL	Verdant Outrider	629697	auto	{1}{g}:cantbeblockedby(power<=2) ueot
-VALIDATE-FAIL	Rhystic Study	632453	auto	@movedto(*|opponentstack):name(pay or draw) ability$!name(pay or draw) pay[[{1}]] name(pay 1 mana) donothing?draw:1 all(opponent)!$ opponent
 VALIDATE-FAIL	Priest of the Wakening Sun	435179	auto	@each my upkeep if type(dinosaur|myhand)~morethan~0 then life:2 controller
 VALIDATE-FAIL	Rampaging Ferocidon	435308	auto	@movedto(creature|mybattlefield) damage:1 controller
 VALIDATE-FAIL	Rampaging Ferocidon	435308	auto	@movedto(creature|opponentbattlefield) damage:1 opponent
-VALIDATE-FAIL	Emeria, Shattered Skyclave	491634	auto	ability$!name(choose one) choice name(pay 3 life) life:-3 _ choice name(tap) tap(noevent) all(mysource)!$ controller
-VALIDATE-SUMMARY	cards=68020	lines=144759	failures=222
+VALIDATE-SUMMARY	cards=68020	lines=144759	failures=152
