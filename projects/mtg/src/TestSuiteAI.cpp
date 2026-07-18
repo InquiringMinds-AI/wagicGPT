@@ -51,6 +51,32 @@ bool TestSuiteAI::parseLine(const string& s)
         expectedTappedInPlay = atoi(s.c_str() + kTapped.size());
         return true;
     }
+    static const string kNecroed = "necroed:";
+    if (s.compare(0, kNecroed.size(), kNecroed) == 0)
+    {
+        expectedNecroed.clear();
+        string names = s.substr(kNecroed.size());
+        while (names.size())
+        {
+            size_t comma = names.find(",");
+            string name = comma == string::npos ? names : names.substr(0, comma);
+            expectedNecroed.push_back(trim(name));
+            names = comma == string::npos ? "" : names.substr(comma + 1);
+        }
+        return true;
+    }
+    static const string kAbility = "ability:";
+    if (s.compare(0, kAbility.size(), kAbility) == 0)
+    {
+        expectedBasicAbilities.push_back(s.substr(kAbility.size()));
+        return true;
+    }
+    static const string kCardText = "cardtext:";
+    if (s.compare(0, kCardText.size(), kCardText) == 0)
+    {
+        expectedCardText.push_back(s.substr(kCardText.size()));
+        return true;
+    }
     return AIPlayerBaka::parseLine(s);
 }
 
@@ -126,6 +152,13 @@ int TestSuiteAI::displayStack()
 
 int TestSuiteAI::Act(float)
 {
+    if (observer->didWin())
+    {
+        if (!observer->didWin(observer->players[0]))
+            suite->observedGameOver = 1;
+        else if (!observer->didWin(observer->players[1]))
+            suite->observedGameOver = 2;
+    }
     observer->setLoser(NULL); // Prevent draw rule from losing the game
 
     //Last bits of initialization require to be done here, after the first "update" call of the game
@@ -432,6 +465,7 @@ void TestSuiteActions::add(string s)
 TestSuiteState::TestSuiteState()
 {
     phase = MTG_PHASE_INVALID;
+    expectedGameOver = -1;
     players.clear();
 }
 
@@ -448,6 +482,28 @@ TestSuiteState::~TestSuiteState()
 
 void TestSuiteState::parsePlayerState(int playerId, string s)
 {
+    // MTGPlayerCards::parseLine intentionally only covers the ordinary duel
+    // zones. Test state also needs the hidden deck-construction zones so a
+    // target(sideboard|...) or target(commandzone|...) fixture can seed and
+    // assert a real card movement without changing production parsing.
+    size_t limiter = s.find("=");
+    if (limiter == string::npos) limiter = s.find(":");
+    if (limiter != string::npos)
+    {
+        string areaS = s.substr(0, limiter);
+        MTGGameZone * zone = NULL;
+        if (areaS.compare("sideboard") == 0)
+            zone = players[playerId]->game->sideboard;
+        else if (areaS.compare("commandzone") == 0)
+            zone = players[playerId]->game->commandzone;
+        else if (areaS.compare("temp") == 0)
+            zone = players[playerId]->game->temp;
+        if (zone)
+        {
+            zone->parseLine(s.substr(limiter + 1));
+            return;
+        }
+    }
     if (!players[playerId]->parseLine(s))
     {
         //A typo'd key (e.g. "inhand:" for "hand:") used to vanish without a
@@ -525,6 +581,14 @@ void TestSuiteGame::assertGame()
     int error = 0;
     bool wasAI = false;
 
+    if (endState.expectedGameOver >= 0 && observedGameOver != endState.expectedGameOver)
+    {
+        sprintf(result, "<span class=\"error\">==game-over problem. Expected %i, got %i==</span><br />",
+            endState.expectedGameOver, observedGameOver);
+        Log(result);
+        error++;
+    }
+
     if (observer->getCurrentGamePhase() != endState.phase)
     {
         //A garbage/uninitialized expected phase means the test file's
@@ -592,15 +656,16 @@ void TestSuiteGame::assertGame()
             error++;
 
         }
-        MTGGameZone * playerZones[] = { p->game->graveyard, p->game->library, p->game->hand, p->game->inPlay, p->game->commandzone, p->game->sideboard, p->game->removedFromGame };
+        MTGGameZone * playerZones[] = { p->game->graveyard, p->game->library, p->game->hand, p->game->inPlay, p->game->commandzone, p->game->sideboard, p->game->removedFromGame, p->game->temp };
         MTGGameZone * endstateZones[] = { endState.players[i]->game->graveyard,
                                          endState.players[i]->game->library,
                                          endState.players[i]->game->hand,
                                          endState.players[i]->game->inPlay,
                                          endState.players[i]->game->commandzone,
                                          endState.players[i]->game->sideboard,
-                                         endState.players[i]->game->removedFromGame };
-        for (int j = 0; j < 7; j++)
+                                         endState.players[i]->game->removedFromGame,
+                                         endState.players[i]->game->temp };
+        for (int j = 0; j < 8; j++)
         {
             MTGGameZone * zone = playerZones[j];
             if (zone->nb_cards != endstateZones[j]->nb_cards)
@@ -665,6 +730,110 @@ void TestSuiteGame::assertGame()
                         }
                     }
                 }
+            }
+        }
+        MTGGameZone * flagZones[] = { p->game->library, p->game->hand, p->game->inPlay,
+                                      p->game->graveyard, p->game->commandzone,
+                                      p->game->sideboard, p->game->removedFromGame,
+                                      p->game->temp };
+        //The expected necroed/ability/cardtext lists are parsed into the END
+        //STATE players; the live players' copies are always empty, and reading
+        //them made these asserts silently vacuous (they could never fail).
+        TestSuiteAI * expectedP = endState.players[i];
+        for (size_t n = 0; n < expectedP->expectedNecroed.size(); n++)
+        {
+            bool foundFlag = false;
+            for (size_t z = 0; z < sizeof(flagZones) / sizeof(flagZones[0]); z++)
+            {
+                MTGGameZone * zone = flagZones[z];
+                for (int k = 0; k < zone->nb_cards; k++)
+                {
+                    MTGCardInstance * card = zone->cards[k];
+                    if (card && card->getLCName() == expectedP->expectedNecroed[n])
+                        foundFlag = foundFlag || card->has(Constants::NECROED);
+                }
+            }
+            if (!foundFlag)
+            {
+                sprintf(result, "<span class=\"error\">==necroed flag missing for %s in player %i==</span><br />",
+                        expectedP->expectedNecroed[n].c_str(), i);
+                Log(result);
+                error++;
+            }
+        }
+        MTGGameZone * abilityZones[] = { p->game->library, p->game->hand, p->game->inPlay,
+                                         p->game->graveyard, p->game->commandzone,
+                                         p->game->sideboard, p->game->removedFromGame,
+                                         p->game->temp };
+        for (size_t n = 0; n < expectedP->expectedBasicAbilities.size(); n++)
+        {
+            string spec = expectedP->expectedBasicAbilities[n];
+            size_t divider = spec.rfind("|");
+            bool foundAbility = false;
+            if (divider != string::npos)
+            {
+                string cardName = spec.substr(0, divider);
+                string abilityName = spec.substr(divider + 1);
+                std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
+                std::transform(abilityName.begin(), abilityName.end(), abilityName.begin(), ::tolower);
+                int abilityIndex = -1;
+                for (int a = 0; a < Constants::NB_BASIC_ABILITIES; a++)
+                {
+                    if (abilityName == Constants::MTGBasicAbilities[a])
+                    {
+                        abilityIndex = a;
+                        break;
+                    }
+                }
+                if (abilityIndex >= 0)
+                {
+                    for (size_t z = 0; z < sizeof(abilityZones) / sizeof(abilityZones[0]); z++)
+                    {
+                        MTGGameZone * zone = abilityZones[z];
+                        for (int k = 0; k < zone->nb_cards; k++)
+                        {
+                            MTGCardInstance * card = zone->cards[k];
+                            if (card && card->getLCName() == cardName && card->has(abilityIndex))
+                                foundAbility = true;
+                        }
+                    }
+                }
+            }
+            if (!foundAbility)
+            {
+                sprintf(result, "<span class=\"error\">==basic ability assertion failed for %s in player %i==</span><br />",
+                        expectedP->expectedBasicAbilities[n].c_str(), i);
+                Log(result);
+                error++;
+            }
+        }
+        for (size_t n = 0; n < expectedP->expectedCardText.size(); n++)
+        {
+            string spec = expectedP->expectedCardText[n];
+            size_t divider = spec.rfind("|");
+            bool foundText = false;
+            if (divider != string::npos)
+            {
+                string cardName = spec.substr(0, divider);
+                string expectedText = spec.substr(divider + 1);
+                std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
+                for (size_t z = 0; z < sizeof(abilityZones) / sizeof(abilityZones[0]); z++)
+                {
+                    MTGGameZone * zone = abilityZones[z];
+                    for (int k = 0; k < zone->nb_cards; k++)
+                    {
+                        MTGCardInstance * card = zone->cards[k];
+                        if (card && card->getLCName() == cardName && card->text == expectedText)
+                            foundText = true;
+                    }
+                }
+            }
+            if (!foundText)
+            {
+                sprintf(result, "<span class=\"error\">==card text assertion failed for %s in player %i==</span><br />",
+                        expectedP->expectedCardText[n].c_str(), i);
+                Log(result);
+                error++;
             }
         }
     }
@@ -740,15 +909,30 @@ TestSuite::TestSuite(const char * filename)
     endTime = startTime;
     std::string contents;
     const char * testPrimitivesFile = getenv("WAGIC_TEST_PRIMITIVES_FILE");
+    //Lexicon fixtures reference synthetic cards, and some of them (the landwalk
+    //family) are in the MAIN registry — without the synthetic set the canonical
+    //no-env invocation fails those tests. So the lexicon primitives are the
+    //DEFAULT when the env var is unset; the env var still overrides (scoped runs
+    //point it at a probe copy), and a missing default file is not an error.
+    bool defaultedPrimitives = false;
+    if (getenv("WAGIC_TESTSUITE") && (!testPrimitivesFile || !testPrimitivesFile[0]))
+    {
+        testPrimitivesFile = "test/lexicon/test_primitives.txt";
+        defaultedPrimitives = true;
+    }
     if (getenv("WAGIC_TESTSUITE") && testPrimitivesFile && testPrimitivesFile[0])
     {
         string error;
         if (!MTGCollection()->loadTestPrimitives(testPrimitivesFile, error))
         {
-            fprintf(stderr, "WAGIC_TEST_PRIMITIVES_FILE: %s\n", error.c_str());
-            exit(EXIT_FAILURE);
+            if (!defaultedPrimitives)
+            {
+                fprintf(stderr, "WAGIC_TEST_PRIMITIVES_FILE: %s\n", error.c_str());
+                exit(EXIT_FAILURE);
+            }
         }
-        fprintf(stderr, "WAGIC_TEST_PRIMITIVES_FILE: loaded %s\n", testPrimitivesFile);
+        else
+            fprintf(stderr, "WAGIC_TEST_PRIMITIVES_FILE: loaded %s\n", testPrimitivesFile);
     }
     if (JFileSystem::GetInstance()->readIntoString(filename, contents))
     {
@@ -979,6 +1163,8 @@ void TestSuiteActions::cleanup()
 
 void TestSuiteState::cleanup(TestSuiteGame* tsGame)
 {
+    phase = MTG_PHASE_INVALID;
+    expectedGameOver = -1;
     for (size_t i = 0; i < players.size(); i++)
     {
         SAFE_DELETE(players[i]);
@@ -1004,6 +1190,10 @@ bool TestSuiteGame::load()
     summoningSickness = 0;
     forceAbility = false;
     gameType = GAME_TYPE_CLASSIC;
+    //TestSuite (the single-threaded path) IS a TestSuiteGame reused across every
+    //test — without this reset, any earlier test whose game actually ended leaks
+    //its result into later gameover: asserts (order-dependent false failures).
+    observedGameOver = 0;
 
     std::string s;
 
@@ -1095,6 +1285,14 @@ bool TestSuiteGame::load()
                 {
                     state++;
                 }
+                else if (s.compare(0, 9, "gameover:") == 0)
+                {
+                    string value = s.substr(9);
+                    if (value == "none") endState.expectedGameOver = 0;
+                    else if (value == "p1") endState.expectedGameOver = 1;
+                    else if (value == "p2") endState.expectedGameOver = 2;
+                    else endState.expectedGameOver = -1;
+                }
                 else
                 {
                     endState.phase = PhaseRing::phaseStrToInt(s);
@@ -1154,13 +1352,13 @@ TestSuiteGame::~TestSuiteGame()
 
 TestSuiteGame::TestSuiteGame(TestSuite* testsuite)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(0),
-      currentAction(0), observer(0), testsuite(testsuite)
+      currentAction(0), observer(0), observedGameOver(0), testsuite(testsuite)
 {
 }
 
 TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(FAST_TEST),
-      currentAction(0), observer(0), testsuite(testsuite)
+      currentAction(0), observer(0), observedGameOver(0), testsuite(testsuite)
 {
     filename = _filename;
     observer = new GameObserver();

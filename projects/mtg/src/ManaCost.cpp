@@ -330,7 +330,10 @@ ManaCost * ManaCost::parseManaCost(string s, ManaCost * _manaCost, MTGCardInstan
                             }
                             else if(value == "chosencolor")
                             {
-                                if(c)
+                                //chooseacolor defaults to -1 until a color is actually chosen
+                                //(AASetColorChosen). Guard the sentinel like every other consumer
+                                //(WParsedInt, CardGui) so add() never indexes cost[-1].
+                                if(c && c->chooseacolor >= 0)
                                     manaCost->add(c->chooseacolor, 1);
                             }
                             else if(value == "cycle")

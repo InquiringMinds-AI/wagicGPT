@@ -29,6 +29,9 @@ class TestSuiteState
 {
 public:
     GamePhase phase;
+    // -1 means no terminal-state assertion was requested; 0 means the game
+    // must still be live; 1/2 means player 1/2 must be the loser.
+    int expectedGameOver;
     void parsePlayerState(int playerId, string s);
     TestSuiteState();
     ~TestSuiteState();
@@ -55,6 +58,10 @@ protected:
     bool isOK;
     int currentAction;
     GameObserver* observer;
+    // TestSuiteAI clears GameObserver::gameOver each tick so a test can keep
+    // executing scripted actions. Preserve the observed terminal result for
+    // an explicit [ASSERT] gameover: assertion.
+    int observedGameOver;
 
     static boost::mutex mMutex;
     virtual void handleResults(bool wasAI, int error);
@@ -144,6 +151,12 @@ private:
 public:
     //[ASSERT]-only: expected number of tapped battlefield cards (-1 = don't check)
     int expectedTappedInPlay;
+    //[ASSERT]-only: cards expected to carry the hidden necroed flag.
+    vector<string> expectedNecroed;
+    //[ASSERT]-only: card|basic-ability pairs expected on the live card.
+    vector<string> expectedBasicAbilities;
+    //[ASSERT]-only: card|display-text pairs expected on the live card.
+    vector<string> expectedCardText;
 
     TestSuiteAI(TestSuiteGame *tsGame, int playerId);
     virtual int Act(float dt);
