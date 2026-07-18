@@ -703,8 +703,40 @@ void TestSuiteGame::assertGame()
                     int actualCount = 0;
                     for (int m = 0; m < zone->nb_cards; m++)
                     {
-                        if (zone->cards[m] && zone->cards[m]->getMTGId() == cardToCheck->getId())
-                            actualCount++;
+                        MTGCardInstance * actual = zone->cards[m];
+                        if (!actual || actual->getMTGId() != cardToCheck->getId())
+                            continue;
+                        // Face-aware id match for transformed DOUBLE-FACED cards. A DFC
+                        // keeps its FRONT MTGId after flipping in test-suite mode
+                        // (AAFlip::resolve skips setMTGId under MODE_TEST_SUITE,
+                        // AllAbilities.cpp:5308) while its name IS updated to the current
+                        // face (_target->setName(myFlip->name)). An id-only match would
+                        // let an expected pre-flip face name silently pass against a card
+                        // that has transformed to its other face - so no fixture could
+                        // observe a flip. When the actual card is double-faced, require
+                        // its CURRENT face name to equal the expected name for the id hit
+                        // to count.
+                        //   The gate is scoped precisely to double-faced cards
+                        // (backSide non-empty - set for every DFC/MDFC/werewolf face,
+                        // AllAbilities.cpp:5279) and excludes COPIES (isACopier). This is
+                        // deliberately narrow: OTHER effects also rename an instance while
+                        // keeping its id, and the fixtures that use them assert by the
+                        // ORIGINAL id, which is exactly the check they intend -
+                        //   * copies: clone*, body_double, Living_Death (Clone keeps its
+                        //     id, takes the copied creature's name; isACopier gates it),
+                        //   * type-change "becomes": Evil Presence renames a Forest to
+                        //     Swamp (backSide stays empty; the backSide gate excludes it).
+                        // isFlipped is NOT usable as the discriminator - the day/night
+                        // transform path leaves it 0. Tokens (negative id) keep pure id
+                        // matching per the token note below. Non-DFC cards are unaffected
+                        // (backSide empty). [DO] click-targeting (getCard) stays permissive
+                        // by design - players click the physical card; face identity only
+                        // matters at the ASSERT.
+                        if (!actual->backSide.empty() && !actual->isACopier &&
+                            cardToCheck->getId() >= 0 &&
+                            actual->getName() != cardToCheck->getName())
+                            continue;
+                        actualCount++;
                     }
                     if (actualCount < expectedCount)
                     {
@@ -1605,7 +1637,6 @@ int runCardScriptValidation()
                                   p0->game->stack, p0->game->exile, p0->game->commandzone };
     const char * stateOnlyKeys[] = { "facedown", "faceup", "skill" };
 
-    AbilityFactory af(obs);
     long cardCount = 0;
 
     vector<int> & ids = MTGCollection()->ids;
@@ -1614,6 +1645,14 @@ int runCardScriptValidation()
         MTGCard * mc = MTGCollection()->getCardById(ids[i]);
         if (!mc || !mc->data) continue;
         cardCount++;
+
+        // Fresh factory PER CARD, exactly as every production call site does
+        // (ActionLayer, AIPlayerBaka construct one per parse). A shared factory
+        // leaks its stored parse-state members (storedAbilityString/PayString/
+        // String/AndAbility) between cards, and a card that leaves them dirty
+        // corrupts a LATER card's parse — that ordering artifact produced 71
+        // false positives (incl. all 10 shocklands) in the first corpus run.
+        AbilityFactory af(obs);
 
         MTGCardInstance * inst = NEW MTGCardInstance(mc, p0->game);
         // Seed runtime-context fields that some target choosers dereference during a

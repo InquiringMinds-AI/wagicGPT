@@ -1,5 +1,17 @@
-# nonight prevents the global day/night state from transforming a daybound
-# permanent during an otherwise empty turn.
+# nonight ("It can't become night") freezes the day/night state at day, so a
+# daybound permanent never transforms even across empty turns. Angel of Eternal
+# Dawn carries nonight; Ballista Watcher is the daybound witness.
+#
+# This is the negative control for basic_daybound_flips_after_empty_turn: it uses
+# the IDENTICAL pacing (three clean empty turns, through turn 3), which flips a
+# lone daybound Watcher to Wielder by turn 3. Here the Angel's nonight keeps it
+# day the whole time, so Watcher stays on its front face - proven by the
+# face-aware assert (a wrongful flip to Ballista Wielder would fail this).
+#
+# Both the Angel and the Watcher independently establish day on turn 1, so TWO
+# "Day" marker cards are created; both bounce to player 2's battlefield each end
+# step and sit there by turn 3. An omitted zone asserts zero, so every card is
+# accounted for: two permanents on player 1, two Day markers on player 2.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -7,11 +19,16 @@ inplay:Angel of Eternal Dawn,Ballista Watcher
 [PLAYER2]
 [DO]
 goto end
+next
 goto end
+next
+goto end
+next
 goto firstmain
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
 inplay:Angel of Eternal Dawn,Ballista Watcher
 [PLAYER2]
+inplay:Day,Day
 [END]

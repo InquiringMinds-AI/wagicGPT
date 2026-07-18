@@ -1,5 +1,22 @@
-# nightbound transforms the back face to day after its controller casts two
-# spells during a turn.
+# Nightbound: a permanent on its back (night) face transforms to its front (day)
+# face when it becomes day. Ballista Wielder (back, nightbound) // Ballista
+# Watcher (front, daybound).
+#
+# Timeline (empirically traced):
+#   Turn 1  establishment - Wielder's auto sees no marker and no nonight and
+#           makes it NIGHT, casting the "Night" marker. Player 1 (the active
+#           player) then casts TWO spells this turn (the two vanilla creatures),
+#           which arms the "it becomes day next turn" transition.
+#   Turn 2  it becomes DAY (the Night marker flips to "Day"); the nightbound
+#           Wielder transforms to its day face, Ballista Watcher.
+# We assert on turn 2 while it is day - one more empty turn would flip it back
+# to night, so the assert lands immediately after the transition.
+#
+# Each vanilla costs {1}; the pool funds exactly {1}{1}. A "no" after each cast
+# passes priority through the response window. The two vanillas remain on the
+# battlefield and are counted. The Day/Night marker bounces to player 2's
+# battlefield (Day's "@each end moveto opponentbattlefield") and sits there as
+# "Day". The Ballista card is asserted by its CURRENT face (Ballista Watcher).
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -9,13 +26,16 @@ manapool:{1}{1}
 [PLAYER2]
 [DO]
 Lexicon Synthetic Vanilla
+no
 Lexicon Synthetic Vanilla
+no
 goto end
-goto end
+next
 goto firstmain
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Ballista Watcher
+inplay:Ballista Watcher,Lexicon Synthetic Vanilla,Lexicon Synthetic Vanilla
 [PLAYER2]
+inplay:Day
 [END]

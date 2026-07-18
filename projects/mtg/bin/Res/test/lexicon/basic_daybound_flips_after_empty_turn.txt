@@ -1,5 +1,22 @@
-# daybound transforms the front face when its controller casts no spells for
-# the turn and the next turn begins at night.
+# Daybound: a permanent on its front (day) face transforms to its back (night)
+# face when it becomes night. Ballista Watcher (front, daybound) // Ballista
+# Wielder (back, nightbound).
+#
+# Timeline (empirically traced):
+#   Turn 1  establishment - Watcher's auto sees no day/night marker and makes it
+#           DAY, casting the "Day" marker onto the battlefield.
+#   Turn 2  one clean empty turn (no spells cast) keeps day but arms the
+#           transition.
+#   Turn 3  it becomes NIGHT (the Day marker flips to "Night"); the daybound
+#           Watcher transforms to its night face, Ballista Wielder.
+# So a day->night flip needs the establishment turn PLUS one clean empty turn.
+#
+# The Day/Night marker is a real card ON the battlefield and BOUNCES to the
+# opponent's battlefield at each end step (Day's "@each end moveto
+# opponentbattlefield"); by turn 3 it sits on player 2's battlefield as "Night".
+# An omitted zone line asserts zero cards, so both faces are accounted for.
+# The Ballista card is asserted by its CURRENT face (Ballista Wielder) - the
+# face-aware zone matcher makes asserting the old face (Ballista Watcher) fail.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -7,11 +24,16 @@ inplay:Ballista Watcher
 [PLAYER2]
 [DO]
 goto end
+next
 goto end
+next
+goto end
+next
 goto firstmain
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
 inplay:Ballista Wielder
 [PLAYER2]
+inplay:Night
 [END]

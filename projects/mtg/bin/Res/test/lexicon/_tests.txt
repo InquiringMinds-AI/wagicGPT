@@ -807,3 +807,6 @@ lexicon/macro_scavenge.txt
 lexicon/macro_eternalize.txt
 lexicon/effect_reveal_resolves_followup.txt
 lexicon/cost_dynamic_tokens_parse.txt
+lexicon/basic_daybound_flips_after_empty_turn.txt
+lexicon/basic_nightbound_flips_after_two_spells.txt
+lexicon/basic_nonight_rejects_night_transition.txt
