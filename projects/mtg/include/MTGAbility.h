@@ -25,6 +25,18 @@ using std::string;
 using std::map;
 
 
+// ---- Card-script parse-validation hooks (loud-rejection validator, WAGIC_VALIDATE) ----
+// When gAbilityParseFailCallback is registered, AbilityFactory::getAbilities reports
+// every NULL parseMagicLine result to it (instead of the ERROR DebugTrace) and counts
+// each parsed line in gAbilityParseLineCount. gAbilityParseAltCostUnpaid is set by
+// parseMagicLine when the NULL is the BY-DESIGN unpaid-alternative-cost branch (kicker,
+// alternative, flashback, ...): a cold parse with no fulfilled spell always takes it, so
+// it is a SKIP, never a failure. The callback receives (card, line, dest, byDesign).
+typedef void (*AbilityParseFailFn)(MTGCardInstance * card, const std::string & line, MTGGameZone * dest, bool byDesign);
+extern AbilityParseFailFn gAbilityParseFailCallback;
+extern bool gAbilityParseAltCostUnpaid;
+extern long gAbilityParseLineCount;
+
 //stupid variables used to give a hint to the AI:
 // Should I cast a spell on an enemy or friendly unit ?
 #define BAKA_EFFECT_GOOD 1

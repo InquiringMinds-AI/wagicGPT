@@ -44,7 +44,14 @@ const string kAlternateCostKeywords[] =
     "overload",
     "bestow"
 }; 
-const int kAlternateCostIds[] = 
+// Card-script parse-validation hooks (see MTGAbility.h). Inert unless a validator
+// registers a callback; the by-design flag is always maintained so the runtime
+// "alternative not paid" NULL stops wearing the ERROR costume that mis-triaged.
+AbilityParseFailFn gAbilityParseFailCallback = NULL;
+bool gAbilityParseAltCostUnpaid = false;
+long gAbilityParseLineCount = 0;
+
+const int kAlternateCostIds[] =
 {
     ManaCost::MANA_UNPAID,
     ManaCost::MANA_PAID,
@@ -2540,13 +2547,17 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     if (splitTrigger.size())
     {
         TriggeredAbility * trigger = parseTrigger(splitTrigger[1], s, id, spell, card, target);
-        if (splitTrigger[1].find("restriction{") != string::npos)//using other/cast restrictions for abilities.
+        //trigger can be NULL when parseTrigger rejects the line; the restriction
+        //branches below wrote through it unconditionally (NULL deref / crash). Guard
+        //them with the same `trigger` check the resolve branch at 2563 already uses,
+        //so a rejected trigger falls through to the normal NULL-return (loud) path.
+        if (trigger && splitTrigger[1].find("restriction{") != string::npos)//using other/cast restrictions for abilities.
         {
             vector<string> splitRest = parseBetween(s,"restriction{","}");
             if (splitRest.size())
                 trigger->castRestriction = splitRest[1];
         }
-        if (splitTrigger[1].find("restriction{{") != string::npos)
+        if (trigger && splitTrigger[1].find("restriction{{") != string::npos)
         {
             vector<string> splitRest = parseBetween(s,"restriction{{","}}");
             if (splitRest.size())
@@ -2742,6 +2753,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             if (!(spell && spell->FullfilledAlternateCost(kAlternateCostIds[i])))
             {
                 DebugTrace("INFO parseMagicLine: Alternative Cost was not fulfilled for " << spell << s);
+                gAbilityParseAltCostUnpaid = true; //by-design NULL, not a parse failure
                 SAFE_DELETE(tc);
                 return NULL;
             }
@@ -6525,11 +6537,26 @@ int AbilityFactory::getAbilities(vector<MTGAbility *> * v, Spell * spell, MTGCar
             line = magicText;
             magicText = "";
         }
+        gAbilityParseAltCostUnpaid = false; //reset before each top-level line parse
+        if (gAbilityParseFailCallback)
+            gAbilityParseLineCount++;
         MTGAbility * a = parseMagicLine(line, result, spell, card, false, false, dest);
         if (a)
         {
             v->push_back(a);
             result++;
+        }
+        else if (gAbilityParseFailCallback)
+        {
+            //Validation pass: report every NULL to the sink; it decides whether the
+            //by-design unpaid-alternative NULL is a SKIP or a real failure.
+            gAbilityParseFailCallback(card, line, dest, gAbilityParseAltCostUnpaid);
+        }
+        else if (gAbilityParseAltCostUnpaid)
+        {
+            //Runtime, unpaid alt-cost branch: benign, not an error. Renamed from the
+            //old "ABILITYFACTORY ERROR: Parser returned NULL" costume that mis-triaged.
+            DebugTrace("INFO ABILITYFACTORY: alternative not paid (by design): " + line);
         }
         else
         {

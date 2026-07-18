@@ -165,5 +165,11 @@ public:
     bool summoningSickness() {return (suite->summoningSickness == 1); }
 };
 
+// Card-script validator (WAGIC_VALIDATE=1): drives every collection card's ability
+// lines through the real AbilityFactory parse path and reports each line that fails
+// to produce an ability. Returns the failure count (0 = all clean). Does not return
+// to the caller in the intended flow — the caller exit()s on its result.
+int runCardScriptValidation();
+
 #endif
 #endif

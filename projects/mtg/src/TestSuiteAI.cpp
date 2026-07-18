@@ -8,6 +8,8 @@
 #include "Rules.h"
 #include "GameObserver.h"
 #include "GameStateShop.h"
+#include "MTGDeck.h"
+#include "AIPlayerBaka.h"
 #ifdef QT_CONFIG
 #include <QThread>
 #endif
@@ -1492,6 +1494,188 @@ MTGPlayerCards * TestSuiteGame::buildDeck(Player* player, int playerId)
     }
 
     return deck;
+}
+
+// ---------------------------------------------------------------------------
+// Card-script validator (WAGIC_VALIDATE=1)
+//
+// Drives EVERY collection card's ability lines through the REAL ability-factory
+// parse path (AbilityFactory::getAbilities -> parseMagicLine), the same code
+// gameplay uses. A line that fails to produce an ability is reported as one
+// machine-readable VALIDATE-FAIL record; a summary and exit code follow. The
+// engine's NULL detection is tapped in place via gAbilityParseFailCallback (see
+// MTGAbility.cpp), so there is no parallel parser to drift from the real one.
+// ---------------------------------------------------------------------------
+namespace
+{
+    struct ValFailure { string name; int id; string kind; string line; };
+
+    static GameObserver *      gValObserver   = NULL;
+    static vector<ValFailure> * gValFailures  = NULL;
+    static map<string,int> *   gValSkip       = NULL;
+
+    // Map a getAbilities dest zone back to the CardPrimitive key / line "kind".
+    static string valKindForDest(MTGGameZone * dest)
+    {
+        if (!dest || !gValObserver) return "auto";
+        Player * p = gValObserver->players[0];
+        MTGPlayerCards * g = p->game;
+        if (dest == g->hand)        return "autohand";
+        if (dest == g->graveyard)   return "autograveyard";
+        if (dest == g->stack)       return "autostack";
+        if (dest == g->exile)       return "autoexile";
+        if (dest == g->commandzone) return "autocommandzone";
+        if (dest == g->library)     return "autolibrary";
+        return "autozone";
+    }
+
+    static void valFailSink(MTGCardInstance * card, const string & line, MTGGameZone * dest, bool byDesign)
+    {
+        if (byDesign)
+        {
+            if (gValSkip) (*gValSkip)["skip:alt-cost-unpaid(by-design)"]++;
+            return;
+        }
+        if (!gValFailures) return;
+        ValFailure f;
+        f.name = card ? card->name : string("?");
+        f.id   = card ? card->getId() : 0;
+        f.kind = valKindForDest(dest);
+        f.line = line;
+        gValFailures->push_back(f);
+    }
+}
+
+int runCardScriptValidation()
+{
+    // Output target: stdout by default, or the file named by WAGIC_VALIDATE_OUT.
+    FILE * out = stdout;
+    bool closeOut = false;
+    if (const char * of = getenv("WAGIC_VALIDATE_OUT"))
+        if (of[0])
+        {
+            FILE * f = fopen(of, "w");
+            if (f) { out = f; closeOut = true; }
+            else fprintf(stderr, "WAGIC_VALIDATE: could not open %s for write; using stdout\n", of);
+        }
+
+    // Optional synthetic primitives (validate those too); default is the real sets only.
+    if (const char * tp = getenv("WAGIC_TEST_PRIMITIVES_FILE"))
+        if (tp[0])
+        {
+            string err;
+            if (!MTGCollection()->loadTestPrimitives(tp, err))
+                fprintf(stderr, "WAGIC_VALIDATE: could not load test primitives %s: %s\n", tp, err.c_str());
+            else
+                fprintf(stderr, "WAGIC_VALIDATE: loaded test primitives %s\n", tp);
+        }
+
+    MTGCollection()->prefetchCardNameCache();
+
+    // Full 2-player game context via the normal startGame path. A bare GameObserver
+    // is not enough: some ability constructors fire game events on creation (e.g.
+    // fading:N -> AVanishing -> Counters::addCounter -> GameObserver::receiveEvent ->
+    // DuelLayers), which dereference the observer's duel infrastructure. startGame
+    // builds mLayers/phaseRing/currentPlayer and seeds each player's zones. We never
+    // enter the duel loop; we exit() after the pass. Deck contents are irrelevant.
+    GameObserver * obs = new GameObserver(WResourceManager::Instance(), JGE::GetInstance());
+    for (int i = 0; i < 2; ++i)
+    {
+        MTGDeck * d = NEW MTGDeck("ai/baka/deck1.txt", MTGCollection(), 0, 0);
+        AIPlayerBaka * p = NEW AIPlayerBaka(obs, "ai/baka/deck1.txt", "ai_baka_deck1", "", d);
+        obs->loadPlayer(i, p);
+    }
+    obs->startGame(GAME_TYPE_CLASSIC, Rules::getRulesByFilename("classic.txt"));
+    Player * p0 = obs->players[0];
+
+    vector<ValFailure> failures;
+    map<string,int> skips;
+    gValObserver  = obs;
+    gValFailures  = &failures;
+    gValSkip      = &skips;
+    gAbilityParseLineCount   = 0;
+    gAbilityParseFailCallback = valFailSink;
+
+    // Zones getAbilities routes text for via dest. facedown/faceup/skill texts are
+    // parsed only from specific card STATE (morph/equip) rather than a dest, so they
+    // are counted as an explicit SKIP category below rather than parsed cold (which
+    // would flood false positives). reveal/sideboard texts come only from anyzone=,
+    // whose lines are ALSO in the default text and thus already validated there.
+    MTGGameZone * destZones[] = { NULL, p0->game->hand, p0->game->graveyard,
+                                  p0->game->stack, p0->game->exile, p0->game->commandzone };
+    const char * stateOnlyKeys[] = { "facedown", "faceup", "skill" };
+
+    AbilityFactory af(obs);
+    long cardCount = 0;
+
+    vector<int> & ids = MTGCollection()->ids;
+    for (size_t i = 0; i < ids.size(); ++i)
+    {
+        MTGCard * mc = MTGCollection()->getCardById(ids[i]);
+        if (!mc || !mc->data) continue;
+        cardCount++;
+
+        MTGCardInstance * inst = NEW MTGCardInstance(mc, p0->game);
+        // Seed runtime-context fields that some target choosers dereference during a
+        // COLD parse (no live ability/spell): "abilitycontroller"/"mysource" read
+        // card->storedSourceCard->controller(), NULL until an ability resolves.
+        inst->storedSourceCard = inst;
+        // Parse with a Spell context, exactly as gameplay does (AbilityFactory::
+        // addAbilities builds a Spell before magicText/getAbilities). spell=NULL made
+        // ability$!...!$ / mysource / choice ETB lines (e.g. shocklands) spuriously
+        // NULL because they read spell->source. payResult stays MANA_UNPAID so unpaid
+        // alternative-cost branches still take the by-design SKIP path.
+        Spell * sp = NEW Spell(obs, inst);
+
+        for (size_t z = 0; z < sizeof(destZones)/sizeof(destZones[0]); ++z)
+        {
+            MTGGameZone * dest = destZones[z];
+            if (dest)
+            {
+                // Only parse a zone the card actually has authored/derived text for.
+                string key = valKindForDest(dest).substr(4); // strip "auto"
+                map<string,string>::iterator it = inst->magicTexts.find(key);
+                if (it == inst->magicTexts.end() || it->second.empty())
+                    continue;
+            }
+            vector<MTGAbility *> v;
+            af.getAbilities(&v, sp, inst, 0, dest);
+            for (size_t k = 0; k < v.size(); ++k)
+                SAFE_DELETE(v[k]);
+        }
+        SAFE_DELETE(sp);
+
+        for (size_t u = 0; u < sizeof(stateOnlyKeys)/sizeof(stateOnlyKeys[0]); ++u)
+        {
+            map<string,string>::iterator it = inst->magicTexts.find(stateOnlyKeys[u]);
+            if (it != inst->magicTexts.end() && !it->second.empty())
+                skips[string("skip:state-context-only:") + stateOnlyKeys[u]]++;
+        }
+
+        SAFE_DELETE(inst);
+    }
+
+    gAbilityParseFailCallback = NULL;
+    gValFailures = NULL;
+    gValSkip     = NULL;
+    gValObserver = NULL;
+
+    for (size_t i = 0; i < failures.size(); ++i)
+        fprintf(out, "VALIDATE-FAIL\t%s\t%d\t%s\t%s\n",
+                failures[i].name.c_str(), failures[i].id,
+                failures[i].kind.c_str(), failures[i].line.c_str());
+
+    for (map<string,int>::iterator it = skips.begin(); it != skips.end(); ++it)
+        fprintf(stderr, "VALIDATE-SKIP\t%s\tcount=%d\n", it->first.c_str(), it->second);
+
+    fprintf(out, "VALIDATE-SUMMARY\tcards=%ld\tlines=%ld\tfailures=%zu\n",
+            cardCount, gAbilityParseLineCount, failures.size());
+    fflush(out);
+    if (closeOut) fclose(out);
+
+    SAFE_DELETE(obs);
+
+    return (int) failures.size();
 }
 
 #endif

@@ -22,6 +22,7 @@
 #include "ModRules.h"
 #include "Credits.h"
 #include "AIPlayer.h"
+#include "TestSuiteAI.h"
 
 #ifdef NETWORK_SUPPORT
 #include <JNetwork.h>
@@ -616,6 +617,17 @@ void GameStateMenu::Update(float dt)
     case MENU_STATE_MAJOR_MAINMENU:
         {
 #ifdef TESTSUITE
+            //Card-script validator: WAGIC_VALIDATE=1 drives every collection card's
+            //ability lines through the real parse path and exits (never enters a
+            //game). Runs here because the full collection is loaded by now.
+            static bool autoValidateTried = false;
+            if (!autoValidateTried && getenv("WAGIC_VALIDATE"))
+            {
+                autoValidateTried = true;
+                fprintf(stderr, "WAGIC_VALIDATE: running card-script validation pass\n");
+                int failures = runCardScriptValidation();
+                exit(failures ? 1 : 0);
+            }
             //Headless-ish test runs: WAGIC_TESTSUITE=1 jumps straight into
             //the test suite from the main menu (same effect as selecting it
             //in the debug submenu). Results land in test/results.html.
