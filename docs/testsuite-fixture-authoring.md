@@ -140,6 +140,14 @@ be clicked by the suite (printing-id mismatch) — use nonbasic lands anywhere a
 must be clicked, revealed, or selected. The turn-1 draw step is skipped — draw-step
 mechanics (dredge) need the game advanced to a later turn's draw.
 
+## INIT state lines
+
+**Repeated same-zone lines in one player block OVERWRITE, they do not append** —
+`inplay:Megrim` followed by `inplay:Witness` leaves ONLY the Witness in play, and
+the silently-missing permanent reads as "trigger never fired" downstream (this
+false negative produced a phantom engine-bug report). Always comma-join:
+`inplay:Megrim,Witness`.
+
 ## Asserts are exhaustive (11+, "zone-list-vs-count"; 5+, "mana-float")
 
 - **An omitted zone line asserts ZERO cards in that zone.** Account for everything:

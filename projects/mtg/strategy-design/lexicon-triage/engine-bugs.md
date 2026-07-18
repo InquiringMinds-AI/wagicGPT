@@ -14,6 +14,31 @@ proliferate) — those turned out to be fixture/synthetic-card defects and are n
 green. Details of each falsification live in the fix reports; the authoring guide
 (docs/testsuite-fixture-authoring.md) encodes the lessons.
 
+## The validator (shipped 2026-07-18)
+
+`WAGIC_VALIDATE=1` (+ WAGIC_HEADLESS=1) lints the whole collection through the
+REAL parse path (AbilityFactory::getAbilities with full game context, per-zone),
+emitting `VALIDATE-FAIL` records (`WAGIC_VALIDATE_OUT` for a file) and counted
+`VALIDATE-SKIP` categories; exit 1 on any failure. The by-design unpaid-alternative
+trace no longer wears an ERROR costume ("INFO ABILITYFACTORY: alternative not
+paid (by design)"). First corpus run: 68,020 entries / 144,759 lines / **222
+parse-NULL failures (~98 distinct cards)** in ~28s — full list in
+`validator-corpus-failures.tsv`. Headline candidates (parse-NULL, runtime impact
+unconfirmed): **all 10 Ravnica shocklands** (the pay-2-life ETB choice line),
+incomplete `lord(...)`/`foreach(...)` lines with no payload (Rhystic Study, Veil
+of Summer), Orim's Chant's kicker conditional, cost-embedded token/counter forms
+(Triskelavus, Giver of Runes). Bring-up also found and fixed a REAL engine crash:
+`trigger->castRestriction` written unconditionally when `parseTrigger` returned
+NULL (`@each combat restriction{...}` lines) — now guarded, falls through to the
+loud NULL path.
+
+CALIBRATION NUANCE (adjusts items 2 and 5 below): a cold-parse validator catches
+lines that NEVER produce an ability (altermutationcounter ✓ caught). The
+`@mutated <upto:mutations>` and real-Battle defense-counter NULLs are
+RUNTIME-CONTEXT failures — they parse non-NULL cold and only fail when fired in a
+live game — so they are behavior bugs outside the validator's reach, correctly
+absent from its output.
+
 ## Crashes / parser failures (CONFIRMED)
 
 1. **FIXED 2026-07-18 — `{chosencolor}` OOB crash** (was "cost-catalog
@@ -66,10 +91,23 @@ green. Details of each falsification live in the fix reports; the authoring guid
    (no observable). Witness: `basic_phasing_leaves_and_returns`.
 9. **`leyline`** — Constants::LEYLINE parsed but zero game-logic references; the
    harness also has no opening-hand step. Witness: `basic_leyline_*`.
-10. **Day/Night machinery** — the Day emblem's "becomes night" trigger never fires,
-    `castcard(Day)` parses NULL, and DFC face-names are indistinguishable in zone
-    asserts; blocks daybound/nightbound/nonight. Witnesses: `basic_daybound_*`,
-    `basic_nightbound_*`, `basic_nonight_*`.
+10. **Day/Night: RESCOPED — machinery WORKS, ~0 real-play impact (2026-07-18
+    probe).** Trace-verified: markers establish from bound cards, empty-turn →
+    Night and two-spells → Day transitions fire (Day→Night needs the
+    establishment turn + one clean empty turn), nonight correctly freezes at
+    day, bound permanents transform. The original claims re-adjudicated:
+    "trigger never fires" = fixture under-pacing; "castcard(Day) parses NULL" =
+    benign re-parse noise on the flipped face (marker already established) —
+    silence as part of trace hygiene. The LOAD-BEARING item is a HARNESS GAP:
+    zone asserts collapse a DFC's two faces (TestSuiteAI.cpp:680-732 matches by
+    id-then-name and both faces resolve to the same card) — no fixture can
+    observe a flip. FIX SEATS in order: (a) harness face-aware zone matching —
+    unblocks testing for ALL DFC/werewolf/MDFC cards; (b) re-pace the three
+    fixtures (they are fixture-bugs; stay parked until (a) lands); (c) low-prio
+    engine: standalone `{0}:doubleside(backside)` activated form parses NULL
+    (only parsed inside transforms(...) context, MTGAbility.cpp:5476) — the
+    automatic cycle never uses it (fold with item 40).
+    Witnesses: `basic_daybound_*`, `basic_nightbound_*`, `basic_nonight_*`.
 11. **`primitive=` aliasing in a primitives file** — never copies the referenced
     card's data (even aliasing Grizzly Bears yields an empty card); the field is
     only functional for set `_cards.dat`. Witness: `card_field_primitive_alias_*`.
@@ -120,9 +158,22 @@ green. Details of each falsification live in the fix reports; the authoring guid
     drain block should be REJECTED AT PARSE TIME (silent card-stranding today) —
     a loud-validation item, not a behavior fix. Witness to be reauthored on the
     real form. Fixture: `effect_reveal_resolves_followup`.
-23. **interactive surveil strands revealed cards in the `temp` zone** — the
-    "put into graveyard" selection never lands them (all `_SURVEIL1/2/3_` cards,
-    every driver variant). Witnesses: `macro_surveil1/2/3_*`.
+23. **surveil: RESCOPED — engine correct, HARNESS limitation, ~0 real-play
+    impact (2026-07-18 probe).** The reveal→select→moveto(ownergraveyard) chain
+    is engine-correct end-to-end (activated-witness proof; AAMover
+    OWNER_GRAVEYARD path verified, MTGGameZones.cpp:1587). The fixtures fail
+    because TestSuiteGame::getCard searches library BEFORE the reveal zone, so
+    for TRIGGERED reveals the selection click is consumed by the library copy
+    and never re-queued (the pending-menu re-queue only covers menu-based
+    reveals) — the unselected card then takes the put-back default, whose
+    library staging via temp (flushed only by shuffleLibrary,
+    MTGGameZones.cpp:673-678) produced the "stranded in temp" symptom. In real
+    play the player/AI clicks the reveal display directly — all ~104 surveil
+    cards function (keep-on-top default and @surveiled trigger verified green).
+    FIX SEAT: harness — prefer the reveal zone in getCard while a reveal
+    display is open (or re-queue selection during MTGRevealingCards), then the
+    three fixtures return from _known_failures.txt.
+    Witnesses: `macro_surveil1/2/3_*`.
 24. **`manifest dread` battlefield leg missing** — mills one, never puts the other
     face-down onto the battlefield. Witness: `macro_manifest_dread`.
 25. **`echo` pay-to-keep fails** — paying the echo cost at the right upkeep still
@@ -139,17 +190,35 @@ green. Details of each falsification live in the fix reports; the authoring guid
     evidence on the grant witness).
 29. **`{myevictcost}` always charges {0}** — imprinted-card state not applied at
     cost-parse time. Witness: `cost_dynamic_eval_mycost_myevictcost`.
-30. **`ward` counter/fizzle unreliable** — a lone ward wedges the spell on the
-    stack; chained wards let it resolve. Witness: `macro_ward_variants`.
+30. **`ward`: RESCOPED to ~0 real-play impact — suite-driver limitation
+    (2026-07-18 probe).** All 114 real ward cards (count corrected from 87; all
+    mana-tax `_WARDn_`, no life/discard forms exist) share one mechanism: a
+    mandatory pay-menu arming `mExtraPayment`, which the scripted suite can
+    neither complete nor cancel (needs JGE_BTN_SEC) — hence the wedge. Real play
+    works: humans click/cancel, and AIPlayerBaka::selectAbility pays-or-fizzles
+    (empirically no wedge under an [AI] drive). Actions: (a) harness — add a
+    suite command that completes/cancels an mExtraPayment so ward becomes
+    testable (same family as item 38); (b) LATENT RULES SMELL to verify: the
+    ward payment is attributed to the warded creature's CONTROLLER (defender)
+    in both MenuAbility::Update and the AI branch, but MTG rules make the
+    SPELL'S controller (attacker) pay — needs a targeted AI test to confirm.
+    Witness: `macro_ward_variants` stays parked as suite-undrivable.
 31. **`crewbonus` not applied to the crewed vehicle** — Gearshift Ace's first
     strike doesn't reach the Copter. Witness: `field_crewbonus_gearshift_ace`.
 32. **sideboard/command-zone targeting inert** — clicks register,
     `target(...|sideboard)`/`(...|commandzone)` moves never happen (all 6 pairs).
     Witness: `target_sideboard_commandzone_matrix`.
-33. **`@discarded` never fires on a forced discard from hand** — only the
-    cycle-event path reaches it (MTGAbility receiveEvent cycleCheck); rule 603.10a
-    says any discard should. Worked around (fixture tests the cycling path); latent
-    gap.
+33. **CLOSED — NOT A BUG (2026-07-18 probe, could-not-reproduce).** Forced
+    discard DOES fire `@discarded` on both engine paths (random/discardRandom
+    and targeted reject/AADiscardCard), for controller-side AND opponent-side
+    watchers, probe-verified on real cards (Megrim, Glint-Horn Buccaneer) —
+    emit/listen wiring confirmed (WEventCardDiscard emitted with the card still
+    in hand; TrCardDiscarded accepts any non-cycle discard). Madness rides a
+    separate, working flag-based replacement path. The original diagnosis was
+    likely poisoned by the repeated-same-zone-INIT-line OVERWRITE trap (the
+    watcher silently never entered play) — now in the authoring doc. Follow-up:
+    add a watcher-path fixture to lock coverage (current fixture only exercises
+    the `this`-self cycling form).
 34. **`oppnomaxhand` protection collapses when the beneficiary controls no
     permanents** — GameObserver.cpp:1151 clears `nomaxhandsize` by scanning the
     player's own battlefield, ignoring grants from the opponent's permanents.
