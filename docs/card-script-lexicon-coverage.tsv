@@ -1,0 +1,858 @@
+# Machine-auditable coverage ledger for docs/card-script-lexicon.md.
+# Columns: section, item, registered fixture, observable assertion, status.
+# Every row must point to a registered gameplay fixture with an observable
+# assertion. `covered-unverified` means the row is structurally integrated but
+# has not yet been confirmed by a passing runtime result.
+section	item	registered fixture	observable assertion	status
+basic	trample	lexicon/basic_trample.txt	fixture [ASSERT] observes trample gameplay behavior	covered-unverified
+basic	forestwalk	lexicon/basic_forestwalk.txt	fixture [ASSERT] observes forestwalk gameplay behavior	covered-unverified
+basic	islandwalk	lexicon/basic_islandwalk.txt	fixture [ASSERT] observes islandwalk gameplay behavior	covered-unverified
+basic	mountainwalk	lexicon/basic_mountainwalk.txt	fixture [ASSERT] observes mountainwalk gameplay behavior	covered-unverified
+basic	swampwalk	lexicon/basic_swampwalk.txt	fixture [ASSERT] observes swampwalk gameplay behavior	covered-unverified
+basic	plainswalk	lexicon/basic_plainswalk.txt	fixture [ASSERT] observes plainswalk gameplay behavior	covered-unverified
+basic	flying	lexicon/basic_cloud_accepts_flying_block.txt	fixture [ASSERT] observes flying gameplay behavior	covered-unverified
+basic	first strike	generic/rampage_vs_first_strike.txt	fixture [ASSERT] observes first strike gameplay behavior	covered-unverified
+basic	double strike	lexicon/basic_double_strike.txt	fixture [ASSERT] observes double strike gameplay behavior	covered-unverified
+basic	fear	lexicon/basic_fear_rejects_nonartifact_nonblack_blocker.txt	fixture [ASSERT] observes fear gameplay behavior	covered-unverified
+basic	flash	lexicon/basic_asflash_adventure_casts_during_upkeep.txt	fixture [ASSERT] observes flash gameplay behavior	covered-unverified
+basic	haste	lexicon/basic_haste.txt	fixture [ASSERT] observes haste gameplay behavior	covered-unverified
+basic	lifelink	lexicon/basic_perpetual_lifelink_persists_on_card.txt	fixture [ASSERT] observes lifelink gameplay behavior	covered-unverified
+basic	reach	lexicon/basic_reach_blocks_flying.txt	fixture [ASSERT] observes reach gameplay behavior	covered-unverified
+basic	shroud	lexicon/basic_playershroud_rejects_player_target.txt	fixture [ASSERT] observes shroud gameplay behavior	covered-unverified
+basic	vigilance	lexicon/basic_vigilance.txt	fixture [ASSERT] observes vigilance gameplay behavior	covered-unverified
+basic	defender	lexicon/basic_defender_rejects_attack.txt	fixture [ASSERT] observes defender gameplay behavior	covered-unverified
+basic	banding	lexicon/basic_banding_attacks_as_group.txt	fixture [ASSERT] observes banding gameplay behavior	covered-unverified
+basic	protection from green	lexicon/basic_protection_green_rejects_green_blocker.txt	fixture [ASSERT] observes protection from green gameplay behavior	covered-unverified
+basic	protection from blue	lexicon/basic_protection_blue_rejects_blue_blocker.txt	fixture [ASSERT] observes protection from blue gameplay behavior	covered-unverified
+basic	protection from red	lexicon/basic_protection_red.txt	fixture [ASSERT] observes protection from red gameplay behavior	covered-unverified
+basic	protection from black	lexicon/basic_protection_black_rejects_black_blocker.txt	fixture [ASSERT] observes protection from black gameplay behavior	covered-unverified
+basic	protection from white	lexicon/basic_protection_white_rejects_white_blocker.txt	fixture [ASSERT] observes protection from white gameplay behavior	covered-unverified
+basic	unblockable	lexicon/basic_unblockable.txt	fixture [ASSERT] observes unblockable gameplay behavior	covered-unverified
+basic	wither	lexicon/basic_wither.txt	fixture [ASSERT] observes wither gameplay behavior	covered-unverified
+basic	persist	lexicon/basic_perpetual_lifelink_persists_on_card.txt	fixture [ASSERT] observes persist gameplay behavior	covered-unverified
+basic	retrace	lexicon/cost_retrace_land_discard.txt	fixture [ASSERT] observes retrace gameplay behavior	covered-unverified
+basic	exalted	lexicon/basic_exalted.txt	fixture [ASSERT] observes exalted gameplay behavior	covered-unverified
+basic	nofizzle	lexicon/basic_nofizzle_alternative_survives_counterspell.txt	fixture [ASSERT] observes nofizzle gameplay behavior	covered-unverified
+basic	shadow	lexicon/basic_shadow.txt	fixture [ASSERT] observes shadow gameplay behavior	covered-unverified
+basic	reachshadow	lexicon/basic_reachshadow.txt	fixture [ASSERT] observes reachshadow gameplay behavior	covered-unverified
+basic	foresthome	lexicon/basic_foresthome.txt	fixture [ASSERT] observes foresthome gameplay behavior	covered-unverified
+basic	islandhome	lexicon/basic_islandhome.txt	fixture [ASSERT] observes islandhome gameplay behavior	covered-unverified
+basic	mountainhome	lexicon/basic_mountainhome_rejects_no_mountain.txt	fixture [ASSERT] observes mountainhome gameplay behavior	covered-unverified
+basic	swamphome	lexicon/basic_swamphome.txt	fixture [ASSERT] observes swamphome gameplay behavior	covered-unverified
+basic	plainshome	lexicon/basic_plainshome_rejects_no_plains.txt	fixture [ASSERT] observes plainshome gameplay behavior	covered-unverified
+basic	cloud	lexicon/basic_cloud_rejects_ground_block.txt	fixture [ASSERT] observes cloud gameplay behavior	covered-unverified
+basic	cantattack	lexicon/basic_cantattack.txt	fixture [ASSERT] observes cantattack gameplay behavior	covered-unverified
+basic	mustattack	lexicon/basic_mustattack.txt	fixture [ASSERT] observes mustattack gameplay behavior	covered-unverified
+basic	cantblock	lexicon/basic_cantblock_rejects_block.txt	fixture [ASSERT] observes cantblock gameplay behavior	covered-unverified
+basic	doesnotuntap	lexicon/basic_doesnotuntap.txt	fixture [ASSERT] observes doesnotuntap gameplay behavior	covered-unverified
+basic	hexproof	lexicon/basic_hexproof_rejects_opponent_target.txt	fixture [ASSERT] observes hexproof gameplay behavior	covered-unverified
+basic	indestructible	lexicon/basic_indestructible_survives_destroy.txt	fixture [ASSERT] observes indestructible gameplay behavior	covered-unverified
+basic	intimidate	lexicon/basic_intimidate_colored_blocker.txt	fixture [ASSERT] observes intimidate gameplay behavior	covered-unverified
+basic	deathtouch	lexicon/basic_perpetual_deathtouch_persists_on_card.txt	fixture [ASSERT] observes deathtouch gameplay behavior	covered-unverified
+basic	horsemanship	lexicon/basic_horsemanship_ordinary_blocker.txt	fixture [ASSERT] observes horsemanship gameplay behavior	covered-unverified
+basic	cantregen	lexicon/basic_cantregen_rejects_regeneration_shield.txt	fixture [ASSERT] observes cantregen gameplay behavior	covered-unverified
+basic	oneblocker	lexicon/basic_menace_one_blocker.txt	fixture [ASSERT] observes oneblocker gameplay behavior	covered-unverified
+basic	infect	lexicon/basic_infect_player.txt	fixture [ASSERT] observes infect gameplay behavior	covered-unverified
+basic	poisontoxic	lexicon/basic_toxic_one_adds_exact_poison.txt	fixture [ASSERT] observes poisontoxic gameplay behavior	covered-unverified
+basic	poisontwotoxic	lexicon/basic_toxic_two_adds_exact_poison.txt	fixture [ASSERT] observes poisontwotoxic gameplay behavior	covered-unverified
+basic	poisonthreetoxic	lexicon/basic_toxic_three_adds_exact_poison.txt	fixture [ASSERT] observes poisonthreetoxic gameplay behavior	covered-unverified
+basic	phantom	lexicon/basic_phantom_prevents_damage.txt	fixture [ASSERT] observes phantom gameplay behavior	covered-unverified
+basic	wilting	lexicon/basic_wilting_lethalizes_one_damage.txt	fixture [ASSERT] observes wilting gameplay behavior	covered-unverified
+basic	vigor	lexicon/basic_vigor_prevents_damage.txt	fixture [ASSERT] observes vigor gameplay behavior	covered-unverified
+basic	changeling	lexicon/basic_changeling_is_goblin_for_lord.txt	fixture [ASSERT] observes changeling gameplay behavior	covered-unverified
+basic	absorb	lexicon/basic_absorb_reduces_two_damage.txt	fixture [ASSERT] observes absorb gameplay behavior	covered-unverified
+basic	treason	lexicon/basic_treason_sacrifices_at_end.txt	fixture [ASSERT] observes treason gameplay behavior	covered-unverified
+basic	unearth	dregscape_zombie_unearth.txt	fixture [ASSERT] observes unearth gameplay behavior	covered-unverified
+basic	cantlose	lexicon/basic_cantlose_survives_zero_life.txt	fixture [ASSERT] observes cantlose gameplay behavior	covered-unverified
+basic	cantlifelose	lexicon/basic_cantlifelose_survives_zero_life.txt	fixture [ASSERT] observes cantlifelose gameplay behavior	covered-unverified
+basic	cantmilllose	lexicon/basic_cantmilllose_replaces_empty_library_loss.txt	fixture [ASSERT] observes cantmilllose gameplay behavior	covered-unverified
+basic	snowlandwalk	lexicon/basic_snowlandwalk_synthetic.txt	fixture [ASSERT] observes snowlandwalk gameplay behavior	covered-unverified
+basic	nonbasiclandwalk	lexicon/basic_nonbasiclandwalk.txt	fixture [ASSERT] observes nonbasiclandwalk gameplay behavior	covered-unverified
+basic	strong	lexicon/basic_strong_rejects_lower_power.txt	fixture [ASSERT] observes strong gameplay behavior	covered-unverified
+basic	storm	lexicon/basic_storm_copies_prior_spell.txt	fixture [ASSERT] observes storm gameplay behavior	covered-unverified
+basic	phasing	lexicon/basic_phasing_leaves_and_returns.txt	fixture [ASSERT] observes phasing gameplay behavior	covered-unverified
+basic	split second	lexicon/basic_split_second_cannot_be_countered.txt	fixture [ASSERT] observes split second gameplay behavior	covered-unverified
+basic	weak	lexicon/basic_weak_rejects_higher_power.txt	fixture [ASSERT] observes weak gameplay behavior	covered-unverified
+basic	affinityartifacts	lexicon/affinity_artifacts_reduces_cost.txt	fixture [ASSERT] observes affinityartifacts gameplay behavior	covered-unverified
+basic	affinityplains	lexicon/basic_affinity_plains_reduces_cost.txt	fixture [ASSERT] observes affinityplains gameplay behavior	covered-unverified
+basic	affinityforests	lexicon/basic_affinity_forests_reduces_cost.txt	fixture [ASSERT] observes affinityforests gameplay behavior	covered-unverified
+basic	affinityislands	lexicon/affinity_islands_spire_golem.txt	fixture [ASSERT] observes affinityislands gameplay behavior	covered-unverified
+basic	affinitymountains	lexicon/affinity_mountains_oxidda_golem.txt	fixture [ASSERT] observes affinitymountains gameplay behavior	covered-unverified
+basic	affinityswamps	lexicon/affinity_swamps_reduces_cost.txt	fixture [ASSERT] observes affinityswamps gameplay behavior	covered-unverified
+basic	affinitygreencreatures	lexicon/basic_affinity_green_creatures_reduces_cost.txt	fixture [ASSERT] observes affinitygreencreatures gameplay behavior	covered-unverified
+basic	cantwin	lexicon/basic_cantwin_rejects_opponent_win.txt	fixture [ASSERT] observes cantwin gameplay behavior	covered-unverified
+basic	nomaxhand	lexicon/basic_nomaxhand_preserves_eight_cards.txt	fixture [ASSERT] observes nomaxhand gameplay behavior	covered-unverified
+basic	leyline	lexicon/basic_leyline_starts_from_opening_hand.txt	fixture [ASSERT] observes leyline gameplay behavior	covered-unverified
+basic	playershroud	lexicon/basic_playershroud_rejects_player_target.txt	fixture [ASSERT] observes playershroud gameplay behavior	covered-unverified
+basic	controllershroud	lexicon/basic_controllershroud_rejects_player_target.txt	fixture [ASSERT] observes controllershroud gameplay behavior	covered-unverified
+basic	sunburst	lexicon/basic_sunburst_counts_spent_colors.txt	fixture [ASSERT] observes sunburst gameplay behavior	covered-unverified
+basic	flanking	lexicon/basic_flanking_kills_nonflanking_blocker.txt	fixture [ASSERT] observes flanking gameplay behavior	covered-unverified
+basic	exiledeath	lexicon/basic_gainedexiledeath_granted_damage.txt	fixture [ASSERT] observes exiledeath gameplay behavior	covered-unverified
+basic	legendarylandwalk	lexicon/basic_legendarylandwalk.txt	fixture [ASSERT] observes legendarylandwalk gameplay behavior	covered-unverified
+basic	desertlandwalk	lexicon/basic_desertlandwalk_synthetic.txt	fixture [ASSERT] observes desertlandwalk gameplay behavior	covered-unverified
+basic	snowforestlandwalk	lexicon/basic_snowforestlandwalk.txt	fixture [ASSERT] observes snowforestlandwalk gameplay behavior	covered-unverified
+basic	snowplainslandwalk	lexicon/basic_snowplainslandwalk_zombie_musher.txt	fixture [ASSERT] observes snowplainslandwalk gameplay behavior	covered-unverified
+basic	snowmountainlandwalk	lexicon/basic_snowmountainlandwalk_zombie_musher.txt	fixture [ASSERT] observes snowmountainlandwalk gameplay behavior	covered-unverified
+basic	snowislandlandwalk	lexicon/basic_snowislandlandwalk_zombie_musher.txt	fixture [ASSERT] observes snowislandlandwalk gameplay behavior	covered-unverified
+basic	snowswamplandwalk	lexicon/basic_snowswamplandwalk.txt	fixture [ASSERT] observes snowswamplandwalk gameplay behavior	covered-unverified
+basic	canattack	lexicon/basic_canattack_overrides_cantattack.txt	fixture [ASSERT] observes canattack gameplay behavior	covered-unverified
+basic	hydra	lexicon/basic_hydra_removes_counters_instead_of_taking_damage.txt	fixture [ASSERT] observes hydra gameplay behavior	covered-unverified
+basic	undying	lexicon/basic_undying_returns_with_counter.txt	fixture [ASSERT] observes undying gameplay behavior	covered-unverified
+basic	poisonshroud	lexicon/basic_poisonshroud_rejects_poison.txt	fixture [ASSERT] observes poisonshroud gameplay behavior	covered-unverified
+basic	noactivatedability	lexicon/basic_noactivatedability_blocks_activation.txt	fixture [ASSERT] observes noactivatedability gameplay behavior	covered-unverified
+basic	notapability	lexicon/basic_notapability_blocks_tap_cost.txt	fixture [ASSERT] observes notapability gameplay behavior	covered-unverified
+basic	nomanaability	lexicon/basic_nomanaability_blocks_mana_activation.txt	fixture [ASSERT] observes nomanaability gameplay behavior	covered-unverified
+basic	onlymanaability	lexicon/basic_onlymanaability_allows_only_mana.txt	fixture [ASSERT] observes onlymanaability gameplay behavior	covered-unverified
+basic	poisondamager	lexicon/basic_poisondamager_deals_poison_instead_of_life.txt	fixture [ASSERT] observes poisondamager gameplay behavior	covered-unverified
+basic	soulbond	lexicon/basic_soulbond_pairs_and_pumps.txt	fixture [ASSERT] observes soulbond gameplay behavior	covered-unverified
+basic	lure	lexicon/basic_lure.txt	fixture [ASSERT] observes lure gameplay behavior	covered-unverified
+basic	nolegend	lexicon/basic_nolegend_allows_duplicate_legendary_permanents.txt	fixture [ASSERT] observes nolegend gameplay behavior	covered-unverified
+basic	canplayfromgraveyard	lexicon/basic_canplayfromgraveyard_casts_card.txt	fixture [ASSERT] observes canplayfromgraveyard gameplay behavior	covered-unverified
+basic	tokenizer	lexicon/basic_tokenizer_doubles_tokens.txt	fixture [ASSERT] observes tokenizer gameplay behavior	covered-unverified
+basic	mygraveexiler	lexicon/basic_mygraveexiler_replaces_any_creature_death.txt	fixture [ASSERT] observes mygraveexiler gameplay behavior	covered-unverified
+basic	oppgraveexiler	lexicon/basic_oppgraveexiler_replaces_opponent_creature_death.txt	fixture [ASSERT] observes oppgraveexiler gameplay behavior	covered-unverified
+basic	librarydeath	lexicon/basic_bottomlibrarydeath_draws_existing_top.txt	fixture [ASSERT] observes librarydeath gameplay behavior	covered-unverified
+basic	shufflelibrarydeath	lexicon/basic_shufflelibrarydeath_returns_to_library.txt	fixture [ASSERT] observes shufflelibrarydeath gameplay behavior	covered-unverified
+basic	offering	lexicon/cost_subtype_offering.txt	fixture [ASSERT] observes offering gameplay behavior	covered-unverified
+basic	evadebigger	lexicon/basic_evadebigger_rejects_higher_power_blocker.txt	fixture [ASSERT] observes evadebigger gameplay behavior	covered-unverified
+basic	spellmastery	lexicon/basic_spellmastery_allows_flash_cast.txt	fixture [ASSERT] observes spellmastery gameplay behavior	covered-unverified
+basic	nolifegain	lexicon/basic_nolifegain_rejects_life_gain.txt	fixture [ASSERT] observes nolifegain gameplay behavior	covered-unverified
+basic	nolifegainopponent	lexicon/basic_nolifegainopponent_rejects_opponent_gain.txt	fixture [ASSERT] observes nolifegainopponent gameplay behavior	covered-unverified
+basic	auraward	lexicon/basic_auraward_keeps_protected_aura.txt	fixture [ASSERT] observes auraward gameplay behavior	covered-unverified
+basic	madness	lexicon/basic_madness_casts_after_discard.txt	fixture [ASSERT] observes madness gameplay behavior	covered-unverified
+basic	protectionfromcoloredspells	lexicon/basic_protectionfromcoloredspells_rejects_shock.txt	fixture [ASSERT] observes protectionfromcoloredspells gameplay behavior	covered-unverified
+basic	mygcreatureexiler	lexicon/basic_mygravecreatureexiler_replaces_creature_death.txt	controller's dead creature is exiled instead of entering the graveyard	covered-unverified
+basic	oppgcreatureexiler	lexicon/basic_oppgcreatureexiler_replaces_opponent_death.txt	fixture [ASSERT] observes oppgcreatureexiler gameplay behavior	covered-unverified
+basic	zerocast	lexicon/basic_zerocast_allows_free_cast.txt	fixture [ASSERT] observes zerocast gameplay behavior	covered-unverified
+basic	trinisphere	lexicon/basic_trinisphere_raises_small_spell_cost.txt	fixture [ASSERT] observes trinisphere gameplay behavior	covered-unverified
+basic	canplayfromexile	lexicon/basic_canplayfromexile_casts_card.txt	fixture [ASSERT] observes canplayfromexile gameplay behavior	covered-unverified
+basic	libraryeater	lexicon/basic_libraryeater_turns_combat_damage_into_mill.txt	fixture [ASSERT] observes libraryeater gameplay behavior	covered-unverified
+basic	devoid	lexicon/basic_devoid_is_colorless_for_protection.txt	fixture [ASSERT] observes devoid gameplay behavior	covered-unverified
+basic	cantchangelife	lexicon/basic_cantchangelife_rejects_damage.txt	fixture [ASSERT] observes cantchangelife gameplay behavior	covered-unverified
+basic	combattoughness	lexicon/basic_combattoughness_assigns_toughness_damage.txt	fixture [ASSERT] observes combattoughness gameplay behavior	covered-unverified
+basic	cantpaylife	lexicon/basic_cantpaylife_rejects_life_payment.txt	fixture [ASSERT] observes cantpaylife gameplay behavior	covered-unverified
+basic	cantbesacrified	lexicon/basic_cantbesacrified_rejects_sacrifice.txt	fixture [ASSERT] observes cantbesacrified gameplay behavior	covered-unverified
+basic	skulk	lexicon/basic_skulk_rejects_higher_power.txt	fixture [ASSERT] observes skulk gameplay behavior	covered-unverified
+basic	menace	lexicon/basic_menace_one_blocker.txt	fixture [ASSERT] observes menace gameplay behavior	covered-unverified
+basic	nosolo	lexicon/basic_nosolo_rejects_alone.txt	fixture [ASSERT] observes nosolo gameplay behavior	covered-unverified
+basic	mustblock	lexicon/basic_mustblock_automatic.txt	fixture [ASSERT] observes mustblock gameplay behavior	covered-unverified
+basic	dethrone	lexicon/basic_dethrone_survives_equal_blocker.txt	fixture [ASSERT] observes dethrone gameplay behavior	covered-unverified
+basic	overload	lexicon/basic_overload_affects_each_target.txt	fixture [ASSERT] observes overload gameplay behavior	covered-unverified
+basic	shackler	lexicon/basic_shackler_does_not_untap.txt	fixture [ASSERT] observes shackler gameplay behavior	covered-unverified
+basic	flyersonly	lexicon/basic_flyersonly_rejects_ground_attack.txt	fixture [ASSERT] observes flyersonly gameplay behavior	covered-unverified
+basic	tempflashback	lexicon/basic_tempflashback_casts_from_graveyard.txt	fixture [ASSERT] observes tempflashback gameplay behavior	covered-unverified
+basic	legendruleremove	lexicon/basic_legendruleremove_allows_duplicate_sakashima.txt	fixture [ASSERT] observes legendruleremove gameplay behavior	covered-unverified
+basic	canttransform	lexicon/basic_canttransform_prevents_day_night_flip.txt	fixture [ASSERT] observes canttransform gameplay behavior	covered-unverified
+basic	asflash	lexicon/basic_asflash_adventure_casts_during_upkeep.txt	fixture [ASSERT] observes asflash gameplay behavior	covered-unverified
+basic	conduited	lexicon/basic_conduited_reduces_first_creature.txt	fixture [ASSERT] observes conduited gameplay behavior	covered-unverified
+basic	canblocktapped	lexicon/basic_canblocktapped_blocks_while_tapped.txt	fixture [ASSERT] observes canblocktapped gameplay behavior	covered-unverified
+basic	oppnomaxhand	lexicon/basic_opponent_nomaxhand_survives_cleanup.txt	opponent keeps more than seven cards through cleanup	covered-unverified
+basic	cantcrew	lexicon/basic_cantcrew_rejects_vehicle_crew.txt	fixture [ASSERT] observes cantcrew gameplay behavior	covered-unverified
+basic	hiddenface	lexicon/basic_visibility_and_commander_flags.txt	live card retains the hidden-face flag in the gameplay state	covered-unverified
+basic	anytypeofmana	lexicon/basic_anytypeofmana_casts_planeswalker.txt	fixture [ASSERT] observes anytypeofmana gameplay behavior	covered-unverified
+basic	necroed	lexicon/effect_hiddenmoveto_moves_card_to_exile.txt	hiddenmoveto leaves the moved card carrying the necroed hidden-state flag	covered-unverified
+basic	cantpwattack	lexicon/basic_cantpwattack_rejects_planeswalker_attack.txt	attacker remains untapped and planeswalker remains in play	covered-unverified
+basic	canplayfromlibrarytop	lexicon/top_library_any_synthetic.txt	any card on top of the library is castable and enters the battlefield	covered-unverified
+basic	canplaylandlibrarytop	lexicon/top_library_land_courser.txt	top-library land play enters the battlefield and triggers landfall	covered-unverified
+basic	canplaycreaturelibrarytop	lexicon/top_library_creature_garruks_horde.txt	top-library creature play casts and enters the battlefield	covered-unverified
+basic	canplayartifactlibrarytop	lexicon/top_library_artifact_synthetic.txt	top-library artifact play casts and enters the battlefield	covered-unverified
+basic	canplayinstantsorcerylibrarytop	lexicon/top_library_instant_sorcery_synthetic.txt	top-library instant resolves and reaches the graveyard	covered-unverified
+basic	showfromtoplibrary	lexicon/basic_visibility_and_commander_flags.txt	live card retains the own-top-library reveal flag in the gameplay state	covered-unverified
+basic	showopponenttoplibrary	lexicon/basic_visibility_and_commander_flags.txt	live card retains the opponent-top-library reveal flag in the gameplay state	covered-unverified
+basic	totemarmor	lexicon/basic_totemarmor_saves_creature_and_destroys_aura.txt	fixture [ASSERT] observes totemarmor gameplay behavior	covered-unverified
+basic	discardtoplaybyopponent	lexicon/basic_discardtoplaybyopponent_returns_card.txt	fixture [ASSERT] observes discardtoplaybyopponent gameplay behavior	covered-unverified
+basic	modular	lexicon/basic_modular_transfers_counter.txt	fixture [ASSERT] observes modular gameplay behavior	covered-unverified
+basic	mutate	lexicon/basic_mutate_triggers_mutation_event.txt	fixture [ASSERT] observes mutate gameplay behavior	covered-unverified
+basic	adventure	lexicon/basic_asflash_adventure_casts_during_upkeep.txt	fixture [ASSERT] observes adventure gameplay behavior	covered-unverified
+basic	mentor	lexicon/basic_mentor_pumps_lesser_attacker.txt	fixture [ASSERT] observes mentor gameplay behavior	covered-unverified
+basic	prowess	lexicon/basic_prowess.txt	fixture [ASSERT] observes prowess gameplay behavior	covered-unverified
+basic	nofizzle alternative	lexicon/basic_nofizzle_alternative_survives_counterspell.txt	alternate-cost spell resolves through Counterspell	covered-unverified
+basic	hasotherkicker	lexicon/basic_hasotherkicker_pays_nonmana_kicker.txt	fixture [ASSERT] observes hasotherkicker gameplay behavior	covered-unverified
+basic	partner	lexicon/basic_partner_finds_named_partner.txt	fixture [ASSERT] observes partner gameplay behavior	covered-unverified
+basic	canbecommander	lexicon/basic_visibility_and_commander_flags.txt	commander-eligible card retains its eligibility flag in the command zone	covered-unverified
+basic	poisonfourtoxic	lexicon/basic_toxic_four_adds_exact_poison.txt	fixture [ASSERT] observes poisonfourtoxic gameplay behavior	covered-unverified
+basic	threeblockers	lexicon/basic_threeblockers.txt	fixture [ASSERT] observes threeblockers gameplay behavior	covered-unverified
+basic	handdeath	lexicon/basic_handdeath_returns_to_hand.txt	fixture [ASSERT] observes handdeath gameplay behavior	covered-unverified
+basic	inplaydeath	lexicon/basic_inplaydeath_returns_untapped.txt	fixture [ASSERT] observes inplaydeath gameplay behavior	covered-unverified
+basic	inplaytapdeath	lexicon/basic_inplaytapdeath_returns_tapped.txt	fixture [ASSERT] observes inplaytapdeath gameplay behavior	covered-unverified
+basic	gainedexiledeath	lexicon/basic_gainedexiledeath_granted_damage.txt	fixture [ASSERT] observes gainedexiledeath gameplay behavior	covered-unverified
+basic	gainedhanddeath	lexicon/basic_gainedhanddeath_granted_damage.txt	fixture [ASSERT] observes gainedhanddeath gameplay behavior	covered-unverified
+basic	cycling	generic/cycling.txt	fixture [ASSERT] observes cycling gameplay behavior	covered-unverified
+basic	foretell	lexicon/basic_foretell_exiles_face_down.txt	fixture [ASSERT] observes foretell gameplay behavior	covered-unverified
+basic	anytypeofmanaability	lexicon/basic_anytypeofmanaability_pays_activated_cost.txt	fixture [ASSERT] observes anytypeofmanaability gameplay behavior	covered-unverified
+basic	boast	lexicon/basic_boast_activates_after_attack.txt	fixture [ASSERT] observes boast gameplay behavior	covered-unverified
+basic	twoboast	lexicon/basic_twoboast_allows_two_events.txt	fixture [ASSERT] observes twoboast gameplay behavior	covered-unverified
+basic	replacescry	lexicon/basic_replacescry_draws_cards.txt	fixture [ASSERT] observes replacescry gameplay behavior	covered-unverified
+basic	hasnokicker	lexicon/basic_hasnokicker_replicate_casts.txt	fixture [ASSERT] observes hasnokicker gameplay behavior	covered-unverified
+basic	undamageable	lexicon/basic_undamageable_rejects_damage.txt	fixture [ASSERT] observes undamageable gameplay behavior	covered-unverified
+basic	lifefaker	lexicon/basic_lifefaker_doubles_life_gain.txt	fixture [ASSERT] observes lifefaker gameplay behavior	covered-unverified
+basic	doublefacedeath	lexicon/basic_doublefacedeath_temp_zone.txt	native double-faced-death flag routes a dying permanent to temp	covered-unverified
+basic	gaineddoublefacedeath	lexicon/basic_doublefacedeath_temp_zone.txt	granted double-faced-death flag routes a dying permanent to temp	covered-unverified
+basic	twodngtrg	lexicon/basic_dungeon_flag_state.txt	live card retains the two-dungeon trigger flag in gameplay state	covered-unverified
+basic	nodngopp	lexicon/basic_dungeon_flag_state.txt	live card retains the no-opponent-venture flag in gameplay state	covered-unverified
+basic	nodngplr	lexicon/basic_dungeon_flag_state.txt	live card retains the no-controller-venture flag in gameplay state	covered-unverified
+basic	canplayauraequiplibrarytop	lexicon/top_library_auraequip_synthetic.txt	top-library Equipment play enters the battlefield	covered-unverified
+basic	counterdeath	lexicon/basic_counterdeath_returns_with_counter.txt	fixture [ASSERT] observes counterdeath gameplay behavior	covered-unverified
+basic	dungeoncompleted	lexicon/basic_dungeoncompleted_target_restriction.txt	dungeon flag selects a sideboard card for a zone move	covered-unverified
+basic	perpetuallifelink	lexicon/basic_perpetual_lifelink_persists_on_card.txt	fixture [ASSERT] observes perpetuallifelink gameplay behavior	covered-unverified
+basic	perpetualdeathtouch	lexicon/basic_perpetual_deathtouch_persists_on_card.txt	fixture [ASSERT] observes perpetualdeathtouch gameplay behavior	covered-unverified
+basic	noncombatvigor	lexicon/basic_noncombatvigor.txt	fixture [ASSERT] observes noncombatvigor gameplay behavior	covered-unverified
+basic	nomovetrigger	lexicon/basic_nomovetrigger_suppresses_zone_change_trigger.txt	entry does not fire the moved-to-battlefield trigger	covered-unverified
+basic	canloyaltytwice	lexicon/basic_canloyaltytwice_allows_two_activations.txt	two loyalty activations each gain one life	covered-unverified
+basic	showopponenthand	lexicon/basic_visibility_and_commander_flags.txt	live card retains the opponent-hand reveal flag in the gameplay state	covered-unverified
+basic	showcontrollerhand	lexicon/basic_visibility_and_commander_flags.txt	live card retains the controller-hand reveal flag in the gameplay state	covered-unverified
+basic	hasreplicate	lexicon/basic_hasreplicate_copies_targeted_spell.txt	fixture [ASSERT] observes hasreplicate gameplay behavior	covered-unverified
+basic	isprey	lexicon/basic_isprey_haunted_creature_triggers.txt	haunted creature matches an isprey zone-change trigger	covered-unverified
+basic	hasdisturb	lexicon/basic_hasdisturb_casts_transformed_from_graveyard.txt	fixture [ASSERT] observes hasdisturb gameplay behavior	covered-unverified
+basic	daybound	lexicon/basic_daybound_flips_after_empty_turn.txt	fixture [ASSERT] observes daybound gameplay behavior	covered-unverified
+basic	nightbound	lexicon/basic_nightbound_flips_after_two_spells.txt	fixture [ASSERT] observes nightbound gameplay behavior	covered-unverified
+basic	decayed	lexicon/basic_decayed_sacrifices_after_attack.txt	fixture [ASSERT] observes decayed gameplay behavior	covered-unverified
+basic	hasstrive	lexicon/basic_hasstrive_multikicker_targets.txt	fixture [ASSERT] observes hasstrive gameplay behavior	covered-unverified
+basic	isconspiracy	lexicon/basic_visibility_and_commander_flags.txt	conspiracy card retains its hidden-agenda flag in the command zone	covered-unverified
+basic	hasaftermath	lexicon/basic_hasaftermath_casts_from_graveyard.txt	aftermath spell casts from graveyard and is exiled	covered-unverified
+basic	noentertrg	lexicon/basic_noentertrg_suppresses_etb.txt	fixture [ASSERT] observes noentertrg gameplay behavior	covered-unverified
+basic	nodietrg	lexicon/basic_nodietrg_suppresses_death.txt	fixture [ASSERT] observes nodietrg gameplay behavior	covered-unverified
+basic	training	lexicon/basic_training.txt	fixture [ASSERT] observes training gameplay behavior	covered-unverified
+basic	energyshroud	lexicon/basic_energyshroud_rejects_energy.txt	fixture [ASSERT] observes energyshroud gameplay behavior	covered-unverified
+basic	expshroud	lexicon/basic_expshroud_rejects_experience.txt	fixture [ASSERT] observes expshroud gameplay behavior	covered-unverified
+basic	countershroud	lexicon/basic_countershroud_rejects_counters.txt	fixture [ASSERT] observes countershroud gameplay behavior	covered-unverified
+basic	nonight	lexicon/basic_nonight_rejects_night_transition.txt	fixture [ASSERT] observes nonight gameplay behavior	covered-unverified
+basic	nodamageremoved	lexicon/basic_nodamageremoved_preserves_damage.txt	fixture [ASSERT] observes nodamageremoved gameplay behavior	covered-unverified
+basic	backgroundpartner	lexicon/basic_visibility_and_commander_flags.txt	Background card retains its partner-selection flag in the command zone	covered-unverified
+basic	bottomlibrarydeath	lexicon/basic_bottomlibrarydeath_draws_existing_top.txt	fixture [ASSERT] observes bottomlibrarydeath gameplay behavior	covered-unverified
+basic	noloyaltydamage	lexicon/basic_noloyaltydamage_preserves_planeswalker.txt	fixture [ASSERT] observes noloyaltydamage gameplay behavior	covered-unverified
+basic	nodefensedamage	lexicon/basic_nodefensedamage_preserves_battle_defense.txt	Battle remains in play after combat damage	covered-unverified
+basic	affinityallcreatures	lexicon/basic_affinity_all_creatures_counts_both_battlefields.txt	fixture [ASSERT] observes affinityallcreatures gameplay behavior	covered-unverified
+basic	affinitycontrollercreatures	lexicon/basic_affinity_controller_creatures_counts_own_battlefield.txt	fixture [ASSERT] observes affinitycontrollercreatures gameplay behavior	covered-unverified
+basic	affinityopponentcreatures	lexicon/basic_affinity_opponent_creatures_counts_opponent.txt	fixture [ASSERT] observes affinityopponentcreatures gameplay behavior	covered-unverified
+basic	affinityalldeadcreatures	lexicon/basic_affinity_dead_creatures_counts_death_this_turn.txt	fixture [ASSERT] observes affinityalldeadcreatures gameplay behavior	covered-unverified
+basic	affinityparty	lexicon/basic_affinity_party_counts_party_members.txt	fixture [ASSERT] observes affinityparty gameplay behavior	covered-unverified
+basic	affinityenchantments	lexicon/basic_affinity_enchantments_counts_own_enchantment.txt	fixture [ASSERT] observes affinityenchantments gameplay behavior	covered-unverified
+basic	affinitybasiclandtypes	lexicon/basic_affinity_basic_land_types_counts_unique_types.txt	fixture [ASSERT] observes affinitybasiclandtypes gameplay behavior	covered-unverified
+basic	affinitytwobasiclandtypes	lexicon/basic_affinity_two_basic_land_types_counts_double.txt	fixture [ASSERT] observes affinitytwobasiclandtypes gameplay behavior	covered-unverified
+basic	affinitygravecreatures	lexicon/basic_affinity_grave_creatures_counts_your_graveyard.txt	fixture [ASSERT] observes affinitygravecreatures gameplay behavior	covered-unverified
+basic	affinityattackingcreatures	lexicon/basic_affinity_attacking_creatures_reduces_in_combat.txt	fixture [ASSERT] observes affinityattackingcreatures gameplay behavior	covered-unverified
+basic	affinitygraveinstsorc	lexicon/basic_affinity_grave_instants_counts_graveyard.txt	graveyard instant count reduces the witness's casting cost	covered-unverified
+basic	poisonfivetoxic	lexicon/basic_toxic_five_adds_exact_poison.txt	fixture [ASSERT] observes poisonfivetoxic gameplay behavior	covered-unverified
+basic	poisonsixtoxic	lexicon/basic_toxic_six_adds_exact_poison.txt	fixture [ASSERT] observes poisonsixtoxic gameplay behavior	covered-unverified
+basic	poisonseventoxic	lexicon/basic_toxic_seven_adds_exact_poison.txt	fixture [ASSERT] observes poisonseventoxic gameplay behavior	covered-unverified
+basic	poisoneighttoxic	lexicon/basic_toxic_eight_adds_exact_poison.txt	fixture [ASSERT] observes poisoneighttoxic gameplay behavior	covered-unverified
+basic	poisonninetoxic	lexicon/basic_toxic_nine_adds_exact_poison.txt	fixture [ASSERT] observes poisonninetoxic gameplay behavior	covered-unverified
+basic	poisontentoxic	lexicon/basic_toxic_ten_adds_exact_poison.txt	fixture [ASSERT] observes poisontentoxic gameplay behavior	covered-unverified
+basic	eqpasinst	lexicon/basic_eqpasinst_equips_during_combat.txt	equipped creature deals four combat damage during combat phase	covered-unverified
+basic	canloyaltyasinst	lexicon/basic_canloyaltyasinst_activates_during_combat.txt	loyalty activation gains life during combat phase	covered-unverified
+basic	canplayenchantmentlibrarytop	lexicon/top_library_enchantment_synthetic.txt	top-library enchantment play enters the battlefield	covered-unverified
+basic	affinitytwoalldeadcreatures	lexicon/basic_affinity_two_dead_creatures_counts_two_units.txt	fixture [ASSERT] observes affinitytwoalldeadcreatures gameplay behavior	covered-unverified
+basic	mytreason	generic/thirsting_axe_sac_i1085.txt	mytreason sacrifices the creature at its controller's end step	covered-unverified
+effect	trigger_effect	lexicon/trigger_tapped_for_mana_scopes.txt	Manabarbs' triggered effects resolve for mana taps in both player scopes	covered-unverified
+effect	tutorial	lexicon/effect_tutorial_message_headless.txt	tutorial modal resolves without wedging the headless gameplay test	covered-unverified
+effect	message	lexicon/effect_tutorial_message_headless.txt	message modal resolves without wedging the headless gameplay test	covered-unverified
+effect	if	lexicon/structural_if_true_branch_changes_life.txt	if selects the true branch and changes life	covered-unverified
+effect	ifnot	lexicon/structural_ifnot_false_branch_preserves_life.txt	ifnot selects its false condition behavior	covered-unverified
+effect	pay	lexicon/structural_pay_accepts_zero_cost_branch.txt	pay accepts the optional zero-cost branch	covered-unverified
+effect	pay[[	spell_rupture.txt	Spell Rupture's bracketed pay branch counters the spell only after its payment choice resolves	covered-unverified
+effect	may	lexicon/structural_may_accepts_optional_effect.txt	may accepts the optional life effect	covered-unverified
+effect	choice	lexicon/structural_choice_selects_first_branch.txt	choice resolves the selected branch	covered-unverified
+effect	ueot	lexicon/effect_ueot_expires_at_end_of_turn.txt	UEOT trigger fires once before cleanup and not on the next end step	covered-unverified
+effect	activate	lexicon/effect_activate_adds_nested_effect.txt	activate resolves its nested life effect	covered-unverified
+effect	emblem	lexicon/effect_emblem_persists_as_game_rule.txt	emblem trigger persists across two end steps	covered-unverified
+effect	lord	lexicon/effect_lord_buffs_matching_creatures.txt	lord grants the matching Bear enough toughness to trade with a Hill Giant	covered-unverified
+effect	foreach	lexicon/effect_foreach_scales_creature_modifier.txt	foreach scales the source creature's modifier so it trades with a Hill Giant	covered-unverified
+effect	aslongas	Auriok_Sunchaser_ASLONGAS_1.txt	Auriok Sunchaser remains a 3/3 after one artifact leaves while the as-long-as threshold still holds	covered-unverified
+effect	teach	generic/krovikan_plague_i1085.txt	Krovikan Plague grants its tap-and-counter ability to the enchanted Bear	covered-unverified
+effect	all	Living_Death.txt	Living Death applies its mass graveyard/battlefield transition and the resulting creatures survive combat	covered-unverified
+effect	this	lexicon/effect_this_conditions_source_modifier.txt	this applies its nested modifier when the source controller-life condition is true	covered-unverified
+effect	thisforeach	generic/thisforeach.txt	thisforeach scales the nested ability and the fixture asserts the resulting zone state	covered-unverified
+effect	while	lexicon/effect_while_keeps_matching_modifier.txt	while keeps the source's modifier active while the opponent outnumbers it	covered-unverified
+effect	and	lexicon/structural_and_resolves_both_effects.txt	and resolves both chained effects	covered-unverified
+effect	soulbond	lexicon/basic_soulbond_pairs_and_pumps.txt	Druid's Familiar's soulbond pair grants the pump needed to survive combat	covered-unverified
+effect	poolsave	lexicon/effect_poolsave_preserves_green_mana_across_phase.txt	controller green mana remains after phase change	covered-unverified
+effect	mypoolsave	lexicon/effect_mypoolsave_preserves_controller_green_mana.txt	mypoolsave preserves controller green mana across a phase change	covered-unverified
+effect	opponentpoolsave	lexicon/effect_opponentpoolsave_preserves_opponent_mana.txt	opponent green mana remains after phase change	covered-unverified
+effect	replacedraw	lexicon/effect_replacedraw_replaces_draw_with_ability.txt	controller draw is replaced by the nested ability	covered-unverified
+effect	opponentreplacedraw	lexicon/effect_opponentreplacedraw_replaces_opponent_draw.txt	opponent draw is replaced by life gain	covered-unverified
+effect	dynamicability	abyssal_hunter_POWERSTRIKE.txt	Abyssal Hunter's dynamic ability resolves its power-strike damage and destroys the Hill Giant	covered-unverified
+effect	flipacoin	lexicon/trigger_coinflipped_branch.txt	coin result selects exactly one gameplay branch	covered
+effect	rolld4	lexicon/effect_rolls_all_supported_die_sizes.txt	d4 emits one die event	covered-unverified
+effect	rolld6	lexicon/effect_rolls_all_supported_die_sizes.txt	d6 emits one die event	covered-unverified
+effect	rolld8	lexicon/effect_rolls_all_supported_die_sizes.txt	d8 emits one die event	covered-unverified
+effect	rolld10	lexicon/effect_rolls_all_supported_die_sizes.txt	d10 emits one die event	covered-unverified
+effect	rolld12	lexicon/effect_rolls_all_supported_die_sizes.txt	d12 emits one die event	covered-unverified
+effect	rolld20	lexicon/effect_rolls_all_supported_die_sizes.txt	d20 emits one die event	covered-unverified
+effect	ninjutsu	lexicon/cost_ninjutsu_return_attacker.txt	ninjutsu returns the unblocked attacker and puts the ninjutsu creature into play	covered-unverified
+effect	readytofight	lexicon/effect_readytofight_returns_graveyard_creature.txt	readytofight returns the graveyard creature to the battlefield	covered-unverified
+effect	removefromcombat	lexicon/effect_removefromcombat_prevents_combat_damage.txt	removefromcombat removes an attacker before damage	covered-unverified
+effect	shackle	lexicon/effect_shackle_takes_control_until_untap.txt	The shackle effect moves control of Hill Giant to the witness controller	covered-unverified
+effect	grant	lexicon/effect_grant_changes_lethal_damage_result.txt	grant supplies temporary toughness that prevents lethal damage	covered-unverified
+effect	blink	lexicon/blink_retriggers_etb.txt	blink exiles and returns a permanent, retriggering its ETB	covered-unverified
+effect	return	lexicon/effect_return_blinks_and_counters_target.txt	return blinks a creature and applies its nested counter effect	covered-unverified
+effect	spellmover	generic/misdirection_i1085.txt	Misdirection moves the targeted Shock on the stack so its damage resolves to the new player	covered-unverified
+effect	fizzleto	fizzleto_exile.txt	Dissipate fizzleto(exile) puts the countered spell into exile	covered-unverified
+effect	fizzle	generic/arcane_denial_i1126.txt	Arcane Denial's nested fizzle counteracts the targeted spell before its draw effects resolve	covered-unverified
+effect	ability$	lexicon/structural_ability_dollar_changes_life.txt	ability$ creates and resolves its stored targeted ability	covered-unverified
+effect	token	lexicon/effect_token_creates_comma_token.txt	the comma-delimited token effect creates a token on the battlefield	covered-unverified
+effect	create	lexicon/effect_create_token_colon_syntax.txt	create resolves the colon-delimited token syntax	covered-unverified
+effect	equip	generic/equip_landfall_buff.txt	Adventuring Gear's equip effect attaches it to the Bear and changes combat damage	covered-unverified
+effect	reconfigure	lexicon/effect_reconfigure_attaches_equipment.txt	Simian Sling's reconfigure attaches the artifact creature and changes combat damage	covered-unverified
+effect	attach	lexicon/effect_attach_equips_target.txt	The attach effect equips its target without a main-phase restriction and changes combat damage	covered-unverified
+effect	moveto	lexicon/target_this_moves_source.txt	moveto moves the selected source card to exile	covered-unverified
+effect	hiddenmoveto	lexicon/effect_hiddenmoveto_moves_card_to_exile.txt	hiddenmoveto moves the selected permanent into exile	covered-unverified
+effect	moverandom	lexicon/effect_moverandom_single_candidate.txt	moverandom moves the only matching card between zones	covered-unverified
+effect	placefromthetop	lexicon/effect_placefromthetop_positions_card.txt	placefromthetop puts a card at the requested library position	covered-unverified
+effect	bottomoflibrary	lexicon/effect_bottomoflibrary_moves_graveyard_card.txt	bottomoflibrary moves a card to the library bottom	covered-unverified
+effect	copy	body_double.txt	Body Double copies the Grizzly Bears in the graveyard and deals its copied combat damage	covered-unverified
+effect	imprint	lexicon/effect_imprint_reuses_exiled_card.txt	imprint exiles the card and reuses its copy	covered-unverified
+effect	haunt	lexicon/basic_isprey_haunted_creature_triggers.txt	The haunt effect associates the source with the prey so the isprey death trigger gains life	covered-unverified
+effect	dotrain	lexicon/effect_dotrain_changes_lethal_damage_result.txt	dotrain adds training toughness that prevents lethal damage	covered-unverified
+effect	bury	lexicon/effect_bury_moves_target_without_regeneration.txt	bury moves the target to its graveyard	covered-unverified
+effect	destroy	lexicon/effect_destroy_moves_target_to_graveyard.txt	destroy moves the target to its graveyard	covered-unverified
+effect	sacrifice	lexicon/effect_sacrifice_moves_controller_target.txt	sacrifice moves the controller's creature to its graveyard	covered-unverified
+effect	exploits	lexicon/effect_exploits_fires_exploited_trigger.txt	exploit sacrifices the creature and fires the exploited trigger	covered-unverified
+effect	reject	lexicon/effect_reject_discards_opponent_card.txt	reject discards the selected card	covered-unverified
+effect	resetdamage	lexicon/effect_resetdamage_clears_marked_damage.txt	resetdamage clears marked damage	covered-unverified
+effect	preventallcombatdamage	lexicon/prevent_combat_only.txt	combat damage is prevented while noncombat damage still resolves	covered-unverified
+effect	preventallnoncombatdamage	lexicon/prevent_noncombat_only.txt	noncombat damage is prevented while combat damage still resolves	covered-unverified
+effect	preventalldamage	generic/preventalldamage.txt	preventalldamage prevents damage to creatures while player damage still resolves	covered-unverified
+effect	fog	fog.txt	fog prevents combat damage for its one-shot duration	covered-unverified
+effect	prevent:N	lexicon/prevention_pooled_shield.txt	prevent:N prevents the next matching damage	covered-unverified
+effect	damage:N	lexicon/effect_damage_changes_player_life.txt	damage changes the target player's life	covered-unverified
+effect	life:N	lexicon/effect_life_gains_controller_life.txt	life:N changes the controller's life	covered-unverified
+effect	lifeleech:N	lexicon/effect_lifeleech_transfers_lost_life.txt	lifeleech transfers damage life loss to its controller	covered-unverified
+effect	lifeset:N	lexicon/effect_lifeset_sets_controller_total.txt	lifeset sets the controller's life total	covered-unverified
+effect	wingame	lexicon/effect_wingame_sets_terminal_result.txt	wingame produces the terminal win result	covered-unverified
+effect	alterpoison:N	lexicon/effect_alterpoison_adds_poison.txt	alterpoison adds the requested poison counter	covered-unverified
+effect	alterenergy:N	lexicon/effect_alterenergy_fires_energy_trigger.txt	alterenergy changes energy and fires its trigger	covered-unverified
+effect	alterexperience:N	lexicon/effect_alterexperience_fires_experience_trigger.txt	alterexperience changes experience and fires its trigger	covered-unverified
+effect	completedungeon:N	lexicon/effect_completedungeon_fires_completion_trigger.txt	completedungeon changes dungeon state and fires its trigger	covered-unverified
+effect	alteryidarocount:N	lexicon/effect_alteryidarocount_changes_cycle_count.txt	alteryidarocount changes the Yidaro cycle count	covered-unverified
+effect	theringtempts:N	lexicon/trigger_ringtempted_controller_fires.txt	theringtempts emits the Ring-tempted event	covered-unverified
+effect	becomesmonarch	lexicon/trigger_monarch_controller_fires.txt	becomesmonarch emits the monarch event	covered-unverified
+effect	taketheinitiative	lexicon/trigger_initiative_controller_fires.txt	taketheinitiative emits the initiative event	covered-unverified
+effect	altersurvoffset:N	lexicon/effect_altersurvoffset_changes_surveil_window.txt	altersurvoffset changes the number of surveilled cards	covered-unverified
+effect	alterdevoffset:N	lexicon/effect_alterdevoffset_changes_devotion.txt	alterdevoffset changes devotion calculation	covered-unverified
+effect	altermutationcounter:N	lexicon/effect_altermutationcounter_emits_mutated_event.txt	altermutationcounter emits the mutated event observed by the source trigger	covered-unverified
+effect	mutationover:N	lexicon/effect_mutateover_places_source_over_target.txt	mutation-over placement forms a mutation stack that survives the target interaction	covered-unverified
+effect	mutationunder:N	lexicon/effect_mutationunder_guarded.txt	guarded mutationunder gameplay line constructs and resolves without parser failure	covered-unverified
+effect	doboast	lexicon/effect_doboast_fires_event.txt	doboast emits the boast event	covered-unverified
+effect	surveil	lexicon/trigger_surveiled_fires_once.txt	surveil emits the surveiled event	covered-unverified
+effect	explores	lexicon/trigger_explored_fires_once.txt	explores emits the explored event	covered-unverified
+effect	becomesringbearer	lexicon/effect_becomesringbearer_fires_bearer_trigger.txt	becomesringbearer emits the bearer event	covered-unverified
+effect	doforetell	lexicon/effect_doforetell_fires_foretold_event.txt	doforetell emits the foretold event	covered-unverified
+effect	conjure	lexicon/effect_conjure_creates_card_in_hand.txt	conjure creates the requested card in hand	covered-unverified
+effect	clone	lexicon/effect_clone_copies_creature.txt	clone creates a copy of the selected creature	covered-unverified
+effect	castcard	generic/sram_expertise_castcard.txt	Sram's Expertise casts the hand's Grizzly Bears for no additional mana	covered-unverified
+effect	train	lexicon/effect_dotrain_changes_lethal_damage_result.txt	dotrain adds enough toughness for the trained creature to survive Shock	covered-unverified
+effect	becomes	lexicon/effect_becomes_changes_lethal_result.txt	becomes changes the target's creature characteristics	covered-unverified
+effect	remake	lexicon/effect_remake_changes_lethal_result.txt	remake changes the target's creature characteristics	covered-unverified
+effect	transforms	lexicon/effect_transforms_changes_lethal_result.txt	transforms changes the target's creature characteristics	covered-unverified
+effect	flip	lexicon/effect_flip_changes_lethal_result.txt	flip changes the target's lethal combat result	covered-unverified
+effect	doubleside	lexicon/effect_doubleside_turns_back_face.txt	doubleside changes the card's face	covered-unverified
+effect	morph	lexicon/effect_morph_turns_creature_face_down.txt	morph turns the targeted creature face down before combat	covered-unverified
+effect	manafaceup	lexicon/effect_manafaceup_turns_morph_face_up.txt	manafaceup turns a morphed creature face up	covered-unverified
+effect	manifest	lexicon/trigger_facedup_life.txt	Mastery of the Unseen manifests the top card and the face-up transition fires the life trigger	covered-unverified
+effect	meldfrom	lexicon/effect_meld_combines_pair.txt	Gisela and Bruna meld through the production meld declarations into Brisela	covered-unverified
+effect	meld	lexicon/effect_meld_combines_pair.txt	meld combines the named pair	covered-unverified
+effect	counter	lexicon/effect_counter_changes_lethal_damage_result.txt	counter changes the lethal damage result	covered-unverified
+effect	countershroud	lexicon/effect_countershroud_rejects_counters.txt	countershroud rejects a counter	covered-unverified
+effect	countertrack	lexicon/effect_countertrack_restores_removed_counter.txt	countertrack restores the removed counter when its source leaves	covered-unverified
+effect	duplicatecounters	lexicon/effect_duplicatecounters_changes_lethal_damage_result.txt	duplicatecounters doubles the target counter	covered-unverified
+effect	removesinglecountertype	lexicon/effect_removesinglecountertype_removes_one.txt	removesinglecountertype removes one counter	covered-unverified
+effect	removeallcounters	lexicon/effect_removeallcounters_clears_counters.txt	removeallcounters clears the target counters	covered-unverified
+effect	proliferate	lexicon/effect_proliferate_adds_poison.txt	proliferate adds a poison counter	covered-unverified
+effect	propagate	lexicon/effect_propagate_adds_poison.txt	propagate adds a poison counter	covered-unverified
+effect	loseabilities	lexicon/effect_bloodmoon_strips_land_types.txt	Blood Moon's loseabilities removes the Island's original mana ability before its replacement Mountain ability is observed	covered-unverified
+effect	losesubtypesof	lexicon/effect_bloodmoon_strips_land_types.txt	Blood Moon's losesubtypesof changes the Island into a Mountain that produces red mana	covered-unverified
+effect	losesatype	lexicon/effect_losesatype_removes_human_target_quality.txt	losesatype removes Human so a later Human-only target fails	covered-unverified
+effect	protection	generic/true_name_nemesis_i1085.txt	True-Name Nemesis's protection effect prevents the chosen opponent's Bear from blocking it	covered-unverified
+effect	cantbetargetof	lexicon/effect_cantbetargetof_rejects_red_spell.txt	cantbetargetof rejects the prohibited spell	covered-unverified
+effect	cantbeblockedby	lexicon/effect_amrou_kithkin_cantbeblockedby.txt	cantbeblockedby rejects the illegal blocker	covered-unverified
+effect	cantbeblockerof	lexicon/effect_cantbeblockerof_rejects_block.txt	cantbeblockerof rejects the illegal block	covered-unverified
+effect	power_toughness	lexicon/effect_power_toughness_saves_target.txt	generic P/T modifier raises a creature enough to survive Shock	covered-unverified
+effect	rampage	generic/rampage.txt	rampage scales combat power by blockers	covered-unverified
+effect	flanker	generic/bushido_1.txt	flanking applies its combat counter effect	covered-unverified
+effect	bushido	generic/bushido_1.txt	bushido changes combat power and toughness	covered-unverified
+effect	spiritlink	SPIRITLINK_keyword#3.txt	spiritlink gains life from combat damage	covered-unverified
+effect	combatspiritlink	lexicon/effect_combatspiritlink_gains_combat_life.txt	combatspiritlink gains life from combat damage	covered-unverified
+effect	provoke	lexicon/effect_provoke_forces_block.txt	provoke forces the selected creature to block	covered-unverified
+effect	setblocker	lexicon/effect_setblocker_forces_block.txt	setblocker forces the selected blocker	covered-unverified
+effect	exert	lexicon/trigger_exerted_untaps_others.txt	exert emits the exerted event	covered-unverified
+effect	evolve	generic/evolve.txt	evolve adds the expected counter when a larger creature enters	covered-unverified
+effect	bloodthirst	lexicon/effect_bloodthirst_enters_after_damage.txt	bloodthirst enters with its conditional counters	covered-unverified
+effect	vanishing	vanishing.txt	vanishing removes its time counter and sacrifices at zero	covered-unverified
+effect	fading	fading.txt	fading removes its fade counter and sacrifices at zero	covered-unverified
+effect	regenerate	generic/regenerate.txt	Drudge Skeletons' regeneration shield keeps it on the battlefield after lethal combat damage	covered-unverified
+effect	swap	lexicon/effect_swap_changes_target_power_toughness.txt	swap exchanges the target's power and toughness	covered-unverified
+effect	exchangelife	lexicon/effect_exchangelife_swaps_player_totals.txt	exchangelife swaps the player life totals	covered-unverified
+effect	bstw	lexicon/cost_bestow_attaches.txt	bstw resolves bestow as an attached Aura	covered-unverified
+effect	tap	lexicon/effect_tap_marks_opponent_permanent.txt	tap marks the targeted permanent tapped	covered-unverified
+effect	tap(noevent)	lexicon/effect_tap_noevent_suppresses_tap_trigger.txt	tap(noevent) taps the permanent without firing its tapped trigger	covered-unverified
+effect	untap	lexicon/effect_untap_clears_tap_state.txt	untap clears the target's tapped state	covered-unverified
+effect	frozen	lexicon/effect_frozen_prevents_next_untap.txt	frozen prevents the next untap	covered-unverified
+effect	freeze	lexicon/effect_freeze_prevents_next_untap.txt	freeze taps and prevents the next untap	covered-unverified
+effect	phaseout	lexicon/effect_phaseout_returns_card.txt	phaseout removes and returns the permanent	covered-unverified
+effect	phasealter	lexicon/effect_damia_removes_draw_phase.txt	Damia's phasealter removes the draw phase while the game advances from upkeep to draw	covered-unverified
+effect	steal	lexicon/effect_steal_changes_control_until_source_leaves.txt	steal changes control until its source leaves	covered-unverified
+effect	block	lexicon/effect_block_forces_source_to_block_attacker.txt	block assigns the source as a blocker of the selected attacker	covered-unverified
+effect	connect	lexicon/effect_connectrule_destroys_connected_child.txt	connect associates the child that connectrule later cleans up	covered-unverified
+effect	connectrule	lexicon/effect_connectrule_destroys_connected_child.txt	connectrule moves the connected child to the graveyard with its parent	covered-unverified
+effect	retarget	generic/prison_term_i1085.txt	Prison Term retargets itself onto the entering Hill Giant and frees the original Bear to attack	covered-unverified
+effect	newtarget	lexicon/effect_newtarget_refreshes_enter_trigger.txt	newtarget refreshes Venerable Monk and repeats its enter trigger	covered-unverified
+effect	rehook	generic/nim_deathmantle_i1085.txt	Nim Deathmantle rehooks to the returned Bear, which survives the second Shock	covered-unverified
+effect	newhook	kaldra.txt	newhook assembles the three Kaldra equipment into the Kaldra token	covered-unverified
+effect	mutateover	lexicon/effect_mutateover_places_source_over_target.txt	Archipelagore mutates over the target and its mutation trigger taps another creature	covered-unverified
+effect	mutateunder	lexicon/basic_mutate_triggers_mutation_event.txt	Archipelagore mutates under the target and its mutation trigger taps another creature	covered-unverified
+effect	draw:N	lexicon/effect_draw_moves_library_card_to_hand.txt	draw moves a library card to hand	covered-unverified
+effect	discard:N	lexicon/effect_discard_moves_opponent_card_to_graveyard.txt	discard moves a random opponent card to graveyard	covered-unverified
+effect	shuffle	lexicon/trigger_shuffled_controller_fires.txt	The shuffle effect changes the library order and emits the controller shuffled event	covered-unverified
+effect	serumpowder	generic/serum_powder_leyline_i979.txt	serum redraw exiles the opening hand	covered-unverified
+effect	deplete:N	lexicon/effect_deplete_moves_cards_to_graveyard.txt	deplete mills cards to the graveyard	covered-unverified
+effect	colordeplete	lexicon/effect_colordeplete_repeats_same_color.txt	colordeplete repeats a one-card batch for same-color cards	covered-unverified
+effect	namedeplete	lexicon/effect_namedeplete_repeats_same_name.txt	namedeplete repeats a one-card batch for same-name cards	covered-unverified
+effect	ingest:N	lexicon/effect_ingest_moves_cards_to_exile.txt	ingest moves milled cards to exile	covered-unverified
+effect	coloringest	lexicon/effect_coloringest_repeats_same_color.txt	coloringest repeats a one-card batch into exile for same-color cards	covered-unverified
+effect	nameingest	lexicon/effect_nameingest_repeats_same_name.txt	nameingest repeats a one-card batch into exile for same-name cards	covered-unverified
+effect	cascade	lexicon/effect_cascade_casts_lower_card.txt	cascade casts a lower-cost library card	covered-unverified
+effect	maxlevel	generic/level_up.txt	level progression reaches the expected maximum	covered-unverified
+effect	reveal	lexicon/effect_reveal_resolves_followup.txt	reveal completes and resolves its afterrevealed life effect	covered-unverified
+effect	scry	lexicon/trigger_scryed_fires_once.txt	scry moves the top card and fires the scryed event	covered-unverified
+effect	hmodifer	lexicon/effect_hmodifer_raises_cleanup_hand_limit.txt	hmodifer raises the cleanup hand limit	covered-unverified
+effect	sethand	lexicon/effect_sethand_reduces_cleanup_hand_limit.txt	sethand reduces the cleanup hand limit	covered-unverified
+effect	turns	generic/extra_turn.txt	Time Walk's turns effect grants an extra turn, producing a second attack before the assertion	covered-unverified
+effect	count	lexicon/effect_count_sets_draw_amount.txt	count stores the creature count used by a later draw	covered-unverified
+effect	countb	lexicon/effect_countb_sets_draw_amount.txt	countb stores the opposing-creature count used by a later draw	covered-unverified
+effect	donothing	lexicon/effect_donothing_preserves_followup.txt	donothing preserves its follow-up ability	covered-unverified
+effect	epic	lexicon/effect_epic_blocks_later_spell_cast.txt	epic prevents the later spell cast	covered-unverified
+effect	forcefield	lexicon/effect_forcefield_reduces_damage_to_one.txt	forcefield reduces incoming damage to one	covered-unverified
+effect	add	lexicon/effect_add_mana_changes_pool.txt	add changes the mana pool	covered-unverified
+effect	out	lexicon/effect_out_produces_mana.txt	out produces the requested green mana	covered-unverified
+effect	doesntempty	lexicon/effect_doesntempty_preserves_mana.txt	doesntempty preserves produced mana across a phase change	covered-unverified
+effect	produceextra	lexicon/effect_produceextra_bubbling_muck.txt	produceextra adds mana to the mana ability	covered-unverified
+effect	producecolor	lexicon/effect_producecolor_adds_engaged_mana.txt	producecolor adds engaged mana	covered-unverified
+effect	removemana	lexicon/effect_removemana_clears_pool.txt	removemana removes matching mana	covered-unverified
+effect	reduceto	lexicon/effect_reduceto_sets_life_total.txt	reduceto sets the life total	covered-unverified
+effect	altercost	alabaster_leech.txt	altercost changes the white spell cost	covered-unverified
+effect	changecost	lexicon/effect_changecost_reduces_creature_cast.txt	changecost reduces a creature cast cost	covered-unverified
+effect	modbenchant	lexicon/effect_modbenchant_increases_green_bestow_cost.txt	modbenchant increases a green bestow cost	covered-unverified
+effect	affinity	lexicon/effect_affinity_reduces_artifact_cast.txt	affinity reduces an artifact cast using the target chooser	covered-unverified
+target	* type selector	lexicon/effect_hiddenmoveto_moves_card_to_exile.txt	all-card targeting selects the battlefield card moved by hiddenmoveto	covered-unverified
+target	this type selector	lexicon/target_this_moves_source.txt	this selects the source card and moves it	covered-unverified
+target	sourcecard type selector	lexicon/target_sourcecard_moves_source.txt	sourcecard selects the source across zones	covered-unverified
+target	mysource type selector	lexicon/effect_grant_changes_lethal_damage_result.txt	granted ability state retains the real granting source for its effect	covered-unverified
+target	mytgt type selector	lexicon/target_special_and_advanced.txt	mytgt reuses the current creature target for a second damage event	covered-unverified
+target	mytgtforced type selector	lexicon/target_special_and_advanced.txt	mytgtforced reuses the forced current creature target for a second damage event	covered-unverified
+target	other selector	lexicon/target_player_and_zone_matrix.txt	other excludes the source while moving a different controller creature	covered-unverified
+target	^ type/zone alias	lexicon/target_player_and_zone_matrix.txt	caret-separated type aliases select the artifact target	covered-unverified
+target	blockable chooser	lexicon/basic_cloud_accepts_flying_block.txt	combat legality selects only creatures the source can block	covered-unverified
+target	pairable chooser	lexicon/basic_soulbond_pairs_and_pumps.txt	soulbond selects a legal pairable creature and the pair changes combat	covered-unverified
+target	dredgeable chooser	lexicon/field_dredge_and_target.txt	dredgeable selects a graveyard card with dredge	covered-unverified
+target	mychild chooser	lexicon/basic_auraward_keeps_protected_aura.txt	attached Aura child is retained by the totem-armor replacement	covered-unverified
+target	mytotem chooser	lexicon/basic_totemarmor_saves_creature_and_destroys_aura.txt	totem armor locates the attached protective Aura and sacrifices it	covered-unverified
+target	myeqp chooser	lexicon/effect_attach_equips_target.txt	attached Equipment is the object selected by the equipment path	covered-unverified
+target	mycurses chooser	lexicon/basic_mycurses_witchbane_orb.txt	Witchbane Orb destroys Curses attached to its controller	covered-unverified
+target	proliferation chooser	lexicon/effect_proliferate_adds_poison.txt	proliferate selects the existing poison counter target	covered-unverified
+target	propagation chooser	lexicon/effect_propagate_adds_poison.txt	propagation selects the existing poison counter target	covered-unverified
+target	children chooser	lexicon/effect_mutateover_places_source_over_target.txt	mutation stack parent/child traversal retains the formed relationship	covered-unverified
+target	parents chooser	lexicon/effect_mutateover_places_source_over_target.txt	mutation stack parent/child traversal identifies the parent relationship	covered-unverified
+target	anytarget chooser	lexicon/target_special_and_advanced.txt	anytarget selects the opponent player as a damageable target	covered-unverified
+target	trigger chooser	lexicon/trigger_trained_fires_once.txt	trigger event resolution applies its effect to the triggering card	covered-unverified
+target	trigger[to] chooser	lexicon/basic_mutate_triggers_mutation_event.txt	mutation resolution follows the trigger-to card relationship	covered-unverified
+target	trigger[from] chooser	lexicon/trigger_damaged_fires.txt	damage trigger resolution follows the triggering source relationship	covered-unverified
+target	controller player target	lexicon/target_player_and_zone_matrix.txt	controller damage lowers the source controller life total	covered-unverified
+target	opponent player target	lexicon/target_player_and_zone_matrix.txt	opponent damage lowers the opposing player life total	covered-unverified
+target	targetedplayer player target	lexicon/target_player_and_zone_matrix.txt	stored player target receives the second damage event	covered-unverified
+target	player target	lexicon/target_player_and_zone_matrix.txt	generic player target accepts the opponent player	covered-unverified
+target	abilitycontroller player target	lexicon/target_abilitycontroller_production.txt	production ability$ nested effect targets the activating player through abilitycontroller	covered-unverified
+target	* zone	lexicon/target_player_and_zone_matrix.txt	all-zones target moves the matrix card to hand	covered-unverified
+target	battlefield zone	lexicon/target_player_and_zone_matrix.txt	both-battlefields target moves the opponent permanent to exile	covered-unverified
+target	inplay zone	lexicon/target_player_and_zone_matrix.txt	inplay alias moves its battlefield target to exile	covered-unverified
+target	graveyard zone	lexicon/target_player_and_zone_matrix.txt	both-graveyards target moves the selected card to exile	covered-unverified
+target	hand zone	lexicon/target_player_and_zone_matrix.txt	both-hands target moves the selected hand card to exile	covered-unverified
+target	library zone	lexicon/target_player_and_zone_matrix.txt	both-libraries target moves the selected library card to exile	covered-unverified
+target	exile zone	lexicon/target_player_and_zone_matrix.txt	both-exiles target returns the selected exile card to hand	covered-unverified
+target	stack zone	lexicon/target_stack_zone_triggers.txt	both-stack event observation gains life when Shock is put on the stack	covered-unverified
+target	reveal zone	lexicon/target_special_and_advanced.txt	ripple reveals and resolves the top library card through the reveal zone	covered-unverified
+target	sideboard zone	lexicon/target_sideboard_commandzone_matrix.txt	both-sideboards target returns the selected sideboard card to hand	covered-unverified
+target	commandzone zone	lexicon/target_sideboard_commandzone_matrix.txt	both-command-zones target returns the selected command card to hand	covered-unverified
+target	mybattlefield zone	lexicon/effect_hiddenmoveto_moves_card_to_exile.txt	mybattlefield selects the controller permanent moved by hiddenmoveto	covered-unverified
+target	opponentbattlefield zone	lexicon/target_player_and_zone_matrix.txt	opponent-battlefield target moves the opposing permanent to exile	covered-unverified
+target	mygraveyard zone	lexicon/target_player_and_zone_matrix.txt	mygraveyard target moves the controller graveyard card to exile	covered-unverified
+target	opponentgraveyard zone	lexicon/target_player_and_zone_matrix.txt	opponentgraveyard target moves the opposing graveyard card to exile	covered-unverified
+target	myhand zone	lexicon/target_player_and_zone_matrix.txt	myhand target moves the controller hand card to exile	covered-unverified
+target	opponenthand zone	lexicon/target_player_and_zone_matrix.txt	opponenthand target moves the opposing hand card to exile	covered-unverified
+target	mylibrary zone	lexicon/target_player_and_zone_matrix.txt	mylibrary target moves the controller library card to exile	covered-unverified
+target	opponentlibrary zone	lexicon/target_player_and_zone_matrix.txt	opponentlibrary target moves the opposing library card to exile	covered-unverified
+target	myexile zone	lexicon/target_player_and_zone_matrix.txt	myexile target returns the controller exile card to hand	covered-unverified
+target	opponentexile zone	lexicon/target_player_and_zone_matrix.txt	opponentexile target returns the opposing exile card to hand	covered-unverified
+target	mystack zone	lexicon/target_stack_zone_triggers.txt	controller stack event observation gains life when Shock is cast	covered-unverified
+target	opponentstack zone	lexicon/target_stack_zone_triggers.txt	opponentstack observation gains life for the opposing spell	covered-unverified
+target	myreveal zone	lexicon/target_special_and_advanced.txt	ripple accesses the controller reveal zone while resolving	covered-unverified
+target	opponentreveal zone	lexicon/target_special_and_advanced.txt	opponent reveal event reaches the opposing reveal-zone witness	covered-unverified
+target	mysideboard zone	lexicon/target_sideboard_commandzone_matrix.txt	mysideboard target returns the controller sideboard card to hand	covered-unverified
+target	opponentsideboard zone	lexicon/target_sideboard_commandzone_matrix.txt	opponentsideboard target returns the opposing sideboard card to hand	covered-unverified
+target	mycommandzone zone	lexicon/target_sideboard_commandzone_matrix.txt	mycommandzone target returns the controller command card to hand	covered-unverified
+target	opponentcommandzone zone	lexicon/target_sideboard_commandzone_matrix.txt	opponentcommandzone target returns the opposing command card to hand	covered-unverified
+target	mybattlefieldhand composite zone	lexicon/target_my_battlefield_hand_moves_hand_card.txt	mybattlefieldhand includes the controller's hand	covered-unverified
+target	nonbattlezone composite zone	lexicon/target_nonbattlezone_moves_hand_card.txt	nonbattlezone includes the selected nonbattlefield card	covered-unverified
+target	mycastingzone composite zone	lexicon/target_special_and_advanced.txt	mycastingzone selects the controller graveyard card	covered-unverified
+target	myrestrictedcastingzone composite zone	lexicon/target_my_restricted_casting_zone_moves_hand_card.txt	myrestrictedcastingzone includes the controller's hand	covered-unverified
+target	mycommandplay composite zone	lexicon/target_my_command_play_zone_moves_permanent.txt	mycommandplay includes the controller's battlefield	covered-unverified
+target	myhandlibrary composite zone	lexicon/target_my_hand_library_moves_hand_card.txt	myhandlibrary includes the controller's hand	covered-unverified
+target	mygravelibrary composite zone	lexicon/target_my_grave_library_moves_grave_card.txt	mygravelibrary includes the controller's graveyard	covered-unverified
+target	opponentgravelibrary composite zone	lexicon/target_opponent_grave_library_moves_grave_card.txt	opponentgravelibrary includes the opponent's graveyard	covered-unverified
+target	mygraveexile composite zone	lexicon/target_my_grave_exile_moves_grave_card.txt	mygraveexile includes the controller's graveyard	covered-unverified
+target	opponentgraveexile composite zone	lexicon/target_opponent_grave_exile_moves_grave_card.txt	opponentgraveexile includes the opponent's graveyard	covered-unverified
+target	opponentcastingzone composite zone	lexicon/target_special_and_advanced.txt	opponentcastingzone selects the opponent graveyard card	covered-unverified
+target	opponentrestrictedcastingzone composite zone	lexicon/target_opponent_restricted_casting_zone_moves_hand_card.txt	opponentrestrictedcastingzone includes the opponent's hand	covered-unverified
+target	opponentcommandplay composite zone	lexicon/target_opponent_command_play_zone_moves_permanent.txt	opponentcommandplay includes the opponent's battlefield	covered-unverified
+target	opponenthandlibrary composite zone	lexicon/target_opponent_hand_library_moves_hand_card.txt	opponenthandlibrary includes the opponent's hand	covered-unverified
+target	mynonplaynonexile composite zone	lexicon/target_my_nonplay_nonexile_moves_hand_card.txt	mynonplaynonexile includes the controller's hand	covered-unverified
+target	opponentnonplaynonexile composite zone	lexicon/target_opponent_nonplay_nonexile_moves_hand_card.txt	opponentnonplaynonexile includes the opponent's hand	covered-unverified
+target	myhandexilegrave composite zone	lexicon/target_my_hand_exile_grave_moves_hand_card.txt	myhandexilegrave includes the controller's hand	covered-unverified
+target	opponenthandexilegrave composite zone	lexicon/target_opponent_hand_exile_grave_moves_hand_card.txt	opponenthandexilegrave includes the opponent's hand	covered-unverified
+target	myzones composite zone	lexicon/zone_myzones_damage_source.txt	myzones includes the controller's source zone	covered-unverified
+target	opponentzones composite zone	lexicon/zone_opponentzones_target_source.txt	opponentzones includes the opponent's source zone	covered-unverified
+target	<N> quantity	Rack_and_Ruin.txt	Rack and Ruin requires and resolves exactly two artifact targets	covered-unverified
+target	<upto:N> quantity	generic/collected_conjuring_i1085.txt	up-to quantity limits the number of selected library cards	covered-unverified
+target	<anyamount> quantity	generic/jaddi_lifestrider_i1085.txt	any-amount quantity lets the test tap both selected creatures	covered-unverified
+target	<prex> quantity	generic/skeletal_scrying_x2_i1085.txt	pre-X quantity selects the cards used by the X-dependent cost	covered-unverified
+target	<prexx> quantity	generic/hour_of_eternity_x1.txt	pre-XX quantity selects the X-dependent target count	covered-unverified
+target	controller player selector	lexicon/target_player_and_zone_matrix.txt	controller selector damages its controller	covered-unverified
+target	opponent player selector	lexicon/target_player_and_zone_matrix.txt	opponent selector damages the opponent	covered-unverified
+target	targetedplayer player selector	lexicon/target_player_and_zone_matrix.txt	targetedplayer selector reuses the selected player	covered-unverified
+target	player player selector	lexicon/effect_damage_changes_player_life.txt	player targeting selects the requested player for damage	covered-unverified
+target	abilitycontroller player selector	lexicon/target_abilitycontroller_production.txt	production ability$ nested effect selects the activating player through abilitycontroller	covered-unverified
+cost	{w} colored mana	lexicon/cost_colored_and_generic_pips_pay_abilities.txt	white pip pays a colored activated ability	covered-unverified
+cost	{u} colored mana	lexicon/cost_colored_and_generic_pips_pay_abilities.txt	blue pip pays a colored activated ability	covered-unverified
+cost	{b} colored mana	lexicon/cost_colored_and_generic_pips_pay_abilities.txt	black pip pays a colored activated ability	covered-unverified
+cost	{r} colored mana	lexicon/cost_colored_and_generic_pips_pay_abilities.txt	red pip pays a colored activated ability	covered-unverified
+cost	{g} colored mana	lexicon/cost_colored_and_generic_pips_pay_abilities.txt	green pip pays a colored activated ability	covered-unverified
+cost	{N} generic mana	lexicon/cost_colored_and_generic_pips_pay_abilities.txt	generic mana pays a generic activated ability	covered-unverified
+cost	{c} true-colorless mana	lexicon/mana_true_colorless_success.txt	true-colorless mana pays the true-colorless cost	covered-unverified
+cost	{x} variable mana	generic/hour_of_eternity_x1.txt	X controls the copy count and payment	covered-unverified
+cost	{x}{x} double-variable mana	generic/hour_of_eternity_x1.txt	the double-X path uses the announced X value	covered-unverified
+cost	{x:color} restricted-X mana	lexicon/mana_color_restricted_x_success.txt	restricted X accepts only the matching color	covered-unverified
+cost	{wb}/{cw} hybrid mana	generic/hybrid_mana.txt	hybrid payment accepts one legal hybrid branch	covered-unverified
+cost	{p(color)} Phyrexian mana	lexicon/cost_phyrexian_life_branch.txt	Phyrexian mana pays with life when colored mana is absent	covered-unverified
+cost	{i} snow mana	lexicon/mana_snow_source_payment.txt	snow mana requires a snow source	covered-unverified
+cost	{value:...} dynamic mana	lexicon/mana_dynamic_value_graveyard.txt	dynamic value reads the selected graveyard count	covered-unverified
+cost	{eval(expr)} evaluated mana	lexicon/cost_dynamic_eval_mycost_myevictcost.txt	eval(expr) pays the evaluated generic amount	covered-unverified
+cost	{mycost} own-cost mana	lexicon/cost_dynamic_eval_mycost_myevictcost.txt	mycost charges the source's printed mana cost	covered-unverified
+cost	{myevictcost} imprinted-cost mana	lexicon/cost_dynamic_eval_mycost_myevictcost.txt	myevictcost charges the imprinted card's mana cost	covered-unverified
+cost	{chosencolor} chosen-color mana	lexicon/mana_chosen_color_persists.txt	chosen-color mana persists and is produced	covered-unverified
+cost	{t} tap source cost	lexicon/cost_tap_source.txt	tap source cost taps the source	covered-unverified
+cost	{t(target)} tap target cost	lexicon/cost_targeted_tap_sacrifice_exile.txt	Target tap cost taps the selected creature before gaining life	covered-unverified
+cost	{crew(target)} crew cost	lexicon/cost_crew_target.txt	crew taps the selected creatures and casts the vehicle	covered-unverified
+cost	{q} untap source cost	lexicon/cost_untap_gate_untapped.txt	untap source cost requires a tapped source	covered-unverified
+cost	{q(target)} untap target cost	lexicon/cost_untap_crackleburr.txt	untap target cost requires a tapped candidate	covered-unverified
+cost	{s} sacrifice source cost	lexicon/cost_sacrifice_source.txt	sacrifice source cost moves the source to its graveyard	covered-unverified
+cost	{s(target)} sacrifice target cost	lexicon/cost_targeted_tap_sacrifice_exile.txt	Target sacrifice cost sacrifices the selected creature before gaining life	covered-unverified
+cost	{s2l} top-library movement cost	lexicon/cost_to_library_from_hand.txt	s2l moves the selected card to the top of the library	covered-unverified
+cost	{s2l(target)} targeted top-library movement cost	lexicon/cost_to_library_from_hand.txt	s2l target moves the selected hand card	covered-unverified
+cost	{s2g} graveyard movement cost	lexicon/cost_to_grave_from_opponent_exile.txt	s2g moves an exiled card to its graveyard	covered-unverified
+cost	{s2g(target)} targeted graveyard movement cost	lexicon/cost_to_grave_from_opponent_exile.txt	s2g target moves the selected exiled card	covered-unverified
+cost	{saclands} sacrifice-all-lands cost	lexicon/cost_sacrifice_all_lands.txt	saclands sacrifices every controlled land	covered-unverified
+cost	{e(target)} exile target cost	lexicon/cost_targeted_tap_sacrifice_exile.txt	Target exile cost exiles the selected graveyard card before gaining life	covered-unverified
+cost	{e:N} energy cost	lexicon/cost_energy_payment.txt	energy cost consumes the requested energy	covered-unverified
+cost	{emerge} emerge cost	lexicon/cost_emerge_reduction.txt	emerge reduces its cost by the sacrificed creature	covered-unverified
+cost	{h} bounce cost	lexicon/cost_bounce_land_grants_trample.txt	bounce cost returns the selected land	covered-unverified
+cost	{h(target)} targeted bounce cost	lexicon/cost_bounce_land_grants_trample.txt	targeted bounce cost returns the selected land	covered-unverified
+cost	{l} one-life cost	lexicon/cost_bare_life_pip_pays_ability.txt	bare life cost reduces the controller's life and resolves damage	covered-unverified
+cost	{l:N} specific-life cost	griselbrand.txt	pays the requested life amount as a cost	covered-unverified
+cost	{l2e} mill-to-exile cost	lexicon/cost_exile_library_arc_slogger.txt	l2e exiles the top library cards	covered-unverified
+cost	{d} random-discard cost	lexicon/cost_random_discard.txt	random discard cost moves a card from hand	covered-unverified
+cost	{discard(target)} chosen-discard cost	lexicon/cost_discard_chosen_card.txt	chosen discard cost discards the selected card	covered-unverified
+cost	{delve} delve cost	lexicon/cost_delve_multi_card.txt	delve exiles graveyard cards to pay generic mana	covered-unverified
+cost	{delve(target)} targeted delve cost	lexicon/cost_delve_multi_card.txt	delve selects graveyard cards as payment	covered-unverified
+cost	{m} mill-to-graveyard cost	lexicon/cost_mill_rot_farm_skeleton.txt	mill cost moves the top cards to the graveyard	covered-unverified
+cost	{n} ninjutsu cost	lexicon/cost_ninjutsu_return_attacker.txt	ninjutsu cost returns an unblocked attacker	covered-unverified
+cost	{kgoblin} Goblin offering	lexicon/cost_offering_variants.txt	Goblin offering sacrifices its matching subtype source	covered-unverified
+cost	{kfox} Fox offering	lexicon/cost_offering_variants.txt	Fox offering sacrifices its matching subtype source	covered-unverified
+cost	{kmoonfolk} Moonfolk offering	lexicon/cost_offering_variants.txt	Moonfolk offering sacrifices its matching subtype source	covered-unverified
+cost	{krat} Rat offering	lexicon/cost_subtype_offering.txt	Rat offering reduces the Patron cost	covered-unverified
+cost	{ksnake} Snake offering	lexicon/cost_offering_variants.txt	Snake offering sacrifices its matching subtype source	covered-unverified
+cost	{convoke} convoke cost	lexicon/cost_convoke_multi_creature.txt	convoke taps creatures to pay generic mana	covered-unverified
+cost	{convoke(target)} targeted convoke cost	lexicon/cost_convoke_multi_creature.txt	convoke target selects the payment creatures	covered-unverified
+cost	{improvise} improvise cost	lexicon/cost_improvise_multi_artifact.txt	improvise taps artifacts to pay generic mana	covered-unverified
+cost	{improvise(target)} targeted improvise cost	lexicon/cost_improvise_multi_artifact.txt	improvise target selects artifact payment sources	covered-unverified
+cost	{cycle} cycling cost	generic/cycling.txt	cycling cost moves the card from hand and draws from the library	covered-unverified
+cost	{c(counterspec)} counter cost	lexicon/cost_add_counter.txt	counter cost adds the requested counter as payment	covered-unverified
+cost	{unattach} unattach cost	lexicon/cost_unattach_equipment.txt	unattach detaches the equipment as payment	covered-unverified
+cost	kicker card field	lexicon/basic_hasotherkicker_pays_nonmana_kicker.txt	kicker field participates in alternate casting	covered-unverified
+cost	other card field	lexicon/cost_convoke_multi_creature.txt	other field supplies an alternative cost	covered-unverified
+cost	flashback card field	lexicon/basic_hasaftermath_casts_from_graveyard.txt	alternate graveyard casting uses the field	covered-unverified
+cost	facedown card field	Morph#1.txt	facedown cost casts a morph creature	covered-unverified
+cost	buyback card field	buyback.txt	buyback returns the first Capsize cast before the second cast goes to the graveyard	covered-unverified
+cost	bestow card field	lexicon/cost_bestow_attaches.txt	bestow field selects the Aura alternate cost	covered-unverified
+cost	retrace card field	lexicon/cost_retrace_land_discard.txt	retrace casts from the graveyard by discarding a land	covered-unverified
+cost	suspend(N) card field	lexicon/cost_suspend_one_casts.txt	suspend field exiles the spell with time counters	covered-unverified
+field	name=	lexicon/card_field_dispatches_gameplay.txt	card name identifies the actionable field-dispatch witness in the gameplay harness	covered-unverified
+field	primitive=	lexicon/card_field_primitive_alias_preserves_behavior.txt	primitive dispatch preserves the primitive's gameplay behavior	covered-unverified
+field	id=	lexicon/card_field_dispatches_gameplay.txt	id= identifies the injected field-dispatch witness that resolves damage	covered-unverified
+field	grade=	lexicon/card_field_dispatches_gameplay.txt	grade=Supported is parsed on the gameplay field-dispatch witness	covered-unverified
+field	rarity=	lexicon/card_field_dispatches_gameplay.txt	rarity-dispatched field witness remains playable and resolves its effect	covered-unverified
+field	mana=	lexicon/card_field_dispatches_gameplay.txt	mana field determines the card's playable cost	covered-unverified
+field	color=	lexicon/card_field_dispatches_gameplay.txt	forced red color is present on the creature used by the damage assertion	covered-unverified
+field	type=	lexicon/card_field_dispatches_gameplay.txt	type field determines the permanent's gameplay type	covered-unverified
+field	subtype=	lexicon/card_field_dispatches_gameplay.txt	Goblin subtype is present on the creature used by the gameplay assertion	covered-unverified
+field	power=	lexicon/card_field_dispatches_gameplay.txt	power field supplies the creature's combat-relevant printed stats	covered-unverified
+field	toughness=	lexicon/card_field_dispatches_gameplay.txt	toughness field supplies the creature's combat-relevant printed stats	covered-unverified
+field	text=	lexicon/field_text_gameplay.txt	live gameplay card retains its text field alongside its resolving ability	covered-unverified
+field	target=	lexicon/card_field_dispatches_gameplay.txt	target field makes the spell choose a legal target	covered-unverified
+field	abilities=	lexicon/basic_boast_activates_after_attack.txt	abilities field installs boast behavior that can be activated after attacking	covered-unverified
+field	auto=	lexicon/card_field_dispatches_gameplay.txt	auto field executes the scripted gameplay action	covered-unverified
+field	auto<ZONE>=	lexicon/card_field_anyzone_executes_in_battlefield.txt	zone-specific auto text executes in the battlefield	covered-unverified
+field	anyzone=	lexicon/card_field_anyzone_executes_in_battlefield.txt	anyzone text executes in the battlefield	covered-unverified
+field	alias=	lexicon/card_field_primitive_alias_preserves_behavior.txt	alias dispatch preserves the aliased gameplay behavior	covered-unverified
+field	kicker=	lexicon/basic_hasotherkicker_pays_nonmana_kicker.txt	kicker field participates in casting	covered-unverified
+field	other=	lexicon/cost_convoke_multi_creature.txt	other field supplies an alternative cost	covered-unverified
+field	otherrestriction=	lexicon/cost_emerge_reduction.txt	Abundant Maw's alternative cast is gated by its otherrestriction field	covered-unverified
+field	restriction=	lexicon/basic_asflash_adventure_casts_during_upkeep.txt	Bonecrusher Giant's Adventure cast is gated by its restriction field	covered-unverified
+field	flashback=	lexicon/basic_hasaftermath_casts_from_graveyard.txt	flashback-like graveyard casting uses the alternate field	covered-unverified
+field	buyback=	buyback.txt	buyback field participates in the return-to-hand alternate cast	covered-unverified
+field	bestow=	lexicon/cost_bestow_attaches.txt	bestow field enables attached Aura casting	covered-unverified
+field	backside=	lexicon/effect_doubleside_turns_back_face.txt	backside identifies the alternate face	covered-unverified
+field	retrace=	lexicon/cost_retrace_land_discard.txt	retrace field enables graveyard recasting	covered-unverified
+field	suspend(N)=	lexicon/cost_suspend_one_casts.txt	suspend field creates the suspended cast path	covered-unverified
+field	dredge=	lexicon/field_dredge_and_target.txt	dredge= replaces a draw and returns Dakmor Salvage to hand	covered-unverified
+field	doublefaced=	lexicon/effect_doubleside_turns_back_face.txt	doublefaced marks the card as double-faced	covered-unverified
+field	modular=	lexicon/basic_modular_transfers_counter.txt	modular field transfers its counter on death	covered-unverified
+field	partner=	lexicon/basic_partner_finds_named_partner.txt	partner field finds its named partner	covered-unverified
+field	aicode=	generic/collected_conjuring_i1085.txt	AI aicode chooser drives the gameplay cast-selection path	covered-unverified
+field	crewbonus=	lexicon/field_crewbonus_gearshift_ace.txt	crewbonus= grants first strike to the Vehicle during combat	covered-unverified
+field	phasedoutbonus=	lexicon/trigger_phasedin_draws.txt	Teferi's Imp executes its phased-out bonus during phase-out	covered-unverified
+trigger	@each phase	lexicon/trigger_each_end_fires.txt	each phase trigger fires at the controller's end step	covered-unverified
+trigger	@next phase	lexicon/trigger_next_end_fires_once.txt	next phase trigger fires once	covered-unverified
+trigger	@rebounded	lexicon/trigger_rebounded_fires.txt	rebounded fires on the next upkeep	covered-unverified
+trigger	@movedto	generic/triggers_at_movedto_i179.txt	Soul Warden gains life when another creature moves onto the battlefield, but not on controller changes	covered-unverified
+trigger	@untapped	generic/trigger_untapped.txt	Wake Thrasher's power increases when Vitalize untaps the permanents	covered-unverified
+trigger	@tapped	lifetap.txt	Lifetap gains life when the opponent's Forest becomes tapped	covered-unverified
+trigger	@tappedformana	lexicon/trigger_tapped_for_mana_scopes.txt	tappedformana fires only for mana taps	covered-unverified
+trigger	@producedmana	lexicon/trigger_producedmana_fires_for_mana_ability.txt	producedmana fires for produced mana	covered-unverified
+trigger	@transformed	lexicon/trigger_transformed_equipment.txt	transformed fires when the permanent transforms	covered-unverified
+trigger	@facedup	lexicon/trigger_facedup_life.txt	facedup fires when a morph turns face up	covered-unverified
+trigger	@phasedin	lexicon/trigger_phasedin_draws.txt	phasedin fires when a permanent phases in	covered-unverified
+trigger	@exerted	lexicon/trigger_exerted_untaps_others.txt	exerted fires after exerting	covered-unverified
+trigger	@combat(attacking)	generic/sigarda_col_coven_i1085.txt	Sigarda's explicit attacking combat trigger resolves its coven library search after attack declaration	covered-unverified
+trigger	@combat(attackedalone)	lexicon/trigger_attackedalone_fires_once.txt	the sole attacker emits the attackedalone event and gains one life	covered-unverified
+trigger	@combat(notblocked)	lexicon/trigger_notblocked_fires_once.txt	the unblocked attacker emits the notblocked event and gains one life	covered-unverified
+trigger	@combat(blocked)	generic/trigger_blocked.txt	Brushwagg's combined blocked trigger changes its combat result when it becomes blocked	covered-unverified
+trigger	@combat(blocking)	generic/trigger_blocking.txt	Brushwagg's combined blocking trigger changes its combat result when it blocks	covered-unverified
+trigger	@damaged	lexicon/trigger_damaged_fires.txt	damaged fires for any matching damage	covered-unverified
+trigger	@damageof	lexicon/trigger_damageof_fires.txt	damageof fires when the controller is damaged	covered-unverified
+trigger	@damagefoeof	lexicon/trigger_damagefoeof_fires.txt	damagefoeof fires when the opponent is damaged	covered-unverified
+trigger	@combatdamaged	lexicon/trigger_combatdamaged_fires.txt	combatdamaged fires for combat damage	covered-unverified
+trigger	@combatdamageof	lexicon/trigger_combatdamageof_fires.txt	combatdamageof fires for controller combat damage	covered-unverified
+trigger	@combatdamagefoeof	lexicon/trigger_combatdamagefoeof_fires.txt	combatdamagefoeof fires for opponent combat damage	covered-unverified
+trigger	@noncombatdamaged	lexicon/trigger_noncombatdamaged_fires.txt	noncombatdamaged fires for noncombat damage	covered-unverified
+trigger	@noncombatdamageof	lexicon/trigger_noncombatdamageof_fires.txt	noncombatdamageof fires for controller noncombat damage	covered-unverified
+trigger	@noncombatdamagefoeof	lexicon/trigger_noncombatdamagefoeof_fires.txt	noncombatdamagefoeof fires for opponent noncombat damage	covered-unverified
+trigger	@lifed	lexicon/trigger_lifed_fires.txt	lifed fires for life gain	covered-unverified
+trigger	@lifeof	lexicon/trigger_lifeof_fires.txt	lifeof fires for controller life gain	covered-unverified
+trigger	@lifefoeof	lexicon/trigger_lifefoeof_fires.txt	lifefoeof fires for opponent life gain	covered-unverified
+trigger	@lifeloss	lexicon/trigger_lifeloss_fires.txt	lifeloss fires for life loss	covered-unverified
+trigger	@lifelostof	lexicon/trigger_lifelostof_fires.txt	lifelostof fires for controller life loss	covered-unverified
+trigger	@lifelostfoeof	lexicon/trigger_lifelostfoeof_fires.txt	lifelostfoeof fires for opponent life loss	covered-unverified
+trigger	@drawn	lexicon/trigger_drawn_fires.txt	drawn fires for the static draw scope	covered-unverified
+trigger	@drawof	lexicon/trigger_drawof_fires.txt	drawof fires for controller draws	covered-unverified
+trigger	@drawfoeof	lexicon/trigger_drawfoeof_fires.txt	drawfoeof fires for opponent draws	covered-unverified
+trigger	@counteradded	lexicon/trigger_counteradded_once_per_event.txt	counteradded fires when a counter is added	covered-unverified
+trigger	@counterremoved	lexicon/trigger_counterremoved_fires_on_remove.txt	counterremoved fires when a counter is removed	covered-unverified
+trigger	@countermod	lexicon/trigger_countermod_fires_on_add.txt	countermod fires on a counter modification	covered-unverified
+trigger	@totalcounteradded	lexicon/trigger_totalcounteradded_fires_once.txt	totalcounteradded fires once for the event	covered-unverified
+trigger	@totalcounterremoved	lexicon/trigger_counterremoved_fires_on_remove.txt	totalcounterremoved observes counter removal	covered-unverified
+trigger	@targeted	generic/livewire_lash_i1085.txt	Livewire Lash's targeted trigger deals damage when the equipped Bear is targeted by Shock	covered-unverified
+trigger	@vampired	[at]Vampired#1.txt	Vampiric Dragon puts a counter on itself after its damaged Goblin dies	covered-unverified
+trigger	@sacrificed	generic/kathari_bomber_sacrifice_i1146.txt	Body Dropper receives its counter when Kathari Bomber sacrifices itself	covered-unverified
+trigger	@exploited	lexicon/trigger_exploited_fires.txt	exploited fires when a creature is exploited	covered-unverified
+trigger	@discarded	lexicon/trigger_discarded_fires_for_card.txt	The discarded-card trigger gains life when its own card is discarded from hand	covered-unverified
+trigger	@cycled	lexicon/trigger_cycled_fires_once.txt	cycled fires after cycling	covered-unverified
+trigger	@tokencreated	lexicon/trigger_tokencreated_per_token.txt	tokencreated fires for each created token	covered-unverified
+trigger	@mutated	lexicon/basic_mutate_triggers_mutation_event.txt	mutated fires after mutation	covered-unverified
+trigger	@boasted	lexicon/trigger_boasted_fires_once.txt	boasted fires after boast	covered-unverified
+trigger	@defeated	lexicon/trigger_defeated_fires.txt	defeated fires when the battle is defeated	covered-unverified
+trigger	@surveiled	lexicon/trigger_surveiled_fires_once.txt	surveiled fires after surveil	covered-unverified
+trigger	@foretold	lexicon/trigger_foretold_fires_once.txt	foretold fires after foretell	covered-unverified
+trigger	@trained	lexicon/trigger_trained_fires_once.txt	trained fires after training	covered-unverified
+trigger	@scryed	lexicon/trigger_scryed_fires_once.txt	scryed fires after scry	covered-unverified
+trigger	@ninjutsued	lexicon/trigger_ninjutsued_fires.txt	ninjutsued fires after ninjutsu	covered-unverified
+trigger	@explored	lexicon/trigger_explored_fires_once.txt	explored fires after explore	covered-unverified
+trigger	@bearerchosen	lexicon/effect_becomesringbearer_fires_bearer_trigger.txt	The first Ring-bearer selection emits bearerchosen and gains life	covered-unverified
+trigger	@bearernewchosen	lexicon/trigger_bearernewchosen_fires.txt	bearernewchosen fires for a new Ring-bearer	covered-unverified
+trigger	@dungeoncompleted	lexicon/effect_completedungeon_fires_completion_trigger.txt	dungeoncompleted fires when a dungeon completes	covered-unverified
+trigger	@dierolled	lexicon/trigger_dierolled_fires.txt	dierolled fires after a die roll	covered-unverified
+trigger	@coinflipped	lexicon/trigger_coinflipped_branch.txt	coinflipped fires after a coin flip	covered-unverified
+trigger	@poisonedof	lexicon/trigger_poisoned_controller_fires.txt	poisonedof fires for controller poison	covered-unverified
+trigger	@poisonedfoeof	lexicon/trigger_poisoned_foe_fires.txt	poisonedfoeof fires for opponent poison	covered-unverified
+trigger	@energizedof	lexicon/trigger_energized_controller.txt	energizedof fires for controller energy	covered-unverified
+trigger	@energizedfoeof	lexicon/trigger_energized_foe_fires.txt	energizedfoeof fires for opponent energy	covered-unverified
+trigger	@experiencedof	lexicon/trigger_experienced_controller_fires.txt	experiencedof fires for controller experience	covered-unverified
+trigger	@experiencedfoeof	lexicon/trigger_experienced_foe_fires.txt	experiencedfoeof fires for opponent experience	covered-unverified
+trigger	@proliferateof	lexicon/trigger_proliferated_controller_fires.txt	proliferateof fires for controller proliferate	covered-unverified
+trigger	@proliferatefoeof	lexicon/trigger_proliferated_foe_fires.txt	proliferatefoeof fires for opponent proliferate	covered-unverified
+trigger	@ringtemptedof	lexicon/trigger_ringtempted_controller_fires.txt	ringtemptedof fires for controller Ring temptation	covered-unverified
+trigger	@ringtemptedfoeof	lexicon/trigger_ringtempted_foe_fires.txt	ringtemptedfoeof fires for opponent Ring temptation	covered-unverified
+trigger	@becomesmonarchof	lexicon/trigger_monarch_controller_fires.txt	becomesmonarchof fires for controller monarch change	covered-unverified
+trigger	@becomesmonarchfoeof	lexicon/trigger_monarch_foe_fires.txt	becomesmonarchfoeof fires for opponent monarch change	covered-unverified
+trigger	@takeninitiativeof	lexicon/trigger_initiative_controller_fires.txt	takeninitiativeof fires for controller initiative	covered-unverified
+trigger	@takeninitiativefoeof	lexicon/trigger_initiative_foe_fires.txt	takeninitiativefoeof fires for opponent initiative	covered-unverified
+trigger	@shuffledof	lexicon/trigger_shuffled_controller_fires.txt	shuffledof fires for controller shuffle	covered-unverified
+trigger	@shuffledfoeof	lexicon/trigger_shuffled_foe_fires.txt	shuffledfoeof fires for opponent shuffle	covered-unverified
+macro	__CYCLING__($cost)	generic/cycling.txt	Akroma's Vengeance cycles by paying the parameterized cost and drawing	covered-unverified
+macro	__BASIC_LANDCYCLING__($cost)	lexicon/macro_basic_landcycling.txt	__BASIC_LANDCYCLING__($cost) searches a basic land into hand	covered-unverified
+macro	_DIES_	symbiotic_wurm.txt	Symbiotic Wurm creates its death tokens after leaving the battlefield	covered-unverified
+macro	_TRAINING_	lexicon/basic_training.txt	macro expansion performs the training behavior	covered-unverified
+macro	_PARTNER_	lexicon/basic_partner_finds_named_partner.txt	macro expansion finds the named partner	covered-unverified
+macro	_GOAD_	lexicon/macro_goad_disrupt_decorum.txt	Disrupt Decorum makes an opposing creature attack on the next combat	covered-unverified
+macro	_REBOUND_	lexicon/trigger_rebounded_recasts.txt	macro expansion rebounds and recasts the spell	covered-unverified
+macro	_POPULATE_	generic/populate_zektar_i1145.txt	macro expansion clones the token during the populate behavior test	covered-unverified
+macro	_FEROCIOUS_	lexicon/macro_ferocious_barrage_blocks.txt	Barrage of Boulders prevents blocking when a power-4 creature is controlled	covered-unverified
+macro	_ATTACKING_	lexicon/macro_surveil1_appendage_amalgam.txt	Appendage Amalgam's attacking trigger resolves during combat	covered-unverified
+macro	_BLOCKED_	generic/siege_behemoth_i1085.txt	Siege Behemoth's blocked combat trigger assigns damage as unblocked	covered-unverified
+macro	_HEROIC_	lexicon/macro_heroic_akroan_skyguard.txt	Akroan Skyguard gains a heroic counter when targeted	covered-unverified
+macro	_VALIANT_	lexicon/macro_valiant_heartfire_hero.txt	Heartfire Hero gains a valiant counter when targeted	covered-unverified
+macro	_RALLY_	ondu_cleric.txt	Ondu Cleric's Ally-enter trigger gains life through Rally	covered-unverified
+macro	_LANDFALL_	lexicon/macro_landfall_buffs_equipped_creature.txt	macro expansion grants the landfall P/T trigger to the equipped creature	covered-unverified
+macro	_ADDENDUM_	lexicon/macro_conditionals_and_markers.txt	_ADDENDUM_ gates its payload to an instant or sorcery source	covered-unverified
+macro	_CONSTELLATION_	lexicon/macro_constellation_doomwake_giant.txt	Doomwake Giant triggers when Rancor enters as an enchantment	covered-unverified
+macro	_AMASSZOMBIE1_	lexicon/macro_amass_variants.txt	_AMASSZOMBIE1_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSZOMBIE2_	lexicon/macro_amass_variants.txt	_AMASSZOMBIE2_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSZOMBIE3_	lexicon/macro_amass_variants.txt	_AMASSZOMBIE3_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSZOMBIE4_	lexicon/macro_amass_variants.txt	_AMASSZOMBIE4_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSZOMBIE5_	lexicon/macro_amass_variants.txt	_AMASSZOMBIE5_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSORC1_	lexicon/macro_amass_variants.txt	_AMASSORC1_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSORC2_	lexicon/macro_amass_variants.txt	_AMASSORC2_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSORC3_	lexicon/macro_amass_variants.txt	_AMASSORC3_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSORC4_	lexicon/macro_amass_variants.txt	_AMASSORC4_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSORC5_	lexicon/macro_amass_variants.txt	_AMASSORC5_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSSLIVER1_	lexicon/macro_amass_variants.txt	_AMASSSLIVER1_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSSLIVER2_	lexicon/macro_amass_variants.txt	_AMASSSLIVER2_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSSLIVER3_	lexicon/macro_amass_variants.txt	_AMASSSLIVER3_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSSLIVER4_	lexicon/macro_amass_variants.txt	_AMASSSLIVER4_ resolves and contributes its observable life witness	covered-unverified
+macro	_AMASSSLIVER5_	lexicon/macro_amass_variants.txt	_AMASSSLIVER5_ resolves and contributes its observable life witness	covered-unverified
+macro	_SCRY1_	generic/select_for_inspection_i1085.txt	Select for Inspection resolves its one-card scry after bouncing a creature	covered-unverified
+macro	_SCRY2_	lexicon/macro_scry2.txt	_SCRY2_ emits a scryed event after its two-card scry window	covered-unverified
+macro	_SCRY3_	lexicon/macro_scry3.txt	_SCRY3_ emits a scryed event after its three-card scry window	covered-unverified
+macro	_SCRY4_	lexicon/macro_scry4.txt	_SCRY4_ emits a scryed event after its four-card scry window	covered-unverified
+macro	_SCRY5_	lexicon/macro_scry5.txt	_SCRY5_ emits a scryed event after its five-card scry window	covered-unverified
+macro	_FABRICATE_($c)	lexicon/macro_fabricate_and_second_draw.txt	_FABRICATE_($c) creates the parameterized Servo branch	covered-unverified
+macro	_ENRAGE_	dromad_purebred.txt	Dromad Purebred gains life when damage fires its Enrage trigger	covered-unverified
+macro	_SECOND_DRAW_	lexicon/macro_fabricate_and_second_draw.txt	_SECOND_DRAW_ fires when the controller draws the second card	covered-unverified
+macro	_ADAPT1_	lexicon/macro_adapt1_benthic_biomancer.txt	Benthic Biomancer adapts and deals its increased combat damage	covered-unverified
+macro	_ADAPT2_	lexicon/macro_adapt2_growth_chamber_guardian.txt	Growth-Chamber Guardian adapts two counters before attacking	covered-unverified
+macro	_ADAPT3_	lexicon/macro_adapt3_scuttlegator.txt	Scuttlegator adapts three counters and attacks despite defender	covered-unverified
+macro	_ADAPT4_	lexicon/macro_adapt4_sauroform_hybrid.txt	Sauroform Hybrid adapts four counters before attacking	covered-unverified
+macro	_BATTALION_	lexicon/macro_battalion_daring_skyjek.txt	Daring Skyjek gains flying with two additional attackers	covered-unverified
+macro	_CHAMPION_($Word)	lexicon/target_special_and_advanced.txt	Champion macro enters and exiles the selected creature as its required choice	covered-unverified
+macro	_METALCRAFT_	lexicon/macro_conditionals_and_markers.txt	_METALCRAFT_ resolves its payload with three artifacts present	covered-unverified
+macro	_ECHO_($cost)	lexicon/macro_echo.txt	_ECHO_($cost) offers and accepts its next-upkeep payment	covered-unverified
+macro	_THRESHOLD_	lexicon/macro_conditionals_and_markers.txt	_THRESHOLD_ resolves its payload with seven graveyard cards	covered-unverified
+macro	_SPLICEARCANE_	lexicon/target_special_and_advanced.txt	Splice Arcane macro observes an Arcane spell entering the stack and offers its hand card	covered-unverified
+macro	_RIPPLE_($c)	lexicon/target_special_and_advanced.txt	Ripple macro reveals the top library card and resolves its cast-or-bottom branch	covered-unverified
+macro	_RECOVER_($cost)	lexicon/macro_recover.txt	_RECOVER_($cost) returns the dead source to hand after payment	covered-unverified
+macro	_PROLIFERATE_	Contagion_Clasp.txt	Contagion Clasp proliferates an existing counter during its activated ability	covered-unverified
+macro	_SCAVENGE_($power)	lexicon/macro_scavenge.txt	_SCAVENGE_($power) puts the parameterized counters on a target	covered-unverified
+macro	_ASCEND_	lexicon/macro_conditionals_and_markers.txt	_ASCEND_ creates the City's Blessing marker after ten permanents	covered-unverified
+macro	_CITY'S_BLESSING_	lexicon/macro_conditionals_and_markers.txt	_CITY'S_BLESSING_ gates its payload after the blessing marker exists	covered-unverified
+macro	_MONARCH_CONTROLLER_	lexicon/macro_conditionals_and_markers.txt	_MONARCH_CONTROLLER_ creates or moves the monarch marker	covered-unverified
+macro	_MONARCH_OPPONENT_	lexicon/macro_conditionals_and_markers.txt	_MONARCH_OPPONENT_ transfers the monarch marker to the opponent	covered-unverified
+macro	_INITIATIVE_CONTROLLER_	lexicon/macro_conditionals_and_markers.txt	_INITIATIVE_CONTROLLER_ creates or moves the initiative marker	covered-unverified
+macro	_INITIATIVE_OPPONENT_	lexicon/macro_conditionals_and_markers.txt	_INITIATIVE_OPPONENT_ transfers the initiative marker to the opponent	covered-unverified
+macro	_RINGTEMPTS_	lexicon/macro_conditionals_and_markers.txt	_RINGTEMPTS_ creates the Ring marker	covered-unverified
+macro	_CASTHISTORIC_	lexicon/macro_cast_historic_and_extort.txt	_CASTHISTORIC_ fires when a legendary artifact enters the stack	covered-unverified
+macro	_MENTOR_	lexicon/basic_mentor_pumps_lesser_attacker.txt	Mentor puts a counter on the lesser attacking creature	covered-unverified
+macro	_SURVEIL1_	lexicon/macro_surveil1_appendage_amalgam.txt	Appendage Amalgam's attack surveils one card into its graveyard	covered-unverified
+macro	_SURVEIL2_	lexicon/macro_surveil2_sultai_ascendancy.txt	Sultai Ascendancy surveils two cards at upkeep	covered-unverified
+macro	_SURVEIL3_	lexicon/macro_surveil3_grim_flayer.txt	Grim Flayer's combat damage surveils three cards	covered-unverified
+macro	_AFTERLIFETOKEN_	lexicon/macro_afterlife_insurance.txt	Afterlife Insurance creates a Spirit when its creature dies	covered-unverified
+macro	_LEARN_	lexicon/macro_learn_cram_session.txt	_LEARN_ moves a sideboard Lesson into hand while preserving the spell effect	covered-unverified
+macro	_ADVENTURE_	lexicon/basic_asflash_adventure_casts_during_upkeep.txt	An Adventure spell enters exile after resolving its Adventure half	covered-unverified
+macro	_EXTORT_	lexicon/macro_cast_historic_and_extort.txt	_EXTORT_ drains the opponent when its hybrid payment is accepted	covered-unverified
+macro	_FORETELL_	lexicon/basic_foretell_exiles_face_down.txt	macro expansion foretell exiles the card face down	covered-unverified
+macro	_PLOT_	lexicon/macro_plot.txt	_PLOT_ exiles its sorcery through the plot/doforetell path	covered-unverified
+macro	_PLOTCAST_	lexicon/macro_plotcast.txt	_PLOTCAST_ casts the plotted card from exile through its alternative branch	covered-unverified
+macro	_LOOT_	lexicon/macro_loot_abomination_of_gudul.txt	Abomination of Gudul draws then discards after combat damage	covered-unverified
+macro	_UNEARTH_	lexicon/macro_unearth_artificers_dragon.txt	Artificer's Dragon returns from the graveyard with its unearth cost	covered-unverified
+macro	_IMPULSE_DRAW_	lexicon/macro_impulse_draws.txt	_IMPULSE_DRAW_ exiles the top library card for the turn	covered-unverified
+macro	_IMPULSEUENT_	lexicon/macro_impulse_until_next_turn.txt	_IMPULSEUENT_ exiles the top library card until the next turn	covered-unverified
+macro	_WARD1_	lexicon/macro_ward_variants.txt	_WARD1_ counters an unpaid targeted spell	covered-unverified
+macro	_WARD2_	lexicon/macro_ward_variants.txt	_WARD2_ counters an unpaid targeted spell	covered-unverified
+macro	_WARD3_	lexicon/macro_ward_variants.txt	_WARD3_ counters an unpaid targeted spell	covered-unverified
+macro	_WARD4_	lexicon/macro_ward_variants.txt	_WARD4_ counters an unpaid targeted spell	covered-unverified
+macro	_WARD8_	lexicon/macro_ward_variants.txt	_WARD8_ counters an unpaid targeted spell	covered-unverified
+macro	_RENOWN_($c)	lexicon/macro_renown_acolyte.txt	_RENOWN_($c) increases the source power after its first player hit	covered-unverified
+macro	_BLINK_UEOT_	lexicon/macro_blink_aetherling.txt	Aetherling returns from exile at the next end step	covered-unverified
+macro	_CONNIVES_	lexicon/macro_connives_hypnotic_grifter.txt	_CONNIVES_ draws, discards a nonland, and grows its source	covered-unverified
+macro	_ETERNALIZE_	lexicon/macro_eternalize.txt	_ETERNALIZE_ creates the transformed graveyard copy and exiles the source	covered-unverified
+macro	_EXPLORES_	lexicon/macro_explores_brazen_buccaneers.txt	Brazen Buccaneers moves a revealed land to hand when it explores	covered-unverified
+macro	_DISCARD&DRAW_	lexicon/macro_discard_draw_academy_raider.txt	Academy Raider replaces a discarded hand card with a draw	covered-unverified
+macro	_PUNCH_	lexicon/macro_punch_fights_target_creatures.txt	macro expansion deals the source power to the selected opposing creature	covered-unverified
+macro	_FIGHT_	lexicon/macro_fight_exchanges_power_damage.txt	macro expansion exchanges power damage and destroys the weaker opposing creature	covered-unverified
+macro	_MUST_BE_BLOCKD_	lexicon/macro_must_be_blocked_forces_combat_block.txt	macro expansion forces the targeted attacker to be blocked	covered-unverified
+macro	_SUSPECT_IT_	lexicon/macro_suspect_and_finality.txt	_SUSPECT_IT_ makes the attacker unblockable by one blocker through menace	covered-unverified
+macro	_FINALITY_COUNTER_	lexicon/macro_suspect_and_finality.txt	_FINALITY_COUNTER_ exiles its marked creature instead of destroying it	covered-unverified
+macro	_HARNESSED_LIGHTNING_($c)	lexicon/macro_harnessed_lightning.txt	_HARNESSED_LIGHTNING_($c) spends the selected energy amount as damage	covered-unverified
+macro	_ENLIST_	lexicon/macro_enlist_argivian_cavalier.txt	_ENLIST_ adds the enlisted creature's power to combat damage	covered-unverified
+macro	_MANAOFANYCOLOR_	lexicon/macro_mana_any_color.txt	_MANAOFANYCOLOR_ adds the selected color to the mana pool	covered-unverified
+macro	_MANIFEST_DREAD_	lexicon/macro_manifest_dread.txt	_MANIFEST_DREAD_ moves one revealed card to the graveyard and manifests the other	covered-unverified
+macro	_EERIE_	lexicon/macro_eerie_enchantment_entry.txt	_EERIE_ triggers when a controller's enchantment enters	covered-unverified
+macro	_CREW1_	lexicon/cost_crew_target.txt	Crew 1 taps the selected creature and makes the Vehicle a creature	covered-unverified
+macro	_CREW2_	lexicon/macro_crew2_daredevil_dragster.txt	Daredevil Dragster crews with one power-2 creature	covered-unverified
+macro	_CREW2COMPLEMENT_	lexicon/macro_crew2_complement_dragster.txt	Daredevil Dragster crews with two power-1 creatures	covered-unverified
+macro	_ENDURE1_	lexicon/macro_endure_variants.txt	_ENDURE1_ creates the parameterized 1/1 Spirit branch	covered-unverified
+macro	_ENDURE2_	lexicon/macro_endure_variants.txt	_ENDURE2_ creates the parameterized 2/2 Spirit branch	covered-unverified
+macro	_ENDURE3_	lexicon/macro_endure_variants.txt	_ENDURE3_ creates the parameterized 3/3 Spirit branch	covered-unverified
+macro	_ENDURE4_	lexicon/macro_endure_variants.txt	_ENDURE4_ creates the parameterized 4/4 Spirit branch	covered-unverified
+macro	_ENDURE5_	lexicon/macro_endure_variants.txt	_ENDURE5_ creates the parameterized 5/5 Spirit branch	covered-unverified
+macro	_ENDURE6_	lexicon/macro_endure_variants.txt	_ENDURE6_ creates the parameterized 6/6 Spirit branch	covered-unverified
+macro	_ENDURE7_	lexicon/macro_endure_variants.txt	_ENDURE7_ creates the parameterized 7/7 Spirit branch	covered-unverified
+macro	_ENDURE8_	lexicon/macro_endure_variants.txt	_ENDURE8_ creates the parameterized 8/8 Spirit branch	covered-unverified
+macro	_ENDURE9_	lexicon/macro_endure_variants.txt	_ENDURE9_ creates the parameterized 9/9 Spirit branch	covered-unverified
+macro	_ENDURE10_	lexicon/macro_endure_variants.txt	_ENDURE10_ creates the parameterized 10/10 Spirit branch	covered-unverified
+macro	_ENDURE11_	lexicon/macro_endure_variants.txt	_ENDURE11_ creates the parameterized 11/11 Spirit branch	covered-unverified
+macro	_ENDURE12_	lexicon/macro_endure_variants.txt	_ENDURE12_ creates the parameterized 12/12 Spirit branch	covered-unverified
+macro	_ENDURE13_	lexicon/macro_endure_variants.txt	_ENDURE13_ creates the parameterized 13/13 Spirit branch	covered-unverified
+macro	_ENDURE14_	lexicon/macro_endure_variants.txt	_ENDURE14_ creates the parameterized 14/14 Spirit branch	covered-unverified
+macro	_ENDURE15_	lexicon/macro_endure_variants.txt	_ENDURE15_ creates the parameterized 15/15 Spirit branch	covered-unverified
+macro	_ENDURE16_	lexicon/macro_endure_variants.txt	_ENDURE16_ creates the parameterized 16/16 Spirit branch	covered-unverified
+macro	_ENDURE17_	lexicon/macro_endure_variants.txt	_ENDURE17_ creates the parameterized 17/17 Spirit branch	covered-unverified
+macro	_ENDURE18_	lexicon/macro_endure_variants.txt	_ENDURE18_ creates the parameterized 18/18 Spirit branch	covered-unverified
+macro	_ENDURE19_	lexicon/macro_endure_variants.txt	_ENDURE19_ creates the parameterized 19/19 Spirit branch	covered-unverified
+macro	_ENDURE20_	lexicon/macro_endure_variants.txt	_ENDURE20_ creates the parameterized 20/20 Spirit branch	covered-unverified
+macro	_FLURRY_	lexicon/macro_flurry_and_mobilize.txt	_FLURRY_ fires on the second spell of the turn	covered-unverified
+macro	_MOBILIZE_($c)	lexicon/macro_flurry_and_mobilize.txt	_MOBILIZE_($c) creates the parameterized attacking-support tokens	covered-unverified
+macro	_ANGELTOKEN_	lexicon/macro_additional_tokens.txt	_ANGELTOKEN_ creates one observable Angel token	covered-unverified
+macro	_BEASTTOKEN_	lexicon/macro_beast_feral_incarnation.txt	Feral Incarnation creates three Beast tokens	covered-unverified
+macro	_BIRDTOKEN_	lexicon/macro_bird_battle_screech.txt	Battle Screech creates two Bird tokens	covered-unverified
+macro	_OTTERTOKEN_	lexicon/macro_otter_otterball_antics.txt	Otterball Antics creates an Otter token on its normal cast	covered-unverified
+macro	_CITIZENTOKEN_	lexicon/macro_citizen_caldaia_guardian.txt	Caldaia Guardian creates two Citizen tokens when it dies	covered-unverified
+macro	_DETECTIVETOKEN_	lexicon/macro_additional_tokens.txt	_DETECTIVETOKEN_ creates one observable Detective token	covered-unverified
+macro	_DRAGONTOKEN_	lexicon/macro_dragon_death_by_dragons.txt	Death by Dragons creates a Dragon token for the chosen player	covered-unverified
+macro	_ELDRAZISCION_	lexicon/macro_additional_tokens.txt	_ELDRAZISCION_ creates one observable Eldrazi Scion token	covered-unverified
+macro	_ELDRAZISPAWN_	lexicon/macro_additional_tokens.txt	_ELDRAZISPAWN_ creates one observable Eldrazi Spawn token	covered-unverified
+macro	_ELEPHANTTOKEN_	generic/selvalas_charge_i1085.txt	Selvala's Charge creates an Elephant for each nonland reveal	covered-unverified
+macro	_FISHTOKEN_	lexicon/macro_fish_into_the_flood_maw.txt	Into the Flood Maw creates the optional tapped Fish token	covered-unverified
+macro	_GOBLINTOKEN_	dragon_fodder.txt	Dragon Fodder creates two Goblin tokens	covered-unverified
+macro	_GNOMETOKEN_	lexicon/macro_gnome_metrognome.txt	Metrognome creates four Gnome tokens from its activation	covered-unverified
+macro	_GLIMMERTOKEN_	lexicon/macro_glimmer_glimmerburst.txt	Glimmerburst creates a Glimmer token after drawing two cards	covered-unverified
+macro	_HUMANKNIGHTTOKEN_	lexicon/macro_additional_tokens.txt	_HUMANKNIGHTTOKEN_ creates one observable Human Knight token	covered-unverified
+macro	_HUMANSOLDIERTOKEN_	lexicon/macro_human_soldier_daysquad_marshal.txt	Daysquad Marshal creates a Human Soldier token	covered-unverified
+macro	_INSECTTOKEN_	beacon_of_creation.txt	Beacon of Creation creates one Insect token per Forest	covered-unverified
+macro	_KNIGHTTOKEN_	lexicon/macro_knight_knight_watch.txt	Knight Watch creates two Knight tokens	covered-unverified
+macro	_MERCENARYTOKEN_	lexicon/macro_mercenary_prosperity_tycoon.txt	Prosperity Tycoon creates a Mercenary token on entry	covered-unverified
+macro	_PHYREXIANMITETOKEN_	lexicon/macro_phyrexian_mite_charge.txt	Charge of the Mites creates two Phyrexian Mite tokens	covered-unverified
+macro	_RABBITTOKEN_	lexicon/macro_rabbit_carrot_cake.txt	Carrot Cake creates a Rabbit token on entry	covered-unverified
+macro	_REDELEMENTALTOKEN_	lexicon/macro_red_elemental_devastating_summons.txt	Devastating Summons creates two Red Elemental tokens	covered-unverified
+macro	_SAPROLINGTOKEN_	aether_mutation.txt	Aether Mutation creates Saproling tokens from the bounced creature's mana value	covered-unverified
+macro	_SERVOTOKEN_	generic/sram_expertise_castcard.txt	Sram's Expertise creates three Servo tokens	covered-unverified
+macro	_SOLDIERTOKEN_	generic/idol_of_oblivion_i1085.txt	Raise the Alarm creates Soldier tokens that are visible in the assertion	covered-unverified
+macro	_SPIRITTOKEN_	lexicon/macro_spirit_doomed_traveler.txt	Doomed Traveler creates a Spirit token when it dies	covered-unverified
+macro	_SQUIRRELTOKEN_	lexicon/macro_squirrel_chatter.txt	Chatter of the Squirrel creates a Squirrel token	covered-unverified
+macro	_THOPTERTOKEN_	generic/thopter_spy_network_i1085.txt	Thopter Spy Network creates a Thopter during upkeep	covered-unverified
+macro	_WOLFTOKEN_	lexicon/macro_wolf_howl_night_pack.txt	Howl of the Night Pack creates one Wolf per Forest	covered-unverified
+macro	_WHITEVAMPIRE_	lexicon/macro_white_vampire_call_to_feast.txt	Call to the Feast creates three Vampire tokens	covered-unverified
+macro	_ZOMBIETOKEN_	Zombie_Infestation.txt	Zombie Infestation creates a Zombie after discarding two cards	covered-unverified
+macro	_BLOOD_	lexicon/macro_blood_blood_fountain.txt	Blood Fountain creates a Blood token on entry	covered-unverified
+macro	_CLUE_	TirelessTracker.txt	Tireless Tracker creates a Clue when a land enters	covered-unverified
+macro	_FOOD_	lexicon/macro_food_bartered_cow.txt	Bartered Cow creates a Food token when it dies	covered-unverified
+macro	_TREASURE_	lexicon/macro_treasure_big_score.txt	Big Score creates two Treasure tokens	covered-unverified
+macro	_VEHICLE_	lexicon/macro_additional_tokens.txt	_VEHICLE_ creates one observable Vehicle token	covered-unverified
