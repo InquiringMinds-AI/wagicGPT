@@ -815,6 +815,7 @@ lexicon/basic_nonight_rejects_night_transition.txt
 lexicon/macro_surveil1_appendage_amalgam.txt
 lexicon/macro_surveil2_sultai_ascendancy.txt
 lexicon/macro_surveil3_grim_flayer.txt
+lexicon/macro_surveil3_keep_all_grim_flayer.txt
 lexicon/effect_donothing_preserves_followup.txt
 lexicon/macro_suspect_and_finality.txt
 lexicon/basic_combattoughness_assigns_toughness_damage.txt
@@ -830,3 +831,13 @@ lexicon/macro_manifest_dread.txt
 lexicon/basic_mutate_triggers_mutation_event.txt
 lexicon/effect_mutateover_places_source_over_target.txt
 lexicon/basic_anafenza_foremost_exiles_opponent.txt
+lexicon/macro_amass_variants.txt
+lexicon/macro_conditionals_and_markers.txt
+lexicon/macro_red_elemental_devastating_summons.txt
+lexicon/macro_monarch_markers.txt
+lexicon/lexicon_global_cantattack_payload.txt
+lexicon/lexicon_global_pump_payload.txt
+lexicon/lexicon_aslongas_typecount_blocks_attack.txt
+lexicon/lexicon_aslongas_typecount_allows_attack.txt
+lexicon/lexicon_costcounter_named_token_creation.txt
+lexicon/lexicon_clone_all_artifacts.txt

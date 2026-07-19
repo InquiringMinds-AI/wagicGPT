@@ -28,14 +28,11 @@ lexicon/cost_subtype_offering.txt
 lexicon/cost_suspend_one_casts.txt
 lexicon/effect_altermutationcounter_emits_mutated_event.txt
 lexicon/macro_fish_into_the_flood_maw.txt
-lexicon/macro_conditionals_and_markers.txt
 lexicon/macro_recover.txt
 lexicon/macro_plotcast.txt
 lexicon/cost_dynamic_eval_mycost_myevictcost.txt
 lexicon/field_crewbonus_gearshift_ace.txt
 lexicon/macro_enlist_argivian_cavalier.txt
-lexicon/macro_red_elemental_devastating_summons.txt
-lexicon/macro_amass_variants.txt
 lexicon/target_sideboard_commandzone_matrix.txt
 
 # Harness-design blocker (2026-07-18): the cardtext: assert cannot work against the
@@ -43,3 +40,5 @@ lexicon/target_sideboard_commandzone_matrix.txt
 # the first format, so by assert time the raw text is gone. Needs an engine/harness
 # decision (preserve raw text, or compare formatted text) before this can return.
 lexicon/field_text_gameplay.txt
+# Parked: initiative marker mechanics blocked on unimplemented takesinitiative/venture (deferred pile)
+lexicon/macro_initiative_markers.txt

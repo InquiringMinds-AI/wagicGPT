@@ -1,0 +1,28 @@
+# PARKED (registered in _known_failures.txt).
+#
+# Blocker: the initiative mechanic depends on `takesinitiative` / the Undercity
+# venture machinery, which is UNIMPLEMENTED (deferred by user ruling). Unlike the
+# monarch marker (which is a clean create-a-marker + end-step-draw), creating The
+# Initiative token immediately runs its venture-into-Undercity triggers, which
+# pull an Undercity dungeon into the command zone and depend on the
+# `takeninitiativeof` / `taketheinitiative` initiative-state plumbing not being
+# wired end-to-end. Observed during authoring: activating _INITIATIVE_CONTROLLER_
+# creates The Initiative but leaves an unaccounted dungeon card in the command
+# zone ("Card number not the same in player 0's zone, expected 0, got 1").
+#
+# Return this fixture to _tests.txt once takesinitiative / venture is implemented.
+# Observability target when it is: The Initiative marker on the battlefield (name-
+# matched) and the Undercity dungeon in the controller's command zone.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Initiative Controller Macro Witness
+[PLAYER2]
+[DO]
+Lexicon Initiative Controller Macro Witness
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Initiative Controller Macro Witness,The Initiative
+[PLAYER2]
+[END]

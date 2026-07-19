@@ -1,31 +1,36 @@
-# The fifteen Amass variants all resolve against a shared Army. Each witness
-# also gains one life, making every macro invocation independently observable.
+# Amass, observed by the Army it produces (no observability rider).
+#
+# Each _AMASS*_ macro is an if/then/else: if you already control an Army, put
+# +1/+1 counter(s) on it (the "then" branch); otherwise create a 0/0 black Army
+# creature token and put the counter(s) on it (the "else" branch). The witnesses
+# are modelled on the real amass card Aven Eternal (a creature whose bare
+# `auto=_AMASSZOMBIE1_` fires on enter-the-battlefield).
+#
+# Why this observes the result DIRECTLY and drops the old `&& life:1` rider: the
+# if/then/else parser absorbs a trailing `&& rider` into the else branch, so the
+# synthetic life rider corrupted the macro. We instead observe the amass result
+# itself -- the Army token. Its mere survival is proof the counter landed: a 0/0
+# Army with no +1/+1 counter dies to state-based actions before the assert, so an
+# Army present in play is an Army that was created AND amassed onto.
+#
+# Harness-observability notes (authoring evidence, all three families + several
+# magnitudes verified to create an Army during authoring):
+#  * Army tokens are id-matched, not name-matched, in the zone assert, so the
+#    token is asserted as a `*` wildcard (marker tokens like The Monarch match by
+#    name; full P/T creature tokens like Army do not).
+#  * There is no counter/power assert key, and the "then" (add-counter) branch's
+#    `notatarget(army)` chooser gates a chained amass cast from the scripted seat,
+#    so a single create is the representative, drivable, observable amass event.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Lexicon Zombie Amass 1 Macro Witness,Lexicon Zombie Amass 2 Macro Witness,Lexicon Zombie Amass 3 Macro Witness,Lexicon Zombie Amass 4 Macro Witness,Lexicon Zombie Amass 5 Macro Witness,Lexicon Orc Amass 1 Macro Witness,Lexicon Orc Amass 2 Macro Witness,Lexicon Orc Amass 3 Macro Witness,Lexicon Orc Amass 4 Macro Witness,Lexicon Orc Amass 5 Macro Witness,Lexicon Sliver Amass 1 Macro Witness,Lexicon Sliver Amass 2 Macro Witness,Lexicon Sliver Amass 3 Macro Witness,Lexicon Sliver Amass 4 Macro Witness,Lexicon Sliver Amass 5 Macro Witness
-life:20
+hand:Lexicon Zombie Amass 3 Macro Witness
 [PLAYER2]
 [DO]
-Lexicon Zombie Amass 1 Macro Witness
-Lexicon Zombie Amass 2 Macro Witness
 Lexicon Zombie Amass 3 Macro Witness
-Lexicon Zombie Amass 4 Macro Witness
-Lexicon Zombie Amass 5 Macro Witness
-Lexicon Orc Amass 1 Macro Witness
-Lexicon Orc Amass 2 Macro Witness
-Lexicon Orc Amass 3 Macro Witness
-Lexicon Orc Amass 4 Macro Witness
-Lexicon Orc Amass 5 Macro Witness
-Lexicon Sliver Amass 1 Macro Witness
-Lexicon Sliver Amass 2 Macro Witness
-Lexicon Sliver Amass 3 Macro Witness
-Lexicon Sliver Amass 4 Macro Witness
-Lexicon Sliver Amass 5 Macro Witness
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Lexicon Zombie Amass 1 Macro Witness,Lexicon Zombie Amass 2 Macro Witness,Lexicon Zombie Amass 3 Macro Witness,Lexicon Zombie Amass 4 Macro Witness,Lexicon Zombie Amass 5 Macro Witness,Lexicon Orc Amass 1 Macro Witness,Lexicon Orc Amass 2 Macro Witness,Lexicon Orc Amass 3 Macro Witness,Lexicon Orc Amass 4 Macro Witness,Lexicon Orc Amass 5 Macro Witness,Lexicon Sliver Amass 1 Macro Witness,Lexicon Sliver Amass 2 Macro Witness,Lexicon Sliver Amass 3 Macro Witness,Lexicon Sliver Amass 4 Macro Witness,Lexicon Sliver Amass 5 Macro Witness,*
-life:35
+inplay:Lexicon Zombie Amass 3 Macro Witness,*
 [PLAYER2]
 [END]

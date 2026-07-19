@@ -1,18 +1,39 @@
-# Devastating Summons uses _REDELEMENTALTOKEN_ when one land is sacrificed.
+# Devastating Summons -- sacrifice as an ADDITIONAL COST (Oracle: "As an
+# additional cost to cast Devastating Summons, sacrifice X lands. Create two X/X
+# red Elemental creature tokens, where X is the number of lands sacrificed.").
+#
+# Re-scripted from the old resolution-effect model (a choice-ladder that sacrificed
+# via `ability$!sacrifice notaTarget(land)!$ controller && token(...)` -- the
+# synchronous-notatarget `&&` shape the engine-bug ledger flagged) to a genuine
+# additional cost in the mana line, copied from the working analogue Village Rites
+# (`mana={B}{S(creature|myBattlefield)}` + `auto=draw:2`). Two `{S(land)}` tokens
+# sacrifice two lands as an additional cost when the spell is cast; on resolution it
+# creates two 2/2 red Elemental tokens (X=2 = the number of lands sacrificed).
+#
+# Harness note: the suite pays a `{S(land)}` cost by clicking the land to sacrifice,
+# but clicking a real (mana-producing) land opens its tap-for-mana ability menu
+# instead of selecting it, so the two sacrificed lands here are plain no-ability
+# test lands (Lexicon Sacrifice Land / Lexicon Sacrifice Land Two) -- Village Rites'
+# creature has no such ability, which is why a creature sacrifice drives cleanly.
+# Engine limitation (residual, not fixed here): Wagic has no variable-count
+# sacrifice-cost primitive (`{S(land)}` is one land each; `{saclands}` sacrifices
+# ALL lands and is activated-ability-only, not castable as a spell cost), so the
+# player-chosen X of the Oracle is modelled as a fixed 2-land cost.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Mountain
+inplay:Lexicon Sacrifice Land,Lexicon Sacrifice Land Two
 hand:Devastating Summons
 manapool:{R}
 [PLAYER2]
 [DO]
 Devastating Summons
-choice 0
+Lexicon Sacrifice Land
+Lexicon Sacrifice Land Two
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-graveyard:Devastating Summons,Mountain
+graveyard:Devastating Summons,Lexicon Sacrifice Land,Lexicon Sacrifice Land Two
 inplay:*,*
 manapool:{0}
 [PLAYER2]

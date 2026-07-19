@@ -31670,7 +31670,7 @@ toughness=8
 [/card]
 [card]
 name=Dread Charge
-auto=lord(creature|myBattlefield) cantbeblockedby(creature[-black])
+auto=all(creature[black]|myBattlefield) transforms((,newability[cantbeblockedby(creature[-black])])) ueot
 text=Until end of turn, black creatures you control can be blocked only by black creatures.
 mana={3}{B}
 type=Sorcery
@@ -52935,7 +52935,7 @@ toughness=2
 [/card]
 [card]
 name=Hazardous Conditions
-auto=-2/-2 all(creature[counter{notany}]) ueot
+auto=all(creature[counter{notany}]) -2/-2 ueot
 text=Creatures with no counters on them get -2/-2 until end of turn.
 mana={2}{B}{G}
 type=Sorcery
@@ -65989,7 +65989,7 @@ toughness=3
 [/card]
 [card]
 name=Lavafume Invoker
-auto={8}:3/0 all(creature|myBattlefield) ueot
+auto={8}:all(creature|myBattlefield) 3/0 ueot
 text={8}: Creatures you control get +3/+0 until end of turn.
 mana={2}{R}
 type=Creature
@@ -73336,7 +73336,7 @@ auto=@movedto(*[instant;sorcery;manacost=17]|mystack):create(Construct:Artifact 
 auto=@movedto(*[instant;sorcery;manacost=18]|mystack):create(Construct:Artifact Creature Construct:18/18) controller
 auto=@movedto(*[instant;sorcery;manacost=19]|mystack):create(Construct:Artifact Creature Construct:19/19) controller
 auto=@movedto(*[instant;sorcery;manacost=20]|mystack):create(Construct:Artifact Creature Construct:20/20) controller
-auto={3}{U}{U}{E}:moveto(hand) all(*[instant;sorcery]|mygraveyard) restriction{type(artifact|mybattlefield)~morethan~5}
+auto={3}{U}{U}{E} restriction{type(artifact|mybattlefield)~morethan~4}:moveto(hand) all(*[instant;sorcery]|mygraveyard)
 text=Whenever you cast an instant or sorcery spell, create an X/X colorless Construct artifact creature token, where X is that spell's mana value. -- {3}{U}{U}, Exile Metallurgic Summonings: Return all instant and sorcery cards from your graveyard to your hand. Activate this ability only if you control six or more artifacts.
 mana={3}{U}{U}
 type=Enchantment
@@ -95397,7 +95397,7 @@ toughness=2
 name=Rime Transfusion
 target=creature
 auto=2/1
-auto=teach(creature) {i}:cantbeblockedby(creature[-snow]) ueot
+auto=teach(creature) {S}:transforms((,newability[cantbeblockedby(creature[-snow])])) ueot
 text=Enchant creature -- Enchanted creature gets +2/+1 and has "{S}i}: This creature can't be blocked this turn except by snow creatures." ({S}i} can be paid with one mana from a snow permanent.)
 mana={1}{B}
 type=Snow Enchantment
@@ -106505,7 +106505,7 @@ color=black
 [card]
 name=Skeletonize
 target=creature
-auto=@movedto(mytgt|graveyard) from(battlefield):token(Skeleton Token)
+auto=@movedto(mytgt|graveyard) from(battlefield):token(Skeleton,Creature Skeleton,1/1,black)
 auto=damage:3
 text=Skeletonize deals 3 damage to target creature. When a creature dealt damage this way dies this turn, create a 1/1 black Skeleton creature token with "{B}: Regenerate this creature."
 mana={4}{R}
@@ -119156,7 +119156,7 @@ toughness=4
 [card]
 name=Teroh's Vanguard
 abilities=flash
-auto=aslongas(*|mygraveyard) protection from black all(creature|myBattlefield) ueot >6 oneshot
+auto=aslongas(*|mygraveyard) all(creature|myBattlefield) protection from black ueot >6 oneshot
 text=Flash -- Threshold - As long as seven or more cards are in your graveyard, Teroh's Vanguard has "When Teroh's Vanguard enters, creatures you control gain protection from black until end of turn."
 mana={3}{W}
 type=Creature
@@ -124258,7 +124258,7 @@ toughness=1
 name=Triskelavus
 abilities=flying
 auto=counter(1/1,3)
-auto={1}{C(1/1,-1)}:token(Triskelavite Token)
+auto={1}{C(1/1,-1)}:token(Triskelavite,Artifact Creature Triskelavite,1/1,flying) and!( transforms((,newability[{S}:damage:1 target(anytarget)])) forever )!
 text=Flying -- Triskelavus enters with three +1/+1 counters on it. -- {1}, Remove a +1/+1 counter from Triskelavus: Put a 1/1 colorless Triskelavite artifact creature token with flying onto the battlefield. It has "Sacrifice this creature: This creature deals 1 damage to any target."
 mana={7}
 type=Artifact Creature
@@ -131828,7 +131828,7 @@ type=Enchantment
 [card]
 name=War's Toll
 auto=@tappedformana(land|opponentBattlefield):tap all(land|opponentBattlefield)
-auto=@combat(attacking) source(creature|opponentBattlefield):mustattack all(creature|opponentBattlefield) ueot
+auto=@combat(attacking) source(creature|opponentBattlefield):all(creature|opponentBattlefield) mustattack ueot
 text=Whenever an opponent taps a land for mana, tap all lands that player controls. -- If a creature an opponent controls attacks, all creatures that opponent controls attack if able.
 mana={3}{R}
 type=Enchantment

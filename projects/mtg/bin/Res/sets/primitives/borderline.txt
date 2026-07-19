@@ -4058,7 +4058,6 @@ auto={T}:name(Add X blue) thisforeach(variable{ths:highest:creature:mybattlefiel
 auto={T}:name(Add X black) thisforeach(variable{ths:highest:creature:mybattlefield}>0) add{B}
 auto={T}:name(Add X red) thisforeach(variable{ths:highest:creature:mybattlefield}>0) add{R}
 auto={T}:name(Add X green) thisforeach(variable{ths:highest:creature:mybattlefield}>0) add{G}
-auto=lord(other creature|myBattlefield)
 text={T}: Add one mana of any color. -- {T}: Add X mana of any one color, where X is the greatest toughness among other creatures you control.
 mana={3}{G}
 type=Creature
@@ -4806,7 +4805,7 @@ toughness=4
 [card]
 name=Archway Angel
 abilities=flying
-auto=life:thisforeach(Gate|mybattlefield)*2
+auto=foreach(Gate|mybattlefield) life:2
 text=Flying -- When Archway Angel enters, you gain 2 life for each Gate you control.
 mana={5}{W}
 type=Creature
@@ -9069,7 +9068,7 @@ type=Sorcery
 [card]
 name=Beckoning Will-o'-Wisp
 abilities=flying
-auto=@each my combatbegins:name(Lure the Unwary) target(opponent)
+auto=@each my combatbegins:name(Lure the Unwary) target(opponent) donothing
 auto=lord(creature[attacking]|mybattlefield) 1/0
 text=Flying -- Lure the Unwary - At the beginning of combat on your turn, choose an opponent. -- Creatures attacking the last chosen player get +1/+0.
 mana={2}{W}
@@ -16658,7 +16657,6 @@ subtype=Case
 name=Case of the Shattered Pact
 auto=target(land[basic]|mylibrary) moveto(hand)
 auto=@each my end restriction{type(*[white]|myBattlefield)~morethan~0,type(*[blue]|myBattlefield)~morethan~0,type(*[black]|myBattlefield)~morethan~0,type(*[red]|myBattlefield)~morethan~0,type(*[green]|myBattlefield)~morethan~0}:becomes(Solved) forever
-auto=lord(creature|myBattlefield)
 auto=this(cantargetcard(*[Solved]) transforms((,newability[@each my combatbegins:target(creature|myBattlefield) transforms((,flying,double strike,vigilance)) ueot])) forever)
 text=When this Case enters, search your library for a basic land card, reveal it, put it into your hand, then shuffle. -- To solve - There are five colors among permanents you control. (If unsolved, solve at the beginning of your end step.) -- Solved - At the beginning of combat on your turn, target creature you control gains flying, double strike, and vigilance until end of turn.
 mana={2}
@@ -19739,7 +19737,7 @@ type=Sorcery
 name=Cleansing Meditation
 auto=aslongas(*|mygraveyard) all(enchantment|opponentBattlefield) destroy >6
 auto=aslongas(*|mygraveyard) all(enchantment|myBattlefield) destroy and!( moveto(myBattlefield) )! >6
-auto=aslongas(*|mygraveyard) destroy all(enchantment) <7
+auto=aslongas(*|mygraveyard) all(enchantment|battlefield) destroy <7
 text=Destroy all enchantments. -- Threshold - If seven or more cards are in your graveyard, instead destroy all enchantments, then return all cards in your graveyard destroyed this way to the battlefield.
 mana={1}{W}{W}
 type=Sorcery
@@ -27792,28 +27790,9 @@ type=Sorcery
 [/card]
 [card]
 name=Devastating Summons
-auto=if type(*[land]|myBattlefield)~morethan~0 then choice name(Sacrifice 1 land) ability$!sacrifice notaTarget(land|mybattlefield)!$ controller && _REDELEMENTALTOKEN_*2
-auto=if type(*[land]|myBattlefield)~morethan~1 then choice name(Sacrifice 2 lands) ability$!sacrifice notaTarget(<2>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,2/2,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~2 then choice name(Sacrifice 3 lands) ability$!sacrifice notaTarget(<3>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,3/3,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~3 then choice name(Sacrifice 4 lands) ability$!sacrifice notaTarget(<4>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,4/4,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~4 then choice name(Sacrifice 5 lands) ability$!sacrifice notaTarget(<5>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,5/5,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~5 then choice name(Sacrifice 6 lands) ability$!sacrifice notaTarget(<6>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,6/6,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~6 then choice name(Sacrifice 7 lands) ability$!sacrifice notaTarget(<7>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,7/7,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~7 then choice name(Sacrifice 8 lands) ability$!sacrifice notaTarget(<8>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,8/8,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~8 then choice name(Sacrifice 9 lands) ability$!sacrifice notaTarget(<9>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,9/9,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~9 then choice name(Sacrifice 10 lands) ability$!sacrifice notaTarget(<10>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,10/10,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~10 then choice name(Sacrifice 11 lands) ability$!sacrifice notaTarget(<11>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,11/11,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~11 then choice name(Sacrifice 12 lands) ability$!sacrifice notaTarget(<12>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,12/12,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~12 then choice name(Sacrifice 13 lands) ability$!sacrifice notaTarget(<13>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,13/13,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~13 then choice name(Sacrifice 14 lands) ability$!sacrifice notaTarget(<14>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,14/14,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~14 then choice name(Sacrifice 15 lands) ability$!sacrifice notaTarget(<15>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,15/15,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~15 then choice name(Sacrifice 16 lands) ability$!sacrifice notaTarget(<16>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,16/16,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~16 then choice name(Sacrifice 17 lands) ability$!sacrifice notaTarget(<17>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,17/17,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~17 then choice name(Sacrifice 18 lands) ability$!sacrifice notaTarget(<18>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,18/18,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~18 then choice name(Sacrifice 19 lands) ability$!sacrifice notaTarget(<19>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,19/19,red)*2
-auto=if type(*[land]|myBattlefield)~morethan~19 then choice name(Sacrifice 20 lands) ability$!sacrifice notaTarget(<20>land|mybattlefield)!$ controller && token(Elemental,Creature Elemental,20/20,red)*2
-text=As an additional cost to cast Devastating Summons, sacrifice X lands. -- Put two X/X red Elemental creature tokens onto the battlefield.
-mana={R}
+auto=token(Elemental,Creature Elemental,2/2,red)*2
+text=As an additional cost to cast Devastating Summons, sacrifice X lands. -- Create two X/X red Elemental creature tokens, where X is the number of lands sacrificed.
+mana={R}{S(land|myBattlefield)}{S(land|myBattlefield)}
 type=Sorcery
 [/card]
 [card]
@@ -31098,8 +31077,6 @@ toughness=2
 name=Dropkick Bomber
 auto=lord(other goblin|myBattlefield) 1/1
 auto={R}:target(other goblin|myBattlefield) transforms((,flying,newability[@combatdamaged(player) from(this):sacrifice])) ueot
-auto=@combatdamaged(player) from(this):
-auto=@combatdamaged(creature) from(this):
 text=Other Goblins you control get +1/+1. -- {R}: Until end of turn, another target Goblin you control gains flying and "When this creature deals combat damage, sacrifice it."
 mana={2}{R}
 type=Creature
@@ -35035,7 +35012,7 @@ type=Instant
 [/card]
 [card]
 name=Erebos's Titan
-auto=restriction{type(creature|opponentBattlefield)~lessthan~1}:indestructible
+auto=aslongas(creature|opponentBattlefield) indestructible <1
 autograveyard=@movedTo(creature|opponentexile) from(opponentgraveyard):if type(*|myhand)~morethan~0 then ability$!may reject notaTarget(*|myhand) and!(moveto(hand))! !$ controller
 autograveyard=@movedTo(creature|opponentBattlefield) from(opponentgraveyard):if type(*|myhand)~morethan~0 then ability$!may reject notaTarget(*|myhand) and!(moveto(hand))! !$ controller
 autograveyard=@movedTo(creature|opponenthand) from(opponentgraveyard):if type(*|myhand)~morethan~0 then ability$!may reject notaTarget(*|myhand) and!(moveto(hand))! !$ controller
@@ -38940,7 +38917,7 @@ type=Land
 name=Fell Specter
 abilities=flying
 auto=target(opponent) ability$!name(discard) reject notaTarget(*|myhand)!$
-auto=@discarded(*|opponenthand):life-2 opponent
+auto=@discarded(*|opponenthand):life:-2 opponent
 text=Flying -- When Fell Specter enters, target opponent discards a card. -- Whenever an opponent discards a card, that player loses 2 life.
 mana={3}{B}
 type=Creature
@@ -43475,7 +43452,6 @@ auto=_HARNESSED_LIGHTNING_(17)
 auto=_HARNESSED_LIGHTNING_(18)
 auto=_HARNESSED_LIGHTNING_(19)
 auto=_HARNESSED_LIGHTNING_(20)
-auto=Choose target creature or planeswalker You get {E}{E}{E} then you may pay any amount of {E} Galvanic Discharge deals that much damage to that permanent
 text=Choose target creature or planeswalker. You get {E}{E}{E} (three energy counters), then you may pay any amount of {E}. Galvanic Discharge deals that much damage to that permanent.
 mana={R}
 type=Instant
@@ -44302,7 +44278,7 @@ toughness=2
 [card]
 name=Generous Pup
 abilities=vigilance
-auto=@totalcounteradded(1/1) from(this):counter(1/1) all(other creature|myBattlefield) turnlimited
+auto=@counteradded(1/1) from(this) turnlimited:counter(1/1) all(other creature|myBattlefield)
 text=Vigilance -- Whenever one or more +1/+1 counters are put on Generous Pup, put a +1/+1 counter on each other creature you control. This ability triggers only once each turn.
 mana={1}{W}
 type=Creature
@@ -45036,7 +45012,7 @@ toughness=3
 name=Gideon's Defeat
 target=creature[white;attacking;blocking]
 auto=moveto(exile)
-auto=if casted(this) then if type(gideon|opponentbattlefield)~morethan~0 life:5 controller
+auto=if casted(this) then if type(gideon|opponentexile)~morethan~0 then life:5 controller
 text=Exile target white creature that's attacking or blocking. If it was a Gideon planeswalker, you gain 5 life.
 mana={W}
 type=Instant
@@ -46873,7 +46849,7 @@ type=Sorcery
 [/card]
 [card]
 name=Goblin Bird-Grabber
-auto={R}:restriction{type(creature[flying]|mybattlefield)~morethan~0}:flying ueot
+auto={R}:flying ueot restriction{type(creature[flying]|mybattlefield)~morethan~0}
 text={R}: Goblin Bird-Grabber gains flying until end of turn. Activate this ability only if you control a creature with flying.
 mana={1}{R}
 type=Creature
@@ -64544,7 +64520,7 @@ toughness=2
 [card]
 name=Landroval, Horizon Witness
 abilities=flying
-auto=@each blockers restriction{type(creature[attacking]|mybattlefield)~morethan~1}:name(Creature gains flying) name(Creature gains flying) target(creature[-flying&attacking]|mybattlefield) flying ueot
+auto=@each blockers restriction{type(creature[attacking]|mybattlefield)~morethan~1}:name(Creature gains flying) target(creature[-flying&attacking]|mybattlefield) flying ueot
 text=Flying -- Whenever two or more creatures you control attack a player, target attacking creature without flying gains flying until end of turn.
 mana={4}{W}
 type=Legendary Creature
@@ -73737,7 +73713,7 @@ toughness=1
 [card]
 name=Molten Birth
 auto=_REDELEMENTALTOKEN_*2
-auto=flipacoin winability moveto(hand) all(this) winabilityend flipend
+auto=flipacoin winability all(this) moveto(myhand) winabilityend flipend
 text=Put two 1/1 red Elemental creature tokens onto the battlefield. Then flip a coin. If you win the flip, return Molten Birth to its owner's hand.
 mana={1}{R}{R}
 type=Sorcery
@@ -74351,7 +74327,7 @@ type=Sorcery
 [card]
 name=Mordor Trebuchet
 abilities=defender
-auto=@combat(attacking) source(*[goblin;orc]|mybattlefield) turnlimited:name(Create construct) token(Ballistic Boulder) and!( transforms((,newability[readytofight],newability[@each my combatends:name(Sacrifice construct) sacrifice])) forever )!
+auto=@combat(attacking) source(*[goblin;orc]|mybattlefield) turnlimited:name(Create construct) token(Ballistic Boulder,Artifact Creature Construct,2/1,flying) and!( transforms((,newability[readytofight],newability[@each my combatends:name(Sacrifice construct) sacrifice])) forever )!
 text=Defender -- Whenever you attack with one or more Goblins and/or Orcs, create a 2/1 colorless Construct artifact creature token with flying named Ballistic Boulder that's tapped and attacking. Sacrifice that token at end of combat.
 mana={2}{B}
 type=Artifact Creature
@@ -85982,7 +85958,7 @@ toughness=4
 [card]
 name=Priest of the Wakening Sun
 auto={3}{W}{W}{S}:moveto(hand) target(dinosaur|mylibrary)
-auto=@each my upkeep if type(dinosaur|myhand)~morethan~0 then life:2 controller
+auto=@each my upkeep:if type(dinosaur|myhand)~morethan~0 then life:2 controller
 text=At the beginning of your upkeep, you may reveal a Dinosaur card from your hand. If you do, you gain 2 life. -- {3}{W}{W}, Sacrifice Priest of the Wakening Sun: Search your library for a Dinosaur card, reveal it, put it into your hand, then shuffle.
 mana={W}
 type=Creature
@@ -86906,7 +86882,7 @@ type=Instant
 [card]
 name=Psemilla, Meletian Poet
 auto=@movedTo(enchantment|mystack) turnlimited:create(nymph:creature nymph enchantment:2/2:white)
-auto=@each combat restriction{type(enchantment|myBattlefield)~morethan~4}:lifelink ueot
+auto=@each combat restriction{type(enchantment|myBattlefield)~morethan~4}:transforms((,newability[lifelink])) ueot
 auto=@each combat restriction{type(enchantment|myBattlefield)~morethan~4}:4/4 ueot
 text=Whenever you cast your first enchantment spell each turn, create a 2/2 white Nymph enchantment creature token. -- At the beginning of each combat, if you control five or more enchantments, Psemilla, Meletian Poet gets +4/+4 and gains lifelink until end of turn. (Damage dealt by this creature also causes you to gain that much life.)
 mana={2}{W}
@@ -88895,7 +88871,7 @@ type=Sorcery
 [card]
 name=Ral's Staticaster
 abilities=trample
-auto=_ATTACKING_if type(planeswalker[ral]|myBattlefield)~morethan~0 then 1/0 foreach(*|hand) ueot
+auto=_ATTACKING_if type(planeswalker[ral]|myBattlefield)~morethan~0 then foreach(*|myhand) 1/0 ueot
 text=Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.) -- Whenever Ral's Staticaster attacks, if you control a Ral planeswalker, Ral's Staticaster gets +1/+0 for each card in your hand until end of turn.
 mana={2}{U}{R}
 type=Creature
@@ -89054,8 +89030,8 @@ toughness=4
 [card]
 name=Rampaging Ferocidon
 abilities=nolifegain,nolifegainopponent,menace
-auto=@movedto(creature|mybattlefield) damage:1 controller
-auto=@movedto(creature|opponentbattlefield) damage:1 opponent
+auto=@movedto(other creature|mybattlefield):damage:1 controller
+auto=@movedto(other creature|opponentbattlefield):damage:1 opponent
 text=Menace -- Players can't gain life. -- Whenever another creature enters, Rampaging Ferocidon deals 1 damage to that creature's controller.
 mana={2}{R}
 type=Creature
@@ -89374,7 +89350,6 @@ toughness=3
 [card]
 name=Rapacious Guest
 abilities=menace
-auto=lord(other creature|myBattlefield)
 auto=@combatdamaged(player) from(creature|mybattlefield) turnlimited:name(Create food) _FOOD_
 auto=@sacrificed(food|mybattlefield):name(Put 1/1 counter) counter(1/1)
 auto=_DIES_name(Opponent loses life) life:-power opponent
@@ -89819,7 +89794,7 @@ auto=aslongas(creature[protection from white;counter{0/0.1.Blood}]|exile) protec
 auto=aslongas(creature[protection from blue;counter{0/0.1.Blood}]|exile) protection from blue
 auto=aslongas(creature[protection from green;counter{0/0.1.Blood}]|exile) protection from green
 auto=aslongas(creature[protection from red;counter{0/0.1.Blood}]|exile) protection from red
-auto=aslongas(creature[protection from artifact;counter{0/0.1.Blood}]|exile) protection from artifact
+auto=aslongas(creature[protection from artifact;counter{0/0.1.Blood}]|exile) protection from(artifact)
 text=If a nontoken creature would die, exile that card with a blood counter on it instead. -- As long as an exiled creature card with a blood counter on it has flying, Rayami, First of the Fallen has flying. The same is true for first strike, double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, protection, reach, trample, and vigilance.
 mana={1}{B}{G}{U}
 type=Legendary Creature
@@ -92438,7 +92413,7 @@ type=Legendary Artifact
 [card]
 name=Rhonas's Stalwart
 auto=@exerted(this):1/1 ueot
-auto=@exerted(this):cantbeblockedby(power<=2) ueot
+auto=@exerted(this):transforms((,newability[cantbeblockedby(creature[power<=2])])) ueot
 auto=_ATTACKING_may exert && freeze
 text=You may exert Rhonas's Stalwart as it attacks. When you do, it gets +1/+1 until end of turn and can't be blocked by creatures with power 2 or less this turn. (An exerted creature won't untap during your next untap step.)
 mana={1}{G}
@@ -93220,27 +93195,27 @@ type=Sorcery
 name=Risen Executioner
 abilities=cantblock
 auto=lord(other zombie|mybattlefield) 1/1
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~0 name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~1 Pay({1}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~2 Pay({2}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~3 Pay({3}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~4 Pay({4}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~5 Pay({5}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~6 Pay({6}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~7 Pay({7}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~8 Pay({8}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~9 Pay({9}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~10 Pay({10}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~11 Pay({11}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~12 Pay({12}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~13 Pay({13}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~14 Pay({14}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~15 Pay({15}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~16 Pay({16}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~17 Pay({17}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~18 Pay({18}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~19 Pay({19}) name(cast from graveyard) moveto(mybattlefield)
-autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~20 Pay({20}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~1 then name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~2 then Pay({1}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~3 then Pay({2}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~4 then Pay({3}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~5 then Pay({4}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~6 then Pay({5}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~7 then Pay({6}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~8 then Pay({7}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~9 then Pay({8}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~10 then Pay({9}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~11 then Pay({10}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~12 then Pay({11}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~13 then Pay({12}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~14 then Pay({13}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~15 then Pay({14}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~16 then Pay({15}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~17 then Pay({16}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~18 then Pay({17}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~19 then Pay({18}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~20 then Pay({19}) name(cast from graveyard) moveto(mybattlefield)
+autograveyard={2}{B}{B}:if type(creature|mygraveyard)~equalto~21 then Pay({20}) name(cast from graveyard) moveto(mybattlefield)
 text=Risen Executioner can't block. -- Other Zombie creatures you control get +1/+1. -- You may cast Risen Executioner from your graveyard if you pay {1} more to cast it for each other creature card in your graveyard.
 mana={2}{B}{B}
 type=Creature
@@ -100779,7 +100754,7 @@ toughness=4
 [/card]
 [card]
 name=Shanna, Sisay's Legacy
-auto=cantbetargetof(artifact,creature,enchantment[-auras],land,planeswalker|opponentbattlefield,opponentgraveyard)
+auto=cantbetargetof(*|opponentbattlefield,opponentgraveyard)
 auto=foreach(creature|myBattlefield) 1/1
 text=Shanna, Sisay's Legacy can't be the target of abilities your opponents control. -- Shanna gets +1/+1 for each creature you control.
 mana={G}{W}
@@ -107239,7 +107214,7 @@ type=Instant
 [/card]
 [card]
 name=Spell Syphon
-auto=*|stack
+target=*|stack
 auto=if cantargetcard(*|opponentstack) then transforms((,newability[pay[[{value:type:*[blue]:opponentbattlefield}]] name(pay {value} mana) donothing?fizzle])) forever else transforms((,newability[pay[[{value:type:*[blue]:mybattlefield}]] name(pay {value} mana) donothing?fizzle])) forever
 text=Counter target spell unless its controller pays {1} for each blue permanent you control.
 mana={1}{U}
@@ -114737,8 +114712,8 @@ toughness=3
 [/card]
 [card]
 name=Tenacious Hunter
-auto=aslongas(creature[counter(-1/-1)]|battlefield) vigilance
-auto=aslongas(creature[counter(-1/-1)]|battlefield) deathtouch
+auto=aslongas(creature[counter{-1/-1}]|battlefield) vigilance
+auto=aslongas(creature[counter{-1/-1}]|battlefield) deathtouch
 text=As long as a creature has a -1/-1 counter on it, Tenacious Hunter has vigilance and deathtouch.
 mana={2}{G}{G}
 type=Creature
@@ -116779,7 +116754,7 @@ auto=@each my firstmain:counter(0/0,1,Lore)
 auto=name(The ring tempts you) ability$!name(The ring tempts you) _RINGTEMPTS_!$ controller
 auto=may name(Creature can't block) target(creature|battlefield) transforms((,newability[aslongas(*[There and Back Again]|battlefield) cantblock])) forever
 auto=@counteradded(0/0,1,Lore) from(this):this(counter{0/0.2.Lore}) name(Search mountain) name(Search mountain) target(mountain|mylibrary) moveto(mybattlefield) and!( shuffle )!
-auto=@counteradded(0/0,1,Lore) from(this):this(counter{0/0.3.Lore}) name(Create smaug) name(Create smaug) token(Smaug)
+auto=@counteradded(0/0,1,Lore) from(this):this(counter{0/0.3.Lore}) name(Create smaug) token(Smaug,Legendary Creature Dragon,6/6,red,flying,haste) and!( transforms((,newability[_DIES_name(Create treasures) _TREASURE_*14])) forever )!
 auto=@counteradded(0/0,1,Lore) from(this):this(counter{0/0.3.Lore}) sacrifice(this)
 text=(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.) -- I - Up to one target creature can't block for as long as you control There and Back Again. The Ring tempts you. -- II - Search your library for a Mountain card, put it onto the battlefield, then shuffle. -- III - Create Smaug, a legendary 6/6 red Dragon creature token with flying, haste, and "When this creature dies, create fourteen Treasure tokens."
 mana={3}{R}{R}
@@ -117405,7 +117380,7 @@ toughness=3
 name=Thrasta, Tempest's Roar
 abilities=trample,haste
 anyzone=affinity(variable{pstormcount}) reduce({3})
-auto=this(cantargetcard(*[fresh])) hexproof
+auto=aslongas(this[fresh]|mybattlefield) hexproof
 text=This spell costs {3} less to cast for each other spell cast this turn. -- Trample, haste -- Trample over planeswalkers (This creature can deal excess combat damage to the controller of the planeswalker it's attacking.) -- Thrasta, Tempest's Roar has hexproof as long as it entered the battlefield this turn.
 mana={10}{G}{G}
 type=Legendary Creature
@@ -119832,7 +119807,7 @@ type=Instant
 name=Tragic Lesson
 auto=draw:2
 auto=choice target(land|mybattlefield) moveto(hand)
-auto=choice D(*|myhand)
+auto=choice reject notaTarget(*|myhand)
 text=Draw two cards. Then discard a card unless you return a land you control to its owner's hand.
 mana={2}{U}
 type=Instant
@@ -121629,7 +121604,6 @@ abilities=devoid
 target=*[-land|opponentBattlefield]
 auto=moveTo(hand)
 autograveyard=@movedto(eldrazi[manacost>=6]|mystack):may moveto(exile) and!(all(*[-land]|opponentBattlefield) moveto(hand))!
-auto=Whenever you castcolorless spell with mana value 7 or greater you may exile Ugin's Binding from your graveyard When you do return each nonland permanent you don't control to its owner's hand
 text=Devoid (This card has no color.) -- Return target nonland permanent you don't control to its owner's hand. -- Whenever you cast a colorless spell with mana value 7 or greater, you may exile Ugin's Binding from your graveyard. When you do, return each nonland permanent you don't control to its owner's hand.
 mana={2}{U}
 type=Instant
@@ -122799,7 +122773,6 @@ toughness=1
 [card]
 name=Unstoppable Plan
 auto=@each my end:untap all(*[-land]|myBattlefield)
-auto=lord(creature|myBattlefield)
 text=At the beginning of your end step, untap all nonland permanents you control.
 mana={2}{U}
 type=Enchantment
@@ -123253,7 +123226,6 @@ type=Artifact
 name=Urza's Workshop
 auto={T}:name(Add single mana) add{C}
 auto=this(variable{type:artifact:mybattlefield}>2) {T}:name(Add mana for each urza's) name(Add mana for each urza's) foreach(land[urza's]|mybattlefield) add{C}
-auto=foreach(|myBattlefield)
 text={T}: Add {C}. -- Metalcraft - {T}: Add {C} for each Urza's land you control. Activate only if you control three or more artifacts.
 type=Land
 subtype=Urza's
@@ -124239,15 +124211,15 @@ type=Artifact
 name=Veil of Summer
 auto=if thisturn(*[blue;black]|opponentstack)~morethan~0 then draw:1 controller
 auto=all(*|mybattlefield) transforms((,newability[@targeted(*|mystack) from(instant|opponentzones):choice name(Spells can't be countered) name(Spells can't be countered) all(instant|opponentzones) fizzle])) ueot
-auto=lord(*|myBattlefield) cantbetargetof(*[blue;black]) ueot
+auto=all(*|myBattlefield) transforms((,newability[cantbetargetof(*[blue;black])])) ueot
 text=Draw a card if an opponent has cast a blue or black spell this turn. Spells you control can't be countered this turn. You and permanents you control gain hexproof from blue and from black until end of turn. (You and they can't be the targets of blue or black spells or abilities your opponents control.)
 mana={G}
 type=Instant
 [/card]
 [card]
 name=Veiled Crocodile
-auto=aslongas(*|myhand) transforms((Crocodile Creature,setpower=4,settoughness=4)) forever all(this) <1
-auto=aslongas(*|opponenthand) transforms((Crocodile Creature,setpower=4,settoughness=4)) forever all(this) <1
+auto=aslongas(*|myhand) all(this) transforms((Crocodile Creature,setpower=4,settoughness=4)) forever <1
+auto=aslongas(*|opponenthand) all(this) transforms((Crocodile Creature,setpower=4,settoughness=4)) forever <1
 text=When a player has no cards in hand, if Veiled Crocodile is an enchantment, Veiled Crocodile becomes a 4/4 Crocodile creature.
 mana={2}{U}
 type=Enchantment
@@ -124746,7 +124718,7 @@ type=Sorcery
 [/card]
 [card]
 name=Verdant Outrider
-auto={1}{G}:cantbeblockedby(power<=2) ueot
+auto={1}{G}:transforms((,newability[cantbeblockedby(creature[power<=2])])) ueot
 text={1}{G}: Verdant Outrider can't be blocked by creatures with power 2 or less this turn.
 mana={2}{G}
 type=Creature
@@ -131377,7 +131349,7 @@ name=Zabaz, the Glimmerwasp
 abilities=modular
 modular=1
 auto=_DIES_may thisforeach(counter{1/1.1}) counter(1/1) target(creature[artifact])
-auto={R}:name(Destroy artifact) target(artifact|myBattlefield)
+auto={R}:name(Destroy artifact) target(artifact|myBattlefield) destroy
 auto={W}:name(Gains flying) flying ueot
 auto=@totalcounteradded(1/1) from(*[modular]|mybattlefield) plus(1):ability$!name(That many plus 1) donothing!$ controller
 text=Modular 1 -- If a modular triggered ability would put one or more +1/+1 counters on a creature you control, that many plus one +1/+1 counters are put on it instead. -- {R}: Destroy target artifact you control. -- {W}: Zabaz, the Glimmerwasp gains flying until end of turn.

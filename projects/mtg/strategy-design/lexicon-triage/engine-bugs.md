@@ -41,6 +41,17 @@ Devastating Summons' script is unfaithful to its Oracle (sacrifice is an
 ADDITIONAL COST, not a resolution effect) — re-script it, which sidesteps the
 synchronous-notatarget gap entirely.
 
+**POST-INTEGRATION PROBE RESULTS (2026-07-19):** Rampaging Ferocidon PASS
+(entering creature pings its controller; `other` self-exclusion works); Zabaz
+PASS (activated destroy per Oracle). Risen Executioner: recast works and the
+`then`-gated branch selection is correct, but the probe exposed BOTH a script
+off-by-one (the graveyard count is SELF-INCLUSIVE — diagonal shifted down by
+one, now per-line Oracle-correct) AND a narrow engine gap: the `Pay({N})`
+surcharge leg inside an `autograveyard ... if ... then Pay({N}) ...` composite
+never collects (doesn't arm an mExtraPayment either — `paycost` reports none
+pending), so the card currently undercharges its surcharge (base {2}{B}{B}
+always exact). Single-card costing nuance, logged for the engine queue.
+
 **DESIGN NOTES (not bugs):** `grant ... grantend` is inherently WHILE-TAPPED —
 a `{0}` non-tapping activation evaporates next Update; use transforms/ueot for
 persistent zero-cost pumps. NEW LEAD (deferred, high blast radius): Altar of the
@@ -61,6 +72,85 @@ completedungeon, affinity-dead-undercount, nolifegainopponent, player-poison
 proliferate) — those turned out to be fixture/synthetic-card defects and are now
 green. Details of each falsification live in the fix reports; the authoring guide
 (docs/testsuite-fixture-authoring.md) encodes the lessons.
+
+## CARD-SCRIPT FIX WAVE — borderline.txt (agent 2, 2026-07-19)
+
+Worked the validator-corpus failures whose offending line lives in
+`Res/sets/primitives/borderline.txt`. My-file failure-row contribution: **119 → 32**
+(global validator failures 150 → 49). Every fix Oracle-verified (Scryfall API) and
+re-run through `WAGIC_VALIDATE=1` to confirm the line now parses and produces an
+ability. 0 U+FFFD introduced (byte-splice edits on ASCII anchors).
+
+**FIXED (27 cards, faithful rewrites):**
+- Spurious payload-less `lord(...)` lines DELETED (Oracle has no anthem): Unstoppable
+  Plan, Rapacious Guest, Arbor Adherent, Case of the Shattered Pact.
+- Stub/duplicate lines DELETED (effect already scripted elsewhere): Dropkick Bomber (2
+  empty `@combatdamaged(...):` lines — the sacrifice rides the `{R}` transforms grant),
+  Urza's Workshop (`foreach(|myBattlefield)` stub), Galvanic Discharge (raw-prose line;
+  `_HARNESSED_LIGHTNING_`/`alterenergy` lines carry it), Ugin's Binding (raw-prose line;
+  `autograveyard` recast line carries it).
+- Syntax corrections: `cantbeblockedby(power<=2)`→`cantbeblockedby(creature[power<=2])`
+  AND further needed a `transforms((,newability[...])) ueot` wrapper for the ueot grant
+  (Rhonas's Stalwart, Verdant Outrider); `life-2`→`life:-2` (Fell Specter); added `destroy`
+  verb (Zabaz); `counter(-1/-1)` selector→`counter{-1/-1}` (Tenacious Hunter);
+  `life:thisforeach(Gate)*2`→`foreach(Gate|mybattlefield) life:2` (Archway Angel);
+  missing `:`/`then` in trigger conditionals — `@each my upkeep:if...` (Priest of the
+  Wakening Sun), `@movedto(other creature|...):damage:1` (Rampaging Ferocidon, +`other`
+  for "another creature"), nested-if `then` (Gideon's Defeat, checks opponentexile since
+  the gideon is exiled), Risen Executioner (all 21 graveyard-recast lines: added `then`
+  after `~equalto~N`); reordered `destroy all(enchantment)`→`all(enchantment|battlefield)
+  destroy` (Cleansing Meditation, `<7` threshold); `@totalcounteradded`→`@counteradded`
+  + `turnlimited` before the colon (Generous Pup); dropped duplicated `name()` token
+  (Landroval); grant-keyword-ueot needs transforms wrapper — `lifelink`/`cantbetargetof`
+  (Psemilla, Veil of Summer); static `cantbetargetof(<typelist>|zones)` → single-selector
+  `cantbetargetof(*|opponentbattlefield,opponentgraveyard)` (Shanna); conditional static
+  via aslongas absence-threshold `aslongas(creature|opponentBattlefield) indestructible <1`
+  (Erebos's Titan); `this(cantargetcard(*[fresh])) hexproof`→`aslongas(this[fresh]|
+  mybattlefield) hexproof` (Thrasta); reordered `all(this)` before verb in flip
+  (Molten Birth) and in aslongas+transforms (Veiled Crocodile); `choice D(*|myhand)`→
+  `choice reject notaTarget(*|myhand)` (Tragic Lesson); stray `auto=*|stack`→`target=*|stack`
+  (Spell Syphon); `1/0 foreach(*|hand)`→`foreach(*|myhand) 1/0` (Ral's Staticaster);
+  bare `target(opponent)`→`target(opponent) donothing` (Beckoning Will-o'-Wisp);
+  `protection from artifact`→`protection from(artifact)` paren form (Rayami).
+- **Named-token references fail for multi-word-type / legendary / spaced-name tokens**
+  (`token(Smaug)`, `token(Ballistic Boulder)` fail; single-word-type `token(Gold)`,
+  `token(Spawnwrithe)` work). Fix: INLINE token defs — Mordor Trebuchet
+  `token(Ballistic Boulder,Artifact Creature Construct,2/1,flying)` (its sacrifice/attacking
+  rides the existing `and!(transforms(...))`); There and Back Again
+  `token(Smaug,Legendary Creature Dragon,6/6,red,flying,haste) and!( transforms((,newability[
+  _DIES_name(Create treasures) _TREASURE_*14])) forever )!` (dies→14-Treasures preserved via
+  the and!/transforms chain). This named-token limitation is itself a latent engine/validator
+  gap worth a loud parse-time diagnostic.
+
+**ENGINE-GAP (left as-is + logged; no faithful card-script form exists):**
+- **`thisforeach(aura)` as a lord multiplier** — Heavenly Blademaster (+1/+1 per attached
+  aura/equipment). `thisforeach(gear) lord(...)` PARSES (equipment-attach is tracked), but
+  `thisforeach(aura) lord(...)` does not — no aura-attached-count keyword. The gear leg
+  works; the aura leg is the residual. (2 lines × printings.)
+- **`protection from colorless` grant** — Giver of Runes. Color legs (`protection from white`
+  …) work; `colorless` isn't a color in that path and the `protection from(colorless)` paren
+  form also fails to parse, despite the engine handling `"colorless"` in AAuraIncreaseReduce
+  (MTGAbility.cpp:4755). Needs an engine grant path for colorless protection.
+- **`myriad` + `iscommander`** — Ironwill Forger (Lieutenant grants myriad ueot). Both keywords
+  have ZERO engine implementation (grep: 0 uses); payload also lacks a verb.
+- **Discard-as-alternative-cost lord** — Dream Halls (`{D(*|myhand)}: castcard(restricted)
+  lord(*[share!color!][-land]|myhand) ...`). `castcard(restricted)` is supported (Miracle) but
+  the whole cost-substitution-for-all-color-sharing-spells construct does not parse. (2 lines
+  × 2 zones.)
+
+**OUT OF TERRITORY / SKIP (not a borderline.txt data-line fix):**
+- `_HEROIC_` macro (Hero of the Games/Nyxborn/Pride/Winds — `@targeted...|mycastingzone`,
+  parser-agent) and `_IMPULSE_DRAW_` macro (Meria) live in `_macros.txt`, not borderline.txt.
+- Unimplemented keywords logged, not invented: `_IMPULSEDRAW_` (Diversion Specialist),
+  `mobilize` (Infantry Shield), `pdrewcount` (Spinehorn Minotaur), `giftcard`/gift (Kitnap).
+- `aslongas(type(*|zone)~cmp~N)` comparison form (River Serpent) — parser-agent grammar item.
+
+**NEEDS USER MAGIC-JUDGMENT:**
+- Gideon's Defeat: rewrote the "if it was a Gideon" check to `type(gideon|opponentexile)` since
+  the target is exiled first — could false-positive if the opponent already had a Gideon in
+  exile. Faithful-enough; flag if precise "the exiled card was a Gideon" is wanted.
+- Rampaging Ferocidon: split into my/opponent-battlefield ETB lines dealing to `controller`/
+  `opponent` respectively to model "that creature's controller"; added `other` to exclude self.
 
 ## The validator (shipped 2026-07-18)
 

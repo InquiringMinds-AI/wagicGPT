@@ -1,29 +1,42 @@
-# Conditional macro witnesses are activated with their required board state.
+# Conditional and marker macros, each observed by its DIRECT result -- no
+# `&& life:1` observability rider (the if/then/else parser folds a trailing
+# `&& rider` into the else branch, corrupting the macro). The monarch and
+# initiative legs were split out (see macro_monarch_markers.txt and the parked
+# macro_initiative_markers.txt); this fixture keeps the conditional-payload and
+# non-monarch marker legs that observe cleanly.
+#
+#  * Metalcraft  -> `if 3+ artifacts then life:1`  : 6 Ornithopters + 5 artifact
+#                   witnesses satisfy it; observed as +1 life.
+#  * Threshold   -> `if 7+ in graveyard then life:1` : 7 graveyard cards; +1 life.
+#  * Addendum    -> `if cast at sorcery speed then life:1` : the instant is cast
+#                   in the main phase; +1 life, and it ends in the graveyard.
+#  * Ascend      -> with 10+ permanents, creates a City's Blessing marker.
+#  * City's Blessing -> `aslongas(City's Blessing) life:1` : reads the marker
+#                   Ascend just made; +1 life. (Ascend then City's Blessing chain.)
+#  * Ring tempts -> creates The Ring marker and makes the clicked Ornithopter the
+#                   ring-bearer.
+# Total life 20 -> 24 (metalcraft, threshold, addendum, city's blessing).
 [INIT]
 FIRSTMAIN
 [PLAYER1]
-hand:Lexicon Addendum Macro Witness
-inplay:Lexicon Threshold Macro Witness,Lexicon Metalcraft Macro Witness,Lexicon Ascend Macro Witness,Lexicon City Blessing Macro Witness,Lexicon Monarch Controller Macro Witness,Lexicon Monarch Opponent Macro Witness,Lexicon Initiative Controller Macro Witness,Lexicon Initiative Opponent Macro Witness,Lexicon Ring Tempts Macro Witness,Ornithopter,Ornithopter,Ornithopter,Forest,Island,Mountain,Plains,Swamp,Desert,Forest
+inplay:Ornithopter,Ornithopter,Ornithopter,Ornithopter,Ornithopter,Ornithopter,Lexicon Metalcraft Macro Witness,Lexicon Threshold Macro Witness,Lexicon Ascend Macro Witness,Lexicon City Blessing Macro Witness,Lexicon Ring Tempts Macro Witness
 graveyard:Forest,Island,Mountain,Plains,Swamp,Desert,Forest
+hand:Lexicon Addendum Macro Witness
 life:20
 [PLAYER2]
 [DO]
-Lexicon Addendum Macro Witness
-Lexicon Threshold Macro Witness
 Lexicon Metalcraft Macro Witness
+Lexicon Threshold Macro Witness
+Lexicon Addendum Macro Witness
 Lexicon Ascend Macro Witness
 Lexicon City Blessing Macro Witness
-Lexicon Monarch Controller Macro Witness
-Lexicon Monarch Opponent Macro Witness
-Lexicon Initiative Controller Macro Witness
-Lexicon Initiative Opponent Macro Witness
 Lexicon Ring Tempts Macro Witness
+Ornithopter
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Lexicon Threshold Macro Witness,Lexicon Metalcraft Macro Witness,Lexicon Ascend Macro Witness,Lexicon City Blessing Macro Witness,Lexicon Monarch Controller Macro Witness,Lexicon Monarch Opponent Macro Witness,Lexicon Initiative Controller Macro Witness,Lexicon Initiative Opponent Macro Witness,Lexicon Ring Tempts Macro Witness,Ornithopter,Ornithopter,Ornithopter,Forest,Island,Mountain,Plains,Swamp,Desert,Forest,*,*
+inplay:Ornithopter,Ornithopter,Ornithopter,Ornithopter,Ornithopter,Ornithopter,Lexicon Metalcraft Macro Witness,Lexicon Threshold Macro Witness,Lexicon Ascend Macro Witness,Lexicon City Blessing Macro Witness,Lexicon Ring Tempts Macro Witness,City's Blessing,The Ring
 graveyard:Forest,Island,Mountain,Plains,Swamp,Desert,Forest,Lexicon Addendum Macro Witness
-life:30
+life:24
 [PLAYER2]
-inplay:*,*
 [END]

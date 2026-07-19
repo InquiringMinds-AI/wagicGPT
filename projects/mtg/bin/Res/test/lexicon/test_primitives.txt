@@ -4614,120 +4614,165 @@ id=2100000387
 name=Lexicon Zombie Amass 1 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSZOMBIE1_ && life:1 controller
+type=Creature
+subtype=Zombie
+power=1
+toughness=1
+auto=_AMASSZOMBIE1_
 [/card]
 [card]
 id=2100000388
 name=Lexicon Zombie Amass 2 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSZOMBIE2_ && life:1 controller
+type=Creature
+subtype=Zombie
+power=1
+toughness=1
+auto=_AMASSZOMBIE2_
 [/card]
 [card]
 id=2100000389
 name=Lexicon Zombie Amass 3 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSZOMBIE3_ && life:1 controller
+type=Creature
+subtype=Zombie
+power=1
+toughness=1
+auto=_AMASSZOMBIE3_
 [/card]
 [card]
 id=2100000390
 name=Lexicon Zombie Amass 4 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSZOMBIE4_ && life:1 controller
+type=Creature
+subtype=Zombie
+power=1
+toughness=1
+auto=_AMASSZOMBIE4_
 [/card]
 [card]
 id=2100000391
 name=Lexicon Zombie Amass 5 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSZOMBIE5_ && life:1 controller
+type=Creature
+subtype=Zombie
+power=1
+toughness=1
+auto=_AMASSZOMBIE5_
 [/card]
 [card]
 id=2100000392
 name=Lexicon Orc Amass 1 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSORC1_ && life:1 controller
+type=Creature
+subtype=Orc
+power=1
+toughness=1
+auto=_AMASSORC1_
 [/card]
 [card]
 id=2100000393
 name=Lexicon Orc Amass 2 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSORC2_ && life:1 controller
+type=Creature
+subtype=Orc
+power=1
+toughness=1
+auto=_AMASSORC2_
 [/card]
 [card]
 id=2100000394
 name=Lexicon Orc Amass 3 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSORC3_ && life:1 controller
+type=Creature
+subtype=Orc
+power=1
+toughness=1
+auto=_AMASSORC3_
 [/card]
 [card]
 id=2100000395
 name=Lexicon Orc Amass 4 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSORC4_ && life:1 controller
+type=Creature
+subtype=Orc
+power=1
+toughness=1
+auto=_AMASSORC4_
 [/card]
 [card]
 id=2100000396
 name=Lexicon Orc Amass 5 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSORC5_ && life:1 controller
+type=Creature
+subtype=Orc
+power=1
+toughness=1
+auto=_AMASSORC5_
 [/card]
 [card]
 id=2100000397
 name=Lexicon Sliver Amass 1 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSSLIVER1_ && life:1 controller
+type=Creature
+subtype=Sliver
+power=1
+toughness=1
+auto=_AMASSSLIVER1_
 [/card]
 [card]
 id=2100000398
 name=Lexicon Sliver Amass 2 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSSLIVER2_ && life:1 controller
+type=Creature
+subtype=Sliver
+power=1
+toughness=1
+auto=_AMASSSLIVER2_
 [/card]
 [card]
 id=2100000399
 name=Lexicon Sliver Amass 3 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSSLIVER3_ && life:1 controller
+type=Creature
+subtype=Sliver
+power=1
+toughness=1
+auto=_AMASSSLIVER3_
 [/card]
 [card]
 id=2100000400
 name=Lexicon Sliver Amass 4 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSSLIVER4_ && life:1 controller
+type=Creature
+subtype=Sliver
+power=1
+toughness=1
+auto=_AMASSSLIVER4_
 [/card]
 [card]
 id=2100000401
 name=Lexicon Sliver Amass 5 Macro Witness
 rarity=C
 mana={0}
-type=Artifact
-auto={0}:_AMASSSLIVER5_ && life:1 controller
+type=Creature
+subtype=Sliver
+power=1
+toughness=1
+auto=_AMASSSLIVER5_
 [/card]
 [card]
 id=2100000402
@@ -4777,7 +4822,7 @@ name=Lexicon Ascend Macro Witness
 rarity=C
 mana={0}
 type=Artifact
-auto={0}:_ASCEND_ && life:1 controller
+auto={0}:_ASCEND_
 [/card]
 [card]
 id=2100000408
@@ -4785,7 +4830,7 @@ name=Lexicon Monarch Controller Macro Witness
 rarity=C
 mana={0}
 type=Artifact
-auto={0}:_MONARCH_CONTROLLER_ && life:1 controller
+auto={0}:_MONARCH_CONTROLLER_
 [/card]
 [card]
 id=2100000409
@@ -4793,7 +4838,7 @@ name=Lexicon Monarch Opponent Macro Witness
 rarity=C
 mana={0}
 type=Artifact
-auto={0}:_MONARCH_OPPONENT_ && life:1 controller
+auto={0}:_MONARCH_OPPONENT_
 [/card]
 [card]
 id=2100000410
@@ -4801,7 +4846,7 @@ name=Lexicon Initiative Controller Macro Witness
 rarity=C
 mana={0}
 type=Artifact
-auto={0}:_INITIATIVE_CONTROLLER_ && life:1 controller
+auto={0}:_INITIATIVE_CONTROLLER_
 [/card]
 [card]
 id=2100000411
@@ -4809,7 +4854,7 @@ name=Lexicon Initiative Opponent Macro Witness
 rarity=C
 mana={0}
 type=Artifact
-auto={0}:_INITIATIVE_OPPONENT_ && life:1 controller
+auto={0}:_INITIATIVE_OPPONENT_
 [/card]
 [card]
 id=2100000412
@@ -4817,7 +4862,7 @@ name=Lexicon Ring Tempts Macro Witness
 rarity=C
 mana={0}
 type=Artifact
-auto={0}:_RINGTEMPTS_ && life:1 controller
+auto={0}:_RINGTEMPTS_
 [/card]
 [card]
 id=2100000413
@@ -6187,4 +6232,43 @@ mana={0}
 type=Artifact
 auto=alterdevoffset:1 controller
 text=Test-only witness that raises devotion via alterdevoffset.
+[/card]
+[card]
+id=2100000998
+name=Lexicon Sacrifice Land
+rarity=C
+type=Land
+[/card]
+[card]
+id=2100000997
+name=Lexicon Sacrifice Land Two
+rarity=C
+type=Land
+[/card]
+[card]
+id=2100000976
+name=Lexicon Global Cantattack Witness
+rarity=C
+mana={2}
+type=Enchantment
+auto={0}:cantattack all(creature|mybattlefield) ueot
+text=Test-only: {0}: creatures you control cannot attack this turn (effect-before-all restriction payload, as on kicked Orim's Chant).
+[/card]
+[card]
+id=2100000977
+name=Lexicon Global Pump Witness
+rarity=C
+mana={2}
+type=Enchantment
+auto={0}:1/0 all(creature|mybattlefield) ueot oneshot
+text=Test-only: {0}: creatures you control get +1/+0 until end of turn (effect-before-all pump payload, as on the Hero-of heroic family).
+[/card]
+[card]
+id=2100000978
+name=Lexicon Clone All Artifacts Witness
+rarity=C
+mana={2}
+type=Enchantment
+auto={0}:all(artifact|mybattlefield) clone with(unearth) oneshot
+text=Test-only: {0}: for each artifact you control, create a token copy with unearth (Saheeli, the Gifted -7 clone-all mechanism).
 [/card]
