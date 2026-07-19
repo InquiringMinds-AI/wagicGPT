@@ -81,6 +81,14 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
                 return NEW PlayerTargetChooser(observer, card, 1, pTarget);
     };
 
+    if (s.find("opponent,planeswalker") == 0 || s.find("planeswalker,opponent") == 0)
+    {
+        //"target opponent or planeswalker": damageable chooser with the player half locked to the opponent
+        DamageableTargetChooser * dtc = NEW DamageableTargetChooser(observer, card, 1, other, false, "planeswalker");
+        dtc->opponentOnly = true;
+        return dtc;
+    };
+
     found = s.find("opponent");
     if (found == 0)
     {
@@ -2110,6 +2118,8 @@ bool DamageableTargetChooser::canTarget(Targetable * target, bool withoutProtect
 {
     if (Player * p = dynamic_cast<Player*>(target))
     {
+        if (opponentOnly && source && p == source->controller())
+            return false;
         if (source && (source->controller() != source->controller()->opponent()) && (source->controller()->opponent()->game->inPlay->hasAbility(Constants::CONTROLLERSHROUD)) && source->controller() != p)
             return false;
         if (source && source->controller()->opponent()->game->inPlay->hasAbility(Constants::PLAYERSHROUD) && source->controller()->opponent() == p)
@@ -2147,7 +2157,9 @@ bool DamageableTargetChooser::equals(TargetChooser * tc)
     DamageableTargetChooser  * dtc = dynamic_cast<DamageableTargetChooser  *> (tc);
     if (!dtc)
         return false;
-    
+    if (opponentOnly != dtc->opponentOnly)
+        return false;
+
     return TypeTargetChooser::equals(tc);
 }
 

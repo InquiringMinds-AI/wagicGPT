@@ -154,13 +154,14 @@ class DamageableTargetChooser: public TypeTargetChooser
 {
 public:
     bool withoutProtections;
+    bool opponentOnly; //player half restricted to the source controller's opponent ("target opponent or planeswalker")
     DamageableTargetChooser(GameObserver *observer, int * _zones, int _nbzones, MTGCardInstance * card = NULL, int _maxtargets = 1, bool other = false, bool targetMin = false, string type = "creature") :
-        TypeTargetChooser(observer, type.c_str(),_zones, _nbzones, card, _maxtargets, other, targetMin)
+        TypeTargetChooser(observer, type.c_str(),_zones, _nbzones, card, _maxtargets, other, targetMin), opponentOnly(false)
     {
     }
     ;
     DamageableTargetChooser(GameObserver *observer, MTGCardInstance * card = NULL, int _maxtargets = 1, bool other = false, bool targetMin = false, string type = "creature") :
-        TypeTargetChooser(observer, type.c_str(), card, _maxtargets, other, targetMin)
+        TypeTargetChooser(observer, type.c_str(), card, _maxtargets, other, targetMin), opponentOnly(false)
     {
     }
     ;

@@ -1,0 +1,95 @@
+Aether Charge	mtg.txt	target(opponent) -> target(opponent,planeswalker)
+Aethertorch Renegade	mtg.txt	target(player) -> target(player,planeswalker)
+Axelrod Gunnarson	mtg.txt	target(player) -> target(player,planeswalker)
+Blightning	mtg.txt	target=player -> target=player,planeswalker
+Boggart Shenanigans	mtg.txt	target(player) -> target(player,planeswalker)
+Brion Stoutarm	mtg.txt	target(player) -> target(player,planeswalker)
+Chandra's Fury	mtg.txt	target=player -> target=player,planeswalker
+Cinder Hellion	mtg.txt	target(opponent) -> target(opponent,planeswalker)
+Cinder Pyromancer	mtg.txt	target(player) -> target(player,planeswalker)
+Consulate Turret	mtg.txt	target(player) -> target(player,planeswalker)
+Consuming Sinkhole	mtg.txt	target(player) -> target(player,planeswalker)
+Cosi's Ravager	mtg.txt	target(player) -> target(player,planeswalker)
+Deathforge Shaman	mtg.txt	target(player) -> target(player,planeswalker)
+Emberwilde Augur	mtg.txt	target(player) -> target(player,planeswalker)
+Exploding Borders	mtg.txt	target=player -> target=player,planeswalker
+Exuberant Firestoker	mtg.txt	target(player) -> target(player,planeswalker)
+Feedback Bolt	mtg.txt	target=player -> target=player,planeswalker
+Final Strike	mtg.txt	target=opponent -> target=opponent,planeswalker
+Flame Jet	mtg.txt	target=player -> target=player,planeswalker
+Flame Wave	mtg.txt	target=player -> target=player,planeswalker
+Flamewave Invoker	mtg.txt	target(player) -> target(player,planeswalker)
+Font of Ire	mtg.txt	target(player) -> target(player,planeswalker)
+Furious Assault	mtg.txt	target(player) -> target(player,planeswalker)
+Giant's Ire	mtg.txt	target=player -> target=player,planeswalker
+Goblin Bomb	mtg.txt	target(player) -> target(player,planeswalker)
+Goblin Fireslinger	mtg.txt	target(player) -> target(player,planeswalker)
+Goblin Razerunners	mtg.txt	target(player) -> target(player,planeswalker)
+Goblin War Strike	mtg.txt	target=player -> target=player,planeswalker
+Goretusk Firebeast	mtg.txt	target(player) -> target(player,planeswalker)
+Gruul Guildmage	mtg.txt	target(player) -> target(player,planeswalker)
+Heartwood Giant	mtg.txt	target(player) -> target(player,planeswalker)
+Hellhole Flailer	mtg.txt	target(player) -> target(player,planeswalker)
+Implement of Combustion	mtg.txt	target(player) -> target(player,planeswalker)
+Jeskai Charm	mtg.txt	target(opponent) -> target(opponent,planeswalker)
+Keldon Champion	mtg.txt	target(player) -> target(player,planeswalker)
+Kessig Malcontents	mtg.txt	target(player) -> target(player,planeswalker)
+Kyren Negotiations	mtg.txt	target(player) -> target(player,planeswalker)
+Kyren Sniper	mtg.txt	target(player) -> target(player,planeswalker)
+Lava Axe	mtg.txt	target=player -> target=player,planeswalker
+Lava Spike	mtg.txt	target=player -> target=player,planeswalker
+Lavalanche	mtg.txt	target(player) -> target(player,planeswalker)
+Leyline of Lightning	mtg.txt	target(player) -> target(player,planeswalker)
+Lunge	mtg.txt	target(player) -> target(player,planeswalker)
+Mob Justice	mtg.txt	target=player -> target=player,planeswalker
+Mogg Bombers	mtg.txt	target(player) -> target(player,planeswalker)
+Noble Vestige	mtg.txt	target(player) -> target(player,planeswalker)
+Obelisk of Alara	mtg.txt	target(player) -> target(player,planeswalker)
+Pulse of the Forge	mtg.txt	target=player -> target=player,planeswalker
+Rage Forger	mtg.txt	target(player) -> target(player,planeswalker)
+Rage Thrower	mtg.txt	target(player) -> target(player,planeswalker)
+Rakdos's Return	mtg.txt	target(opponent) -> target(opponent,planeswalker)
+Razortip Whip	mtg.txt	target(opponent) -> target(opponent,planeswalker)
+Rite of Consumption	mtg.txt	target=player -> target=player,planeswalker
+Scalding Devil	mtg.txt	target(player) -> target(player,planeswalker)
+Scepter of Empires	mtg.txt	target(player) -> target(player,planeswalker)
+Scorched Rusalka	mtg.txt	target(player) -> target(player,planeswalker)
+Scorching Missile	mtg.txt	target=player -> target=player,planeswalker
+Scrapyard Salvo	mtg.txt	target=player -> target=player,planeswalker
+Scuttling Doom Engine	mtg.txt	target(opponent) -> target(opponent,planeswalker)
+Shower of Sparks	mtg.txt	target(player) -> target(player,planeswalker)
+Sorin's Vengeance	mtg.txt	target=player -> target=player,planeswalker
+Stalking Vengeance	mtg.txt	target(player) -> target(player,planeswalker)
+Stensia Bloodhall	mtg.txt	target(player) -> target(player,planeswalker)
+Stensia Banquet	mtg.txt	target=opponent -> target=opponent,planeswalker
+Taste of Blood	mtg.txt	target=player -> target=player,planeswalker
+Telim'Tor's Darts	mtg.txt	target(player) -> target(player,planeswalker)
+Touch of Death	mtg.txt	target=player -> target=player,planeswalker
+Vent Sentinel	mtg.txt	target(player) -> target(player,planeswalker)
+Volcanic Rambler	mtg.txt	target(player) -> target(player,planeswalker)
+Vulshok Replica	mtg.txt	target(player) -> target(player,planeswalker)
+Wandering Mage	mtg.txt	target(player) -> target(player,planeswalker)
+Witch Hunter	mtg.txt	target(player) -> target(player,planeswalker)
+Zada's Commando	mtg.txt	target(opponent) -> target(opponent,planeswalker)
+Bonfire of the Damned	borderline.txt	target=player -> target=player,planeswalker
+Chandra, Fire of Kaladesh	borderline.txt	target(player) -> target(player,planeswalker)
+Clan Defiance	borderline.txt	target=player -> target=player,planeswalker
+Haunting Misery	borderline.txt	target=player -> target=player,planeswalker
+Noggle Hedge-Mage	borderline.txt	target(player) -> target(player,planeswalker)
+Searing Blaze	borderline.txt	target=player -> target=player,planeswalker
+Skullcrack	borderline.txt	target=player -> target=player,planeswalker
+Sunscorched Desert	borderline.txt	target(player) -> target(player,planeswalker)
+Unstable Footing	borderline.txt	target(player) -> target(player,planeswalker)
+Wall of Forgotten Pharaohs	borderline.txt	target(player) -> target(player,planeswalker)
+Zealot of the God-Pharaoh	borderline.txt	target(opponent) -> target(opponent,planeswalker)
+Chandra Nalaar	planeswalkers.txt	target(player) -> target(player,planeswalker)
+# REVERTED after probe verification (see engine-bugs.md Oracle-drift-sweep section):
+Sparkcaster	mtg.txt	REVERTED (dual-interactive-ETB fizzle)
+Manticore of the Gauntlet	borderline.txt	REVERTED (dual-interactive-ETB fizzle)
+Ravager of the Fells	mtg.txt	REVERTED (dual-interactive shape)
+Scalding Tongs	mtg.txt	REVERTED (trigger-payload chooser fizzle)
+Thumbscrews	mtg.txt	REVERTED (trigger-payload chooser fizzle)
+Mogg Maniac	mtg.txt	REVERTED (trigger-payload chooser fizzle)
+Wall of Souls	mtg.txt	REVERTED (trigger-payload chooser fizzle)
+# KEPT from manual batch: Kiss of Death, Searing Flesh, Stolen Grain, Vampiric Touch (spell target=),
+# Keldon Marauders (ETB targeted), Relic Bind (choice widened). Plus the 85 AUTO widenings above.

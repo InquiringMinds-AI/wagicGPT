@@ -1,0 +1,20 @@
+# Wave-1: Searing Flesh (was non-targeted 'opponent') now targets opponent or planeswalker.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Searing Flesh
+manapool:{6}{R}
+[PLAYER2]
+inplay:Jace Beleren
+[DO]
+Searing Flesh
+Jace Beleren
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Searing Flesh
+manapool:{0}
+[PLAYER2]
+graveyard:Jace Beleren
+life:20
+[END]

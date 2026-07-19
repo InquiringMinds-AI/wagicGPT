@@ -1,0 +1,19 @@
+# Wave-1 planeswalker-damage errata: Blightning can target and kill a 3-loyalty planeswalker.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Blightning
+manapool:{1}{B}{R}
+[PLAYER2]
+inplay:Jace Beleren
+[DO]
+Blightning
+Jace Beleren
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Blightning
+manapool:{0}
+[PLAYER2]
+graveyard:Jace Beleren
+[END]

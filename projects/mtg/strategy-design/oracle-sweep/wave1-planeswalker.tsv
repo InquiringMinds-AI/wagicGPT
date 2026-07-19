@@ -1,0 +1,118 @@
+Aether Charge	OPP_OR_PW	Whenever a Beast you control enters, you may have it deal 4 damage to target opponent or planeswalker.
+Aethertorch Renegade	PLAYER_OR_PW	When this creature enters, you get {E}{E}{E}{E} (four energy counters). -- {T}, Pay {E}{E}: This creature deals 1 damage to target creature. -- {T}, Pay eight {E}: This creature deals 6 damage to target player or planeswalker.
+Axelrod Gunnarson	PLAYER_OR_PW	Trample -- Whenever a creature dealt damage by Axelrod Gunnarson this turn dies, you gain 1 life and Axelrod Gunnarson deals 1 damage to target player or planeswalker.
+Blightning	PLAYER_OR_PW	Blightning deals 3 damage to target player or planeswalker. That player or that planeswalker's controller discards two cards.
+Boggart Shenanigans	PLAYER_OR_PW	Whenever another Goblin you control is put into a graveyard from the battlefield, you may have this enchantment deal 1 damage to target player or planeswalker.
+Brion Stoutarm	PLAYER_OR_PW	Lifelink -- {R}, {T}, Sacrifice another creature: Brion Stoutarm deals damage equal to the sacrificed creature's power to target player or planeswalker.
+Chandra's Fury	PLAYER_OR_PW	Chandra's Fury deals 4 damage to target player or planeswalker and 1 damage to each creature that player or that planeswalker's controller controls.
+Cinder Hellion	OPP_OR_PW	Trample -- When this creature enters, it deals 2 damage to target opponent or planeswalker.
+Cinder Pyromancer	PLAYER_OR_PW	{T}: This creature deals 1 damage to target player or planeswalker. -- Whenever you cast a red spell, you may untap this creature.
+Consulate Turret	PLAYER_OR_PW	{T}: You get {E} (an energy counter). -- {T}, Pay {E}{E}{E}: This artifact deals 2 damage to target player or planeswalker.
+Consuming Sinkhole	PLAYER_OR_PW	Devoid (This card has no color.) -- Choose one — -- • Exile target land creature. -- • Consuming Sinkhole deals 4 damage to target player or planeswalker.
+Cosi's Ravager	PLAYER_OR_PW	Landfall — Whenever a land you control enters, you may have this creature deal 1 damage to target player or planeswalker.
+Curse of the Pierced Heart	NO_PATTERN	Enchant player -- At the beginning of enchanted player's upkeep, this Aura deals 1 damage to that player or a planeswalker that player controls.
+Deathforge Shaman	PLAYER_OR_PW	Multikicker {R} (You may pay an additional {R} any number of times as you cast this spell.) -- When this creature enters, it deals damage to target player or planeswalker equal to twice the number of times it was kicked.
+Emberwilde Augur	PLAYER_OR_PW	Sacrifice this creature: It deals 3 damage to target player or planeswalker. Activate only during your upkeep.
+Eternal Flame	OPP_OR_PW	Eternal Flame deals X damage to target opponent or planeswalker and half X damage, rounded up, to you, where X is the number of Mountains you control.
+Exploding Borders	PLAYER_OR_PW	Domain — Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle. Exploding Borders deals X damage to target player or planeswalker, where X is the number of basic land types among lands you control.
+Exuberant Firestoker	PLAYER_OR_PW	At the beginning of your end step, if you control a creature with power 5 or greater, you may have this creature deal 2 damage to target player or planeswalker. -- {T}: Add {C}.
+Feedback Bolt	PLAYER_OR_PW	Feedback Bolt deals damage to target player or planeswalker equal to the number of artifacts you control.
+Final Strike	OPP_OR_PW	As an additional cost to cast this spell, sacrifice a creature. -- Final Strike deals damage to target opponent or planeswalker equal to the sacrificed creature's power.
+Flame Jet	PLAYER_OR_PW	Flame Jet deals 3 damage to target player or planeswalker. -- Cycling {2} ({2}, Discard this card: Draw a card.)
+Flame Wave	PLAYER_OR_PW	Flame Wave deals 4 damage to target player or planeswalker and each creature that player or that planeswalker's controller controls.
+Flamewave Invoker	PLAYER_OR_PW	{7}{R}: This creature deals 5 damage to target player or planeswalker.
+Font of Ire	PLAYER_OR_PW	{3}{R}, Sacrifice this enchantment: It deals 5 damage to target player or planeswalker.
+Furious Assault	PLAYER_OR_PW	Whenever you cast a creature spell, this enchantment deals 1 damage to target player or planeswalker.
+Giant's Ire	PLAYER_OR_PW	Giant's Ire deals 4 damage to target player or planeswalker. If you control a Giant, draw a card.
+Goblin Bomb	PLAYER_OR_PW	At the beginning of your upkeep, you may flip a coin. If you win the flip, put a fuse counter on this enchantment. If you lose the flip, remove a fuse counter from this enchantment. -- Remove five fuse counters from this enchantment and sacrifice it: It deals 20 damage to target player or planeswalker.
+Goblin Fireslinger	PLAYER_OR_PW	{T}: This creature deals 1 damage to target player or planeswalker.
+Goblin Lyre	OPP_OR_PW	Sacrifice this artifact: Flip a coin. If you win the flip, this artifact deals damage to target opponent or planeswalker equal to the number of creatures you control. If you lose the flip, this artifact deals damage to you equal to the number of creatures that opponent or that planeswalker's controller controls.
+Goblin Razerunners	PLAYER_OR_PW	{1}{R}, Sacrifice a land: Put a +1/+1 counter on this creature. -- At the beginning of your end step, you may have this creature deal damage equal to the number of +1/+1 counters on it to target player or planeswalker.
+Goblin War Strike	PLAYER_OR_PW	Goblin War Strike deals damage to target player or planeswalker equal to the number of Goblins you control.
+Goretusk Firebeast	PLAYER_OR_PW	When this creature enters, it deals 4 damage to target player or planeswalker.
+Gruul Guildmage	PLAYER_OR_PW	({R/G} can be paid with either {R} or {G}.) -- {3}{R}, Sacrifice a land: This creature deals 2 damage to target player or planeswalker. -- {3}{G}: Target creature gets +2/+2 until end of turn.
+Heart of Bogardan	PLAYER_OR_PW	Cumulative upkeep {2} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.) -- When a player doesn't pay this enchantment's cumulative upkeep, this enchantment deals X damage to target player or planeswalker and each creature that player or that planeswalker's controller controls, where X is twice the numb
+Heartwood Giant	PLAYER_OR_PW	{T}, Sacrifice a Forest: This creature deals 2 damage to target player or planeswalker.
+Hellrider	PLAYER_OR_PW	Haste -- Whenever a creature you control attacks, this creature deals 1 damage to the player or planeswalker it's attacking.
+Hellhole Flailer	PLAYER_OR_PW	Unleash (You may have this creature enter with a +1/+1 counter on it. It can't block as long as it has a +1/+1 counter on it.) -- {2}{B}{R}, Sacrifice this creature: It deals damage equal to its power to target player or planeswalker.
+Implement of Combustion	PLAYER_OR_PW	{R}, Sacrifice this artifact: It deals 1 damage to target player or planeswalker. -- When this artifact is put into a graveyard from the battlefield, draw a card.
+Jeskai Charm	OPP_OR_PW	Choose one — -- • Put target creature on top of its owner's library. -- • Jeskai Charm deals 4 damage to target opponent or planeswalker. -- • Creatures you control get +1/+1 and gain lifelink until end of turn.
+Keldon Champion	PLAYER_OR_PW	Haste -- Echo {2}{R}{R} (At the beginning of your upkeep, if this came under your control since the beginning of your last upkeep, sacrifice it unless you pay its echo cost.) -- When this creature enters, it deals 3 damage to target player or planeswalker.
+Keldon Marauders	PLAYER_OR_PW	Vanishing 2 (This creature enters with two time counters on it. At the beginning of your upkeep, remove a time counter from it. When the last is removed, sacrifice it.) -- When this creature enters or leaves the battlefield, it deals 1 damage to target player or planeswalker.
+Kessig Malcontents	PLAYER_OR_PW	When this creature enters, it deals damage to target player or planeswalker equal to the number of Humans you control.
+Kiss of Death	OPP_OR_PW	Kiss of Death deals 4 damage to target opponent or planeswalker. You gain 4 life.
+Kyren Negotiations	PLAYER_OR_PW	Tap an untapped creature you control: This enchantment deals 1 damage to target player or planeswalker.
+Kyren Sniper	PLAYER_OR_PW	At the beginning of your upkeep, you may have this creature deal 1 damage to target player or planeswalker.
+Landslide	PLAYER_OR_PW	Sacrifice any number of Mountains. Landslide deals that much damage to target player or planeswalker.
+Lava Axe	PLAYER_OR_PW	Lava Axe deals 5 damage to target player or planeswalker.
+Lava Spike	PLAYER_OR_PW	Lava Spike deals 3 damage to target player or planeswalker.
+Lavalanche	PLAYER_OR_PW	Lavalanche deals X damage to target player or planeswalker and each creature that player or that planeswalker's controller controls.
+Leyline of Lightning	PLAYER_OR_PW	If this card is in your opening hand, you may begin the game with it on the battlefield. -- Whenever you cast a spell, you may pay {1}. If you do, this enchantment deals 1 damage to target player or planeswalker.
+Lunge	PLAYER_OR_PW	Lunge deals 2 damage to target creature and 2 damage to target player or planeswalker.
+Mage Slayer	PLAYER_OR_PW	Whenever equipped creature attacks, it deals damage equal to its power to the player or planeswalker it's attacking. -- Equip {3}
+Mob Justice	PLAYER_OR_PW	Mob Justice deals damage to target player or planeswalker equal to the number of creatures you control.
+Mogg Bombers	PLAYER_OR_PW	When another creature enters, sacrifice this creature and it deals 3 damage to target player or planeswalker.
+Mogg Maniac	OPP_OR_PW	Whenever this creature is dealt damage, it deals that much damage to target opponent or planeswalker.
+Myr Battlesphere	PLAYER_OR_PW	When this creature enters, create four 1/1 colorless Myr artifact creature tokens. -- Whenever this creature attacks, you may tap X untapped Myr you control. If you do, this creature gets +X/+0 until end of turn and deals X damage to the player or planeswalker it's attacking.
+Noble Vestige	PLAYER_OR_PW	Flying -- {T}: Prevent the next 1 damage that would be dealt to target player or planeswalker this turn.
+Obelisk of Alara	PLAYER_OR_PW	{1}{W}, {T}: You gain 5 life. -- {1}{U}, {T}: Draw a card, then discard a card. -- {1}{B}, {T}: Target creature gets -2/-2 until end of turn. -- {1}{R}, {T}: This artifact deals 3 damage to target player or planeswalker. -- {1}{G}, {T}: Target creature gets +4/+4 until end of turn.
+Pulse of the Forge	PLAYER_OR_PW	Pulse of the Forge deals 4 damage to target player or planeswalker. Then if that player or that planeswalker's controller has more life than you, return Pulse of the Forge to its owner's hand.
+Rage Forger	PLAYER_OR_PW	When this creature enters, put a +1/+1 counter on each other Shaman creature you control. -- Whenever a creature you control with a +1/+1 counter on it attacks, you may have that creature deal 1 damage to target player or planeswalker.
+Rage Thrower	PLAYER_OR_PW	Whenever another creature dies, this creature deals 2 damage to target player or planeswalker.
+Raid Bombardment	PLAYER_OR_PW	Whenever a creature you control with power 2 or less attacks, this enchantment deals 1 damage to the player or planeswalker that creature is attacking.
+Rakdos's Return	OPP_OR_PW	Rakdos's Return deals X damage to target opponent or planeswalker. That player or that planeswalker's controller discards X cards.
+Ravager of the Fells	OPP_OR_PW	Trample -- Whenever this creature transforms into Ravager of the Fells, it deals 2 damage to target opponent or planeswalker and 2 damage to up to one target creature that player or that planeswalker's controller controls. -- At the beginning of each upkeep, if a player cast two or more spells last turn, transform this creature.
+Razortip Whip	OPP_OR_PW	{1}, {T}: This artifact deals 1 damage to target opponent or planeswalker.
+Relic Bind	PLAYER_OR_PW	Enchant artifact an opponent controls -- Whenever enchanted artifact becomes tapped, choose one — -- • This Aura deals 1 damage to target player or planeswalker. -- • Target player gains 1 life.
+Rite of Consumption	PLAYER_OR_PW	As an additional cost to cast this spell, sacrifice a creature. -- Rite of Consumption deals damage equal to the sacrificed creature's power to target player or planeswalker. You gain life equal to the damage dealt this way.
+Scalding Devil	PLAYER_OR_PW	{2}{R}: This creature deals 1 damage to target player or planeswalker.
+Scalding Tongs	OPP_OR_PW	At the beginning of your upkeep, if you have three or fewer cards in hand, this artifact deals 1 damage to target opponent or planeswalker.
+Scepter of Empires	PLAYER_OR_PW	{T}: This artifact deals 1 damage to target player or planeswalker. It deals 3 damage instead if you control artifacts named Crown of Empires and Throne of Empires.
+Scorched Rusalka	PLAYER_OR_PW	{R}, Sacrifice a creature: This creature deals 1 damage to target player or planeswalker.
+Scorching Missile	PLAYER_OR_PW	Scorching Missile deals 4 damage to target player or planeswalker. -- Flashback {9}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)
+Scrapyard Salvo	PLAYER_OR_PW	Scrapyard Salvo deals damage to target player or planeswalker equal to the number of artifact cards in your graveyard.
+Scuttling Doom Engine	OPP_OR_PW	This creature can't be blocked by creatures with power 2 or less. -- When this creature dies, it deals 6 damage to target opponent or planeswalker.
+Searing Flesh	OPP_OR_PW	Searing Flesh deals 7 damage to target opponent or planeswalker.
+Shower of Sparks	PLAYER_OR_PW	Shower of Sparks deals 1 damage to target creature and 1 damage to target player or planeswalker.
+Sorin's Vengeance	PLAYER_OR_PW	Sorin's Vengeance deals 10 damage to target player or planeswalker and you gain 10 life.
+Sparkcaster	PLAYER_OR_PW	When this creature enters, return a red or green creature you control to its owner's hand. -- When this creature enters, it deals 1 damage to target player or planeswalker.
+Stalking Vengeance	PLAYER_OR_PW	Haste -- Whenever another creature you control dies, it deals damage equal to its power to target player or planeswalker.
+Stensia Bloodhall	PLAYER_OR_PW	{T}: Add {C}. -- {3}{B}{R}, {T}: This land deals 2 damage to target player or planeswalker.
+Stensia Banquet	OPP_OR_PW	Stensia Banquet deals damage to target opponent or planeswalker equal to the number of Vampires you control. -- Draw a card.
+Stolen Grain	OPP_OR_PW	Stolen Grain deals 5 damage to target opponent or planeswalker. You gain 5 life.
+Taste of Blood	PLAYER_OR_PW	Taste of Blood deals 1 damage to target player or planeswalker and you gain 1 life.
+Telim'Tor's Darts	PLAYER_OR_PW	{2}, {T}: This artifact deals 1 damage to target player or planeswalker.
+Thumbscrews	OPP_OR_PW	At the beginning of your upkeep, if you have five or more cards in hand, this artifact deals 1 damage to target opponent or planeswalker.
+Touch of Death	PLAYER_OR_PW	Touch of Death deals 1 damage to target player or planeswalker. You gain 1 life. -- Draw a card at the beginning of the next turn's upkeep.
+Vampiric Touch	OPP_OR_PW	Vampiric Touch deals 2 damage to target opponent or planeswalker and you gain 2 life.
+Vent Sentinel	PLAYER_OR_PW	Defender -- {1}{R}, {T}: This creature deals damage to target player or planeswalker equal to the number of creatures you control with defender.
+Volcanic Rambler	PLAYER_OR_PW	{2}{R}: This creature deals 1 damage to target player or planeswalker.
+Vulshok Replica	PLAYER_OR_PW	{1}{R}, Sacrifice this creature: It deals 3 damage to target player or planeswalker.
+Wall of Souls	OPP_OR_PW	Defender (This creature can't attack.) -- Whenever this creature is dealt combat damage, it deals that much damage to target opponent or planeswalker.
+Wandering Mage	PLAYER_OR_PW	{W}, Pay 1 life: Prevent the next 2 damage that would be dealt to target creature this turn. -- {U}: Prevent the next 1 damage that would be dealt to target Cleric or Wizard creature this turn. -- {B}, Put a -1/-1 counter on a creature you control: Prevent the next 2 damage that would be dealt to target player or planeswalker this turn.
+Witch Hunter	PLAYER_OR_PW	{T}: This creature deals 1 damage to target player or planeswalker. -- {1}{W}{W}, {T}: Return target creature an opponent controls to its owner's hand.
+Zada's Commando	OPP_OR_PW	First strike -- Cohort — {T}, Tap an untapped Ally you control: This creature deals 1 damage to target opponent or planeswalker.
+Bonfire of the Damned	PLAYER_OR_PW	Bonfire of the Damned deals X damage to target player or planeswalker and each creature that player or that planeswalker's controller controls. -- Miracle {X}{R} (You may cast this card for its miracle cost when you draw it if it's the first card you drew this turn.)
+Captain's Maneuver	NO_PATTERN	The next X damage that would be dealt to target creature, planeswalker, or player this turn is dealt to another target creature, planeswalker, or player instead.
+Chandra, Fire of Kaladesh	PLAYER_OR_PW	Whenever you cast a red spell, untap Chandra. -- {T}: Chandra deals 1 damage to target player or planeswalker. If Chandra has dealt 3 or more damage this turn, exile her, then return her to the battlefield transformed under her owner's control.
+Clan Defiance	PLAYER_OR_PW	Choose one or more — -- • Clan Defiance deals X damage to target creature with flying. -- • Clan Defiance deals X damage to target creature without flying. -- • Clan Defiance deals X damage to target player or planeswalker.
+Flames of the Blood Hand	PLAYER_OR_PW	Flames of the Blood Hand deals 4 damage to target player or planeswalker. The damage can't be prevented. If that player or that planeswalker's controller would gain life this turn, that player gains no life instead.
+Haunting Misery	PLAYER_OR_PW	As an additional cost to cast this spell, exile X creature cards from your graveyard. -- Haunting Misery deals X damage to target player or planeswalker.
+Manticore of the Gauntlet	OPP_OR_PW	When this creature enters, put a -1/-1 counter on target creature you control. This creature deals 3 damage to target opponent or planeswalker.
+Noggle Hedge-Mage	PLAYER_OR_PW	When this creature enters, if you control two or more Islands, you may tap two target permanents. -- When this creature enters, if you control two or more Mountains, you may have this creature deal 2 damage to target player or planeswalker.
+Pyromancy	ANYTARGET	{3}, Discard a card at random: This enchantment deals damage to any target equal to the mana value of the discarded card.
+Searing Blaze	PLAYER_OR_PW	Searing Blaze deals 1 damage to target player or planeswalker and 1 damage to target creature that player or that planeswalker's controller controls. -- Landfall — If you had a land enter the battlefield under your control this turn, Searing Blaze deals 3 damage to that player or planeswalker and 3 damage to that creature instead.
+Skullcrack	PLAYER_OR_PW	Players can't gain life this turn. Damage can't be prevented this turn. Skullcrack deals 3 damage to target player or planeswalker.
+Sunscorched Desert	PLAYER_OR_PW	When this land enters, it deals 1 damage to target player or planeswalker. -- {T}: Add {C}.
+Unstable Footing	PLAYER_OR_PW	Kicker {3}{R} (You may pay an additional {3}{R} as you cast this spell.) -- Damage can't be prevented this turn. If this spell was kicked, it deals 5 damage to target player or planeswalker.
+Wall of Forgotten Pharaohs	PLAYER_OR_PW	Defender -- {T}: This creature deals 1 damage to target player or planeswalker. Activate only if you control a Desert or there is a Desert card in your graveyard.
+Zealot of the God-Pharaoh	OPP_OR_PW	{4}{R}: This creature deals 2 damage to target opponent or planeswalker.
+Chandra Nalaar	PLAYER_OR_PW	+1: Chandra Nalaar deals 1 damage to target player or planeswalker. -- −X: Chandra Nalaar deals X damage to target creature. -- −8: Chandra Nalaar deals 10 damage to target player or planeswalker and each creature that player or that planeswalker's controller controls.
+Chandra, Pyromaster	PLAYER_OR_PW	+1: Chandra deals 1 damage to target player or planeswalker and 1 damage to up to one target creature that player or that planeswalker's controller controls. That creature can't block this turn. -- 0: Exile the top card of your library. You may play it this turn. -- −7: Exile the top ten cards of your library. Choose an instant or sorcery card exiled this way and copy it three times. You may cast the co
+Kaboom!	PLAYER_OR_PW	Choose any number of target players or planeswalkers. For each of them, reveal cards from the top of your library until you reveal a nonland card, Kaboom! deals damage equal to that card's mana value to that player or planeswalker, then you put the revealed cards on the bottom of your library in any order.
+Land's Edge	PLAYER_OR_PW	Discard a card: If the discarded card was a land card, this enchantment deals 2 damage to target player or planeswalker. Any player may activate this ability.
+Martyrdom	NO_PATTERN	Until end of turn, target creature you control gains "{0}: The next 1 damage that would be dealt to target creature, planeswalker, or player this turn is dealt to this creature instead." Only you may activate this ability.
+Soul Burn	ANYTARGET	Spend only black and/or red mana on X. -- Soul Burn deals X damage to any target. You gain life equal to the damage dealt, but not more than the amount of {B} spent on X, the player's life total before the damage was dealt, the planeswalker's loyalty before the damage was dealt, or the creature's toughness.
+Surestrike Trident	PLAYER_OR_PW	Equipped creature has first strike and "{T}, Unattach Surestrike Trident: This creature deals damage equal to its power to target player or planeswalker." -- Equip {4} ({4}: Attach to target creature you control. Equip only as a sorcery.)
+The Ultimate Nightmare of Wizards of the Coast® Customer Service	NO_PATTERN	The Ultimate Nightmare of Wizards of the Coast® Customer Service deals X damage to each of Y target creatures and Z target players or planeswalkers.
+Vengeful Archon	PLAYER_OR_PW	Flying -- {X}: Prevent the next X damage that would be dealt to you this turn. If damage is prevented this way, this creature deals that much damage to target player or planeswalker.

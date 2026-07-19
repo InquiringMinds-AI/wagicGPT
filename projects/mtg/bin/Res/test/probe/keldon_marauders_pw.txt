@@ -1,0 +1,23 @@
+# Keldon Marauders ETB: 1 damage to target player or planeswalker (Shock arithmetic proves the point landed).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Keldon Marauders,Shock
+manapool:{1}{R}{R}
+[PLAYER2]
+inplay:Jace Beleren
+[DO]
+Keldon Marauders
+Jace Beleren
+Shock
+Jace Beleren
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Keldon Marauders
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+graveyard:Jace Beleren
+life:20
+[END]

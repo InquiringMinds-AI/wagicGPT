@@ -1,0 +1,118 @@
+Aether Charge	OPP_OR_PW	AUTO	target(opponent)
+Aethertorch Renegade	PLAYER_OR_PW	AUTO	target(player)
+Axelrod Gunnarson	PLAYER_OR_PW	AUTO	target(player)
+Blightning	PLAYER_OR_PW	AUTO	target=player
+Boggart Shenanigans	PLAYER_OR_PW	AUTO	target(player)
+Brion Stoutarm	PLAYER_OR_PW	AUTO	target(player)
+Chandra's Fury	PLAYER_OR_PW	AUTO	target=player
+Cinder Hellion	OPP_OR_PW	AUTO	target(opponent)
+Cinder Pyromancer	PLAYER_OR_PW	AUTO	target(player)
+Consulate Turret	PLAYER_OR_PW	AUTO	target(player)
+Consuming Sinkhole	PLAYER_OR_PW	AUTO	target(player)
+Cosi's Ravager	PLAYER_OR_PW	AUTO	target(player)
+Curse of the Pierced Heart	NO_PATTERN	REVIEW	target=player
+Deathforge Shaman	PLAYER_OR_PW	AUTO	target(player)
+Emberwilde Augur	PLAYER_OR_PW	AUTO	target(player)
+Eternal Flame	OPP_OR_PW	REVIEW	no-player-target: 
+Exploding Borders	PLAYER_OR_PW	AUTO	target=player
+Exuberant Firestoker	PLAYER_OR_PW	AUTO	target(player)
+Feedback Bolt	PLAYER_OR_PW	AUTO	target=player
+Final Strike	OPP_OR_PW	AUTO	target=opponent
+Flame Jet	PLAYER_OR_PW	AUTO	target=player
+Flame Wave	PLAYER_OR_PW	AUTO	target=player
+Flamewave Invoker	PLAYER_OR_PW	AUTO	target(player)
+Font of Ire	PLAYER_OR_PW	AUTO	target(player)
+Furious Assault	PLAYER_OR_PW	AUTO	target(player)
+Giant's Ire	PLAYER_OR_PW	AUTO	target=player
+Goblin Bomb	PLAYER_OR_PW	AUTO	target(player)
+Goblin Fireslinger	PLAYER_OR_PW	AUTO	target(player)
+Goblin Lyre	OPP_OR_PW	REVIEW	no-player-target: 
+Goblin Razerunners	PLAYER_OR_PW	AUTO	target(player)
+Goblin War Strike	PLAYER_OR_PW	AUTO	target=player
+Goretusk Firebeast	PLAYER_OR_PW	AUTO	target(player)
+Gruul Guildmage	PLAYER_OR_PW	AUTO	target(player)
+Heart of Bogardan	PLAYER_OR_PW	REVIEW	no-player-target: 
+Heartwood Giant	PLAYER_OR_PW	AUTO	target(player)
+Hellrider	PLAYER_OR_PW	REVIEW	no-player-target: 
+Hellhole Flailer	PLAYER_OR_PW	AUTO	target(player)
+Implement of Combustion	PLAYER_OR_PW	AUTO	target(player)
+Jeskai Charm	OPP_OR_PW	AUTO	target(opponent)
+Keldon Champion	PLAYER_OR_PW	AUTO	target(player)
+Keldon Marauders	PLAYER_OR_PW	REVIEW	no-player-target: 
+Kessig Malcontents	PLAYER_OR_PW	AUTO	target(player)
+Kiss of Death	OPP_OR_PW	REVIEW	no-player-target: 
+Kyren Negotiations	PLAYER_OR_PW	AUTO	target(player)
+Kyren Sniper	PLAYER_OR_PW	AUTO	target(player)
+Landslide	PLAYER_OR_PW	REVIEW	no-player-target: target=<anyamount>mountain|mybattlefield
+Lava Axe	PLAYER_OR_PW	AUTO	target=player
+Lava Spike	PLAYER_OR_PW	AUTO	target=player
+Lavalanche	PLAYER_OR_PW	AUTO	target(player)
+Leyline of Lightning	PLAYER_OR_PW	AUTO	target(player)
+Lunge	PLAYER_OR_PW	AUTO	target(player)
+Mage Slayer	PLAYER_OR_PW	REVIEW	no-player-target: 
+Mob Justice	PLAYER_OR_PW	AUTO	target=player
+Mogg Bombers	PLAYER_OR_PW	AUTO	target(player)
+Mogg Maniac	OPP_OR_PW	REVIEW	no-player-target: 
+Myr Battlesphere	PLAYER_OR_PW	REVIEW	no-player-target: 
+Noble Vestige	PLAYER_OR_PW	AUTO	target(player)
+Obelisk of Alara	PLAYER_OR_PW	AUTO	target(player)
+Pulse of the Forge	PLAYER_OR_PW	AUTO	target=player
+Rage Forger	PLAYER_OR_PW	AUTO	target(player)
+Rage Thrower	PLAYER_OR_PW	AUTO	target(player)
+Raid Bombardment	PLAYER_OR_PW	REVIEW	no-player-target: 
+Rakdos's Return	OPP_OR_PW	AUTO	target(opponent)
+Ravager of the Fells	OPP_OR_PW	REVIEW	no-player-target: target(creature|opponentbattlefield)
+Razortip Whip	OPP_OR_PW	AUTO	target(opponent)
+Relic Bind	PLAYER_OR_PW	REVIEW	target(player) | target(player)
+Rite of Consumption	PLAYER_OR_PW	AUTO	target=player
+Scalding Devil	PLAYER_OR_PW	AUTO	target(player)
+Scalding Tongs	OPP_OR_PW	REVIEW	no-player-target: 
+Scepter of Empires	PLAYER_OR_PW	AUTO	target(player)
+Scorched Rusalka	PLAYER_OR_PW	AUTO	target(player)
+Scorching Missile	PLAYER_OR_PW	AUTO	target=player
+Scrapyard Salvo	PLAYER_OR_PW	AUTO	target=player
+Scuttling Doom Engine	OPP_OR_PW	AUTO	target(opponent)
+Searing Flesh	OPP_OR_PW	REVIEW	no-player-target: 
+Shower of Sparks	PLAYER_OR_PW	AUTO	target(player)
+Sorin's Vengeance	PLAYER_OR_PW	AUTO	target=player
+Sparkcaster	PLAYER_OR_PW	REVIEW	no-player-target: 
+Stalking Vengeance	PLAYER_OR_PW	AUTO	target(player)
+Stensia Bloodhall	PLAYER_OR_PW	AUTO	target(player)
+Stensia Banquet	OPP_OR_PW	AUTO	target=opponent
+Stolen Grain	OPP_OR_PW	REVIEW	no-player-target: 
+Taste of Blood	PLAYER_OR_PW	AUTO	target=player
+Telim'Tor's Darts	PLAYER_OR_PW	AUTO	target(player)
+Thumbscrews	OPP_OR_PW	REVIEW	no-player-target: 
+Touch of Death	PLAYER_OR_PW	AUTO	target=player
+Vampiric Touch	OPP_OR_PW	REVIEW	no-player-target: 
+Vent Sentinel	PLAYER_OR_PW	AUTO	target(player)
+Volcanic Rambler	PLAYER_OR_PW	AUTO	target(player)
+Vulshok Replica	PLAYER_OR_PW	AUTO	target(player)
+Wall of Souls	OPP_OR_PW	REVIEW	no-player-target: 
+Wandering Mage	PLAYER_OR_PW	AUTO	target(player)
+Witch Hunter	PLAYER_OR_PW	AUTO	target(player)
+Zada's Commando	OPP_OR_PW	AUTO	target(opponent)
+Bonfire of the Damned	PLAYER_OR_PW	AUTO	target=player
+Captain's Maneuver	NO_PATTERN	REVIEW	no-player-target: target=anytarget | target(anytarget)
+Chandra, Fire of Kaladesh	PLAYER_OR_PW	AUTO	target(player)
+Clan Defiance	PLAYER_OR_PW	AUTO	target=player
+Flames of the Blood Hand	PLAYER_OR_PW	REVIEW	no-player-target: 
+Haunting Misery	PLAYER_OR_PW	AUTO	target=player
+Manticore of the Gauntlet	OPP_OR_PW	REVIEW	no-player-target: target(creature|mybattlefield)
+Noggle Hedge-Mage	PLAYER_OR_PW	AUTO	target(player)
+Pyromancy	ANYTARGET	REVIEW	no-player-target: target(anytarget)
+Searing Blaze	PLAYER_OR_PW	AUTO	target=player
+Skullcrack	PLAYER_OR_PW	AUTO	target=player
+Sunscorched Desert	PLAYER_OR_PW	AUTO	target(player)
+Unstable Footing	PLAYER_OR_PW	AUTO	target(player)
+Wall of Forgotten Pharaohs	PLAYER_OR_PW	AUTO	target(player)
+Zealot of the God-Pharaoh	OPP_OR_PW	AUTO	target(opponent)
+Chandra Nalaar	PLAYER_OR_PW	AUTO	target(player)
+Chandra, Pyromaster	PLAYER_OR_PW	REVIEW	no-player-target: target(creature|opponentbattlefield) | target(creature|mybattlefield) | target(*[-permanent&tobecha]|myexile)
+Kaboom!	PLAYER_OR_PW	REVIEW	no-player-target: 
+Land's Edge	PLAYER_OR_PW	REVIEW	no-player-target: 
+Martyrdom	NO_PATTERN	REVIEW	no-player-target: 
+Soul Burn	ANYTARGET	REVIEW	no-player-target: 
+Surestrike Trident	PLAYER_OR_PW	REVIEW	no-player-target: 
+The Ultimate Nightmare of Wizards of the Coast® Customer Service	NO_PATTERN	REVIEW	no-player-target: 
+Vengeful Archon	PLAYER_OR_PW	REVIEW	no-player-target: 

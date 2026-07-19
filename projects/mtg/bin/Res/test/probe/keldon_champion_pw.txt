@@ -1,0 +1,20 @@
+# ETB damage: Keldon Champion deals 3 to a targeted planeswalker.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Keldon Champion
+manapool:{2}{R}{R}
+[PLAYER2]
+inplay:Jace Beleren
+[DO]
+Keldon Champion
+Jace Beleren
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Keldon Champion
+manapool:{0}
+[PLAYER2]
+graveyard:Jace Beleren
+life:20
+[END]

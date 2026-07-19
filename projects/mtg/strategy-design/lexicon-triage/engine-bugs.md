@@ -1,5 +1,60 @@
 # Lexicon test campaign — engine bug catalogue (post fix-pass, 2026-07-18)
 
+## ORACLE DRIFT SWEEP — WAVE 1 (planeswalker-damage errata, 2026-07-19)
+
+Sweep tooling: `tools/oracle_sweep.py` + `tools/oracle_judge.py`; buckets in
+`strategy-design/oracle-sweep/`. 244 confirmed functional-drift cards; wave 1 =
+the 118-card planeswalker-damage class ("target player" → "any target" /
+"player or planeswalker" 2017 errata).
+
+**SHIPPED (probe-verified):** 85 mechanical widenings of EXISTING choosers
+(`target=player`→`player,planeswalker`, `target(opponent)`→
+`target(opponent,planeswalker)`, 2× `anytarget`) + Kiss of Death / Searing
+Flesh / Stolen Grain / Vampiric Touch converted to spell-level
+`target=opponent,planeswalker` + Keldon Marauders' choice-ladder replaced with
+`damage:1 target(player,planeswalker)` + Relic Bind choice widened. Probes
+registered in main `_tests.txt`: blightning_pw, searing_flesh_pw,
+keldon_champion_pw, keldon_marauders_pw.
+
+**ENGINE FIXED:** TargetChooserFactory had NO opponent+planeswalker form —
+`target=opponent,planeswalker` SILENTLY parsed as opponent-only
+(`s.find("opponent")==0` matched first; loud-rejection doctrine case). Added
+`opponentOnly` flag to DamageableTargetChooser + factory branch for
+`opponent,planeswalker` / `planeswalker,opponent` (TargetChooser.{h,cpp}).
+
+**NEW ENGINE GAP — dual-interactive-ETB fizzle:** when a card has TWO ETB
+auto lines that each need an interactive chooser, only ONE StackAbility ever
+stacks — the other leg silently fizzles (probe-proven on Sparkcaster
+bounce+damage and Manticore counter+damage, both orders). Consequence: cards
+whose Oracle needs a second targeted leg CANNOT be upgraded from non-targeted
+`damage:N opponent` without losing the other leg. REVERTED to pre-existing
+1v1-approximate scripts: Sparkcaster, Manticore of the Gauntlet, Ravager of
+the Fells (same shape via its may-damage second line).
+
+**NEW ENGINE GAP — trigger-payload targeted conversion fizzles:** converting a
+non-interactive trigger payload (`damage:N opponent`) to
+`target(...)` makes the trigger fire with an unanswered chooser → effect
+becomes a NO-OP (probe-proven on Scalding Tongs upkeep trigger; `p2` player
+click in suite does not reach the chooser). REVERTED: Scalding Tongs,
+Thumbscrews, Mogg Maniac, Wall of Souls. These need verified
+trigger-target machinery (how does AIPlayerBaka answer mid-trigger choosers?)
+before conversion.
+
+**NEW ENGINE GAP — attacked-entity primitive missing:** Hellrider / Raid
+Bombardment / Mage Slayer / Myr Battlesphere need "the player or planeswalker
+it's attacking". Engine tracks it (`MTGCardInstance::isAttacking` is
+`Targetable*`, planeswalker attacks exist via MTGPlaneswalkerAttackRule) but no
+script token exposes it. Scripts stay `damage:N opponent` (correct vs players,
+wrong when a planeswalker is attacked).
+
+**RESIDUE (complex composites, unconverted, logged):** Heart of Bogardan,
+Eternal Flame, Goblin Lyre, Landslide (second-target limit), Flames of the
+Blood Hand, Chandra Pyromaster (+1 choice-ladder), Curse of the Pierced Heart.
+OK-as-is: Captain's Maneuver, Pyromancy (already anytarget). N/A: 7
+unsupported.txt stubs. Remaining sweep classes (scope 35, numbers 33, other
+27, timing 21, ability 6, target/zone 4) NOT yet worked — see
+oracle-sweep/verdicts.tsv.
+
 ## FIX WAVE RESOLUTION LEDGER (2026-07-19) — authoritative overlay on the items below
 
 The implemented-but-wrong pile was worked by five worktree agents, integrated,
