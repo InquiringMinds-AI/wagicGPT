@@ -1,0 +1,79 @@
+Deck identity: MONO-BLACK DISCARD / SACRIFICE ATTRITION. You strip the opponent's hand and force them
+to sacrifice, then grind them out with removal and reach and bury them under a big black threat. Your
+namesake payoff is Tergrid; but Tergrid is a SINGLE copy in a 100-card deck, so MOST games you will
+never draw it. You must win WITHOUT Tergrid: disrupt, deploy a real threat, and ATTACK. Games where you
+sit on cheap disruption and never present a clock, you lose to the race - that is this deck's #1 leak.
+
+TERGRID IS THE ENGINE - CAST IT AND PROTECT IT THE MOMENT YOU DRAW IT. Tergrid, God of Fright ({3}{B}{B},
+4/4 menace): "Whenever an opponent sacrifices a nontoken permanent or DISCARDS a PERMANENT card, you may
+put that card onto the battlefield UNDER YOUR CONTROL." With Tergrid out, every discard/sacrifice card in
+your deck STEALS the opponent's permanents onto your side - Hymn, Thoughtseize, Smallpox, Pox, Liliana's
+Triumph, Plaguecrafter, Butcher, Grave Pact all become one-sided theft. If Tergrid is in your cast list,
+CAST IT (it is your best card); once it is down, prioritize forcing discards/sacrifices of their
+PERMANENTS (creatures/artifacts/enchantments/lands - NOT instants/sorceries, those it cannot steal).
+
+WHAT YOUR CARDS ACTUALLY DO - read this, do NOT invent effects:
+FINISHERS / REACH (this is how you WIN - deploy one and attack, or drain them out):
+- Archon of Cruelty ({6}{B}{B} 6/6 FLYING): on ETB AND on attack, opponent sacs a creature/planeswalker,
+  discards, loses 3; you gain 3 and draw. Your best bomb - land it and swing every turn.
+- Sheoldred, Whispering One ({5}{B}{B} 6/6 swampwalk): each of YOUR upkeeps reanimate a creature from your
+  graveyard; each opponent upkeep they sacrifice a creature. A clock plus a recursion engine.
+- Butcher of Malakir (5/4 FLYING): when any creature you control dies, each opponent sacrifices. Steel
+  Hellkite ({6} 5/5 FLYING). Phyrexian Obliterator ({B}{B}{B}{B} 4/4 TRAMPLE): anything that damages it
+  makes its controller sacrifice that many permanents - a punishing attacker AND a wall aggro cannot race.
+- Korlash (P/T = number of Swamps you control - huge in this 27-Swamp deck; {1}{B} regenerate).
+- Gray Merchant of Asphodel: ETB drains the opponent for your devotion to black (every {B} pip on your
+  board) and gains you that much - a game-ending swing on a black-heavy board. Corrupt ({5}{B}): deals
+  X = your Swamps to ANY target and gains you that much - removal OR a finisher to the face.
+- Syr Konrad, the Grim: pings each opponent for 1 whenever a creature dies or a creature is discarded -
+  with all your sacrifice/discard, this is real damage AND reach. Liliana, Dreadhorde General (planeswalker).
+ONE-SIDED DISRUPTION (safe - hits only them; lead with these):
+- Hymn to Tourach ({B}{B}): opponent discards TWO at random. Thoughtseize ({B}): strip one nonland card.
+- Fell Specter (FLYING, ETB opp discards, then drains 2 per opp discard). Megrim (opp discards -> 2 dmg).
+- Painful Quandary ({3}{B}{B}): each opponent SPELL costs them 5 life or a discard - a one-sided prison.
+- No Mercy: any creature that damages YOU is destroyed - a brutal wall against attackers. Ravenous
+  Chupacabra (ETB destroy a creature). Liliana's Triumph / Soul Shatter / Plaguecrafter (edicts).
+- Tourach, Dread Cantor ({1}{B} 2/1, pro-white): grows +1/+1 every time the opponent discards - with your
+  discard package it becomes a fast clock. Sangromancer (FLYING): gain 3 whenever they discard or a
+  creature of theirs dies - stabilizes the race.
+
+THE SYMMETRIC TRAP - Pox, Smallpox, Braids, and Necrogen Mists HURT YOU TOO. Pox and Smallpox make EACH
+player lose life, discard, and sacrifice creatures/lands; Braids and Necrogen Mists hit both upkeeps.
+Without Tergrid to steal the opponent's half, these are MUTUAL destruction. The option line shows your own
+cost ("{right now: life -7, ...}") - believe it. Cast a symmetric mass-effect ONLY when (a) Tergrid is on
+the battlefield, (b) you are AHEAD on board and want to break a stall, or (c) your OWN hand and board are
+already near-empty so you lose little. NEVER fire Pox or Smallpox while you are BEHIND on life or being
+raced by an aggressor - you are helping them kill you. When in doubt, cast a THREAT instead.
+
+YOUR DISRUPTION IS NOT A CLOCK - DEPLOY A THREAT AND ATTACK EVERY TURN. Stripping their hand does not
+reduce their life. Each turn: play a land, and once you are not about to die, cast the biggest real THREAT
+you can afford (a finisher or a beater from the list above) instead of another cheap disruption spell, and
+ATTACK with every creature that can. The "creatures that can attack" list is exactly the eligible set
+(summoning-sick and tapped bodies are already dropped) - declare ALL of them; do not re-derive
+eligibility. "No attackers" is correct only when every creature you have is tapped, summoning-sick, or is
+your sole blocker against a lethal swing back. A board of a Tourach and a rock while the opponent sits at
+19 is a game you are throwing - present a threat.
+
+REANIMATION IS FREE VALUE - your discard fills graveyards, so use them. Animate Dead ({1}{B}), Sheoldred,
+The Eldest Reborn, and Whip of Erebos return a creature from EITHER graveyard to the battlefield - and
+when your Thoughtseize/Hymn/edicts put the opponent's best creature in THEIR graveyard, Animate Dead
+steals it back for you (this is your poor-man's Tergrid; it won a game vs Zombies). After a discard or
+kill, look for a reanimation target before casting a fresh spell.
+
+THOUGHTSEIZE / DISCARD PICK - the "Reveal" menu strips exactly ONE card. When Thoughtseize resolves you
+get a menu (mislabeled "top N cards of your library" - it is really the OPPONENT'S revealed hand). You
+strip exactly ONE nonland card: only the FIRST card you name is discarded, the rest stay in their hand.
+So do NOT list several - name the SINGLE most dangerous nonland (their best threat, engine, or removal),
+by choosing that one card's number. If Tergrid is out, prefer taking a PERMANENT (creature/artifact/
+enchantment), because you STEAL a discarded permanent.
+
+WHEN YOU ARE BEHIND AND CANNOT WIN OR STABILIZE THIS TURN, make your single best play and PASS - do not
+re-derive the whole board hunting for lethal or a miracle. If the arithmetic says you cannot win this
+turn, that is a fact, not a mistake to recompute; pick the one action that helps most (a blocker, a
+removal spell, a life-swing like Gray Merchant/Corrupt, a discard) and move on. Grinding a giant reply
+here wastes the decision and it defaults to a worse play.
+
+MULLIGAN: keep 2-4 Swamps with at least one early black play (Thoughtseize, Hymn to Tourach, Tourach, a
+cheap creature, or a mana rock like Sol Ring/Mind Stone). Ship 0-1 land hands, 6+ land hands, and hands
+that are all expensive bombs with no early disruption - this deck needs to disrupt early and curve into a
+threat.
