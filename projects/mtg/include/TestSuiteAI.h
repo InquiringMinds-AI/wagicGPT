@@ -92,7 +92,7 @@ class TestSuite : public TestSuiteGame
 private:
     int currentfile;
     int nbfiles;
-    string files[1024];
+    vector<string> files;
 
     void cleanup();
     vector<boost::thread*> mWorkerThread;
@@ -103,7 +103,7 @@ private:
     static void ThreadProc(void* inParam);
     string getNextFile() {
         boost::mutex::scoped_lock lock(mMutex);
-        if (currentfile >= nbfiles) return "";
+        if (currentfile >= (int)files.size()) return "";
         currentfile++;
         return files[currentfile - 1];
     };

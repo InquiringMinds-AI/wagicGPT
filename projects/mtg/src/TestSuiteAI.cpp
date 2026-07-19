@@ -1067,6 +1067,7 @@ TestSuite::TestSuite(const char * filename)
     
     std::string s;
     nbfiles = 0;
+    files.clear();
     currentfile = 0;
     nbFailed = 0;
     nbTests = 0;
@@ -1116,7 +1117,7 @@ TestSuite::TestSuite(const char * filename)
             if (s[0] == '/' && s[1] == '*') comment = 1;
             if (s[0] && s[0] != '#' && !comment)
             {
-                files[nbfiles] = s;
+                files.push_back(s);
                 nbfiles++;
             }
             if (s[0] == '*' && s[1] == '/') comment = 0;
