@@ -1,0 +1,21 @@
+# Form 4: cost-embedded token creation. Triskelavus (cast for {7}, entering with
+# three +1/+1 counters via counter(1/1,3)) activates {1}{C(1/1,-1)} to create a
+# Triskelavite token. The named-token reference was rescripted to the inline
+# token form + a transforms rider that grants the token its sacrifice ability, so
+# the activation now yields a token on the battlefield.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Triskelavus
+manapool:{8}
+[PLAYER2]
+[DO]
+Triskelavus
+Triskelavus
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Triskelavus,*
+manapool:{0}
+[PLAYER2]
+[END]

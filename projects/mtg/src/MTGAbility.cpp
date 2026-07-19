@@ -3135,16 +3135,71 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     {
         SAFE_DELETE(tc);
         size_t header = kLordKeywords[i].size();
-        size_t end = s.find(")", found + header);
-        string s1;
-        if (found == 0 || end != s.size() - 1)
+        // Match the CLOSING paren of the lord keyword's argument, accounting for
+        // nested parens (e.g. aslongas(type(*|mygraveyard)~lessthan~5),
+        // all(creature[counter(-1/-1)]|...)). The old s.find(")") stopped at the
+        // first inner ')' and split the rest of the line into garbage.
+        size_t openParen = found + header - 1; // position of the keyword's '('
+        size_t end = string::npos;
         {
-            s1 = s.substr(end + 1);
+            int depth = 0;
+            for (size_t p = openParen; p < s.size(); ++p)
+            {
+                if (s[p] == '(') depth++;
+                else if (s[p] == ')') { depth--; if (depth == 0) { end = p; break; } }
+            }
+        }
+        string s1;
+        if (end == string::npos)
+        {
+            s1 = (found == 0) ? "" : s.substr(0, found);
         }
         else
         {
-            s1 = s.substr(0, found);
+            string afterPart = s.substr(end + 1);
+            string beforePart = s.substr(0, found);
+            if (found == 0)
+            {
+                s1 = afterPart;                 // all(...) EFFECT  (effect strictly after)
+            }
+            else if (end == s.size() - 1)
+            {
+                s1 = beforePart;                // EFFECT all(...)  (nothing trailing)
+            }
+            else
+            {
+                // Content on both sides of the paren. If the trailing side is only
+                // duration/count modifiers (ueot/oneshot/forever/uynt/>N/<N), the
+                // effect is the BEFORE part (EFFECT all(...) ueot) — keep the
+                // modifiers attached to it so ueot etc. still scope the granted
+                // ability. Otherwise the effect is AFTER (name(...) all(...) EFFECT).
+                bool onlyModifiers = true;
+                {
+                    string t = afterPart;
+                    size_t p = 0;
+                    while (p < t.size())
+                    {
+                        while (p < t.size() && t[p] == ' ') p++;
+                        if (p >= t.size()) break;
+                        size_t e2 = t.find(' ', p);
+                        if (e2 == string::npos) e2 = t.size();
+                        string tok = t.substr(p, e2 - p);
+                        p = e2;
+                        bool modifier = (tok == "ueot" || tok == "oneshot" || tok == "forever" || tok == "uynt");
+                        if (!modifier && !tok.empty() && (tok[0] == '<' || tok[0] == '>'))
+                        {
+                            modifier = true;
+                            for (size_t q = 1; q < tok.size(); ++q)
+                                if (!isdigit(tok[q])) { modifier = false; break; }
+                        }
+                        if (!modifier) { onlyModifiers = false; break; }
+                    }
+                }
+                s1 = onlyModifiers ? (beforePart + afterPart) : afterPart;
+            }
         }
+        int cmpMini = 0, cmpMaxi = 0;
+        bool cmpMiniFound = false, cmpMaxiFound = false;
         if (end != string::npos)
         {
             int lordIncludeSelf = 1;
@@ -3155,6 +3210,35 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
                 s1.replace(other, 6, "");
             }
             string lordTargetsString = s.substr(found + header, end - found - header);
+            // aslongas(type(TC)~cmp~N): a nested count-comparison condition. Reduce
+            // it to the native target-chooser + mini/maxi form AAsLongAs already
+            // evaluates (count of matching cards vs the bound), mirroring the
+            // type(...)~cmp~N idiom used by if/restriction. lessthan -> active while
+            // count < N (maxi); morethan -> active while count > N (mini).
+            if (i == 2 && lordTargetsString.find("~") != string::npos)
+            {
+                vector<string> cmp = split(lordTargetsString, '~');
+                if (cmp.size() == 3)
+                {
+                    string cleft = cmp[0];
+                    string cop = cmp[1];
+                    int cn = atoi(cmp[2].c_str());
+                    size_t tp = cleft.find("type(");
+                    if (tp != string::npos)
+                    {
+                        size_t te = cleft.rfind(")");
+                        if (te != string::npos && te > tp + 5)
+                        {
+                            string inner = cleft.substr(tp + 5, te - (tp + 5));
+                            if (cop.find("lessthan") != string::npos) { cmpMaxi = cn; cmpMaxiFound = true; lordTargetsString = inner; }
+                            else if (cop.find("morethan") != string::npos) { cmpMini = cn; cmpMiniFound = true; lordTargetsString = inner; }
+                            // equalto / other ops are not representable by AAsLongAs's
+                            // strict mini/maxi bounds: leave lordTargetsString intact so
+                            // createTargetChooser fails and the line is rejected loudly.
+                        }
+                    }
+                }
+            }
             TargetChooserFactory tcf(observer);
             TargetChooser * lordTargets = tcf.createTargetChooser(lordTargetsString, card);
 
@@ -3213,7 +3297,13 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             {
                 compareZone = true;
             }
-            
+
+            // aslongas(type(TC)~cmp~N) parsed above into a plain target chooser plus
+            // a count bound: apply it here (overriding the ' >'/' <' scan, which the
+            // ~cmp~ syntax does not carry).
+            if (cmpMiniFound) { mini = cmpMini; miniFound = true; maxiFound = false; }
+            if (cmpMaxiFound) { maxi = cmpMaxi; maxiFound = true; miniFound = false; }
+
             switch (i)
             {
             case 0:

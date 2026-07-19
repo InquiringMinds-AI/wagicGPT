@@ -1,0 +1,24 @@
+# Form 3 (threshold control): aslongas(type(*|mygraveyard)~lessthan~5) cantattack
+# (River Serpent). With five cards in the graveyard the count (5) is NOT < 5, so
+# the restriction is inactive and the 5/5 Serpent attacks for 5.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:River Serpent
+graveyard:Grizzly Bears,Runeclaw Bear,Grizzly Bears,Runeclaw Bear,Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+River Serpent
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:River Serpent
+tappedinplay:1
+graveyard:Grizzly Bears,Runeclaw Bear,Grizzly Bears,Runeclaw Bear,Grizzly Bears
+[PLAYER2]
+life:15
+[END]

@@ -1,0 +1,19 @@
+# Form 4 (Saheeli, the Gifted -7): the clone-all form `all(artifact|mybattlefield)
+# clone with(unearth)` — for each artifact you control, create a token copy. The
+# witness carries the same payload as a {0} activated ability; with one Ornithopter
+# in play, activating it yields a second (token) Ornithopter.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ornithopter,Lexicon Clone All Artifacts Witness
+[PLAYER2]
+[DO]
+Lexicon Clone All Artifacts Witness
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ornithopter,Ornithopter,Lexicon Clone All Artifacts Witness
+[PLAYER2]
+[END]

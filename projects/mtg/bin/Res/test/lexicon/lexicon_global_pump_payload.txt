@@ -1,0 +1,24 @@
+# Form 2: the effect-before-all pump payload `1/0 all(creature|mybattlefield) ueot
+# oneshot` (the Hero-of heroic family's @targeted trigger payload). The witness
+# carries the same payload as a {0} activated ability; once activated the
+# controller's Runeclaw Bear becomes 3/2 and deals 3 combat damage instead of 2.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Runeclaw Bear,Lexicon Global Pump Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon Global Pump Witness
+Runeclaw Bear
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Runeclaw Bear,Lexicon Global Pump Witness
+tappedinplay:1
+[PLAYER2]
+life:17
+[END]

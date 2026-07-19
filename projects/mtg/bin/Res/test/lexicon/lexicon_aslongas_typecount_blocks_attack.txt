@@ -1,0 +1,21 @@
+# Form 3: aslongas(type(*|mygraveyard)~lessthan~5) cantattack (River Serpent).
+# "River Serpent can't attack unless there are five or more cards in your
+# graveyard." With an empty graveyard the count (0) is < 5, so the restriction is
+# live and the 5/5 Serpent stays home — PLAYER2 takes no damage.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:River Serpent
+[PLAYER2]
+life:20
+[DO]
+River Serpent
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:River Serpent
+[PLAYER2]
+life:20
+[END]

@@ -1,0 +1,22 @@
+# Form 1: the effect-before-all restriction payload `cantattack all(creature) ueot`
+# (kicked Orim's Chant's then-branch). The witness carries the same payload as a
+# {0} activated ability; once activated, the controller's Runeclaw Bear cannot be
+# declared as an attacker, so PLAYER2 takes no combat damage.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Runeclaw Bear,Lexicon Global Cantattack Witness
+[PLAYER2]
+life:20
+[DO]
+Lexicon Global Cantattack Witness
+Runeclaw Bear
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Runeclaw Bear,Lexicon Global Cantattack Witness
+[PLAYER2]
+life:20
+[END]
