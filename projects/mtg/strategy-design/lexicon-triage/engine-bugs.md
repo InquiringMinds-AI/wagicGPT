@@ -47,6 +47,29 @@ it's attacking". Engine tracks it (`MTGCardInstance::isAttacking` is
 script token exposes it. Scripts stay `damage:N opponent` (correct vs players,
 wrong when a planeswalker is attacked).
 
+### WAVE 2 (remaining 126 DIFFERENT cards, 2026-07-19)
+
+Four Opus proposal agents (per-class briefs in `oracle-sweep/wave2/`), edits
+applied centrally (100 edit dicts, 0 apply failures). Verdict totals:
+TEXT_ONLY 49 (faithful scripts, stale display text — the judge compares
+text= lines), SCRIPT_FIX 34, OK_AS_IS 12 (incl. name-collision false flags:
+Blood token vs Flesh//Blood, Fast//Furious joke printing, Day/Night =
+engine-internal daybound emblems — future sweep exclusion rule), ENGINE_BLOCKED
+6, UNSUPPORTED_STUB 25. Notable real fixes: Lanterns' Lift was missing its
+entire +1/+1+flying teach (probe lanterns_lift.txt registered); Soulhunter
+Rakshasa flat 5 → per-Swamp dynamic damage (probe soulhunter_swamps.txt);
+Enatu Golem life 3→4; generic-vs-colorless family `add{1|2}` → `add{C}...`
+(Contested Cliffs, Mana Seism, Bounty of the Luxa, Mana Screw, Weaver of
+Currents, Soldevi Machinist); Fallen Ferromancer + Assemble from Parts cost
+drift (web-verified); optional-trigger errata via `may` (Soul's Attendant,
+Leyline of Vitality, Awakening Zone; Pirated Copy inverse). ENGINE_BLOCKED
+ledger: Soul of Shandalar linked-controller chain, Nicol Bolas -9
+targetedplayer→pw-controller, Grizzled Wolverine blocked-gated activation,
+Arms Scavenger equip-cost reduction (#MISSING), Liliana of the Veil -6
+two-pile, Flaccify half-mana cost. Residual watch: Old-Growth Troll nested
+create-then-tap rider unprobed (failure mode = status quo untapped token);
+Expedition Supplier self-ETB inclusion unprobed.
+
 **RESIDUE (complex composites, unconverted, logged):** Heart of Bogardan,
 Eternal Flame, Goblin Lyre, Landslide (second-target limit), Flames of the
 Blood Hand, Chandra Pyromaster (+1 choice-ladder), Curse of the Pierced Heart.

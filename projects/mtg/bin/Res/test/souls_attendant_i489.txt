@@ -9,6 +9,7 @@ manapool:{B}{B}
 [PLAYER2]
 [DO]
 black knight
+choice 0
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]

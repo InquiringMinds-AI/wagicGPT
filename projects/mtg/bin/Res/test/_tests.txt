@@ -1040,3 +1040,5 @@ probe/blightning_pw.txt
 probe/searing_flesh_pw.txt
 probe/keldon_champion_pw.txt
 probe/keldon_marauders_pw.txt
+probe/lanterns_lift.txt
+probe/soulhunter_swamps.txt

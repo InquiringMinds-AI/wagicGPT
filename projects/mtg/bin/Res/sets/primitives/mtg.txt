@@ -412,7 +412,7 @@ type=Artifact
 name=Abzan Battle Priest
 auto={W}{T}:counter(1/1) asSorcery
 auto=lord(creature[counter{1/1.1}]|mybattlefield) lifelink
-text=Outlast {W} ({W},{T}: Put a +1/+1 counter on this creature. Outlast only as a sorcery.) -- Each creature you control with a +1/+1 counter on it has first strike.
+text=Outlast {W} ({W},{T}: Put a +1/+1 counter on this creature. Outlast only as a sorcery.) -- Each creature you control with a +1/+1 counter on it has lifelink.
 mana={3}{W}
 type=Creature
 subtype=Human Cleric
@@ -2098,7 +2098,7 @@ toughness=1
 [card]
 name=Akoum Boulderfoot
 auto=damage:1 target(anytarget)
-text=Defender -- When Akoum Boulderfoot enters, it deals 1 damage to any target.
+text=When Akoum Boulderfoot enters, it deals 1 damage to any target.
 mana={4}{R}{R}
 type=Creature
 subtype=Giant Warrior
@@ -3353,7 +3353,7 @@ toughness=2
 name=Anafenza, the Foremost
 abilities=oppgcreatureexiler
 auto=_ATTACKING_counter(1/1) target(other creature[tapped]|mybattlefield)
-text=When Anafenza, the Foremost attacks, put a +1/+1 counter on another target tapped creature you control. -- If a creature card would be put into an opponent's graveyard from anywhere, exile it instead.
+text=When Anafenza, the Foremost attacks, put a +1/+1 counter on another target tapped creature you control. -- If a nontoken creature an opponent owns would die or a creature card not on the battlefield would be put into an opponent's graveyard, exile that card instead.
 mana={W}{B}{G}
 type=Legendary Creature
 subtype=Human Soldier
@@ -7915,7 +7915,7 @@ toughness=2
 name=Awaken the Ancient
 target=land[mountain]
 auto=transforms((Giant Creature,setpower=7,settoughness=7,red,haste))
-text=Enchant Mountain -- {2}: Enchanted Mountain becomes a 7/7 red Giant creature with haste. It's still a land.
+text=Enchant Mountain -- Enchanted Mountain is a 7/7 red Giant creature with haste. It's still a land.
 mana={1}{R}{R}{R}
 type=Enchantment
 subtype=Aura
@@ -7948,8 +7948,8 @@ type=Enchantment
 [/card]
 [card]
 name=Awakening Zone
-auto=@each my upkeep:_ELDRAZISPAWN_
-text=At the beginning of your upkeep, put a 0/1 colorless Eldrazi Spawn creature token onto the battlefield. It has "Sacrifice this creature: Add {1}."
+auto=@each my upkeep:may _ELDRAZISPAWN_
+text=At the beginning of your upkeep, you may create a 0/1 colorless Eldrazi Spawn creature token. It has "Sacrifice this token: Add {C}."
 mana={2}{G}
 type=Enchantment
 [/card]
@@ -10143,8 +10143,8 @@ subtype=Aura
 [card]
 name=Beasts of Bogardan
 abilities=protection from red
-auto=aslongas(*[white]|opponentBattlefield) 1/1
-text=Protection from red -- Beasts of Bogardan gets +1/+1 as long as an opponent controls a white permanent.
+auto=aslongas(*[-token;white]|opponentBattlefield) 1/1
+text=Protection from red -- Beasts of Bogardan gets +1/+1 as long as an opponent controls a nontoken white permanent.
 mana={4}{R}
 type=Creature
 subtype=Beast
@@ -16572,7 +16572,7 @@ toughness=2
 name=Caller of the Hunt
 auto=counter(0/1) notrg
 auto=chooseatype transforms((,newability[type:creature[chosentype]:battlefield/type:creature[chosentype]:battlefield cdaactive],newability[counter(0/1.-1) notrg])) forever chooseend
-text=As Caller of the Hunt enters, choose a creature type. -- Caller of the Hunt's power and toughness are each equal to the number of creatures of the chosen type on the battlefield.
+text=As an additional cost to cast this spell, choose a creature type. -- Caller of the Hunt's power and toughness are each equal to the number of creatures of the chosen type on the battlefield.
 mana={2}{G}
 type=Creature
 subtype=Human
@@ -18021,8 +18021,8 @@ type=Instant
 [/card]
 [card]
 name=Celestial Sword
-auto={3}{T}:target(creature|mybattlefield) transforms((,newability[phaseaction[end once] bury],newability[3/3])) ueot
-text={3}, {T}: Target creature you control gets +3/+3 until end of turn. Destroy it at the beginning of the next end step. A creature destroyed this way can't be regenerated.
+auto={3}{T}:target(creature|mybattlefield) transforms((,newability[phaseaction[end once] sacrifice],newability[3/3])) ueot
+text={3}, {T}: Target creature you control gets +3/+3 until end of turn. Its controller sacrifices it at the beginning of the next end step.
 mana={6}
 type=Artifact
 [/card]
@@ -21775,10 +21775,10 @@ toughness=3
 [/card]
 [card]
 name=Concussive Bolt
-target=player
+target=player,planeswalker
 auto=damage:4
 auto=aslongas(artifact|mybattlefield) all(creature|opponentbattlefield) cantblock ueot >2
-text=Concussive Bolt deals 4 damage to target player. -- Metalcraft - If you control three or more artifacts, creatures that player controls can't block this turn.
+text=Concussive Bolt deals 4 damage to target player or planeswalker. -- Metalcraft - If you control three or more artifacts, creatures controlled by that player or by that planeswalker's controller can't block this turn.
 mana={3}{R}{R}
 type=Sorcery
 [/card]
@@ -22254,9 +22254,9 @@ subtype=Aura
 [/card]
 [card]
 name=Contested Cliffs
-auto={T}:add{1}
+auto={T}:add{C}
 auto={R}{G}{T}:target(creature[beast]|mybattlefield) transforms((,newability[target(creature) dynamicability<!powerstrike eachother!>])) ueot
-text={T}: Add {1}. -- {R}{G}, {T}: Choose target Beast creature you control and target creature an opponent controls. Those creatures fight each other. (Each deals damage equal to its power to the other.)
+text={T}: Add {C}. -- {R}{G}, {T}: Target Beast creature you control fights target creature an opponent controls. (Each deals damage equal to its power to the other.)
 type=Land
 [/card]
 [card]
@@ -35754,8 +35754,8 @@ toughness=15
 [/card]
 [card]
 name=Enatu Golem
-auto=_DIES_life:3
-text=When Enatu Golem goes to the graveyard from the battlefield, you gain 3 life.
+auto=_DIES_life:4
+text=When Enatu Golem dies, you gain 4 life.
 mana={6}
 type=Artifact Creature
 subtype=Golem
@@ -38758,8 +38758,8 @@ toughness=2
 [card]
 name=Fallen Ferromancer
 abilities=infect
-auto={2}{R}{T}:damage:1 target(anytarget)
-text=Infect -- {2}{R}, {T}: Fallen Ferromancer deals 1 damage to any target.
+auto={1}{R}{T}:damage:1 target(anytarget)
+text=Infect -- {1}{R}, {T}: Fallen Ferromancer deals 1 damage to any target.
 mana={3}{R}
 type=Creature
 subtype=Phyrexian Human Shaman
@@ -39940,7 +39940,7 @@ type=Artifact
 [card]
 name=Ferrovore
 auto={R}{S(artifact|myBattlefield)}:3/0
-text={R}, sacrifice an artifact: Ferrovore gets +3/+3 until end of turn.
+text={R}, Sacrifice an artifact: Ferrovore gets +3/+0 until end of turn.
 mana={2}{R}
 type=Creature
 subtype=Beast
@@ -43878,9 +43878,9 @@ subtype=Aura
 [/card]
 [card]
 name=Fruit of the First Tree
-target=creature|mybattlefield
+target=creature
 auto=@movedto(mytgt|graveyard) from(Battlefield):choice life:toughness controller && draw:toughness controller
-text=Enchant creature you control -- When enchanted creature dies, you gain X life and draw X cards, where X is its toughness.
+text=Enchant creature -- When enchanted creature dies, you gain X life and draw X cards, where X is its toughness.
 mana={3}{G}
 type=Enchantment
 subtype=Aura
@@ -46641,7 +46641,7 @@ type=Land
 name=Glacial Stalker
 facedown={3}
 autofacedown={4}{U}:morph
-text=Morph {2}{W} (You may cast this face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)
+text=Morph {4}{U} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)
 mana={5}{U}
 type=Creature
 subtype=Elemental
@@ -52431,7 +52431,7 @@ toughness=2
 [card]
 name=Harmless Assault
 auto=preventAllCombatDamage from(creature[attacking]|battlefield) ueot
-text=Prevent all combat damage that would be dealt this turn.
+text=Prevent all combat damage that would be dealt this turn by attacking creatures.
 mana={2}{W}{W}
 type=Instant
 [/card]
@@ -55140,7 +55140,7 @@ auto=@each my upkeep:all(homarid[counter{0/0.4.Tide}]) removeallcounters(0/0,1,T
 auto=@each my upkeep:counter(0/0,1,Tide)
 auto=this(counter{0/0,1,Tide}=) -1/-1
 auto=this(counter{0/0,3,Tide}=) 1/1
-text=Homarid enters with a tide counter on it. -- At the beginning of your upkeep, put a tide counter on Homarid. -- As long as there is exactly one tide counter on Homarid, it gets -1/-1. -- As long as there are exactly three tide counters on Homarid, it gets +1/+1. -- Whenever there are four tide counters on Homarid, remove all tide counters from it.
+text=Homarid enters with a tide counter on it. -- At the beginning of your upkeep, put a tide counter on Homarid. -- As long as there is exactly one tide counter on Homarid, it gets -1/-1. -- As long as there are exactly three tide counters on Homarid, it gets +1/+1. -- Whenever there are four or more tide counters on Homarid, remove all tide counters from it.
 mana={2}{U}
 type=Creature
 subtype=Homarid
@@ -59136,7 +59136,7 @@ auto=lord(creature|mybattlefield) menace
 auto=preventalldamage to(creature[attacking]|mybattlefield)
 auto=this(variable{boros}<7) transforms((removetypes,newability[becomes(Legendary Enchantment God)]))
 auto=this(variable{boros}>6) transforms((Legendary Enchantment Creature))
-text=Indestructible -- As long as your devotion to red and white is less than seven, Iroas isn't a creature. -- Creatures you control can't be blocked except by two or more creatures. -- Prevent all damage that would be dealt to attacking creatures you control.
+text=Indestructible -- As long as your devotion to red and white is less than seven, Iroas isn't a creature. -- Creatures you control have menace. -- Prevent all damage that would be dealt to attacking creatures you control.
 mana={2}{R}{W}
 type=Legendary Enchantment Creature
 subtype=God
@@ -61184,7 +61184,7 @@ auto=this(counter{0/0.2.Level}) 1/2
 auto=this(counter{0/0.5.Level}) lord(other creature|myBattlefield) 1/1
 auto=this(counter{0/0.5.Level}) 1/2
 auto=maxlevel:5
-text=Level up {2}{W} -- [Level 2-4] Other creatures you control get +1/+1. (3/6) -- [Level 5+] Other creatures you control get +1/+1. (4/8)
+text=Level up {2}{W} -- [Level 2-4] Other creatures you control get +1/+1. (3/6) -- [Level 5+] Other creatures you control get +2/+2. (4/8)
 mana={3}{W}
 type=Creature
 subtype=Human Knight
@@ -65476,7 +65476,7 @@ auto=@each my upkeep:counter(0/0,-1,Depletion)
 auto={T}:Add{W} and!( counter(0/0,1,Depletion) )!
 auto={T}:Add{U} and!( counter(0/0,1,Depletion) )!
 auto=this(counter{0/0.1.Depletion}>=1) doesnotuntap
-text=Land Cap doesn't untap during your untap step if it has a depletion counter on it. -- At the beginning of your upkeep, remove a depletion counter from Land Cap. -- {T}: Add {W} or {B}. Put a depletion counter on Land Cap.
+text=Land Cap doesn't untap during your untap step if it has a depletion counter on it. -- At the beginning of your upkeep, remove a depletion counter from Land Cap. -- {T}: Add {W} or {U}. Put a depletion counter on Land Cap.
 type=Land
 [/card]
 [card]
@@ -66240,7 +66240,7 @@ toughness=3
 [card]
 name=Leaping Master
 auto={2}{W}:flying ueot
-text=Leaping Master gains flying until end of turn.
+text={2}{W}: Leaping Master gains flying until end of turn.
 mana={1}{R}
 type=Creature
 subtype=Human Monk
@@ -66667,8 +66667,8 @@ abilities=leyline
 [card]
 name=Leyline of Vitality
 auto=lord(creature|mybattlefield) 0/1
-auto=@movedTo(creature|mybattlefield):life:1
-text=If Leyline of Vitality is in your opening hand, you may begin the game with it on the battlefield. -- Creatures you control get +0/+1. -- Whenever a creature enters under your control, you gain 1 life.
+auto=@movedTo(creature|mybattlefield):may life:1
+text=If Leyline of Vitality is in your opening hand, you may begin the game with it on the battlefield. -- Creatures you control get +0/+1. -- Whenever a creature you control enters, you may gain 1 life.
 mana={2}{G}{G}
 type=Enchantment
 abilities=leyline
@@ -68392,8 +68392,8 @@ toughness=2
 [/card]
 [card]
 name=Lorescale Coatl
-auto=@drawof(player):may counter(1/1)
-text=Whenever you draw a card, you may put a +1/+1 counter on Lorescale Coatl.
+auto=@drawof(player):counter(1/1)
+text=Whenever you draw a card, put a +1/+1 counter on Lorescale Coatl.
 mana={1}{G}{U}
 type=Creature
 subtype=Snake
@@ -70095,7 +70095,7 @@ toughness=3
 [card]
 name=Magus of the Will
 auto={2}{B}{T}{E}:name(Can play from graveyard) emblem transforms((,newability[lord(*|mygraveyard) canPlayFromGraveyard],newability[@movedTo(*|mygraveyard):all(trigger[to]) moveTo(exile)])) ueot
-text={2}{B}, {T}, Exile Magus of the Will: Until end of turn, you may play cards from your graveyard. If a card would be put into your graveyard from anywhere this turn, exile that card instead.
+text={2}{B}, {T}, Exile Magus of the Will: Until end of turn, you may play lands and cast spells from your graveyard. If a card would be put into your graveyard from anywhere this turn, exile that card instead.
 mana={2}{B}
 type=Creature
 subtype=Human Wizard
@@ -70516,8 +70516,8 @@ type=Artifact
 [card]
 name=Mana Seism
 target=<anyamount>land|myBattlefield
-auto=sacrifice && add{1}
-text=Sacrifice any number of lands. Add {1} for each land sacrificed this way.
+auto=sacrifice && add{C}
+text=Sacrifice any number of lands, then add that much {C}.
 mana={1}{R}
 type=Sorcery
 [/card]
@@ -73030,7 +73030,7 @@ name=Merfolk Skyscout
 abilities=flying
 auto=_ATTACKING_untap target(*)
 auto=@combat(blocking) source(this):untap target(*)
-text=Merchant Ship can't attack unless defending player controls an Island. -- Whenever Merchant Ship attacks and isn't blocked, you gain 2 life. -- When you control no Islands, sacrifice Merchant Ship.
+text=Flying -- Whenever Merfolk Skyscout attacks or blocks, untap target permanent.
 mana={2}{U}{U}
 type=Creature
 subtype=Merfolk Scout
@@ -81755,7 +81755,8 @@ auto=@each combatbegins restriction{type(*[lifelink]|mybattlefield)~morethan~0}:
 auto=@each combatbegins restriction{type(*[reach]|mybattlefield)~morethan~0}:all(creature|mybattlefield) reach ueot
 auto=@each combatbegins restriction{type(*[trample]|mybattlefield)~morethan~0}:all(creature|mybattlefield) trample ueot
 auto=@each combatbegins restriction{type(*[vigilance]|mybattlefield)~morethan~0}:all(creature|mybattlefield) vigilance ueot
-text=at the beginning of each combat, creatures you control gain first strike until end of turn if you control a creature with first strike, the same is true for lying, deathtouch, double strike, haste, hexproof, indestructible, lifelink, reach, trample, and vigilance
+auto=@each combatbegins restriction{type(*[skulk]|mybattlefield)~morethan~0}:all(creature|mybattlefield) skulk ueot
+text=At the beginning of each combat, creatures you control gain first strike until end of turn if a creature you control has first strike. The same is true for flying, deathtouch, double strike, haste, hexproof, indestructible, lifelink, menace, reach, skulk, trample, and vigilance.
 mana={3}{W}
 type=Legendary Creature
 subtype=Human Soldier
@@ -86698,9 +86699,9 @@ type=Instant
 [card]
 name=Pilfered Plans
 target=player
-auto=deplete:3
+auto=deplete:2
 auto=draw:2 controller
-text=Target player mills three cards. -- Draw two cards.
+text=Target player mills two cards. -- Draw two cards.
 mana={1}{U}{B}
 type=Sorcery
 [/card]
@@ -96053,7 +96054,7 @@ auto=@each my upkeep:counter(0/0,-1,Depletion)
 auto={T}:Add{U} and!( counter(0/0,1,Depletion) )!
 auto={T}:Add{B} and!( counter(0/0,1,Depletion) )!
 auto=this(counter{0/0.1.Depletion}>=1) doesnotuntap
-text=River Delta doesn't untap during your untap step if it has a depletion counter on it. -- At the beginning of your upkeep, remove a depletion counter from River Delta. -- {T}: Add {W} or {B}. Put a depletion counter on River Delta.
+text=River Delta doesn't untap during your untap step if it has a depletion counter on it. -- At the beginning of your upkeep, remove a depletion counter from River Delta. -- {T}: Add {U} or {B}. Put a depletion counter on River Delta.
 type=Land
 [/card]
 [card]
@@ -108946,8 +108947,8 @@ name=Soldevi Excavations
 aicode=activate transforms((,newability[all(*[zpos<=1]|mylibrary) transforms((,newability[may name(Put on bottom of library) moveto(myreveal) and!( bottomoflibrary )!])) oneshot])) oneshot
 auto={1}{T}:name(Scry 1) _SCRY1_
 auto=if type(island[-tapped]|mybattlefield)~morethan~0 then sacrifice notaTarget(island[-tapped]|mybattlefield) oneshot else sacrifice
-auto={T}:add{1}{U}
-text=If Soldevi Excavations would enter the battlefield, sacrifice an untapped Island instead. If you do, put Soldevi Excavations onto the battlefield. If you don't, put it into its owner's graveyard. -- {T}: Add {1}{U}. -- {1}, {T}: Scry 1.
+auto={T}:add{C}{U}
+text=If Soldevi Excavations would enter the battlefield, sacrifice an untapped Island instead. If you do, put Soldevi Excavations onto the battlefield. If you don't, put it into its owner's graveyard. -- {T}: Add {C}{U}. -- {1}, {T}: Scry 1.
 type=Land
 [/card]
 [card]
@@ -109874,8 +109875,8 @@ toughness=6
 [/card]
 [card]
 name=Soul's Attendant
-auto=@movedTo(other creature|battlefield):life:1
-text=Whenever another creature enters, you gain 1 life.
+auto=@movedTo(other creature|battlefield):may life:1
+text=Whenever another creature enters, you may gain 1 life.
 mana={W}
 type=Creature
 subtype=Human Cleric
@@ -110958,7 +110959,7 @@ type=Instant
 [/card]
 [card]
 name=Spike Breeder
-text=Spike Breeder enters with a +1/+1 counter on it. -- {2}, Remove a +1/+1 counter from Spike Breeder: Put a +1/+1 counter on target creature. -- {2}, Remove a +1/+1 counter from Spike Breeder: Put a 1/1 green Spike creature token onto the battlefield.
+text=Spike Breeder enters with three +1/+1 counters on it. -- {2}, Remove a +1/+1 counter from Spike Breeder: Put a +1/+1 counter on target creature. -- {2}, Remove a +1/+1 counter from Spike Breeder: Create a 1/1 green Spike creature token.
 mana={3}{G}
 type=Creature
 subtype=Spike
@@ -110970,7 +110971,7 @@ toughness=0
 [/card]
 [card]
 name=Spike Colony
-text=Spike Colony enters with a +1/+1 counter on it. -- {2}, Remove a +1/+1 counter from Spike Colony: Put a +1/+1 counter on target creature.
+text=Spike Colony enters with four +1/+1 counters on it. -- {2}, Remove a +1/+1 counter from Spike Colony: Put a +1/+1 counter on target creature.
 mana={4}{G}
 type=Creature
 subtype=Spike
@@ -110992,7 +110993,7 @@ toughness=0
 [/card]
 [card]
 name=Spike Feeder
-text=Spike Feeder enters with a +1/+1 counter on it. -- {2}, Remove a +1/+1 counter from Spike Feeder: Put a +1/+1 counter on target creature. -- {2}, Remove a +1/+1 counter from Spike Feeder: You gain 2 life.
+text=Spike Feeder enters with two +1/+1 counters on it. -- {2}, Remove a +1/+1 counter from Spike Feeder: Put a +1/+1 counter on target creature. -- Remove a +1/+1 counter from Spike Feeder: You gain 2 life.
 mana={1}{G}{G}
 type=Creature
 subtype=Spike
@@ -111004,7 +111005,7 @@ toughness=0
 [/card]
 [card]
 name=Spike Hatcher
-text=Spike Hatcher enters with a +1/+1 counter on it. -- {2}, Remove a +1/+1 counter from Spike Hatcher: Put a +1/+1 counter on target creature. -- {2}, Remove a +1/+1 counter from Spike Hatcher: Regenerate Spike Hatcher.
+text=Spike Hatcher enters with six +1/+1 counters on it. -- {2}, Remove a +1/+1 counter from Spike Hatcher: Put a +1/+1 counter on target creature. -- {1}, Remove a +1/+1 counter from Spike Hatcher: Regenerate Spike Hatcher.
 mana={6}{G}
 type=Creature
 subtype=Spike
@@ -111038,7 +111039,7 @@ toughness=0
 [/card]
 [card]
 name=Spike Soldier
-text=Spike Soldier enters with a +1/+1 counter on it. -- {2}, Remove a +1/+1 counter from Spike Soldier: Put a +1/+1 counter on target creature. -- {2}, Remove a +1/+1 counter from Spike Soldier: Spike Soldier gets +2/+2 until end of turn.
+text=Spike Soldier enters with three +1/+1 counters on it. -- {2}, Remove a +1/+1 counter from Spike Soldier: Put a +1/+1 counter on target creature. -- Remove a +1/+1 counter from Spike Soldier: Spike Soldier gets +2/+2 until end of turn.
 mana={2}{G}{G}
 type=Creature
 subtype=Spike Soldier
@@ -111074,7 +111075,7 @@ toughness=0
 [/card]
 [card]
 name=Spike Worker
-text=Spike Worker enters with a +1/+1 counter on it. -- {2}, Remove a +1/+1 counter from Spike Worker: Put a +1/+1 counter on target creature.
+text=Spike Worker enters with two +1/+1 counters on it. -- {2}, Remove a +1/+1 counter from Spike Worker: Put a +1/+1 counter on target creature.
 mana={2}{G}
 type=Creature
 subtype=Spike
@@ -115563,7 +115564,7 @@ abilities=sunburst
 auto=counter(1/1,sunburst)
 auto={C(1/1,-1)}{4}{T}:destroy target(creature)
 auto={C(1/1,-1)}{2}:moveTo(hand)
-text=Sunburst (This enters with a +1/+1 counter on it for each color of mana spent to cast it.) -- Remove two +1/+1 counters from Sawtooth Thresher: Sawtooth Thresher gets +4/+4 until end of turn.
+text=Sunburst (This creature enters with a +1/+1 counter on it for each color of mana spent to cast it.) -- {4}, {T}, Remove a +1/+1 counter from Suncrusher: Destroy target creature. -- {2}, Remove a +1/+1 counter from Suncrusher: Return Suncrusher to its owner's hand.
 mana={9}
 type=Artifact Creature
 subtype=Construct
@@ -124056,7 +124057,7 @@ type=Artifact
 name=Triassic Egg
 auto={3}{T}:counter(0/0,1,Hatchling)
 auto={C(0/0,-2,Hatchling)}{S}:moveTo(myBattlefield) target(other creature|myhand,mygraveyard)
-text={3}{T}: Put a hatchling counter on Triassic Egg. -- Remove two hatchling counters from Triassic Egg, Sacrifice Triassic Egg: You may put a creature card from your hand or graveyard onto the battlefield.
+text={3}, {T}: Put a hatchling counter on Triassic Egg. -- Sacrifice Triassic Egg: Choose one -- Activate only if there are two or more hatchling counters on Triassic Egg. -- * You may put a creature card from your hand onto the battlefield. -- * Return target creature card from your graveyard to the battlefield.
 mana={4}
 type=Artifact
 [/card]
@@ -129339,7 +129340,7 @@ name=Viridian Claw
 auto={1}:equip
 auto=teach(creature) 1/0
 auto=teach(creature) first strike
-text=Equipped creature gets +1/+0 and has first strike. -- Equip {2}
+text=Equipped creature gets +1/+0 and has first strike. -- Equip {1}
 mana={2}
 type=Artifact
 subtype=Equipment
@@ -135682,7 +135683,7 @@ name=World at War
 auto=nextphasealter(add,combatphaseswithmain,controller,after<postbattle>)
 auto=all(creature|mybattlefield) transforms((,newability[@each my combatends turnlimited:phaseaction[combatbegins once sourceinplay] untap])) ueot
 auto=_REBOUND_
-text=After the first second main phase this turn, there's an additional combat phase followed by an additional main phase. At the beginning of that combat, untap all creatures that attacked this turn. -- Rebound (If you cast this spell from your hand, exile it as it resolves. At the beginning of your next upkeep, you may cast this card from exile without paying its mana cost.)
+text=After the second main phase this turn, there's an additional combat phase followed by an additional main phase. At the beginning of that combat, untap all creatures that attacked this turn. -- Rebound (If you cast this spell from your hand, exile it as it resolves. At the beginning of your next upkeep, you may cast this card from exile without paying its mana cost.)
 mana={3}{R}{R}
 type=Sorcery
 [/card]
@@ -136538,7 +136539,7 @@ name=Yawgmoth's Agenda
 abilities=mygraveexiler
 auto=lord(*|mygraveyard) canPlayFromGraveyard
 auto=maxCast(*)1
-text=You can't cast more than one spell each turn. -- You may play cards from your graveyard. -- If a card would be put into your graveyard from anywhere, exile it instead.
+text=You can't cast more than one spell each turn. -- You may play lands and cast spells from your graveyard. -- If a card would be put into your graveyard from anywhere, exile it instead.
 mana={3}{B}{B}
 type=Enchantment
 [/card]

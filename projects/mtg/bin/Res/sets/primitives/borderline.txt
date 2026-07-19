@@ -2681,7 +2681,7 @@ abilities=exiledeath
 backside=Kindly Ancestor
 target=creature
 auto=teach(creature) lifelink
-text=Enchant creature -- Enchanted creature has lifelink. // Kindly Ancestor
+text=Enchant creature -- Enchanted creature has lifelink. -- If Ancestor's Embrace would be put into a graveyard from anywhere, exile it instead. // Kindly Ancestor
 color=white
 type=Enchantment
 subtype=Aura
@@ -5828,7 +5828,7 @@ name=Aspect of Lamprey
 target=creature|myBattlefield
 auto=target(opponent) ability$!name(discard 2 cards) target(<2>*|myhand) reject!$ targetedplayer
 auto=teach(creature) lifelink
-text=Enchant creature -- When Strands of Undeath enters, target player discards two cards. -- {B}: Regenerate enchanted creature.
+text=Enchant creature you control -- When Aspect of Lamprey enters, target opponent discards two cards. -- Enchanted creature has lifelink.
 mana={3}{B}
 type=Enchantment
 subtype=Aura
@@ -5917,8 +5917,8 @@ type=Sorcery
 name=Assemble from Parts
 target=creature|mygraveyard
 auto=counter(0/0.1.PerpetualAssemble) notrg
-auto=emblem transforms((,newability[lord(*[counter{0/0.1.PerpetualAssemble}]|graveyard) transforms((,newability[{3}{B}:name(Shuffle and copy) moveto(myexile) and!( moveto(mylibrary) and!( clone and!( transforms((Zombie,black,setpower=4,settoughness=4,newability[shuffle])) forever )! )! )! asSorcery]))])) forever dontremove
-text=Target creature card in your graveyard perpetually gains "{3}{B}, Exile this card from your graveyard: Shuffle it into your library. Create a token that's a copy of it, except it's a 4/4 black Zombie in addition to its other types. Activate only as a sorcery."
+auto=emblem transforms((,newability[lord(*[counter{0/0.1.PerpetualAssemble}]|graveyard) transforms((,newability[{1}{B}{B}:name(Shuffle and copy) moveto(myexile) and!( moveto(mylibrary) and!( clone and!( transforms((Zombie,black,setpower=4,settoughness=4,newability[shuffle])) forever )! )! )! asSorcery]))])) forever dontremove
+text=Target creature card in your graveyard perpetually gains "{1}{B}{B}, Exile this card from your graveyard: Shuffle it into its owner's library. Create a token that's a copy of it, except it's a 4/4 black Zombie in addition to its other types. Activate only as a sorcery."
 mana={B}
 type=Instant
 [/card]
@@ -8290,7 +8290,7 @@ auto=this(variable{type:creature[cleric;rogue;warrior;wizard]:myrestrictedcastin
 auto=this(variable{type:creature[cleric;rogue;warrior;wizard]:mybattlefield}>0) {T}:add{U}
 auto=this(variable{type:creature[cleric;rogue;warrior;wizard]:myrestrictedcastingzone}>0) {T}:add{G}
 auto=this(variable{type:creature[cleric;rogue;warrior;wizard]:mybattlefield}>0) {T}:add{G}
-text={T}: Add {C}. -- {T}: Add one mana of any color. Spend this mana only to cast a Cleric, Rogue, Warrior, or Wizard spell, or to activate an ability of a Cleric, Rogue, Warrior, or Wizard.
+text=This land enters tapped. -- {T}: Add {C}. -- {T}: Add one mana of any color. Spend this mana only to cast a Cleric, Rogue, Warrior, or Wizard spell, or to activate an ability of a Cleric, Rogue, Warrior, or Wizard.
 type=Land
 [/card]
 [card]
@@ -11065,9 +11065,8 @@ type=Land
 [/card]
 [card]
 name=Blind Fury
-restriction=before battle damage
 auto=all(creature) transforms((,newability[-trample],newability[@combatdamaged(creature) from(this):damage:thatmuch all(trigger[to])])) ueot
-text=Cast Blind Fury only before the combat damage step. -- All creatures lose trample until end of turn. If a creature would deal combat damage to a creature this turn, it deals double that damage to that creature instead.
+text=All creatures lose trample until end of turn. If a creature would deal combat damage to a creature this turn, it deals double that damage to that creature instead.
 mana={2}{R}{R}
 type=Instant
 [/card]
@@ -13383,8 +13382,8 @@ type=Instant
 [card]
 name=Bounty of the Luxa
 auto=@each my firstmain restriction{compare(hascntflood)~equalto~0}:name(Put counter and draw) name(Put counter and draw) counter(0/0,1,flood) && draw:1 controller
-auto=@each my firstmain restriction{compare(hascntflood)~morethan~0}:name(Remove all counters and add mana) name(Remove all counters and add mana) removeallcounters(0/0,1,flood) && add{1}{G}{U} controller
-text=At the beginning of your precombat main phase, remove all flood counters from Bounty of the Luxa. If no counters were removed this way, put a flood counter on Bounty of the Luxa and draw a card. Otherwise, add {1}{G}{U}.
+auto=@each my firstmain restriction{compare(hascntflood)~morethan~0}:name(Remove all counters and add mana) name(Remove all counters and add mana) removeallcounters(0/0,1,flood) && add{C}{G}{U} controller
+text=At the beginning of your first main phase, remove all flood counters from Bounty of the Luxa. If no counters were removed this way, put a flood counter on Bounty of the Luxa and draw a card. Otherwise, add {C}{G}{U}.
 mana={2}{G}{U}
 type=Enchantment
 [/card]
@@ -14081,7 +14080,7 @@ other={2}{G} name(Adventure)
 auto=alternative _SAPROLINGTOKEN_*2
 auto=lord(*[Fungus;Saproling]|mybattlefield) {T}:Add{G}
 auto=@each my end:_SAPROLINGTOKEN_
-text=Each Fungus and Saproling you control has "{T}: Add {G}." -- At the beginning of your end step, create a 1/1 green Saproling creature token.
+text=Each Fungus and Saproling you control has "{T}: Add {G}." -- At the beginning of your end step, create a 1/1 green Saproling creature token. -- Create two 1/1 green Saproling creature tokens. (Then exile this card. You may cast the creature later from exile.)
 mana={3}{G}
 type=Creature
 subtype=Badger Druid
@@ -14957,7 +14956,7 @@ auto=if type(creature[-tapped]|myBattlefield)~morethan~16 then choice name(Tap 1
 auto=if type(creature[-tapped]|myBattlefield)~morethan~17 then choice name(Tap 18 creatures) name(Tap 18 creatures) damage:54 && ability$!name(Tap 18 creatures) name(Tap 18 creatures) target(<18>creature|myBattlefield) tap!$ controller
 auto=if type(creature[-tapped]|myBattlefield)~morethan~18 then choice name(Tap 19 creatures) name(Tap 19 creatures) damage:57 && ability$!name(Tap 19 creatures) name(Tap 19 creatures) target(<19>creature|myBattlefield) tap!$ controller
 auto=if type(creature[-tapped]|myBattlefield)~morethan~19 then choice name(Tap 20 creatures) name(Tap 20 creatures) damage:60 && ability$!name(Tap 20 creatures) name(Tap 20 creatures) target(<20>creature|myBattlefield) tap!$ controller
-text=As an additional cost to cast Burn at the Stake, tap any number of untapped creatures you control. -- Burn at the Stake deals damage to target creature or player equal to three times the number of creatures tapped this way.
+text=As an additional cost to cast Burn at the Stake, tap any number of untapped creatures you control. -- Burn at the Stake deals damage to any target equal to three times the number of creatures tapped this way.
 mana={2}{R}{R}{R}
 type=Sorcery
 [/card]
@@ -18552,7 +18551,7 @@ name=Charred Graverobber
 auto=target(Assassin,Mercenary,Pirate,Rogue,Warlock|mygraveyard) moveto(hand)
 retrace={3}{B}{B}{E(other *|myGraveyard)}{E(other *|myGraveyard)}{E(other *|myGraveyard)}{E(other *|myGraveyard)} name(Escape)
 auto=if paid(retrace) then counter(1/1)
-text=When Charred Graverobber enters, return target outlaw card from your graveyard to your hand. -- Escape-{3}{B}, Exile four other cards from your graveyard. (You may cast this card from your graveyard for its escape cost.) -- Charred Graverobber escapes with a +1/+1 counter on it.
+text=When Charred Graverobber enters, return target outlaw card from your graveyard to your hand. -- Escape-{3}{B}{B}, Exile four other cards from your graveyard. (You may cast this card from your graveyard for its escape cost.) -- Charred Graverobber escapes with a +1/+1 counter on it.
 mana={2}{B}
 type=Creature
 subtype=Skeleton Mercenary
@@ -18678,8 +18677,8 @@ toughness=3
 [card]
 name=Chicken Egg
 auto=@each my upkeep:rolld6 6 winability donothing winabilityend rolld6end
-auto=@dierolled(this) result(6) from(controller):all(this) sacrifice && token(Giant Chicken,Creature Giant Chicken,4/4,red) myupkeeponly
-text=During your upkeep, roll a six-sided die. On a 6, sacrifice Chicken Egg and put a Giant Chicken token into play. Treat this token as a 4/4 red creature that counts as a Chicken.
+auto=@dierolled(this) result(6) from(controller):all(this) sacrifice && token(Giant Bird,Creature Giant Bird,4/4,red) myupkeeponly
+text=At the beginning of your upkeep, roll a six-sided die. If you roll a 6, sacrifice Chicken Egg and create a 4/4 red Giant Bird creature token.
 mana={1}{R}
 type=Creature
 subtype=Egg
@@ -25439,9 +25438,9 @@ type=Sorcery
 [/card]
 [card]
 name=Davriel's Withering
-target=creature
+target=creature|opponentbattlefield
 auto=counter(-1/-2,1,PerpetualPT)
-text=Target creature perpetually gets -1/-2.
+text=Target creature an opponent controls perpetually gets -1/-2.
 mana={B}
 type=Instant
 [/card]
@@ -36750,8 +36749,8 @@ toughness=2
 [card]
 name=Expedition Supplier
 auto=name(Conjure a card) conjure cards(Utility Knife) zone(mybattlefield)
-auto=@movedTo(other *[human]|myBattlefield) turnlimited:name(Conjure a card) conjure cards(Utility Knife) zone(mybattlefield)
-text=Whenever Expedition Supplier or another Human enters under your control, conjure a card named Utility Knife onto the battlefield. This ability triggers only once each turn.
+auto=@movedTo(other *[human;warrior]|myBattlefield) turnlimited:name(Conjure a card) conjure cards(Utility Knife) zone(mybattlefield)
+text=Whenever one or more Humans and/or Warriors you control enter, conjure a card named Utility Knife onto the battlefield. This ability triggers only once each turn.
 mana={2}{W}
 type=Creature
 subtype=Human Warrior
@@ -43001,7 +43000,8 @@ toughness=5
 name=Furnace of Rath
 auto=@damaged(creature) from(*[-Furnace of Rath]|*):damage:thatmuch all(trigger[to])
 auto=@damaged(player) from(*[-Furnace of Rath]|*):damage:thatmuch all(trigger[to])
-text=If a source would deal damage to a creature or player, it deals double that damage to that creature or player instead.
+auto=@damaged(planeswalker) from(*[-Furnace of Rath]|*):damage:thatmuch all(trigger[to])
+text=If a source would deal damage to a permanent or player, it deals double that damage to that permanent or player instead.
 mana={1}{R}{R}{R}
 type=Enchantment
 [/card]
@@ -46352,7 +46352,7 @@ abilities=foretell,flash,flying
 autohand=_FORETELL_
 autoexile={2}{W} restriction{compare(canforetellcast)~morethan~0}:name(Cast with foretell) name(Cast with foretell) activate castcard(alternative)
 auto=may name(Exile non-angel creatures) target(<anyamount>creature[-angel]|mybattlefield) (blink)forsrc
-text=Flash -- Flying -- When Glorious Protector enters, you may exile any number of non-Angel creatures you control until Glorious Protector leaves the battlefield.
+text=Flash -- Flying -- When Glorious Protector enters, you may exile any number of non-Angel creatures you control until Glorious Protector leaves the battlefield. -- Foretell {2}{W}
 mana={2}{W}{W}
 type=Creature
 subtype=Angel Cleric
@@ -50434,7 +50434,7 @@ partner=Pako, Arcane Retriever
 auto=_PARTNER_
 auto=lord(*[-creature;counter{0/0.1.Fetch}]|myexile) transforms((,newability[canplayfromexile],newability[anytypeofmana]))
 auto={0}:name(Cast opponent card) name(Cast opponent card) target(*[-creature;counter{0/0.1.Fetch}]|opponentexile) moveto(myexile) and!( transforms((,newability[counter(0/0.1.Fetch)],newability[phaseaction[end once checkex] moveTo(ownerexile)],newability[phaseaction[untap once checkex] counter(0/0.1.Fetch)])) ueot )!
-text=Partner with Pako, Arcane Retriever (When this creature enters, target player may put Pako into their hand from their library, then shuffle.) -- You may play noncreature cards from exile with fetch counters on them if you exiled them, and you may spend mana as though it were mana of any color to cast those spells.
+text=Partner with Pako, Arcane Retriever (When this creature enters, target player may put Pako into their hand from their library, then shuffle.) -- You may play lands and cast noncreature spells from among cards you exiled that have fetch counters on them, and you may spend mana as though it were mana of any color to cast those spells.
 mana={2}{U}
 type=Legendary Creature
 subtype=Human Wizard
@@ -64397,7 +64397,7 @@ name=Laelia, the Blade Reforged
 abilities=haste
 auto=_ATTACKING_name(Exile top card) all(*[zpos=1]|mylibrary) moveto(myexile) and!( transforms((,newability[canplayfromexile])) ueot )!
 auto=@movedto(*|myexile) from(mylibrary,mygraveyard):name(Put 1/1 counter) counter(1/1)
-text=Haste -- Whenever Laelia, the Blade Reforged attacks, exile the top card of your library. You may play that card this turn. -- Whenever a spell or ability you control exiles one or more cards from your library and/or your graveyard, put a +1/+1 counter on Laelia.
+text=Haste -- Whenever Laelia, the Blade Reforged attacks, exile the top card of your library. You may play that card this turn. -- Whenever one or more cards are put into exile from your library and/or your graveyard, put a +1/+1 counter on Laelia.
 mana={2}{R}
 type=Legendary Creature
 subtype=Spirit Warrior
@@ -64589,7 +64589,9 @@ name=Lanterns' Lift
 abilities=exiledeath
 backside=Lantern Bearer
 target=creature
-text=Enchant creature -- Enchanted creature gets +1/+1 and has flying. // Lantern Bearer
+auto=teach(creature) 1/1
+auto=teach(creature) flying
+text=Enchant creature -- Enchanted creature gets +1/+1 and has flying. -- If Lanterns' Lift would be put into a graveyard from anywhere, exile it instead. // Lantern Bearer
 color=blue
 type=Enchantment
 subtype=Aura
@@ -69435,8 +69437,8 @@ type=Enchantment
 [/card]
 [card]
 name=Mana Screw
-auto={1}:flipacoin winability add{2} winabilityend flipend
-text={1}: Flip a coin. If you win the flip, add {2}. Play this ability only any time you could play an instant.
+auto={1}:flipacoin winability add{C}{C} winabilityend flipend
+text={1}: Flip a coin. If you win the flip, add {C}{C}. Activate only as an instant.
 mana={1}
 type=Artifact
 [/card]
@@ -72006,9 +72008,9 @@ toughness=3
 name=Millicent, Restless Revenant
 abilities=flying
 anyzone=affinity(spirit|mybattlefield) reduce({1})
-auto=@damaged(player) from(spirit[-token]|myBattlefield):name(Create Spirit) _SPIRITTOKEN_
+auto=@combatdamaged(player) from(spirit[-token]|myBattlefield):name(Create Spirit) _SPIRITTOKEN_
 auto=@movedto(spirit[-token]|graveyard) from(myBattlefield):name(Create Spirit) _SPIRITTOKEN_
-text=This spell costs {1} less to cast for each Spirit you control. -- Flying -- Whenever Millicent, Restless Revenant or another nontoken Spirit you control dies or deals damage to a player, create a 1/1 white Spirit creature token with flying.
+text=This spell costs {1} less to cast for each Spirit you control. -- Flying -- Whenever Millicent, Restless Revenant or another nontoken Spirit you control dies or deals combat damage to a player, create a 1/1 white Spirit creature token with flying.
 mana={5}{W}{U}
 type=Legendary Creature
 subtype=Spirit Soldier
@@ -72547,7 +72549,7 @@ type=Sorcery
 name=Mire's Grasp
 target=creature
 auto=-3/-3
-text=Enchant creature -- Enchanted creature gets -2/-2.
+text=Enchant creature -- Enchanted creature gets -3/-3.
 mana={1}{B}
 type=Enchantment
 subtype=Aura
@@ -76276,7 +76278,7 @@ toughness=3
 name=Necropolis Fiend
 abilities=flying
 auto={X}{T}{E<X>(*|myGraveyard)}: target(creature) -X/-X ueot
-text=Flying -- Delve (You may exile any number of cards from your graveyard as you cast this spell. It costs {1} less to cast for each card exiled this way.)
+text=Delve (Each card you exile from your graveyard while casting this spell pays for {1}.) -- Flying -- {X}, {T}, Exile X cards from your graveyard: Target creature gets -X/-X until end of turn.
 mana={7}{B}{B}
 other={delve} name(Delve)
 type=Creature
@@ -77341,7 +77343,7 @@ toughness=3
 name=Nightveil Specter
 abilities=flying
 auto=@combatdamaged(player) from(this):moveto(exile) and!( transforms((,canplayfromexile)))! all(*[zpos=1]|opponentlibrary)
-text=Whenever Nightveil Specter deals combat damage to a player, that player exiles the top card of their library. -- You may play cards exiled with Nightveil Specter.
+text=Flying -- Whenever Nightveil Specter deals combat damage to a player, that player exiles the top card of their library. -- You may play lands and cast spells from among cards exiled with Nightveil Specter.
 mana={UB}{UB}{UB}
 type=Creature
 subtype=Specter
@@ -78148,7 +78150,7 @@ name=Nullpriest of Oblivion
 abilities=menace,lifelink
 kicker={3}{B}
 auto=if paid(kicker) then moveTo(myBattlefield) target(creature|myGraveyard)
-text=Kicker {4}{B} -- Menace, lifelink -- When Nullpriest of Oblivion enters, if it was kicked, return target creature card from your graveyard to the battlefield.
+text=Kicker {3}{B} -- Menace, lifelink -- When Nullpriest of Oblivion enters, if it was kicked, return target creature card from your graveyard to the battlefield.
 mana={1}{B}
 type=Creature
 subtype=Vampire Cleric
@@ -79066,9 +79068,9 @@ toughness=4
 name=Oglor, Devoted Assistant
 aicode=activate transforms((,newability[target(*[zpos<=2]|mylibrary) moveto(mygraveyard)])) ueot
 auto=@each my upkeep:name(Look top 2 card) reveal:2 optionone name(Put in graveyard) target(*|reveal) moveto(mylibrary) and!( moveto(mygraveyard) )! optiononeend optiontwo name(Put back) target(*|reveal) moveto(mylibrary) optiontwoend revealend
-auto=@movedto(creature|mygraveyard) from(mylibrary):name(Gains ability) all(trigger[to]) name(Gains ability) counter(0/0.1.PerpetualZombie) notrg
+auto=@movedto(creature|mygraveyard) from(mylibrary,myhand):name(Gains ability) all(trigger[to]) name(Gains ability) counter(0/0.1.PerpetualZombie) notrg
 auto=emblem transforms((,newability[@movedto(*|myzones) from(mygraveyard):name(Create zombie) all(trigger[to]) name(Create zombie) transforms((,newability[if compare(hascntperpetualzombie)~morethan~0 then _ZOMBIETOKEN_ and!( tap(noevent) )!])) oneshot])) forever dontremove
-text=At the beginning of your upkeep, look at the top two cards of your library, then put one of them into your graveyard. -- Whenever a creature card is put into your graveyard from your library, it perpetually gains "When this card leaves your graveyard, create a 2/2 tapped black Zombie creature token."
+text=At the beginning of your upkeep, look at the top two cards of your library, then put one of them into your graveyard. -- Whenever a creature card is put into your graveyard from your library or hand, it perpetually gains "When this card leaves your graveyard, create a 2/2 tapped black Zombie creature token."
 mana={1}{U}
 type=Legendary Creature
 subtype=Homunculus
@@ -79460,11 +79462,11 @@ type=Land
 name=Old-Growth Troll
 abilities=trample
 auto=this(cantargetcard(*[creature]) transforms((,newability[_DIES_name(Return as enchantment) target(Old-Growth Troll[fresh]|mygraveyard) activate castcard(alternative)]))
-auto=alternative name(Enchant Forest) name(Enchant Forest) target(land[forest]|mybattlefield) transforms((,newability[counter(0/0.1.TrollEffect)],newability[this(counter{0/0.1.TrollEffect}>0) {T}:add{G}{G}],newability[this(counter{0/0.1.TrollEffect}>0) {1}{T}{S}:token(Troll^Creature Troll Warrior^4/4^green^trample)])) forever
+auto=alternative name(Enchant Forest) name(Enchant Forest) target(land[forest]|mybattlefield) transforms((,newability[counter(0/0.1.TrollEffect)],newability[this(counter{0/0.1.TrollEffect}>0) {T}:add{G}{G}],newability[this(counter{0/0.1.TrollEffect}>0) {1}{T}{S}:token(Troll^Creature Troll Warrior^4/4^green^trample) and!( tap(noevent) )!])) forever
 auto=alternative transforms((removetypes,newability[becomes(enchantment aura)])) forever
 auto=alternative transforms((,newability[_DIES_name(Terminate effect) target(forest[counter{0/0.1.TrollEffect}]|mybattlefield) counter(0/0.-1.TrollEffect)]))
 auto=alternative transforms((,newability[@movedTo(forest[counter{0/0.1.TrollEffect}]|mygraveyard) from(mybattlefield):name(Terminate effect) target(Old-Growth Troll[aura]|mybattlefield) moveto(mygraveyard)]))
-text=Trample -- When Old-Growth Troll dies, if it was a creature, return it to the battlefield. it's an Aura enchantment with enchant Forest you control and Enchanted Forest has "{T}: Add {G}{G}" and "{1}, {T}, Sacrifice this land: Create a 4/4 green Troll Warrior creature token with trample."
+text=Trample -- When Old-Growth Troll dies, if it was a creature, return it to the battlefield. it's an Aura enchantment with enchant Forest you control and Enchanted Forest has "{T}: Add {G}{G}" and "{1}, {T}, Sacrifice this land: Create a tapped 4/4 green Troll Warrior creature token with trample."
 mana={G}{G}{G}
 type=Creature
 subtype=Troll Warrior
@@ -84219,8 +84221,8 @@ type=Sorcery
 [/card]
 [card]
 name=Pirated Copy
-auto=may name(Copy creature) notaTarget(creature|battlefield) copy and!( transforms((,newability[@combatdamaged(player) from(creature[share!name!]|battlefield):may name(Draw a card) draw:1 controller])) forever )!
-text=You may have Pirated Copy enter the battlefield as a copy of any creature on the battlefield, except it's a Pirate in addition to its other types and it has "Whenever this creature or another creature with the same name deals combat damage to a player, you may draw a card."
+auto=may name(Copy creature) notaTarget(creature|battlefield) copy and!( transforms((,newability[@combatdamaged(player) from(creature[share!name!]|battlefield):name(Draw a card) draw:1 controller])) forever )!
+text=You may have Pirated Copy enter the battlefield as a copy of any creature on the battlefield, except it's a Pirate in addition to its other types and it has "Whenever this creature or another creature with the same name deals combat damage to a player, you draw a card."
 mana={4}{U}
 type=Creature
 subtype=Shapeshifter Pirate
@@ -87469,10 +87471,12 @@ type=Legendary Artifact
 name=Pyromancer's Swath
 auto=@damaged(creature|myBattlefield) from(*[instant;sorcery]|myzones):all(trigger[to]) damage:2
 auto=@damaged(creature|opponentBattlefield) from(*[instant;sorcery]|*):all(trigger[to]) damage:2
+auto=@damaged(planeswalker|myBattlefield) from(*[instant;sorcery]|myzones):all(trigger[to]) damage:2
+auto=@damaged(planeswalker|opponentBattlefield) from(*[instant;sorcery]|*):all(trigger[to]) damage:2
 auto=@damageof(player) from(*[instant;sorcery]|myzones):damage:2 opponent
 auto=@damagefoeof(player) from(*[instant;sorcery]|*):damage:2 opponent
 auto=@each end:name(Discard hand) all(*|myhand) reject
-text=If an instant or sorcery source you control would deal damage to a creature or player, it deals that much damage plus 2 to that creature or player instead. -- At the beginning of each end step, discard your hand.
+text=If an instant or sorcery source you control would deal damage to a permanent or player, it deals that much damage plus 2 to that permanent or player instead. -- At the beginning of each end step, discard your hand.
 mana={2}{R}
 type=Enchantment
 [/card]
@@ -99735,7 +99739,7 @@ type=Instant
 [card]
 name=Sen Triplets
 auto=@each my upkeep:all(*|opponentBattlefield) noactivatedability && all(*|opponentcastingzone) maxCast(*)0 && may castcard(normal) target(*|opponenthand)
-text=At the beginning of your upkeep, choose target opponent. This turn, that player can't cast spells or activate abilities and plays with their hand revealed. You may play cards from that player's hand this turn.
+text=At the beginning of your upkeep, choose target opponent. This turn, that player can't cast spells or activate abilities and plays with their hand revealed. You may play lands and cast spells from that player's hand this turn.
 mana={2}{W}{U}{B}
 type=Legendary Artifact Creature
 subtype=Human Wizard
@@ -100449,7 +100453,7 @@ target=player
 auto=@each targetedplayer secondmain:nextphasealter(add,untap,controller,after<this>)
 auto=@each targetedplayer secondmain:nextphasealter(add,upkeep,controller,after<this>)
 auto=@each targetedplayer secondmain:nextphasealter(add,draw,controller,after<this>)
-text=Enchant player -- At the beginning of enchanted player's second main phase, there is an additional beginning phase after this phase. (The end step happens after the added untap, upkeep, and draw steps.)
+text=Enchant player -- At the beginning of each of enchanted player's postcombat main phases, there is an additional beginning phase after this phase. (The end step happens after the added untap, upkeep, and draw steps.)
 mana={4}{U}{U}
 type=Enchantment
 subtype=Aura
@@ -106496,8 +106500,8 @@ toughness=1
 [card]
 name=Soulhunter Rakshasa
 abilities=cantblock
-auto=damage:5 target(opponent)
-text=Soulhunter Rakshasa can't block. -- When Soulhunter Rakshasa enters, it deals 5 damage to target opponent.
+auto=damage:type:swamp:mybattlefield target(opponent)
+text=Soulhunter Rakshasa can't block. -- When Soulhunter Rakshasa enters, if you cast it from your hand, it deals 1 damage to target opponent for each Swamp you control.
 mana={3}{B}{B}
 type=Creature
 subtype=Demon
@@ -118411,8 +118415,8 @@ type=Sorcery
 [/card]
 [card]
 name=Tireless Angler
-auto=@movedTo(island|myBattlefield):name(Draft a card) transforms((,newability[choice name(Fleet Swallower) conjure cards(Fleet Swallower) zone(myhand)],newability[choice name(Moat Piranhas) conjure cards(Moat Piranhas) zone(myhand)],newability[choice name(Mystic Skyfish) conjure cards(Mystic Skyfish) zone(myhand)],newability[choice name(Nadir Kraken) conjure cards(Nadir Kraken) zone(myhand)],newability[choice name(Pouncing Shoreshark) conjure cards(Pouncing Shoreshark) zone(myhand)],newability[choice name(Sea-Dasher Octopus) conjure cards(Sea-Dasher Octopus) zone(myhand)],newability[choice name(Spined Megalodon) conjure cards(Spined Megalodon) zone(myhand)],newability[choice name(Stinging Lionfish) conjure cards(Stinging Lionfish) zone(myhand)],newability[choice name(Voracious Greatshark) conjure cards(Voracious Greatshark) zone(myhand)],newability[choice name(Archipelagore) conjure cards(Archipelagore) zone(myhand)],newability[choice name(Serpent of Yawning Depths) conjure cards(Serpent of Yawning Depths) zone(myhand)],newability[choice name(Wormhole Serpent) conjure cards(Wormhole Serpent) zone(myhand)],newability[choice name(Sigiled Starfish) conjure cards(Sigiled Starfish) zone(myhand)],newability[choice name(Riptide Turtle) conjure cards(Riptide Turtle) zone(myhand)],newability[choice name(Ruin Crab) conjure cards(Ruin Crab) zone(myhand)])) oneshot
-text=Whenever an Island enters under your control, draft a card from Tireless Angler's spellbook.
+auto=@movedTo(island,swamp|myBattlefield):name(Draft a card) transforms((,newability[choice name(Fleet Swallower) conjure cards(Fleet Swallower) zone(myhand)],newability[choice name(Moat Piranhas) conjure cards(Moat Piranhas) zone(myhand)],newability[choice name(Mystic Skyfish) conjure cards(Mystic Skyfish) zone(myhand)],newability[choice name(Nadir Kraken) conjure cards(Nadir Kraken) zone(myhand)],newability[choice name(Pouncing Shoreshark) conjure cards(Pouncing Shoreshark) zone(myhand)],newability[choice name(Sea-Dasher Octopus) conjure cards(Sea-Dasher Octopus) zone(myhand)],newability[choice name(Spined Megalodon) conjure cards(Spined Megalodon) zone(myhand)],newability[choice name(Stinging Lionfish) conjure cards(Stinging Lionfish) zone(myhand)],newability[choice name(Voracious Greatshark) conjure cards(Voracious Greatshark) zone(myhand)],newability[choice name(Archipelagore) conjure cards(Archipelagore) zone(myhand)],newability[choice name(Serpent of Yawning Depths) conjure cards(Serpent of Yawning Depths) zone(myhand)],newability[choice name(Wormhole Serpent) conjure cards(Wormhole Serpent) zone(myhand)],newability[choice name(Sigiled Starfish) conjure cards(Sigiled Starfish) zone(myhand)],newability[choice name(Riptide Turtle) conjure cards(Riptide Turtle) zone(myhand)],newability[choice name(Ruin Crab) conjure cards(Ruin Crab) zone(myhand)])) oneshot
+text=Whenever an Island or Swamp enters the battlefield under your control, draft a card from Tireless Angler's spellbook.
 mana={2}{U}
 type=Creature
 subtype=Human Rogue
@@ -119662,7 +119666,7 @@ toughness=1
 name=Town-razer Tyrant
 abilities=flying
 auto=name(Land loses abilities) target(land[-basic]|battlefield) transforms((,newability[onlymanaability],newability[@each my upkeep:ability$!name(Sacrifice or damage) choice name(Sacrifice) all(mysource) sacrifice _ choice name(Damage) damage:2 controller!$ controller])) forever
-text=Flying -- When Town-Razer Tyrant enters, target nonbasic land you don't control loses all abilities except mana abilities and gains "At the beginning of your end step, this permanent deals 2 damage to you unless you sacrifice it."
+text=Flying -- When Town-Razer Tyrant enters, target nonbasic land you don't control loses all abilities except mana abilities and gains "At the beginning of your upkeep, this permanent deals 2 damage to you unless you sacrifice it."
 mana={2}{R}{R}
 type=Creature
 subtype=Dragon
@@ -120975,7 +120979,7 @@ kicker={1}{R} name(Fuse)
 auto=alternative ability$!name(Deal Damage) name(Deal Damage) damage:2 target(anytarget)!$ controller
 auto=if paid(kicker) then ability$!name(Deal Damage) name(Deal Damage) damage:2 target(anytarget)!$ controller
 auto=ifnot paid(alternative) then target(creature) transforms((Weird,red,setpower=0,settoughness=1,newability[loseabilities])) ueot
-text=Target creature loses all abilities and becomes a 0/1 red Weird until end of turn. // Burn deals 2 damage to target creature or player. -- Fuse (You may cast one or both halves of this card from your hand.)
+text=Target creature loses all abilities and becomes a 0/1 red Weird until end of turn. // Burn deals 2 damage to any target. -- Fuse (You may cast one or both halves of this card from your hand.)
 mana={2}{U}
 type=Instant
 [/card]
@@ -121128,7 +121132,7 @@ abilities=flying
 auto=_ASCEND_
 auto=@movedTo(*|myBattlefield) restriction{type(City's Blessing|mybattlefield)~equalto~0}:_ASCEND_
 auto=@each my upkeep restriction{type(City's Blessing|mybattlefield)~morethan~0}:name(Reveal top card) all(*[zpos=1]|mylibrary) moveto(hand) and!( transforms((,newability[damage:manacost opponent],newability[life:manacost controller])) ueot )!
-text=Ascend (If you control ten or more permanents, you get the city's blessing for the rest of the game.) -- At the beginning of your upkeep, if you have the city's blessing, reveal the top card of your library and put it into your hand. Each opponent loses X life and you gain X life, where X is that card's mana value.
+text=Flying -- Ascend (If you control ten or more permanents, you get the city's blessing for the rest of the game.) -- At the beginning of your upkeep, if you have the city's blessing, reveal the top card of your library and put it into your hand. Each opponent loses X life and you gain X life, where X is that card's mana value.
 mana={2}{B}{B}
 type=Creature
 subtype=Vampire Cleric
@@ -121571,7 +121575,7 @@ toughness=3
 name=Uba Mask
 auto=replacedraw reveal:1 optionone all(*|reveal) moveto(exile) and!( transforms((,newability[canplayfromexile])) ueot)! optiononeend revealend
 auto=opponentreplacedraw reveal:1 revealzone(opponentlibrary) optionone all(*|reveal) moveto(exile) and!( transforms((,newability[canplayfromexile])) ueot)! optiononeend revealend
-text=If a player would draw a card, that player exiles that card face up instead. -- Each player may play cards they exiled with Uba Mask this turn.
+text=If a player would draw a card, that player exiles that card face up instead. -- Each player may play lands and cast spells from among cards they exiled with Uba Mask this turn.
 mana={4}
 type=Artifact
 [/card]
@@ -123199,7 +123203,7 @@ auto=@dierolled(this) result(3) from(controller):this(counter{0/0.1.UrzaEffect}=
 auto=@dierolled(this) result(4) from(controller):this(counter{0/0.1.UrzaEffect}=1) name(Gains first strike) name(Gains first strike) all(this) transforms((,first strike,newability[counter(0/0.-1.UrzaEffect)])) ueot
 auto=@dierolled(this) result(5) from(controller):this(counter{0/0.1.UrzaEffect}=1) name(Gains flying) name(Gains flying) all(this) transforms((,flying,newability[counter(0/0.-1.UrzaEffect)])) ueot
 auto=@dierolled(this) result(6) from(controller):this(counter{0/0.1.UrzaEffect}=1) name(Gets 2/2) name(Gets 2/2) all(this) transforms((,newability[2/2],newability[counter(0/0.-1.UrzaEffect)])) ueot
-text={2}: Roll a six-sided die for Urza's Science Fair Project. -- 1 It gets -2/-2 until end of turn. -- 2 It deals no combat damage this turn. -- 3 Attacking does not cause it to tap this turn. -- 4 It gains first strike until end of turn. -- 5 It gains flying until end of turn. -- 6 It gets +2/+2 until end of turn.
+text={2}: Roll a six-sided die. This creature gets the indicated result. -- 1 - It gets -2/-2 until end of turn. -- 2 - Prevent all combat damage it would deal this turn. -- 3 - It gains vigilance until end of turn. -- 4 - It gains first strike until end of turn. -- 5 - It gains flying until end of turn. -- 6 - It gets +2/+2 until end of turn.
 mana={6}
 type=Artifact Creature
 power=4
@@ -125547,7 +125551,7 @@ auto=alternative target(creature) -3/-3 ueot
 auto=alternative life:2
 auto=alternative _ADVENTURE_
 auto=@each my upkeep:target(creature|graveyard) moveto(mybattlefield)
-text=Adventre Locthwain Scorn Target creature gets -3/-3 until end of turn. You gain 2 life. At the beginning of your upkeep, put target creature card from a graveyard onto the battlefield under your control.
+text=Adventure -- Locthwain Scorn {1}{B} Sorcery -- Target creature gets -3/-3 until end of turn. You gain 2 life. -- Virtue of Persistence -- At the beginning of your upkeep, put target creature card from a graveyard onto the battlefield under your control.
 mana={5}{B}{B}
 type=Enchantment
 [/card]
@@ -128216,8 +128220,8 @@ toughness=3
 [/card]
 [card]
 name=Weaver of Currents
-auto={T}:Add{2}
-text={T}: Add {1}{1}.
+auto={T}:Add{C}{C}
+text={T}: Add {C}{C}.
 mana={1}{G}{U}
 type=Creature
 subtype=Snake Druid

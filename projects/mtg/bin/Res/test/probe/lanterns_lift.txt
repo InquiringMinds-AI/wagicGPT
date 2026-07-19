@@ -1,0 +1,21 @@
+# Lanterns' Lift now grants +1/+1: enchanted 2/2 Bears becomes 3/3 and survives Shock.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Lanterns' Lift,Shock
+manapool:{R}
+[PLAYER2]
+[DO]
+Lanterns' Lift
+Grizzly Bears
+Shock
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Lanterns' Lift
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+[END]
