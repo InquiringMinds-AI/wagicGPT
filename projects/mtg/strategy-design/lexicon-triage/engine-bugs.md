@@ -1,5 +1,53 @@
 # Lexicon test campaign — engine bug catalogue (post fix-pass, 2026-07-18)
 
+## FIX WAVE RESOLUTION LEDGER (2026-07-19) — authoritative overlay on the items below
+
+The implemented-but-wrong pile was worked by five worktree agents, integrated,
+and verified (lexicon 805/0/0, main 1010+8/0). Dispositions:
+
+**ENGINE FIXED (5):** #17 donothing now composes its `and!` rider (MultiAbility);
+#19-partial: an EMPTY-primary `and!()` payload now parses as the effect
+(Finality); #14 totemarmor now destroys the consumed Umbra (self-finding
+ATriggerTotem, the un-drivable chooser removed); #34 oppnomaxhand no longer
+cleared when the beneficiary's battlefield is empty but the opponent grants it;
+#24 manifest dread's mill leg now fires (missing fireOneShot in
+MTGRevealingCards::CheckUserInput). Harness bonus: zone lists accept `^` as an
+escaped comma, so comma-named cards are placeable (`inplay:Anafenza^ the
+Foremost`).
+
+**NOT ENGINE BUGS — witness/data defects, fixed as such (8):** #2 @mutated (the
+trigger machinery is CORRECT; the witnesses declined their own `may` prompt —
+driving fixed); #13 combattoughness (comma-split "Doran, the Siege Tower" never
+entered play; keyword verified with Assault Formation); #15 noloyaltydamage
+(fixture setup artifact — Spark Rupture's ETB draw stole Jace from the library;
+the NOLOYALTYDAMAGE keyword remains registered-but-unconsumed, moot because the
+transform dominates); #16 alterdevoffset (symmetric all along — Altar of the
+Pantheon's own tap-ability contaminated the observation); #18 count/countb (the
+plumbing is correct; witnesses used the invented bare form — real form is
+`count(type:creature:mybattlefield)`); #25 echo (malformed `_ECHO_` macro —
+fixed to the real `upcost[...;next upkeep]` form; engine pay-path correct); #28
+cantbetargetof (invented persistent-activated form; faithful idiom is
+`transforms((,newability[cantbetargetof(*[color])])) ueot`); #35 Anafenza (the
+comma trap again; regression fixture added on the `^` escape).
+
+**ALREADY FIXED / STALE (1):** #20 exploits — passes at HEAD, no bystander
+sacrifice, @exploited fires.
+
+**REMAINING FROM #19 (witness rework queued, not engine):** the if/then/else
+parser absorbs a trailing `&& rider` into its else-branch — this only affects
+the synthetic observability riders (real amass/monarch cards don't use the
+shape, verified); their witnesses should observe tokens/counters directly.
+Devastating Summons' script is unfaithful to its Oracle (sacrifice is an
+ADDITIONAL COST, not a resolution effect) — re-script it, which sidesteps the
+synchronous-notatarget gap entirely.
+
+**DESIGN NOTES (not bugs):** `grant ... grantend` is inherently WHILE-TAPPED —
+a `{0}` non-tapping activation evaporates next Update; use transforms/ueot for
+persistent zero-cost pumps. NEW LEAD (deferred, high blast radius): Altar of the
+Pantheon's `this(variable{...}>0)` conditional life-gain fires when the variable
+should be 0, and the mana engine taps it unnecessarily when the floating pool
+already covers the cost.
+
 Provenance: 832 lexicon fixtures swept per-process → 300 non-passes triaged
 one-by-one (9 agents, probe-verified) → all fixture-side defects FIXED and
 re-verified → what remains below is the residue that survived BOTH passes. Every

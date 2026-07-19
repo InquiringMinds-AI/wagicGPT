@@ -237,6 +237,17 @@ the silently-missing permanent reads as "trigger never fired" downstream (this
 false negative produced a phantom engine-bug report). Always comma-join:
 `inplay:Megrim,Witness`.
 
+**Comma-carrying card names in zone lists: escape the comma as `^`** —
+`inplay:Anafenza^ the Foremost` (the parser replaces `^` with `,` before lookup,
+the engine's existing escape convention). Unescaped commas split the name into
+garbage that silently never loads — this single trap manufactured THREE phantom
+engine-bug reports (legendarylandwalk, combattoughness/Doran, Anafenza).
+
+**`inplay:` cards are CAST during setup, in list order, firing their ETBs** — a
+card with an ETB draw (Spark Rupture) can pull a LATER-LISTED card out of the
+library before the harness places it, silently deleting it from the scenario.
+List draw-ETB cards LAST and account for the drawn card in your asserts.
+
 ## Asserts are exhaustive (11+, "zone-list-vs-count"; 5+, "mana-float")
 
 - **An omitted zone line asserts ZERO cards in that zone.** Account for everything:
