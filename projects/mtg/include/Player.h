@@ -138,6 +138,28 @@ public:
         return (playMode == MODE_HUMAN);
     }
 
+    //Interactive reveal/scry decision for an interactive AI (the LLM
+    //opponent). When such a player controls a reveal/surveil/scry display,
+    //the display delegates the whole look-and-choose to this seam instead of
+    //the headless aicode substitute (a moverandom heuristic that cannot
+    //look-and-choose). ONE bundled decision: the model is shown EVERY revealed
+    //card and picks which ones go to "option one" (surveil: the graveyard);
+    //the rest default to option two (surveil: top of the library). Returns
+    //1 = decided (selForOptionOne holds indices into 'revealed'),
+    //0 = the model call is in flight (wait, act on no card this tick),
+    //-1 = not handled / model failed (the display uses its safe default:
+    //     select nothing, so every revealed card takes option two). The base
+    //returns -1; only an interactive AI (AIPlayerGPT) overrides it.
+    virtual int decideReveal(const vector<MTGCardInstance*>& revealed,
+                             const string& optOneLabel, const string& optTwoLabel,
+                             const string& optOneEffect,
+                             vector<int>& selForOptionOne)
+    {
+        (void) revealed; (void) optOneLabel; (void) optTwoLabel;
+        (void) optOneEffect; (void) selForOptionOne;
+        return -1;
+    }
+
     Player * opponent();
     int getId();
     JQuadPtr getIcon();

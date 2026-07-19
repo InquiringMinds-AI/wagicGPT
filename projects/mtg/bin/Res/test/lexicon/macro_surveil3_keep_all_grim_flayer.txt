@@ -1,0 +1,37 @@
+# Grim Flayer surveil 3, DECLINE ALL: look at the top three, keep every one on
+# top of the library (put none into the graveyard). This is the "safe default"
+# outcome the interactive-reveal driver produces for an interactive AI when the
+# model call fails/times out (AIPlayerGPT::decideReveal returns -1 -> the
+# display's driveInteractiveReveal sends nothing to option one, so every
+# revealed card takes option two = top of library). The seam itself needs a
+# live endpoint (isInteractiveAI), so this fixture locks the DISPLAY
+# choreography the fallback relies on, offline: decline option one (no clicks,
+# revealnext), then move the whole remainder to the library via option two.
+# Non-basic library cards (basics are not clickable). Top of library = last
+# listed = Darksteel Citadel; the three revealed go back on top.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Grim Flayer
+library:Hill Giant,Juggernaut,Millstone,Darksteel Citadel
+[PLAYER2]
+life:20
+[DO]
+interactivereveal
+Grim Flayer
+next
+next
+revealnext
+revealnext
+Darksteel Citadel
+Millstone
+Juggernaut
+revealnext
+[ASSERT]
+COMBATDAMAGE
+[PLAYER1]
+inplay:Grim Flayer
+library:Hill Giant,Darksteel Citadel,Millstone,Juggernaut
+[PLAYER2]
+life:18
+[END]

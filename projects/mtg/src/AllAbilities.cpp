@@ -66,7 +66,7 @@ int GenericRevealAbility::resolve()
     //every other fixture (and all real play) keeps the aicode substitute below.
     //Mirrors the existing suite carve-outs (skip-free phase pinning, the
     //WAGIC_TESTSUITE reveal auto-key disable in CheckUserInput).
-    if(source->lastController->isAI() && source->getAICustomCode().size() && !game->mForceInteractiveReveal)
+    if(source->lastController->isAI() && !source->lastController->isInteractiveAI() && source->getAICustomCode().size() && !game->mForceInteractiveReveal)
     {
         string abi = source->getAICustomCode();
         std::transform(abi.begin(), abi.end(), abi.begin(), ::tolower);//fix crash
@@ -141,6 +141,10 @@ MTGRevealingCards::MTGRevealingCards(GameObserver* observer, int _id, MTGCardIns
     abilitySecond = NULL;
     abilityString = coreAbility;
     initCD = false;
+    mAIPhase = 0;
+    mAIClickIdx = 0;
+    mAIZoneAtFinalize = 0;
+    mAIDriveDone = false;
 
     afterReveal = "";
     afterEffectActivated = false;
@@ -350,6 +354,8 @@ void MTGRevealingCards::Update(float dt)
             this->removeFromGame();
     }
 
+    driveInteractiveReveal();
+
     if (revealDisplay)
     {
         revealDisplay->Update(dt);
@@ -456,8 +462,20 @@ void MTGRevealingCards::Render()
 {
     if (!revealDisplay)
         return;
-    CheckUserInput(mEngine->ReadButton());
-    revealDisplay->CheckUserInput(mEngine->ReadButton());
+    //An interactive AI (the LLM opponent) is driven SOLELY by
+    //driveInteractiveReveal(), one deterministic action per tick. This
+    //per-frame ReadButton() routing must NOT run for it: stray/held input read
+    //here during the (multi-second, asynchronous) model call auto-declined
+    //option one and built option two before the driver acted, sending the
+    //model's graveyard picks to the library instead (the intermittent
+    //all-to-library reveal). Humans and the heuristic AI still route here (the
+    //heuristic's auto-key lives in CheckUserInput and is what completes THEIR
+    //reveals).
+    if (!source->controller()->isInteractiveAI())
+    {
+        CheckUserInput(mEngine->ReadButton());
+        revealDisplay->CheckUserInput(mEngine->ReadButton());
+    }
     //Headless suite workers must not touch the GPU resource manager: two
     //concurrent reveal tests crashed in CardGui::Render (fonts) from a
     //ThreadProc worker. The input routing above still runs - it is what
@@ -476,7 +494,7 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
     //auto-key would self-advance reveal displays before scripted clicks can
     //land. Headless tests drive reveals explicitly with the revealok /
     //revealnext harness commands instead.
-    if (this->source->controller()->isAI() && !getenv("WAGIC_TESTSUITE"))
+    if (this->source->controller()->isAI() && !this->source->controller()->isInteractiveAI() && !getenv("WAGIC_TESTSUITE"))
     {
         if (this->source->controller() != game->isInterrupting)
             game->mLayers->stackLayer()->cancelInterruptOffer(ActionStack::DONT_INTERRUPT, false);
@@ -553,6 +571,182 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
     if(revealDisplay)
         return revealDisplay->CheckUserInput(key);
     return false;
+}
+
+//Interactive-AI reveal driving (surveil/reveal). Called every Update tick
+//while the display is up and the controller is an interactive AI. ONE ACTION
+//PER TICK (a card click's target commits on a later tick, so the click and the
+//BTN_NEXT that finalizes it must be on different ticks - the exact
+//click/revealnext cadence the suite fixtures prove): ask the model once, then
+//click the option-one picks, finalize, arm option two for the remainder, click
+//that, finalize.
+void MTGRevealingCards::driveInteractiveReveal()
+{
+    if (mAIDriveDone)
+        return;
+    Player * ctrl = source->controller();
+    if (!ctrl || !ctrl->isInteractiveAI())
+    {
+        mAIDriveDone = true; //not the interactive-AI path; stay out of the way
+        return;
+    }
+    if (!revealDisplay)
+        return; //display not open yet, or already closing
+    if (!zone->cards.size())
+    {
+        mAIDriveDone = true; //reveal fully consumed
+        return;
+    }
+
+    TargetChooser * tc = observer->mLayers->actionLayer()->getCurrentTargetChooser();
+
+    //Option one is a real look-and-choose only when it is a targeted move
+    //(surveil: <upto:N> to the graveyard). A non-targeted first option makes no
+    //selection - drive to completion without a model call (the "only one
+    //outcome" case).
+    bool optionOneChoice = abilityOne.find("target(") != string::npos;
+    if (!optionOneChoice)
+    {
+        CheckUserInput(JGE_BTN_NEXT);
+        return;
+    }
+
+    switch (mAIPhase)
+    {
+    case 0: //ASK the model (once), then SELECT the picks in the SAME tick
+    {
+        if (!tc)
+            return; //wait until option one's target chooser is armed
+        vector<MTGCardInstance*> revealed;
+        for (int i = 0; i < zone->nb_cards; i++)
+            if (zone->cards[i])
+                revealed.push_back(zone->cards[i]);
+        if (revealed.empty())
+        {
+            mAIDriveDone = true;
+            return;
+        }
+        vector<string> nm1 = parseBetween(abilityOne, "name(", ")");
+        vector<string> nm2 = parseBetween(abilityTwo, "name(", ")");
+        string oneLabel = nm1.size() ? nm1[1] : string("option one");
+        string twoLabel = nm2.size() ? nm2[1]
+                          : (abilityTwo.size() ? string("option two")
+                                               : string("keep on top of library"));
+        vector<int> sel;
+        int r = ctrl->decideReveal(revealed, oneLabel, twoLabel, abilityOne, sel);
+        if (r == 0)
+            return; //model call in flight; act on no card this tick
+        mAIGraveSel.clear();
+        if (r == 1) //r == -1 (defer/fail): empty selection -> all to option two
+            for (size_t k = 0; k < sel.size(); k++)
+                if (sel[k] >= 0 && sel[k] < (int) revealed.size())
+                    mAIGraveSel.push_back(revealed[sel[k]]);
+
+        //Click ALL the option-one picks NOW, in the same tick as the decision.
+        //Clicks are synchronous (each toggles its target immediately), and doing
+        //them here closes the one-tick window between the decision and a
+        //separate click phase - a window in which the <upto:1> chooser of a
+        //single-card reveal vanished, so the pick was never clicked and
+        //defaulted to option two (surveil-1 sent the model's graveyard pick to
+        //the library). Selecting the pick that FILLS the chooser makes
+        //TargetAbility::reactToClick AUTO-FIRE option one and clear the waiting
+        //action; stop clicking then and wait for the deferred move (phase 3),
+        //rather than issuing the phase-2 BTN_NEXT which - with the chooser gone -
+        //would build option two and steal the still-in-zone cards to library.
+        for (size_t k = 0; k < mAIGraveSel.size(); k++)
+        {
+            if (!observer->mLayers->actionLayer()->getCurrentTargetChooser())
+                break; //chooser auto-fired on the previous pick
+            MTGCardInstance * c = mAIGraveSel[k];
+            for (int i = 0; i < zone->nb_cards; i++)
+                if (zone->cards[i] == c) //only click a pick still in the zone
+                {
+                    observer->cardClick(c, c);
+                    break;
+                }
+        }
+        if (!observer->mLayers->actionLayer()->getCurrentTargetChooser())
+        {
+            //Option one auto-fired (every revealed card was picked). Wait for
+            //its deferred move; no option two (nothing remains).
+            mAIZoneAtFinalize = zone->nb_cards;
+            mAIPhase = 3;
+        }
+        else
+        {
+            //A proper subset (or a decline) was selected; the chooser is still
+            //open. Finalize option one with BTN_NEXT on the next tick.
+            mAIPhase = 2;
+        }
+        return;
+    }
+    case 2: //FINALIZE option one (BTN_NEXT on its own tick)
+    {
+        mAIZoneAtFinalize = zone->nb_cards; //option one's moveto resolves LATER
+        CheckUserInput(JGE_BTN_NEXT);
+        mAIPhase = 3;
+        return;
+    }
+    case 3: //WAIT for option one to resolve, then arm option two (or finish)
+    {
+        //Option one's moveto is deferred one Update after BTN_NEXT. If picks
+        //were made, wait until the reveal zone shrinks (they left it) before
+        //acting - racing ahead built option two while the picks were still in
+        //the zone, so everything took option two (all to library). A decline
+        //(0 picks) builds option two inside the finalize itself (abilitySecond
+        //set), and never shrinks the zone, so that case skips the wait.
+        if (!abilitySecond && !mAIGraveSel.empty() && zone->nb_cards >= mAIZoneAtFinalize)
+            return; //option one has not resolved yet
+        if (!zone->cards.size())
+        {
+            mAIDriveDone = true; //option one consumed every revealed card
+            return;
+        }
+        if (!abilitySecond)
+        {
+            CheckUserInput(JGE_BTN_NEXT); //build option two; re-enter until armed
+            return;
+        }
+        if (!tc)
+            return; //option two built but its chooser has not armed yet - wait
+        mAIRemainder.clear();
+        for (int i = 0; i < zone->nb_cards; i++)
+            if (zone->cards[i])
+                mAIRemainder.push_back(zone->cards[i]);
+        mAIClickIdx = 0;
+        mAIPhase = 4;
+        return;
+    }
+    case 4: //CLICK the remainder into option two, one card per tick
+    {
+        if (!tc)
+        {
+            mAIPhase = 5;
+            return;
+        }
+        if (mAIClickIdx < mAIRemainder.size())
+        {
+            MTGCardInstance * c = mAIRemainder[mAIClickIdx++];
+            for (int i = 0; i < zone->nb_cards; i++)
+                if (zone->cards[i] == c)
+                {
+                    observer->cardClick(c, c);
+                    break;
+                }
+            return;
+        }
+        mAIPhase = 5;
+        return;
+    }
+    case 5: //FINALIZE option two
+    default:
+    {
+        CheckUserInput(JGE_BTN_NEXT);
+        mAIPhase = 6;
+        mAIDriveDone = true;
+        return;
+    }
+    }
 }
 
 MTGRevealingCards * MTGRevealingCards::clone() const

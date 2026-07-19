@@ -936,7 +936,8 @@ string AIPlayerGPT::consumePlan(const string& content)
     //prose full of numbers cannot hijack it - the reason head-first
     //existed. Find the LAST label at a line start (a plan that quotes the
     //protocol loses to the real trailing answer).
-    static const char * kAnswerLabels[] = { "CHOICE:", "ATTACK:", "BLOCKS:" };
+    static const char * kAnswerLabels[] = { "CHOICE:", "ATTACK:", "BLOCKS:", "PUT:" };
+    const int kNumAnswerLabels = (int) (sizeof(kAnswerLabels) / sizeof(kAnswerLabels[0]));
     size_t answerStart = string::npos, answerEnd = 0, labelLineStart = string::npos;
     size_t lineStart = 0;
     while (lineStart <= text.size())
@@ -946,7 +947,7 @@ string AIPlayerGPT::consumePlan(const string& content)
         size_t s = lineStart;
         while (s < end && (text[s] == ' ' || text[s] == '\t' || text[s] == '*' || text[s] == '#'))
             s++; //tolerate markdown bullet/heading decoration on the label line
-        for (int li = 0; li < 3; li++)
+        for (int li = 0; li < kNumAnswerLabels; li++)
         {
             size_t len = strlen(kAnswerLabels[li]);
             if (end - s >= len)
@@ -3578,6 +3579,100 @@ int AIPlayerGPT::chooseBlockers()
                                      : ("You declared blockers: " + declared));
     mBlocksDoneTurn = observer->turn;
     DebugTrace("AIPlayerGPT: declared blocks from " << pairs << " assignment(s) in one reply");
+    return 1;
+}
+
+//Interactive reveal/surveil decision, driven from MTGRevealingCards for an
+//interactive AI. ONE bundled ask over ALL revealed cards; the model picks the
+//subset that goes to option one (surveil: the graveyard). Async: 0 while the
+//call is in flight, 1 decided, -1 on failure (the display then sends nothing
+//to option one - the safe keep-on-top default). Reuses parseAttackerSet: the
+//"pick a subset of N labelled items" reply shape is identical to declaring
+//attackers (bare-index or name list, "none" = an explicit empty subset).
+int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
+                              const string& optOneLabel, const string& optTwoLabel,
+                              const string& optOneEffect,
+                              vector<int>& selForOptionOne)
+{
+    selForOptionOne.clear();
+    if (mEndpoint.empty() || revealed.empty())
+        return -1; //no endpoint / nothing to choose: the display's default
+
+    if (mSystemPrompt.empty())
+        buildSystemPrompt();
+
+    std::ostringstream tail;
+    tail << "Reveal: you looked at the top " << revealed.size()
+         << " card" << (revealed.size() == 1 ? "" : "s") << " of your library."
+            " Decide, in ONE reply, which of them go to \"" << optOneLabel
+         << "\"; every card you do NOT pick goes to \"" << optTwoLabel << "\".\n";
+    for (size_t j = 0; j < revealed.size(); j++)
+    {
+        tail << (j + 1) << ". " << revealed[j]->name;
+        if (revealed[j]->isCreature())
+            tail << " (" << revealed[j]->power << "/" << revealed[j]->toughness
+                 << " creature)";
+        else
+        {
+            string tt = typeTag(revealed[j]);
+            if (!tt.empty())
+                tail << " (" << tt << ")";
+        }
+        string kw = keywordList(revealed[j]);
+        if (!kw.empty())
+            tail << " [" << kw << "]";
+        string txt = cardTextSnippet(revealed[j], 140);
+        if (!txt.empty())
+            tail << " {text: " << txt << "}";
+        tail << "\n";
+    }
+    tail << "Write your PLAN: line first, then on the last line PUT: followed by"
+            " the card numbers you send to \"" << optOneLabel << "\", comma-separated"
+            " (e.g. \"PUT: 1, 3\"), or exactly \"PUT: none\" to send none there"
+            " (every revealed card then goes to \"" << optTwoLabel << "\").";
+    string userMsg = assemblePrompt(tail.str());
+
+    string content;
+    if (pollCompletion(userMsg, content) == kChoicePending)
+        return 0; //decision in flight; the display waits and re-polls next tick
+
+    //Plan split BEFORE the subset parse: bare numbers in the plan prose must
+    //not read as card picks.
+    string decisionPart = consumePlan(content);
+    vector<bool> send;
+    vector<string> names;
+    names.reserve(revealed.size());
+    for (size_t j = 0; j < revealed.size(); j++)
+        names.push_back(revealed[j]->name);
+    int result = content.empty() ? -1
+                 : parseAttackerSet(decisionPart, revealed.size(), send, &names);
+
+    if (result < 0)
+    {
+        //Unusable reply: the display falls back to its safe default (send
+        //nothing to option one - every card keeps option two).
+        writeTransLog("reveal", userMsg, content, result, (int) revealed.size(),
+                      "", content.empty() ? "empty_reply" : "unparsed_reply", &names);
+        setNotice("model reply failed - reveal kept the default", 5.0f);
+        return -1;
+    }
+
+    string chosen;
+    for (size_t j = 0; j < revealed.size(); j++)
+        if (send[j])
+        {
+            selForOptionOne.push_back((int) j);
+            chosen += (chosen.empty() ? "" : ", ") + revealed[j]->name;
+        }
+    writeTransLog("reveal", userMsg, content, result, (int) revealed.size(),
+                  chosen.empty() ? string("none") : chosen, NULL, &names);
+    narrateDecision(chosen.empty()
+                    ? ("You revealed " + std::to_string(revealed.size())
+                       + " and kept them all (" + optTwoLabel + ")")
+                    : ("You revealed " + std::to_string(revealed.size()) + " and put "
+                       + chosen + " to " + optOneLabel));
+    DebugTrace("AIPlayerGPT: reveal put " << selForOptionOne.size() << " of "
+               << revealed.size() << " to option one in one reply");
     return 1;
 }
 

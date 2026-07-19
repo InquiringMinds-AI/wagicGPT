@@ -66,6 +66,33 @@ public:
     bool repeat;//only the first ability can be repeated, and it must be targeted.
     bool initCD;
 
+    //Interactive-AI (LLM) reveal driving. The headless aicode substitute is
+    //skipped for an interactive AI (GenericRevealAbility::resolve), so this
+    //display arms for it exactly as for a human - and drives the option-one /
+    //option-two selection from the model's ONE bundled answer instead of the
+    //dumb isAI auto-key. Multi-tick state machine mirroring the suite's
+    //revealok/revealnext choreography. Card clicks are synchronous (each toggles
+    //its target at once), but the FINALIZE (BTN_NEXT) resolves option one's move
+    //on a LATER tick. Phases: 0 ask the model AND click every option-one pick in
+    //the SAME tick (closing the window that let a single-card <upto:1> chooser
+    //vanish before the pick landed, defaulting it to library); 2 finalize option
+    //one; 3 wait for its deferred move, then arm option two for the remainder;
+    //4 click the remainder; 5 finalize option two. When ALL revealed cards are
+    //picked, the filling click AUTO-FIRES option one (chooser clears) and the
+    //driver skips finalize straight to the resolve-wait. mAIDriveDone latches
+    //when the reveal is consumed (or the controller is not an interactive AI /
+    //option one is not a real choice - the driver then stays out of the way).
+    int mAIPhase;                          //state machine cursor (0..6)
+    size_t mAIClickIdx;                    //per-phase click cursor
+    int mAIZoneAtFinalize;                 //reveal-zone size when option one was
+                                           //finalized (its moveto resolves a tick
+                                           //LATER; wait for the zone to shrink
+                                           //before arming option two)
+    bool mAIDriveDone;                     //nothing more for the driver to do
+    vector<MTGCardInstance*> mAIGraveSel;  //model's option-one picks (pointers)
+    vector<MTGCardInstance*> mAIRemainder; //option-two cards (captured at arm)
+    void driveInteractiveReveal();
+
     void Update(float dt);
     int testDestroy();
     int toResolve();

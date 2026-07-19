@@ -128,6 +128,21 @@ protected:
     //tick (payTheManaCost re-reaches it on the next poll).
     virtual MTGCardInstance * chooseCostTarget(TargetChooser * tc, MTGCardInstance * source);
 
+    //Interactive reveal/surveil decision (Player::decideReveal override). When
+    //this player controls a reveal/surveil display, GenericRevealAbility routes
+    //it onto the interactive MTGRevealingCards display (the ishuman lens: the
+    //aicode moverandom substitute is for the heuristic AI's limits, not this
+    //one). The display shows the model EVERY revealed card in ONE bundled ask
+    //and the model picks which go to option one (surveil: the graveyard); the
+    //rest default to option two (top of library). Async: returns 0 while the
+    //call is in flight (the display waits), 1 once decided (selForOptionOne
+    //filled), -1 on any failure (the display's safe default sends nothing to
+    //option one). One JSONL "reveal" translog record per consumed decision.
+    virtual int decideReveal(const vector<MTGCardInstance*>& revealed,
+                             const string& optOneLabel, const string& optTwoLabel,
+                             const string& optOneEffect,
+                             vector<int>& selForOptionOne);
+
 private:
     //Ask the model to choose among options (0-based result, -1 to defer to
     //the heuristic). No model call when there is one option or none - that
