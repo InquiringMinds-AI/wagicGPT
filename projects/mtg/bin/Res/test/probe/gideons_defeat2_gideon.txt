@@ -1,0 +1,22 @@
+# Gideon's Defeat choice 2: exile an attacking animated Gideon, gain 5 life.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Gideon Blackblade
+hand:Gideon's Defeat
+manapool:{W}
+life:20
+[PLAYER2]
+[DO]
+Gideon Blackblade
+Gideon's Defeat
+choice 1
+Gideon Blackblade
+[ASSERT]
+COMBATATTACKERS
+[PLAYER1]
+exile:Gideon Blackblade
+graveyard:Gideon's Defeat
+life:25
+[PLAYER2]
+[END]

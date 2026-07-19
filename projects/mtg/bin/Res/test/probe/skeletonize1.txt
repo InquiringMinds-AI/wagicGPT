@@ -1,0 +1,20 @@
+# Skeletonize: creature dealt the 3 damage dies -> caster gets the named Skeleton token.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Skeletonize
+manapool:{4}{R}
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Skeletonize
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Skeleton
+graveyard:Skeletonize
+manapool:{0}
+[PLAYER2]
+graveyard:Grizzly Bears
+[END]

@@ -1032,3 +1032,7 @@ lexicon/basic_defender_rejects_attack.txt
 lexicon/combat_illegal_attacker_click_noop.txt
 galvanic_blast_metalcraft.txt
 galvanic_blast_base.txt
+probe/skeletonize1.txt
+probe/skeletonize2_regen.txt
+probe/gideons_defeat1.txt
+probe/gideons_defeat2_gideon.txt

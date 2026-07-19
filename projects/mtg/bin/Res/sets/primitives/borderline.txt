@@ -45010,9 +45010,8 @@ toughness=3
 [/card]
 [card]
 name=Gideon's Defeat
-target=creature[white;attacking;blocking]
-auto=moveto(exile)
-auto=if casted(this) then if type(gideon|opponentexile)~morethan~0 then life:5 controller
+auto=choice name(Exile white attacker or blocker) moveto(exile) target(creature[white;attacking;blocking])
+auto=choice name(Exile Gideon) moveto(exile) target(creature[gideon;white;attacking;blocking]) && life:5 controller
 text=Exile target white creature that's attacking or blocking. If it was a Gideon planeswalker, you gain 5 life.
 mana={W}
 type=Instant

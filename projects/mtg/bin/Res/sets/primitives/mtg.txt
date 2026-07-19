@@ -106505,9 +106505,9 @@ color=black
 [card]
 name=Skeletonize
 target=creature
-auto=@movedto(mytgt|graveyard) from(battlefield):token(Skeleton,Creature Skeleton,1/1,black)
+auto=@movedto(mytgt|graveyard) from(battlefield):token(Skeleton)
 auto=damage:3
-text=Skeletonize deals 3 damage to target creature. When a creature dealt damage this way dies this turn, create a 1/1 black Skeleton creature token with "{B}: Regenerate this creature."
+text=Skeletonize deals 3 damage to target creature. When a creature dealt damage this way dies this turn, create a 1/1 black Skeleton creature token with "{B}: Regenerate this token."
 mana={4}{R}
 type=Instant
 [/card]

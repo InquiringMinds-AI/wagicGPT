@@ -1,0 +1,20 @@
+# The Skeleton token definition regenerates for {B}: bolt it after raising the shield; it survives.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Skeleton
+hand:Lightning Bolt
+manapool:{B}{R}
+[PLAYER2]
+[DO]
+Skeleton
+Lightning Bolt
+Skeleton
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Skeleton
+graveyard:Lightning Bolt
+manapool:{0}
+[PLAYER2]
+[END]

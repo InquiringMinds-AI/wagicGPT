@@ -1,0 +1,22 @@
+# Gideon's Defeat choice 1: exile a white attacking creature, no life gain.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Savannah Lions
+hand:Gideon's Defeat
+manapool:{W}
+life:20
+[PLAYER2]
+[DO]
+Savannah Lions
+Gideon's Defeat
+choice 0
+Savannah Lions
+[ASSERT]
+COMBATATTACKERS
+[PLAYER1]
+exile:Savannah Lions
+graveyard:Gideon's Defeat
+life:20
+[PLAYER2]
+[END]
