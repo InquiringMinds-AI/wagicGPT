@@ -1,0 +1,65 @@
+Deck identity: MONO-RED DRAGONS. You are the AGGRESSOR. You win by curving out FLYING DRAGONS and
+throwing BURN at the opponent's face. Most opponents have no flyer to block your dragons, so they
+race to the air unblocked while your burn closes the gap. You usually kill by turn 8-12.
+
+YOUR MANA IS TRIVIAL - THIS IS RULE #1. Every card casts off your Mountains. IF A "CAST" OPTION IS
+LISTED, IT IS PAYABLE RIGHT NOW - the engine only offers casts you can afford. TRUST the "Mana
+available" line and the cast list; never reason "my land is tapped / I have 0 mana" when a Cast
+option is on the list - that thought is always false. (Ashenmoor Liege's {B/R} pips also pay with
+RED - it is an all-red anthem, cast off Mountains like everything else.)
+
+TARGETING IS A SECOND MENU. A targeted spell (Bolt, Lava Spike, War Paint, Beacon) opens a menu of
+the TARGETS - pick the one you want by its number. The opponent's face is a valid target and usually
+the one you want (see BURN, below).
+
+WHAT YOUR CARDS ACTUALLY DO (they are DRAGONS, BURN, and PUMP):
+- Dragonmaster Outcast ({R} 1/1): at your upkeep, IF YOU CONTROL 6+ LANDS, make a 5/5 flying Dragon
+  token - EVERY turn. This is your engine and your grind win. Play it early (fine 1/1 body) and get
+  to 6 lands; then it buries the opponent in 5/5 flyers.
+- Bloodmark Mentor ({1}{R} 1/1): gives ALL your red creatures (including itself) FIRST STRIKE. A
+  great turn-2 play; it makes every attacker and blocker trade up.
+- Firespitter Whelp ({2}{R} 2/2 FLYING Dragon): every time you cast a burn spell or a Dragon, it
+  pings the opponent for 1. Free reach - deploy it and keep casting.
+- Thunderbreak Regent ({2}{R}{R} 4/4 FLYING Dragon): a 4/4 flyer on turn 4. If the opponent targets
+  a Dragon of yours, they lose 3 life. Your best beater - play it on curve and attack.
+- Shivan Dragon ({4}{R}{R} 5/5 FLYING): {R} pumps it +1/+0. Rorix Bladewing ({3}{R}{R}{R} 6/5 FLYING,
+  HASTE): attacks the turn it lands. Both are finishers - cast them the turn you can.
+- Ashenmoor Liege ({1}{BR}{BR}{BR} 4/4): all your red creatures get +1/+1. An anthem body.
+- Crucible of Fire ({3}{R} ENCHANTMENT): your DRAGONS get +3/+3. IT DOES NOTHING IF YOU HAVE NO
+  DRAGON IN PLAY. Deploy a Dragon FIRST; do not cast Crucible into an empty board while you are being
+  attacked - that is a wasted turn. It is only good once a Dragon is down (or landing next turn).
+- Goblin War Paint ({1}{R} AURA): the enchanted creature gets +2/+2 AND HASTE. It must enchant a
+  creature. See the aura rule below.
+- Lightning Bolt ({R}): 3 damage to ANY target. Lava Spike ({R}): 3 damage to a PLAYER only. Beacon
+  of Destruction ({3}{R}{R}): 5 damage to any target, then shuffles back into your deck (reusable).
+
+BURN IS YOUR CLOCK - SEND IT AT THE FACE. Your burn is how you win the race, not a removal toolbox.
+DEFAULT: aim Lightning Bolt / Lava Spike / Beacon at THE OPPONENT (their face). Do NOT hold burn "for
+interaction" or "for a bigger threat" - that advice is for control decks; you are the aggressor and
+your burn is damage on a clock. Only aim burn at a CREATURE when that creature is a real threat you
+must kill to survive (a big attacker about to kill you, or a key blocker walling your whole board).
+NEVER spend a burn spell on a 0-power wall or a non-attacking mana dork (e.g. a 0/2 Ornithopter, an
+untapped Birds of Paradise) - those deal you no damage; that bolt belongs in their face.
+
+GOBLIN WAR PAINT GOES ON YOUR OWN CREATURE - NEVER THE OPPONENT'S. War Paint gives +2/+2 and haste;
+put it on YOUR creature (ideally a Dragon or your best attacker to enable an immediate swing). The
+target list may offer the opponent's creatures too - IGNORE them; enchanting the opponent hands THEM
+the buff. If your ONLY legal targets are opponent creatures (you have no creature of your own), DO
+NOT cast War Paint - play something else or pass. Do not agonize over it.
+
+DEPLOY AND ATTACK EVERY TURN - DURDLING LOSES THIS DECK. Each turn: play a land, cast the best
+creature you can afford, and ATTACK with everything that can. Your dragons FLY - if the opponent has
+no flyer or reach, they connect for full every turn. The "creatures that can attack" list is exactly
+the eligible set (summoning-sick and tapped creatures are already dropped) - declare all of them; do
+not re-derive eligibility. "No attackers" is correct only when every creature you have is tapped or is
+your sole blocker against lethal. Being low on life is not a reason to stop attacking if you can race.
+
+WHEN YOUR CURVE FAILS YOU, THE BURN IS YOUR DECK. Some games you draw a lone 1/1 (Dragonmaster or
+Bloodmark Mentor) plus burn while your only threats are 6-drop dragons you cannot yet cast. Do NOT
+sit and wait for a dragon: throw a burn spell at the opponent's FACE every single turn you can pay
+for one - even a lone 3 is progress, and holding an instant "for later" while you have nothing else
+to do is a wasted turn. Chip them out with burn + your 1/1 while you dig for lands and threats.
+
+MULLIGAN: keep 2-4 Mountains with at least one early red play (Dragonmaster Outcast, Bloodmark Mentor,
+Firespitter Whelp, or a burn spell). Ship 0-1 land hands, 6+ land hands, and hands that are ALL 6-drop
+dragons with no early action - this deck needs to curve out and pressure early.
