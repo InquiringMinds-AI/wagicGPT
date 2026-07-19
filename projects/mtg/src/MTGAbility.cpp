@@ -2542,6 +2542,25 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             s.erase(sIndex, real_end - sIndex);
         }
     }
+    //and!(payload)! composes a follow-up that runs AFTER the primary; the stash
+    //is consumed by the many creator/mover/transform parsers below. When the
+    //primary is EMPTY (once the cost is stripped, all that is left is the empty
+    //and!()! marker - e.g. Finality's {0}:and!(counter/exiledeath)!), no parser
+    //ever consumes it, so the whole effect was silently dropped. In that case the
+    //payload IS the effect: parse and return it directly. A non-empty primary
+    //keeps its normal path (its own parser consumes the stash).
+    if (!storedAndAbility.empty())
+    {
+        string trimmed = s;
+        size_t ta = trimmed.find_first_not_of(' ');
+        trimmed = (ta == string::npos) ? "" : trimmed.substr(ta);
+        if (trimmed == "and!()!" || trimmed.empty())
+        {
+            string payload = storedAndAbility;
+            storedAndAbility.clear();
+            return parseMagicLine(payload, id, spell, card, activated);
+        }
+    }
 
     vector<string> splitTrigger = parseBetween(s, "@", ":");
     if (splitTrigger.size())
@@ -4402,9 +4421,26 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     found = s.find("donothing");
     if (found != string::npos)
     {
-        
+
         MTGAbility * a = NEW AAFakeAbility(observer, id, card, target,newName);
         a->oneShot = 1;
+        //donothing is a real no-op, but an and!(payload)! rider must still fire
+        //(e.g. {0}:donothing and!(life:1 controller)!). No AAFakeAbility path
+        //consumes the stash, so compose the follow-up as an ordered MultiAbility.
+        if(storedAndAbility.size())
+        {
+            string stored = storedAndAbility;
+            storedAndAbility.clear();
+            MTGAbility * follow = parseMagicLine(stored, id, spell, card);
+            if(follow)
+            {
+                MultiAbility * multi = NEW MultiAbility(observer, id, card, target, NULL);
+                multi->Add(a);
+                multi->Add(follow);
+                multi->oneShot = 1;
+                return multi;
+            }
+        }
         return a;
     }
 

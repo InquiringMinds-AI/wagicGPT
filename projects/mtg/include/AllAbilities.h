@@ -7877,6 +7877,32 @@ public:
     int resolve()
     {
         MTGCardInstance * card = (MTGCardInstance *) target;
+        //Totem armor (Umbra) Oracle: "if enchanted permanent would be
+        //destroyed, instead remove all damage from it and destroy this Aura."
+        //The aura destruction must happen automatically as part of the
+        //replacement - it used to be deferred to an interactive target
+        //chooser that nothing ever drives, so the shielded creature survived
+        //but the Umbra stayed on the battlefield (a permanent shield). When no
+        //explicit target was handed in, find the totem Aura enchanting the
+        //source ourselves and destroy exactly one (one shield is consumed per
+        //destruction event; the controller's menu already picked "Totem Armor"
+        //over regeneration upstream).
+        if (!card && source)
+        {
+            for (int i = 0; i < 2 && !card; i++)
+            {
+                MTGGameZone * bf = game->players[i]->game->battlefield;
+                for (int x = 0; x < bf->nb_cards; x++)
+                {
+                    MTGCardInstance * c = bf->cards[x];
+                    if (c && c->auraParent == source && c->has(Constants::TOTEMARMOR))
+                    {
+                        card = c;
+                        break;
+                    }
+                }
+            }
+        }
         if (card)
         {
             card->destroy();

@@ -1835,6 +1835,14 @@ bool MTGGameZone::parseLine(const string& ss)
             s = "";
         }
 
+        //Allow '^' to stand in for ',' inside a single card name (the engine's
+        //own convention, used ~everywhere a comma-bearing card name must live in
+        //a comma-delimited DSL string - see token/meld/becomes/etc.). This is
+        //what lets a comma-named card (e.g. "Anafenza^ the Foremost") be seeded
+        //or asserted in this comma-separated zone list; names without '^' are
+        //untouched, so existing fixtures behave exactly as before.
+        replace(toFind.begin(), toFind.end(), '^', ',');
+
         card = MTGCollection()->getCardByName(toFind);
         int id = Rules::getMTGId(toFind);
 

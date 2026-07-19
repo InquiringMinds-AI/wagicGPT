@@ -1148,7 +1148,11 @@ void GameObserver::gameStateBasedEffects()
                 card->fresh = 0; // Remove fresh attribute to cards put in sideboard last turn
             }
         }
-        if (z->nb_cards == 0)
+        // An empty battlefield cannot grant NOMAXHAND from the player's own side,
+        // but the opponent may still grant OPPNOMAXHAND from THEIRS - do not
+        // clear the flag in that case (else a beneficiary controlling no
+        // permanents loses the protection). Consult the actual granting side.
+        if (z->nb_cards == 0 && !p->opponent()->inPlay()->hasAbility(Constants::OPPNOMAXHAND))
         {
             p->nomaxhandsize = false;
         }

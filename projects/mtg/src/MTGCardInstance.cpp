@@ -508,24 +508,21 @@ int MTGCardInstance::totem(bool noregen)
     }
     bool canregen = (regenerateTokens && !has(Constants::CANTREGEN) && !noregen);
     vector<MTGAbility*>selection;
-    TargetChooserFactory tf(getObserver());
-    TargetChooser * tcb = tf.createTargetChooser("mytotem",this);
-    tcb->targetter = NULL;
-    tcb->maxtargets = 1;
+    //Destroying the totem Aura is part of the replacement, not a separate
+    //player action: ATriggerTotem (target NULL) finds the Umbra enchanting
+    //this creature and destroys it on resolve. It used to be wrapped in an
+    //interactive GenericTargetAbility(mytotem) that nothing drove, so the
+    //Aura was never destroyed. GenericAddToGame simply queues the destroy when
+    //the "Totem Armor" menu option is chosen.
     MTGAbility * destroyTotem = NEW ATriggerTotem(getObserver(), getObserver()->mLayers->actionLayer()->getMaxId(),this,NULL);
     destroyTotem->oneShot = true;
     destroyTotem->canBeInterrupted = false;
-    MTGAbility * dtTarget = NEW GenericTargetAbility(getObserver(), "","",getObserver()->mLayers->actionLayer()->getMaxId(), this,tcb->clone(), destroyTotem->clone());
+    MTGAbility * addTotemtoGame = NEW GenericAddToGame(getObserver(), getObserver()->mLayers->actionLayer()->getMaxId(), this,NULL,destroyTotem->clone());
     SAFE_DELETE(destroyTotem);
-    dtTarget->oneShot = true;
-    dtTarget->canBeInterrupted = false;
-    MTGAbility * addTotemtoGame = NEW GenericAddToGame(getObserver(), getObserver()->mLayers->actionLayer()->getMaxId(), this,NULL,dtTarget->clone());
-    SAFE_DELETE(dtTarget);
     addTotemtoGame->oneShot = true;
     addTotemtoGame->canBeInterrupted = false;
     selection.push_back(addTotemtoGame->clone());
     SAFE_DELETE(addTotemtoGame);
-    SAFE_DELETE(tcb);
     if(canregen)
     {
         MTGAbility * triggerRegen = NEW ATriggerRegen(getObserver(), getObserver()->mLayers->actionLayer()->getMaxId(), this, this);

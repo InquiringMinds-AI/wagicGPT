@@ -509,6 +509,12 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
                     repeat = false;
                     abilitySecond = contructAbility(abilityTwo);
                     game->addObserver(abilitySecond);
+                    //An addObserver'd one-shot never resolves on its own (same
+                    //disease documented in toResolve/fireOneShot): Manifest Dread's
+                    //optiontwo "all(*|reveal) moveto(mygraveyard)" left the
+                    //un-manifested card stranded in the reveal zone. Fire it here,
+                    //exactly as toResolve() does for the no-valid-target branch.
+                    fireOneShot(abilitySecond);
                 }
             }
             else if (tc->source)
@@ -537,6 +543,9 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
                 repeat = false;
                 abilitySecond = contructAbility(abilityTwo);
                 game->addObserver(abilitySecond);
+                //See note above: fire the one-shot optiontwo so its mover runs
+                //(Manifest Dread mills the un-manifested card here).
+                fireOneShot(abilitySecond);
             }
 
         }
