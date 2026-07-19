@@ -309,3 +309,28 @@ List draw-ETB cards LAST and account for the drawn card in your asserts.
 - [ ] All zones accounted for (cast spells, tokens, markers, library remainder);
       mana funded exactly.
 - [ ] Observed passing solo, or filed as an engine finding with evidence.
+
+## Harness driving facts (2026-07-19 session)
+
+- **Suite summary lines go to STDERR.** Always capture `> log 2>&1`; a
+  `2>/dev/null | grep` pipeline silently loses the "Test suite finished"
+  line and failure output.
+- **`WAGIC_TESTSUITE_FILE` takes a REGISTRY file** (one Res/test-relative
+  fixture path per line), never a fixture directly — feeding it a fixture
+  makes every line parse as a filename ("Could not load test file") and
+  the run hangs.
+- **`choice N` is 0-based.**
+- **`p1` / `p2` are the [DO] player-click tokens.**
+- **`may`-prompts are MENUS**: answer with `choice 0` (accept). Clicking
+  the trigger's source card does NOT answer them.
+- **Damage-vs-loyalty arithmetic must be exact** in planeswalker fixtures:
+  a survivor is indistinguishable from a fizzle unless you finish with a
+  second burn whose sum exactly equals starting loyalty (the
+  Shock-finisher pattern, see probe/sparkcaster-era fixtures).
+- **The registry has no size cap anymore** (files[1024] fixed 6c22c63c2),
+  but the incident is the reason any full-suite segfault right after the
+  pregame tests on an OLD binary means "registry > 1024", not a code bug.
+- **Async reveal fixtures**: `WAGIC_REVEAL_TEST_ASYNC="Name1,Name2"` makes
+  the scripted seat run the real interactive-AI reveal driver with those
+  picks (see probe/glacial_revelation_async.txt header for the recipe);
+  such fixtures are run explicitly, not registered.
