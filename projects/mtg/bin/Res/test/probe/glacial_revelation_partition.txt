@@ -1,0 +1,24 @@
+# ENGINE-R1 repro: Glacial Revelation interactive reveal - snow picks must go to HAND,
+# the rest to graveyard. Wave-19 corpus showed all picks milled instead.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Glacial Revelation
+library:Grizzly Bears,Ornithopter,Millstone,Juggernaut,Hill Giant,Ohran Viper,Icehide Golem
+manapool:{2}{G}
+[PLAYER2]
+[DO]
+interactivereveal
+Glacial Revelation
+Icehide Golem
+Ohran Viper
+revealnext
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Icehide Golem,Ohran Viper
+graveyard:Hill Giant,Juggernaut,Millstone,Ornithopter,Glacial Revelation
+library:Grizzly Bears
+manapool:{0}
+[PLAYER2]
+[END]
