@@ -109,8 +109,8 @@
 # Metalcraft, not implemented
 #AUTO_DEFINE _METALCRAFT_ if type(artifact|mybattlefield)~morethan~2 then
 
-# Echo, not implemented
-#AUTO_DEFINE _ECHO_($cost) $cost[{$c};next upkeep] sacrifice
+# Echo (pay cost at your next upkeep or sacrifice)
+#AUTO_DEFINE _ECHO_($cost) upcost[$cost;next upkeep] sacrifice
 
 # Threshold
 #AUTO_DEFINE _THRESHOLD_ if type(*|mygraveyard)~morethan~6 then 

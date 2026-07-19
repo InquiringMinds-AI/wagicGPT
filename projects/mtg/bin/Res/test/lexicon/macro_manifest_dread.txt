@@ -1,19 +1,26 @@
-# Manifest Dread puts one of two revealed cards face down and the other into
-# the graveyard; both zones make the branch observable in the assertion.
+# Manifest dread: look at the top two cards, put one onto the battlefield face
+# down as a 2/2 (optionone: manifest the clicked card) and the other into the
+# graveyard (optiontwo: all(*|reveal) moveto(mygraveyard)). Both zones make the
+# branch observable. Non-basic library cards (basics are unclickable/unassertable
+# in the suite); the last-listed library card is the top, so Darksteel Citadel is
+# revealed on top and manifested, Mind Stone is milled. The face-down card keeps
+# its collector id, so inplay: matches it by the chosen card's identity.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
 hand:Manifest Dread
-library:Forest,Island
+library:Mind Stone,Darksteel Citadel
 manapool:{1}{G}
 [PLAYER2]
 [DO]
 Manifest Dread
-choice 0
+Darksteel Citadel
+revealnext
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-graveyard:*
-inplay:*
+graveyard:Manifest Dread,Mind Stone
+inplay:Darksteel Citadel
+manapool:{0}
 [PLAYER2]
 [END]

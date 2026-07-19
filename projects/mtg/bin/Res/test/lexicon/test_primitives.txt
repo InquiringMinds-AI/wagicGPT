@@ -3683,7 +3683,7 @@ name=Lexicon Cant Target Effect Witness
 rarity=C
 type=Artifact
 mana={0}
-auto={0}:cantbetargetof(red) target(creature|mybattlefield)
+auto={0}:target(creature|mybattlefield) transforms((,newability[cantbetargetof(*[red])])) ueot
 [/card]
 [card]
 id=2100000286
@@ -4131,7 +4131,7 @@ name=Lexicon Count Behavior Witness
 rarity=C
 mana={0}
 type=Artifact
-auto={0}:count(creature|mybattlefield) && draw:countedamount controller
+auto={0}:count(type:creature:mybattlefield) && draw:countedamount controller
 text=Test-only witness that uses count to set a later draw amount.
 [/card]
 [card]
@@ -4140,7 +4140,7 @@ name=Lexicon Countb Behavior Witness
 rarity=C
 mana={0}
 type=Artifact
-auto={0}:countb(creature|opponentbattlefield) && draw:countedbamount controller
+auto={0}:countb(type:creature:opponentbattlefield) && draw:countedbamount controller
 text=Test-only witness that uses countb to set a later draw amount.
 [/card]
 [card]
@@ -6178,4 +6178,13 @@ rarity=C
 mana={2}{U}
 type=Enchantment Room
 text=Lexicon room enchantment witness
+[/card]
+[card]
+id=2100000975
+name=Lexicon Devotion Offset Witness
+rarity=C
+mana={0}
+type=Artifact
+auto=alterdevoffset:1 controller
+text=Test-only witness that raises devotion via alterdevoffset.
 [/card]

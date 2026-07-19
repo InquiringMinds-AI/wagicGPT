@@ -1,8 +1,16 @@
 # alterdevoffset contributes to devotion calculations used by Gray Merchant.
+# The offset source is a pure synthetic witness carrying ONLY alterdevoffset:1,
+# so devotion to black = Gray Merchant's own {B}{B} (2) + offset (1) = 3.
+# Each opponent loses 3, controller gains that same 3 (Gray Merchant siphon).
+# The previous source (Altar of the Pantheon) also carried a {T}: add mana
+# ability that gets tapped to help pay the cast and conditionally gains 1 life,
+# contaminating the observation with an extra +1 to the controller (a stray
+# ability, per the authoring rules) and making this read like an asymmetric
+# drain. Isolating alterdevoffset removes that contamination.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Altar of the Pantheon
+inplay:Lexicon Devotion Offset Witness
 hand:Gray Merchant of Asphodel
 manapool:{3}{B}{B}
 [PLAYER2]
@@ -12,7 +20,7 @@ Gray Merchant of Asphodel
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Altar of the Pantheon,Gray Merchant of Asphodel
+inplay:Lexicon Devotion Offset Witness,Gray Merchant of Asphodel
 life:23
 [PLAYER2]
 life:17

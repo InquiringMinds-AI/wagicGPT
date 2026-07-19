@@ -15,22 +15,12 @@ lexicon/macro_catalog_loads.txt
 
 # Engine-blocked conformance witnesses (2026-07-18 triage): fail only on catalogued engine defects — see projects/mtg/strategy-design/lexicon-triage/engine-bugs.md
 lexicon/basic_noentertrg_suppresses_etb.txt
-lexicon/basic_mutate_triggers_mutation_event.txt
-lexicon/effect_alterdevoffset_changes_devotion.txt
-lexicon/basic_noloyaltydamage_preserves_planeswalker.txt
 lexicon/effect_doubleside_turns_back_face.txt
 lexicon/basic_nodefensedamage_preserves_battle_defense.txt
 lexicon/effect_doforetell_fires_foretold_event.txt
-lexicon/effect_donothing_preserves_followup.txt
-lexicon/effect_exploits_fires_exploited_trigger.txt
 lexicon/effect_sethand_reduces_cleanup_hand_limit.txt
-lexicon/effect_count_sets_draw_amount.txt
-lexicon/effect_countb_sets_draw_amount.txt
-lexicon/effect_cantbetargetof_rejects_red_spell.txt
 lexicon/basic_banding_attacks_as_group.txt
 lexicon/basic_phasing_leaves_and_returns.txt
-lexicon/basic_combattoughness_assigns_toughness_damage.txt
-lexicon/basic_totemarmor_saves_creature_and_destroys_aura.txt
 lexicon/basic_leyline_starts_from_opening_hand.txt
 lexicon/card_field_primitive_alias_preserves_behavior.txt
 lexicon/effect_reduceto_sets_life_total.txt
@@ -40,16 +30,12 @@ lexicon/effect_altermutationcounter_emits_mutated_event.txt
 lexicon/macro_fish_into_the_flood_maw.txt
 lexicon/macro_conditionals_and_markers.txt
 lexicon/macro_recover.txt
-lexicon/macro_suspect_and_finality.txt
 lexicon/macro_plotcast.txt
 lexicon/cost_dynamic_eval_mycost_myevictcost.txt
 lexicon/field_crewbonus_gearshift_ace.txt
 lexicon/macro_enlist_argivian_cavalier.txt
 lexicon/macro_red_elemental_devastating_summons.txt
-lexicon/effect_mutateover_places_source_over_target.txt
-lexicon/macro_manifest_dread.txt
 lexicon/macro_amass_variants.txt
-lexicon/macro_echo.txt
 lexicon/target_sideboard_commandzone_matrix.txt
 
 # Harness-design blocker (2026-07-18): the cardtext: assert cannot work against the

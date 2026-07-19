@@ -2,14 +2,15 @@
 # The discard-to-max-hand check only runs at the ACTIVE player's cleanup, so the
 # scenario crosses into PLAYER2's turn (draws 1) and back to PLAYER1's upkeep; by
 # then PLAYER2 has passed its own cleanup holding 9 cards (no trim to 7).
-# NOTE: PLAYER2 must control a permanent — the engine clears nomaxhandsize when a
-# player's own battlefield is empty (GameObserver.cpp:1151), so give it a land.
+# PLAYER2 controls NO permanents of its own: the protection comes entirely from
+# PLAYER1's OPPNOMAXHAND permanent. This is the no-permanent case that formerly
+# collapsed (GameObserver cleared nomaxhandsize whenever the beneficiary's OWN
+# battlefield was empty, ignoring the opponent's grant); it now survives.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
 inplay:Lexicon Opponent No Max Hand Witness
 [PLAYER2]
-inplay:Forest
 hand:Grizzly Bears,Hill Giant,Forest,Island,Swamp,Mountain,Plains,Shock
 library:Forest,Forest,Forest,Forest,Forest
 [DO]
@@ -22,7 +23,6 @@ UPKEEP
 [PLAYER1]
 inplay:Lexicon Opponent No Max Hand Witness
 [PLAYER2]
-inplay:Forest
 hand:Grizzly Bears,Hill Giant,Forest,Island,Swamp,Mountain,Plains,Shock,Forest
 library:Forest,Forest,Forest,Forest
 [END]

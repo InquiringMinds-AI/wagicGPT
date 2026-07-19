@@ -1,12 +1,21 @@
-# noloyaltydamage prevents damage from removing loyalty counters, so a Shock
-# aimed at the protected planeswalker still resolves (goes to the graveyard,
-# mana spent) but leaves the planeswalker in play with its loyalty intact.
+# Spark Rupture turns every loyalty-bearing planeswalker into a creature whose
+# power/toughness equal its loyalty (and carries noloyaltydamage). Jace Beleren
+# enters with 3 loyalty, so under Spark Rupture he is a 3/3 creature: a Shock
+# aimed at him resolves (goes to the graveyard, mana spent) but only marks 2
+# damage, leaving the planeswalker in play with its loyalty intact.
+#
+# AUTHORING NOTE: Spark Rupture's ETB ("When Spark Rupture enters, draw a card")
+# fires when the harness resolves it into play. Jace MUST be listed before Spark
+# Rupture on the inplay line, otherwise Spark Rupture's ETB draw pulls Jace out
+# of the still-populated setup library before the harness can place him, and he
+# never enters (the original ordering made the cast look "blocked"). The single
+# library card is what that ETB draw puts into hand.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Spark Rupture,Jace Beleren
+inplay:Jace Beleren,Spark Rupture
 hand:Shock
-library:Forest
+library:Darksteel Citadel
 manapool:{R}
 [PLAYER2]
 [DO]
@@ -16,9 +25,8 @@ no
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
-inplay:Spark Rupture,Jace Beleren
+inplay:Jace Beleren,Spark Rupture
 graveyard:Shock
-library:Forest
-manapool:{0}
+hand:Darksteel Citadel
 [PLAYER2]
 [END]

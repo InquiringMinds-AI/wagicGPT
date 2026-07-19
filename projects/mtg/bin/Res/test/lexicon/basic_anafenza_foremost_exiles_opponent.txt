@@ -1,0 +1,28 @@
+# Anafenza, the Foremost (oppgcreatureexiler on a REAL card whose name carries a
+# comma). If a creature card would be put into an opponent's graveyard from
+# anywhere, exile it instead. The '^' stands in for the ',' in her name so the
+# comma-delimited zone list keeps her as one card (the engine's own ^-for-comma
+# convention); without it "Anafenza, the Foremost" splits into two junk tokens
+# and never enters play. PLAYER2's Grizzly Bears is destroyed by Wrecking Ball
+# and must land in exile, not the graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Anafenza^ the Foremost
+hand:Wrecking Ball
+manapool:{2}{B}{R}
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Wrecking Ball
+Grizzly Bears
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Anafenza^ the Foremost
+graveyard:Wrecking Ball
+manapool:{0}
+[PLAYER2]
+exile:Grizzly Bears
+[END]
