@@ -73336,7 +73336,7 @@ auto=@movedto(*[instant;sorcery;manacost=17]|mystack):create(Construct:Artifact 
 auto=@movedto(*[instant;sorcery;manacost=18]|mystack):create(Construct:Artifact Creature Construct:18/18) controller
 auto=@movedto(*[instant;sorcery;manacost=19]|mystack):create(Construct:Artifact Creature Construct:19/19) controller
 auto=@movedto(*[instant;sorcery;manacost=20]|mystack):create(Construct:Artifact Creature Construct:20/20) controller
-auto={3}{U}{U}{E} restriction{type(artifact|mybattlefield)~morethan~4}:moveto(hand) all(*[instant;sorcery]|mygraveyard)
+auto={3}{U}{U}{E} restriction{type(artifact|mybattlefield)~morethan~5}:moveto(hand) all(*[instant;sorcery]|mygraveyard)
 text=Whenever you cast an instant or sorcery spell, create an X/X colorless Construct artifact creature token, where X is that spell's mana value. -- {3}{U}{U}, Exile Metallurgic Summonings: Return all instant and sorcery cards from your graveyard to your hand. Activate this ability only if you control six or more artifacts.
 mana={3}{U}{U}
 type=Enchantment
