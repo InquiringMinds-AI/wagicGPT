@@ -1953,6 +1953,13 @@ public:
     int reactToTargetClick(Targetable * object);
     int reactToChoiceClick(Targetable * object,int choice,int control);
     int processAbility();
+    //Decline the pending extra payment (game->mExtraPayment): drop the
+    //payment, clear its cost targets, and re-route the choice onto the unpaid
+    //branch (opts[1]) so the spell/ability's decline effect (counter/fizzle)
+    //resolves - REPLACING any already-committed paid branch rather than
+    //firing alongside it. Shared by the engine's own unpayable-release path
+    //and the test suite's `cancelcost` driver command.
+    void declineExtraPayment();
     MenuAbility * clone() const;
     ~MenuAbility();
 

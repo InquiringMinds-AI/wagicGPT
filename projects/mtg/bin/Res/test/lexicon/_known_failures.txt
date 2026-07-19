@@ -46,7 +46,6 @@ lexicon/macro_recover.txt
 lexicon/macro_suspect_and_finality.txt
 lexicon/macro_plotcast.txt
 lexicon/cost_dynamic_eval_mycost_myevictcost.txt
-lexicon/macro_ward_variants.txt
 lexicon/field_crewbonus_gearshift_ace.txt
 lexicon/macro_enlist_argivian_cavalier.txt
 lexicon/macro_red_elemental_devastating_summons.txt

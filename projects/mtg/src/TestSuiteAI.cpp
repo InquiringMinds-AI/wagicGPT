@@ -2,6 +2,9 @@
 
 #include "TestSuiteAI.h"
 #include "MTGAbility.h"
+#include "AllAbilities.h"
+#include "ExtraCost.h"
+#include "ManaEngine.h"
 #include "MTGRules.h"
 #include "ActionLayer.h"
 #include "GuiCombat.h"
@@ -221,7 +224,11 @@ int TestSuiteAI::Act(float)
     {
         ActionLayer * al = observer->mLayers->actionLayer();
         if (al->menuObject && al->abilitiesMenu && al->abilitiesMenu->mObjects.size()
-            && action.find("choice ") == string::npos)
+            && action.find("choice ") == string::npos
+            //cancelcost declines the OPEN pay-or-decline menu itself (choosing
+            //the unpaid branch) - it must reach the menu, not be pre-answered
+            //by the suite default (which would commit to the paid branch).
+            && action.compare("cancelcost") != 0)
         {
             //Mana abilities pierce menus in the engine (a pending X-payment
             //may need mana floated while its menu waits - flameblast_dragon).
@@ -390,6 +397,86 @@ int TestSuiteAI::Act(float)
         DebugTrace("TESTSUITE choice !!!");
         int choice = atoi(action.substr(action.find("choice ") + 7).c_str());
         observer->mLayers->actionLayer()->doReactTo(choice);
+    }
+    else if (action.compare("cancelcost") == 0)
+    {
+        //Decline a pay-or-decline prompt (ward, kicker-style may-costs, etc.).
+        //The reliable, rules-correct decline is to choose the UNPAID branch of
+        //the still-open menu - the human's "don't pay" click - rather than
+        //committing to pay and then backing out. The unpaid branch is the last
+        //menu item (a cancel item when the menu is cancelable, the fizzle/
+        //counter option when the paidability is mandatory). If the pay was
+        //already committed and the mExtraPayment is armed (no open menu), route
+        //to MenuAbility::declineExtraPayment(), the engine's own unpaid-branch
+        //release used by the auto-release path.
+        ActionLayer * al = observer->mLayers->actionLayer();
+        if (al->menuObject && al->abilitiesMenu && al->abilitiesMenu->mObjects.size())
+        {
+            int last = (int)al->abilitiesMenu->mObjects.size() - 1;
+            al->doReactTo(last);
+            DebugTrace("TESTSUITE cancelcost: declined open pay menu (option " << last << ") [" << suite->filename << "]");
+        }
+        else if (observer->mExtraPayment)
+        {
+            if (MenuAbility * ma = dynamic_cast<MenuAbility*>(observer->mExtraPayment->action))
+                ma->declineExtraPayment();
+            else
+            {
+                observer->mLayers->actionLayer()->CheckUserInput(JGE_BTN_SEC);
+                observer->mExtraPayment = NULL;
+            }
+            DebugTrace("TESTSUITE cancelcost: declined armed extra payment [" << suite->filename << "]");
+        }
+        else
+        {
+            std::cerr << "TESTSUITE cancelcost: no pending pay prompt (state unchanged)" << std::endl;
+            DebugTrace("TESTSUITE cancelcost: no pending pay prompt [" << suite->filename << "]");
+        }
+    }
+    else if (action.compare("paycost") == 0)
+    {
+        //Complete a pending mExtraPayment (the pay leg of a pay-or-decline
+        //prompt). The scripted seat has no producers to click, so this mirrors
+        //the human casting-payment path.
+        ExtraCosts * ep = observer->mExtraPayment;
+        if (!ep)
+        {
+            std::cerr << "TESTSUITE paycost: no pending extra payment (state unchanged)" << std::endl;
+            DebugTrace("TESTSUITE paycost: no pending extra payment [" << suite->filename << "]");
+            return 1;
+        }
+        {
+            //The human completes an extra payment by tapping mana producers
+            //until the pool covers the cost, at which point the engine's own
+            //MenuAbility::Update / paidability auto-pays from the pool and
+            //resolves the paid branch. The scripted seat has no producers to
+            //click, so mirror the human casting-payment path exactly:
+            //ManaEngine::autoTapForCost taps the paying player's free
+            //untapped producers to cover the extra mana cost, then the engine
+            //finishes the payment on its own next tick.
+            MTGCardInstance * src = ep->source;
+            Player * payer = src ? src->controller() : NULL;
+            ManaCost * leg = NULL;
+            for (size_t ec = 0; !leg && ec < ep->costs.size(); ec++)
+                if (ExtraManaCost * emc = dynamic_cast<ExtraManaCost *>(ep->costs[ec]))
+                    leg = emc->costToPay;
+            int anytype = src ? src->has(Constants::ANYTYPEOFMANAABILITY) : 0;
+            if (payer && leg && !ep->isPaymentSet())
+                ManaEngine::autoTapForCost(payer, src, leg, anytype);
+            if (ep->isPaymentSet() && ep->canPay())
+            {
+                //covered - the engine's MenuAbility::Update will consume the
+                //pool and fire the paid branch on the following tick, same as
+                //for a human who just tapped enough mana.
+                DebugTrace("TESTSUITE paycost: extra cost covered, engine will resolve paid branch [" << suite->filename << "]");
+            }
+            else
+            {
+                std::cerr << "TESTSUITE paycost: paying player cannot cover the extra cost"
+                             " (state unchanged) [" << suite->filename << "]" << std::endl;
+                DebugTrace("TESTSUITE paycost: unpayable, state unchanged [" << suite->filename << "]");
+            }
+        }
     }
     else if (action.find(" -momir- ") != string::npos)
     {

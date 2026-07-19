@@ -1,0 +1,33 @@
+# Ward {1} conformance - PAY case. The active player (P1) casts Shock at P2's
+# Dancing Sword Construct (2/1 flying, ward {1}). Ward triggers: it counters
+# Shock unless Shock's controller pays {1}. P1 pays via `paycost`, which taps
+# a free producer (Darksteel Citadel -> {1}) the same way a human/AI covers an
+# extra cost; Shock then resolves and the 2 damage kills the 2/1.
+#   choice 0        - answer the ward trigger's menu (commit to the pay branch)
+#   Dancing Sword.. - re-click the spell to satisfy ward's target(spell) chooser
+#   paycost         - complete the {1} ward payment from P1's producers
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Shock
+inplay:Darksteel Citadel
+manapool:{R}
+[PLAYER2]
+inplay:Dancing Sword Construct
+[DO]
+Shock
+Dancing Sword Construct
+choice 0
+Shock
+paycost
+no
+no
+goto end
+[ASSERT]
+END
+[PLAYER1]
+graveyard:Shock
+inplay:Darksteel Citadel
+[PLAYER2]
+graveyard:Dancing Sword Construct
+[END]

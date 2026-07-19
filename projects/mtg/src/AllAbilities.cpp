@@ -7610,6 +7610,42 @@ bool MenuAbility::CheckUserInput(JButton key)
     return false;
 }
 
+void MenuAbility::declineExtraPayment()
+{
+    if (!game->mExtraPayment)
+        return;
+    //clear any target-chooser state on the dropped cost so a later re-offer
+    //does not inherit stale targets
+    for (size_t ec = 0; ec < game->mExtraPayment->costs.size(); ec++)
+        if (game->mExtraPayment->costs[ec]->tc)
+            game->mExtraPayment->costs[ec]->tc->initTargets();
+    game->mExtraPayment = NULL;
+    //after an X-announcement swap the original options live in retiredOptions;
+    //the unpaid branch must come from THERE, not from the AAWhatsX entries now
+    //occupying abilities[]
+    vector<MTGAbility*> & opts = retiredOptions.size() ? retiredOptions : abilities;
+    if (opts.size() > 1)
+    {
+        //re-route the choice onto the unpaid branch and let the menu's own
+        //decline machinery run it (must-may wrap vs one-shot,
+        //processed/removeMenu, interrupt-offer cancel). Replacing mClone here
+        //is what makes a decline AFTER the paid branch was committed still
+        //resolve as the unpaid branch instead of both firing.
+        SAFE_DELETE(mClone);
+        mClone = opts[1]->clone();
+        processAbility();
+    }
+    else
+    {
+        SAFE_DELETE(mClone);
+        processed = true;
+        this->forceDestroy = 1;
+        removeMenu = true;
+        if (source->controller() == game->isInterrupting)
+            game->mLayers->stackLayer()->cancelInterruptOffer(ActionStack::DONT_INTERRUPT, false);
+    }
+}
+
 void MenuAbility::Update(float dt)
 {
     MTGAbility::Update(dt);
@@ -7666,32 +7702,7 @@ void MenuAbility::Update(float dt)
                 delete pMana;
                 if (!coverable)
                 {
-                    for (size_t ec = 0; ec < game->mExtraPayment->costs.size(); ec++)
-                        if (game->mExtraPayment->costs[ec]->tc)
-                            game->mExtraPayment->costs[ec]->tc->initTargets();
-                    game->mExtraPayment = NULL;
-                    //after an X-announcement swap the original options live in
-                    //retiredOptions; the unpaid branch must come from THERE,
-                    //not from the AAWhatsX entries now occupying abilities[]
-                    vector<MTGAbility*> & opts = retiredOptions.size() ? retiredOptions : abilities;
-                    if (opts.size() > 1)
-                    {
-                        //re-route the choice onto the unpaid branch and let the
-                        //menu's own decline machinery run it (must-may wrap vs
-                        //one-shot, processed/removeMenu, interrupt-offer cancel)
-                        SAFE_DELETE(mClone);
-                        mClone = opts[1]->clone();
-                        processAbility();
-                    }
-                    else
-                    {
-                        SAFE_DELETE(mClone);
-                        processed = true;
-                        this->forceDestroy = 1;
-                        removeMenu = true;
-                        if (source->controller() == game->isInterrupting)
-                            game->mLayers->stackLayer()->cancelInterruptOffer(ActionStack::DONT_INTERRUPT, false);
-                    }
+                    declineExtraPayment();
                     return;
                 }
             }

@@ -140,6 +140,50 @@ be clicked by the suite (printing-id mismatch) — use nonbasic lands anywhere a
 must be clicked, revealed, or selected. The turn-1 draw step is skipped — draw-step
 mechanics (dredge) need the game advanced to a later turn's draw.
 
+### Pay-or-decline prompts (extra costs / ward): `paycost` and `cancelcost`
+
+Some cards arm a **pay-or-decline extra payment** (`GameObserver::mExtraPayment`) — a
+prompt that counters/fizzles the effect unless a mana cost is paid. Ward is the
+canonical case: `_WARDn_` triggers when the creature is targeted by an opponent's
+spell/ability and offers that opponent's controller the choice to pay `{n}` or have
+the spell countered. Two `[DO]` commands drive this prompt; a human presses a mana
+key to complete it or `JGE_BTN_SEC` to decline, and the scripted seat has neither.
+
+- **`paycost`** — complete the payment. It taps the paying player's free untapped
+  producers to cover the extra cost (`ManaEngine::autoTapForCost`, the same path a
+  human's casting-payment takes), then the engine's own auto-pay resolves the paid
+  branch on the next tick. The payer must control enough untapped producers, or hold
+  enough floating pool mana, to cover the cost; if it cannot, `paycost` logs loudly
+  and leaves the prompt untouched (author a `cancelcost` after it, or expect the
+  engine's own auto-decline). NOTE: if the pool already covers the cost when the
+  prompt arms, the engine auto-pays with no command needed — put the mana in an
+  untapped **producer** (a nonbasic land / mana rock), not the floating pool, when
+  you want `paycost` itself to be the acting command.
+- **`cancelcost`** — decline the payment. It chooses the **unpaid branch** of the
+  still-open pay-or-decline menu (the counter/fizzle option — the last menu item),
+  the human's "don't pay" click. Use this even when the payer *could* pay: it is the
+  only way to decline while holding enough mana (a fully-broke payer auto-declines on
+  its own). It is exempt from the menu-default (so it reaches the open menu rather
+  than being pre-answered onto the paid branch).
+
+Driving the full ward sequence — `A` casts a spell at `B`'s warded creature:
+
+```
+[DO]
+Shock                        # cast the spell
+Dancing Sword Construct      # target the warded creature
+choice 0                     # answer the ward trigger's menu (open pay-or-decline)
+Shock                        # re-click the SPELL to satisfy ward's target(spell) chooser
+paycost                      # ...or `cancelcost` to decline
+```
+
+The re-click of the spell after `choice 0` is load-bearing: ward's script targets the
+triggering spell (`target(*|opponentzones)`), and that chooser — owned by the defender
+— is what actually wedges the scripted seat, upstream of the payment itself. Only real
+mana-tax ward exists in the card pool (all `_WARDn_`); there are no life/discard forms.
+See `Res/test/lexicon/macro_ward_pay.txt` and `macro_ward_decline.txt` for worked
+examples.
+
 ## INIT state lines
 
 **Repeated same-zone lines in one player block OVERWRITE, they do not append** —

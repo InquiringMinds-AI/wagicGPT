@@ -208,11 +208,19 @@ absent from its output.
     works: humans click/cancel, and AIPlayerBaka::selectAbility pays-or-fizzles
     (empirically no wedge under an [AI] drive). Actions: (a) harness — add a
     suite command that completes/cancels an mExtraPayment so ward becomes
-    testable (same family as item 38); (b) LATENT RULES SMELL to verify: the
-    ward payment is attributed to the warded creature's CONTROLLER (defender)
-    in both MenuAbility::Update and the AI branch, but MTG rules make the
-    SPELL'S controller (attacker) pay — needs a targeted AI test to confirm.
-    Witness: `macro_ward_variants` stays parked as suite-undrivable.
+    testable (same family as item 38); (b) payer-attribution smell — WITHDRAWN
+    2026-07-18: the pay ability is re-parented onto the SPELL by transforms(...),
+    so source->controller() is the attacker; payment verified charging the
+    spell's controller, rules-correct. RESOLVED 2026-07-18: harness gained
+    `paycost`/`cancelcost` [DO] commands (drive mExtraPayment via the real
+    ManaEngine/decline paths; MenuAbility::declineExtraPayment extracted for
+    reuse); ward now has real pay+decline conformance fixtures
+    (`macro_ward_pay`, `macro_ward_decline`, both green in _tests.txt;
+    `macro_ward_variants` retired). Note: the actual scripted-seat wedge was
+    the ward's intermediate target(*|opponentzones) chooser (answered by
+    re-clicking the spell), not the pay menu itself. The commands do NOT
+    unblock item 38 (offering/suspend) — that blocker is upstream (the
+    alt-cost menu never initiates from the heuristic seat).
 31. **`crewbonus` not applied to the crewed vehicle** — Gearshift Ace's first
     strike doesn't reach the Copter. Witness: `field_crewbonus_gearshift_ace`.
 32. **sideboard/command-zone targeting inert** — clicks register,

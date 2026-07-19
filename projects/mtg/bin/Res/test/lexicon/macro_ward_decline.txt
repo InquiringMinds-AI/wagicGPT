@@ -1,0 +1,33 @@
+# Ward {1} conformance - DECLINE case. Same board as the pay case, but P1
+# declines the ward cost with `cancelcost`. Even though P1 controls a producer
+# that COULD pay the {1} (so the engine does not auto-decline), cancelcost
+# chooses the unpaid branch of the ward menu; Shock is countered to P1's
+# graveyard and the warded creature survives untapped.
+#   choice 0    - answer the ward trigger's menu (open the pay-or-decline menu)
+#   Dancing..   - re-click the spell to satisfy ward's target(spell) chooser
+#   cancelcost  - decline the {1} ward payment (spell countered)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Shock
+inplay:Darksteel Citadel
+manapool:{R}
+[PLAYER2]
+inplay:Dancing Sword Construct
+[DO]
+Shock
+Dancing Sword Construct
+choice 0
+Shock
+cancelcost
+no
+no
+goto end
+[ASSERT]
+END
+[PLAYER1]
+graveyard:Shock
+inplay:Darksteel Citadel
+[PLAYER2]
+inplay:Dancing Sword Construct
+[END]
