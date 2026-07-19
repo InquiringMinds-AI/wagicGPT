@@ -37,9 +37,6 @@ lexicon/effect_reduceto_sets_life_total.txt
 lexicon/cost_subtype_offering.txt
 lexicon/cost_suspend_one_casts.txt
 lexicon/effect_altermutationcounter_emits_mutated_event.txt
-lexicon/macro_surveil1_appendage_amalgam.txt
-lexicon/macro_surveil2_sultai_ascendancy.txt
-lexicon/macro_surveil3_grim_flayer.txt
 lexicon/macro_fish_into_the_flood_maw.txt
 lexicon/macro_conditionals_and_markers.txt
 lexicon/macro_recover.txt

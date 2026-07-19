@@ -88,6 +88,39 @@ bool TestSuiteAI::parseLine(const string& s)
 MTGCardInstance * TestSuiteAI::getCard(string action)
 {
     int mtgid = Rules::getMTGId(action);
+
+    //While a REVEAL DISPLAY is open, a click lands IN the display: a human
+    //clicking during a reveal is selecting one of the revealed cards, not a
+    //same-named copy sitting elsewhere (its pre-reveal library home, a second
+    //printing). Search the reveal zone FIRST so the selection resolves to the
+    //revealed instance, mirroring real play - and so the id path below cannot
+    //return a library copy that shares the revealed card's collector id. The
+    //gate is a reveal SPECIFICALLY (an open display backed by a populated
+    //reveal zone - GameObserver's own OpenedDisplay+reveal idiom), so
+    //library-search displays (tutors) and every no-reveal click keep their
+    //existing library-first resolution untouched.
+    bool revealOpen = observer->OpenedDisplay
+        && (observer->players[0]->game->reveal->nb_cards
+            || observer->players[1]->game->reveal->nb_cards);
+    if (revealOpen)
+    {
+        string lc = action;
+        std::transform(lc.begin(), lc.end(), lc.begin(), ::tolower);
+        for (int i = 0; i < 2; i++)
+        {
+            MTGGameZone * rz = observer->players[i]->game->reveal;
+            for (int k = 0; k < rz->nb_cards; k++)
+            {
+                MTGCardInstance * card = rz->cards[k];
+                if (!card) continue;
+                if ((mtgid && card->getMTGId() == mtgid) || card->getLCName().compare(lc) == 0)
+                    return card;
+            }
+        }
+        //Named card is not in a reveal zone (a click aimed elsewhere while a
+        //reveal happens to be open) - fall through to the normal resolution.
+    }
+
     if (mtgid)
     {
         MTGCardInstance * byId = Rules::getCardByMTGId(observer, mtgid);
@@ -104,7 +137,9 @@ MTGCardInstance * TestSuiteAI::getCard(string action)
     {
         Player * p = observer->players[i];
         //reveal included so tests can click cards revealed by effects like
-        //Alrund's end-step type choice
+        //Alrund's end-step type choice (and as the general fallback when no
+        //reveal display is open; the reveal-first short-circuit above handles
+        //the display-open case)
         MTGGameZone * zones[] = { p->game->library, p->game->hand, p->game->inPlay, p->game->graveyard, p->game->commandzone, p->game->sideboard, p->game->removedFromGame, p->game->reveal };
         for (int j = 0; j < 8; j++)
         {
@@ -240,6 +275,7 @@ int TestSuiteAI::Act(float)
             //lookup (its miss path dumps the whole board to the log).
             bool keyword = action == "" || action == "next" || action == "eot" || action == "yes"
                 || action == "no" || action == "human" || action == "ai" || action == "endinterruption"
+                || action == "interactivereveal"
                 || action.find("goto") != string::npos || action.find("reveal") != string::npos
                 || action.find("p1") != string::npos || action.find("p2") != string::npos;
             MTGCardInstance * manaCard = keyword ? NULL : getCard(action);
@@ -365,6 +401,20 @@ int TestSuiteAI::Act(float)
     {
         if (observer->mLayers->stackLayer()->askIfWishesToInterrupt == this)
             observer->mLayers->stackLayer()->cancelInterruptOffer();
+    }
+    else if (action.compare("interactivereveal") == 0)
+    {
+        //Opt this fixture into the REAL interactive reveal/scry display for
+        //cards that carry an aicode= substitute (Grim Flayer, Sultai
+        //Ascendancy, ...). Without this, an aicode card's reveal resolves
+        //through the AI's headless heuristic (which the scripted seat cannot
+        //select from); with it, GenericReveal/ScryAbility::resolve opens the
+        //display so revealok/revealnext/reveal-card clicks drive the selection.
+        //Issue it once, before the reveal fires (first [DO] line). Real play
+        //and unopted fixtures are unaffected. See docs/testsuite-fixture-
+        //authoring.md (Menus -> reveal/surveil/scry displays).
+        observer->mForceInteractiveReveal = true;
+        DebugTrace("TESTSUITE interactivereveal: aicode reveal/scry -> interactive display [" << suite->filename << "]");
     }
     else if (action.find("revealok") != string::npos || action.find("revealnext") != string::npos)
     {

@@ -180,10 +180,20 @@ absent from its output.
     MTGGameZones.cpp:673-678) produced the "stranded in temp" symptom. In real
     play the player/AI clicks the reveal display directly — all ~104 surveil
     cards function (keep-on-top default and @surveiled trigger verified green).
-    FIX SEAT: harness — prefer the reveal zone in getCard while a reveal
-    display is open (or re-queue selection during MTGRevealingCards), then the
-    three fixtures return from _known_failures.txt.
-    Witnesses: `macro_surveil1/2/3_*`.
+    RESOLVED 2026-07-18: getCard now searches the reveal zones FIRST while a
+    reveal display is open, and — the deeper blocker — the aicode fork
+    (GenericRevealAbility/scry substituting a headless heuristic whenever an
+    AI controls the card, which the suite seat is) gained an opt-in
+    `mForceInteractiveReveal` flag driven by a new `interactivereveal` [DO]
+    directive. All three surveil fixtures re-authored and back in _tests.txt,
+    green. Compat verified by counterfactual (a blanket carve-out broke two
+    aicode-search fixtures; the per-fixture opt-in doesn't).
+    ISHUMAN-LENS FOLLOW-UP (AI-track ledger, real-play behavior change,
+    needs live validation): AIPlayerGPT also takes the aicode path for reveal
+    cards (gate keys on isAI(), not isInteractiveAI()) — the GPT opponent
+    could arguably drive the interactive reveal instead of the headless
+    heuristic for surveil/scry-class decisions.
+    Witnesses: `macro_surveil1/2/3_*` (now active conformance tests).
 24. **`manifest dread` battlefield leg missing** — mills one, never puts the other
     face-down onto the battlefield. Witness: `macro_manifest_dread`.
 25. **`echo` pay-to-keep fails** — paying the echo cost at the right upkeep still

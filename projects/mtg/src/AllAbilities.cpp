@@ -55,7 +55,18 @@ GenericRevealAbility::GenericRevealAbility(GameObserver* observer, int id, MTGCa
 
 int GenericRevealAbility::resolve()
 {
-    if(source->lastController->isAI() && source->getAICustomCode().size())
+    //A card with an aicode= line resolves its reveal/surveil through that
+    //headless substitute (a moverandom heuristic) whenever an AI controls it,
+    //because Baka cannot drive an interactive reveal display. The SCRIPTED
+    //test-suite seat IS an AI subclass, but it CAN drive the display (that is
+    //what the revealok/revealnext/reveal-card-click commands exist for). A
+    //fixture that must test the interactive selection (surveil binning on an
+    //aicode card like Grim Flayer / Sultai Ascendancy) opts in with the
+    //`interactivereveal` [DO] directive, which sets mForceInteractiveReveal;
+    //every other fixture (and all real play) keeps the aicode substitute below.
+    //Mirrors the existing suite carve-outs (skip-free phase pinning, the
+    //WAGIC_TESTSUITE reveal auto-key disable in CheckUserInput).
+    if(source->lastController->isAI() && source->getAICustomCode().size() && !game->mForceInteractiveReveal)
     {
         string abi = source->getAICustomCode();
         std::transform(abi.begin(), abi.end(), abi.begin(), ::tolower);//fix crash
@@ -943,7 +954,10 @@ int GenericScryAbility::resolve()
         if(source->lastController->game->battlefield->cards[i]->has(Constants::REPLACESCRY))
             replaceScry = true;
     }
-    if(!replaceScry && source->lastController->isAI() && source->getAICustomCode().size())
+    //See GenericRevealAbility::resolve: a fixture drives the interactive scry
+    //display itself via the `interactivereveal` opt-in (mForceInteractiveReveal);
+    //without it the aicode substitute runs (real play + every other fixture).
+    if(!replaceScry && source->lastController->isAI() && source->getAICustomCode().size() && !game->mForceInteractiveReveal)
     {
         string abi = source->getAICustomCode();
         std::transform(abi.begin(), abi.end(), abi.begin(), ::tolower);//fix crash

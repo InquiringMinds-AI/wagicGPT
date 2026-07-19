@@ -1,9 +1,13 @@
-# Sultai Ascendancy uses _SURVEIL2_ at the beginning of the controller's upkeep.
-# The script advances to player 0's own upkeep on turn 3, where surveil 2 looks
-# at the top two library cards; selecting both for "put in graveyard" should
-# move them there and leave the third on top.
-# ENGINE-BLOCKED (surveil-selection): the reveal's "put in graveyard" option
-# strands the revealed cards in the temp zone; they never reach the graveyard.
+# Sultai Ascendancy (@each my upkeep:_SURVEIL2_): at the beginning of the
+# controller's upkeep, surveil 2 - look at the top two library cards, may put
+# any number into the graveyard. The script reaches player 0's own upkeep on
+# turn 3 (end/upkeep pairs skip player 1's turn-2 upkeep, whose "my upkeep"
+# trigger does not fire). One goto-upkeep pump-in-place resolves the trigger
+# and opens the reveal display; we then select BOTH revealed cards for the
+# graveyard, leaving Hill Giant on top. Non-basic library cards - basics are
+# not clickable. Sultai carries an aicode= surveil, so this exercises the
+# suite's interactive-reveal path (mSuiteGame carve-out in
+# GenericRevealAbility::resolve). Top of library = last listed = Millstone.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -11,14 +15,15 @@ inplay:Sultai Ascendancy
 library:Hill Giant,Juggernaut,Millstone
 [PLAYER2]
 [DO]
+interactivereveal
 goto end
 goto upkeep
 goto end
+goto upkeep
 goto upkeep
 Millstone
-revealok
 Juggernaut
-revealok
+revealnext
 [ASSERT]
 UPKEEP
 [PLAYER1]

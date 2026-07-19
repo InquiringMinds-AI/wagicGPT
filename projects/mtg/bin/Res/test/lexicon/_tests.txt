@@ -812,3 +812,6 @@ lexicon/cost_dynamic_tokens_parse.txt
 lexicon/basic_daybound_flips_after_empty_turn.txt
 lexicon/basic_nightbound_flips_after_two_spells.txt
 lexicon/basic_nonight_rejects_night_transition.txt
+lexicon/macro_surveil1_appendage_amalgam.txt
+lexicon/macro_surveil2_sultai_ascendancy.txt
+lexicon/macro_surveil3_grim_flayer.txt

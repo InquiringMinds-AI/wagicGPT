@@ -83,6 +83,14 @@ class GameObserver{
   //even after the `ai` command flips both players to MODE_AI (the old
   //playMode==MODE_TEST_SUITE check stops seeing them at that point).
   bool mSuiteGame;
+  //Test-suite opt-in: a fixture's `interactivereveal` [DO] directive sets this
+  //so an aicode= reveal/scry card drives its REAL interactive display (which
+  //the scripted seat can operate) instead of the AI's headless aicode
+  //substitute. Off by default, so every existing aicode fixture (Armillary
+  //Sphere, Collected Conjuring, ...) keeps the aicode path unchanged; only a
+  //fixture that must test the interactive selection (surveil binning) opts in.
+  //In-class initialized so real games and unopted fixtures never see it true.
+  bool mForceInteractiveReveal = false;
   int oldGamePhase;
   TargetChooser * targetChooser;
   CardDisplay * OpenedDisplay;

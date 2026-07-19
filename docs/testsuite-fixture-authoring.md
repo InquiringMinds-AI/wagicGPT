@@ -140,6 +140,51 @@ be clicked by the suite (printing-id mismatch) — use nonbasic lands anywhere a
 must be clicked, revealed, or selected. The turn-1 draw step is skipped — draw-step
 mechanics (dredge) need the game advanced to a later turn's draw.
 
+### Reveal / surveil / scry displays
+
+A `reveal:`/surveil/scry effect opens a **reveal display** — a card box the player
+clicks IN to choose which revealed cards go where (surveil: graveyard vs. back on
+top). Driving one from a fixture:
+
+- **While a reveal display is open, a card-name click lands IN the display.**
+  `TestSuiteGame::getCard` searches the reveal zone FIRST whenever a reveal display
+  is open (an `OpenedDisplay` backed by a populated reveal zone), so a click resolves
+  to the revealed copy — never a same-named copy elsewhere (its pre-reveal library
+  home, a second printing) — exactly as a human clicking the on-screen display would.
+  When no reveal display is open this is inert: library/tutor clicks keep their normal
+  resolution.
+- **Pace the click AFTER the reveal opens.** A TRIGGERED reveal opens a beat late: the
+  trigger must resolve first. Declare/arm the trigger source, then advance so the
+  trigger resolves and the display opens BEFORE you click — one `next` for an
+  attack/combat-damage trigger (assert the phase you land on: BLOCKERS after one
+  `next` from attackers, DAMAGE after two), or a `goto <phase>` pump-in-place for an
+  upkeep trigger (a second `goto upkeep` after you have reached upkeep spends one pump
+  cycle without leaving the phase, letting the trigger resolve). A click issued before
+  the display opens is consumed against the library and is NOT retried.
+- **Select, then finalize.** With the display open, click each card to bin by NAME
+  (one command per card for a multi-card `<upto:N>` surveil), then `revealnext`
+  (JGE_BTN_NEXT) to finalize the `<upto:N>` selection; the unselected remainder
+  auto-resolves back on top. `revealok` (JGE_BTN_OK) also advances a single-option
+  reveal. You do NOT need a `choice 0` before the clicks — the reveal's option menu
+  auto-picks "put in graveyard" (option one) via the menu-default and re-queues your
+  click onto its target chooser. Use non-basic library cards only (basics are not
+  clickable), and remember the LAST-listed `library:` card is the top (revealed first).
+- **`aicode=` cards need the `interactivereveal` opt-in.** Cards that carry an
+  `aicode=` surveil/scry (Grim Flayer, Sultai Ascendancy, and other `_SURVEIL2_/3_`
+  cards; also search-tutors like Armillary Sphere, Collected Conjuring) substitute a
+  headless heuristic for the interactive display when an AI controls them — and the
+  scripted suite seat IS an AI subclass, so by default it takes that substitute (which
+  it cannot select from). To test the interactive selection instead, put
+  `interactivereveal` as the FIRST `[DO]` line: it sets `mForceInteractiveReveal`, so
+  `GenericRevealAbility`/`GenericScryAbility::resolve` opens the real display and your
+  reveal-card clicks drive it. Use it ONLY when you are driving the display — omit it
+  and an aicode fixture keeps the (deterministic-to-that-fixture) aicode path it was
+  written for. A card with NO `aicode=` (Appendage Amalgam) always uses the interactive
+  display and needs no opt-in. See `macro_surveil1_appendage_amalgam.txt` (attack
+  trigger, no aicode), `macro_surveil2_sultai_ascendancy.txt` (upkeep trigger, aicode,
+  multi-select) and `macro_surveil3_grim_flayer.txt` (combat-damage trigger, aicode,
+  select three) for worked examples.
+
 ### Pay-or-decline prompts (extra costs / ward): `paycost` and `cancelcost`
 
 Some cards arm a **pay-or-decline extra payment** (`GameObserver::mExtraPayment`) — a

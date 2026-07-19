@@ -1,8 +1,13 @@
-# Grim Flayer uses _SURVEIL3_ after it deals combat damage. Surveil 3 should
-# reveal the top three library cards; selecting all three for "put in graveyard"
-# moves them there and leaves the fourth on top. The 2/2 deals two damage.
-# ENGINE-BLOCKED (surveil-selection): the reveal's "put in graveyard" option
-# strands the revealed cards in the temp zone; they never reach the graveyard.
+# Grim Flayer (@combatdamaged(player) from(this):_SURVEIL3_): whenever it deals
+# combat damage to a player, surveil 3 - look at the top three library cards,
+# may put any number into the graveyard. Grim Flayer is a 2/2 (no delirium yet:
+# graveyard is empty at damage time), attacks unblocked for 2 (opponent 20->18).
+# The two phase advances (attackers->blockers->damage) deal the damage and fire
+# the trigger, opening the reveal display; we select ALL THREE revealed cards
+# for the graveyard, leaving Hill Giant on top. Non-basic library cards - basics
+# are not clickable. Grim Flayer carries an aicode= surveil, so this exercises
+# the suite's interactive-reveal path (mSuiteGame carve-out in
+# GenericRevealAbility::resolve). Top of library = last listed = Darksteel Citadel.
 [INIT]
 COMBATATTACKERS
 [PLAYER1]
@@ -11,18 +16,16 @@ library:Hill Giant,Juggernaut,Millstone,Darksteel Citadel
 [PLAYER2]
 life:20
 [DO]
+interactivereveal
 Grim Flayer
 next
 next
 Darksteel Citadel
-revealok
 Millstone
-revealok
 Juggernaut
-revealok
-next
+revealnext
 [ASSERT]
-COMBATEND
+COMBATDAMAGE
 [PLAYER1]
 inplay:Grim Flayer
 graveyard:Juggernaut,Millstone,Darksteel Citadel
