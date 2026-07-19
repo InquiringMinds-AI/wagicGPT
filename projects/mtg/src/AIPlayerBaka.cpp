@@ -1521,10 +1521,51 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
         delete pMana;
         return false;
     }
-    ManaCost * diff = pMana->Diff(cost);
-    delete (pMana);
-
     map<MTGCardInstance *, bool> used;
+    //Spare would-be ATTACKERS from the mana bill. This loop taps every usable
+    //producer except the surplus (diff); a creature that also makes mana (a
+    //sliver under Gemhide, a mana dork) would be tapped to cast a spell while
+    //lands sit idle, leaving no untapped attacker at COMBATATTACKERS - so the
+    //engine correctly never offers the declare-attackers step (live-observed,
+    //corpus 20260719 deck35). Build the SWING-NEUTRAL pool (lands, rocks,
+    //sick/tapped creatures + the mana pool); if it alone affords the cost, base
+    //the surplus (diff) on it and pre-mark every would-be attacker as used, so
+    //the loop taps only neutrals and never under-taps on the strength of
+    //attacker mana it will not use. When neutrals CANNOT cover (e.g. the only
+    //blue is a sliver, or an {X} spell spending everything) attackers stay
+    //eligible and are tapped as before - correctness first.
+    ManaCost * neutral = NEW ManaCost();
+    neutral->add(this->getManaPool());
+    {
+        map<MTGCardInstance*, bool> counted;
+        for (size_t z = 1; z < observer->mLayers->actionLayer()->mObjects.size(); ++z)
+        {
+            AManaProducer * zamp = dynamic_cast<AManaProducer*>((MTGAbility *) observer->mLayers->actionLayer()->mObjects[z]);
+            if (!zamp || !canHandleCost(zamp))
+                continue;
+            MTGCardInstance * zsrc = zamp->source;
+            if (!zsrc || zsrc == target || counted[zsrc] || !zamp->isReactingToClick(zsrc) || zamp->output->getConvertedCost() < 1)
+                continue;
+            if (zsrc->isCreature() && zsrc->canAttack())
+                continue; //a would-be attacker is not "neutral"
+            counted[zsrc] = true;
+            neutral->add(zamp->output);
+        }
+    }
+    bool spareAttackers = neutral->canAfford(cost, 0);
+    ManaCost * diff = spareAttackers ? neutral->Diff(cost) : pMana->Diff(cost);
+    SAFE_DELETE(neutral);
+    delete (pMana);
+    if (spareAttackers)
+    {
+        for (size_t z = 1; z < observer->mLayers->actionLayer()->mObjects.size(); ++z)
+        {
+            AManaProducer * zamp = dynamic_cast<AManaProducer*>((MTGAbility *) observer->mLayers->actionLayer()->mObjects[z]);
+            MTGCardInstance * zsrc = zamp ? zamp->source : NULL;
+            if (zsrc && zsrc != target && zsrc->isCreature() && zsrc->canAttack())
+                used[zsrc] = true;
+        }
+    }
     for (size_t i = 1; i < observer->mLayers->actionLayer()->mObjects.size(); ++i)
     { //0 is not a mtgability...hackish
         //Make sure we can use the ability

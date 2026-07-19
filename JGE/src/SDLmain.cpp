@@ -873,6 +873,18 @@ int main(int argc, char* argv[])
 
 	DebugTrace("I R in da native");
 
+#ifdef WITH_GPT_AI
+	//Reply-parser self-test: run the wave-20 parse/salvage checks against the
+	//real static parsers and exit, no game/display needed (WAGIC_GPT_PARSETEST=1).
+	//Declared extern to keep the heavy mtg AIPlayerGPT header out of the JGE layer.
+	extern void wagicGptParseSelfTest();
+	if (getenv("WAGIC_GPT_PARSETEST"))
+	{
+		wagicGptParseSelfTest();
+		return 0;
+	}
+#endif
+
 	g_launcher = new JGameLauncher();
 
 	u32 flags = g_launcher->GetInitFlags();

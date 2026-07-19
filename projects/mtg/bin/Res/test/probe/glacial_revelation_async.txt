@@ -1,0 +1,45 @@
+# ENGINE-R1 repro (async driver): Glacial Revelation interactive reveal driven by
+# the INTERACTIVE-AI async path (driveInteractiveReveal), not scripted clicks.
+# The scripted-click fixture (glacial_revelation_partition.txt) passes; the live
+# GPT games milled the whole partition. This fixture forces the async driver so
+# the same defect is reproducible headlessly. Snow picks must go to HAND, the
+# rest to graveyard.
+#
+# NOT registered in _tests.txt: it needs the env WAGIC_REVEAL_TEST_ASYNC, which
+# makes the scripted seat present as an interactive AI and stands in for the
+# model's decideReveal (picks = the named cards). Run it explicitly:
+#   echo probe/glacial_revelation_async.txt > Res/test/_x.txt
+#   env -u WAYLAND_DISPLAY -u DISPLAY WAGIC_HEADLESS=1 WAGIC_TESTSUITE=1 \
+#       WAGIC_TESTSUITE_THREADS=1 WAGIC_REVEAL_TEST_ASYNC="Icehide Golem,Ohran Viper" \
+#       WAGIC_TESTSUITE_FILE=test/_x.txt ./wagic
+# (add WAGIC_REVEAL_DEBUG=1 for the phase-by-phase [REVEAL] trace). Pre-fix this
+# fixture FAILS (whole partition milled); post-fix it PASSES.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Glacial Revelation
+library:Grizzly Bears,Ornithopter,Millstone,Juggernaut,Hill Giant,Ohran Viper,Icehide Golem
+manapool:{2}{G}
+[PLAYER2]
+[DO]
+interactivereveal
+Glacial Revelation
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Icehide Golem,Ohran Viper
+graveyard:Hill Giant,Juggernaut,Millstone,Ornithopter,Glacial Revelation
+library:Grizzly Bears
+manapool:{0}
+[PLAYER2]
+[END]

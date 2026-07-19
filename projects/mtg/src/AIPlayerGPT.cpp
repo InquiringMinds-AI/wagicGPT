@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <fstream>
+#include <iostream>
 #include <set>
 #include <algorithm>
 #include <thread>
@@ -2982,16 +2983,45 @@ static void significantWords(const string& seg, vector<string>& words)
     }
 }
 
-//The UNIQUE listed name whose lowercased form contains ALL the given words,
-//optionally restricted to a set of allowed indices. -1 on zero OR multiple
-//matches (ambiguity - e.g. duplicate creature names - drops the assignment,
-//never guesses; the known gang-block disambiguation guard).
+//A trailing "#N" disambiguation ordinal on a reply segment: the model marks
+//WHICH of several identically-named creatures it means ("Saproling (1/1) #1";
+//deck135 wave-19 s27). Returns N (>=1) after the LAST '#', or 0 if none. The
+//significant-word split already discards the '#N' and '(P/T)' as sub-4-char
+//tokens, so the name match is unaffected; this recovers the ordinal the split
+//throws away, to break a same-name tie the parser would otherwise drop.
+static int nameOrdinal(const string& seg)
+{
+    size_t h = seg.rfind('#');
+    if (h == string::npos)
+        return 0;
+    size_t k = h + 1;
+    while (k < seg.size() && (seg[k] == ' ' || seg[k] == '\t'))
+        k++;
+    int n = 0;
+    bool any = false;
+    while (k < seg.size() && isdigit((unsigned char) seg[k]))
+    {
+        n = n * 10 + (seg[k++] - '0');
+        any = true;
+    }
+    return any ? n : 0;
+}
+
+//The listed name whose lowercased form contains ALL the given words, optionally
+//restricted to a set of allowed indices. With a unique match, returns it.
+//AMBIGUITY (duplicate creature names) normally drops the assignment (-1, the
+//gang-block disambiguation guard) - EXCEPT when the reply carried a "#N"
+//ordinal (ordinal>0): among the same-named matches, in label order, the N-th
+//is the model's intent, so it is selected instead of dropped (identically
+//named creatures blocking are interchangeable, so honoring the pick the model
+//made is faithful, never a guess). Zero matches always -> -1.
 static int uniqueNameMatch(const vector<string>& words, const vector<string>& names,
-                           size_t limit, const vector<int> * allowed = NULL)
+                           size_t limit, const vector<int> * allowed = NULL,
+                           int ordinal = 0)
 {
     if (words.empty())
         return -1;
-    int match = -1;
+    vector<int> matches;
     for (size_t o = 0; o < names.size() && o < limit; o++)
     {
         if (allowed)
@@ -3009,13 +3039,13 @@ static int uniqueNameMatch(const vector<string>& words, const vector<string>& na
         for (size_t k = 0; k < words.size() && all; k++)
             all = low.find(words[k]) != string::npos;
         if (all)
-        {
-            if (match >= 0)
-                return -1; //not unique
-            match = (int) o;
-        }
+            matches.push_back((int) o);
     }
-    return match;
+    if (matches.size() == 1)
+        return matches[0];
+    if (matches.size() > 1 && ordinal >= 1 && ordinal <= (int) matches.size())
+        return matches[ordinal - 1]; //"#N" disambiguates equivalent duplicates
+    return -1; //zero matches, or ambiguous with no ordinal to break the tie
 }
 
 //A terse, NAIVE single-block combat-trade preview: what happens if this ONE
@@ -3079,6 +3109,86 @@ static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * at
     return o.str();
 }
 
+//Forward declarations: the salvage helpers below re-parse a labeled line
+//through the same validators the primary path uses (defined further down).
+static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
+                            const vector<string> * optionNames);
+static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
+                                 const vector<string> * blockerNames, const vector<string> * attackerNames,
+                                 const vector<vector<int> > * legalPerBlocker);
+
+//Every line of a reply whose FIRST token (after markdown decoration) is the
+//given answer label, as the text AFTER the label to end of line, in reply
+//order. The salvage path re-parses these through the full validation: a
+//decode-time repeat-loop often states a well-formed BLOCKS:/ATTACK:/PUT: line
+//before spiraling (the same premise as salvageLoopedChoice), so the last one
+//that validates is recovered rather than lost to the heuristic.
+static void collectLabeledLines(const string& content, const char * label, vector<string>& out)
+{
+    size_t labelLen = strlen(label);
+    size_t lineStart = 0;
+    while (lineStart <= content.size())
+    {
+        size_t lineEnd = content.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? content.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (content[s] == ' ' || content[s] == '\t'
+                           || content[s] == '*' || content[s] == '#' || content[s] == '-'))
+            s++;
+        if (end - s >= labelLen)
+        {
+            bool m = true;
+            for (size_t k = 0; k < labelLen && m; k++)
+                m = (toupper((unsigned char) content[s + k]) == toupper((unsigned char) label[k]));
+            if (m)
+                out.push_back(content.substr(s + labelLen, end - (s + labelLen)));
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+}
+
+//Salvage a bundled BLOCK reply from a decode spiral: the LAST BLOCKS: line that
+//re-parses to >=1 well-formed pairing through the full validation path (range +
+//name reconcile + legal-per-blocker). Fills 'out' and returns the pair count;
+//0 = nothing salvageable (caller keeps its heuristic fallback). Never bypasses
+//validation - a hallucinated/out-of-range line yields 0 pairs and is skipped.
+static int salvageLoopedBlocks(const string& content, size_t nBlockers, size_t nAttackers,
+                               const vector<string>& blockerNames, const vector<string>& attackerNames,
+                               const vector<vector<int> >& legalIdx, vector<int>& out)
+{
+    vector<string> lines;
+    collectLabeledLines(content, "BLOCKS:", lines);
+    for (size_t idx = lines.size(); idx-- > 0; )
+    {
+        vector<int> pick;
+        int pairs = parseBlockAssignments(lines[idx], nBlockers, nAttackers, pick,
+                                          &blockerNames, &attackerNames, &legalIdx);
+        if (pairs > 0) { out = pick; return pairs; }
+    }
+    return 0;
+}
+
+//Salvage a bundled SUBSET reply (ATTACK: attackers, or PUT: reveal picks) from a
+//decode spiral: the LAST labeled line that names >=1 eligible item through
+//parseAttackerSet. Fills 'out'; returns that count, or -1 if none salvageable.
+//A bare "none" is NOT salvaged (declining is the safe default already, and a
+//spiral that meant to decline would not have spiraled).
+static int salvageLoopedSubset(const string& content, const char * label, size_t n,
+                               const vector<string>& names, vector<bool>& out)
+{
+    vector<string> lines;
+    collectLabeledLines(content, label, lines);
+    for (size_t idx = lines.size(); idx-- > 0; )
+    {
+        vector<bool> send;
+        int r = parseAttackerSet(lines[idx], n, send, &names);
+        if (r >= 1) { out = send; return r; }
+    }
+    return -1;
+}
+
 //Scan a bundled-attacker reply for the set of attackers to send: "A<n>"
 //tokens (or bare numbers) in [1..nAttackers]. Returns >0 = that many named,
 //0 = an explicit decline (a "none/hold/pass" keyword with no numbers) OR a
@@ -3137,39 +3247,15 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
             string seg = content.substr(start, s - start);
             start = s + 1;
             vector<string> words;
-            string w;
-            for (size_t k = 0; k <= seg.size(); k++)
-            {
-                char c = (k < seg.size()) ? (char) tolower((unsigned char) seg[k]) : ' ';
-                if (isalnum((unsigned char) c))
-                    w += c;
-                else
-                {
-                    if (w.size() >= 4 && w != "attack" && w != "with" && w != "cast"
-                        && w != "play" && w != "none" && w != "hold" && w != "pass"
-                        && w != "nobody")
-                        words.push_back(w);
-                    w.clear();
-                }
-            }
+            significantWords(seg, words);
             if (words.empty())
                 continue;
             sawNamedContent = true; //the model listed a named creature here
-            int match = -1;
-            for (size_t o = 0; o < optionNames->size() && o < nAttackers; o++)
-            {
-                string low = (*optionNames)[o];
-                for (size_t k = 0; k < low.size(); k++)
-                    low[k] = (char) tolower((unsigned char) low[k]);
-                bool all = true;
-                for (size_t k = 0; k < words.size() && all; k++)
-                    all = low.find(words[k]) != string::npos;
-                if (all)
-                {
-                    if (match >= 0) { match = -1; break; } //not unique -> drop
-                    match = (int) o;
-                }
-            }
+            //A "#N" ordinal breaks a same-name tie (two identically-named
+            //attackers, or two identical revealed cards); without one an
+            //ambiguous name still drops, unchanged.
+            size_t limit = optionNames->size() < nAttackers ? optionNames->size() : nAttackers;
+            int match = uniqueNameMatch(words, *optionNames, limit, NULL, nameOrdinal(seg));
             if (match >= 0 && !out[match])
             {
                 out[match] = true;
@@ -3221,14 +3307,19 @@ int AIPlayerGPT::chooseAttackers()
     std::ostringstream tail;
     tail << "Combat: declare ALL attackers for this turn in ONE decision.\n"
             "Your creatures that can attack:\n";
+    //Capture each presented option line for the translog (item: combat
+    //options_text was EMPTY, which blocked wave-19's combat-decision review).
+    vector<string> shownLines;
     for (size_t j = 0; j < attackers.size(); j++)
     {
-        tail << "A" << (j + 1) << ". " << attackers[j]->name
-             << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
+        std::ostringstream ln;
+        ln << "A" << (j + 1) << ". " << attackers[j]->name
+           << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
         string kw = keywordList(attackers[j]);
         if (!kw.empty())
-            tail << " [" << kw << "]";
-        tail << "\n";
+            ln << " [" << kw << "]";
+        shownLines.push_back(ln.str());
+        tail << ln.str() << "\n";
     }
     tail << "Write your PLAN: line first, then on the last line ATTACK: followed by"
             " the attackers you send, comma-separated (e.g. \"ATTACK: A1, A3\"),"
@@ -3250,11 +3341,24 @@ int AIPlayerGPT::chooseAttackers()
     int result = content.empty() ? -1
                  : parseAttackerSet(decisionPart, attackers.size(), send, &attackerNames);
 
+    //Repeat-loop salvage: an unparsed (non-empty) reply may be a decode spiral
+    //that stated a valid ATTACK: line before degenerating - recover the last
+    //well-formed one through the same validator (mirrors salvageLoopedChoice).
+    if (result < 0 && !content.empty())
+    {
+        int sal = salvageLoopedSubset(content, "ATTACK:", attackers.size(), attackerNames, send);
+        if (sal >= 1)
+        {
+            DebugTrace("AIPlayerGPT: salvaged looped ATTACK (" << sal << ")");
+            result = sal;
+        }
+    }
+
     if (result < 0)
     {
         //Unusable reply: the heuristic declares this turn's attack instead.
         writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
-                      "", content.empty() ? "empty_reply" : "unparsed_reply");
+                      "", content.empty() ? "empty_reply" : "unparsed_reply", &shownLines);
         setNotice("model reply failed - the heuristic attacks", 5.0f);
         mAttacksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseAttackers();
@@ -3280,7 +3384,7 @@ int AIPlayerGPT::chooseAttackers()
     }
     DecisionManager::applyDeclareAttackers(req, act);
     writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
-                  declared.empty() ? string("no attackers") : declared, NULL);
+                  declared.empty() ? string("no attackers") : declared, NULL, &shownLines);
     narrateDecision(declared.empty() ? string("You declared no attackers this turn")
                                      : ("You declared attackers: " + declared));
     mAttacksDoneTurn = observer->turn;
@@ -3368,15 +3472,18 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
             if (blk != string::npos && (sep == string::npos || blk < sep)) { sep = blk; sepLen = 8; }
             if (sep == string::npos)
                 continue; //no blocker:attacker structure in this segment
+            string leftSeg = seg.substr(0, sep), rightSeg = seg.substr(sep + sepLen);
             vector<string> leftWords, rightWords;
-            significantWords(seg.substr(0, sep), leftWords);
-            significantWords(seg.substr(sep + sepLen), rightWords);
-            int bMatch = uniqueNameMatch(leftWords, *blockerNames, nBlockers);
+            significantWords(leftSeg, leftWords);
+            significantWords(rightSeg, rightWords);
+            int bMatch = uniqueNameMatch(leftWords, *blockerNames, nBlockers, NULL, nameOrdinal(leftSeg));
             if (bMatch < 0 || out[bMatch] != 0)
                 continue; //no unique blocker, or already assigned by a code
             const vector<int> * allowed = (legalPerBlocker && (size_t) bMatch < legalPerBlocker->size())
                                           ? &(*legalPerBlocker)[bMatch] : NULL;
-            int aMatch = uniqueNameMatch(rightWords, *attackerNames, nAttackers, allowed);
+            //"#N" on the attacker half ("Saproling (1/1) #1") disambiguates
+            //two identically-named attackers the plain match would drop.
+            int aMatch = uniqueNameMatch(rightWords, *attackerNames, nAttackers, allowed, nameOrdinal(rightSeg));
             if (aMatch < 0)
                 continue; //ambiguous / unmatched attacker -> drop this one only
             out[bMatch] = aMatch + 1;
@@ -3431,18 +3538,25 @@ int AIPlayerGPT::chooseBlockers()
                  : " - NOT lethal: block only where the trade favors you; taking damage while ahead is often correct.")
              << "\n";
     }
+    //Capture each presented combat option line (attacker context + blocker
+    //options WITH their trade annotations) for the translog: combat records
+    //logged options_text EMPTY, which blocked wave-19's validation of the
+    //trade-outcome annotations. Pure observability - the prompt text below is
+    //byte-identical to before, just also accumulated per line.
+    vector<string> shownLines;
     tail << "Attackers:\n";
     for (size_t j = 0; j < attackers.size(); j++)
     {
-        tail << "A" << (j + 1) << ". " << attackers[j]->name
-             << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
+        std::ostringstream ln;
+        ln << "A" << (j + 1) << ". " << attackers[j]->name
+           << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
         //POWER is the damage number, not toughness. The model misread a
         //Saproling "(2/4)" as dealing 4 (deck35 wave-18 G1); state the damage
         //explicitly at the line that decides.
-        tail << " deals " << (attackers[j]->power > 0 ? attackers[j]->power : 0);
+        ln << " deals " << (attackers[j]->power > 0 ? attackers[j]->power : 0);
         string kw = keywordList(attackers[j]);
         if (!kw.empty())
-            tail << " [" << kw << "]";
+            ln << " [" << kw << "]";
         //Punisher rider: an attacker whose text does something WHEN BLOCKED
         //or WHEN DEALT DAMAGE (sacrifice permanents, damage you, pump
         //itself) is a trap the bare name hides - surface the text at the
@@ -3456,37 +3570,40 @@ int AIPlayerGPT::chooseBlockers()
             || txt.find("deals damage") != string::npos
             || txt.find("dealt damage") != string::npos
             || txt.find("deals combat damage") != string::npos)
-            tail << " {text: " << cardTextSnippet(attackers[j], 160) << "}";
-        tail << "\n";
+            ln << " {text: " << cardTextSnippet(attackers[j], 160) << "}";
+        shownLines.push_back(ln.str());
+        tail << ln.str() << "\n";
     }
     tail << "Your available blockers (with, for each attacker it may block, the"
             " naive 1-on-1 trade - before other blockers, pump or combat tricks):\n";
     for (size_t i = 0; i < blockers.size(); i++)
     {
-        tail << "B" << (i + 1) << ". " << blockers[i]->name
-             << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ")";
+        std::ostringstream ln;
+        ln << "B" << (i + 1) << ". " << blockers[i]->name
+           << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ")";
         string kw = keywordList(blockers[i]);
         if (!kw.empty())
-            tail << " [" << kw << "]";
+            ln << " [" << kw << "]";
         //A 0-power blocker kills nothing - it only absorbs damage. Wave-8:
         //a 0-power blocker was thrown in front of a 0/2 Ornithopter, a
         //block that neither killed nor saved anything (the [deals 0] gap
         //in the blocker-seam lethal family).
         if (blockers[i]->power <= 0)
-            tail << " [deals 0 - this block kills nothing, it only absorbs damage]";
-        tail << " - may block";
+            ln << " [deals 0 - this block kills nothing, it only absorbs damage]";
+        ln << " - may block";
         for (size_t j = 0; j < legal[i].size(); j++)
             for (size_t k = 0; k < attackers.size(); k++)
                 if (attackers[k] == legal[i][j])
                 {
-                    tail << (j ? "," : "") << " A" << (k + 1);
+                    ln << (j ? "," : "") << " A" << (k + 1);
                     //The computed trade rides the B#:A# pairing so there is
                     //nothing left to re-derive (block-outcome annotation).
                     string trade = combatBlockOutcome(blockers[i], attackers[k]);
                     if (!trade.empty())
-                        tail << " (" << trade << ")";
+                        ln << " (" << trade << ")";
                 }
-        tail << "\n";
+        shownLines.push_back(ln.str());
+        tail << ln.str() << "\n";
     }
     tail << "Assign each blocker to AT MOST ONE attacker (a creature cannot block"
             " two attackers), but several DIFFERENT blockers may gang-block the same"
@@ -3540,7 +3657,7 @@ int AIPlayerGPT::chooseBlockers()
             DecisionAction none;
             DecisionManager::applyDeclareBlockers(req, none);
             writeTransLog("blockers", userMsg, content, 0, (int) blockers.size(),
-                          "no blockers", NULL);
+                          "no blockers", NULL, &shownLines);
             narrateDecision("You declared no blockers");
             mBlocksDoneTurn = observer->turn;
             DebugTrace("AIPlayerGPT: explicit all-decline (no blockers) in one reply");
@@ -3548,11 +3665,28 @@ int AIPlayerGPT::chooseBlockers()
         }
     }
 
+    //Repeat-loop salvage: a spiral may have stated a valid BLOCKS: line before
+    //degenerating (the seat's fallbacks were 0-of-9 salvaged; the CHOICE
+    //salvage did not cover this path). Recover the last well-formed assignment
+    //through the full validator; a hallucinated/out-of-range line yields 0 and
+    //is skipped, so this never invents a block. Not for the explicit-decline
+    //case above (already handled).
+    if (pairs == 0 && !content.empty())
+    {
+        int sal = salvageLoopedBlocks(content, blockers.size(), attackers.size(),
+                                      blockerNames, attackerNames, legalIdx, pick);
+        if (sal > 0)
+        {
+            DebugTrace("AIPlayerGPT: salvaged looped BLOCKS (" << sal << " pair(s))");
+            pairs = sal;
+        }
+    }
+
     if (pairs == 0)
     {
         //Unusable reply: the heuristic declares this combat instead.
         writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
-                      "", content.empty() ? "empty_reply" : "unparsed_reply");
+                      "", content.empty() ? "empty_reply" : "unparsed_reply", &shownLines);
         setNotice("model reply failed - the heuristic blocks", 5.0f);
         mBlocksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseBlockers();
@@ -3574,12 +3708,76 @@ int AIPlayerGPT::chooseBlockers()
     }
     DecisionManager::applyDeclareBlockers(req, act);
     writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
-                  declared.empty() ? string("no blockers") : declared, NULL);
+                  declared.empty() ? string("no blockers") : declared, NULL, &shownLines);
     narrateDecision(declared.empty() ? string("You declared no blockers")
                                      : ("You declared blockers: " + declared));
     mBlocksDoneTurn = observer->turn;
     DebugTrace("AIPlayerGPT: declared blocks from " << pairs << " assignment(s) in one reply");
     return 1;
+}
+
+//A human-readable name for option one's eligibility filter, parsed from the
+//card-script target clause (the same restriction the engine's canTarget
+//enforces). "target(<upto:1>*[-land;-creature]|reveal)" -> "noncreature,
+//nonland card"; "target(land[snow]|reveal)" -> "snow land". Empty string when
+//there is no parseable restriction (the per-card [eligible] marks still carry
+//the ground truth; this only makes the WHY legible). Representation only.
+static string describeRevealFilter(const string& effect)
+{
+    size_t t = effect.find("target(");
+    if (t == string::npos)
+        return "";
+    size_t open = t + 7;
+    size_t close = effect.find(')', open);
+    if (close == string::npos || close <= open)
+        return "";
+    string inner = effect.substr(open, close - open);
+    size_t bar = inner.find('|'); //drop the "|reveal" zone suffix
+    if (bar != string::npos)
+        inner = inner.substr(0, bar);
+    if (!inner.empty() && inner[0] == '<') //drop the "<upto:N>"/"<anyamount>" amount
+    {
+        size_t g = inner.find('>');
+        if (g != string::npos)
+            inner = inner.substr(g + 1);
+    }
+    size_t br = inner.find('[');
+    string base = (br == string::npos) ? inner : inner.substr(0, br);
+    string attrs;
+    if (br != string::npos)
+    {
+        attrs = inner.substr(br + 1);
+        size_t brc = attrs.find(']');
+        if (brc != string::npos)
+            attrs = attrs.substr(0, brc);
+    }
+    //Each ';'-separated attribute: "-X" reads "nonX", "+X"/"X" reads "X".
+    string adjectives;
+    {
+        string tok;
+        for (size_t i = 0; i <= attrs.size(); i++)
+        {
+            char c = (i < attrs.size()) ? attrs[i] : ';';
+            if (c == ';')
+            {
+                if (!tok.empty())
+                {
+                    string a = (tok[0] == '-') ? ("non" + tok.substr(1))
+                             : (tok[0] == '+') ? tok.substr(1) : tok;
+                    adjectives += (adjectives.empty() ? "" : ", ") + a;
+                }
+                tok.clear();
+            }
+            else
+                tok += c;
+        }
+    }
+    string noun = (base == "*" || base.empty()) ? "card" : base;
+    string out = adjectives;
+    if (!out.empty())
+        out += " ";
+    out += noun;
+    return out;
 }
 
 //Interactive reveal/surveil decision, driven from MTGRevealingCards for an
@@ -3592,7 +3790,8 @@ int AIPlayerGPT::chooseBlockers()
 int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
                               const string& optOneLabel, const string& optTwoLabel,
                               const string& optOneEffect,
-                              vector<int>& selForOptionOne)
+                              vector<int>& selForOptionOne,
+                              const vector<bool>& eligibleForOptionOne)
 {
     selForOptionOne.clear();
     if (mEndpoint.empty() || revealed.empty())
@@ -3601,11 +3800,38 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     if (mSystemPrompt.empty())
         buildSystemPrompt();
 
+    //Eligibility surfacing: a FILTERED reveal (a snow-land tutor, a
+    //noncreature-nonland dig) only accepts a subset for option one, but the
+    //model was shown the whole set with no hint of the filter and picked
+    //ineligible cards -> zero to hand (deck135 wave-19 R3 Into the North / R4
+    //Search for Azcanta). When the engine's own per-card verdict marks some
+    //cards ineligible, name the filter and tag each card. Annotation only -
+    //every revealed card stays listed and pickable; the engine still rejects
+    //an ineligible pick exactly as before.
+    bool haveElig = (eligibleForOptionOne.size() == revealed.size());
+    int eligCount = 0;
+    if (haveElig)
+        for (size_t j = 0; j < eligibleForOptionOne.size(); j++)
+            if (eligibleForOptionOne[j]) eligCount++;
+    bool restricted = haveElig && eligCount < (int) revealed.size();
+    string filterPhrase = restricted ? describeRevealFilter(optOneEffect) : string();
+
     std::ostringstream tail;
     tail << "Reveal: you looked at the top " << revealed.size()
          << " card" << (revealed.size() == 1 ? "" : "s") << " of your library."
             " Decide, in ONE reply, which of them go to \"" << optOneLabel
          << "\"; every card you do NOT pick goes to \"" << optTwoLabel << "\".\n";
+    if (restricted)
+    {
+        tail << "ELIGIBILITY: only " << (filterPhrase.empty() ? "certain cards"
+                                                              : ("a " + filterPhrase))
+             << " may go to \"" << optOneLabel << "\" - the rest do not qualify and go"
+                " to \"" << optTwoLabel << "\" regardless. Pick ONLY from the cards"
+                " marked [eligible] below";
+        if (eligCount == 0)
+            tail << " (none of these qualify - answer \"PUT: none\")";
+        tail << ".\n";
+    }
     for (size_t j = 0; j < revealed.size(); j++)
     {
         tail << (j + 1) << ". " << revealed[j]->name;
@@ -3624,6 +3850,12 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         string txt = cardTextSnippet(revealed[j], 140);
         if (!txt.empty())
             tail << " {text: " << txt << "}";
+        //The eligibility tag rides the option line so the filter cannot be
+        //missed (the same "deciding fact rides the option" principle as combat).
+        if (restricted)
+            tail << (eligibleForOptionOne[j]
+                     ? " [eligible for \"" + optOneLabel + "\"]"
+                     : " [does NOT qualify - goes to \"" + optTwoLabel + "\"]");
         tail << "\n";
     }
     tail << "Write your PLAN: line first, then on the last line PUT: followed by"
@@ -3646,6 +3878,19 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         names.push_back(revealed[j]->name);
     int result = content.empty() ? -1
                  : parseAttackerSet(decisionPart, revealed.size(), send, &names);
+
+    //Repeat-loop salvage: the reveal seam's worst fallbacks are 12k+ decode
+    //spirals; if one stated a valid PUT: line before degenerating, recover it
+    //(the same net as salvageLoopedChoice, through parseAttackerSet's validator).
+    if (result < 0 && !content.empty())
+    {
+        int sal = salvageLoopedSubset(content, "PUT:", revealed.size(), names, send);
+        if (sal >= 1)
+        {
+            DebugTrace("AIPlayerGPT: salvaged looped PUT (" << sal << ")");
+            result = sal;
+        }
+    }
 
     if (result < 0)
     {
@@ -3674,6 +3919,125 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     DebugTrace("AIPlayerGPT: reveal put " << selForOptionOne.size() << " of "
                << revealed.size() << " to option one in one reply");
     return 1;
+}
+
+//Env-gated (WAGIC_GPT_PARSETEST) self-test: drives the wave-19 failing replies
+//and synthetic decode-spiral strings through the REAL static parse/salvage
+//paths and prints before/after. No game/observer needed - called from main()
+//before setup. Same-TU access to the file-static parsers is the point.
+void AIPlayerGPT::runParseSelfTest()
+{
+    using std::cout;
+    int passed = 0, failed = 0;
+    #define CHECK(cond, label) do { \
+        if (cond) { cout << "  PASS  " << label << "\n"; passed++; } \
+        else { cout << "  FAIL  " << label << "\n"; failed++; } } while (0)
+
+    cout << "=== AIPlayerGPT parse self-test (wave-20 items 3a/3b/3c) ===\n";
+
+    // ---- ITEM 3b: "#N" ordinal disambiguates duplicate names ----
+    cout << "\n[3b] deck135 wave-19 s27: 'BLOCKS: Ice-Fang Coatl: Saproling (1/1) #1'\n";
+    cout << "     board: B1=Ice-Fang Coatl; A1=Saproling A2=Argothian Enchantress A3=Saproling\n";
+    {
+        vector<string> bn; bn.push_back("Ice-Fang Coatl");
+        vector<string> an; an.push_back("Saproling"); an.push_back("Argothian Enchantress"); an.push_back("Saproling");
+        vector<vector<int> > legal(1); legal[0].push_back(0); legal[0].push_back(1); legal[0].push_back(2);
+        // WITH the "#1" ordinal (the real reply): resolves to the 1st Saproling = A1.
+        vector<int> out;
+        int pairs = parseBlockAssignments("Ice-Fang Coatl: Saproling (1/1) #1", 1, 3, out, &bn, &an, &legal);
+        cout << "     with '#1': pairs=" << pairs << " B1->A" << (out.empty()?0:out[0]) << "\n";
+        CHECK(pairs == 1 && out[0] == 1, "3b with '#1' -> B1 blocks A1 (was dropped/unparsed pre-fix)");
+        // WITHOUT the ordinal: 'Saproling' is genuinely ambiguous -> still dropped (guard intact).
+        vector<int> out2;
+        int pairs2 = parseBlockAssignments("Ice-Fang Coatl: Saproling", 1, 3, out2, &bn, &an, &legal);
+        cout << "     no ordinal: pairs=" << pairs2 << " (ambiguous duplicate -> drop, guard intact)\n";
+        CHECK(pairs2 == 0, "3b ambiguity guard: bare duplicate name still drops (no arbitrary guess)");
+    }
+    // parseAttackerSet ordinal (two identical attacker names + '#2')
+    {
+        vector<string> an; an.push_back("Saproling"); an.push_back("Saproling");
+        vector<bool> send;
+        int r = parseAttackerSet("ATTACK: Saproling #2", 2, send, &an);
+        cout << "     ATTACK 'Saproling #2': result=" << r << " send=["
+             << (send.size()>0&&send[0]) << "," << (send.size()>1&&send[1]) << "]\n";
+        CHECK(r == 1 && !send[0] && send[1], "3b attacker '#2' selects the 2nd of two Saprolings");
+    }
+
+    // ---- ITEM 3c: mixed reply keeps valid pairing, drops only the invalid ----
+    cout << "\n[3c] mixed 'BLOCKS: B1:A1, B2:A5' with only 2 attackers (A5 hallucinated)\n";
+    {
+        vector<int> out;
+        int pairs = parseBlockAssignments("B1:A1, B2:A5", 2, 2, out, NULL, NULL, NULL);
+        cout << "     pairs=" << pairs << " B1->A" << out[0] << " B2->A" << out[1] << "\n";
+        CHECK(pairs == 1 && out[0] == 1 && out[1] == 0, "3c valid B1:A1 kept, invalid B2:A5 ignored");
+        // attacker analogue: 'ATTACK: A1, A9' with 3 attackers keeps A1
+        vector<bool> send;
+        int r = parseAttackerSet("A1, A9", 3, send, NULL);
+        cout << "     ATTACK 'A1, A9' (3 atk): result=" << r << " A1=" << (int)send[0] << " A9-dropped\n";
+        CHECK(r == 1 && send[0] && !send[1] && !send[2], "3c valid A1 kept, out-of-range A9 ignored");
+    }
+
+    // ---- ITEM 3a: repeat-loop salvage of BLOCKS / ATTACK / PUT ----
+    cout << "\n[3a] salvage a valid labeled line from a decode spiral (last-valid wins)\n";
+    {
+        // A spiral that stated a valid block, looped, then emitted a bad final line.
+        string spiral = "PLAN: I am at 5 life vs a 3/3.\nBLOCKS: B1:A1\n"
+                        "wait wait wait wait wait wait wait wait\nBLOCKS: B1:A9";
+        vector<string> bn; bn.push_back("Wall");
+        vector<string> an; an.push_back("Ogre");
+        vector<vector<int> > legal(1); legal[0].push_back(0);
+        vector<int> out;
+        int sal = salvageLoopedBlocks(spiral, 1, 1, bn, an, legal, out);
+        cout << "     BLOCKS spiral salvage: pairs=" << sal << " B1->A" << (out.empty()?0:out[0])
+             << " (final line B1:A9 is out-of-range and skipped)\n";
+        CHECK(sal == 1 && out[0] == 1, "3a BLOCKS salvage recovers the earlier valid B1:A1");
+    }
+    {
+        string spiral = "PLAN: swing wide.\nATTACK: A1, A3\nloop loop loop loop loop\nATTACK:";
+        vector<string> an; an.push_back("Bear"); an.push_back("Bird"); an.push_back("Beast");
+        vector<bool> send;
+        int sal = salvageLoopedSubset(spiral, "ATTACK:", 3, an, send);
+        cout << "     ATTACK spiral salvage: result=" << sal
+             << " A1=" << (send.size()>0?(int)send[0]:-1) << " A3=" << (send.size()>2?(int)send[2]:-1) << "\n";
+        CHECK(sal == 2 && send[0] && !send[1] && send[2], "3a ATTACK salvage recovers 'A1, A3'");
+    }
+    {
+        string spiral = "PLAN: keep the bomb.\nPUT: 2\nhmm hmm hmm hmm hmm hmm hmm\nblah";
+        vector<string> nm; nm.push_back("Island"); nm.push_back("Dragon"); nm.push_back("Forest");
+        vector<bool> send;
+        int sal = salvageLoopedSubset(spiral, "PUT:", 3, nm, send);
+        cout << "     PUT spiral salvage: result=" << sal
+             << " picks card #2=" << (send.size()>1?(int)send[1]:-1) << "\n";
+        CHECK(sal == 1 && !send[0] && send[1] && !send[2], "3a PUT salvage recovers 'PUT: 2'");
+    }
+
+    // ---- Real wave-19 hallucinations: MUST still fall back (nothing valid) ----
+    cout << "\n[verify] wave-19 hallucinated out-of-range replies stay unsalvageable\n";
+    {
+        // deck14 s31 / deck27 s9 shape: model answered B1:A2 but only A1 exists.
+        vector<string> bn; bn.push_back("Dragon");
+        vector<string> an; an.push_back("Outcast"); // only ONE attacker
+        vector<vector<int> > legal(1); legal[0].push_back(0);
+        string reply = "PLAN: block the 5/5 dragon to survive.\nBLOCKS: B1:A2";
+        vector<int> pout;
+        int primary = parseBlockAssignments("B1:A2", 1, 1, pout, &bn, &an, &legal);
+        vector<int> sout;
+        int sal = salvageLoopedBlocks(reply, 1, 1, bn, an, legal, sout);
+        cout << "     s31/s9 'B1:A2' (only A1): primary pairs=" << primary
+             << " salvage pairs=" << sal << " -> correct heuristic fallback\n";
+        CHECK(primary == 0 && sal == 0, "hallucinated out-of-range attacker: no fabricated block");
+    }
+
+    cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
+    cout.flush();
+    #undef CHECK
+}
+
+//Free-function entry so the JGE layer's main() can trigger the self-test
+//without including the mtg-heavy AIPlayerGPT header.
+void wagicGptParseSelfTest()
+{
+    AIPlayerGPT::runParseSelfTest();
 }
 
 #endif //WITH_GPT_AI

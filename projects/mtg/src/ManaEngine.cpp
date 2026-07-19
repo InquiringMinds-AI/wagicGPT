@@ -151,6 +151,52 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
     //for them.
     int offColorFilled = 0;
     int genericAmount = int(cost->getCost(0) + cost->getCost(7));
+    //Spare would-be ATTACKERS from the mana bill. Tapping a creature that could
+    //attack this turn (a sliver under Gemhide, a mana dork) to pay a cast that
+    //lands/rocks could have covered leaves the board with no untapped attacker
+    //at COMBATATTACKERS - so the engine correctly never offers the declare-
+    //attackers step (live-observed, corpus 20260719 deck35). If the SWING-NEUTRAL
+    //producers (lands, rocks, sick/tapped creatures) plus the pool can already
+    //afford this cost, pre-mark every would-be attacker as used so the payment
+    //walk below never reaches it. When neutral sources CANNOT cover the cost
+    //(e.g. the only blue is a sliver), attackers stay eligible and are tapped as
+    //before - correctness first, attackers spared only when genuinely optional.
+    if (!searchingAgain)
+    {
+        ManaCost * neutral = NEW ManaCost();
+        neutral->add(p->getManaPool());
+        map<MTGCardInstance*, bool> counted;
+        for (size_t z = 0; z < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); z++)
+        {
+            MTGAbility * za = (MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[z];
+            AManaProducer * zamp = dynamic_cast<AManaProducer*>(za);
+            if (!zamp || !policy.canHandle(zamp) || !producerUsable(p, zamp, zamp->source, true))
+                continue;
+            MTGCardInstance * zsrc = zamp->source;
+            if (zsrc == target || counted[zsrc])
+                continue;
+            if (zsrc && zsrc->isCreature() && zsrc->canAttack())
+                continue; //a would-be attacker is not "neutral"
+            counted[zsrc] = true;
+            neutral->add(zamp->output);
+        }
+        bool neutralCovers = neutral->canAfford(cost, anytypeofmana);
+        SAFE_DELETE(neutral);
+        if (neutralCovers)
+        {
+            for (size_t z = 0; z < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); z++)
+            {
+                MTGAbility * za = (MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[z];
+                MTGCardInstance * zsrc = NULL;
+                if (AManaProducer * zamp = dynamic_cast<AManaProducer*>(za))
+                    zsrc = zamp->source;
+                else if (GenericActivatedAbility * zgmp = dynamic_cast<GenericActivatedAbility*>(za))
+                    zsrc = zgmp->source;
+                if (zsrc && zsrc != target && zsrc->isCreature() && zsrc->canAttack())
+                    used[zsrc] = true;
+            }
+        }
+    }
     for (int pass = 0; pass < 2; pass++)
     {
     for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)

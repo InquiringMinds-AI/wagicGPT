@@ -89,6 +89,8 @@ public:
                                            //LATER; wait for the zone to shrink
                                            //before arming option two)
     bool mAIDriveDone;                     //nothing more for the driver to do
+    int mAITestTicks;                      //TESTSUITE-only: in-flight tick counter
+                                           //for the forced-async reveal repro hook
     vector<MTGCardInstance*> mAIGraveSel;  //model's option-one picks (pointers)
     vector<MTGCardInstance*> mAIRemainder; //option-two cards (captured at arm)
     void driveInteractiveReveal();

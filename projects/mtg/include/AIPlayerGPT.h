@@ -138,10 +138,27 @@ protected:
     //call is in flight (the display waits), 1 once decided (selForOptionOne
     //filled), -1 on any failure (the display's safe default sends nothing to
     //option one). One JSONL "reveal" translog record per consumed decision.
+    //eligibleForOptionOne (same size/order as revealed) is the engine's own
+    //per-card verdict from option one's target chooser (tc->canTarget): true
+    //when THIS card may actually go to option one. The reveal seam routes a
+    //TUTOR/FILTERED reveal (Into the North's snow-land search, Search for
+    //Azcanta's noncreature-nonland dig) here; without the flags the model was
+    //offered the whole set with no hint of the filter and picked ineligible
+    //cards -> zero to hand (deck135 wave-19 R3/R4). The seam surfaces the
+    //eligibility per card + a readable filter line - annotation only, every
+    //revealed card stays listed.
     virtual int decideReveal(const vector<MTGCardInstance*>& revealed,
                              const string& optOneLabel, const string& optTwoLabel,
                              const string& optOneEffect,
-                             vector<int>& selForOptionOne);
+                             vector<int>& selForOptionOne,
+                             const vector<bool>& eligibleForOptionOne = vector<bool>());
+
+public:
+    //Env-gated (WAGIC_GPT_PARSETEST) self-test of the reply parsers: feeds the
+    //wave-19 failing replies + synthetic spirals through the real parse paths
+    //(consumePlan-free: the static parsers + salvage) and prints before/after
+    //to stdout. Invoked from main() before any game setup; no observer needed.
+    static void runParseSelfTest();
 
 private:
     //Ask the model to choose among options (0-based result, -1 to defer to

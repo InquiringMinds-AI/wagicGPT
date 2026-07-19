@@ -1,0 +1,59 @@
+#Wave-20 engine item #2 -- the ATTACKERS twin of the wave-18 blockers-non-issuance item.
+#
+#SYMPTOM (corpus 20260719 deck35, a blue-screwed Gemhide sliver swarm): the engine
+#"never issued" the declare-attackers decision on some own-turns despite unsick,
+#untapped attackers. ROOT CAUSE is NOT a phase gate -- the AI's mana payment tapped a
+#would-be ATTACKER (a sliver that, under Gemhide, also produces mana) to pay a cast that
+#LANDS alone could have covered, so by COMBATATTACKERS hasPossibleAttackers() was
+#genuinely false and GameObserver::pendingCombatDecision correctly returned NONE. The
+#board really was tapped; the fault was needlessly tapping the attacker.
+#
+#FIX: the AI mana-payment paths (AIPlayerBaka::payTheManaCost's tap loop for main casts;
+#ManaEngine::planPayment for GPT casts / instants) now build the SWING-NEUTRAL pool
+#(lands, rocks, sick/tapped creatures) and, when it alone affords the cost, pre-mark
+#every would-be attacker as "used" so the payment taps only neutrals. Attackers are still
+#tapped when neutrals cannot cover (e.g. the only blue is a sliver, or an {X} spell).
+#
+#WITNESS: Gemhide Sliver (unsick 1/1 that, via its own lord grant, also taps for any
+#color -- so it is BOTH a legal attacker AND a mana source, exactly the deck35 shape)
+#plus three Mountains. The AI casts Goblin Piker {1}{R}; the Mountains alone can pay, so
+#Gemhide must stay untapped and swing for 1 (opponent 20 -> 19). PRE-FIX the engine
+#tapped Gemhide for the cast, had no attacker at combat, and the opponent stayed at 20.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Gemhide Sliver, Mountain, Mountain, Mountain
+hand:Goblin Piker
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Gemhide Sliver, Mountain, Mountain, Mountain, Goblin Piker
+[PLAYER2]
+life:19
+[END]

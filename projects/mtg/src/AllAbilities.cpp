@@ -145,6 +145,7 @@ MTGRevealingCards::MTGRevealingCards(GameObserver* observer, int _id, MTGCardIns
     mAIClickIdx = 0;
     mAIZoneAtFinalize = 0;
     mAIDriveDone = false;
+    mAITestTicks = 0;
 
     afterReveal = "";
     afterEffectActivated = false;
@@ -458,6 +459,8 @@ MTGAbility * MTGRevealingCards::contructAbility(string abilityToMake)
     return abilityToCast;
 }
 
+static bool revealTestAsyncActive(); //defined below (TESTSUITE forced-async hook)
+
 void MTGRevealingCards::Render()
 {
     if (!revealDisplay)
@@ -471,7 +474,8 @@ void MTGRevealingCards::Render()
     //all-to-library reveal). Humans and the heuristic AI still route here (the
     //heuristic's auto-key lives in CheckUserInput and is what completes THEIR
     //reveals).
-    if (!source->controller()->isInteractiveAI())
+    bool asyncDrive = source->controller()->isInteractiveAI() || revealTestAsyncActive();
+    if (!asyncDrive)
     {
         CheckUserInput(mEngine->ReadButton());
         revealDisplay->CheckUserInput(mEngine->ReadButton());
@@ -512,6 +516,12 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
             tc->forceTargetListReadyByPlayer = 1;
             //this is for when we have <upto:x> targets but only want to move Y targets, it allows us to
             //tell the targetchooser we are done.
+            if (getenv("WAGIC_REVEAL_DEBUG"))
+                std::cerr << "[REVEAL] CheckUserInput NEXT: nbTargets=" << tc->getNbTargets()
+                          << " abilitySecond=" << (void*) abilitySecond
+                          << " -> " << ((!abilitySecond && !tc->getNbTargets() && tc->source)
+                                        ? "DECLINE(all option-two)" : "FINALIZE(option-one picks)")
+                          << std::endl;
             if (!abilitySecond && !tc->getNbTargets() && tc->source)
             {//we selected nothing for the first ability.
                 tc->source->getObserver()->cardClick(tc->source, 0, false);
@@ -580,12 +590,46 @@ bool MTGRevealingCards::CheckUserInput(JButton key)
 //click/revealnext cadence the suite fixtures prove): ask the model once, then
 //click the option-one picks, finalize, arm option two for the remainder, click
 //that, finalize.
+//Env-gated tracing for the interactive-reveal async driver. Removed builds are
+//silent; set WAGIC_REVEAL_DEBUG=1 to follow the phase/target choreography.
+#define REVEAL_DBG(x) do { if (getenv("WAGIC_REVEAL_DEBUG")) { std::cerr << "[REVEAL] " << x << std::endl; } } while (0)
+
+//TESTSUITE-only forced-async hook. The suite normally drives reveals with
+//scripted clicks (revealok/revealnext) and NEVER exercises the interactive-AI
+//async driver (driveInteractiveReveal). This hook lets a fixture run the real
+//driver headlessly: WAGIC_REVEAL_TEST_ASYNC holds a comma-or-space list of card
+//NAME substrings to send to option one; the driver treats the seat as an
+//interactive AI and this stub stands in for the model's decideReveal, returning
+//0 (in flight) for a couple ticks - faithfully mirroring the live multi-tick
+//poll - then 1 with the selected indices.
+#ifdef TESTSUITE
+static bool revealTestAsyncActive()
+{
+    const char * e = getenv("WAGIC_REVEAL_TEST_ASYNC");
+    return e && e[0];
+}
+static int revealTestAsyncDecide(const vector<MTGCardInstance*>& revealed,
+                                 int & tickCounter, vector<int>& sel)
+{
+    if (tickCounter < 2) { tickCounter++; return 0; } //simulate in-flight polls
+    sel.clear();
+    string picks = getenv("WAGIC_REVEAL_TEST_ASYNC");
+    for (size_t j = 0; j < revealed.size(); j++)
+        if (revealed[j] && picks.find(revealed[j]->name) != string::npos)
+            sel.push_back((int) j);
+    return 1;
+}
+#else
+static bool revealTestAsyncActive() { return false; }
+#endif
+
 void MTGRevealingCards::driveInteractiveReveal()
 {
     if (mAIDriveDone)
         return;
     Player * ctrl = source->controller();
-    if (!ctrl || !ctrl->isInteractiveAI())
+    bool asyncDrive = (ctrl && ctrl->isInteractiveAI()) || revealTestAsyncActive();
+    if (!ctrl || !asyncDrive)
     {
         mAIDriveDone = true; //not the interactive-AI path; stay out of the way
         return;
@@ -632,10 +676,28 @@ void MTGRevealingCards::driveInteractiveReveal()
         string twoLabel = nm2.size() ? nm2[1]
                           : (abilityTwo.size() ? string("option two")
                                                : string("keep on top of library"));
+        //Per-card eligibility for option one, from the engine's OWN filter
+        //(this tick's option-one target chooser): a filtered tutor/dig
+        //(Into the North's snow land, Search for Azcanta's noncreature-nonland)
+        //only accepts a subset, and the reveal seam surfaces that so the model
+        //stops picking cards the chooser rejects (deck135 wave-19 R3/R4).
+        //canTarget is exactly what the engine's click will accept.
+        vector<bool> eligible(revealed.size(), true);
+        for (size_t i = 0; i < revealed.size(); i++)
+            eligible[i] = tc->canTarget(revealed[i]);
         vector<int> sel;
-        int r = ctrl->decideReveal(revealed, oneLabel, twoLabel, abilityOne, sel);
+        int r;
+#ifdef TESTSUITE
+        if (revealTestAsyncActive())
+            r = revealTestAsyncDecide(revealed, mAITestTicks, sel);
+        else
+#endif
+            r = ctrl->decideReveal(revealed, oneLabel, twoLabel, abilityOne, sel, eligible);
         if (r == 0)
             return; //model call in flight; act on no card this tick
+        REVEAL_DBG("phase0 decided r=" << r << " picks=" << sel.size()
+                   << " zone=" << zone->nb_cards << " tc=" << (void*) tc
+                   << " nbTargets=" << (tc ? (int) tc->getNbTargets() : -1));
         mAIGraveSel.clear();
         if (r == 1) //r == -1 (defer/fail): empty selection -> all to option two
             for (size_t k = 0; k < sel.size(); k++)
@@ -665,7 +727,12 @@ void MTGRevealingCards::driveInteractiveReveal()
                     break;
                 }
         }
-        if (!observer->mLayers->actionLayer()->getCurrentTargetChooser())
+        TargetChooser * tcAfter = observer->mLayers->actionLayer()->getCurrentTargetChooser();
+        REVEAL_DBG("phase0 after clicks: clicked=" << mAIGraveSel.size()
+                   << " tcAfter=" << (void*) tcAfter
+                   << " nbTargets=" << (tcAfter ? (int) tcAfter->getNbTargets() : -1)
+                   << " zone=" << zone->nb_cards);
+        if (!tcAfter)
         {
             //Option one auto-fired (every revealed card was picked). Wait for
             //its deferred move; no option two (nothing remains).
@@ -674,14 +741,41 @@ void MTGRevealingCards::driveInteractiveReveal()
         }
         else
         {
-            //A proper subset (or a decline) was selected; the chooser is still
-            //open. Finalize option one with BTN_NEXT on the next tick.
-            mAIPhase = 2;
+            //A proper subset (or a decline) was selected and the chooser is
+            //still open. FINALIZE IT THIS TICK, not on a later one.
+            //
+            //Deferring the BTN_NEXT to a separate tick lost the whole
+            //to-hand partition of an <anyamount> reveal (Glacial Revelation:
+            //every snow pick ended up in the graveyard). When the model keeps
+            //EVERY valid target of an unlimited chooser - which it does for
+            //<anyamount>*[snow], since all snow permanents are the valid set -
+            //getNbTargets() == countValidTargets(), so the option-one target
+            //ability stops waiting (waitingForAnswer -> 0) at the end of this
+            //tick and is reaped by the next ActionLayer::Update (forceDestroy=1)
+            //WITHOUT resolving its move. The next tick's driver then found the
+            //chooser gone, and BTN_NEXT built option two and swept the whole
+            //reveal into the graveyard. Surveil <upto:N> escaped this only
+            //because the model picks a proper SUBSET there, leaving the chooser
+            //genuinely waiting across the tick. Issuing the finalize in the same
+            //tick, while the chooser is still live, commits the picks before any
+            //Update can reap the ability. The move itself still resolves a tick
+            //later, so phase 3's shrink-wait is unchanged.
+            mAIZoneAtFinalize = zone->nb_cards; //option one's moveto resolves LATER
+            REVEAL_DBG("phase0 finalize (same tick): tc=" << (void*) tcAfter
+                       << " nbTargets=" << tcAfter->getNbTargets()
+                       << " zone=" << zone->nb_cards);
+            CheckUserInput(JGE_BTN_NEXT);
+            mAIPhase = 3;
         }
         return;
     }
-    case 2: //FINALIZE option one (BTN_NEXT on its own tick)
+    case 2: //(retained defensive fallback; the subset finalize now happens in
+            //phase 0's same tick - see the comment there. Reached only if a
+            //future path sets mAIPhase = 2 explicitly.)
     {
+        REVEAL_DBG("phase2 finalize: tc=" << (void*) tc
+                   << " nbTargets=" << (tc ? (int) tc->getNbTargets() : -1)
+                   << " zone=" << zone->nb_cards);
         mAIZoneAtFinalize = zone->nb_cards; //option one's moveto resolves LATER
         CheckUserInput(JGE_BTN_NEXT);
         mAIPhase = 3;

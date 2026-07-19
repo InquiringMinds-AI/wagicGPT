@@ -150,13 +150,18 @@ public:
     //-1 = not handled / model failed (the display uses its safe default:
     //     select nothing, so every revealed card takes option two). The base
     //returns -1; only an interactive AI (AIPlayerGPT) overrides it.
+    //eligibleForOptionOne (optional; same size/order as revealed) carries the
+    //engine's per-card canTarget verdict for option one's filter, so a filtered
+    //tutor/dig can surface which revealed cards actually qualify. The base
+    //ignores it (headless AIs never reach this override).
     virtual int decideReveal(const vector<MTGCardInstance*>& revealed,
                              const string& optOneLabel, const string& optTwoLabel,
                              const string& optOneEffect,
-                             vector<int>& selForOptionOne)
+                             vector<int>& selForOptionOne,
+                             const vector<bool>& eligibleForOptionOne = vector<bool>())
     {
         (void) revealed; (void) optOneLabel; (void) optTwoLabel;
-        (void) optOneEffect; (void) selForOptionOne;
+        (void) optOneEffect; (void) selForOptionOne; (void) eligibleForOptionOne;
         return -1;
     }
 

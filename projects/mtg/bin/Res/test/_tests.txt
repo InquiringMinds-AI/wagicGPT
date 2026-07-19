@@ -1043,3 +1043,4 @@ probe/keldon_marauders_pw.txt
 probe/lanterns_lift.txt
 probe/soulhunter_swamps.txt
 probe/glacial_revelation_partition.txt
+attacker_mana_tap_wave20.txt

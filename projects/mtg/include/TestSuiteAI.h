@@ -160,6 +160,11 @@ public:
 
     TestSuiteAI(TestSuiteGame *tsGame, int playerId);
     virtual int Act(float dt);
+    //TESTSUITE forced-async reveal repro: make the scripted seat present as an
+    //interactive AI so the reveal resolves the interactive way (aicode
+    //substitute skipped, MTGRevealingCards display driven by
+    //driveInteractiveReveal) - faithfully mirroring the live AIPlayerGPT path.
+    virtual bool isInteractiveAI() const { return getenv("WAGIC_REVEAL_TEST_ASYNC") != NULL; }
     virtual int displayStack();
     bool parseLine(const string& s);
     bool summoningSickness() {return (suite->summoningSickness == 1); }
