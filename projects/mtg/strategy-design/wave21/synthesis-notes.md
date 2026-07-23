@@ -312,3 +312,11 @@ deck from the ~148 unreviewed roster (Step-0-bis newcomer) — that is a roster-
 - 109/44/140: baseline the older guides against the current engine batch; 109 = co-firing-fork template re-validation +
   burn-face; 44 = attacker-sparing/evasion second-corpus confirmation; 140 = the second-symmetric-deck test that gates
   the symmetric-trap fire-gate core-promotion question.
+
+## Post-synthesis integrator correction (2026-07-23)
+
+- **CARD Ashenmoor Liege (wave-22 ledger item 6): RESOLVED — NOT A BUG.** Scryfall verification:
+  Ashenmoor Liege is printed **4/1** (power 4, toughness 1); the engine's 4/1 render and the
+  primitive are CORRECT. The deck49 reviewer's "real Oracle is 4/4" was a hallucinated value
+  (the Metallurgic Summonings lesson again: verify agent Oracle claims against Scryfall/text=
+  before acting). No primitive change; the vs27 loss attribution reverts to matchup/draw.

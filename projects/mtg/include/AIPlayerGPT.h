@@ -176,7 +176,8 @@ private:
     //events (land drop, casting - the zone changes narrate themselves) or
     //whose "no" answer is a non-action; true for choices that leave no
     //event trace (targets, modes, X values, damage order).
-    int askModel(const string& decision, const vector<string>& options, bool narrateChoice = true);
+    int askModel(const string& decision, const vector<string>& options, bool narrateChoice = true,
+                 const string& pendingSourceName = string());
     std::map<string, int> mAskCache;
 
     //Answer a menu-family DecisionRequest (CHOOSE_MENU / CHOOSE_MODE /
@@ -217,7 +218,11 @@ private:
     //protocol) plan into mCurrentPlan and returns the decision part, which
     //is the ONLY text the choice parsers may see - plan prose is full of
     //numbers that would misparse as option indices.
-    string consumePlan(const string& content);
+    //`expectedLabel` (e.g. "CHOICE:") restricts answer-line selection to this
+    //decision's own label, so a chain-of-thought line beginning with a
+    //DIFFERENT answer label ("Attack: Regent 6/6 vs...") in the reasoning body
+    //is not mistaken for the answer. NULL keeps the legacy any-label behavior.
+    string consumePlan(const string& content, const char * expectedLabel = NULL);
 
     //Decision seams return this while the model call for their prompt is
     //still in flight. Callers unwind for the current tick and re-poll on the
@@ -315,7 +320,8 @@ private:
     //that routes the answer to the heuristic instead of the raw index.
     static int parseChoice(const string& content, int optionCount,
                            const std::vector<string> * optionTexts = NULL,
-                           bool * staleEcho = NULL);
+                           bool * staleEcho = NULL,
+                           const std::string * pendingSource = NULL);
 
     //Salvage a decode-time repeat-loop reply: when the normal parse fails,
     //scan the raw reply for the LAST well-formed "CHOICE: N (name)" line

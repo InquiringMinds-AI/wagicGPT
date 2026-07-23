@@ -1045,3 +1045,4 @@ probe/soulhunter_swamps.txt
 probe/glacial_revelation_partition.txt
 attacker_mana_tap_wave20.txt
 attacker_mana_tap_partial_wave21.txt
+fetchland_crack_after_landdrop_wave22.txt

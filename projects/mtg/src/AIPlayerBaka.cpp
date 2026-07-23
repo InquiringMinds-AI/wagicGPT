@@ -1447,7 +1447,17 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
     if(!cost->getConvertedCost())
     {
         DebugTrace("AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  ");
-        if (target && target->isLand() && game->playRestrictions->canPutIntoZone(target, game->battlefield) == PlayRestriction::CANT_PLAY)
+        //The land-per-turn restriction applies only to PLAYING a land from
+        //hand. A fetchland crack (and any activated ability whose source is a
+        //land already on the battlefield) is NOT a land play - its {T}/Sac/Life
+        //cost carries no mana, so it reaches this zero-cost branch, but gating
+        //it on canPutIntoZone silently DROPPED the whole activation whenever the
+        //turn's land drop was spent (ENGINE-F1: the fetch was chosen + narrated,
+        //but payTheManaCost returned false so the AIAction was never queued, so
+        //the crack fizzled with no event and re-armed next turn). Only refuse a
+        //land that is NOT yet in play (i.e. an actual play-from-hand).
+        if (target && target->isLand() && !target->isInPlay(observer)
+            && game->playRestrictions->canPutIntoZone(target, game->battlefield) == PlayRestriction::CANT_PLAY)
             return false;
         DebugTrace("AIPlayerBaka: Card or Ability was free to play.  ");
         if(!cost->hasX())//don't return true if it contains {x} but no cost, locks ai in a loop. ie oorchi hatchery cost {x}{x} to play.

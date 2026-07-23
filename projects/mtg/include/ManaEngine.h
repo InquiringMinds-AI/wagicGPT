@@ -19,6 +19,7 @@
 
 #include <map>
 #include <vector>
+#include <string>
 
 class ManaCost;
 class MTGAbility;
@@ -90,6 +91,26 @@ public:
     //payment machinery releases). Specific-X costs ({X:red}) are bounded by
     //that color's availability. Capped at 20, the engine's own X-menu bound.
     static int maxAnnounceableX(Player * p, ManaCost * baseWithX, int anytypeofmana);
+
+    //Self-harming mana sources (R-PAINLAND, wave-21 deck102). A source that
+    //deals damage to its controller when tapped for mana (Ancient Tomb: 2,
+    //painlands: 1 per colored tap) is priced NOWHERE on the decision surface,
+    //and a pilot self-killed paying life through a source it did not know
+    //about (vs27: cast through Ancient Tomb at 3 life, died at -1). These
+    //surface the life the auto-tap can spend.
+    //
+    // selfDamageOnTap: the largest damage `card` would deal to ITS CONTROLLER
+    //   for one usable mana tap right now, 0 if none/none currently usable.
+    //   For the per-permanent battlefield line.
+    // selfDamageManaSources: "<Name>: <N> damage" fragments (de-duped by card
+    //   name) for every usable self-harming source player `p` controls, for
+    //   the AI "Mana available" caution line.
+    // Both gate on the SAME producerUsable check as potentialMana's counting
+    //   (wave-21 disabled/tapped exclusion) so a spent or disabled painland is
+    //   not reported. Only constant damage amounts are evaluated (a "rand"
+    //   rider is never evaluated - it would draw the game RNG).
+    static int selfDamageOnTap(MTGCardInstance * card);
+    static std::vector<std::string> selfDamageManaSources(Player * p);
 };
 
 #endif

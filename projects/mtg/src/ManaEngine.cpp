@@ -6,6 +6,7 @@
 #include "AllAbilities.h"
 #include "ManaCostHybrid.h"
 #include "ExtraCost.h"
+#include <sstream>
 
 int ManaEngine::FreeProducerPolicy::canHandle(MTGAbility * producer)
 {
@@ -83,6 +84,26 @@ namespace
                 return false;
         }
         return true;
+    }
+
+    //Damage this mana producer deals to ITS OWN CONTROLLER when activated:
+    //an "and!( damage:N controller )!" rider (Ancient Tomb 2, painlands 1).
+    //0 when the rider damages someone else or is absent. A "rand" amount is
+    //left unevaluated (it would draw the game RNG) and reported as 0.
+    int producerSelfDamage(AManaProducer * amp)
+    {
+        AADamager * dmg = dynamic_cast<AADamager*>(amp->andAbility);
+        if (!dmg)
+            return 0;
+        //who resolves the AADamager's victim: CONTROLLER/OWNER == the tapping
+        //player (see ActivatedAbilityTP::getTarget). Any other value damages
+        //someone else and is not a self-cost to warn about.
+        if (dmg->who != TargetChooser::CONTROLLER && dmg->who != TargetChooser::OWNER)
+            return 0;
+        if (dmg->d.find("rand") != string::npos)
+            return 0;
+        int n = dmg->getDamage();
+        return n > 0 ? n : 0;
     }
 }
 
@@ -557,4 +578,60 @@ int ManaEngine::maxAnnounceableX(Player * p, ManaCost * baseWithX, int anytypeof
     if (avail > 20)
         avail = 20;
     return avail;
+}
+
+int ManaEngine::selfDamageOnTap(MTGCardInstance * card)
+{
+    if (!card)
+        return 0;
+    Player * p = card->controller();
+    if (!p)
+        return 0;
+    ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+    int worst = 0;
+    for (size_t i = 0; i < al->manaObjects.size(); i++)
+    {
+        AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility *) al->manaObjects[i]);
+        if (!amp || amp->source != card)
+            continue;
+        if (!producerUsable(p, amp, card, true))
+            continue;
+        int n = producerSelfDamage(amp);
+        if (n > worst)
+            worst = n;
+    }
+    return worst;
+}
+
+vector<string> ManaEngine::selfDamageManaSources(Player * p)
+{
+    vector<string> out;
+    if (!p)
+        return out;
+    ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+    map<MTGCardInstance *, int> worst; //per source card, largest self-damage
+    for (size_t i = 0; i < al->manaObjects.size(); i++)
+    {
+        AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility *) al->manaObjects[i]);
+        if (!amp)
+            continue;
+        MTGCardInstance * card = amp->source;
+        if (!card || card->controller() != p)
+            continue;
+        if (!producerUsable(p, amp, card, true))
+            continue;
+        int n = producerSelfDamage(amp);
+        if (n <= 0)
+            continue;
+        map<MTGCardInstance *, int>::iterator it = worst.find(card);
+        if (it == worst.end() || n > it->second)
+            worst[card] = n;
+    }
+    for (map<MTGCardInstance *, int>::iterator it = worst.begin(); it != worst.end(); ++it)
+    {
+        std::ostringstream o;
+        o << it->first->getDisplayName() << ": " << it->second << " damage";
+        out.push_back(o.str());
+    }
+    return out;
 }

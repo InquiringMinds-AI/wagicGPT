@@ -18,6 +18,7 @@
 #include "CardDescriptor.h"
 #include "ManaCost.h"
 #include "ManaCostHybrid.h"
+#include "ManaEngine.h"
 #include "ExtraCost.h"
 #include "Counters.h"
 #include "ActionLayer.h"
@@ -343,6 +344,14 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             out << " [artifact]";
         if (withStatus)
         {
+            //R-PAINLAND (wave-21 deck102): a mana source that damages its
+            //controller when tapped for mana (Ancient Tomb 2, painlands 1)
+            //shows nothing here otherwise - a bare land name - so the pilot
+            //taps it blind and pays life it never priced. Name the cost at
+            //the permanent. Neutral "its controller" phrasing stays correct
+            //for either player's board.
+            if (int selfDmg = ManaEngine::selfDamageOnTap(card))
+                out << " [tapping for mana deals " << selfDmg << " damage to its controller]";
             //the LIVE keyword set - granted/lost abilities the decklist
             //text cannot show (Bloodghast "can't block", taught flying...)
             if (card->isCreature())
@@ -934,7 +943,61 @@ void AIPlayerGPT::narrateDecision(const string& line)
 //Defined below (near salvageLoopedChoice): drops verbatim reply-template lines.
 static bool isTemplatePlaceholderLine(const string& line);
 
-string AIPlayerGPT::consumePlan(const string& content)
+//Find the LAST line-leading answer-label line in `text`, returning its
+//remainder (after the label token) as [segStart, segEnd) plus the line's start
+//offset. Template-placeholder lines are skipped. When `expectedLabel` is
+//non-NULL, ONLY lines with that exact label count - the other answer labels are
+//treated as chain-of-thought and ignored.
+//
+//The expectedLabel filter is stale-echo family B (wave-22). deck49 vs35 s18: a
+//5.7k-char CHOICE deliberation contained the combat-math line "Attack: Regent
+//(6/6) vs Striking Sliver (2/2, First Strike)..." AFTER its answer-first
+//"CHOICE: 1 (...)". The unfiltered scan kept that later "Attack:" line as the
+//"answer", handing parseChoice reasoning prose ("Regent (6/6) vs ... 2/2 ...")
+//whose trailing 2/2 parsed to option 2, which then matched no echoed option and
+//was dropped as stale_echo - discarding a valid, in-range CHOICE. A CHOICE ask
+//can only be answered by a CHOICE: line; combat labels in its body are CoT.
+static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
+                                size_t& segStart, size_t& segEnd, size_t& labelLineStart)
+{
+    static const char * kAnswerLabels[] = { "CHOICE:", "ATTACK:", "BLOCKS:", "PUT:" };
+    const int kNumAnswerLabels = (int) (sizeof(kAnswerLabels) / sizeof(kAnswerLabels[0]));
+    bool found = false;
+    size_t lineStart = 0;
+    while (lineStart <= text.size())
+    {
+        size_t lineEnd = text.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (text[s] == ' ' || text[s] == '\t' || text[s] == '*' || text[s] == '#'))
+            s++; //tolerate markdown bullet/heading decoration on the label line
+        for (int li = 0; li < kNumAnswerLabels; li++)
+        {
+            if (expectedLabel && strcmp(kAnswerLabels[li], expectedLabel) != 0)
+                continue; //restricted to this decision's own answer label
+            size_t len = strlen(kAnswerLabels[li]);
+            if (end - s >= len)
+            {
+                bool match = true;
+                for (size_t k = 0; k < len && match; k++)
+                    match = (toupper((unsigned char) text[s + k]) == kAnswerLabels[li][k]);
+                if (match && !isTemplatePlaceholderLine(text.substr(s, end - s)))
+                {
+                    segStart = s + len;
+                    segEnd = end;
+                    labelLineStart = lineStart;
+                    found = true;
+                }
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    return found;
+}
+
+string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabel)
 {
     //Drop any inline think block first (same as parseChoice).
     string text = content;
@@ -951,40 +1014,19 @@ string AIPlayerGPT::consumePlan(const string& content)
     //prose full of numbers cannot hijack it - the reason head-first
     //existed. Find the LAST label at a line start (a plan that quotes the
     //protocol loses to the real trailing answer).
-    static const char * kAnswerLabels[] = { "CHOICE:", "ATTACK:", "BLOCKS:", "PUT:" };
-    const int kNumAnswerLabels = (int) (sizeof(kAnswerLabels) / sizeof(kAnswerLabels[0]));
+    //Last line-leading answer-label line (template placeholders skipped, as
+    //in the deck62 N7-template fix). `expectedLabel` restricts the match to
+    //this decision's own label so a CoT combat line ("Attack: ...") inside a
+    //CHOICE deliberation is not mistaken for the answer (stale-echo family B).
     size_t answerStart = string::npos, answerEnd = 0, labelLineStart = string::npos;
-    size_t lineStart = 0;
-    while (lineStart <= text.size())
     {
-        size_t lineEnd = text.find('\n', lineStart);
-        size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
-        size_t s = lineStart;
-        while (s < end && (text[s] == ' ' || text[s] == '\t' || text[s] == '*' || text[s] == '#'))
-            s++; //tolerate markdown bullet/heading decoration on the label line
-        for (int li = 0; li < kNumAnswerLabels; li++)
+        size_t ss = 0, se = 0, ls = 0;
+        if (findAnswerLabelLine(text, expectedLabel, ss, se, ls))
         {
-            size_t len = strlen(kAnswerLabels[li]);
-            if (end - s >= len)
-            {
-                bool match = true;
-                for (size_t k = 0; k < len && match; k++)
-                    match = (toupper((unsigned char) text[s + k]) == kAnswerLabels[li][k]);
-                //Skip a literal reply-template line ("CHOICE: [Number]
-                //([Name])") the model parroted - it is not an answer, and
-                //taking it as the last label line would hide the real one
-                //(deck62 N7-template).
-                if (match && !isTemplatePlaceholderLine(text.substr(s, end - s)))
-                {
-                    answerStart = s + len;
-                    answerEnd = end;
-                    labelLineStart = lineStart;
-                }
-            }
+            answerStart = ss;
+            answerEnd = se;
+            labelLineStart = ls;
         }
-        if (lineEnd == string::npos)
-            break;
-        lineStart = lineEnd + 1;
     }
 
     //Find the "PLAN:" marker, case-insensitive; the colon is required so
@@ -1326,6 +1368,21 @@ string AIPlayerGPT::serializeGameState()
     if (!pool.empty())
         out << " | Already in pool: " << pool;
     out << "\n";
+    //R-PAINLAND (wave-21 deck102): the count above hides that some of your
+    //usable sources DAMAGE you when tapped for mana (Ancient Tomb: 2 damage;
+    //painlands: 1 per colored tap) - and auto-tap, which taps sources for you
+    //when you cast, can spend them. A pilot self-killed paying life through an
+    //Ancient Tomb it never priced (died at -1). List the life the auto-tap can
+    //cost so the pilot counts it before committing to a cast.
+    vector<string> harmSources = ManaEngine::selfDamageManaSources(this);
+    if (!harmSources.empty())
+    {
+        out << "CAUTION - some usable mana sources DAMAGE YOU when tapped for mana"
+               " (auto-tap when you cast may spend them - count this life loss first): ";
+        for (size_t i = 0; i < harmSources.size(); i++)
+            out << (i ? "; " : "") << harmSources[i];
+        out << "\n";
+    }
 
     out << "Your hand: ";
     describeZoneCards(out, game->hand, false);
@@ -1514,7 +1571,8 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
 
 int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                              const std::vector<string> * optionTexts,
-                             bool * staleEcho)
+                             bool * staleEcho,
+                             const std::string * pendingSource)
 {
     if (staleEcho) *staleEcho = false;
     //Drop any inline think block first.
@@ -1544,6 +1602,39 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
         if (open != string::npos && close != string::npos && close > open + 1)
         {
             string echo = text.substr(open + 1, close - open - 1);
+            //Target-menu spell-name prefix (stale-echo family A, wave-22).
+            //Target sub-menus instruct "answer with the TARGET's name (not
+            //'<spell>')", yet the model routinely echoes "<spell> targeting
+            //<target>" (deck14 vs27 s29 "Unsummon targeting Inkfathom
+            //Infiltrator"; deck62 vs14 s29 "Web targeting Yavimaya
+            //Enchantress"). The spell prefix injected words absent from the
+            //option AND the option's rules-text words were absent from the
+            //echo, so BOTH echo passes missed and a CORRECT in-range index was
+            //wrongly downgraded to stale_echo (the heuristic then bounced /
+            //Web'd a worse target). When the parenthetical reads "<X>
+            //targeting <Y>" and X is the pending target source, strip to <Y>
+            //so the match runs on the target name. ANCHORED to the actual
+            //source name - never a blanket "targeting" strip.
+            if (pendingSource && !pendingSource->empty())
+            {
+                string el = echo;
+                for (size_t i = 0; i < el.size(); i++)
+                    el[i] = (char) tolower((unsigned char) el[i]);
+                size_t tp = el.find(" targeting ");
+                if (tp != string::npos)
+                {
+                    string x = el.substr(0, tp);
+                    size_t xs = x.find_first_not_of(" \t");
+                    size_t xe = x.find_last_not_of(" \t");
+                    if (xs != string::npos)
+                        x = x.substr(xs, xe - xs + 1);
+                    string src = *pendingSource;
+                    for (size_t i = 0; i < src.size(); i++)
+                        src[i] = (char) tolower((unsigned char) src[i]);
+                    if (!x.empty() && (src.find(x) != string::npos || x.find(src) != string::npos))
+                        echo = echo.substr(tp + 11); //strlen(" targeting ") == 11
+                }
+            }
             //significant words: lowercase, length >= 4
             vector<string> words;
             string w;
@@ -1809,14 +1900,34 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
     return salvaged;
 }
 
-//True when the reply's LAST well-formed CHOICE line is followed (later in the
-//reply) by an explicit self-retraction phrase and NO subsequent well-formed
-//CHOICE line - the model took its answer back without replacing it, so the
-//parsed digit must NOT be used (route to the heuristic). Conservative,
-//file-static phrase list; false whenever a corrected CHOICE followed the
-//retraction (that later line becomes the last well-formed one, so nothing
-//retracts it). deck135 wave-20 HARNESS-1: "CHOICE: 4 (Cast nothing)" ->
-//"Wait, I made a mistake in my reasoning" -> loop, no final CHOICE.
+//True when the reply's LAST well-formed CHOICE line is disavowed by an
+//explicit self-retraction phrase that plausibly refers to THE ANSWER, with no
+//subsequent well-formed CHOICE line - the model took its answer back without
+//replacing it, so the parsed digit must NOT be used (route to the heuristic).
+//False whenever a corrected CHOICE followed the retraction (that later line
+//becomes the last well-formed one, so nothing retracts it).
+//
+//REFERENCE-SCOPED (wave-22 HARNESS-N9). The wave-21 detector keyed on a
+//retraction phrase ANYWHERE after the CHOICE line and OVER-FIRED 4 of 5 times
+//(deck62 vs27/vs135/vs102, deck135 vs27): the model emitted the correct
+//answer-first "CHOICE: N" on line 1, NEVER retracted it, then used "Correction:"
+///"Wait" purely in DOWNSTREAM PLAN prose - mana math and rules asides about
+//OTHER cards (Fists/Shroud, islandwalk). Two conditions are now BOTH required:
+//  (a) the phrase must occur BEFORE the first line-leading PLAN: marker
+//      (everything after PLAN: is plan prose, never an answer disavowal). Under
+//      answer-first the coded line is line 1, so a mid-reasoning "correction"
+//      about rules trivia lives after PLAN: and no longer counts. This alone
+//      separates all 5 wave-21 witnesses: the ONE correct fire (deck35 vs62 s18,
+//      "CHOICE: 3 (Heart)" -> "Actually, no." at char 5327 -> PLAN switched to
+//      Fury at 7416) has its phrase BEFORE PLAN:; every false positive's
+//      "Correction:" sits AFTER PLAN:.
+//  (b) the phrase must plausibly refer to the ANSWER - its surrounding window
+//      names the chosen option (significant name-word or the option number),
+//      OR the phrase directly abuts the CHOICE line (the deck135 wave-20
+//      HARNESS-1 shape: "CHOICE: 4 (Cast nothing)" -> "Wait, I made a mistake"
+//      on the next line -> loop, no final CHOICE).
+//A false fallback here only routes to the (safe) heuristic; a false take (a
+//used retracted digit) is the harmful case we still catch.
 bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int optionCount,
                                                const std::vector<string> * optionTexts)
 {
@@ -1825,9 +1936,11 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
     if (thinkEnd != string::npos)
         text = text.substr(thinkEnd + 8);
 
-    //End offset of the LAST well-formed CHOICE line (placeholders skipped, as
-    //in salvage - they never parse anyway).
+    //End offset AND parsed number of the LAST well-formed CHOICE line
+    //(placeholders skipped, as in salvage - they never parse anyway).
     long lastChoiceEnd = -1;
+    int chosenNum = -1;
+    size_t planPos = string::npos; //first LINE-LEADING "PLAN:" marker
     size_t lineStart = 0;
     while (lineStart <= text.size())
     {
@@ -1849,10 +1962,21 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
                 if (!isTemplatePlaceholderLine(line))
                 {
                     bool st = false;
-                    if (parseChoice(line, optionCount, optionTexts, &st) >= 0)
-                        lastChoiceEnd = (long) end;
+                    int c = parseChoice(line, optionCount, optionTexts, &st);
+                    if (c >= 0) { lastChoiceEnd = (long) end; chosenNum = c; }
                 }
             }
+        }
+        //First line-leading PLAN: marker (the answer-first plan line). A
+        //quoted mid-line "Your plan:" is NOT line-leading, so it is ignored -
+        //the deck35 correct fire quotes the prompt's "Your plan:" at 5217 but
+        //its real PLAN: line is at 7416.
+        if (planPos == string::npos && end - s >= 5)
+        {
+            if (tolower((unsigned char) text[s]) == 'p' && tolower((unsigned char) text[s + 1]) == 'l'
+                && tolower((unsigned char) text[s + 2]) == 'a' && tolower((unsigned char) text[s + 3]) == 'n'
+                && text[s + 4] == ':')
+                planPos = s;
         }
         if (lineEnd == string::npos)
             break;
@@ -1861,23 +1985,98 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
     if (lastChoiceEnd < 0)
         return false; //nothing well-formed to retract
 
-    string tail = text.substr((size_t) lastChoiceEnd);
-    for (size_t i = 0; i < tail.size(); i++)
-        tail[i] = (char) tolower((unsigned char) tail[i]);
-    //Conservative and strong: each disavows the ANSWER, not merely a step of
-    //reasoning. With answer-first the reasoning follows the answer, so weak
-    //exploratory phrases ("let me reconsider", "on second thought") are
-    //deliberately EXCLUDED - they would discard a valid kept answer. A
-    //false positive here only routes to the (safe) heuristic, never a wrong
-    //action; a false negative is a taken retracted digit, the bug we fix.
+    //Condition (a): the search region ends at the first line-leading PLAN:
+    //marker (when it follows the answer). No PLAN: -> the whole tail. A PLAN:
+    //BEFORE the answer (legacy plan-first shape) leaves no valid region and
+    //cannot fire - the safe direction.
+    size_t regionEnd;
+    if (planPos == string::npos)
+        regionEnd = text.size();
+    else if (planPos > (size_t) lastChoiceEnd)
+        regionEnd = planPos;
+    else
+        return false;
+
+    //Significant name-words of the chosen option (same filter as parseChoice:
+    //lowercase, length >= 4, minus the verb/decline filler) for condition (b)'s
+    //answer-reference test.
+    vector<string> chWords;
+    if (optionTexts && chosenNum >= 1 && chosenNum <= (int) optionTexts->size())
+    {
+        const string& src = (*optionTexts)[chosenNum - 1];
+        string t;
+        for (size_t k = 0; k <= src.size(); k++)
+        {
+            char c = (k < src.size()) ? (char) tolower((unsigned char) src[k]) : ' ';
+            if (isalnum((unsigned char) c))
+                t += c;
+            else
+            {
+                if (t.size() >= 4 && t != "cast" && t != "with" && t != "play"
+                    && t != "pass" && t != "none" && t != "hold" && t != "done"
+                    && t != "skip" && t != "decline" && t != "nobody")
+                    chWords.push_back(t);
+                t.clear();
+            }
+        }
+    }
+
+    string low = text;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+
+    //Conservative and strong phrase list: each disavows the ANSWER, not merely
+    //a step of reasoning. Weak exploratory phrases ("let me reconsider", "on
+    //second thought") are deliberately EXCLUDED.
     static const char * kRetract[] = {
         "made a mistake", "i was wrong", "i'm wrong", "im wrong",
         "that's wrong", "that is wrong", "actually, no", "scratch that",
         "i made an error", "correction:"
     };
+    const size_t kAbutChars = 140;   //(b) the phrase abuts the CHOICE line
+    const size_t kRefBack = 200, kRefFwd = 80; //(b) answer-reference window
     for (size_t p = 0; p < sizeof(kRetract) / sizeof(kRetract[0]); p++)
-        if (tail.find(kRetract[p]) != string::npos)
-            return true;
+    {
+        string phrase = kRetract[p];
+        size_t pos = (size_t) lastChoiceEnd;
+        while ((pos = low.find(phrase, pos)) != string::npos)
+        {
+            if (pos >= regionEnd)
+                break; //condition (a): only phrases before the PLAN: marker
+            //condition (b): abut the CHOICE line, OR reference the answer.
+            bool refs = (pos - (size_t) lastChoiceEnd) <= kAbutChars;
+            if (!refs)
+            {
+                size_t ws = (pos > kRefBack) ? pos - kRefBack : 0;
+                if (ws < (size_t) lastChoiceEnd) ws = (size_t) lastChoiceEnd;
+                size_t we = pos + phrase.size() + kRefFwd;
+                if (we > regionEnd) we = regionEnd;
+                string win = low.substr(ws, we - ws);
+                for (size_t w = 0; w < chWords.size() && !refs; w++)
+                    if (win.find(chWords[w]) != string::npos)
+                        refs = true;
+                //the chosen option number as a standalone token
+                if (!refs && chosenNum > 0)
+                {
+                    char buf[16];
+                    snprintf(buf, sizeof(buf), "%d", chosenNum);
+                    string num = buf;
+                    size_t np = 0;
+                    while (!refs && (np = win.find(num, np)) != string::npos)
+                    {
+                        bool lok = (np == 0) || !isdigit((unsigned char) win[np - 1]);
+                        size_t after = np + num.size();
+                        bool rok = (after >= win.size()) || !isdigit((unsigned char) win[after]);
+                        if (lok && rok) refs = true;
+                        np = after;
+                    }
+                }
+            }
+            if (refs)
+                return true;
+            pos += phrase.size();
+        }
+    }
     return false;
 }
 
@@ -2057,8 +2256,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             return NULL;
         }
         //The plan is split off BEFORE choice parsing: plan prose is full of
-        //numbers that would otherwise misparse as the chosen action.
-        string decisionPart = consumePlan(content);
+        //numbers that would otherwise misparse as the chosen action. Restrict
+        //the answer line to CHOICE: so a CoT "Attack:"/"Blocks:" line in the
+        //reasoning body is not taken as the answer (stale-echo family B).
+        string decisionPart = consumePlan(content, "CHOICE:");
         bool staleEcho = false;
         choice = parseChoice(decisionPart, index, &shownLines, &staleEcho);
         //Repeat-loop salvage: an unparsed (NOT stale, NOT empty) reply may be
@@ -2144,7 +2345,8 @@ int AIPlayerGPT::selectHintAbility()
     return AIPlayerBaka::selectHintAbility();
 }
 
-int AIPlayerGPT::askModel(const string& decision, const vector<string>& options, bool narrateChoice)
+int AIPlayerGPT::askModel(const string& decision, const vector<string>& options, bool narrateChoice,
+                          const string& pendingSourceName)
 {
     //"Only one valid action": no decision to make, no model call.
     if (options.empty())
@@ -2180,10 +2382,13 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     if (pollCompletion(userMsg, content) == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
 
-    //Plan split BEFORE choice parsing: plan prose is full of numbers.
-    string decisionPart = consumePlan(content);
+    //Plan split BEFORE choice parsing: plan prose is full of numbers. Restrict
+    //the answer line to CHOICE: so a CoT combat line ("Attack: ...") in the
+    //reasoning body is not mistaken for the answer (stale-echo family B).
+    string decisionPart = consumePlan(content, "CHOICE:");
     bool staleEcho = false;
-    int choice = parseChoice(decisionPart, (int) options.size(), &options, &staleEcho);
+    int choice = parseChoice(decisionPart, (int) options.size(), &options, &staleEcho,
+                             pendingSourceName.empty() ? NULL : &pendingSourceName);
     //Repeat-loop salvage (see chooseOrderedAction): recover a valid CHOICE
     //stated before a decode spiral; never overrides a stale_echo verdict.
     if (choice < 0 && !staleEcho && !content.empty())
@@ -2932,6 +3137,21 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         act.choice = 0;
         return 0;
     }
+    //ENGINE-R6 (wave-21 deck135): a Transform/flip menu option is only ever
+    //offered when its gating condition is already satisfied - the engine arms
+    //the flip only when it is legal (Search for Azcanta's "7+ cards in
+    //graveyard" upkeep trigger only presents the transform once the threshold
+    //is met). Without that fact riding the option the model fills the vacuum
+    //with an error-prone manual recount and declines an available transform
+    //(vs14 seq 29/40: recounted its graveyard, got 5-6, Declined a legal flip
+    //twice, losing the grind). The deciding fact rides the option. Annotation
+    //only - the option stays legal and pickable; req.optionTexts (the
+    //staleness key) is untouched, and only trailing text is appended so the
+    //answer index is unchanged.
+    for (size_t i = 0; i < opts.size(); i++)
+        if (opts[i].compare(0, 10, "Transform:") == 0)
+            opts[i] += " [available NOW - this transform is only offered because its"
+                       " condition is already met; do not recount, it is legal this instant]";
     string decision = ctx ? ("Choose an option for " + ctx->getDisplayName() + ":")
                           : string("A choice is required - choose an option:");
     int pick = askModel(decision, opts);
@@ -3129,7 +3349,10 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         q << " from the list below, and answer with the chosen TARGET's name (not \""
           << effectName << "\")";
 
-        int pick = askModel(q.str(), opts);
+        //Pass the pending source name so parseChoice can strip a "<spell>
+        //targeting <target>" echo prefix down to the target name (stale-echo
+        //family A). effectName is the exact spell/ability named in the prompt.
+        int pick = askModel(q.str(), opts, true, effectName);
         if (pick == kChoicePending)
             return 1; //chooser stays open; earlier picks re-derive from cache next tick
         if (pick < 0)
@@ -4414,7 +4637,7 @@ void AIPlayerGPT::runParseSelfTest()
         if (cond) { cout << "  PASS  " << label << "\n"; passed++; } \
         else { cout << "  FAIL  " << label << "\n"; failed++; } } while (0)
 
-    cout << "=== AIPlayerGPT parse self-test (wave-20 3a/3b/3c + wave-21 A/B/C) ===\n";
+    cout << "=== AIPlayerGPT parse self-test (wave-20 3a/3b/3c + wave-21 A/B/C + wave-22 N9/A2/B3) ===\n";
 
     // ---- ITEM 3b: "#N" ordinal disambiguates duplicate names ----
     cout << "\n[3b] deck135 wave-19 s27: 'BLOCKS: Ice-Fang Coatl: Saproling (1/1) #1'\n";
@@ -4651,6 +4874,141 @@ void AIPlayerGPT::runParseSelfTest()
             CHECK(ps == 2 && send[0] && !send[1] && send[2], "C prose 'attack with A1 and A3' salvages");
         }
     }
+
+    // ================= WAVE-22 items (N9 retract over-fire / stale-echo A+B) ==
+    // Built from the real matchups-20260723-084938 corpus replies (seq cited).
+
+    // ---- ITEM 1 (HARNESS-N9): retracted_choice must be REFERENCE-SCOPED ----
+    cout << "\n[N9] retracted_choice: fire only when the retraction is before PLAN: AND refs the answer\n";
+    {
+        // deck62 vs27 s10 (real, FALSE POSITIVE): correct CHOICE 1 (Play Forest)
+        // never retracted; "Correction:" lives in the DOWNSTREAM PLAN prose
+        // (a mana/Shroud aside), AFTER the first line-leading PLAN: marker.
+        vector<string> land; land.push_back("Play Forest");
+        land.push_back("Hold Forest - do not play it now");
+        string fpLand =
+            "CHOICE: 1 (Play Forest)\n"
+            "The opponent has a flying blocker and an unblockable attacker. I need to establish a board presence and draw cards.\n"
+            "PLAN: Play Forest to increase mana base. Cast Fists of Ironwood targeting a Saproling. Wait, Fists requires a creature target and Argothian has Shroud.\n"
+            "Correction: I cannot cast Fists or Web because I have no legal target (Argothian has Shroud). I must play the Forest and pass the turn.\n"
+            "PLAN: Play Forest. Pass the turn without casting any spells since I lack a legal target for my auras.\n";
+        int r1 = RESOLVE(fpLand, 2, land);
+        cout << "     deck62 vs27 s10 (Correction: after PLAN) -> " << r1 << " (must be 1, not fallback)\n";
+        CHECK(r1 == 1, "N9 FP land-drop: 'Correction:' in PLAN prose does NOT retract the CHOICE");
+
+        // deck135 vs27 s26 (real, FALSE POSITIVE): CHOICE 2 (Ice-Fang Coatl);
+        // "Correction: **Islandwalk** means..." is rules trivia after PLAN:.
+        vector<string> cast; cast.push_back("Cast Glacial Revelation {2}{g}");
+        cast.push_back("Cast Ice-Fang Coatl {g}{u} (1/1)");
+        cast.push_back("Cast nothing right now");
+        string fpRules =
+            "CHOICE: 2 (Cast Ice-Fang Coatl)\n"
+            "It is a creature and casting a creature takes priority. It draws a card and adds a flyer.\n"
+            "PLAN: Cast Ice-Fang Coatl. Then attack with it since the opponent's ground creatures cannot block a flyer. Wait, Vodalian Zombie has islandwalk.\n"
+            "Correction: **Islandwalk** means the creature can't be blocked as long as the defender controls an Island. It does not let it block a flyer.\n";
+        int r2 = RESOLVE(fpRules, 3, cast);
+        cout << "     deck135 vs27 s26 (rules 'Correction:' after PLAN) -> " << r2 << " (must be 2)\n";
+        CHECK(r2 == 2, "N9 FP rules-aside: downstream 'Correction:' about islandwalk does NOT retract");
+
+        // deck35 vs62 s18 (real, the ONE CORRECT fire): snap CHOICE 3 (Heart),
+        // "Actually, no." BEFORE the PLAN: marker referencing Heart Sliver, and
+        // the final PLAN switches to Fury. This MUST still route to the heuristic.
+        vector<string> slivers;
+        slivers.push_back("Cast Spinneret Sliver {1}{g} (2/2)");
+        slivers.push_back("Cast Fury Sliver {5}{r} (3/3)");
+        slivers.push_back("Cast Heart Sliver {1}{r} (1/1)");
+        slivers.push_back("Cast nothing right now");
+        string correctFire =
+            "CHOICE: 3 (Cast Heart Sliver)\n"
+            "I will follow the plan and cast Heart Sliver to add a creature and hope for the best. Actually, no. The strategy guide says attack every turn; I must maximize damage now and Fury Sliver deals more.\n"
+            "PLAN: Cast Fury Sliver to add a 3/3 double strike creature to my board, then attack with all four creatures for lethal.\n";
+        int r3 = RESOLVE(correctFire, 4, slivers);
+        cout << "     deck35 vs62 s18 ('Actually, no.' before PLAN, refs Heart) -> " << r3 << " (must be -1: real change of mind)\n";
+        CHECK(r3 == -1, "N9 correct fire kept: pre-PLAN retraction referencing the answer still fires");
+
+        // Guard: the wave-20 HARNESS-1 shape (no PLAN:, phrase abuts the CHOICE) still fires.
+        string abut = "CHOICE: 1 (Play Forest)\nWait, I made a mistake. Hold the land instead.\n";
+        int r4 = RESOLVE(abut, 2, land);
+        cout << "     no-PLAN retraction abutting the CHOICE -> " << r4 << " (must be -1)\n";
+        CHECK(r4 == -1, "N9 abut case: a retraction on the line right after CHOICE still fires");
+    }
+
+    // ---- ITEM 2 (stale-echo family A): spell-name-prefix on a TARGET echo ----
+    cout << "\n[A2] target menu: strip '<spell> targeting ' prefix anchored to the pending source\n";
+    {
+        // deck14 vs27 s29 (real): "Unsummon targeting Inkfathom Infiltrator";
+        // N=1 is the correct target but the spell prefix + rules-text words
+        // made both echo passes miss -> stale_echo. Source = "Unsummon".
+        vector<string> tgt;
+        tgt.push_back("Inkfathom Infiltrator (3/2) [islandwalk, unblockable, cantblock] [opponent's battlefield] [tapped] - \"Inkfathom Infiltrator can't block and is unblockable.\"");
+        tgt.push_back("Lord of Atlantis (2/2) [opponent's battlefield] - \"Other Merfolk creatures get +1/+1 and have islandwalk.\"");
+        tgt.push_back("Zombie Master (2/3) [opponent's battlefield] - \"Other Zombie creatures have swampwalk.\"");
+        string src = "Unsummon";
+        bool st = false;
+        int c = parseChoice("1 (Unsummon targeting Inkfathom Infiltrator)", 3, &tgt, &st, &src);
+        cout << "     with source 'Unsummon' -> " << c << " (must be 1, was stale_echo)\n";
+        CHECK(c == 1 && !st, "A2 deck14 s29: spell-prefix stripped, target name matches option 1");
+        // Without the pending source the bug reproduces (stale_echo).
+        bool st0 = false;
+        int c0 = parseChoice("1 (Unsummon targeting Inkfathom Infiltrator)", 3, &tgt, &st0, NULL);
+        cout << "     without source -> " << c0 << " (bug repro: stale_echo)\n";
+        CHECK(c0 < 0 && st0, "A2 bug repro: unstripped spell-prefix echo is dropped stale");
+
+        // deck62 vs14 s29 (real): "Web targeting Yavimaya Enchantress"; N=4 correct.
+        vector<string> tgt2;
+        tgt2.push_back("Birds of Paradise (0/1) [trample, flying] [your battlefield] [tapped]");
+        tgt2.push_back("Saproling (1/1) [trample] [your battlefield]");
+        tgt2.push_back("Saproling (1/1) [trample] [your battlefield]");
+        tgt2.push_back("Yavimaya Enchantress (4/4) [trample] [your battlefield] - \"Yavimaya Enchantress gets +1/+1 for each enchantment on the battlefield.\"");
+        tgt2.push_back("Saproling (1/1) [trample] [your battlefield]");
+        tgt2.push_back("Saproling (1/1) [trample] [your battlefield]");
+        tgt2.push_back("Coral Merfolk (2/1) [opponent's battlefield] [tapped]");
+        string src2 = "Web";
+        bool st2 = false;
+        int c2 = parseChoice("4 (Web targeting Yavimaya Enchantress)", 7, &tgt2, &st2, &src2);
+        cout << "     with source 'Web' -> " << c2 << " (must be 4)\n";
+        CHECK(c2 == 4 && !st2, "A2 deck62 s29: 'Web targeting' stripped, Yavimaya matches option 4");
+
+        // Anchor guard: the "X targeting Y" strip requires X == the pending
+        // source. A mismatched X ("Boomerang" when the source is Unsummon) must
+        // NOT strip (no blanket 'targeting' strip). Here it stays stale (the
+        // safe outcome), never mis-picks a wrong target.
+        bool st3 = false;
+        int c3 = parseChoice("1 (Boomerang targeting Inkfathom Infiltrator)", 3, &tgt, &st3, &src);
+        cout << "     mismatched source ('Boomerang' vs 'Unsummon') -> " << c3 << " (no strip; stays stale)\n";
+        CHECK(c3 < 0 && st3, "A2 anchor: strip is skipped when the prefix is not the pending source");
+    }
+
+    // ---- ITEM 3 (stale-echo family B): CoT answer-label line hijacks the answer --
+    cout << "\n[B3] a CoT 'Attack:' line in a CHOICE reply must not be taken as the answer\n";
+    {
+        // deck49 vs35 s18 (real): valid answer-first CHOICE 1, then the combat
+        // math line "Attack: Regent (6/6) vs Striking Sliver (2/2, ...)" as CoT.
+        vector<string> opts3;
+        opts3.push_back("Cast Goblin War Paint {1}{r} - legal targets right now: Dragonmaster Outcast, Firespitter Whelp, Thunderbreak Regent, Muscle Sliver (+1 more)");
+        opts3.push_back("Cast nothing right now");
+        string s18 =
+            "CHOICE: 1 (Cast Goblin War Paint)\n"
+            "The opponent has two 2/2 creatures with First Strike.\n"
+            "Attack: Regent (6/6) vs Striking Sliver (2/2, First Strike). Striking deals 2 to Regent. Regent deals 6 to Striking.\n"
+            "PLAN: Cast Goblin War Paint on Thunderbreak Regent to make it a 6/6 flyer.\n";
+        size_t ss = 0, se = 0, ls = 0;
+        bool okF = findAnswerLabelLine(s18, "CHOICE:", ss, se, ls);
+        string seg = okF ? s18.substr(ss, se - ss) : string();
+        bool st = false;
+        int c = parseChoice(seg, 2, &opts3, &st);
+        cout << "     expectedLabel 'CHOICE:' seg=\"" << seg << "\" -> " << c << " (must be 1)\n";
+        CHECK(okF && c == 1 && !st, "B3 CHOICE-filtered selection keeps the real answer-first CHOICE 1");
+        // Bug repro: the unfiltered (any-label) scan grabs the later 'Attack:' line.
+        size_t bs = 0, be = 0, bl = 0;
+        bool okB = findAnswerLabelLine(s18, NULL, bs, be, bl);
+        string segBug = okB ? s18.substr(bs, be - bs) : string();
+        bool stBug = false;
+        int cBug = parseChoice(segBug, 2, &opts3, &stBug);
+        cout << "     unfiltered picks the CoT line seg=\"" << segBug << "\" -> " << cBug << " (bug: stale)\n";
+        CHECK(cBug < 0, "B3 bug repro: any-label scan hands parseChoice the CoT 'Attack:' prose -> dropped");
+    }
+
     #undef RESOLVE
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

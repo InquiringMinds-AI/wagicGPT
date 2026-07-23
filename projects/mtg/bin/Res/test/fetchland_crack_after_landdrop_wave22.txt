@@ -1,0 +1,53 @@
+#Wave-22 ledger ENGINE-F1 -- fetchland activations intermittently FIZZLE for the AI.
+#
+#SYMPTOM (corpus 20260723 deck135, primary driver of its 4/6 -> 1/6 record swing): the
+#AI chose "Put in Play with <fetchland> targeting <land>" (a {T},Pay 1 life,Sacrifice
+#activated ability), the decision was narrated as taken, but NOTHING resolved -- no life
+#paid, no sacrifice, no land fetched. The fetchland stayed on the battlefield and the
+#option re-armed next turn. Silent to the model (its own plan asserts the fetch succeeded),
+#so it never re-cracks. deck135's whole plan is fetch-a-color-then-cast, so a fizzled fetch
+#green-screws it for the game.
+#
+#ROOT CAUSE (predates wave-20/21; the check dates to 2016, commit 00adb20dc): a fetchland
+#crack has no MANA cost ({T}/Life/Sacrifice are extra costs), so AIPlayerBaka::payTheManaCost
+#reaches its zero-cost branch. That branch refused any LAND whose land-per-turn play was
+#spent (canPutIntoZone == CANT_PLAY) -- meant to stop the AI replaying a land, but it also
+#matched a fetchland ALREADY IN PLAY whose ability is being ACTIVATED. So whenever the AI
+#had spent its land drop earlier that turn, payTheManaCost returned false, the crack
+#AIAction was never queued, and the whole activation vanished. Intermittent because it only
+#bites when a land was played before the crack ON THE SAME TURN.
+#
+#FIX: the land-per-turn restriction applies only to PLAYING a land from hand -- gate it on
+#!target->isInPlay(observer) so activating an in-play land's ability is never refused.
+#
+#WITNESS: Misty Rainforest is already in play; the AI plays Snow-Covered Plains from hand
+#(spending the turn's land drop), then cracks Misty. PRE-FIX Misty was never sacrificed
+#(life stays 20, graveyard empty, Snow-Covered Forest stays in library = 6 cards). POST-FIX
+#Misty -> graveyard, Snow-Covered Forest library -> battlefield, life 20 -> 19.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Misty Rainforest
+hand:Snow-Covered Plains
+library:Snow-Covered Forest, Mind Stone, Mind Stone, Mind Stone, Mind Stone, Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Snow-Covered Forest, Snow-Covered Plains
+library:Mind Stone, Mind Stone, Mind Stone, Mind Stone, Mind Stone
+graveyard:Misty Rainforest
+life:19
+[PLAYER2]
+[END]
