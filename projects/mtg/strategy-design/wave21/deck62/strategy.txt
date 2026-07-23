@@ -1,0 +1,108 @@
+Deck identity: MONO-GREEN ENCHANTRESS. Your enchantments are a DRAW ENGINE and your auras are
+PUMP - none of them deal damage or destroy anything. You win one of two ways: (A) VOLTRON -
+stack pump auras onto ONE creature, give it TRAMPLE, and swing for a huge unblockable-through
+hit; or (B) GO WIDE - Fists-of-Ironwood Saproling tokens grown by Gaea's Anthem + Primal Rage.
+You usually kill by turn 8-13. Your mana is trivial - EVERY spell is green off your Forests
+(plus Birds/Druid dorks). There is never a mana problem to agonize over; if a Cast option is
+listed, it is payable now.
+
+THE #1 RULE - YOUR CARDS DRAW AND PUMP, THEY DO NOT KILL. NEVER cast an aura "to kill" or "to
+trade with" an opponent's creature - they only make bodies bigger. What each card ACTUALLY does:
+- Argothian Enchantress ({1}{g} 0/1, SHROUD): whenever you cast an enchantment spell, DRAW A
+  CARD. This is your engine. She is the most important card in the deck - cast her EARLY, and cast
+  her BEFORE you pour out your enchantments, so every enchantment after her refills your hand.
+- Yavimaya Enchantress ({2}{g} 2/2): gets +1/+1 for EACH enchantment on the battlefield (yours
+  AND the opponent's). In this deck she becomes a 5/5, 6/6, 7/7 fast - a real beater. Pump her.
+- Web ({g} AURA): enchanted creature gets +0/+2 AND REACH (can now block flyers). It adds NO
+  power - it is a draw-trigger and a reach-granter, not a way to grow your clock. Cheap.
+- Fists of Ironwood ({1}{g} AURA): when it enters, make TWO 1/1 green Saproling tokens; the
+  enchanted creature gains TRAMPLE (no stat boost). The two tokens are the real payoff.
+- Blanchwood Armor ({2}{g} AURA): +1/+1 for EACH Forest you control. You run ~26 Forests, so this
+  is routinely +5/+5 or more. Your best single pump.
+- Ancestral Mask ({2}{g} AURA): +2/+2 for each OTHER enchantment on the battlefield. In a deck
+  full of enchantments this is enormous (it made a 0/1 Birds into a 9/10 in a game you won).
+- Primal Rage ({1}{g} ENCHANTMENT, no target): ALL your creatures have TRAMPLE. Global. A SECOND
+  copy does nothing - if Primal Rage is already on your battlefield, do not agonize over a copy in
+  hand; it is redundant. Cast a real threat instead.
+- Gaea's Anthem ({1}{g}{g} ENCHANTMENT, no target): ALL your creatures get +1/+1. Global anthem.
+- Briar Patch ({1}{g}{g} ENCHANTMENT, no target): every creature that attacks YOU gets -1/-0.
+  Defensive - it shrinks the opponent's attackers, it does not help you attack.
+- Birds of Paradise ({g} 0/1 flying): mana dork, taps for any color. Druid of the Cowl ({1}{g}
+  1/3): mana dork for {g}. Canopy Spider ({1}{g} 1/3, REACH): a blocker that can block flyers.
+
+SEQUENCE THE ENGINE - CAST ARGOTHIAN ENCHANTRESS FIRST, THEN DUMP ENCHANTMENTS:
+- The turn you can, cast Argothian Enchantress. AFTER she is down, every enchantment you cast
+  (Web, Fists, Primal Rage, Gaea's Anthem, Blanchwood, Ancestral Mask, Briar Patch) draws you a
+  card. Casting your cheap enchantments BEFORE her throws away free cards - do not do it.
+- She has SHROUD: she cannot be targeted, so you can NEVER put your own auras on her, and the
+  opponent cannot remove her. Protect the engine - do not attack with her (she is a 0/1).
+
+AURA TARGETING - ENCHANT YOUR OWN CREATURE:
+- Web, Fists, Blanchwood Armor and Ancestral Mask must target a creature. When the option is
+  labeled "the only legal targets are YOUR OWN," just pick the creature you want to grow. When it
+  also lists the opponent's creatures, IGNORE them - enchanting the opponent gives THEM the pump.
+- If your ONLY legal target is an opponent's creature (you have no creature of your own yet), do
+  NOT cast the aura. Deploy a body first - a mana dork, Canopy Spider, Yavimaya, or make Saprolings
+  with Fists. Best target for a big pump: Yavimaya Enchantress or a Saproling you intend to swing.
+- Pick a target that carries POWER. Blanchwood/Ancestral/Gaea's add power; Web does not. Stacking
+  auras on a 0-power body (Birds, Argothian) mostly buys evasion or toughness, not a clock - if you
+  need to close, grow a creature that already has power (Yavimaya, a Saproling) or one that flies
+  and can carry a real power boost.
+
+YOUR WIN CONDITION - MAKE ONE BIG TRAMPLER AND ATTACK:
+- Pick one creature (Yavimaya, a Saproling, or a pumped dork), stack Blanchwood Armor / Ancestral
+  Mask / Gaea's Anthem on it, and make sure it has TRAMPLE (Primal Rage or Fists). A single 7/7+
+  trampler ends games - trample means it deals its excess through any blocker to the face.
+- When you have a large trampler and the opponent cannot block it profitably, that is LETHAL math -
+  do not re-derive the aura stack. The battlefield line ALREADY shows the final boosted number -
+  e.g. "Saproling (6/6) (printed 1/1)" means it IS a 6/6 right now, Forests and auras already
+  counted. TRUST that printed [X/Y] and SWING; do NOT recount Forests or re-add anthems/auras.
+
+YOU CANNOT ALWAYS WIN THIS TURN - DO NOT HUNT LETHAL THAT ISN'T THERE (AHEAD OR BEHIND):
+- Some turns your board simply cannot deal enough THIS turn - and this is just as true when you
+  are AHEAD with a big board as when you are behind. If your attackers add up to (say) 6 and the
+  opponent is at 13, the exact lethal is not there this turn - you are NOT missing a trick. Do NOT
+  re-read the board over and over hunting for a combo or an extra 7 damage you do not have. Make
+  the best single play (add a body, pump ONE threat, draw off Argothian, block to survive) and
+  pass. You are a turn-8-13 deck: winning over TWO turns is the normal plan, not a failure. Spinning
+  on lethal-this-turn wastes the turn and can even lose the reply to a run-on.
+- Being behind and at low life is normal against faster decks. The plan is: BLOCK to stay alive,
+  keep drawing off Argothian, grow ONE real threat, and win a turn or two later. You do not have to
+  find lethal this exact turn - you have to not die and keep building.
+
+ATTACK EVERY TURN - DURDLING LOSES THIS DECK:
+- Your losses were fast decks racing you while your board sat home under auras. Every turn, attack
+  with every creature that has real power and is not needed to block.
+- The "creatures that can attack" list (A1, A2, ...) is the EXACT and ONLY eligible set. You may
+  declare ONLY creatures printed on that list, by their A-number or exact name. A creature you WISH
+  could attack is not eligible just because you want the damage - if it is not on the list it
+  CANNOT attack this turn (almost always summoning-sick because you made it this turn, or tapped).
+  This holds EVEN when you feel you must attack to win: naming a creature that is absent from the
+  list does not add it to combat, it throws the whole attack away. If the list is empty or holds
+  only your 0-power engine/dorks, answer exactly ATTACK: none.
+- Do NOT attack with 0-power engine/dork creatures: Argothian Enchantress (0/1) and un-pumped
+  Birds of Paradise (0/1) deal 0 - keep them home. Your Saprolings, Yavimaya, and pumped creatures
+  are your attackers.
+- "No attackers" is correct ONLY when every creature with power is tapped/summoning-sick or is your
+  sole blocker against lethal. Being at low life is not a reason to stop attacking if you can race.
+
+SURVIVING AGGRO AND FLIERS WHILE THE ENGINE SETS UP:
+- Against faster decks (fliers, aggro) do not just race - stabilize. Canopy Spider (reach) and any
+  creature wearing Web (reach) can BLOCK FLYERS. Briar Patch shrinks every attacker against you.
+  Block to survive, keep drawing off Argothian, and out-card them into your big trampler.
+- Protect the engine on DEFENSE too. The block prompt tells you the total incoming damage and
+  whether it is lethal. If it says NOT lethal and you are ahead or comfortable, TAKE the damage -
+  do NOT chump-block with Argothian Enchantress or an un-pumped Birds (your 0/1 engine/dorks) just
+  to absorb a few points. The prompt marks them "deals 0 - only absorbs damage": a 0/1 that keeps
+  drawing you cards is worth far more than soaking 1-2 life you can afford. Chump the engine ONLY to
+  stop ACTUAL lethal.
+- This "do not chump" caution is ONLY about your 0/1 Argothian/Birds. Blocking with a REAL creature
+  (Yavimaya, a Saproling, Canopy Spider) is NOT a chump-block. When the prompt tags a block "(you kill
+  it, your blocker lives)" or "(both die)" and you want that attacker gone, just MAKE the block and move
+  on - it is a favorable trade, not a chump. Do NOT re-litigate whether a good block counts as
+  chump-blocking; the 0/1 caution does not touch your real creatures. Commit and answer.
+
+MULLIGAN: keep 2-4 lands (Forest / a dork counts) with at least one green spell. An opener with
+Argothian Enchantress or a mana dork plus a Forest is ideal. Ship 0-1 or 6+ land hands, or an
+all-expensive hand with no early play. Decide KEEP or MULLIGAN from what the hand HAS (mana +
+a green spell) - do not plan out future turns to answer it.
