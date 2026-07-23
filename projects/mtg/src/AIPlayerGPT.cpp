@@ -123,14 +123,17 @@ const char * kStrategyPriors =
 //the contract the parsers and the plan carry-forward depend on.
 const char * kReplyProtocol =
     "\nHOW TO REPLY (every decision):\n"
-    "Think the decision through briefly if you need to - that scratch text is discarded.\n"
-    "Then, on a line starting with PLAN:, write your complete game plan from here on - CONCISE, a "
-    "few sentences of intent, not an analysis.\n"
-    "Then, on the LAST line of your reply, give your answer in exactly the format the decision asks "
-    "for, after its answer label (CHOICE: for numbered choices, ATTACK: for attack declarations, "
-    "BLOCKS: for block assignments). The answer line is your FINAL decision: if thinking it through "
-    "changes your mind, the answer line is where the changed decision lands. A reply without its "
-    "answer line is thrown away, so keep the thinking short enough to always reach it.\n"
+    "Put your ANSWER on the VERY FIRST line, using exactly the label the decision asks for "
+    "(CHOICE: for numbered choices, ATTACK: for attack declarations, BLOCKS: for block "
+    "assignments), e.g. \"CHOICE: 2 (Cast Fatal Push)\". Answer first so a long reply can never "
+    "lose it.\n"
+    "After the answer line you may think the decision through briefly if you need to - that scratch "
+    "text is discarded. If that thinking changes your mind, write a NEW answer line with the "
+    "corrected answer; the LAST well-formed answer line is the one taken. If instead you realize "
+    "your answer was a mistake and are unsure, it is fine to stop - the game's own reliable player "
+    "will step in.\n"
+    "Then, on the LAST line of your reply, a line starting with PLAN:, write your complete game "
+    "plan from here on - CONCISE, a few sentences of intent, not an analysis.\n"
     "Nothing you write is kept except that PLAN line. At your next decision you will see only the "
     "game log, the current board, your last PLAN line, and the new choices - your reasoning and "
     "your earlier plans will have dropped out of context. So every PLAN must be complete and "
@@ -553,6 +556,9 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     mConfigUrls = cfg.urls;
     mConfigModel = cfg.model;
     mMaxTokens = cfg.maxTokens;
+    mRepetitionPenalty = cfg.repetitionPenalty;
+    if (const char * rp = getenv("WAGIC_GPT_REPPENALTY"))
+        mRepetitionPenalty = atof(rp);
     mApiKey = cfg.key;
     mTimeoutMs = 1000L * cfg.timeoutSecs;
     if (const char * key = getenv("WAGIC_GPT_KEY"))
@@ -644,7 +650,8 @@ void AIPlayerGPT::ensureGameStartRecord()
 }
 
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
-                                const string& chosenText, const char * fallback, const vector<string> * optionTexts)
+                                const string& chosenText, const char * fallback, const vector<string> * optionTexts,
+                                const char * choiceSource)
 {
     if (mTransLogPath.empty())
         return;
@@ -676,6 +683,10 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["chosen_text"] = chosenText;
     if (fallback)
         rec["fallback"] = fallback;
+    //Provenance for an answer recovered by prose-intent salvage (no coded
+    //line existed) - so corpus review can audit every prose salvage.
+    if (choiceSource)
+        rec["choice_source"] = choiceSource;
     //the exact option strings, when the seam has them as a list (ask /
     //priority) - offered-vs-taken tallies without re-parsing the prompt
     if (optionTexts)
@@ -920,6 +931,9 @@ void AIPlayerGPT::narrateDecision(const string& line)
     appendNarration(line);
 }
 
+//Defined below (near salvageLoopedChoice): drops verbatim reply-template lines.
+static bool isTemplatePlaceholderLine(const string& line);
+
 string AIPlayerGPT::consumePlan(const string& content)
 {
     //Drop any inline think block first (same as parseChoice).
@@ -956,7 +970,11 @@ string AIPlayerGPT::consumePlan(const string& content)
                 bool match = true;
                 for (size_t k = 0; k < len && match; k++)
                     match = (toupper((unsigned char) text[s + k]) == kAnswerLabels[li][k]);
-                if (match)
+                //Skip a literal reply-template line ("CHOICE: [Number]
+                //([Name])") the model parroted - it is not an answer, and
+                //taking it as the last label line would hide the real one
+                //(deck62 N7-template).
+                if (match && !isTemplatePlaceholderLine(text.substr(s, end - s)))
                 {
                     answerStart = s + len;
                     answerEnd = end;
@@ -1482,6 +1500,15 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     if (mEndpoint.find("api.openai.com") == string::npos)
         request["chat_template_kwargs"] = {{"enable_thinking", mThinking}};
 
+    //Repetition damping (decode-side guard against 12-16k-char spirals).
+    //vLLM accepts repetition_penalty as a non-standard top-level field; the
+    //official OpenAI API rejects unknown top-level params with a 400, so omit
+    //it there (same reasoning as chat_template_kwargs). Inert at 1.0, so only
+    //sent when explicitly configured != 1.0 (sampling changes play quality
+    //and must be corpus-validated before it is ever defaulted on).
+    if (mRepetitionPenalty != 1.0 && mEndpoint.find("api.openai.com") == string::npos)
+        request["repetition_penalty"] = mRepetitionPenalty;
+
     return request.dump();
 }
 
@@ -1724,6 +1751,19 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     return choice;
 }
 
+//A verbatim reply-template line the model parroted instead of filling in:
+//the system prompt's example "CHOICE: [Number] ([Name])" copied literally
+//(deck62 wave-20 N7-template). Its "[Number]"/"[Name]" placeholders are not
+//a real answer and must be dropped before disambiguation so the real
+//CHOICE: line wins. Case-insensitive on the token.
+static bool isTemplatePlaceholderLine(const string& line)
+{
+    string low = line;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    return low.find("[number]") != string::npos || low.find("[name]") != string::npos;
+}
+
 int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
                                      const std::vector<string> * optionTexts)
 {
@@ -1732,7 +1772,8 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
     //(deck135 wave-18 HARNESS#2). Walk every line, keep the LAST one whose
     //CHOICE: label re-parses to a valid, offered option through the normal
     //parseChoice (so echo + staleness protection still apply - a stale line
-    //re-parses to -1 and is skipped, never used).
+    //re-parses to -1 and is skipped, never used). Literal template-placeholder
+    //lines ("CHOICE: [Number] ([Name])") are dropped first (deck62 N7).
     int salvaged = -1;
     size_t lineStart = 0;
     while (lineStart <= content.size())
@@ -1752,10 +1793,13 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
             if (m)
             {
                 string line = content.substr(s + 7, end - (s + 7));
-                bool st = false;
-                int c = parseChoice(line, optionCount, optionTexts, &st);
-                if (c >= 0)
-                    salvaged = c; //keep the last well-formed, offered choice
+                if (!isTemplatePlaceholderLine(line))
+                {
+                    bool st = false;
+                    int c = parseChoice(line, optionCount, optionTexts, &st);
+                    if (c >= 0)
+                        salvaged = c; //keep the last well-formed, offered choice
+                }
             }
         }
         if (lineEnd == string::npos)
@@ -1763,6 +1807,78 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
         lineStart = lineEnd + 1;
     }
     return salvaged;
+}
+
+//True when the reply's LAST well-formed CHOICE line is followed (later in the
+//reply) by an explicit self-retraction phrase and NO subsequent well-formed
+//CHOICE line - the model took its answer back without replacing it, so the
+//parsed digit must NOT be used (route to the heuristic). Conservative,
+//file-static phrase list; false whenever a corrected CHOICE followed the
+//retraction (that later line becomes the last well-formed one, so nothing
+//retracts it). deck135 wave-20 HARNESS-1: "CHOICE: 4 (Cast nothing)" ->
+//"Wait, I made a mistake in my reasoning" -> loop, no final CHOICE.
+bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int optionCount,
+                                               const std::vector<string> * optionTexts)
+{
+    string text = content;
+    size_t thinkEnd = text.rfind("</think>");
+    if (thinkEnd != string::npos)
+        text = text.substr(thinkEnd + 8);
+
+    //End offset of the LAST well-formed CHOICE line (placeholders skipped, as
+    //in salvage - they never parse anyway).
+    long lastChoiceEnd = -1;
+    size_t lineStart = 0;
+    while (lineStart <= text.size())
+    {
+        size_t lineEnd = text.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (text[s] == ' ' || text[s] == '\t'
+                           || text[s] == '*' || text[s] == '#' || text[s] == '-'))
+            s++;
+        if (end - s >= 7)
+        {
+            static const char * kLabel = "CHOICE:";
+            bool m = true;
+            for (int k = 0; k < 7 && m; k++)
+                m = (toupper((unsigned char) text[s + k]) == kLabel[k]);
+            if (m)
+            {
+                string line = text.substr(s + 7, end - (s + 7));
+                if (!isTemplatePlaceholderLine(line))
+                {
+                    bool st = false;
+                    if (parseChoice(line, optionCount, optionTexts, &st) >= 0)
+                        lastChoiceEnd = (long) end;
+                }
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    if (lastChoiceEnd < 0)
+        return false; //nothing well-formed to retract
+
+    string tail = text.substr((size_t) lastChoiceEnd);
+    for (size_t i = 0; i < tail.size(); i++)
+        tail[i] = (char) tolower((unsigned char) tail[i]);
+    //Conservative and strong: each disavows the ANSWER, not merely a step of
+    //reasoning. With answer-first the reasoning follows the answer, so weak
+    //exploratory phrases ("let me reconsider", "on second thought") are
+    //deliberately EXCLUDED - they would discard a valid kept answer. A
+    //false positive here only routes to the (safe) heuristic, never a wrong
+    //action; a false negative is a taken retracted digit, the bug we fix.
+    static const char * kRetract[] = {
+        "made a mistake", "i was wrong", "i'm wrong", "im wrong",
+        "that's wrong", "that is wrong", "actually, no", "scratch that",
+        "i made an error", "correction:"
+    };
+    for (size_t p = 0; p < sizeof(kRetract) / sizeof(kRetract[0]); p++)
+        if (tail.find(kRetract[p]) != string::npos)
+            return true;
+    return false;
 }
 
 //A land-fetch activation, by its rendered option line (the same string the
@@ -1898,7 +2014,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         DebugTrace("AIPlayerGPT[ph" << phase << "]: all actions pass-declined this turn; passing");
         return NULL;
     }
-    tail << "\nWhich action do you take? Write your PLAN: line first, then on the last line CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 2 (Cast Fatal Push)\" or \"CHOICE: 0 (pass)\".";
+    tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 2 (Cast Fatal Push)\" or \"CHOICE: 0 (pass)\"; then any brief reasoning; then your PLAN: line last.";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
@@ -1956,6 +2072,17 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 choice = sal;
             }
         }
+        //Retraction gate: a parsed/salvaged choice that the model explicitly
+        //took back (with no replacing CHOICE) is not its decision - defer to
+        //the heuristic rather than execute the retracted digit.
+        bool retracted = false;
+        if (choice >= 0 && !content.empty()
+            && choiceRetractedNoReplacement(content, index, &shownLines))
+        {
+            DebugTrace("AIPlayerGPT: CHOICE " << choice << " retracted with no replacement; deferring");
+            choice = -1;
+            retracted = true;
+        }
         if (content.empty())
             setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
@@ -1980,7 +2107,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 mPassDeclineCount[isFetchCrackLine(shownLines[s])
                                   ? fetchLineKey(shownLines[s]) : shownLines[s]]++;
         {
-            const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : (staleEcho ? "stale_echo" : "unparsed_reply"));
+            const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
                           : (choice == 0 ? string("pass") : string());
             writeTransLog("priority", userMsg, content, choice, index, chosen, fb, &shownLines);
@@ -2034,7 +2161,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
         tail << (i + 1) << ". " << options[i] << "\n";
-    tail << "\nWrite your PLAN: line first, then on the last line CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 2 (Cast Fatal Push)\".";
+    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 2 (Cast Fatal Push)\"; then any brief reasoning; then your PLAN: line last.";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -2068,6 +2195,16 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
             choice = sal;
         }
     }
+    //Retraction gate (see chooseOrderedAction): a choice the model explicitly
+    //took back with no replacement is not its decision.
+    bool retracted = false;
+    if (choice >= 0 && !content.empty()
+        && choiceRetractedNoReplacement(content, (int) options.size(), &options))
+    {
+        DebugTrace("AIPlayerGPT: ask CHOICE " << choice << " retracted with no replacement; deferring");
+        choice = -1;
+        retracted = true;
+    }
     if (content.empty())
         setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
@@ -2078,7 +2215,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     mAskCache[askKey] = choice;
     {
         bool valid = choice >= 1 && choice <= (int) options.size();
-        const char * fb = valid ? NULL : (content.empty() ? "empty_reply" : (staleEcho ? "stale_echo" : "unparsed_reply"));
+        const char * fb = valid ? NULL : (content.empty() ? "empty_reply" : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
         writeTransLog("ask", userMsg, content, choice, (int) options.size(),
                       valid ? options[choice - 1] : string(), fb, &options);
     }
@@ -2458,6 +2595,36 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                 o << " - the opponent holds only " << oppHand << " card" << (oppHand > 1 ? "s" : "");
                         }
                     }
+                }
+                //Bounce-on-the-stack cast annotation (deck14 wave-20 E1): when
+                //this instant is offered as a response while an opponent spell
+                //resolves on the stack, but its chooser reaches only the
+                //battlefield (not the stack), say so on the cast line - the
+                //model repeatedly cast Unsummon/Boomerang believing it could
+                //stop the spell being cast. firstHit stays true when no stack
+                //card was targetable. Annotation only; the offer is unchanged.
+                if (firstHit)
+                {
+                    bool oppSpellOnStack = false;
+                    for (int pi = 0; pi < 2 && !oppSpellOnStack; pi++)
+                    {
+                        MTGGameZone * sz = observer->players[pi]->game->stack;
+                        for (int zi = 0; zi < sz->nb_cards; zi++)
+                        {
+                            MTGCardInstance * sc = sz->cards[zi];
+                            if (sc && sc != card && sc->controller() != this)
+                            {
+                                oppSpellOnStack = true;
+                                break;
+                            }
+                        }
+                    }
+                    bool hitsBattlefield =
+                        tc->targetsZone(observer->players[0]->game->inPlay) ||
+                        tc->targetsZone(observer->players[1]->game->inPlay);
+                    if (oppSpellOnStack && hitsBattlefield)
+                        o << " [this cannot target the spell on the stack -"
+                             " battlefield permanents only]";
                 }
                 SAFE_DELETE(tc);
                 if (!firstHit)
@@ -2848,6 +3015,42 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     if (multi)
         tc->initTargets(); //fresh selection, mirroring the heuristic path
 
+    //Bounce-on-the-stack misconception (deck14 wave-20 E1): the model casts
+    //Unsummon/Boomerang to "answer" a spell the opponent is CASTING, then at
+    //this forced target menu - whose legal set is battlefield permanents only -
+    //self-bounces or thrashes hunting for the on-stack spell that is not here.
+    //When (a) the chooser cannot reach the stack but targets the battlefield,
+    //and (b) an opponent spell is actually resolving on the stack, prepend a
+    //one-line header naming that trap. Conditioned so it only appears when the
+    //confusion can occur; representation only, the offered set is unchanged.
+    bool stackTrapNote = false;
+    {
+        MTGGameZone * stk0 = observer->players[0]->game->stack;
+        MTGGameZone * stk1 = observer->players[1]->game->stack;
+        bool chooserHitsStack = tc->targetsZone(stk0) || tc->targetsZone(stk1);
+        bool chooserHitsBattlefield =
+            tc->targetsZone(observer->players[0]->game->inPlay) ||
+            tc->targetsZone(observer->players[1]->game->inPlay);
+        if (!chooserHitsStack && chooserHitsBattlefield)
+        {
+            for (int pi = 0; pi < 2 && !stackTrapNote; pi++)
+            {
+                MTGGameZone * sz = observer->players[pi]->game->stack;
+                for (int zi = 0; zi < sz->nb_cards; zi++)
+                {
+                    MTGCardInstance * sc = sz->cards[zi];
+                    //An opponent-controlled object on the stack (not the bounce
+                    //spell itself) is what the model mistakes for a target.
+                    if (sc && sc != tc->source && sc->controller() != this)
+                    {
+                        stackTrapNote = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     //Multi-target selection runs as a sequence of single picks: each round
     //asks for one more target (with a "Done" escape once the minimum is
     //satisfiable), so the reply stays a single reliable number instead of a
@@ -2906,6 +3109,12 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         //and tell the model to answer with the TARGET's name. Representation
         //only - the offered set and the apply path are unchanged.
         std::ostringstream q;
+        if (stackTrapNote)
+            q << "NOTE: these targets are battlefield permanents only - the spell"
+                 " being cast on the stack is NOT a legal target and is NOT in this"
+                 " list. If your only goal was to stop that spell, this cannot do"
+                 " it; pick a battlefield permanent that is worth bouncing, or"
+                 " decline.\n";
         q << "TARGET CHOICE for " << effectName
           << " (this spell/ability is already on the stack and needs a target - "
           << "it is NOT a cast or phase step). Pick ";
@@ -3056,35 +3265,49 @@ static int uniqueNameMatch(const vector<string>& words, const vector<string>& na
 //gang-blocks, pump, damage prevention and regeneration - the section header
 //hedges "before other blockers/tricks". Perspective: 'you' = the AI (the
 //blocking side). Empty string when there is nothing decisive to say.
-static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * attacker)
+//Plain-stat combatant view for the trade preview, so the outcome logic is
+//unit-testable without an engine-built MTGCardInstance (see runParseSelfTest).
+//'wither' is set for wither OR infect (both deal -1/-1-counter damage);
+//'infectLabel' only picks the word for the message.
+struct CombatTradeStat
 {
-    int bp = blocker->power  > 0 ? blocker->power  : 0;
-    int ap = attacker->power > 0 ? attacker->power : 0;
-    int bt = blocker->toughness;
-    int at = attacker->toughness;
-    bool bDeath = blocker->basicAbilities[Constants::DEATHTOUCH]
-               || blocker->basicAbilities[Constants::WITHER]
-               || blocker->basicAbilities[Constants::INFECT];
-    bool aDeath = attacker->basicAbilities[Constants::DEATHTOUCH]
-               || attacker->basicAbilities[Constants::WITHER]
-               || attacker->basicAbilities[Constants::INFECT];
-    bool bFirst = blocker->basicAbilities[Constants::FIRSTSTRIKE]
-               || blocker->basicAbilities[Constants::DOUBLESTRIKE];
-    bool aFirst = attacker->basicAbilities[Constants::FIRSTSTRIKE]
-               || attacker->basicAbilities[Constants::DOUBLESTRIKE];
-    bool bIndest = blocker->basicAbilities[Constants::INDESTRUCTIBLE];
-    bool aIndest = attacker->basicAbilities[Constants::INDESTRUCTIBLE];
-    bool aTrample = attacker->basicAbilities[Constants::TRAMPLE];
+    int power;
+    int toughness;
+    bool deathtouch;
+    bool wither;       //wither or infect: damage as -1/-1 counters
+    bool infectLabel;  //message word: true=infect, false=wither
+    bool firststrike;  //first strike or double strike
+    bool indestructible;
+    bool trample;
+};
+
+//The pure trade-outcome logic. Perspective: 'b' = the blocking side ('you'),
+//'a' = the attacker. Empty-ish returns handled by the caller.
+static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a)
+{
+    int bp = b.power > 0 ? b.power : 0;
+    int ap = a.power > 0 ? a.power : 0;
+    int bt = b.toughness;
+    int at = a.toughness;
 
     //Base lethality (before first-strike ordering): does X's damage kill Y?
-    bool aKillsB = (ap > 0) && !bIndest && (aDeath || ap >= bt);
-    bool bKillsA = (bp > 0) && !aIndest && (bDeath || bp >= at);
+    //Deathtouch makes ANY damage lethal; normal damage is lethal at
+    //power>=toughness. Both DESTROY, which indestructible prevents. Wither/
+    //infect do NOT change the lethality threshold (still power>=toughness) -
+    //they only change the damage FORM to -1/-1 counters, which shrink a
+    //survivor and, at a lethal hit, drop toughness to 0 for a state-based
+    //death that indestructible does NOT prevent. Conflating wither with
+    //deathtouch made a wither blocker read as auto-lethal ("both die") even
+    //when its power could not kill (deck27 wave-20 item 1: Oona's Gatewarden
+    //2/1 wither vs a 3/4 -> the attacker survives as a 1/2, it does NOT trade).
+    bool aKillsB = (ap > 0) && ((a.wither && ap >= bt) || (!b.indestructible && (a.deathtouch || ap >= bt)));
+    bool bKillsA = (bp > 0) && ((b.wither && bp >= at) || (!a.indestructible && (b.deathtouch || bp >= at)));
     //First strike / double strike ordering: a one-sided first striker that
     //kills its foe removes that foe before it can deal (the survivor's later
     //normal-step damage lands on a dead creature).
-    if (aFirst && !bFirst && aKillsB)
+    if (a.firststrike && !b.firststrike && aKillsB)
         bKillsA = false;
-    else if (bFirst && !aFirst && bKillsA)
+    else if (b.firststrike && !a.firststrike && bKillsA)
         aKillsB = false;
 
     std::ostringstream o;
@@ -3098,15 +3321,52 @@ static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * at
         o << "neither dies";
     //Trample-through to your face (attacker assigns lethal to the blocker,
     //rest carries over) - only when the attacker actually deals (not killed
-    //first by a one-sided first-strike blocker).
-    if (aTrample && !(bFirst && !aFirst && bKillsA))
+    //first by a one-sided first-strike blocker). Wither trample still assigns
+    //full toughness as lethal (only deathtouch reduces the lethal cut to 1).
+    if (a.trample && !(b.firststrike && !a.firststrike && bKillsA))
     {
-        int lethalToB = aDeath ? 1 : (bt > 0 ? bt : 0);
+        int lethalToB = a.deathtouch ? 1 : (bt > 0 ? bt : 0);
         int through = ap - lethalToB;
         if (through > 0)
             o << ", " << through << " tramples to your face";
     }
+    //Wither/infect that does NOT kill still SHRINKS the survivor by its damage
+    //(-1/-1 counters), so the model does not read the survivor as untouched -
+    //or, pre-fix, as dead. Only when the target actually survives (!kills).
+    if (b.wither && bp > 0 && !bKillsA)
+    {
+        int np = ap - bp; if (np < 0) np = 0;
+        int nt = at - bp; //survives => bp < at, so nt >= 1
+        o << " (" << (b.infectLabel ? "infect" : "wither")
+          << " shrinks it to " << np << "/" << nt << ")";
+    }
+    if (a.wither && ap > 0 && !aKillsB)
+    {
+        int np = bp - ap; if (np < 0) np = 0;
+        int nt = bt - ap; //survives => ap < bt, so nt >= 1
+        o << " (" << (a.infectLabel ? "infect" : "wither")
+          << " shrinks your blocker to " << np << "/" << nt << ")";
+    }
     return o.str();
+}
+
+static CombatTradeStat combatStatOf(MTGCardInstance * c)
+{
+    CombatTradeStat s;
+    s.power = c->power;
+    s.toughness = c->toughness;
+    s.deathtouch = c->basicAbilities[Constants::DEATHTOUCH];
+    s.wither = c->basicAbilities[Constants::WITHER] || c->basicAbilities[Constants::INFECT];
+    s.infectLabel = c->basicAbilities[Constants::INFECT] && !c->basicAbilities[Constants::WITHER];
+    s.firststrike = c->basicAbilities[Constants::FIRSTSTRIKE] || c->basicAbilities[Constants::DOUBLESTRIKE];
+    s.indestructible = c->basicAbilities[Constants::INDESTRUCTIBLE];
+    s.trample = c->basicAbilities[Constants::TRAMPLE];
+    return s;
+}
+
+static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * attacker)
+{
+    return combatTradePreviewStats(combatStatOf(blocker), combatStatOf(attacker));
 }
 
 //Forward declarations: the salvage helpers below re-parse a labeled line
@@ -3187,6 +3447,139 @@ static int salvageLoopedSubset(const string& content, const char * label, size_t
         if (r >= 1) { out = send; return r; }
     }
     return -1;
+}
+
+//--- Prose-intent salvage (ITEM C, last resort before the heuristic) --------
+//When a combat reply carried NO well-formed coded line (a >12k-char decode
+//spiral truncated before BLOCKS:/ATTACK: - salvage has nothing to grab), scan
+//the prose for an EXPLICIT declaration in a NARROW pattern and take it only
+//when it maps unambiguously onto the legal set. Deliberately conservative: a
+//wrong salvage is worse than a heuristic fallback. Scoped to combat, where
+//the answer is an imperative declaration ("block A3", "attack with A1, A2");
+//NOT extended to the cast menu, where reasoning prose about NOT casting a card
+//would read as casting it (the wave-10 "cast the condemned spell" trap).
+
+//A "block"/"attack" verb occurrence is disqualified when it is negated by a
+//nearby preceding word ("do not block", "won't attack", "without blocking").
+static bool proseNegatedBefore(const string& low, size_t verbPos)
+{
+    size_t from = (verbPos >= 12) ? verbPos - 12 : 0;
+    string ctx = low.substr(from, verbPos - from);
+    static const char * kNeg[] = { "not ", "n't ", "without", "avoid", "instead of", "rather than", "cannot", "can not" };
+    for (size_t i = 0; i < sizeof(kNeg) / sizeof(kNeg[0]); i++)
+        if (ctx.find(kNeg[i]) != string::npos)
+            return true;
+    return false;
+}
+
+//The 1-based attacker ordinal named by an "A<n>" token starting at or after
+//'from', within the same clause (stops at a sentence/newline). -1 if none.
+static int proseAttackerOrdinal(const string& low, size_t from, size_t clauseEnd)
+{
+    for (size_t k = from; k + 1 < clauseEnd; k++)
+    {
+        if (low[k] == '.' || low[k] == '\n')
+            break;
+        if (low[k] == 'a' && isdigit((unsigned char) low[k + 1]))
+        {
+            int n = 0; size_t d = k + 1;
+            while (d < low.size() && isdigit((unsigned char) low[d]))
+                n = n * 10 + (low[d++] - '0');
+            return n;
+        }
+    }
+    return -1;
+}
+
+//Prose block salvage: an explicit "block A<n>" (attacker named, blocker left
+//implicit) resolves when EXACTLY ONE legal blocker can block that attacker.
+//Multiple candidate blockers (or multiple attackers colliding on one blocker)
+//-> ambiguous -> nothing. deck14 vs27 s47: "block A3 (Lord of Atlantis)".
+static int salvageProseBlocks(const string& content, size_t nBlockers, size_t nAttackers,
+                              const vector<vector<int> >& legalIdx, vector<int>& pick)
+{
+    string low;
+    for (size_t i = 0; i < content.size(); i++)
+        low += (char) tolower((unsigned char) content[i]);
+    std::set<int> wanted;
+    size_t pos = 0;
+    while ((pos = low.find("block", pos)) != string::npos)
+    {
+        size_t verb = pos;
+        pos += 5;
+        if (proseNegatedBefore(low, verb))
+            continue;
+        //the attacker token must sit right after the verb (a short window)
+        size_t window = (pos + 14 < low.size()) ? pos + 14 : low.size();
+        int a = proseAttackerOrdinal(low, pos, window);
+        if (a >= 1 && a <= (int) nAttackers)
+            wanted.insert(a);
+    }
+    if (wanted.empty())
+        return 0;
+    pick.assign(nBlockers, 0);
+    int pairs = 0;
+    for (std::set<int>::iterator it = wanted.begin(); it != wanted.end(); ++it)
+    {
+        int a = *it;
+        int only = -1;
+        bool ambiguous = false;
+        for (size_t b = 0; b < nBlockers; b++)
+        {
+            if (pick[b] != 0)
+                continue;
+            bool legal = false;
+            for (size_t j = 0; j < legalIdx[b].size(); j++)
+                if (legalIdx[b][j] == a - 1) { legal = true; break; }
+            if (legal)
+            {
+                if (only >= 0) { ambiguous = true; break; }
+                only = (int) b;
+            }
+        }
+        if (ambiguous) { pick.assign(nBlockers, 0); return 0; }
+        if (only >= 0) { pick[only] = a; pairs++; }
+    }
+    if (pairs == 0)
+        pick.assign(nBlockers, 0);
+    return pairs;
+}
+
+//Prose attacker salvage: an explicit "attack with A1, A2" declaration - the
+//"A<n>" tokens in the first non-negated "attack" clause, mapped straight onto
+//the send set. Returns the count sent (0 = nothing usable).
+static int salvageProseAttackers(const string& content, size_t nAttackers, vector<bool>& send)
+{
+    string low;
+    for (size_t i = 0; i < content.size(); i++)
+        low += (char) tolower((unsigned char) content[i]);
+    size_t pos = 0;
+    while ((pos = low.find("attack", pos)) != string::npos)
+    {
+        size_t verb = pos;
+        pos += 6;
+        if (proseNegatedBefore(low, verb))
+            continue;
+        size_t clauseEnd = low.find_first_of(".\n", pos);
+        if (clauseEnd == string::npos)
+            clauseEnd = low.size();
+        send.assign(nAttackers, false);
+        int count = 0;
+        for (size_t k = pos; k + 1 < clauseEnd; k++)
+        {
+            if (low[k] == 'a' && isdigit((unsigned char) low[k + 1]))
+            {
+                int n = 0; size_t d = k + 1;
+                while (d < clauseEnd && isdigit((unsigned char) low[d]))
+                    n = n * 10 + (low[d++] - '0');
+                if (n >= 1 && n <= (int) nAttackers && !send[n - 1]) { send[n - 1] = true; count++; }
+                k = d - 1;
+            }
+        }
+        if (count > 0)
+            return count;
+    }
+    return 0;
 }
 
 //Scan a bundled-attacker reply for the set of attackers to send: "A<n>"
@@ -3321,9 +3714,10 @@ int AIPlayerGPT::chooseAttackers()
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
-    tail << "Write your PLAN: line first, then on the last line ATTACK: followed by"
-            " the attackers you send, comma-separated (e.g. \"ATTACK: A1, A3\"),"
-            " or \"ATTACK: none\" to attack with nobody this turn.";
+    tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
+            " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
+            " attack with nobody this turn; then any brief reasoning; then your"
+            " PLAN: line last.";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -3351,6 +3745,20 @@ int AIPlayerGPT::chooseAttackers()
         {
             DebugTrace("AIPlayerGPT: salvaged looped ATTACK (" << sal << ")");
             result = sal;
+        }
+    }
+
+    //Prose-intent salvage (no coded ATTACK: line at all): recover an explicit
+    //"attack with A1, A2" stated in prose before the reply spiralled/truncated.
+    const char * attackSource = NULL;
+    if (result < 0 && !content.empty())
+    {
+        int ps = salvageProseAttackers(content, attackers.size(), send);
+        if (ps >= 1)
+        {
+            DebugTrace("AIPlayerGPT: prose-salvaged ATTACK (" << ps << ")");
+            result = ps;
+            attackSource = "prose";
         }
     }
 
@@ -3384,7 +3792,7 @@ int AIPlayerGPT::chooseAttackers()
     }
     DecisionManager::applyDeclareAttackers(req, act);
     writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
-                  declared.empty() ? string("no attackers") : declared, NULL, &shownLines);
+                  declared.empty() ? string("no attackers") : declared, NULL, &shownLines, attackSource);
     narrateDecision(declared.empty() ? string("You declared no attackers this turn")
                                      : ("You declared attackers: " + declared));
     mAttacksDoneTurn = observer->turn;
@@ -3607,10 +4015,11 @@ int AIPlayerGPT::chooseBlockers()
     }
     tail << "Assign each blocker to AT MOST ONE attacker (a creature cannot block"
             " two attackers), but several DIFFERENT blockers may gang-block the same"
-            " attacker. Blockers you do not mention stay out of combat.\nWrite your"
-            " PLAN: line first, then on the last line BLOCKS: followed by the"
-            " assignments, comma-separated, e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\","
-            " or exactly \"BLOCKS: none\" to block with nobody this turn.";
+            " attacker. Blockers you do not mention stay out of combat.\nOn the"
+            " FIRST line write BLOCKS: followed by the assignments, comma-separated,"
+            " e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\", or exactly \"BLOCKS: none\" to"
+            " block with nobody this turn; then any brief reasoning; then your PLAN:"
+            " line last.";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -3682,6 +4091,21 @@ int AIPlayerGPT::chooseBlockers()
         }
     }
 
+    //Prose-intent salvage (no coded BLOCKS: line at all): recover an explicit
+    //"block A<n>" stated in prose, when exactly one legal blocker maps to it
+    //(deck14 vs27 s47's truncated reply). Conservative; ambiguity -> nothing.
+    const char * blockSource = NULL;
+    if (pairs == 0 && !content.empty())
+    {
+        int ps = salvageProseBlocks(content, blockers.size(), attackers.size(), legalIdx, pick);
+        if (ps > 0)
+        {
+            DebugTrace("AIPlayerGPT: prose-salvaged BLOCKS (" << ps << " pair(s))");
+            pairs = ps;
+            blockSource = "prose";
+        }
+    }
+
     if (pairs == 0)
     {
         //Unusable reply: the heuristic declares this combat instead.
@@ -3708,7 +4132,7 @@ int AIPlayerGPT::chooseBlockers()
     }
     DecisionManager::applyDeclareBlockers(req, act);
     writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
-                  declared.empty() ? string("no blockers") : declared, NULL, &shownLines);
+                  declared.empty() ? string("no blockers") : declared, NULL, &shownLines, blockSource);
     narrateDecision(declared.empty() ? string("You declared no blockers")
                                      : ("You declared blockers: " + declared));
     mBlocksDoneTurn = observer->turn;
@@ -3780,34 +4204,28 @@ static string describeRevealFilter(const string& effect)
     return out;
 }
 
-//Interactive reveal/surveil decision, driven from MTGRevealingCards for an
-//interactive AI. ONE bundled ask over ALL revealed cards; the model picks the
-//subset that goes to option one (surveil: the graveyard). Async: 0 while the
-//call is in flight, 1 decided, -1 on failure (the display then sends nothing
-//to option one - the safe keep-on-top default). Reuses parseAttackerSet: the
-//"pick a subset of N labelled items" reply shape is identical to declaring
-//attackers (bare-index or name list, "none" = an explicit empty subset).
-int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
-                              const string& optOneLabel, const string& optTwoLabel,
-                              const string& optOneEffect,
-                              vector<int>& selForOptionOne,
-                              const vector<bool>& eligibleForOptionOne)
+//Pure builder for the reveal ask text (no game/observer/endpoint state).
+//revealSource: 0 = top of library (surveil/dig), 1 = the opponent's hand, 2 =
+//the decider's own hand. pickExactlyOne: option one is a fixed <1> chooser.
+//
+//Eligibility surfacing (unchanged): a FILTERED reveal (a snow-land tutor, a
+//noncreature-nonland dig) only accepts a subset for option one; when the
+//engine's per-card verdict marks some cards ineligible, name the filter and tag
+//each card. Annotation only - every revealed card stays listed and pickable.
+//
+//deck102 wave-20 E1: a HAND reveal (Thoughtseize/Duress-class targeted discard)
+//was mislabelled "the top N cards of your library" and used choose-a-SUBSET
+//framing on a pick-EXACTLY-ONE discard. Render the true source, and frame a
+//fixed <1> chooser as choose-ONE. Library/multi-pick reveals (Glacial
+//Revelation, Into the North, surveil - wave-20 ENGINE-R1) hit revealSource 0 +
+//pickExactlyOne=false and keep byte-identical prior text.
+static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
+                                 const string& optOneLabel,
+                                 const string& optTwoLabel,
+                                 const string& optOneEffect,
+                                 const vector<bool>& eligibleForOptionOne,
+                                 int revealSource, bool pickExactlyOne)
 {
-    selForOptionOne.clear();
-    if (mEndpoint.empty() || revealed.empty())
-        return -1; //no endpoint / nothing to choose: the display's default
-
-    if (mSystemPrompt.empty())
-        buildSystemPrompt();
-
-    //Eligibility surfacing: a FILTERED reveal (a snow-land tutor, a
-    //noncreature-nonland dig) only accepts a subset for option one, but the
-    //model was shown the whole set with no hint of the filter and picked
-    //ineligible cards -> zero to hand (deck135 wave-19 R3 Into the North / R4
-    //Search for Azcanta). When the engine's own per-card verdict marks some
-    //cards ineligible, name the filter and tag each card. Annotation only -
-    //every revealed card stays listed and pickable; the engine still rejects
-    //an ineligible pick exactly as before.
     bool haveElig = (eligibleForOptionOne.size() == revealed.size());
     int eligCount = 0;
     if (haveElig)
@@ -3816,11 +4234,38 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     bool restricted = haveElig && eligCount < (int) revealed.size();
     string filterPhrase = restricted ? describeRevealFilter(optOneEffect) : string();
 
+    bool fromHand = (revealSource == 1 || revealSource == 2);
+    bool selfHand = (revealSource == 2);
     std::ostringstream tail;
-    tail << "Reveal: you looked at the top " << revealed.size()
-         << " card" << (revealed.size() == 1 ? "" : "s") << " of your library."
-            " Decide, in ONE reply, which of them go to \"" << optOneLabel
-         << "\"; every card you do NOT pick goes to \"" << optTwoLabel << "\".\n";
+    if (fromHand)
+    {
+        tail << (selfHand ? "You revealed your hand"
+                          : "The opponent revealed their hand")
+             << " (" << revealed.size() << " card"
+             << (revealed.size() == 1 ? "" : "s") << ").\n";
+        if (pickExactlyOne)
+            tail << "Choose the ONE card to send to \"" << optOneLabel
+                 << "\" - that is the card "
+                 << (selfHand ? "you discard" : "they discard")
+                 << "; every other card stays in "
+                 << (selfHand ? "your" : "their") << " hand.\n";
+        else
+            tail << "Decide, in ONE reply, which cards go to \"" << optOneLabel
+                 << "\"; every card you do NOT pick goes to \"" << optTwoLabel
+                 << "\".\n";
+    }
+    else
+    {
+        tail << "Reveal: you looked at the top " << revealed.size()
+             << " card" << (revealed.size() == 1 ? "" : "s") << " of your library.";
+        if (pickExactlyOne)
+            tail << " Choose the ONE card that goes to \"" << optOneLabel
+                 << "\"; every other card goes to \"" << optTwoLabel << "\".\n";
+        else
+            tail << " Decide, in ONE reply, which of them go to \"" << optOneLabel
+                 << "\"; every card you do NOT pick goes to \"" << optTwoLabel
+                 << "\".\n";
+    }
     if (restricted)
     {
         tail << "ELIGIBILITY: only " << (filterPhrase.empty() ? "certain cards"
@@ -3858,11 +4303,41 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
                      : " [does NOT qualify - goes to \"" + optTwoLabel + "\"]");
         tail << "\n";
     }
-    tail << "Write your PLAN: line first, then on the last line PUT: followed by"
-            " the card numbers you send to \"" << optOneLabel << "\", comma-separated"
-            " (e.g. \"PUT: 1, 3\"), or exactly \"PUT: none\" to send none there"
-            " (every revealed card then goes to \"" << optTwoLabel << "\").";
-    string userMsg = assemblePrompt(tail.str());
+    if (pickExactlyOne)
+        tail << "On the FIRST line write PUT: followed by the ONE card number you"
+                " choose (e.g. \"PUT: 2\")"
+             << (eligCount == 0 ? ", or \"PUT: none\" if none qualify" : "")
+             << "; then any brief reasoning; then your PLAN: line last.";
+    else
+        tail << "On the FIRST line write PUT: followed by the card numbers you send to \""
+             << optOneLabel << "\", comma-separated (e.g. \"PUT: 1, 3\"), or exactly"
+                " \"PUT: none\" to send none there (every revealed card then goes to \""
+             << optTwoLabel << "\"); then any brief reasoning; then your PLAN: line last.";
+    return tail.str();
+}
+
+//Interactive reveal/surveil decision, driven from MTGRevealingCards for an
+//interactive AI. ONE bundled ask over ALL revealed cards; the model picks the
+//subset that goes to option one (surveil: the graveyard). Async: 0 while the
+//call is in flight, 1 decided, -1 on failure (the display then sends nothing
+//to option one - the safe keep-on-top default).
+int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
+                              const string& optOneLabel, const string& optTwoLabel,
+                              const string& optOneEffect,
+                              vector<int>& selForOptionOne,
+                              const vector<bool>& eligibleForOptionOne,
+                              int revealSource, bool pickExactlyOne)
+{
+    selForOptionOne.clear();
+    if (mEndpoint.empty() || revealed.empty())
+        return -1; //no endpoint / nothing to choose: the display's default
+
+    if (mSystemPrompt.empty())
+        buildSystemPrompt();
+
+    string userMsg = assemblePrompt(
+        buildRevealAskText(revealed, optOneLabel, optTwoLabel, optOneEffect,
+                           eligibleForOptionOne, revealSource, pickExactlyOne));
 
     string content;
     if (pollCompletion(userMsg, content) == kChoicePending)
@@ -3908,6 +4383,12 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         {
             selForOptionOne.push_back((int) j);
             chosen += (chosen.empty() ? "" : ", ") + revealed[j]->name;
+            //A fixed <1> chooser takes exactly ONE card: the engine's option-one
+            //chooser auto-fires on the first eligible click (driveInteractiveReveal
+            //phase 0), so any extra picks would silently drop. Trim to the first
+            //selected card here so narration/translog match what the engine does.
+            if (pickExactlyOne)
+                break;
         }
     writeTransLog("reveal", userMsg, content, result, (int) revealed.size(),
                   chosen.empty() ? string("none") : chosen, NULL, &names);
@@ -3933,7 +4414,7 @@ void AIPlayerGPT::runParseSelfTest()
         if (cond) { cout << "  PASS  " << label << "\n"; passed++; } \
         else { cout << "  FAIL  " << label << "\n"; failed++; } } while (0)
 
-    cout << "=== AIPlayerGPT parse self-test (wave-20 items 3a/3b/3c) ===\n";
+    cout << "=== AIPlayerGPT parse self-test (wave-20 3a/3b/3c + wave-21 A/B/C) ===\n";
 
     // ---- ITEM 3b: "#N" ordinal disambiguates duplicate names ----
     cout << "\n[3b] deck135 wave-19 s27: 'BLOCKS: Ice-Fang Coatl: Saproling (1/1) #1'\n";
@@ -4027,6 +4508,150 @@ void AIPlayerGPT::runParseSelfTest()
              << " salvage pairs=" << sal << " -> correct heuristic fallback\n";
         CHECK(primary == 0 && sal == 0, "hallucinated out-of-range attacker: no fabricated block");
     }
+
+    // ================= WAVE-21 items (A wither / B parser / C salvage) =====
+
+    // ---- ITEM A: wither trade-annotation lethality + survivor shrink ----
+    cout << "\n[A] wither blocker trade annotation (combatTradePreviewStats)\n";
+    {
+        // fields: power, toughness, deathtouch, wither, infectLabel, firststrike, indestructible, trample
+        CombatTradeStat oona = { 2, 1, false, true, false, false, false, false }; // Oona's Gatewarden 2/1 wither
+        CombatTradeStat a34  = { 3, 4, false, false, false, false, false, false };
+        CombatTradeStat a88  = { 8, 8, false, false, false, false, false, false };
+        CombatTradeStat a13  = { 1, 3, false, false, false, false, false, false };
+        CombatTradeStat dt11 = { 1, 1, true,  false, false, false, false, false }; // 1/1 deathtouch
+        string s34 = combatTradePreviewStats(oona, a34);
+        string s88 = combatTradePreviewStats(oona, a88);
+        string s13 = combatTradePreviewStats(oona, a13);
+        string sdt = combatTradePreviewStats(oona, dt11);
+        cout << "     Oona 2/1 wither vs 3/4: \"" << s34 << "\"  (pre-fix said \"both die, 2 tramples\")\n";
+        cout << "     Oona 2/1 wither vs 8/8: \"" << s88 << "\"\n";
+        cout << "     Oona 2/1 wither vs 1/3: \"" << s13 << "\"\n";
+        cout << "     Oona 2/1 wither vs 1/1 deathtouch attacker: \"" << sdt << "\"\n";
+        CHECK(s34 == "your blocker dies, attacker lives (wither shrinks it to 1/2)", "A vs 3/4 survives 1/2, not 'both die'");
+        CHECK(s88 == "your blocker dies, attacker lives (wither shrinks it to 6/6)", "A vs 8/8 survives 6/6");
+        CHECK(s13 == "your blocker dies, attacker lives (wither shrinks it to 0/1)", "A vs 1/3 survives 0/1");
+        CHECK(sdt == "both die", "A deathtouch attacker vs Oona correctly both die (lethal wither kills the 1/1)");
+        // Symmetric: a WITHER ATTACKER whose power cannot kill the blocker.
+        CombatTradeStat b14 = { 1, 4, false, false, false, false, false, false };
+        CombatTradeStat witherAtk = { 2, 1, false, true, false, false, false, false };
+        string ssym = combatTradePreviewStats(b14, witherAtk);
+        cout << "     blocker 1/4 vs 2/1 wither attacker: \"" << ssym << "\"\n";
+        CHECK(ssym == "you kill it, your blocker lives (wither shrinks your blocker to 0/2)",
+              "A symmetric: wither attacker shrinks the surviving blocker, does not auto-kill it");
+        // Indestructible attacker still dies to a LETHAL wither hit (0 toughness SBA).
+        CombatTradeStat oona2 = { 2, 1, false, true, false, false, false, false };
+        CombatTradeStat aIndest = { 3, 2, false, false, false, false, true, false }; // 3/2 indestructible
+        string sind = combatTradePreviewStats(oona2, aIndest);
+        cout << "     Oona 2/1 wither vs 3/2 indestructible: \"" << sind << "\"\n";
+        CHECK(sind == "both die", "A lethal wither (bp>=at) kills even an indestructible attacker");
+    }
+
+    // The final-precedence CHOICE resolver used at the call sites, as the
+    // test's model: last well-formed CHOICE wins (salvage authority), UNLESS
+    // it was retracted with no replacement -> heuristic fallback (-1).
+    // (parseChoice on consumePlan's single answer line agrees for these.)
+    #define RESOLVE(reply, oc, opts) ([&]() -> int { \
+        int _c = salvageLoopedChoice((reply), (oc), &(opts)); \
+        if (_c >= 0 && choiceRetractedNoReplacement((reply), (oc), &(opts))) _c = -1; \
+        return _c; }())
+
+    vector<string> opts;
+    opts.push_back("Cast Icehide Golem");   // 1
+    opts.push_back("Attack for 3");         // 2
+    opts.push_back("Hold up mana");         // 3
+    opts.push_back("Cast nothing right now");// 4
+    opts.push_back("Play a land");          // 5
+
+    // ---- ITEM B: retracted CHOICE + template-parrot ----
+    cout << "\n[B] retracted / duplicate CHOICE lock-in + template-parrot lines\n";
+    {
+        string retractNoRepl = "CHOICE: 4 (Cast nothing right now)\n"
+                               "Wait, I made a mistake in my reasoning.\n"
+                               "cast cast cast cast the golem instead\n";
+        int r = RESOLVE(retractNoRepl, 5, opts);
+        cout << "     retracted-no-replacement CHOICE 4 -> " << r << " (must NOT be 4)\n";
+        CHECK(r == -1, "B retracted-first-choice-no-replacement -> fallback, not 4");
+
+        string parrot = "PLAN: deploy the threat.\n"
+                        "CHOICE: [Number] ([Name])\n"
+                        "CHOICE: 1 (Cast Icehide Golem)\n"
+                        "CHOICE: [Number] ([Name])\n"
+                        "CHOICE: Argothian Enchantress\n";
+        int p = RESOLVE(parrot, 5, opts);
+        cout << "     template-parrot + real CHOICE 1 -> " << p << "\n";
+        CHECK(p == 1, "B template-parrot lines dropped; real CHOICE 1 recovered");
+
+        string retractThenNew = "CHOICE: 4 (Cast nothing right now)\n"
+                                "Wait, I made a mistake. The golem is better.\n"
+                                "CHOICE: 1 (Cast Icehide Golem)\n";
+        int n = RESOLVE(retractThenNew, 5, opts);
+        cout << "     retraction-then-new-choice -> " << n << "\n";
+        CHECK(n == 1, "B retraction followed by a NEW choice takes the new one");
+
+        string plain = "CHOICE: 2 (Attack for 3)\nquick note\nPLAN: race them\n";
+        int pl = RESOLVE(plain, 5, opts);
+        cout << "     plain single choice -> " << pl << "\n";
+        CHECK(pl == 2, "B plain single choice unchanged");
+    }
+
+    // ---- ITEM C: answer-first parse composition + prose-intent salvage ----
+    cout << "\n[C] answer-first + prose salvage\n";
+    {
+        string afReason = "CHOICE: 2 (Attack for 3)\n"
+                          "I attack because I am ahead on board and want to pressure their life total.\n"
+                          "PLAN: keep attacking each turn.\n";
+        int a = RESOLVE(afReason, 5, opts);
+        cout << "     answer-first then reasoning -> " << a << "\n";
+        CHECK(a == 2, "C answer-first-then-reasoning parses");
+
+        string afTrunc = "CHOICE: 3 (Hold up mana)\n"
+                         "I hold because I have an instant and want to represen"; // truncated mid-word, no PLAN
+        int t = RESOLVE(afTrunc, 5, opts);
+        cout << "     truncated answer-first -> " << t << "\n";
+        CHECK(t == 3, "C truncated answer-first still parses (first line survived)");
+
+        // prose block salvage: "block A3", one blocker legal for A3 -> B1:A3
+        {
+            vector<vector<int> > legal(1); legal[0].push_back(0); legal[0].push_back(1); legal[0].push_back(2);
+            string reply = "I have thought about this combat for a long time and considered every line. "
+                           "In the end I should block A3 (Lord of Atlantis) to trade with their lord.";
+            vector<int> pick;
+            int ps = salvageProseBlocks(reply, 1, 3, legal, pick);
+            cout << "     prose 'block A3' (1 legal blocker) -> pairs=" << ps
+                 << " B1->A" << (pick.empty()?0:pick[0]) << "\n";
+            CHECK(ps == 1 && pick[0] == 3, "C prose 'block A3' salvages to the unique legal blocker");
+        }
+        // ambiguous: TWO blockers legal for A3 -> no salvage
+        {
+            vector<vector<int> > legal(2); legal[0].push_back(2); legal[1].push_back(2);
+            string reply = "I should block A3 with something.";
+            vector<int> pick;
+            int ps = salvageProseBlocks(reply, 2, 3, legal, pick);
+            cout << "     prose 'block A3' (2 legal blockers) -> pairs=" << ps << " (ambiguous -> fallback)\n";
+            CHECK(ps == 0, "C ambiguous prose does NOT salvage");
+        }
+        // negated: "I will not block A3" -> no salvage
+        {
+            vector<vector<int> > legal(1); legal[0].push_back(2);
+            string reply = "I will not block A3, it is too risky to trade here.";
+            vector<int> pick;
+            int ps = salvageProseBlocks(reply, 1, 3, legal, pick);
+            cout << "     prose 'will NOT block A3' -> pairs=" << ps << " (negation guard)\n";
+            CHECK(ps == 0, "C negated prose ('not block') does NOT salvage");
+        }
+        // prose attacker salvage: "attack with A1 and A3"
+        {
+            string reply = "After a long deliberation I will attack with A1 and A3 to close the game.";
+            vector<bool> send;
+            int ps = salvageProseAttackers(reply, 3, send);
+            cout << "     prose 'attack with A1 and A3' -> count=" << ps
+                 << " send=[" << (send.size()>0?(int)send[0]:-1) << ","
+                 << (send.size()>1?(int)send[1]:-1) << "," << (send.size()>2?(int)send[2]:-1) << "]\n";
+            CHECK(ps == 2 && send[0] && !send[1] && send[2], "C prose 'attack with A1 and A3' salvages");
+        }
+    }
+    #undef RESOLVE
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();

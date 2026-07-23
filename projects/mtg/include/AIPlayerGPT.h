@@ -151,7 +151,8 @@ protected:
                              const string& optOneLabel, const string& optTwoLabel,
                              const string& optOneEffect,
                              vector<int>& selForOptionOne,
-                             const vector<bool>& eligibleForOptionOne = vector<bool>());
+                             const vector<bool>& eligibleForOptionOne = vector<bool>(),
+                             int revealSource = 0, bool pickExactlyOne = false);
 
 public:
     //Env-gated (WAGIC_GPT_PARSETEST) self-test of the reply parsers: feeds the
@@ -285,7 +286,8 @@ private:
     void ensureGameStartRecord();
     void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                        const string& chosenText = "", const char * fallback = NULL,
-                       const std::vector<string> * optionTexts = NULL);
+                       const std::vector<string> * optionTexts = NULL,
+                       const char * choiceSource = NULL);
     //One "gameend" record per duel: result + final life + turn count. The
     //per-decision records alone cannot say who WON - win-rate and timeout
     //adjudication both need it in the same file.
@@ -323,6 +325,12 @@ private:
     static int salvageLoopedChoice(const string& content, int optionCount,
                                    const std::vector<string> * optionTexts = NULL);
 
+    //True when a well-formed CHOICE was superseded by an explicit
+    //self-retraction with no replacing CHOICE - the answer must route to the
+    //heuristic instead of using the retracted digit (deck135 HARNESS-1).
+    static bool choiceRetractedNoReplacement(const string& content, int optionCount,
+                                             const std::vector<string> * optionTexts = NULL);
+
     string mEndpoint; //base URL, empty if nothing answered
     string mModel;
     string mApiKey;
@@ -332,6 +340,7 @@ private:
     vector<string> mConfigUrls;
     string mConfigModel;
     long mMaxTokens; // -1 = use the built-in/thinking-dependent default
+    double mRepetitionPenalty; // vLLM repetition_penalty; 1.0 = OFF (not sent)
 
     //the per-duel head of every request; empty until first built
     string mSystemPrompt;

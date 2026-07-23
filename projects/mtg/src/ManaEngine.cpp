@@ -54,6 +54,27 @@ namespace
             return false;
         if (source->isPhased)
             return false;
+        //Mirror the click layer's disable refusals (ActivatedAbility::
+        //isReactingToClick, enforced on mana taps via AManaProducer::
+        //reactToClick's base-class guard). Counting a producer the click
+        //will refuse makes the cast oracle offer uncompletable casts: the
+        //plan taps the real sources, stalls on the disabled one, floats
+        //the mana, and the still-miscounted option re-arms every poll
+        //(wave-20 deck102 Witch-of-the-Moors loop).
+        if (source->has(Constants::NOACTIVATED) || source->has(Constants::NOMANA))
+            return false;
+        if (source->mutation && source->parentCards.size() > 0)
+            return false;
+        if (source->has(Constants::NOACTIVATEDTAP))
+        {
+            ManaCost * dcost = amp->getCost();
+            if (amp->tap)
+                return false;
+            if (dcost && dcost->extraCosts)
+                for (size_t k = 0; k < dcost->extraCosts->costs.size(); k++)
+                    if (dynamic_cast<TapCost*>(dcost->extraCosts->costs[k]))
+                        return false;
+        }
         if (checkCost)
         {
             ManaCost * cost = amp->getCost();
@@ -151,21 +172,28 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
     //for them.
     int offColorFilled = 0;
     int genericAmount = int(cost->getCost(0) + cost->getCost(7));
-    //Spare would-be ATTACKERS from the mana bill. Tapping a creature that could
-    //attack this turn (a sliver under Gemhide, a mana dork) to pay a cast that
-    //lands/rocks could have covered leaves the board with no untapped attacker
-    //at COMBATATTACKERS - so the engine correctly never offers the declare-
-    //attackers step (live-observed, corpus 20260719 deck35). If the SWING-NEUTRAL
-    //producers (lands, rocks, sick/tapped creatures) plus the pool can already
-    //afford this cost, pre-mark every would-be attacker as used so the payment
-    //walk below never reaches it. When neutral sources CANNOT cover the cost
-    //(e.g. the only blue is a sliver), attackers stay eligible and are tapped as
-    //before - correctness first, attackers spared only when genuinely optional.
-    if (!searchingAgain)
+    //Spare would-be ATTACKERS from the mana bill - PARTIALLY. Tapping a creature
+    //that could attack this turn (a sliver under Gemhide, a mana dork) to pay a
+    //cast that lands/rocks could have covered leaves the board with no untapped
+    //attacker at COMBATATTACKERS, and the engine then correctly never offers the
+    //declare-attackers step (live-observed, corpus 20260719 deck35 vs49: casting
+    //Might Sliver {4}{g} over four lands tapped all three flyers and skipped the
+    //swing). Build the SWING-NEUTRAL pool (mana pool + lands/rocks/sick/tapped
+    //creatures), then draw in would-be attackers ONE AT A TIME, weakest first,
+    //only while the bill is still short of affordable - and mark every attacker
+    //the bill did not reach as used so the payment walk below never taps it. The
+    //prior form was all-or-nothing (spare EVERY attacker iff neutrals covered the
+    //WHOLE cost, else spare NONE), so a cost a single mana over the neutral supply
+    //emptied the board of attackers when tapping one of them would have sufficed.
+    //An {X} spell is EXCLUDED: there the AI wants to spend everything to maximize X,
+    //so holding a mana-attacker back would shrink X (Death Wind {X}{B} over three
+    //Leaden Myr must tap all three to reach X=2, not spare one and settle for X=0).
+    if (!searchingAgain && !cost->hasX())
     {
         ManaCost * neutral = NEW ManaCost();
         neutral->add(p->getManaPool());
         map<MTGCardInstance*, bool> counted;
+        vector<AManaProducer*> attackerProd; //deferred: only tapped if the bill needs it
         for (size_t z = 0; z < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); z++)
         {
             MTGAbility * za = (MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[z];
@@ -175,26 +203,30 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
             MTGCardInstance * zsrc = zamp->source;
             if (zsrc == target || counted[zsrc])
                 continue;
-            if (zsrc && zsrc->isCreature() && zsrc->canAttack())
-                continue; //a would-be attacker is not "neutral"
             counted[zsrc] = true;
-            neutral->add(zamp->output);
+            if (zsrc && zsrc->isCreature() && zsrc->canAttack())
+                attackerProd.push_back(zamp);
+            else
+                neutral->add(zamp->output);
         }
-        bool neutralCovers = neutral->canAfford(cost, anytypeofmana);
-        SAFE_DELETE(neutral);
-        if (neutralCovers)
+        //Tap the WEAKEST would-be attackers first, so the strongest swingers are
+        //the ones held back for combat.
+        std::sort(attackerProd.begin(), attackerProd.end(),
+            [](AManaProducer * a, AManaProducer * b) { return a->source->power < b->source->power; });
+        size_t atkNeed = 0;
+        while (!neutral->canAfford(cost, anytypeofmana) && atkNeed < attackerProd.size())
         {
-            for (size_t z = 0; z < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); z++)
-            {
-                MTGAbility * za = (MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[z];
-                MTGCardInstance * zsrc = NULL;
-                if (AManaProducer * zamp = dynamic_cast<AManaProducer*>(za))
-                    zsrc = zamp->source;
-                else if (GenericActivatedAbility * zgmp = dynamic_cast<GenericActivatedAbility*>(za))
-                    zsrc = zgmp->source;
-                if (zsrc && zsrc != target && zsrc->isCreature() && zsrc->canAttack())
-                    used[zsrc] = true;
-            }
+            neutral->add(attackerProd[atkNeed]->output);
+            ++atkNeed;
+        }
+        bool coversWithoutRest = neutral->canAfford(cost, anytypeofmana);
+        SAFE_DELETE(neutral);
+        //Spare exactly the attackers the bill never reached. When even every
+        //attacker cannot cover the cost, spare none - correctness first.
+        if (coversWithoutRest)
+        {
+            for (size_t k = atkNeed; k < attackerProd.size(); k++)
+                used[attackerProd[k]->source] = true;
         }
     }
     for (int pass = 0; pass < 2; pass++)

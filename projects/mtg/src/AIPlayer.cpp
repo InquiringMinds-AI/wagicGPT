@@ -58,7 +58,7 @@ int AIAction::Act()
     }
     if (ability)
     {
-        g->cardClick(click, ability);
+        int clickResult = g->cardClick(click, ability);
         if (target && !mAbilityTargets.size())
         {
             g->cardClick(target);
@@ -73,6 +73,10 @@ int AIAction::Act()
         {
             return clickMultiAct(mAbilityTargets);
         }
+        //bare ability click (payment plans ride these): surface whether the
+        //engine actually accepted it, so the pump can abort a broken plan
+        //instead of floating mana and dead-ending the cast
+        return clickResult;
     }
     else  if(mAbilityTargets.size())
     {

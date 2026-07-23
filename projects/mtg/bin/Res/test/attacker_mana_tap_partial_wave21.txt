@@ -1,0 +1,66 @@
+#Wave-21 ledger item #1 -- the PARTIAL-sparing case of the wave-20 attacker-mana-tap fix.
+#
+#SYMPTOM (corpus 20260719 deck35 vs49): the engine "never issued" the declare-attackers
+#decision on own-turns despite creatures that looked untapped and unsick in the board
+#snapshot. ROOT CAUSE is the AI mana payment: casting the turn's last spell tapped EVERY
+#would-be attacker for mana, so by COMBATATTACKERS hasPossibleAttackers() was genuinely
+#false and GameObserver::pendingCombatDecision correctly returned NONE. The wave-20 fix
+#spared attackers only ALL-OR-NOTHING -- it protected every attacker iff the swing-neutral
+#sources (lands/rocks/sick creatures) covered the WHOLE cost, and protected NONE otherwise.
+#So a cost one mana over the neutral supply (Might Sliver {4}{g} over four lands + three
+#mana-Slivers) still emptied the board: the payment tapped all three Slivers when tapping
+#ONE would have paid the bill.
+#
+#FIX: ManaEngine::planPayment (GPT/Baka casts) and AIPlayerBaka::payTheManaCost (heuristic
+#main casts) now draw would-be attackers into the bill ONE AT A TIME, weakest first, only
+#while the neutral pool is still short -- and mark every attacker the bill did not reach as
+#used, so the payment holds the surplus attackers back for combat.
+#
+#WITNESS: two Gemhide Slivers (each a 1/1 that, via its own Sliver lord grant, also taps
+#for any color -- so each is BOTH a legal attacker AND a mana source) plus three Mind
+#Stones (colorless rocks). The AI casts Juggernaut {4}. The three rocks pay only 3 of the
+#4 generic, so ONE Gemhide must be tapped -- but the OTHER must stay back and swing for 1
+#(opponent 20 -> 19). Juggernaut is summoning-sick and cannot attack this turn, so the 1
+#damage can only come from a spared Gemhide. PRE-FIX (all-or-nothing) the neutral rocks
+#did not cover {4}, so NO Gemhide was spared: the payment tapped both, no attacker existed
+#at combat, and the opponent stayed at 20.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Gemhide Sliver, Gemhide Sliver, Mind Stone, Mind Stone, Mind Stone
+hand:Juggernaut
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Gemhide Sliver, Gemhide Sliver, Mind Stone, Mind Stone, Mind Stone, Juggernaut
+[PLAYER2]
+life:19
+[END]

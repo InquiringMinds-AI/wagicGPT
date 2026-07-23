@@ -1522,49 +1522,66 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
         return false;
     }
     map<MTGCardInstance *, bool> used;
-    //Spare would-be ATTACKERS from the mana bill. This loop taps every usable
-    //producer except the surplus (diff); a creature that also makes mana (a
-    //sliver under Gemhide, a mana dork) would be tapped to cast a spell while
-    //lands sit idle, leaving no untapped attacker at COMBATATTACKERS - so the
-    //engine correctly never offers the declare-attackers step (live-observed,
-    //corpus 20260719 deck35). Build the SWING-NEUTRAL pool (lands, rocks,
-    //sick/tapped creatures + the mana pool); if it alone affords the cost, base
-    //the surplus (diff) on it and pre-mark every would-be attacker as used, so
-    //the loop taps only neutrals and never under-taps on the strength of
-    //attacker mana it will not use. When neutrals CANNOT cover (e.g. the only
-    //blue is a sliver, or an {X} spell spending everything) attackers stay
-    //eligible and are tapped as before - correctness first.
-    ManaCost * neutral = NEW ManaCost();
-    neutral->add(this->getManaPool());
+    //Spare would-be ATTACKERS from the mana bill - PARTIALLY. This loop taps every
+    //usable producer except the surplus (diff); a creature that also makes mana (a
+    //sliver under Gemhide, a mana dork) tapped to cast a spell while lands sit idle
+    //leaves no untapped attacker at COMBATATTACKERS - so the engine correctly never
+    //offers the declare-attackers step (live-observed, corpus 20260719 deck35 vs49).
+    //Build the SWING-NEUTRAL pool (lands, rocks, sick/tapped creatures + the mana
+    //pool), then draw in would-be attackers ONE AT A TIME, weakest first, only
+    //while the bill is still short; base the surplus (diff) on that set and pre-mark
+    //every attacker the bill did not reach as used, so the loop taps only what it
+    //needs and holds the strongest swingers back. The prior form was all-or-nothing
+    //(spare EVERY attacker iff neutrals covered the WHOLE cost, else spare NONE), so
+    //a cost a single mana over the neutral supply emptied the board of attackers.
+    //An {X} spell is EXCLUDED: there the AI wants to spend everything to maximize X,
+    //so holding a mana-attacker back would shrink X (Death Wind {X}{B} over three
+    //Leaden Myr must tap all three to reach X=2, not spare one and settle for X=0).
+    bool spareAttackers = false;
+    size_t atkNeed = 0;
+    vector<AManaProducer*> attackerProd; //deferred: only tapped if the bill needs it
+    ManaCost * diff = NULL;
+    if (!cost->hasX())
     {
-        map<MTGCardInstance*, bool> counted;
-        for (size_t z = 1; z < observer->mLayers->actionLayer()->mObjects.size(); ++z)
+        ManaCost * neutral = NEW ManaCost();
+        neutral->add(this->getManaPool());
         {
-            AManaProducer * zamp = dynamic_cast<AManaProducer*>((MTGAbility *) observer->mLayers->actionLayer()->mObjects[z]);
-            if (!zamp || !canHandleCost(zamp))
-                continue;
-            MTGCardInstance * zsrc = zamp->source;
-            if (!zsrc || zsrc == target || counted[zsrc] || !zamp->isReactingToClick(zsrc) || zamp->output->getConvertedCost() < 1)
-                continue;
-            if (zsrc->isCreature() && zsrc->canAttack())
-                continue; //a would-be attacker is not "neutral"
-            counted[zsrc] = true;
-            neutral->add(zamp->output);
+            map<MTGCardInstance*, bool> counted;
+            for (size_t z = 1; z < observer->mLayers->actionLayer()->mObjects.size(); ++z)
+            {
+                AManaProducer * zamp = dynamic_cast<AManaProducer*>((MTGAbility *) observer->mLayers->actionLayer()->mObjects[z]);
+                if (!zamp || !canHandleCost(zamp))
+                    continue;
+                MTGCardInstance * zsrc = zamp->source;
+                if (!zsrc || zsrc == target || counted[zsrc] || !zamp->isReactingToClick(zsrc) || zamp->output->getConvertedCost() < 1)
+                    continue;
+                counted[zsrc] = true;
+                if (zsrc->isCreature() && zsrc->canAttack())
+                    attackerProd.push_back(zamp);
+                else
+                    neutral->add(zamp->output);
+            }
         }
+        std::sort(attackerProd.begin(), attackerProd.end(),
+            [](AManaProducer * a, AManaProducer * b) { return a->source->power < b->source->power; });
+        while (!neutral->canAfford(cost, 0) && atkNeed < attackerProd.size())
+        {
+            neutral->add(attackerProd[atkNeed]->output);
+            ++atkNeed;
+        }
+        spareAttackers = neutral->canAfford(cost, 0);
+        diff = spareAttackers ? neutral->Diff(cost) : pMana->Diff(cost);
+        SAFE_DELETE(neutral);
     }
-    bool spareAttackers = neutral->canAfford(cost, 0);
-    ManaCost * diff = spareAttackers ? neutral->Diff(cost) : pMana->Diff(cost);
-    SAFE_DELETE(neutral);
+    else
+    {
+        diff = pMana->Diff(cost);
+    }
     delete (pMana);
     if (spareAttackers)
     {
-        for (size_t z = 1; z < observer->mLayers->actionLayer()->mObjects.size(); ++z)
-        {
-            AManaProducer * zamp = dynamic_cast<AManaProducer*>((MTGAbility *) observer->mLayers->actionLayer()->mObjects[z]);
-            MTGCardInstance * zsrc = zamp ? zamp->source : NULL;
-            if (zsrc && zsrc != target && zsrc->isCreature() && zsrc->canAttack())
-                used[zsrc] = true;
-        }
+        for (size_t k = atkNeed; k < attackerProd.size(); k++)
+            used[attackerProd[k]->source] = true;
     }
     for (size_t i = 1; i < observer->mLayers->actionLayer()->mObjects.size(); ++i)
     { //0 is not a mtgability...hackish
@@ -3793,6 +3810,17 @@ int AIPlayerBaka::chooseBlockers()
         if (hints && hints->HintSaysDontBlock(observer, card))
             continue;
 
+        //A 0-power creature can never contribute to KILLING an attacker (this
+        //pass's whole purpose), yet blocking with one here left the attacker's
+        //tracked remaining toughness unchanged - so it still read as "needs a
+        //blocker" and pulled a real blocker on top, gang-chumping a valuable
+        //0-power engine (Argothian Enchantress 0/1) that a single real blocker
+        //already killed (deck62 wave-20 N8: Yavimaya 4/6 + Argothian 0/1 on a
+        //2/2; two Argothians on a 2/2). Skip 0-power creatures in the kill pass;
+        //a lone 0-power chump to survive lethal is still reached in pass 3.
+        if (card->power == 0)
+            continue;
+
         observer->cardClick(card, MTGAbility::MTG_BLOCK_RULE);
         int set = 0;
         while (!set)
@@ -3943,6 +3971,14 @@ int AIPlayerBaka::chooseBlockers()
             }
 
             if (currentBlockers >= requiredBlockers || currentBlockPower >= bestAttacker->toughness)
+                continue;
+
+            //Deprioritize a 0-power creature as a SECOND+ blocker: if the
+            //attacker already has a blocker assigned, piling a 0-power engine on
+            //adds no lethality and only loses the engine (deck62 N8). A LONE
+            //0-power chump (no other blocker) stays allowed - it can still
+            //absorb damage to prevent lethal.
+            if (card->power == 0 && currentBlockers >= 1)
                 continue;
 
             vector<MTGCardInstance*> extraBlockers;
@@ -4214,9 +4250,27 @@ int AIPlayerBaka::Act(float dt)
         while(clickstream.size())
         {
             AIAction * action = clickstream.front();
-            action->Act();
+            int acted = action->Act();
+            //a refused payment click (mana producer / wrapped producer)
+            //means the rest of this plan can no longer complete - clicking
+            //on would float partial mana and dead-end at the cast click
+            //(wave-20 deck102 stall loop). Abort the remaining plan.
+            bool paymentClickRefused = !acted && action->ability
+                && !action->target && !action->playerAbilityTarget
+                && action->mAbilityTargets.empty()
+                && (dynamic_cast<AManaProducer*>(action->ability)
+                    || dynamic_cast<GenericActivatedAbility*>(action->ability));
             SAFE_DELETE(action);
             clickstream.pop();
+            if (paymentClickRefused)
+            {
+                while(clickstream.size())
+                {
+                    AIAction * rest = clickstream.front();
+                    SAFE_DELETE(rest);
+                    clickstream.pop();
+                }
+            }
         }
     }
     return 1;

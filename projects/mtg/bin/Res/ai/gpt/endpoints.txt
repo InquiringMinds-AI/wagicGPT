@@ -11,10 +11,20 @@
 #   model=<id>      model id (default: first id the endpoint reports)
 #   key=<token>     bearer token sent to the endpoint
 #   thinking=1      enable thinking on local Qwen-style servers
-#   maxtokens=<n>   completion token budget
+#   max_reply_tokens=<n>  reply length cap (default 4096). A decode-side
+#                   truncation guard: useful replies sit far under this, so
+#                   the cap only bounds pathological 12-16k-char decode
+#                   spirals. (Legacy alias: maxtokens=<n>.)
+#   repetition_penalty=<f>  vLLM repetition-penalty for decode damping.
+#                   Default 1.0 = OFF and the field is not sent. Values >1.0
+#                   (e.g. 1.05-1.15) damp repeat-loops but are a SAMPLING
+#                   change that affects play quality - corpus-validate before
+#                   turning it on. Not sent to api.openai.com (unknown-field
+#                   400). vLLM-family endpoints only.
 #
 # Environment variables (WAGIC_GPT_URL, WAGIC_GPT_MODEL, WAGIC_GPT_KEY,
-# WAGIC_GPT_THINKING, WAGIC_GPT_HINTS, WAGIC_GPT_MAXTOKENS) override
-# anything set here. The GPT opponent itself is enabled with WAGIC_AI=gpt.
+# WAGIC_GPT_THINKING, WAGIC_GPT_HINTS, WAGIC_GPT_MAXTOKENS,
+# WAGIC_GPT_REPPENALTY) override anything set here. The GPT opponent itself
+# is enabled with WAGIC_AI=gpt.
 
 url=http://127.0.0.1:8080

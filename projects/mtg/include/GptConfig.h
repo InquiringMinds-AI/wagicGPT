@@ -30,7 +30,13 @@ public:
     std::string model;        //empty = auto-detect (first id from /v1/models)
     std::string key;          //bearer token; empty = none
     int thinking;             //-1 unset, else 0/1
-    long maxTokens;           //-1/0 unset = built-in default
+    long maxTokens;           //-1/0 unset = built-in default; caps the reply
+                              //length (config key max_reply_tokens, legacy
+                              //alias maxtokens) - a decode-side truncation
+                              //guard against 12-16k-char spirals
+    double repetitionPenalty; //vLLM repetition_penalty; 1.0 = OFF (the field
+                              //is only sent when != 1.0). Sampling change,
+                              //corpus-validate before defaulting on
     int timeoutSecs;          //per-call HTTP timeout for model completions
     int translog;             //0/1: dump every decision (prompt+reply) to
                               //~/.Wagic/ai/gpt/logs/*.jsonl - prompt-tuning

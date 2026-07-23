@@ -154,14 +154,21 @@ public:
     //engine's per-card canTarget verdict for option one's filter, so a filtered
     //tutor/dig can surface which revealed cards actually qualify. The base
     //ignores it (headless AIs never reach this override).
+    //revealSource: 0 = top of library (surveil/dig), 1 = the OPPONENT's hand
+    //(Thoughtseize/Duress-class targeted discard, from this decider's seat),
+    //2 = the decider's OWN hand. pickExactlyOne: option one's chooser is a
+    //fixed pick-EXACTLY-ONE (<1>, targetMin) rather than a subset (<upto:N> /
+    //<anyamount>) - drives choose-ONE framing instead of choose-a-subset.
     virtual int decideReveal(const vector<MTGCardInstance*>& revealed,
                              const string& optOneLabel, const string& optTwoLabel,
                              const string& optOneEffect,
                              vector<int>& selForOptionOne,
-                             const vector<bool>& eligibleForOptionOne = vector<bool>())
+                             const vector<bool>& eligibleForOptionOne = vector<bool>(),
+                             int revealSource = 0, bool pickExactlyOne = false)
     {
         (void) revealed; (void) optOneLabel; (void) optTwoLabel;
         (void) optOneEffect; (void) selForOptionOne; (void) eligibleForOptionOne;
+        (void) revealSource; (void) pickExactlyOne;
         return -1;
     }
 

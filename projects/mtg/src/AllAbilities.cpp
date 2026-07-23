@@ -685,6 +685,17 @@ void MTGRevealingCards::driveInteractiveReveal()
         vector<bool> eligible(revealed.size(), true);
         for (size_t i = 0; i < revealed.size(); i++)
             eligible[i] = tc->canTarget(revealed[i]);
+        //Reveal-source + chooser-arity for the ask framing (deck102 wave-20 E1).
+        //A HAND reveal (Thoughtseize/Duress-class targeted discard,
+        //revealzone(targetedpersonshand)) must be rendered as a hand, not "the
+        //top N of your library", and a fixed <1> chooser (targetMin, exactly one)
+        //must be framed as choose-ONE, not choose-a-subset. Library/multi-pick
+        //reveals (surveil, Glacial Revelation, Into the North) keep source 0 and
+        //pickExactlyOne=false so their prompt text is byte-identical.
+        int revealSource = 0; //top of library
+        if (RevealFromZone && string(RevealFromZone->getName()) == "hand")
+            revealSource = (RevealFromZone->owner == ctrl) ? 2 : 1;
+        bool pickExactlyOne = (tc && tc->maxtargets == 1 && tc->targetMin);
         vector<int> sel;
         int r;
 #ifdef TESTSUITE
@@ -692,7 +703,8 @@ void MTGRevealingCards::driveInteractiveReveal()
             r = revealTestAsyncDecide(revealed, mAITestTicks, sel);
         else
 #endif
-            r = ctrl->decideReveal(revealed, oneLabel, twoLabel, abilityOne, sel, eligible);
+            r = ctrl->decideReveal(revealed, oneLabel, twoLabel, abilityOne, sel,
+                                   eligible, revealSource, pickExactlyOne);
         if (r == 0)
             return; //model call in flight; act on no card this tick
         REVEAL_DBG("phase0 decided r=" << r << " picks=" << sel.size()
