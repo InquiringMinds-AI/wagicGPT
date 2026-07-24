@@ -2319,46 +2319,16 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
         }
     }
 
-    //(b) A PAYABILITY/LEGALITY disavowal of the CHOSEN action, before the first
-    //PLAN: marker, referencing that action. TIGHT set - each says the coded
-    //option itself cannot be paid/cast/afforded (never a weak "let me
-    //reconsider"). Reference is required so a payability aside about a DIFFERENT
-    //card does not fire it: either a name-word of the chosen option appears in the
-    //window, or the ask had a SINGLE option (the disavowal can only be about it,
-    //e.g. deck133 vs137 s26's lone unpayable Yawgmoth activation).
-    static const char * kUnpayable[] = {
-        "cannot pay", "can't pay", "cannot afford", "can't afford",
-        "cannot cast", "can't cast", "cannot sacrifice", "can't sacrifice",
-        "cannot legally", "can't legally", "unpayable", "impossible to pay",
-        "no legal target", "not a legal target",
-        "no other creature", "no other creatures", "no creature to sacrifice"
-    };
-    const size_t kPayBack = 160, kPayFwd = 120; //(b) answer-reference window
-    for (size_t p = 0; p < sizeof(kUnpayable) / sizeof(kUnpayable[0]); p++)
-    {
-        string phrase = kUnpayable[p];
-        size_t pos = (size_t) lastChoiceEnd;
-        while ((pos = low.find(phrase, pos)) != string::npos)
-        {
-            if (pos >= regionEnd)
-                break; //before the first line-leading PLAN: marker only
-            bool refs = (optionCount == 1); //one option -> unambiguous referent
-            if (!refs)
-            {
-                size_t ws = (pos > kPayBack) ? pos - kPayBack : 0;
-                if (ws < (size_t) lastChoiceEnd) ws = (size_t) lastChoiceEnd;
-                size_t we = pos + phrase.size() + kPayFwd;
-                if (we > regionEnd) we = regionEnd;
-                string win = low.substr(ws, we - ws);
-                for (size_t w = 0; w < chWords.size() && !refs; w++)
-                    if (win.find(chWords[w]) != string::npos)
-                        refs = true;
-            }
-            if (refs)
-                return true;
-            pos += phrase.size();
-        }
-    }
+    //(b) RETIRED (wave-24 corpus, 2026-07-24): the payability-disavowal branch
+    //over-fired 131 times in ONE live corpus (11% fallback rate) - the phrase
+    //set matched hypothetical rules deliberation ("if they have no creatures
+    //they can't sacrifice") and the name-word reference gate passed on common
+    //words like "opponent"/"mountain" that appear in any reasoning. Its single
+    //justifying case (the lone unpayable Yawgmoth activation, deck133 vs137
+    //s26) is now structurally impossible: unpayable sacrifice offers are gated
+    //at the root by SacrificeCost::canPay candidate-existence (same wave-24
+    //batch). Retraction now requires shape (a) alone - a genuine second,
+    //contradictory coded index.
     return false;
 }
 
@@ -5537,7 +5507,7 @@ void AIPlayerGPT::runParseSelfTest()
     }
 
     // ---- WAVE-23 N9 residual: the three real deck133 replies (matchups-20260724-013710) ----
-    cout << "\n[N9-W23] contradictory-coded-index (a) fires; payability disavowal (b) fires; sub-point Correction does NOT\n";
+    cout << "\n[N9-W23/24] contradictory-coded-index (a) fires; payability prose does NOT ((b) retired); sub-point Correction does NOT\n";
     {
         // deck133 vs140 s9 (real, GENUINE - (a)): line-1 "CHOICE: 2 (Decline)",
         // then the reasoning oscillates and buries "So CHOICE: 1" in prose. The
@@ -5555,10 +5525,12 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "     deck133 vs140 s9 (line-1 CHOICE 2, prose CHOICE 1) -> " << g9 << " (must be -1: (a) contradictory index)\n";
         CHECK(g9 == -1, "N9-W23 (a): a prose coded index contradicting the resolved answer retracts (genuine s9)");
 
-        // deck133 vs137 s26 (real, ENGINE-CAUSED - (b)): a SINGLE-option ask; the
-        // engine offered an unpayable "Sacrifice another creature" Yawgmoth cost;
-        // the model coded 1 then proved it cannot pay. Payability disavowal of the
-        // sole option -> retract (safe; the engine cause is fixed separately).
+        // deck133 vs137 s26 (real, ENGINE-CAUSED): branch (b) originally retracted
+        // this. Branch (b) is RETIRED (wave-24 corpus: 131 live false positives -
+        // the phrase set matched hypothetical rules prose and the reference gate
+        // passed on common words). The engine cause (unpayable offer) is fixed at
+        // the root by SacrificeCost::canPay, so this shape can no longer occur
+        // legitimately; the sustained coded index is now TRUSTED.
         vector<string> yaw; yaw.push_back("-1/-1 Counter with Yawgmoth, Thran Physician targeting Venerated Loxodon [cost: Life, Sacrifice]");
         string unpayable =
             "CHOICE: 1 (-1/-1 Counter with Yawgmoth, Thran Physician targeting Venerated Loxodon)\n"
@@ -5567,8 +5539,24 @@ void AIPlayerGPT::runParseSelfTest()
             "But the game lists it as legal, so I will choose 1.\n"
             "PLAN: Activate Yawgmoth to place a -1/-1 counter and draw a card.\n";
         int u26 = RESOLVE(unpayable, 1, yaw);
-        cout << "     deck133 vs137 s26 (sole option, 'cannot pay'/'cannot sacrifice') -> " << u26 << " (must be -1: (b) payability)\n";
-        CHECK(u26 == -1, "N9-W23 (b): a payability disavowal of the sole coded action retracts (engine-caused s26)");
+        cout << "     deck133 vs137 s26 (sole option, payability prose, branch (b) retired) -> " << u26 << " (must be 1: index trusted)\n";
+        CHECK(u26 == 1, "N9-W24: payability prose no longer retracts a sustained coded index ((b) retired)");
+
+        // wave-24 corpus LIVE over-fire (deck137 vs Liliana targeting ask, one of
+        // 131): sustained "CHOICE: 2 (The opponent)", hypothetical rules prose
+        // "if they have no creatures they can't sacrifice" with "opponent"
+        // nearby. The retired branch (b) fired on this constantly; the index
+        // must be trusted.
+        vector<string> lil; lil.push_back("You (player, life 14)"); lil.push_back("The opponent (player, life 19)");
+        string hypo =
+            "CHOICE: 2 (The opponent)\n"
+            "Using Liliana of the Veil's -2 ability to force a sacrifice is the correct play. "
+            "if they have no creatures they can't sacrifice, but the prompt implies a choice is needed. "
+            "Ah, the Giant Killer is on the battlefield! Targeting the opponent forces them to sacrifice it.\n"
+            "PLAN: Clear their blocker, then attack with Bloodghast.\n";
+        int lv = RESOLVE(hypo, 2, lil);
+        cout << "     wave-24 live FP shape (hypothetical 'can't sacrifice' prose) -> " << lv << " (must be 2)\n";
+        CHECK(lv == 2, "N9-W24 regression: hypothetical payability prose never retracts (the 131-FP shape)");
 
         // deck133 vs137 s29 (real, OVER-FIRE the rework KILLS): a single sustained
         // "CHOICE: 1 (Play Polluted Delta)", a "*Correction:*" about Bloodghast's
