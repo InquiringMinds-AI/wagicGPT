@@ -1436,6 +1436,21 @@ string AIPlayerGPT::serializeGameState()
     return out.str();
 }
 
+//A modal-DFC "Flip Side" activation reaches the seat wrapped: the doubleside
+//`{0}` cost makes it a GenericActivatedAbility (a NestedAbility) whose
+//getMenuText delegates to the inner AATurnSide, so a direct dynamic_cast on
+//the ranked ability misses it. Unwrap one NestedAbility layer.
+static AATurnSide * asTurnSide(MTGAbility * a)
+{
+    if (!a)
+        return NULL;
+    if (AATurnSide * direct = dynamic_cast<AATurnSide *>(a))
+        return direct;
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        return dynamic_cast<AATurnSide *>(na->ability);
+    return NULL;
+}
+
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 {
     std::ostringstream out;
@@ -1443,6 +1458,37 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         out << action.ability->getMenuText();
     if (action.click)
         out << " with " << action.click->getDisplayName();
+
+    //Kaldheim-style modal DFC in hand (R-DFC-FLIP, deck102 wave-22): the
+    //engine surfaces a double-faced card ONLY as a repeatable "Flip Side"
+    //pseudo-action that toggles which face the hand card presents - it casts
+    //nothing and touches no stack. deck102's Tergrid, God of Fright //
+    //Tergrid's Lantern was flipped 11x as a no-op with no idea what it did.
+    //Name the other face + its cost and state plainly that the actual cast
+    //happens via the Cast menu once the wanted face is showing. The current
+    //face's cast already appears (with cost) in the Cast menu when affordable.
+    if (AATurnSide * ats = asTurnSide(action.ability))
+    {
+        MTGCardInstance * fc = action.click ? action.click : ats->source;
+        if (fc)
+        {
+            string otherName = (fc->isFlipped > 0) ? fc->nameOrig : ats->_SideName;
+            if (!otherName.empty())
+            {
+                out << " -> DISPLAY TOGGLE only: switches this hand card to show"
+                       " its other face \"" << otherName << "\"";
+                MTGCard * oc = MTGCollection()->getCardByName(otherName, fc->setId);
+                if (oc && oc->data && oc->data->getManaCost()
+                    && oc->data->getManaCost()->getConvertedCost())
+                    out << " (" << oc->data->getManaCost()->toString() << ")";
+                out << ". It does NOT cast anything and uses no stack. You"
+                       " usually do NOT need it: the Cast menu is where you cast,"
+                       " and it lists every face you can afford (the other face"
+                       " appears there as an alternative-cost cast). This only"
+                       " changes which face is displayed.";
+            }
+        }
+    }
     if (action.target)
     {
         out << " targeting " << action.target->getDisplayName();
@@ -1594,6 +1640,7 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     int echoRemap = -1;
     bool echoConflict = false;
     bool echoNoMatch = false;
+    vector<string> words; //echo's significant words (hoisted for INDEX-WINS)
     if (optionTexts && !optionTexts->empty())
     {
         //the LAST "(...)" following a digit on the answer-ish tail
@@ -1636,7 +1683,6 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                 }
             }
             //significant words: lowercase, length >= 4
-            vector<string> words;
             string w;
             for (size_t i = 0; i <= echo.size(); i++)
             {
@@ -1752,6 +1798,52 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
         }
     }
 
+    //INDEX-WINS (wave-23 ITEM A). A well-formed, in-range POSITIVE index is
+    //only DISCARDED as a stale echo when the echoed name is genuinely
+    //out-of-context: FOREIGN to the option the index points at AND not a
+    //reference to the decision's own source card. A dual-face label ("Transform:
+    //Search for Azcanta" vs option "Transform:azcanta, the sunken ruin"), an
+    //invented verb ("Activate Tergrid's Lantern" vs "Flip Side with Tergrid's
+    //Lantern"), or a parameter-menu prefix ("Cast <spell> with X=1" vs the bare
+    //option "X = 1") still shares content with the chosen option (or names the
+    //announced spell) and is TRUSTED at its index. Only a wholly stale answer -
+    //a prior land drop echoed into a cast menu, whose index maps to a DIFFERENT
+    //KIND of option (deck133 forbidden Thoughtseize, deck140 dumped kill shot) -
+    //is dropped. This is the family-level root fix that replaces the per-shape
+    //echo band-aids: the echo guard now needs the label to match NO current
+    //option AND to be foreign to the CHOSEN option before it fires.
+    auto echoStaleForIndex = [&](int k1) -> bool {
+        if (!echoNoMatch || words.empty())
+            return false;
+        //(a) the echo shares a significant word with the option the index
+        //selects -> the label is consistent with that option, trust the index.
+        if (optionTexts && k1 >= 1 && k1 <= (int) optionTexts->size())
+        {
+            string low = (*optionTexts)[k1 - 1];
+            for (size_t li = 0; li < low.size(); li++)
+                low[li] = (char) tolower((unsigned char) low[li]);
+            for (size_t wi = 0; wi < words.size(); wi++)
+                if (low.find(words[wi]) != string::npos)
+                    return false;
+        }
+        //(b) every echoed word names the decision's own source card (the spell
+        //whose X/mode/parameter is being announced) -> a self-reference, not a
+        //stale prior answer. Handles the ANNOUNCE_X "Cast <spell> with X=N" echo
+        //whose bare "X = N" option carries no anchor words of its own.
+        if (pendingSource && !pendingSource->empty())
+        {
+            string src = *pendingSource;
+            for (size_t si = 0; si < src.size(); si++)
+                src[si] = (char) tolower((unsigned char) src[si]);
+            bool allInSrc = true;
+            for (size_t wi = 0; wi < words.size(); wi++)
+                if (src.find(words[wi]) == string::npos) { allInSrc = false; break; }
+            if (allInSrc)
+                return false;
+        }
+        return true; //label foreign to the chosen option and the source -> stale
+    };
+
     //The reply contract puts the chosen option number FIRST. Prefer an
     //in-range integer at the HEAD of the text ("N", "N.", "N)" - leading
     //whitespace tolerated). Keeping the LAST in-range integer (the
@@ -1789,8 +1881,11 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             //Thoughtseize, deck140 dumped kill shot). Route to the heuristic
             //instead. A deliberate 0 (decline/pass) carries no card name and
             //is never treated as stale. A multi-option echo (echoConflict)
-            //and a no-significant-word echo ("(pass)") keep index-wins.
-            if (echoNoMatch && n != 0)
+            //and a no-significant-word echo ("(pass)") keep index-wins. Under
+            //INDEX-WINS the discard fires only when the label is ALSO foreign to
+            //the option this index selects (echoStaleForIndex) - a consistent
+            //label (dual-face / invented-verb / source self-reference) trusts n.
+            if (echoNoMatch && n != 0 && echoStaleForIndex(n))
             {
                 if (staleEcho) *staleEcho = true;
                 return -1;
@@ -1832,9 +1927,9 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     }
     //Absent-echo staleness on the trailing-scan index (the common path for
     //real "CHOICE: N (...)" replies). A resolved 0 is a deliberate decline
-    //and is exempt; a positive index whose echo named no offered option is
-    //stale -> defer to the heuristic.
-    if (echoNoMatch && choice > 0)
+    //and is exempt; a positive index whose echo named no offered option AND is
+    //foreign to that option (INDEX-WINS) is stale -> defer to the heuristic.
+    if (echoNoMatch && choice > 0 && echoStaleForIndex(choice))
     {
         if (staleEcho) *staleEcho = true;
         return -1;
@@ -2183,10 +2278,23 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (mPassDeclineTurn != observer->turn)
     {
         mPassDeclineCount.clear();
+        mFlipDoneCount.clear();
         mPassDeclineTurn = observer->turn;
     }
     for (size_t c = 0; c < candidates.size(); c++)
     {
+        //Modal-DFC flip-thrash cap (see header): an in-hand "Flip Side"
+        //toggle already taken 2x this turn stops being offered - it is a
+        //no-op that mutates the presented face, so the no-progress deadlock
+        //breaker below never catches it (deck102 flipped Tergrid 11x). Two
+        //flips reach the wanted face and allow one flip back; the cast itself
+        //rides the Cast menu on the showing face.
+        if (AATurnSide * fats = asTurnSide(candidates[c]->ability))
+        {
+            MTGCardInstance * fcard = candidates[c]->click ? candidates[c]->click : fats->source;
+            if (fcard && mFlipDoneCount[fcard] >= 2)
+                continue;
+        }
         string line = describeAction(*candidates[c]);
         if (!seenLines.insert(line).second)
             continue;
@@ -2262,14 +2370,22 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         string decisionPart = consumePlan(content, "CHOICE:");
         bool staleEcho = false;
         choice = parseChoice(decisionPart, index, &shownLines, &staleEcho);
-        //Repeat-loop salvage: an unparsed (NOT stale, NOT empty) reply may be
-        //a decode spiral that stated a valid CHOICE before degenerating.
-        if (choice < 0 && !staleEcho && !content.empty())
+        //Repeat-loop AND absent-card-bookend salvage (wave-23 ITEM A part 2).
+        //salvageLoopedChoice walks EVERY CHOICE: line through the full validator
+        //(echo + INDEX-WINS staleness still apply), keeping the last that
+        //resolves clean. Running it on a stale primary too lets a hallucinated
+        //CHOICE naming a card absent from the option set (which re-parses to -1
+        //and is skipped) yield to a clean sibling line - deck140 vs102 s9, where
+        //the real answer "CHOICE: 0 (pass)" bookended a middle "CHOICE: 1 (Cast
+        //Black Sun's Zenith)" that named a sorcery not offered in the upkeep.
+        //A lone genuine stale echo has no clean sibling, so it still routes to
+        //the heuristic (salvage returns -1, choice unchanged).
+        if (choice < 0 && !content.empty())
         {
             int sal = salvageLoopedChoice(content, index, &shownLines);
             if (sal >= 0)
             {
-                DebugTrace("AIPlayerGPT: salvaged looped CHOICE " << sal << " of " << index);
+                DebugTrace("AIPlayerGPT: salvaged looped/bookend CHOICE " << sal << " of " << index);
                 choice = sal;
             }
         }
@@ -2297,6 +2413,13 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //re-offers.
             if (isFetchCrackLine(shownLines[choice - 1]))
                 mPassDeclineCount[fetchLineKey(shownLines[choice - 1])] = 2;
+            //Count a consumed DFC flip toward the per-turn thrash cap.
+            if (AATurnSide * cats = asTurnSide(shown[choice - 1]->ability))
+            {
+                MTGCardInstance * ccard = shown[choice - 1]->click ? shown[choice - 1]->click : cats->source;
+                if (ccard)
+                    mFlipDoneCount[ccard]++;
+            }
         }
 
         mLastAskKey = askKey;
@@ -2389,14 +2512,16 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     bool staleEcho = false;
     int choice = parseChoice(decisionPart, (int) options.size(), &options, &staleEcho,
                              pendingSourceName.empty() ? NULL : &pendingSourceName);
-    //Repeat-loop salvage (see chooseOrderedAction): recover a valid CHOICE
-    //stated before a decode spiral; never overrides a stale_echo verdict.
-    if (choice < 0 && !staleEcho && !content.empty())
+    //Repeat-loop AND absent-card-bookend salvage (see chooseOrderedAction):
+    //walk every CHOICE: line through the validator, recovering a clean sibling
+    //when the primary line was a decode spiral OR a stale absent-card echo. A
+    //lone genuine stale echo has no clean sibling and still defers to heuristic.
+    if (choice < 0 && !content.empty())
     {
         int sal = salvageLoopedChoice(content, (int) options.size(), &options);
         if (sal >= 0)
         {
-            DebugTrace("AIPlayerGPT: salvaged looped CHOICE " << sal << " of " << options.size());
+            DebugTrace("AIPlayerGPT: salvaged looped/bookend CHOICE " << sal << " of " << options.size());
             choice = sal;
         }
     }
@@ -3097,10 +3222,15 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //instead of at zero. The contract's index==X invariant and the
         //other consumers are untouched - this is presentation only.
         vector<string> shown(req.optionTexts.rbegin(), req.optionTexts.rend());
+        //Pass the spell being announced as the pending source: the model echoes
+        //"Cast <spell> with X=N" against the bare "X = N" option, and INDEX-WINS
+        //treats an echo that names the source spell as a self-reference rather
+        //than a stale answer (wave-23 ITEM A shape 1, deck140 Black Sun's Zenith).
         int pick = askModel("Announce the value of X for "
                             + (ctx ? ctx->getDisplayName() : string("this spell"))
                             + " (every listed value is affordable; option 1 is the LARGEST X)."
-                            + " Reply with the OPTION number, not the X value:", shown);
+                            + " Reply with the OPTION number, not the X value:", shown,
+                            true, ctx ? ctx->getDisplayName() : string());
         if (pick == kChoicePending)
             return kChoicePending;
         if (pick >= 0 && pick < (int) shown.size())
@@ -3318,6 +3448,44 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 effectName = "this effect";
         }
 
+        //Forced self-loss inversion (deck140/deck102 wave-22, LOSS-CAUSING):
+        //when an OPPONENT'S effect forces THIS seat to discard/sacrifice/exile
+        //one of its OWN cards, the chooser is a TargetChooser whose legal set
+        //is entirely the deciding player's own cards. The generic "TARGET
+        //CHOICE ... pick the ONE target it will affect" wording is built for
+        //choosing what a spell AFFECTS (an enemy permanent to remove -> pick
+        //the MOST valuable) and inverts catastrophically here: you are picking
+        //which of your OWN cards to LOSE, so the correct choice is the LEAST
+        //valuable. deck140 pitched Damnation then Pyroclasm - its two live
+        //sweepers - into an Archon-of-Cruelty forced discard and died T12.
+        //Detect the shape (every candidate is my own card AND the effect verb
+        //is a loss) and render inverted framing. Representation only - the
+        //offered set and the apply path are unchanged.
+        bool forcedSelfLoss = false;
+        string lossVerb;
+        {
+            string en = effectName;
+            for (size_t i = 0; i < en.size(); i++) en[i] = (char) tolower((unsigned char) en[i]);
+            if (en.find("discard") != string::npos) lossVerb = "discard";
+            else if (en.find("sacrifice") != string::npos) lossVerb = "sacrifice";
+            else if (en.find("exile") != string::npos) lossVerb = "exile";
+            if (!lossVerb.empty() && !targets.empty())
+            {
+                bool allMine = true;
+                for (size_t i = 0; i < targets.size(); i++)
+                {
+                    //the "Done" escape is a string option, never in targets.
+                    MTGCardInstance * mc = dynamic_cast<MTGCardInstance *>(targets[i]);
+                    if (!mc || mc->controller() != this) { allMine = false; break; }
+                }
+                //The source is the opponent's forcing effect (Baka fallback is
+                //fine either way, but self-costs of my OWN spells are also a
+                //"pick least valuable" so the source test only strengthens the
+                //wording, it does not gate the fix).
+                forcedSelfLoss = allMine;
+            }
+        }
+
         //Target sub-menus reached the model as a bare "Choose ... for X" line
         //that read like a phase or cast decision, owning most of the corpus's
         //fallbacks: the pilot answered with an attack PLAN ("Choose the target
@@ -3329,6 +3497,28 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         //and tell the model to answer with the TARGET's name. Representation
         //only - the offered set and the apply path are unchanged.
         std::ostringstream q;
+        if (forcedSelfLoss)
+        {
+            q << "FORCED " << lossVerb << " OF YOUR OWN CARD"
+              << ((multi && tc->maxtargets != 1) ? "S" : "")
+              << ": the opponent's effect (" << effectName << ") forces YOU to "
+              << lossVerb << " one of your OWN cards from the list below - each"
+                 " option is a card YOU will LOSE, not something you affect or"
+                 " attack. Pick the card you can best AFFORD TO LOSE (usually your"
+                 " LEAST valuable: pitch a spare land or a redundant/dead card,"
+                 " and KEEP your best spells, answers, and threats). ";
+            if (!multi)
+                q << "Choose the ONE card to give up";
+            else
+            {
+                q << "Choose card " << (picks.size() + 1);
+                if (!unlimited)
+                    q << " of " << (tc->targetMin ? "exactly " : "up to ") << tc->maxtargets;
+            }
+            q << " from the list below, and answer with the chosen card's name.";
+        }
+        else
+        {
         if (stackTrapNote)
             q << "NOTE: these targets are battlefield permanents only - the spell"
                  " being cast on the stack is NOT a legal target and is NOT in this"
@@ -3348,6 +3538,7 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         }
         q << " from the list below, and answer with the chosen TARGET's name (not \""
           << effectName << "\")";
+        }
 
         //Pass the pending source name so parseChoice can strip a "<spell>
         //targeting <target>" echo prefix down to the target name (stale-echo
@@ -3949,14 +4140,43 @@ int AIPlayerGPT::chooseAttackers()
 
     //Plan split BEFORE the attacker-set parse: numbers (and words like
     //"hold") in the plan prose must not read as attack declarations.
-    string decisionPart = consumePlan(content);
+    string decisionPart = consumePlan(content, "ATTACK:");
     vector<bool> send;
     vector<string> attackerNames;
     attackerNames.reserve(attackers.size());
     for (size_t j = 0; j < attackers.size(); j++)
         attackerNames.push_back(attackers[j]->name);
-    int result = content.empty() ? -1
-                 : parseAttackerSet(decisionPart, attackers.size(), send, &attackerNames);
+
+    //ANSWER-FIRST primary (wave-23 ITEM B). The shipped contract puts the
+    //declaration on the FIRST line; consumePlan's last-wins otherwise let a
+    //LATER same-label CoT combat-math line hijack it - deck109 vs62 s21, where
+    //the clean line-1 "ATTACK: A1, A2, A3, A4" was overridden by a line-179 CoT
+    //"Attack: Deal 1, Take 5. Net -4 life. Opponent -1 life." whose bare prose
+    //numbers (1, -4) parsed to a bogus A1+A4 subset. This is stale-echo family B
+    //where the decoy shares the answer's OWN label, so the expectedLabel filter
+    //cannot separate them: take the FIRST line-leading ATTACK: line that parses
+    //to a usable declaration. (Prose-salvage was NOT the cause - it fires only
+    //when result<0; here the mis-parse produced result>=1.)
+    int result = -1;
+    if (!content.empty())
+    {
+        string stripped = content;
+        size_t te = stripped.rfind("</think>");
+        if (te != string::npos)
+            stripped = stripped.substr(te + 8);
+        vector<string> attackLines;
+        collectLabeledLines(stripped, "ATTACK:", attackLines);
+        for (size_t li = 0; li < attackLines.size(); li++)
+        {
+            vector<bool> s;
+            int r = parseAttackerSet(attackLines[li], attackers.size(), s, &attackerNames);
+            if (r >= 0) { send = s; result = r; break; } //first usable declaration
+        }
+    }
+    //Fallback for a reply that named attackers WITHOUT a line-leading ATTACK:
+    //label (consumePlan's short-bare-answer path) - unchanged behavior.
+    if (result < 0 && !content.empty())
+        result = parseAttackerSet(decisionPart, attackers.size(), send, &attackerNames);
 
     //Repeat-loop salvage: an unparsed (non-empty) reply may be a decode spiral
     //that stated a valid ATTACK: line before degenerating - recover the last
@@ -4948,11 +5168,14 @@ void AIPlayerGPT::runParseSelfTest()
         int c = parseChoice("1 (Unsummon targeting Inkfathom Infiltrator)", 3, &tgt, &st, &src);
         cout << "     with source 'Unsummon' -> " << c << " (must be 1, was stale_echo)\n";
         CHECK(c == 1 && !st, "A2 deck14 s29: spell-prefix stripped, target name matches option 1");
-        // Without the pending source the bug reproduces (stale_echo).
+        // INDEX-WINS (wave-23): even WITHOUT the source hint (so the spell
+        // prefix is not stripped), the in-range index 1 is trusted because the
+        // echoed label still names option 1's target ("Inkfathom Infiltrator").
+        // The wave-22 stale_echo drop here is superseded by the root fix.
         bool st0 = false;
         int c0 = parseChoice("1 (Unsummon targeting Inkfathom Infiltrator)", 3, &tgt, &st0, NULL);
-        cout << "     without source -> " << c0 << " (bug repro: stale_echo)\n";
-        CHECK(c0 < 0 && st0, "A2 bug repro: unstripped spell-prefix echo is dropped stale");
+        cout << "     without source -> " << c0 << " (INDEX-WINS: trust the index)\n";
+        CHECK(c0 == 1 && !st0, "A2 INDEX-WINS: unstripped prefix echo still trusts the in-range index whose target matches option 1");
 
         // deck62 vs14 s29 (real): "Web targeting Yavimaya Enchantress"; N=4 correct.
         vector<string> tgt2;
@@ -4969,14 +5192,144 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "     with source 'Web' -> " << c2 << " (must be 4)\n";
         CHECK(c2 == 4 && !st2, "A2 deck62 s29: 'Web targeting' stripped, Yavimaya matches option 4");
 
-        // Anchor guard: the "X targeting Y" strip requires X == the pending
-        // source. A mismatched X ("Boomerang" when the source is Unsummon) must
-        // NOT strip (no blanket 'targeting' strip). Here it stays stale (the
-        // safe outcome), never mis-picks a wrong target.
+        // Anchor guard + INDEX-WINS: the "X targeting Y" strip is still anchored
+        // (a mismatched prefix "Boomerang" vs source "Unsummon" is NOT stripped -
+        // no blanket 'targeting' strip). But under INDEX-WINS the outcome is now
+        // the CORRECT index 1: the echoed label names option 1's target
+        // ("Inkfathom Infiltrator"), so the well-formed in-range index is trusted
+        // regardless of the wrong spell name. (Pre-INDEX-WINS this dropped stale.)
         bool st3 = false;
         int c3 = parseChoice("1 (Boomerang targeting Inkfathom Infiltrator)", 3, &tgt, &st3, &src);
-        cout << "     mismatched source ('Boomerang' vs 'Unsummon') -> " << c3 << " (no strip; stays stale)\n";
-        CHECK(c3 < 0 && st3, "A2 anchor: strip is skipped when the prefix is not the pending source");
+        cout << "     mismatched source ('Boomerang' vs 'Unsummon') -> " << c3 << " (INDEX-WINS: index names option 1's target)\n";
+        CHECK(c3 == 1 && !st3, "A2 INDEX-WINS: a mismatched spell prefix still trusts the in-range index whose target matches option 1");
+    }
+
+    // ==================== WAVE-23 items (ITEM A: INDEX-WINS echo root fix, +
+    // absent-card bookend; ITEM B: answer-first ATTACK over a CoT same-label
+    // line). Cases built from the real matchups-20260723-173843 corpus replies.
+    cout << "\n[W23-A] INDEX-WINS: trust an in-range index whose parenthetical name mismatches\n";
+    {
+        // Shape 1 - ANNOUNCE_X child menu (deck140 vs102 s12, real reply). The
+        // bare "X = N" options carry no anchor words; the echo "Cast Black Sun's
+        // Zenith with X=1" names the SOURCE spell. With the source threaded
+        // (chooseMenuAction now passes it), INDEX-WINS trusts index 1.
+        vector<string> xopts; xopts.push_back("X = 1"); xopts.push_back("X = 0");
+        string bszSrc = "Black Sun's Zenith";
+        bool sx = false;
+        int cx = parseChoice("1 (Cast Black Sun's Zenith with X=1)", 2, &xopts, &sx, &bszSrc);
+        cout << "     ANNOUNCE_X 'Cast <spell> with X=1' vs 'X = 1' -> " << cx << " (must be 1)\n";
+        CHECK(cx == 1 && !sx, "W23-A shape1: ANNOUNCE_X source-echo trusts the in-range index (was stale_echo)");
+        // Without the source the bare "X = N" options still have no shared word,
+        // so this correctly stays stale (no false accept) - the source thread is
+        // what makes it safe, exactly why chooseMenuAction now passes it.
+        bool sx0 = false;
+        int cx0 = parseChoice("1 (Cast Black Sun's Zenith with X=1)", 2, &xopts, &sx0, NULL);
+        cout << "     ANNOUNCE_X without source -> " << cx0 << " (stale without the anchor; heuristic max-X)\n";
+        CHECK(cx0 < 0 && sx0, "W23-A shape1: without the source anchor the bare-X echo is (safely) stale");
+
+        // Shape 2 - transform dual-face (deck135 vs27 s27, real). Echo names the
+        // PRE-transform face; option names the POST-transform face. They share
+        // "azcanta"/"transform", so INDEX-WINS trusts index 1.
+        vector<string> tf;
+        tf.push_back("Transform:azcanta, the sunken ruin [available NOW - this transform is only offered because its condition is already met; do not recount, it is legal this instant]");
+        tf.push_back("Decline - do nothing");
+        bool s2 = false;
+        int c2b = parseChoice("1 (Transform: Search for Azcanta)", 2, &tf, &s2, NULL);
+        cout << "     transform dual-face 'Search for Azcanta' vs 'Transform:azcanta...' -> " << c2b << " (must be 1)\n";
+        CHECK(c2b == 1 && !s2, "W23-A shape2: transform dual-face echo trusts the index (shares 'azcanta'/'transform')");
+
+        // Shape 3 - DFC invented verb (deck102 vs109 s42, real). Echo "Activate
+        // Tergrid's Lantern" vs option "Flip Side with Tergrid's Lantern"; they
+        // share "Tergrid's Lantern", so INDEX-WINS trusts index 1 (activate).
+        vector<string> dfc;
+        dfc.push_back("Flip Side with Tergrid's Lantern {card text: \"{T}: Target player loses 3 life unless they sacrifice a nonland permanent or discard a card.\"}");
+        bool s3 = false;
+        int c3b = parseChoice("1 (Activate Tergrid's Lantern)", 1, &dfc, &s3, NULL);
+        cout << "     DFC invented-verb 'Activate ...' vs 'Flip Side with ...' -> " << c3b << " (must be 1)\n";
+        CHECK(c3b == 1 && !s3, "W23-A shape3: DFC invented-verb echo trusts the index (shares 'Tergrid's Lantern')");
+
+        // TRUE ECHO that must STILL be caught: a prior land drop ("Play Forest")
+        // echoed into a cast menu; the index maps to a DIFFERENT KIND of option
+        // (a cast) foreign to the echoed card -> genuinely stale -> heuristic.
+        vector<string> cast;
+        cast.push_back("Cast Damnation {2}{b}{b}");
+        cast.push_back("Cast Pyroclasm {1}{r}");
+        cast.push_back("Cast nothing right now");
+        bool se = false;
+        int ce = parseChoice("2 (Play Forest)", 3, &cast, &se, NULL);
+        cout << "     TRUE echo 'Play Forest' in a cast menu -> " << ce << " (must be -1: stale)\n";
+        CHECK(ce < 0 && se, "W23-A true-echo: a foreign land-drop echo is STILL dropped stale (index-wins does not blindly trust)");
+        // And with a source that does NOT account for it, still stale.
+        string dmSrc = "Damnation";
+        bool se2 = false;
+        int ce2 = parseChoice("2 (Play Forest)", 3, &cast, &se2, &dmSrc);
+        cout << "     TRUE echo with unrelated source -> " << ce2 << " (must be -1)\n";
+        CHECK(ce2 < 0 && se2, "W23-A true-echo: an unrelated source does not rescue a foreign echo");
+    }
+
+    cout << "\n[W23-A2] absent-card bookend: a clean sibling CHOICE line beats a hallucinated middle one\n";
+    {
+        // deck140 vs102 s9 (real): the only option is the Elixir; the model's
+        // real answer is "CHOICE: 0 (pass)" on line 1, but a middle "CHOICE: 1
+        // (Cast Black Sun's Zenith with X=1)" names a sorcery NOT offered in the
+        // upkeep. salvageLoopedChoice walks both lines: the absent-card line
+        // re-parses to stale (-1) and is skipped, the pass survives.
+        vector<string> el; el.push_back("Life with Elixir of Immortality [cost: {2}, Tap]");
+        string reply =
+            "CHOICE: 0 (pass)\n"
+            "Reasoning: I cannot pay {2} generic for the Elixir.\n"
+            "CHOICE: 1 (Cast Black Sun's Zenith with X=1)\n"
+            "Wait, the phase is Upkeep; I cannot cast a sorcery. So the answer is CHOICE: 0 (pass).\n";
+        int sal = salvageLoopedChoice(reply, 1, &el);
+        cout << "     bookend salvage (0 pass / absent 1 / 0 pass) -> " << sal << " (must be 0: pass)\n";
+        CHECK(sal == 0, "W23-A2 bookend: the hallucinated absent-card CHOICE is skipped; the pass is recovered");
+        // The middle absent-card line, parsed alone, is stale (its name matches
+        // no option and is foreign to the Elixir option).
+        bool sb = false;
+        int cb = parseChoice("1 (Cast Black Sun's Zenith with X=1)", 1, &el, &sb, NULL);
+        cout << "     absent-card line alone -> " << cb << " (must be -1: stale)\n";
+        CHECK(cb < 0 && sb, "W23-A2 the absent-card CHOICE alone is stale (foreign to the only option)");
+    }
+
+    cout << "\n[W23-B] answer-first ATTACK: the FIRST declaration beats a later CoT 'Attack:' line\n";
+    {
+        // deck109 vs62 s21 (real): line-1 "ATTACK: A1, A2, A3, A4" (all eligible)
+        // was overridden by a line-179 CoT "Attack: Deal 1, Take 5. Net -4 life.
+        // Opponent -1 life." whose bare prose numbers parsed to a bogus A1+A4.
+        // Answer-first (first usable ATTACK: line) fixes it; last-wins was the bug.
+        vector<string> anames;
+        anames.push_back("Goblin"); anames.push_back("Goblin");
+        anames.push_back("Ash Zealot"); anames.push_back("Legion Loyalist");
+        string reply =
+            "ATTACK: A1, A2, A3, A4\n"
+            "Reasoning: with Legion Loyalist my team gets first strike and trample...\n"
+            "Attack: Deal 1, Take 5. Net -4 life. Opponent -1 life.\n"
+            "I will declare no attackers. Wait, the guide says attack every turn...\n";
+        // strip think (none here) then collect ATTACK: lines in reply order
+        vector<string> lines;
+        collectLabeledLines(reply, "ATTACK:", lines);
+        cout << "     collected ATTACK: lines = " << lines.size() << " (line1 + CoT decoy)\n";
+        CHECK(lines.size() == 2, "W23-B two same-label lines collected (declaration + CoT decoy)");
+        // Answer-first: FIRST usable declaration wins -> all 4.
+        int afResult = -1; vector<bool> afSend;
+        for (size_t li = 0; li < lines.size(); li++)
+        {
+            vector<bool> s;
+            int r = parseAttackerSet(lines[li], 4, s, &anames);
+            if (r >= 0) { afSend = s; afResult = r; break; }
+        }
+        cout << "     answer-first -> count=" << afResult
+             << " send=[" << (afSend.size()>0?(int)afSend[0]:-1) << (afSend.size()>1?(int)afSend[1]:-1)
+             << (afSend.size()>2?(int)afSend[2]:-1) << (afSend.size()>3?(int)afSend[3]:-1) << "] (must be 4, all)\n";
+        CHECK(afResult == 4 && afSend[0] && afSend[1] && afSend[2] && afSend[3],
+              "W23-B answer-first ATTACK takes line-1 A1,A2,A3,A4 (not the CoT line)");
+        // Document the bug: the LAST line (CoT decoy) parses to the bogus 2-subset.
+        vector<bool> bug;
+        int bugR = parseAttackerSet(lines[lines.size() - 1], 4, bug, &anames);
+        cout << "     last-wins (bug) -> count=" << bugR
+             << " send=[" << (int)bug[0] << (int)bug[1] << (int)bug[2] << (int)bug[3] << "] (the CoT numbers 1,-4 -> A1,A4)\n";
+        CHECK(bugR == 2 && bug[0] && !bug[1] && !bug[2] && bug[3],
+              "W23-B bug repro: the CoT 'Attack: Deal 1... -4 life' line parses to a bogus A1,A4 under last-wins");
     }
 
     // ---- ITEM 3 (stale-echo family B): CoT answer-label line hijacks the answer --

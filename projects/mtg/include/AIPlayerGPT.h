@@ -266,6 +266,18 @@ private:
     std::map<string, int> mPassDeclineCount;
     int mPassDeclineTurn;
 
+    //Modal-DFC flip-thrash cap (R-DFC-FLIP, deck102 wave-22): the in-hand
+    //"Flip Side" pseudo-action is a no-op face toggle offered at every
+    //priority window, and it CHANGES board state (the presented face) so the
+    //no-progress deadlock breaker never catches it - deck102 flipped Tergrid
+    //11x. Cap flips per source card per turn: enough to reach the wanted face
+    //(and flip back once) but not to thrash. Keyed by the card INSTANCE
+    //pointer - getId()/mtgid TOGGLES with the presented face, so keying by id
+    //let each face accrue its own count (up to 4 flips/turn); the instance
+    //pointer is stable across flips. Clears on turn change alongside
+    //mPassDeclineCount.
+    std::map<MTGCardInstance *, int> mFlipDoneCount;
+
     //Cast-seam livelock breaker (the priority seam's no-progress pass,
     //mirrored): a consumed cast pick that leaves the board byte-identical
     //did not execute (an unexecutable menu entry - e.g. a restricted cast
