@@ -514,3 +514,41 @@ absent from its output.
   activated `{0}:` form breaks attack declaration for the carrier.
 - `completedungeon` sideboards the completing card and emits `@dungeoncompleted`
   with the card in the sideboard — triggers must scope `*|mysideboard`.
+
+## Modal-DFC back-face cast resolves the FRONT face (wave-24, R-DFC-BACKFACE-RESOLVES-FRONT)
+
+Repro (live): deck102 vs27 s34. Tergrid, God of Fright // Tergrid's Lantern is a
+Kaldheim modal DFC modelled as the front creature carrying the back as an
+alternative cost:
+  other={3}{B} name(Tergrid's Lantern)
+  autostack=if paid(alternative) then flip(Tergrid's Lantern) forcetype(Legendary Artifact)
+With exactly {3}{B} on the pool (God front {3}{B}{B} unaffordable) the pilot
+flipped the display to the Lantern side, cast, and the {3}{B} deployed the 4/5
+God — a mechanical discount, beneficial that game but rules-wrong.
+
+DIAGNOSIS (deterministic, this worktree):
+- The INTENDED path WORKS. Flip the display (the anyzone {0} `doubleside`
+  toggle), then cast via the ALTERNATIVE-COST menu option ("Tergrid's Lantern"):
+  paid(alternative) is set (MTGRules.cpp ~L1144), the autostack AAFlip fires with
+  forcetype='legendary artifact', and the Lantern resolves. PROVEN by the
+  registered witness `probe/tergrid_lantern_altcost_wave24.txt` (green).
+- The BUG is a DIFFERENT menu option. `AATurnSide::resolve` (AllAbilities.cpp
+  ~L5500) updates the flipped card's MTGId to the back face ONLY when
+  `playMode != MODE_TEST_SUITE`. So in a LIVE game the post-flip card IS the
+  Lantern (artifact, {3}{B}, castable "normally"), and the click menu offers a
+  plain **"Cast Card Normally"** (MTGPutInPlayRule) NEXT TO the correct
+  alternative-cost option. "Cast Card Normally" pays {3}{B} but never sets
+  paid(alternative), so the `autostack ... if paid(alternative)` flip is skipped
+  and the base front (God) face resolves. The pilot picked that option.
+- HARNESS LIMITATION: because the suite path keeps the God's MTGId (the
+  MODE_TEST_SUITE branch), the "Cast Card Normally" option never appears in a
+  scripted fixture and the bug itself cannot be witnessed here — only the
+  correct path can.
+
+FIX SEAT (PARKED — not shipped; bug is currently benefit-side and a wrong change
+risks the just-achieved Tergrid cast+steal milestone): the "Cast Card Normally"
+path for a flipped modal-DFC back face must either be suppressed (leaving only
+the alternative-cost cast) or routed through the same forcetype flip so it can't
+deploy the front face. Both live in engine flip/cast machinery gated by the
+MODE_TEST_SUITE divergence above; they need live (non-suite) validation the
+harness can't provide. Reassess when the modal-DFC surface is next touched.

@@ -1,0 +1,27 @@
+# CS-002-family engine fix regression: a "Sacrifice another creature" cost
+# (SacrificeCost with an "other creature" filter) must NOT let its ability
+# react when the only controlled creature is the source itself.
+# Yawgmoth, Thran Physician (464065) alone: his -1/-1 ability costs
+# "Pay 1 life, Sacrifice another creature" - unpayable with no other creature.
+# Pre-fix SacrificeCost::canPay() always returned 1, so the ability was
+# offered; clicking it armed mExtraPayment and the game wedged forever behind
+# WaitForExtraPayment (the AI-seat spiral+fallback in the wave-23 corpus).
+# The clicks below must fall dead and the turn must reach SECONDMAIN unchanged.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:464065
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+464065
+grizzly bears
+goto secondmain
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:464065
+[PLAYER2]
+inplay:grizzly bears
+[END]

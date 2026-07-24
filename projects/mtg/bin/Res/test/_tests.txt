@@ -1025,6 +1025,8 @@ lexicon/trigger_landfall_targeted_damage.txt
 lexicon/mana_chosen_color_persists.txt
 lexicon/cost_untap_crackleburr.txt
 lexicon/cost_untap_gate_untapped.txt
+lexicon/cost_sacrifice_gate_alone.txt
+lexicon/cost_sacrifice_gate_fodder.txt
 lexicon/cost_ninjutsu_return_attacker.txt
 lexicon/mana_dynamic_value_graveyard.txt
 lexicon/mana_dynamic_value_graveyard_empty.txt
@@ -1046,3 +1048,4 @@ probe/glacial_revelation_partition.txt
 attacker_mana_tap_wave20.txt
 attacker_mana_tap_partial_wave21.txt
 fetchland_crack_after_landdrop_wave22.txt
+probe/tergrid_lantern_altcost_wave24.txt

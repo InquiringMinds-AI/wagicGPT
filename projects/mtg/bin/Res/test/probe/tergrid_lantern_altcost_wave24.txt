@@ -1,0 +1,50 @@
+# WITNESS (wave-24 ledger item R-DFC-BACKFACE-RESOLVES-FRONT).
+#
+# Tergrid, God of Fright // Tergrid's Lantern is a Kaldheim modal DFC. The
+# front face (God, {3}{B}{B}, 4/5 Legendary Creature) carries the back face as
+# an alternative cost:  other={3}{B} name(Tergrid's Lantern)  plus the flip
+# machinery  autostack=if paid(alternative) then flip(Tergrid's Lantern)
+# forcetype(Legendary Artifact).  The INTENDED cast of the Lantern face is:
+# (1) flip the display to the Lantern side (the anyzone {0} doubleside toggle),
+# then (2) cast via the ALTERNATIVE-COST option ("Tergrid's Lantern").  Paying
+# the alternative sets paid(alternative), the autostack fires, and the card
+# resolves as the Legendary Artifact -- NOT the God.
+#
+# This fixture drives exactly that path with only {3}{B} on the pool (the God's
+# {3}{B}{B} front cost is unaffordable, so only the alternative is legal) and
+# asserts the Lantern -- not Tergrid the God -- reaches the battlefield.  It
+# GUARDS the milestone: a regression that let the alternative-cost cast deploy
+# the front face would flip this red.
+#
+# NOTE on the live defect it does NOT cover: in a real (non-suite) game the
+# soft-flip (AATurnSide) updates the card's MTGId to the Lantern (that setMTGId
+# is skipped under MODE_TEST_SUITE, AllAbilities.cpp), so the click menu ALSO
+# offers a plain "Cast Card Normally" alongside the alternative-cost option.
+# Taking "Cast Card Normally" bypasses the paid(alternative) gate, the autostack
+# never fires, and the FRONT God face resolves (the observed vs27 s34 bug).  The
+# suite harness cannot reproduce that menu because it keeps the God's MTGId, so
+# that path is parked in engine-bugs.md, not witnessed here.
+#
+# The choice index is deterministic: setMenuObject builds the menu in ActionLayer
+# mObjects order, so the alternative-cost rule (lower ability index) is menu
+# position 0 and the "Flip Side" toggle is position 1.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Tergrid^ God of Fright
+manapool:{3}{B}
+[PLAYER2]
+life:20
+[DO]
+Tergrid, God of Fright
+no
+no
+Tergrid's Lantern
+choice 0
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Tergrid's Lantern
+[END]

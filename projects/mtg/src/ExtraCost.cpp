@@ -1549,6 +1549,31 @@ int SacrificeCost::canPay()
 {
     if (target && target->has(Constants::CANTBESACRIFIED))
         return 0;
+    //base ExtraCost::canPay() always says 1, which offers the activation as
+    //legal even when the sacrifice filter (e.g. "Sacrifice another creature")
+    //matches no sacrificeable permanent - the player (or AI) then enters a
+    //target-selection dead-end that can never commit (CS-002 family; the
+    //Yawgmoth-with-only-itself unpayable offer). Payable = at least one
+    //candidate the chooser accepts (and that may be sacrificed) exists.
+    //No tc means "sacrifice this card itself" (setSource set target=source),
+    //handled by the CANTBESACRIFIED check above.
+    if (tc && source)
+    {
+        GameObserver * g = source->getObserver();
+        if (!g)
+            return 1;
+        for (int i = 0; i < 2; i++)
+        {
+            MTGGameZone * z = g->players[i]->game->inPlay;
+            for (int k = 0; k < z->nb_cards; k++)
+            {
+                MTGCardInstance * c = z->cards[k];
+                if (c && !c->has(Constants::CANTBESACRIFIED) && tc->canTarget(c))
+                    return 1;
+            }
+        }
+        return 0;
+    }
     return 1;
 }
 

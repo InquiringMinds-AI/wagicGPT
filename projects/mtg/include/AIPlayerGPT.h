@@ -323,6 +323,21 @@ private:
     //content once done. A finished answer for a DIFFERENT prompt (stale
     //state drift) is dropped and the new request started.
     int pollCompletion(const string& userMsg, string& content);
+    //pollCompletion wrapped with ONE answer-locked retry: when a completed reply
+    //is decode-garbage (isDecodeGarbage), fires a single re-ask of the same
+    //decision with a short "answer only" prefix and a tight max_tokens, riding
+    //the same kChoicePending machinery (a second pollCompletion round). Returns
+    //kChoicePending while either attempt is in flight; 0 with the reply content
+    //once done (the retry's reply, which may itself still be unusable -> the
+    //caller's heuristic fallback). NEVER retries ordinary unparsed replies.
+    int pollCompletionRetry(const string& userMsg, string& content);
+    //True when a completed reply is a decode-COLLAPSE (token garbage): no
+    //well-formed coded answer line AND a long reply that is either
+    //repetition-signatured or >=30% markup/non-ASCII with near-zero prose. The
+    //shape that burns 80-120s and yields nothing (deck27 vs137 s12-14). Kept
+    //conservative: an ordinary long unparsed reply (real prose, no coded line)
+    //is NOT garbage and is never retried.
+    static bool isDecodeGarbage(const string& content);
     //Serialize the chat request (system prompt + the pending user message)
     //for the worker thread; built on the game thread, nothing shared.
     string buildRequestBody(const string& userMsg);
@@ -396,6 +411,19 @@ private:
     //read that as "state changed" and defeat the deadlock breaker.
     string mLastAskKey;
     int mLastChoice;
+    //Answer-locked decode-garbage retry (ITEM: decode-collapse mitigation).
+    //mRetryActivePrompt: the retry userMsg (prefix + base) currently in flight;
+    //empty when no retry is pending. mRetryBase: the base userMsg that active
+    //retry is for (abandon the retry if the decision drifts). mRetryDoneBase:
+    //a base userMsg whose single retry was already spent (enforces ONE retry
+    //and blocks re-detecting garbage on the retry's own reply). Latency of the
+    //first (garbage) attempt, summed into mLastLatencyMs at retry completion.
+    //mLastRetry: set when the reply handed back was a retry (translog retry=1).
+    string mRetryActivePrompt;
+    string mRetryBase;
+    string mRetryDoneBase;
+    long mRetryFirstLatencyMs;
+    bool mLastRetry;
 };
 
 #endif //WITH_GPT_AI

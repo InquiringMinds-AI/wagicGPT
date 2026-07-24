@@ -556,8 +556,159 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     return kChoicePending;
 }
 
+//A line-leading coded answer label (CHOICE:/ATTACK:/BLOCKS:/PUT:) with SOME
+//payload after it. Used only by the garbage detector: if the model emitted any
+//such line, the normal parse + salvage can work it and we must NOT retry.
+static bool hasCodedAnswerLine(const string& content)
+{
+    static const char * kLabels[] = { "choice:", "attack:", "blocks:", "put:" };
+    string low = content;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    size_t lineStart = 0;
+    while (lineStart <= low.size())
+    {
+        size_t lineEnd = low.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? low.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (low[s] == ' ' || low[s] == '\t'
+                           || low[s] == '*' || low[s] == '#' || low[s] == '-'
+                           || low[s] == '>' || low[s] == '`'))
+            s++;
+        for (size_t k = 0; k < sizeof(kLabels) / sizeof(kLabels[0]); k++)
+        {
+            size_t len = strlen(kLabels[k]);
+            if (end - s >= len && low.compare(s, len, kLabels[k]) == 0)
+            {
+                //require a non-space payload char after the label
+                size_t p = s + len;
+                while (p < end && (low[p] == ' ' || low[p] == '\t')) p++;
+                if (p < end)
+                    return true;
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    return false;
+}
+
+bool AIPlayerGPT::isDecodeGarbage(const string& content)
+{
+    //Conservative floor: a decode collapse is always long (the 80-120s spirals
+    //were 6.4-10.8k chars). Short/normal replies are never garbage-retried.
+    const size_t kMinLen = 800;
+    if (content.size() < kMinLen)
+        return false;
+    //A well-formed coded answer line means the parser/salvage can act on it -
+    //not a collapse; never retry (this is what keeps ordinary unparsed replies
+    //with a real answer line out of the retry path).
+    if (hasCodedAnswerLine(content))
+        return false;
+
+    size_t total = content.size();
+    size_t letters = 0, junk = 0;
+    for (size_t i = 0; i < total; i++)
+    {
+        unsigned char c = (unsigned char) content[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
+            letters++;
+        else if (c >= 0x80 || c == '*' || c == '#' || c == '`')
+            junk++; //non-ASCII (incl. U+FFFD collapse bytes) + markup symbols
+    }
+    //Signal 1: near-zero prose. A real reply - even a truncated one - is mostly
+    //English; a token collapse is punctuation/markup/garbage. <5% letters over a
+    //long reply cannot be a genuine unparsed answer (deck27 s12/s13/s14 ~0%).
+    bool lowProse = (letters * 100 < total * 5);
+    //Signal 2: markup/non-ASCII density (s13's U+FFFD **, s14's ``` ### fences).
+    bool markupHeavy = (junk * 100 >= total * 30);
+    //Signal 3: a short line repeated many times (the literal decode loop). Find
+    //the most frequent non-empty trimmed line; a collapse repeats ONE tiny line.
+    bool repetition = false;
+    {
+        std::map<string, int> freq;
+        size_t lineStart = 0, nonEmpty = 0, top = 0;
+        while (lineStart <= content.size())
+        {
+            size_t lineEnd = content.find('\n', lineStart);
+            size_t end = (lineEnd == string::npos) ? content.size() : lineEnd;
+            size_t a = lineStart, b = end;
+            while (a < b && (unsigned char) content[a] <= ' ') a++;
+            while (b > a && (unsigned char) content[b - 1] <= ' ') b--;
+            if (b > a && (b - a) <= 12) //only short lines feed the loop signature
+            {
+                string ln = content.substr(a, b - a);
+                int c = ++freq[ln];
+                if ((size_t) c > top) top = c;
+            }
+            if (b > a) nonEmpty++;
+            if (lineEnd == string::npos)
+                break;
+            lineStart = lineEnd + 1;
+        }
+        repetition = (top >= 20 && top * 10 >= nonEmpty * 3); //>=20x and >=30% of lines
+    }
+    return lowProse || markupHeavy || repetition;
+}
+
+int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
+{
+    //Mid-retry: poll the retry prompt (buildRequestBody sees mRetryActivePrompt
+    //and uses the tight retry max_tokens). If the decision drifted, abandon the
+    //pending retry and fall through to a fresh poll of the new decision.
+    if (!mRetryActivePrompt.empty())
+    {
+        if (userMsg == mRetryBase)
+        {
+            int r = pollCompletion(mRetryActivePrompt, content);
+            if (r == kChoicePending)
+                return kChoicePending;
+            //Retry finished: sum both attempts' latency into the record's field,
+            //spend this decision's one retry, and hand back the retry reply
+            //(possibly still unusable -> the caller's heuristic answers).
+            if (mLastLatencyMs >= 0 && mRetryFirstLatencyMs >= 0)
+                mLastLatencyMs += mRetryFirstLatencyMs;
+            mRetryDoneBase = userMsg;
+            mRetryActivePrompt.clear();
+            mRetryBase.clear();
+            mRetryFirstLatencyMs = -1;
+            mLastRetry = true;
+            return 0;
+        }
+        //Decision changed under a pending retry: drop it, poll the new decision.
+        mRetryActivePrompt.clear();
+        mRetryBase.clear();
+        mRetryFirstLatencyMs = -1;
+    }
+
+    int r = pollCompletion(userMsg, content);
+    if (r == kChoicePending)
+        return kChoicePending;
+
+    mLastRetry = false;
+    //Fire ONE answer-locked retry iff the reply is decode-garbage AND this
+    //decision's retry has not already been spent. isDecodeGarbage is
+    //conservative - ordinary unparsed replies (real prose, no coded line) are
+    //not garbage and fall straight through to the heuristic.
+    if (!content.empty() && userMsg != mRetryDoneBase && isDecodeGarbage(content))
+    {
+        static const char * kAnswerLockPrefix =
+            "IMPORTANT: your previous reply was corrupted (garbled, looping text with"
+            " no answer line). Reply with ONLY the required coded answer line"
+            " (CHOICE: / ATTACK: / BLOCKS:) and nothing else - no reasoning, no PLAN.\n\n";
+        mRetryFirstLatencyMs = mLastLatencyMs;
+        mRetryBase = userMsg;
+        mRetryActivePrompt = string(kAnswerLockPrefix) + userMsg;
+        setNotice("previous reply was corrupted - re-asking briefly", 3.0f);
+        DebugTrace("AIPlayerGPT: decode-garbage reply; launching one answer-locked retry");
+        return kChoicePending; //next tick polls the retry prompt
+    }
+    return 0;
+}
+
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -679,6 +830,14 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         {"opp_life", opponent() ? opponent()->life : 0},
         {"latency_ms", mLastLatencyMs},
     };
+    //Answer-locked decode-garbage retry: mark the record and note the first
+    //(garbage) attempt's latency separately; latency_ms above already carries the
+    //SUMMED first+retry round trip (set in pollCompletionRetry).
+    if (mLastRetry)
+    {
+        rec["retry"] = 1;
+        mLastRetry = false;
+    }
     mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
     //Narration delta: the game events that landed since the previous
     //record. A consumed cast's outcome (resolved/countered/died) shows up
@@ -1587,6 +1746,11 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
         maxTokens = mMaxTokens;
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
         maxTokens = atol(mt);
+    //Answer-locked retry: the re-ask needs only the coded line, so cap it tight
+    //to fail fast to the heuristic instead of burning another long spiral. This
+    //wins over any larger configured/env default for the retry request only.
+    if (!mRetryActivePrompt.empty() && userMsg == mRetryActivePrompt)
+        maxTokens = 512;
 
     json request = {
         {"model", mModel},
@@ -1995,34 +2159,39 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
     return salvaged;
 }
 
-//True when the reply's LAST well-formed CHOICE line is disavowed by an
-//explicit self-retraction phrase that plausibly refers to THE ANSWER, with no
-//subsequent well-formed CHOICE line - the model took its answer back without
-//replacing it, so the parsed digit must NOT be used (route to the heuristic).
-//False whenever a corrected CHOICE followed the retraction (that later line
-//becomes the last well-formed one, so nothing retracts it).
+//True when the resolved (last line-leading) coded CHOICE is not the model's
+//committed answer - route to the heuristic instead of executing the digit.
 //
-//REFERENCE-SCOPED (wave-22 HARNESS-N9). The wave-21 detector keyed on a
-//retraction phrase ANYWHERE after the CHOICE line and OVER-FIRED 4 of 5 times
-//(deck62 vs27/vs135/vs102, deck135 vs27): the model emitted the correct
-//answer-first "CHOICE: N" on line 1, NEVER retracted it, then used "Correction:"
-///"Wait" purely in DOWNSTREAM PLAN prose - mana math and rules asides about
-//OTHER cards (Fists/Shroud, islandwalk). Two conditions are now BOTH required:
-//  (a) the phrase must occur BEFORE the first line-leading PLAN: marker
-//      (everything after PLAN: is plan prose, never an answer disavowal). Under
-//      answer-first the coded line is line 1, so a mid-reasoning "correction"
-//      about rules trivia lives after PLAN: and no longer counts. This alone
-//      separates all 5 wave-21 witnesses: the ONE correct fire (deck35 vs62 s18,
-//      "CHOICE: 3 (Heart)" -> "Actually, no." at char 5327 -> PLAN switched to
-//      Fury at 7416) has its phrase BEFORE PLAN:; every false positive's
-//      "Correction:" sits AFTER PLAN:.
-//  (b) the phrase must plausibly refer to the ANSWER - its surrounding window
-//      names the chosen option (significant name-word or the option number),
-//      OR the phrase directly abuts the CHOICE line (the deck135 wave-20
-//      HARNESS-1 shape: "CHOICE: 4 (Cast nothing)" -> "Wait, I made a mistake"
-//      on the next line -> loop, no final CHOICE).
-//A false fallback here only routes to the (safe) heuristic; a false take (a
-//used retracted digit) is the harmful case we still catch.
+//REWORKED (wave-23 N9 residual, deck133 vs137/vs140 evidence). The wave-22
+//detector fired on any tight self-correction PHRASE ("Correction:"/"made a
+//mistake"/"Actually, no") that referenced the answer before PLAN:, and it
+//OVER-FIRED when the model revised a SUB-POINT of its reasoning while the coded
+//index stood unchanged (deck133 vs137 s29: a single sustained "CHOICE: 1", a
+//"*Correction:*" about Bloodghast's haste, the index never moved - yet a bare
+//number match on "1" in "2/1 attacker" tripped it). INDEX-WINS now trusts a
+//sustained in-range coded index; a generic self-correction phrase alone, with a
+//single sustained index and no contradictory coded sibling, NO LONGER fires.
+//retracted_choice now fires on exactly the two shapes that are genuinely not the
+//committed answer:
+//  (a) a SECOND, CONTRADICTORY coded "CHOICE: N" appearing AFTER the resolved
+//      answer (the last line-leading CHOICE, = salvageLoopedChoice's pick) and
+//      naming a DIFFERENT in-range option - the model talked itself onto another
+//      index in prose after answering (deck133 vs140 s9: line-1 "CHOICE: 2
+//      (Decline)" then, buried mid-reasoning, "So CHOICE: 1"). A clean
+//      line-leading RE-ANSWER is NOT this: salvage promotes the last line-leading
+//      CHOICE to the resolved answer, so nothing contradictory sits after it -
+//      the [B] retraction-then-new case still takes the new coded line.
+//  (b) an explicit PAYABILITY/LEGALITY disavowal of the CHOSEN action - the model
+//      says it cannot actually pay/cast/afford the option it coded (deck133 vs137
+//      s26: the engine offered an unpayable "Sacrifice another creature" Yawgmoth
+//      cost with no other creature; the model coded it, then proved it could not
+//      pay). Routing that to the heuristic is always safe. The phrase set is
+//      TIGHT and scoped to the pre-PLAN region AND to the chosen action (a
+//      name-word window, or the sole option of a one-option ask), so a payability
+//      aside about a DIFFERENT card (deck62 vs27 s10 "I cannot cast Fists ...",
+//      which also sits after PLAN:) cannot fire it.
+//A false fallback here only routes to the (safe) heuristic; a false take (a used
+//retracted digit) is the harmful case we still catch.
 bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int optionCount,
                                                const std::vector<string> * optionTexts)
 {
@@ -2120,52 +2289,69 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
     for (size_t i = 0; i < low.size(); i++)
         low[i] = (char) tolower((unsigned char) low[i]);
 
-    //Conservative and strong phrase list: each disavows the ANSWER, not merely
-    //a step of reasoning. Weak exploratory phrases ("let me reconsider", "on
-    //second thought") are deliberately EXCLUDED.
-    static const char * kRetract[] = {
-        "made a mistake", "i was wrong", "i'm wrong", "im wrong",
-        "that's wrong", "that is wrong", "actually, no", "scratch that",
-        "i made an error", "correction:"
-    };
-    const size_t kAbutChars = 140;   //(b) the phrase abuts the CHOICE line
-    const size_t kRefBack = 200, kRefFwd = 80; //(b) answer-reference window
-    for (size_t p = 0; p < sizeof(kRetract) / sizeof(kRetract[0]); p++)
+    //(a) A contradictory coded "CHOICE: N" AFTER the resolved answer's line.
+    //lastChoiceEnd is the END offset of the LAST line-leading well-formed CHOICE
+    //(salvage's resolved answer), so any "choice:" token found from there is
+    //necessarily mid-line prose - the model re-stating a DIFFERENT index after it
+    //already answered (deck133 vs140 s9: line-1 CHOICE: 2, then "So CHOICE: 1").
+    //A clean line-leading recode ([B] retraction-then-new) resolves lastChoiceEnd
+    //to the LATER line, so its earlier superseded index sits BEFORE the scan and
+    //never fires. The parroted template "CHOICE: [Number]" is skipped.
     {
-        string phrase = kRetract[p];
+        size_t scan = (size_t) lastChoiceEnd;
+        while ((scan = low.find("choice:", scan)) != string::npos)
+        {
+            size_t d = scan + 7;
+            while (d < low.size() && (low[d] == ' ' || low[d] == '\t'))
+                d++;
+            if (d < low.size() && low[d] == '[') { scan += 7; continue; }
+            if (d < low.size() && isdigit((unsigned char) low[d]))
+            {
+                size_t e = d;
+                while (e < low.size() && isdigit((unsigned char) low[e]))
+                    e++;
+                int n = atoi(low.substr(d, e - d).c_str());
+                if (n >= 0 && n <= optionCount && n != chosenNum)
+                    return true; //genuine second, contradictory coded index
+            }
+            scan += 7;
+        }
+    }
+
+    //(b) A PAYABILITY/LEGALITY disavowal of the CHOSEN action, before the first
+    //PLAN: marker, referencing that action. TIGHT set - each says the coded
+    //option itself cannot be paid/cast/afforded (never a weak "let me
+    //reconsider"). Reference is required so a payability aside about a DIFFERENT
+    //card does not fire it: either a name-word of the chosen option appears in the
+    //window, or the ask had a SINGLE option (the disavowal can only be about it,
+    //e.g. deck133 vs137 s26's lone unpayable Yawgmoth activation).
+    static const char * kUnpayable[] = {
+        "cannot pay", "can't pay", "cannot afford", "can't afford",
+        "cannot cast", "can't cast", "cannot sacrifice", "can't sacrifice",
+        "cannot legally", "can't legally", "unpayable", "impossible to pay",
+        "no legal target", "not a legal target",
+        "no other creature", "no other creatures", "no creature to sacrifice"
+    };
+    const size_t kPayBack = 160, kPayFwd = 120; //(b) answer-reference window
+    for (size_t p = 0; p < sizeof(kUnpayable) / sizeof(kUnpayable[0]); p++)
+    {
+        string phrase = kUnpayable[p];
         size_t pos = (size_t) lastChoiceEnd;
         while ((pos = low.find(phrase, pos)) != string::npos)
         {
             if (pos >= regionEnd)
-                break; //condition (a): only phrases before the PLAN: marker
-            //condition (b): abut the CHOICE line, OR reference the answer.
-            bool refs = (pos - (size_t) lastChoiceEnd) <= kAbutChars;
+                break; //before the first line-leading PLAN: marker only
+            bool refs = (optionCount == 1); //one option -> unambiguous referent
             if (!refs)
             {
-                size_t ws = (pos > kRefBack) ? pos - kRefBack : 0;
+                size_t ws = (pos > kPayBack) ? pos - kPayBack : 0;
                 if (ws < (size_t) lastChoiceEnd) ws = (size_t) lastChoiceEnd;
-                size_t we = pos + phrase.size() + kRefFwd;
+                size_t we = pos + phrase.size() + kPayFwd;
                 if (we > regionEnd) we = regionEnd;
                 string win = low.substr(ws, we - ws);
                 for (size_t w = 0; w < chWords.size() && !refs; w++)
                     if (win.find(chWords[w]) != string::npos)
                         refs = true;
-                //the chosen option number as a standalone token
-                if (!refs && chosenNum > 0)
-                {
-                    char buf[16];
-                    snprintf(buf, sizeof(buf), "%d", chosenNum);
-                    string num = buf;
-                    size_t np = 0;
-                    while (!refs && (np = win.find(num, np)) != string::npos)
-                    {
-                        bool lok = (np == 0) || !isdigit((unsigned char) win[np - 1]);
-                        size_t after = np + num.size();
-                        bool rok = (after >= win.size()) || !isdigit((unsigned char) win[after]);
-                        if (lok && rok) refs = true;
-                        np = after;
-                    }
-                }
             }
             if (refs)
                 return true;
@@ -2357,7 +2543,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     else
     {
         string content;
-        if (pollCompletion(userMsg, content) == kChoicePending)
+        if (pollCompletionRetry(userMsg, content) == kChoicePending)
         {
             //Round trip in flight: no action this tick. The Act override
             //keeps the empty clickstream from being committed as a pass.
@@ -2502,7 +2688,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
 
     string userMsg = assemblePrompt(tailStr);
     string content;
-    if (pollCompletion(userMsg, content) == kChoicePending)
+    if (pollCompletionRetry(userMsg, content) == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
 
     //Plan split BEFORE choice parsing: plan prose is full of numbers. Restrict
@@ -2796,13 +2982,45 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             else
                 o << "alternative cost";
             o << " " << cost->getAlternative()->toString();
-            if (card->isCreature())
+            //Adventure alternative casts put an INSTANT/SORCERY spell onto the
+            //stack, not the creature - the card's power/toughness belongs to the
+            //creature face you may cast LATER from exile, so printing "(5/5)"
+            //here read as "pay the adventure cost, get a 5/5 body now" and drove
+            //a confirmed misfire (deck131 s15: cast Usher to Safety expecting a
+            //creature, forced to bounce its own permanent). Suppress the P/T on
+            //this face and append the ADVENTURE SPELL's effect text instead
+            //(the creature-face option below still carries the P/T). Generalized
+            //by the adventure mechanism, not by card name.
+            bool isAdventureCast = card->has(Constants::ADVENTURE);
+            if (card->isCreature() && !isAdventureCast)
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << casts[ci].zoneLabel;
             o << hybridPipNote(cost->getAlternative());
             //Name the card an exile/pitch extra cost will consume, so a free
             //alt-cast cannot silently eat the deck's finisher unseen (#1d).
             o << pitchCostNote(card, cost->getAlternative());
+            if (isAdventureCast)
+            {
+                //The engine text= for an adventure is "<creature face> //
+                //<adventure spell>" (or, when the creature is vanilla, just the
+                //adventure spell with no separator - e.g. Shepherd of the Flock).
+                //The adventure face is always the part after " // "; with no
+                //separator the whole text IS the adventure effect.
+                string advText = card->text;
+                size_t sep = advText.find(" // ");
+                if (sep != string::npos)
+                    advText = advText.substr(sep + 4);
+                for (size_t ti = 0; ti < advText.size(); ti++)
+                    if (advText[ti] == '\n')
+                        advText[ti] = ' ';
+                if (advText.size() > 200)
+                {
+                    size_t cut = advText.rfind(' ', 200);
+                    advText = advText.substr(0, (cut == string::npos || cut < 100) ? 200 : cut) + "...";
+                }
+                if (!advText.empty())
+                    o << " {adventure spell: " << advText << "}";
+            }
         }
         //A response option offered because of pending stack objects names what
         //it can hit ("Cast Counterspell {u}{u} - can target on the stack:
@@ -3126,12 +3344,28 @@ int AIPlayerGPT::computeActions()
     //GUI's (GameStateDuel): the AI's own first turn, nothing developed yet.
     //Each distinct hand is asked about once (prompt-keyed cache); a mulligan
     //redraws the hand, which changes the prompt and earns a fresh ask.
+    //`inPlay->nb_cards == 0` is the reliable "I have developed nothing" signal
+    //for BOTH windows. The graveyard/exile "pristine" guards only make sense
+    //for the on-the-play window (turn 0): that player acts first, so anything
+    //in its own graveyard/exile would be self-inflicted. For the on-the-draw
+    //window (turn 1, pre-draw) the OPPONENT has already taken turn 0, and an
+    //Inquisition/Thoughtseize/mill can put the draw player's OWN cards into its
+    //graveyard or exile before this window ever opens - which must NOT silently
+    //deny the STEP-1 mulligan (verified: deck131 vs deck133, opponent
+    //Inquisition of Kozilek discarded Young Pyromancer pre-upkeep, and the
+    //mulligan-worthy hand was kept with no decision record).
+    bool mulliganOnDraw = (observer->turn == 1
+                           && observer->getCurrentGamePhase() < MTG_PHASE_DRAW);
+    bool mulliganOnPlay = (observer->turn == 0
+                           && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN);
+    bool mulliganPristine = mulliganOnDraw
+        ? true
+        : (game->graveyard->nb_cards == 0 && game->exile->nb_cards == exiledBySerum);
     if (!mEndpoint.empty()
-        && ((observer->turn == 0 && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN)
-            || (observer->turn == 1 && observer->getCurrentGamePhase() < MTG_PHASE_DRAW))
+        && (mulliganOnPlay || mulliganOnDraw)
         && observer->currentPlayer == this && observer->currentlyActing() == this
         && game->hand->nb_cards > 0 && game->inPlay->nb_cards == 0
-        && game->graveyard->nb_cards == 0 && game->exile->nb_cards == exiledBySerum)
+        && mulliganPristine)
     {
         std::ostringstream q;
         q << "Mulligan decision: you are on " << game->hand->nb_cards
@@ -3205,6 +3439,24 @@ void AIPlayerGPT::Render()
     font->DrawString(buf, SCREEN_WIDTH / 2, 2, JGETEXT_CENTER);
 }
 
+//The ANNOUNCE_X ask header. States the mana CAP and its reason so the model
+//does not reason about an X its mana cannot reach (wave-23 deck140 vs27 s46:
+//the model computed X=20 "lethal" while the engine offered at most X=6). capX =
+//the highest AFFORDABLE X = the last option's X value (option index == X value,
+//bounded upstream by ManaEngine::maxAnnounceableX). Factored out so the PARSETEST
+//covers the exact production string.
+static string announceXHeader(const string& spell, int capX)
+{
+    std::ostringstream xa;
+    xa << "Announce the value of X for " << spell
+       << ". You can afford X up to " << capX << " with your current mana"
+       << " - higher values are NOT offered (they are unaffordable), so do not"
+       << " plan around an X above " << capX << ". Every listed value is"
+       << " affordable; option 1 is the LARGEST X (X = " << capX << ")."
+       << " Reply with the OPTION number, not the X value:";
+    return xa.str();
+}
+
 int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & act)
 {
     MTGCardInstance * ctx = req.contextCard;
@@ -3222,15 +3474,21 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //instead of at zero. The contract's index==X invariant and the
         //other consumers are untouched - this is presentation only.
         vector<string> shown(req.optionTexts.rbegin(), req.optionTexts.rend());
+        //State the CAP and its reason (wave-23 ITEM, deck140 vs27 s46). The
+        //offered X values top out at the highest AFFORDABLE X (mana-limited);
+        //option index == X value, so the cap is the last option's X = the option
+        //count minus one. Without this the model reasons about an X its mana
+        //cannot reach (s46: computed X=20 as "lethal" while the engine offered
+        //at most X=6) - a belief-vs-menu mismatch that costs a long reply and can
+        //mis-place a kill. Cheap, truthful, no option changes: the cap already
+        //bounds the option set built upstream (ManaEngine::maxAnnounceableX).
+        int capX = (int) req.optionTexts.size() - 1;
         //Pass the spell being announced as the pending source: the model echoes
         //"Cast <spell> with X=N" against the bare "X = N" option, and INDEX-WINS
         //treats an echo that names the source spell as a self-reference rather
         //than a stale answer (wave-23 ITEM A shape 1, deck140 Black Sun's Zenith).
-        int pick = askModel("Announce the value of X for "
-                            + (ctx ? ctx->getDisplayName() : string("this spell"))
-                            + " (every listed value is affordable; option 1 is the LARGEST X)."
-                            + " Reply with the OPTION number, not the X value:", shown,
-                            true, ctx ? ctx->getDisplayName() : string());
+        int pick = askModel(announceXHeader(ctx ? ctx->getDisplayName() : string("this spell"), capX),
+                            shown, true, ctx ? ctx->getDisplayName() : string());
         if (pick == kChoicePending)
             return kChoicePending;
         if (pick >= 0 && pick < (int) shown.size())
@@ -4135,7 +4393,7 @@ int AIPlayerGPT::chooseAttackers()
     string userMsg = assemblePrompt(tail.str());
 
     string content;
-    if (pollCompletion(userMsg, content) == kChoicePending)
+    if (pollCompletionRetry(userMsg, content) == kChoicePending)
         return 1; //decision in flight; nothing declared yet, re-poll next tick
 
     //Plan split BEFORE the attacker-set parse: numbers (and words like
@@ -4466,7 +4724,7 @@ int AIPlayerGPT::chooseBlockers()
     string userMsg = assemblePrompt(tail.str());
 
     string content;
-    if (pollCompletion(userMsg, content) == kChoicePending)
+    if (pollCompletionRetry(userMsg, content) == kChoicePending)
         return 1; //decision in flight; nothing declared yet, re-poll next tick
 
     //Plan split BEFORE the assignment parse: a "B2" or bare numbers in the
@@ -4783,7 +5041,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
                            eligibleForOptionOne, revealSource, pickExactlyOne));
 
     string content;
-    if (pollCompletion(userMsg, content) == kChoicePending)
+    if (pollCompletionRetry(userMsg, content) == kChoicePending)
         return 0; //decision in flight; the display waits and re-polls next tick
 
     //Plan split BEFORE the subset parse: bare numbers in the plan prose must
@@ -5009,12 +5267,15 @@ void AIPlayerGPT::runParseSelfTest()
     // ---- ITEM B: retracted CHOICE + template-parrot ----
     cout << "\n[B] retracted / duplicate CHOICE lock-in + template-parrot lines\n";
     {
+        //Wave-23 rework: a generic self-correction phrase ("made a mistake") with
+        //a single SUSTAINED coded index and no contradictory coded sibling no
+        //longer retracts - INDEX-WINS trusts the coded digit (deck133 s29 class).
         string retractNoRepl = "CHOICE: 4 (Cast nothing right now)\n"
                                "Wait, I made a mistake in my reasoning.\n"
                                "cast cast cast cast the golem instead\n";
         int r = RESOLVE(retractNoRepl, 5, opts);
-        cout << "     retracted-no-replacement CHOICE 4 -> " << r << " (must NOT be 4)\n";
-        CHECK(r == -1, "B retracted-first-choice-no-replacement -> fallback, not 4");
+        cout << "     generic-phrase + sustained CHOICE 4 -> " << r << " (INDEX-WINS: trust 4)\n";
+        CHECK(r == 4, "B generic self-correction with a sustained coded index is trusted (not retracted)");
 
         string parrot = "PLAN: deploy the threat.\n"
                         "CHOICE: [Number] ([Name])\n"
@@ -5098,8 +5359,9 @@ void AIPlayerGPT::runParseSelfTest()
     // ================= WAVE-22 items (N9 retract over-fire / stale-echo A+B) ==
     // Built from the real matchups-20260723-084938 corpus replies (seq cited).
 
-    // ---- ITEM 1 (HARNESS-N9): retracted_choice must be REFERENCE-SCOPED ----
-    cout << "\n[N9] retracted_choice: fire only when the retraction is before PLAN: AND refs the answer\n";
+    // ---- ITEM 1 (HARNESS-N9, REWORKED wave-23): retracted_choice fires ONLY on
+    //      (a) a contradictory second coded index or (b) a payability disavowal ----
+    cout << "\n[N9] retracted_choice: over-fire guards stay clean; generic self-correction no longer retracts a sustained index\n";
     {
         // deck62 vs27 s10 (real, FALSE POSITIVE): correct CHOICE 1 (Play Forest)
         // never retracted; "Correction:" lives in the DOWNSTREAM PLAN prose
@@ -5130,27 +5392,82 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "     deck135 vs27 s26 (rules 'Correction:' after PLAN) -> " << r2 << " (must be 2)\n";
         CHECK(r2 == 2, "N9 FP rules-aside: downstream 'Correction:' about islandwalk does NOT retract");
 
-        // deck35 vs62 s18 (real, the ONE CORRECT fire): snap CHOICE 3 (Heart),
-        // "Actually, no." BEFORE the PLAN: marker referencing Heart Sliver, and
-        // the final PLAN switches to Fury. This MUST still route to the heuristic.
+        // deck35 vs62 s18 (real): snap CHOICE 3 (Heart), "Actually, no." before
+        // PLAN referencing Heart, PLAN switches to Fury IN PROSE (no recoded
+        // CHOICE). Wave-23 rework: a PROSE-only reversal that never re-issues a
+        // coded CHOICE line is now trusted at the coded index (deck133 ruling:
+        // "where one in-range coded index is sustained, INDEX-WINS trusts it").
         vector<string> slivers;
         slivers.push_back("Cast Spinneret Sliver {1}{g} (2/2)");
         slivers.push_back("Cast Fury Sliver {5}{r} (3/3)");
         slivers.push_back("Cast Heart Sliver {1}{r} (1/1)");
         slivers.push_back("Cast nothing right now");
-        string correctFire =
+        string proseSwitch =
             "CHOICE: 3 (Cast Heart Sliver)\n"
             "I will follow the plan and cast Heart Sliver to add a creature and hope for the best. Actually, no. The strategy guide says attack every turn; I must maximize damage now and Fury Sliver deals more.\n"
             "PLAN: Cast Fury Sliver to add a 3/3 double strike creature to my board, then attack with all four creatures for lethal.\n";
-        int r3 = RESOLVE(correctFire, 4, slivers);
-        cout << "     deck35 vs62 s18 ('Actually, no.' before PLAN, refs Heart) -> " << r3 << " (must be -1: real change of mind)\n";
-        CHECK(r3 == -1, "N9 correct fire kept: pre-PLAN retraction referencing the answer still fires");
+        int r3 = RESOLVE(proseSwitch, 4, slivers);
+        cout << "     deck35 vs62 s18 (prose-only switch, no recoded CHOICE) -> " << r3 << " (INDEX-WINS: trust 3)\n";
+        CHECK(r3 == 3, "N9 rework: a prose-only reversal with no recoded CHOICE is trusted, not retracted");
 
-        // Guard: the wave-20 HARNESS-1 shape (no PLAN:, phrase abuts the CHOICE) still fires.
+        // Guard: the wave-20 abut shape (generic phrase, single sustained index)
+        // no longer retracts either - it is generic self-correction, not a coded
+        // contradiction or a payability disavowal.
         string abut = "CHOICE: 1 (Play Forest)\nWait, I made a mistake. Hold the land instead.\n";
         int r4 = RESOLVE(abut, 2, land);
-        cout << "     no-PLAN retraction abutting the CHOICE -> " << r4 << " (must be -1)\n";
-        CHECK(r4 == -1, "N9 abut case: a retraction on the line right after CHOICE still fires");
+        cout << "     generic phrase abutting a sustained CHOICE -> " << r4 << " (INDEX-WINS: trust 1)\n";
+        CHECK(r4 == 1, "N9 rework: generic self-correction abutting a sustained coded index is trusted");
+    }
+
+    // ---- WAVE-23 N9 residual: the three real deck133 replies (matchups-20260724-013710) ----
+    cout << "\n[N9-W23] contradictory-coded-index (a) fires; payability disavowal (b) fires; sub-point Correction does NOT\n";
+    {
+        // deck133 vs140 s9 (real, GENUINE - (a)): line-1 "CHOICE: 2 (Decline)",
+        // then the reasoning oscillates and buries "So CHOICE: 1" in prose. The
+        // resolved line-leading answer (2) is contradicted by a later coded index
+        // (1) -> retract. (Excerpt preserves the two coded tokens + order.)
+        vector<string> bg; bg.push_back("Put in Play"); bg.push_back("Decline - do nothing");
+        string genuine =
+            "CHOICE: 2 (Decline - do nothing)\n"
+            "According to your strategy guide you should prioritize Gray Merchant. "
+            "But wait, I have 3 Swamps, Gray Merchant costs 5, I cannot cast him. "
+            "The best sequence: cast Bloodghast, then Inquisition.\n"
+            "So CHOICE: 1.\n"
+            "PLAN: Cast Bloodghast to build the board and devotion, then Inquisition.\n";
+        int g9 = RESOLVE(genuine, 2, bg);
+        cout << "     deck133 vs140 s9 (line-1 CHOICE 2, prose CHOICE 1) -> " << g9 << " (must be -1: (a) contradictory index)\n";
+        CHECK(g9 == -1, "N9-W23 (a): a prose coded index contradicting the resolved answer retracts (genuine s9)");
+
+        // deck133 vs137 s26 (real, ENGINE-CAUSED - (b)): a SINGLE-option ask; the
+        // engine offered an unpayable "Sacrifice another creature" Yawgmoth cost;
+        // the model coded 1 then proved it cannot pay. Payability disavowal of the
+        // sole option -> retract (safe; the engine cause is fixed separately).
+        vector<string> yaw; yaw.push_back("-1/-1 Counter with Yawgmoth, Thran Physician targeting Venerated Loxodon [cost: Life, Sacrifice]");
+        string unpayable =
+            "CHOICE: 1 (-1/-1 Counter with Yawgmoth, Thran Physician targeting Venerated Loxodon)\n"
+            "The prompt says 'Sacrifice another creature'. I have no other creatures on the battlefield. "
+            "My Bloodghast is in the graveyard. I cannot sacrifice a creature I don't control, and I cannot pay the cost. "
+            "But the game lists it as legal, so I will choose 1.\n"
+            "PLAN: Activate Yawgmoth to place a -1/-1 counter and draw a card.\n";
+        int u26 = RESOLVE(unpayable, 1, yaw);
+        cout << "     deck133 vs137 s26 (sole option, 'cannot pay'/'cannot sacrifice') -> " << u26 << " (must be -1: (b) payability)\n";
+        CHECK(u26 == -1, "N9-W23 (b): a payability disavowal of the sole coded action retracts (engine-caused s26)");
+
+        // deck133 vs137 s29 (real, OVER-FIRE the rework KILLS): a single sustained
+        // "CHOICE: 1 (Play Polluted Delta)", a "*Correction:*" about Bloodghast's
+        // haste (a reasoning sub-point), a bare "2/1 attacker" number. No second
+        // coded index, no payability disavowal of the LAND play -> must NOT fire.
+        vector<string> pd; pd.push_back("Play Polluted Delta"); pd.push_back("Decline - do nothing");
+        string subpoint =
+            "CHOICE: 1 (Play Polluted Delta)\n"
+            "Playing Polluted Delta fetches a Swamp and triggers Bloodghast, "
+            "returning it as a 2/1 attacker with haste (opponent at 18 life). "
+            "*Correction:* Bloodghast's haste is only at 10 or less; opponent is at 18, "
+            "so it returns with summoning sickness. Still huge - it adds devotion.\n"
+            "PLAN: Play Polluted Delta, fetch a Swamp, return Bloodghast, then Gray Merchant next turn.\n";
+        int s29 = RESOLVE(subpoint, 2, pd);
+        cout << "     deck133 vs137 s29 (sub-point Correction, sustained CHOICE 1) -> " << s29 << " (must be 1: no over-fire)\n";
+        CHECK(s29 == 1, "N9-W23: a sub-point 'Correction:' with a sustained coded index does NOT retract (s29 over-fire killed)");
     }
 
     // ---- ITEM 2 (stale-echo family A): spell-name-prefix on a TARGET echo ----
@@ -5202,6 +5519,57 @@ void AIPlayerGPT::runParseSelfTest()
         int c3 = parseChoice("1 (Boomerang targeting Inkfathom Infiltrator)", 3, &tgt, &st3, &src);
         cout << "     mismatched source ('Boomerang' vs 'Unsummon') -> " << c3 << " (INDEX-WINS: index names option 1's target)\n";
         CHECK(c3 == 1 && !st3, "A2 INDEX-WINS: a mismatched spell prefix still trusts the in-range index whose target matches option 1");
+    }
+
+    // ---- WAVE-23 X-menu cap header: the ANNOUNCE_X ask states the affordable cap ----
+    cout << "\n[W23-X] ANNOUNCE_X header states the mana cap + reason (deck140 vs27 s46)\n";
+    {
+        // capX = highest affordable X (option index == X value). The header must
+        // state the cap so the model cannot plan an unaffordable X (s46: reasoned
+        // X=20 "lethal" while the engine offered at most X=6).
+        string h6 = announceXHeader("Black Sun's Zenith", 6);
+        cout << "     header(cap=6): " << h6 << "\n";
+        CHECK(h6.find("X up to 6") != string::npos, "W23-X header states the numeric cap");
+        CHECK(h6.find("Black Sun's Zenith") != string::npos, "W23-X header names the spell");
+        CHECK(h6.find("above 6") != string::npos, "W23-X header warns against planning above the cap");
+        CHECK(h6.find("LARGEST X (X = 6)") != string::npos, "W23-X header ties option 1 to the cap value");
+        // A different cap threads the same value everywhere (data-driven, no hardcode).
+        string h2 = announceXHeader("Rakdos's Return", 2);
+        CHECK(h2.find("X up to 2") != string::npos && h2.find("(X = 2)") != string::npos,
+              "W23-X cap value is data-driven, not hardcoded");
+    }
+
+    // ---- WAVE-23 decode-collapse detector: retry the garbage shape, never normal replies ----
+    cout << "\n[W23-G] isDecodeGarbage: the deck27 vs137 s12-14 collapse shapes fire; normal replies do NOT\n";
+    {
+        // s12 (real shape): '**' + whitespace repetition, ASCII, near-zero prose.
+        string g12; for (int i = 0; i < 250; i++) g12 += "\n\n    **";
+        cout << "     s12 (** repetition, len " << g12.size() << ") -> " << AIPlayerGPT::isDecodeGarbage(g12) << "\n";
+        CHECK(AIPlayerGPT::isDecodeGarbage(g12), "W23-G s12 shape (** repetition, no prose) is decode-garbage");
+        // s13 (real shape): '**' interleaved with U+FFFD collapse bytes.
+        string g13; for (int i = 0; i < 250; i++) g13 += "\xef\xbf\xbd**\n\n";
+        CHECK(AIPlayerGPT::isDecodeGarbage(g13), "W23-G s13 shape (U+FFFD ** repetition) is decode-garbage");
+        // s14 (real shape): '### N.' inside ``` code fences, repeated.
+        string g14; for (int i = 0; i < 200; i++) g14 += "```\n### 0.\n```\n";
+        CHECK(AIPlayerGPT::isDecodeGarbage(g14), "W23-G s14 shape (### fenced repetition) is decode-garbage");
+
+        // NORMAL replies must NOT trigger (retry only on the collapse shape):
+        // (1) a long English reply WITH a coded line (the 12k mana-rederivation class).
+        string normLong = "CHOICE: 2 (Cast Damnation)\n";
+        for (int i = 0; i < 60; i++)
+            normLong += "I re-derive my mana: three Swamps make black, and I need double black for the sweeper this turn.\n";
+        CHECK(!AIPlayerGPT::isDecodeGarbage(normLong), "W23-G a long prose reply WITH a coded line is not garbage");
+        // (2) a long English reply with NO coded line (truncated reasoning) - NEVER retry.
+        string normNoCode;
+        for (int i = 0; i < 40; i++)
+            normNoCode += "I weigh attacking versus holding my creatures back given the opposing board and my open mana.\n";
+        cout << "     ordinary unparsed prose (no coded line, len " << normNoCode.size() << ") -> " << AIPlayerGPT::isDecodeGarbage(normNoCode) << " (must be 0)\n";
+        CHECK(!AIPlayerGPT::isDecodeGarbage(normNoCode), "W23-G an ordinary long unparsed prose reply is NOT garbage (no retry)");
+        // (3) short replies are never garbage.
+        CHECK(!AIPlayerGPT::isDecodeGarbage("**"), "W23-G a short reply is not garbage");
+        // (4) a coded ATTACK line present -> not garbage even amid trailing markup noise.
+        string atk = "ATTACK: A1, A2, A3\n"; for (int i = 0; i < 200; i++) atk += "**\n";
+        CHECK(!AIPlayerGPT::isDecodeGarbage(atk), "W23-G a coded ATTACK line present -> not garbage");
     }
 
     // ==================== WAVE-23 items (ITEM A: INDEX-WINS echo root fix, +

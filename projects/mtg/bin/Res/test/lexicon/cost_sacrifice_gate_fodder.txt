@@ -1,0 +1,29 @@
+# Companion to cost_sacrifice_gate_alone: the legitimate 2+ creature case must
+# still work. Yawgmoth (464065) + a fodder creature (Ornithopter): the
+# "Sacrifice another creature" ability IS payable and must still be offered and
+# resolve - sacrifice Ornithopter, put a -1/-1 counter on the opposing Grizzly
+# Bears, draw a card (Mind Stone), pay 1 life. Guards the SacrificeCost::canPay
+# candidate-existence check against over-restriction.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:464065,ornithopter
+library:mind stone
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+464065
+ornithopter
+grizzly bears
+goto secondmain
+goto secondmain
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:464065
+graveyard:ornithopter
+hand:mind stone
+life:19
+[PLAYER2]
+inplay:grizzly bears
+[END]
