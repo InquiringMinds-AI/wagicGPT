@@ -708,7 +708,8 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false)
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+      mPregameBottomAsked(false), mPregameBottomForMulls(-1)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -3339,53 +3340,11 @@ int AIPlayerGPT::computeActions()
         }
     }
 
-    //Mulligan: the engine offers it to humans through the game menu and the
-    //heuristic AI simply never mulligans. The window predicate mirrors the
-    //GUI's (GameStateDuel): the AI's own first turn, nothing developed yet.
-    //Each distinct hand is asked about once (prompt-keyed cache); a mulligan
-    //redraws the hand, which changes the prompt and earns a fresh ask.
-    //`inPlay->nb_cards == 0` is the reliable "I have developed nothing" signal
-    //for BOTH windows. The graveyard/exile "pristine" guards only make sense
-    //for the on-the-play window (turn 0): that player acts first, so anything
-    //in its own graveyard/exile would be self-inflicted. For the on-the-draw
-    //window (turn 1, pre-draw) the OPPONENT has already taken turn 0, and an
-    //Inquisition/Thoughtseize/mill can put the draw player's OWN cards into its
-    //graveyard or exile before this window ever opens - which must NOT silently
-    //deny the STEP-1 mulligan (verified: deck131 vs deck133, opponent
-    //Inquisition of Kozilek discarded Young Pyromancer pre-upkeep, and the
-    //mulligan-worthy hand was kept with no decision record).
-    bool mulliganOnDraw = (observer->turn == 1
-                           && observer->getCurrentGamePhase() < MTG_PHASE_DRAW);
-    bool mulliganOnPlay = (observer->turn == 0
-                           && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN);
-    bool mulliganPristine = mulliganOnDraw
-        ? true
-        : (game->graveyard->nb_cards == 0 && game->exile->nb_cards == exiledBySerum);
-    if (!mEndpoint.empty()
-        && (mulliganOnPlay || mulliganOnDraw)
-        && observer->currentPlayer == this && observer->currentlyActing() == this
-        && game->hand->nb_cards > 0 && game->inPlay->nb_cards == 0
-        && mulliganPristine)
-    {
-        std::ostringstream q;
-        q << "Mulligan decision: you are on " << game->hand->nb_cards
-          << " cards. Keep this opening hand, or mulligan (shuffle it back and draw one fewer)?";
-        vector<string> opts;
-        opts.push_back("Keep this hand");
-        opts.push_back("Mulligan");
-        int pick = askModel(q.str(), opts, false); //keep = non-action; a taken mulligan narrates below
-        if (pick == kChoicePending)
-            return 1; //decision in flight; poll again next tick
-        if (pick == 1)
-        {
-            DebugTrace("AIPlayerGPT: taking a mulligan at " << game->hand->nb_cards << " cards");
-            narrateDecision("You took a mulligan");
-            mDealDone = false; //re-open the opening-hand collapse for the redraw
-            observer->Mulligan(this);
-            return 1;
-        }
-        //keep (0), or defer/failure (-1): play on
-    }
+    //The mulligan is now a PRE-GAME PHASE (PreGamePhase, before turn 1), not an
+    //in-game window here: the old turn-0/turn-1 mulligan hack was removed with
+    //the London pre-game phase. This player's opening-hand decisions arrive
+    //through the pregameMulliganDecision / pregameChooseBottom / pregameLeyline
+    //hooks below, driven by PreGamePhase while GameObserver::Update is gated.
     return AIPlayerBaka::computeActions();
 }
 
@@ -5103,6 +5062,164 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     return 1;
 }
 
+//---- Pre-game (opening-hand) decision hooks (PreGamePhase, before turn 1) ----
+
+int AIPlayerGPT::pregameMulliganDecision(int mullsTaken)
+{
+    if (mEndpoint.empty())
+        return AIPlayerBaka::pregameMulliganDecision(mullsTaken);
+    std::ostringstream q;
+    int keepSize = startingHandSize() - mullsTaken;
+    q << "Pre-game mulligan decision (London mulligan). You have a fresh "
+      << game->hand->nb_cards << "-card opening hand";
+    if (mullsTaken > 0)
+        q << ", and having already taken " << mullsTaken << " mulligan"
+          << (mullsTaken > 1 ? "s" : "") << " you will bottom " << mullsTaken
+          << " card" << (mullsTaken > 1 ? "s" : "") << " on a keep (keeping "
+          << keepSize << ")";
+    q << ". Keep this hand, or mulligan (shuffle back and draw " << startingHandSize()
+      << " again, bottoming one more at the next keep)?";
+    vector<string> opts;
+    opts.push_back("Keep this hand");
+    opts.push_back("Mulligan");
+    int pick = askModel(q.str(), opts, true);
+    if (pick == kChoicePending)
+        return PREGAME_PENDING;
+    if (pick < 0)
+        return AIPlayerBaka::pregameMulliganDecision(mullsTaken);
+    return pick; //0 keep, 1 mulligan
+}
+
+int AIPlayerGPT::pregameLeylineDecision(MTGCardInstance * card)
+{
+    if (mEndpoint.empty() || !card)
+        return AIPlayerBaka::pregameLeylineDecision(card);
+    std::ostringstream q;
+    q << "Pre-game action (CR 103.6): you may begin the game with " << card->name
+      << " already on the battlefield (its static ability is live for the whole"
+         " game). Put it onto the battlefield?";
+    vector<string> opts;
+    opts.push_back("Yes, begin the game with " + card->name + " on the battlefield");
+    opts.push_back("No, keep it in hand");
+    int pick = askModel(q.str(), opts, true);
+    if (pick == kChoicePending)
+        return PREGAME_PENDING;
+    if (pick < 0)
+        return AIPlayerBaka::pregameLeylineDecision(card);
+    return pick == 0 ? 1 : 0;
+}
+
+//Build the tail for the ONE bundled BOTTOM-N ask (reuses the reveal PUT: reply
+//shape; parsed by parseAttackerSet / salvageLoopedSubset like decideReveal).
+string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& hand, int need)
+{
+    std::ostringstream tail;
+    int keep = (int) hand.size() - need;
+    tail << "London mulligan bottoming (CR 103.5): you kept after " << need
+         << " mulligan" << (need > 1 ? "s" : "") << ", so you must put EXACTLY "
+         << need << " card" << (need > 1 ? "s" : "")
+         << " from your hand on the BOTTOM of your library. Keep your best "
+         << keep << ", bottom your worst " << need << ".\n";
+    for (size_t j = 0; j < hand.size(); j++)
+    {
+        tail << (j + 1) << ". " << hand[j]->name;
+        if (hand[j]->isLand())
+            tail << " (land)";
+        else if (hand[j]->getManaCost())
+            tail << " (cost " << hand[j]->getManaCost()->getConvertedCost() << ")";
+        string txt = cardTextSnippet(hand[j], 120);
+        if (!txt.empty())
+            tail << " {text: " << txt << "}";
+        tail << "\n";
+    }
+    tail << "On the FIRST line write PUT: followed by the " << need << " card number"
+         << (need > 1 ? "s" : "") << " you send to the bottom, comma-separated (e.g. \"PUT: "
+         << (need == 1 ? "3" : "3, 5") << "\"); then brief reasoning; then your PLAN: line last.";
+    return tail.str();
+}
+
+MTGCardInstance * AIPlayerGPT::pregameChooseBottom(int need, int chosenSoFar, int & status)
+{
+    status = 0;
+    if (mEndpoint.empty())
+        return AIPlayerBaka::pregameChooseBottom(need, chosenSoFar, status);
+
+    //ONE bundled ask per keep; then pop the queued cards one per call.
+    if (!mPregameBottomAsked || mPregameBottomForMulls != need)
+    {
+        vector<MTGCardInstance*> hand;
+        for (int i = 0; i < game->hand->nb_cards; i++)
+            hand.push_back(game->hand->cards[i]);
+        if (mSystemPrompt.empty())
+            buildSystemPrompt();
+        string userMsg = assemblePrompt(buildPregameBottomAskText(hand, need));
+        string content;
+        if (pollCompletionRetry(userMsg, content) == kChoicePending)
+        {
+            status = PREGAME_PENDING;
+            return NULL; //call in flight; PreGamePhase re-polls next tick
+        }
+        string decisionPart = consumePlan(content);
+        vector<bool> send;
+        vector<string> names;
+        for (size_t j = 0; j < hand.size(); j++)
+            names.push_back(hand[j]->name);
+        int result = content.empty() ? -1
+                     : parseAttackerSet(decisionPart, hand.size(), send, &names);
+        if (result < 0 && !content.empty())
+        {
+            int sal = salvageLoopedSubset(content, "PUT:", hand.size(), names, send);
+            if (sal >= 1)
+                result = sal;
+        }
+        mPregameBottomQueue.clear();
+        string chosen;
+        if (result >= 0)
+            for (size_t j = 0; j < hand.size() && (int) mPregameBottomQueue.size() < need; j++)
+                if (j < send.size() && send[j])
+                {
+                    mPregameBottomQueue.push_back(hand[j]);
+                    chosen += (chosen.empty() ? "" : ", ") + hand[j]->name;
+                }
+        //Enforce EXACTLY N: the model under-picked or failed -> fill with the
+        //highest-cost cards not already chosen (the heuristic policy). We already
+        //capped at N above, so over-picks are trimmed.
+        while ((int) mPregameBottomQueue.size() < need)
+        {
+            MTGCardInstance * fill = NULL;
+            int fc = -1;
+            for (int i = 0; i < game->hand->nb_cards; i++)
+            {
+                MTGCardInstance * c = game->hand->cards[i];
+                bool already = false;
+                for (size_t k = 0; k < mPregameBottomQueue.size(); k++)
+                    if (mPregameBottomQueue[k] == c) { already = true; break; }
+                if (already)
+                    continue;
+                int cost = c->getManaCost() ? c->getManaCost()->getConvertedCost() : 0;
+                if (cost > fc) { fc = cost; fill = c; }
+            }
+            if (!fill)
+                break;
+            mPregameBottomQueue.push_back(fill);
+        }
+        writeTransLog("bottom", userMsg, content, result, (int) hand.size(), chosen,
+                      result < 0 ? (content.empty() ? "empty_reply" : "unparsed_reply") : NULL,
+                      &names);
+        mPregameBottomAsked = true;
+        mPregameBottomForMulls = need;
+    }
+    //Pop the next queued card that is still in hand.
+    while (!mPregameBottomQueue.empty())
+    {
+        MTGCardInstance * c = mPregameBottomQueue.front();
+        mPregameBottomQueue.erase(mPregameBottomQueue.begin());
+        if (game->hand->hasCard(c))
+            return c;
+    }
+    return AIPlayerBaka::pregameChooseBottom(need, chosenSoFar, status);
+}
+
 //Env-gated (WAGIC_GPT_PARSETEST) self-test: drives the wave-19 failing replies
 //and synthetic decode-spiral strings through the REAL static parse/salvage
 //paths and prints before/after. No game/observer needed - called from main()
@@ -5731,6 +5848,37 @@ void AIPlayerGPT::runParseSelfTest()
     }
 
     #undef RESOLVE
+
+    // ---- Pre-game London BOTTOM-N reply parse (reuses the reveal PUT parser) ----
+    cout << "\n[bottom] London mulligan 'PUT: 1, 3' bottoms exactly those cards; salvage from a spiral\n";
+    {
+        // 5-card hand; the model was asked to bottom N=2 -> "PUT: 1, 3".
+        vector<string> names;
+        names.push_back("Mountain"); names.push_back("Lightning Bolt");
+        names.push_back("Shivan Dragon"); names.push_back("Island"); names.push_back("Counterspell");
+        vector<bool> send;
+        int r = parseAttackerSet("PUT: 1, 3", names.size(), send, &names);
+        cout << "     'PUT: 1, 3': count=" << r
+             << " picks=[" << (send.size()>0?(int)send[0]:-1) << ","
+             << (send.size()>2?(int)send[2]:-1) << "]\n";
+        CHECK(r == 2 && send[0] && !send[1] && send[2] && !send[3] && !send[4],
+              "bottom: 'PUT: 1, 3' bottoms cards 1 and 3, only those");
+        // Name form: the model bottomed by name instead of number.
+        vector<bool> send2;
+        int r2 = parseAttackerSet("PUT: Shivan Dragon", names.size(), send2, &names);
+        cout << "     'PUT: Shivan Dragon': count=" << r2
+             << " picks card3=" << (send2.size()>2?(int)send2[2]:-1) << "\n";
+        CHECK(r2 == 1 && !send2[0] && !send2[1] && send2[2],
+              "bottom: name-form 'PUT: Shivan Dragon' resolves to card 3");
+        // Decode-spiral salvage: recover the earlier well-formed PUT: line.
+        vector<bool> send3;
+        int sal = salvageLoopedSubset(
+            "PLAN: keep the cheap curve.\nPUT: 3\nhmm hmm hmm hmm hmm hmm\nblah",
+            "PUT:", names.size(), names, send3);
+        cout << "     spiral salvage: count=" << sal
+             << " picks card3=" << (send3.size()>2?(int)send3[2]:-1) << "\n";
+        CHECK(sal == 1 && send3[2] && !send3[0], "bottom: salvage recovers 'PUT: 3' from a spiral");
+    }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();

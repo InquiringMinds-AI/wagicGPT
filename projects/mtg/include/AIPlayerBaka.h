@@ -183,6 +183,14 @@ class AIPlayerBaka: public AIPlayer{
 
     //used by AIHInts, therefore public instead of private :/
     virtual int createAbilityTargets(MTGAbility * a, MTGCardInstance * c, RankingContainer& ranking);
+
+    //Pre-game (opening-hand) heuristics for the headless AI: keep hands with a
+    //reasonable land count, floor mulligans at a 5-card hand, bottom the most
+    //expensive cards, always start leylines on the battlefield. AIPlayerGPT
+    //overrides these with model calls and falls back to these on any failure.
+    virtual int pregameMulliganDecision(int mullsTaken);
+    virtual MTGCardInstance * pregameChooseBottom(int need, int chosenSoFar, int & status);
+    virtual int pregameLeylineDecision(MTGCardInstance * card);
 };
 
 #endif

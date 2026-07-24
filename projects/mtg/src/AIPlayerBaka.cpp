@@ -4294,3 +4294,50 @@ AIPlayerBaka::~AIPlayerBaka() {
     }
     SAFE_DELETE(hints);
 }
+
+//---- Pre-game (opening-hand) heuristics -------------------------------------
+
+int AIPlayerBaka::pregameMulliganDecision(int mullsTaken)
+{
+    //London floor: once two mulligans have been taken a keep would already be
+    //down to five cards, so stop (never mulligan below a 5-card hand).
+    if (mullsTaken >= 2)
+        return 0;
+    int lands = 0;
+    MTGGameZone * h = game->hand;
+    for (int i = 0; i < h->nb_cards; i++)
+        if (h->cards[i]->isLand())
+            lands++;
+    //A hand with too few or too many lands is worth a mulligan.
+    if (lands < 2 || lands > 5)
+        return 1;
+    return 0;
+}
+
+MTGCardInstance * AIPlayerBaka::pregameChooseBottom(int need, int chosenSoFar, int & status)
+{
+    (void) need; (void) chosenSoFar;
+    status = 0;
+    //Bottom the highest-converted-cost card currently in hand (keep the cheap
+    //spells and the lands).
+    MTGGameZone * h = game->hand;
+    MTGCardInstance * best = NULL;
+    int bestCost = -1;
+    for (int i = 0; i < h->nb_cards; i++)
+    {
+        MTGCardInstance * c = h->cards[i];
+        int cost = c->getManaCost() ? c->getManaCost()->getConvertedCost() : 0;
+        if (cost > bestCost)
+        {
+            bestCost = cost;
+            best = c;
+        }
+    }
+    return best;
+}
+
+int AIPlayerBaka::pregameLeylineDecision(MTGCardInstance * card)
+{
+    (void) card;
+    return 1; //always begin the game with a leyline on the battlefield
+}

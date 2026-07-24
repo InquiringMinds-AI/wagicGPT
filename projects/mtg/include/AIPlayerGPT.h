@@ -154,6 +154,21 @@ protected:
                              const vector<bool>& eligibleForOptionOne = vector<bool>(),
                              int revealSource = 0, bool pickExactlyOne = false);
 
+    //Pre-game (opening-hand) decisions, driven by PreGamePhase before turn 1.
+    //Each routes through the model with the AIPlayerBaka heuristic as the
+    //deadlock-safe fallback. Mulligan and leyline use the CHOICE ask machinery
+    //(narrated + "ask" translog); bottoming is ONE bundled PUT-N ask over the
+    //hand, mirroring decideReveal (parsed with the reveal PUT parser, "bottom"
+    //translog), whose picks are cached and popped one card per call.
+    virtual int pregameMulliganDecision(int mullsTaken);
+    virtual MTGCardInstance * pregameChooseBottom(int need, int chosenSoFar, int & status);
+    virtual int pregameLeylineDecision(MTGCardInstance * card);
+    //State for the single bundled BOTTOM-N ask per keep.
+    std::vector<MTGCardInstance*> mPregameBottomQueue;
+    bool mPregameBottomAsked;
+    int  mPregameBottomForMulls;
+    string buildPregameBottomAskText(const vector<MTGCardInstance*>& hand, int need);
+
 public:
     //Env-gated (WAGIC_GPT_PARSETEST) self-test of the reply parsers: feeds the
     //wave-19 failing replies + synthetic spirals through the real parse paths

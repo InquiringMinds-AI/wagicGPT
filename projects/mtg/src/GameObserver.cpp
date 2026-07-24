@@ -1,6 +1,7 @@
 #include "PrecompiledHeader.h"
 
 #include "GameObserver.h"
+#include "PreGamePhase.h"
 #include "LegalActions.h"
 #ifdef WITH_GPT_AI
 #include "GptConfig.h"
@@ -64,6 +65,7 @@ void GameObserver::cleanup()
 GameObserver::~GameObserver()
 {
     LOG("==Destroying GameObserver==");
+    SAFE_DELETE(mPregame);
 
     for (size_t i = 0; i < players.size(); ++i)
     {
@@ -486,6 +488,20 @@ void GameObserver::startGame(GameType gtype, Rules * rules)
     if (rules) 
         rules->initGame(this);
 
+    //CR pre-game procedure (opening hands + London mulligan + 103.6
+    //actions) runs before turn 1 of real/selfplay/demo games. Suite games
+    //seed hands via INIT and assume the old start, so they skip it; story
+    //mode and any test-suite seat skip it too.
+    mPregame = NULL;
+    mPregameDone = false;
+    if (!mSuiteGame && gtype != GAME_TYPE_STORY
+        && players.size() >= 2
+        && players[0]->playMode != Player::MODE_TEST_SUITE
+        && players[1]->playMode != Player::MODE_TEST_SUITE)
+    {
+        mPregame = NEW PreGamePhase(this);
+    }
+
     //Preload images from hand
     if (!players[0]->isAI())
     {
@@ -653,6 +669,20 @@ void GameObserver::dumpAssert(bool val)
 
 void GameObserver::Update(float dt)
 {
+    //Pre-game phase gate: while it runs, the normal game loop is
+    //suppressed (the board still renders via GameObserver::Render). On
+    //completion the phase is torn down and mPregameDone latches, which
+    //closes the old in-game mulligan/leyline paths.
+    if (mPregame)
+    {
+        mPregame->Update(dt);
+        if (mPregame->isDone())
+        {
+            SAFE_DELETE(mPregame);
+            mPregameDone = true;
+        }
+        return;
+    }
     Player * player = currentPlayer;
     if (MTG_PHASE_COMBATBLOCKERS == mCurrentGamePhase && BLOCKERS == combatStep)
     {
@@ -1455,6 +1485,8 @@ void GameObserver::Render()
     {
         players[i]->Render();
     }
+    if (mPregame)
+        mPregame->Render();
 }
 
 void GameObserver::ButtonPressed(PlayGuiObject * target)

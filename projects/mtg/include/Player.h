@@ -100,6 +100,35 @@ public:
     ManaPool * getManaPool();
     void takeMulligan();
     void serumMulligan();
+    //London mulligan (CR 103.5): shuffle the WHOLE hand back into the library
+    //and draw a fresh starting hand of full size. The London shrink is applied
+    //later as bottoming at KEEP time (bottomCardToLibrary), not here.
+    void takeLondonMulligan();
+    //Put one card from hand onto the BOTTOM of the library (London bottoming /
+    //any-order pre-game placement).
+    void bottomCardToLibrary(MTGCardInstance * card);
+    //Starting hand size (CR 103.5, default 7). Keyed here so draw count, redraw
+    //count, and the mulligan-to-zero floor all read one value.
+    int startingHandSize() { return 7; }
+
+    //Sentinel returned by the pre-game AI decision hooks while an asynchronous
+    //model call is still in flight (same value as AIPlayerGPT::kChoicePending):
+    //PreGamePhase unwinds for the tick and re-polls next frame.
+    static const int PREGAME_PENDING = -2;
+    //Pre-game (opening-hand) decisions for an AI seat, consulted by PreGamePhase
+    //ONLY for AI players (a human's choices come from the phase's own menus).
+    //Base defaults (non-interactive seats never actually reach these): keep, no
+    //bottom preference, start leylines on the battlefield.
+    // returns 0 = keep, 1 = mulligan, PREGAME_PENDING = model call in flight
+    virtual int pregameMulliganDecision(int mullsTaken) { (void) mullsTaken; return 0; }
+    // choose ONE hand card to put on the bottom. Returns a card currently in
+    // hand, or NULL for no preference. `status` set to PREGAME_PENDING while a
+    // model call is in flight.
+    virtual MTGCardInstance * pregameChooseBottom(int need, int chosenSoFar, int & status)
+    { (void) need; (void) chosenSoFar; status = 0; return NULL; }
+    // returns 1 = begin the game with this leyline on the battlefield,
+    // 0 = keep it in hand, PREGAME_PENDING while a model call is in flight
+    virtual int pregameLeylineDecision(MTGCardInstance * card) { (void) card; return 1; }
     bool hasPossibleAttackers();
     bool noPossibleAttackers();
     //Engine game-over hook, called once the duel's outcome is decided

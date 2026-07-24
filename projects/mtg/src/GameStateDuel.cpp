@@ -1028,8 +1028,11 @@ void GameStateDuel::Update(float dt)
                 menu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(), DUEL_MENU_GAME_MENU, this, Fonts::MENU_FONT, SCREEN_WIDTH / 2 - 100, 25);
                 menu->Add(MENUITEM_CANCEL, "Cancel");
                 if(taskList->getState() != TaskList::TASKS_ACTIVE){
-                    //almosthumane - mulligan
-                    if (((game->turn == 0 && game->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN) || (game->turn == 1 && game->getCurrentGamePhase() < MTG_PHASE_DRAW))
+                    //almosthumane - mulligan. Suppressed once the pre-game phase
+                    //has run (it replaced this Paris-style in-game mulligan with
+                    //the London pre-game phase; suite games keep it, no phase).
+                    if (!game->pregameDone()
+                        && ((game->turn == 0 && game->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN) || (game->turn == 1 && game->getCurrentGamePhase() < MTG_PHASE_DRAW))
                         && game->currentPlayer->game->hand->nb_cards > 0 && game->currentPlayer->game->inPlay->nb_cards == 0 && game->currentPlayer->game->graveyard->nb_cards == 0
                         && game->currentPlayer->game->exile->nb_cards == game->currentPlayer->exiledBySerum && game->currentlyActing() == (Player*)game->currentPlayer) //Now you can mulligan even if you didn't start as first. Serum Powder exiles don't end the window (issue #979).
                     {

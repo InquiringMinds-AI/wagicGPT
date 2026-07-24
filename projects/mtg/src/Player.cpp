@@ -280,6 +280,39 @@ void Player::serumMulligan()
          //Draw hand no penalty
 }
 
+void Player::takeLondonMulligan()
+{
+    //CR 103.5 London: shuffle the whole hand back, draw a fresh FULL starting
+    //hand. The per-mulligan shrink is the bottoming at keep time, not the draw.
+    MTGPlayerCards * z = game;
+    int n = z->hand->nb_cards;
+    for (int i = 0; i < n; i++)
+        z->putInZone(z->hand->cards[0], z->hand, z->library);
+    z->library->shuffle();
+    int draw = startingHandSize();
+    for (int i = 0; i < draw && z->library->nb_cards; i++)
+        z->drawFromLibrary();
+}
+
+void Player::bottomCardToLibrary(MTGCardInstance * card)
+{
+    if (!card || !game->hand->hasCard(card))
+        return;
+    MTGCardInstance * copy = game->putInZone(card, game->hand, game->library);
+    if (!copy)
+        return;
+    //putInZone appends the card to the TOP of the library (drawFromLibrary reads
+    //index nb_cards-1). Move it to the very BOTTOM (index 0), mirroring the
+    //engine's own bottom-of-library rearrange in MTGPlayerCards::putInZone.
+    MTGLibrary * library = game->library;
+    vector<MTGCardInstance *> newOrder;
+    newOrder.push_back(copy);
+    for (unsigned int k = 0; k < library->cards.size(); ++k)
+        if (library->cards[k] != copy)
+            newOrder.push_back(library->cards[k]);
+    library->cards = newOrder;
+}
+
 bool Player::hasPossibleAttackers()
 {
     MTGGameZone * z = game->inPlay;

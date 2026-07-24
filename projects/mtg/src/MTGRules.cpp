@@ -313,6 +313,7 @@ int MTGPutInPlayRule::isReactingToClick(MTGCardInstance * card, ManaCost *)
     //cards exiled by Serum Powder redraws (player->exiledBySerum) are part
     //of that window and must not close it (issue #979).
     if ((game->turn < 1) && (player->game->hand->nb_cards != 0) && (card->basicAbilities[(int)Constants::LEYLINE])
+        && !game->pregameDone()
         && game->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN
         && player->game->graveyard->nb_cards == 0
         && player->game->exile->nb_cards == player->exiledBySerum

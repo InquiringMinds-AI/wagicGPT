@@ -26,6 +26,7 @@ class Rules;
 class TestSuiteGame;
 class Trash;
 class DeckManager;
+class PreGamePhase;
 using namespace std;
 
 class GameObserver{
@@ -91,6 +92,16 @@ class GameObserver{
   //fixture that must test the interactive selection (surveil binning) opts in.
   //In-class initialized so real games and unopted fixtures never see it true.
   bool mForceInteractiveReveal = false;
+  //The CR pre-game phase (opening hands + London mulligan + 103.6 actions),
+  //run before turn 1 of real/selfplay/demo games. NULL in suite games and
+  //once the phase has completed. While non-NULL, Update runs the phase and
+  //gates the normal game loop.
+  PreGamePhase * mPregame = NULL;
+  //TRUE once the pre-game phase has finished. Closes the old in-game mulligan
+  //menu entry (GameStateDuel) and the old leyline click path (MTGPutInPlayRule)
+  //so there is no double mulligan / double leyline. Stays FALSE in suite games
+  //(which skip the phase and rely on the old start), keeping those paths live.
+  bool mPregameDone = false;
   int oldGamePhase;
   TargetChooser * targetChooser;
   CardDisplay * OpenedDisplay;
@@ -159,6 +170,10 @@ class GameObserver{
   //dangle class (currentActionCard core 3266478, ATransformer target core
   //3151670).
   MTGCardInstance * validateCardPointer(MTGCardInstance * card);
+  //TRUE once the CR pre-game phase (opening hands + London mulligan + 103.6)
+  //has completed. Read by the old mulligan menu / leyline click path to close
+  //themselves so there is no double action. FALSE in suite games (no phase).
+  bool pregameDone() const { return mPregameDone; }
   void startGame(GameType, Rules * rules);
   void phasingPhase();
   void untapPhase();

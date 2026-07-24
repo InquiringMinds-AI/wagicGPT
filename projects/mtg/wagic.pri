@@ -133,6 +133,7 @@ SOURCES += \
         src/OptionItem.cpp\
         src/PhaseRing.cpp\
         src/Player.cpp\
+        src/PreGamePhase.cpp\
         src/PlayerData.cpp\
         src/PlayGuiObject.cpp\
         src/PlayGuiObjectController.cpp\
@@ -250,6 +251,7 @@ HEADERS  += \
         include/CardSelector.h\
         include/GuiBackground.h\
         include/PhaseRing.h\
+        include/PreGamePhase.h\
         include/TranslateKeys.h\
         include/config.h\
         include/GuiCardsController.h\
