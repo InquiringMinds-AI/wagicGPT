@@ -1,0 +1,70 @@
+SELESNYA (GW) ADVENTURES — go-wide beatdown. You win by curving out cheap creatures,
+drawing extra cards off Edgewall Innkeeper, flooding the board with 1/1 lifelink Soldiers
+(Emmara, Trostani, March, Castle), pumping them (Trostani, Venerated Loxodon, Unbreakable
+Formation, Flourish), and swinging for the win around turn 6-8. You are the BEATDOWN.
+Deploy a creature and ATTACK every turn.
+
+ADVENTURE CARDS SHOW TWO CAST OPTIONS — READ THIS FIRST. Five of your cards are adventures
+(Faerie Guidemother, Giant Killer, Lovestruck Beast, Shepherd of the Flock, Flaxen Intruder).
+Each appears TWICE in your list:
+  "Cast NAME // ADV {base cost}"                  = the CREATURE (a real body on the board)
+  "Cast NAME // ADV with its adventure cost {..}" = the ADVENTURE SPELL (an effect, then the
+                                                    card is EXILED to cast as the creature LATER)
+TRAP: the "with its adventure cost" option prints the CREATURE's (P/T) — e.g. "Heart's Desire
+with its adventure cost {g} (5/5)". That (5/5) is NOT what you get now; it is the creature you
+may cast LATER from exile. The adventure option does its SPELL effect only. Do NOT pick "with
+its adventure cost" thinking you are deploying that body — you are not.
+
+WHAT EACH FACE DOES (memorize; the option line does not tell you the effect):
+  Faerie Guidemother {W} = 1/1 flyer. Gift of the Fae {1}{W} = target creature +2/+1 and flying
+    until end of turn (a combat/evasion trick — use to push lethal).
+  Giant Killer {W} = 1/2, can {1}{W}{T} to tap a creature. Chop Down {2}{W} = DESTROY target
+    creature with power 4+ (your removal for big threats).
+  Lovestruck Beast {2}{G} = 5/5, but CANNOT ATTACK unless you control a 1/1 creature.
+    Heart's Desire {G} = make a 1/1 white Human (use it to UNLOCK Lovestruck, or as a body).
+  Shepherd of the Flock {1}{W} = 3/1. Usher to Safety {W} = return a permanent YOU control to
+    hand — cast this ONLY to save your own creature from removal or re-use an ETB; otherwise it
+    bounces your own board for nothing. NEVER cast Usher to Safety just to "get a body."
+  Flaxen Intruder {G} = 1/2. Welcome Home {5}{G}{G} = three 2/2 Bears (7 mana, rarely castable).
+
+DEFAULT: cast the CREATURE face. Cast the adventure SPELL face only for its listed effect above.
+
+EDGEWALL INNKEEPER DRAW ENGINE. While Edgewall Innkeeper (1/1) is on your battlefield, casting
+any adventure CREATURE (the five above) DRAWS YOU A CARD. Casting the adventure SPELL face does
+NOT draw. So play Innkeeper early and, with it out, cast adventure creatures for the free cards.
+Innkeeper is your card advantage — deploy it turn 1-2 and keep it alive.
+
+CONVOKE CARDS — Venerated Loxodon and March of the Multitudes. Convoke lets you TAP your
+creatures to help pay. When "Cast X with its convoke cost" is offered, you CAN afford it — the
+engine taps your creatures for you automatically (you do not choose which; a separate deferred
+step handles it). Do NOT recompute mana or agonize; just pick the convoke option when you want it.
+  Venerated Loxodon {4}{W} convoke = 4/4 that puts a +1/+1 counter on EACH creature that helped
+    convoke it. Cast it AFTER you have a wide board of tapped-able creatures, to pump the team.
+  March of the Multitudes {G}{W}{W}{X} convoke = make X 1/1 white lifelink Soldiers. Convoke to
+    make X large. Great go-wide + lifegain.
+  Bonus: tapping Emmara for convoke makes her trigger — a free 1/1 lifelink Soldier.
+
+ATTACK EVERY TURN — per-attacker test over the offered A-list. A creature ATTACKS if ANY of:
+no untapped blocker can kill it / it kills or trades up / the opponent has no untapped creatures.
+When the opponent has no untapped blocker, SWING WITH EVERYONE — a 1/1 or 1/2 to the face is
+real progress. Declare "no attackers" ONLY when every listed attacker would die for zero gain.
+Do not spiral: pick the attackers and commit. EXCLUSION: the offered A-list already drops
+ineligible creatures; if Lovestruck Beast is missing it is because you control no 1/1 — make a
+Human (Heart's Desire / Castle Ardenvale) to unlock it.
+
+ROLE CHECK (rerun every turn on your life totals). Default = beatdown. If YOUR life is falling
+while theirs is not (a fast aggro race — e.g. mono-red), switch to LIFELINK STABILIZE: make
+1/1 lifelink Soldiers (Emmara taps for one, Trostani makes two on entry, March makes X), block
+with them and gain life. You STILL cast a creature every turn in both roles — never go passive.
+
+PUMP AND CLOSE. Trostani Discordant gives your other creatures +1/+1 (an anthem — cast it to
+grow the whole team). Unbreakable Formation cast in your MAIN phase gives every creature a
++1/+1 counter, vigilance, AND indestructible until end of turn — cast it before your alpha
+strike, or in response to a board wipe to save your team. Flourish (Flower's back face,
+{4}{G}{W}) gives all your creatures +2/+2 until end of turn. Before a lethal swing, TRUST the
+printed [X/Y] on each creature — it already includes anthems and counters; do not recompute
+power from base stats.
+
+MULLIGAN: keep 2-4 lands with green AND white reachable (Temple Garden, Once Upon a Time, and
+Flower all fix). Once Upon a Time is FREE if it is your first spell of the game — cast it turn 1
+to dig for lands and creatures.
