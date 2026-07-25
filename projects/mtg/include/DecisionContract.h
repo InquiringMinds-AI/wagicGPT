@@ -58,6 +58,19 @@ public:
     std::vector<int> menuIndices;
     MTGCardInstance * contextCard;
     bool canDecline;
+    //CHOOSE_MENU, triggered/activated "may"-ability ask (the all(trigger[to])
+    //moveto class - Tergrid's steal): the card-script option label is a
+    //static, SUBJECT-LESS string ("Put onto battlefield under your control")
+    //and contextCard is the TRIGGER SOURCE, so with no object named the model
+    //reads the verb as acting on the source itself and declines a free effect
+    //(w26 deck199 re-probe: threw away a stolen Bog Wraith). When the option's
+    //underlying ability has a single trigger-supplied target object, its NAME
+    //and ORIGIN zone are recovered here so the seat can name it. Both empty
+    //for every other menu (ETB pay/tap, transform, mode, generic) and for
+    //may-asks whose object is not resolvable at ask time - those keep their
+    //current text. Snapshotted strings, never a live pointer.
+    std::string mayObjectName;    //e.g. "Bog Wraith"
+    std::string mayObjectOrigin;  //e.g. "opponent's graveyard"
     //CHOOSE_TARGET: the chooser's currently-legal candidates (players and
     //cards across all zones, capped), the source card, and the selection
     //bounds (targetMin: a minimum must be met before stopping; maxTargets

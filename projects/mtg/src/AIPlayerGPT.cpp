@@ -3711,6 +3711,32 @@ static bool annotateEtbPayOrTapMenu(vector<string>& opts)
     return true;
 }
 
+//Triggered/activated "may"-ability ask assembly (Tergrid's steal class). The
+//card-script option label is a subject-less string ("Put onto battlefield
+//under your control") and the source card is the TRIGGER SOURCE - so with no
+//object named the model read the verb as acting on the source itself,
+//concluded the prompt was a glitch ("Tergrid is already on the battlefield")
+//and declined a free permanent (w26 deck199 re-probe). Given the source name
+//and the resolved object's name + origin zone (both recovered upstream in
+//DecisionManager::buildMenuChoice), build an ask header that NAMES the object
+//and marks the source AS the trigger source, and annotate the real option
+//(opts[0]; a decline, when offered, is the appended last entry) so its verb
+//clearly refers to the object, not the source. Representation only - the
+//caller leaves req.optionTexts (the staleness key) untouched. objName is
+//non-empty by construction (the caller gates on a resolved object).
+static string buildMayObjectAsk(const string & srcName, const string & objName,
+                                const string & objOrigin, vector<string> & opts)
+{
+    string origin = objOrigin.empty() ? string() : (" (from " + objOrigin + ")");
+    string src = srcName.empty() ? string("A triggered ability")
+                                 : ("Triggered ability of " + srcName);
+    string srcRef = srcName.empty() ? string("the source") : srcName;
+    if (!opts.empty())
+        opts[0] += " [" + objName + origin + " is the card this acts on, NOT " + srcRef + "]";
+    return src + " - you MAY act on " + objName + origin + ". " + srcRef
+         + " is the trigger SOURCE, not the object being moved. Choose:";
+}
+
 int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & act)
 {
     MTGCardInstance * ctx = req.contextCard;
@@ -3815,11 +3841,20 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         if (ctxName.empty() && ctx->model && ctx->model->data)
             ctxName = ctx->model->data->getName();
     }
+    string decision;
+    if (!req.mayObjectName.empty())
+        //Triggered "may"-ability ask (Tergrid's steal class): name the object
+        //and its origin so the subject-less card-script verb stops reading as
+        //acting on the trigger source (w26 deck199 re-probe seq 21 - a free
+        //3/3 declined). Representation only; the object name is stable within a
+        //board state, so the ask cache (board-state + question) does not churn.
+        decision = buildMayObjectAsk(ctxName, req.mayObjectName, req.mayObjectOrigin, opts);
     //When the subject name is unrecoverable, fall to a clean generic prompt
     //rather than the grammatically-broken bare "Choose an option for :" the old
     //code emitted (a dangling empty subject after "for", deck137 wave-25).
-    string decision = !ctxName.empty() ? ("Choose an option for " + ctxName + ":")
-                                       : string("A choice is required - choose an option:");
+    else
+        decision = !ctxName.empty() ? ("Choose an option for " + ctxName + ":")
+                                    : string("A choice is required - choose an option:");
     //Thread the source card as the pending source (as ANNOUNCE_X does): the model
     //often echoes "<verb> <source card>" against a bare option ("Tap Temple
     //Garden" vs "tap"), and INDEX-WINS treats a source-naming echo as a
@@ -5953,6 +5988,32 @@ void AIPlayerGPT::runParseSelfTest()
         // A lone "Tap" (no pay-life sibling) is untouched.
         vector<string> tapOnly; tapOnly.push_back("Tap"); tapOnly.push_back("Do nothing");
         CHECK(!annotateEtbPayOrTapMenu(tapOnly), "A a Tap option with no pay-life sibling is untouched");
+    }
+
+    cout << "\n[A-mayobject] triggered may-ability ask names the object + origin (deck199 wave-26)\n";
+    {
+        // The Tergrid steal: bare card-script label + trigger-source contextCard.
+        vector<string> may; may.push_back("Put onto battlefield under your control");
+        may.push_back("Decline - do nothing");
+        string header = buildMayObjectAsk("Tergrid, God of Fright", "Bog Wraith",
+                                          "opponent's graveyard", may);
+        cout << "     header: \"" << header << "\"\n     opt1: \"" << may[0] << "\"\n";
+        // Requirements: the object NAME appears, the source is marked AS the
+        // trigger source (not the thing being moved), and the origin is stated.
+        CHECK(header.find("Bog Wraith") != string::npos, "A-mayobject header names the object");
+        CHECK(header.find("Triggered ability of Tergrid, God of Fright") != string::npos,
+              "A-mayobject header marks the source as the trigger source");
+        CHECK(header.find("opponent's graveyard") != string::npos, "A-mayobject header states the origin");
+        CHECK(header.find("not the object being moved") != string::npos,
+              "A-mayobject header disambiguates source vs object");
+        CHECK(may[0].find("Bog Wraith") != string::npos && may[0].find("NOT Tergrid") != string::npos,
+              "A-mayobject real option is annotated with the object, not the source");
+        CHECK(may[1] == "Decline - do nothing", "A-mayobject decline option is left untouched");
+        // Missing origin: still names the object, no dangling "(from )".
+        vector<string> may2; may2.push_back("Put onto battlefield under your control");
+        string h2 = buildMayObjectAsk("Tergrid, God of Fright", "Bog Wraith", "", may2);
+        CHECK(h2.find("Bog Wraith") != string::npos && h2.find("(from ") == string::npos,
+              "A-mayobject unknown origin omits the origin clause cleanly");
     }
 
     // The final-precedence CHOICE resolver used at the call sites, as the

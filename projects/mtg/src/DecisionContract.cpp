@@ -138,6 +138,43 @@ namespace
         //engine (ATransformer::destroy) can use it too
         return g->validateCardPointer(card);
     }
+
+    //For a triggered/activated "may" ability whose effect acts on an object
+    //supplied by the trigger event (all(trigger[to]) moveto - the Tergrid
+    //steal class), recover that resolved object so the ask can NAME it.
+    //Mirrors GenericTriggeredAbility::set/getTriggerTarget: at resolve time
+    //the sacrificed/discarded card was stamped onto the ->target of the node
+    //bearing the TriggerTargetChooser, and MayAbility/AAMover clones copy it,
+    //so the armed menu ability still carries it. Returns NULL when no single
+    //trigger-supplied card target is resolvable - every non-may menu, and any
+    //may whose object cannot be named, keeps its current generic text.
+    MTGCardInstance * resolveTriggerObject(MTGAbility * a)
+    {
+        if (!a)
+            return NULL;
+        if (dynamic_cast<TriggerTargetChooser *>(a->getActionTc()))
+            if (MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(a->target))
+                return c;
+        if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+            if (MTGCardInstance * c = resolveTriggerObject(na->ability))
+                return c;
+        if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+            for (size_t i = 0; i < ma->abilities.size(); i++)
+                if (MTGCardInstance * c = resolveTriggerObject(ma->abilities[i]))
+                    return c;
+        return NULL;
+    }
+
+    //"your graveyard" / "opponent's graveyard" (whatever zone the object now
+    //sits in), relative to the deciding player.
+    std::string objectOrigin(MTGCardInstance * obj, Player * decider)
+    {
+        MTGGameZone * z = obj ? obj->getCurrentZone() : NULL;
+        if (!z)
+            return std::string();
+        std::string possessive = (z->owner == decider) ? "your " : "opponent's ";
+        return possessive + z->getName();
+    }
 }
 
 bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
@@ -205,6 +242,7 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
 
     //Regular menu: items with GetId() > 0 map to action-layer abilities;
     //the trailing cancel item (when the menu is cancellable) is the decline.
+    MTGAbility * soleOptionAbility = NULL;
     for (unsigned int k = 0; k < object->abilitiesMenu->mObjects.size(); k++)
     {
         if (object->abilitiesMenu->mObjects[k]->GetId() <= 0)
@@ -212,9 +250,22 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
         MTGAbility * ab = (MTGAbility *) object->mObjects[object->abilitiesMenu->mObjects[k]->GetId()];
         req.optionTexts.push_back(ab ? ab->getMenuText() : string("(option)"));
         req.menuIndices.push_back((int) k);
+        soleOptionAbility = ab;
     }
     if (req.optionTexts.empty())
         return false;
+    //Name the object of a single-option "may"-ability ask. Only when there is
+    //exactly ONE real option (the Tergrid/steal shape - one may leg + an
+    //implicit decline) so the recovered name cannot be attached to the wrong
+    //leg of a multi-choice menu. The strings ride the request; the seat
+    //renders them and leaves req.optionTexts (the staleness key) untouched.
+    if (req.optionTexts.size() == 1)
+        if (MayAbility * may = dynamic_cast<MayAbility *>(soleOptionAbility))
+            if (MTGCardInstance * obj = resolveTriggerObject(may))
+            {
+                req.mayObjectName = obj->getName();
+                req.mayObjectOrigin = objectOrigin(obj, p);
+            }
     req.canDecline = !object->checkCantCancel();
     req.kind = DecisionRequest::CHOOSE_MENU;
     return true;
