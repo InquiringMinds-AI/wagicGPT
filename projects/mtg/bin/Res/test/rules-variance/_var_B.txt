@@ -1,0 +1,25 @@
+# rules-variance registry -- SET B (worker B): 5xx turn-structure findings.
+# Run from projects/mtg/bin/ :
+#   env -u WAYLAND_DISPLAY -u DISPLAY WAGIC_HEADLESS=1 WAGIC_TESTSUITE=1 \
+#     WAGIC_TESTSUITE_THREADS=1 WAGIC_TESTSUITE_FILE=test/_var_B.txt \
+#     WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_B_primitives.txt ./wagic
+# The WAGIC_TEST_PRIMITIVES_FILE is REQUIRED: every fixture uses synthetic cards.
+#
+# Each fixture ASSERTS CR-correct behavior. A FAIL is therefore a PROVEN variance,
+# a PASS a REFUTED one (or a control). Expected: 3 failed (the three PROVEN ids).
+# Full verdicts + observed-vs-CR in strategy-design/rules-audit/verdicts-B.md.
+#
+# Finding 1 (500.1/501.1/504.1) -- UNPROBEABLE; this fixture is the machinery
+#   control (upkeep trigger fires on a harness-provided untap->upkeep). PASS.
+rules-variance/var_501.1_turn1_upkeep_trigger.txt
+# Finding 2 (500.3/502.4) -- PROVEN: instant cast+resolved during UNTAP. FAIL.
+rules-variance/var_500.3_untap_priority_instant.txt
+# Finding 2 (514.3) -- PROVEN: instant cast+resolved during CLEANUP. FAIL.
+rules-variance/var_514.3_cleanup_priority_instant.txt
+# Finding 4 (511.3) -- negative control: non-attacking creature un-targetable. PASS.
+rules-variance/var_511.3_never_attacked_control.txt
+# Finding 4 (511.3) -- PROVEN: attacking flag persists into main 2. FAIL.
+rules-variance/var_511.3_attacking_persists_main2.txt
+# Finding 5 (514.2) -- REFUTED (observable): damaged+pumped creature survives
+#   cleanup; engine removes damage before ueot expiry, no lethal SBA window. PASS.
+rules-variance/var_514.2_cleanup_damage_ueot.txt

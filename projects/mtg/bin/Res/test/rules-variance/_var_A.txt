@@ -1,0 +1,6 @@
+rules-variance/var_304.4_sorcery_to_battlefield.txt
+rules-variance/var_304.4_instant_to_battlefield.txt
+rules-variance/var_306.7_pw_damage_redirect.txt
+rules-variance/var_400.7_kick_confirm.txt
+rules-variance/var_400.7_reanim_confirm.txt
+rules-variance/var_400.7_kicker_memory_reanimate.txt
