@@ -1,0 +1,16 @@
+READ-ONLY AUDIT. Make no changes to any file except writing the single report file named below.
+
+Goal: audit the wagicGPT engine (repo root = current directory; C++ sources in projects/mtg/src and projects/mtg/include) against CR 609-616 (effects: one-shot, continuous, the layer system 613, replacement/prevention 614-615, interaction 616), and write the report to projects/mtg/strategy-design/rules-audit/14-effects.md.
+
+Rules source - read this file, never rules from memory: projects/mtg/strategy-design/rules-audit/data/sec-609-616-effects.txt (official Comprehensive Rules text, effective 2026-02-27).
+
+Audit contract - read and follow exactly: projects/mtg/strategy-design/rules-audit/00-frame.md
+It defines the verdicts (IMPLEMENTED / PARTIAL / INCORRECT / UNIMPLEMENTED / N/A), one verdict per rule id, code-evidence discipline (file:line for IMPLEMENTED/PARTIAL/INCORRECT), the N/A policy for excluded game types, and the known-defect cross-reference (strategy-design/lexicon-triage/engine-bugs.md).
+
+Engine orientation: Effects machinery: MTGAbility / AllAbilities / ReplacementEffects / WEvent; continuous effects and lords. The layer-system (613) verdict quality matters most: be precise about what dependency/timestamp behavior the engine actually has, with code evidence.
+
+Report format: per-hundred-block markdown tables with columns rule, verdict, evidence/note; then a summary counting each verdict class; then a HIGHLIGHTS list (incorrect and notable-unimplemented findings, priority-ordered).
+
+Done means this command prints MISSING: 0:
+python3 projects/mtg/strategy-design/rules-audit/check-coverage.py projects/mtg/strategy-design/rules-audit/data/sec-609-616-effects.txt projects/mtg/strategy-design/rules-audit/14-effects.md
+Run it before claiming done and include its output with your claim. Do not end while it reports any missing rule ids.
