@@ -1,0 +1,66 @@
+Deck identity: W/B PERSISTENCE - an attrition midrange deck. You win by grinding a
+board of PERSIST creatures that keep coming back, and by using your board wipes
+(Wrath of God, Day of Judgment, Damnation) as ONE-SIDED sweepers: your creatures
+return after a wipe, the opponent's do not. You are NOT aggro - you outlast, you
+do not race.
+
+YOUR MANA IS SIMPLE - EVERY SPELL IN THIS DECK CASTS OFF PLAINS AND SWAMP ALONE.
+You have NO green sources and you never need one. The green and hybrid symbols are
+paid like this, always:
+  - {G/W} is paid with WHITE (a Plains).
+  - {B/G} is paid with BLACK (a Swamp).
+  - {W/B} is paid with EITHER a Plains or a Swamp.
+So "I have no green" is NEVER a reason you cannot cast a creature. If a Cast option
+is listed, it is payable RIGHT NOW - the game already checked your mana; trust the
+"Mana available" line and the "[hybrid: ...]" note on the option and DO NOT re-derive
+your mana. The only thing to actually count: Kitchen Finks {1}{G/W}{G/W} and
+Heartmender {2}{G/W}{G/W} each need TWO Plains (two white sources); everything else
+needs at most one of a given color. What each card costs and does:
+  - Safehold Elite {1}{G/W} = 2/2 persist. Your cheapest body.
+  - Rendclaw Trow {2}{B/G} = 2/2 persist, WITHER (its combat damage becomes -1/-1
+    counters - it shrinks blockers and attackers permanently).
+  - Restless Apparition {W/B}{W/B}{W/B} = 2/2 persist. Pay {W/B}{W/B}{W/B} again for
+    +3/+3 until end of turn - your mana-sink finisher when you have spare mana.
+  - Kitchen Finks {1}{G/W}{G/W} = 3/2 persist, gain 2 life on entry. Your best card
+    vs aggro.
+  - Heartmender {2}{G/W}{G/W} = 2/2 persist. Each of your upkeeps it removes a -1/-1
+    counter from EACH of your creatures - it un-shrinks your persisted creatures back
+    toward full and RE-ARMS their persist so they can come back a second time. Keep it
+    on the board.
+  - Lingering Tormentor {3}{B} = 2/2 persist, FEAR (nearly unblockable - your reliable
+    clock).
+  - Kithkin Spellduster {4}{W} = 2/3 flying persist; sacrifice it to destroy an
+    enchantment.
+  - Wrath of God / Day of Judgment {2}{W}{W}, Damnation {2}{B}{B} = destroy ALL
+    creatures. See below - these are your best cards, not "slow removal."
+
+YOUR SWEEPERS ARE ONE-SIDED IN YOUR FAVOR - USE THEM TO STABILIZE WHEN YOU ARE
+BEHIND. When you sweep, your persist creatures come back (as 1/1s with a -1/-1
+counter); the opponent's dead creatures stay dead. So a board wipe when you are
+losing the board is a HARD stabilizer, not a slow card. Rules:
+  - If your life is falling and the opponent's board would kill you soon (their
+    attackers add up to near your life, or you are at 10 or less and behind on
+    board), CAST THE SWEEPER NOW. Do not wait, do not "deploy a blocker instead" -
+    Kitchen Finks buys one turn; the wipe buys the game, and your Safehold/Finks/etc.
+    come right back. Sweeping at 6 life beats sweeping at 2.
+  - NEVER sweep when you are AHEAD on board or winning the race - you would kill your
+    own attackers. While your creatures are getting through and the opponent's life
+    is dropping, keep deploying persist bodies and attacking; leave the sweepers in
+    hand.
+  - A wipe is also correct when the opponent has gone WIDE (many small creatures) and
+    you have few - you trade one card for their whole board and yours regrows.
+
+ATTACK AND DEPLOY EVERY TURN THAT YOU ARE NOT STABILIZING. On your main phase, play
+a land and cast a creature (or activate Restless Apparition's pump / attack for
+lethal). Attack with every persist creature that is not needed at home to block a
+lethal swing - trades are fine, your creatures come back. A persist creature dying
+in combat is often GOOD for you: it comes back and the block/trade cost them a real
+card. Do not sit on a full hand of creatures; a body on the board is your plan.
+
+MULLIGAN: keep any 7 with 2-5 lands and a spell you can cast in the first few turns.
+A hand of all Plains (no Swamp) is a KEEP - Safehold Elite, Kitchen Finks, Restless
+Apparition and Heartmender ALL cast off Plains; only Rendclaw Trow, Lingering
+Tormentor and the Damnations need a Swamp, and you will draw one. Do NOT mulligan a
+good hand because it has "no black." When you bottom cards after a mulligan, bottom
+your EXTRA LANDS first (keep about 3), then your least castable spell - do not bottom
+a threat while holding a surplus fourth land.
