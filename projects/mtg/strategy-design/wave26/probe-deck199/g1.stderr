@@ -1,0 +1,838 @@
+I R in da native
+Init ResourceManagerImpl : 0x560f4a38f710
+21hgeParticleSystemInfo cache resized to 500000 bytes
+7JSample cache resized to 1500000 bytes
+8JTexture cache resized to 2000000 bytes
+Threaded Version
+8JTexture cache resized to 60000000 bytes
+AttemptNew failed to load. Deleting cache item 0x560f4a3d2770
+Destroying WCachedResource: background/backdrop1.jpg
+Can't locate 
+background/backdrop1.jpg
+AttemptNew failed to load. Deleting cache item 0x560f4a3d2770
+Destroying WCachedResource: background/backdrop2.jpg
+Can't locate 
+background/backdrop2.jpg
+AttemptNew failed to load. Deleting cache item 0x560f4a3d2770
+Destroying WCachedResource: background/backdrop3.jpg
+Can't locate 
+background/backdrop3.jpg
+AttemptNew failed to load. Deleting cache item 0x560f4a3d2770
+Destroying WCachedResource: background/backdrop4.jpg
+Can't locate 
+background/backdrop4.jpg
+AttemptNew failed to load. Deleting cache item 0x560f4a3d2770
+Destroying WCachedResource: background/backdrop5.jpg
+Can't locate 
+background/backdrop5.jpg
+AttemptNew failed to load. Deleting cache item 0x560f4a3d2770
+Destroying WCachedResource: background/backdrop6.jpg
+Can't locate 
+background/backdrop6.jpg
+size of MTGCardInstance: 2616
+size of MTGCard: 32
+size of CardPrimitive: 800
+size of ExtraCost: 72
+size of ManaCost: 176
+entergamestate:menu
+Selected soundtrack is: Track0.mp3
+sound/Track0.mp3
+inserted item ptr 0x560f4a40de20 at index 2000000016
+Time elapsed while loading sets/primitives/. : 0 ms
+Time elapsed while loading sets/primitives/.. : 0 ms
+Time elapsed while loading sets/primitives/_macros.txt : 1 ms
+Time elapsed while loading sets/primitives/borderline.txt : 284 ms
+Time elapsed while loading sets/primitives/mtg.txt : 265 ms
+Time elapsed while loading sets/primitives/planeswalkers.txt : 8 ms
+Time elapsed while loading sets/primitives/unsupported.txt : 0 ms
+warning, card id collision! : 446807 -> Nighteyes the Desecrator(Commander Anthology Volume II)
+
+==
+Total MTGCards: 68020
+Total CardPrimitives: 26078
+==
+8JTexture cache resized to 60000000 bytes
+WAGIC_SELFPLAY: auto-launching AI-vs-AI demo
+leavegamestate:menuentergamestate:transitioninserted item ptr 0x560f4dcb8e00 at index 2000000017
+inserted item ptr 0x560f4dcbaf00 at index 2000000018
+inserted item ptr 0x560f4dcbb0a0 at index 2000000019
+inserted item ptr 0x560f4dcbb240 at index 2000000020
+inserted item ptr 0x560f4dcbb560 at index 2000000021
+inserted item ptr 0x560f4d4735c0 at index 2000000022
+inserted item ptr 0x560f4dcba2f0 at index 2000000023
+leavegamestate:transitionentergamestate:duelDeleting cache item 0x560f4a40de20, cache reduced by 1048576 bytes
+Destroying WCachedResource: menutitle.png
+enterduelphase:choose_deck1WAGIC_SELFPLAY: matchup deck199 vs deck198
+inserted item ptr 0x560f4ec0df30 at index 2000000024
+AIPlayerGPT: using http://100.116.136.74:8081 (model qwen35)
+inserted item ptr 0x560f4ec2c080 at index 2000000025
+AIPlayerGPT: using http://100.116.136.74:8081 (model qwen35)
+leaveduelphase:choose_deck1enterduelphase:playinserted item ptr 0x560f4ec8ddb0 at index 2000000027
+RULES Init Game
+
+PhasingRing: goToPhase called, current phase is ---
+sound/sfx/
+AttemptNew failed to load. Deleting cache item 0x560f4a4fce70
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000028
+Can't locate 
+
+ZONE SHUFFLE obs=0x560f4d4d25c0 isLibrary=1 nb=40
+ZONE SHUFFLE obs=0x560f4d4d25c0 isLibrary=1 nb=40
+ZONE SHUFFLE obs=0x560f4d4d25c0 isLibrary=1 nb=40
+ZONE SHUFFLE obs=0x560f4d4d25c0 isLibrary=1 nb=40
+RULES Init Game Done !
+
+PREGAME: starting pre-game phase; starting player = seat 0, opponent = seat 1
+
+Selected soundtrack is: ai_baka_music.mp3
+sound/ai_baka_music.mp3
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand. Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 1 of 2
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand. Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 1 of 2
+PREGAME: player 0 (seat 0) KEEPS after 0 mulligan(s); will bottom 0 card(s)
+PREGAME: player 1 (seat 1) KEEPS after 0 mulligan(s); will bottom 0 card(s)
+PREGAME: pre-game phase complete; turn 1 begins (game opens at the untap step; the starting player skips only its first draw)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load. Deleting cache item 0x560f4eccade0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000029
+Can't locate 
+swamp.wav
+
+AttemptNew failed to load. Deleting cache item 0x560f4eccabb0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000030
+Can't locate 
+land.wav
+
+AttemptNew failed to load. Deleting cache item 0x560f4ecc09d0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000031
+Can't locate 
+basic.wav
+Untap Phase -------------   Turn 1
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+Untap Phase -------------   Turn 2
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Hymn to Tourach?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Hymn to Tourach
+
+AIPlayerGPT: casting Hymn to Tourach (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Hymn to Tourach
+-  Cost: {b}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+sound/sfx/mana.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ecd9c10
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000032
+Can't locate 
+mana.wav
+inserted item ptr 0x560f4eccaca0 at index 2000000033
+AIPlayerGPT: TARGET CHOICE for Hymn to Tourach (this spell/ability is already on the stack and needs a target - it is NOT a cast or phase step). Pick the ONE target it will affect from the list below, and answer with the chosen TARGET's name (not "Hymn to Tourach") -> chose 2 of 2
+AIPlayerGPT: targeting with Hymn to Tourach -> 1 target(s), first: The opponent (player, life 20)
+ACTIONSTACK Add spell
+Action added to stack: Hymn to Tourach
+Resolving Action on stack: Hymn to Tourach
+sound/sfx/sorcery.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ece0cb0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000034
+Can't locate 
+sorcery.wav
+sound/sfx/graveyard.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ecdf6d0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000035
+Can't locate 
+graveyard.wav
+Untap Phase -------------   Turn 3
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 3
+Should I play Erg Raiders?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Erg Raiders
+
+AIPlayerGPT: casting Erg Raiders (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Erg Raiders
+-  Cost: {1}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Erg Raiders
+Resolving Action on stack: Erg Raiders
+
+AttemptNew failed to load. Deleting cache item 0x560f4ecebcf0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000036
+Can't locate 
+warrior.wav
+sound/sfx/human.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ecf40a0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000037
+Can't locate 
+human.wav
+sound/sfx/creature.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ecd9d80
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000038
+Can't locate 
+creature.wav
+Untap Phase -------------   Turn 4
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 3 of 4
+Should I play Liliana's Triumph?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Liliana's Triumph
+
+AIPlayerGPT: casting Liliana's Triumph (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Liliana's Triumph
+-  Cost: {1}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Liliana's Triumph
+Resolving Action on stack: Liliana's Triumph
+sound/sfx/instant.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ecc0a50
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000039
+Can't locate 
+instant.wav
+inserted item ptr 0x560f4ebf5df0 at index 2000000043
+ActionLayer::doReactTo 121
+CHECKING Spell
+
+AIPlayerGPT: targeting with  -> 1 target(s), first: Erg Raiders (2/3) [your battlefield] - "At the beginning of your end step, if Erg Raiders didn't attack this turn, Erg Raiders deals 2 damage to you..."
+Action added to stack: StackAbility.  (Source: )
+Resolving Action on stack: StackAbility.  (Source: )
+Untap Phase -------------   Turn 5
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Bog Imp?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Bog Imp
+
+AIPlayerGPT: casting Bog Imp (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Bog Imp
+-  Cost: {1}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Bog Imp
+Resolving Action on stack: Bog Imp
+sound/sfx/imp.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ec88700
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000044
+Can't locate 
+imp.wav
+sound/sfx/flying.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ebfe7f0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000045
+Can't locate 
+flying.wav
+Untap Phase -------------   Turn 6
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 3 of 4
+Should I play Fell Specter?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Fell Specter
+
+AIPlayerGPT: casting Fell Specter (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Fell Specter
+-  Cost: {3}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Fell Specter
+Resolving Action on stack: Fell Specter
+
+AttemptNew failed to load. Deleting cache item 0x560f4ebf67e0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000046
+Can't locate 
+specter.wav
+ActionLayer::doReactTo 122
+AIPlayerGPT: targeting with Fell Specter -> 1 target(s), first: The opponent (player, life 20)
+Action added to stack: StackAbility.  (Source: Fell Specter)
+Resolving Action on stack: StackAbility.  (Source: Fell Specter)
+ActionLayer::doReactTo 123
+CHECKING Spell
+
+AIPlayerGPT: FORCED discard OF YOUR OWN CARD: the opponent's effect (Discard) forces YOU to discard one of your OWN cards from the list below - each option is a card YOU will LOSE, not something you affect or attack. Pick the card you can best AFFORD TO LOSE (usually your LEAST valuable: pitch a spare land or a redundant/dead card, and KEEP your best spells, answers, and threats). Choose the ONE card to give up from the list below, and answer with the chosen card's name. -> chose 1 of 3
+AIPlayerGPT: targeting with  -> 1 target(s), first: Bog Imp (1/1) [flying] [your hand] - "Flying (This creature can't be blocked except by creatures with flying or reach.)"
+Action added to stack: StackAbility.  (Source: )
+Resolving Action on stack: StackAbility.  (Source: )
+Untap Phase -------------   Turn 7
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Bog Wraith?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Bog Wraith
+
+AIPlayerGPT: casting Bog Wraith (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Bog Wraith
+-  Cost: {3}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Bog Wraith
+Resolving Action on stack: Bog Wraith
+
+AttemptNew failed to load. Deleting cache item 0x560f4ed02be0
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000047
+Can't locate 
+wraith.wav
+
+AttemptNew failed to load. Deleting cache item 0x560f4ed02b40
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000048
+Can't locate 
+swampwalk.wav
+AIPlayerGPT: declared attack (1 of 1) in one reply
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Fell Specter
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Defenser Toggle: Fell Specter
+- canDefend: 0
+- currentOpponent: 0x560f4ecfada0
+AIPlayerGPT: declared blocks from 1 assignment(s) in one reply
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Fell Specter
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 8
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 3
+Should I play Hymn to Tourach?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Hymn to Tourach
+
+AIPlayerGPT: casting Hymn to Tourach (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Hymn to Tourach
+-  Cost: {b}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+AIPlayerGPT: TARGET CHOICE for Hymn to Tourach (this spell/ability is already on the stack and needs a target - it is NOT a cast or phase step). Pick the ONE target it will affect from the list below, and answer with the chosen TARGET's name (not "Hymn to Tourach") -> chose 2 of 2
+AIPlayerGPT: targeting with Hymn to Tourach -> 1 target(s), first: The opponent (player, life 18)
+ACTIONSTACK Add spell
+Action added to stack: Hymn to Tourach
+Resolving Action on stack: Hymn to Tourach
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 3 of 3
+AIPlayerGPT: chose to cast nothing
+AIPlayerGPT: declared attack (1 of 1) in one reply
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Bog Wraith
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+AIPlayerGPT: Casting decision (Main phase 2, YOUR turn): which card do you cast now, if any? -> chose 2 of 3
+Should I play Necrogen Mists?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Necrogen Mists
+
+AIPlayerGPT: casting Necrogen Mists (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Necrogen Mists
+-  Cost: {2}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Necrogen Mists
+Resolving Action on stack: Necrogen Mists
+sound/sfx/enchantment.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ed0da40
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000049
+Can't locate 
+enchantment.wav
+Untap Phase -------------   Turn 9
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Scathe Zombies?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Scathe Zombies
+
+AIPlayerGPT: casting Scathe Zombies (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Scathe Zombies
+-  Cost: {2}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Scathe Zombies
+Resolving Action on stack: Scathe Zombies
+sound/sfx/zombie.wav
+AttemptNew failed to load. Deleting cache item 0x560f4ed07e10
+Destroying WCachedResource: 
+inserted item ptr 00000000 at index 2000000050
+Can't locate 
+zombie.wav
+AIPlayerGPT: declared attack (1 of 1) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 10
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+ActionLayer::doReactTo 127
+AIPlayerGPT: targeting with Necrogen Mists -> 1 target(s), first: Hymn to Tourach [sorcery] [your hand] - "Target player discards two cards at random."
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: declared attack (1 of 1) in one reply
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Scathe Zombies
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 11
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: declared attack (2 of 2) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 12
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 2 of 2
+AIPlayerGPT: chose to cast nothing
+AIPlayerGPT: declared attack (1 of 1) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+AIPlayerGPT: Casting decision (Main phase 2, YOUR turn): which card do you cast now, if any? -> chose 2 of 2
+AIPlayerGPT: chose to cast nothing
+Untap Phase -------------   Turn 13
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: declared attack (2 of 2) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 14
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+ActionLayer::doReactTo 130
+AIPlayerGPT: targeting with Necrogen Mists -> 1 target(s), first: Hymn to Tourach [sorcery] [your hand] - "Target player discards two cards at random."
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: declared attack (1 of 1) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 15
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: declared attack (2 of 2) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 16
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Soul Shatter?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Soul Shatter
+
+AIPlayerGPT: casting Soul Shatter (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Soul Shatter
+-  Cost: {2}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Soul Shatter
+Resolving Action on stack: Soul Shatter
+ActionLayer::doReactTo 132
+CHECKING Spell
+
+AIPlayerGPT: targeting with  -> 1 target(s), first: Bog Wraith (3/3) [swampwalk] [your battlefield] [tapped] - "Swampwalk (This creature is unblockable as long as defending player controls a Swamp.)"
+Action added to stack: StackAbility.  (Source: )
+Resolving Action on stack: StackAbility.  (Source: )
+AIPlayerGPT: declared attack (1 of 1) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 17
+Action added to stack: StackAbility.  (Source: Necrogen Mists)
+Resolving Action on stack: StackAbility.  (Source: Necrogen Mists)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Swamp now? -> chose 1 of 2
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: declared attack (1 of 1) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+WAGIC_SELFPLAY_RESULT winner=1 life0=0 life1=11 turn=17

@@ -841,3 +841,6 @@ lexicon/lexicon_aslongas_typecount_blocks_attack.txt
 lexicon/lexicon_aslongas_typecount_allows_attack.txt
 lexicon/lexicon_costcounter_named_token_creation.txt
 lexicon/lexicon_clone_all_artifacts.txt
+lexicon/tergrid_steals_sacrificed_creature.txt
+lexicon/tergrid_steals_discarded_permanent.txt
+lexicon/tergrid_ignores_sacrificed_token.txt

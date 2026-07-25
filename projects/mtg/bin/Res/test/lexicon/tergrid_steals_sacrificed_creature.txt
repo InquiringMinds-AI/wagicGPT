@@ -1,0 +1,31 @@
+# Tergrid, God of Fright: "Whenever an opponent sacrifices a nontoken permanent
+# ... you may put that card from a graveyard onto the battlefield under your
+# control." Player2 controls Tergrid. Player1 casts Lexicon Forced Sacrifice and
+# sacrifices its own Grizzly Bears (a nontoken creature). From Tergrid's
+# controller (Player2) that is an opponent's sacrifice, so Tergrid's may-trigger
+# fires; accepting it (choice 0) moves Grizzly Bears from Player1's graveyard
+# onto Player2's battlefield under Player2's control.
+# (P1 is the scripted actor so the sacrifice is a discrete action and the may
+# arms with choice-0 pending -- the phase-progression cancel trap is avoided.)
+# ('^' stands in for the comma inside "Tergrid, God of Fright".)
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Lexicon Forced Sacrifice
+manapool:{1}
+[PLAYER2]
+inplay:Tergrid^ God of Fright
+[DO]
+Lexicon Forced Sacrifice
+Grizzly Bears
+choice 0
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+graveyard:Lexicon Forced Sacrifice
+[PLAYER2]
+inplay:Tergrid^ God of Fright,Grizzly Bears
+[END]

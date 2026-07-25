@@ -1,0 +1,29 @@
+# Negative: Tergrid only triggers on a NONTOKEN sacrifice (Oracle: "sacrifices a
+# nontoken permanent"; the trigger filter is *[-token]). Player2 controls
+# Tergrid. Player1 makes a 1/1 token, then sacrifices it with Lexicon Forced
+# Sacrifice. Because the sacrificed permanent is a TOKEN, Tergrid's trigger must
+# NOT fire -- nothing is put onto Player2's battlefield (it holds only Tergrid).
+# The trailing choice-0 would accept a wrongly-armed may, so a broken filter that
+# offered the steal would fail this assertion.
+# ('^' stands in for the comma inside "Tergrid, God of Fright".)
+[INIT]
+firstmain
+[PLAYER1]
+hand:Lexicon Make Token Creature,Lexicon Forced Sacrifice
+manapool:{2}
+[PLAYER2]
+inplay:Tergrid^ God of Fright
+[DO]
+Lexicon Make Token Creature
+Lexicon Forced Sacrifice
+Lexitoken
+choice 0
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+graveyard:Lexicon Make Token Creature,Lexicon Forced Sacrifice
+[PLAYER2]
+inplay:Tergrid^ God of Fright
+[END]

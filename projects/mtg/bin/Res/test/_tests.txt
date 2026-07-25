@@ -1049,3 +1049,6 @@ attacker_mana_tap_wave20.txt
 attacker_mana_tap_partial_wave21.txt
 fetchland_crack_after_landdrop_wave22.txt
 probe/tergrid_lantern_altcost_wave24.txt
+lexicon/tergrid_steals_sacrificed_creature.txt
+lexicon/tergrid_steals_discarded_permanent.txt
+lexicon/tergrid_ignores_sacrificed_token.txt

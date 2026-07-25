@@ -1121,6 +1121,9 @@ void AIPlayerGPT::narrateDecision(const string& line)
 
 //Defined below (near salvageLoopedChoice): drops verbatim reply-template lines.
 static bool isTemplatePlaceholderLine(const string& line);
+//Defined below: drops a coded line that merely echoes the protocol's worked
+//example (its parenthetical names the placeholder card kExampleFakeCardLc).
+static bool isExampleEchoLine(const string& line);
 
 //Find the LAST line-leading answer-label line in `text`, returning its
 //remainder (after the label token) as [segStart, segEnd) plus the line's start
@@ -1160,7 +1163,8 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
                 bool match = true;
                 for (size_t k = 0; k < len && match; k++)
                     match = (toupper((unsigned char) text[s + k]) == kAnswerLabels[li][k]);
-                if (match && !isTemplatePlaceholderLine(text.substr(s, end - s)))
+                if (match && !isTemplatePlaceholderLine(text.substr(s, end - s))
+                    && !isExampleEchoLine(text.substr(s, end - s)))
                 {
                     segStart = s + len;
                     segEnd = end;
@@ -1658,11 +1662,74 @@ static AATurnSide * asTurnSide(MTGAbility * a)
     return NULL;
 }
 
+//A power/toughness-pump activation (Restless Apparition's "{W/B}{W/B}{W/B}:
+//gets +3/+3 until end of turn", and every ability of that CLASS) renders its
+//menu text as a bare "%i/%i" (APowerToughnessModifier) - which reads as a
+//RESULTING P/T stat block and contradicts the "+3/+3" in the option's card
+//text. The model cannot reconcile the two and spirals (R-RESTLESS-PUMP-OPTION-
+//AMBIGUOUS, deck59 wave-25: 4 of the corpus's 5 largest priority spirals; every
+//pump still resolved right, so a latency/verbosity tax). Recover the signed
+//modifier delta (dp/dt) and whether it is the until-end-of-turn variant so the
+//option can render "+X/+Y until EOT" instead. The GenericActivatedAbility that
+//is offered nests the PTInstant (UEOT pump) which owns the APowerToughnessModifier;
+//a static/lord modifier is a bare APowerToughnessModifier (no UEOT). Unwrap the
+//NestedAbility layers to reach whichever it is.
+static bool ptPumpModifierDelta(MTGAbility * a, int& dp, int& dt, bool& ueot,
+                                MTGCardInstance *& modTarget)
+{
+    ueot = false;
+    modTarget = NULL;
+    APowerToughnessModifier * ptm = NULL;
+    MTGAbility * cur = a;
+    for (int guard = 0; cur && guard < 6; guard++)
+    {
+        if (PTInstant * pti = dynamic_cast<PTInstant *>(cur)) { ptm = pti->ability; ueot = true; break; }
+        if (APowerToughnessModifier * m = dynamic_cast<APowerToughnessModifier *>(cur)) { ptm = m; break; }
+        NestedAbility * na = dynamic_cast<NestedAbility *>(cur);
+        if (!na || !na->ability || na->ability == cur)
+            break;
+        cur = na->ability;
+    }
+    if (!ptm || !ptm->wppt)
+        return false;
+    dp = ptm->wppt->power.getValue();
+    dt = ptm->wppt->toughness.getValue();
+    //The creature the modifier applies to (self for Restless Apparition's
+    //self-pump). Used to compute current -> resulting stats only when it is a
+    //known creature; a not-yet-chosen "target creature" pump leaves this NULL.
+    modTarget = dynamic_cast<MTGCardInstance *>(ptm->target);
+    return true;
+}
+
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 {
     std::ostringstream out;
     if (action.ability)
-        out << action.ability->getMenuText();
+    {
+        //PT-pump activations: render the modifier as a signed DELTA with its
+        //duration (and, where the pumped creature is identifiable, its
+        //current -> resulting P/T) instead of the ambiguous bare "N/N". The
+        //"+X/+Y" now agrees with the card text appended below, and the pilot
+        //no longer burns reasoning reconciling "3/3" with "+3/+3".
+        int dp = 0, dt = 0; bool ueot = false; MTGCardInstance * modTarget = NULL;
+        if (ptPumpModifierDelta(action.ability, dp, dt, ueot, modTarget))
+        {
+            out << (dp >= 0 ? "+" : "") << dp << "/" << (dt >= 0 ? "+" : "") << dt;
+            if (ueot)
+                out << " until EOT";
+            //The pumped creature: an explicit chosen target, else the modifier's
+            //own target (the source itself for a self-pump like Restless
+            //Apparition). When neither is a known creature, show only the delta -
+            //never guess a creature whose stats would be wrong.
+            MTGCardInstance * pumped = (action.target && action.target->isCreature())
+                                       ? action.target : modTarget;
+            if (pumped && pumped->isCreature())
+                out << " (" << pumped->power << "/" << pumped->toughness << " -> "
+                    << (pumped->power + dp) << "/" << (pumped->toughness + dt) << ")";
+        }
+        else
+            out << action.ability->getMenuText();
+    }
     if (action.click)
         out << " with " << action.click->getDisplayName();
 
@@ -1838,6 +1905,20 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
         text = text.substr(thinkEnd + 8);
+
+    //Protocol-example parrot (belt-and-suspenders for the example-leak, deck133
+    //vs131 s21 class). A coded token whose parenthetical verbatim-echoes the
+    //reply protocol's worked example (kExampleFakeCardLc) is a copied format
+    //string, not a decision, so exclude it from index resolution. This is the
+    //universal choke point: findAnswerLabelLine segments, salvage lines and the
+    //retraction walk all resolve through parseChoice, so guarding here closes the
+    //real consumePlan flow (not just the salvage path). The de-fang makes the
+    //example name NON-LIVE, so this is inert today (no real option is named it) -
+    //it keeps the resolver safe should a FUTURE example text again collide with a
+    //live option (the exact wave-24 shape). A drop routes to the safe heuristic,
+    //and salvageLoopedChoice still recovers any real sibling line.
+    if (isExampleEchoLine(text))
+        return -1;
 
     //Name-echo reconciliation: the answer line carries the chosen option's
     //name in parentheses ("CHOICE: 2 (Cast Fatal Push)"). When the plan
@@ -2211,6 +2292,41 @@ static bool isTemplatePlaceholderLine(const string& line)
     return low.find("[number]") != string::npos || low.find("[name]") != string::npos;
 }
 
+//A coded line whose parenthetical is a verbatim echo of the reply protocol's
+//worked example ("CHOICE: 3 (Cast Example Card)", or its remainder "3 (Cast
+//Example Card)") - the model parroting the format string, not a decision.
+//
+//Belt-and-suspenders for the protocol-example leak (deck133 vs131 s21 class,
+//wave-24 HARNESS/PARSER). The wave-25 de-fang made the example card name
+//(kExampleFakeCardLc) NON-LIVE, so such a line already resolves stale TODAY
+//(its foreign echo name matches no offered option -> echoStaleForIndex). But
+//that closure is trigger-removal, not a parser guarantee: were a FUTURE example
+//text to again collide with a live option name (exactly the wave-24 shape, where
+//the old example "Cast Fatal Push" equalled a real option), a line-anchored
+//parrot of it would be TAKEN. Excluding it structurally, in the same line-start
+//coded-index walk that drops template placeholders, makes the primary resolution
+//independent of the de-fang. Scoped to a parenthetical that names the example
+//card so an incidental "for example card advantage" in prose cannot trip it, and
+//a false drop only routes to the (safe) heuristic.
+static bool isExampleEchoLine(const string& line)
+{
+    string low = line;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    size_t open = 0;
+    while ((open = low.find('(', open)) != string::npos)
+    {
+        size_t close = low.find(')', open);
+        size_t ex = low.find(kExampleFakeCardLc, open);
+        if (ex != string::npos && (close == string::npos || ex < close))
+            return true;
+        if (close == string::npos)
+            break;
+        open = close + 1;
+    }
+    return false;
+}
+
 int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
                                      const std::vector<string> * optionTexts)
 {
@@ -2242,6 +2358,9 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
                 string line = content.substr(s + 7, end - (s + 7));
                 if (!isTemplatePlaceholderLine(line))
                 {
+                    //parseChoice drops an example-echo parenthetical (returns -1),
+                    //so a parroted example line is skipped here without a separate
+                    //guard - the last REAL line-leading choice still wins.
                     bool st = false;
                     int c = parseChoice(line, optionCount, optionTexts, &st);
                     if (c >= 0)
@@ -2322,6 +2441,8 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
                 string line = text.substr(s + 7, end - (s + 7));
                 if (!isTemplatePlaceholderLine(line))
                 {
+                    //An example-echo line resolves to -1 in parseChoice, so it
+                    //never becomes the retraction anchor (chosenNum/lastChoiceEnd).
                     bool st = false;
                     int c = parseChoice(line, optionCount, optionTexts, &st);
                     if (c >= 0) { lastChoiceEnd = (long) end; chosenNum = c; }
@@ -3168,9 +3289,24 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     int ownT = 0, oppT = 0;
                     std::ostringstream tNames;
                     int tShown = 0;
-                    for (int pi = 0; pi < 2; pi++)
+                    //Enumerate ALL legal targets, OPPONENT side FIRST (the
+                    //strategically-live burn/removal targets), then the
+                    //caster's own. Do NOT truncate behind "(+N more)": a
+                    //capped, own-creatures-first preview hid an opponent's
+                    //Young Pyromancer (deck109 wave-25 vs131 s11/s8) and the
+                    //pilot declined a guide-mandated on-sight kill because it
+                    //read the truncated preview as the complete legal set - a
+                    //legal play suppressed by omission. Owner ruling: never
+                    //hide a legal play on a representation cap. A single-target
+                    //preview is cheap (corpus p95 prompt sizes are fine), and
+                    //the downstream chooseTarget window already shows the full
+                    //list - so the option preview must not disagree with it.
+                    Player * ordered[2] = { this->opponent(), this };
+                    for (int oi = 0; oi < 2; oi++)
                     {
-                        Player * pp = observer->players[pi];
+                        Player * pp = ordered[oi];
+                        if (!pp)
+                            continue;
                         MTGGameZone * zz[] = { pp->game->inPlay, pp->game->graveyard, pp->game->hand, pp->game->exile, pp->game->commandzone };
                         for (int zi = 0; zi < 5; zi++)
                             if (tc->targetsZone(zz[zi]))
@@ -3178,14 +3314,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                     if (tc->canTarget(zz[zi]->cards[cj]))
                                     {
                                         (zz[zi]->cards[cj]->controller() == this ? ownT : oppT)++;
-                                        if (tShown < 4)
-                                            tNames << (tShown++ ? ", " : "") << zz[zi]->cards[cj]->getDisplayName();
+                                        tNames << (tShown++ ? ", " : "") << zz[zi]->cards[cj]->getDisplayName();
                                     }
                         if (tc->canTarget(pp))
                         {
                             (pp == this ? ownT : oppT)++;
-                            if (tShown < 4)
-                                tNames << (tShown++ ? ", " : "") << (pp == this ? "you" : "the opponent");
+                            tNames << (tShown++ ? ", " : "") << (pp == this ? "you" : "the opponent");
                         }
                     }
                     if (ownT && !oppT && firstHit)
@@ -3204,9 +3338,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     }
                     else if (ownT + oppT > 0)
                     {
+                        //Full list, opponent-first: no "(+N more)" truncation
+                        //(see the enumeration comment above).
                         o << " - legal targets right now: " << tNames.str();
-                        if (ownT + oppT > tShown)
-                            o << " (+" << (ownT + oppT - tShown) << " more)";
                         //Owner ruling (2026-07-16): same as the own-side case
                         //above - annotate, never hide. A beneficial cast with
                         //only opponent-side targets is usually futile (deck49
@@ -3529,24 +3663,48 @@ static string announceXHeader(const string& spell, int capX)
 //are untouched. Mechanism-matched by the CO-PRESENCE of a "Pay ... life" option
 //and a "Tap" option (the pay-or-tapped ETB shape, the only menu that pairs
 //them), NOT by card name. Returns true when it fired (for the self-test).
+//Case-insensitive helpers: the ACTUAL rendered shock menu options are
+//LOWERCASE ("pay 2 life" / "tap", confirmed in the real translog - deck137
+//vs109 s4, vs59 s3), while the auto-script name() reads "Pay 2 life"/"Tap".
+//The original capital-only matcher therefore never fired on the live menu and
+//the options stayed bare (the b4 annotation reached the card TEXT, not the
+//menu). Match both forms.
+static string toLowerCopy(const string & s)
+{
+    string r = s;
+    for (size_t i = 0; i < r.size(); i++)
+        r[i] = (char) tolower((unsigned char) r[i]);
+    return r;
+}
+static bool isPayLifeOption(const string & opt)
+{
+    string lo = toLowerCopy(opt);
+    return lo.compare(0, 4, "pay ") == 0 && lo.find(" life") != string::npos;
+}
+static bool isTapOption(const string & opt)
+{
+    //the bare tap branch is exactly "tap" (any case); guard against matching a
+    //longer option that merely starts with "tap ..."
+    return toLowerCopy(opt) == "tap";
+}
 static bool annotateEtbPayOrTapMenu(vector<string>& opts)
 {
     bool hasPayLife = false, hasTap = false;
     for (size_t i = 0; i < opts.size(); i++)
     {
-        if (opts[i].compare(0, 4, "Pay ") == 0 && opts[i].find(" life") != string::npos)
+        if (isPayLifeOption(opts[i]))
             hasPayLife = true;
-        if (opts[i] == "Tap")
+        if (isTapOption(opts[i]))
             hasTap = true;
     }
     if (!(hasPayLife && hasTap))
         return false;
     for (size_t i = 0; i < opts.size(); i++)
     {
-        if (opts[i].compare(0, 4, "Pay ") == 0 && opts[i].find(" life") != string::npos)
+        if (isPayLifeOption(opts[i]))
             opts[i] += " [this permanent then enters the battlefield UNTAPPED -"
                        " usable (tap for mana / attack) this turn]";
-        else if (opts[i] == "Tap")
+        else if (isTapOption(opts[i]))
             opts[i] += " [decline the payment; this permanent instead enters the"
                        " battlefield TAPPED - unusable until your next untap step]";
     }
@@ -3642,14 +3800,32 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //Annotation only, mechanism-matched (see annotateEtbPayOrTapMenu). deck137
     //wave-24.
     annotateEtbPayOrTapMenu(opts);
-    string decision = ctx ? ("Choose an option for " + ctx->getDisplayName() + ":")
-                          : string("A choice is required - choose an option:");
+    //Recover the subject name for the header. Some ETB menus arm on an instance
+    //whose own name is cleared (getDisplayName() empty) but whose card TEMPLATE
+    //(model->data) still carries the printed name - recover it there. The
+    //shockland pay-or-tap menu is the WORST case: its entering instance is a
+    //stripped copy with name cleared AND model == NULL (verified w26a probe -
+    //currentActionCard/menuObject/option-source all point to the same nameless,
+    //model-less instance), so no name is recoverable at this seam. Naming it
+    //would need an engine-level change to the ETB menu-arming flow.
+    string ctxName;
+    if (ctx)
+    {
+        ctxName = ctx->getDisplayName();
+        if (ctxName.empty() && ctx->model && ctx->model->data)
+            ctxName = ctx->model->data->getName();
+    }
+    //When the subject name is unrecoverable, fall to a clean generic prompt
+    //rather than the grammatically-broken bare "Choose an option for :" the old
+    //code emitted (a dangling empty subject after "for", deck137 wave-25).
+    string decision = !ctxName.empty() ? ("Choose an option for " + ctxName + ":")
+                                       : string("A choice is required - choose an option:");
     //Thread the source card as the pending source (as ANNOUNCE_X does): the model
     //often echoes "<verb> <source card>" against a bare option ("Tap Temple
     //Garden" vs "tap"), and INDEX-WINS treats a source-naming echo as a
     //self-reference rather than a stale prior answer (deck137 wave-24 s4). Empty
     //when the source name did not render - then (a2) option-label-in-echo covers it.
-    int pick = askModel(decision, opts, true, ctx ? ctx->getDisplayName() : string());
+    int pick = askModel(decision, opts, true, ctxName);
     if (pick == kChoicePending)
         return kChoicePending;
     if (pick < 0)
@@ -5564,7 +5740,7 @@ void AIPlayerGPT::runParseSelfTest()
         if (cond) { cout << "  PASS  " << label << "\n"; passed++; } \
         else { cout << "  FAIL  " << label << "\n"; failed++; } } while (0)
 
-    cout << "=== AIPlayerGPT parse self-test (wave-20 3a/3b/3c + wave-21 A/B/C + wave-22 N9/A2/B3 + wave-25 1/2/3) ===\n";
+    cout << "=== AIPlayerGPT parse self-test (wave-20 3a/3b/3c + wave-21 A/B/C + wave-22 N9/A2/B3 + wave-25 1/2/3 + wave-26 example-echo) ===\n";
 
     // ---- ITEM 3b: "#N" ordinal disambiguates duplicate names ----
     cout << "\n[3b] deck135 wave-19 s27: 'BLOCKS: Ice-Fang Coatl: Saproling (1/1) #1'\n";
@@ -6321,6 +6497,47 @@ void AIPlayerGPT::runParseSelfTest()
         int s5 = parseChoice("2 (Cast Commander's Sphere)", 1, &flip, &sst);
         cout << "     s5 (index 2, card absent from a 1-option ask) -> " << s5 << " (must be < 0)\n";
         CHECK(s5 < 0, "W25-1b: an example/stale-seeded out-of-range coded index is not taken");
+    }
+
+    // ---- WAVE-26 ITEM 2: line-anchored coded-index scan + example-echo exclusion
+    // (belt-and-suspenders for the protocol-example leak, deck133 reviewer). The
+    // de-fang removed the LIVE-collision trigger; these guard the PARSER itself so
+    // it holds even if a FUTURE example text again collides with a real option.
+    cout << "\n[W26] line-anchored coded-index scan; a verbatim example-echo line is never taken as the answer\n";
+    {
+        // A future example whose card name EQUALS a live option (the exact wave-24
+        // shape). Under the old resolver a line-leading parrot of it would be taken.
+        vector<string> opts;
+        opts.push_back("Cast Doom Blade");
+        opts.push_back("Cast Example Card");
+
+        // (1) LINE-ANCHORED POSITIVE: a normal coded answer at line start resolves.
+        string ok = "CHOICE: 1 (Cast Doom Blade)\nPLAN: kill the threat.\n";
+        int rp = RESOLVE(ok, 2, opts);
+        cout << "     line-anchored 'CHOICE: 1 (Cast Doom Blade)' -> " << rp << " (must be 1)\n";
+        CHECK(rp == 1, "W26 line-anchored positive: a real coded answer at line start still resolves");
+
+        // (2) EXAMPLE-ECHO NEGATIVE: a line-leading verbatim echo of the protocol
+        // example (its card collides with option 2) is a parrot, not a decision ->
+        // heuristic (-1). Pre-change this resolved to 2 (the leak).
+        string echoLine = "CHOICE: 2 (Cast Example Card)\nPLAN: follow the format.\n";
+        int re = RESOLVE(echoLine, 2, opts);
+        cout << "     line-leading example echo 'CHOICE: 2 (Cast Example Card)' -> " << re << " (must be < 0)\n";
+        CHECK(re < 0, "W26 example-echo negative: a verbatim protocol-example line is not taken as the answer");
+
+        // (3) MID-LINE QUOTED NEGATIVE: a quoted example token that does NOT begin
+        // its line is not a coded answer (line-anchoring) -> nothing salvageable.
+        string quoted = "The example \"CHOICE: 2 (Cast Example Card)\" shows the format.\nPLAN: decide next.\n";
+        int rq = RESOLVE(quoted, 2, opts);
+        cout << "     mid-line quoted example only -> " << rq << " (must be < 0: not line-anchored)\n";
+        CHECK(rq < 0, "W26 mid-line quoted negative: a non-line-start quoted CHOICE token is never the answer");
+
+        // (4) The example-echo exclusion must not swallow a REAL answer that merely
+        // mentions the phrase in prose (not inside the coded parenthetical).
+        string prose = "CHOICE: 1 (Cast Doom Blade) - good for example card advantage later.\nPLAN: go.\n";
+        int rr = RESOLVE(prose, 2, opts);
+        cout << "     real answer with 'example card' in trailing prose -> " << rr << " (must be 1, not dropped)\n";
+        CHECK(rr == 1, "W26 precision: 'example card' outside the coded parenthetical does NOT drop a real answer");
     }
 
     // ---- ITEM 2: natural-stop prefer-last / prose reconcile ----

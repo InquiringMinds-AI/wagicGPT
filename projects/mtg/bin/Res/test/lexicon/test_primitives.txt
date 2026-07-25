@@ -6272,3 +6272,21 @@ type=Enchantment
 auto={0}:all(artifact|mybattlefield) clone with(unearth) oneshot
 text=Test-only: {0}: for each artifact you control, create a token copy with unearth (Saheeli, the Gifted -7 clone-all mechanism).
 [/card]
+[card]
+id=2100000981
+name=Lexicon Forced Selfdiscard
+rarity=C
+mana={1}
+type=Sorcery
+auto=reject notaTarget(*[-land]|myhand)
+text=Test-only: its caster discards a nonland card from their own hand (forced; with one such card, no choice). Fires an opponent's discard trigger on a permanent card.
+[/card]
+[card]
+id=2100000982
+name=Lexicon Make Token Creature
+rarity=C
+mana={1}
+type=Sorcery
+auto=create(Lexitoken:creature soldier:1/1:colorless)
+text=Test-only: creates a 1/1 colorless token creature for its caster. Used to exercise Tergrid's nontoken (-token) sacrifice filter.
+[/card]
