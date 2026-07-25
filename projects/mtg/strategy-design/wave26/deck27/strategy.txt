@@ -1,0 +1,128 @@
+Deck identity: BLUE-BLACK (UB) ZOMBIE/MERFOLK TRIBAL. You win by flooding the board with cheap
+tribal creatures, stacking LORDS that pump the whole team, and sending EVASIVE attackers (unblockable,
+flyers, islandwalkers) at the opponent's face every turn. You have NO burn and NO removal - every
+decision is deploy a creature, attack, or block. You are the aggressor, but a resilient one: regenerate
+and recur your creatures to grind through anything. You usually kill by turn 10-13.
+
+YOUR MANA IS FLEXIBLE - THIS IS RULE #1. Most of your deck costs hybrid {U/B}: EVERY {U/B} pip pays
+with EITHER a blue OR a black source, whichever you have. IF A "CAST" OPTION IS LISTED, IT IS PAYABLE
+RIGHT NOW - the engine only offers casts you can afford, and the "[hybrid: each {u/b} pays with U or B
+- total N mana]" tag already did the math. TRUST the "Mana available" line and the cast list; never
+reason "I don't have the right color" when a Cast option is on the list - that thought is always false.
+The battlefield [X/Y] on each creature ALREADY includes your lord buffs - read it, do not re-derive it.
+
+DEPLOY A CREATURE AND ATTACK EVERY TURN - DURDLING IS HOW YOU LOSE. Your worst games are the ones
+where you sit back, play small bodies one at a time, and save your lords for "later." There is no
+later. Each turn: play a land, cast the best creature(s) you can afford, and ATTACK with everything
+that can. Your losses came from deploying lords on turn 13 and attacking piecemeal with un-buffed 1/1s
+while the opponent built up. Get your board and your lords DOWN. The durdle also strikes LATE, in a
+ground stall: when the opponent has STOPPED attacking you and your life is stable, a board that never
+swings loses to the turn clock. If you are not being raced, keep attacking every turn to FORCE trades
+and push damage - swing your whole board even into blockers, even for 2 a turn with a lone flyer while
+you grind. Holding your buffed attackers back in a stall does not win; the clock runs out and you lose
+the adjudication.
+
+YOUR LORDS ARE THE ENGINE - PLAY THEM ON CURVE, NOT LAST. Cast them as soon as you can; a lord in
+hand does nothing.
+- Glen Elendra Liege ({1}{U/B}{U/B}{U/B} 2/3 FLYING): a DOUBLE anthem - gives +1/+1 to your other BLUE
+  creatures AND +1/+1 to your other BLACK creatures. Because your whole deck is blue and/or black, this
+  buffs almost your ENTIRE board at once. It also flies. This is your best lord - prioritize it.
+- Lord of the Undead ({1}{B}{B} 2/2): other Zombies get +1/+1, and {1}{B},{T}: return a Zombie from
+  your graveyard to your hand (see RECURSION below).
+- Zombie Master (2/3): your other Zombies get swampwalk (unblockable if the opponent controls a Swamp)
+  AND "{B}: regenerate." A resilience anthem.
+- Lord of Atlantis ({U}{U} 2/2): other Merfolk get +1/+1 AND islandwalk (unblockable if the opponent
+  controls an Island). Your Merfolk are Vodalian Zombie, Inkfathom Infiltrator, Deepchannel Mentor.
+- Deepchannel Mentor (2/2): makes ALL your BLUE creatures UNBLOCKABLE. If you draw it, it is a top
+  priority to cast - it turns your whole blue team into an unblockable clock.
+
+EVASION IS YOUR WIN CONDITION - LEAD WITH THE UNBLOCKABLE AND FLYING DAMAGE. Your cleanest wins come
+from attackers the opponent simply cannot block. Cast and attack with these first and every turn:
+- Inkfathom Infiltrator ({U/B}{U/B} 2/1): UNBLOCKABLE. It also can't block - it is a pure attacker, so
+  send it in every single turn; it is never a blocker.
+- Flyers: Wasp Lancer ({U/B}{U/B}{U/B} 3/2), Glen Elendra Liege. Most opponents have no flyer - they
+  connect for full.
+- Under Lord of Atlantis, all your Merfolk have islandwalk; under Deepchannel Mentor, all your blue
+  creatures are unblockable. Once a lord grants evasion, ATTACK with the whole evasive team - do not
+  leave unblockable creatures at home.
+
+BLOCK WHEN THE TRADE FAVORS YOU - TAKE THE FREE BLOCK. You are NOT a pure race deck; you have real
+blockers and you must use them to survive go-wide swarms and flyers. Each block option shows the naive
+trade - TRUST IT:
+- "(you kill it, your blocker lives)" is a FREE, favorable block. TAKE IT - it is a misplay to decline
+  it. This is especially true against an opponent LORD or anthem-giver (e.g. a creature that grants the
+  whole enemy team first strike): killing it for free weakens their entire board.
+- "(both die)" is a fair trade - take it when you need to stem damage or when your creature is expendable
+  and theirs is not.
+- "(your blocker dies, attacker lives)" is a chump. Only do it to prevent lethal or near-lethal, and
+  never chump with a LORD (losing an anthem to save a few life is usually wrong).
+FIRST STRIKE CHANGES THE MATH - TRUST THE ANNOTATION, DO NOT RE-DERIVE IT. When an attacker has FIRST
+STRIKE, it deals its damage BEFORE your blocker deals any. If its power is at least your blocker's
+toughness, your blocker dies WITHOUT dealing damage - so blocking it is a CHUMP ("your blocker dies,
+attacker lives"), NOT a trade, even when the printed power/toughness look even (a 2/2 first striker
+kills your 2/2 and lives). The engine already folded first strike into the block annotation: if it says
+"(your blocker dies, attacker lives)", believe it - do NOT talk yourself into "both die." NEVER chump a
+LORD into a first striker you cannot outright kill; put that lord on one of its FREE kills instead.
+WHEN SEVERAL ATTACKERS COME AT ONCE and you have fewer blockers than attackers, ALLOCATE by FREE KILLS
+FIRST: assign your blockers to the attackers marked "(you kill it, your blocker lives)" before anything
+else - two free kills that keep your blockers alive are worth far more than saving 2-3 life. Do NOT put
+a blocker (least of all a lord) in front of a big attacker you cannot kill, while a small attacker you
+COULD have killed for free connects instead. Take the free kills and let the big one through unless it
+is lethal THIS turn.
+WHEN THE INCOMING DAMAGE IS LETHAL you MUST block enough to survive even if every block is a losing
+chump - count the damage the annotation still lets through (first strikers kill your blocker but the
+attacker's remaining power TRAMPLES over; the option line already prints "(N tramples to your face)").
+Block the assignment that leaves you at the HIGHEST life: chumping the BIGGEST attacker removes the most
+face damage. Do not decline all blocks at lethal to "save" a wall - a dead you keeps nothing. Decide the
+block, put it on your first line, and if you reason your way to a different, survival-correct block,
+END on that line - your final block line is the one that counts.
+Oona's Gatewarden ({U/B} 1/3... 2/1 body, FLYING, DEFENDER, WITHER) CANNOT ATTACK - it is a pure wall.
+Deploy it to block, especially against flyers, and its wither shrinks the attacker permanently - but
+wither only lands if your wall survives to deal damage, so it does NOT shrink a first striker that kills
+it first (trust the annotation for that case too - it will show "(your blocker dies, attacker lives)"
+WITHOUT a shrink note against a first striker, and "(wither shrinks it to X/X)" only when your wall
+actually lives long enough to bite). Chump-withering a big NON-first-striker (shrinking a 5/5 to 3/3
+forever) can be worth more than trading Oona for a small flyer - weigh the permanent shrink.
+
+YOU ARE RESILIENT - REGENERATE AND RECUR YOUR BEST CREATURES, NOT YOUR WORST. Hold {B} up to regenerate
+a blocker when the trade would otherwise kill it (Zombie Master gives every Zombie "{B}: regenerate";
+Sanguine Guard, Metathran Zombie, and Walking Dead regenerate themselves). But do NOT sink your whole
+turn babysitting a 1/1 - regenerating a Walking Dead over and over while you are being raced is a wasted
+turn. RECURSION: Lord of the Undead's {1}{B},{T} returns a Zombie from your graveyard - aim it at your
+BEST dead Zombie (a LORD, or your biggest threat), never at a 1/1 filler.
+
+PROTECTION MATTERS: Zombie Outlander and Vodalian Zombie have protection from GREEN (green creatures
+can't block them and can't deal them damage); Marauding Knight has protection from WHITE (and grows
++1/+1 for each Plains the opponent controls). Against a green or white deck, these creatures attack and
+block with near-impunity - lean on them.
+
+WHEN YOU ARE AHEAD, KEEP IT SIMPLE. If you are winning the race, do not spiral on "what if their one
+card is removal." Deploy your best creature, attack, pass. Over-thinking a won board is how you waste a
+turn or truncate your reply.
+
+WHEN YOU ARE BEHIND, MAKE THE BEST PLAY AND PASS - DO NOT HUNT IMPOSSIBLE LETHAL. Some games the swarm
+gets ahead of you. When you cannot win THIS turn, do not re-derive the whole board hunting for a lethal
+that isn't there ("2 is not 20, I must have miscounted"). Make the best developing or blocking play and
+pass. In combat, ONLY the attackers listed as A1, A2, ... exist right now - do not imagine or block an
+attacker from an earlier turn that is not in the current list, and do not distrust a correct "up to N"
+damage hint by inventing extra attackers. Answer blockers in ONE short line using the B#/A# codes (e.g.
+"BLOCKS: B1:A1"), never card names, never a long trade enumeration.
+
+MULLIGAN: keep 2-4 lands with both blue and black available (Underground Sea and the {U/B} hybrids make
+this easy) and at least one early creature. Ship 0-1 land hands, 6+ land hands, and hands that are all
+expensive cards with no turn 1-3 play - this deck wants to curve out cheap tribal creatures into lords.
+WHEN YOU BOTTOM CARDS after a mulligan, keep your COLOR-FIXING FIRST: Underground Sea is your only dual
+land (it makes BOTH {U} and {B}) - it is almost never a card you bottom, and you must NEVER bottom your
+only source of a color you need. A hand of three basic Swamps is COLORSTUCK: it produces only black, so
+it cannot cast anything that needs {U} (Metathran Zombie, Lord of Atlantis, and every blue-only card
+are dead in hand). Keep 2-3 lands including at least one BLUE source, plus your cheapest CASTABLE
+creatures; bottom the EXCESS basic Swamps and the expensive cards you cannot cast in the first few
+turns. RULE #1 APPLIES IN THE BOTTOM PHASE TOO: a {U/B} hybrid creature (Inkfathom Infiltrator, Vodalian
+Zombie, Wasp Lancer, Zombie Outlander, Sanguine Guard) is the EASIEST card to cast in your deck, NOT the
+hardest - every {U/B} pip pays with EITHER blue OR black, so it needs NO special "mana fixing." NEVER
+bottom a cheap hybrid creature reasoning it is "hard to cast without fixing" - that thought is rule #1
+being wrong again, this time in the pregame. If you must ship a threat to hit your bottom count, ship a
+DOUBLE-PIP card that demands a specific color ({U}{U} Lord of Atlantis, {1}{B}{B} Lord of the Undead)
+BEFORE a flexible hybrid of equal or lower cost. Decide your bottom list ONCE and put it on your FIRST
+line (e.g. "PUT: 4, 5, 6"); do not name one set of cards then reason your way to a different set - your
+first line is the one that counts.

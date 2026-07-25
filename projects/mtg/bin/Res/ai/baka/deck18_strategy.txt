@@ -1,0 +1,85 @@
+Deck identity: KITHKIN - mono-white tribal ANTHEM AGGRO. You win by turn 5-8 by
+flooding the board with cheap white creatures and stacking LORDS and ANTHEMS on top
+of them so a wide team hits far harder than its printed stats. You are the BEATDOWN
+in almost every game: deploy a creature every turn, attack every turn, close fast.
+You are NOT a control deck - do not sit back trading one-for-one.
+
+TRUST THE PRINTED [X/Y] - DO NOT RECOMPUTE IT. Every creature line already shows its
+CURRENT power/toughness with all your lords and anthems added in, e.g.
+"Field Marshal (3/3) (printed 2/2)". READ that number and use it directly for combat
+math and lethal. NEVER re-derive a creature's size from its base stats plus each lord
+one at a time - the board line has already done it, for BOTH your creatures AND the
+opponent's. Doing the math by hand is the single biggest time-waste at this deck and
+it makes you second-guess correct numbers. Same for mana: if a "Cast ..." option is
+listed it is payable right now (the game checked); trust the "Mana available" line.
+Your mana is all Plains (mono-white); a {W/U} pip is paid with a Plains, so Zealous
+Guardian and Thistledown Liege cast off Plains alone - "I have no blue" is NEVER a
+reason not to cast them, and never a reason to mulligan.
+
+WHAT EACH CARD DOES (use these facts; do not invent others):
+  - Goldmeadow Dodger {W} 1/1 = CANNOT BE BLOCKED by creatures with power 4 or
+    greater. Against any deck with a big creature (a 4/4, a 5/5 Obliterator, a Giant)
+    it is UNBLOCKABLE and connects every turn. SWING IT EVERY TURN - it will not die
+    to a big blocker because a big blocker cannot block it. This is your best evasion.
+  - Cenn's Heir {1}{W} 1/1 = when it ATTACKS it gets +1/+1 for each OTHER attacking
+    Kithkin. In a wide attack it becomes large - always send it WITH the rest of the
+    team, never alone.
+  - Ballynock Cohort {2}{W} 2/2 = FIRST STRIKE, and +1/+1 while you control another
+    white creature (so it is 3/3 whenever any other creature is out). A first-strike
+    3/3 wins most combats without dying.
+  - Wizened Cenn {W}{W} 2/2 = LORD: every OTHER Kithkin you control gets +1/+1
+    (Goldmeadow Dodger, Cenn's Heir, Ballynock Cohort, Zealous Guardian, Thistledown).
+  - Field Marshal {1}{W}{W} 2/2 = LORD: every OTHER Soldier gets +1/+1 AND FIRST
+    STRIKE. Your Soldiers are Ballynock Cohort, Cenn's Heir, Zealous Guardian, and
+    every Mobilization token. This turns your team into first strikers - it is your
+    combat engine. Two Field Marshals stack (their buffs add).
+  - Thistledown Liege {1}{W/U}{W/U}{W/U} 1/3 = LORD: other white creatures +1/+1 AND
+    other blue creatures +1/+1 (a W/U hybrid creature counts as both). It is small
+    itself (1/3) - it is a buff, not a beater; keep it back or send it only in a wide
+    swing.
+  - Glorious Anthem {1}{W}{W} = every creature you control gets +1/+1. Anthems and
+    lords all STACK on top of each other.
+  - Mobilization {2}{W} enchantment = your Soldiers get vigilance; and it has an
+    ACTIVATED ability {2}{W}: make a 1/1 white Soldier token. That token maker does
+    NOT appear in your cast list - it shows up as an option like "Create soldier with
+    Mobilization" during a priority window (often your upkeep or main). Whenever you
+    have {2}{W} to spare and nothing better to cast, MAKE A TOKEN - it is a Soldier,
+    so Field Marshal makes it a first striker and Mobilization gives it vigilance.
+  - Armored Ascension {3}{W} aura = enchant ONE of your creatures: it gains flying and
+    +1/+1 for EACH Plains you control (usually +4 to +6). This is your evasive
+    FINISHER. Put it on a creature that is already buffed and will survive (a
+    first-strike Ballynock Cohort or a Field Marshal), then swing in the air for the
+    kill. Decide the target in one step - any durable creature is fine.
+
+ATTACK EVERY TURN. On each of your turns: play a Plains, cast the biggest board you
+can, then declare attackers. Send EVERY creature that is not needed at home to stop a
+lethal swing back at you - your first strikers win their fights and your team is
+bigger than it looks. Always include Goldmeadow Dodger (it cannot be blocked by big
+creatures) and Cenn's Heir (it grows in a wide swing). Do not durdle with creatures
+in hand and an empty board.
+
+YOU HAVE NO FLYERS AND NO REACH (until Armored Ascension). YOUR GROUND CREATURES
+CANNOT BLOCK THE OPPONENT'S FLYERS. If the opponent attacks with a flying creature,
+you CANNOT block it - do not try, and do not spend time planning a block for it. Just
+take the damage and RACE: kill them before their flyer kills you. Against a flyer
+deck, prioritize speed and your own evasion (Goldmeadow Dodger, an Armored Ascension
+flyer) over defense.
+
+BLOCKING - LEAN ON FIRST STRIKE. When you must block a big attacker, GANG-BLOCK it
+with your FIRST-STRIKE Soldiers (once Field Marshal is out, most of your team has
+first strike): several first strikers deal their damage FIRST and can kill a large
+attacker before it deals any damage back, so your blockers survive. Example: three
+2/2 first strikers kill a 5/5 and none of them die. Prefer this to chump-blocking.
+Do NOT trade a LORD (Wizened Cenn, Field Marshal, Thistledown Liege) away in a block
+if a cheaper creature or a first-strike gang can do the job - losing a lord shrinks
+your whole team.
+
+VS BIG-CREATURE / MONO-BLACK DEVOTION decks (Phyrexian Obliterator, big trampler):
+race with Goldmeadow Dodger (unblockable by their big creature) and your wide first-
+strike team. Do NOT block the Obliterator with your creatures - when your creature
+deals damage to it, YOU sacrifice that many permanents, which wrecks your wide board.
+Let it through and win the race instead.
+
+MULLIGAN: keep any hand with 2-4 Plains and at least one creature you can cast in the
+first two turns. Your curve is low and every creature is castable off Plains, so most
+7s are keeps. Never mulligan for color.
