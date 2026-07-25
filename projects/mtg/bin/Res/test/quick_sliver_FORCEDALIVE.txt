@@ -1,7 +1,11 @@
 #Testing Quick Sliver (keyword: FORCEDALIVE).
 #All slivers should have flash until Quick Sliver dies.
+#Re-authored: the casts run in the UPKEEP step, not the untap step. No player has
+#priority during untap (CR 500.3/502.4), so an untap-step cast is illegal. Upkeep
+#is a priority-bearing NON-main step, so it still isolates the flash grant: after
+#Quick Sliver dies, Muscle Sliver (a non-flash sliver) can no longer be cast.
 [INIT]
-UNTAP
+UPKEEP
 [PLAYER1]
 hand:Muscle Sliver,Winged Sliver,Lightning Bolt
 inplay:Quick Sliver
@@ -13,7 +17,7 @@ Lightning Bolt
 Quick Sliver
 Muscle Sliver
 [ASSERT]
-UNTAP
+UPKEEP
 [PLAYER1]
 hand:Muscle Sliver
 inplay:Winged Sliver

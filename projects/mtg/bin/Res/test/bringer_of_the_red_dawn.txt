@@ -1,19 +1,20 @@
 #Testing Bringer of the Red Dawn. Target is a Grizzly Bears.
 #Bringer's rules text:
 #"At the beginning of your upkeep, you may untap target creature and gain control of it until end of turn. That creature gains haste until end of turn."
+#Re-authored: Grizzly Bears starts TAPPED via [INIT] tappedinplay (a legal setup
+#state) instead of being tapped by casting Dispatch during the untap step -- no
+#player has priority in untap (CR 500.3/502.4), so an untap-step cast is illegal.
+#The tapped bear still proves Bringer's untap clause: only an untapped creature
+#can attack, so player2 taking 2 shows Bringer untapped and gained control of it.
 [INIT]
 UNTAP
 [PLAYER1]
-hand:Dispatch
 inplay:Bringer of the Red Dawn
-manapool:{W}
 [PLAYER2]
 inplay:Grizzly Bears
+tappedinplay:1
 life:20
 [DO]
-Dispatch
-Grizzly Bears
-#Grizzly Bear is tapped now.
 next
 #Upkeep
 choice 0
@@ -33,8 +34,6 @@ goto untap
 UNTAP
 [PLAYER1]
 inplay:Bringer of the Red Dawn
-graveyard:Dispatch
-manapool:{0}
 [PLAYER2]
 inplay:Grizzly Bears
 life:18

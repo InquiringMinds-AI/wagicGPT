@@ -2067,36 +2067,8 @@ int AADamager::resolve()
     if (_target)
     {
         WParsedInt damage(d, NULL, (MTGCardInstance *)source);
-        if(_target == game->opponent() && game->opponent()->inPlay()->hasType("planeswalker") && !redirected)
-        {
-            vector<MTGAbility*>selection;
-            MTGCardInstance * check = NULL;
-            this->redirected = true;
-            MTGAbility * setPlayer = this->clone();
-            this->redirected = false;
-            selection.push_back(setPlayer);
-            int checkWalkers = ((Player*)_target)->game->battlefield->cards.size();
-            for(int i = 0; i < checkWalkers;++i)
-            {
-                check = ((Player*)_target)->game->battlefield->cards[i];
-                if(check->hasType(Subtypes::TYPE_PLANESWALKER))
-                {
-                    this->redirected = true;
-                    MTGAbility * setWalker = this->clone();
-                    this->redirected = false;
-                    setWalker->oneShot = true;
-                    setWalker->target = check;
-                    selection.push_back(setWalker);
-                }
-            }
-            if(selection.size())
-            {
-                MTGAbility * a1 = NEW MenuAbility(game, this->GetId(), source, source,true,selection);
-                game->mLayers->actionLayer()->currentActionCard = source;
-                a1->resolve();
-            }
-            return 1;
-        }
+        // CR 306.7: planeswalker damage-redirection removed (pre-2018 rule). Player-aimed
+        // damage hits the player; planeswalkers are damaged only by directly targeting them.
         game->mLayers->stackLayer()->addDamage(source, _target, damage.getValue());
         game->mLayers->stackLayer()->resolve();
         if(andAbility)

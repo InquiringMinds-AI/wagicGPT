@@ -1,18 +1,26 @@
 # Testing (keyword:fading)
-# Permanent with fading must be sacrificed at the upkeep after last counter is removed
-
+# Permanent with fading must be sacrificed at the upkeep after its last counter is removed.
+# Re-authored: the fade-counter-removal ability is activated during a MAIN phase (a
+# priority-bearing step), not the untap step. No player has priority in untap
+# (CR 500.3/502.4), so the old untap-step activation was illegal. Phyrexian Prowler's
+# fade counters are emptied on turn 1; on the controller's NEXT upkeep the fading
+# trigger cannot remove a counter and sacrifices it (proven at the following firstmain).
 [INIT]
 UNTAP
 [PLAYER1]
 inplay:Phyrexian Prowler
 [PLAYER2]
 [DO]
-Phyrexian Prowler
-Phyrexian Prowler
-Phyrexian Prowler
 next
 next
 next
+Phyrexian Prowler
+Phyrexian Prowler
+Phyrexian Prowler
+goto upkeep
+next
+goto upkeep
+goto firstmain
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]

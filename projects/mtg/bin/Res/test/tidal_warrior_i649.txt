@@ -11,9 +11,10 @@ Tidal Warrior
 Forest
 eot
 eot
+next
 Forest
 [ASSERT]
-UNTAP
+UPKEEP
 [PLAYER1]
 inplay:Forest, Tidal Warrior
 manapool:{G}

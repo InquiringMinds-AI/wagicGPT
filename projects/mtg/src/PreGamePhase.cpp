@@ -306,8 +306,8 @@ void PreGamePhase::Update(float dt)
         {
             mState = PG_DONE;
             mDone = true;
-            DebugTrace("PREGAME: pre-game phase complete; turn 1 begins (starting"
-                       " player skips its first draw - game opens at first main)");
+            DebugTrace("PREGAME: pre-game phase complete; turn 1 begins (game opens at"
+                       " the untap step; the starting player skips only its first draw)");
             return;
         }
         Player * p = mOrder[mIdx];

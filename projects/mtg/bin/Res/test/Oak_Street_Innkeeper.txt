@@ -1,4 +1,10 @@
 #Testing Oak Street Innkeeper hexproof during opponent turn
+#Re-authored: the opponent's Lightning Bolt is now cast on the OPPONENT's turn
+#(player2's main phase), not during player1's cleanup step. No player has priority
+#in cleanup (CR 514.3), so the old cleanup-step cast was illegal. Oak stays tapped
+#from its turn-1 attack (creatures only untap in their controller's untap step), so
+#on player2's turn Oak's 'not your turn' hexproof is active and the Bolt cannot
+#target it -> it is redirected to player1.
 [INIT]
 combatattackers
 [PLAYER1]
@@ -10,13 +16,14 @@ life:20
 [DO]
 Oak Street Innkeeper
 eot
-#next turn opponent
+#advance into the opponent's (player2's) turn; Oak remains tapped -> hexproof on
+goto firstmain
 Mountain
 Lightning Bolt
 Oak Street Innkeeper
-#since i cant target because of hexproof, i choose p1
+#hexproof: cannot target Oak, choose player1 instead
 p1
-eot
+goto untap
 [ASSERT]
 untap
 [PLAYER1]

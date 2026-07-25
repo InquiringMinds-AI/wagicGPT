@@ -708,6 +708,31 @@ int TestSuiteGame::Log(const char * text)
 
 }
 
+//CR designation markers (day/night 730, city's blessing 702.131, the monarch,
+//the initiative, the ring) are NOT objects and occupy no zone as permanents.
+//The engine models them as type=Emblem marker cards parked on a battlefield so
+//the daybound/ascend/monarch machinery can locate them, but they must not be
+//counted as permanents by any object-accounting. Zone assertions therefore
+//treat these markers as invisible on BOTH the observed and expected sides, so a
+//fixture can neither require nor be tripped by a marker's presence in a zone.
+static bool isDesignationMarker(MTGCardInstance * c)
+{
+    return c && c->hasType(Subtypes::TYPE_EMBLEM);
+}
+
+static int zoneNonMarkerCount(MTGGameZone * zone)
+{
+    //Start from nb_cards (which includes '*' wildcard placeholders that inflate
+    //the expected count without a backing object in the cards vector) and
+    //subtract only the designation markers actually present as objects, so a
+    //marker is uncounted while wildcard assertions keep their intended count.
+    int markers = 0;
+    for (int k = 0; k < zone->nb_cards && k < (int)zone->cards.size(); k++)
+        if (isDesignationMarker(zone->cards[k]))
+            markers++;
+    return zone->nb_cards - markers;
+}
+
 void TestSuiteGame::assertGame()
 {
     mAsserted = true;
@@ -807,18 +832,25 @@ void TestSuiteGame::assertGame()
         for (int j = 0; j < 8; j++)
         {
             MTGGameZone * zone = playerZones[j];
-            if (zone->nb_cards != endstateZones[j]->nb_cards)
+            //Compare object counts with designation markers excluded (see
+            //isDesignationMarker): an emblem marker is not a permanent, so it
+            //must not make a zone's count diverge.
+            int observedRealCount = zoneNonMarkerCount(zone);
+            int expectedRealCount = zoneNonMarkerCount(endstateZones[j]);
+            if (observedRealCount != expectedRealCount)
             {
                 sprintf(
                                 result,
                                 "<span class=\"error\">==Card number not the same in player %i's %s==, expected %i, got %i</span><br />",
-                                i, zone->getName(), endstateZones[j]->nb_cards, zone->nb_cards);
+                                i, zone->getName(), expectedRealCount, observedRealCount);
                 Log(result);
                 error++;
             }
             for (size_t k = 0; k < (size_t)endstateZones[j]->nb_cards; k++)
             {
                 MTGCardInstance* cardToCheck = (k<endstateZones[j]->cards.size())?endstateZones[j]->cards[k]:0;
+                //Designation markers are invisible to zone assertions.
+                if (isDesignationMarker(cardToCheck)) continue;
                 if(cardToCheck)
                 {   // Can be NULL if used "*" in the testcase.
                     // Resolving the expected id to ONE instance anywhere in the game

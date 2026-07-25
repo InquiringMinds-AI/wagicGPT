@@ -769,6 +769,28 @@ int MTGCardInstance::initAttackersDefensers()
     return 1;
 }
 
+//CR 511.3 / 506.4: as combat ends (or when otherwise removed from combat) a permanent
+//stops being an attacking/blocking creature. This clears the combat-ROLE state only, so
+//that "target attacking/blocking creature" restrictions no longer match in later phases.
+//Turn-scoped flags (didattacked/didblocked/notblocked, consumed by "attacked this turn"
+//descriptors) are deliberately left alone; they are cleared at end of turn by cleanup().
+//setAttacker(0)/setDefenser(NULL) fire the stop-attacking/stop-blocking WEvents, which
+//also drive GuiCombat teardown of its damage-order display.
+int MTGCardInstance::removeFromCombat()
+{
+    if (attacker)
+        setAttacker(0);
+    if (defenser)
+        setDefenser(NULL);
+    blockers.clear();
+    blocked = 0;
+    banding = NULL;
+    isAttacking = NULL;
+    willattackplayer = 0;
+    willattackpw = 0;
+    return 1;
+}
+
 //Function to cleanup flags on a card (generally at the end of the turn)
 int MTGCardInstance::cleanup()
 {
@@ -859,6 +881,9 @@ int MTGCardInstance::canAttack( bool pwcheck )
     if (has(Constants::DEFENSER) && !has(Constants::CANATTACK))
         return 0;
     if (!isCreature())
+        return 0;
+    // CR 506.3 / 508.1a: a permanent that is also a Battle can't attack.
+    if (hasType(Subtypes::TYPE_BATTLE))
         return 0;
     if (!isInPlay(observer))
         return 0;
@@ -1128,6 +1153,9 @@ int MTGCardInstance::canBlock()
     if (basicAbilities[(int)Constants::CANTBLOCK])
         return 0;
     if (!isCreature())
+        return 0;
+    // CR 506.3 / 509.1a: a permanent that is also a Battle can't block.
+    if (hasType(Subtypes::TYPE_BATTLE))
         return 0;
     if (!isInPlay(observer))
         return 0;

@@ -11,11 +11,12 @@ Tidal Warrior
 Forest
 eot
 eot
+next
 Tidal Warrior
 Mountain
 Mountain
 [ASSERT]
-UNTAP
+UPKEEP
 [PLAYER1]
 inplay:Forest, Mountain,Tidal Warrior
 manapool:{U}

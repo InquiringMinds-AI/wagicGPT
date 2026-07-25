@@ -212,6 +212,10 @@ public:
     MTGCardInstance * seized;
     MTGCardInstance * isDefenser();
     int initAttackersDefensers();
+    //CR 511.3 / 506.4: remove this permanent from combat, clearing combat-role state
+    //(attacking/blocking/blocked/banding) WITHOUT touching the turn-scoped
+    //"attacked/blocked this turn" flags (didattacked/didblocked/notblocked).
+    int removeFromCombat();
     MTGCardInstance * getNextOpponent(MTGCardInstance * previous=NULL);
     int nbOpponents();
     int stepPower(CombatStep step);

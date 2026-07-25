@@ -12,9 +12,10 @@ Ovinize
 Llanowar elves
 eot
 eot
+next
 Llanowar elves
 [ASSERT]
-UNTAP
+UPKEEP
 [PLAYER1]
 inplay:Llanowar elves
 graveyard:Ovinize

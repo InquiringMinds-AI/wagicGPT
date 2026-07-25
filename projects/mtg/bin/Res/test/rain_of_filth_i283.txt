@@ -11,9 +11,10 @@ manapool:{B}
 rain of filth
 eot
 eot
+next
 forest
 [ASSERT]
-UNTAP
+UPKEEP
 [PLAYER1]
 manapool:{G}
 inplay:forest

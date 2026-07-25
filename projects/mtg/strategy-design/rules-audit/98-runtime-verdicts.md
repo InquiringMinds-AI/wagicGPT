@@ -14,7 +14,19 @@ with per-set registries `_var_A..E.txt` (run each with its own `_var_X_primitive
 WAGIC_TEST_PRIMITIVES_FILE — the synthetic id ranges overlap between sets, do not merge the
 registries). Per-set details: verdicts-A.md … verdicts-E.md.
 
-## PROVEN — variance demonstrated in gameplay (6 findings; THE priority list)
+## PROVEN — variance demonstrated in gameplay (6 findings) — **ALL SIX FIXED (2026-07-25)**
+
+Status update: every finding in the table below was FIXED in the follow-up engine batch; each
+acceptance fixture flipped FAIL->PASS and the full variance corpus (all five sets) now runs
+0 failed — the fixtures are permanent regression guards. Notable fix designs: combat-role
+clearing defers while another declare-attackers phase is scheduled this turn (the engine's
+extra-combat cards rely on persisted attacker flags); the day/night + city's-blessing fix
+excludes all six designation markers (type=Emblem) from the suite's zone accounting while
+leaving the game-side detection consumers untouched; turn 1 now begins at untap with a
+draw-only skip (103.8a), so turn-1 upkeep triggers fire. Eight legacy fixtures that
+themselves exploited the illegal untap/cleanup priority window were re-authored to legal
+windows (4 found by the fix agent, 4 more by the integration gate — click-at-assert-time
+signatures).
 
 | CR | defect (engine behavior vs rule) | evidence |
 |---|---|---|

@@ -113,7 +113,14 @@ RulesPlayerData::~RulesPlayerData()
 
 RulesState::RulesState()
 {
-    phase = MTG_PHASE_FIRSTMAIN;
+    // CR 500.1/501.1: every turn has a beginning phase (untap, upkeep, draw). The
+    // game formerly opened turn 1 at first main, which deleted the starting player's
+    // entire beginning phase. Turn 1 now begins at the untap step so untap and upkeep
+    // occur (e.g. an upkeep-triggered leyline fires on turn 1); the starting player's
+    // one-time draw-step skip (CR 103.8a / 504.1) is enforced in
+    // GameObserver::nextGamePhase (turn == 0). Test-suite fixtures set their own [INIT]
+    // phase, so this default only affects real games.
+    phase = MTG_PHASE_UNTAP;
     player = 0;
 }
 

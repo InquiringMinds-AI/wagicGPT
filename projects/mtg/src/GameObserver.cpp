@@ -206,6 +206,20 @@ void GameObserver::nextGamePhase()
     Phase * cPhase = phaseRing->getCurrentPhase();
     mCurrentGamePhase = cPhase->id;
 
+    // CR 103.8a / 504.1: in a two-player game the starting player skips the draw
+    // step of their first turn. turn == 0 is the starting player first turn. Skip
+    // past the draw step WITHIN this same nextGamePhase call so no Update observes
+    // the draw phase: the draw-step rule (@each my draw:draw:1) triggers by polling
+    // getCurrentGamePhase between Updates, so a phase the game never rests in never
+    // draws. Suite games are exempt (fixtures manufacture arbitrary turn-0 phase
+    // states and drive their own draws).
+    if (mCurrentGamePhase == MTG_PHASE_DRAW && turn == 0 && !mSuiteGame)
+    {
+        phaseRing->forward();
+        cPhase = phaseRing->getCurrentPhase();
+        mCurrentGamePhase = cPhase->id;
+    }
+
     if (MTG_PHASE_COMBATDAMAGE == mCurrentGamePhase)
         nextCombatStep();
     if (MTG_PHASE_COMBATEND == mCurrentGamePhase)
@@ -1772,6 +1786,19 @@ int GameObserver::cardClick(MTGCardInstance * card, Targetable * object, bool lo
             toReturn = 0;
             return cardClickLog(log, clickedPlayer, zone, backup, index, toReturn);
         }
+
+        // CR 500.3 / 502.4 / 514.3: no player receives priority during the untap
+        // step, and (simplified model) none during the cleanup step, so no spell
+        // may be cast and no ability activated in either step. Suppress the
+        // spell/ability reaction here. The mandatory cleanup hand-size discard
+        // below is a turn-based action (not a priority action) and stays enabled;
+        // the manual-untap fallthrough (reaction == 0) is unaffected.
+        // SIMPLIFICATION: CR 514.3a would grant priority in the cleanup step when a
+        // state-based action or a triggered ability is waiting; the engine has no
+        // trigger-in-cleanup machinery to hang that exception on, so cleanup is
+        // modeled as unconditionally priority-free.
+        if (reaction && (mCurrentGamePhase == MTG_PHASE_UNTAP || mCurrentGamePhase == MTG_PHASE_CLEANUP))
+            reaction = 0;
 
         //Current player's hand
         handmodified = currentPlayer->handsize+currentPlayer->handmodifier;

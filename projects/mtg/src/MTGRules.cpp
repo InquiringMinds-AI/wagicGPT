@@ -2379,6 +2379,42 @@ int MTGCombatTriggersRule::receiveEvent(WEvent *e)
         }
         if (MTG_PHASE_COMBATEND == event->from->id)
         {
+            //CR 511.3: as the combat phase ends, every creature/planeswalker is removed
+            //from combat. Clear combat-role state on BOTH players' permanents so that
+            //attacking/blocking/blocked status does not leak into the postcombat main phase
+            //(e.g. "destroy target attacking creature" must not hit anything after combat).
+            //DEFER this when another combat phase is still scheduled THIS TURN (an inserted
+            //extra combat, e.g. World at War / Aggravated Assault): the engine re-attacks
+            //those creatures by carrying their declared-attacker state into the extra combat,
+            //so clearing now would silently cancel the second attack. Clearing after the
+            //turn's LAST combat still removes attacking/blocking status before the postcombat
+            //main phase of a normal (single-combat) turn, which is the 511.3 observable.
+            bool moreCombatThisTurn = false;
+            if (game->phaseRing)
+            {
+                for (list<Phase*>::iterator pit = game->phaseRing->current;
+                     pit != game->phaseRing->turn.end(); ++pit)
+                {
+                    if (*pit && (*pit)->id == MTG_PHASE_COMBATATTACKERS)
+                    {
+                        moreCombatThisTurn = true;
+                        break;
+                    }
+                }
+            }
+            if (!moreCombatThisTurn)
+            {
+                for (int pi = 0; pi < 2; pi++)
+                {
+                    MTGGameZone * cz = game->players[pi]->game->inPlay;
+                    for (int ci = 0; ci < cz->nb_cards; ci++)
+                    {
+                        MTGCardInstance * ccard = cz->cards[ci];
+                        if (ccard)
+                            ccard->removeFromCombat();
+                    }
+                }
+            }
             Player * p = game->currentPlayer->opponent();
             MTGGameZone * z = p->game->inPlay;
             for (int i = 0; i < z->nb_cards; i++)
