@@ -1,0 +1,45 @@
+# CR 608.3b - a permanent (Aura) spell whose only legal target has become
+# illegal by resolution must NOT enter the battlefield; it goes to its owner's
+# graveyard (the spell "fizzles"). Audit finding 608.3b: Spell::resolve()
+# unconditionally moves a permanent spell to the battlefield with no target
+# re-check (src/ActionStack.cpp:462-481).
+#
+# Observability: end-zone alone can't tell "never entered" (CR) from
+# "entered then died to the unattached-aura SBA" (engine) - both land the aura
+# in the graveyard. So the aura (Var Phantom Grip) carries an ETB "you gain 5
+# life" trigger. If the engine puts it onto the battlefield, that ETB fires and
+# P1 reaches 25 life even though the aura then dies. CR: aura never enters,
+# P1 stays at 20.
+#
+# P1 (active) casts Var Phantom Grip on P1's own Grizzly Bears. In response P2
+# Shocks the Bears (2 dmg kills the 2/2). When the aura resolves its target is
+# gone. CR-correct end state: P1 life 20, aura + bear in P1 graveyard.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Var Phantom Grip
+inplay:Grizzly Bears
+manapool:{B}
+[PLAYER2]
+hand:Shock
+manapool:{R}
+[DO]
+Var Phantom Grip
+Grizzly Bears
+yes
+Shock
+Grizzly Bears
+endinterruption
+no
+no
+goto end
+[ASSERT]
+END
+[PLAYER1]
+graveyard:Var Phantom Grip,Grizzly Bears
+life:20
+[PLAYER2]
+graveyard:Shock
+life:20
+[END]

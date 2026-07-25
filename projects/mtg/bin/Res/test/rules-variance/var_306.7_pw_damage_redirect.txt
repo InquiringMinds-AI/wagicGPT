@@ -1,0 +1,32 @@
+# CR 306.7: the planeswalker damage-redirection rule has been REMOVED. Noncombat
+# damage that would be dealt to a player is dealt to that player; it cannot be
+# redirected onto a planeswalker that player controls.
+# Here P1 casts Lava Spike (deals 3 to TARGET PLAYER) at P2, who controls Jace
+# Beleren (3 loyalty). The `choice 1` line answers the engine's obsolete redirect
+# menu by picking the planeswalker (option 0 = player, option 1 = first walker);
+# under correct CR there is no such menu, so `choice 1` is an inert no-op and the
+# player simply takes 3.
+# This fixture asserts the CR-CORRECT outcome: P2 takes 3 (life 17) and Jace stays
+# in play untouched. A FAIL where P2 is at 20 and Jace is gone = variance PROVEN
+# (player-targeted damage was redirected onto the planeswalker).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lava Spike
+manapool:{R}
+[PLAYER2]
+inplay:Jace Beleren
+life:20
+[DO]
+Lava Spike
+p2
+choice 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Lava Spike
+manapool:{0}
+[PLAYER2]
+inplay:Jace Beleren
+life:17
+[END]

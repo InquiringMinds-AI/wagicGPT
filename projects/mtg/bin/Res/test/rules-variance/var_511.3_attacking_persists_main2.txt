@@ -1,0 +1,35 @@
+# Finding 4 (CR 511.3): combat roles must be cleared at end of combat. In
+# postcombat main NO creature is "attacking", so "destroy target attacking
+# creature" has no legal target and is UNCASTABLE (uncastable != fizzle).
+#
+# Var Brute Runner attacks (unblocked, 1 dmg to p2 -> p2 life 19), combat ends,
+# then in SECONDMAIN player1 tries to cast Var Slay Charge at it.
+#   CR-correct: attacking cleared -> no legal target -> spell stays in hand, the
+#               creature survives in play. (this fixture asserts CR-correct)
+#   Engine bug (511.3): attacking flag persists into main 2 -> spell finds the
+#               stale-attacking creature, destroys it (both cards to graveyard).
+# So PASS = REFUTED; FAIL (creature/instant in graveyard) = PROVEN variance.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Brute Runner
+hand:Var Slay Charge
+[PLAYER2]
+[DO]
+next
+next
+Var Brute Runner
+next
+next
+next
+next
+Var Slay Charge
+Var Brute Runner
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Var Brute Runner
+hand:Var Slay Charge
+[PLAYER2]
+life:19
+[END]

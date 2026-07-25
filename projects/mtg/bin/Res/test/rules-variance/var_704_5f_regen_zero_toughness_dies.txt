@@ -1,0 +1,28 @@
+# CR 704.5f: a creature whose toughness is 0 (or less) is put into its owner's
+# graveyard as a state-based action. This is NOT destruction, so a regeneration
+# shield CANNOT save it (regeneration only replaces a "destroy").
+#
+# Probe: Drudge Skeletons (1/1, {B}:regenerate) banks a regeneration shield, then
+# Disfigure gives it -2/-2 -> toughness -1. CR-correct outcome: it dies (goes to
+# the graveyard) despite the shield. If the engine calls destroy() on the
+# zero-toughness SBA (704.5f finding), the banked shield "regenerates" it and it
+# wrongly survives (tapped, in play) -> this fixture FAILS = bug PROVEN.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Drudge Skeletons
+hand:Disfigure
+manapool:{B}{B}
+[PLAYER2]
+[DO]
+Drudge Skeletons
+choice 0
+Disfigure
+Drudge Skeletons
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Drudge Skeletons,Disfigure
+manapool:{0}
+[PLAYER2]
+[END]

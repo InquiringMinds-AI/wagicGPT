@@ -1,0 +1,22 @@
+# CR 304.4 (instants) / 400.4a: an instant card that would enter the battlefield
+# remains in its previous zone. Var Tomb Lifter Instant is a synthetic generic mover
+# (all(instant|mygraveyard) moveto(mybattlefield)) with no destination/type guard in
+# the script. Asserts the CR-CORRECT outcome: Shock (an Instant) STAYS in the
+# graveyard. A FAIL where Shock appears in inplay = variance PROVEN.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Tomb Lifter Instant
+graveyard:Shock
+[PLAYER2]
+life:20
+[DO]
+Var Tomb Lifter Instant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Tomb Lifter Instant
+graveyard:Shock
+[PLAYER2]
+life:20
+[END]

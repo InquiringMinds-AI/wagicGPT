@@ -1,0 +1,35 @@
+# CR 613 layer 7e - two power/toughness SWITCH effects applied to one creature
+# cancel out: the creature returns to its printed power/toughness. Var Skewed
+# Ogre is 3/1; Var Twist switches P/T (ueot). After casting Var Twist TWICE the
+# ogre is 3/1 again, attacks, and deals 3 -> P2 to 17.
+# Audit finding: multiple switch effects "collapse into one boolean toggle"
+# (src/MTGCardInstance.cpp:902-1000). If so, the second switch is a no-op, the
+# ogre stays 1/3, deals only 1, and P2 is at 19 -> this fixture FAILS = the
+# collapsed-switch defect is PROVEN.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Skewed Ogre
+hand:Var Twist,Var Twist
+manapool:{U}{U}
+[PLAYER2]
+[DO]
+Var Twist
+Var Skewed Ogre
+Var Twist
+Var Skewed Ogre
+goto attackers
+Var Skewed Ogre
+next
+next
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Var Skewed Ogre
+graveyard:Var Twist,Var Twist
+life:20
+[PLAYER2]
+life:17
+[END]

@@ -1,0 +1,33 @@
+# CR 730 (711 in older numbering): day and night are a GAME DESIGNATION, not an
+# object. Becoming day or night does not create any permanent; nothing on the
+# battlefield represents it, so no effect can count it as a permanent or target
+# it.
+#
+# Probe: establish day, then let it become night (Ballista Watcher, daybound,
+# over the establishment turn + one clean empty turn - the timeline traced by the
+# lexicon basic_daybound fixture). CR-correct battlefield: ONLY the (now
+# transformed) Ballista Wielder exists; there is NO Day/Night marker object in
+# either player's play. The engine represents day/night as a real "Day"/"Night"
+# marker CARD (type=Emblem) that sits on a battlefield and bounces to the opponent
+# each end step, so it is a countable/selectable permanent (730 finding). An
+# omitted zone line asserts zero cards, so the "Night" marker the engine parks on
+# player 2's battlefield makes this fixture FAIL = PROVEN.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ballista Watcher
+[PLAYER2]
+[DO]
+goto end
+next
+goto end
+next
+goto end
+next
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ballista Wielder
+[PLAYER2]
+[END]

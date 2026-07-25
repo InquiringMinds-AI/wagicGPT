@@ -1,0 +1,27 @@
+# CR 613 layer system - companion to var_613_layers_setfirst with the effects
+# in the OPPOSITE order: the +1/+1 anthem (Var Rallying Standard) entered first,
+# the base-P/T set (Var Great Leveling) second. CR is order-independent: layer
+# 7b (set to 1/1) still applies before layer 7c (+1/+1), so Var Measure Golem is
+# STILL 2/2 and deals 2 -> P2 to 18. If the engine instead applies effects in
+# timestamp/effect order (set overwrites the already-pumped value), the golem is
+# 1/1 and P2 only drops to 19 -> this fixture FAILS = 613 layer ordering PROVEN.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Measure Golem,Var Rallying Standard,Var Great Leveling
+[PLAYER2]
+[DO]
+goto attackers
+Var Measure Golem
+next
+next
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Var Measure Golem,Var Rallying Standard,Var Great Leveling
+life:20
+[PLAYER2]
+life:18
+[END]

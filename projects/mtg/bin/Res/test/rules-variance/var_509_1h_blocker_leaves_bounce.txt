@@ -1,0 +1,40 @@
+# CR 509.1h: "A creature remains blocked even if all the creatures blocking it are
+# removed from combat." A blocked non-trample attacker whose only blocker leaves
+# during the declare-blockers step must deal NO damage to the defending player.
+# The audit flagged removeBlocker (src/MTGCardInstance.cpp:1703-1713) resetting
+# blocked=false when the last blocker leaves during MTG_PHASE_COMBATBLOCKERS,
+# which would revert the attacker to unblocked and let it hit the player.
+#
+# Probe (no cast needed - casting during the blockers step is not drivable in the
+# harness, clicks route to combat declaration): Elven Warhounds (2/2) attacks the
+# player; Centaur Courser (3/3) blocks it; Warhounds' own on-block trigger
+# ("Whenever Elven Warhounds becomes blocked by a creature, put that creature on
+# top of its owner's library") removes the blocker DURING the Blockers phase
+# (trace: the StackAbility resolves while "Current phase is: Blockers").
+# CR-correct: Warhounds remains blocked -> deals 0 to the player -> P2 at 20.
+# Audit-predicted bug: reverts to unblocked -> deals 2 -> P2 to 18.
+#
+# RESULT: PASSES -> REFUTED on current bin/wagic (P2 stays at 20; the attacker
+# does not deal the forbidden player damage). See the unblocked control fixture
+# proving an unblocked Warhounds does deal 2 (life 18), validating the discriminator.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Elven Warhounds
+[PLAYER2]
+inplay:centaur courser
+[DO]
+Elven Warhounds
+next
+centaur courser
+Elven Warhounds
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Elven Warhounds
+[PLAYER2]
+library:centaur courser
+life:20
+[END]

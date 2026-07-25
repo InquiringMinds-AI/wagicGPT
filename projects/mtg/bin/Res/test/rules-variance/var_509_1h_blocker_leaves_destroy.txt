@@ -1,0 +1,33 @@
+# CR 509.1h - destroy variant (see var_509_1h_blocker_leaves_bounce.txt for the
+# full rule). Here the only blocker is DESTROYED (dies to damage) during the
+# blockers step, exercising the death/SBA cleanup path into removeBlocker.
+#
+# Probe: Acolyte of the Inferno (3/1) attacks the player; Grizzly Bears (2/2)
+# blocks it; Acolyte's on-block trigger ("Whenever Acolyte becomes blocked by a
+# creature, it deals 2 damage to that creature") kills the 2/2 blocker DURING the
+# Blockers phase (trace: StackAbility + graveyard move while "Current phase is:
+# Blockers"). CR-correct: Acolyte remains blocked -> deals 0 to the player ->
+# P2 at 20. Audit-predicted bug: reverts to unblocked -> deals 3 -> P2 to 17.
+#
+# RESULT: PASSES -> REFUTED on current bin/wagic (P2 stays at 20).
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Acolyte of the Inferno
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+Acolyte of the Inferno
+next
+Grizzly Bears
+Acolyte of the Inferno
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Acolyte of the Inferno
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]

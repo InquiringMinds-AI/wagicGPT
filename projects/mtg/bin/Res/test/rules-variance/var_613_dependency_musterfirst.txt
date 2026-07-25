@@ -1,0 +1,24 @@
+# CR 613.7 dependency - type-change (Var Graft Field: every creature is also a
+# Zombie) feeds a type-conditional pump (Var Zombie Muster: Zombies get +2/+2).
+# CR: the type change always applies before the pump, so Var Measure Golem is a
+# Zombie and is 6/6, dealing 6 -> P2 to 14. This ordering: pump (Muster) entered first.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Measure Golem,Var Zombie Muster,Var Graft Field
+[PLAYER2]
+[DO]
+goto attackers
+Var Measure Golem
+next
+next
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Var Measure Golem,Var Zombie Muster,Var Graft Field
+life:20
+[PLAYER2]
+life:14
+[END]

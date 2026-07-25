@@ -1,0 +1,24 @@
+# CR 304.4 / 307.4 / 400.4a: an instant or sorcery card that would enter the
+# battlefield remains in its previous zone instead. Var Tomb Lifter is a synthetic
+# generic mover (all(sorcery|mygraveyard) moveto(mybattlefield)) with NO
+# destination/type guard. This fixture asserts the CR-CORRECT outcome: Lava Spike
+# (a Sorcery) STAYS in the graveyard after the mover resolves.
+# A FAIL where Lava Spike appears in inplay = variance PROVEN (engine let a sorcery
+# enter the battlefield).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Tomb Lifter
+graveyard:Lava Spike
+[PLAYER2]
+life:20
+[DO]
+Var Tomb Lifter
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Tomb Lifter
+graveyard:Lava Spike
+[PLAYER2]
+life:20
+[END]

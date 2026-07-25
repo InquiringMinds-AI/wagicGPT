@@ -1,0 +1,27 @@
+# POSITIVE CONTROL for var_608_2b_target_fizzle: proves the life:5 rider fires
+# when Var Surge Blessing resolves on a LIVING target. P1 casts it on its own
+# Grizzly Bears (not killed). Rider fires -> P1 25. Validates the observable.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Var Surge Blessing
+manapool:{G}
+[PLAYER2]
+[DO]
+Var Surge Blessing
+Grizzly Bears
+goto attackers
+next
+next
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Grizzly Bears
+graveyard:Var Surge Blessing
+life:25
+[PLAYER2]
+life:20
+[END]

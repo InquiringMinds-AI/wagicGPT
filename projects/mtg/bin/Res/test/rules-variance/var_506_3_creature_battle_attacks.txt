@@ -1,0 +1,28 @@
+# CR 506.3 / 508.1a: only a CREATURE may be declared as an attacker, and CR
+# explicitly excludes a permanent that is ALSO a Battle ("...that isn't also a
+# battle..."). The engine's canAttack (src/MTGCardInstance.cpp:840-865) gates on
+# isCreature() but omits the "not also a battle" exception, so a creature-Battle
+# is allowed to attack.
+#
+# Probe: synthetic "Var Bastion Beast" (type=Creature Battle, 2/2) is declared as
+# an attacker against the open opponent. CR-correct: it is NOT a legal attacker
+# -> it cannot attack -> P2 stays at 20. Engine: it attacks and deals 2 -> P2 to
+# 18. This fixture asserts the CR-correct result, so a FAIL here PROVES the finding.
+# (Synthetic type-line "Creature Battle" registers BOTH types: MTGDeck.cpp:401-405
+# splits the type= line and setType()s each word; hasType("battle") is true.)
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Var Bastion Beast
+[PLAYER2]
+[DO]
+Var Bastion Beast
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Var Bastion Beast
+[PLAYER2]
+life:20
+[END]

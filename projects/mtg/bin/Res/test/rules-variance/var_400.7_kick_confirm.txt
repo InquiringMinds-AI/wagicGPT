@@ -1,0 +1,27 @@
+# CONTROL for var_400.7: confirms `choice 1` pays Ardent Soldier's kicker in this
+# command sequence. A kicked Ardent Soldier enters 2/3 and SURVIVES 2 damage from
+# Shock. This PASSING (Soldier still in play after Shock) establishes that the memory
+# probe genuinely started from a kicked (2/3) creature before its zone round-trip —
+# so var_400.7's Shock-kill of the reanimated Soldier proves it came back as 1/2
+# (kicker forgotten), not a spurious never-kicked read.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Ardent Soldier,Shock
+manapool:{3}{W}{R}
+[PLAYER2]
+life:20
+[DO]
+Ardent Soldier
+choice 1
+Shock
+Ardent Soldier
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ardent Soldier
+graveyard:Shock
+manapool:{0}
+[PLAYER2]
+life:20
+[END]

@@ -1,0 +1,30 @@
+# POSITIVE CONTROL for var_608_3b_aura_fizzle: proves the ETB observable is
+# live. Same aura (Var Phantom Grip) on a Grizzly Bears that is NOT killed. The
+# aura resolves onto its legal target, enters the battlefield, its ETB
+# "gain 5 life" fires -> P1 reaches 25 and the aura survives in play. If this
+# control does not reach 25, the ETB observable is broken and the fizzle test
+# would be inconclusive.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Var Phantom Grip
+manapool:{B}
+[PLAYER2]
+[DO]
+Var Phantom Grip
+Grizzly Bears
+goto attackers
+next
+next
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Grizzly Bears,Var Phantom Grip
+hand:
+life:25
+[PLAYER2]
+life:20
+[END]

@@ -1,0 +1,27 @@
+# CR 613 layer system - a P/T-SETTING effect (layer 7b) always applies before a
+# P/T-modifying effect (layer 7c), regardless of the timestamp/effect order in
+# which the two effects began. Here Var Great Leveling sets every creature's
+# base P/T to 1/1 (7b) and Var Rallying Standard gives +1/+1 (7c). CR result:
+# Var Measure Golem is 2/2, so it deals 2 -> P2 to 18. This must hold in BOTH
+# orderings; see var_613_layers_pumpfirst for the other order.
+# This ordering: leveling entered first, anthem second.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Measure Golem,Var Great Leveling,Var Rallying Standard
+[PLAYER2]
+[DO]
+goto attackers
+Var Measure Golem
+next
+next
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Var Measure Golem,Var Great Leveling,Var Rallying Standard
+life:20
+[PLAYER2]
+life:18
+[END]

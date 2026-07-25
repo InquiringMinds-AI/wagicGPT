@@ -1,0 +1,21 @@
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Var Ward Charm,Shock,Shock
+inplay:Grizzly Bears
+manapool:{W}{R}{R}
+[PLAYER2]
+[DO]
+Var Ward Charm
+Grizzly Bears
+Shock
+Grizzly Bears
+Shock
+Grizzly Bears
+goto end
+[ASSERT]
+END
+[PLAYER1]
+graveyard:Var Ward Charm,Shock,Shock,Grizzly Bears
+life:20
+[END]

@@ -1,0 +1,12 @@
+# Synthetic test-only cards for rules-variance set C (combat 5xx findings).
+# Loaded with WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_C_primitives.txt
+# IDs 2100000500-2100000599 reserved for this set. Names carry no driver-command substring.
+[card]
+id=2100000510
+name=Var Bastion Beast
+rarity=C
+mana={2}
+type=Creature Battle
+power=2
+toughness=2
+[/card]

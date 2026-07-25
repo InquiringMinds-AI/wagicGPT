@@ -1,0 +1,18 @@
+# Rules-variance probe registry - agent D (findings from 99-summary sec 601-608
+# and 609-616). Each fixture asserts CR-CORRECT behavior on the current binary.
+# A PASS refutes the audit finding at the observable level; a FAIL proves it.
+# Run with WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+rules-variance/var_608_2b_target_fizzle.txt
+rules-variance/var_608_2b_instant_control.txt
+rules-variance/var_608_3b_aura_fizzle.txt
+rules-variance/var_608_3b_aura_control.txt
+rules-variance/var_611_2e_enters_with_counters.txt
+rules-variance/var_613_layers_setfirst.txt
+rules-variance/var_613_layers_pumpfirst.txt
+rules-variance/var_613_humility_vs_lord.txt
+rules-variance/var_613_dependency_graftfirst.txt
+rules-variance/var_613_dependency_musterfirst.txt
+rules-variance/var_613_double_switch.txt
+rules-variance/var_614_7a_zero_damage_shield.txt
+rules-variance/var_614_7a_ctl_noshield.txt
+rules-variance/var_614_7a_ctl_oneshot.txt

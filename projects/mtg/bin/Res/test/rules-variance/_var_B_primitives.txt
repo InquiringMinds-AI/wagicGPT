@@ -1,0 +1,82 @@
+# Synthetic test-only cards for the 5xx turn-structure rules-variance probes (set B).
+# Loaded with WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_B_primitives.txt
+# IDs 2100000700-2100000799 reserved for this rules-variance set-B family.
+# Every ability form is copied from a real card (provenance in verdicts-B.md).
+# Card names carry NO driver-command substring ("ai","no","eot","goto","reveal",...).
+
+# --- Finding 1 (500.1/501.1/504.1): upkeep-trigger permanent -------------------
+# Form copied from Dreadhorde Invasion / Dawn of the Dead / Phyrexian Arena:
+#   auto=@each my upkeep:life:-1 controller
+# Clean, no menus, no tokens: controller loses 1 life at each of its upkeeps.
+[card]
+id=2100000700
+name=Var Bleed Sigil
+rarity=C
+mana={B}
+type=Enchantment
+text=Test-only. At the beginning of your upkeep, you lose 1 life.
+auto=@each my upkeep:life:-1 controller
+[/card]
+
+# --- Finding 4 (511.3): a vanilla attacker whose combat role we inspect -------
+[card]
+id=2100000702
+name=Var Brute Runner
+rarity=C
+mana={R}
+type=Creature
+subtype=Beast
+power=1
+toughness=1
+text=Test-only vanilla 1/1 used as a combat attacker witness.
+[/card]
+
+# --- Finding 4 (511.3): destroy-target-ATTACKING-creature instant -------------
+# target= restriction form copied from Dark Banishing (target=creature[-black]);
+# [attacking] restriction copied from borderline target(creature[attacking]);
+# auto=bury copied from Dark Banishing (destroy, moves target to graveyard).
+# A mandatory-target spell: with no legal ATTACKING target it is UNCASTABLE
+# (uncastable-not-fizzle), so it can only resolve while a creature is flagged
+# attacking. If it destroys a creature in postcombat main, attacking persisted.
+[card]
+id=2100000703
+name=Var Slay Charge
+rarity=C
+mana={0}
+type=Instant
+target=creature[attacking]
+text=Test-only. Destroy target attacking creature.
+auto=bury
+[/card]
+
+# --- Finding 2 (500.3/502.4/514.3): a {0} burn instant --------------------------
+# Form copied from Shock (target=anytarget, auto=damage:2). Cost {0} so no mana
+# click is needed. Used to test whether the active player has priority to cast an
+# instant during the UNTAP step (CR: no priority in untap -> uncastable).
+[card]
+id=2100000704
+name=Var Spark Jolt
+rarity=C
+mana={0}
+type=Instant
+target=anytarget
+text=Test-only. Var Spark Jolt deals 2 damage to any target.
+auto=damage:2
+[/card]
+
+# --- Finding 5 (514.2): until-end-of-turn +0/+2 toughness pump ------------------
+# Form copied from Giant Growth (target=creature, auto=3/3 = +3/+3 ueot) and
+# Mammoth Growth (auto=4/4 ueot). Gives target +0/+2 until end of turn. Used to
+# hold a 1/1 alive at 1/3 under 2 marked damage across the cleanup boundary, to
+# test whether damage removal and ueot expiry produce a lethal intermediate SBA
+# window (CR 514.2: they are one simultaneous non-stack turn-based action).
+[card]
+id=2100000705
+name=Var Bark Ward
+rarity=C
+mana={0}
+type=Instant
+target=creature
+text=Test-only. Target creature gets +0/+2 until end of turn.
+auto=0/2 ueot
+[/card]

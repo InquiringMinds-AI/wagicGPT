@@ -1,0 +1,32 @@
+# CONTROL for var_704_5f: proves the regeneration shield in that fixture is
+# actually banked and functional. Same setup (Drudge Skeletons banks a {B}:
+# regenerate shield) but the kill is a REAL destroy (Murder) instead of a -X/-X
+# toughness reduction. CR + engine agree: regeneration replaces a destroy, so
+# Drudge survives (tapped, removed from combat), shield consumed.
+#
+# This fixture PASSING confirms the shield banks; therefore the companion
+# var_704_5f_regen_zero_toughness_dies PASSING (creature dies) is a genuine
+# CR-correct result driven by triggerRegenerate()'s "life = toughness; if life<1
+# return 0" guard, not a hollow pass from a never-banked shield. Together they
+# REFUTE the 704.5f finding (engine does NOT let a toughness<=0 creature regen).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Drudge Skeletons
+hand:Murder
+manapool:{1}{B}{B}{B}
+[PLAYER2]
+[DO]
+Drudge Skeletons
+choice 0
+Murder
+Drudge Skeletons
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Drudge Skeletons
+tappedinplay:1
+graveyard:Murder
+manapool:{0}
+[PLAYER2]
+[END]

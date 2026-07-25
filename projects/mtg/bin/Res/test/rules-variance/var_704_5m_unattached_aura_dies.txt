@@ -1,0 +1,30 @@
+# CR 704.5m: an Aura attached to an illegal or nonexistent object (e.g. its
+# enchanted permanent has left the battlefield) is put into its owner's graveyard
+# as a state-based action.
+#
+# Probe: Holy Strength enchants Grizzly Bears; Murder then destroys the Bears.
+# CR-correct outcome: with nothing to enchant, Holy Strength is put into the
+# graveyard - P1's graveyard holds Grizzly Bears + Holy Strength + Murder and the
+# battlefield is empty. The engine gates aura cleanup on card->target being
+# non-null (704.5m finding), so an aura whose target vanished can linger
+# unattached in play. If Holy Strength is still on the battlefield (graveyard
+# short one card), this fixture FAILS = PROVEN.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Holy Strength,Murder
+manapool:{W}{1}{B}{B}
+[PLAYER2]
+[DO]
+Holy Strength
+Grizzly Bears
+Murder
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Grizzly Bears,Holy Strength,Murder
+manapool:{0}
+[PLAYER2]
+[END]

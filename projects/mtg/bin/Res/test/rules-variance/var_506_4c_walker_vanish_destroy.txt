@@ -1,0 +1,35 @@
+# CR 506.4c / 510.1b - destroy variant (see var_506_4c_walker_vanish_bounce.txt
+# for the full rule). Here the attacked planeswalker is DESTROYED (not bounced)
+# before combat damage, to cover the case where isAttacking might dangle.
+#
+# Probe: Craw Wurm (6/4) attacks Jace Beleren (choice 1 / choice 0); before combat
+# damage the active player kills Jace with Lightning Bolt (3 dmg, any target).
+# CR-correct: destination gone -> Craw Wurm deals NO damage -> P2 stays at 20.
+# Audit-predicted bug: fallback to opponent -> P2 to 14.
+#
+# RESULT: PASSES -> REFUTED on current bin/wagic (P2 stays at 20).
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Craw Wurm
+hand:Lightning Bolt
+manapool:{R}
+[PLAYER2]
+inplay:Jace Beleren
+[DO]
+Craw Wurm
+choice 1
+choice 0
+Lightning Bolt
+Jace Beleren
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Craw Wurm
+graveyard:Lightning Bolt
+[PLAYER2]
+graveyard:Jace Beleren
+life:20
+[END]

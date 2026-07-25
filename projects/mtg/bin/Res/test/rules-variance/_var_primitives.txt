@@ -1,0 +1,39 @@
+# Synthetic test cards for the rules-variance probes (rules-audit set A).
+# Loaded via WAGIC_TEST_PRIMITIVES_FILE. IDs in the reserved 2100000000-2100000999 range.
+# Names carry NO driver-command substring ("ai","no","goto","reveal", etc.).
+[card]
+id=2100000200
+name=Var Tomb Lifter
+rarity=C
+mana={0}
+type=Artifact
+text=Test-only: a generic mover with NO destination/type guard. {0}: put all sorceries from your graveyard onto the battlefield.
+auto={0}:name(Lift Tomb) all(sorcery|mygraveyard) moveto(mybattlefield)
+[/card]
+[card]
+id=2100000201
+name=Var Tomb Lifter Instant
+rarity=C
+mana={0}
+type=Artifact
+text=Test-only: generic mover, instant variant. {0}: put all instants from your graveyard onto the battlefield.
+auto={0}:name(Lift Tomb) all(instant|mygraveyard) moveto(mybattlefield)
+[/card]
+[card]
+id=2100000202
+name=Var Grave Caller
+rarity=C
+mana={0}
+type=Artifact
+text=Test-only reanimator: {0}: put all creatures from your graveyard onto the battlefield (fires their ETBs).
+auto={0}:name(Call Grave) all(creature|mygraveyard) moveto(mybattlefield)
+[/card]
+[card]
+id=2100000203
+name=Var Ruin
+rarity=C
+mana={0}
+type=Sorcery
+text=Test-only removal: destroy target creature.
+auto=name(Ruin) destroy target(creature)
+[/card]

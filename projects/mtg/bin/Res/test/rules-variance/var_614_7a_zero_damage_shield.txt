@@ -1,0 +1,38 @@
+# CR 614.7a - a "prevent the next N damage" shield is NOT consumed by a
+# zero-damage event; a 0 is not "the next damage." Audit finding: the
+# prevention registry runs before the zero-damage check (src/Damage.cpp:45-58),
+# so a 0-damage event spends the shield.
+#
+# In this harness each instant resolves as it is cast, so P1 (active) casts in
+# resolve order:
+#   1. Var Ward Charm -> "prevent next 2 damage" shield on P1's Grizzly Bears.
+#   2. Var Null Bolt  -> deals 0 damage to the Bears (the consumption test).
+#   3. Shock          -> deals 2 damage to the Bears.
+# CR-correct: the 0 does not consume the shield, so Shock's 2 is prevented and
+# the 2/2 Bears SURVIVES. If the engine let the 0 consume the shield, Shock's 2
+# lands and the Bears dies -> this fixture FAILS = 614.7a PROVEN.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Var Ward Charm,Var Null Bolt,Shock
+inplay:Grizzly Bears
+manapool:{W}{R}{R}
+[PLAYER2]
+[DO]
+Var Ward Charm
+Grizzly Bears
+Var Null Bolt
+Grizzly Bears
+Shock
+Grizzly Bears
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Grizzly Bears
+graveyard:Var Ward Charm,Var Null Bolt,Shock
+life:20
+[PLAYER2]
+life:20
+[END]

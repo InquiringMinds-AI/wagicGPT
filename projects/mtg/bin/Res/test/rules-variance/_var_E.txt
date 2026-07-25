@@ -1,0 +1,6 @@
+rules-variance/var_704_5f_regen_zero_toughness_dies.txt
+rules-variance/var_704_5f_control_regen_saves_destroy.txt
+rules-variance/var_704_4_deathtouch_synchronous_order.txt
+rules-variance/var_704_5m_unattached_aura_dies.txt
+rules-variance/var_730_daynight_not_an_object.txt
+rules-variance/var_702_131_ascend_blessing_not_an_object.txt

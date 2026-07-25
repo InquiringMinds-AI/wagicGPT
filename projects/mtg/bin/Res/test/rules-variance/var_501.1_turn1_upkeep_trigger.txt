@@ -1,0 +1,27 @@
+# Finding 1 (CR 500.1/501.1/504.1): turn 1 deletes the starting player's entire
+# beginning phase (untap+upkeep+draw). The real game does this by starting turn 1
+# at FIRSTMAIN (Rules::initGame reads initState.phase=FIRSTMAIN from the rules
+# config). The test harness CANNOT reproduce that: TestSuiteGame::initGame jumps
+# to the fixture's own [INIT] phase (goToPhase, sendEvents=false), never running
+# the pregame->turn-1 opening that performs the deletion.
+#
+# This fixture therefore does NOT probe the deletion (unprobeable); it establishes
+# the CONTROL fact that the upkeep-trigger machinery itself works: when the harness
+# provides a real UNTAP->UPKEEP transition, an "@each my upkeep" trigger fires. So
+# the ONLY reason turn-1 upkeep is missing in real play is the phase config the
+# suite bypasses -- not a broken trigger. Expect: PASS (life 19).
+[INIT]
+UNTAP
+[PLAYER1]
+inplay:Var Bleed Sigil
+[PLAYER2]
+[DO]
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Var Bleed Sigil
+life:19
+[PLAYER2]
+life:20
+[END]

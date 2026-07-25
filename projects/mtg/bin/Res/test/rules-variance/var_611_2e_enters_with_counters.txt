@@ -1,0 +1,24 @@
+# CR 611.2e enters-with characteristics are simultaneous with zone entry.
+# P1 casts Var Hollow Spike (base 0/0, enters with two +1/+1 counters). CR: it
+# enters as a 2/2 and survives; it must NOT die to the 0-toughness SBA.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Var Hollow Spike
+manapool:{1}{G}
+[PLAYER2]
+[DO]
+Var Hollow Spike
+goto attackers
+next
+next
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Var Hollow Spike
+life:20
+[PLAYER2]
+life:20
+[END]

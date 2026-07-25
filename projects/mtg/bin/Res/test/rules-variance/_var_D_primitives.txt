@@ -1,0 +1,197 @@
+# Synthetic test-only cards for the rules-variance probe set (agent D).
+# IDs 2100000700-2100000799 reserved for this agent to avoid collision with
+# other rules-variance primitive files.
+
+# --- 608.3b: an Aura whose ETB is OBSERVABLE. If the engine moves this
+# permanent spell to the battlefield despite the target being illegal at
+# resolution, the ETB "gain 5 life" fires (visible) even though the aura
+# then dies to the unattached-aura SBA. CR: the spell fizzles, never enters,
+# no life gained.
+[card]
+id=2100000701
+name=Var Phantom Grip
+mana={B}
+type=Enchantment
+subtype=Aura
+target=creature
+auto=teach(creature) 2/1
+auto=life:5
+text=Enchant creature. Enchanted creature gets +2/+1. When this enters, you gain 5 life.
+[/card]
+
+# --- 613 layers: a base-P/T SETTING enchantment (Humility-class, layer 7b:
+# "all creatures have base power and toughness 1/1"). Pairs with an anthem
+# (+1/+1, layer 7c). CR fixed result: every creature is 2/2 regardless of the
+# order the two effects entered. Applied in effect/timestamp order (engine),
+# casting order changes the result.
+[card]
+id=2100000710
+name=Var Great Leveling
+mana={2}{W}{W}
+type=Enchantment
+auto=lord(creature) becomes(Creature,1/1)
+text=All creatures have base power and toughness 1/1.
+[/card]
+
+# --- 613 layers: an anthem giving all creatures +1/+1 (layer 7c).
+[card]
+id=2100000711
+name=Var Rallying Standard
+mana={1}{W}
+type=Enchantment
+auto=lord(creature) 1/1
+text=Creatures get +1/+1.
+[/card]
+
+# --- 613 layers: a witness creature to measure the resulting P/T through
+# combat. Base 4/4; mustattack so it swings without an ability-menu click.
+[card]
+id=2100000712
+name=Var Measure Golem
+mana={4}
+type=Artifact Creature
+subtype=Golem
+power=4
+toughness=4
+auto=mustattack
+text=Test witness whose live power/toughness is read via combat damage.
+[/card]
+
+# --- 608.2b: an INSTANT pump with a controller-side rider (gain 5 life) so
+# "the ability resolved" is observable even when the creature target is dead.
+# TargetAbility::resolve (src/MTGAbility.cpp:8052) reuses the retained target
+# and only rejects phased permanents. If it resolves on a dead target, the
+# rider fires. CR: single illegal target -> spell fizzles, rider does NOT fire.
+[card]
+id=2100000702
+name=Var Surge Blessing
+mana={G}
+type=Instant
+target=creature
+auto=2/2
+auto=life:5
+text=Target creature gets +2/+2 until end of turn. You gain 5 life.
+[/card]
+
+# --- 613 sharp discriminator (ability-loss vs a creature-based lord).
+# Var Humbling Field is Humility-class: every creature becomes base 1/1 AND
+# loses all abilities (layers 6 + 7b). Var Anthem Beast is a CREATURE whose
+# printed ability is a lord giving every creature +1/+1 (layer 7c, but it is an
+# ABILITY of a creature). Under Humility the Beast loses that ability, so no
+# +1/+1 exists to apply. CR result: all creatures are 1/1. The audit flags
+# ALoseAbilities as a "hack" that exempts lord-granted abilities; if so the
+# +1/+1 survives and creatures are 2/2 (CR-wrong).
+[card]
+id=2100000720
+name=Var Humbling Field
+mana={2}{W}{W}
+type=Enchantment
+auto=lord(creature) becomes(Creature,1/1)
+auto=lord(creature) loseabilities
+text=All creatures have base power and toughness 1/1 and lose all abilities.
+[/card]
+[card]
+id=2100000721
+name=Var Anthem Beast
+mana={2}{G}
+type=Creature
+subtype=Beast
+power=3
+toughness=3
+auto=lord(creature) 1/1
+text=Creatures you control get +1/+1 (a creature-based lord).
+[/card]
+
+# --- 613 dependency discriminator (layer 4 type-change feeding a layer-7c
+# type-conditional pump). Var Graft Field makes every creature also a Zombie
+# (a type change). Var Zombie Muster gives +2/+2 to Zombies. The pump DEPENDS
+# on the graft's output. CR (613.7 dependency): the type change always applies
+# first, so Var Measure Golem is a Zombie and gets +2/+2 = 6/6 (deals 6),
+# regardless of which effect began first. If the engine evaluates the pump
+# before the type-change in a frame, the golem is not yet a Zombie and misses
+# the +2/+2 (stays 4/4, deals 4) -> order-dependent = 613 dependency PROVEN.
+[card]
+id=2100000730
+name=Var Graft Field
+mana={2}{U}
+type=Enchantment
+auto=lord(creature) transforms((Zombie))
+text=Every creature is also a Zombie.
+[/card]
+[card]
+id=2100000731
+name=Var Zombie Muster
+mana={2}{B}
+type=Enchantment
+auto=lord(creature[zombie]) 2/2
+text=Zombies get +2/+2.
+[/card]
+
+# --- 611.2e: a creature with base 0/0 that ENTERS WITH two +1/+1 counters.
+# CR 611.2e: the enters-with counters are present as the creature enters (a
+# single simultaneous event), so it is 2/2 on entry and never dies to the
+# zero-toughness state-based action. Audit finding: enters-with characteristics
+# are installed AFTER zone entry (with a skipDamageTestOnce workaround). If the
+# 0-toughness SBA sees the pre-counter state, the creature dies on entry ->
+# it lands in the graveyard = 611.2e PROVEN. If it survives in play = REFUTED
+# (the workaround masks the ordering at the observable level).
+[card]
+id=2100000740
+name=Var Hollow Spike
+mana={1}{G}
+type=Creature
+subtype=Spike
+power=0
+toughness=0
+auto=counter(1/1,2)
+text=Var Hollow Spike enters with two +1/+1 counters on it.
+[/card]
+
+# --- 614.7a: zero-damage must NOT consume a one-shot prevention shield.
+# Var Ward Charm gives a creature a "prevent the next 2 damage" shield.
+# Var Null Bolt deals 0 damage (a real damage event of magnitude 0).
+[card]
+id=2100000750
+name=Var Ward Charm
+mana={W}
+type=Instant
+target=creature
+auto=prevent:2
+text=Prevent the next 2 damage that would be dealt to target creature this turn.
+[/card]
+[card]
+id=2100000751
+name=Var Null Bolt
+mana={R}
+type=Instant
+target=anytarget
+auto=damage:0
+text=Var Null Bolt deals 0 damage to any target.
+[/card]
+
+# --- 613 layer 7e switch discriminator. Var Skewed Ogre is an asymmetric 3/1.
+# Var Twist switches a creature's power and toughness (ueot). Applying TWO
+# independent switch effects must return the creature to 3/1 (CR: two 7e switch
+# effects, applied in turn, cancel). Audit finding: multiple switch effects
+# "collapse into one boolean toggle" (src/MTGCardInstance.cpp:902-1000), so a
+# second switch is a no-op and the ogre stays 1/3.
+[card]
+id=2100000760
+name=Var Skewed Ogre
+mana={2}{R}
+type=Creature
+subtype=Ogre
+power=3
+toughness=1
+auto=mustattack
+text=Asymmetric 3/1 witness for the power/toughness switch test.
+[/card]
+[card]
+id=2100000761
+name=Var Twist
+mana={U}
+type=Instant
+target=creature
+auto=swap
+text=Switch target creature's power and toughness until end of turn.
+[/card]

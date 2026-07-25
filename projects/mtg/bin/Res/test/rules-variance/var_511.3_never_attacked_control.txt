@@ -1,0 +1,26 @@
+# Finding 4 (CR 511.3) -- NEGATIVE CONTROL / discrimination fixture.
+# Confirms Var Slay Charge's target=creature[attacking] restriction is actually
+# enforced: a creature that NEVER attacked cannot be targeted. Cast is attempted
+# at FIRSTMAIN before any combat, so no creature is attacking.
+#   If [attacking] is honored: spell UNCASTABLE -> creature survives, instant in
+#   hand (this fixture asserts that -> PASS).
+#   If PASS here but the main2 probe FAILS (creature destroyed), the difference
+#   is precisely the stale attacking flag = 511.3, not an ignored restriction.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Brute Runner
+hand:Var Slay Charge
+[PLAYER2]
+[DO]
+Var Slay Charge
+Var Brute Runner
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Brute Runner
+hand:Var Slay Charge
+[PLAYER2]
+life:20
+[END]

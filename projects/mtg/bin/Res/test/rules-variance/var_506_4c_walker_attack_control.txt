@@ -1,0 +1,27 @@
+# CONTROL for finding 2 (506.4c): proves the Craw Wurm -> choice 1 -> choice 0
+# sequence genuinely declares Craw Wurm ATTACKING Jace Beleren (not the player,
+# not a no-op). No removal is cast; Craw Wurm's 6 combat damage kills the
+# 3-loyalty Jace. If the walker-attack sequence were a no-op, Jace would survive
+# and this control would fail - so its PASS validates the two REFUTED fixtures'
+# premise that a walker attack was really on the board when the destination was
+# removed.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Craw Wurm
+[PLAYER2]
+inplay:Jace Beleren
+[DO]
+Craw Wurm
+choice 1
+choice 0
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Craw Wurm
+[PLAYER2]
+graveyard:Jace Beleren
+life:20
+[END]

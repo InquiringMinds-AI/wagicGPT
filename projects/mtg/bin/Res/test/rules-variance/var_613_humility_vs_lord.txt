@@ -1,0 +1,27 @@
+# CR 613 - Humility-class ability loss shuts off a CREATURE-based lord.
+# Var Humbling Field makes every creature base 1/1 AND removes all abilities
+# (layers 6 + 7b). Var Anthem Beast's +1/+1 is a printed ability of a creature,
+# so Humility removes it: no anthem applies. CR result: Var Measure Golem is
+# 1/1 and deals 1 -> P2 to 19. Audit finding (613/ALoseAbilities "hack"
+# exempting lord grants): if the +1/+1 survives, the golem is 2/2, deals 2, and
+# P2 drops to 18 -> this fixture FAILS = the wrong Humility result is PROVEN.
+#   NEEDS: WAGIC_TEST_PRIMITIVES_FILE=test/rules-variance/_var_D_primitives.txt
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Measure Golem,Var Anthem Beast,Var Humbling Field
+[PLAYER2]
+[DO]
+goto attackers
+Var Measure Golem
+next
+next
+goto end
+[ASSERT]
+END
+[PLAYER1]
+inplay:Var Measure Golem,Var Anthem Beast,Var Humbling Field
+life:20
+[PLAYER2]
+life:19
+[END]

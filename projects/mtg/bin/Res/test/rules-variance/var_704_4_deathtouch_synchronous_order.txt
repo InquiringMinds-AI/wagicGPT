@@ -1,0 +1,32 @@
+# CR 510.1c / 704.4 / 702.2b: all combat damage is dealt SIMULTANEOUSLY, then
+# lethal-damage / deathtouch destruction happens together at the next SBA. Two
+# creatures that deal each other lethal damage in one combat both die.
+#
+# Probe: Typhoid Rats (1/1 deathtouch) attacks; Grizzly Bears (2/2) blocks.
+# CR-correct outcome: damage is simultaneous, so Rats' 1 deathtouch kills Bears
+# AND Bears' 2 damage kills Rats -> BOTH die. If the engine destroys the Bears
+# synchronously during the Rats' damage event (704.4/702.2b finding) BEFORE the
+# Bears assigns its damage, the Rats would survive -> this fixture FAILS = the
+# ordering defect is PROVEN observable. If both die, the outcome matches CR and
+# the defect is REFUTED-as-unobservable at the combat-outcome level.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Typhoid Rats
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Typhoid Rats
+next
+Grizzly Bears
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:Typhoid Rats
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]

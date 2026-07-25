@@ -1,0 +1,40 @@
+# CR 400.7: an object that moves from one zone to another becomes a NEW object with
+# no memory of its previous existence (only the 400.7a-d exceptions survive, none of
+# which is "was this spell kicked"). So a creature reanimated from the graveyard is a
+# new object that was NOT kicked, and its "if it was kicked, enters with a +1/+1
+# counter" ETB must NOT trigger.
+#
+# Scenario: P1 casts Ardent Soldier KICKED (choice 1) -> enters 2/3 (base 1/2 + a
+# +1/+1 counter). Var Ruin destroys it (-> graveyard). Var Grave Caller reanimates it
+# (fires its ETB anew). Shock (2 damage) is then aimed at the reanimated Soldier.
+#
+# CR-CORRECT: the reanimated Soldier is a new, un-kicked object = 1/2, so 2 damage
+# KILLS it -> it ends in the graveyard, NOT in play. This fixture asserts that.
+# A FAIL where Ardent Soldier is still in play = variance PROVEN: the engine carried
+# the `kicked` flag across the zone change, the ETB re-added the counter, the
+# reanimated Soldier was 2/3 and survived Shock.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Ardent Soldier,Var Ruin,Shock
+inplay:Var Grave Caller
+manapool:{3}{W}{R}
+[PLAYER2]
+life:20
+[DO]
+Ardent Soldier
+choice 1
+Var Ruin
+Ardent Soldier
+Var Grave Caller
+Shock
+Ardent Soldier
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Grave Caller
+graveyard:Ardent Soldier,Var Ruin,Shock
+manapool:{0}
+[PLAYER2]
+life:20
+[END]

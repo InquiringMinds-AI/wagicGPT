@@ -1,0 +1,24 @@
+# Finding 2 (CR 500.3/502.4/514.3): untap is NOT a priority-bearing step -- no
+# player receives priority during untap, so no spell or ability can be cast/used
+# there. This fixture starts the game in UNTAP and has the active player attempt
+# to cast an instant (Var Spark Jolt, deals 2 to any target) at player2.
+#   CR-correct: no priority in untap -> spell UNCASTABLE -> stays in hand, p2 at
+#               20 (this fixture asserts CR-correct).
+#   Engine bug (500.3): untap runs as an ordinary priority-bearing phase -> the
+#               instant casts and resolves, p2 -> 18, instant to graveyard.
+# PASS = REFUTED; FAIL (p2 life 18, instant in graveyard) = PROVEN variance.
+[INIT]
+untap
+[PLAYER1]
+hand:Var Spark Jolt
+[PLAYER2]
+[DO]
+Var Spark Jolt
+p2
+[ASSERT]
+untap
+[PLAYER1]
+hand:Var Spark Jolt
+[PLAYER2]
+life:20
+[END]

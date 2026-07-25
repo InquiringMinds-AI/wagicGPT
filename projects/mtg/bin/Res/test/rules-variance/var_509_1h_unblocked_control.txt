@@ -1,0 +1,21 @@
+# CONTROL for finding 5 (509.1h): proves the life discriminator. An UNBLOCKED
+# Elven Warhounds (2/2) attacks the open player and deals 2 -> P2 to 18. This
+# establishes that "P2 stays at 20" in the two REFUTED fixtures genuinely means
+# "the attacker was treated as blocked / dealt no player damage", not that the
+# attack silently failed.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Elven Warhounds
+[PLAYER2]
+[DO]
+Elven Warhounds
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Elven Warhounds
+[PLAYER2]
+life:18
+[END]

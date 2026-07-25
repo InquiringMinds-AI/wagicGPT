@@ -1,0 +1,8 @@
+rules-variance/var_506_3_creature_battle_attacks.txt
+rules-variance/var_509_1a_creature_battle_blocks.txt
+rules-variance/var_506_4c_walker_vanish_bounce.txt
+rules-variance/var_506_4c_walker_vanish_destroy.txt
+rules-variance/var_506_4c_walker_attack_control.txt
+rules-variance/var_509_1h_blocker_leaves_bounce.txt
+rules-variance/var_509_1h_blocker_leaves_destroy.txt
+rules-variance/var_509_1h_unblocked_control.txt

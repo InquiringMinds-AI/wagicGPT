@@ -1,0 +1,25 @@
+# Finding 2 cont. (CR 514.3): during cleanup no player normally receives priority
+# (priority is granted only in the special case where a cleanup SBA/trigger
+# occurs). This fixture starts in CLEANUP and the active player attempts to cast
+# an instant.
+#   CR-correct: no priority in cleanup -> UNCASTABLE -> stays in hand, p2 at 20.
+#   Engine bug (514.3): cleanup runs as an ordinary priority-bearing phase -> the
+#               instant casts and resolves, p2 -> 18.
+# PASS = REFUTED; FAIL (p2 life 18, instant in graveyard) = PROVEN variance.
+# NOTE: cleanup is a transient phase; if the harness cannot hold it (phase
+# problem in the log) this id is UNPROBEABLE instead -- see verdicts-B.md.
+[INIT]
+cleanup
+[PLAYER1]
+hand:Var Spark Jolt
+[PLAYER2]
+[DO]
+Var Spark Jolt
+p2
+[ASSERT]
+cleanup
+[PLAYER1]
+hand:Var Spark Jolt
+[PLAYER2]
+life:20
+[END]

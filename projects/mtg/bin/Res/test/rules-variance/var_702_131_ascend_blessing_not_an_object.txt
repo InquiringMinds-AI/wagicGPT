@@ -1,0 +1,27 @@
+# CR 702.131 (Ascend): the "city's blessing" is a designation a PLAYER has for
+# the rest of the game once they control ten or more permanents. It is not an
+# object; nothing is created on the battlefield, and it cannot be counted as a
+# permanent or targeted.
+#
+# Probe: Dusk Charger (Ascend) plus nine other permanents = ten permanents, so
+# the controller gets the city's blessing. CR-correct battlefield: exactly those
+# ten permanents (Dusk Charger + 9 Darksteel Citadel) - the blessing is a player
+# designation, invisible to the zone lists. The engine implements the city's
+# blessing as a battlefield TOKEN (_ASCEND_ -> token(City's Blessing)), a real
+# countable permanent (702.131 finding). An omitted zone line asserts zero cards,
+# so the "City's Blessing" token the engine adds makes this fixture FAIL = PROVEN.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Dusk Charger,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel
+[PLAYER2]
+[DO]
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Dusk Charger,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel,Darksteel Citadel
+[PLAYER2]
+[END]

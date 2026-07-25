@@ -1,0 +1,42 @@
+# CR 506.4c / 510.1b: an unblocked attacker whose attacked planeswalker leaves
+# combat "continues to be an attacking creature, although it is not attacking any
+# player, planeswalker, or battle... If it is unblocked, it will deal NO combat
+# damage." The audit flagged GuiCombat::resolve (src/GuiCombat.cpp) as falling
+# back to observer->opponent() when attacker->isAttacking is null, i.e. dealing
+# the damage to the OPPONENT instead of none.
+#
+# Probe: Craw Wurm (6/4) attacks Jace Beleren (choice 1 = Attack a Planeswalker,
+# choice 0 = Jace); before combat damage, the active player bounces Jace with
+# Boomerang (instant, cast in the same attackers step where casting is drivable).
+# CR-correct: destination gone -> Craw Wurm deals NO damage -> P2 stays at 20.
+# Audit-predicted bug: fallback to opponent -> P2 to 14.
+#
+# RESULT: PASSES -> REFUTED on current bin/wagic. P2 stays at 20; the ?opponent()
+# fallback does not fire (the attacker is dropped from damage assignment when its
+# planeswalker leaves). See the walker-attack control fixture proving the attack
+# on Jace was genuinely declared (Craw Wurm's 6 kills Jace by combat there).
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Craw Wurm
+hand:Boomerang
+manapool:{U}{U}
+[PLAYER2]
+inplay:Jace Beleren
+[DO]
+Craw Wurm
+choice 1
+choice 0
+Boomerang
+Jace Beleren
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Craw Wurm
+graveyard:Boomerang
+[PLAYER2]
+hand:Jace Beleren
+life:20
+[END]

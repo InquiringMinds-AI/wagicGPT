@@ -1,0 +1,36 @@
+# CR 509.1a: only a CREATURE may be declared as a blocker, and CR excludes a
+# permanent that is also a Battle. The engine's block eligibility gates on
+# isCreature() but omits the "not also a battle" exception, so a creature-Battle
+# is allowed to block.
+#
+# Probe: Craw Wurm (6/4) attacks P2 (choice 0 = attack the player, since P2's
+# Battle also arms an attack-target menu); P2 declares the synthetic creature-
+# Battle "Var Bastion Beast" (2/2) as a blocker. CR-correct: the creature-Battle
+# is NOT a legal blocker -> Craw Wurm is unblocked -> P2 takes 6 -> life 14 and
+# the beast survives. Engine: the beast blocks -> Craw Wurm dealt 0 to the player
+# (life 20) and the beast dies to the 6 combat damage (graveyard). This fixture
+# asserts the CR-correct (beast-can't-block) result, so a FAIL here PROVES the
+# finding. Trace evidence: "Defenser Toggle: Var Bastion Beast" confirms the block
+# was accepted.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Craw Wurm
+[PLAYER2]
+inplay:Var Bastion Beast
+[DO]
+Craw Wurm
+choice 0
+next
+Var Bastion Beast
+Craw Wurm
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Craw Wurm
+[PLAYER2]
+inplay:Var Bastion Beast
+life:14
+[END]

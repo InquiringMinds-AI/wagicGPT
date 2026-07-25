@@ -1,0 +1,19 @@
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Var Null Bolt,Shock
+inplay:Grizzly Bears
+manapool:{R}{R}
+[PLAYER2]
+[DO]
+Var Null Bolt
+Grizzly Bears
+Shock
+Grizzly Bears
+goto end
+[ASSERT]
+END
+[PLAYER1]
+graveyard:Var Null Bolt,Shock,Grizzly Bears
+life:20
+[END]

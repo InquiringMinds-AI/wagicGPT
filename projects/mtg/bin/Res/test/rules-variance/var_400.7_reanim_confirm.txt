@@ -1,0 +1,29 @@
+# CONTROL for var_400.7: identical chain (cast Ardent Soldier KICKED, destroy with
+# Var Ruin, reanimate with Var Grave Caller) but WITHOUT the finishing Shock. Its job
+# is to prove the mechanics of the memory probe actually fire: that Var Grave Caller
+# reanimates the destroyed Soldier back onto the battlefield (ETB re-runs). If this
+# PASSES, the reanimation step in var_400.7 genuinely happened, so that fixture's
+# Shock-survival outcome is a real read of the reanimated creature's toughness.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Ardent Soldier,Var Ruin
+inplay:Var Grave Caller
+manapool:{3}{W}
+[PLAYER2]
+life:20
+[DO]
+Ardent Soldier
+choice 1
+Var Ruin
+Ardent Soldier
+Var Grave Caller
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Var Grave Caller,Ardent Soldier
+graveyard:Var Ruin
+manapool:{0}
+[PLAYER2]
+life:20
+[END]
