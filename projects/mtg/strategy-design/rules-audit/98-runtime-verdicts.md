@@ -32,6 +32,13 @@ cleanup auto-discard hand->cards[0] (402.2/514.1-discard), unpayable alternate a
 wedge (508.1h), attacked-entity primitive missing (508.3a), Recover no-op (702.59), Plot
 non-castable (702.170), Gift promised-branch unreachable (702.174).
 
+Owner correction (2026-07-24): **sideboard/command-zone targeting (400.11b) is RECLASSIFIED
+off the defect list** - there is no sideboard feature (no match structure), so inert moves to
+a zone that doesn't exist are a FEATURE BOUNDARY, not a gameplay variance. Its only in-game
+consumers are Wish-class cards, already in the owner's parked-unimplemented ruling. The
+loud-rejection doctrine applies meanwhile: scripts referencing those zones should reject
+loudly rather than sit silently inert.
+
 ## PROVEN-MECHANISM, narrow gameplay surface (1)
 
 - **500.1/501.1/504.1 — turn 1 deletes the starting player's untap+upkeep+draw.** Mechanism
