@@ -119,6 +119,22 @@ const char * kStrategyPriors =
     "into a sweeper; leading with your best threat into open mana; sloppy combat math (missing lethal, "
     "making bad trades, forgetting the opponent's trick).\n";
 
+//The de-fanged worked-example card name (wave-25 ITEM 1, part 3). The example
+//in kReplyProtocol MUST use an obviously-FAKE card that can never collide with a
+//real option and MUST NOT reuse a real option's card name. The old example,
+//`CHOICE: 2 (Cast Fatal Push)`, poisoned the parsers two ways: (1) when a real
+//option WAS "Cast Fatal Push" (deck133 vs131 s21), the model quoted the example
+//obsessively while debating output format, and the retraction detector's coded-
+//index scan latched the quoted "CHOICE: 2" as a contradictory second index -> a
+//false retraction; (2) the concrete index 2 seeded value-as-index slips into
+//real asks (deck102 vs133 s5, index 2 into a 1-option ask). A fake name defuses
+//both: a quoted/echoed "(Cast Example Card)" matches NO real option, so the
+//name-echo cannot validate a wrong index, and the retraction scan's example-echo
+//guard recognizes it. `kExampleFakeCardLc` is the lowercase form that guard
+//matches. The FORMAT is stated index-agnostically ("<number> (<action name>)")
+//so the example's own digit is presented as illustrative, not a value to copy.
+const char * kExampleFakeCardLc = "example card";
+
 //The reply protocol is appended in code AFTER the (user-editable) system
 //prompt template, so a stale or hand-edited template cannot silently drop
 //the contract the parsers and the plan carry-forward depend on.
@@ -126,8 +142,11 @@ const char * kReplyProtocol =
     "\nHOW TO REPLY (every decision):\n"
     "Put your ANSWER on the VERY FIRST line, using exactly the label the decision asks for "
     "(CHOICE: for numbered choices, ATTACK: for attack declarations, BLOCKS: for block "
-    "assignments), e.g. \"CHOICE: 2 (Cast Fatal Push)\". Answer first so a long reply can never "
-    "lose it.\n"
+    "assignments). Format: the label, then the NUMBER of your choice FROM THE LIST, then that "
+    "option's name in parentheses - CHOICE: <number> (<action name exactly as listed>). For "
+    "example, \"CHOICE: 3 (Cast Example Card)\" (Example Card is a placeholder - always copy the "
+    "real number and name from the options in front of you, never this example's). Answer first "
+    "so a long reply can never lose it.\n"
     "After the answer line you may think the decision through briefly if you need to - that scratch "
     "text is discarded. If that thinking changes your mind, write a NEW answer line with the "
     "corrected answer; the LAST well-formed answer line is the one taken. If instead you realize "
@@ -1412,6 +1431,34 @@ string AIPlayerGPT::describeEvent(WEvent * event)
             out << "Opponent puts a card into their " << toName;
             return out.str();
         }
+        //Persist / undying return: the just-dead creature re-enters as a fresh
+        //copy carrying its signature counter (persist: -1/-1, undying: +1/+1).
+        //The engine routes it through a temp zone, but putInZone stamps the event
+        //'from' as the card's PREVIOUS zone - the GRAVEYARD - so the raw line
+        //reads "<card>: graveyard -> battlefield" and the model loses that the
+        //creature it just saw DIE is back (verified live, deck59). Name the
+        //mechanic on the return event so the death and the comeback read as one
+        //thing (deck59 wave-24). The counter is added only AFTER this zone event,
+        //so it is rule-mandated (not yet attached here); the next board snapshot
+        //shows the resulting P/T. Gated on graveyard -> battlefield entry of a
+        //persist/undying creature (a reanimation of such a creature is rare and
+        //the mechanic tag still names its ability faithfully).
+        if (owner && e->to == owner->game->inPlay && e->from == owner->game->graveyard
+            && e->card->isCreature())
+        {
+            if (e->card->basicAbilities[Constants::PERSIST])
+            {
+                out << (mine ? "Your " : "Opponent's ") << cardName
+                    << " returns to the battlefield with a -1/-1 counter (persist)";
+                return out.str();
+            }
+            if (e->card->basicAbilities[Constants::UNDYING])
+            {
+                out << (mine ? "Your " : "Opponent's ") << cardName
+                    << " returns to the battlefield with a +1/+1 counter (undying)";
+                return out.str();
+            }
+        }
         out << (mine ? "Your " : "Opponent's ") << cardName
             << ": " << zoneDesc(e->from) << " -> " << toName;
         return out.str();
@@ -1806,6 +1853,7 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     bool echoConflict = false;
     bool echoNoMatch = false;
     vector<string> words; //echo's significant words (hoisted for INDEX-WINS)
+    string echoLc;        //lowercased echo string (hoisted for INDEX-WINS (a2))
     if (optionTexts && !optionTexts->empty())
     {
         //the LAST "(...)" following a digit on the answer-ish tail
@@ -1847,6 +1895,10 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                         echo = echo.substr(tp + 11); //strlen(" targeting ") == 11
                 }
             }
+            //Hoist the (post-strip) lowercased echo for INDEX-WINS branch (a2).
+            echoLc = echo;
+            for (size_t i = 0; i < echoLc.size(); i++)
+                echoLc[i] = (char) tolower((unsigned char) echoLc[i]);
             //significant words: lowercase, length >= 4
             string w;
             for (size_t i = 0; i <= echo.size(); i++)
@@ -1990,6 +2042,50 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             for (size_t wi = 0; wi < words.size(); wi++)
                 if (low.find(words[wi]) != string::npos)
                     return false;
+        }
+        //(a2) the CHOSEN option's OWN anchor words ALL appear in the echo -> the
+        //echo is a FULLER phrasing that WRAPS this option (the model prefixed the
+        //option's verb and/or named the source card). R-STALE-ECHO-QUALIFIER
+        //residual, deck137 wave-24 s4: a shockland ETB menu offered the bare
+        //options "pay 2 life" / "tap"; the model answered CHOICE: 2 (Tap Temple
+        //Garden). Branch (a) missed because the echo's >=4-length words
+        //("temple"/"garden") name the SOURCE card, which is absent from the bare
+        //option "tap"; branch (b) had no anchor because the menu's source name did
+        //not render ("Choose an option for :"). But the echo CONTAINS the option's
+        //own label ("tap"), so the answer is coherent -> trust the index. Length
+        //>=3 here (not the >=4 significance floor) so a short-but-meaningful label
+        //like "tap" counts, and >=1 qualifying option word is REQUIRED so an
+        //anchorless option ("X = 1") cannot vacuously pass (that must stay stale
+        //without a source anchor - W23-A shape1).
+        if (optionTexts && !echoLc.empty() && k1 >= 1 && k1 <= (int) optionTexts->size())
+        {
+            const string& el = echoLc;
+            const string& src = (*optionTexts)[k1 - 1];
+            vector<string> ow;
+            string t;
+            for (size_t k = 0; k <= src.size(); k++)
+            {
+                char c = (k < src.size()) ? (char) tolower((unsigned char) src[k]) : ' ';
+                if (isalnum((unsigned char) c))
+                    t += c;
+                else
+                {
+                    if (t.size() >= 3 && t != "cast" && t != "with" && t != "play"
+                        && t != "pass" && t != "none" && t != "hold" && t != "done"
+                        && t != "the" && t != "for" && t != "skip" && t != "decline"
+                        && t != "nobody")
+                        ow.push_back(t);
+                    t.clear();
+                }
+            }
+            if (!ow.empty())
+            {
+                bool all = true;
+                for (size_t k = 0; k < ow.size() && all; k++)
+                    all = el.find(ow[k]) != string::npos;
+                if (all)
+                    return false; //option label fully echoed -> consistent, trust
+            }
         }
         //(b) every echoed word names the decision's own source card (the spell
         //whose X/mode/parameter is being announced) -> a self-reference, not a
@@ -2298,10 +2394,32 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
     //A clean line-leading recode ([B] retraction-then-new) resolves lastChoiceEnd
     //to the LATER line, so its earlier superseded index sits BEFORE the scan and
     //never fires. The parroted template "CHOICE: [Number]" is skipped.
+    //
+    //WAVE-25 ITEM 1 (protocol-example leak, deck133 vs131 s21): a mid-line coded
+    //index is only a genuine re-answer when the model WROTE it as prose intent, NOT
+    //when it QUOTED the reply protocol's own worked example while agonizing over
+    //output format. s21's reply re-affirmed line-1 "CHOICE: 1" repeatedly and never
+    //changed its decision, but quoted the prompt's `e.g. "CHOICE: 2 (Cast Fatal
+    //Push)"` four times (the old example used option 1's very card name), and the
+    //scan latched that quoted "CHOICE: 2" as a contradictory index -> false
+    //retraction. TWO exclusions make the scan segment-anchored to real prose:
+    //(1) a "choice:" token immediately preceded by a quote character is the model
+    //quoting a format string, not answering; (2) a token whose parenthetical names
+    //the protocol's fake example card ("Example Card") is a verbatim echo of the
+    //example. Both are skipped; a bare prose re-code like "So CHOICE: 1" (deck133
+    //vs140 s9) is neither quoted nor an example echo and still fires. Part 3
+    //(the fake-card de-fang) prevents the shape at the source going forward; this
+    //guard keeps replies generated under the old example (and any future quoting)
+    //from mis-firing.
     {
         size_t scan = (size_t) lastChoiceEnd;
         while ((scan = low.find("choice:", scan)) != string::npos)
         {
+            //(1) inside quotation marks -> the model is quoting the format/example,
+            //not restating an answer. Straight quotes and backtick code spans.
+            if (scan > 0 && (low[scan - 1] == '"' || low[scan - 1] == '\''
+                             || low[scan - 1] == '`'))
+            { scan += 7; continue; }
             size_t d = scan + 7;
             while (d < low.size() && (low[d] == ' ' || low[d] == '\t'))
                 d++;
@@ -2312,6 +2430,22 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
                 while (e < low.size() && isdigit((unsigned char) low[e]))
                     e++;
                 int n = atoi(low.substr(d, e - d).c_str());
+                //(2) verbatim echo of the protocol example: the parenthetical right
+                //after the index names the fake example card. Bounded to the same
+                //line so a distant paren cannot spuriously match.
+                size_t p = e;
+                while (p < low.size() && (low[p] == ' ' || low[p] == '\t')) p++;
+                bool exampleEcho = false;
+                if (p < low.size() && low[p] == '(')
+                {
+                    size_t close = low.find(')', p);
+                    size_t lineEnd = low.find('\n', e);
+                    size_t ex = low.find(kExampleFakeCardLc, p);
+                    if (ex != string::npos && close != string::npos && ex < close
+                        && (lineEnd == string::npos || close <= lineEnd))
+                        exampleEcho = true;
+                }
+                if (exampleEcho) { scan += 7; continue; }
                 if (n >= 0 && n <= optionCount && n != chosenNum)
                     return true; //genuine second, contradictory coded index
             }
@@ -2478,7 +2612,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         DebugTrace("AIPlayerGPT[ph" << phase << "]: all actions pass-declined this turn; passing");
         return NULL;
     }
-    tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 2 (Cast Fatal Push)\" or \"CHOICE: 0 (pass)\"; then any brief reasoning; then your PLAN: line last.";
+    tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list) or \"CHOICE: 0 (pass)\"; then any brief reasoning; then your PLAN: line last.";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
@@ -2643,7 +2777,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
         tail << (i + 1) << ". " << options[i] << "\n";
-    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 2 (Cast Fatal Push)\"; then any brief reasoning; then your PLAN: line last.";
+    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list); then any brief reasoning; then your PLAN: line last.";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -3386,6 +3520,39 @@ static string announceXHeader(const string& spell, int capX)
     return xa.str();
 }
 
+//Annotate a shockland-style ETB "pay life or enter tapped" menu in place. The
+//engine offers only the bare labels "Pay N life" and "Tap", neither of which
+//states the CONSEQUENCE the player is trading on: paying the life lets the
+//permanent enter UNTAPPED (usable this turn), while "Tap" declines the payment
+//so it instead enters TAPPED. The model saw only the labels and could not weigh
+//tempo against life (deck137 wave-24). Append-only - labels and answer indices
+//are untouched. Mechanism-matched by the CO-PRESENCE of a "Pay ... life" option
+//and a "Tap" option (the pay-or-tapped ETB shape, the only menu that pairs
+//them), NOT by card name. Returns true when it fired (for the self-test).
+static bool annotateEtbPayOrTapMenu(vector<string>& opts)
+{
+    bool hasPayLife = false, hasTap = false;
+    for (size_t i = 0; i < opts.size(); i++)
+    {
+        if (opts[i].compare(0, 4, "Pay ") == 0 && opts[i].find(" life") != string::npos)
+            hasPayLife = true;
+        if (opts[i] == "Tap")
+            hasTap = true;
+    }
+    if (!(hasPayLife && hasTap))
+        return false;
+    for (size_t i = 0; i < opts.size(); i++)
+    {
+        if (opts[i].compare(0, 4, "Pay ") == 0 && opts[i].find(" life") != string::npos)
+            opts[i] += " [this permanent then enters the battlefield UNTAPPED -"
+                       " usable (tap for mana / attack) this turn]";
+        else if (opts[i] == "Tap")
+            opts[i] += " [decline the payment; this permanent instead enters the"
+                       " battlefield TAPPED - unusable until your next untap step]";
+    }
+    return true;
+}
+
 int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & act)
 {
     MTGCardInstance * ctx = req.contextCard;
@@ -3433,7 +3600,8 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     if (req.kind == DecisionRequest::CHOOSE_MODE)
     {
         int pick = askModel("Choose one mode for "
-                            + (ctx ? ctx->getDisplayName() : string("this spell")) + ":", req.optionTexts);
+                            + (ctx ? ctx->getDisplayName() : string("this spell")) + ":", req.optionTexts,
+                            true, ctx ? ctx->getDisplayName() : string());
         if (pick == kChoicePending)
             return kChoicePending;
         if (pick < 0)
@@ -3469,9 +3637,19 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         if (opts[i].compare(0, 10, "Transform:") == 0)
             opts[i] += " [available NOW - this transform is only offered because its"
                        " condition is already met; do not recount, it is legal this instant]";
+    //ETB "pay life or enter tapped" menu (shocklands - Temple Garden class, and
+    //the fixed painland sibling): append the consequence each bare label omits.
+    //Annotation only, mechanism-matched (see annotateEtbPayOrTapMenu). deck137
+    //wave-24.
+    annotateEtbPayOrTapMenu(opts);
     string decision = ctx ? ("Choose an option for " + ctx->getDisplayName() + ":")
                           : string("A choice is required - choose an option:");
-    int pick = askModel(decision, opts);
+    //Thread the source card as the pending source (as ANNOUNCE_X does): the model
+    //often echoes "<verb> <source card>" against a bare option ("Tap Temple
+    //Garden" vs "tap"), and INDEX-WINS treats a source-naming echo as a
+    //self-reference rather than a stale prior answer (deck137 wave-24 s4). Empty
+    //when the source name did not render - then (a2) option-label-in-echo covers it.
+    int pick = askModel(decision, opts, true, ctx ? ctx->getDisplayName() : string());
     if (pick == kChoicePending)
         return kChoicePending;
     if (pick < 0)
@@ -3880,6 +4058,7 @@ struct CombatTradeStat
     bool firststrike;  //first strike or double strike
     bool indestructible;
     bool trample;
+    bool persist;      //has persist AND no -1/-1 counter yet -> returns once if it dies
 };
 
 //The pure trade-outcome logic. Perspective: 'b' = the blocking side ('you'),
@@ -3905,10 +4084,14 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     bool bKillsA = (bp > 0) && ((b.wither && bp >= at) || (!a.indestructible && (b.deathtouch || bp >= at)));
     //First strike / double strike ordering: a one-sided first striker that
     //kills its foe removes that foe before it can deal (the survivor's later
-    //normal-step damage lands on a dead creature).
-    if (a.firststrike && !b.firststrike && aKillsB)
+    //normal-step damage lands on a dead creature). A creature killed in the
+    //first-strike step deals NO damage at all - so any effect that rides its
+    //damage (trample, and the wither/infect SHRINK below) must not be claimed.
+    bool bDiesToFirstStrike = a.firststrike && !b.firststrike && aKillsB;
+    bool aDiesToFirstStrike = b.firststrike && !a.firststrike && bKillsA;
+    if (bDiesToFirstStrike)
         bKillsA = false;
-    else if (b.firststrike && !a.firststrike && bKillsA)
+    else if (aDiesToFirstStrike)
         aKillsB = false;
 
     std::ostringstream o;
@@ -3933,21 +4116,35 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     }
     //Wither/infect that does NOT kill still SHRINKS the survivor by its damage
     //(-1/-1 counters), so the model does not read the survivor as untouched -
-    //or, pre-fix, as dead. Only when the target actually survives (!kills).
-    if (b.wither && bp > 0 && !bKillsA)
+    //or, pre-fix, as dead. Only when the target actually survives (!kills) AND
+    //the wither creature actually LIVED TO DEAL its damage: a wither blocker
+    //that dies to the attacker's first strike before the normal step never
+    //applies its -1/-1 counters, so the shrink must not be claimed (deck27
+    //wave-24: the shrink was printed for a wither blocker already dead to first
+    //strike). bDiesToFirstStrike / aDiesToFirstStrike mark that no-damage case.
+    if (b.wither && bp > 0 && !bKillsA && !bDiesToFirstStrike)
     {
         int np = ap - bp; if (np < 0) np = 0;
         int nt = at - bp; //survives => bp < at, so nt >= 1
         o << " (" << (b.infectLabel ? "infect" : "wither")
           << " shrinks it to " << np << "/" << nt << ")";
     }
-    if (a.wither && ap > 0 && !aKillsB)
+    if (a.wither && ap > 0 && !aKillsB && !aDiesToFirstStrike)
     {
         int np = bp - ap; if (np < 0) np = 0;
         int nt = bt - ap; //survives => ap < bt, so nt >= 1
         o << " (" << (a.infectLabel ? "infect" : "wither")
           << " shrinks your blocker to " << np << "/" << nt << ")";
     }
+    //Persist: a creature that DIES here but has persist (and no -1/-1 counter
+    //yet) comes straight back with a -1/-1 counter, so "both die" / "dies"
+    //understates what the model keeps: the body returns, one smaller. Note it
+    //on whichever side dies. Keyed on the FINAL kill flags, so a persist blocker
+    //that dies to first strike still returns (death is death, order aside).
+    if (aKillsB && b.persist)
+        o << " (yours returns with a -1/-1 counter (persist))";
+    if (bKillsA && a.persist)
+        o << " (theirs returns with a -1/-1 counter (persist))";
     return o.str();
 }
 
@@ -3962,6 +4159,10 @@ static CombatTradeStat combatStatOf(MTGCardInstance * c)
     s.firststrike = c->basicAbilities[Constants::FIRSTSTRIKE] || c->basicAbilities[Constants::DOUBLESTRIKE];
     s.indestructible = c->basicAbilities[Constants::INDESTRUCTIBLE];
     s.trample = c->basicAbilities[Constants::TRAMPLE];
+    //Persist returns the creature once, with a -1/-1 counter - but only if it
+    //does not already carry one (the counter is what ends the loop). Undying is
+    //the +1/+1 mirror; scoped to persist here (deck59 wave-24).
+    s.persist = c->basicAbilities[Constants::PERSIST] && c->counters && !c->counters->hasCounter(-1, -1);
     return s;
 }
 
@@ -4181,6 +4382,149 @@ static int salvageProseAttackers(const string& content, size_t nAttackers, vecto
             return count;
     }
     return 0;
+}
+
+//===================== WAVE-25 ITEM 2 =====================================
+//Natural-stop vs truncation classifier + the unified answer-line precedence it
+//drives across ALL coded-answer paths.
+//
+//PRECEDENCE RULES (CHOICE / ATTACK / BLOCKS / PUT), stated in one place:
+//  * The reply protocol puts the ANSWER first, then optional scratch reasoning,
+//    then PLAN: last. So the FIRST coded line is the answer-first commitment and
+//    the LAST well-formed coded line is the model's final answer after reasoning.
+//  * TRUNCATED reply (hit the token cap: no PLAN: line and a long/mid-word cut):
+//    prefer the FIRST well-formed coded line. The tail is unreliable - a cut
+//    reply's later lines are decode spiral or half-thoughts (deck133 s21 shape),
+//    so answer-first wins ([C] truncated answer-first still takes line 1).
+//  * NATURALLY TERMINATED reply (reached its PLAN: line, or a short compliant
+//    answer ending on terminal punctuation): prefer the model's FINAL answer -
+//    the LAST well-formed coded line, OR, when the correction lived ONLY in prose
+//    (deck27 vs137 bottom: line 1 "PUT: 3,5,6" bottomed its only blue source, but
+//    the reasoning reached and stated "So I bottom 5, 6, and 7."), the last
+//    explicit prose restatement (salvageProsePutList).
+//  * A "later"/"last" coded line only counts when it is a WELL-FORMED answer for
+//    the CURRENT ask - proper labels, in range - NOT combat-math prose. The ATTACK
+//    path keeps ANSWER-FIRST precisely because a CoT line ("Attack: Deal 1, Take 5.
+//    Net -4 life.") shares the ATTACK label and its bare prose numbers parse to a
+//    bogus subset (deck109 vs62 s21); taking the LAST such line would resurrect the
+//    wave-23 bug, so ATTACK trusts the FIRST well-formed declaration and never a
+//    trailing bare-number line (this is both the truncated->first rule AND the
+//    well-formedness guard, so ATTACK needs no separate natural->last branch).
+//  * INDEX-WINS / echo-staleness / retraction still gate every candidate line.
+//
+//A reply terminated naturally iff it reached the contract's terminal PLAN:
+//section, or (legacy short answers) it is short and ends on terminal punctuation.
+//A long reply with no PLAN: is a token-cap cut.
+static bool replyTerminatedNaturally(const string& content)
+{
+    string t = content;
+    size_t thinkEnd = t.rfind("</think>");
+    if (thinkEnd != string::npos)
+        t = t.substr(thinkEnd + 8);
+    //A line-leading PLAN: marker = the model completed the full reply contract.
+    size_t lineStart = 0;
+    while (lineStart <= t.size())
+    {
+        size_t lineEnd = t.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? t.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (t[s] == ' ' || t[s] == '\t' || t[s] == '*'
+                           || t[s] == '#' || t[s] == '-'))
+            s++;
+        if (end - s >= 5
+            && tolower((unsigned char) t[s]) == 'p' && tolower((unsigned char) t[s + 1]) == 'l'
+            && tolower((unsigned char) t[s + 2]) == 'a' && tolower((unsigned char) t[s + 3]) == 'n'
+            && t[s + 4] == ':')
+            return true;
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    //No PLAN: marker. Trim trailing whitespace; a long remainder is a cut spiral.
+    size_t e = t.find_last_not_of(" \t\r\n");
+    if (e == string::npos)
+        return false; //empty
+    if (e + 1 > 1200)
+        return false; //long with no PLAN: -> token-cap truncation
+    char last = t[e];
+    return last == '.' || last == '!' || last == '?' || last == ')' || last == '"';
+}
+
+//Natural-stop PUT/bottom prose reconciler (the deck27 shape). A bottom reply whose
+//answer-first coded line is wrong but whose reasoning reaches the right set and
+//states it in PROSE ("So I bottom 5, 6, and 7."). Scan for the LAST "bottom"/"put"
+//statement (negation-guarded) immediately followed by a CLEAN comma/and-separated
+//list of EXACTLY `need` distinct in-range card numbers, and return that set. The
+//strict shape - a bottom verb, then only digits + ", "/" and "/whitespace up to the
+//exact count, terminating at the first other token - keeps ordinary reasoning prose
+//(full of numbers) from matching. Caller gates on natural termination (a truncated
+//reply's late prose is unreliable) and prefers this over the coded first line only
+//when it yields the full count. Returns the count, or -1 when no clean full list.
+static int salvageProsePutList(const string& content, size_t n, int need, vector<bool>& send)
+{
+    if (need <= 0)
+        return -1;
+    string low;
+    for (size_t i = 0; i < content.size(); i++)
+        low += (char) tolower((unsigned char) content[i]);
+    int best = -1;
+    long bestPos = -1; //document position of the winning list (LAST wins across verbs)
+    vector<bool> bestSend;
+    static const char * kVerbs[] = { "bottom", "put" };
+    for (size_t vi = 0; vi < sizeof(kVerbs) / sizeof(kVerbs[0]); vi++)
+    {
+        const char * verb = kVerbs[vi];
+        size_t vlen = strlen(verb);
+        size_t pos = 0;
+        while ((pos = low.find(verb, pos)) != string::npos)
+        {
+            size_t verbPos = pos;
+            pos += vlen;
+            if (proseNegatedBefore(low, verbPos))
+                continue;
+            //skip a short run of separators (": ", spaces) to the first digit
+            size_t k = pos;
+            size_t guard = (pos + 6 < low.size()) ? pos + 6 : low.size();
+            while (k < guard && !isdigit((unsigned char) low[k])
+                   && (low[k] == ' ' || low[k] == ':' || low[k] == ',' || low[k] == '\t'))
+                k++;
+            if (k >= low.size() || !isdigit((unsigned char) low[k]))
+                continue;
+            //read a CLEAN list: digits, and only ", " / " and " / whitespace between
+            std::set<int> nums;
+            bool clean = true;
+            size_t q = k;
+            while (q < low.size())
+            {
+                if (isdigit((unsigned char) low[q]))
+                {
+                    int num = 0; size_t d = q;
+                    while (d < low.size() && isdigit((unsigned char) low[d]))
+                        num = num * 10 + (low[d++] - '0');
+                    if (d < low.size() && low[d] == '/') { clean = false; break; } //"2/2" stat
+                    if (num < 1 || num > (int) n) { clean = false; break; }
+                    nums.insert(num);
+                    q = d;
+                    if ((int) nums.size() > need) { clean = false; break; }
+                }
+                else if (low[q] == ',' || low[q] == ' ' || low[q] == '\t')
+                    q++;
+                else if (low.compare(q, 3, "and") == 0)
+                    q += 3;
+                else
+                    break; //any other char terminates the list
+            }
+            if (clean && (int) nums.size() == need && (long) verbPos > bestPos)
+            {
+                vector<bool> s(n, false);
+                for (std::set<int>::iterator it = nums.begin(); it != nums.end(); ++it)
+                    s[*it - 1] = true;
+                bestSend = s; best = need; bestPos = (long) verbPos; //LAST in document wins
+            }
+        }
+    }
+    if (best > 0) { send = bestSend; return best; }
+    return -1;
 }
 
 //Scan a bundled-attacker reply for the set of attackers to send: "A<n>"
@@ -5136,6 +5480,24 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottom(int need, int chosenSoFar, in
             names.push_back(hand[j]->name);
         int result = content.empty() ? -1
                      : parseAttackerSet(decisionPart, hand.size(), send, &names);
+        //Natural-stop reconciliation (wave-25 ITEM 2): the coded FIRST line is
+        //answer-first, but a reply that reasoned to a DIFFERENT bottom set and
+        //stated it in PROSE while terminating naturally (deck27 vs137: line 1
+        //"PUT: 3, 5, 6" bottomed its only blue source, then "So I bottom 5, 6, and
+        //7.") meant the prose conclusion. On a non-truncated reply prefer the LAST
+        //clean full-count prose list over the answer-first coded line. A truncated
+        //reply keeps answer-first (its late prose is unreliable).
+        if (!content.empty() && replyTerminatedNaturally(content))
+        {
+            vector<bool> prose;
+            int pr = salvageProsePutList(content, hand.size(), need, prose);
+            if (pr == need)
+            {
+                send = prose;
+                result = pr;
+                DebugTrace("AIPlayerGPT: bottom prose-reconciled to the final stated set");
+            }
+        }
         if (result < 0 && !content.empty())
         {
             int sal = salvageLoopedSubset(content, "PUT:", hand.size(), names, send);
@@ -5202,7 +5564,7 @@ void AIPlayerGPT::runParseSelfTest()
         if (cond) { cout << "  PASS  " << label << "\n"; passed++; } \
         else { cout << "  FAIL  " << label << "\n"; failed++; } } while (0)
 
-    cout << "=== AIPlayerGPT parse self-test (wave-20 3a/3b/3c + wave-21 A/B/C + wave-22 N9/A2/B3) ===\n";
+    cout << "=== AIPlayerGPT parse self-test (wave-20 3a/3b/3c + wave-21 A/B/C + wave-22 N9/A2/B3 + wave-25 1/2/3) ===\n";
 
     // ---- ITEM 3b: "#N" ordinal disambiguates duplicate names ----
     cout << "\n[3b] deck135 wave-19 s27: 'BLOCKS: Ice-Fang Coatl: Saproling (1/1) #1'\n";
@@ -5333,6 +5695,88 @@ void AIPlayerGPT::runParseSelfTest()
         string sind = combatTradePreviewStats(oona2, aIndest);
         cout << "     Oona 2/1 wither vs 3/2 indestructible: \"" << sind << "\"\n";
         CHECK(sind == "both die", "A lethal wither (bp>=at) kills even an indestructible attacker");
+    }
+
+    // ---- WAVE-25 items: wither-under-first-strike + persist return ----
+    // fields: power, toughness, deathtouch, wither, infectLabel, firststrike, indestructible, trample, persist
+    cout << "\n[A2] wither shrink respects first-strike order (deck27 wave-24)\n";
+    {
+        // A wither blocker that DIES to the attacker's first strike deals no
+        // damage - no shrink may be claimed.
+        CombatTradeStat witherBlk   = { 2, 1, false, true,  false, false, false, false, false };
+        CombatTradeStat fsAtk34     = { 3, 4, false, false, false, true,  false, false, false };
+        string sfs = combatTradePreviewStats(witherBlk, fsAtk34);
+        cout << "     2/1 wither blocker vs 3/4 FIRST STRIKE attacker: \"" << sfs << "\"  (pre-fix falsely appended 'wither shrinks it to 1/2')\n";
+        CHECK(sfs == "your blocker dies, attacker lives",
+              "A2 wither blocker dead to first strike deals no wither - no shrink claimed");
+        // Symmetric: a wither ATTACKER that dies to the blocker's first strike
+        // never shrinks the blocker.
+        CombatTradeStat fsBlk22     = { 2, 2, false, false, false, true,  false, false, false };
+        CombatTradeStat witherAtk21 = { 2, 1, false, true,  false, false, false, false, false };
+        string sfa = combatTradePreviewStats(fsBlk22, witherAtk21);
+        cout << "     2/2 FIRST STRIKE blocker vs 2/1 wither attacker: \"" << sfa << "\"\n";
+        CHECK(sfa == "you kill it, your blocker lives",
+              "A2 wither attacker dead to first strike deals no wither - no shrink claimed");
+        // Control: a wither blocker that ITSELF has first strike deals in the
+        // first-strike step before it dies, so the shrink IS still claimed.
+        CombatTradeStat witherFsBlk = { 2, 1, false, true,  false, true,  false, false, false };
+        CombatTradeStat plainAtk34  = { 3, 4, false, false, false, false, false, false, false };
+        string sfsb = combatTradePreviewStats(witherFsBlk, plainAtk34);
+        cout << "     2/1 wither+FIRST STRIKE blocker vs 3/4 attacker: \"" << sfsb << "\"\n";
+        CHECK(sfsb == "your blocker dies, attacker lives (wither shrinks it to 1/2)",
+              "A2 wither+first-strike blocker still shrinks (dealt before dying)");
+    }
+
+    cout << "\n[C-persist] persist return noted on the block-outcome annotation (deck59 wave-24)\n";
+    {
+        CombatTradeStat persistBlk22 = { 2, 2, false, false, false, false, false, false, true };
+        CombatTradeStat plainAtk22   = { 2, 2, false, false, false, false, false, false, false };
+        string sboth = combatTradePreviewStats(persistBlk22, plainAtk22);
+        cout << "     2/2 persist blocker vs 2/2 (both die): \"" << sboth << "\"\n";
+        CHECK(sboth == "both die (yours returns with a -1/-1 counter (persist))",
+              "C both die - your persist blocker returns");
+        CombatTradeStat persistBlk11 = { 1, 1, false, false, false, false, false, false, true };
+        CombatTradeStat plainAtk33   = { 3, 3, false, false, false, false, false, false, false };
+        string sdies = combatTradePreviewStats(persistBlk11, plainAtk33);
+        cout << "     1/1 persist blocker vs 3/3 (blocker dies): \"" << sdies << "\"\n";
+        CHECK(sdies == "your blocker dies, attacker lives (yours returns with a -1/-1 counter (persist))",
+              "C your persist blocker dies and returns");
+        CombatTradeStat plainBlk33   = { 3, 3, false, false, false, false, false, false, false };
+        CombatTradeStat persistAtk22 = { 2, 2, false, false, false, false, false, false, true };
+        string skill = combatTradePreviewStats(plainBlk33, persistAtk22);
+        cout << "     3/3 blocker vs 2/2 persist attacker (you kill it): \"" << skill << "\"\n";
+        CHECK(skill == "you kill it, your blocker lives (theirs returns with a -1/-1 counter (persist))",
+              "C the attacker's persist return is noted when you kill it");
+        // No persist -> no return clause (guards the gate).
+        CombatTradeStat noPersistBlk = { 2, 2, false, false, false, false, false, false, false };
+        string snone = combatTradePreviewStats(noPersistBlk, plainAtk22);
+        CHECK(snone == "both die", "C non-persist both-die is unchanged");
+    }
+
+    cout << "\n[A-shockland] ETB pay-life-or-tapped menu annotation (deck137 wave-24)\n";
+    {
+        // The shockland menu the engine builds: bare "Pay N life" / "Tap".
+        vector<string> shock; shock.push_back("Pay 2 life"); shock.push_back("Tap");
+        bool fired = annotateEtbPayOrTapMenu(shock);
+        cout << "     opt1: \"" << shock[0] << "\"\n     opt2: \"" << shock[1] << "\"\n";
+        CHECK(fired, "A shockland shape (Pay N life + Tap) is recognized");
+        CHECK(shock[0].compare(0, 10, "Pay 2 life") == 0 && shock[0].find("UNTAPPED") != string::npos,
+              "A the pay-life option keeps its label and gains the UNTAPPED consequence");
+        CHECK(shock[1].compare(0, 3, "Tap") == 0 && shock[1].find("TAPPED") != string::npos
+              && shock[1].find("untap step") != string::npos,
+              "A the Tap option keeps its label and gains the enters-TAPPED consequence");
+        // A larger life cost (Pay 3 life) is the same shape.
+        vector<string> shock3; shock3.push_back("Pay 3 life"); shock3.push_back("Tap");
+        CHECK(annotateEtbPayOrTapMenu(shock3), "A 'Pay 3 life' + Tap also recognized");
+        // A "Pay N life" menu WITHOUT a "Tap" sibling (e.g. a damage/drain menu)
+        // must NOT be touched - only the pay-or-tapped ETB shape.
+        vector<string> other; other.push_back("Pay 2 Life"); other.push_back("Deal 2 damage");
+        string before = other[0];
+        CHECK(!annotateEtbPayOrTapMenu(other) && other[0] == before,
+              "A a Pay-life option with no Tap sibling is left untouched");
+        // A lone "Tap" (no pay-life sibling) is untouched.
+        vector<string> tapOnly; tapOnly.push_back("Tap"); tapOnly.push_back("Do nothing");
+        CHECK(!annotateEtbPayOrTapMenu(tapOnly), "A a Tap option with no pay-life sibling is untouched");
     }
 
     // The final-precedence CHOICE resolver used at the call sites, as the
@@ -5833,6 +6277,139 @@ void AIPlayerGPT::runParseSelfTest()
         int cBug = parseChoice(segBug, 2, &opts3, &stBug);
         cout << "     unfiltered picks the CoT line seg=\"" << segBug << "\" -> " << cBug << " (bug: stale)\n";
         CHECK(cBug < 0, "B3 bug repro: any-label scan hands parseChoice the CoT 'Attack:' prose -> dropped");
+    }
+
+    // ================= WAVE-25 items =========================================
+    // ITEM 1: protocol-example leak (retraction FP + index seed). ITEM 2:
+    // natural-stop prefer-last / prose reconcile. ITEM 3: R-STALE-ECHO-QUALIFIER
+    // residual. Cases built from the real matchups-20260724-125739 corpus.
+
+    // ---- ITEM 1: the quoted-`e.g.`-example must not fire retracted_choice ----
+    cout << "\n[W25-1] protocol-example leak: quoted example CHOICE tokens do NOT retract; a genuine mid-line recode still does\n";
+    {
+        vector<string> fp;
+        fp.push_back("Cast Fatal Push {b} - legal targets right now: Bloodghast, Geralf's Messenger, Guttersnipe");
+        fp.push_back("Cast nothing right now");
+        // deck133 vs131 s21 (real shape, truncated): line-1 clean CHOICE 1,
+        // re-affirmed; the ONLY contradicting numeric coded index is the prompt's
+        // OWN worked example quoted verbatim x4 - `"CHOICE: 2 (Cast Fatal Push)"`
+        // (the old example reused option 1's card name). No PLAN (token-cap cut).
+        string s21 =
+            "CHOICE: 1 (Cast Fatal Push)\n"
+            "The opponent cast Downsize at Geralf's Messenger. I could Push Guttersnipe instead.\n"
+            "Let's look at the example: \"CHOICE: 2 (Cast Fatal Push)\". The example shows the format.\n"
+            "So I must say CHOICE: 1. I will stick to the format \"CHOICE: 1 (Cast Fatal Push)\".\n"
+            "But the example \"CHOICE: 2 (Cast Fatal Push)\" uses the same card name, confusing me.\n"
+            "Is the answer the number or the target name? The example \"CHOICE: 2 (Cast Fatal Push)\"\n"
+            "and \"CHOICE: Guttersnipe\" - which contract applies here? Let me re-read once more,\n";
+        int r = RESOLVE(s21, 2, fp);
+        cout << "     s21 (line-1 CHOICE 1, quoted example CHOICE 2 x4) -> " << r << " (must be 1, no retraction)\n";
+        CHECK(r == 1, "W25-1 s21: quoted protocol-example CHOICE tokens do not retract the sustained CHOICE 1");
+        // A GENUINE mid-line recode (unquoted, not the example) still retracts.
+        string genuine =
+            "CHOICE: 1 (Cast Fatal Push)\n"
+            "On reflection, holding removal for their bomb is the better line. So CHOICE: 2.\n"
+            "PLAN: hold up Fatal Push.\n";
+        int g = RESOLVE(genuine, 2, fp);
+        cout << "     genuine unquoted 'So CHOICE: 2' -> " << g << " (must be -1: genuine contradiction still fires)\n";
+        CHECK(g == -1, "W25-1 genuine: an unquoted mid-line recode contradicting line 1 still retracts");
+        // ITEM 1b (deck102 vs133 s5): the example's index seeded into an ask whose
+        // named card is NOT an option -> must NOT take that index (heuristic).
+        vector<string> flip;
+        flip.push_back("Flip Side with Tergrid's Lantern {card text: \"{T}: Target player loses 3 life...\"}");
+        bool sst = false;
+        int s5 = parseChoice("2 (Cast Commander's Sphere)", 1, &flip, &sst);
+        cout << "     s5 (index 2, card absent from a 1-option ask) -> " << s5 << " (must be < 0)\n";
+        CHECK(s5 < 0, "W25-1b: an example/stale-seeded out-of-range coded index is not taken");
+    }
+
+    // ---- ITEM 2: natural-stop prefer-last / prose reconcile ----
+    cout << "\n[W25-2] natural-stop: the deck27 bottom reply's PROSE conclusion wins over its answer-first coded line; truncated keeps line 1\n";
+    {
+        // deck27 vs137 bottom (real shape): line 1 "PUT: 3, 5, 6" bottomed its ONLY
+        // blue source (Underground Sea = card 3); the reply reasoned to the correct
+        // set and ended NATURALLY with "So I bottom 5, 6, and 7." + a matching PLAN.
+        string deck27 =
+            "PUT: 3, 5, 6\n"
+            "Reasoning: keep mana and the cheap creature. Wait - Metathran Zombie needs {1}{U},\n"
+            "and Underground Sea (card 3) is my ONLY blue source, so I MUST keep it.\n"
+            "Re-evaluating: keep Metathran Zombie (2) and Underground Sea (3); bottom the two\n"
+            "expensive creatures and one redundant Swamp.\n"
+            "So I bottom 5, 6, and 7.\n"
+            "PLAN: Put cards 5, 6, and 7 on the bottom. Play Underground Sea, cast Metathran Zombie.\n";
+        vector<string> hand;
+        hand.push_back("Swamp"); hand.push_back("Metathran Zombie"); hand.push_back("Underground Sea");
+        hand.push_back("Swamp"); hand.push_back("Sanguine Guard"); hand.push_back("Wasp Lancer");
+        hand.push_back("Swamp");
+        // The answer-first coded line alone yields the WRONG 3,5,6 (the bug).
+        vector<bool> coded;
+        int cr = parseAttackerSet("3, 5, 6", hand.size(), coded, &hand);
+        cout << "     answer-first coded '3, 5, 6' -> count=" << cr
+             << " picks=[" << (int)coded[2] << (int)coded[4] << (int)coded[5] << "] (the bug: bottoms Underground Sea)\n";
+        CHECK(cr == 3 && coded[2] && coded[4] && coded[5], "W25-2 bug repro: answer-first takes 3,5,6");
+        // The reply terminated naturally (has a PLAN: line).
+        CHECK(replyTerminatedNaturally(deck27), "W25-2 deck27 reply is classified as NATURALLY terminated (has PLAN:)");
+        // Natural-stop prose reconcile recovers the model's final 5,6,7.
+        vector<bool> prose;
+        int pr = salvageProsePutList(deck27, hand.size(), 3, prose);
+        cout << "     prose reconcile -> count=" << pr
+             << " picks=[" << (prose.size()>4?(int)prose[4]:-1) << (prose.size()>5?(int)prose[5]:-1)
+             << (prose.size()>6?(int)prose[6]:-1) << "] keep-UndergroundSea=" << (prose.size()>2?(int)prose[2]:-1) << "\n";
+        CHECK(pr == 3 && prose[4] && prose[5] && prose[6] && !prose[2] && !prose[0] && !prose[1] && !prose[3],
+              "W25-2 deck27: prose reconcile yields 5,6,7 (keeps the blue source)");
+        // A TRUNCATED reply (no PLAN:, long, mid-word cut) is NOT natural -> the
+        // caller keeps answer-first (deck109-style tail is unreliable).
+        string trunc = "PUT: 3, 5, 6\n";
+        for (int i = 0; i < 40; i++)
+            trunc += "I keep re-deriving my mana base and which lands make blue versus black here,\n";
+        cout << "     truncated (no PLAN, len " << trunc.size() << ") natural? " << replyTerminatedNaturally(trunc) << " (must be 0)\n";
+        CHECK(!replyTerminatedNaturally(trunc), "W25-2 a long no-PLAN reply is classified TRUNCATED (answer-first kept)");
+        // The deck109 CoT-hijack ATTACK reply still yields the FIRST declaration
+        // (answer-first), NOT the trailing bare-number CoT line - unchanged.
+        vector<string> anames;
+        anames.push_back("Goblin"); anames.push_back("Goblin");
+        anames.push_back("Ash Zealot"); anames.push_back("Legion Loyalist");
+        string atkReply =
+            "ATTACK: A1, A2, A3, A4\n"
+            "Reasoning: with Legion Loyalist my team gets first strike and trample...\n"
+            "Attack: Deal 1, Take 5. Net -4 life. Opponent -1 life.\n"
+            "I will declare no attackers. Wait, the guide says attack every turn...\n";
+        vector<string> alines;
+        collectLabeledLines(atkReply, "ATTACK:", alines);
+        int af = -1; vector<bool> as;
+        for (size_t li = 0; li < alines.size(); li++)
+        {
+            vector<bool> s;
+            int rr = parseAttackerSet(alines[li], 4, s, &anames);
+            if (rr >= 0) { as = s; af = rr; break; }
+        }
+        cout << "     deck109 answer-first ATTACK -> count=" << af << " (must be 4, all)\n";
+        CHECK(af == 4 && as[0] && as[1] && as[2] && as[3],
+              "W25-2 ATTACK stays answer-first (not the CoT bare-number line): no wave-23 regression");
+    }
+
+    // ---- ITEM 3: R-STALE-ECHO-QUALIFIER residual (shockland ETB menu) ----
+    cout << "\n[W25-3] shockland ETB menu: 'Tap Temple Garden' echo trusts option 'tap' under INDEX-WINS\n";
+    {
+        // deck137 vs102 s4 (real): options "pay 2 life" / "tap"; source name did
+        // NOT render ("Choose an option for :"). The echo "Tap Temple Garden" names
+        // the SOURCE card (absent from the bare option "tap"), so it was wrongly
+        // dropped stale. The option label "tap" IS inside the echo -> INDEX-WINS.
+        vector<string> shock;
+        shock.push_back("pay 2 life");
+        shock.push_back("tap");
+        bool st = false;
+        int c = parseChoice("2 (Tap Temple Garden)", 2, &shock, &st, NULL);
+        cout << "     'CHOICE: 2 (Tap Temple Garden)' vs ['pay 2 life','tap'] -> " << c << " (must be 2, not stale)\n";
+        CHECK(c == 2 && !st, "W25-3 deck137 s4: option label 'tap' echoed inside 'Tap Temple Garden' trusts index 2");
+        // Guard: an anchorless bare-X option with a source-naming echo and NO source
+        // passed still stays stale (the (a2) option-in-echo test needs a real option
+        // word; "X = 1" has none) - W23-A shape1 invariant preserved.
+        vector<string> xopts; xopts.push_back("X = 1"); xopts.push_back("X = 0");
+        bool sx = false;
+        int cx = parseChoice("1 (Cast Black Sun's Zenith with X=1)", 2, &xopts, &sx, NULL);
+        cout << "     anchorless 'X = 1' echo w/o source -> " << cx << " (must be < 0: still stale)\n";
+        CHECK(cx < 0 && sx, "W25-3 guard: an anchorless bare-X option without a source anchor stays stale");
     }
 
     #undef RESOLVE
