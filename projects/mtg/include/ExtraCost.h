@@ -307,6 +307,14 @@ class Convoke : public ExtraCost
 {
 public:
     ManaCost * getReduction();
+    //Cast-offer payability probe (LegalActionsOracle seam). TRUE when
+    //`source`'s printed cost can actually be completed via convoke right now -
+    //max creature-tap reduction (mirroring getReduction's greedy so a TRUE
+    //here means doPay can pay the same way) plus `floatable` mana (pool +
+    //potential from lands) covers the cost. For an X-spell it answers "is X>=1
+    //affordable" (an X=0-only convoke is a donothing and is never worth
+    //offering). Pure - no live state is mutated. `floatable` is borrowed.
+    static bool offerable(MTGCardInstance * source, ManaCost * floatable);
     Convoke(TargetChooser *_tc = NULL);
     virtual int canPay();
     virtual int isPaymentSet();

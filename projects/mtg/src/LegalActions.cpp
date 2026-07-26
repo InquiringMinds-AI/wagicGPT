@@ -103,9 +103,38 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
             bool normalOk = cost
                 && (pMana->canAfford(cost, card->has(Constants::ANYTYPEOFMANA))
                     || ManaEngine::planPayment(p, policy, card, cost, card->has(Constants::ANYTYPEOFMANA)).size());
+            //Convoke models its alternative as a {0}(+{X}) shell plus a
+            //Convoke extra cost, so the plain canAfford below is TRIVIALLY true
+            //(zero mana is always affordable) - the convoke variant was offered
+            //regardless of whether the tapped creatures + floatable mana could
+            //ever complete the PRINTED cost (deck137: unaffordable March
+            //convoke picked then deferred, unaffordable Loxodon convoke picked
+            //then silently no-op'd; corpus 20260726). The legality-oracle
+            //invariant is that unpayable choices are structurally impossible, so
+            //compute real convoke payability BEFORE offering: max creature-tap
+            //reduction + floatable mana must complete the cost (and for an
+            //X-spell, reach X>=1 - an X=0 March is a donothing). This is NOT
+            //over-suppression: a convoke affordable ONLY via creatures (too few
+            //lands for the normal cost - convoke's whole point, the wave-28
+            //Venerated-Loxodon witness) still passes, because offerable() adds
+            //the creature reduction the plain canAfford ignores. Non-convoke
+            //alternatives (offering/delve/flashback/pitch) keep the mana check.
+            bool altIsConvoke = false;
+            if (cost && cost->getAlternative() && cost->getAlternative()->extraCosts)
+            {
+                ExtraCosts * aec = cost->getAlternative()->extraCosts;
+                for (size_t ei = 0; ei < aec->costs.size(); ei++)
+                    if (dynamic_cast<Convoke *>(aec->costs[ei]))
+                    {
+                        altIsConvoke = true;
+                        break;
+                    }
+            }
             bool altOk = zone == p->game->hand && cost && cost->getAlternative()
-                && (pMana->canAfford(cost->getAlternative(), 0)
-                    || ManaEngine::planPayment(p, policy, card, cost->getAlternative(), 0).size());
+                && (altIsConvoke
+                    ? Convoke::offerable(card, pMana)
+                    : (pMana->canAfford(cost->getAlternative(), 0)
+                       || ManaEngine::planPayment(p, policy, card, cost->getAlternative(), 0).size()));
 
             //A targeted EXTRA cost on the alternative (Force of Negation's
             //"exile another blue card from hand", `other={E(other

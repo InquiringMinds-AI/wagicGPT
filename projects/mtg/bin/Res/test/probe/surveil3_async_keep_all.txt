@@ -1,0 +1,46 @@
+# N-136a guard (async driver): a PLAIN, non-predicate reveal must keep FULL
+# options. Surveil 3's option one is target(<upto:3>*|reveal) moveto(ownergrave-
+# yard) - UNRESTRICTED (any of the top 3 may go to the graveyard). Here the
+# engine's per-card verdict (canTarget) is all-true, so the N-136a enforcement
+# filter must be a no-op and the empty-eligible no-ask must NOT fire: the model's
+# picks are honored exactly. The stub selects all three revealed cards; all three
+# must reach the graveyard, leaving Hill Giant on top of the library.
+# Grim Flayer deals combat damage (opp 20->18) to fire _SURVEIL3_.
+#
+# NOT in _tests.txt: needs the async env WAGIC_REVEAL_TEST_ASYNC. Run:
+#   echo probe/surveil3_async_keep_all.txt > Res/test/_x.txt
+#   env -u WAYLAND_DISPLAY -u DISPLAY WAGIC_HEADLESS=1 WAGIC_TESTSUITE=1 \
+#       WAGIC_TESTSUITE_THREADS=1 \
+#       WAGIC_REVEAL_TEST_ASYNC="Juggernaut,Millstone,Darksteel Citadel" \
+#       WAGIC_TESTSUITE_FILE=test/_x.txt ./wagic
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Grim Flayer
+library:Hill Giant,Juggernaut,Millstone,Darksteel Citadel
+[PLAYER2]
+life:20
+[DO]
+interactivereveal
+Grim Flayer
+next
+next
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+COMBATDAMAGE
+[PLAYER1]
+inplay:Grim Flayer
+graveyard:Juggernaut,Millstone,Darksteel Citadel
+library:Hill Giant
+[PLAYER2]
+life:18
+[END]

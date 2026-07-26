@@ -517,12 +517,62 @@ string changelingAnnotation(MTGCardInstance * card)
     return o.str();
 }
 
+//N-93c (wave-29 deck93/deck137): the tapped tag USED to read "[tapped - untaps
+//and can attack next turn]". That trailing "can attack" is an attractive-nuisance
+//affirmative substring: the model latched onto it and called a [tapped] creature
+//"untapped", listing it as a present-turn attacker (deck137 s18). The
+//summoning-sick tag works precisely because it is restriction-first and carries
+//no affirmative verb ("cannot attack this turn"). Reword the tapped tag the same
+//way. Rules-correct: a tapped creature cannot be declared as an attacker (only
+//untapped creatures attack) and cannot block unless it has CANBLOCKTAPPED
+//(MTGCardInstance::canBlock returns 0 for tapped without that keyword) - so the
+//"or block" clause is dropped only for the rare CANBLOCKTAPPED case. Pure helper
+//so the exact emitted shape is deterministically provable (runParseSelfTest).
+static string tappedCreatureTag(bool canBlockTapped)
+{
+    return canBlockTapped
+        ? " [tapped - cannot attack this turn]"
+        : " [tapped - cannot attack or block this turn]";
+}
+
+//N-139c (wave-29 deck139/deck146): a mutate pile is ONE creature (CR 725) but the
+//engine keeps the mutated-down cards as separate battlefield instances, so the
+//board render split the pile into two adjacent lines - the top card with P/T +
+//keywords, then the under card as a bare name (no P/T, no tag) - reading as "one
+//creature or two?" and hiding that the merged creature carries the under card's
+//abilities too. The under lines are folded out (skipped) by the caller; this tag
+//rides the TOP card's line to say it is ONE merged creature and name what is
+//underneath (so the model recalls those cards' abilities from the decklist). Pure
+//helper for a deterministic proof.
+static string mutatedPileTag(const std::vector<string>& underNames)
+{
+    if (underNames.empty())
+        return "";
+    std::ostringstream o;
+    o << " [mutated pile - ONE merged creature (top card's name + P/T shown above,"
+         " plus the combined abilities of every card in the pile); "
+      << underNames.size() << " card" << (underNames.size() > 1 ? "s" : "")
+      << " underneath: ";
+    for (size_t i = 0; i < underNames.size(); i++)
+        o << (i ? ", " : "") << underNames[i];
+    o << "]";
+    return o.str();
+}
+
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus)
 {
     bool first = true;
     for (int i = 0; i < zone->nb_cards; i++)
     {
         MTGCardInstance * card = zone->cards[i];
+        //N-139c: fold mutated-DOWN cards into the top card's line. A card that is
+        //underneath a mutate pile satisfies the engine's own "follows the fate of
+        //the top-card" predicate (mutation set AND it has a parent above it) and is
+        //rendered as part of the top card via mutatedPileTag below - do not list it
+        //as its own battlefield entry. Battlefield renders only (withStatus); an
+        //under card never appears off the battlefield.
+        if (withStatus && card->mutation && !card->parentCards.empty())
+            continue;
         if (!first)
             out << "; ";
         first = false;
@@ -635,7 +685,9 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             //a sweeper-hold it should never have satisfied). Name the truth
             //at the flag: it untaps and attacks again next turn.
             if (card->isTapped())
-                out << (card->isCreature() ? " [tapped - untaps and can attack next turn]" : " [tapped]");
+                out << (card->isCreature()
+                        ? tappedCreatureTag(card->has(Constants::CANBLOCKTAPPED))
+                        : string(" [tapped]"));
             //A summoning-sick creature renders identically to an attack-ready one
             //otherwise, so the pilot pattern-completes its ATTACK line from the
             //board count and lists slots the A-lines never offered (deck93 N-93a:
@@ -651,6 +703,26 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 out << " [attacking]";
             else if (card->isDefenser())
                 out << " [blocking " << card->isDefenser()->getDisplayName() << "]";
+            //N-139c: if this is the TOP of a mutate pile (it has mutated-down cards
+            //beneath it), render the whole pile as this one line - gather the under
+            //card names (BFS over childrenCards, bounded) and append the merged tag.
+            if (card->mutation && !card->childrenCards.empty())
+            {
+                std::vector<string> underNames;
+                std::vector<MTGCardInstance *> stack(card->childrenCards.begin(),
+                                                     card->childrenCards.end());
+                while (!stack.empty() && underNames.size() < 8)
+                {
+                    MTGCardInstance * u = stack.back();
+                    stack.pop_back();
+                    if (!u)
+                        continue;
+                    underNames.push_back(u->getDisplayName());
+                    for (size_t k = 0; k < u->childrenCards.size(); k++)
+                        stack.push_back(u->childrenCards[k]);
+                }
+                out << mutatedPileTag(underNames);
+            }
         }
     }
     if (first)
@@ -1817,6 +1889,23 @@ string AIPlayerGPT::describeEvent(WEvent * event)
     return ""; //everything else (mana plumbing, taps, micro-steps) is noise
 }
 
+//N-146f: the "Dungeons completed" status line for CURRENT SITUATION. Empty when
+//neither player has completed one (non-dungeon games untouched). Pure helper so
+//the emitted shape is deterministically provable (runParseSelfTest).
+static string dungeonsCompletedLine(int mine, int opp)
+{
+    if (mine <= 0 && opp <= 0)
+        return "";
+    std::ostringstream o;
+    if (mine > 0)
+        o << "Dungeons completed (you): " << mine
+          << " - effects that check \"completed a dungeon\" (e.g. a completed-dungeon"
+             " anthem) are ACTIVE for you.\n";
+    if (opp > 0)
+        o << "Dungeons completed (opponent): " << opp << "\n";
+    return o.str();
+}
+
 string AIPlayerGPT::serializeGameState()
 {
     std::ostringstream out;
@@ -1825,6 +1914,13 @@ string AIPlayerGPT::serializeGameState()
     out << "Phase: " << observer->getCurrentGamePhaseName();
     out << " | It is " << (observer->currentPlayer == this ? "your" : "the opponent's") << " turn.\n";
     out << "Your life: " << this->life << " | Opponent life: " << (opp ? opp->life : 0) << "\n";
+    //N-146f (wave-29 deck146): dungeon-completion is a hidden boolean the engine
+    //tracks (Player::dungeonCompleted) and payoffs check ("as long as you've
+    //completed a dungeon" - the Nadaar anthem). With no status line the model could
+    //only INFER completion from anthem'd P/T and audibly second-guessed it. Surface
+    //the count in the player-status area (only when >0, so non-dungeon games are
+    //untouched). Opponent's completions shown too when present (rare, but symmetric).
+    out << dungeonsCompletedLine(this->dungeonCompleted, opp ? opp->dungeonCompleted : 0);
 
     //The stack, top-first. Pending spells/abilities were previously invisible
     //in the situation block: the model saw "Cast Counterspell" offered but not
@@ -3486,6 +3582,24 @@ static string pitchCostNote(MTGCardInstance * card, ManaCost * altCost)
     return note.str();
 }
 
+//N-139d (wave-29 deck139/deck122/deck93): a mutate alt-cast's cost label was
+//inconsistent - Gemrazer rendered "with its mutate cost" (alternativeName ==
+//"Mutate"), but Migratory Greathorn (identical `other={..} name(Mutate)`) rendered
+//"with its alternative cost" whenever the alternative object being priced had lost
+//its name (e.g. a cost-reduced copy - Pollywog on board). The bare "alternative
+//cost" label kept the model from recognizing the mutate line up front. Unify: any
+//alt-cast of a card with the mutate keyword is a "mutate cost" (canonical
+//lowercase, so Gemrazer and Migratory read identically); a NAMED non-mutate
+//alternative keeps its own name; an unnamed non-mutate stays "alternative cost".
+static string mutateAltCostLabel(bool hasMutate, const string& alternativeName)
+{
+    if (hasMutate && (alternativeName.empty() || alternativeName == "Mutate"))
+        return "mutate cost";
+    if (!alternativeName.empty())
+        return alternativeName + " cost";
+    return "alternative cost";
+}
+
 MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * type)
 {
     //No endpoint, or a scripted combo is mid-execution: heuristic as-is.
@@ -3612,10 +3726,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         else
         {
             o << "Cast " << card->getDisplayName() << " with its ";
-            if (!cost->getAlternative()->alternativeName.empty())
-                o << cost->getAlternative()->alternativeName << " cost";
-            else
-                o << "alternative cost";
+            o << mutateAltCostLabel(card->has(Constants::MUTATE),
+                                    cost->getAlternative()->alternativeName);
             o << " " << cost->getAlternative()->toString();
             //Adventure alternative casts put an INSTANT/SORCERY spell onto the
             //stack, not the creature - the card's power/toughness belongs to the
@@ -4146,6 +4258,18 @@ static string buildMayObjectAsk(const string & srcName, const string & objName,
          + " is the trigger SOURCE, not the object being moved. Choose:";
 }
 
+//N-139a: role header for the mutate OVER/UNDER placement menu. Pure helper.
+static string mutateOverUnderHeader(const string& ctxName)
+{
+    string who = ctxName.empty() ? string("this creature") : ctxName;
+    return "MUTATE PLACEMENT for " + who + ": choose whether " + who + "'s card goes"
+           " OVER (on top of) or UNDER the host. This is a middle step of the mutate"
+           " cast - you pick WHICH of your non-Human creatures to mutate onto NEXT."
+           " OVER keeps " + who + "'s name and P/T on the merged creature; UNDER keeps"
+           " the host's. Either way the merged creature gains BOTH cards' abilities"
+           " (CR 725). Choose:";
+}
+
 int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & act)
 {
     MTGCardInstance * ctx = req.contextCard;
@@ -4268,6 +4392,34 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                     break;
                 }
     }
+    //N-139a (wave-29 deck139): the mutate OVER/UNDER placement menu ("Mutate Over"/
+    //"Mutate Under") and the cast-mode sub-menu's "mutate" option reached the model
+    //as bare labels under the generic "Choose an option" header, asked mid-sequence
+    //(before the host is chosen), so the model could not tell it was the mutate
+    //placement step and spent minutes re-deriving. Name the role: annotate each
+    //placement option with what over/under does, flag the menu for a role header
+    //below, and annotate the cast-mode "mutate" option. Self-gating on the exact
+    //labels; append-only (answer index + staleness key unchanged).
+    bool mutatePlaceMenu = false;
+    for (size_t i = 0; i < opts.size(); i++)
+    {
+        if (opts[i].compare(0, 11, "Mutate Over") == 0)
+        {
+            mutatePlaceMenu = true;
+            opts[i] += " [this card goes ON TOP: the merged creature keeps THIS card's"
+                       " name and P/T, and ALSO gains the host's abilities]";
+        }
+        else if (opts[i].compare(0, 12, "Mutate Under") == 0)
+        {
+            mutatePlaceMenu = true;
+            opts[i] += " [this card goes UNDERNEATH: the creature on top keeps its name"
+                       " and P/T, and gains THIS card's abilities]";
+        }
+        else if (opts[i] == "mutate" || opts[i] == "Mutate")
+            opts[i] += " [cast for the MUTATE cost: merge onto one of your non-Human"
+                       " creatures (you pick over/under, then the host) instead of"
+                       " casting a fresh separate body]";
+    }
     //ETB "pay life or enter tapped" menu (shocklands - Temple Garden class, and
     //the fixed painland sibling): append the consequence each bare label omits.
     //Annotation only, mechanism-matched (see annotateEtbPayOrTapMenu). deck137
@@ -4302,6 +4454,9 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     else
         decision = !ctxName.empty() ? ("Choose an option for " + ctxName + ":")
                                     : string("A choice is required - choose an option:");
+    //N-139a: a mutate placement menu overrides the generic header with a role header.
+    if (mutatePlaceMenu)
+        decision = mutateOverUnderHeader(ctxName);
     //Thread the source card as the pending source (as ANNOUNCE_X does): the model
     //often echoes "<verb> <source card>" against a bare option ("Tap Temple
     //Garden" vs "tap"), and INDEX-WINS treats a source-naming echo as a
@@ -4366,6 +4521,95 @@ MTGCardInstance * AIPlayerGPT::chooseCostTarget(TargetChooser * tc, MTGCardInsta
     if (pick < 0 || pick >= (int) cands.size())
         return AIPlayerBaka::chooseCostTarget(tc, source);
     return cands[pick];
+}
+
+//N-139b: map a lowercased "what the engine will do" string (built from the chooser
+//source name AND the acting ability's menu verb) to the human verb for a
+//remove-from-your-own-cards ask. Returns "" when no remove/lose verb is present.
+//Sets relocate=true for a keep-the-card relocation (put back into library) as
+//opposed to an outright loss. Pure helper for a deterministic proof.
+static string handRemovalVerb(const string& lc, bool& relocate)
+{
+    relocate = false;
+    if (lc.find("discard") != string::npos) return "discard";
+    if (lc.find("exploit") != string::npos) return "sacrifice";
+    if (lc.find("sacrifice") != string::npos) return "sacrifice";
+    if (lc.find("exile") != string::npos) return "exile";
+    if (lc.find("bury") != string::npos) return "sacrifice";
+    if (lc.find("put in library") != string::npos || lc.find("put back") != string::npos)
+    {
+        relocate = true;
+        return "put back into your library";
+    }
+    return "";
+}
+
+//N-139b: build the verb-labeled ask for a remove-from-your-own-cards selection.
+//Three framings share the "pick your least valuable" logic but name WHO caused it
+//and WHAT happens: a keep-the-card relocation, an OPPONENT-forced loss (the
+//validated deck140 wording, kept byte-identical), and a self-inflicted loss (a
+//loot's own discard). Pure helper so the exact emitted strings are provable.
+static string buildHandRemovalAsk(const string& verb, bool byOpponent, bool relocate,
+                                  const string& effectName, bool multi, bool unlimited,
+                                  bool targetMin, int maxtargets, size_t pickIndex)
+{
+    std::ostringstream q;
+    if (relocate)
+    {
+        q << "PUT ONE OF YOUR OWN CARDS BACK: " << effectName << "'s effect will "
+          << verb << " a card you choose from the list below - these are YOUR OWN"
+             " cards, this is NOT a target you attack or affect. Pick the card you"
+             " least need to keep in hand right now. ";
+    }
+    else if (byOpponent)
+    {
+        q << "FORCED " << verb << " OF YOUR OWN CARD"
+          << ((multi && maxtargets != 1) ? "S" : "")
+          << ": the opponent's effect (" << effectName << ") forces YOU to "
+          << verb << " one of your OWN cards from the list below - each"
+             " option is a card YOU will LOSE, not something you affect or"
+             " attack. Pick the card you can best AFFORD TO LOSE (usually your"
+             " LEAST valuable: pitch a spare land or a redundant/dead card,"
+             " and KEEP your best spells, answers, and threats). ";
+    }
+    else
+    {
+        string VERB = verb;
+        for (size_t i = 0; i < VERB.size(); i++) VERB[i] = (char) toupper((unsigned char) VERB[i]);
+        q << VERB << " ONE OF YOUR OWN CARDS: your own effect (" << effectName
+          << ") makes you " << verb << " a card from the list below - each option is"
+             " a card YOU will LOSE, NOT a target you attack or affect. Pick the card"
+             " you can best AFFORD TO LOSE (usually your LEAST valuable: a spare land"
+             " or a redundant/dead card; KEEP your best spells, answers, and threats). ";
+    }
+    if (!multi)
+        q << (relocate ? "Choose the ONE card to put back" : "Choose the ONE card to give up");
+    else
+    {
+        q << "Choose card " << (pickIndex + 1);
+        if (!unlimited)
+            q << " of " << (targetMin ? "exactly " : "up to ") << maxtargets;
+    }
+    q << " from the list below, and answer with the chosen card's name.";
+    return q.str();
+}
+
+//N-139a: role-named ask for the mutate-HOST target step (placement 1=over,
+//2=under, already chosen). Names what this step is and what the placement means,
+//so the model stops re-deriving the whole mutate sequence here. Pure helper.
+static string mutateHostAsk(const string& effectName, int placement)
+{
+    std::ostringstream q;
+    q << "MUTATE - CHOOSE THE HOST creature to mutate onto (placement step for "
+      << effectName << "; the over/under choice is already made). You chose "
+      << (placement == 1
+            ? ("OVER: " + effectName + "'s card goes ON TOP, so the merged creature keeps "
+               + effectName + "'s name and P/T and ALSO gains the host's abilities")
+            : ("UNDER: " + effectName + " goes BENEATH, so the host keeps its name and P/T and gains "
+               + effectName + "'s abilities"))
+      << ". Each option is one of your non-Human creatures; the two become ONE merged"
+         " creature (CR 725). Pick the ONE creature to mutate onto, and answer with its name.";
+    return q.str();
 }
 
 int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCardInstance * chosenCard, bool checkOnly)
@@ -4484,14 +4728,41 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         //Detect the shape (every candidate is my own card AND the effect verb
         //is a loss) and render inverted framing. Representation only - the
         //offered set and the apply path are unchanged.
+        //N-139b (wave-29 deck139/deck93, PRIORITY): a loot / draw-then-discard (and
+        //any remove-from-your-own-hand cost/effect) reaches this same seam - the
+        //legal set is entirely the deciding player's OWN cards - but its chooser
+        //SOURCE is the CARD name (e.g. "Pollywog Symbiote"), so the old
+        //source-name-only verb check MISSED it and rendered the generic "TARGET
+        //CHOICE ... pick the ONE target it will affect": the model read its own hand
+        //as spell targets and discarded a land it needed (deck93 s20, a 14,181-char
+        //reply one class short of the truncation cliff). Fix: derive the VERB the
+        //engine will apply from the ACTING ABILITY too - AADiscardCard::getMenuText
+        //is "Discard", AASacrificeCard "Sacrifice"/"Exploit", AAMover's zone-aware
+        //menu names the destination ("Put in Library"/"Exile"). Build the detection
+        //string from the source name AND that ability verb, and split the framing:
+        //self-inflicted (your own loot) vs opponent-forced (the validated deck140
+        //path, kept byte-identical) vs a keep-the-card relocation (put back).
         bool forcedSelfLoss = false;
+        bool relocateNotLoss = false;
+        bool selfInflicted = false;
         string lossVerb;
         {
-            string en = effectName;
-            for (size_t i = 0; i < en.size(); i++) en[i] = (char) tolower((unsigned char) en[i]);
-            if (en.find("discard") != string::npos) lossVerb = "discard";
-            else if (en.find("sacrifice") != string::npos) lossVerb = "sacrifice";
-            else if (en.find("exile") != string::npos) lossVerb = "exile";
+            string lc = effectName;
+            MTGAbility * waiting = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+            if (AAMover * mv = dynamic_cast<AAMover *>(waiting))
+            {
+                //AAMover's menu verb is zone-aware (dest + chooser source zone);
+                //pass the current chooser so hand->library reads "Put in Library".
+                lc += " ";
+                lc += mv->getMenuText(tc);
+            }
+            else if (waiting)
+            {
+                lc += " ";
+                lc += waiting->getMenuText();
+            }
+            for (size_t i = 0; i < lc.size(); i++) lc[i] = (char) tolower((unsigned char) lc[i]);
+            lossVerb = handRemovalVerb(lc, relocateNotLoss);
             if (!lossVerb.empty() && !targets.empty())
             {
                 bool allMine = true;
@@ -4501,11 +4772,11 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                     MTGCardInstance * mc = dynamic_cast<MTGCardInstance *>(targets[i]);
                     if (!mc || mc->controller() != this) { allMine = false; break; }
                 }
-                //The source is the opponent's forcing effect (Baka fallback is
-                //fine either way, but self-costs of my OWN spells are also a
-                //"pick least valuable" so the source test only strengthens the
-                //wording, it does not gate the fix).
                 forcedSelfLoss = allMine;
+                //Self-inflicted (a loot, a sacrifice-as-cost of MY OWN spell) vs an
+                //OPPONENT forcing the loss: only my own source flips to the self
+                //wording; anything else keeps the validated opponent framing.
+                selfInflicted = tc->source && tc->source->controller() == this;
             }
         }
 
@@ -4524,6 +4795,20 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 dungeonSelect = false;
         }
 
+        //N-139a (wave-29 deck139): the mutate cast is a scrambled multi-ask
+        //sequence (cast -> over/under -> TARGET), and the mutate-HOST target step
+        //reached the model as the same bare "TARGET CHOICE ... target it will
+        //affect" line as any removal - so the model spent minutes re-deriving what
+        //it was choosing. The over/under placement is asked BEFORE this step (engine
+        //order), so by now it is decided; name the ROLE of THIS step. The waiting
+        //ability is an AANewTarget carrying the placement (1 over / 2 under).
+        int mutatePlacement = 0;
+        {
+            MTGAbility * waiting = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+            if (AANewTarget * nt = dynamic_cast<AANewTarget *>(waiting))
+                mutatePlacement = nt->mutation;
+        }
+
         //Target sub-menus reached the model as a bare "Choose ... for X" line
         //that read like a phase or cast decision, owning most of the corpus's
         //fallbacks: the pilot answered with an attack PLAN ("Choose the target
@@ -4537,23 +4822,13 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         std::ostringstream q;
         if (forcedSelfLoss)
         {
-            q << "FORCED " << lossVerb << " OF YOUR OWN CARD"
-              << ((multi && tc->maxtargets != 1) ? "S" : "")
-              << ": the opponent's effect (" << effectName << ") forces YOU to "
-              << lossVerb << " one of your OWN cards from the list below - each"
-                 " option is a card YOU will LOSE, not something you affect or"
-                 " attack. Pick the card you can best AFFORD TO LOSE (usually your"
-                 " LEAST valuable: pitch a spare land or a redundant/dead card,"
-                 " and KEEP your best spells, answers, and threats). ";
-            if (!multi)
-                q << "Choose the ONE card to give up";
-            else
-            {
-                q << "Choose card " << (picks.size() + 1);
-                if (!unlimited)
-                    q << " of " << (tc->targetMin ? "exactly " : "up to ") << tc->maxtargets;
-            }
-            q << " from the list below, and answer with the chosen card's name.";
+            q << buildHandRemovalAsk(lossVerb, !selfInflicted, relocateNotLoss,
+                                     effectName, multi, unlimited, tc->targetMin,
+                                     tc->maxtargets, picks.size());
+        }
+        else if (mutatePlacement)
+        {
+            q << mutateHostAsk(effectName, mutatePlacement);
         }
         else if (dungeonSelect)
         {
@@ -6107,6 +6382,41 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     if (mEndpoint.empty() || revealed.empty())
         return -1; //no endpoint / nothing to choose: the display's default
 
+    //eligibleForOptionOne is the engine's OWN per-card acceptance verdict for
+    //option one (tc->canTarget - exactly what the click enforces). When it is
+    //populated it is the same size/order as `revealed`; when it is empty the
+    //reveal is not predicate-gated (a plain surveil/look-at-top-N) and every
+    //card may go to option one.
+    bool haveElig = (eligibleForOptionOne.size() == revealed.size());
+    int eligCount = (int) revealed.size();
+    if (haveElig)
+    {
+        eligCount = 0;
+        for (size_t j = 0; j < eligibleForOptionOne.size(); j++)
+            if (eligibleForOptionOne[j]) eligCount++;
+    }
+
+    //N-136a: a predicate-gated reveal with NOTHING eligible for option one is
+    //not a decision - do NOT ask the model. Mausoleum Secrets with an empty
+    //graveyard gates option one on "black card, MV <= creature cards in
+    //graveyard" = MV<=0 = no card in the library qualifies. The seam still
+    //LISTS every revealed card (soft "[does NOT qualify]" tag), so the model
+    //happily "picked" an ineligible bomb (MV4 Ritual of Soot), the engine's
+    //click filter bounced it, the tutor no-opped, and the model mis-planned for
+    //turns around a card it never received. An empty legal set auto-resolves to
+    //the card's fail branch (option two: shuffle/keep) via the display's safe
+    //default (-1 -> nothing to option one) - offer and enforcement cannot
+    //diverge because the offer never happens.
+    if (haveElig && eligCount == 0)
+    {
+        writeTransLog("reveal", "", "", -1, (int) revealed.size(),
+                      "none (no legal target)", NULL, NULL);
+        narrateDecision("You revealed " + std::to_string(revealed.size())
+                        + " card" + (revealed.size() == 1 ? "" : "s")
+                        + " but none was a legal target - took none");
+        return -1;
+    }
+
     if (mSystemPrompt.empty())
         buildSystemPrompt();
 
@@ -6156,6 +6466,16 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     for (size_t j = 0; j < revealed.size(); j++)
         if (send[j])
         {
+            //N-136a enforcement filter: never ACCEPT a pick the option-one
+            //chooser will reject at the click - the same canTarget verdict in
+            //eligibleForOptionOne. The soft "[does NOT qualify]" annotation is
+            //advisory only; a model that picks an ineligible card anyway must
+            //not have that pick recorded as chosen/narrated as tutored (the
+            //engine would silently bounce it). Dropping it here keeps the
+            //translog + narration consistent with what the engine does, so the
+            //model is never told it holds a card that never reached hand.
+            if (haveElig && j < eligibleForOptionOne.size() && !eligibleForOptionOne[j])
+                continue;
             selForOptionOne.push_back((int) j);
             chosen += (chosen.empty() ? "" : ", ") + revealed[j]->name;
             //A fixed <1> chooser takes exactly ONE card: the engine's option-one
@@ -7076,6 +7396,129 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(sel.str() == "[dungeon: 5 rooms; completion reward (\"Cradle of the Death God\"): "
               "Create The Atropal, a legendary 4/4 black God Horror creature token with deathtouch.]",
               "W29-R N-146c: dungeon selection shows room count + completion payoff");
+    }
+
+    // ---- WAVE-30 RENDER PROOFS (deterministic): the wave-30 representation fixes
+    // reproduce the EXACT strings the seams emit, via the same pure helpers the
+    // render sites call. No engine/observer needed.
+    cout << "\n[W30-R] wave-30 representation fixes (mutate + tapped-tag + dungeons-completed)\n";
+    {
+        // Item 2 / N-93c: tapped tag is restriction-first, no "can attack" nuisance.
+        CHECK(tappedCreatureTag(false) == " [tapped - cannot attack or block this turn]",
+              "W30-R N-93c: tapped creature tag is restriction-first (cannot attack or block)");
+        CHECK(tappedCreatureTag(true) == " [tapped - cannot attack this turn]",
+              "W30-R N-93c: CANBLOCKTAPPED creature drops the 'or block' clause (still cannot attack)");
+        CHECK(tappedCreatureTag(false).find("can attack") == string::npos
+              && tappedCreatureTag(true).find("can attack") == string::npos,
+              "W30-R N-93c: no affirmative 'can attack' substring remains in the tapped tag");
+
+        // Item 1d / N-139d: mutate alt-cost label is unified to "mutate cost".
+        CHECK(mutateAltCostLabel(true, "Mutate") == "mutate cost",
+              "W30-R N-139d: a named mutate alternative -> 'mutate cost' (Gemrazer)");
+        CHECK(mutateAltCostLabel(true, "") == "mutate cost",
+              "W30-R N-139d: an UNNAMED mutate alternative (cost-reduced copy) -> 'mutate cost' (Migratory Greathorn)");
+        CHECK(mutateAltCostLabel(false, "flashback") == "flashback cost",
+              "W30-R N-139d: a non-mutate NAMED alternative keeps its own name");
+        CHECK(mutateAltCostLabel(false, "") == "alternative cost",
+              "W30-R N-139d: a non-mutate UNNAMED alternative stays 'alternative cost'");
+
+        // Item 1c / N-139c: the mutate pile renders as ONE line; the under-card names ride the top.
+        {
+            std::vector<string> under; under.push_back("Dryad of the Ilysian Grove");
+            string tag = mutatedPileTag(under);
+            CHECK(tag.find("ONE merged creature") != string::npos
+                  && tag.find("1 card underneath: Dryad of the Ilysian Grove") != string::npos,
+                  "W30-R N-139c: merged pile tag = ONE creature + names the under card");
+            CHECK(mutatedPileTag(std::vector<string>()).empty(),
+                  "W30-R N-139c: no pile tag for a non-pile creature (empty under list)");
+            std::vector<string> two; two.push_back("Pollywog Symbiote"); two.push_back("Arboreal Grazer");
+            CHECK(mutatedPileTag(two).find("2 cards underneath: Pollywog Symbiote, Arboreal Grazer") != string::npos,
+                  "W30-R N-139c: a deeper pile lists every under card with a plural count");
+        }
+
+        // Item 3 / N-146f: the dungeons-completed line only renders when >0.
+        CHECK(dungeonsCompletedLine(0, 0).empty(),
+              "W30-R N-146f: no dungeons-completed line when neither player has completed one");
+        CHECK(dungeonsCompletedLine(2, 0).find("Dungeons completed (you): 2") != string::npos,
+              "W30-R N-146f: your completion count renders when >0");
+        CHECK(dungeonsCompletedLine(0, 1).find("Dungeons completed (opponent): 1") != string::npos,
+              "W30-R N-146f: opponent completions render when >0");
+
+        // Item 1b / N-139b: the remove-from-hand verb is derived from the acting
+        // ability, not the source name - a loot's "Pollywog Symbiote Discard" -> discard.
+        bool rel = false;
+        CHECK(handRemovalVerb("pollywog symbiote discard", rel) == "discard" && !rel,
+              "W30-R N-139b: loot detection string ('<card> discard') -> verb 'discard' (not a relocate)");
+        CHECK(handRemovalVerb("archon of cruelty discard", rel) == "discard" && !rel,
+              "W30-R N-139b: an opponent-forced discard still resolves to 'discard'");
+        CHECK(handRemovalVerb("some spell sacrifice", rel) == "sacrifice",
+              "W30-R N-139b: 'sacrifice' verb resolves");
+        CHECK(handRemovalVerb("bogey exploit", rel) == "sacrifice",
+              "W30-R N-139b: 'exploit' maps to sacrifice");
+        CHECK(handRemovalVerb("x exile", rel) == "exile",
+              "W30-R N-139b: 'exile' verb resolves");
+        CHECK(handRemovalVerb("x put in library", rel) == "put back into your library" && rel,
+              "W30-R N-139b: 'put in library' is a RELOCATE (keep the card), not a loss");
+        CHECK(handRemovalVerb("just a target", rel).empty(),
+              "W30-R N-139b: a plain target (no remove verb) is NOT treated as a self-loss");
+
+        // Item 1b framing: self-inflicted vs opponent-forced vs relocate. The
+        // opponent branch is kept BYTE-IDENTICAL to the validated deck140 wording.
+        string oppAsk = buildHandRemovalAsk("discard", true, false, "Archon of Cruelty",
+                                            false, false, false, 1, 0);
+        CHECK(oppAsk.find("FORCED discard OF YOUR OWN CARD:") == 0
+              && oppAsk.find("the opponent's effect (Archon of Cruelty) forces YOU to discard") != string::npos
+              && oppAsk.find("Choose the ONE card to give up") != string::npos,
+              "W30-R N-139b: opponent-forced framing (validated deck140 wording) preserved");
+        string selfAsk = buildHandRemovalAsk("discard", false, false, "Pollywog Symbiote",
+                                             false, false, false, 1, 0);
+        CHECK(selfAsk.find("DISCARD ONE OF YOUR OWN CARDS:") == 0
+              && selfAsk.find("your own effect (Pollywog Symbiote) makes you discard") != string::npos
+              && selfAsk.find("NOT a target you attack or affect") != string::npos,
+              "W30-R N-139b: self-inflicted loot framing names the verb + own source, not 'target it will affect'");
+        string relAsk = buildHandRemovalAsk("put back into your library", false, true,
+                                            "Brainstorm", false, false, false, 1, 0);
+        CHECK(relAsk.find("PUT ONE OF YOUR OWN CARDS BACK:") == 0
+              && relAsk.find("Choose the ONE card to put back") != string::npos,
+              "W30-R N-139b: relocate (put-back) framing keeps the card, no 'afford to lose' language");
+
+        // Item 1a / N-139a: the mutate-host target step and the over/under menu
+        // name their role instead of the bare 'target it will affect' / 'Choose an option'.
+        string hostOver = mutateHostAsk("Gemrazer", 1);
+        CHECK(hostOver.find("MUTATE - CHOOSE THE HOST") == 0
+              && hostOver.find("You chose OVER") != string::npos
+              && hostOver.find("Gemrazer's card goes ON TOP") != string::npos,
+              "W30-R N-139a: mutate-host target step names the role + the chosen OVER placement");
+        string hostUnder = mutateHostAsk("Gemrazer", 2);
+        CHECK(hostUnder.find("You chose UNDER") != string::npos
+              && hostUnder.find("Gemrazer goes BENEATH") != string::npos,
+              "W30-R N-139a: mutate-host target step reflects the UNDER placement");
+        string ouHeader = mutateOverUnderHeader("Illuna, Apex of Wishes");
+        CHECK(ouHeader.find("MUTATE PLACEMENT for Illuna, Apex of Wishes:") == 0
+              && ouHeader.find("OVER (on top of) or UNDER the host") != string::npos,
+              "W30-R N-139a: over/under menu carries a role header, not the generic 'Choose an option'");
+        CHECK(mutateOverUnderHeader("").find("MUTATE PLACEMENT for this creature:") == 0,
+              "W30-R N-139a: over/under header degrades cleanly when the source name is unrecoverable");
+    }
+
+    // ---- WAVE-30: the new render annotations that ride OPTION lines (mutate
+    // over/under [..] tails) must still echo-match; the board tags ([tapped - ...],
+    // [mutated: ...]) ride board renders only and are stripped by
+    // stripRenderAnnotationsLc like every other bracket, so they never reach the
+    // parser as a distinct shape - proven here for the option-borne ones.
+    cout << "\n[W30-A] wave-30 mutate over/under option annotations still echo-match\n";
+    {
+        vector<string> ou;
+        ou.push_back("Mutate Over [this card goes ON TOP: the merged creature keeps THIS card's name and P/T, and ALSO gains the host's abilities]");
+        ou.push_back("Mutate Under [this card goes UNDERNEATH: the creature on top keeps its name and P/T, and gains THIS card's abilities]");
+        bool so = false;
+        int co = parseChoice("1 (Mutate Over)", 2, &ou, &so, NULL);
+        cout << "     'Mutate Over' echo vs annotated option -> " << co << " (must be 1)\n";
+        CHECK(co == 1 && !so, "W30-A mutate 'Mutate Over' echo matches its annotated option");
+        bool su = false;
+        int cu = parseChoice("2 (Mutate Under)", 2, &ou, &su, NULL);
+        cout << "     'Mutate Under' echo vs annotated option -> " << cu << " (must be 2)\n";
+        CHECK(cu == 2 && !su, "W30-A mutate 'Mutate Under' echo matches its annotated option");
     }
 
     // ---- WAVE-29: deciding-fact annotations added to OPTION lines this wave must

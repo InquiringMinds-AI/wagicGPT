@@ -16,7 +16,7 @@ The opponent's battlefield line prints its creature count for you, like
   deploy a finisher instead (see DEPLOY WHEN SAFE).
 The printed C already counts everything that matters, so do not talk yourself out of a
 sweep. Two reminders the count settles for you:
-- A creature marked "[tapped - untaps and can attack next turn]" is STILL in C. Tapped is
+- A creature marked "[tapped - cannot attack or block this turn]" is STILL in C. Tapped is
   never a reason to wait, and neither is "it isn't attacking THIS turn" - it hit you last
   turn and swings again next turn; kill it now on your main phase.
 - ARTIFACTS do not lower C and do not shield a creature. If C is 1+, your sweeper kills

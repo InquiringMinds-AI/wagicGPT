@@ -713,8 +713,25 @@ void MTGRevealingCards::driveInteractiveReveal()
         mAIGraveSel.clear();
         if (r == 1) //r == -1 (defer/fail): empty selection -> all to option two
             for (size_t k = 0; k < sel.size(); k++)
-                if (sel[k] >= 0 && sel[k] < (int) revealed.size())
-                    mAIGraveSel.push_back(revealed[sel[k]]);
+            {
+                int idx = sel[k];
+                if (idx < 0 || idx >= (int) revealed.size())
+                    continue;
+                //N-136a authoritative enforcement: drop any pick option
+                //one's target chooser will reject at the click - the SAME
+                //canTarget verdict already captured in `eligible`. This is
+                //the single point BOTH the live model (decideReveal) and the
+                //test-async stub flow through, so the offered set and the
+                //enforced set can never diverge. Without it the seam offered
+                //the whole revealed library (soft [does NOT qualify] tag only)
+                //and an ineligible model pick was clicked, silently bounced,
+                //and the tutor no-opped (Mausoleum Secrets, empty graveyard,
+                //offered all 43 library cards; the MV4 Ritual pick never
+                //reached hand).
+                if (idx < (int) eligible.size() && !eligible[idx])
+                    continue;
+                mAIGraveSel.push_back(revealed[idx]);
+            }
 
         //Click ALL the option-one picks NOW, in the same tick as the decision.
         //Clicks are synchronous (each toggles its target immediately), and doing

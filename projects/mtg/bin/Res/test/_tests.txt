@@ -1053,6 +1053,7 @@ lexicon/tergrid_steals_sacrificed_creature.txt
 lexicon/tergrid_steals_discarded_permanent.txt
 lexicon/tergrid_ignores_sacrificed_token.txt
 ai/convoke_altcost_wave28.txt
+ai/convoke_unaffordable_not_offered.txt
 ai/dual_land_color_cast_n146a.txt
 legions_end_phantom_chooser_wave28.txt
 march_plain_x.txt

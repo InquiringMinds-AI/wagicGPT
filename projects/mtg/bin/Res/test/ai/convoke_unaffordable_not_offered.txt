@@ -1,0 +1,72 @@
+# Wave-30 engine item: the cast-offer seam OFFERED convoke casts whose payment
+# could never complete. Convoke models its alternative as a {0}(+{X}) shell plus
+# a Convoke extra cost, so LegalActionsOracle::legalCasts' plain canAfford was
+# TRIVIALLY true (zero mana is always affordable) - the convoke variant was
+# offered regardless of whether the tapped creatures + floatable mana could pay
+# the PRINTED cost. deck137 corpus 20260726: unaffordable March convoke picked
+# then DEFERRED (8/corpus), unaffordable Venerated Loxodon convoke picked then
+# silently NO-OP'd. FIX: Convoke::offerable() computes real convoke payability
+# (max creature reduction + floatable mana) BEFORE offering, and legalCasts gates
+# the convoke variant on it, restoring the legality-oracle invariant (unpayable
+# choices are structurally impossible to offer). The complementary
+# don't-over-suppress case (a cast affordable ONLY via convoke stays offered and
+# resolves) is the convoke_altcost_wave28 witness - keep BOTH green.
+#
+# SCOPE OF THIS FIXTURE (read before trusting its pass as proof): this is a
+# BEHAVIOURAL SMOKE test at the Baka seat, NOT a discriminating regression guard
+# for the offer-suppression. Board: Venerated Loxodon {4}{W} in hand with only
+# two Forest - via convoke there are no creatures to tap and the two Forest float
+# {G}{G} (no white, too little mana), so {4}{W} is UNPAYABLE and its normal cost
+# is equally unaffordable; a Grizzly Bears {1}{G} also sits in hand, payable from
+# the two Forest. Post-fix Baka casts the Grizzly Bears (one creature in play);
+# offerable() runs on a genuinely unaffordable board without crash/hang and
+# casting proceeds. NOTE (verified 2026-07-26 against the pre-fix binary): this
+# fixture ALSO passes pre-fix - Baka simply SKIPS an unpayable convoke offer and
+# casts the Bears anyway, so the OFFER difference is invisible to a zone assert.
+# The offer-suppression itself was proven directly with env-gated legalCasts
+# instrumentation (WAGIC_DEBUG_CONVOKE): the pre-fix trivial canAfford({0}) would
+# OFFER this Loxodon convoke (oldTrivial=1) while offerable()=0 suppresses it
+# (offer=0), whereas the convoke-ONLY-affordable Loxodon in convoke_altcost_wave28
+# stays offer=1/offerable=1. Keep this fixture as the unaffordable-board smoke
+# test; keep convoke_altcost_wave28 + march_convoke_x as the resolving witnesses.
+# Asserted at secondmain (the newly-cast Bears is summoning-sick, so no combat
+# perturbs either life total; both players stay at 20).
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest
+hand:Venerated Loxodon,Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Grizzly Bears,Forest,Forest
+hand:Venerated Loxodon
+[PLAYER2]
+life:20
+[END]

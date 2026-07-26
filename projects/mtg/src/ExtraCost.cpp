@@ -1232,6 +1232,91 @@ ManaCost * Convoke::getReduction()
     return toReduce;
 }
 
+//Reduce `toReduce` in place by tapping the given creatures, mirroring
+//getReduction's per-creature greedy EXACTLY (a creature reduces the GREEN pip
+//when it is green and the cost still has green, otherwise it reduces one
+//generic) so this probe agrees with what doPay can actually pay. `reverse`
+//walks the creature list backwards, matching getReduction's own second-pass
+//retry.
+static void convokeReduceByCreatures(ManaCost * toReduce,
+                                     const vector<MTGCardInstance*> & creatures,
+                                     bool reverse)
+{
+    size_t n = creatures.size();
+    for (size_t idx = 0; idx < n; idx++)
+    {
+        MTGCardInstance * c = reverse ? creatures[n - 1 - idx] : creatures[idx];
+        if (!c)
+            continue;
+        bool next = false;
+        for (int i = Constants::MTG_COLOR_GREEN; i <= Constants::MTG_COLOR_WHITE; ++i)
+        {
+            if (next)
+                break;
+            if ((c->getManaCost()->hasColor(i) || c->hasColor(i)) && toReduce->hasColor(i))
+            {
+                toReduce->remove(i, 1);
+                next = true;
+            }
+            else
+            {
+                toReduce->remove(Constants::MTG_COLOR_ARTIFACT, 1);
+                next = true;
+            }
+        }
+    }
+}
+
+bool Convoke::offerable(MTGCardInstance * source, ManaCost * floatable)
+{
+    if (!source || !floatable || !source->getManaCost())
+        return false;
+    Player * p = source->controller();
+    if (!p || !p->game || !p->game->inPlay)
+        return false;
+
+    //The untapped creatures that could convoke (Convoke's tc is
+    //"creature|mybattlefield"; isPaymentSet drops any already-tapped one).
+    //Summoning-sick creatures CAN convoke, so no sickness gate.
+    vector<MTGCardInstance*> creatures;
+    MTGGameZone * z = p->game->inPlay;
+    for (int i = 0; i < z->nb_cards; i++)
+    {
+        MTGCardInstance * c = z->cards[i];
+        if (!c || !c->isCreature())
+            continue;
+        if (c->isTapped() || c->isPhased)
+            continue;
+        creatures.push_back(c);
+    }
+
+    //Build the cost the payment must actually reach. An X-spell must reach X>=1
+    //(X=0 is a donothing), so strip the X flag and add one generic pip.
+    ManaCost * target = NEW ManaCost(source->getManaCost());
+    if (target->hasX())
+    {
+        target->remove(Constants::NB_Colors, 1); //drop the {X} marker
+        target->add(Constants::MTG_COLOR_ARTIFACT, 1); //require X = 1
+    }
+    int anytype = source->has(Constants::ANYTYPEOFMANA);
+
+    //Forward greedy, then getReduction's backward retry, before deciding
+    //unpayable - matching the two passes doPay's getReduction uses.
+    ManaCost * fwd = NEW ManaCost(target);
+    convokeReduceByCreatures(fwd, creatures, false);
+    bool ok = floatable->canAfford(fwd, anytype) != 0;
+    SAFE_DELETE(fwd);
+    if (!ok)
+    {
+        ManaCost * bwd = NEW ManaCost(target);
+        convokeReduceByCreatures(bwd, creatures, true);
+        ok = floatable->canAfford(bwd, anytype) != 0;
+        SAFE_DELETE(bwd);
+    }
+    SAFE_DELETE(target);
+    return ok;
+}
+
 int Convoke::doPay()
 {
     if (target && tc->getNbTargets())
