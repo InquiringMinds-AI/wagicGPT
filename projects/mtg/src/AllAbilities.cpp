@@ -5418,7 +5418,15 @@ int AATurnSide::resolve()
         if(_target->mutation && _target->parentCards.size() > 0) return 0; // Mutated down cards cannot be turned, they will follow the fate of top-card
         MTGCard * fcard;
         MTGCardInstance* sideCard;
-        if(_target->controller()->isAI() && _target->isFlipped > 0) _target->isFlipped = 0; // If it's AI calling back we just have to reset isFLipped flag and then return.
+        // (Removed a former AI-only branch here that, when the controller was
+        // an AI and isFlipped>0, set isFlipped=0 and fell through to the return
+        // below WITHOUT reverting the displayed face. It existed solely to clean
+        // up the scorer's std::rand isFlipped toggle in AIPlayerBaka::getEfficiency
+        // - and together with it produced the display/flag DESYNC (face showing
+        // the back while the flag read front) and the flip-thrash livelock.
+        // The scorer no longer mutates isFlipped, so isFlipped now changes ONLY
+        // through the full face swap at the bottom of this method, keeping the
+        // flag and the displayed face coherent for AI and human alike.)
         if(_target->isFlipped == 0 && _SideName == "") return 0; // No need to turn front if card has not been flipped before.
         if(_target->isFlipped == 0){
             if(_SideName == "backside" && _target->backSide != "") 

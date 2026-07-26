@@ -1,0 +1,12 @@
+#NAME: Tokenless Black Bodies 198
+#DESC: wave26 probe opponent (TEMPORARY, delete after harvest)
+#DESC: mono-black nontoken creatures + Swamps only; no tokens, no instants/sorceries
+Scathe Zombies (*) *4
+Bog Wraith (*) *3
+Wall of Bone (*) *3
+Hypnotic Specter (*) *3
+Zombie Master (*) *2
+Drudge Skeletons (*) *3
+Bog Imp (*) *2
+Erg Raiders (*) *2
+Swamp (*) *18

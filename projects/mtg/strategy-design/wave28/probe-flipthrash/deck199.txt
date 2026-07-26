@@ -1,0 +1,12 @@
+#NAME: Tergrid Probe 199
+#DESC: wave26 steal-window + R-DFC-BACKFACE probe (TEMPORARY, delete after harvest)
+#DESC: stacked Tergrid + forced nontoken discard/sacrifice vs a tokenless board
+Tergrid, God of Fright (*) *8
+Hymn to Tourach (*) *4
+Necrogen Mists (*) *2
+Fell Specter (*) *2
+Thoughtseize (*) *2
+Plaguecrafter (*) *1
+Liliana's Triumph (*) *1
+Soul Shatter (*) *1
+Swamp (*) *19

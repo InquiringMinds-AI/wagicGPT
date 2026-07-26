@@ -1,0 +1,55 @@
+# Wave-28 engine item CONVOKE-NONRESOLUTION: the AI's "cast with convoke"
+# alternative-cost cast aborted whenever the tapped creatures did not cover the
+# WHOLE printed cost - the reduced mana remainder was never floated from lands,
+# and Convoke::isPaymentSet (keyed off a transient `target` that nulls itself
+# on a short pool) could never re-pass. deck137's payoffs were functionally
+# dead (Venerated Loxodon 2/23, March 0/17, corpus 20260725).
+#
+# FIX: (1) payTheManaCost floats the reduced remainder from lands and queues
+# those producer clicks BEFORE the card click; (2) Convoke::isPaymentSet keys
+# off the chosen creature targets so the gate re-passes once the mana lands;
+# (3) FindCardToPlay no longer degrades a convoke alternative to normal pricing
+# (offering/delve stay blocked). Baka now uses convoke when it cannot afford the
+# normal cost; the GPT seat's forced "cast with convoke" pick resolves too.
+#
+# WITNESS: Venerated Loxodon {4}{W}. Only ONE Plains, so the NORMAL cost is
+# unpayable and the AI must CONVOKE - tap the 4 Grizzly Bears for the 4 generic
+# and pay {W} from the Plains. Pre-fix the cast aborted and Loxodon sat in hand;
+# post-fix it resolves onto the battlefield with the creatures tapped.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Plains
+hand:Venerated Loxodon
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Venerated Loxodon,Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Plains
+[PLAYER2]
+[END]

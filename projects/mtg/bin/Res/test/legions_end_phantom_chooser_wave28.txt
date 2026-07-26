@@ -1,0 +1,46 @@
+# Wave-28 engine item R-RESOLVED-SPELL-PHANTOM-CHOOSER: Legion's End's 4th
+# script line `auto=donothing notaTarget(*|targetcontrollerhand)` (a botched
+# "reveals their hand" clause, borderline.txt:65393) resolved AFTER its primary
+# target creature was exiled, so `targetcontroller` degraded to "any hand" and
+# the MayAbility wrapping it spawned a PHANTOM interactive target chooser for a
+# spell already in the graveyard - two invariants violated (no ask without
+# legal options; no ask for a resolved spell), the largest reasoning-tax sink
+# in corpus deck136 wave-27.
+#
+# FIX (engine, closes the class): a notaTarget selector attached to a
+# zero-decision effect (donothing / a look-reveal AAFakeAbility) auto-resolves
+# silently and never surfaces a chooser (MayAbility::Update /
+# isReactingToTargetClick gate on the wrapped effect's content).
+#
+# This fixture guards the PRIMARY effect: Legion's End resolves vs a valid
+# target and exiles the target + all same-name creatures on that player's
+# battlefield + all same-name cards in their graveyard (the hand line 15 rides
+# the same all(share!name!) mechanic). The phantom line between them is now a
+# silent no-op. (The "no interactive ask" itself is state-neutral and cannot be
+# asserted from zone counts; it is validated live via GPT selfplay + the gate's
+# own mechanism.)
+[INIT]
+firstmain
+[PLAYER1]
+hand:Legion's End
+manapool:{1}{B}
+[PLAYER2]
+inplay:Grizzly Bears,Grizzly Bears
+hand:Hill Giant
+graveyard:Grizzly Bears,Mountain
+[DO]
+Legion's End
+Grizzly Bears
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+graveyard:Legion's End
+[PLAYER2]
+hand:Hill Giant
+graveyard:Mountain
+exile:Grizzly Bears,Grizzly Bears,Grizzly Bears
+[END]

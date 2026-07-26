@@ -1052,3 +1052,5 @@ probe/tergrid_lantern_altcost_wave24.txt
 lexicon/tergrid_steals_sacrificed_creature.txt
 lexicon/tergrid_steals_discarded_permanent.txt
 lexicon/tergrid_ignores_sacrificed_token.txt
+ai/convoke_altcost_wave28.txt
+legions_end_phantom_chooser_wave28.txt

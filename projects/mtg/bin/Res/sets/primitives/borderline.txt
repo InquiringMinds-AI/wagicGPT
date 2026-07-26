@@ -65390,7 +65390,6 @@ name=Legion's End
 target=creature[manacost<=2]|opponentbattlefield
 auto=moveto(exile)
 auto=all(*[share!name!]|targetcontrollerbattlefield) moveto(exile)
-auto=donothing notaTarget(*|targetcontrollerhand)
 auto=all(*[share!name!]|targetcontrollerhand) moveto(exile)
 auto=all(*[share!name!]|targetcontrollergraveyard) moveto(exile)
 text=Exile target creature an opponent controls with mana value 2 or less and all other creatures that player controls with the same name as that creature. Then that player reveals their hand and exiles all cards with that name from their hand and graveyard.

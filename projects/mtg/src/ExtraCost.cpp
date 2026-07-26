@@ -1151,27 +1151,28 @@ int Convoke::canPay()
 
 int Convoke::isPaymentSet()
 {
+    //A convoke creature already tapped cannot pay - drop it from the set.
     if (target && target->isTapped())
     {
         tc->removeTarget(target);
         target->isExtraCostTarget = false;
         target = NULL;
-        return 0;
     }
+    if (!tc || tc->getNbTargets() == 0)
+        return 0; //no creature chosen to convoke yet
+    //Payment is set once the chosen creatures' reduction plus the mana in the
+    //pool cover the printed cost. This historically keyed off the transient
+    //`target` field (the last-added creature), which NULLS ITSELF the first
+    //time the pool is short - so a cast whose remaining mana is floated AFTER
+    //the creatures were chosen (exactly how the AI pays: creatures set
+    //synchronously, land taps queued for later ticks) could never re-satisfy
+    //the gate and every not-fully-creature-covered convoke aborted (Venerated
+    //Loxodon 2/23, March 0/17, corpus 20260725). Key it off the actual chosen
+    //targets so the gate re-passes once the floated mana lands.
     ManaCost * toReduce = getReduction();
-    if (target && (!source->controller()->getManaPool()->canAfford(toReduce,target->has(Constants::ANYTYPEOFMANAABILITY))))
-    {
-        target = NULL;
-        SAFE_DELETE(toReduce);
-        return 0;
-    }
-    if (target && (source->controller()->getManaPool()->canAfford(toReduce,target->has(Constants::ANYTYPEOFMANAABILITY))))
-    {
-        SAFE_DELETE(toReduce);
-        return 1;
-    }
+    int afford = source->controller()->getManaPool()->canAfford(toReduce, source->has(Constants::ANYTYPEOFMANAABILITY));
     SAFE_DELETE(toReduce);
-    return 0;
+    return afford ? 1 : 0;
 }
 
 ManaCost * Convoke::getReduction()

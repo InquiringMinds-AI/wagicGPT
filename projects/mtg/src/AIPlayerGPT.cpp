@@ -297,6 +297,67 @@ string typeTag(MTGCardInstance * card)
     return "";
 }
 
+//A compact land-identity tag for the DECISION surfaces where a bare land name -
+//especially a basic "Swamp" - carried no land/mana signal and the pilot
+//miscounted lands as unplayable spells (deck93 wave-27: mulliganed the identical
+//3-Swamp opening hand 5 of 6 games claiming "zero lands", once while writing
+//"Swamps produce black mana"). Names that the card IS a LAND and the color(s) it
+//taps for. Basic land types - including dual/tri lands that carry them (e.g.
+//Underground Sea = subtype "Island Swamp") - map by subtype; other lands read
+//produced colors from the auto script's "Add{...}" clauses (Karplusan Forest:
+//Add{R}/Add{G}); a land whose colors are not cheaply known still gets a bare
+//" (land)". Returns "" for a non-land. Leading space so it appends after a name.
+string landTag(MTGCardInstance * card)
+{
+    if (!card || !card->isLand())
+        return "";
+    bool have[5] = { false, false, false, false, false }; //W U B R G
+    static const char * kSub[5] = { "plains", "island", "swamp", "mountain", "forest" };
+    static const int kIdx[5] = { 0, 1, 2, 3, 4 };
+    for (int i = 0; i < 5; i++)
+        if (card->hasSubtype(kSub[i]))
+            have[kIdx[i]] = true;
+    if (!(have[0] || have[1] || have[2] || have[3] || have[4]))
+    {
+        //Nonbasic without a basic land type: read produced colors from the auto
+        //script's "Add{...}" mana clauses. Anchored on the '{' so an "add" inside
+        //another word cannot trip it; generic "Add{1}" contributes no color.
+        string mt = card->magicText;
+        for (size_t k = 0; k < mt.size(); k++)
+            mt[k] = (char) tolower((unsigned char) mt[k]);
+        size_t pos = 0;
+        while ((pos = mt.find("add", pos)) != string::npos)
+        {
+            size_t b = pos + 3;
+            pos += 3;
+            while (b < mt.size() && (mt[b] == ' ' || mt[b] == '\t'))
+                b++;
+            if (b >= mt.size() || mt[b] != '{')
+                continue;
+            for (b++; b < mt.size() && mt[b] != '}'; b++)
+            {
+                switch (mt[b])
+                {
+                    case 'w': have[0] = true; break;
+                    case 'u': have[1] = true; break;
+                    case 'b': have[2] = true; break;
+                    case 'r': have[3] = true; break;
+                    case 'g': have[4] = true; break;
+                    default: break;
+                }
+            }
+        }
+    }
+    static const char * kSym[5] = { "{W}", "{U}", "{B}", "{R}", "{G}" };
+    string colors;
+    for (int i = 0; i < 5; i++)
+        if (have[i])
+            colors += kSym[i];
+    if (colors.empty())
+        return " (land)";
+    return " (land: taps for " + colors + ")";
+}
+
 //The auras/equipment attached to a permanent. There is no forward list, so
 //find them the way the engine does (cf. MTGCardInstance::hasTotemArmor):
 //every attachment carries a reverse pointer (auraParent) to its host.
@@ -484,10 +545,18 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         }
         else
         {
-            //a bare name does not say what it IS (lands excepted: the name does)
+            //a bare name does not say what it IS
             string tag = typeTag(card);
             if (!tag.empty() && tag != "land")
                 out << " [" << tag << "]";
+            //A bare land name (esp. a basic "Swamp") gave the pilot no land/mana
+            //signal and it miscounted lands as unplayable spells at the mulligan
+            //(deck93 wave-27). Scoped to the HAND surfaces (withStatus == false:
+            //the hand render feeding the mulligan/bottom asks and CURRENT
+            //SITUATION) - a battlefield land already carries deployment/painland
+            //tags, and tagging every board render would just be prompt-budget noise.
+            else if (card->isLand() && !withStatus)
+                out << landTag(card);
         }
         //A changeling is every creature type: name the tribe(s) a card in this
         //deck/battlefield actually consumes so the model chains it to a role.
@@ -1118,6 +1187,10 @@ string AIPlayerGPT::describeDeckCards(Player * p, bool withCounts)
         //A changeling in the decklist: name the tribe(s) this deck consumes so
         //the identity is known before a card is ever drawn (mulligan/keep).
         out << changelingAnnotation(card);
+        //Name LAND + colors so the deck's mana base is legible before any draw
+        //(deck93 wave-27 land-blindness); "" for non-lands. A basic land also
+        //carries no rules text below, so this is its only identity signal here.
+        out << landTag(card);
         string text = card->text;
         if (!text.empty())
         {
@@ -2042,6 +2115,71 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     return request.dump();
 }
 
+//Strip the render-only annotations a model may copy out of the board/hand text
+//into its echoed answer - a bracketed "[changeling: counts as Giant]" /
+//"[artifact]" / "[tapped]" tail, or the parenthesized land-identity tag "(land:
+//taps for {B})" / "(land)" this build adds at the hand/mulligan surfaces. These
+//annotations are NEVER part of a canonical OPTION name, so removing them from
+//both an echo and an option before an option-core comparison lets an annotated
+//echo reconcile with its bare option (deck22 wave-27 R-ANNOTATION-ECHO-PARSE)
+//WITHOUT loosening the match to a different card. ONLY a "(land...)" parenthetical
+//is dropped (its content begins with "land"); meaningful parentheticals - (1/1),
+//(player, life 20), (printed 2/2) - are preserved. Returns a lowercased,
+//whitespace-collapsed core.
+static string stripRenderAnnotationsLc(const string& s)
+{
+    string o;
+    for (size_t i = 0; i < s.size(); )
+    {
+        if (s[i] == '[')
+        {
+            size_t c = s.find(']', i);
+            if (c == string::npos)
+                break; //unterminated bracket - stop (rest is annotation-ish)
+            i = c + 1;
+            continue;
+        }
+        if (s[i] == '(')
+        {
+            size_t c = s.find(')', i);
+            if (c != string::npos)
+            {
+                size_t k = i + 1;
+                while (k < c && (s[k] == ' ' || s[k] == '\t'))
+                    k++;
+                if (c - k >= 4
+                    && tolower((unsigned char) s[k]) == 'l'
+                    && tolower((unsigned char) s[k + 1]) == 'a'
+                    && tolower((unsigned char) s[k + 2]) == 'n'
+                    && tolower((unsigned char) s[k + 3]) == 'd')
+                {
+                    i = c + 1; //a land-identity parenthetical - drop it
+                    continue;
+                }
+            }
+        }
+        o += (char) tolower((unsigned char) s[i]);
+        i++;
+    }
+    //collapse whitespace runs to single spaces + trim
+    string r;
+    bool sp = false;
+    for (size_t i = 0; i < o.size(); i++)
+    {
+        char ch = o[i];
+        if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r')
+        {
+            sp = true;
+            continue;
+        }
+        if (sp && !r.empty())
+            r += ' ';
+        sp = false;
+        r += ch;
+    }
+    return r;
+}
+
 int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                              const std::vector<string> * optionTexts,
                              bool * staleEcho,
@@ -2314,6 +2452,30 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                     all = el.find(ow[k]) != string::npos;
                 if (all)
                     return false; //option label fully echoed -> consistent, trust
+            }
+        }
+        //(a3) Annotation-echo tolerance (deck22 wave-27 R-ANNOTATION-ECHO-PARSE):
+        //the model copied a render annotation onto the echoed option name - a
+        //bracketed "[changeling: counts as Giant]" tail (deck22 vs131 s3, the
+        //stale_echo repro) or the "(land: taps for {B})" land tag this build adds -
+        //injecting words foreign to the bare option AND, when the option carries a
+        //"(1/1)" that the annotation follows, fooling the paren-extraction above
+        //into grabbing the annotation instead of the name. Rescue by comparing
+        //annotation-stripped cores: if the CHOSEN option's own core name appears
+        //verbatim in the (likewise stripped) reply, the answer references THIS
+        //option - trust the index. Strictly widen-only: it needs the chosen
+        //option's core in the reply, so a DIFFERENT card's echo cannot cross-match,
+        //and it never fires without an already-in-range index. Requires a
+        //multi-token core (>= 6 chars, has a space) so a bare short label ("tap")
+        //stays with branch (a2) and incidental prose cannot trip it.
+        if (optionTexts && k1 >= 1 && k1 <= (int) optionTexts->size())
+        {
+            string optCore = stripRenderAnnotationsLc((*optionTexts)[k1 - 1]);
+            if (optCore.size() >= 6 && optCore.find(' ') != string::npos)
+            {
+                string replyCore = stripRenderAnnotationsLc(text);
+                if (replyCore.find(optCore) != string::npos)
+                    return false; //chosen option's core name present -> consistent, trust
             }
         }
         //(b) every echoed word names the decision's own source card (the spell
@@ -5797,7 +5959,7 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
     {
         tail << (j + 1) << ". " << hand[j]->name << changelingAnnotation(hand[j]);
         if (hand[j]->isLand())
-            tail << " (land)";
+            tail << landTag(hand[j]); //land + colors it taps for (deck93 wave-27), not a bare "(land)"
         else if (hand[j]->getManaCost())
             tail << " (cost " << hand[j]->getManaCost()->getConvertedCost() << ")";
         string txt = cardTextSnippet(hand[j], 120);
@@ -6860,6 +7022,52 @@ void AIPlayerGPT::runParseSelfTest()
         int cx = parseChoice("1 (Cast Black Sun's Zenith with X=1)", 2, &xopts, &sx, NULL);
         cout << "     anchorless 'X = 1' echo w/o source -> " << cx << " (must be < 0: still stale)\n";
         CHECK(cx < 0 && sx, "W25-3 guard: an anchorless bare-X option without a source anchor stays stale");
+    }
+
+    // ---- WAVE-28: R-ANNOTATION-ECHO-PARSE (the model echoes a render annotation
+    // onto the option name) + the Item-1 land-tag echo shape ----
+    cout << "\n[W28-ECHO] annotation-tolerant name match: an echoed [changeling]/(land) tail resolves; a different card still stays stale\n";
+    {
+        // deck22 vs131 s3 (real): the model appended the hand-render annotation
+        // "[changeling: counts as Giant]" to its echoed option name; the canonical
+        // cast option has no annotation, the number+name reconcile failed -> stale_echo
+        // -> Baka. The chosen option's core ("Cast Universal Automaton {1} (1/1)")
+        // still appears verbatim in the reply, so the in-range index is trusted.
+        vector<string> autom;
+        autom.push_back("Cast Universal Automaton {1} (1/1)");
+        autom.push_back("Cast Mogg Sentry {r} (1/1)");
+        autom.push_back("Cast nothing right now");
+        bool sa = false;
+        int ca = parseChoice("CHOICE: 1 (Cast Universal Automaton {1} (1/1) [changeling: counts as Giant])",
+                             3, &autom, &sa, NULL);
+        cout << "     changeling-annotated echo -> " << ca << " (must be 1, was stale_echo)\n";
+        CHECK(ca == 1 && !sa, "W28-ECHO deck22 s3: a '[changeling: ...]' tail on the echoed name still trusts the in-range index");
+
+        // NEGATIVE: a DIFFERENT card echoed (with the same annotation) must NOT
+        // match option 1 - its core name is absent from the reply, so it stays stale.
+        bool sn = false;
+        int cn = parseChoice("CHOICE: 1 (Cast Grizzly Bears {1}{g} [changeling: counts as Giant])",
+                             3, &autom, &sn, NULL);
+        cout << "     different card + annotation -> " << cn << " (must be -1: stale, no cross-match)\n";
+        CHECK(cn < 0 && sn, "W28-ECHO negative: a different card name with an annotation does NOT cross-match option 1");
+
+        // Item-1 land-tag echo shape: the model copied "(land: taps for {B})" out of
+        // the hand render onto a bare "Play Swamp" option. The '(land...)' tail is
+        // stripped, so the option core "Play Swamp" reconciles -> trust the index.
+        vector<string> lands;
+        lands.push_back("Cast Dark Ritual {b}");
+        lands.push_back("Play Swamp");
+        lands.push_back("Cast nothing right now");
+        bool sl = false;
+        int cl = parseChoice("CHOICE: 2 (Play Swamp (land: taps for {B}))", 3, &lands, &sl, NULL);
+        cout << "     land-tag-annotated echo -> " << cl << " (must be 2, tolerant of the new land tag)\n";
+        CHECK(cl == 2 && !sl, "W28-ECHO Item-1 land tag: a '(land: taps for {B})' tail on the echoed name still trusts the in-range index");
+
+        // NEGATIVE land: a different land echoed must not rescue option 2 (Swamp).
+        bool sl2 = false;
+        int cl2 = parseChoice("CHOICE: 2 (Play Mountain (land: taps for {R}))", 3, &lands, &sl2, NULL);
+        cout << "     different land + land tag -> " << cl2 << " (must be -1: stale)\n";
+        CHECK(cl2 < 0 && sl2, "W28-ECHO negative land: a different land name does NOT cross-match the Swamp option");
     }
 
     #undef RESOLVE
