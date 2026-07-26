@@ -1,0 +1,24 @@
+# Aclazotz, Deepest Betrayal carries an `anyzone={0}:doubleside(backside)` line
+# (NULL-by-design on the battlefield) BEFORE its ability lines. This proves the
+# ability AFTER the doubleside line still installs and fires: Player1 casts a
+# forced land-discard; from Aclazotz's controller (Player2) that opponent land
+# discard fires `@discarded(land|opponentHand):create(bat:creature bat:1/1:black:flying)`,
+# creating a 1/1 black Bat token on Player2's battlefield.
+# ('^' stands in for the comma inside "Aclazotz, Deepest Betrayal".)
+[INIT]
+firstmain
+[PLAYER1]
+hand:Lexicon Forced Landdiscard,Forest
+manapool:{1}
+[PLAYER2]
+inplay:Aclazotz^ Deepest Betrayal
+[DO]
+Lexicon Forced Landdiscard
+Forest
+[ASSERT]
+firstmain
+[PLAYER1]
+graveyard:Lexicon Forced Landdiscard,Forest
+[PLAYER2]
+inplay:Aclazotz^ Deepest Betrayal,*
+[END]

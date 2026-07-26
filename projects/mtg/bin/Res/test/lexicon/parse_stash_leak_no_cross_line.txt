@@ -1,0 +1,23 @@
+# Regression: a NULL-returning line must not leak its and!()/pay[[ stash into the
+# NEXT line. "Lexicon Stash Leak Probe" line 1 = `zzznomatchzzz and!( draw:2 )!`
+# (the and!() stash is set to " draw:2", then the primary matches no parser and
+# returns NULL); line 2 = `draw:1`. Pre-fix the leaked " draw:2" was consumed by
+# line 2's draw parser as an andAbility, drawing 3 total. Fixed: getAbilities clears
+# storedAndAbility/storedPayString before each top-level line, so exactly 1 is drawn.
+# Library uses Lexicon Synthetic Vanilla (id 2100000000) filler.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Stash Leak Probe
+library:Lexicon Synthetic Vanilla,Lexicon Synthetic Vanilla,Lexicon Synthetic Vanilla,Lexicon Synthetic Vanilla,Lexicon Synthetic Vanilla
+[PLAYER2]
+[DO]
+Lexicon Stash Leak Probe
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lexicon Synthetic Vanilla
+library:Lexicon Synthetic Vanilla,Lexicon Synthetic Vanilla,Lexicon Synthetic Vanilla,Lexicon Synthetic Vanilla
+graveyard:Lexicon Stash Leak Probe
+[PLAYER2]
+[END]

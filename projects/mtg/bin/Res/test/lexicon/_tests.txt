@@ -844,3 +844,5 @@ lexicon/lexicon_clone_all_artifacts.txt
 lexicon/tergrid_steals_sacrificed_creature.txt
 lexicon/tergrid_steals_discarded_permanent.txt
 lexicon/tergrid_ignores_sacrificed_token.txt
+lexicon/parse_stash_leak_no_cross_line.txt
+lexicon/aclazotz_postdoubleside_ability_installs.txt

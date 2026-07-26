@@ -322,6 +322,140 @@ void describeAttachments(std::ostringstream& out, MTGCardInstance * host)
         out << "}";
 }
 
+//A stable per-instance handle for a battlefield permanent whose NAME collides
+//with another permanent its controller has in play. A bare name cannot bind a
+//board-snapshot entry to an offered A#/B#/target line: wave-26 deck137 s36 had
+//TWO Lovestruck Beasts (one tapped, one untapped), the B-line said only
+//"Lovestruck Beast", and the model resolved the collision against itself and
+//declined a free kill-and-survive block (10.8k-char spiral). Give each colliding
+//copy a "#N" suffix. N is the card's 1-based rank among same-named permanents on
+//ITS controller's battlefield, in battlefield array order (i.e. enter/play
+//order) - a deterministic function of the instance, so every surface (board
+//snapshot, A/B option lines, target lines) prints the SAME number for the SAME
+//physical card and an offered label binds unambiguously. Returns "" for a
+//singleton name (no collision -> no noise) or a card not on its controller's
+//battlefield. The name reconcile already reads a trailing "#N"
+//(nameOrdinal/uniqueNameMatch), so a reply that answers by name+handle resolves
+//too; the A#/B# label binding is positional and correct regardless of this
+//decoration.
+string instanceHandle(MTGCardInstance * card)
+{
+    if (!card)
+        return "";
+    Player * ctrl = card->controller();
+    if (!ctrl || !ctrl->game)
+        return "";
+    MTGGameZone * bf = ctrl->game->battlefield;
+    if (!bf)
+        return "";
+    int total = 0, rank = 0;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * o = bf->cards[i];
+        if (!o || o->name != card->name)
+            continue;
+        total++;
+        if (o == card)
+            rank = total;
+    }
+    if (total < 2 || rank == 0)
+        return ""; //singleton name, or card not on its controller's battlefield
+    std::ostringstream h;
+    h << " #" << rank;
+    return h.str();
+}
+
+//Read the alnum/hyphen token at 'start' and, if it is a creature subtype, add
+//its proper-cased form to 'out'. Helper for collectTribalTypes.
+void addTribeToken(const string& mt, size_t start,
+                   const std::map<string, string>& proper, std::set<string>& out)
+{
+    size_t e = start;
+    while (e < mt.size() && (isalnum((unsigned char) mt[e]) || mt[e] == '-'))
+        e++;
+    if (e <= start)
+        return;
+    std::map<string, string>::const_iterator it = proper.find(mt.substr(start, e - start));
+    if (it != proper.end())
+        out.insert(it->second);
+}
+
+//Creature subtypes that some card in p's deck/battlefield mechanically CONSUMES
+//- a count, anthem or gate keyed on that type: lord(other TYPE), foreach(other
+//TYPE), aslongas(other TYPE), or a "[...&TYPE]" source filter (Calamity Bearer).
+//These are the tribes for which a changeling's "counts as every creature type"
+//actually changes a decision. Extracted from each card's raw auto script
+//(magicText): a vanilla creature's own subtype lives on its subtype= line, NOT
+//in magicText, so a creature-type word appearing in an "other TYPE"/"&TYPE"
+//context pinpoints a genuine tribal consumer and skips incidental mentions
+//(token makers etc.). Wave-26 deck22: Universal Automaton (a Changeling) was
+//mulliganed/bottomed as "not a Giant" while it enabled Blind-Spot Giant and fed
+//Calamity Bearer / Sunrise Sovereign / Borderland Behemoth.
+void collectTribalTypes(Player * p, std::set<string>& out)
+{
+    if (!p || !p->game)
+        return;
+    const vector<string>& vocab = MTGAllCards::getCreatureValuesById();
+    std::map<string, string> proper; //lowercased -> proper-cased subtype name
+    for (size_t i = 0; i < vocab.size(); i++)
+    {
+        string low = vocab[i];
+        for (size_t k = 0; k < low.size(); k++)
+            low[k] = (char) tolower((unsigned char) low[k]);
+        if (!low.empty())
+            proper[low] = vocab[i];
+    }
+    MTGGameZone * zones[] = { p->game->library, p->game->hand, p->game->inPlay, p->game->graveyard };
+    for (size_t z = 0; z < sizeof(zones) / sizeof(zones[0]); z++)
+    {
+        MTGGameZone * zone = zones[z];
+        if (!zone)
+            continue;
+        for (int i = 0; i < zone->nb_cards; i++)
+        {
+            MTGCardInstance * c = zone->cards[i];
+            if (!c || c->magicText.empty())
+                continue;
+            string mt = c->magicText;
+            for (size_t k = 0; k < mt.size(); k++)
+                mt[k] = (char) tolower((unsigned char) mt[k]);
+            //"other <type>" - the lord/foreach/aslongas(other TYPE) tribal form.
+            //Require a boundary before "other" so "another" does not match.
+            for (size_t q = 0; (q = mt.find("other ", q)) != string::npos; q += 6)
+                if (q == 0 || !isalnum((unsigned char) mt[q - 1]))
+                    addTribeToken(mt, q + 6, proper, out);
+            //"&<type>" - a source/count filter that keys on a type.
+            for (size_t q = 0; (q = mt.find('&', q)) != string::npos; q += 1)
+                addTribeToken(mt, q + 1, proper, out);
+        }
+    }
+}
+
+//If 'card' is a changeling AND its controller's deck/battlefield holds a
+//tribal consumer, name the live-relevant type(s) so the model chains
+//keyword->type->tribal role (it renders "[changeling]" today but never made
+//that inference; wave-26 deck22 rule #1). Capped at 3 types; "" when there is
+//no live consumer (no noise).
+string changelingAnnotation(MTGCardInstance * card)
+{
+    if (!card || !card->basicAbilities[Constants::CHANGELING])
+        return "";
+    Player * ctrl = card->controller();
+    if (!ctrl)
+        return "";
+    std::set<string> tribes;
+    collectTribalTypes(ctrl, tribes);
+    if (tribes.empty())
+        return "";
+    std::ostringstream o;
+    o << " [changeling: counts as ";
+    int n = 0;
+    for (std::set<string>::iterator it = tribes.begin(); it != tribes.end() && n < 3; ++it, ++n)
+        o << (n ? ", " : "") << *it;
+    o << "]";
+    return o.str();
+}
+
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus)
 {
     bool first = true;
@@ -332,6 +466,10 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             out << "; ";
         first = false;
         out << card->getDisplayName();
+        //Disambiguate same-named permanents so a board entry binds to the
+        //A#/B#/target line that offers it (battlefield lines only; "" otherwise).
+        if (withStatus)
+            out << instanceHandle(card);
         ManaCost * cost = card->getManaCost();
         if (cost && cost->getConvertedCost())
             out << " " << cost->toString(); //toString carries its own braces
@@ -351,6 +489,11 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             if (!tag.empty() && tag != "land")
                 out << " [" << tag << "]";
         }
+        //A changeling is every creature type: name the tribe(s) a card in this
+        //deck/battlefield actually consumes so the model chains it to a role.
+        //On hand lines (withStatus false) this is the only changeling signal -
+        //keywordList below is battlefield-only - so it also covers mulligan.
+        out << changelingAnnotation(card);
         //Tag-completeness for artifacts (battlefield lines): the "Artifacts
         //in play: you N" summary counts EVERY artifact, but the per-
         //permanent tags used to mark only non-creature non-land artifacts -
@@ -467,6 +610,8 @@ string describeTarget(Player * me, Targetable * t)
     if (!c)
         return "(unknown)";
     o << c->getDisplayName();
+    //Bind a target line to the specific same-named body (battlefield only).
+    o << instanceHandle(c);
     if (c->isCreature())
     {
         o << " (" << c->power << "/" << c->toughness << ")";
@@ -970,6 +1115,9 @@ string AIPlayerGPT::describeDeckCards(Player * p, bool withCounts)
             out << " " << cost->toString();
         if (card->isCreature())
             out << " (" << card->power << "/" << card->toughness << ")";
+        //A changeling in the decklist: name the tribe(s) this deck consumes so
+        //the identity is known before a card is ever drawn (mulligan/keep).
+        out << changelingAnnotation(card);
         string text = card->text;
         if (!text.empty())
         {
@@ -4862,7 +5010,7 @@ int AIPlayerGPT::chooseAttackers()
     for (size_t j = 0; j < attackers.size(); j++)
     {
         std::ostringstream ln;
-        ln << "A" << (j + 1) << ". " << attackers[j]->name
+        ln << "A" << (j + 1) << ". " << attackers[j]->name << instanceHandle(attackers[j])
            << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
         string kw = keywordList(attackers[j]);
         if (!kw.empty())
@@ -5141,7 +5289,7 @@ int AIPlayerGPT::chooseBlockers()
     for (size_t j = 0; j < attackers.size(); j++)
     {
         std::ostringstream ln;
-        ln << "A" << (j + 1) << ". " << attackers[j]->name
+        ln << "A" << (j + 1) << ". " << attackers[j]->name << instanceHandle(attackers[j])
            << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
         //POWER is the damage number, not toughness. The model misread a
         //Saproling "(2/4)" as dealing 4 (deck35 wave-18 G1); state the damage
@@ -5172,7 +5320,7 @@ int AIPlayerGPT::chooseBlockers()
     for (size_t i = 0; i < blockers.size(); i++)
     {
         std::ostringstream ln;
-        ln << "B" << (i + 1) << ". " << blockers[i]->name
+        ln << "B" << (i + 1) << ". " << blockers[i]->name << instanceHandle(blockers[i])
            << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ")";
         string kw = keywordList(blockers[i]);
         if (!kw.empty())
@@ -5647,7 +5795,7 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
          << keep << ", bottom your worst " << need << ".\n";
     for (size_t j = 0; j < hand.size(); j++)
     {
-        tail << (j + 1) << ". " << hand[j]->name;
+        tail << (j + 1) << ". " << hand[j]->name << changelingAnnotation(hand[j]);
         if (hand[j]->isLand())
             tail << " (land)";
         else if (hand[j]->getManaCost())
@@ -5803,6 +5951,30 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "     ATTACK 'Saproling #2': result=" << r << " send=["
              << (send.size()>0&&send[0]) << "," << (send.size()>1&&send[1]) << "]\n";
         CHECK(r == 1 && !send[0] && send[1], "3b attacker '#2' selects the 2nd of two Saprolings");
+    }
+
+    // ---- ITEM 3b-w27: R-DUPLICATE-NAME-INSTANCE render->reply round-trip ----
+    // The board/B-lines now print a "#N" handle for same-named permanents
+    // (wave-26 deck137 s36: two Lovestruck Beasts, one tapped one untapped; the
+    // undecorated B-line let the model decline a free block). Verify a reply
+    // that answers with the RENDERED handle binds to the right blocker, and that
+    // the positional B# label binds correctly no matter the name decoration.
+    cout << "\n[3b-w27] two 'Lovestruck Beast' blockers; B2 is the untapped copy offered vs A1\n";
+    {
+        vector<string> bn; bn.push_back("Lovestruck Beast"); bn.push_back("Lovestruck Beast");
+        vector<string> an; an.push_back("Zealous Guardian");
+        // only B2 (the untapped copy) may legally block A1 in this scenario
+        vector<vector<int> > legal(2); legal[1].push_back(0);
+        // name+handle reply: "#2" picks the 2nd Lovestruck = the offered untapped one
+        vector<int> out;
+        int pairs = parseBlockAssignments("Lovestruck Beast #2: Zealous Guardian", 2, 1, out, &bn, &an, &legal);
+        cout << "     name+'#2': pairs=" << pairs << " B1->A" << out[0] << " B2->A" << out[1] << "\n";
+        CHECK(pairs == 1 && out[0] == 0 && out[1] == 1, "3b-w27 'Lovestruck Beast #2' blocks A1 (right instance)");
+        // positional label reply: "B2:A1" binds to blockers[1] regardless of name
+        vector<int> out2;
+        int pairs2 = parseBlockAssignments("B2:A1", 2, 1, out2, &bn, &an, &legal);
+        cout << "     label 'B2:A1': pairs=" << pairs2 << " B1->A" << out2[0] << " B2->A" << out2[1] << "\n";
+        CHECK(pairs2 == 1 && out2[0] == 0 && out2[1] == 1, "3b-w27 label B2:A1 binds positionally (decoration-independent)");
     }
 
     // ---- ITEM 3c: mixed reply keeps valid pairing, drops only the invalid ----

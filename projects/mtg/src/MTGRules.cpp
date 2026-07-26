@@ -602,6 +602,32 @@ int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
     ManaCost * spellCost = previousManaPool->Diff(player->getManaPool());
 
     delete previousManaPool;
+    //R-DFC-BACKFACE-RESOLVES-FRONT: a Kaldheim-style modal DFC (a front creature
+    //carrying its back face as an other= alternative cost plus
+    //autostack=if paid(alternative) then flip(...)) can have its DISPLAYED face
+    //flipped to the cheaper back while an AI flip hack leaves the isFlipped flag
+    //reading the front face (the flag desyncs from the shown face). In that state
+    //this front "Cast Card Normally" rule is wrongly offered and pays the back
+    //face's reduced cost but resolves the FRONT permanent, because the autostack
+    //flip only fires when paid(alternative) is set - a normal cast never sets it
+    //(the discounted-God bug, R-DFC-BACKFACE, deck102 vs27 s34 / wave26 probe).
+    //When the shown face is NOT the base/front face (name changed by the display
+    //flip) and the paid cost is the front's alternative cost, route this cast
+    //through the alternative path: stamp paid(alternative) so the autostack flip
+    //fires and the DISPLAYED (back) face resolves. The paid cost then always
+    //matches the face that resolves, for the whole modal-DFC-god class, without
+    //touching front-face casts, transforms, or the alternative-cost cast itself.
+    if (payResult == ManaCost::MANA_PAID && card->model && card->model->data
+        && card->model->data->getManaCost() && card->model->data->getManaCost()->getAlternative()
+        && card->model->data->magicTexts.count("stack")
+        && card->model->data->magicTexts["stack"].find("flip(") != string::npos
+        && card->name != card->model->data->name && card->getManaCost()
+        && card->getManaCost()->getConvertedCost()
+             <= card->model->data->getManaCost()->getAlternative()->getConvertedCost())
+    {
+        payResult = ManaCost::MANA_PAID_WITH_ALTERNATIVE;
+        card->alternateCostPaid[ManaCost::MANA_PAID_WITH_ALTERNATIVE] = 1;
+    }
     if (card->isLand())
     {
         MTGCardInstance * copy = player->game->putInZone(card, card->currentZone, player->game->temp);

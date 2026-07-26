@@ -1,0 +1,5 @@
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=0 nameOrig='' MTGId=503721 isAI=1 _SideName='tergrid's lantern' altPaid=0
+[DFCPROBE] AATurnSide::resolve EXIT  name='Tergrid's Lantern' isFlipped=0 nameOrig='Tergrid, God of Fright' MTGId=503721
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Tergrid's Lantern' modelName='Tergrid, God of Fright' isFlipped=0 nameOrig='Tergrid, God of Fright' MTGId=503721 altHasAlt=1 altPaid=0
+Resolving Action on stack: Tergrid, God of Fright
+<span class="success">==Test Successful !==</span>

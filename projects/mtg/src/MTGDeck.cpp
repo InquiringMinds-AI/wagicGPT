@@ -1024,10 +1024,11 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
     int setId = -1;
     size_t found = nameDescriptor.find(" (");
     string name = nameDescriptor;
+    string setName = "";
     if (found != string::npos)
     {
         size_t end = nameDescriptor.find(")");
-        string setName = nameDescriptor.substr(found + 2, end - found - 2);
+        setName = nameDescriptor.substr(found + 2, end - found - 2);
         trim(setName);
         name = nameDescriptor.substr(0, found);
         trim(name);
@@ -1037,17 +1038,29 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
         nameDescriptor = name + " (" + setName + ")";
     }
 
+    bool nameMatchedButSetDropped = false;
     for (it = collection.begin(); it != collection.end(); it++)
     {
         MTGCard * c = it->second;
-        if (setId != -1 && setId != c->setId) continue;
         string cardName = c->data->name;
         std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
+        if (setId != -1 && setId != c->setId)
+        {
+            //A printing with this exact name EXISTS, but the set hint filtered it out.
+            //Remember it so a name-only miss can be reported loudly below instead of
+            //silently yielding no card. (Matching behavior is unchanged.)
+            if (cardName.compare(name) == 0) nameMatchedButSetDropped = true;
+            continue;
+        }
         if (cardName.compare(name) == 0) {
             mtgCardByNameCache[nameDescriptor] = c;
             return c;
         }
     }
+
+    if (nameMatchedButSetDropped)
+        fprintf(stderr, "DECK LOAD WARNING: \"%s\" (%s) matched by name but dropped by set filter -- use (*) or bare name\n",
+                name.c_str(), setName.c_str());
 
     mtgCardByNameCache[nameDescriptor] = NULL;
     return NULL;

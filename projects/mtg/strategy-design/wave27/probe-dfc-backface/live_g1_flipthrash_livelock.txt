@@ -1,0 +1,50 @@
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Swamp' modelName='Swamp' isFlipped=0 nameOrig='' MTGId=277 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Swamp' modelName='Swamp' isFlipped=0 nameOrig='' MTGId=277 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Swamp' modelName='Swamp' isFlipped=0 nameOrig='' MTGId=277 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Hymn to Tourach' modelName='Hymn to Tourach' isFlipped=0 nameOrig='' MTGId=1849 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Hymn to Tourach' modelName='Hymn to Tourach' isFlipped=0 nameOrig='' MTGId=1849 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Swamp' modelName='Swamp' isFlipped=0 nameOrig='' MTGId=277 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Erg Raiders' modelName='Erg Raiders' isFlipped=0 nameOrig='' MTGId=916 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Swamp' modelName='Swamp' isFlipped=0 nameOrig='' MTGId=277 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Soul Shatter' modelName='Soul Shatter' isFlipped=0 nameOrig='' MTGId=491765 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Swamp' modelName='Swamp' isFlipped=0 nameOrig='' MTGId=277 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Hypnotic Specter' modelName='Hypnotic Specter' isFlipped=0 nameOrig='' MTGId=68 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Swamp' modelName='Swamp' isFlipped=0 nameOrig='' MTGId=277 altHasAlt=0 altPaid=0
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 isAI=1 _SideName='' altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Liliana's Triumph' modelName='Liliana's Triumph' isFlipped=0 nameOrig='' MTGId=461025 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Hymn to Tourach' modelName='Hymn to Tourach' isFlipped=0 nameOrig='' MTGId=1849 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Hymn to Tourach' modelName='Hymn to Tourach' isFlipped=0 nameOrig='' MTGId=1849 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Scathe Zombies' modelName='Scathe Zombies' isFlipped=0 nameOrig='' MTGId=81 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Hymn to Tourach' modelName='Hymn to Tourach' isFlipped=0 nameOrig='' MTGId=1849 altHasAlt=0 altPaid=0
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Hymn to Tourach' modelName='Hymn to Tourach' isFlipped=0 nameOrig='' MTGId=1849 altHasAlt=0 altPaid=0
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Swamp' modelName='Swamp' isFlipped=0 nameOrig='' MTGId=277 altHasAlt=0 altPaid=0
+AIPlayerGPT: dropping stale async answer
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 isAI=1 _SideName='' altPaid=0
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 isAI=1 _SideName='' altPaid=0
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 isAI=1 _SideName='' altPaid=0
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 isAI=1 _SideName='' altPaid=0
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 isAI=1 _SideName='' altPaid=0
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 isAI=1 _SideName='' altPaid=0
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 isAI=1 _SideName='' altPaid=0
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+[DFCPROBE] AATurnSide::resolve ENTER name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 isAI=1 _SideName='' altPaid=0
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: casting Tergrid, God of Fright (model's pick)
+[DFCPROBE] MTGAltCostRule::reactToClick name='Tergrid, God of Fright' modelName='Tergrid, God of Fright' isFlipped=1 nameOrig='' MTGId=503721 altPaid=0
+Action added to stack: Tergrid, God of Fright
+[DFCPROBE] MTGPutInPlayRule::reactToClick name='Swamp' modelName='Swamp' isFlipped=0 nameOrig='' MTGId=277 altHasAlt=0 altPaid=0
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
