@@ -1,0 +1,31 @@
+# March of the Multitudes {X}{G}{W}{W}, convoke, Instant. Scripted convoke X-cast
+# through the cast-mode menu. Pool affords both costs so clicking pops the mode
+# menu: choice 1 = convoke variant -> the alternative-cost rule announces X
+# (choice 2 = X=2) -> tap creatures to convoke the {G}{W}{W} colored requirement
+# -> finish. The engine convokes as needed and pays the rest from the pool.
+# Expect 2 Soldier tokens (wildcard '*') + March in the graveyard. Pre-fix the
+# convoke alternative carried no X -> X=0 -> 0 tokens (March 0/17, corpus
+# 20260725). The tap-count / residual-mana split is engine-chosen so this asserts
+# only the load-bearing outcome: X=2 announced -> 2 tokens created, spell resolved.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Eager Cadet,Eager Cadet
+hand:March of the Multitudes
+manapool:{2}{G}{W}{W}
+[PLAYER2]
+[DO]
+March of the Multitudes
+choice 1
+choice 2
+Grizzly Bears
+Eager Cadet
+Eager Cadet
+March of the Multitudes
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Eager Cadet,Eager Cadet,*,*
+graveyard:March of the Multitudes
+[PLAYER2]
+[END]

@@ -636,6 +636,17 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             //at the flag: it untaps and attacks again next turn.
             if (card->isTapped())
                 out << (card->isCreature() ? " [tapped - untaps and can attack next turn]" : " [tapped]");
+            //A summoning-sick creature renders identically to an attack-ready one
+            //otherwise, so the pilot pattern-completes its ATTACK line from the
+            //board count and lists slots the A-lines never offered (deck93 N-93a:
+            //11/15 attack decls padded with phantom attackers, plausibly cost the
+            //vs18 game on a false-lethal tap). Annotate the restriction inline on
+            //the surface the model reads, using the ENGINE's own predicate
+            //(hasSummoningSickness = entered this turn, no haste, is a creature) -
+            //exactly what canAttack() enforces, no re-derivation. Guide prose
+            //alone ("count from the A-lines") already failed to override this.
+            if (card->hasSummoningSickness())
+                out << " [summoning sick - cannot attack this turn]";
             if (card->isAttacker())
                 out << " [attacking]";
             else if (card->isDefenser())
@@ -664,6 +675,61 @@ string zoneDesc(MTGGameZone * z)
     if (isRevealZone(z))
         return "reveal";
     return z->getName();
+}
+
+//Dungeon rooms: a dungeon card's text= lists every room as
+//"<Room Name> - <effect>. -- <Room Name> - <effect>. -- ...". The engine
+//surfaces room CHOICES - the first-venture dungeon SELECTION and the in-dungeon
+//room BRANCH menu - carrying only the room/dungeon NAME; each room's effect
+//lives in dense auto= script the model cannot read (deck146 N-146b/c). Parse
+//the readable text= into (name, effect) pairs so the deciding fact can ride the
+//option, mirroring the land/target/magnitude annotations already in place.
+void parseDungeonRooms(const string& t, std::vector<std::pair<string, string> >& rooms)
+{
+    size_t pos = 0;
+    while (pos <= t.size())
+    {
+        size_t sep = t.find(" -- ", pos);
+        string piece = t.substr(pos, sep == string::npos ? string::npos : sep - pos);
+        size_t a = piece.find_first_not_of(" \t\r\n");
+        size_t b = piece.find_last_not_of(" \t\r\n");
+        if (a != string::npos)
+        {
+            piece = piece.substr(a, b - a + 1);
+            //split name from effect on the FIRST " - " (room names never contain
+            //it; an effect that does keeps the rest intact via find's first-match).
+            size_t dash = piece.find(" - ");
+            if (dash != string::npos)
+                rooms.push_back(std::make_pair(piece.substr(0, dash), piece.substr(dash + 3)));
+        }
+        if (sep == string::npos)
+            break;
+        pos = sep + 4;
+    }
+}
+
+//The dungeon a player is currently venturing lives (exactly one) in the command
+//zone; the dungeons being SELECTED sit in the sideboard as chooseTarget cands.
+MTGCardInstance * activeDungeon(MTGPlayerCards * g)
+{
+    if (!g || !g->commandzone)
+        return NULL;
+    for (int i = 0; i < g->commandzone->nb_cards; i++)
+        if (g->commandzone->cards[i] && g->commandzone->cards[i]->hasType(Subtypes::TYPE_DUNGEON))
+            return g->commandzone->cards[i];
+    return NULL;
+}
+
+//case-insensitive: is `name` a prefix of `s` (used to match a menu option, which
+//may carry trailing annotation, against a room name).
+bool ciStartsWith(const string& s, const string& name)
+{
+    if (name.empty() || s.size() < name.size())
+        return false;
+    for (size_t i = 0; i < name.size(); i++)
+        if (tolower((unsigned char) s[i]) != tolower((unsigned char) name[i]))
+            return false;
+    return true;
 }
 
 //One targetable thing, described for the model's target menu.
@@ -698,6 +764,25 @@ string describeTarget(Player * me, Targetable * t)
         o << " [" << (c->controller() == me ? "your " : "opponent's ") << zoneDesc(c->currentZone) << "]";
     if (c->isTapped())
         o << " [tapped]";
+    //Dungeon SELECTION target (N-146c): the generic 110-char snippet TRUNCATED
+    //the room list at ~1-2 rooms, hiding the completion room + payoff the value
+    //pick depends on (Lost Mine completes in 3 rooms vs Tomb's 4 vs Mad Mage's
+    //8). Show the full room path plus a compact room-count / completion-payoff
+    //summary (the final text= room is the completion reward) instead of the cut
+    //snippet. Dungeons only ever surface as targets in the venture selection, so
+    //this special-case does not touch normal removal/target rendering.
+    if (c->hasType(Subtypes::TYPE_DUNGEON))
+    {
+        std::vector<std::pair<string, string> > rooms;
+        parseDungeonRooms(c->text, rooms);
+        if (!rooms.empty())
+        {
+            o << " [dungeon: " << rooms.size() << " rooms; completion reward (\""
+              << rooms.back().first << "\"): " << rooms.back().second << "]";
+            o << " - full room path: \"" << c->text << "\"";
+            return o.str();
+        }
+    }
     //The deciding fact rides on the option: a discard or removal pick from
     //bare names is a coin flip for the model.
     string txt = cardTextSnippet(c, 110);
@@ -1283,8 +1368,15 @@ void AIPlayerGPT::flushOpeningHand()
 string AIPlayerGPT::assemblePrompt(const string& tail)
 {
     std::ostringstream u;
-    flushOpeningHand();
-    if (!mNarration.empty())
+    flushOpeningHand(); //always: preserves the opening-hand log line for turn 1+
+    //N-93b de-dup: at pregame (turn 0 - mulligan/leyline/bottom asks) the only
+    //narration is the just-flushed opening-hand line, and the live "Your hand:"
+    //render below shows the SAME cards tagged (strictly more info). Rendering
+    //both double-lists the hand at the mulligan prompt. Suppress the GAME LOG
+    //here only - the flush above still keeps the line in mNarration, so the
+    //first real (turn 1+) decision logs the opening hand as history.
+    bool pregame = (observer && observer->turn == 0);
+    if (!mNarration.empty() && !pregame)
         u << "GAME LOG (everything that has happened so far):\n" << mNarration << "\n";
     u << "--- CURRENT SITUATION ---\n" << serializeGameState();
     if (!mCurrentPlan.empty())
@@ -1787,9 +1879,16 @@ string AIPlayerGPT::serializeGameState()
     //the potential of its untapped producers. The old "Mana in your pool:
     //(none)" line was the model's #1 source of false can't-pay beliefs.
     string pool = this->getManaPool()->toString();
-    ManaCost * potential = getPotentialMana();
-    int sources = potential ? potential->getConvertedCost() : 0;
-    string colors = potential ? potential->toString() : "";
+    //Color REACH, not a flat ability sum: a dual source (Snarl: add{B}/add{W})
+    //must show BOTH its colors, and count as ONE source, or the model believes
+    //a second-color pip unpayable (N-146d) - the same dual-land collapse that
+    //denied casts in the oracle (N-146a). potentialColorReach dedups colors and
+    //counts distinct source cards; the engine now really can assemble any single
+    //color per dual (the planPayment fix).
+    ManaEngine::FreeProducerPolicy manaReachPolicy;
+    ManaCost * potential = NEW ManaCost();
+    int sources = ManaEngine::potentialColorReach(this, manaReachPolicy, potential);
+    string colors = potential->toString();
     SAFE_DELETE(potential);
     out << "Mana available: ";
     if (sources)
@@ -4131,6 +4230,44 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         if (opts[i].compare(0, 10, "Transform:") == 0)
             opts[i] += " [available NOW - this transform is only offered because its"
                        " condition is already met; do not recount, it is legal this instant]";
+    //Modal-DFC "Flip Side" in the CLICK menu (deck199 Tergrid, observed live at
+    //g1 seq21: "1. Cast Card Normally / 2. Flip Side / 3. Decline"). AATurnSide::
+    //getMenuText renders it as a bare "Flip Side"; AATurnSide::resolve swaps the
+    //hand card's displayed face (name/cost/P/T) but casts nothing, uses no stack,
+    //and moves no zone - and BOTH faces stay castable from the Cast menu (the back
+    //via its alternative cost), so it is a game no-op for the AI (the sanctioned
+    //mechanically-no-op UI dead-end class). It is a real face-data mutation, not a
+    //pure display redraw, so per the suppression rule it is ANNOTATED, not filtered
+    //- and this keeps the CHOOSE_MENU seat CONSISTENT with the priority seam, which
+    //already annotates the same pseudo-action "DISPLAY TOGGLE only" in describeAction.
+    //Append-only text: the answer index and the req.optionTexts staleness key are
+    //untouched.
+    for (size_t i = 0; i < opts.size(); i++)
+        if (opts[i] == "Flip Side")
+            opts[i] += " [display toggle only - no game effect: switches which face this"
+                       " hand card shows; it casts nothing and uses no stack. The Cast menu"
+                       " is where you cast, and it offers the other face as an"
+                       " alternative-cost cast - you do not need this.]";
+    //Dungeon room-BRANCH menu (deck146 N-146b): advancing WITHIN a dungeon offers
+    //the next room as a bare name ("Veils of Fear" / "Oubliette") with ZERO effect
+    //text - the deciding fact for the venture path is absent (standing P1/P4), and
+    //option-1 bias then steers navigation. The active dungeon in the command zone
+    //carries every room's readable effect in its text=; attach each branch option's
+    //room effect. Self-gating: only options whose text matches a room name of the
+    //active dungeon are touched, so every other bare-name menu is untouched.
+    //Append-only - the answer index and req.optionTexts (staleness key) are unchanged.
+    if (MTGCardInstance * dng = activeDungeon(game))
+    {
+        std::vector<std::pair<string, string> > rooms;
+        parseDungeonRooms(dng->text, rooms);
+        for (size_t i = 0; i < opts.size(); i++)
+            for (size_t r = 0; r < rooms.size(); r++)
+                if (ciStartsWith(opts[i], rooms[r].first))
+                {
+                    opts[i] += " {room effect: " + rooms[r].second + "}";
+                    break;
+                }
+    }
     //ETB "pay life or enter tapped" menu (shocklands - Temple Garden class, and
     //the fixed painland sibling): append the consequence each bare label omits.
     //Annotation only, mechanism-matched (see annotateEtbPayOrTapMenu). deck137
@@ -4372,6 +4509,21 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             }
         }
 
+        //Dungeon SELECTION (N-146c): the first venture reaches this target seam
+        //with the sideboard dungeons as the candidate set. The generic "TARGET
+        //CHOICE ... pick the ONE target it will affect" wording mis-frames it as
+        //targeting a permanent (it is choosing WHICH dungeon to venture into).
+        //Detect the shape (every candidate is a Dungeon) and reframe as a venture
+        //choice. Representation only - the offered set and apply path are unchanged;
+        //describeTarget already renders each dungeon's full room path + summary.
+        bool dungeonSelect = !targets.empty();
+        for (size_t i = 0; i < targets.size() && dungeonSelect; i++)
+        {
+            MTGCardInstance * dc = dynamic_cast<MTGCardInstance *>(targets[i]);
+            if (!dc || !dc->hasType(Subtypes::TYPE_DUNGEON))
+                dungeonSelect = false;
+        }
+
         //Target sub-menus reached the model as a bare "Choose ... for X" line
         //that read like a phase or cast decision, owning most of the corpus's
         //fallbacks: the pilot answered with an attack PLAN ("Choose the target
@@ -4402,6 +4554,17 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                     q << " of " << (tc->targetMin ? "exactly " : "up to ") << tc->maxtargets;
             }
             q << " from the list below, and answer with the chosen card's name.";
+        }
+        else if (dungeonSelect)
+        {
+            q << "VENTURE - CHOOSE A DUNGEON to enter (you are picking WHICH dungeon"
+                 " to venture into, NOT targeting a permanent). Each option below is a"
+                 " dungeon; its tag shows the room count and the completion reward, and"
+                 " its full room path follows. Weigh how many rooms to completion and"
+                 " whether the completion payoff and the rooms en route fit your plan"
+                 " (a dungeon whose completion turns on your payoffs is usually worth"
+                 " the shorter path). Pick the ONE dungeon to venture into, and answer"
+                 " with its name.";
         }
         else
         {
@@ -4969,6 +5132,104 @@ static bool replyTerminatedNaturally(const string& content)
         return false; //long with no PLAN: -> token-cap truncation
     char last = t[e];
     return last == '.' || last == '!' || last == '?' || last == ')' || last == '"';
+}
+
+//===================== WAVE-29 ITEM 2 (N-18e) ============================
+//A TRUNCATED blockers reply whose early coded BLOCKS: line committed to a
+//block, then whose reasoning reversed to a no-block conclusion but ran out of
+//tokens before emitting a corrected/terminal answer. The parser's last-coded-
+//line precedence would honor the stale early commitment - a fatal reach-trade
+//the model had ALREADY talked itself out of (deck18 vs93 s20: emitted
+//"BLOCKS: B1:A1", looped "So I should NOT block ... blocking is strictly worse",
+//hit the token ceiling mid-sentence with no terminator; the block executed and
+//the Soldier died for nothing, contradicting the reply's own conclusion).
+//
+//Fires ONLY when BOTH hold, so real answers are never masked:
+//  (1) the reply is TRUNCATED (replyTerminatedNaturally == false). A naturally
+//      terminated reply is trusted as-is: the model's final answer stands and
+//      the normal last-line precedence resolves any self-correction.
+//  (2) a GLOBAL no-block decline conclusion appears AFTER the committing coded
+//      line. A truncated reply whose early commit was NEVER contradicted keeps
+//      it (unchanged) - the defect is specifically contradicted-then-truncated.
+//The "not block" family is guarded against "cannot block" (a legality note, not
+//a decline of intent). ATTACK keeps its own answer-first CoT-hijack guard and
+//is untouched; this is scoped to the blockers seam where the defect was seen.
+static bool truncatedBlockCommitmentAbandoned(const string& content)
+{
+    if (content.empty())
+        return false;
+    if (replyTerminatedNaturally(content))
+        return false; //natural stop: the reply's final answer is trustworthy
+
+    //Locate the FIRST line-leading BLOCKS: that COMMITS a block (a digit in the
+    //remainder and not a bare "none"); scan only the tail after it.
+    size_t commitLineEnd = string::npos;
+    size_t lineStart = 0;
+    while (lineStart <= content.size())
+    {
+        size_t lineEnd = content.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? content.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (content[s] == ' ' || content[s] == '\t'
+                           || content[s] == '*' || content[s] == '#' || content[s] == '-'))
+            s++;
+        static const char * kLabel = "BLOCKS:";
+        if (end - s >= 7)
+        {
+            bool m = true;
+            for (int k = 0; k < 7 && m; k++)
+                m = (toupper((unsigned char) content[s + k]) == kLabel[k]);
+            if (m)
+            {
+                bool hasDigit = false;
+                string remLow;
+                for (size_t i = s + 7; i < end; i++)
+                {
+                    if (isdigit((unsigned char) content[i]))
+                        hasDigit = true;
+                    remLow += (char) tolower((unsigned char) content[i]);
+                }
+                bool none = remLow.find("none") != string::npos
+                    || remLow.find("no block") != string::npos;
+                if (hasDigit && !none)
+                {
+                    commitLineEnd = end;
+                    break;
+                }
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    if (commitLineEnd == string::npos)
+        return false; //no committing coded line -> nothing to abandon
+
+    string tail;
+    for (size_t i = commitLineEnd; i < content.size(); i++)
+        tail += (char) tolower((unsigned char) content[i]);
+    static const char * kDecline[] = {
+        "not block", "no block", "won't block", "wont block",
+        "do not block", "don't block", "dont block", "not to block", "no benefit"
+    };
+    for (size_t d = 0; d < sizeof(kDecline) / sizeof(kDecline[0]); d++)
+    {
+        const char * phrase = kDecline[d];
+        size_t plen = strlen(phrase);
+        size_t pos = 0;
+        while ((pos = tail.find(phrase, pos)) != string::npos)
+        {
+            //Guard "not block" against "cannot block" (legality, not intent).
+            bool legality = false;
+            if (strcmp(phrase, "not block") == 0 && pos >= 3
+                && tail.compare(pos - 3, 3, "can") == 0)
+                legality = true;
+            if (!legality)
+                return true;
+            pos += plen;
+        }
+    }
+    return false;
 }
 
 //Natural-stop PUT/bottom prose reconciler (the deck27 shape). A bottom reply whose
@@ -5544,6 +5805,25 @@ int AIPlayerGPT::chooseBlockers()
     vector<int> pick;
     int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick,
                                                              &blockerNames, &attackerNames, &legalIdx);
+
+    //WAVE-29 N-18e: the reply committed a block in an early coded line, then
+    //reasoned itself OUT of blocking but was cut off by the token ceiling before
+    //a corrected answer. Honoring the stale commit is a fatal reach-trade the
+    //model already rejected (deck18 vs93 s20). Declare the SAFE combat default
+    //(no blockers). Only fires on truncated-AND-contradicted; a well-terminated
+    //reply, or a truncated commit never contradicted, keeps its answer.
+    if (pairs > 0 && truncatedBlockCommitmentAbandoned(content))
+    {
+        DecisionAction none;
+        DecisionManager::applyDeclareBlockers(req, none);
+        writeTransLog("blockers", userMsg, content, 0, (int) blockers.size(),
+                      "no blockers", "truncated_abandoned", &shownLines);
+        setNotice("model reply cut off mid-reversal - no blocks (safe default)", 5.0f);
+        narrateDecision("You declared no blockers");
+        mBlocksDoneTurn = observer->turn;
+        DebugTrace("AIPlayerGPT: truncated-abandoned block commit -> safe no-blocks default");
+        return 1;
+    }
 
     //A bare "BLOCKS: none" - the model's natural way to decline every
     //block - carries no B<n> pair, and falling back on it handed the
@@ -6755,6 +7035,83 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(ce2 < 0 && se2, "W23-A true-echo: an unrelated source does not rescue a foreign echo");
     }
 
+    // ---- WAVE-29 RENDER PROOF (deterministic): the dungeon room parser +
+    // room-branch annotation (N-146b) and the dungeon-selection summary (N-146c)
+    // reproduce the exact strings the seams emit, from the real Tomb of
+    // Annihilation text= (bin/Res/sets/primitives/borderline.txt).
+    cout << "\n[W29-R] dungeon room parse + branch/selection render proof\n";
+    {
+        string tomb =
+            "Trapped Entry - Each player loses 1 life. "
+            "-- Veils of Fear - Each player loses 2 life unless they discard a card. "
+            "-- Sandfall Cell - Each player loses 2 life unless they sacrifice an artifact, a creature, or a land. "
+            "-- Oubliette - Discard a card and sacrifice an artifact, a creature, and a land. "
+            "-- Cradle of the Death God - Create The Atropal, a legendary 4/4 black God Horror creature token with deathtouch.";
+        std::vector<std::pair<string, string> > rooms;
+        parseDungeonRooms(tomb, rooms);
+        cout << "     parsed " << rooms.size() << " rooms (must be 5)\n";
+        CHECK(rooms.size() == 5, "W29-R parseDungeonRooms splits the 5 Tomb rooms");
+        CHECK(rooms.size() > 1 && rooms[1].first == "Veils of Fear"
+              && rooms[1].second == "Each player loses 2 life unless they discard a card.",
+              "W29-R room name/effect split is clean (Veils of Fear)");
+        CHECK(!rooms.empty() && rooms.back().first == "Cradle of the Death God",
+              "W29-R the final text= room is the completion reward");
+
+        // N-146b branch-menu render: a bare room option gains its {room effect: ...}.
+        // (case-insensitive prefix match tolerates the engine's lowercased name.)
+        CHECK(ciStartsWith("veils of fear", "Veils of Fear"),
+              "W29-R ciStartsWith matches the engine's lowercased room-option name");
+        string opt = "Veils of Fear";
+        for (size_t r = 0; r < rooms.size(); r++)
+            if (ciStartsWith(opt, rooms[r].first)) { opt += " {room effect: " + rooms[r].second + "}"; break; }
+        cout << "     branch option -> " << opt << "\n";
+        CHECK(opt == "Veils of Fear {room effect: Each player loses 2 life unless they discard a card.}",
+              "W29-R N-146b: branch option carries its room effect");
+
+        // N-146c selection summary: room count + completion reward + full path.
+        std::ostringstream sel;
+        sel << "[dungeon: " << rooms.size() << " rooms; completion reward (\""
+            << rooms.back().first << "\"): " << rooms.back().second << "]";
+        cout << "     selection summary -> " << sel.str() << "\n";
+        CHECK(sel.str() == "[dungeon: 5 rooms; completion reward (\"Cradle of the Death God\"): "
+              "Create The Atropal, a legendary 4/4 black God Horror creature token with deathtouch.]",
+              "W29-R N-146c: dungeon selection shows room count + completion payoff");
+    }
+
+    // ---- WAVE-29: deciding-fact annotations added to OPTION lines this wave must
+    // not break the option-echo match. The model echoes the bare room/action NAME
+    // against an option that now carries a trailing brace/bracket annotation - the
+    // same shape family as the existing {card text:}/[Transform:] tails, guarded
+    // here explicitly. (The N-93a summoning-sick tag rides BOARD renders only -
+    // never an option or target line - so it does not enter the choice parser and
+    // needs no separate case; it reuses the existing "[tapped - ...]" bracket shape.)
+    cout << "\n[W29-A] option-line deciding-fact annotations ({room effect}/[display toggle]) still echo-match\n";
+    {
+        // Dungeon room BRANCH (deck146 N-146b): each option is a room name carrying
+        // its effect text; the reply echoes the bare room name.
+        vector<string> rooms;
+        rooms.push_back("Veils of Fear {room effect: Each player loses 2 life unless they discard a card.}");
+        rooms.push_back("Oubliette {room effect: Discard a card and sacrifice an artifact, a creature, and a land.}");
+        bool sr = false;
+        int cr = parseChoice("2 (Oubliette)", 2, &rooms, &sr, NULL);
+        cout << "     room-branch 'Oubliette' vs annotated option -> " << cr << " (must be 2)\n";
+        CHECK(cr == 2 && !sr, "W29-A dungeon room-branch: a bare room-name echo matches its {room effect: ...} option");
+
+        // Modal-DFC Flip Side no-op annotation (Item 3): the option gains a trailing
+        // "[display toggle only - no game effect: ...]" tail; a "Flip Side" echo must
+        // still land on it, and "Cast Card Normally" still lands on option 1.
+        vector<string> dfcMenu;
+        dfcMenu.push_back("Cast Card Normally");
+        dfcMenu.push_back("Flip Side [display toggle only - no game effect: switches which face this hand card shows; it casts nothing and uses no stack. The Cast menu is where you cast, and it offers the other face as an alternative-cost cast - you do not need this.]");
+        bool sf = false;
+        int cf = parseChoice("2 (Flip Side)", 2, &dfcMenu, &sf, NULL);
+        cout << "     annotated 'Flip Side' echo -> " << cf << " (must be 2)\n";
+        CHECK(cf == 2 && !sf, "W29-A modal-DFC: a 'Flip Side' echo still matches its annotated no-op option");
+        bool sf1 = false;
+        int cf1 = parseChoice("1 (Cast Card Normally)", 2, &dfcMenu, &sf1, NULL);
+        CHECK(cf1 == 1 && !sf1, "W29-A modal-DFC: 'Cast Card Normally' still matches option 1 alongside the annotated Flip Side");
+    }
+
     cout << "\n[W23-A2] absent-card bookend: a clean sibling CHOICE line beats a hallucinated middle one\n";
     {
         // deck140 vs102 s9 (real): the only option is the Elixir; the model's
@@ -7101,6 +7458,52 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "     spiral salvage: count=" << sal
              << " picks card3=" << (send3.size()>2?(int)send3[2]:-1) << "\n";
         CHECK(sal == 1 && send3[2] && !send3[0], "bottom: salvage recovers 'PUT: 3' from a spiral");
+    }
+
+    // ---- WAVE-29 N-18e: truncated block commit abandoned by the reasoning ----
+    cout << "\n[W29-N18e] truncated blockers reply: early BLOCKS commit reversed in prose -> safe no-blocks\n";
+    {
+        // deck18 vs93 s20 shape: an early coded block commit, then a repeated
+        // no-block conclusion, cut off mid-sentence with NO PLAN: terminator.
+        string reversal;
+        for (int i = 0; i < 40; i++)
+            reversal += "So I should NOT block: blocking is strictly worse, I lose a card for no benefit. ";
+        string vs93 = "BLOCKS: B1:A1\n" + reversal + "If I don't block, I have 13 life.";
+        cout << "     len=" << vs93.size() << " terminatedNaturally=" << replyTerminatedNaturally(vs93)
+             << " abandoned=" << truncatedBlockCommitmentAbandoned(vs93) << "\n";
+        CHECK(!replyTerminatedNaturally(vs93), "W29-N18e vs93 shape classified TRUNCATED (long, no PLAN:)");
+        CHECK(truncatedBlockCommitmentAbandoned(vs93),
+              "W29-N18e truncated+contradicted commit is abandoned (-> safe no-blocks, not the stale B1:A1)");
+
+        // Non-contradicted truncation: same early commit, long prose that never
+        // reverses the block. Must KEEP the first line (abandoned == false).
+        string affirm;
+        for (int i = 0; i < 40; i++)
+            affirm += "Trading my Soldier for the 4/4 is correct here, the block holds the line and buys tempo. ";
+        string keep = "BLOCKS: B1:A1\n" + affirm + "That is the plan I commit to and";
+        cout << "     non-contradicted len=" << keep.size() << " terminatedNaturally=" << replyTerminatedNaturally(keep)
+             << " abandoned=" << truncatedBlockCommitmentAbandoned(keep) << "\n";
+        CHECK(!replyTerminatedNaturally(keep), "W29-N18e non-contradicted reply is also TRUNCATED (control)");
+        CHECK(!truncatedBlockCommitmentAbandoned(keep),
+              "W29-N18e truncated but NOT contradicted -> keeps the early commit (no masking)");
+
+        // Naturally terminated reply (reached PLAN:), even with a reversal in
+        // prose: NOT this path's business - the normal last-line precedence
+        // owns self-correction on a complete reply.
+        string terminated = "BLOCKS: B1:A1\nOn reflection I should NOT block this one.\nPLAN: hold up blockers next turn.";
+        cout << "     terminated terminatedNaturally=" << replyTerminatedNaturally(terminated)
+             << " abandoned=" << truncatedBlockCommitmentAbandoned(terminated) << "\n";
+        CHECK(replyTerminatedNaturally(terminated), "W29-N18e a reply with PLAN: is NATURALLY terminated");
+        CHECK(!truncatedBlockCommitmentAbandoned(terminated),
+              "W29-N18e a terminated reply is untouched (unchanged precedence)");
+
+        // "cannot block" legality note must NOT read as a decline of intent.
+        string legality = "BLOCKS: B1:A1\n";
+        for (int i = 0; i < 40; i++)
+            legality += "Note A2 cannot block because it is tapped, so my assignment stands and is fine here. ";
+        cout << "     cannot-guard len=" << legality.size() << " abandoned=" << truncatedBlockCommitmentAbandoned(legality) << "\n";
+        CHECK(!truncatedBlockCommitmentAbandoned(legality),
+              "W29-N18e 'cannot block' (legality) is not a decline -> commit kept");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

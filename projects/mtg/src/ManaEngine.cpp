@@ -105,6 +105,59 @@ namespace
         int n = dmg->getDamage();
         return n > 0 ? n : 0;
     }
+
+    //Greedy colored-pip assignment defers a FLEXIBLE source. A source that can
+    //also pay a DIFFERENT still-needed color must not be spent on color k when
+    //another (as-yet-unused) source can cover k instead. Without this, a dual
+    //land scripted as two single-color mana abilities (Shineshadow Snarl:
+    //`{T}:add{B}` THEN `{T}:add{W}`) has its FIRST-listed color claim the whole
+    //source (used[] is per-source), and a mono source of that same color then
+    //leaves the dual's OTHER color unpayable - so {W}{B} over Snarl + a black
+    //source was wrongly judged unaffordable, denying the seat every gold cast
+    //(N-146a; the same collapse the render showed as N-146d, wave-29). Deferring
+    //the flexible source frees it for the color only it can supply. Order-
+    //independent: whichever of the source's colors is still needed AND unique to
+    //it gets taken; the redundant color goes to the dedicated source.
+    bool deferFlexibleSource(Player * p, ManaEngine::ManaPolicy & policy,
+                             ManaCost * cost, ManaCost * result,
+                             map<MTGCardInstance*, bool> & used,
+                             MTGCardInstance * card, int k)
+    {
+        ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+        bool sourceHasOtherNeeded = false;
+        bool otherUnusedCoversK = false;
+        for (size_t i = 0; i < al->manaObjects.size(); i++)
+        {
+            AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility*) al->manaObjects[i]);
+            if (!amp || !policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true))
+                continue;
+            if (amp->output->getConvertedCost() < 1)
+                continue;
+            if (amp->source == card)
+            {
+                for (int c = 1; c < Constants::NB_Colors; c++)
+                    if (c != k && cost->hasColor(c) && amp->output->hasColor(c)
+                        && result->getCost(c) < cost->getCost(c))
+                        sourceHasOtherNeeded = true;
+            }
+            else if (!used[amp->source] && amp->output->hasColor(k))
+            {
+                //Only rely on the other source for k if it is DEDICATED to k for
+                //this cost - it must NOT itself produce another still-needed
+                //color. Otherwise two flexible sources could MUTUALLY defer and
+                //strand the payment (two {W}/{B} duals paying {B}{W} must not
+                //both defer: one takes B, the other W).
+                bool competesElsewhere = false;
+                for (int c = 1; c < Constants::NB_Colors; c++)
+                    if (c != k && cost->hasColor(c) && amp->output->hasColor(c)
+                        && result->getCost(c) < cost->getCost(c))
+                        competesElsewhere = true;
+                if (!competesElsewhere)
+                    otherUnusedCoversK = true;
+            }
+        }
+        return sourceHasOtherNeeded && otherUnusedCoversK;
+    }
 }
 
 ManaCost * ManaEngine::potentialMana(Player * p, ManaPolicy & policy, MTGCardInstance * target)
@@ -335,6 +388,13 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                         used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
                     if (!used[card] && producerUsable(p, amp, card, true) && amp->output->getConvertedCost() >= 1)
                     {
+                        //Don't burn a dual/flexible source on a color a dedicated
+                        //source can pay - hold it for the color only it supplies.
+                        //Only a single-color ability is deferrable; an add-both
+                        //producer ({W}{B} at once) pays both pips in one tap.
+                        if (amp->output->getConvertedCost() == 1
+                            && deferFlexibleSource(p, policy, cost, result, used, card, k))
+                            continue;
                         ManaCost * check = NEW ManaCost();
                         check->add(k,cost->getCost(k));
                         ManaCost * checkResult = NEW ManaCost();
@@ -487,6 +547,26 @@ ManaCost * ManaEngine::potentialManaPermissive(Player * p, ManaPolicy & policy)
             result->add(amp->output);
     }
     return result;
+}
+
+int ManaEngine::potentialColorReach(Player * p, ManaPolicy & policy, ManaCost * outColors)
+{
+    map<MTGCardInstance *, bool> seen;
+    ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+    for (size_t i = 0; i < al->manaObjects.size(); i++)
+    {
+        AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility*) al->manaObjects[i]);
+        if (!amp || !policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true))
+            continue;
+        if (amp->output->getConvertedCost() < 1)
+            continue;
+        seen[amp->source] = true;
+        if (outColors)
+            for (int c = 0; c < Constants::NB_Colors; c++)
+                if (amp->output->hasColor(c) && outColors->getCost(c) < 1)
+                    outColors->add(c, 1);
+    }
+    return (int) seen.size();
 }
 
 vector<MTGAbility*> ManaEngine::selectAutoTapProducers(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana)

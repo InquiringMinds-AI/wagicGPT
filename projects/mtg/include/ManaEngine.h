@@ -69,6 +69,16 @@ public:
     //total only risks a spurious auto-answered ask. Caller owns the result.
     static ManaCost * potentialManaPermissive(Player * p, ManaPolicy & policy);
 
+    //Render-facing color reach: the SET of colors the player's untapped
+    //sources can produce (a dual source contributes EACH of its colors) plus
+    //the count of distinct untapped SOURCE cards. potentialMana counts one
+    //ability per card, so a dual land (Snarl: add{B}/add{W}) collapsed to a
+    //single color in the "Mana available" line and made the model believe a
+    //second-color pip unpayable (N-146d). This shows the true options without
+    //over-reporting the ability count as total mana. `outColors` (may be NULL)
+    //gets each producible color set to 1; returns the distinct source count.
+    static int potentialColorReach(Player * p, ManaPolicy & policy, ManaCost * outColors);
+
     //The producers auto-tap WOULD activate to pay `cost` from the current
     //pool: producers whose single-color output pays a still-uncovered
     //COLORED symbol first, generic fillers after, stopping the moment the

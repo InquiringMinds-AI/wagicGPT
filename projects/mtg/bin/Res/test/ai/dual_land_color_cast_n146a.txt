@@ -1,0 +1,60 @@
+# Wave-29 N-146a / N-146d: a {W}{B} spell must be castable over a dual land plus a
+# mono source of ONE of its colors, even though the strict ManaEngine::potentialMana
+# COLLAPSES that pool to a single color. A dual is scripted as two single-color mana
+# abilities on one source (Scrubland's Plains+Swamp subtypes -> add{W}, add{B}); the
+# used[card] dedup keeps only the FIRST ability, so potentialMana reports {w}{w} for
+# Scrubland + Ancient Den ({W}) and pool->canAfford({W}{B}) is FALSE (this is exactly
+# the "Mana available collapses a dual to one color" the model saw as N-146d, live in
+# deck146's translog as "{b}{b}"). LegalActionsOracle::payable must still offer the
+# cast via its planPayment fallback (which does per-color assignment). This fixture
+# guards that end-to-end: the {W}{B} creature is offered and cast despite the collapsed
+# potentialMana pool.
+#
+# NOTE ON SCOPE: this guards the castability/collapse path, not the deferFlexibleSource
+# greedy fix in isolation. That fix matters when the dual's shared-color ability is
+# assigned BEFORE the mono source in the payment walk (planPayment returns empty) - the
+# order the LIVE deck146 game hit because Shineshadow Snarl was played (registered) a
+# turn before its Swamp. A test [INIT] cannot reproduce that ordering: manaObjects order
+# is engine-fixed (Ancient Den always precedes Scrubland regardless of the inplay list),
+# so here the mono is walked first, the greedy already succeeds, and payable is true with
+# OR without the fix. The greedy failure + its fix are covered by the live translog and
+# the code trace (see strategy-design/wave29 notes); the fix is verified sound and suite-
+# green. WITNESS below: Scrubland ({W}|{B}) + Ancient Den ({W}) untapped, Triumphant
+# Adventurer {W}{B} in hand -> resolves onto the battlefield.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ancient Den,Scrubland
+hand:Triumphant Adventurer
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Ancient Den,Scrubland,Triumphant Adventurer
+[PLAYER2]
+[END]

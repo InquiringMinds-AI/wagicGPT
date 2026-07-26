@@ -1,0 +1,23 @@
+# March of the Multitudes {X}{G}{W}{W} plain X-cast via the cast-mode menu.
+# Pool affords both the normal cost and the convoke shell -> clicking pops the
+# mode menu: choice 0 = "Cast Card Normally" -> normal rule announces X (=2) ->
+# pays {2}{G}{W}{W}. Creatureless, so no convoke. Expect 2 Soldier tokens
+# (asserted with the token wildcard '*').
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:March of the Multitudes
+manapool:{2}{G}{W}{W}
+[PLAYER2]
+[DO]
+March of the Multitudes
+choice 0
+choice 2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:*,*
+graveyard:March of the Multitudes
+manapool:{0}
+[PLAYER2]
+[END]

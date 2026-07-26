@@ -7,6 +7,7 @@
 #include "Subtypes.h"
 #include "Translate.h"
 #include "GameApp.h"
+#include "ExtraCost.h"
 
 using std::string;
 
@@ -225,6 +226,30 @@ void CardPrimitive::setManaCost(const string& s)
         if (manaCost.hasColor(i))
         {
             setColor(i);
+        }
+    }
+    //X + convoke composition (CR 702.51 + 601.2b). A convoke card models its
+    //convoke as an ALTERNATIVE cost - a {0}+Convoke shell parsed from the
+    //`other={convoke}` line, which is read BEFORE this printed cost. When the
+    //printed cost carries {X}, that {X} must ride the alternative shell so
+    //MTGAlternativeCostRule announces X when the "cast with convoke" variant is
+    //chosen. Without it the alternative has no X, the announce block is skipped,
+    //and the spell casts at X=0 (March of the Multitudes: 0/17 Soldier tokens,
+    //corpus 20260725). The convoke extra still reduces the printed {G}{W}{W}
+    //colored requirement from tapped creatures; the announced X is paid from the
+    //pool - a legal payment (CR 601.2h) that yields X>0 tokens. Guarded on an
+    //actual Convoke extra so no other alternative (offering/delve/flashback)
+    //inherits a spurious X.
+    if (manaCost.hasX() && manaCost.getAlternative() && manaCost.getAlternative()->extraCosts)
+    {
+        ExtraCosts * aec = manaCost.getAlternative()->extraCosts;
+        for (size_t xi = 0; xi < aec->costs.size(); xi++)
+        {
+            if (dynamic_cast<Convoke*>(aec->costs[xi]))
+            {
+                manaCost.getAlternative()->x();
+                break;
+            }
         }
     }
 }

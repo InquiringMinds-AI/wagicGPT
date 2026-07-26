@@ -1099,7 +1099,15 @@ int MTGAlternativeCostRule::reactToClick(MTGCardInstance * card, ManaCost *alter
     //////the announced value.While an activated ability is on the stack, any X in   //////
     //////its activation cost equals the announced value.                            //////
     ///////////////////////////////////////////////////////////////////////////////////////
-    if (card->setX > -1)
+    //Only resolve X while the alternative cost still CARRIES an X (mirror of the
+    //normal-cast rule's guard). The announce pass rewrites alternateCost in place
+    //(X flag cleared) and then returns 0 to arm the extra payment, so a convoke
+    //X-spell (March of the Multitudes) re-enters HERE on the finishing click with
+    //setX still announced and the cost already resolved - re-adding X turned the
+    //resolved {2}+convoke back into {4}+convoke, failed the affordability re-check
+    //below and silently aborted the cast. Guarding on the live X flag makes the
+    //re-entry a no-op so the committed convoke cast completes.
+    if (card->setX > -1 && (alternateCost->hasX() || alternateCost->hasSpecificX()))
     {
         ManaCost * Xcost = NEW ManaCost();
         Xcost->copy(alternateCost);
