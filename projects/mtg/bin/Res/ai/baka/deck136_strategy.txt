@@ -1,0 +1,102 @@
+Deck identity: MONO-BLACK MIDRANGE / ATTRITION (walker value). You win by trading your
+cheap, efficient removal for the opponent's threats, out-drawing them with your card
+engine, and grinding to a board of recursive value and planeswalkers they cannot beat.
+You are the BEATDOWN against slow/control decks (deploy threats, attack, close) and the
+CONTROL against aggro (kill/block early, stabilize, THEN grind them out). You almost
+never lose the LONG game - so vs a slower deck, be the aggressor; vs a faster deck,
+survive to turn 6-8 where your value engine takes over.
+
+TRUST THE NUMBERS AND YOUR MANA. Every creature line shows its CURRENT [X/Y] - read it,
+do not recompute from base stats. Your mana is ALL BLACK: every land (Swamp, Witch's
+Cottage, Castle Locthwain) taps for {B}, and Ugin's {6} is generic (any six lands). If a
+"Cast ..." option is listed it is payable RIGHT NOW - trust it; never hesitate on a
+double- or triple-black cost ({2}{B}{B}{B} Cavalier, {4}{B}{B} Liliana/Command) because
+"that's a lot of black" - you are mono-black, black is all you have. Do not recount
+Swamps.
+
+WHAT EACH CARD DOES (use these facts; do not invent others):
+  - Knight of the Ebon Legion {B} 1/2 = MANA SINK + combat trick. Pay {2}{B}: it gets
+    +3/+3 AND deathtouch until end of turn (a 4/5 deathtoucher). Pump it when it will
+    connect for damage or win a fight. If a player lost 4+ life this turn it gets a
+    permanent +1/+1 counter at your end step - so pump-and-attack snowballs it.
+  - Foulmire Knight {B} 1/1 DEATHTOUCH = a cheap blocker/attacker that trades with
+    ANYTHING. Its other half Profane Insight {2}{B} = draw a card, lose 1 life (cast
+    this when you have mana to spare and no better play; the Knight comes later from
+    exile).
+  - Yarok's Fenlurker {B}{B} 1/1 = when it ENTERS, each opponent exiles a card from
+    their hand (hand disruption - always good). {2}{B}: +1/+1 until end of turn.
+  - Murderous Rider // Swift End = FLEXIBLE REMOVAL. Swift End {1}{B}{B} instant:
+    DESTROY target creature OR PLANESWALKER, you lose 2 life. Then later cast the
+    creature Murderous Rider {1}{B}{B} 2/3 LIFELINK from exile. Use Swift End to kill
+    their best threat or their planeswalker; the lifelink body helps you race.
+  - Legion's End {1}{B} = exile ONE opponent creature with mana value 2 or LESS, plus
+    every other creature they control with that same name, plus that name from their
+    hand and graveyard. GREAT against go-wide / tribal decks (Relentless Rats, Kithkin,
+    tokens) - it strips a whole name. Only targets MV<=2 creatures.
+  - Ritual of Soot {2}{B}{B} = destroy ALL creatures with mana value 3 or LESS. A
+    one-sided-ish sweeper vs small aggro. IMPORTANT: it does NOT kill mana value 4+
+    creatures - it MISSES Relentless Rats (MV4). It also kills your own small creatures,
+    so cast it when their board is bigger/wider than yours.
+  - Dread Presence {3}{B} 3/3 = whenever a Swamp enters, CHOOSE: draw a card & lose 1
+    life, OR deal 2 damage to any target & gain 2 life. Play a Swamp EVERY turn once
+    this is out to trigger it - it is repeatable removal/reach AND card advantage.
+  - Midnight Reaper {2}{B} 3/2 = whenever a NONTOKEN creature you control dies, draw a
+    card (and take 1). Your removal-heavy grind refills your hand through it.
+  - Cavalier of Night {2}{B}{B}{B} 4/5 LIFELINK = when it enters you MAY sacrifice
+    another creature to DESTROY an opponent creature; when it dies it returns a MV<=3
+    creature from your graveyard. A body + removal + recursion in one. Sac a spent/small
+    creature to kill their best threat.
+  - Rankle, Master of Pranks {2}{B}{B} 3/3 FLYING HASTE = attacks the turn it lands and
+    FLIES over most blockers. When it deals combat damage to a player you may choose any
+    number of: each player discards / each loses 1 & draws / each sacrifices a creature.
+    Swing it and take the modes that hurt them more than you (sacrifice when they have
+    more creatures; discard when their hand is bigger).
+  - Command the Dreadhorde {4}{B}{B} = return ANY number of creature/planeswalker cards
+    from graveyards to the battlefield under your control; you take damage equal to their
+    total mana value. A huge swing - cast it when your graveyard is stocked and your life
+    total can pay; do not cast it if the life cost would kill you.
+  - Mausoleum Secrets {1}{B} instant = tutor: search your library for a black card with
+    mana value <= creature cards in your graveyard, to hand. Early it finds cheap cards;
+    late it finds your bombs (Cavalier, Liliana, Command).
+  - Liliana, Dreadhorde General {4}{B}{B} planeswalker (starts 6) = static: draw a card
+    whenever a creature you control dies. +1: make a 2/2 Zombie (protect her, build a
+    board). -4: EACH PLAYER sacrifices TWO creatures - this is your ANTI-GO-WIDE button
+    (you have tokens/recursion to spare, they lose their best two). Default to +1 to
+    protect her unless -4 breaks a wide opposing board.
+  - Ugin, the Ineffable {6} planeswalker = -3: DESTROY target permanent that is one or
+    more colors (kills their bomb, artifact, planeswalker, or enchantment). +1: exile
+    top card + make a 2/2 Spirit (card advantage + a blocker). Great vs big colored
+    threats and control.
+
+ATTACK / DEPLOY FLOOR (run this every turn; midrange = attack when it is profitable,
+hold back only what you need). After you cast, look at each of your untapped creatures
+and ATTACK with it if EITHER: (a) it is unblocked or flies and no opponent flyer/reach
+can block it (Rankle almost always connects), OR (b) it trades UP or kills a blocker you
+are happy to kill (Foulmire Knight's deathtouch trades with anything; a pumped Knight
+wins fights). Do NOT sit back with a full grip and an empty board vs a slow deck - deploy
+a threat every turn. EXCEPTIONS (keep at home): vs an aggro deck (Kithkin, Giants,
+Relentless Rats, burn) keep enough blockers that their swing-back is not lethal; do not
+send your ONLY blocker into a race you are losing. Rankle and a pumped Knight are your
+best attackers - lead with them.
+
+YOU HAVE ALMOST NO FLYERS OR REACH (only Rankle flies). If an opponent attacks with a
+flyer (e.g. Faerie Guidemother) you usually CANNOT block it - take the damage or race,
+do not spend time planning a ground block for a flyer.
+
+REMOVAL PRIORITY - kill the RIGHT thing: spend Swift End / Cavalier's sac / Ugin -3 on
+their BIGGEST or most dangerous permanent (a 6/6 Inferno Titan, a planeswalker, a
+Guttersnipe that pings you every spell). Use Legion's End on their go-wide/tribal name
+(Rats, Kithkin, tokens). Save the sweeper (Ritual of Soot) for when their board is wide
+and mostly MV<=3 - never as a one-for-one.
+
+MATCHUPS (opponents you will face):
+  - vs GO-WIDE (Relentless Rats, Kithkin tokens): Ritual of Soot MISSES the Rats (MV4) -
+    do NOT rely on it there; it DOES sweep Kithkin (MV<=3). Your real anti-wide tools are
+    Liliana -4 (each sacs two), Legion's End (name-strip), and Cavalier/blockers. Grind
+    them; your card engine beats their empty hand.
+  - vs BIG RAMP / CONTROL (Giants, mono-U tron): you are the aggressor. Kill their bombs
+    with Swift End / Cavalier / Ugin -3, disrupt with Yarok's Fenlurker, and out-grind
+    with Dread Presence + Midnight Reaper + Castle Locthwain. Rankle flies over their big
+    ground creatures - close with it.
+  - vs BURN (Guttersnipe): race with LIFELINK (Cavalier, Murderous Rider body, Dread
+    Presence's gain-2 mode) and kill Guttersnipe on sight with any removal.
