@@ -1,0 +1,109 @@
+YOUR DECK: Simic-green RAMP + MUTATE midrange. You ramp with cheap creatures and land-fetchers,
+then MUTATE your big "Apex" bombs onto a creature you already control to fire game-swinging
+triggers and build one huge threat. You are usually the CONTROL against aggro (deploy blockers
+early, survive, then take over with a mutated bomb) and the BEATDOWN against slow decks (ramp
+into an Apex, mutate it, and race). Read the opponent: if they are faster than you, your first
+job is to STOP DYING - put bodies down to block - and save your mutate value for when you are
+stable. Do not sit on a hand of expensive Apexes while an aggro deck kills you.
+
+HOW MUTATE WORKS (this is the whole deck - learn it once):
+- MUTATE = casting a creature "for its mutate cost" onto a NON-HUMAN creature you already
+  control on the battlefield. Every creature in this deck is non-Human, so any of your creatures
+  can be the host. The two cards MERGE into ONE creature.
+- The MERGED creature has the P/T and NAME of whichever card is ON TOP, PLUS ALL abilities of
+  both cards. It keeps the host's summoning-sickness status (if the host was already in play a
+  turn, the merged creature can attack immediately).
+- "mutate OVER" puts the card you are casting ON TOP. "mutate UNDER" leaves the host on top.
+  DEFAULT = mutate OVER with your Apex/bigger creature, so the merged creature gets the big P/T
+  and evasion. Only mutate UNDER if the host already has the bigger, better P/T you want to keep.
+- The mutate TRIGGER fires either way (over or under) - it belongs to the card that mutated.
+
+#1 RULE - THE APEX BOMBS ARE PAYOFFS ONLY WHEN YOU MUTATE THEM. Snapdax, Illuna, Nethroi,
+Vadrok, Brokkos, Everquill Phoenix, Gemrazer and Migratory Greathorn all say "Whenever this
+creature MUTATES, <do something powerful>." If you HARDCAST one (pay its full cost, "Cast Card
+Normally") you get ONLY a body and its keywords - the trigger does NOTHING. To get the value you
+must keep a cheap creature around as a host and cast the Apex FOR ITS MUTATE COST onto it. So:
+almost always mutate an Apex rather than hardcast it - UNLESS you have no legal host, or you need
+the extra BODY as a blocker more than you need the trigger (see #2).
+- SNAPDAX (mutate {2}{BR}{W}{W}, 3/5 double strike): on mutate, deal 4 damage to an opponent's
+  creature/planeswalker AND gain 4 life. This is your best anti-aggro play - it removes a threat
+  and stabilizes your life in one card. Mutate it, don't hardcast it.
+- ILLUNA (mutate {3}{RG}{U}{U}, 6/6 flying trample): on mutate, dig until you hit a nonland
+  permanent and put it onto the battlefield or into hand - a free extra card/threat.
+- NETHROI (mutate {4}{GW}{B}{B}, 5/5 deathtouch lifelink): on mutate, return creatures with
+  total power 10 or less from your graveyard to the battlefield - a mass reanimation swing.
+- VADROK (mutate {1}{WU}{R}{R}, 3/3 flying first strike): on mutate, recast a noncreature card
+  of mana value 3 or less from your graveyard for free.
+- BROKKOS (mutate {2}{UB}{G}{G}, 6/6 trample): you may even cast it FROM YOUR GRAVEYARD using its
+  mutate ability - a recurring threat.
+- GEMRAZER (mutate {1}{G}{G}, 4/4 reach trample): on mutate, destroy an opponent's artifact or
+  enchantment. MIGRATORY GREATHORN (mutate {2}{G}, 3/4): on mutate, fetch a basic land onto the
+  battlefield (ramp/fixing). Its land-search fires on mutate ONLY, not on a normal cast.
+
+#2 RULE - UNDER AGGRO, A FRESH BODY BEATS A MUTATE. Mutating grows one creature but adds NO new
+body; hardcasting adds a blocker. When you are being attacked and need more blockers to survive,
+CAST A CREATURE NORMALLY. Save mutate for when your life is safe or when the trigger (Snapdax's
+4-damage-and-gain-4 especially) is itself the stabilizer. Do NOT mutate to "make one creature
+bigger" while a wide aggro board is racing you - that is how this deck loses (getting run over by
+turn 12). Mutate to REMOVE/RECUR value or to close, not for vanity size.
+
+RAMP FIRST, THEN THE BOMBS. Your early plays enable everything:
+- ARBOREAL GRAZER ({G}, 0/3 reach): when it enters, put a LAND FROM YOUR HAND onto the
+  battlefield tapped - a ramp step AND a 0/3 wall that blocks the ground and is a fine mutate
+  host. Play it turn 1 when you can.
+- DRYAD OF THE ILYSIAN GROVE ({2}{G}, 2/4): extra land drop each turn + all your lands tap for
+  every color. Fixes your greedy mana AND is a great mutate host to keep (its abilities survive
+  underneath a mutate).
+- MIGRATORY GREATHORN, BEANSTALK GIANT // FERTILE FOOTSTEPS (cast Fertile Footsteps {2}{G} to
+  fetch a basic; Beanstalk Giant is */* = your land count), NISSA WHO SHAKES THE WORLD (Forests
+  make double green; +1 turns a land into a 3/3 haste-vigilance body that is still a land) - all
+  push you toward the mana to cast and mutate Apexes.
+
+RENDER TRAPS - know these or you will misplay:
+- When you cast a mutate spell and POLLYWOG SYMBIOTE is on your battlefield, you will next be
+  asked something titled "TARGET CHOICE for Pollywog Symbiote - pick the ONE target it will
+  affect" that lists cards IN YOUR HAND. That is NOT a mutate target - it is Pollywog's
+  draw-then-DISCARD. Pick your LEAST useful card to DISCARD (an extra land), never a creature or
+  spell you want to keep. (Pollywog also makes your mutate spells cost {1} less - a good reason
+  to keep it in play.)
+- The ACTUAL mutate target question is titled "TARGET CHOICE for <the card you are mutating>"
+  and lists creatures on YOUR BATTLEFIELD. Choose a host whose abilities you want to keep
+  (Dryad's ramp, Pollywog's discount) over a vanilla 0/3.
+- After a mutate resolves, your battlefield list may show the pile as TWO adjacent lines - the
+  top card with its P/T (e.g. "Gemrazer (4/4)") and the under card as just a name with no P/T
+  (e.g. "Dryad of the Ilysian Grove"). That is ONE creature, not two. In attack/block lists it
+  correctly shows as a single creature. Count it as one, and remember it has the abilities of
+  both cards even though the render only shows the top card's keywords.
+- A cast option may read "with its mutate cost" OR "with its alternative cost" - for this deck
+  both mean the MUTATE cost. Taking it starts the mutate flow above.
+
+DECIDE COMBAT FAST - DO NOT OVER-THINK. Your merged creatures are big; attack with them once
+they can. Double strike (Snapdax) and trample (Gemrazer/Illuna/Nethroi/Brokkos) mean: a blocked
+tramplers assigns lethal to the blocker and the rest to the player; a blocked creature WITHOUT
+trample deals nothing to the player. Do the math once and commit - long combat deliberation
+costs you and risks a truncated answer that defaults to no action.
+
+MULLIGAN: keep 2-5 lands with at least green, plus an early ramp creature (Grazer/Greathorn/
+Dryad) OR a cheap creature you can later mutate onto. A Forest is a land - never call a hand with
+lands "no lands." Ship 0-1 land hands, all-land (6-7) hands, and hands that are only expensive
+Apexes with no ramp and no early body. You want to be DOING something by turn 2-3.
+
+DECIDING SITUATIONS (recognize -> do):
+- You can cast an Apex and you control a non-Human creature -> MUTATE it (its mutate cost, then
+  "mutate", then "mutate over"), not hardcast - the trigger is the payoff.
+- You are under attack and short on blockers -> cast a creature NORMALLY for the extra body;
+  do NOT mutate (mutate adds no blocker).
+- Snapdax is castable and the opponent has a threatening creature/planeswalker -> mutate Snapdax:
+  it kills the threat AND you gain 4 life. Best stabilizer in the deck.
+- You are asked a "TARGET CHOICE for Pollywog Symbiote" listing your HAND -> that is a DISCARD;
+  discard your worst card (a spare land), not a card you want.
+- You are asked "mutate over / mutate under" -> choose OVER (put the Apex/bigger card on top),
+  unless the host already has the P/T you want to keep.
+- Arboreal Grazer is castable and you have a spare land in hand -> cast it; ramp + a wall + a
+  future mutate host.
+- Dryad is on your battlefield -> take your extra land drop every turn; it is also your best
+  mutate host (its ramp survives under the pile).
+- You are flooding on lands -> play Fertile Footsteps / Beanstalk for value; use Nissa +1 to
+  turn a spare land into a 3/3 body.
+- A game is drifting to the turn cap even -> that is a LOSS risk; mutate a bomb and PRESS to
+  close.

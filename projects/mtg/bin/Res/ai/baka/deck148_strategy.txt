@@ -1,0 +1,76 @@
+YOUR DECK: mono-WHITE KOR EQUIPMENT AGGRO. You flood the board with cheap Kor creatures, bolt
+EQUIPMENT onto them, and beat down fast. You are the BEATDOWN in almost every game - your job is to
+attack every turn and end the game before a slower deck takes over. You have no removal and no way
+to catch up from behind, so tempo and pressure ARE your game plan. When in doubt, add a body,
+equip, and SWING.
+
+YOUR MANA IS SIMPLE. Every spell casts off Plains alone - if a Cast option is listed, you can pay
+for it; never decline a spell thinking you "lack a color." Play a land every single turn. Kabira
+Crossroads enters TAPPED (gains you 2 life); play it on a turn you do not need mana that turn.
+
+#1 RULE - ATTACK EVERY TURN A CREATURE CAN CONNECT. This deck loses by DURDLING. Each of your
+turns, declare as attackers EVERY untapped creature that is not summoning-sick, unless it would die
+for nothing (blocked and killed with no worthwhile trade) or you must hold it back as your ONLY
+blocker while behind. A 2/2 that pokes for 2 every turn wins races your equipment then finishes. Do
+NOT sit on a board of creatures building the "perfect" equipped attacker - swing with what you have
+NOW, equip during your main phase before combat, and attack again.
+
+#2 RULE - GEAR ARMAMENT MASTER ITSELF FIRST; IT IS YOUR BEST ENGINE. Armament Master ({W}{W}, 2/2)
+gives every OTHER Kor creature you control +2/+2 FOR EACH Equipment attached TO ARMAMENT MASTER.
+A bare Armament Master with no equipment on it does NOTHING - it is just a 2/2. So the instant you
+have Armament Master out, attach your CHEAP equipment (Bone Saw costs {1} to equip, Captain's Claws
+{1}) to ARMAMENT MASTER, not to an attacker:
+- 1 equipment on AM = your whole Kor team gets +2/+2.
+- 2 equipment on AM = the whole team gets +4/+4.
+This is almost always more total power than putting the same equipment on one creature. Load
+Armament Master, then swing with the pumped team.
+
+#3 RULE - EQUIP KOR DUELIST FOR DOUBLE STRIKE. Kor Duelist ({W}, 1/1) has DOUBLE STRIKE as long as
+it is equipped. Any equipment turns it into a real threat: Bone Saw makes it a 2/1 double strike =
+4 damage; Sword of Vengeance makes it a 3/1 double strike with first strike + trample = huge. If
+you have a spare equipment and a Kor Duelist, gearing the Duelist is one of your best attacks.
+
+DEPLOY CREATURES OVER EQUIPMENT WHEN YOU ARE CREATURE-LIGHT. Equipment is DEAD without a body to
+carry it. If you have 0-1 creatures, spend your mana on CREATURES, not on dumping Bone Saws/Bladed
+Pinions. (Bone Saw casts for {0} - drop it for free to build your artifact count for Cranial
+Plating, but do not spend real mana equipping nothing.)
+
+YOUR CARDS (what they actually do here):
+- KOR DUELIST ({W}, 1/1): double strike while equipped. See #3.
+- KITESAIL APPRENTICE ({W}, 1/1): while equipped it gets +1/+1 AND flying -> a 2/2 flyer. Equip it
+  to get an evasive attacker past ground blockers.
+- STONE HAVEN OUTFITTER ({1}{W}, 2/2): equipped creatures YOU control get +1/+1; whenever an
+  equipped creature you control DIES, you draw a card. Your only card advantage - a great body.
+- STONE HAVEN PILGRIM ({1}{W}, 2/2): when it ATTACKS, if you control any artifact or enchantment
+  it gets +1/+1 and lifelink until end of turn. You almost always have an artifact, so attack with
+  it - it hits for 3 and gains you 3.
+- ARMAMENT MASTER ({W}{W}, 2/2): the team-pump engine. See #2.
+- ZAMRIEL, SERAPH OF STEEL ({2}{W}{W}, 3/4 flyer): as long as it is YOUR turn, your equipped
+  creatures have INDESTRUCTIBLE. Play it and attack freely - your geared team survives combat and
+  most removal on your turn.
+- BONE SAW ({0} to cast, equip {1}): +1/+0. Cheap; best on Armament Master for the team pump.
+- CAPTAIN'S CLAWS (cast {2}, equip {1}): +1/+0, and when the equipped creature ATTACKS it makes a
+  1/1 Kor Ally token tapped and attacking. Free extra damage + a body every attack - strong on a
+  creature you swing with every turn.
+- BLADED PINIONS (cast {2}, equip {2}): flying + first strike. Use it to make an attacker evasive.
+- SWORD OF VENGEANCE (cast {3}, equip {3}): +2/+0, first strike, vigilance, trample, haste. Your
+  best combat equipment - put it on Kor Duelist (double strike) or your biggest body and attack.
+- CRANIAL PLATING (cast {2}, equip {1}): equipped creature gets +1/+0 FOR EACH artifact you
+  control. Read the "Artifacts in play: you N" line - with several artifacts out this is a huge
+  buff. (Its {B}{B} attach ability is unusable - you have no black; use Equip {1}.)
+- ARGENTUM ARMOR (cast {6}, equip {6}): +6/+6, and whenever the equipped creature attacks, DESTROY
+  a target permanent. Expensive but a bomb - your only "removal." Equip it when you can and attack
+  to blow up their best thing.
+- OATH OF GIDEON ({2}{W}): makes two 1/1 Kor Ally tokens when it enters. Two bodies to carry
+  equipment and get the Armament Master pump.
+- EMERIA, THE SKY RUIN (land): at your upkeep, if you control 7+ Plains you may return a creature
+  from your graveyard. Late-game grind insurance; do not build around it.
+
+CLOSE THE GAME. You have no reach and no comeback - a game that goes long is a game you LOSE. Once
+your board is bigger than their blockers, ALPHA STRIKE. Push damage every turn; trust the printed
+[X/Y] on your creatures (it already counts equipment and the Armament Master pump) and swing.
+
+MULLIGAN: keep 2-4 lands with AT LEAST ONE creature you can cast by turn 2 (Kor Duelist, Kitesail
+Apprentice, or a 2-drop). A hand of lands + equipment and NO creature is a mulligan - the equipment
+is dead. Ship 0-1 land hands, all-land hands, and all-equipment-no-creature hands. Prefer a hand
+with an early creature over a pile of equipment.

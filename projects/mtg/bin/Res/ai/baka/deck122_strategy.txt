@@ -1,0 +1,87 @@
+YOUR DECK: Orzhov (white-black) LIFEGAIN. You have no removal and no tricks - you win by
+turning LIFE INTO A WEAPON. Cheap creatures and lands GAIN you life; a second set of cards
+gets BIGGER, meaner, or WINS THE GAME the more life you have. Your life total is not a cushion
+you spend down to zero - it is the ENGINE that powers your best cards. Every point of life you
+gain is progress toward winning. You have TWO ways to win: (1) beat down with lifelink fliers
+and drain the opponent out with Blood Artist, and (2) climb to 40 life and WIN OUTRIGHT with
+Felidar Sovereign. Both plans want the same thing: gain life and keep it.
+
+#1 RULE - LIFE IS YOUR ENGINE. STAY ABOVE YOUR THRESHOLDS. Several of your creatures are HUGE
+only while your life is high, and shrink the moment you drop below the line. Before you attack
+or take damage, check whether the play will push you UNDER a threshold and turn your own
+monsters back into 1/1s.
+- SERRA ASCENDANT ({W}, 1/1): at 30 OR MORE life she is a 6/6 FLYER with lifelink. Below 30 she
+  is a 1/1 with no flying. The board shows her CURRENT size (e.g. "(6/6) (printed 1/1)") - trust
+  that number. Do NOT attack yourself below 30 and throw away a 6/6 flying blocker to swing for
+  1. Above 30, a Serra Ascendant is your best attacker AND your best blocker at once.
+- DIVINITY OF PRIDE ({W/B}x5, 4/4): at 25 OR MORE life she is an 8/8 FLYER with lifelink. Below
+  25 she is a 4/4. Same rule - the 25 line is worth protecting.
+- The single biggest mistake this deck can make is RACING an aggressive opponent by spending its
+  own life. When you burn your life to trade or to push damage, you shrink Serra and Divinity
+  AND you walk into their next attack. Against a fast deck your job is to STABILIZE: gain life,
+  block, and let your lifelink bodies climb you back up - not to trade life for tempo.
+
+#2 RULE - FELIDAR SOVEREIGN CAN JUST WIN THE GAME. Felidar Sovereign ({4}{W}{W}, 4/6 vigilance
+lifelink) has: "At the beginning of your upkeep, if you have 40 or more life, you win the game."
+This is a REAL win condition, not a bonus. Once you have stabilized behind lifelink and Felidar
+is on the battlefield, your plan is simple: get to 40 life, survive to your next upkeep, WIN. A
+4/6 vigilant lifelink body also attacks AND blocks while you climb. Do not bottom Felidar on a
+mulligan unless the rest of your hand truly cannot function - in a grind it is your cleanest out.
+When you are at 30+ life with a stable board, actively look for the 40-life line: gain triggers,
+lifelink attacks, and Kabira/Lone Missionary/Kitchen Finks all push you there.
+
+#3 RULE - BUILD THE LIFEGAIN ENGINE EARLY, THEN CASH IT IN.
+- SOUL WARDEN ({W}, 1/1): gain 1 life whenever ANY creature enters - yours or the opponent's.
+  Cast it TURN 1 if you can; every creature all game then feeds you.
+- SUTURE PRIEST ({1}{W}, 1/1): may gain 1 when YOUR creature enters; may make the OPPONENT lose
+  1 when THEIRS enters. Always take both ("Life" and "Life Loss" when asked) unless a rare
+  reason not to. Great early against a creature deck.
+- LONE MISSIONARY ({1}{W}, 2/1): gain 4 on enter. A big single burst - even better with Soul
+  Warden/Suture Priest also triggering, and it grows Ajani's Pridemate.
+- KITCHEN FINKS ({1}{G/W}{G/W}, 3/2, persist): gain 2 on enter, and PERSIST means it comes back
+  once when it dies (as a 2/1) and gains you 2 AGAIN. A premier blocker vs aggro - it eats two
+  attackers and gains you 4 life total. The {G/W} pips pay with white.
+- KABIRA CROSSROADS: a land that enters tapped and gains you 2 life. Lead on it when you do not
+  need untapped mana - free life every game.
+- AJANI'S PRIDEMATE ({1}{W}, 2/2): puts a +1/+1 counter on ITSELF every time you gain life
+  (once per life-gain event). Deploy it EARLY behind your gainers and it snowballs into a huge
+  body. It is a payoff, so play your gainers around it.
+
+#4 RULE - YOUR LIFELINK BEATERS ARE THE PRIMARY CLOCK, AND THEY GAIN YOU LIFE WHILE THEY WORK.
+- VAMPIRE NIGHTHAWK ({1}{B}{B}, 2/3 flying, deathtouch, lifelink): your best all-rounder. As a
+  BLOCKER, deathtouch means it kills ANYTHING it blocks and (flying) it can block fliers; you
+  gain 2 when it deals damage. Hold it back vs aggro; attack with it when the coast is clear.
+- SERRA ASCENDANT (above 30) and DIVINITY OF PRIDE (above 25) are lifelink FLIERS - attacking
+  with them gains you life AND pushes you toward Felidar's 40. Evasive lifelink is exactly what
+  both of your win plans want.
+
+#5 RULE - BLOOD ARTIST IS A DRAIN ENGINE - DO NOT ATTACK WITH IT. Blood Artist ({1}{B}, 0/1):
+whenever ANY creature dies (yours OR the opponent's), the opponent loses 1 life and you gain 1.
+It is a 0/1 - never attack with it. Its value is in grindy, trade-heavy boards: every death,
+including chump blocks and your own dying creatures, drains the opponent and gains you life.
+Keep it alive; it makes every combat swing the life totals your way.
+
+#6 RULE - SORIN, LORD OF INNISTRAD ({2}{W}{B}, planeswalker, loyalty 3). USE HIM EVERY TURN.
+- +1: create a 1/1 black Vampire with LIFELINK. This is your default almost every turn - it
+  ticks Sorin up (protecting him), adds a lifelink body (more attacks, more Blood Artist fodder,
+  triggers Soul Warden/Suture Priest/Pridemate), and builds a board for free. Chaining +1 is
+  correct and strong.
+- -2: emblem "creatures you control get +1/+0" (permanent anthem). Only when a wide board makes
+  the extra power lethal or race-winning; usually +1 is better.
+- -6: destroy up to three creatures/planeswalkers and reanimate them under YOUR control. A
+  finisher - only when there are real targets worth taking. Do NOT -6 for a small or worthless
+  creature; keep +1ing until the -6 is a blowout.
+
+MATCHUP POSTURE.
+- vs AGGRO (fast creature decks): you are the CONTROL. Do not race. Deploy blockers (Kitchen
+  Finks, Nighthawk, Serra as a 6/6 above 30), take the good blocks, gain life, keep Serra above
+  30 and yourself climbing. Let lifelink and Blood Artist grind them out. Your life total going
+  UP is you winning.
+- vs MIDRANGE / SLOWER decks: you are the BEATDOWN. Grind value with the lifegain engine, apply
+  the lifelink fliers, use Sorin +1 every turn, and go over the top - either drain them out or
+  ride the life lead to Felidar's 40.
+
+MANA: you need white and black. Scrubland and Isolated Chapel make both; Urborg turns all your
+lands into Swamps for black; Kabira Crossroads and Plains give white, Swamp gives black. If a
+Cast option is listed, you CAN pay for it - never decline a spell thinking you lack the color.
+Play a land every turn.
