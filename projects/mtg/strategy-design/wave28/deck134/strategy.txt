@@ -1,0 +1,76 @@
+YOUR DECK: blue-green Urza tron control. You are ALWAYS the defense here - every opponent is
+faster than you. You do not race. You WIN LATE, and you win late BY DOING SOMETHING EVERY TURN:
+build your mana with the Urza lands, keep yourself alive with fogs, walls and lifegain, LOCK the
+opponent out of combat with Stonehorn Dignitary + Ghostly Flicker, then grind them out with
+Mulldrifter flyers (and Compelling Argument mill as the slow backup). A turn where you pass with
+mana up is a turn you lose the game - there is always a land to fetch, a spell to dig with, or a
+threat to deploy.
+
+YOUR MANA IS SIMPLE. Unknown Shores and Prophetic Prism each make mana of ANY color, so you can
+always pay the green (fogs, Pulse), white (Stonehorn), and black (Dinrova) pips - never decline
+or skip a card thinking you "lack the color." If a Cast option is listed, you CAN pay for it.
+
+#1 RULE - CRACK EXPEDITION MAP. The moment "search card with Expedition Map [cost {2}, Tap,
+Sacrifice]" appears in your list, TAKE IT - do not pass. Search for whichever Urza land you do
+NOT yet control: Urza's Mine, Urza's Power-Plant, or Urza's Tower. Controlling all THREE turns
+your 3 Urza lands into ~7 mana, which powers your whole deck. If you already have all three Urza
+lands, fetch any land to make your land drop. The ONLY time to pass the Map crack is when you
+control all three Urza lands AND already made your land drop AND need the {2} this turn for a
+counter or a threat. "Sacrifice" is how the Map works - do not refuse it.
+
+THE LOCK - HOW YOU BEAT AGGRO. Stonehorn Dignitary's enter makes the opponent SKIP their next
+combat phase - they cannot attack you at all. Ghostly Flicker exiles and returns two of your own
+permanents, RE-TRIGGERING their enter effects. So: cast Stonehorn, then EVERY ONE OF YOUR TURNS
+cast Ghostly Flicker targeting Stonehorn Dignitary - the opponent skips combat again, forever.
+Once this is going you cannot lose to attacks; take your time and win. Do NOT attack with the
+1/4 Stonehorn for 1 damage - its job is the ETB, keep it home and re-blink it.
+
+GHOSTLY FLICKER TARGETS (it needs TWO). Pick two of these, best first: Stonehorn Dignitary
+(opponent skips combat), Mulldrifter (draw 2), Mnemonic Wall (return an instant/sorcery from
+your graveyard), Prophetic Prism (draw a card). NEVER target a plain land with Flicker - blinking
+a land does nothing and wastes the whole spell. If only ONE value permanent is out, a land is an
+acceptable second target, but the FIRST target is always a value ETB.
+
+KEY CARDS - what each actually does:
+- Mulldrifter: HARD-CAST it {4}{U} for the 2/2 FLYING body plus draw 2 - the flyer is your best
+  blocker and your main clock. Choose "evoke" {2}{U} (draw 2, then it dies, no body) ONLY when
+  you cannot afford {4}{U} or you are safe and just want the cards. Under attack or at low life,
+  hard-cast for the body. You can Flicker Mulldrifter later to draw 2 more.
+- Moment's Peace: FOG - it prevents ALL combat damage this turn. When the opponent's attack would
+  drop you to 8 or less, leave {1}{G} untapped on their turn and cast Moment's Peace to take ZERO
+  damage. It comes back: you can cast it AGAIN from your graveyard (flashback) to fog a second
+  time. This is your main way to survive while your engine sets up.
+- Pulse of Murasa: GAINS YOU 6 LIFE (and returns a creature or land to a hand). At 10 life or
+  less, cast it for the life. Prefer returning your OWN creature or land (a Mulldrifter to recast
+  is great); the 6 life is the point even when the only return is an opponent's card.
+- Mnemonic Wall: 0/4 defender - a great blocker AND its enter returns an instant/sorcery from
+  your graveyard (get back a Counterspell, a fog, a Pulse). Flicker it to return another one.
+- Counterspell / Condescend: save these for the opponent's most dangerous spell or a board wipe
+  (Ritual of Soot kills your board - counter it). Leave {U}{U} (or {X}{U}) untapped on their turn
+  when you are holding one. For Condescend, choose the LARGEST X you can pay so they cannot pay it.
+- Compelling Argument: mills the opponent 5. This is a slow BACKUP win - only real once your
+  Flicker + Mnemonic Wall loop lets you mill many times. Do not build your whole plan on it early;
+  cycle it ({U}, draw a card) if you just need a card.
+- Dinrova Horror / Mystical Teachings: Dinrova bounces a permanent + makes them discard (tempo vs
+  their best threat); Mystical Teachings tutors any instant (grab Counterspell or a fog). Use them.
+
+CLOSE THE GAME. Once you are not about to die - lock online, or life stabilized above 10 - you
+must WIN, not sit. Attack every turn with your Mulldrifter flyers, keep flickering for cards, and
+grind the opponent down. A game left even until the turn cap is a LOSS for you. Deploy and press.
+
+MULLIGAN: keep 2-5 lands with at least one blue source (Island, Thornwood Falls, Remote Isle,
+Unknown Shores, or Prophetic Prism). Count Unknown Shores and Prophetic Prism as any-color
+sources - never ship a hand for "no green" or "no white." An Expedition Map plus 2 lands is a
+keep (the Map finds your third land). Ship 0-1 or 6-7 land hands.
+
+DECIDING SITUATIONS (recognize -> do):
+- "search card with Expedition Map" is listed -> crack it, fetch the missing Urza land.
+- You control Stonehorn and can cast Ghostly Flicker on your turn -> blink Stonehorn; they skip
+  combat again.
+- The opponent's attack would put you to 8 or less and you have Moment's Peace + {1}{G} open ->
+  fog it, take zero damage.
+- Your life is 10 or less and Pulse of Murasa is castable -> cast it for the 6 life.
+- Mulldrifter is offered and you are under pressure -> hard-cast {4}{U} for the flyer, not evoke.
+- Ghostly Flicker is castable and Stonehorn / Mulldrifter / Mnemonic Wall / Prophetic Prism is on
+  your board -> flicker the value permanent(s), never a bare land.
+- A board wipe or their best threat is on the stack and you have Counterspell/Condescend -> counter it.

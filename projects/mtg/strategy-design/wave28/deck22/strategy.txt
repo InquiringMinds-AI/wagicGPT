@@ -1,0 +1,78 @@
+Deck identity: MONO-RED GIANTS - a tribal ramp/midrange BEATDOWN. You win by curving
+cheap enablers and cost-reducers into big Giants, then swinging with all of them -
+doubled and buffed by your payoffs. You ARE the beatdown against control and midrange;
+against faster aggro you deploy a body every turn and race with bigger creatures. Every
+turn ask: did I add a threat, and did I attack with every Giant that can attack? If not,
+you are losing to your own passivity.
+
+YOUR MANA IS SIMPLE - EVERY SPELL CASTS OFF MOUNTAINS ALONE. There are no color or
+fixing decisions. If a Cast option is listed, it is payable right now; trust it. Your
+Giants get CHEAPER as you play Stinkdrinker Daredevils - the option line already shows
+the reduced cost, so just cast what is offered.
+
+RULE #1 - UNIVERSAL AUTOMATON IS A GIANT. It is a {1} 1/1 with CHANGELING, which means
+it is EVERY creature type, INCLUDING Giant. Treat it as a one-mana Giant, always:
+  - It is "another Giant" that turns ON Blind-Spot Giant (which otherwise cannot attack
+    or block). Automaton on turn 1 -> Blind-Spot Giant can attack the turn it lands.
+  - It counts for Borderland Behemoth (+4/+4 per other Giant), for Sunrise Sovereign's
+    +2/+2 trample anthem, and it is a Giant source for Calamity Bearer's damage-doubling.
+  - So CAST Universal Automaton on turn 1 whenever you have it. NEVER keep it home as a
+    do-nothing 1/1, and NEVER mulligan or bottom it away thinking "it's just a 1/1" - it
+    is the cheapest enabler in the deck and it makes the rest of your hand work.
+
+THE ENGINE - how the deck wins (deploy in this order when you have the pieces):
+  1. Turn 1-2: cast Universal Automaton and/or Stinkdrinker Daredevil (the enablers).
+  2. Turn 3+: cast a Giant every turn. With another Giant already out, Blind-Spot Giant
+     (4/3) can attack immediately.
+  3. Land your PAYOFFS and the deck snowballs:
+     - Calamity Bearer (3/4): DOUBLES all damage from your Giants - combat damage AND
+       Inferno Titan's pings. Once it is out, your attacks and Titan are lethal fast.
+       Get it down and KEEP it - it is a payoff, not a trade-fodder body.
+     - Sunrise Sovereign (5/5): gives your OTHER Giants +2/+2 and trample - a board-wide
+       anthem. Cast it and swing wide.
+     - Inferno Titan (6/6): when it ENTERS and each time it ATTACKS, deal 3 damage split
+       among up to 3 targets (aim ALL 3 at the opponent's FACE for reach, unless a
+       blocker must die first). With Calamity Bearer out it deals 6. {R}: +1/+0 - pump
+       it with spare mana for extra reach.
+     - Borderland Behemoth (4/4 base, trample): gets +4/+4 for each OTHER Giant you
+       control, so it is huge on a developed board. A finisher, not a blocker.
+
+ATTACK FLOOR - RUN THIS EVERY COMBAT (this is how you win; you lose games by NOT
+attacking). Look at the offered attacker list and DECLARE every GIANT on it, every turn,
+UNLESS that Giant must stay home this turn to block an attacker that would otherwise
+kill you. Your Giants are: Universal Automaton, Blind-Spot Giant, Skyraker Giant,
+Calamity Bearer, Inferno Titan, Sunrise Sovereign, Borderland Behemoth. Do not leave a
+4/3 or bigger sitting home while you chip with a 1/1 - that has lost close games.
+  - EXCEPTION 1 - MOGG SENTRY STAYS HOME. Mogg Sentry is NOT a Giant and is a 1/1 when
+    you attack with it (it only grows when the OPPONENT casts a spell). It is a BLOCKER
+    and ambusher - do NOT declare it as an attacker.
+  - EXCEPTION 2 - STINKDRINKER DAREDEVIL (1/3) stays back to block; attack with it only
+    when that 1 extra damage is lethal-relevant or nothing can block it.
+  - "No attackers" is correct ONLY when every Giant you could declare would die for zero
+    gain or is needed to block lethal.
+
+INFERNO TITAN TARGETING: on enter/attack you pick targets for 3 damage (6 with Calamity
+Bearer). Default: send it all at the opponent's face to close the game. Only spend some
+on a creature when that creature will block your lethal or is a real threat you must
+remove now.
+
+MULLIGAN: keep any hand with 2+ Mountains and at least one early play - a Universal
+Automaton, a Stinkdrinker Daredevil, or a Giant you can cast by turn 3-4. Universal
+Automaton COUNTS as an early Giant play (see Rule #1) - do NOT mulligan a hand just
+because "Blind-Spot Giant needs another Giant"; the Automaton in your hand IS that
+Giant. Ship only hands with 0-1 lands, or all lands, or nothing castable before turn 4.
+When you keep and must bottom a card, bottom your MOST EXPENSIVE excess or a duplicate
+bomb - NEVER bottom Universal Automaton, Stinkdrinker Daredevil, or your only early
+Giant; those are what let the hand function.
+
+DECIDING SITUATIONS (recap):
+  - You have Universal Automaton and a Blind-Spot Giant -> cast the Automaton first; now
+    the Blind-Spot Giant can attack. Deploy and swing.
+  - Calamity Bearer is on your board -> your combat and Inferno Titan damage is DOUBLED;
+    push for lethal, attack with everything.
+  - A 4/3+ Giant is offered as an attacker and the opponent cannot profitably block or
+    kill it -> ATTACK with it. Do not sit behind it.
+  - Mogg Sentry is on the board and the opponent has attackers -> keep it back to block
+    (it grows +2/+2 when they cast a spell), never send it in.
+  - Fresh 7 with 2-3 Mountains + Automaton/Stinkdrinker + a Giant -> KEEP. That is your
+    good hand, not a mulligan.

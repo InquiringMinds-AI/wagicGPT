@@ -1,0 +1,74 @@
+Deck identity: MONO-BLACK RELENTLESS RATS - a single-card SWARM. Your deck is 24 Swamps
+and 36 Relentless Rats, nothing else. You win ONE way: put many Relentless Rats onto the
+battlefield. Every Rat makes every OTHER Rat bigger, so your board snowballs - 2 Rats are
+3/3s, 3 Rats are 4/4s, 4 Rats are 5/5s, and it keeps climbing. Deploy a Rat every turn
+and swing wide. Every turn ask: did I add a Rat, and is my board wide enough to attack for
+a lot? If you are not growing the swarm, you are losing.
+
+RULE #1 - SWAMP IS YOUR LAND AND IT TAPS FOR BLACK MANA. This is the most important line
+in this guide because it decides games at the mulligan. A Swamp in your hand IS a land. A
+hand with three Swamps has THREE lands and plenty of mana. NEVER call a hand with Swamps
+in it "zero lands" - that is false. Relentless Rats costs {1}{B}{B} = three mana, so with
+three Swamps you cast your first Rat on turn 3. That is a completely normal, strong start.
+Do NOT mulligan a hand just because you cannot cast a Rat on turn 1 or turn 2 - NO hand in
+this deck can, every hand plays its first Rat on turn 3.
+
+MULLIGAN - decide on LAND COUNT, and Swamps are lands:
+  - KEEP any hand with 3+ Swamps and at least one Relentless Rats. Three Swamps + three
+    Rats is a SNAP KEEP, not a mulligan - it curves out perfectly (Rat on 3, Rat on 4...).
+  - KEEP a 2-Swamp hand with several Rats - you will usually draw a third land in time.
+  - MULLIGAN only hands with 0-1 Swamps, or all Swamps and no Rats.
+  - When you DO mulligan, keep the replacement that has MORE SWAMPS. A hand with six Rats
+    and one Swamp is UNKEEPABLE (you cannot cast a single Rat until you draw two more
+    lands) - it is far worse than a three-Swamp hand. Never ship a 3-land hand and then
+    keep a 1-land hand; that loses the game on the spot.
+  - When you keep and must bottom a card, bottom an EXCESS Rat if you already have plenty
+    in hand; never bottom a Swamp when you are on 2-3 lands.
+
+THE ENGINE - how the swarm wins:
+  1. Turns 1-2: play a Swamp each turn. You cannot cast a Rat yet - that is fine.
+  2. Turn 3 onward: play a Swamp AND cast a Relentless Rats every single turn. Each new
+     Rat pumps ALL your Rats by +1/+1. Casting a Rat is almost always your best play; you
+     have nothing else to spend mana on.
+  3. Keep deploying. A board of 4 Rats is four 5/5s (20 power). A board of 6 Rats is six
+     7/7s. There is no ceiling - just keep adding Rats and the team keeps growing.
+
+COMBAT - ONLY THE LISTED CREATURES CAN ACT. Look at the A. attacker lines and the B.
+blocker lines - those are the ONLY creatures that can attack or block this turn. A Rat you
+just cast this turn is summoning sick and will NOT be on the attacker list; a Rat marked
+[tapped] cannot block. Do not declare attackers or blockers that are not in the A./B.
+list - count your actual legal attackers from the A-lines, not from how many Rats are on
+the board, or your damage math will be wrong.
+
+ATTACK - build width, then swing hard:
+  - Attack with your Rats when they get through for good damage - especially when the
+    opponent has no blockers or only small ones. A wide board of big Rats is your win.
+  - Do NOT feed Rats into bad trades. Losing one Rat shrinks EVERY other Rat (they all
+    lose +1/+1), so a Rat that dies costs you twice. If attacking a Rat means it dies to a
+    bigger blocker for nothing, hold it and keep growing the board instead.
+  - Once your board out-sizes everything the opponent has, alpha-strike: send every Rat
+    and end the game. Count it: (number of attacking Rats) x (their power) vs opponent
+    life.
+
+BLOCK - protect the swarm; do not trade it away:
+  - You are usually the aggressor. When you are AHEAD on life and board, TAKE the damage
+    rather than trading Rats away - the prompt will often tell you the attack is not
+    lethal. Chumping or gang-blocking your Rats to kill one attacker throws away your whole
+    win condition, and every Rat you lose weakens the rest.
+  - Block only when the trade clearly favors you (your Rat kills theirs and survives, or
+    the damage would otherwise be lethal).
+  - CHECK THE OPPONENT'S LIFE FIRST. If the opponent is low and you can win by attacking
+    next turn, do NOT sacrifice Rats on defense to kill a blocker - keep your board and
+    swing for lethal. Racing beats blocking when you are the faster, wider deck.
+
+DECIDING SITUATIONS (recap):
+  - Opening hand with 3 Swamps + Rats -> KEEP. That is a good hand, not a mulligan.
+  - You mulliganed and see a 1-Swamp hand full of Rats -> that is UNKEEPABLE if you can
+    still mulligan for more lands; a Rat-heavy 1-lander does nothing.
+  - It is turn 3+ and you can cast a Rat -> cast it. Grow the swarm every turn.
+  - Your board of Rats is bigger than the opponent's creatures and they cannot block
+    profitably -> attack with all of them.
+  - Opponent is at low life and you have a wide board -> race for lethal; do not trade
+    Rats on defense.
+  - A single big/deathtouch blocker is attacking you while you are ahead -> usually just
+    take the damage; do not gang your Rats into it and lose your board.
