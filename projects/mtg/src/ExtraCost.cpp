@@ -1309,20 +1309,30 @@ bool Convoke::offerable(MTGCardInstance * source, ManaCost * floatable)
 
 int Convoke::doPay()
 {
-    if (target && tc->getNbTargets())
+    //Guard on the CHOSEN TARGETS, not the transient `target` field - the
+    //float-then-pay flow nulls `target` before payment lands (see
+    //isPaymentSet), and a doPay that early-outs on it leaves tc holding raw
+    //pointers to creatures that may later die and be freed. The next offer
+    //probe (MTGAlternativeCostRule::isReactingToClick -> isPaymentSet ->
+    //getReduction) then dynamic_casts freed memory: the probe-198 SIGSEGV
+    //at ExtraCost.cpp:1231. doPay and isPaymentSet MUST key off the same
+    //state, and tc must come back empty however payment ends.
+    if (tc && tc->getNbTargets())
     {
         ManaCost * toReduce = getReduction();
-        target->controller()->getManaPool()->pay(toReduce);
+        source->controller()->getManaPool()->pay(toReduce);
         SAFE_DELETE(toReduce);
         vector<Targetable*>targetlist = tc->getTargetsFrom();
         for (vector<Targetable*>::iterator it = targetlist.begin(); it != targetlist.end(); it++)
         {
             MTGCardInstance * targetCard = dynamic_cast<MTGCardInstance*>(*it);
+            if (!targetCard)
+                continue;
             source->storedCard = targetCard->createSnapShot();
             targetCard->tap();
         }
-        if (tc)
-            tc->initTargets();
+        tc->initTargets();
+        target = NULL;
         return 1;
     }
     return 0;
@@ -1854,9 +1864,20 @@ int ExtraCosts::setAction(MTGAbility * _action, MTGCardInstance * _card)
 int ExtraCosts::reset()
 {
     action = NULL;
-    source->storedCard = NULL;
+    if (source)
+        source->storedCard = NULL;
     source = NULL;
-    //TODO set all payments to "unset"
+    //Set all payments to "unset" (the long-standing TODO): stored payment
+    //targets are raw pointers that dangle once the creatures leave play, and
+    //a stale set makes later offer probes walk freed memory (probe-198
+    //SIGSEGV). Whatever path abandons or completes a cast, the costs come
+    //back target-free.
+    for (size_t i = 0; i < costs.size(); i++)
+    {
+        costs[i]->target = NULL;
+        if (costs[i]->tc)
+            costs[i]->tc->initTargets();
+    }
     return 1;
 }
 
