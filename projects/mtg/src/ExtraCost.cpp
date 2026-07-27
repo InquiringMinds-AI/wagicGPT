@@ -1175,6 +1175,51 @@ int Convoke::isPaymentSet()
     return afford ? 1 : 0;
 }
 
+//CR 702.51b: "each creature tapped this way pays for {1} or one mana of that
+//creature's color". ONE convoker, applied to `toReduce` in place.
+//
+//N-137a: this scan used to live inline in three places (getReduction's forward
+//pass, its backward retry, and convokeReduceByCreatures' offer probe) and every
+//copy broke on the FIRST index - the else arm set `next = true` alongside the
+//match arm, so the `if (next) break;` fired after i == MTG_COLOR_GREEN and
+//colours 2..5 were dead code. A WHITE convoker therefore never paid a {W} pip;
+//it silently reduced GENERIC instead, so `{X}{G}{W}{W}` (March of the
+//Multitudes) was offerable only when the LANDS alone could make both {W} - the
+//deck137 witness where 3-4 untapped Forests plus two untapped white Human
+//tokens produced no March line at all (corpus 20260727 s20/t8, s24/t10).
+//
+//Now: scan every colour, reduce the first COLOURED pip this creature's colour
+//matches, and fall back to one generic only if no colour matched. Reducing a
+//coloured pip is strictly the better greedy - generic can be paid by any mana,
+//a coloured pip cannot - which is why the original intended colour-first order.
+//The generic fallback is guarded on there BEING generic left: a convoker that
+//matches no remaining pip pays nothing, and removing from an empty component
+//was the shape behind the `in GetCost Seems ManaCost was not properly
+//initialized` trace (N-137f).
+//
+//SINGLE DEFINITION ON PURPOSE. The offer probe and the real payment MUST agree
+//or the oracle offers casts doPay cannot complete (the wave-30 over-offer that
+//convoke_unaffordable_not_offered guards); three hand-kept copies is how they
+//drifted. Every caller now routes here.
+static void convokeApplyOneCreature(ManaCost * toReduce, MTGCardInstance * c)
+{
+    if (!toReduce || !c)
+        return;
+    for (int i = Constants::MTG_COLOR_GREEN; i <= Constants::MTG_COLOR_WHITE; ++i)
+    {
+        if ((c->getManaCost() && c->getManaCost()->hasColor(i)) || c->hasColor(i))
+        {
+            if (toReduce->hasColor(i))
+            {
+                toReduce->remove(i, 1);
+                return;
+            }
+        }
+    }
+    if (toReduce->getCost(Constants::MTG_COLOR_ARTIFACT) > 0)
+        toReduce->remove(Constants::MTG_COLOR_ARTIFACT, 1);
+}
+
 ManaCost * Convoke::getReduction()
 {
     ManaCost * toReduce = NEW ManaCost(source->getManaCost());
@@ -1183,88 +1228,33 @@ ManaCost * Convoke::getReduction()
     {
         vector<Targetable*>targetlist = tc->getTargetsFrom();
         for (vector<Targetable*>::iterator it = targetlist.begin(); it != targetlist.end(); it++)
-        {
-            bool next = false;
-            for (int i = Constants::MTG_COLOR_GREEN; i <= Constants::MTG_COLOR_WHITE; ++i)
-            {
-                if (next == true)
-                    break;
-                MTGCardInstance * targetCard = dynamic_cast<MTGCardInstance*>(*it);
-                if ((targetCard->getManaCost()->hasColor(i) || targetCard->hasColor(i)) && toReduce->hasColor(i))
-                {
-                    toReduce->remove(i, 1);
-                    next = true;
-                }
-                else
-                {
-                    toReduce->remove(Constants::MTG_COLOR_ARTIFACT, 1);
-                    next = true;
-                }
-            }
-        }
+            convokeApplyOneCreature(toReduce, dynamic_cast<MTGCardInstance*>(*it));
         //if we didnt find it payable one way, lets try again backwards.
         if (!source->controller()->getManaPool()->canAfford(toReduce,source->has(Constants::ANYTYPEOFMANAABILITY)))
         {
             SAFE_DELETE(toReduce);
             toReduce = NEW ManaCost(source->getManaCost());
             for (vector<Targetable*>::reverse_iterator it = targetlist.rbegin(); it != targetlist.rend(); it++)
-            {
-                bool next = false;
-                for (int i = Constants::MTG_COLOR_GREEN; i <= Constants::MTG_COLOR_WHITE; ++i)
-                {
-                    if (next == true)
-                        break;
-                    MTGCardInstance * targetCard = dynamic_cast<MTGCardInstance*>(*it);
-                    if ((targetCard->getManaCost()->hasColor(i) || targetCard->hasColor(i)) && toReduce->hasColor(i))
-                    {
-                        toReduce->remove(i, 1);
-                        next = true;
-                    }
-                    else
-                    {
-                        toReduce->remove(Constants::MTG_COLOR_ARTIFACT, 1);
-                        next = true;
-                    }
-                }
-            }
+                convokeApplyOneCreature(toReduce, dynamic_cast<MTGCardInstance*>(*it));
         }
     }
     return toReduce;
 }
 
-//Reduce `toReduce` in place by tapping the given creatures, mirroring
-//getReduction's per-creature greedy EXACTLY (a creature reduces the GREEN pip
-//when it is green and the cost still has green, otherwise it reduces one
-//generic) so this probe agrees with what doPay can actually pay. `reverse`
-//walks the creature list backwards, matching getReduction's own second-pass
-//retry.
+//Reduce `toReduce` in place by tapping the given creatures. Shares
+//convokeApplyOneCreature with getReduction's BOTH passes, so this probe agrees
+//with what doPay can actually pay BY CONSTRUCTION rather than by hand-kept
+//duplication (N-137a: the three copies had all drifted the same way, and the
+//probe's agreement with the payment is the offer oracle's whole invariant).
+//`reverse` walks the creature list backwards, matching getReduction's own
+//second-pass retry.
 static void convokeReduceByCreatures(ManaCost * toReduce,
                                      const vector<MTGCardInstance*> & creatures,
                                      bool reverse)
 {
     size_t n = creatures.size();
     for (size_t idx = 0; idx < n; idx++)
-    {
-        MTGCardInstance * c = reverse ? creatures[n - 1 - idx] : creatures[idx];
-        if (!c)
-            continue;
-        bool next = false;
-        for (int i = Constants::MTG_COLOR_GREEN; i <= Constants::MTG_COLOR_WHITE; ++i)
-        {
-            if (next)
-                break;
-            if ((c->getManaCost()->hasColor(i) || c->hasColor(i)) && toReduce->hasColor(i))
-            {
-                toReduce->remove(i, 1);
-                next = true;
-            }
-            else
-            {
-                toReduce->remove(Constants::MTG_COLOR_ARTIFACT, 1);
-                next = true;
-            }
-        }
-    }
+        convokeApplyOneCreature(toReduce, reverse ? creatures[n - 1 - idx] : creatures[idx]);
 }
 
 bool Convoke::offerable(MTGCardInstance * source, ManaCost * floatable)

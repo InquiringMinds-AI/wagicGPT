@@ -1,0 +1,61 @@
+# Wave-32 N-152c NEGATIVE MIRROR / OVER-OFFER GUARD. The colour-aware payment
+# walk must not make an UNPAYABLE multi-pip spell offerable, and in particular a
+# dual source must never be counted as TWO mana.
+#
+# Board: Scrubland x2 (subtype "Plains Swamp" -> add{W} AND add{B} on ONE card)
+# plus Darksteel Citadel ({T}:add{1}).  Hand: Squelching Leeches {2}{B}{B}.
+# THREE sources, cost CMC 4 - unpayable however the colours are assigned.
+#
+# THIS IS THE DISCRIMINATOR AGAINST THE WRONG N-152c FIX.  Routing the cast path
+# onto ManaEngine::potentialManaPermissive (which the ledger row's wording
+# invites, since it is the fix that landed on hasInstantResponse) counts EACH
+# ability of a card, so the permissive bag here reads {W}{B}{W}{B}{1} - five
+# mana, two black - and canAfford({2}{B}{B}) is TRUE.  The spell would be
+# OFFERED, the model would pick it, and the payment could never complete: mana
+# floated for nothing, silent no-op or defer, the divergence-C family shape that
+# item #10 of the same ledger is trying to close.  The shipped fix keeps the
+# strict one-ability-per-SOURCE bag and instead makes planPayment assign colours
+# correctly, so this board is rejected on BOTH the bag and the planPayment
+# fallback.
+#
+# PASS: Squelching Leeches is still in hand at secondmain and the board is
+# unchanged.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Scrubland,Scrubland,Darksteel Citadel
+hand:Squelching Leeches
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Scrubland,Scrubland,Darksteel Citadel
+hand:Squelching Leeches
+[PLAYER2]
+life:20
+[END]

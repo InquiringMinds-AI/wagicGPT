@@ -164,7 +164,11 @@ void AIStats::load(char * filename)
     }
     else
     {
-        DebugTrace("FATAL: AIStats.cpp:load : can't load" << filename);
+        //Wave-31 #29: an absent per-deck stats file is the NORMAL first-encounter
+        //state (a newly rotated-in opponent deck has no history yet) and the load
+        //is fully recoverable - the stat table simply starts empty. Logging it at
+        //"FATAL:" tripped the crash greps of every corpus that rotated a deck in.
+        DebugTrace("WARNING: AIStats.cpp:load : no stats file yet (starting empty): " << filename);
     }
 }
 void AIStats::save()

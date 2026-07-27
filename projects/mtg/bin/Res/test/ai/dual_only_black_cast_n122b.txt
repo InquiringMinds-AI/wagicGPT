@@ -1,0 +1,69 @@
+# Wave-32 N-122b WITNESS. The deck122 report ("no casting-decision ask offered
+# while payable spells sat in hand, two turns running", vs148 t11 and t13) was
+# filed as OBSERVED-but-undiagnosed, with the ledger noting only that it belongs
+# to the "a payable cast never reaches the model" family. This fixture pins it to
+# N-152c and guards the fix.
+#
+# The deck122 board was `{b}{w} from 3 untapped sources` - Chapel / Scrubland /
+# Plains - holding Blood Artist {1}{B} and two Vampire Nighthawk {1}{B}{B}, all
+# reported payable, none offered. Reconstructed here in its sharpest form:
+# Scrubland x2 (subtype "Plains Swamp", so the engine builds add{W} FIRST and
+# add{B} second on each card) plus Ancient Den ({W}). Hand: Vampire Nighthawk
+# {1}{B}{B}.
+#
+# BOTH black sources are duals whose FIRST-listed colour is the wrong one - the
+# distinguishing feature versus dual_land_multipip_cast_n152c, where a dedicated
+# mono source of the needed colour was also present. Strict
+# ManaEngine::potentialMana marks a source used after its first ability, so the
+# bag reads {W}{W}{W}: not one black on a board that can trivially make two.
+# Every consumer of that bag then agrees the cast is unpayable, so the cast is
+# not offered, no ask is built, and the model never sees the play - which is
+# exactly "no casting-decision ask offered while payable spells sat in hand",
+# with no defer record to make it visible.
+#
+# PRE-FIX this FAILS (Nighthawk stuck in hand). POST-FIX planPayment satisfies
+# COLOURED PIPS FIRST, so each Scrubland is spent on its second ability for the
+# {B}{B} and Ancient Den's white pays the {1}; payable()'s planPayment fallback
+# returns non-empty and the cast is offered, paid and resolved.
+#
+# Asserted at secondmain: Nighthawk is summoning-sick the turn it lands, so no
+# combat perturbs either life total.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Scrubland,Scrubland,Ancient Den
+hand:Vampire Nighthawk
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Scrubland,Scrubland,Ancient Den,Vampire Nighthawk
+hand:
+[PLAYER2]
+life:20
+[END]

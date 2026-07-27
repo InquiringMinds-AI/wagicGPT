@@ -167,7 +167,13 @@ protected:
     std::vector<MTGCardInstance*> mPregameBottomQueue;
     bool mPregameBottomAsked;
     int  mPregameBottomForMulls;
-    string buildPregameBottomAskText(const vector<MTGCardInstance*>& hand, int need);
+    //The mulligan count the engine last quoted us (N-139i): the bottom ask
+    //used its own "cards to bottom" number wearing a mulligan label, which is
+    //a different quantity once the count is clamped - and the model argued
+    //with the contradiction out loud (200 s, 12.5k chars, one ask).
+    int  mPregameMullsSeen;
+    string buildPregameBottomAskText(const vector<MTGCardInstance*>& hand, int need,
+                                     int alreadyBottomed);
 
 public:
     //Env-gated (WAGIC_GPT_PARSETEST) self-test of the reply parsers: feeds the

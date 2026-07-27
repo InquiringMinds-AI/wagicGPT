@@ -1,0 +1,64 @@
+# Wave-32 N-148c: a GRANTED `lifelink ueot` must actually gain life on combat
+# damage. Reported as a CLASS defect - the `... ueot && lifelink ueot` construct
+# appears 21x in borderline.txt and 29x in mtg.txt.
+#
+# Stone Haven Pilgrim (2/2, `auto=@combat(attacking) source(this)
+# restriction{type(*[artifact;enchantment]|myBattlefield)~morethan~0}:1/1 ueot
+# && lifelink ueot`) plus Darksteel Citadel as the artifact that satisfies the
+# restriction. The Pilgrim attacks an empty board: the pump fires (it deals 3,
+# not 2), so the FIRST clause of the `&&` chain is live; the question this
+# fixture answers is whether the SECOND clause - the granted lifelink - reaches
+# the combat-damage life-gain path.
+#
+# EXPECTED IF THE ENGINE IS CORRECT: opponent 20 -> 17 and the Pilgrim's
+# controller 20 -> 23.
+# WITNESS FOR THE DEFECT (deck148 corpus 20260727): turn 5 Pilgrim deals 4
+# (= 2 + 1 + 1, confirming the pump) and life 19 goes DOWN next, never +4;
+# turn 7 deals 5 with no +5; vs146 turn 12 deals 4 to a Goblin, life 13 -> 12.
+# Opponent lifegain lines DO render in those same logs, so the renderer is not
+# the gap.
+#
+# Both life totals are asserted, so the fixture distinguishes the three
+# candidate mechanisms the ledger names: if the opponent is at 17 but the
+# controller is at 20, the `&&` chain's SECOND clause never applied or the
+# granted keyword is not consulted by the damage path; if the opponent is at 18
+# the PUMP did not fire either and the whole trigger is the problem.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Stone Haven Pilgrim,Darksteel Citadel
+life:20
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Stone Haven Pilgrim,Darksteel Citadel
+life:23
+[PLAYER2]
+life:17
+[END]

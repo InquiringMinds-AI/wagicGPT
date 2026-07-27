@@ -255,9 +255,15 @@ void PreGamePhase::Update(float dt)
             return;
         }
         Player * p = mOrder[mIdx];
-        int need = mMulls[mIdx];
-        if (need > p->game->hand->nb_cards)
-            need = p->game->hand->nb_cards;
+        //N-139i (wave-31): the clamp must be against the hand size at the START
+        //of bottoming, not the CURRENT one - the hand shrinks by one with every
+        //card bottomed, so clamping live walked the target down alongside the
+        //progress counter and the loop met itself in the middle. With 7
+        //mulligans the seat bottomed 4 of 7 and kept a 3-card hand ("1 of 7",
+        //"2 of 6", "3 of 5", "4 of 4", stop) - a CR 103.5 violation, and it fed
+        //the AI seam a DIFFERENT N on every ask. Cards already bottomed count
+        //toward what was available, so the target stays put.
+        int need = bottomTarget(mMulls[mIdx], mBottomCount, p->game->hand->nb_cards);
         if (mBottomCount >= need)
         {
             mNeedBottom[mIdx] = false;

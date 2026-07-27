@@ -1,0 +1,76 @@
+# Wave-32 N-137a GOLD COUNTERFACTUAL: a convoking creature must be able to pay a
+# COLOURED pip of its own colour, not only generic. CR 702.51b - "each creature
+# tapped this way pays for {1} or one mana of that creature's color."
+#
+# Venerated Loxodon {4}{W} (convoke) with FIVE Eager Cadets ({W} 1/1) and NO
+# LANDS AT ALL. The five white convokers are the entire payment: one of them must
+# pay the {W} pip and the other four the {4}. There is no mana anywhere on the
+# board, so if the {W} pip cannot be convoked the spell is simply unpayable.
+#
+# PRE-FIX this FAILS. Convoke's per-creature colour scan broke on the FIRST index
+# in all three of its copies (Convoke::getReduction forward pass, its backward
+# retry, and convokeReduceByCreatures - the probe behind Convoke::offerable):
+# the else arm set `next = true` alongside the match arm, so `if (next) break;`
+# fired after i == MTG_COLOR_GREEN and colours 2..5 were dead code. A WHITE
+# creature therefore never matched the {W} pip; it silently reduced GENERIC. Five
+# Cadets stripped the {4} (and then removed from an already-empty generic
+# component - the shape behind N-137f's "ManaCost was not properly initialized"
+# trace), left {W} unpaid with an empty pool, offerable() returned false on both
+# passes and the Loxodon was never offered.
+#
+# POST-FIX the scan runs every colour: Cadet #1 matches and removes the {W} pip,
+# Cadets #2-5 find no coloured pip left and take one generic each, toReduce
+# reaches {0}, the cast is offered, paid entirely with creatures, and resolves.
+#
+# THE OFFER PROBE AND THE PAYMENT NOW SHARE ONE FUNCTION
+# (convokeApplyOneCreature), which is the point: three hand-kept copies is how
+# they drifted, and offer-vs-payment agreement is the legality oracle's whole
+# invariant. This fixture exercises BOTH - offerable() to get the option, and
+# getReduction()/doPay() to actually resolve it - so a fix landing on only one
+# copy cannot pass it.
+#
+# Paired guard: convoke_offcolor_pip_not_offered_n137a (same board with GREEN
+# convokers, where the {W} genuinely cannot be convoked and the cast must stay
+# suppressed). Also keep convoke_altcost_wave28 (green convokers + a Plains for
+# the {W}) and convoke_unaffordable_not_offered green.
+#
+# Asserted at FIRSTMAIN so no combat step perturbs the board.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Eager Cadet,Eager Cadet,Eager Cadet,Eager Cadet,Eager Cadet
+hand:Venerated Loxodon
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Venerated Loxodon,Eager Cadet,Eager Cadet,Eager Cadet,Eager Cadet,Eager Cadet
+hand:
+[PLAYER2]
+life:20
+[END]

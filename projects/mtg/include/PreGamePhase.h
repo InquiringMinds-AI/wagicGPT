@@ -55,6 +55,19 @@ public:
     //(the codebase's use-after-free trap) - it is freed in Update.
     virtual void ButtonPressed(int controllerId, int controlId);
 
+    //How many cards this keep still owes to the bottom, in TOTAL (CR 103.5).
+    //Pure arithmetic, exposed so the parse self-test can drive the whole
+    //bottoming loop without a game: the clamp must be against the hand size at
+    //the START of bottoming (alreadyBottomed + what is left in hand), NOT the
+    //shrinking current hand - clamping live walked the target down alongside
+    //the progress counter and stopped a 7-mulligan keep at 4 cards bottomed
+    //(N-139i, wave-31).
+    static int bottomTarget(int mulligans, int alreadyBottomed, int handSize)
+    {
+        int available = alreadyBottomed + handSize;
+        return (mulligans > available) ? available : mulligans;
+    }
+
 private:
     enum State
     {

@@ -405,6 +405,31 @@ int MTGPutInPlayRule::isReactingToClick(MTGCardInstance * card, ManaCost *)
     return 0;//dont play if you cant afford it.
 }
 
+//N-137b helper: does this cost carry a Convoke extra cost? The X-announce
+//option count below is derived from the FLOATED POOL, which is right for every
+//ordinary X spell and wrong for exactly one shape - a convoke cast, whose
+//alternative cost is a {0}+Convoke shell by construction with the convoking
+//creatures still UNTAPPED at announce time. There the pool-derived count
+//collapses to X=0 only and no ANNOUNCE_X ask ever fires (deck137: `Announce the
+//value of X` 28x at the normal-cast seat, ZERO across six games at the convoke
+//seat). ManaEngine::maxAnnounceableX already credits convokers.
+//
+//DELIBERATELY NARROW. An earlier cut widened the count for EVERY X cost; that
+//is a behaviour change on every X spell in the game for a defect that only
+//exists on the convoke shape, and a widened menu whose announcement the pool
+//cannot honour re-arms the menu every tick (allocating an option set each
+//time). Gate on the convoke cost object itself so non-convoke X costs keep
+//byte-identical behaviour, and only ever WIDEN (max), never shrink.
+static bool costHasConvoke(ManaCost * c)
+{
+    if (!c || !c->extraCosts)
+        return false;
+    for (size_t i = 0; i < c->extraCosts->costs.size(); i++)
+        if (dynamic_cast<Convoke*>(c->extraCosts->costs[i]))
+            return true;
+    return false;
+}
+
 int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
 {
     if (!isReactingToClick(card))
@@ -451,6 +476,14 @@ int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
         else
             colorlessx -= costcx;
         int options = cost->hasSpecificX() ? amountx + 1 +colorlessx : (playerMana->getConvertedCost() - cost->getConvertedCost()) + 1;
+        if (costHasConvoke(cost))
+        {
+            //credit the convokers (see costHasConvoke). maxAnnounceableX is
+            //capped at 20 by the engine, so `options` stays bounded.
+            int credited = ManaEngine::maxAnnounceableX(player, cost, card->has(Constants::ANYTYPEOFMANA)) + 1;
+            if (credited > options)
+                options = credited;
+        }
         int discountx = 0; //Try to calculate the correct cost reduction for X.
         if(card->getReducedManaCost()->getManaSymbols(Constants::MTG_COLOR_ARTIFACT) > 0){
             MTGCard * tmpcard = MTGCollection()->getCardByName(card->name);
@@ -1055,6 +1088,15 @@ int MTGAlternativeCostRule::reactToClick(MTGCardInstance * card, ManaCost *alter
     {
         vector<MTGAbility*>selection;
         int options = alternateCost->hasSpecificX()? 20 : (playerMana->getConvertedCost() - alternateCost->getConvertedCost()) + 1;
+        //ALTERNATIVE PATH: measure against the ALTERNATIVE cost object - that is
+        //where the convoke extra cost lives, and maxAnnounceableX reads
+        //extraCosts off the cost it is handed. (See costHasConvoke above.)
+        if (costHasConvoke(alternateCost))
+        {
+            int credited = ManaEngine::maxAnnounceableX(player, alternateCost, card->has(Constants::ANYTYPEOFMANA)) + 1;
+            if (credited > options)
+                options = credited;
+        }
         int discountx = 0; //Try to calculate the correct cost reduction for X.
         if(card->getReducedManaCost()->getManaSymbols(Constants::MTG_COLOR_ARTIFACT) > 0){ 
             MTGCard * tmpcard = MTGCollection()->getCardByName(card->name);

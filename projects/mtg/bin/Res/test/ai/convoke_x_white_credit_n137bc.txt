@@ -1,0 +1,80 @@
+# !! STATUS: THIS FIXTURE CURRENTLY FAILS AND IS DELIBERATELY *NOT* REGISTERED IN
+# !! _tests.txt. It is the wave-32 REPRODUCER for the still-open N-137c residual,
+# !! kept so the next wave starts from a running repro instead of a corpus hunt.
+# !! Do NOT add it to _tests.txt until it passes - the suite invariant is 0 failed.
+# !! Progress so far (wave-32): the FindCardToPlay silent veto that stopped the
+# !! cast from ever being committed is FIXED (see AIPlayerBaka.cpp hasX block),
+# !! so the cast is now picked, priced, and the convoke remainder is floated;
+# !! what remains is downstream - the committed cast still does not reach the
+# !! stack. Instrumented trace of the remaining layer is in the wave-32 report.
+#
+# Wave-32 N-137b/N-137c ARRIVAL-TRACED convoke-X witness, modelled on the
+# deck137 live repro (corpus 20260727 s20/t8, s24/t10, s22-24, s29-30, s36-38,
+# s41-42: March of the Multitudes offered or picked, ZERO Soldier tokens across
+# six games).
+#
+# March of the Multitudes {X}{G}{W}{W} with convoke, over an ALL-GREEN mana base
+# (three Barkchannel Pathway, {T}:add{G}) plus two untapped WHITE convokers
+# (Eager Cadet {W}). The normal cost is unpayable - there is no white mana
+# anywhere - so the ONLY route is the alternative-cost convoke branch, which is
+# the branch the corpus showed consuming the menu answer and then abandoning the
+# cast.
+#
+# This fixture is the ARRIVAL trace, not an offer count: it asserts the
+# downstream GAME EVENT (Soldier tokens on the battlefield, March in the
+# graveyard), because a defer/offer counter cannot see a silent no-op.
+#
+# THREE COUPLED FIXES HAVE TO HOLD FOR IT TO PASS:
+#   N-137a - Convoke's colour scan must let the WHITE Cadets pay the {W}{W}
+#            pips; while it broke on the first index they could only reduce
+#            generic, so the cast was not even OFFERED here.
+#   N-137b - the X-announce option count on BOTH MTGRules paths must credit
+#            convoke. The alternative-cost path (MTGAlternativeCostRule::
+#            reactToClick) derived `options` from the FLOATED POOL minus the
+#            alternative cost, and a convoke alternative is a {0}+Convoke shell,
+#            so with the creatures still untapped the count collapsed to X=0
+#            only - no ANNOUNCE_X ask ever fired.
+#   N-137c - the announced X must actually reach the stack rather than floating
+#            mana and aborting.
+#
+# Wildcard '*' entries are the Soldier tokens; the exact X is engine-chosen from
+# the credited cap, so this asserts the load-bearing outcome (at least one token
+# arrived and the spell resolved), not a specific X.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Barkchannel Pathway,Barkchannel Pathway,Barkchannel Pathway,Eager Cadet,Eager Cadet
+hand:March of the Multitudes
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Barkchannel Pathway,Barkchannel Pathway,Barkchannel Pathway,Eager Cadet,Eager Cadet,*
+graveyard:March of the Multitudes
+[PLAYER2]
+[END]

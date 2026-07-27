@@ -2541,7 +2541,70 @@ public:
             assert(value < 2);
             _target->basicAbilities.set(ability, value > 0);
 
+            //Once this object is LIVE in the game the grant is applied, so it
+            //must never take the resolve() path below. InstantAbility::Update
+            //runs `init = resolve()` while init == 0, and resolve() puts a COPY
+            //in the game - without this line every live copy would spawn
+            //another copy on every tick, forever. That is not hypothetical: the
+            //first cut of the N-148c fix omitted it and the kernel OOM-killed
+            //the suite process at 11.7 GB anon RSS. A memory-ballooning loop
+            //inside a single tick never trips the harness's game-timeout, so
+            //there is no softer symptom to catch it - the invariant has to be
+            //held here. `init = 1` is the codebase's own already-resolved idiom
+            //(AllAbilities.cpp:411, AllAbilities.h:3252).
+            init = 1;
+
             return InstantAbility::addToGame();
+        }
+
+        //N-148c CLASS FIX. This ability implements its whole effect in
+        //addToGame(); it inherited InstantAbility::resolve(), which is a
+        //NO-OP returning 0. Anything that RESOLVES one of these instead of
+        //adding it to the game therefore granted nothing, silently.
+        //
+        //The live case is MultiAbility (the `&&` chain, `src/MTGAbility.cpp`
+        //"Multiple abilities for ONE cost"): MultiAbility::resolve() walks its
+        //legs calling `abilities[i]->resolve()`, so in
+        //`1/1 ueot && lifelink ueot` the P/T leg fired (PTInstant::resolve
+        //clones itself into the game) and the KEYWORD leg did nothing.
+        //Measured on the current binary with three synthetic probes: a plain
+        //`lifelink ueot` attack trigger gained life (20 -> 22), while both
+        //`1/1 ueot && lifelink ueot` AND `lifelink ueot && 1/1 ueot` pumped
+        //and gained NOTHING - order-independent, so it is the chain's resolve
+        //route, not "the second clause is dropped". That is 21 constructs in
+        //borderline.txt and 29 in mtg.txt, incl. activated abilities
+        //(Stone Haven Pilgrim, deck148 corpus 20260727: dealt 4 and 5 with no
+        //matching lifegain across three games).
+        //
+        //Fix in the PTInstant idiom: put a LIVE COPY in the game so the grant
+        //is a real, self-managing ability. The copy is an InstantAbility, so
+        //InstantAbility::testDestroy retires it at MTG_PHASE_AFTER_EOT and its
+        //destroy() restores stateBeforeActivation - correct "until end of
+        //turn" scoping, and correct for a keyword the card already had.
+        //No double-grant risk: MultiAbility RESOLVES the template legs and
+        //ADD-TO-GAMEs clones on the other path, never both for one object.
+        //
+        //TERMINATION (read before touching this): `init` is 0 only on a
+        //PARSE-TIME TEMPLATE - an object that was built by the ability parser
+        //and is resolved by a container such as MultiAbility, but never added
+        //to the game itself. addToGame() sets init = 1, so a live copy can
+        //never re-enter here and the recursion depth is exactly one: template
+        //-> one live copy -> stop. The `if (init)` guard is what makes that
+        //true; without it InstantAbility::Update's `init = resolve()` turns
+        //this into one fresh allocation per live copy per tick (measured: OOM
+        //at 11.7 GB). The guard also keeps the already-working plain
+        //`lifelink ueot` path byte-identical - that path ADDS this ability to
+        //the game, so init is already 1 and resolve() is a no-op, and the
+        //keyword is not granted twice (a second grant would capture
+        //stateBeforeActivation = true and leak the keyword past end of turn).
+        int resolve()
+        {
+            if (init || !target)
+                return 0;
+            AInstantBasicAbilityModifierUntilEOT * live = this->clone();
+            live->target = target;
+            live->addToGame(); //applies the grant and sets live->init = 1
+            return 1;
         }
 
         const string getMenuText()

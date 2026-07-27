@@ -1505,7 +1505,17 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
 
     if(!cost->getConvertedCost())
     {
-        DebugTrace("AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  ");
+        //N-122b sub-item: this trace used to sit HERE, above the test it
+        //describes, so it fired for EVERY zero-mana payment - every land drop
+        //the AI successfully makes, and every free ability - announcing a
+        //land-drop refusal that had not been decided and usually was not
+        //happening (the very next lines normally return true). It is the
+        //`AIPlayerBaka: Card was a land and ai cant play any more lands this
+        //turn.` line the deck122 notes flagged as firing immediately after
+        //every GPT land pick. Benign to the engine, but it is a false signal in
+        //a log that reviewers read as ground truth, so it moves inside the
+        //branch that actually refuses.
+        //
         //The land-per-turn restriction applies only to PLAYING a land from
         //hand. A fetchland crack (and any activated ability whose source is a
         //land already on the battlefield) is NOT a land play - its {T}/Sac/Life
@@ -1517,7 +1527,10 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
         //land that is NOT yet in play (i.e. an actual play-from-hand).
         if (target && target->isLand() && !target->isInPlay(observer)
             && game->playRestrictions->canPutIntoZone(target, game->battlefield) == PlayRestriction::CANT_PLAY)
+        {
+            DebugTrace("AIPlayerBaka: Card was a land and ai cant play any more lands this turn.  ");
             return false;
+        }
         DebugTrace("AIPlayerBaka: Card or Ability was free to play.  ");
         if(!cost->hasX())//don't return true if it contains {x} but no cost, locks ai in a loop. ie oorchi hatchery cost {x}{x} to play.
             return true;
@@ -2649,8 +2662,43 @@ int AIPlayerBaka::selectMenuOption()
                                 mx = 0;
                             return mx;
                         }
+                        //N-146h. The legacy formula below is pool-minus-printed-cost,
+                        //which assumes the payment was already FLOATED. On the
+                        //normal cast path (MTGPutInPlayRule::reactToClick) it is
+                        //not: measured on Agadeem's Awakening {X}{B}{B}{B} over
+                        //five Vault of Whispers, the announce menu was built with
+                        //three options (X = 0,1,2) and this branch returned
+                        //`0 - 3 = -3`. A NEGATIVE menu index is not an answer -
+                        //nothing consumes it, card->setX stays -1, the cast never
+                        //advances, and the floated mana is stranded. That is the
+                        //deck146 signature exactly: mana spent, the face-chooser
+                        //answer consumed, and the whole turn narrating one line,
+                        //with the card still in hand and re-offered next window
+                        //(corpus 20260727 seq30/31 t14, seq32/33 t16, seq34 t18;
+                        //~21 mana burned with the opponent on 5 life). The
+                        //ledger's hypothesis - that no ANNOUNCE_X step is reached
+                        //and X defaults to 0 - is WRONG: the step IS reached, and
+                        //X is never set at all.
+                        //
+                        //Price it the way the `announcing` branch above already
+                        //does: ManaEngine::maxAnnounceableX counts the pool PLUS
+                        //untapped producers, so it is correct whether or not the
+                        //payment has been floated yet. Take the MAX so a path
+                        //that answers correctly today cannot shrink, then CLAMP
+                        //into the menu's real index range - an out-of-range index
+                        //is silently dropped, and "it must not be silent" is this
+                        //item's standing requirement.
                         int potent = manaPool->getConvertedCost();
                         int aftercost = potent - currentMenu->abilities[0]->source->getManaCost()->getConvertedCost();
+                        MTGCardInstance * xsrc = currentMenu->abilities[0]->source;
+                        int credited = ManaEngine::maxAnnounceableX(this, xsrc->getManaCost(),
+                                            xsrc->has(Constants::ANYTYPEOFMANAABILITY));
+                        if (credited > aftercost)
+                            aftercost = credited;
+                        if (aftercost > int(currentMenu->abilities.size()) - 1)
+                            aftercost = int(currentMenu->abilities.size()) - 1;
+                        if (aftercost < 0)
+                            aftercost = 0;
                         return  aftercost;
                     }
                     int checked = getEfficiency(currentMenu->abilities[mk]);
@@ -3018,7 +3066,33 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
             //Reduce the chances of playing a spell with X cost if available mana is low
             if (hasX)
             {
-                int xDiff = pMana->getConvertedCost() - currentCost;
+                //The X-slack penalty must be measured against the X that is
+                //actually ANNOUNCEABLE, not raw pool-minus-printed-cost
+                //(N-137c). For a CONVOKE X-spell the two differ by the whole
+                //point of convoke: March of the Multitudes {X}{G}{W}{W} over
+                //three green sources plus two white convokers has pool 3 and
+                //printed cost 3, so the old xDiff was 0 and the penalty ran
+                //`90 - (90*1.9)/1 = -81`. shouldPlayPercentage then went
+                //NEGATIVE, and because FORCEABILITY / an explicit model pick
+                //only zero the random roll `if (shouldPlayPercentage > 0)`,
+                //`chance > shouldPlayPercentage` was true for every roll and
+                //the candidate was silently `continue`d - no click, no
+                //clickstream entry, no defer record. That is the deck137
+                //silent-abort signature: offered every window, zero Soldier
+                //tokens across six games (corpus 20260727 s22-24, s29-30,
+                //s36-38, s41-42), and it fires BEFORE any of the convoke
+                //payment machinery the wave-28/30/31 fixes hardened, which is
+                //why those fixes never showed up in the arrival trace.
+                //
+                //ManaEngine::maxAnnounceableX is the engine's own answer to
+                //"how big can X be" and already credits convoke creatures
+                //(and leaves a strictly-coloured X uncredited so we never
+                //over-offer an unpayable announcement). Price the heuristic
+                //off the SAME number the announce menu will be built from.
+                int xDiff = ManaEngine::maxAnnounceableX(this, manaToPay,
+                                                         card->has(Constants::ANYTYPEOFMANA));
+                if (xDiff < pMana->getConvertedCost() - currentCost)
+                    xDiff = pMana->getConvertedCost() - currentCost; //never SHRINK the historical slack
                 if (xDiff < 0)
                     xDiff = 0;
                 shouldPlayPercentage = shouldPlayPercentage - static_cast<int> ((shouldPlayPercentage * 1.9f) / (1 + xDiff));

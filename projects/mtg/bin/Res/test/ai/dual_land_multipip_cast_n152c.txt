@@ -1,0 +1,85 @@
+# Wave-32 N-152c GOLD COUNTERFACTUAL. A multi-pip spell payable only when a DUAL
+# source is spent on its SECOND-listed colour must be OFFERED and must RESOLVE.
+#
+# Python {1}{B}{B} (mtg.txt, vanilla 3/2 - no ETB, no target, no abilities) over
+# three non-basic lands: Scrubland (subtype "Plains Swamp", so the engine builds
+# TWO mana abilities on ONE card in subtype order: add{W} FIRST, add{B} second),
+# Vault of Whispers ({B}) and Darksteel Citadel ({1}).  The second {B} is
+# reachable only by spending Scrubland on its SECOND ability; the Citadel pays
+# the {1}.  Scrubland's FIRST-listed colour is white, which this cost does not
+# want at all - that is what makes the board discriminating.
+#
+# PRE-FIX this FAILS - and fails SILENTLY, which is the defect's real cost: no
+# defer record, no ask, the cast simply never appears on the decision surface.
+# Two collapses, both keyed on used[card]:
+#   (1) ManaEngine::potentialMana marks a source used after its FIRST mana
+#       ability, so the strict bag reads {W}{B}{1} - one black - and
+#       pMana->canAfford({1}{B}{B}) is FALSE.  (Instrumented pre-fix, this seat's
+#       payable() logged bagOk=0.)
+#   (2) LegalActionsOracle::payable's planPayment fallback then failed too.
+#       planPayment's GENERIC branch fires for any cost carrying a generic pip
+#       (`cost->hasColor(0)`) and `continue`s past the COLOUR-AWARE branch
+#       entirely, so producers were swallowed in layer order, one ability per
+#       card, until canAfford happened to pass.  Scrubland contributed its white,
+#       {B}{B} was unreachable, and the walk returned empty.
+#
+# POST-FIX planPayment satisfies COLOURED PIPS FIRST and only opens the generic
+# fill once `fullColor == needColorConverted`, so Scrubland's add{B} is taken for
+# the second black and the Citadel pays the {1}.  payable()'s planPayment
+# fallback returns non-empty, the cast is offered, paid and resolved.
+#
+# The strict bag is deliberately left STRICT: swapping the cast path onto
+# ManaEngine::potentialManaPermissive would double-count a dual's TOTAL mana and
+# start offering casts the payment machinery cannot complete (the divergence-C
+# silent no-op shape).  dual_land_multipip_not_offered_n152c is the paired guard
+# against exactly that wrong fix.  Offer and staleness gate agree BY
+# CONSTRUCTION: the option build (AIPlayer*::FindCardToPlay -> legalCasts), the
+# human display (LegalActionsOracle::castableForDisplay), the priority-window
+# predicate (hasInstantResponse) and DecisionManager::planCastSpell's
+# re-validation all route through legalCasts -> payable -> planPayment.
+#
+# NOTE ON CARD CHOICE: no comma in any card name.  The fixture zone parser splits
+# zone lines on ',', so a card whose NAME contains a comma ("Sigarda, Champion of
+# Light") silently resolves to nothing - the [INIT] hand comes up EMPTY and the
+# [ASSERT] then matches vacuously.  Also avoided: lands with a conditional
+# enters-tapped clause (Overgrown Farmland taps itself in [INIT]), which would
+# make the board genuinely unpayable and the "repro" fake.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Scrubland,Vault of Whispers,Darksteel Citadel
+hand:Python
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Scrubland,Vault of Whispers,Darksteel Citadel,Python
+hand:
+[PLAYER2]
+life:20
+[END]

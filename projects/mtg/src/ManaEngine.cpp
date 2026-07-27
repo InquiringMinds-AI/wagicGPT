@@ -311,7 +311,35 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
         AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
         if(amp && (amp->getCost() && amp->getCost()->extraCosts && !amp->getCost()->extraCosts->canPay()))
             continue;
-        if((fullColor == needColorConverted || cost->hasColor(0) || cost->hasColor(7)) && result->getConvertedCost() < cost->getConvertedCost()) // Fixed a bug on colorless mana calculation for AI.
+        //COLOURED PIPS FIRST (N-152c). The generic-fill branch below used to
+        //open on `cost->hasColor(0) || cost->hasColor(7)` alone, i.e. for ANY
+        //cost carrying a generic component - and it `continue`s past the
+        //colour-aware branch, so the colour-aware branch never ran for such a
+        //cost at all. Producers were then swallowed in layer order, ONE ability
+        //per card, until canAfford happened to pass. A dual source (Scrubland's
+        //Plains+Swamp subtypes -> add{W} THEN add{B}; Overgrown Farmland's
+        //add{G}/add{W}) therefore only ever contributed its FIRST-listed colour,
+        //and a multi-pip cost with a generic component ({1}{B}{B} over Scrubland
+        //+ Vault of Whispers + Darksteel Citadel) came back UNPAYABLE. Because
+        //LegalActionsOracle::payable's last resort IS this walk, the cast was
+        //then never offered at all - silently: no defer record, no ask, the
+        //window burned (deck152 Sigarda seq21/seq26, corpus 20260727).
+        //
+        //Gate the generic fill on the coloured pips being COVERED instead.
+        //`fullColor` counts only what THIS walk assigned, so it misses colour
+        //already sitting in the mana pool (pre-added to `result` above) - read
+        //the requirement off `result` vs `cost` directly and keep the historical
+        //counter as a belt-and-braces disjunct. Colour 0 (generic) and colour 7
+        //(land) are the generic side of `needColorConverted` and are excluded.
+        bool coloredSatisfied = true;
+        for (int k = 1; k < Constants::NB_Colors && coloredSatisfied; k++)
+        {
+            if (k == Constants::MTG_COLOR_LAND)
+                continue;
+            if (result->getCost(k) < cost->getCost(k))
+                coloredSatisfied = false;
+        }
+        if((coloredSatisfied || fullColor == needColorConverted) && result->getConvertedCost() < cost->getConvertedCost()) // Fixed a bug on colorless mana calculation for AI.
         {
             if((cost->hasColor(0) || cost->hasColor(7)) && amp)//find colorless after color mana.
             {

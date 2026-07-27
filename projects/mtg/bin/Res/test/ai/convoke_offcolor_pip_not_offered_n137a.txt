@@ -1,0 +1,71 @@
+# Wave-32 N-137a NEGATIVE MIRROR. Widening convoke's colour scan must not let an
+# OFF-COLOUR convoker pay a coloured pip.
+#
+# Same shape as convoke_colored_pip_n137a but with FIVE Grizzly Bears ({1}{G},
+# green) instead of white Cadets, and again NO LANDS. Venerated Loxodon {4}{W}:
+# the green convokers can take the {4} but nothing on the board can produce or
+# convoke the {W}, so the cast must NOT be offered and the Loxodon must stay in
+# hand.
+#
+# This is the guard against the lazy N-137a fix - dropping the colour test, or
+# letting any convoker reduce whichever pip is cheapest to remove. The shipped
+# fix reduces a coloured pip ONLY when the creature actually has that colour
+# (`c->getManaCost()->hasColor(i) || c->hasColor(i)`), and falls back to generic
+# only while generic remains.
+#
+# Contrast with convoke_altcost_wave28, which is the SAME green-convoker board
+# plus one Plains: there the {W} comes from the land and the cast resolves. The
+# pair pins the behaviour to "a convoker pays generic OR its own colour", not
+# "a convoker pays anything".
+#
+# PRE-FIX THIS FIXTURE ALSO FAILS, and for a SECOND defect the same change
+# closes: with the scan breaking on green, each Bear took one generic
+# unconditionally, and the FIFTH Bear removed a generic from an already-empty
+# component. The resulting cost was no longer a real cost, canAfford passed, and
+# the engine OFFERED (and cast) a Loxodon nothing on the board could pay for.
+# convokeApplyOneCreature now only spends generic while generic remains.
+#
+# THE OPPONENT ENDS AT 10, NOT 20, AND THAT IS CORROBORATING EVIDENCE rather
+# than noise: the five Bears are still UNTAPPED at the combat step precisely
+# because no convoke consumed them, so they swing for 10. In the paired positive
+# fixture all five convokers ARE tapped and the opponent stays at 20 - the life
+# totals are a second, independent read on whether the convoke happened.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears
+hand:Venerated Loxodon
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears
+hand:Venerated Loxodon
+[PLAYER2]
+life:10
+[END]

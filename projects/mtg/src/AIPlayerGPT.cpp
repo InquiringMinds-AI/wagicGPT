@@ -28,6 +28,7 @@
 #include "WResourceManager.h"
 #include "GuiCombat.h"
 #include "DuelLayers.h"
+#include "PreGamePhase.h" //PreGamePhase::bottomTarget, driven by the self-test
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -66,7 +67,8 @@ const char * kRulesPrimer =
     "you have priority, including during the opponent's turn and in combat. Spells use the stack and resolve "
     "last-in-first-out; players may respond before a spell resolves.\n"
     "Creatures cannot attack the turn they enter play (summoning sickness) unless they have haste. Tapped "
-    "creatures cannot block. Combat damage is dealt simultaneously; a creature dies if damage reaching it "
+    "creatures cannot block, but a SUMMONING-SICK creature CAN block - summoning sickness restricts "
+    "attacking and {T} abilities only. Combat damage is dealt simultaneously; a creature dies if damage reaching it "
     "this turn is at least its toughness.\n"
     "Mana costs are written like {2}{R} (two generic plus one red). W=white U=blue B=black R=red G=green.\n"
     "All rules are subject to modification by the effects in play.\n"
@@ -186,6 +188,97 @@ string cardTextSnippet(MTGCardInstance * card, size_t maxLen)
 //annotated: plain numbers are already in the rules text, "x" is
 //unknowable before announcement, and "rand" would draw from the game
 //RNG just by being rendered.
+//N-158a/N-158c (wave-31 deck158): AMASS. The amass macro puts N +1/+1 counters
+//on an Army you control, creating a 0/0 Orc Army token first if you control
+//none - and everything the card then does keys off the POST-amass Army. Two
+//defects fell out of not modelling that: the cast option carried no Army-size
+//preview at all (the pilot re-derived it every single time, and this seat's
+//top-2 reply-length spikes are those re-derivations), and "damage:power" was
+//evaluated against the SOURCE - a sorcery, power 0 - so Foray of Orcs rendered
+//"{right now: damage 0}" in 100% of cases while resolving for 2 and for 9. The
+//pilot argued with the annotation out loud at 13.1k and 9.8k characters.
+//Detect the macro from the script and report the count so both surfaces can use
+//the real post-amass number. Returns 0 when the card does not amass.
+//Pure over the script text so the real primitives can be replayed in PARSETEST.
+static int amassCountersFromScript(const string& magicText)
+{
+    string mt = magicText;
+    for (size_t i = 0; i < mt.size(); i++)
+        mt[i] = (char) tolower((unsigned char) mt[i]);
+    //The macro's two halves: retarget an existing Army, or create the 0/0 token.
+    if (mt.find("army|mybattlefield") == string::npos)
+        return 0;
+    //ON-RESOLUTION ONLY. magicText is the auto= lines joined by '\n'
+    //(CardPrimitive::addMagicText), and a line that opens with an '@' TRIGGER or
+    //carries the _DIES_ macro amasses on some LATER event, not when the offered
+    //option resolves: Grim Initiate amasses when it DIES, Saruman the White on
+    //your second spell each turn, Lazotep Chancellor on a discard. Previewing
+    //"Army 0/0 -> 1/1" on their cast line would assert something that is not
+    //about to happen. Keep only the untriggered lines - Foray of Orcs and
+    //Surrounded by Orcs (plain sorcery resolution) and Grishnakh (an ETB on the
+    //creature being cast) all survive this filter.
+    {
+        string kept;
+        size_t p = 0;
+        while (p <= mt.size())
+        {
+            size_t nl = mt.find('\n', p);
+            string line = mt.substr(p, nl == string::npos ? string::npos : nl - p);
+            if (line.find('@') == string::npos && line.find("_dies_") == string::npos)
+                kept += line + "\n";
+            if (nl == string::npos)
+                break;
+            p = nl + 1;
+        }
+        mt = kept;
+        if (mt.find("army|mybattlefield") == string::npos)
+            return 0;
+    }
+    //ATTRIBUTION GUARD, same shape as the N-146g planeswalker skip above: a
+    //card-level scan cannot say WHICH sub-ability the offered option is. Several
+    //amass cards enumerate one branch per X value in a single magicText -
+    //Barad-dur spells out Amass Orcs 1 through 10, Fall of Cair Andros 1 through
+    //20 - so taking the first (or any) literal would stamp a confidently WRONG
+    //Army size onto an option that amasses something else. A wrong number here is
+    //strictly worse than the "damage 0" this fix exists to remove. Emit ONLY when
+    //the whole card agrees on one count; otherwise say nothing. An "x" amount is
+    //excluded for free (atoi -> 0), matching the existing unknowable-X rule.
+    std::set<int> values;
+    for (size_t pos = 0; (pos = mt.find("counter(1/1.", pos)) != string::npos; pos += 12)
+    {
+        int n = atoi(mt.c_str() + pos + 12);
+        if (n > 0)
+            values.insert(n);
+        else
+            return 0; //an unresolved/variable amount: unknowable before announcement
+    }
+    if (values.size() == 1)
+        return *values.begin();
+    if (!values.empty())
+        return 0; //multi-branch card: unattributable at option-build time
+    return mt.find("counter(1/1)") != string::npos ? 1 : 0;
+}
+
+static int amassCounters(MTGCardInstance * card)
+{
+    return card ? amassCountersFromScript(card->magicText) : 0;
+}
+
+//The Army this player already controls, or NULL. An Army token is created 0/0
+//and grows only by counters, so its CURRENT power is the amass baseline.
+static MTGCardInstance * findMyArmy(MTGCardInstance * card)
+{
+    if (!card || !card->controller() || !card->controller()->game)
+        return NULL;
+    MTGGameZone * bf = card->controller()->game->battlefield;
+    if (!bf)
+        return NULL;
+    for (int i = 0; i < bf->nb_cards; i++)
+        if (bf->cards[i] && bf->cards[i]->hasSubtype("army"))
+            return bf->cards[i];
+    return NULL;
+}
+
 string dynamicMagnitudes(MTGCardInstance * card)
 {
     //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
@@ -213,6 +306,26 @@ string dynamicMagnitudes(MTGCardInstance * card)
     std::ostringstream out;
     std::set<string> seen;
     int count = 0;
+    //Amass preview FIRST (it is also the baseline every other magnitude on this
+    //card keys off). "Army 7/7 -> 9/9" is the whole arithmetic, done.
+    int amassN = amassCounters(card);
+    int amassResultP = 0;
+    if (amassN > 0)
+    {
+        MTGCardInstance * army = findMyArmy(card);
+        int curP = army ? army->power : 0;
+        int curT = army ? army->toughness : 0;
+        amassResultP = curP + amassN;
+        out << "Army " << curP << "/" << curT << " -> " << amassResultP << "/"
+            << (curT + amassN);
+        //Creature type stays UNSPOKEN: the macro creates an Orc Army on Foray of
+        //Orcs and a ZOMBIE Army on Widespread Brutality (both detected here), so
+        //naming one would be wrong half the time. The card text on the same line
+        //says which; the size is what the pilot could not compute.
+        if (!army)
+            out << " (a new 0/0 Army token is created first)";
+        count++;
+    }
     for (size_t v = 0; v < sizeof(kVerbs) / sizeof(kVerbs[0]) && count < 3; v++)
     {
         size_t pos = 0;
@@ -233,10 +346,33 @@ string dynamicMagnitudes(MTGCardInstance * card)
                 }
             if (numeric || expr == "x" || expr == "-x" || expr.find("rand") != string::npos)
                 continue;
+            //N-158h (wave-31 deck158, ~44/44 renders wrong): "life:-manacost" on a
+            //TARGETED spell means "the DESTROYED permanent's mana value", not the
+            //spell's own - Feed the Swarm printed a constant "{right now: life -2}"
+            //while the true self-cost ran -1 (Serra Ascendant), -2, -3 (Nadaar) and
+            //0 (a token). The evaluator cannot know the target at option-build
+            //time, and this deck finishes its wins at 3-15 life, so a 1-life error
+            //is live. Drop the clause here; the per-target cost is folded into the
+            //cast option's "legal targets right now:" list instead, where the
+            //target IS known.
+            if (expr.find("manacost") != string::npos && !card->spellTargetType.empty())
+                continue;
             if (!seen.insert(string(kVerbs[v].key) + expr).second)
                 continue;
+            //An expression reading the SOURCE's own power/toughness is
+            //unevaluable when the source is not a creature: a sorcery has power
+            //0, and "damage 0" printed with authority is worse than no
+            //annotation (owner-facing rule from the ledger). The amass case is
+            //the one place the true number IS knowable - the post-amass Army's
+            //power - so use it and suppress everywhere else.
+            if ((expr == "power" || expr == "toughness") && !card->isCreature())
+            {
+                if (!(amassN > 0 && expr == "power"))
+                    continue;
+            }
             WParsedInt val(expr, NULL, card);
-            int n = val.getValue();
+            int n = (amassN > 0 && expr == "power" && !card->isCreature())
+                    ? amassResultP : val.getValue();
             if (kVerbs[v].absValue)
                 n = abs(n);
             //Cast-option magnitudes evaluate with the source still in hand,
@@ -370,9 +506,19 @@ string landTag(MTGCardInstance * card)
     return " (land: taps for " + colors + ")";
 }
 
+string instanceHandle(MTGCardInstance * card); //defined below; used by describeAttachments
+
 //The auras/equipment attached to a permanent. There is no forward list, so
 //find them the way the engine does (cf. MTGCardInstance::hasTotemArmor):
-//every attachment carries a reverse pointer (auraParent) to its host.
+//every attachment carries a reverse pointer to its host - but the pointer is
+//TYPE-SPLIT, and that split is what defeated the original scan (N-148a,
+//wave-31 deck148: 112 reverse "[attached to: X]" renders and ZERO forward
+//"{attached:" renders across six games, because EVERY attachment in that deck
+//was Equipment). An AURA keeps its host in auraParent; an EQUIPMENT (and a
+//fortification) keeps its host in target and is deliberately EXCLUDED from
+//auraParent by the engine - the very fact the reverse render at the
+//battlefield-line block already encodes. Match both, using the same type test
+//the reverse block performs, so the relationship is answerable from either end.
 void describeAttachments(std::ostringstream& out, MTGCardInstance * host)
 {
     GameObserver * obs = host->getObserver();
@@ -385,9 +531,16 @@ void describeAttachments(std::ostringstream& out, MTGCardInstance * host)
         for (int x = 0; x < bf->nb_cards; x++)
         {
             MTGCardInstance * att = bf->cards[x];
-            if (att->auraParent != host)
+            if (!att || att == host)
                 continue;
-            out << (first ? " {attached: " : ", ") << att->getDisplayName();
+            bool attached = (att->auraParent == host);
+            if (!attached
+                && (att->hasType(Subtypes::TYPE_EQUIPMENT) || att->hasType("fortification")))
+                attached = (att->target == host);
+            if (!attached)
+                continue;
+            out << (first ? " {attached: " : ", ") << att->getDisplayName()
+                << instanceHandle(att);
             first = false;
         }
     }
@@ -540,11 +693,106 @@ string changelingAnnotation(MTGCardInstance * card)
 //(MTGCardInstance::canBlock returns 0 for tapped without that keyword) - so the
 //"or block" clause is dropped only for the rare CANBLOCKTAPPED case. Pure helper
 //so the exact emitted shape is deterministically provable (runParseSelfTest).
-static string tappedCreatureTag(bool canBlockTapped)
+//
+//N-122c (wave-31, HIGH cross-seat, cost deck122 a game): the reword above was
+//correct for a tapped NON-combatant and a self-contradiction for everything
+//else. An attacker is TAPPED BY ATTACKING (CR 508.1f), so every declared
+//attacker printed "[tapped - cannot attack or block this turn] [attacking]" -
+//331 occurrences across 42 corpus logs, verbalized as a paradox by models at
+//FOUR separate seats ("this is a contradiction in the log description ... I
+//will assume it does NOT attack"), which dropped two correct chump blocks and
+//lost the game at -16. The restriction clause describes a creature that is NOT
+//in combat; for one that IS, the tapped state has a cause and that cause is the
+//whole story. State the cause instead. Still restriction-first in spirit and
+//still carries no affirmative FUTURE-permission substring ("attacking" is the
+//present declared fact the [attacking] line already asserts, not a "can attack
+//next turn" invitation - that was the N-93c failure mode).
+static string tappedCreatureTag(bool canBlockTapped, bool attacking, const string& blockedName)
 {
+    if (attacking)
+        return " [tapped - attacking]";
+    if (!blockedName.empty())
+        return " [tapped - blocking " + blockedName + "]";
     return canBlockTapped
         ? " [tapped - cannot attack this turn]"
         : " [tapped - cannot attack or block this turn]";
+}
+
+//N-139k: summoning sickness restricts ATTACKING and {T} abilities only (CR
+//302.6) - the creature can still block. The old tag stated only the attack
+//restriction and, beside the tapped tag that spells BOTH out, read as "cannot
+//block either"; a seat declared lethal on that belief and lost. Pure helper so
+//the exact clause is provable.
+static string summoningSickTag()
+{
+    return " [summoning sick - cannot attack this turn, but CAN block]";
+}
+
+//N-139j: the blockers menu annotates a 0-power creature and the attackers menu
+//did not, so 0/3 walls were repeatedly declared as attackers "dealing 3". Same
+//shape as the validated blocker text, phrased for the attack side.
+static string zeroPowerAttackerTag(int power)
+{
+    return power <= 0 ? " [deals 0 - this attack deals no damage to the opponent]" : "";
+}
+
+//N-152d: the printed-P/T delta tag. "printed" must mean the DISPLAYED face's
+//printed stats - AAFlip::resolve resyncs origpower/origtoughness on transform
+//and leaves basepower on the FRONT face, so a transformed DFC read as a pumped
+//small creature. Returns "" when there is no delta (which is what suppresses
+//the bogus tag once the face is corrected).
+static string printedPTTag(int power, int toughness, int basepower, int basetoughness,
+                           int origpower, int origtoughness, int isFlipped)
+{
+    int printedP = (isFlipped > 0) ? origpower : basepower;
+    int printedT = (isFlipped > 0) ? origtoughness : basetoughness;
+    if (power == printedP && toughness == printedT)
+        return "";
+    std::ostringstream o;
+    o << " (printed " << printedP << "/" << printedT << ")";
+    return o.str();
+}
+
+//N-158g: the mana line, COUNT-FIRST. Leading with the colour set bound the
+//symbols to the pool size ("I have {R}{B} available, but Snarling Warg costs
+//{3}{B} ... I cannot afford it") and lost a game at 1 life. The count is the
+//number the arithmetic needs; spell it in words too so a digit cannot be
+//misbound to a colour, and demote the colours to a named sub-clause.
+static string manaAvailableLine(int sources, const string& colors)
+{
+    static const char * kNumWord[] = { "zero", "one", "two", "three", "four", "five",
+                                       "six", "seven", "eight", "nine", "ten" };
+    if (sources <= 0)
+        return "0 total (no untapped sources)";
+    std::ostringstream o;
+    o << sources << " total (";
+    if (sources <= 10)
+        o << kNumWord[sources] << " ";
+    o << "untapped source" << (sources > 1 ? "s" : "")
+      << ", tapped automatically when you cast; colours you can make: " << colors << ")";
+    return o.str();
+}
+
+//N-152e: the truthful Flip-Side note for a TRANSFORMING double-faced card. The
+//h4 rewrite fixed the modal-DFC LAND branch and left this class promising that
+//the back face "appears in the Cast menu as an alternative-cost cast" - false:
+//a transform DFC is never CAST as its other face, it only transforms through
+//its own printed condition. ONE helper feeds BOTH emitters (describeAction's
+//priority-seam render and the CHOOSE_MENU option annotation) so the two paths
+//cannot drift apart again - this defect existed only because they had.
+static string transformDfcToggleNote(const string& curFace, const string& otherName,
+                                     const string& otherCost)
+{
+    string s = " -> DISPLAY TOGGLE only (this is a TRANSFORMING double-faced card):"
+               " it currently shows \"" + curFace + "\"; its other face is \""
+             + otherName + "\"";
+    if (!otherCost.empty())
+        s += " (" + otherCost + ")";
+    s += ". Flipping only changes which face is DISPLAYED - it casts nothing, uses"
+         " no stack, and gains you nothing playable: this card is NEVER cast as its"
+         " other face (there is no alternative-cost cast for it), it only TRANSFORMS"
+         " through its own printed transform condition. Ignore this option.";
+    return s;
 }
 
 //N-139c (wave-29 deck139/deck146): a mutate pile is ONE creature (CR 725) but the
@@ -602,8 +850,38 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             //Surface the live delta the static decklist text cannot carry: a
             //creature pumped, counter'd, enchanted or equipped is no longer
             //its printed stats. Only meaningful in play (withStatus).
-            if (withStatus && (card->power != card->basepower || card->toughness != card->basetoughness))
-                out << " (printed " << card->basepower << "/" << card->basetoughness << ")";
+            //N-152d (wave-31 deck152 seat, five witnesses across four opponents):
+            //basepower/basetoughness are NOT resynced when a card TRANSFORMS -
+            //AAFlip::resolve updates origpower/origtoughness to the new face and
+            //leaves basepower on the FRONT face - so every transformed DFC
+            //presented as a pumped small creature ("Moonrage Brute (3/3) (printed
+            //2/2)" for a card whose back face is a printed 3/3; "Tovolar's
+            //Packleader (7/7) (printed 6/6)" for a true 7/7). Read the DISPLAYED
+            //face's printed stats, exactly as name/keywords/text/mana already do:
+            //origpower/origtoughness ARE the displayed face's printed values once
+            //flipped. basepower stays authoritative for the unflipped case, where
+            //it carries characteristic-SETTING effects ("becomes a 1/1") that a
+            //genuine buff annotation must keep showing. The inequality test then
+            //suppresses the tag by construction when the corrected delta is zero.
+            if (withStatus)
+                out << printedPTTag(card->power, card->toughness,
+                                    card->basepower, card->basetoughness,
+                                    card->origpower, card->origtoughness, card->isFlipped);
+            //N-148d (wave-31 deck148 seq1): typeTag() returns "" for creatures by
+            //design, so on a HAND line creature-ness was signalled ONLY by the
+            //"(P/T)" parenthetical while every other type got an explicit
+            //[artifact]/[enchantment]/[instant]/(land: taps for {W}) marker. The
+            //pilot read a hand holding Kor Duelist {w} (1/1) + two Plains as
+            //"this hand has zero creatures ... the lack of a body makes this a
+            //dead hand" and mulliganed against its guide's explicit KEEP rule.
+            //Same shape as the landTag fix above (deck93 wave-27, "zero lands" on
+            //a 3-Swamp hand): an implicit signal loses to an explicit one at
+            //distance. Scoped to the non-battlefield surfaces - a battlefield
+            //creature already carries keywords/combat/summoning-sick tags, and
+            //the board is where prompt budget is spent.
+            if (!withStatus)
+                out << (card->hasType(Subtypes::TYPE_ARTIFACT)
+                        ? " [artifact creature]" : " [creature]");
         }
         else
         {
@@ -689,16 +967,28 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                     host = card->target;
                 else if (card->auraParent)
                     host = card->auraParent;
+                //N-148b (wave-31 deck148, a game lost by 2): the host NAME alone
+                //cannot bind to a board line when the host's name collides -
+                //three identical "Kor ally #1/#2/#3" and a Plating that said only
+                //"attached to: Kor ally". The model attributed the buff to the
+                //wrong copy, re-equipped the same Plating and swung 9 instead of
+                //15. Every surface that NAMES a permanent carries its handle.
                 if (host)
-                    out << " [attached to: " << host->getDisplayName() << "]";
+                    out << " [attached to: " << host->getDisplayName()
+                        << instanceHandle(host) << "]";
             }
             //A tapped creature reads as harmless and the pilot builds plans
             //on that (wave-7 deck140 collapse: "tapped = no threat" bridged
             //a sweeper-hold it should never have satisfied). Name the truth
             //at the flag: it untaps and attacks again next turn.
+            MTGCardInstance * blockedAtk = card->isDefenser();
+            string blockedName = blockedAtk
+                ? blockedAtk->getDisplayName() + instanceHandle(blockedAtk)
+                : string("");
             if (card->isTapped())
                 out << (card->isCreature()
-                        ? tappedCreatureTag(card->has(Constants::CANBLOCKTAPPED))
+                        ? tappedCreatureTag(card->has(Constants::CANBLOCKTAPPED),
+                                            card->isAttacker() != 0, blockedName)
                         : string(" [tapped]"));
             //A summoning-sick creature renders identically to an attack-ready one
             //otherwise, so the pilot pattern-completes its ATTACK line from the
@@ -709,12 +999,28 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             //(hasSummoningSickness = entered this turn, no haste, is a creature) -
             //exactly what canAttack() enforces, no re-derivation. Guide prose
             //alone ("count from the A-lines") already failed to override this.
+            //N-139k (wave-31 deck139, HIGH, cost a game): this tag stated ONLY
+            //the attack restriction, and beside the neighbouring "[tapped -
+            //cannot attack or block this turn]" - which spells BOTH out - the
+            //shorter clause read as the same class of statement, i.e. "cannot
+            //block either". The pilot declared lethal on a board whose untapped
+            //summoning-sick Sauron then blocked, and it lost at t11. Summoning
+            //sickness restricts attacking and {T} abilities only (CR 302.6); a
+            //summoning-sick creature CAN block. Say the permission out loud -
+            //this is the one place an affirmative substring is REQUIRED, because
+            //the omission is what the model was completing wrongly, and "CAN
+            //block" cannot be misread as a present-turn ATTACK licence.
             if (card->hasSummoningSickness())
-                out << " [summoning sick - cannot attack this turn]";
-            if (card->isAttacker())
-                out << " [attacking]";
-            else if (card->isDefenser())
-                out << " [blocking " << card->isDefenser()->getDisplayName() << "]";
+                out << summoningSickTag();
+            //Combat status. When the creature is tapped the tapped tag above
+            //already named the cause (N-122c), so do not print it twice.
+            if (!card->isTapped())
+            {
+                if (card->isAttacker())
+                    out << " [attacking]";
+                else if (blockedAtk)
+                    out << " [blocking " << blockedName << "]";
+            }
             //N-139c: if this is the TOP of a mutate pile (it has mutated-down cards
             //beneath it), render the whole pile as this one line - gather the under
             //card names (BFS over childrenCards, bounded) and append the merged tag.
@@ -1111,7 +1417,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
-      mPregameBottomAsked(false), mPregameBottomForMulls(-1)
+      mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0)
 {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
@@ -1894,7 +2200,24 @@ string AIPlayerGPT::describeEvent(WEvent * event)
     {
         if (!e->targetCard)
             return "";
-        out << (e->added ? "Counter added to " : "Counter removed from ") << e->targetCard->getDisplayName();
+        //N-158b (wave-31 deck158): "- Counter added to Orc army" carried neither
+        //the counter's SIZE nor its SOURCE, so a run of identical lines could not
+        //be turned back into a board state - four lines meant +8 in one game and
+        //two lines meant +2 in another, and the Mauhur bonus was invisible. The
+        //engine sends this event AFTER applying the counter (Counters::addCounter
+        //increments, then fires), so the permanent's CURRENT P/T is the settled
+        //result: print it and there is no arithmetic left to do.
+        out << (e->added ? "Counter added to " : "Counter removed from ")
+            << e->targetCard->getDisplayName() << instanceHandle(e->targetCard);
+        if (!e->name.empty() && e->name != " ")
+            out << ": " << e->name;
+        else if (e->power || e->toughness)
+            out << ": " << (e->power >= 0 ? "+" : "") << e->power << "/"
+                << (e->toughness >= 0 ? "+" : "") << e->toughness;
+        if (e->targetCard->isCreature())
+            out << " (now " << e->targetCard->power << "/" << e->targetCard->toughness << ")";
+        if (e->source && e->source != e->targetCard)
+            out << " [from " << e->source->getDisplayName() << "]";
         return out.str();
     }
 
@@ -1998,12 +2321,17 @@ string AIPlayerGPT::serializeGameState()
     int sources = ManaEngine::potentialColorReach(this, manaReachPolicy, potential);
     string colors = potential->toString();
     SAFE_DELETE(potential);
-    out << "Mana available: ";
-    if (sources)
-        out << colors << " from " << sources << " untapped source" << (sources > 1 ? "s" : "")
-            << " (tapped automatically when you cast)";
-    else
-        out << "(no untapped sources)";
+    //N-158g (wave-31 deck158, HIGH, cost a game at 1 life): this line USED to
+    //read "Mana available: {r}{b} from 5 untapped sources" - colour set FIRST -
+    //and the pilot bound the leading symbols to the POOL SIZE, concluding "I have
+    //{R}{B} available, but Snarling Warg costs {3}{B} (four mana total). I cannot
+    //afford to cast it" on an offered, payable cast; it died at -4 the next turn
+    //to damage that Warg could have blocked. Eight of that seat's ten largest
+    //replies were mana arithmetic. The core prompt says the right thing in three
+    //places and loses at distance, so this is a REPRESENTATION fix: lead with the
+    //COUNT (the number the arithmetic needs), spell it in words so a digit cannot
+    //be misbound to a colour, and demote the colours to a named sub-clause.
+    out << "Mana available: " << manaAvailableLine(sources, colors);
     if (!pool.empty())
         out << " | Already in pool: " << pool;
     out << "\n";
@@ -2245,6 +2573,18 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         if (fc)
         {
             string otherName = (fc->isFlipped > 0) ? fc->nameOrig : ats->_SideName;
+            //N-152e: on a TRANSFORM DFC the script is "doubleside(backside)" and
+            //"backside" is a PLACEHOLDER the engine resolves against the card's
+            //backSide field only at resolution time (AAFlip::resolve). The render
+            //printed the placeholder verbatim - deck152 saw the option name the
+            //other face as literally "backside". Resolve it here the same way.
+            if (otherName == "backside")
+                otherName = fc->backSide;
+            //A TRANSFORM DFC (Innistrad werewolf class) carries a backside= field
+            //on BOTH faces; a modal DFC spell (Tergrid class) carries none - it
+            //declares its other face through other=/doubleside(<real name>) and
+            //an alternative cost. That field is the engine's own discriminator.
+            bool isTransformDfc = !fc->backSide.empty() || ats->_SideName == "backside";
             if (!otherName.empty())
             {
                 MTGCard * oc = MTGCollection()->getCardByName(otherName, fc->setId);
@@ -2279,11 +2619,30 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                            " face can actually be played as a land. Just play the"
                            " current face.";
                 }
+                else if (isTransformDfc)
+                {
+                    //N-152e (wave-31 deck152 seat; Tovolar's Huntmaster vs148
+                    //seq36, Brutal Cathar vs139 seq28): the h4 rewrite fixed the
+                    //modal-DFC LAND branch and left this one on the OLD text,
+                    //which promises the back face "appears there as an
+                    //alternative-cost cast". That is FALSE for a transforming
+                    //DFC: its back face has no cast route at all - the card only
+                    //ever becomes its other face through its own printed
+                    //transform condition (daybound/nightbound, an ETB, an
+                    //activated transform). Sending the pilot to a Cast menu that
+                    //will never list it is the same flip-then-fail loop the land
+                    //branch was rewritten to prevent. State the truth and stop.
+                    string oCost;
+                    if (oc && oc->data && oc->data->getManaCost()
+                        && oc->data->getManaCost()->getConvertedCost())
+                        oCost = oc->data->getManaCost()->toString();
+                    out << transformDfcToggleNote(fc->getDisplayName(), otherName, oCost);
+                }
                 else
                 {
-                    //Standard DFC spell (Tergrid class): both faces cast from the
-                    //Cast menu (back via its alternative cost), so the toggle is
-                    //a true game no-op.
+                    //Standard modal DFC spell (Tergrid class): both faces cast
+                    //from the Cast menu (back via its alternative cost), so the
+                    //toggle is a true game no-op.
                     out << " -> DISPLAY TOGGLE only: switches this hand card to show"
                            " its other face \"" << otherName << "\"";
                     if (oc && oc->data && oc->data->getManaCost()
@@ -3966,6 +4325,20 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     //preview is cheap (corpus p95 prompt sizes are fine), and
                     //the downstream chooseTarget window already shows the full
                     //list - so the option preview must not disagree with it.
+                    //N-158h part 2: a spell whose SELF-COST is "life equal to that
+                    //permanent's mana value" (script "life:-manacost") cannot be
+                    //priced at option-build time, so the flat "{right now: life
+                    //-2}" clause is dropped (see dynamicMagnitudes). Here the
+                    //target IS known, so fold the real per-target cost into the
+                    //list that already enumerates them - the deciding fact rides
+                    //the target it belongs to.
+                    bool lifeCostPerTarget = false;
+                    {
+                        string mtl = card->magicText;
+                        for (size_t li = 0; li < mtl.size(); li++)
+                            mtl[li] = (char) tolower((unsigned char) mtl[li]);
+                        lifeCostPerTarget = mtl.find("life:-manacost") != string::npos;
+                    }
                     Player * ordered[2] = { this->opponent(), this };
                     for (int oi = 0; oi < 2; oi++)
                     {
@@ -3978,8 +4351,17 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                 for (int cj = 0; cj < zz[zi]->nb_cards; cj++)
                                     if (tc->canTarget(zz[zi]->cards[cj]))
                                     {
-                                        (zz[zi]->cards[cj]->controller() == this ? ownT : oppT)++;
-                                        tNames << (tShown++ ? ", " : "") << zz[zi]->cards[cj]->getDisplayName();
+                                        MTGCardInstance * tgt = zz[zi]->cards[cj];
+                                        (tgt->controller() == this ? ownT : oppT)++;
+                                        tNames << (tShown++ ? ", " : "") << tgt->getDisplayName()
+                                               << instanceHandle(tgt);
+                                        if (lifeCostPerTarget)
+                                        {
+                                            ManaCost * tmc = tgt->getManaCost();
+                                            tNames << " (costs you "
+                                                   << (tmc ? tmc->getConvertedCost() : 0)
+                                                   << " life)";
+                                        }
                                     }
                         if (tc->canTarget(pp))
                         {
@@ -4083,6 +4465,35 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     o << " - can target on the stack: " << hits.str();
             }
         }
+        //N-146i (wave-31 deck146): activated-ability and loyalty options carry
+        //their full {card text: ...} and Cast options carried NONE - 0 of 163 at
+        //that seat - so the pilot got rules text for abilities it activated but
+        //not for the spells it cast. It cast Acererak the Archlich as a 5/5 body
+        //across 59 reply passages planning to attack or block with a creature
+        //whose own ETB returns it to hand, and at vs148 seq18 declined an offered
+        //Vanishing Verse on the opponent's Kor lord to do it; the board swung 12
+        //the next turn.
+        //
+        //BROAD over narrow, deliberately. The narrow option - annotate only
+        //permanents whose ETB bounces them - is itself an instance of THIS wave's
+        //dominant defect shape (a fix landing on one shape of one class): it
+        //closes Acererak and misses every other card whose deciding text is not
+        //on the line. The asymmetry with ability lines is the actual defect, so
+        //remove the asymmetry. Cost measured against the corpus: card text= runs
+        //mean 157 chars, 143 capped at 220, so a 3-8 option casting ask grows by
+        //~0.4-1.1k against prompts already at 10-13k - single-digit percent, and
+        //this seat's largest replies are exactly the re-derivations it removes.
+        //Skipped where it would add nothing or duplicate: no text, lands (landTag
+        //already names what they tap for), and adventure alt-casts (the
+        //{adventure spell: ...} clause above is the same text, better scoped).
+        if (!card->isLand() && !(casts[ci].viaAlternative && card->has(Constants::ADVENTURE)))
+        {
+            //Same SHAPE as the ability-line emitter (quoted): one annotation
+            //form across both surfaces, so the model reads one convention.
+            string ct = cardTextSnippet(card, 220);
+            if (!ct.empty())
+                o << " {card text: \"" << ct << "\"}";
+        }
         if (mStuckCastLines.count(o.str()))
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
@@ -4093,48 +4504,100 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     //Nothing castable: only one outcome, no model call.
     if (candidates.empty())
         return NULL;
-    opts.push_back("Cast nothing right now"); //the decline goes LAST
 
-    //no narration: a cast narrates itself as zone events, "nothing" is a non-action
-    int pick = askModel(string("Casting decision (") + observer->getCurrentGamePhaseName()
-                        + (observer->currentPlayer == this ? ", YOUR turn" : ", opponent's turn")
-                        + "): which card do you cast now, if any?", opts, false);
-    if (pick == kChoicePending)
-        return NULL; //no cast this tick; the answer is consumed on a later poll
-    if (pick < 0) //model deferred or endpoint failed: heuristic decides
-        return AIPlayerBaka::FindCardToPlay(pMana, type);
-    if (pick == (int) candidates.size()) //"cast nothing": hold everything this window
+    //DIVERGENCE-C (wave-31 ledger #10), the LOUD RE-ASK. The validation pass
+    //below can reject a cast the oracle's offerable() approved. Three trigger
+    //shapes were witnessed (a convoke shell whose creature reduction cannot
+    //complete the printed cost; a PLAIN cast; an X spell with zero slack), and
+    //they shared ONE exit: a silent defer that burned the priority window and
+    //never told the model. Accepting on offerable() is NOT the fix - the
+    //rejects were substantively RIGHT (an X=0 March of the Multitudes is a
+    //scripted `this(X=0) donothing`). So keep the reject and RE-PUT the
+    //question with the rejected entry removed, capped, and loud in the log.
+    //
+    //Cache/dedupe safety: askModel keys on board state + the rendered QUESTION
+    //(decision line + option list), never the full prompt. A menu with one
+    //entry removed - and a decision line carrying the [RE-ASK n] marker - is a
+    //different question, so it takes its own cache slot and cannot collide
+    //with the original entry, the priority seam's mLastAskKey, or the deadlock
+    //breaker. It is also deterministic on re-poll: the full menu is rebuilt
+    //identically each tick, replays its cached answer, rejects again, and the
+    //reduced menu replays its own. (The rejected line is deliberately NOT put
+    //into mStuckCastLines: that would change the next tick's FULL menu and so
+    //the re-ask's question text, turning a cache hit into a fresh HTTP call.)
+    const int kMaxCastReasks = 2; //3 asks per window, worst case
+    string rejectedSoFar;
+    for (int attempt = 0; ; attempt++)
     {
-        DebugTrace("AIPlayerGPT: chose to cast nothing");
-        return NULL;
-    }
+        vector<string> menu(opts);
+        menu.push_back("Cast nothing right now"); //the decline goes LAST
 
-    //Validate and price the pick with the heuristic's own machinery: with
-    //aiForcedCandidate set, AIPlayerBaka::FindCardToPlay examines only this
-    //card, runs the full legality/restriction/target checks, and leaves
-    //gotPayments / payAlternative set for exactly this play.
-    MTGCardInstance * chosen = candidates[pick];
-    aiForcedCandidate = chosen;
-    aiForcedAlternative = candidateUsesAlt[pick];
-    MTGCardInstance * validated = AIPlayerBaka::FindCardToPlay(pMana, "*");
-    aiForcedCandidate = NULL;
-    aiForcedAlternative = false;
-    if (validated)
-    {
-        DebugTrace("AIPlayerGPT: casting " << validated->name << " (model's pick"
-                   << (validated == chosen ? ")" : " via combo hint)"));
-        mLastCastBoard = boardNow; //livelock breaker: next entry compares
-        mLastCastLine = opts[pick];
-        return validated;
+        std::ostringstream q;
+        q << "Casting decision (" << observer->getCurrentGamePhaseName()
+          << (observer->currentPlayer == this ? ", YOUR turn" : ", opponent's turn")
+          << "): which card do you cast now, if any?";
+        if (attempt > 0)
+            q << "\n[RE-ASK " << attempt << "] The engine could not actually complete: "
+              << rejectedSoFar << " - its cost or its targets cannot be satisfied right"
+                 " now, so it has been REMOVED from the list below. Your priority window"
+                 " is still open: decide again over what remains.";
+
+        //no narration: a cast narrates itself as zone events, "nothing" is a non-action
+        int pick = askModel(q.str(), menu, false);
+        if (pick == kChoicePending)
+            return NULL; //no cast this tick; the answer is consumed on a later poll
+        if (pick < 0) //model deferred or endpoint failed: heuristic decides
+            return AIPlayerBaka::FindCardToPlay(pMana, type);
+        if (pick == (int) candidates.size()) //"cast nothing": hold everything this window
+        {
+            DebugTrace("AIPlayerGPT: chose to cast nothing");
+            return NULL;
+        }
+
+        //Validate and price the pick with the heuristic's own machinery: with
+        //aiForcedCandidate set, AIPlayerBaka::FindCardToPlay examines only this
+        //card, runs the full legality/restriction/target checks, and leaves
+        //gotPayments / payAlternative set for exactly this play.
+        MTGCardInstance * chosen = candidates[pick];
+        aiForcedCandidate = chosen;
+        aiForcedAlternative = candidateUsesAlt[pick];
+        MTGCardInstance * validated = AIPlayerBaka::FindCardToPlay(pMana, "*");
+        aiForcedCandidate = NULL;
+        aiForcedAlternative = false;
+        if (validated)
+        {
+            DebugTrace("AIPlayerGPT: casting " << validated->name << " (model's pick"
+                       << (validated == chosen ? ")" : " via combo hint)"));
+            mLastCastBoard = boardNow; //livelock breaker: next entry compares
+            mLastCastLine = menu[pick];
+            return validated;
+        }
+
+        //The cheap menu filter let through something the real machinery rejects
+        //(cast restriction, no legal target, unpayable kicker, X-slack 0...).
+        gotPayments.clear();
+        rejectedSoFar += (rejectedSoFar.empty() ? "" : ", ") + chosen->getDisplayName();
+        bool lastChance = (attempt >= kMaxCastReasks) || (candidates.size() <= 1);
+        DebugTrace("AIPlayerGPT: model chose " << chosen->name
+                   << " but it fails validation; "
+                   << (lastChance ? "re-ask budget spent, deferring to heuristic"
+                                  : "removing it and re-asking"));
+        //Marked so a corpus reviewer can find every re-ask and every
+        //exhaustion by fallback reason alone (the old single
+        //"deferred_to_heuristic" recorded both the reject and the give-up).
+        writeTransLog("defer", "", "", -1, (int) menu.size(), chosen->name,
+                      lastChance ? "validation_reject_reask_exhausted"
+                                 : "validation_reject_reask");
+        candidates.erase(candidates.begin() + pick);
+        candidateUsesAlt.erase(candidateUsesAlt.begin() + pick);
+        opts.erase(opts.begin() + pick);
+        if (lastChance)
+        {
+            setNotice("that cast could not be completed - the heuristic decides", 5.0f);
+            return AIPlayerBaka::FindCardToPlay(pMana, type);
+        }
+        setNotice("that cast could not be completed - asking again", 5.0f);
     }
-    //The cheap menu filter let through something the real machinery rejects
-    //(cast restriction, no legal target, unpayable kicker...). Fall back to
-    //the heuristic's own pick rather than burning another model call.
-    DebugTrace("AIPlayerGPT: model chose " << chosen->name
-               << " but it fails validation; deferring to heuristic");
-    writeTransLog("defer", "", "", -1, 0, chosen->name, "deferred_to_heuristic");
-    gotPayments.clear();
-    return AIPlayerBaka::FindCardToPlay(pMana, type);
 }
 
 int AIPlayerGPT::orderBlockers()
@@ -4556,6 +5019,22 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                            " currently-shown face can actually be played as a land. Choose"
                            " Play Land to play the current face.]";
             }
+            //N-152e sibling path (the path-scoped sweep): the CHOOSE_MENU seat
+            //carried the SAME false "the Cast menu offers the other face as an
+            //alternative-cost cast" promise that describeAction did, and it is
+            //equally false for a TRANSFORMING DFC - that card is never cast as
+            //its other face. The engine's own discriminator is the backSide
+            //field (present on both faces of a transform DFC, absent on a modal
+            //DFC spell, which declares its other face via other=/doubleside).
+            else if (ctx && !ctx->backSide.empty())
+            {
+                //Same helper as describeAction's branch: one string, two
+                //emitters, no drift. Wrapped in [] like every other menu tail.
+                opts[i] += " ["
+                    + transformDfcToggleNote(ctx->getDisplayName(), ctx->backSide, string())
+                        .substr(4) //drop the leading " -> " arrow; this is a bracket tail
+                    + "]";
+            }
             else
                 opts[i] += " [display toggle only - no game effect: switches which face this"
                            " hand card shows; it casts nothing and uses no stack. The Cast menu"
@@ -4896,11 +5375,24 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         //each player discards" chooser rendered 'Choose the target for '
         //(blank). The waiting action element's menu text names the effect.
         string effectName = tc->source->getDisplayName();
-        if (effectName.empty())
+        //N-158d (wave-31 deck158): when a SPELL grants an ability to a permanent
+        //and that ability then asks for a target (Foray of Orcs transforms a
+        //"deal damage" ability onto the Army it just amassed), tc->source is the
+        //PERMANENT, so the header read "TARGET CHOICE for Orc army" - naming the
+        //creature the pilot controls as the thing being targeted, which invites a
+        //self-target read. The waiting action element knows the EFFECT's own name
+        //("Damage creature"); when it differs from the permanent, say both, so
+        //the header names what is happening rather than who is holding it.
+        string abilityName;
         {
             MTGAbility * waiting = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
             if (waiting)
-                effectName = waiting->getMenuText();
+                abilityName = waiting->getMenuText();
+        }
+        if (effectName.empty())
+        {
+            //Granted/inner abilities ride a nameless fake card.
+            effectName = abilityName;
             if (effectName.empty())
                 effectName = "this effect";
         }
@@ -5039,8 +5531,10 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                  " list. If your only goal was to stop that spell, this cannot do"
                  " it; pick a battlefield permanent that is worth bouncing, or"
                  " decline.\n";
-        q << "TARGET CHOICE for " << effectName
-          << " (this spell/ability is already on the stack and needs a target - "
+        q << "TARGET CHOICE for " << effectName;
+        if (!abilityName.empty() && abilityName != effectName)
+            q << " - its \"" << abilityName << "\" ability";
+        q << " (this spell/ability is already on the stack and needs a target - "
           << "it is NOT a cast or phase step). Pick ";
         if (!multi)
             q << "the ONE target it will affect";
@@ -5619,6 +6113,91 @@ static bool replyTerminatedNaturally(const string& content)
 //The "not block" family is guarded against "cannot block" (a legality note, not
 //a decline of intent). ATTACK keeps its own answer-first CoT-hijack guard and
 //is untouched; this is scoped to the blockers seam where the defect was seen.
+//WAVE-32 (N-122d): condition (2)'s GLOBALITY is now actually enforced - see the
+//two helpers below and their call sites. The predicate had been firing on
+//per-creature bookkeeping and throwing compliant answers away.
+//
+//N-122d helper: is there ANOTHER line-leading, committing BLOCKS: line after
+//`from`? (Same line shape the commit scan below accepts: a digit in the
+//remainder and not a "none".) A truncated reply that re-states its assignment -
+//or states a corrected one - has not abandoned it.
+static bool laterCodedBlockAssignment(const string& content, size_t from)
+{
+    size_t lineStart = from;
+    while (lineStart < content.size())
+    {
+        size_t lineEnd = content.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? content.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (content[s] == ' ' || content[s] == '\t' || content[s] == '\n'
+                           || content[s] == '*' || content[s] == '#' || content[s] == '-'))
+            s++;
+        static const char * kLabel = "BLOCKS:";
+        if (end - s >= 7)
+        {
+            bool m = true;
+            for (int k = 0; k < 7 && m; k++)
+                m = (toupper((unsigned char) content[s + k]) == kLabel[k]);
+            if (m)
+            {
+                bool hasDigit = false;
+                string remLow;
+                for (size_t i = s + 7; i < end; i++)
+                {
+                    if (isdigit((unsigned char) content[i]))
+                        hasDigit = true;
+                    remLow += (char) tolower((unsigned char) content[i]);
+                }
+                if (hasDigit && remLow.find("none") == string::npos
+                    && remLow.find("no block") == string::npos)
+                    return true;
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    return false;
+}
+
+//N-122d helper: is the decline phrase at `pos` scoped to a NAMED combat
+//participant rather than global? Looks at the enclosing sentence (bounded by
+//. ! ? ; : newline) for a B<n>/A<n> label token. `low` is already lowercased.
+static bool declineSentenceIsLabelScoped(const string& low, size_t pos)
+{
+    size_t start = 0;
+    for (size_t i = pos; i > 0; i--)
+    {
+        char c = low[i - 1];
+        if (c == '.' || c == '!' || c == '?' || c == ';' || c == ':' || c == '\n')
+        {
+            start = i;
+            break;
+        }
+    }
+    size_t end = low.size();
+    for (size_t i = pos; i < low.size(); i++)
+    {
+        char c = low[i];
+        if (c == '.' || c == '!' || c == '?' || c == ';' || c == '\n')
+        {
+            end = i;
+            break;
+        }
+    }
+    for (size_t i = start; i + 1 < end; i++)
+    {
+        if (low[i] != 'b' && low[i] != 'a')
+            continue;
+        if (i > start && (isalnum((unsigned char) low[i - 1]) || low[i - 1] == '_'))
+            continue; //mid-word letter, not a label
+        if (!isdigit((unsigned char) low[i + 1]))
+            continue;
+        return true;
+    }
+    return false;
+}
+
 static bool truncatedBlockCommitmentAbandoned(const string& content)
 {
     if (content.empty())
@@ -5670,6 +6249,13 @@ static bool truncatedBlockCommitmentAbandoned(const string& content)
     if (commitLineEnd == string::npos)
         return false; //no committing coded line -> nothing to abandon
 
+    //N-122d guard 1 (wave-31 ledger #12): a LATER complete coded assignment in
+    //the tail is not an abandonment - it is a self-correction, and the shipped
+    //line-anchored precedence (last well-formed BLOCKS: line wins) already owns
+    //that case. Only the prose-only reversal is this predicate's business.
+    if (laterCodedBlockAssignment(content, commitLineEnd))
+        return false;
+
     string tail;
     for (size_t i = commitLineEnd; i < content.size(); i++)
         tail += (char) tolower((unsigned char) content[i]);
@@ -5688,6 +6274,17 @@ static bool truncatedBlockCommitmentAbandoned(const string& content)
             bool legality = false;
             if (strcmp(phrase, "not block") == 0 && pos >= 3
                 && tail.compare(pos - 3, 3, "can") == 0)
+                legality = true;
+            //N-122d guard 2: only a GLOBAL decline abandons the commit. The
+            //comment above this function always claimed globality; the code
+            //never checked it, so per-creature bookkeeping in the SAME
+            //deliberation that re-derives the head line ("B3 will not block",
+            //"B4 blocking A1 has no benefit") read as a reversal and threw a
+            //compliant answer away - twice in the wave-31 corpus, both times
+            //defaulting to the worst possible blockers answer. A decline
+            //sentence that names a specific B<n>/A<n> participant is scoped to
+            //that creature, not a decision to sit out combat.
+            if (!legality && declineSentenceIsLabelScoped(tail, pos))
                 legality = true;
             if (!legality)
                 return true;
@@ -5903,6 +6500,14 @@ int AIPlayerGPT::chooseAttackers()
         string kw = keywordList(attackers[j]);
         if (!kw.empty())
             ln << " [" << kw << "]";
+        //N-139j (wave-31 deck139): the BLOCKERS menu annotates a 0-power creature
+        //("[deals 0 - this block kills nothing...]") and the ATTACKERS menu did
+        //not, so 0/3 Arboreal Grazers were declared as attackers in FOUR separate
+        //declarations, one of them reasoning out loud that "attacking with all
+        //three 0/3 Grazers deals 3 damage". Effective power is already computed
+        //for the "(P/T)" above; name the consequence at the line that decides,
+        //mirroring the validated blocker text.
+        ln << zeroPowerAttackerTag(attackers[j]->power);
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
@@ -6277,8 +6882,33 @@ int AIPlayerGPT::chooseBlockers()
     //model already rejected (deck18 vs93 s20). Declare the SAFE combat default
     //(no blockers). Only fires on truncated-AND-contradicted; a well-terminated
     //reply, or a truncated commit never contradicted, keeps its answer.
+    //N-122d (wave-31 ledger #12) narrows this: the predicate now ignores a
+    //LATER coded assignment (self-correction, owned by line precedence) and
+    //per-creature "B3 will not block" bookkeeping, so a compliant head line
+    //whose reasoning merely re-derives it is no longer discarded. What still
+    //fires is a genuine GLOBAL prose reversal - and that IS the model's
+    //answer, so no-blocks stands there. The blanket part of the old default is
+    //gone: when the abandoned commit also has no legally executable
+    //assignment left, the HEURISTIC blocks instead of declining combat
+    //outright (a blanket no-blocks maximizes incoming damage and is the
+    //adjudication tiebreaker - the worst answer to default to).
     if (pairs > 0 && truncatedBlockCommitmentAbandoned(content))
     {
+        int legalPairs = 0;
+        for (size_t i = 0; i < blockers.size(); i++)
+            if (pick[i] >= 1 && pick[i] <= (int) attackers.size()
+                && blockers[i]->canBlock(attackers[pick[i] - 1]))
+                legalPairs++;
+        if (!legalPairs)
+        {
+            writeTransLog("blockers", userMsg, content, 0, (int) blockers.size(),
+                          "", "truncated_abandoned_heuristic", &shownLines);
+            setNotice("model reply cut off mid-reversal - the heuristic blocks", 5.0f);
+            mBlocksDoneTurn = observer->turn;
+            DebugTrace("AIPlayerGPT: truncated-abandoned commit with no legal assignment"
+                       " -> heuristic declares blockers");
+            return AIPlayerBaka::chooseBlockers();
+        }
         DecisionAction none;
         DecisionManager::applyDeclareBlockers(req, none);
         writeTransLog("blockers", userMsg, content, 0, (int) blockers.size(),
@@ -6691,6 +7321,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
 
 int AIPlayerGPT::pregameMulliganDecision(int mullsTaken)
 {
+    mPregameMullsSeen = mullsTaken; //the true count, for the bottom ask (N-139i)
     if (mEndpoint.empty())
         return AIPlayerBaka::pregameMulliganDecision(mullsTaken);
     std::ostringstream q;
@@ -6736,15 +7367,39 @@ int AIPlayerGPT::pregameLeylineDecision(MTGCardInstance * card)
 
 //Build the tail for the ONE bundled BOTTOM-N ask (reuses the reveal PUT: reply
 //shape; parsed by parseAttackerSet / salvageLoopedSubset like decideReveal).
-string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& hand, int need)
+string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& hand, int need,
+                                             int alreadyBottomed)
 {
     std::ostringstream tail;
-    int keep = (int) hand.size() - need;
-    tail << "London mulligan bottoming (CR 103.5): you kept after " << need
-         << " mulligan" << (need > 1 ? "s" : "") << ", so you must put EXACTLY "
-         << need << " card" << (need > 1 ? "s" : "")
-         << " from your hand on the BOTTOM of your library. Keep your best "
-         << keep << ", bottom your worst " << need << ".\n";
+    //N-139i: every number here is now the number it claims to be. The old text
+    //printed the CARDS-TO-BOTTOM count wearing a "mulligans" label (a different
+    //quantity once the count is clamped, and it walked downward mid-loop), and
+    //it never said that this one ask covers the whole set.
+    int remaining = need - alreadyBottomed;
+    if (remaining < 0)
+        remaining = 0;
+    if (remaining > (int) hand.size())
+        remaining = (int) hand.size();
+    int keep = (int) hand.size() - remaining;
+    //mPregameMullsSeen is stamped by pregameMulliganDecision on every round, so
+    //it is the engine's own count; the max() is a belt for a seat that somehow
+    //reaches bottoming without having been asked (the two quantities are equal
+    //whenever the count is not clamped).
+    int mulls = (mPregameMullsSeen > need) ? mPregameMullsSeen : need;
+    tail << "London mulligan bottoming (CR 103.5): you took " << mulls
+         << " mulligan" << (mulls == 1 ? "" : "s") << " and kept, so you must put "
+         << need << " card" << (need == 1 ? "" : "s")
+         << " from your hand on the BOTTOM of your library";
+    if (alreadyBottomed > 0)
+        tail << " (" << alreadyBottomed << " already bottomed; " << remaining << " to go)";
+    tail << ". Name EXACTLY " << remaining << " card" << (remaining == 1 ? "" : "s")
+         << " now - this is the ONLY ask for them, and they will be bottomed one at a"
+            " time in the order you give. ";
+    if (keep <= 0)
+        tail << "Your ENTIRE hand goes to the bottom, so order them worst-first.\n";
+    else
+        tail << "You will be left with a " << keep << "-card hand, so keep your best "
+             << keep << " and bottom your worst " << remaining << ".\n";
     for (size_t j = 0; j < hand.size(); j++)
     {
         tail << (j + 1) << ". " << hand[j]->name << changelingAnnotation(hand[j]);
@@ -6757,9 +7412,9 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
             tail << " {text: " << txt << "}";
         tail << "\n";
     }
-    tail << "On the FIRST line write PUT: followed by the " << need << " card number"
-         << (need > 1 ? "s" : "") << " you send to the bottom, comma-separated (e.g. \"PUT: "
-         << (need == 1 ? "3" : "3, 5") << "\"); then brief reasoning; then your PLAN: line last.";
+    tail << "On the FIRST line write PUT: followed by the " << remaining << " card number"
+         << (remaining == 1 ? "" : "s") << " you send to the bottom, comma-separated (e.g. \"PUT: "
+         << (remaining == 1 ? "3" : "3, 5") << "\"); then brief reasoning; then your PLAN: line last.";
     return tail.str();
 }
 
@@ -6769,15 +7424,23 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottom(int need, int chosenSoFar, in
     if (mEndpoint.empty())
         return AIPlayerBaka::pregameChooseBottom(need, chosenSoFar, status);
 
-    //ONE bundled ask per keep; then pop the queued cards one per call.
+    //ONE bundled ask per keep; then pop the queued cards one per call. `need`
+    //is the TOTAL owed for this keep and is stable across the loop since the
+    //N-139i clamp fix, so this asks exactly once; `remaining` keeps the ask
+    //honest in the residual case where the engine re-enters with a new total.
+    int remaining = need - chosenSoFar;
+    if (remaining < 0)
+        remaining = 0;
     if (!mPregameBottomAsked || mPregameBottomForMulls != need)
     {
         vector<MTGCardInstance*> hand;
         for (int i = 0; i < game->hand->nb_cards; i++)
             hand.push_back(game->hand->cards[i]);
+        if ((int) hand.size() < remaining)
+            remaining = (int) hand.size();
         if (mSystemPrompt.empty())
             buildSystemPrompt();
-        string userMsg = assemblePrompt(buildPregameBottomAskText(hand, need));
+        string userMsg = assemblePrompt(buildPregameBottomAskText(hand, need, chosenSoFar));
         string content;
         if (pollCompletionRetry(userMsg, content) == kChoicePending)
         {
@@ -6818,16 +7481,16 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottom(int need, int chosenSoFar, in
         mPregameBottomQueue.clear();
         string chosen;
         if (result >= 0)
-            for (size_t j = 0; j < hand.size() && (int) mPregameBottomQueue.size() < need; j++)
+            for (size_t j = 0; j < hand.size() && (int) mPregameBottomQueue.size() < remaining; j++)
                 if (j < send.size() && send[j])
                 {
                     mPregameBottomQueue.push_back(hand[j]);
                     chosen += (chosen.empty() ? "" : ", ") + hand[j]->name;
                 }
-        //Enforce EXACTLY N: the model under-picked or failed -> fill with the
-        //highest-cost cards not already chosen (the heuristic policy). We already
-        //capped at N above, so over-picks are trimmed.
-        while ((int) mPregameBottomQueue.size() < need)
+        //Enforce EXACTLY the owed count: the model under-picked or failed ->
+        //fill with the highest-cost cards not already chosen (the heuristic
+        //policy). We already capped above, so over-picks are trimmed.
+        while ((int) mPregameBottomQueue.size() < remaining)
         {
             MTGCardInstance * fill = NULL;
             int fc = -1;
@@ -7594,12 +8257,14 @@ void AIPlayerGPT::runParseSelfTest()
     cout << "\n[W30-R] wave-30 representation fixes (mutate + tapped-tag + dungeons-completed)\n";
     {
         // Item 2 / N-93c: tapped tag is restriction-first, no "can attack" nuisance.
-        CHECK(tappedCreatureTag(false) == " [tapped - cannot attack or block this turn]",
-              "W30-R N-93c: tapped creature tag is restriction-first (cannot attack or block)");
-        CHECK(tappedCreatureTag(true) == " [tapped - cannot attack this turn]",
+        // (Wave-32 N-122c added the combat-participant arms; the NON-combatant
+        // arm below is the original wave-30 contract, unchanged.)
+        CHECK(tappedCreatureTag(false, false, "") == " [tapped - cannot attack or block this turn]",
+              "W30-R N-93c: tapped NON-COMBATANT tag is restriction-first (cannot attack or block)");
+        CHECK(tappedCreatureTag(true, false, "") == " [tapped - cannot attack this turn]",
               "W30-R N-93c: CANBLOCKTAPPED creature drops the 'or block' clause (still cannot attack)");
-        CHECK(tappedCreatureTag(false).find("can attack") == string::npos
-              && tappedCreatureTag(true).find("can attack") == string::npos,
+        CHECK(tappedCreatureTag(false, false, "").find("can attack") == string::npos
+              && tappedCreatureTag(true, false, "").find("can attack") == string::npos,
               "W30-R N-93c: no affirmative 'can attack' substring remains in the tapped tag");
 
         // Item 1d / N-139d: mutate alt-cost label is unified to "mutate cost".
@@ -8180,6 +8845,356 @@ void AIPlayerGPT::runParseSelfTest()
         cout << "     cannot-guard len=" << legality.size() << " abandoned=" << truncatedBlockCommitmentAbandoned(legality) << "\n";
         CHECK(!truncatedBlockCommitmentAbandoned(legality),
               "W29-N18e 'cannot block' (legality) is not a decline -> commit kept");
+    }
+
+    // ==== WAVE-32 step-1 (decision-flow) cases ====
+
+    // ---- N-122d: a compliant head BLOCKS: line survives truncation ----
+    cout << "\n[W32-N122d] truncated blockers reply whose reasoning AGREES with the head line -> head kept\n";
+    {
+        // deck122 vs137 s22 / vs158 s26 shape: an answer-first assignment, then a
+        // long per-creature deliberation that re-derives the SAME pick while
+        // saying "will not block" ABOUT THE CREATURES IT LEAVES HOME, cut off
+        // with no PLAN:. The old predicate read those as a global reversal and
+        // declared no blocks - the worst answer at this seam.
+        string perCreature;
+        for (int i = 0; i < 40; i++)
+            perCreature += "B3 will not block A1 here, and B4 blocking A2 has no benefit either. ";
+        string agree = "BLOCKS: B1:A3, B2:A4\n" + perCreature
+                     + "So B1 still takes A3 and B2 still takes A4, which is the line I want and";
+        cout << "     len=" << agree.size() << " terminatedNaturally=" << replyTerminatedNaturally(agree)
+             << " abandoned=" << truncatedBlockCommitmentAbandoned(agree) << "\n";
+        CHECK(!replyTerminatedNaturally(agree), "W32-N122d witness shape is TRUNCATED (control)");
+        CHECK(!truncatedBlockCommitmentAbandoned(agree),
+              "W32-N122d per-creature 'B3 will not block' is scoped, not a global decline -> head kept");
+
+        // A LATER complete coded assignment is a self-correction, owned by the
+        // shipped line-anchored precedence - this predicate must stand down.
+        string later;
+        for (int i = 0; i < 30; i++)
+            later += "Reconsidering the trade math for this attacker set once more here. ";
+        string corrected = "BLOCKS: B1:A1\n" + later + "\nBLOCKS: B2:A1\nI should NOT block with B1 after all and";
+        cout << "     later-line abandoned=" << truncatedBlockCommitmentAbandoned(corrected) << "\n";
+        CHECK(!truncatedBlockCommitmentAbandoned(corrected),
+              "W32-N122d a LATER coded BLOCKS: assignment defers to line precedence (not abandoned)");
+
+        // NEGATIVE control: the wave-29 global reversal must still fire. Same
+        // text as the W29-N18e case, re-asserted here against the new guards.
+        string reversal;
+        for (int i = 0; i < 40; i++)
+            reversal += "So I should NOT block: blocking is strictly worse, I lose a card for no benefit. ";
+        string vs93b = "BLOCKS: B1:A1\n" + reversal + "If I don't block, I have 13 life.";
+        CHECK(truncatedBlockCommitmentAbandoned(vs93b),
+              "W32-N122d a GLOBAL prose reversal with no label still abandons (N-18e preserved)");
+
+        // A "BLOCKS: none" tail is not a competing assignment, so a global
+        // reversal that also codes the decline still abandons.
+        string declineLine = "BLOCKS: B1:A1\n" + reversal + "\nBLOCKS: none\nand therefore";
+        CHECK(truncatedBlockCommitmentAbandoned(declineLine),
+              "W32-N122d a 'BLOCKS: none' tail line is not a competing assignment (still abandoned)");
+    }
+
+    // ---- N-139i: London bottoming holds the loop to the full N ----
+    cout << "\n[W32-N139i] London bottoming target: the clamp is against the START hand, not the shrinking one\n";
+    {
+        // deck139 vs122: kept after 7 mulligans on a 7-card hand. Drive the real
+        // PG_BOTTOM arithmetic one card at a time; the old live clamp produced
+        // 7,6,5,4 -> stop at 4 bottomed with a 3-card hand (CR 103.5 violation).
+        int mulls = 7, hand = 7, bottomed = 0, guard = 0;
+        int firstTarget = PreGamePhase::bottomTarget(mulls, bottomed, hand);
+        while (guard++ < 20)
+        {
+            int need = PreGamePhase::bottomTarget(mulls, bottomed, hand);
+            if (bottomed >= need || hand <= 0)
+                break;
+            bottomed++;
+            hand--;
+        }
+        cout << "     first target=" << firstTarget << " bottomed=" << bottomed
+             << " hand left=" << hand << "\n";
+        CHECK(firstTarget == 7, "W32-N139i a 7-mulligan keep owes 7 bottoms up front");
+        CHECK(bottomed == 7 && hand == 0,
+              "W32-N139i the loop bottoms all 7 and ends on an empty hand (CR 103.5)");
+
+        // Ordinary keep: 2 mulligans on a 7-card hand -> exactly 2, hand of 5,
+        // and the target never moves while the loop runs (the AI seam asks once).
+        int m2 = 2, h2 = 7, b2 = 0, targets = 0, distinct = -1;
+        bool stable = true;
+        while (targets++ < 20)
+        {
+            int need = PreGamePhase::bottomTarget(m2, b2, h2);
+            if (distinct < 0) distinct = need;
+            if (need != distinct) stable = false;
+            if (b2 >= need) break;
+            b2++; h2--;
+        }
+        CHECK(b2 == 2 && h2 == 5, "W32-N139i a 2-mulligan keep bottoms exactly 2, keeping 5");
+        CHECK(stable, "W32-N139i the bottom target is CONSTANT across the loop (one honest ask)");
+
+        // Degenerate guard: more mulligans than cards in hand clamps to the hand
+        // and still terminates.
+        CHECK(PreGamePhase::bottomTarget(9, 0, 4) == 4,
+              "W32-N139i target clamps to the cards actually available");
+        CHECK(PreGamePhase::bottomTarget(9, 4, 0) == 4,
+              "W32-N139i already-bottomed cards count toward what was available");
+    }
+
+    // ---- WAVE-32 RENDER PROOFS (deterministic): the wave-32 step-1 render/
+    // annotation fixes reproduce the EXACT strings the seams emit, through the
+    // same pure helpers the render sites call, plus the ECHO shape of every new
+    // bracketed annotation (the model echoes annotations back into its answers,
+    // and answer matching strips "[...]" tails only on already-anchored
+    // candidates - so a new tail that breaks binding is a live regression).
+    cout << "\n[W32-R] wave-32 representation fixes (combat tags, mana line, DFC faces, magnitudes)\n";
+    {
+        // ---- N-122c: the declared-ATTACKER path. The wave-30 reword landed only
+        // on the non-combatant arm, so every attacker printed
+        // "[tapped - cannot attack or block this turn] [attacking]" - 331
+        // occurrences, verbalized as a paradox at four seats, one lost game.
+        CHECK(tappedCreatureTag(false, true, "") == " [tapped - attacking]",
+              "W32-R N-122c: a tapped ATTACKER names the cause, not a false restriction");
+        CHECK(tappedCreatureTag(false, true, "").find("cannot attack") == string::npos,
+              "W32-R N-122c NEGATIVE: the attacker tag carries NO 'cannot attack' clause (the paradox substring)");
+        CHECK(tappedCreatureTag(false, true, "").find("cannot block") == string::npos,
+              "W32-R N-122c NEGATIVE: the attacker tag carries no 'cannot block' clause either");
+        CHECK(tappedCreatureTag(false, false, "Grizzly Bears #2")
+              == " [tapped - blocking Grizzly Bears #2]",
+              "W32-R N-122c: a tapped BLOCKER names the attacker it blocks (handle included)");
+        CHECK(tappedCreatureTag(true, true, "Grizzly Bears #2") == " [tapped - attacking]",
+              "W32-R N-122c: attacking wins over every other arm (a creature cannot do both)");
+        CHECK(tappedCreatureTag(false, true, "").find("can attack next") == string::npos
+              && tappedCreatureTag(false, false, "Bear").find("can attack") == string::npos,
+              "W32-R N-122c: no affirmative future-permission substring in any combat arm");
+        {
+            // Echo shape: a board/answer echo carrying the new tail still binds.
+            vector<string> opts;
+            opts.push_back("Attack with Orc army");
+            opts.push_back("Attack with nobody");
+            bool stale = false;
+            int c = parseChoice("1 (Attack with Orc army [tapped - attacking])", 2, &opts, &stale, NULL);
+            cout << "     N-122c echo with [tapped - attacking] tail -> " << c << " (must be 1)\n";
+            CHECK(c == 1 && !stale, "W32-R N-122c: an echo carrying the [tapped - attacking] tail still binds");
+        }
+
+        // ---- N-139k: summoning sickness restricts attacking only.
+        CHECK(summoningSickTag() == " [summoning sick - cannot attack this turn, but CAN block]",
+              "W32-R N-139k: the summoning-sick tag states the BLOCK permission explicitly");
+        CHECK(summoningSickTag().find("but CAN block") != string::npos,
+              "W32-R N-139k: the permission clause is present (the omission is what was mis-completed)");
+        CHECK(summoningSickTag().find("cannot attack this turn") != string::npos,
+              "W32-R N-139k NEGATIVE: the attack restriction is NOT weakened by adding the permission");
+        CHECK(summoningSickTag().find("can attack") == string::npos,
+              "W32-R N-139k NEGATIVE: still no affirmative 'can attack' substring");
+
+        // ---- N-139j: the attackers menu gains the blockers menu's 0-power tag.
+        CHECK(zeroPowerAttackerTag(0) == " [deals 0 - this attack deals no damage to the opponent]",
+              "W32-R N-139j: a 0-power attacker option names the consequence");
+        CHECK(zeroPowerAttackerTag(-1) == zeroPowerAttackerTag(0),
+              "W32-R N-139j: a negative-power attacker gets the same tag");
+        CHECK(zeroPowerAttackerTag(1).empty() && zeroPowerAttackerTag(6).empty(),
+              "W32-R N-139j NEGATIVE: an attacker with power does NOT get the deals-0 tag");
+        {
+            // The attackers seam answers through parseAttackerSet (bundled
+            // "ATTACK: A1, A3"), NOT parseChoice - so THAT is the parser the new
+            // tail must survive. The live hazard is concrete: the tag contains a
+            // bare digit ("deals 0"), and this parser accepts bare numbers as
+            // attacker indices. A model that echoes the whole annotated option
+            // line back must still declare exactly the creature it named.
+            vector<string> names;
+            names.push_back("Arboreal Grazer");
+            names.push_back("Llanowar Elves");
+            names.push_back("Sauron");
+            vector<bool> send;
+            int r = parseAttackerSet("ATTACK: A2", 3, send, &names);
+            cout << "     N-139j plain 'ATTACK: A2' -> " << r << " (must be 1), A2=" << (int) send[1] << "\n";
+            CHECK(r == 1 && send[1] && !send[0] && !send[2],
+                  "W32-R N-139j: a plain labelled declaration is unaffected by the new tag");
+            string echo = "ATTACK: A2. Llanowar Elves (1/1)\n"
+                          "I am NOT sending A1. Arboreal Grazer (0/3)"
+                          " [deals 0 - this attack deals no damage to the opponent].";
+            vector<bool> send2;
+            int r2 = parseAttackerSet(echo, 3, send2, &names);
+            cout << "     N-139j echo carrying the [deals 0 ...] tail -> " << r2
+                 << " (A1=" << (int) send2[0] << " A2=" << (int) send2[1] << ")\n";
+            CHECK(r2 >= 1 && send2[1],
+                  "W32-R N-139j: an echo carrying the [deals 0 - this attack...] tail still declares its attacker");
+            CHECK(send2.size() == 3 && !send2[2],
+                  "W32-R N-139j NEGATIVE: the bare '0' inside the new tag is NOT read as an extra attacker index");
+        }
+
+        // ---- N-152d: (printed X/Y) must read the DISPLAYED face.
+        // The ledger's own requested case: transformed DFC, no counters, no
+        // anthem -> NO "(printed ...)" tail at all. Moonrage Brute is a printed
+        // 3/3 whose FRONT face (Brutal Cathar) is a 2/2; pre-fix this rendered
+        // "(printed 2/2)" and presented an unbuffed creature as pumped.
+        CHECK(printedPTTag(3, 3, /*base*/2, 2, /*orig*/3, 3, /*isFlipped*/1).empty(),
+              "W32-R N-152d: a TRANSFORMED DFC with no counters renders NO (printed ...) tail");
+        CHECK(printedPTTag(7, 7, 6, 6, 7, 7, 1).empty(),
+              "W32-R N-152d: Tovolar's Packleader (true 7/7) renders no (printed 6/6) tail");
+        CHECK(printedPTTag(5, 5, 2, 2, 3, 3, 1) == " (printed 3/3)",
+              "W32-R N-152d: a transformed DFC that IS buffed reports the BACK face's printed stats");
+        CHECK(printedPTTag(4, 4, 2, 2, 2, 2, 0) == " (printed 2/2)",
+              "W32-R N-152d NEGATIVE: an unflipped, genuinely buffed creature is unchanged");
+        CHECK(printedPTTag(1, 1, 1, 1, 4, 4, 0).empty(),
+              "W32-R N-152d NEGATIVE: an unflipped set-P/T creature at its base renders no tail");
+
+        // ---- N-158g: the mana line leads with the COUNT, not the colour set.
+        {
+            string ml = manaAvailableLine(5, "{r}{b}");
+            cout << "     N-158g mana line -> " << ml << "\n";
+            CHECK(ml.compare(0, 8, "5 total ") == 0,
+                  "W32-R N-158g: the mana line LEADS with the source count");
+            CHECK(ml.find("five untapped sources") != string::npos,
+                  "W32-R N-158g: the count is also spelled in words (a digit cannot bind to a colour)");
+            CHECK(ml.find("colours you can make: {r}{b}") != string::npos,
+                  "W32-R N-158g: the colours survive, demoted to a named sub-clause");
+            CHECK(ml[0] != '{',
+                  "W32-R N-158g NEGATIVE: the line no longer OPENS with a mana symbol (the misbinding)");
+            CHECK(manaAvailableLine(1, "{w}").find("one untapped source,") != string::npos,
+                  "W32-R N-158g: a single source is singular");
+            CHECK(manaAvailableLine(0, "") == "0 total (no untapped sources)",
+                  "W32-R N-158g: the empty case still leads with a count");
+            CHECK(manaAvailableLine(12, "{g}").find("12 total (untapped sources,") != string::npos,
+                  "W32-R N-158g: past the word table the digit stands alone (no out-of-range read)");
+        }
+
+        // ---- N-152e: the transform-DFC Flip-Side text is truthful, and the two
+        // emitters share ONE string (this defect existed only because they had
+        // drifted - the h4 rewrite landed on the LAND branch alone).
+        {
+            string tn = transformDfcToggleNote("Brutal Cathar", "Moonrage Brute", "");
+            cout << "     N-152e transform note -> " << tn.substr(0, 96) << "...\n";
+            CHECK(tn.find("alternative-cost cast for it") != string::npos
+                  && tn.find("NEVER cast as its other face") != string::npos,
+                  "W32-R N-152e: the transform-DFC note DENIES the alternative-cost cast route");
+            CHECK(tn.find("appears there as an alternative-cost cast") == string::npos,
+                  "W32-R N-152e NEGATIVE: the old false promise is gone from this branch");
+            CHECK(tn.find("Moonrage Brute") != string::npos && tn.find("backside") == string::npos,
+                  "W32-R N-152e: the back face resolves to its real NAME, not the literal placeholder");
+            CHECK(transformDfcToggleNote("Tergrid", "Tergrid's Lantern", "{3}{B}").find("({3}{B})") != string::npos,
+                  "W32-R N-152e: an other-face cost is rendered when known");
+            {
+                vector<string> dfc;
+                dfc.push_back("Cast Card Normally");
+                dfc.push_back("Flip Side [" + tn.substr(4) + "]");
+                dfc.push_back("Decline");
+                bool stale = false;
+                int c = parseChoice("2 (Flip Side)", 3, &dfc, &stale, NULL);
+                cout << "     N-152e annotated transform 'Flip Side' echo -> " << c << " (must be 2)\n";
+                CHECK(c == 2 && !stale,
+                      "W32-R N-152e: a 'Flip Side' echo still binds to the transform-annotated option");
+                int c1 = parseChoice("1 (Cast Card Normally)", 3, &dfc, &stale, NULL);
+                CHECK(c1 == 1, "W32-R N-152e NEGATIVE: the sibling options are unaffected by the new tail");
+            }
+        }
+
+        // ---- N-148d: a creature in HAND carries an explicit type marker.
+        {
+            vector<string> hand;
+            hand.push_back("Kor Duelist {w} (1/1) [creature]");
+            hand.push_back("Plains (land: taps for {W})");
+            bool stale = false;
+            int c = parseChoice("1 (Kor Duelist {w} (1/1) [creature])", 2, &hand, &stale, NULL);
+            cout << "     N-148d hand echo with [creature] tail -> " << c << " (must be 1)\n";
+            CHECK(c == 1 && !stale, "W32-R N-148d: an echo carrying the [creature] tail still binds");
+            int c2 = parseChoice("2 (Plains)", 2, &hand, &stale, NULL);
+            CHECK(c2 == 2, "W32-R N-148d NEGATIVE: the land line's own tag is untouched");
+        }
+
+        // ---- N-148b: the reverse attachment render carries the host's handle.
+        {
+            vector<string> board;
+            board.push_back("Cranial Plating {1} [artifact] [attached to: Kor ally #2]");
+            board.push_back("Captain's Claws {2} [artifact] [attached to: Kor ally #1]");
+            bool stale = false;
+            int c = parseChoice("1 (Cranial Plating [attached to: Kor ally #2])", 2, &board, &stale, NULL);
+            cout << "     N-148b echo with handled [attached to: ...] tail -> " << c << " (must be 1)\n";
+            CHECK(c == 1 && !stale,
+                  "W32-R N-148b: an echo carrying the handled [attached to: X #N] tail still binds");
+            int c2 = parseChoice("2 (Captain's Claws [attached to: Kor ally #1])", 2, &board, &stale, NULL);
+            CHECK(c2 == 2,
+                  "W32-R N-148b NEGATIVE: the two same-host lines are now DISTINGUISHABLE and each binds to itself");
+        }
+
+        // ---- N-146i: Cast option lines carry card text, like ability lines do.
+        {
+            vector<string> casts;
+            casts.push_back("Cast Acererak the Archlich {2}{b} (5/5) {card text: \"When Acererak enters,"
+                            " if you haven't completed Tomb of Annihilation, return it to its owner's hand.\"}");
+            casts.push_back("Cast Vanishing Verse {w}{b}");
+            casts.push_back("Cast nothing right now");
+            bool stale = false;
+            int c = parseChoice("1 (Cast Acererak the Archlich)", 3, &casts, &stale, NULL);
+            cout << "     N-146i cast echo against a {card text: ...} line -> " << c << " (must be 1)\n";
+            CHECK(c == 1 && !stale, "W32-R N-146i: a bare cast echo binds to a card-text-annotated option");
+            int c3 = parseChoice("3 (Cast nothing right now)", 3, &casts, &stale, NULL);
+            CHECK(c3 == 3, "W32-R N-146i NEGATIVE: the decline option still binds LAST");
+        }
+
+        // ---- N-158c / N-158a: the amass detector, replayed against the REAL
+        // primitive scripts (verified against bin/Res/sets/primitives).
+        {
+            // Foray of Orcs: "amass 2, THEN damage:power" - the whole reason the
+            // magnitude rendered 0 (evaluated on a power-0 sorcery, pre-amass).
+            CHECK(amassCountersFromScript(
+                      "if type(army|mybattlefield)~morethan~0 then name(Put 1/1 counters)"
+                      " notaTarget(army|myBattlefield) transforms((Orc,newability[counter(1/1.2)],"
+                      "newability[name(Damage creature) damage:power target(creature|opponentbattlefield)])) forever")
+                  == 2,
+                  "W32-R N-158c: Foray of Orcs is detected as amass 2");
+            CHECK(amassCountersFromScript(
+                      "if type(army|mybattlefield)~morethan~0 then transforms((Orc,newability[counter(1/1.3)],"
+                      "newability[choice name(Opponent mills cards) deplete:power opponent])) forever")
+                  == 3,
+                  "W32-R N-158a: Surrounded by Orcs is detected as amass 3");
+            // ATTRIBUTION GUARD (the N-146g shape). Barad-dur enumerates one
+            // branch per X in ONE magicText; stamping any single number onto the
+            // offered option would be confidently WRONG - worse than silence.
+            CHECK(amassCountersFromScript(
+                      "{12}{b}{t}:if type(army|mybattlefield)~morethan~0 then transforms((Orc,newability"
+                      "[counter(1/1.6)])) forever {14}{b}{t}: transforms((Orc,newability[counter(1/1.7)]))"
+                      " {16}{b}{t}: transforms((Orc,newability[counter(1/1.8)]))")
+                  == 0,
+                  "W32-R N-158c NEGATIVE: a MULTI-BRANCH amass card (Barad-dur/Fall of Cair Andros) emits NO preview");
+            CHECK(amassCountersFromScript(
+                      "if type(army|mybattlefield)~morethan~0 then transforms((Orc,newability[counter(1/1.x)])) forever")
+                  == 0,
+                  "W32-R N-158c NEGATIVE: an announced-X amass is unknowable before announcement -> no preview");
+            CHECK(amassCountersFromScript(
+                      "lord(*[orc;goblin]|mybattlefield) newability[counter(1/1.2)]") == 0,
+                  "W32-R N-158c NEGATIVE: a non-amass card is not detected as amass (no army|mybattlefield)");
+            CHECK(amassCountersFromScript("") == 0,
+                  "W32-R N-158c NEGATIVE: an empty script is not amass");
+            // ON-RESOLUTION guard: a LATER-event amass must not be previewed on
+            // the cast line as though it were about to happen.
+            CHECK(amassCountersFromScript(
+                      "_dies_if type(army|mybattlefield)~morethan~0 then counter(1/1)"
+                      " notatarget(army|mybattlefield)") == 0,
+                  "W32-R N-158a NEGATIVE: Grim Initiate amasses when it DIES -> no cast-line preview");
+            CHECK(amassCountersFromScript(
+                      "@movedto(*|mystack) restriction{thisturn(*|mystack)~equalto~1,"
+                      "type(army|mybattlefield)~morethan~0}:transforms((Orc,newability[counter(1/1.2)]))") == 0,
+                  "W32-R N-158a NEGATIVE: Saruman the White's TRIGGERED amass gets no cast-line preview");
+            CHECK(amassCountersFromScript(
+                      "@discarded(*|myhand):name(Pay 1 and amass 2)\n"
+                      "ifnot paid(alternative) then target(army|mybattlefield)"
+                      " transforms((Orc,newability[counter(1/1.2)]))") == 2,
+                  "W32-R N-158a: a card mixing a triggered line with an on-resolution amass keeps the on-resolution one");
+        }
+
+        // ---- N-158h: the per-target self-cost fold. The clause that used to
+        // print a CONSTANT "life -2" for every target now rides each target.
+        {
+            vector<string> opts;
+            opts.push_back("Cast Feed the Swarm {1}{b} - legal targets right now:"
+                           " Nadaar, Selfless Paladin (costs you 3 life), Serra Ascendant (costs you 1 life)");
+            opts.push_back("Cast nothing right now");
+            bool stale = false;
+            int c = parseChoice("1 (Cast Feed the Swarm)", 2, &opts, &stale, NULL);
+            cout << "     N-158h per-target cost line echo -> " << c << " (must be 1)\n";
+            CHECK(c == 1 && !stale,
+                  "W32-R N-158h: a cast echo binds against the per-target life-cost annotation");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
