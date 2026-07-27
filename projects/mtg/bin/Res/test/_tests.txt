@@ -1057,6 +1057,10 @@ ai/convoke_unaffordable_not_offered.txt
 ai/dual_land_color_cast_n146a.txt
 ai/dual_land_multipip_cast_n152c.txt
 ai/dual_land_multipip_not_offered_n152c.txt
+ai/all_flexible_dual_multipip_cast_n152f.txt
+ai/vanishing_verse_artifact_target_n146j.txt
+ai/vanishing_verse_colored_land_target_n146j.txt
+ai/vanishing_verse_multicolor_negative_n146j.txt
 ai/convoke_colored_pip_n137a.txt
 ai/convoke_offcolor_pip_not_offered_n137a.txt
 ai/granted_lifelink_ueot_n148c.txt

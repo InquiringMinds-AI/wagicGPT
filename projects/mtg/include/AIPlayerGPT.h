@@ -223,6 +223,9 @@ private:
     string loadStrategyGuide();
 
     string serializeGameState();
+    //N-146k: the pregame (mulligan/bottoming/leyline) situation block. Hand only
+    //- a pregame ask carries no board-state information at all.
+    string serializePregameState();
     string describeAction(const OrderedAIAction& action);
     string describeEvent(WEvent * event);
 
@@ -321,6 +324,12 @@ private:
     //not), and - when the heuristic answered instead - the fallback reason
     //(c2: the silent choice:-1 class becomes attributable).
     long mLastLatencyMs; //-1 = no round trip behind this record (cache/reuse)
+    //Blocker assignments the apply-site canBlock gate PRUNED as illegal,
+    //rendered "<blocker> -> <attacker>; ...". Set immediately before the
+    //blockers translog write and consumed (cleared) by it. WAVE-33 N-152j:
+    //the name-form parse resolves intent and the validator prunes it, so the
+    //pruning must be visible or the two are indistinguishable in review.
+    string mLastPrunedPairs;
     void ensureGameStartRecord();
     void writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                        const string& chosenText = "", const char * fallback = NULL,
@@ -426,6 +435,13 @@ private:
     //human would remember. Tracked by name (instances are recreated on zone
     //moves), decremented when a card of that name leaves the hand.
     std::map<string, int> mKnownOppHand;
+    //N-105a: last-narrated poison total per player ([0] this seat, [1] the
+    //opponent), so a poison-gain line can state the real DELTA. The engine's
+    //own WEventplayerPoisoned payload cannot be trusted for it - the toxic
+    //path (Damage.cpp:239) fires the event carrying the DAMAGE dealt, not the
+    //toxicity granted - while Player::poisonCount is settled by the time the
+    //event lands, so the delta is derived from the settled totals instead.
+    int mLastPoison[2];
     //Avoid re-querying the model every AI tick while nothing changed. Keyed
     //by board state + question (not the full prompt) for the same reason as
     //mAskCache: taking an action narrates it, and a full-prompt key would

@@ -1824,10 +1824,15 @@ bool CardGui::FilterCard(MTGCard * _card,string filter)
                     //card is multicolored?
                     if (minus)
                     {
+                        //Kept byte-for-byte in step with the TargetChooser.cpp
+                        //`-multicolor` branch, or the card browser's rendering
+                        //of a predicate disagrees with what the game enforces.
+                        //The two SetExclusionColor calls removed here passed
+                        //colour INDICES that resolve to TYPE bits (artifact,
+                        //and WASTE which shares the land bit), so they rejected
+                        //every artifact and every land regardless of colour
+                        //(N-146j). See the long note at the TargetChooser site.
                         cd.setisMultiColored(-1);
-                        cd.SetExclusionColor(0);//not multicolored is monocolored not colorless, use iscolorless attribute
-                        cd.SetExclusionColor(6);//restriction... green, red, blue, black or white colored only
-                        cd.mode = CardDescriptor::CD_OR;
                     }
                     else
                     {

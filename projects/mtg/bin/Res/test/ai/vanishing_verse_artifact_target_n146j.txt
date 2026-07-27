@@ -1,0 +1,90 @@
+# Wave-33 N-146j GOLD COUNTERFACTUAL. `[-multicolor]` must NOT exclude artifacts.
+#
+# Vanishing Verse (borderline.txt) is `target=*[-multicolor]|battlefield` /
+# `auto=moveto(exile)` / `text=Exile target monocolored permanent.`  Scryfall
+# Oracle: "Exile target monocolored permanent."  A monocolored ARTIFACT permanent
+# is a legal target - artifact-ness is a card TYPE, not a colour.
+#
+# Board: PLAYER2 controls Glaze Fiend ({1}{B}, type=Artifact Creature) - a
+# MONOCOLORED (black) artifact creature, plainly legal.  PLAYER1 holds Vanishing
+# Verse {W}{B} over Scrubland (W/B dual) + Vault of Whispers ({B}), which pays
+# the cost through the branch that already worked (one dual + one mono source),
+# keeping this fixture orthogonal to N-152f.
+#
+# PRE-FIX this FAILS: the Verse is never castable because it has no legal target,
+# so the 601.2c cast filter drops it and it stays in hand.  TargetChooser.cpp's
+# `-multicolor` branch compiled the predicate as
+#     cd->setisMultiColored(-1);
+#     cd->SetExclusionColor(0);   // MTG_COLOR_ARTIFACT -> kColorBitMask_Artifact
+#     cd->SetExclusionColor(6);   // MTG_COLOR_WASTE    -> kColorBitMask_Land
+# and CardDescriptor::match rejects on ANY intersection with the exclusion mask.
+# MTGDeck.cpp stamps kColorBitMask_Artifact on every artifact and
+# kColorBitMask_Land on every land ("Legacy: For the Deck editor, we need Lands
+# and Artifact to be colors"), and MTG_COLOR_WASTE SHARES the land bit
+# (CardPrimitive.cpp ConvertColorToBitMask).  So the exclusions rejected EVERY
+# artifact and EVERY land whatever its actual colour, which is not what the
+# comment on the second line claims the code is doing.
+#
+# LIVE WITNESS: deck146 vs36, seq 17/19/23 all at t10 - "Cast Vanishing Verse
+# {b}{w} - the only legal targets are YOUR OWN right now" against an opponent
+# board holding Glaze Fiend and Salvage Slasher, both mana={1}{B} artifact
+# creatures.  The pilot spotted it verbatim: "Glaze Fiend is {1}{B} (Black) -
+# that is monocolored ... Why are they not listed as legal targets?"  deck146
+# LOST that game at t11 holding THREE Vanishing Verses.  Corpus-wide the only
+# artifact ever listed as a Verse target was a Clue token (token creation does
+# not set the artifact colour bit) and no land appeared in any Verse target list
+# across 21 games.
+#
+# POST-FIX `-multicolor` means exactly "not two-or-more colours" and touches
+# neither artifact-ness nor land-ness; Vanishing Verse's primitive gains the
+# `-colorless` qualifier (the corpus idiom for "monocolored", already used by
+# Ultimate Price, Sultai Charm, Awe for the Guilds, Guardian of the Guildpact,
+# Sphinx of the Guildpact, General Ferrous Rokiric and Moonveil Regent) so that
+# it is Oracle-faithful and does NOT reach genuinely colourless permanents.
+# Glaze Fiend is monocolored black -> legal -> exiled.
+#
+# PLAYER1's own Scrubland and Vault of Whispers are COLOURLESS permanents and
+# must therefore NOT be legal targets post-fix either; asserting them still in
+# play is the built-in guard that the fix did not simply become permissive.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Scrubland,Vault of Whispers
+hand:Vanishing Verse
+[PLAYER2]
+inplay:Glaze Fiend
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Scrubland,Vault of Whispers
+graveyard:Vanishing Verse
+hand:
+[PLAYER2]
+exile:Glaze Fiend
+life:20
+[END]

@@ -15,6 +15,7 @@
 #include "PhaseRing.h"
 #include "JFileSystem.h"
 #include "MTGAbility.h"
+#include "AbilityParser.h" //N-158m: AutoLineMacro::Process, for macro-defined magnitudes
 #include "CardDescriptor.h"
 #include "ManaCost.h"
 #include "ManaCostHybrid.h"
@@ -205,9 +206,6 @@ static int amassCountersFromScript(const string& magicText)
     string mt = magicText;
     for (size_t i = 0; i < mt.size(); i++)
         mt[i] = (char) tolower((unsigned char) mt[i]);
-    //The macro's two halves: retarget an existing Army, or create the 0/0 token.
-    if (mt.find("army|mybattlefield") == string::npos)
-        return 0;
     //ON-RESOLUTION ONLY. magicText is the auto= lines joined by '\n'
     //(CardPrimitive::addMagicText), and a line that opens with an '@' TRIGGER or
     //carries the _DIES_ macro amasses on some LATER event, not when the offered
@@ -217,6 +215,23 @@ static int amassCountersFromScript(const string& magicText)
     //about to happen. Keep only the untriggered lines - Foray of Orcs and
     //Surrounded by Orcs (plain sorcery resolution) and Grishnakh (an ETB on the
     //creature being cast) all survive this filter.
+    //  N-158m (wave-32, coverage 3 of 52 live offers = 5.8%): the scan below
+    //looks for literal `counter(1/1...)` text, but a card may express its amass
+    //through a MACRO (`_AMASSORC1_`), and macro expansion runs on a LOCAL COPY
+    //inside the ability factory (MTGAbility.cpp:6650) that is never written back
+    //to CardPrimitive::magicText. Every macro-defined amass card therefore
+    //presented this scanner with an opaque token and scored 0 - Easterling
+    //Vanguard 0/17, Mordor Muster 0/13, March from the Black Gate 0/9. Only
+    //Foray of Orcs, whose script is spelled out by hand, ever previewed.
+    //  Expansion happens PER LINE and AFTER the trigger filter has read the RAW
+    //line, deliberately: `_DIES_` expands to `@movedTo(this|graveyard)`, so a
+    //whole-string expansion first would have destroyed the `_dies_` half of the
+    //suppression guard. Both the raw and the expanded line are checked for '@',
+    //so neither spelling of a trigger can slip through. Expanding through the
+    //engine's own AutoLineMacro::Process (rather than mapping the five amass
+    //macro names) closes the CLASS: any later macro carrying a magnitude is
+    //covered for free, and the render can never disagree with what the ability
+    //factory actually built.
     {
         string kept;
         size_t p = 0;
@@ -224,13 +239,24 @@ static int amassCountersFromScript(const string& magicText)
         {
             size_t nl = mt.find('\n', p);
             string line = mt.substr(p, nl == string::npos ? string::npos : nl - p);
-            if (line.find('@') == string::npos && line.find("_dies_") == string::npos)
-                kept += line + "\n";
+            bool triggered = (line.find('@') != string::npos)
+                             || (line.find("_dies_") != string::npos);
+            if (!triggered)
+            {
+                //Only pay for expansion on a line that could carry a macro token.
+                if (line.find('_') != string::npos)
+                    line = AutoLineMacro::Process(line);
+                if (line.find('@') == string::npos)
+                    kept += line + "\n";
+            }
             if (nl == string::npos)
                 break;
             p = nl + 1;
         }
         mt = kept;
+        //The macro's two halves: retarget an existing Army, or create the 0/0
+        //token. This gate reads the EXPANDED text - reading it before expansion
+        //is precisely what made the scanner macro-blind.
         if (mt.find("army|mybattlefield") == string::npos)
             return 0;
     }
@@ -252,11 +278,17 @@ static int amassCountersFromScript(const string& magicText)
         else
             return 0; //an unresolved/variable amount: unknowable before announcement
     }
+    //N-158m: the bare `counter(1/1)` form (amass 1) has to join the SAME set, not
+    //sit in a fallback below it. Pre-expansion this could not co-occur with a
+    //dotted form on one card, so the fallback was safe; macro expansion makes
+    //`_AMASSORC1_` + `_AMASSORC3_` on one card reachable, and a fallback would
+    //have reported "3" for a card that also amasses 1 - exactly the confidently
+    //wrong number the attribution guard exists to prevent.
+    if (mt.find("counter(1/1)") != string::npos)
+        values.insert(1);
     if (values.size() == 1)
         return *values.begin();
-    if (!values.empty())
-        return 0; //multi-branch card: unattributable at option-build time
-    return mt.find("counter(1/1)") != string::npos ? 1 : 0;
+    return 0; //nothing found, or a multi-branch card: unattributable here
 }
 
 static int amassCounters(MTGCardInstance * card)
@@ -408,6 +440,40 @@ string dynamicMagnitudes(MTGCardInstance * card)
     return "";
 }
 
+//N-105a part (d): the poison family's ENGINE keyword names are opaque to a
+//reader - "poisontoxic" IS toxic 1, "poisondamager" IS "combat damage to a
+//player becomes poison counters". A keyword the model cannot decode is not a
+//rendered fact, so the family is translated at this ONE point, which every
+//surface listing keywords goes through (attacker lines, blocker lines, target
+//lines, the board snapshot). Every other keyword is returned byte-identical.
+//Pure, so PARSETEST can prove both halves.
+string legibleKeywordName(const string& engineName)
+{
+    if (engineName == "poisondamager")
+        return "deals its damage to players as poison counters";
+    //poisontoxic .. poisontentoxic -> "toxic N"
+    if (engineName.size() > 10 && engineName.compare(0, 6, "poison") == 0
+        && engineName.compare(engineName.size() - 5, 5, "toxic") == 0)
+    {
+        static const char * kWords[] = { "", "", "two", "three", "four", "five",
+                                         "six", "seven", "eight", "nine", "ten" };
+        string mid = engineName.substr(6, engineName.size() - 11);
+        int n = 0;
+        if (mid.empty())
+            n = 1;
+        else
+            for (int w = 2; w <= 10; w++)
+                if (mid == kWords[w]) { n = w; break; }
+        if (n > 0)
+        {
+            std::ostringstream t;
+            t << "toxic " << n;
+            return t.str();
+        }
+    }
+    return engineName;
+}
+
 //The set keyword abilities (flying, first strike, can't block...) - the
 //LIVE effective set, including granted/lost ones printed text cannot show.
 string keywordList(MTGCardInstance * card)
@@ -418,10 +484,44 @@ string keywordList(MTGCardInstance * card)
     {
         if (!card->basicAbilities[j])
             continue;
-        out << (first ? "" : ", ") << Constants::MTGBasicAbilities[j];
+        const char * kw = Constants::MTGBasicAbilities[j];
+        out << (first ? "" : ", ") << legibleKeywordName(kw ? kw : "");
         first = false;
     }
     return out.str();
+}
+
+//N-36b (wave-32 deck36, HIGH, 3 emitters): a converted mana cost of ZERO is
+//FALSY, so the guard `if (cost && cost->getConvertedCost())` deleted the cost
+//token outright from every {0} card - 347 renders of three {0} cards at deck36
+//and not one carried a "{0}", including the system-prompt decklist line. From
+//that absence the pilot manufactured four distinct false rules ("they are not
+//spells you can cast from your hand", "putting them onto the battlefield
+//requires a land drop slot", "Moxes ... cost mana to cast") and declined a free
+//permanent in 4 of its 7 cast-nothing windows. ONE helper for every cost
+//emitter, so the shape cannot come back a fourth time.
+//  ManaCost::toString() itself returns "" for a zero cost, so the synthesized
+//"{0}" is emitted only when the real string is genuinely empty - an X-only cost
+//(also converted-0) still renders as "{x}" through the string, not as "{0}".
+//Lands and tokens are excluded: neither is cast for a mana cost, and "{0}" on a
+//Forest would be a new false fact rather than a restored one.
+//Pure core, so the {0} restoration is provable in PARSETEST without a card.
+string manaCostTokenText(const string& costString, bool castForMana)
+{
+    if (!costString.empty())
+        return " " + costString;
+    return castForMana ? " {0}" : "";
+}
+
+string manaCostToken(MTGCardInstance * card)
+{
+    if (!card)
+        return "";
+    ManaCost * cost = card->getManaCost();
+    if (!cost)
+        return "";
+    //carries its own braces; "" for a zero cost, "{x}" for an X-only cost
+    return manaCostTokenText(cost->toString(), !card->isLand() && !card->isToken);
 }
 
 //Primary type for non-creature option/target lines (a discard pick needs
@@ -445,21 +545,19 @@ string typeTag(MTGCardInstance * card)
     return "";
 }
 
-//A compact land-identity tag for the DECISION surfaces where a bare land name -
-//especially a basic "Swamp" - carried no land/mana signal and the pilot
-//miscounted lands as unplayable spells (deck93 wave-27: mulliganed the identical
-//3-Swamp opening hand 5 of 6 games claiming "zero lands", once while writing
-//"Swamps produce black mana"). Names that the card IS a LAND and the color(s) it
-//taps for. Basic land types - including dual/tri lands that carry them (e.g.
-//Underground Sea = subtype "Island Swamp") - map by subtype; other lands read
-//produced colors from the auto script's "Add{...}" clauses (Karplusan Forest:
-//Add{R}/Add{G}); a land whose colors are not cheaply known still gets a bare
-//" (land)". Returns "" for a non-land. Leading space so it appends after a name.
-string landTag(MTGCardInstance * card)
+//The colours a LAND can produce, as a W/U/B/R/G flag array. Basic land types -
+//including dual/tri lands that carry them (e.g. Underground Sea = subtype
+//"Island Swamp") - map by subtype; other lands read produced colors from the
+//auto script's "Add{...}" clauses (Karplusan Forest: Add{R}/Add{G}). Extracted from
+//landTag so the pregame hand header (N-139n) counts colour sources from the
+//SAME engine-read source the per-card tag prints - a count that disagreed with
+//the tags beside it would be worse than no count at all.
+void landColorFlags(MTGCardInstance * card, bool have[5])
 {
+    for (int i = 0; i < 5; i++)
+        have[i] = false;
     if (!card || !card->isLand())
-        return "";
-    bool have[5] = { false, false, false, false, false }; //W U B R G
+        return;
     static const char * kSub[5] = { "plains", "island", "swamp", "mountain", "forest" };
     static const int kIdx[5] = { 0, 1, 2, 3, 4 };
     for (int i = 0; i < 5; i++)
@@ -496,6 +594,20 @@ string landTag(MTGCardInstance * card)
             }
         }
     }
+}
+
+//A compact land-identity tag for the DECISION surfaces where a bare land name -
+//especially a basic "Swamp" - carried no land/mana signal and the pilot
+//miscounted lands as unplayable spells (deck93 wave-27: mulliganed the identical
+//3-Swamp opening hand 5 of 6 games claiming "zero lands", once while writing
+//"Swamps produce black mana"). Names that the card IS a LAND and the color(s) it
+//taps for. Returns "" for a non-land. Leading space so it appends after a name.
+string landTag(MTGCardInstance * card)
+{
+    if (!card || !card->isLand())
+        return "";
+    bool have[5];
+    landColorFlags(card, have);
     static const char * kSym[5] = { "{W}", "{U}", "{B}", "{R}", "{G}" };
     string colors;
     for (int i = 0; i < 5; i++)
@@ -504,6 +616,127 @@ string landTag(MTGCardInstance * card)
     if (colors.empty())
         return " (land)";
     return " (land: taps for " + colors + ")";
+}
+
+//---- N-146k + N-139n: the PREGAME hand header ---------------------------------
+//OWNER DIRECTIVE (2026-07-27): a pregame ask carries NO board-state information
+//at all. His mechanism: "0 mana available reads as an INSTRUCTION that the hand
+//doesn't have mana - the model follows the explicit instruction rather than
+//deriving the real count." A rendered statement outranks the model's own
+//derivation, so a board-scoped line in a prompt with no board is not noise, it
+//is an active override. deck146 declared a land-rich hand landless in 5 of 14
+//mulligan replies, echoing "Mana available: 0 total (no untapped sources)"
+//almost word for word; deck139 and deck116 spiralled the same way.
+//  N-139n is the other half. Per-item tags assert MEMBERSHIP, and membership is
+//exactly what the pilot argues with: the guide layer fixed "zero lands" in
+//wave-31 and the belief MUTATED to "zero GREEN mana sources" in wave-32 (6 false
+//mulligans of 9, one of them reciting the guide's own list while holding a
+//literal Forest). Only an engine-computed AGGREGATE closes it, so the counts
+//below are computed here and are STRICTLY hand-derived - nothing on this surface
+//refers to a battlefield, because at this point there isn't one.
+//Pure core: every sentence of the pregame header, from tallies alone. Nothing
+//here can name a battlefield, a life total, a phase or a mana pool, because
+//none of those is an input - the no-board-state rule is enforced by the
+//function's SIGNATURE rather than by remembering to filter.
+string pregameHandHeaderText(int handSize, int lands, int spells, const int sources[5],
+                             const string& cheapestLabel, int cheapestCmc,
+                             const vector<string>& reachable)
+{
+    static const char * kSym[5] = { "{W}", "{U}", "{B}", "{R}", "{G}" };
+    std::ostringstream o;
+    o << "Your hand (" << handSize << " card" << (handSize == 1 ? "" : "s")
+      << "), counted by the engine: " << lands << " land" << (lands == 1 ? "" : "s")
+      << ", " << spells << " spell" << (spells == 1 ? "" : "s") << ".\n";
+    o << "Mana sources among those lands, counted by the engine: ";
+    if (!lands)
+        o << "none - this hand holds no lands at all.";
+    else
+    {
+        bool any = false;
+        for (int k = 0; k < 5; k++)
+            if (sources[k])
+            {
+                o << (any ? ", " : "") << kSym[k] << " " << sources[k];
+                any = true;
+            }
+        if (!any)
+            o << "no coloured sources (every land here makes only colourless mana)";
+        o << ". A land in your hand IS a mana source: it produces mana from the turn"
+             " you play it, so count these when you judge this hand.";
+    }
+    o << "\n";
+    if (cheapestCmc >= 0)
+        o << "Cheapest spell in this hand: " << cheapestLabel << " (mana value "
+          << cheapestCmc << ").\n";
+    if (!reachable.empty())
+    {
+        o << "Playing every land in this hand would cover the cost of: ";
+        for (size_t i = 0; i < reachable.size(); i++)
+            o << (i ? ", " : "") << reachable[i];
+        o << ".\n";
+    }
+    else if (lands)
+        o << "Playing every land in this hand would not cover any spell in it.\n";
+    return o.str();
+}
+
+static string pregameHandHeader(MTGGameZone * hand)
+{
+    if (!hand)
+        return "";
+    //Index map from this file's W/U/B/R/G order to the engine's colour enum.
+    static const int kEngineColor[5] = { Constants::MTG_COLOR_WHITE, Constants::MTG_COLOR_BLUE,
+                                         Constants::MTG_COLOR_BLACK, Constants::MTG_COLOR_RED,
+                                         Constants::MTG_COLOR_GREEN };
+    int lands = 0, spells = 0;
+    int sources[5] = { 0, 0, 0, 0, 0 };
+    for (int i = 0; i < hand->nb_cards; i++)
+    {
+        MTGCardInstance * c = hand->cards[i];
+        if (!c)
+            continue;
+        if (c->isLand())
+        {
+            lands++;
+            bool have[5];
+            landColorFlags(c, have);
+            for (int k = 0; k < 5; k++)
+                if (have[k])
+                    sources[k]++;
+        }
+        else
+            spells++;
+    }
+    //The castability summary, hand-only: what these lands could pay for if every
+    //one of them were played. A NECESSARY condition (total lands cover the mana
+    //value, and each coloured pip has at least that many lands able to make it),
+    //stated as what it is so the pilot is never handed a claim it can later find
+    //false. Capped at six names so a large hand cannot run away with the header.
+    string cheapest;
+    int cheapestCmc = -1;
+    vector<string> reachable;
+    for (int i = 0; i < hand->nb_cards; i++)
+    {
+        MTGCardInstance * c = hand->cards[i];
+        if (!c || c->isLand())
+            continue;
+        ManaCost * mc = c->getManaCost();
+        int cmc = mc ? mc->getConvertedCost() : 0;
+        if (cheapestCmc < 0 || cmc < cheapestCmc)
+        {
+            cheapestCmc = cmc;
+            cheapest = c->getDisplayName() + manaCostToken(c);
+        }
+        bool payable = (cmc <= lands);
+        if (payable && mc)
+            for (int k = 0; k < 5 && payable; k++)
+                if (mc->getCost(kEngineColor[k]) > sources[k])
+                    payable = false;
+        if (payable && reachable.size() < 6)
+            reachable.push_back(c->getDisplayName() + manaCostToken(c));
+    }
+    return pregameHandHeaderText(hand->nb_cards, lands, spells, sources,
+                                 cheapest, cheapestCmc, reachable);
 }
 
 string instanceHandle(MTGCardInstance * card); //defined below; used by describeAttachments
@@ -741,16 +974,47 @@ static string zeroPowerAttackerTag(int power)
 //and leaves basepower on the FRONT face, so a transformed DFC read as a pumped
 //small creature. Returns "" when there is no delta (which is what suppresses
 //the bogus tag once the face is corrected).
+//N-152d LAYER 2 (wave-32; MECHANISM CORRECTED at fix time): the docket recorded
+//this as "fixed on the attacker/target enumerators, still false on the board
+//snapshot". That is not what the source says - the board snapshot
+//(describeZoneCards) is the ONLY emitter of a "(printed X/Y)" tail in the whole
+//file, and it was ALREADY routed through this helper on the corpus binary
+//7fabd9bd0. The real defect is this helper's DISCRIMINATOR: `isFlipped` is not a
+//reliable "which face is showing" flag. AAFlip::testDestroy (AllAbilities.cpp:
+//5811-5817) RESETS isFlipped back to 0 immediately after a transform resolves,
+//while the card keeps its back-face name and back-face origpower/origtoughness
+//and its FRONT-face basepower/basetoughness - so a day/night werewolf renders
+//with isFlipped == 0, basepower 2 (Brutal Cathar) and power 3 (Moonrage Brute),
+//producing exactly the observed false "(3/3) (printed 2/2)". (TestSuiteAI.cpp:
+//898 already carries the same finding: "isFlipped is NOT usable as the
+//discriminator - the day/night transform path leaves it 0".) AATurnSide, the
+//modal-DFC display toggle, DOES keep isFlipped coherent, so the flag stays in
+//the test as one of two signals rather than being replaced by it.
+//  The reliable signal is the NAME: both face-swapping paths stash the original
+//name in nameOrig and rename the instance (AAFlip 5618, AATurnSide 5474), and
+//both restore name == nameOrig when the card goes back. `showsOtherFace` is the
+//OR of the two signals, so neither path can go unnoticed again.
 static string printedPTTag(int power, int toughness, int basepower, int basetoughness,
-                           int origpower, int origtoughness, int isFlipped)
+                           int origpower, int origtoughness, int showsOtherFace)
 {
-    int printedP = (isFlipped > 0) ? origpower : basepower;
-    int printedT = (isFlipped > 0) ? origtoughness : basetoughness;
+    int printedP = (showsOtherFace > 0) ? origpower : basepower;
+    int printedT = (showsOtherFace > 0) ? origtoughness : basetoughness;
     if (power == printedP && toughness == printedT)
         return "";
     std::ostringstream o;
     o << " (printed " << printedP << "/" << printedT << ")";
     return o.str();
+}
+
+//Is this instance currently displaying a face other than the one it was printed
+//as? See printedPTTag: isFlipped alone misses the transform path.
+static int cardShowsOtherFace(MTGCardInstance * card)
+{
+    if (!card)
+        return 0;
+    if (card->isFlipped > 0)
+        return 1;
+    return (!card->nameOrig.empty() && card->nameOrig != card->name) ? 1 : 0;
 }
 
 //N-158g: the mana line, COUNT-FIRST. Leading with the colour set bound the
@@ -792,6 +1056,48 @@ static string transformDfcToggleNote(const string& curFace, const string& otherN
          " no stack, and gains you nothing playable: this card is NEVER cast as its"
          " other face (there is no alternative-cost cast for it), it only TRANSFORMS"
          " through its own printed transform condition. Ignore this option.";
+    return s;
+}
+
+//The truthful Flip-Side note for a modal-DFC SPELL whose two faces are both
+//castable (Tergrid class). Kept as a helper so all four Flip-Side classes -
+//land//land (N-152a), transform DFC (N-152e), spell//spell and spell//land
+//(N-152h) - are emitted from one place and cannot drift apart again, which is
+//the only reason the stale wording survived on a third card class at all.
+static string mdfcSpellToggleNote(const string& curFace, const string& otherName,
+                                  const string& otherCost)
+{
+    string s = " -> DISPLAY TOGGLE only: switches this hand card to show its other"
+               " face \"" + otherName + "\"";
+    if (!otherCost.empty())
+        s += " (" + otherCost + ")";
+    s += ". It does NOT cast anything and uses no stack. You usually do NOT need it:"
+         " the Cast menu is where you cast, and it lists every face you can afford"
+         " (the other face appears there as an alternative-cost cast). This only"
+         " changes which face is displayed. Current face: \"" + curFace + "\".";
+    return s;
+}
+
+//N-152h (wave-32, third emitter of the stale-Flip-Side class; deck146 seq36,
+//Emeria's Call): a modal-DFC SPELL whose OTHER face is a LAND. The retired
+//wording promised that "the Cast menu ... lists every face you can afford (the
+//other face appears there as an alternative-cost cast)" - false here for the
+//same reason it was false on the transform class: a LAND is never cast, so it
+//can never appear in a Cast menu, at any cost. Say what the other face IS, say
+//the toggle changes nothing playable, and stop - no promise about a route that
+//has not been observed to work.
+static string mdfcSpellLandBackNote(const string& curFace, const string& otherName,
+                                    const string& otherMana)
+{
+    string s = " -> DISPLAY TOGGLE only (this card's other face is a LAND): it"
+               " currently shows \"" + curFace + "\"; its other face is \""
+             + otherName + "\", a land";
+    if (!otherMana.empty())
+        s += " (taps for " + otherMana + ")";
+    s += ". A land is never CAST, so that face will NOT appear in the Cast menu -"
+         " not at any cost and not as an alternative-cost cast. Flipping only"
+         " changes which face is DISPLAYED: it casts nothing, uses no stack, and"
+         " gains you nothing playable. Use the face that is showing.";
     return s;
 }
 
@@ -841,9 +1147,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         //A#/B#/target line that offers it (battlefield lines only; "" otherwise).
         if (withStatus)
             out << instanceHandle(card);
-        ManaCost * cost = card->getManaCost();
-        if (cost && cost->getConvertedCost())
-            out << " " << cost->toString(); //toString carries its own braces
+        out << manaCostToken(card); //N-36b: {0} is a cost, not an absence
         if (card->isCreature())
         {
             out << " (" << card->power << "/" << card->toughness << ")";
@@ -866,7 +1170,8 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             if (withStatus)
                 out << printedPTTag(card->power, card->toughness,
                                     card->basepower, card->basetoughness,
-                                    card->origpower, card->origtoughness, card->isFlipped);
+                                    card->origpower, card->origtoughness,
+                                    cardShowsOtherFace(card));
             //N-148d (wave-31 deck148 seq1): typeTag() returns "" for creatures by
             //design, so on a HAND line creature-ness was signalled ONLY by the
             //"(P/T)" parenthetical while every other type got an explicit
@@ -1123,6 +1428,174 @@ bool ciStartsWith(const string& s, const string& name)
 }
 
 //One targetable thing, described for the model's target menu.
+//---- N-105a / N-105b (wave-32; SEVEN seats; corpus-integrity) ------------------
+//Poison counters were rendered NOWHERE to this seat. The engine tracks
+//Player::poisonCount and renders it FOR THE HUMAN (GuiStatic.cpp:138) - a
+//textbook ishuman-lens gap. With no number the pilot invented one ("I need 10
+//poison counters to win; I currently have 0" at an actual 6), conflated the
+//10-counter threshold with the opponent's LIFE total, and twice reasoned that
+//the game should already have ended. WORDING RULE (perception lane): the
+//threshold number is always explicit, the sentence leads with what ENDS the
+//game, and no affirmative substring ("safe", "fine", "room to spare") is
+//offered for a model to latch onto. Pure over their inputs, so PARSETEST can
+//prove the emitted shape without a game.
+static const int kPoisonLoseAt = 10; //Player::afterDamage: poisonCount >= 10 loses
+
+//"Poison counters (you): 6 of 10 - ..." - one player's status sentence.
+static string poisonCountPhrase(bool mine, int count)
+{
+    std::ostringstream o;
+    const char * who = mine ? "you" : "opponent";
+    const char * loses = mine ? "you LOSE" : "the opponent LOSES";
+    o << "Poison counters (" << who << "): " << count << " of " << kPoisonLoseAt
+      << " - " << loses << " the game at " << kPoisonLoseAt
+      << " poison counters, whatever the life total is";
+    int togo = kPoisonLoseAt - count;
+    if (togo <= 0)
+        o << "; that threshold is already reached";
+    else
+        o << "; " << togo << " more end" << (togo == 1 ? "s" : "") << " it";
+    o << ". Poison is not life: it does not reset between turns, and gaining"
+         " life or preventing damage does not remove a poison counter.";
+    return o.str();
+}
+
+//The CURRENT SITUATION status line for both players. Empty when neither player
+//is poisoned, so a game with no infect/toxic card in it is untouched.
+static string poisonStatusLine(int mine, int opp)
+{
+    if (mine <= 0 && opp <= 0)
+        return "";
+    std::ostringstream o;
+    if (mine > 0)
+        o << poisonCountPhrase(true, mine) << "\n";
+    if (opp > 0)
+        o << poisonCountPhrase(false, opp) << "\n";
+    return o.str();
+}
+
+//The narration line for a poison GAIN. WEventplayerPoisoned fires on all three
+//engine paths - infect combat damage (Damage.cpp:199), toxic (Damage.cpp:239)
+//and the `alterpoison` script ability (AllAbilities.cpp:1468, which narrated
+//NOTHING at all) - so one handler closes the class. The DELTA is computed from
+//this seat's own last-seen total rather than the event payload: the toxic path
+//fires the event carrying the DAMAGE dealt, not the toxicity granted, so that
+//payload is wrong there while the player's settled poisonCount is not.
+static string poisonGainLine(bool mine, int delta, int total)
+{
+    std::ostringstream o;
+    o << "Poison: " << (mine ? "you" : "the opponent");
+    if (delta > 0)
+        o << (mine ? " take " : " takes ") << delta << " poison counter"
+          << (delta == 1 ? "" : "s") << " - now ";
+    else
+        o << (mine ? " now have " : " now has ");
+    o << total << " of " << kPoisonLoseAt << " ("
+      << (mine ? "you LOSE" : "the opponent LOSES") << " at " << kPoisonLoseAt
+      << " poison counters";
+    int togo = kPoisonLoseAt - total;
+    if (togo > 0)
+        o << "; " << togo << " more end" << (togo == 1 ? "s" : "") << " it";
+    else
+        o << "; that threshold is now reached";
+    o << ")";
+    return o.str();
+}
+
+//Does this source REPLACE its damage to a PLAYER with poison counters?
+//Damage.cpp:192 branches on INFECT or POISONDAMAGER: the life total never moves.
+static bool sourceDealsPoisonInsteadOfDamage(MTGCardInstance * c)
+{
+    return c && (c->has(Constants::INFECT) || c->has(Constants::POISONDAMAGER));
+}
+
+//N-105b: the blocker-seam forecast. The old single sentence was built from raw
+//attacker power with NO infect check, so against infect attackers it asserted
+//three falsehoods at once - a life total that will not change, a "NOT lethal"
+//verdict about a resource the attack does not touch (INVERTED on any swing
+//crossing 10 poison), and the advice "taking damage while ahead is often
+//correct", which is the exact inverse of correct play against a counter that
+//never resets. deck36 s25 t12 lost the game to that sentence. Partition the
+//swing by whether its damage is REPLACED, price each half against its own
+//threshold, and DROP the take-the-damage advice entirely whenever any poison is
+//incoming (an accurate number with stale advice attached is still a misteach).
+static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming)
+{
+    std::ostringstream o;
+    o << "Your life: " << life << ".";
+    if (poisonIncoming <= 0)
+    {
+        //Non-poison swing: byte-identical to the validated wording.
+        o << " Unblocked, these attackers deal up to " << lifeIncoming
+          << " - you would be at " << (life - lifeIncoming)
+          << (life - lifeIncoming <= 0
+              ? " - LETHAL if it all connects: block enough to survive."
+              : " - NOT lethal: block only where the trade favors you; taking damage while ahead is often correct.")
+          << "\n";
+        return o.str();
+    }
+    o << " Your poison counters: " << poison << " of " << kPoisonLoseAt << ".\n";
+    int after = poison + poisonIncoming;
+    o << "Unblocked, these attackers put up to " << poisonIncoming
+      << " POISON COUNTER" << (poisonIncoming == 1 ? "" : "S")
+      << " on you - you would be at " << after << " of " << kPoisonLoseAt << " poison";
+    if (after >= kPoisonLoseAt)
+        o << " - LETHAL if it all connects: at " << kPoisonLoseAt
+          << " poison counters you lose the game no matter what your life total is."
+             " Your life total does not answer this; block the poison.";
+    else
+        o << " - that is not yet " << kPoisonLoseAt << ", but poison counters never"
+             " reset and nothing here removes them, so every counter you take is"
+             " permanent progress toward losing. Life total is not the resource"
+             " under attack; price the block against the poison count.";
+    o << "\n";
+    if (lifeIncoming > 0)
+        o << "Those same attackers also deal up to " << lifeIncoming
+          << " ORDINARY damage - your life would be " << (life - lifeIncoming)
+          << (life - lifeIncoming <= 0 ? " - LETHAL on life as well." : " on the life track.")
+          << "\n";
+    return o.str();
+}
+
+//What an attacker's damage actually DOES, stated on the line that decides the
+//block. The engine's own keyword names for this family are opaque
+//("poisontoxic", "poisondamager"), so the effect is spelled out here.
+static string attackerPoisonNote(MTGCardInstance * c)
+{
+    if (!c)
+        return "";
+    std::ostringstream o;
+    if (sourceDealsPoisonInsteadOfDamage(c))
+        o << " [its combat damage to YOU is dealt as POISON COUNTERS, not life loss -"
+             " your life total will not move and blocking is the only thing that stops it]";
+    int tox = c->getToxicity();
+    if (tox > 0)
+        o << " [toxic " << tox << ": if it damages you it ALSO puts " << tox
+          << " poison counter" << (tox == 1 ? "" : "s") << " on you, on top of the damage]";
+    if (c->has(Constants::WITHER))
+        o << " [wither: the damage it deals to a CREATURE arrives as -1/-1 counters,"
+             " which do not wear off at end of turn - a blocker that survives stays shrunk]";
+    else if (c->has(Constants::INFECT))
+        o << " [infect also damages CREATURES as -1/-1 counters, which do not wear off"
+             " at end of turn - a blocker that survives stays shrunk]";
+    return o.str();
+}
+
+//N-158k: the per-target life price for a "life:-manacost" spell (Feed the Swarm
+//class - you pay life equal to the chosen permanent's mana value). Byte-identical
+//wording to the cast-line preview, so the two surfaces cannot disagree and an
+//echo of either binds the same way. "" for a player target (no mana value).
+string perTargetLifeCostNote(Targetable * t)
+{
+    MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(t);
+    if (!c)
+        return "";
+    ManaCost * mc = c->getManaCost();
+    std::ostringstream o;
+    o << " (costs you " << (mc ? mc->getConvertedCost() : 0) << " life)";
+    return o.str();
+}
+
 string describeTarget(Player * me, Targetable * t)
 {
     std::ostringstream o;
@@ -1418,7 +1891,9 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0)
+
 {
+    mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
     curl_global_init(CURL_GLOBAL_DEFAULT);
     //File config first, environment variables override.
     GptSettings cfg = GptSettings::load();
@@ -1518,6 +1993,75 @@ void AIPlayerGPT::ensureGameStartRecord()
         f << rec.dump() << "\n";
 }
 
+//WAVE-33 COMMIT-FAILURE INSTRUMENT (wave-32 synthesis §5). Two cheap,
+//string-only counters written onto EVERY decision record. They change NO
+//behaviour: the retraction semantics are exactly as they were, and nothing
+//reads these back. They exist so the wave-33 seat reviews can count the
+//COMMIT-FAILURE class the synthesis promised - a reply that produces a
+//complete, protocol-compliant answer and then keeps writing past its own
+//PLAN: line ("Wait, looking at the opponent's board...") without ever
+//re-committing (deck158 vs139 s16: 12,180 chars at 2 life; the correct
+//answer was discarded and Baka answered).
+
+//post_plan_overrun: the number of characters the reply emitted AFTER the end
+//of its FIRST "PLAN:" line, trailing whitespace excluded. 0 = the reply
+//stopped at its plan, which is what the protocol asks for (answer, brief
+//reasoning, PLAN: last). >0 = the reply kept going; the magnitude is the size
+//of the un-committed tail. Measured on the same normalisation consumePlan
+//uses (post-</think>, case-insensitive "PLAN:"), so the two agree on where
+//the plan starts. A reply with NO PLAN: line scores 0 - it never committed a
+//plan to overrun, and the empty/unparsed fallbacks already name that case.
+static long postPlanOverrun(const string& reply)
+{
+    string text = reply;
+    size_t thinkEnd = text.rfind("</think>");
+    if (thinkEnd != string::npos)
+        text = text.substr(thinkEnd + 8);
+    size_t pos = string::npos;
+    for (size_t i = 0; i + 5 <= text.size(); i++)
+    {
+        if (tolower((unsigned char) text[i]) == 'p' && tolower((unsigned char) text[i + 1]) == 'l'
+            && tolower((unsigned char) text[i + 2]) == 'a' && tolower((unsigned char) text[i + 3]) == 'n'
+            && text[i + 4] == ':')
+        {
+            pos = i;
+            break;
+        }
+    }
+    if (pos == string::npos)
+        return 0;
+    size_t lineEnd = text.find('\n', pos);
+    if (lineEnd == string::npos)
+        return 0; //the plan line runs to the end: nothing after it
+    size_t last = text.find_last_not_of(" \t\r\n");
+    if (last == string::npos || last <= lineEnd)
+        return 0;
+    return (long) (last - lineEnd);
+}
+
+//commit_retracted: TRUE when the reply DID emit a line-leading coded answer
+//(CHOICE:/ATTACK:/BLOCKS:/PUT:) and the retraction machinery then refused to
+//execute it - i.e. the model answered and then took its answer back, so the
+//heuristic decided instead. It is exactly the disjunction of the three
+//existing retraction/abandonment exits, not a new judgement:
+//  retracted_choice              - choiceRetractedNoReplacement fired
+//  truncated_abandoned           - truncatedBlockCommitmentAbandoned, safe no-blocks
+//  truncated_abandoned_heuristic - the same, with no legal assignment left
+//FALSE on every other record, including empty_reply / unparsed_reply /
+//stale_echo (no answer was ever committed to retract) and on every record the
+//model's own answer carried. Cross-tab with post_plan_overrun to get the
+//promised count: replies that overran, and of those, how many retracted.
+static bool commitRetracted(const char * fallback, const string& reply)
+{
+    if (!fallback)
+        return false;
+    if (strcmp(fallback, "retracted_choice") != 0
+        && strcmp(fallback, "truncated_abandoned") != 0
+        && strcmp(fallback, "truncated_abandoned_heuristic") != 0)
+        return false;
+    return hasCodedAnswerLine(reply);
+}
+
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                                 const string& chosenText, const char * fallback, const vector<string> * optionTexts,
                                 const char * choiceSource)
@@ -1560,6 +2104,17 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["chosen_text"] = chosenText;
     if (fallback)
         rec["fallback"] = fallback;
+    //Commit-failure counters (see postPlanOverrun / commitRetracted above).
+    //Written on EVERY record, present or zero, so a seat review can divide by
+    //the record count without inferring absence.
+    rec["post_plan_overrun"] = postPlanOverrun(reply);
+    rec["commit_retracted"] = commitRetracted(fallback, reply);
+    //Assignments the combat validator pruned as illegal on this record.
+    if (!mLastPrunedPairs.empty())
+    {
+        rec["pruned_pairs"] = mLastPrunedPairs;
+        mLastPrunedPairs.clear();
+    }
     //Provenance for an answer recovered by prose-intent salvage (no coded
     //line existed) - so corpus review can audit every prose salvage.
     if (choiceSource)
@@ -1654,9 +2209,7 @@ string AIPlayerGPT::describeDeckCards(Player * p, bool withCounts)
         if (withCounts)
             out << it->second << "x ";
         out << it->first;
-        ManaCost * cost = card->getManaCost();
-        if (cost && cost->getConvertedCost())
-            out << " " << cost->toString();
+        out << manaCostToken(card); //N-36b: {0} is a cost, not an absence
         if (card->isCreature())
             out << " (" << card->power << "/" << card->toughness << ")";
         //A changeling in the decklist: name the tribe(s) this deck consumes so
@@ -1768,7 +2321,19 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
     bool pregame = (observer && observer->turn == 0);
     if (!mNarration.empty() && !pregame)
         u << "GAME LOG (everything that has happened so far):\n" << mNarration << "\n";
-    u << "--- CURRENT SITUATION ---\n" << serializeGameState();
+    //N-146k, OWNER DIRECTIVE (2026-07-27): the pregame asks (mulligan, London
+    //bottoming, leyline) get the HAND and nothing else. The full situation block
+    //is a battlefield report - phase, both life totals, the stack, the mana line,
+    //both battlefields, opponent hand/library counts, artifact tallies - and every
+    //one of those describes a game that has not begun. The mana line in
+    //particular ("Mana available: 0 total (no untapped sources)") was read as an
+    //instruction that the hand held no mana and drove false mulligans at three
+    //seats. Suppressing that ONE line would have left the same frame standing, so
+    //the whole board frame is replaced here rather than filtered.
+    if (pregame)
+        u << "--- YOUR OPENING HAND ---\n" << serializePregameState();
+    else
+        u << "--- CURRENT SITUATION ---\n" << serializeGameState();
     if (!mCurrentPlan.empty())
     {
         u << "\nYOUR PLAN (as you last stated it): " << mCurrentPlan << "\n";
@@ -1786,7 +2351,12 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
         for (int z = 0; z < 4; z++)
             for (int i = 0; i < zs[z]->nb_cards; i++)
                 myNames.push_back(zs[z]->cards[i]->getDisplayName());
-        if (gptcaveat::planActionsStale(mCurrentPlan, tail, myNames))
+        //N-146k: the caveat's own wording points at "the current board", so it is
+        //itself a board-scoped statement and is suppressed in pregame. A mulligan
+        //reply can carry a PLAN: line, so the second mulligan ask really can reach
+        //this branch - the whole board frame has to go, including the sentences
+        //that only MENTION one.
+        if (!pregame && gptcaveat::planActionsStale(mCurrentPlan, tail, myNames))
             u << "(note: the actions your plan names are no longer among the options available "
                  "right now - the game state has advanced past that plan; re-derive your choice "
                  "from the current board and the options below.)\n";
@@ -2175,14 +2745,62 @@ string AIPlayerGPT::describeEvent(WEvent * event)
     {
         if (!e->damage)
             return "";
+        MTGCardInstance * dsrc = e->damage->source;
+        Player * dp = dynamic_cast<Player *>(e->damage->target);
+        MTGCardInstance * dc = dynamic_cast<MTGCardInstance *>(e->damage->target);
+        //N-105a part (b): infect/poisondamager damage to a PLAYER is REPLACED by
+        //poison counters (Damage.cpp:192-199) and infect/wither damage to a
+        //CREATURE is REPLACED by -1/-1 counters (Damage.cpp:180-189). Rendered in
+        //the ordinary "Damage: N dealt to you" form, both classes read as life
+        //loss, and the ONLY tell that the life total never moved was a MISSING
+        //life line - an absent line is not a rendered fact.
+        if (dp && sourceDealsPoisonInsteadOfDamage(dsrc))
+        {
+            out << "Infect damage: " << e->damage->damage;
+            if (dsrc)
+                out << " from " << dsrc->getDisplayName();
+            out << " to " << (dp == this ? "you" : "the opponent")
+                << " - dealt as POISON COUNTERS, not life loss: no life was lost"
+                   " (see the Poison line)";
+            return out.str();
+        }
+        if (dc && dsrc && (dsrc->has(Constants::WITHER) || dsrc->has(Constants::INFECT)))
+        {
+            out << (dsrc->has(Constants::WITHER) ? "Wither damage: " : "Infect damage: ")
+                << e->damage->damage << " from " << dsrc->getDisplayName()
+                << " to " << dc->getDisplayName() << " - dealt as " << e->damage->damage
+                << " -1/-1 counter" << (e->damage->damage == 1 ? "" : "s")
+                << ", a permanent shrink that does NOT wear off at end of turn";
+            return out.str();
+        }
         out << "Damage: " << e->damage->damage << " dealt";
-        if (e->damage->source)
-            out << " by " << e->damage->source->getDisplayName();
-        if (Player * p = dynamic_cast<Player *>(e->damage->target))
-            out << " to " << (p == this ? "you" : "the opponent");
-        else if (MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(e->damage->target))
-            out << " to " << c->getDisplayName();
+        if (dsrc)
+            out << " by " << dsrc->getDisplayName();
+        if (dp)
+            out << " to " << (dp == this ? "you" : "the opponent");
+        else if (dc)
+            out << " to " << dc->getDisplayName();
+        if (dp && dsrc && dsrc->getToxicity() > 0)
+            out << " - and toxic " << dsrc->getToxicity() << ": it ALSO puts "
+                << dsrc->getToxicity() << " poison counter"
+                << (dsrc->getToxicity() == 1 ? "" : "s") << " on that player"
+                   " (see the Poison line)";
         return out.str();
+    }
+
+    //N-105a part (c): every poison GAIN. The engine fires this event on all
+    //three paths; the seat had no handler at all, so a non-combat `alterpoison`
+    //(Serpent's Slither, a proliferate-class effect) changed the game's actual
+    //win condition and narrated NOTHING.
+    if (WEventplayerPoisoned * e = dynamic_cast<WEventplayerPoisoned *>(event))
+    {
+        if (!e->player)
+            return "";
+        int idx = (e->player == this) ? 0 : 1;
+        int total = e->player->poisonCount;
+        int delta = total - mLastPoison[idx];
+        mLastPoison[idx] = total;
+        return poisonGainLine(e->player == this, delta, total);
     }
 
     if (WEventLife * e = dynamic_cast<WEventLife *>(event))
@@ -2216,8 +2834,21 @@ string AIPlayerGPT::describeEvent(WEvent * event)
                 << (e->toughness >= 0 ? "+" : "") << e->toughness;
         if (e->targetCard->isCreature())
             out << " (now " << e->targetCard->power << "/" << e->targetCard->toughness << ")";
+        //N-158l: the source attribution rendered an EMPTY "[from ]" in 38 distinct
+        //prompts - always right after "- Your Mordor Muster: stack -> graveyard".
+        //A sorcery that has already finished resolving is in the graveyard by the
+        //time its counter event lands, and getDisplayName() comes back empty for
+        //it. An empty bracket is a rendered non-fact on this surface's own new
+        //annotation: emit the bracket only when a name actually resolves, and
+        //fall back to the instance's raw name field before giving up.
         if (e->source && e->source != e->targetCard)
-            out << " [from " << e->source->getDisplayName() << "]";
+        {
+            string sn = e->source->getDisplayName();
+            if (sn.empty())
+                sn = e->source->name;
+            if (!sn.empty())
+                out << " [from " << sn << "]";
+        }
         return out.str();
     }
 
@@ -2241,6 +2872,22 @@ static string dungeonsCompletedLine(int mine, int opp)
     return o.str();
 }
 
+//N-146k + N-139n: the ENTIRE situation block for a pregame ask. Hand only: the
+//engine-computed count header, then the tagged hand list. No phase, no life
+//totals, no stack, no mana line, no battlefield, no opponent counts, no library
+//count - every one of those is information about a game that has not started,
+//and a rendered statement outranks the model's own derivation from the cards it
+//can see. See pregameHandHeader for the owner's mechanism and the evidence.
+string AIPlayerGPT::serializePregameState()
+{
+    std::ostringstream out;
+    out << pregameHandHeader(game->hand);
+    out << "Your hand: ";
+    describeZoneCards(out, game->hand, false);
+    out << "\n";
+    return out.str();
+}
+
 string AIPlayerGPT::serializeGameState()
 {
     std::ostringstream out;
@@ -2249,6 +2896,26 @@ string AIPlayerGPT::serializeGameState()
     out << "Phase: " << observer->getCurrentGamePhaseName();
     out << " | It is " << (observer->currentPlayer == this ? "your" : "the opponent's") << " turn.\n";
     out << "Your life: " << this->life << " | Opponent life: " << (opp ? opp->life : 0) << "\n";
+    //N-105a: poison counters, for BOTH players, whenever either is nonzero.
+    //The life line above was the ONLY resource line this seat ever saw, so an
+    //infect game presented its entire win/loss condition as invisible - and the
+    //pilot filled the gap with invented numbers in 100% of windows across six
+    //games. The engine has the number and shows it to the human.
+    out << poisonStatusLine(this->poisonCount, opp ? opp->poisonCount : 0);
+    //Re-baseline the narration's delta tracker off the live totals. A poison
+    //DECREASE fires no event at all (AllAbilities.cpp carries the engine's own
+    //"todo loses poison event"), so without this a later gain would report a
+    //delta measured from a total that no longer exists. The status line above
+    //is always built from the live counts, so this is the natural sync point.
+    //Heal DOWNWARD only: a tracked total above the live one can only mean a
+    //silent decrease, while a tracked total below it belongs to a gain whose
+    //narration has not run yet - clamping that would swallow the delta. The
+    //returned string is untouched, so the ask-cache key this function also
+    //feeds is unaffected.
+    int live[2] = { this->poisonCount, opp ? opp->poisonCount : 0 };
+    for (int i = 0; i < 2; i++)
+        if (mLastPoison[i] > live[i])
+            mLastPoison[i] = live[i];
     //N-146f (wave-29 deck146): dungeon-completion is a hidden boolean the engine
     //tracks (Player::dungeonCompleted) and payoffs check ("as long as you've
     //completed a dungeon" - the Nadaar anthem). With no status line the model could
@@ -2633,26 +3300,29 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     //will never list it is the same flip-then-fail loop the land
                     //branch was rewritten to prevent. State the truth and stop.
                     string oCost;
-                    if (oc && oc->data && oc->data->getManaCost()
-                        && oc->data->getManaCost()->getConvertedCost())
+                    if (oc && oc->data && oc->data->getManaCost())
                         oCost = oc->data->getManaCost()->toString();
                     out << transformDfcToggleNote(fc->getDisplayName(), otherName, oCost);
+                }
+                else if (otherIsLand)
+                {
+                    //N-152h: a modal-DFC SPELL with a LAND back face (Emeria's
+                    //Call // Emeria, Shattered Skyclave). Reaches this branch
+                    //because the CURRENT face is not a land, so the land//land
+                    //branch above does not catch it - the third card class of
+                    //the stale-Flip-Side family.
+                    out << mdfcSpellLandBackNote(fc->getDisplayName(), otherName,
+                                                 landTapMana(oc->data->text));
                 }
                 else
                 {
                     //Standard modal DFC spell (Tergrid class): both faces cast
                     //from the Cast menu (back via its alternative cost), so the
                     //toggle is a true game no-op.
-                    out << " -> DISPLAY TOGGLE only: switches this hand card to show"
-                           " its other face \"" << otherName << "\"";
-                    if (oc && oc->data && oc->data->getManaCost()
-                        && oc->data->getManaCost()->getConvertedCost())
-                        out << " (" << oc->data->getManaCost()->toString() << ")";
-                    out << ". It does NOT cast anything and uses no stack. You"
-                           " usually do NOT need it: the Cast menu is where you cast,"
-                           " and it lists every face you can afford (the other face"
-                           " appears there as an alternative-cost cast). This only"
-                           " changes which face is displayed.";
+                    string oCost;
+                    if (oc && oc->data && oc->data->getManaCost())
+                        oCost = oc->data->getManaCost()->toString();
+                    out << mdfcSpellToggleNote(fc->getDisplayName(), otherName, oCost);
                 }
             }
         }
@@ -2694,10 +3364,17 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         ManaCost * c = action.ability->getCost();
         std::ostringstream cost;
         bool any = false;
-        if (c->getConvertedCost())
+        //N-36b sweep (same falsy-zero shape): gate on the rendered STRING, not on
+        //the converted cost. An {X}-only activation cost also converts to 0, so
+        //the old guard dropped it silently; a genuinely free ability still renders
+        //nothing, which is the truthful outcome for an ability with no cost.
         {
-            cost << c->toString();
-            any = true;
+            string cs = c->toString();
+            if (!cs.empty())
+            {
+                cost << cs;
+                any = true;
+            }
         }
         if (c->extraCosts)
         {
@@ -4218,8 +4895,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (!casts[ci].viaAlternative)
         {
             o << "Cast " << card->getDisplayName();
-            if (cost && cost->getConvertedCost())
-                o << " " << cost->toString();
+            o << manaCostToken(card); //N-36b: {0} is a cost, not an absence
             if (card->isCreature())
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << casts[ci].zoneLabel;
@@ -4355,13 +5031,11 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                         (tgt->controller() == this ? ownT : oppT)++;
                                         tNames << (tShown++ ? ", " : "") << tgt->getDisplayName()
                                                << instanceHandle(tgt);
+                                        //N-158k: the SAME helper the target menu
+                                        //now uses, so the cast preview and the
+                                        //commit seat cannot drift apart.
                                         if (lifeCostPerTarget)
-                                        {
-                                            ManaCost * tmc = tgt->getManaCost();
-                                            tNames << " (costs you "
-                                                   << (tmc ? tmc->getConvertedCost() : 0)
-                                                   << " life)";
-                                        }
+                                            tNames << perTargetLifeCostNote(tgt);
                                     }
                         if (tc->canTarget(pp))
                         {
@@ -5343,6 +6017,21 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     //free-form list. Prompt-keyed caching keeps repeated polling cheap.
     vector<Targetable *> picks;
     DecisionRequest req; //the last round's request carries the offered set for apply
+    //N-158k (wave-32 HL5.3, the COMMIT seat): Feed the Swarm's per-target life
+    //cost ("life:-manacost" - you pay life equal to the chosen permanent's mana
+    //value) renders on the CAST line and won a game there, but the TARGET menu -
+    //where the target is actually committed - carried rules text and no price at
+    //all. deck152 answered it at 11 life and again at 6 with the number invisible.
+    //The standing rule is that the deciding fact rides the seat where the choice
+    //commits, so the identical "(costs you N life)" fragment is emitted here too.
+    bool lifeCostPerTarget = false;
+    if (tc && tc->source)
+    {
+        string mtl = tc->source->magicText;
+        for (size_t li = 0; li < mtl.size(); li++)
+            mtl[li] = (char) tolower((unsigned char) mtl[li]);
+        lifeCostPerTarget = mtl.find("life:-manacost") != string::npos;
+    }
     for (;;)
     {
         vector<Targetable *> targets;
@@ -5362,7 +6051,8 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 if (std::find(picks.begin(), picks.end(), t) != picks.end())
                     continue;
                 targets.push_back(t);
-                opts.push_back(describeTarget(this, t));
+                opts.push_back(describeTarget(this, t)
+                               + (lifeCostPerTarget ? perTargetLifeCostNote(t) : string()));
             }
             req = round;
         }
@@ -5612,6 +6302,39 @@ static void significantWords(const string& seg, vector<string>& words)
             w.clear();
         }
     }
+}
+
+//Strip a leading protocol ANSWER LABEL ("BLOCKS:", "ATTACK:", "CHOICE:",
+//"PUT:", "BLOCK:") - with any markdown decoration - off a reply SEGMENT.
+//
+//WAVE-33 N-152j/N-158n. The name->label reconciler splits the reply into
+//segments and takes the FIRST ':' as the blocker/attacker separator. On the
+//segment that carries the head label that colon is the LABEL'S OWN, so
+//"BLOCKS: Orc army: Sigarda" split into leftSeg="BLOCKS" (no significant
+//words -> no blocker match) and the whole assignment was dropped. Every
+//name-form BLOCKS reply in the wave-32 corpus died here - both of that
+//corpus's unparsed_reply fallbacks - even though the name pass has shipped
+//since wave-19. Removing the label makes the FIRST colon the real separator.
+static string stripAnswerLabelPrefix(const string& seg)
+{
+    static const char * kLabels[] = { "blocks:", "block:", "attack:", "attacks:", "choice:", "put:" };
+    size_t s = 0;
+    while (s < seg.size() && (seg[s] == ' ' || seg[s] == '\t' || seg[s] == '*'
+                              || seg[s] == '#' || seg[s] == '-' || seg[s] == '>'
+                              || seg[s] == '`'))
+        s++;
+    for (size_t k = 0; k < sizeof(kLabels) / sizeof(kLabels[0]); k++)
+    {
+        size_t len = strlen(kLabels[k]);
+        if (seg.size() - s < len)
+            continue;
+        bool match = true;
+        for (size_t c = 0; c < len && match; c++)
+            match = (tolower((unsigned char) seg[s + c]) == kLabels[k][c]);
+        if (match)
+            return seg.substr(s + len);
+    }
+    return seg;
 }
 
 //A trailing "#N" disambiguation ordinal on a reply segment: the model marks
@@ -6424,7 +7147,13 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
         size_t start = 0;
         for (size_t s = 0; s <= content.size(); s++)
         {
-            if (s != content.size() && content[s] != ',' && content[s] != '\n')
+            //';' is a separator here too (wave-33 N-158n symmetry): the ATTACK
+            //name pass already tolerates names, but a ';'-joined list arrived
+            //as ONE segment whose merged word set matched nothing, so an
+            //otherwise-compliant "ATTACK: Hellrider; Rakdos Cackler" declared
+            //NOBODY. The A#-index scan above is separator-independent and
+            //unaffected.
+            if (s != content.size() && content[s] != ',' && content[s] != ';' && content[s] != '\n')
                 continue;
             string seg = content.substr(start, s - start);
             start = s + 1;
@@ -6691,37 +7420,65 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
         size_t start = 0;
         for (size_t s = 0; s <= content.size(); s++)
         {
-            if (s != content.size() && content[s] != ',' && content[s] != '\n')
+            //';' joins name-form pairs as readily as ',' does (deck158 vs152
+            //s35: "Orc army: Sigarda, Champion of Light; Dunland Crebain:
+            //Moonrage Brute") - without it the second pair never reaches a
+            //segment of its own. WAVE-33 N-158n.
+            if (s != content.size() && content[s] != ',' && content[s] != ';' && content[s] != '\n')
                 continue;
-            string seg = content.substr(start, s - start);
+            string seg = stripAnswerLabelPrefix(content.substr(start, s - start));
             start = s + 1;
             //Find the blocker/attacker separator: ':' or the word "blocks".
+            //A leading colon whose left half carries NO name words (a stray
+            //"Answer:"/"Declaring:" prefix the label strip does not know)
+            //re-splits at the NEXT separator rather than dropping the pair.
             string low;
             for (size_t k = 0; k < seg.size(); k++)
                 low += (char) tolower((unsigned char) seg[k]);
-            size_t sep = string::npos, sepLen = 0;
-            size_t colon = seg.find(':');
-            size_t blk = low.find(" blocks ");
-            if (colon != string::npos) { sep = colon; sepLen = 1; }
-            if (blk != string::npos && (sep == string::npos || blk < sep)) { sep = blk; sepLen = 8; }
-            if (sep == string::npos)
-                continue; //no blocker:attacker structure in this segment
-            string leftSeg = seg.substr(0, sep), rightSeg = seg.substr(sep + sepLen);
-            vector<string> leftWords, rightWords;
-            significantWords(leftSeg, leftWords);
-            significantWords(rightSeg, rightWords);
-            int bMatch = uniqueNameMatch(leftWords, *blockerNames, nBlockers, NULL, nameOrdinal(leftSeg));
-            if (bMatch < 0 || out[bMatch] != 0)
-                continue; //no unique blocker, or already assigned by a code
-            const vector<int> * allowed = (legalPerBlocker && (size_t) bMatch < legalPerBlocker->size())
-                                          ? &(*legalPerBlocker)[bMatch] : NULL;
-            //"#N" on the attacker half ("Saproling (1/1) #1") disambiguates
-            //two identically-named attackers the plain match would drop.
-            int aMatch = uniqueNameMatch(rightWords, *attackerNames, nAttackers, allowed, nameOrdinal(rightSeg));
-            if (aMatch < 0)
-                continue; //ambiguous / unmatched attacker -> drop this one only
-            out[bMatch] = aMatch + 1;
-            pairs++;
+            size_t searchFrom = 0;
+            while (searchFrom <= seg.size())
+            {
+                size_t sep = string::npos, sepLen = 0;
+                size_t colon = seg.find(':', searchFrom);
+                size_t blk = low.find(" blocks ", searchFrom);
+                if (colon != string::npos) { sep = colon; sepLen = 1; }
+                if (blk != string::npos && (sep == string::npos || blk < sep)) { sep = blk; sepLen = 8; }
+                if (sep == string::npos)
+                    break; //no blocker:attacker structure left in this segment
+                string leftSeg = seg.substr(0, sep), rightSeg = seg.substr(sep + sepLen);
+                vector<string> leftWords, rightWords;
+                significantWords(leftSeg, leftWords);
+                significantWords(rightSeg, rightWords);
+                if (leftWords.empty())
+                {
+                    searchFrom = sep + sepLen; //label-ish prefix: try the next separator
+                    continue;
+                }
+                int bMatch = uniqueNameMatch(leftWords, *blockerNames, nBlockers, NULL, nameOrdinal(leftSeg));
+                if (bMatch < 0 || out[bMatch] != 0)
+                    break; //no unique blocker, or already assigned by a code
+                const vector<int> * allowed = (legalPerBlocker && (size_t) bMatch < legalPerBlocker->size())
+                                              ? &(*legalPerBlocker)[bMatch] : NULL;
+                //"#N" on the attacker half ("Saproling (1/1) #1") disambiguates
+                //two identically-named attackers the plain match would drop.
+                int aMatch = uniqueNameMatch(rightWords, *attackerNames, nAttackers, allowed, nameOrdinal(rightSeg));
+                //LEGALITY IS THE VALIDATOR'S JOB, NOT THE PARSER'S (wave-33).
+                //Restricting the attacker match to the blocker's legal set is a
+                //DISAMBIGUATOR, so it is tried first; when it fails, retry over
+                //the whole attacker list so the model's actual intent is
+                //RESOLVED and then PRUNED at the apply site's canBlock gate
+                //(and counted in the translog), exactly as a coded "B1:A5"
+                //naming an illegal attacker already is. Silently dropping it
+                //here made an illegal intent indistinguishable from an
+                //unparseable reply (deck139 s21, deck158 s35).
+                if (aMatch < 0 && allowed)
+                    aMatch = uniqueNameMatch(rightWords, *attackerNames, nAttackers, NULL, nameOrdinal(rightSeg));
+                if (aMatch < 0)
+                    break; //ambiguous / unmatched attacker -> drop this one only
+                out[bMatch] = aMatch + 1;
+                pairs++;
+                break;
+            }
         }
     }
     return pairs;
@@ -6760,17 +7517,26 @@ int AIPlayerGPT::chooseBlockers()
     //miscount - 3 guises across 5 seats; routed to representation, not
     //core prose). Phrased conditionally: an attacker may be hitting a
     //planeswalker, so the sum is an upper bound on face damage.
+    //N-105b: the swing is PARTITIONED by whether each attacker's damage to a
+    //player is REPLACED. Infect/poisondamager damage becomes poison counters and
+    //never touches life; toxic damage hits life AND adds counters; wither only
+    //replaces damage dealt to CREATURES, so it is ordinary damage on this line
+    //(its blocker consequence rides the attacker line instead).
     {
-        int incoming = 0;
+        int lifeIncoming = 0, poisonIncoming = 0;
         for (size_t j = 0; j < attackers.size(); j++)
-            if (attackers[j]->power > 0)
-                incoming += attackers[j]->power;
-        tail << "Your life: " << life << ". Unblocked, these attackers deal up to "
-             << incoming << " - you would be at " << (life - incoming)
-             << (life - incoming <= 0
-                 ? " - LETHAL if it all connects: block enough to survive."
-                 : " - NOT lethal: block only where the trade favors you; taking damage while ahead is often correct.")
-             << "\n";
+        {
+            int p = attackers[j]->power > 0 ? attackers[j]->power : 0;
+            if (sourceDealsPoisonInsteadOfDamage(attackers[j]))
+                poisonIncoming += p;
+            else
+            {
+                lifeIncoming += p;
+                if (p > 0)
+                    poisonIncoming += attackers[j]->getToxicity();
+            }
+        }
+        tail << combatDamageForecast(life, poisonCount, lifeIncoming, poisonIncoming);
     }
     //Capture each presented combat option line (attacker context + blocker
     //options WITH their trade annotations) for the translog: combat records
@@ -6791,6 +7557,11 @@ int AIPlayerGPT::chooseBlockers()
         string kw = keywordList(attackers[j]);
         if (!kw.empty())
             ln << " [" << kw << "]";
+        //N-105a part (d): spell out what infect / toxic / wither damage actually
+        //DOES, at the line that decides the block. The engine keyword names for
+        //this family are opaque, and the seat's own reasoning showed it pricing
+        //an infect swing entirely on the life track.
+        ln << attackerPoisonNote(attackers[j]);
         //Punisher rider: an attacker whose text does something WHEN BLOCKED
         //or WHEN DEALT DAMAGE (sacrifice permanents, damage you, pump
         //itself) is a trap the bare name hides - surface the text at the
@@ -6990,15 +7761,44 @@ int AIPlayerGPT::chooseBlockers()
     //choreography and re-validates each assignment.
     DecisionAction act;
     string declared;
+    int intended = 0;
+    string pruned;
     for (size_t i = 0; i < blockers.size(); i++)
     {
         if (pick[i] < 1)
             continue;
+        intended++;
         MTGCardInstance * chosen = attackers[pick[i] - 1];
         if (!blockers[i]->canBlock(chosen))
-            continue; //model assigned an illegal block: that blocker stays home
+        {
+            //Model assigned an illegal block: that blocker stays home. THIS is
+            //the seam that keeps illegal choices structurally impossible, and
+            //it is the only legality gate the name-form parse relies on - so
+            //record what it pruned rather than losing it (wave-33 N-152j).
+            pruned += (pruned.empty() ? "" : "; ") + blockers[i]->name + " -> " + chosen->name;
+            continue;
+        }
         act.blocks.push_back(std::make_pair(blockers[i], chosen));
         declared += (declared.empty() ? "" : "; ") + blockers[i]->name + " blocks " + chosen->name;
+    }
+    mLastPrunedPairs = pruned;
+
+    //EVERY intended assignment was illegal (deck139 vs152 s21: a name-form
+    //reply naming a flier its own B-line never offered). Declaring the empty
+    //set here would silently convert "the model asked for an impossible
+    //block" into "the model declined to block" - a blanket no-blocks is the
+    //worst combat default (it maximises incoming damage), and wave-32 ledger
+    //#15 flagged this exit as the silent one. Fall back to the heuristic, as
+    //every other failure path does, and log it as its OWN fallback class so
+    //the next corpus can count it separately from unparsed_reply.
+    if (intended > 0 && act.blocks.empty())
+    {
+        writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
+                      "", "all_assignments_illegal", &shownLines, blockSource);
+        setNotice("every block the model asked for was illegal - the heuristic blocks", 5.0f);
+        mBlocksDoneTurn = observer->turn;
+        DebugTrace("AIPlayerGPT: all " << intended << " assignment(s) illegal -> heuristic declares blockers");
+        return AIPlayerBaka::chooseBlockers();
     }
     DecisionManager::applyDeclareBlockers(req, act);
     writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
@@ -7405,8 +8205,11 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
         tail << (j + 1) << ". " << hand[j]->name << changelingAnnotation(hand[j]);
         if (hand[j]->isLand())
             tail << landTag(hand[j]); //land + colors it taps for (deck93 wave-27), not a bare "(land)"
-        else if (hand[j]->getManaCost())
-            tail << " (cost " << hand[j]->getManaCost()->getConvertedCost() << ")";
+        else
+            //N-36b: the same symbolic token every other hand surface prints, so
+            //a {0} card reads identically here and the colour pips the pregame
+            //count header is reasoning about are visible on the card's own line.
+            tail << manaCostToken(hand[j]);
         string txt = cardTextSnippet(hand[j], 120);
         if (!txt.empty())
             tail << " {text: " << txt << "}";
@@ -9195,6 +9998,549 @@ void AIPlayerGPT::runParseSelfTest()
             CHECK(c == 1 && !stale,
                   "W32-R N-158h: a cast echo binds against the per-target life-cost annotation");
         }
+    }
+
+    // ================= WAVE-33 items (N-152j / N-158n name-form BLOCKS,
+    // ================= plus the COMMIT-FAILURE counters) ==================
+    cout << "\n=== WAVE-33: name-form BLOCKS parsing + commit-failure counters ===\n";
+    {
+        // ---- N-152j, the deck139 vs152 s21 witness, VERBATIM head line.
+        // Board: B1 = Pollywog Symbiote, may block A1..A4; A5 = Elite
+        // Spellbinder [flying] is NOT in B1's legal set.
+        cout << "\n[W33 N-152j] 'BLOCKS: Pollywog Symbiote blocks Elite Spellbinder'\n";
+        vector<string> bn; bn.push_back("Pollywog Symbiote");
+        vector<string> an;
+        an.push_back("Grizzly Bears"); an.push_back("Llanowar Elves");
+        an.push_back("Memnite"); an.push_back("Ornithopter");
+        an.push_back("Elite Spellbinder");
+        vector<vector<int> > legal(1);
+        legal[0].push_back(0); legal[0].push_back(1); legal[0].push_back(2); legal[0].push_back(3);
+        {
+            // The parser RESOLVES the intent (the pair is now visible); the
+            // apply site's canBlock gate is what refuses it. Pre-fix this whole
+            // line was dropped -> pairs 0 -> unparsed_reply -> Baka.
+            vector<int> out;
+            int pairs = parseBlockAssignments("BLOCKS: Pollywog Symbiote blocks Elite Spellbinder",
+                                              1, 5, out, &bn, &an, &legal);
+            cout << "     pairs=" << pairs << " B1->A" << (out.empty() ? 0 : out[0])
+                 << " (illegal: the validator prunes it, not the parser)\n";
+            CHECK(pairs == 1 && out[0] == 5,
+                  "W33 N-152j: name-form 'X blocks Y' past the BLOCKS: label resolves (was unparsed_reply)");
+        }
+        {
+            // Same line, LEGAL variant: A5 in B1's legal set -> a real block.
+            vector<vector<int> > legalAll(1);
+            for (int k = 0; k < 5; k++) legalAll[0].push_back(k);
+            vector<int> out;
+            int pairs = parseBlockAssignments("BLOCKS: Pollywog Symbiote blocks Elite Spellbinder",
+                                              1, 5, out, &bn, &an, &legalAll);
+            CHECK(pairs == 1 && out[0] == 5,
+                  "W33 N-152j LEGAL variant: the same reply declares B1 blocks A5 when A5 is offered");
+        }
+
+        // ---- N-158n, the deck158 vs152 s35 witness, VERBATIM head line.
+        // Board: A1 = Moonrage Brute, A2 = Sigarda [flying]; B1 = Orc army,
+        // may block A1 only. "Dunland Crebain" is tapped and is NOT a B-line.
+        cout << "\n[W33 N-158n] 'BLOCKS: Orc army: Sigarda, Champion of Light; Dunland Crebain: Moonrage Brute'\n";
+        vector<string> bn2; bn2.push_back("Orc army");
+        vector<string> an2; an2.push_back("Moonrage Brute"); an2.push_back("Sigarda, Champion of Light");
+        vector<vector<int> > legal2(1); legal2[0].push_back(0);
+        {
+            vector<int> out;
+            int pairs = parseBlockAssignments(
+                "BLOCKS: Orc army: Sigarda, Champion of Light; Dunland Crebain: Moonrage Brute",
+                1, 2, out, &bn2, &an2, &legal2);
+            cout << "     pairs=" << pairs << " B1->A" << (out.empty() ? 0 : out[0])
+                 << " (Sigarda flies -> pruned at apply; 'Dunland Crebain' is no B-line -> dropped here)\n";
+            CHECK(pairs == 1 && out[0] == 2,
+                  "W33 N-158n: NAME:NAME with a ';' pair separator resolves past the label colon");
+        }
+        {
+            // The SAME shape with a legal pair: this is the forward-looking
+            // value of the item - a name-form block that actually happens.
+            vector<int> out;
+            int pairs = parseBlockAssignments("BLOCKS: Orc army: Moonrage Brute", 1, 2, out, &bn2, &an2, &legal2);
+            cout << "     legal name-form: pairs=" << pairs << " B1->A" << (out.empty() ? 0 : out[0]) << "\n";
+            CHECK(pairs == 1 && out[0] == 1,
+                  "W33 N-158n POSITIVE: a LEGAL name-form block declares B1:A1");
+        }
+        {
+            // AMBIGUITY GUARD: two identically-named blockers, no "#N" handle
+            // -> the pair drops whole. A guess would pick the wrong creature.
+            vector<string> bnDup; bnDup.push_back("Orc army"); bnDup.push_back("Orc army");
+            vector<vector<int> > legalDup(2); legalDup[0].push_back(0); legalDup[1].push_back(0);
+            vector<int> out;
+            int pairs = parseBlockAssignments("BLOCKS: Orc army: Moonrage Brute", 2, 2, out, &bnDup, &an2, &legalDup);
+            cout << "     duplicate blocker name, no handle: pairs=" << pairs << " (must drop)\n";
+            CHECK(pairs == 0 && out[0] == 0 && out[1] == 0,
+                  "W33 N-158n NEGATIVE: an ambiguous duplicate blocker name with no #N handle drops the pair");
+            // ...and the RENDERED handle resolves it.
+            vector<int> out2;
+            int pairs2 = parseBlockAssignments("BLOCKS: Orc army #2: Moonrage Brute", 2, 2, out2, &bnDup, &an2, &legalDup);
+            cout << "     handle form '#2': pairs=" << pairs2 << " B1->A" << out2[0] << " B2->A" << out2[1] << "\n";
+            CHECK(pairs2 == 1 && out2[0] == 0 && out2[1] == 1,
+                  "W33 N-158n: the rendered '#2' handle picks the second same-named blocker");
+        }
+        {
+            // A name that matches NOTHING on either list must not invent a block.
+            vector<int> out;
+            int pairs = parseBlockAssignments("BLOCKS: Serra Angel: Shivan Dragon", 1, 2, out, &bn2, &an2, &legal2);
+            CHECK(pairs == 0 && out[0] == 0,
+                  "W33 N-158n NEGATIVE: names on neither list fabricate no block");
+        }
+        {
+            // REGRESSION: the coded form is untouched by the label strip and by
+            // the ';' separator - both the pure and the mixed shapes.
+            vector<int> out;
+            int pairs = parseBlockAssignments("BLOCKS: B1:A1", 1, 2, out, &bn2, &an2, &legal2);
+            CHECK(pairs == 1 && out[0] == 1, "W33 regression: coded 'BLOCKS: B1:A1' still parses");
+            vector<string> bn3; bn3.push_back("Wall"); bn3.push_back("Bear"); bn3.push_back("Bird");
+            vector<string> an3; an3.push_back("Ogre"); an3.push_back("Troll");
+            vector<vector<int> > legal3(3);
+            for (int i = 0; i < 3; i++) { legal3[i].push_back(0); legal3[i].push_back(1); }
+            vector<int> out2;
+            int pairs2 = parseBlockAssignments("BLOCKS: B1:A2, B3:A1, B2:none", 3, 2, out2, &bn3, &an3, &legal3);
+            cout << "     coded triple: pairs=" << pairs2 << " -> " << out2[0] << "," << out2[1] << "," << out2[2] << "\n";
+            CHECK(pairs2 == 3 && out2[0] == 2 && out2[1] == 0 && out2[2] == 1,
+                  "W33 regression: the protocol example 'B1:A2, B3:A1, B2:none' is unchanged");
+            // MIXED coded+name: the coded pair wins its blocker, the name pair
+            // fills a DIFFERENT one (the name pass never overrides a code).
+            vector<int> out3;
+            int pairs3 = parseBlockAssignments("BLOCKS: B1:A2, Bird blocks Ogre", 3, 2, out3, &bn3, &an3, &legal3);
+            CHECK(pairs3 == 2 && out3[0] == 2 && out3[1] == 0 && out3[2] == 1,
+                  "W33: a mixed coded+name reply keeps both, code first");
+        }
+        {
+            // ATTACK ';' symmetry (the same separator gap on the attackers seam).
+            vector<string> an4; an4.push_back("Hellrider"); an4.push_back("Rakdos Cackler"); an4.push_back("Grizzly Bears");
+            vector<bool> send;
+            int r = parseAttackerSet("ATTACK: Hellrider; Rakdos Cackler", 3, send, &an4);
+            cout << "     ATTACK ';' list: result=" << r << " [" << (int) send[0] << ","
+                 << (int) send[1] << "," << (int) send[2] << "]\n";
+            CHECK(r == 2 && send[0] && send[1] && !send[2],
+                  "W33: a ';'-joined ATTACK name list declares both (was one merged unmatchable segment)");
+            // NEGATIVE: an unlisted name still declares nobody, not everybody.
+            vector<bool> send2;
+            int r2 = parseAttackerSet("ATTACK: Shivan Dragon", 3, send2, &an4);
+            CHECK(r2 == 0 && !send2[0] && !send2[1] && !send2[2],
+                  "W33 NEGATIVE: an ineligible ATTACK name declares the empty set, never a guess");
+        }
+
+        // ---- COMMIT-FAILURE counters (instrument only; no behaviour rides them).
+        cout << "\n[W33 commit-failure] post_plan_overrun / commit_retracted\n";
+        {
+            string compliant = "CHOICE: 1 (Cast Mordor Muster {1}{b})\nIt is the best line.\nPLAN: build the army.\n";
+            CHECK(postPlanOverrun(compliant) == 0,
+                  "W33: a compliant reply ending at its PLAN: line scores post_plan_overrun 0");
+            string overrun = "CHOICE: 1 (Cast Mordor Muster {1}{b})\nPLAN: build the army.\n"
+                             "Wait, looking at the opponent's board... Actually, let's re-evaluate.";
+            long n = postPlanOverrun(overrun);
+            cout << "     overrun tail measured: " << n << " chars\n";
+            //69 = strlen("Wait, looking at the opponent's board... Actually,
+            //let's re-evaluate.") - the un-committed tail, exactly.
+            CHECK(n == 69,
+                  "W33: the deck158 vs139 s16 shape scores its exact post-PLAN tail length");
+            CHECK(postPlanOverrun("CHOICE: 1\nno plan here at all") == 0,
+                  "W33 NEGATIVE: a reply with no PLAN: line scores 0 (it never committed a plan)");
+            CHECK(postPlanOverrun("<think>PLAN: ignore me\nlots of hidden reasoning</think>CHOICE: 1\nPLAN: go.") == 0,
+                  "W33 NEGATIVE: a PLAN: inside a </think> block is not the reply's plan");
+            // commit_retracted is the disjunction of the three retraction exits
+            // AND a coded answer line actually existing.
+            CHECK(commitRetracted("retracted_choice", overrun),
+                  "W33: retracted_choice on a reply carrying a coded answer sets commit_retracted");
+            CHECK(commitRetracted("truncated_abandoned", "BLOCKS: B1:A1\nActually no, I should not block."),
+                  "W33: truncated_abandoned sets commit_retracted");
+            CHECK(commitRetracted("truncated_abandoned_heuristic", "BLOCKS: B1:A1\nActually no."),
+                  "W33: truncated_abandoned_heuristic sets commit_retracted");
+            CHECK(!commitRetracted("unparsed_reply", overrun),
+                  "W33 NEGATIVE: unparsed_reply is NOT a retraction (no answer was committed)");
+            CHECK(!commitRetracted("empty_reply", ""),
+                  "W33 NEGATIVE: empty_reply is not a retraction");
+            CHECK(!commitRetracted(NULL, overrun),
+                  "W33 NEGATIVE: a record the model's own answer carried is never commit_retracted");
+            CHECK(!commitRetracted("retracted_choice", "I think option one is fine but actually no."),
+                  "W33 NEGATIVE: no line-leading coded answer -> nothing was committed to retract");
+        }
+    }
+
+    // ==== WAVE-33 step-1 (render lane) cases ====
+
+    // ---- N-105a: the poison status line ----
+    cout << "\n[W33-N105a] poison counters render, with the 10-counter threshold explicit\n";
+    {
+        // NEGATIVE: a game with no poison in it must be byte-untouched.
+        CHECK(poisonStatusLine(0, 0).empty(),
+              "W33-N105a no poison anywhere -> no status line at all");
+        // POSITIVE: this seat's own counters, threshold and remainder explicit.
+        string mine = poisonStatusLine(6, 0);
+        cout << "     " << mine;
+        CHECK(mine.find("Poison counters (you): 6 of 10") != string::npos,
+              "W33-N105a the seat's own poison total renders against the 10 threshold");
+        CHECK(mine.find("4 more end it") != string::npos,
+              "W33-N105a the distance to the loss threshold is stated as a number");
+        CHECK(mine.find("(opponent)") == string::npos,
+              "W33-N105a an unpoisoned opponent contributes no line");
+        // Both players, and the opponent's line names the OPPONENT as the loser.
+        string both = poisonStatusLine(6, 3);
+        CHECK(both.find("Poison counters (opponent): 3 of 10") != string::npos
+              && both.find("the opponent LOSES the game at 10") != string::npos,
+              "W33-N105a both players' totals render, each against its own loss clause");
+        // The threshold-reached case must not print a negative remainder.
+        string over = poisonStatusLine(10, 0);
+        CHECK(over.find("-") == string::npos || over.find(" -1 more") == string::npos,
+              "W33-N105a at/over the threshold no negative remainder is emitted");
+        CHECK(over.find("already reached") != string::npos,
+              "W33-N105a at the threshold the line says so outright");
+        // The wording must not hand the model an affirmative all-clear to latch.
+        CHECK(mine.find("safe") == string::npos && mine.find("plenty") == string::npos,
+              "W33-N105a no affirmative all-clear substring in the poison line");
+    }
+
+    // ---- N-105a (d): the poison keyword family is decodable ----
+    cout << "\n[W33-N105a] opaque engine keyword names for the poison family are translated\n";
+    {
+        CHECK(legibleKeywordName("poisontoxic") == "toxic 1",
+              "W33-N105a 'poisontoxic' renders as toxic 1");
+        CHECK(legibleKeywordName("poisonthreetoxic") == "toxic 3",
+              "W33-N105a the spelled-out toxic magnitudes decode");
+        CHECK(legibleKeywordName("poisontentoxic") == "toxic 10",
+              "W33-N105a the two-syllable top of the range decodes");
+        CHECK(legibleKeywordName("poisondamager")
+                  == "deals its damage to players as poison counters",
+              "W33-N105a 'poisondamager' is spelled out as what it does");
+        // NEGATIVES: every other keyword - including the poison-adjacent ones -
+        // must come back byte-identical, or 100+ existing option lines shift.
+        CHECK(legibleKeywordName("infect") == "infect", "W33-N105a 'infect' is unchanged");
+        CHECK(legibleKeywordName("wither") == "wither", "W33-N105a 'wither' is unchanged");
+        CHECK(legibleKeywordName("poisonshroud") == "poisonshroud",
+              "W33-N105a a poison-prefixed keyword that is NOT toxic is unchanged");
+        CHECK(legibleKeywordName("flying") == "flying" && legibleKeywordName("") == "",
+              "W33-N105a ordinary keywords and the empty name are untouched");
+        // Echo shape: an attacker line carrying the translated keyword still binds.
+        vector<string> blockOpts;
+        blockOpts.push_back("Block A1. Phyrexian Crusader (2/2) [infect, toxic 1]");
+        blockOpts.push_back("Do not block");
+        bool stale = false;
+        int c = parseChoice("1 (Block A1. Phyrexian Crusader)", 2, &blockOpts, &stale, NULL);
+        cout << "     translated-keyword echo -> " << c << " (must be 1)\n";
+        CHECK(c == 1 && !stale,
+              "W33-N105a an echo binds against a line carrying the translated keywords");
+    }
+
+    // ---- N-105a: poison GAIN narration (covers alterpoison, which narrated nothing) ----
+    cout << "\n[W33-N105a] every poison gain narrates, with a real delta and total\n";
+    {
+        string g = poisonGainLine(true, 3, 6);
+        cout << "     " << g << "\n";
+        CHECK(g.find("you take 3 poison counters - now 6 of 10") != string::npos,
+              "W33-N105a a poison gain states delta AND settled total");
+        CHECK(g.find("4 more end it") != string::npos,
+              "W33-N105a the gain line carries the distance to the threshold");
+        string one = poisonGainLine(false, 1, 1);
+        CHECK(one.find("the opponent takes 1 poison counter - now 1 of 10") != string::npos,
+              "W33-N105a singular/plural and the opponent's side both render");
+        // A gain the seat cannot attribute a delta to still states the total.
+        string nod = poisonGainLine(true, 0, 2);
+        CHECK(nod.find("you now have 2 of 10") != string::npos,
+              "W33-N105a an unknown delta degrades to the settled total, never to silence");
+    }
+
+    // ---- N-105b: the blocker-seam forecast is infect-aware ----
+    cout << "\n[W33-N105b] the block forecast prices poison against 10, not life against 20\n";
+    {
+        // CONTROL: a non-poison swing keeps the validated wording byte-for-byte.
+        string plain = combatDamageForecast(20, 0, 5, 0);
+        cout << "     " << plain;
+        CHECK(plain == "Your life: 20. Unblocked, these attackers deal up to 5 - you would be at 15"
+                       " - NOT lethal: block only where the trade favors you; taking damage while"
+                       " ahead is often correct.\n",
+              "W33-N105b a swing with no poison in it is unchanged");
+        CHECK(combatDamageForecast(4, 0, 5, 0).find("LETHAL if it all connects") != string::npos,
+              "W33-N105b the lethal branch of the non-poison forecast is unchanged");
+
+        // The deck36 s25 t12 GAME-LOSING window: 5 infect power onto 6 poison.
+        // The old line said "you would be at 15 - NOT lethal" and the seat took it.
+        string inf = combatDamageForecast(20, 6, 0, 5);
+        cout << "     " << inf;
+        CHECK(inf.find("you would be at 15") == string::npos,
+              "W33-N105b an infect swing emits NO life-total forecast for its damage");
+        CHECK(inf.find("11 of 10 poison") != string::npos
+              && inf.find("LETHAL if it all connects") != string::npos,
+              "W33-N105b crossing 10 poison is reported as LETHAL");
+        CHECK(inf.find("taking damage while ahead is often correct") == string::npos,
+              "W33-N105b the take-the-damage advice is DROPPED on any poison-relevant swing");
+        CHECK(inf.find("Your poison counters: 6 of 10") != string::npos,
+              "W33-N105b the forecast restates the current poison count it is pricing against");
+
+        // Sub-threshold poison: not lethal, but never framed as affordable.
+        string sub = combatDamageForecast(20, 2, 0, 3);
+        CHECK(sub.find("5 of 10 poison") != string::npos
+              && sub.find("taking damage while ahead is often correct") == string::npos,
+              "W33-N105b a sub-threshold poison swing still drops the stale advice");
+        CHECK(sub.find("permanent progress toward losing") != string::npos,
+              "W33-N105b sub-threshold poison is framed as permanent, not as slack");
+
+        // MIXED swing (a toxic attacker): BOTH halves must be priced.
+        string mixed = combatDamageForecast(9, 7, 4, 2);
+        cout << "     " << mixed;
+        CHECK(mixed.find("9 of 10 poison") != string::npos
+              && mixed.find("ORDINARY damage - your life would be 5") != string::npos,
+              "W33-N105b a mixed swing prices poison AND life, both explicitly");
+    }
+
+    // ---- N-36b: a {0} cost is a cost, not an absence ----
+    cout << "\n[W33-N36b] {0} renders instead of being deleted by the falsy-zero guard\n";
+    {
+        CHECK(manaCostTokenText("{2}{b}", true) == " {2}{b}",
+              "W33-N36b an ordinary cost renders unchanged");
+        CHECK(manaCostTokenText("", true) == " {0}",
+              "W33-N36b an EMPTY cost string on a castable card renders {0}");
+        CHECK(manaCostTokenText("", false) == "",
+              "W33-N36b a land/token gets no synthesized {0}");
+        CHECK(manaCostTokenText("{x}", true) == " {x}",
+              "W33-N36b an X-only cost (also converted-0) survives as {x}, not {0}");
+        // Echo shape: a Mox cast line now carries a {0} the reply may echo back.
+        vector<string> opts;
+        opts.push_back("Cast Mox Ruby {0} [artifact]");
+        opts.push_back("Cast nothing right now");
+        bool stale = false;
+        int c = parseChoice("1 (Cast Mox Ruby {0})", 2, &opts, &stale, NULL);
+        cout << "     {0} cast echo -> " << c << " (must be 1)\n";
+        CHECK(c == 1 && !stale, "W33-N36b a cast echo carrying the new {0} token still binds");
+        int c2 = parseChoice("2 (Cast nothing right now)", 2, &opts, &stale, NULL);
+        CHECK(c2 == 2 && !stale, "W33-N36b the decline option is unaffected by the {0} token");
+    }
+
+    // ---- N-152d layer 2: the printed-face discriminator ----
+    cout << "\n[W33-N152d] a day/night transform (isFlipped left 0) no longer fakes a buff\n";
+    {
+        // Moonrage Brute: power 3/3, back-face orig 3/3, FRONT-face base 2/2.
+        // AAFlip::testDestroy resets isFlipped to 0, so the old call site passed 0
+        // here and printed "(printed 2/2)" - Brutal Cathar's stats - 22x in corpus.
+        CHECK(printedPTTag(3, 3, 2, 2, 3, 3, /*showsOtherFace*/1).empty(),
+              "W33-N152d a transformed DFC identified by NAME renders no (printed ...) tail");
+        // The pre-fix behaviour, pinned as the thing that must not come back.
+        CHECK(printedPTTag(3, 3, 2, 2, 3, 3, /*showsOtherFace*/0) == " (printed 2/2)",
+              "W33-N152d control: the old front-face reading is what produced the false tag");
+        // The genuinely-buffed transformed case still reports the BACK face.
+        CHECK(printedPTTag(5, 5, 2, 2, 3, 3, 1) == " (printed 3/3)",
+              "W33-N152d a buffed transformed DFC still reports its displayed face's stats");
+        // An unflipped buffed creature is untouched.
+        CHECK(printedPTTag(4, 4, 2, 2, 2, 2, 0) == " (printed 2/2)",
+              "W33-N152d an ordinary pumped creature is unchanged");
+    }
+
+    // ---- N-158m: the amass scanner sees through macros ----
+    cout << "\n[W33-N158m] amass magnitudes survive macro indirection; both guards hold\n";
+    {
+        // Register the REAL macros from Res/sets/primitives/_macros.txt. PARSETEST
+        // runs before the collection loads, so without this the expansion path is
+        // a no-op and the test would pass vacuously.
+        AutoLineMacro::AddMacro("_DIES_ @movedTo(this|graveyard) from(battlefield):");
+        AutoLineMacro::AddMacro("_AMASSORC1_ if type(army|mybattlefield)~morethan~0 then name(Put 1/1 counter)"
+                                " notatarget(army|myBattlefield) transforms((Orc,newability[counter(1/1)])) forever"
+                                " else name(Create Orc Army) token(Orc Army^Creature Orc Army^0/0^black)"
+                                " and!( name(Put 1/1 counter) counter(1/1) notatarget(army|myBattlefield) )!");
+        AutoLineMacro::AddMacro("_AMASSORC3_ if type(army|mybattlefield)~morethan~0 then name(Put 1/1 counters)"
+                                " notatarget(army|myBattlefield) transforms((Orc,newability[counter(1/1.3)])) forever"
+                                " else name(Create Orc Army) token(Orc Army^Creature Orc Army^0/0^black)"
+                                " and!( name(Put 1/1 counters) counter(1/1.3) notatarget(army|myBattlefield) )!");
+
+        // Mordor Muster class: a plain untriggered macro line. 0 before this fix.
+        int muster = amassCountersFromScript("_AMASSORC3_");
+        cout << "     macro-defined amass 3 -> " << muster << " (must be 3)\n";
+        CHECK(muster == 3, "W33-N158m a macro-defined amass reports its real magnitude");
+        CHECK(amassCountersFromScript("_AMASSORC1_") == 1,
+              "W33-N158m the no-dot counter(1/1) macro form reports 1");
+
+        // GUARD 1, trigger-gated: Easterling Vanguard is "_DIES_ _AMASSORC1_".
+        // The filter reads the RAW line, so _DIES_ is caught before expansion -
+        // and its expansion starts with '@', so the second check catches it too.
+        CHECK(amassCountersFromScript("_DIES_ _AMASSORC1_") == 0,
+              "W33-N158m a DIES-triggered amass still previews NOTHING");
+        CHECK(amassCountersFromScript("@movedTo(this|graveyard) from(battlefield): _AMASSORC1_") == 0,
+              "W33-N158m an already-expanded trigger line is still suppressed");
+
+        // GUARD 2, multi-branch: an X-spell enumerating several magnitudes.
+        CHECK(amassCountersFromScript("_AMASSORC1_\n_AMASSORC3_") == 0,
+              "W33-N158m a card agreeing on no single count emits no number");
+
+        // The hand-written control (Foray of Orcs) is unchanged by the new path.
+        CHECK(amassCountersFromScript(
+                  "if type(army|mybattlefield)~morethan~0 then notatarget(army|myBattlefield)"
+                  " transforms((Orc,newability[counter(1/1.2)])) forever") == 2,
+              "W33-N158m the already-expanded scan is byte-unchanged");
+        CHECK(amassCountersFromScript("") == 0, "W33-N158m an empty script amasses nothing");
+        CHECK(amassCountersFromScript("token(Goblin)") == 0,
+              "W33-N158m a non-amass script is untouched by the expansion pass");
+
+        // ---- The REAL deck158 cards, scripts copied verbatim from
+        // Res/sets/primitives/borderline.txt. This is the coverage claim itself,
+        // proven rather than predicted: 1 of 7 amass cards previewed before.
+        AutoLineMacro::AddMacro("_AMASSORC2_ if type(army|mybattlefield)~morethan~0 then name(Put 1/1 counters)"
+                                " notatarget(army|myBattlefield) transforms((Orc,newability[counter(1/1.2)])) forever"
+                                " else name(Create Orc Army) token(Orc Army^Creature Orc Army^0/0^black)"
+                                " and!( name(Put 1/1 counters) counter(1/1.2) notatarget(army|myBattlefield) )!");
+        AutoLineMacro::AddMacro("_TREASURE_ token(Treasure^Treasure Artifact^0/0) and!( transforms((,"
+                                "newability[{T}{S}:Add{W}],newability[{T}{S}:Add{U}],newability[{T}{S}:Add{B}],"
+                                "newability[{T}{S}:Add{R}],newability[{T}{S}:Add{G}])) forever )!");
+
+        struct { const char * name; const char * script; int want; } kReal[] = {
+            { "Dunland Crebain",           "_AMASSORC2_", 2 },
+            { "March from the Black Gate",
+              "_AMASSORC1_\n@combat(attacking) source(army|mybattlefield):name(Amass orcs 1) _AMASSORC1_", 1 },
+            { "Mordor Muster",
+              "draw:1 controller\nlife:-1 controller\nability$!name(Amass orcs 1) _AMASSORC1_!$ controller", 1 },
+            { "Orcish Bowmasters",
+              "ability$!name(Amass orcs 1) _AMASSORC1_!$ controller\n"
+              "name(Damage any target) damage:1 target(anytarget)\n"
+              "@drawfoeof(player) restriction{compare(odrewcount)~morethan~1}:name(Amass Orcs 1)"
+              " ability$!name(Amass orcs 1) _AMASSORC1_!$ controller", 1 },
+            { "Swarming of Moria",         "_TREASURE_\n_AMASSORC2_", 2 },
+            //Trigger-gated: amasses only when it DIES. Must stay silent.
+            { "Easterling Vanguard",       "_DIES_ _AMASSORC1_", 0 },
+        };
+        for (size_t r = 0; r < sizeof(kReal) / sizeof(kReal[0]); r++)
+        {
+            int got = amassCountersFromScript(kReal[r].script);
+            cout << "     " << kReal[r].name << " -> " << got
+                 << " (must be " << kReal[r].want << ")\n";
+            CHECK(got == kReal[r].want,
+                  string("W33-N158m real primitive: ") + kReal[r].name);
+        }
+
+        // NEGATIVE CONTROL the docket names explicitly: Assault on Osgiliath's
+        // nine fullpaid branches carry counter(1/1) through counter(1/1.10), so
+        // the card agrees on no single count and must emit NOTHING. Note the
+        // bare counter(1/1) branch now joins the same value set - as a fallback
+        // it would have let a 10-branch X-spell report "10".
+        {
+            string osgiliath;
+            for (int k = 1; k <= 10; k++)
+            {
+                std::ostringstream ln;
+                ln << "alternative if compare(fullpaid)~equalto~" << k
+                   << " then notatarget(army|myBattlefield) transforms((Orc,newability[counter(1/1";
+                if (k > 1)
+                    ln << "." << k;
+                ln << ")])) forever\n";
+                osgiliath += ln.str();
+            }
+            int got = amassCountersFromScript(osgiliath);
+            cout << "     Assault on Osgiliath (10 branches) -> " << got << " (must be 0)\n";
+            CHECK(got == 0,
+                  "W33-N158m NEGATIVE CONTROL: a 10-branch X-spell still emits no amass number");
+        }
+    }
+
+    // ---- N-152h: the third stale Flip-Side path (MDFC spell with a LAND back) ----
+    cout << "\n[W33-N152h] an MDFC spell whose other face is a LAND stops promising a Cast-menu route\n";
+    {
+        string note = mdfcSpellLandBackNote("Emeria's Call", "Emeria, Shattered Skyclave", "{W}");
+        cout << "     " << note << "\n";
+        CHECK(note.find("appears there as an alternative-cost cast") == string::npos,
+              "W33-N152h the retired false promise is GONE from the spell//land path");
+        CHECK(note.find("other face is a LAND") != string::npos
+              && note.find("A land is never CAST") != string::npos,
+              "W33-N152h the note says what the other face IS and why it has no cast route");
+        CHECK(note.find("taps for {W}") != string::npos,
+              "W33-N152h the land face's colour is named");
+        // The spell//spell path keeps its (true) Cast-menu statement.
+        string spell = mdfcSpellToggleNote("Tergrid, God of Fright", "Tergrid's Lantern", "{3}");
+        CHECK(spell.find("appears there as an alternative-cost cast") != string::npos,
+              "W33-N152h control: the spell//spell class keeps its accurate wording");
+        // Echo shape: a "Flip Side" reply still binds against the new annotation.
+        vector<string> menu;
+        menu.push_back("Cast Card Normally");
+        menu.push_back("Flip Side" + note);
+        menu.push_back("Decline");
+        bool stale = false;
+        int c = parseChoice("2 (Flip Side)", 3, &menu, &stale, NULL);
+        cout << "     land-back Flip Side echo -> " << c << " (must be 2)\n";
+        CHECK(c == 2 && !stale,
+              "W33-N152h a 'Flip Side' echo binds to the land-back annotated option");
+        int c1 = parseChoice("1 (Cast Card Normally)", 3, &menu, &stale, NULL);
+        CHECK(c1 == 1 && !stale,
+              "W33-N152h the normal cast still binds alongside the annotated Flip Side");
+    }
+
+    // ---- N-158k: the per-target life price at the COMMIT seat ----
+    cout << "\n[W33-N158k] the target menu carries the same (costs you N life) the cast line does\n";
+    {
+        // The chooseTarget option now = describeTarget(...) + perTargetLifeCostNote.
+        vector<string> opts;
+        opts.push_back("Ornithopter (0/2) [flying] [opponent's battlefield] (costs you 0 life)");
+        opts.push_back("Cathodion (3/3) [opponent's battlefield] (costs you 3 life)");
+        bool stale = false;
+        int c = parseChoice("1 (Ornithopter)", 2, &opts, &stale, NULL);
+        cout << "     priced target echo -> " << c << " (must be 1)\n";
+        CHECK(c == 1 && !stale,
+              "W33-N158k a target-name echo binds against the new price annotation");
+        int c2 = parseChoice("2 (Cathodion (costs you 3 life))", 2, &opts, &stale, NULL);
+        cout << "     price-repeating echo -> " << c2 << " (must be 2)\n";
+        CHECK(c2 == 2 && !stale,
+              "W33-N158k an echo that repeats the price annotation still binds");
+        // NEGATIVE: a target list for a spell with no per-target life cost must
+        // not acquire one (the annotation is gated on the script shape upstream).
+        vector<string> free_;
+        free_.push_back("Ornithopter (0/2) [flying] [opponent's battlefield]");
+        CHECK(free_[0].find("costs you") == string::npos,
+              "W33-N158k control: an unpriced target line carries no price fragment");
+    }
+
+    // ---- N-158l: no empty [from ] bracket ----
+    cout << "\n[W33-N158l] a counter-source bracket is emitted only when a name resolves\n";
+    {
+        // The emitter is inside describeEvent (needs an event), so the shape is
+        // pinned at the parser boundary: an EMPTY bracket must never appear in a
+        // counter line, and a NAMED one must still bind on echo.
+        string good = "Counter added to Orc army: +1/+1 (now 3/3) [from Mauhur, Uruk-hai Captain]";
+        CHECK(good.find("[from ]") == string::npos,
+              "W33-N158l a resolved source keeps its bracket");
+        string bare = "Counter added to Orc army: +1/+1 (now 3/3)";
+        CHECK(bare.find("[from") == string::npos,
+              "W33-N158l an unresolvable source emits NO bracket rather than an empty one");
+    }
+
+    // ---- N-146k / N-139n: the pregame block is hand-only and engine-counted ----
+    cout << "\n[W33-N146k] a pregame ask carries the hand and NOTHING about a board\n";
+    {
+        int sources[5] = { 2, 0, 1, 0, 0 }; //two {W}, one {B}
+        vector<string> reach;
+        reach.push_back("Triumphant Adventurer {1}{b}");
+        string h = pregameHandHeaderText(7, 3, 4, sources, "Triumphant Adventurer {1}{b}", 2, reach);
+        cout << h;
+        // THE DIRECTIVE: no board-state string may appear in a pregame prompt.
+        CHECK(h.find("Mana available") == string::npos,
+              "W33-N146k the pregame header contains no 'Mana available' line");
+        CHECK(h.find("battlefield") == string::npos && h.find("Battlefield") == string::npos,
+              "W33-N146k the pregame header contains no battlefield frame");
+        CHECK(h.find("life") == string::npos && h.find("Phase") == string::npos
+              && h.find("untapped") == string::npos,
+              "W33-N146k no life total, phase or tap state reaches a pregame ask");
+        // N-139n: the counts the guide layer twice failed to install.
+        CHECK(h.find("3 lands, 4 spells") != string::npos,
+              "W33-N139n the land/spell split is an engine-computed AGGREGATE");
+        CHECK(h.find("{W} 2, {B} 1") != string::npos,
+              "W33-N139n colour sources are counted per colour, not merely tagged per card");
+        CHECK(h.find("A land in your hand IS a mana source") != string::npos,
+              "W33-N139n the header states outright that a hand land counts");
+        CHECK(h.find("would cover the cost of: Triumphant Adventurer {1}{b}") != string::npos,
+              "W33-N139n the castability summary names what these lands reach");
+        // The landless hand: the count must say zero rather than go silent.
+        int none_[5] = { 0, 0, 0, 0, 0 };
+        vector<string> noReach;
+        string z = pregameHandHeaderText(7, 0, 7, none_, "Vanishing Verse {w}{b}", 2, noReach);
+        CHECK(z.find("0 lands, 7 spells") != string::npos
+              && z.find("none - this hand holds no lands at all") != string::npos,
+              "W33-N139n a genuinely landless hand says so with the same counted shape");
+        CHECK(z.find("would not cover any spell") == string::npos,
+              "W33-N139n with zero lands no 'would not cover' claim is made");
+        // Colourless-only lands still count as lands.
+        string cl = pregameHandHeaderText(7, 2, 5, none_, "Steel Wall {1}", 1, noReach);
+        CHECK(cl.find("2 lands, 5 spells") != string::npos
+              && cl.find("no coloured sources") != string::npos,
+              "W33-N139n colourless lands are counted as lands with an explicit colour verdict");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

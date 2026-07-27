@@ -1,0 +1,63 @@
+# Wave-33 N-146j NEGATIVE MIRROR. The fix must not become permissive: a genuinely
+# MULTICOLORED permanent stays untargetable, and so does a genuinely COLOURLESS
+# one.
+#
+# Scryfall Oracle, Vanishing Verse: "Exile target monocolored permanent."
+# Monocolored means EXACTLY ONE colour - a two-or-more-colour permanent is out,
+# and so is a zero-colour permanent.
+#
+# Board: PLAYER2's only permanent is Woolly Thoctar ({R}{G}{W}, vanilla 5/4 Beast,
+# no abilities of any kind), a three-colour permanent.  PLAYER1's only permanents
+# are Scrubland and Vault of Whispers, both COLOURLESS.  Not one permanent in the
+# game is monocolored, so Vanishing Verse has no legal target and the 601.2c
+# mandatory-target cast filter must keep it out of the cast menu entirely.
+#
+# PASS: Vanishing Verse is still in PLAYER1's hand at secondmain and every
+# permanent on both sides is untouched.
+#
+# This fixture is the discriminator against the two wrong shapes of the N-146j
+# fix: (a) dropping the isMultiColored test along with the bogus colour
+# exclusions, which would let the Thoctar be exiled; (b) leaving Vanishing Verse
+# on a bare `[-multicolor]` predicate, which would let PLAYER1's own colourless
+# lands be exiled since "not multicolored" is true of a colourless permanent.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Scrubland,Vault of Whispers
+hand:Vanishing Verse
+[PLAYER2]
+inplay:Woolly Thoctar
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Scrubland,Vault of Whispers
+hand:Vanishing Verse
+[PLAYER2]
+inplay:Woolly Thoctar
+life:20
+[END]

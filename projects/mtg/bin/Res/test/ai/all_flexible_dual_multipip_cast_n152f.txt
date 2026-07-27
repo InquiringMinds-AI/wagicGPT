@@ -1,0 +1,89 @@
+# Wave-33 N-152f GOLD COUNTERFACTUAL (N-152c LAYER 2). A multi-pip spell whose
+# COLOURED pips can ONLY come from FLEXIBLE (multi-ability dual) sources must
+# still be offered and must resolve.  This is the branch the wave-32 fixture
+# missed (HL5): dual_land_multipip_cast_n152c rides ONE dual plus a MONO source
+# of the contested colour, i.e. the deck146 shape that already worked.  Here
+# there is NO mono coloured source at all.
+#
+# Board: Scrubland x2 (subtype "Plains Swamp", so the engine builds TWO separate
+# single-colour mana abilities on ONE card: add{W} FIRST, add{B} second) plus
+# Darksteel Citadel ({T}:add{1}).  Hand: Blood-Cursed Knight {1}{W}{B}.  CMC 3
+# over 3 sources; the only legal assignment is Scrubland#1 -> one colour,
+# Scrubland#2 -> the other, Citadel -> the generic {1}.
+#
+# PRE-FIX this FAILS SILENTLY - no defer record, no ask, the cast simply never
+# reaches the decision surface.  ManaEngine::deferFlexibleSource is asymmetric:
+# its SELF test (sourceHasOtherNeeded) aggregates over EVERY ability whose
+# source is the card under consideration, but its OTHER test (competesElsewhere)
+# is evaluated per-ABILITY on whichever amp the loop happens to hold.  Reaching
+# Scrubland#2 through its add{W} ability yields output {W} only, so
+# amp->output->hasColor(BLACK) is false and Scrubland#2 is judged "dedicated to
+# W" - otherUnusedCoversK becomes true.  Both halves true -> Scrubland#1 defers
+# {W}.  By symmetry Scrubland#2 defers {W} too, and both defer {B}.  Nothing
+# claims either pip and the payment walk returns empty.  This is exactly the
+# mutual deferral the function's own comment claims to prevent; the guard fails
+# because one half is source-scoped and the other is ability-scoped.
+#
+# LIVE WITNESS (deck152 vs116, seq17 t8 and identically at s19/23/25/28/30):
+# five untapped sources reading "colours you can make: {g}{u}{w}" - four
+# Deserted Beach ({T}:add{W} THEN {T}:add{U}) plus Barkchannel Pathway - with
+# Teferi, Who Slows the Sunset {2}{U}{W} in hand.  "Cast Teferi" appears ZERO
+# times in the entire game log.  Teferi's real name carries a comma, which the
+# fixture zone parser splits on, so this fixture reproduces the SHAPE (all
+# coloured pips on flexible duals only) with comma-free cards.
+#
+# POST-FIX competesElsewhere aggregates over ALL abilities of the candidate
+# other-source, symmetric with the self test: Scrubland#2 is seen to also make
+# the other still-needed colour, so it is NOT counted as a dedicated substitute,
+# otherUnusedCoversK stays false, and Scrubland#1 takes the pip.  The change is
+# strictly LESS deferral, so it cannot resurrect the over-offer shape - and the
+# N-146a case it was written for is untouched, because a genuine MONO source has
+# only one ability and aggregating over it changes nothing.
+#
+# PAIRED NEGATIVE GUARD: dual_land_multipip_not_offered_n152c.txt uses this SAME
+# board with {2}{B}{B} (CMC 4 over 3 sources) and must stay red-listed, i.e. the
+# spell must remain in hand.  That is the discriminator against the wrong fix
+# (routing the cast path onto potentialManaPermissive, which double-counts each
+# dual's abilities).
+#
+# Blood-Cursed Knight's two aslongas(enchantment) statics never fire here - no
+# enchantment on either side - so it behaves as a vanilla 3/2.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Scrubland,Scrubland,Darksteel Citadel
+hand:Blood-Cursed Knight
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Scrubland,Scrubland,Darksteel Citadel,Blood-Cursed Knight
+hand:
+[PLAYER2]
+life:20
+[END]

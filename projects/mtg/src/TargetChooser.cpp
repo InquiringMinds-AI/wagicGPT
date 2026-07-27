@@ -1068,10 +1068,27 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
                     //card is multicolored?
                     if (minus)
                     {
+                        //`-multicolor` asks ONE question: does this card have
+                        //fewer than two of the five real colours? It must say
+                        //nothing about artifact-ness or land-ness. The former
+                        //implementation added two SetExclusionColor calls here,
+                        //and both were colour-INDEX arguments that resolve to
+                        //TYPE bits: index 0 (MTG_COLOR_ARTIFACT) is
+                        //kColorBitMask_Artifact, and index 6 (MTG_COLOR_WASTE)
+                        //SHARES kColorBitMask_Land with MTG_COLOR_LAND (see
+                        //CardPrimitive::ConvertColorToBitMask, whose own comment
+                        //says that bit only drives the card quad and symbol).
+                        //MTGDeck stamps those two bits on every artifact and
+                        //every land as a deck-editor legacy, and match_and/
+                        //match_or reject on ANY intersection - so the predicate
+                        //rejected EVERY artifact and EVERY land whatever its
+                        //real colour. Vanishing Verse could never target a
+                        //monocolored artifact creature or a green Dryad Arbor
+                        //(N-146j; deck146 lost a game holding three Verses).
+                        //Colourlessness is a SEPARATE question - a card that
+                        //wants "monocolored" writes `-multicolor;-colorless`,
+                        //the idiom Ultimate Price and Sultai Charm already use.
                         cd->setisMultiColored(-1);
-                        cd->SetExclusionColor(0);//not multicolored is monocolored not colorless, use iscolorless attribute
-                        cd->SetExclusionColor(6);//restriction... green, red, blue, black or white colored only
-                        cd->mode = CardDescriptor::CD_OR;
                     }
                     else
                     {

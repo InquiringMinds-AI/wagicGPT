@@ -532,14 +532,23 @@ MTGCardInstance * CardDescriptor::match(MTGCardInstance * card)
         match = NULL;
     }
 
-    if ((CDnocolor == -1 && card->getColor() == 0))
+    //countColors() masks to the FIVE real colours; getColor() walks colour
+    //indices 1..NB_Colors and so returns MTG_COLOR_WASTE (6) for any land,
+    //because WASTE and LAND share kColorBitMask_Land and MTGDeck stamps that
+    //bit on every land as a deck-editor legacy. Asking getColor() "is this
+    //colourless?" therefore answered NO for every land, including a plain
+    //Plains. That made `-colorless` unable to keep colourless lands out of a
+    //"monocolored" predicate - the land half of N-146j. A land with no colour
+    //indicator IS colourless (CR 202.2/105.2), so both directions read the
+    //real colour count now.
+    if ((CDnocolor == -1 && card->countColors() == 0))
     {
         match = NULL;
     }
     else if(CDnocolor == 1)
     {
         if(!card->has(Constants::DEVOID))
-            if(card->getColor()>0)
+            if(card->countColors() > 0)
                 match = NULL;
     }
 

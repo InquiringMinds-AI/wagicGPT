@@ -1,0 +1,67 @@
+# Wave-33 N-146j GOLD COUNTERFACTUAL, LAND HALF. `[-multicolor]` must NOT exclude
+# lands - it must reject only the actual colour count.
+#
+# The pre-fix predicate excluded MTG_COLOR_WASTE, which SHARES kColorBitMask_Land
+# with MTG_COLOR_LAND (CardPrimitive.cpp ConvertColorToBitMask, whose own comment
+# says the shared bit "dictates the color of the quad ... nothing more"), so every
+# land was rejected regardless of colour.  Corpus evidence: no land appears in any
+# Vanishing Verse target list across all 21 games of the wave-32 corpus.
+#
+# Dryad Arbor is the discriminating card: `color=green`, `type=Land Creature`,
+# `subtype=Forest Dryad`.  Scryfall Oracle confirms it - "Dryad Arbor is green."
+# It is a MONOCOLORED permanent that happens to be a land, so Vanishing Verse
+# ("Exile target monocolored permanent") may legally exile it.
+#
+# PRE-FIX: no legal target -> the Verse is filtered out of the cast menu by the
+# 601.2c mandatory-target rule and stays in hand; PLAYER2 keeps Dryad Arbor.
+# POST-FIX: Dryad Arbor is monocolored and not colourless -> legal -> exiled.
+#
+# The colourless-land control is carried by the two fixtures' PLAYER1 boards:
+# Scrubland and Vault of Whispers are colourless permanents and must survive in
+# every one of these fixtures - the `-colorless` qualifier added to the Vanishing
+# Verse primitive is what keeps them out of the target set, and it only works
+# because CardDescriptor's colourless test now counts REAL colours instead of
+# calling getColor(), which returned MTG_COLOR_WASTE for any land and so declared
+# every land "coloured".
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Scrubland,Vault of Whispers
+hand:Vanishing Verse
+[PLAYER2]
+inplay:Dryad Arbor
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Scrubland,Vault of Whispers
+graveyard:Vanishing Verse
+hand:
+[PLAYER2]
+exile:Dryad Arbor
+life:20
+[END]

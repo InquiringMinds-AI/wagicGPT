@@ -106,6 +106,35 @@ namespace
         return n > 0 ? n : 0;
     }
 
+    //Can this SOURCE CARD, across EVERY usable mana ability printed on it,
+    //still supply a color this cost needs OTHER than k? Both halves of the
+    //deferral test below ask exactly this question, so both must ask it of the
+    //whole CARD. Asking it of a single ability is what deadlocked N-152f: a
+    //dual scripted as two separate single-color abilities answers "no" through
+    //whichever ability the caller happens to be holding, and so looks dedicated
+    //to one color when the card is nothing of the kind.
+    bool cardCoversOtherNeededColor(Player * p, ManaEngine::ManaPolicy & policy,
+                                    ManaCost * cost, ManaCost * result,
+                                    MTGCardInstance * sourceCard, int k)
+    {
+        ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+        for (size_t i = 0; i < al->manaObjects.size(); i++)
+        {
+            AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility*) al->manaObjects[i]);
+            if (!amp || amp->source != sourceCard)
+                continue;
+            if (!policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true))
+                continue;
+            if (amp->output->getConvertedCost() < 1)
+                continue;
+            for (int c = 1; c < Constants::NB_Colors; c++)
+                if (c != k && cost->hasColor(c) && amp->output->hasColor(c)
+                    && result->getCost(c) < cost->getCost(c))
+                    return true;
+        }
+        return false;
+    }
+
     //Greedy colored-pip assignment defers a FLEXIBLE source. A source that can
     //also pay a DIFFERENT still-needed color must not be spent on color k when
     //another (as-yet-unused) source can cover k instead. Without this, a dual
@@ -124,7 +153,11 @@ namespace
                              MTGCardInstance * card, int k)
     {
         ActionLayer * al = p->getObserver()->mLayers->actionLayer();
-        bool sourceHasOtherNeeded = false;
+        //SELF test: this source can also pay a different still-needed color, so
+        //spending it on k might be the wrong use of it.
+        bool sourceHasOtherNeeded = cardCoversOtherNeededColor(p, policy, cost, result, card, k);
+        if (!sourceHasOtherNeeded)
+            return false;
         bool otherUnusedCoversK = false;
         for (size_t i = 0; i < al->manaObjects.size(); i++)
         {
@@ -134,25 +167,31 @@ namespace
             if (amp->output->getConvertedCost() < 1)
                 continue;
             if (amp->source == card)
-            {
-                for (int c = 1; c < Constants::NB_Colors; c++)
-                    if (c != k && cost->hasColor(c) && amp->output->hasColor(c)
-                        && result->getCost(c) < cost->getCost(c))
-                        sourceHasOtherNeeded = true;
-            }
-            else if (!used[amp->source] && amp->output->hasColor(k))
+                continue;
+            if (!used[amp->source] && amp->output->hasColor(k))
             {
                 //Only rely on the other source for k if it is DEDICATED to k for
                 //this cost - it must NOT itself produce another still-needed
                 //color. Otherwise two flexible sources could MUTUALLY defer and
                 //strand the payment (two {W}/{B} duals paying {B}{W} must not
                 //both defer: one takes B, the other W).
-                bool competesElsewhere = false;
-                for (int c = 1; c < Constants::NB_Colors; c++)
-                    if (c != k && cost->hasColor(c) && amp->output->hasColor(c)
-                        && result->getCost(c) < cost->getCost(c))
-                        competesElsewhere = true;
-                if (!competesElsewhere)
+                //
+                //N-152f: this used to be judged on amp->output alone, i.e. on
+                //the ONE ability the loop was holding, while the self test above
+                //was judged over the whole card. On an all-flexible manabase the
+                //asymmetry inverted the guard into the very deadlock it was
+                //written to prevent: four Deserted Beach ({T}:add{W} THEN
+                //{T}:add{U}) reached through their add{W} ability each reported
+                //hasColor(U) == false, were each judged "dedicated to W", and so
+                //every Beach deferred every pip to every other Beach. Nothing
+                //claimed a pip, the walk returned empty, and Teferi {2}{U}{W}
+                //was never offered across six windows (deck152 vs116, s17-s30).
+                //Judging the whole CARD makes the two halves symmetric. It is
+                //strictly LESS deferral, so it cannot resurrect the over-offer
+                //shape, and it leaves the N-146a case that motivated deferral
+                //untouched - a genuine mono source has one ability, and
+                //aggregating over one ability changes nothing.
+                if (!cardCoversOtherNeededColor(p, policy, cost, result, amp->source, k))
                     otherUnusedCoversK = true;
             }
         }

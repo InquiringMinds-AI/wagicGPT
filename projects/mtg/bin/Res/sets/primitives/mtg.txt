@@ -28064,8 +28064,8 @@ toughness=2
 [card]
 name=Defiler of Souls
 abilities=flying
-auto=@each opponent upkeep:ability$!name(sacrifice monocolored creature) notaTarget(creature[-multicolor]|mybattlefield) sacrifice !$ opponent
-auto=@each my upkeep:notaTarget(creature[-multicolor]|mybattlefield) sacrifice
+auto=@each opponent upkeep:ability$!name(sacrifice monocolored creature) notaTarget(creature[-multicolor;-colorless]|mybattlefield) sacrifice !$ opponent
+auto=@each my upkeep:notaTarget(creature[-multicolor;-colorless]|mybattlefield) sacrifice
 text=Flying -- At the beginning of each player's upkeep, that player sacrifices a monocolored creature.
 mana={3}{B}{B}{R}
 type=Creature
