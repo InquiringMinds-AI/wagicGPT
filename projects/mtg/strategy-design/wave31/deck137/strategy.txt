@@ -1,0 +1,113 @@
+SELESNYA (GW) ADVENTURES -- go-wide beatdown. You win by curving out cheap creatures,
+drawing extra cards off Edgewall Innkeeper, flooding the board with 1/1 lifelink Soldiers
+(Emmara, Trostani, March, Castle), pumping them (Trostani, Venerated Loxodon, Unbreakable
+Formation, Flourish), and swinging for the win around turn 6-8. You are the BEATDOWN.
+Deploy a creature and ATTACK every turn. Your losses come from being too SLOW -- develop your
+board fast and press damage; do not durdle on setup while an aggressive opponent races you.
+
+ADVENTURE CARDS SHOW TWO CAST OPTIONS. Five of your cards are adventures (Faerie Guidemother,
+Giant Killer, Lovestruck Beast, Shepherd of the Flock, Flaxen Intruder). Each appears TWICE:
+  "Cast NAME // ADV {base cost} (P/T)"                    = the CREATURE (a real body on board)
+  "Cast NAME // ADV with its adventure cost {..} {adventure spell: ...}" = the SPELL (its listed
+     effect happens, then the card is EXILED so you may cast the creature LATER from exile)
+The option line now TELLS you exactly what the adventure spell does (the {adventure spell: ...}
+text) and the creature face shows its (P/T). Read them and pick the one you want.
+DEFAULT: cast the CREATURE face (a body + an Innkeeper draw). Cast the adventure SPELL face only
+when you want its effect right now. Per-face strategy:
+  Faerie Guidemother = a 1/1 flyer, OR Gift of the Fae {1}{W}: +2/+1 & flying to a creature until
+    end of turn -- a combat/evasion trick, use it to push lethal.
+  Giant Killer = a 1/2 tapper, OR Chop Down {2}{W}: destroy a creature with power 4+ -- your removal
+    for the opponent's big threats.
+  Lovestruck Beast = a 5/5 that CANNOT ATTACK unless you control a 1/1 creature, OR Heart's Desire
+    {G}: make a 1/1 white Human -- cast Heart's Desire to UNLOCK Lovestruck (or as a chump/body).
+  Shepherd of the Flock = a 3/1, OR Usher to Safety {W}: return a permanent YOU control to hand --
+    cast Usher ONLY to save your own creature from removal or re-use an ETB; NEVER just "for a body,"
+    it bounces your own board for nothing.
+  Flaxen Intruder = a 1/2, OR Welcome Home {5}{G}{G}: three 2/2 Bears (7 mana, rarely castable).
+
+AN ADVENTURE CREATURE ON YOUR BATTLEFIELD IS A REAL BODY OF ITS PRINTED (P/T). When you see a
+creature on your battlefield tagged [adventure] with a (1/1) or (1/2) -- e.g.
+"Faerie Guidemother // Gift of the Fae (1/1) [flying, adventure]" -- that IS a live 1/1 creature.
+The [adventure] tag only means the card is an adventure card; it does NOT mean it is "just a
+face" or "not a real creature." It counts as a 1/1 for EVERYTHING: it satisfies Lovestruck
+Beast's "you control a 1/1" requirement, it can attack and block, and it can tap for convoke.
+Do not talk yourself out of a play by claiming a battlefield adventure creature "is not a real
+1/1 body" -- it is exactly the body its (P/T) shows.
+
+EDGEWALL INNKEEPER DRAW ENGINE. While Edgewall Innkeeper (1/1) is on your battlefield, casting
+any adventure CREATURE (the five above) DRAWS YOU A CARD. Casting the adventure SPELL face does
+NOT draw. Innkeeper is your card advantage -- deploy it turn 1-2 the moment you can and keep it
+alive; then cast adventure creatures for the free cards.
+
+CONVOKE CARDS -- Venerated Loxodon and March of the Multitudes. Convoke lets you TAP your
+creatures to help pay. You are often offered TWO cast options: the PLAIN cast (full mana cost,
+e.g. "Cast Venerated Loxodon {4}{W}") and the convoke cast ("Cast X with its convoke cost").
+  Venerated Loxodon {4}{W} = a 4/4 that puts a +1/+1 counter on EACH creature that helped convoke
+    it. EITHER cast works reliably -- pick whichever fits the turn. Prefer the PLAIN cast when you
+    have the mana AND want your creatures left UNTAPPED to attack or block this turn; use the
+    convoke cast when you are short of mana or when tapping the team for a bigger pump is worth it.
+    Cast it every turn you can afford it -- it adds a body and grows the team.
+  March of the Multitudes {G}{W}{W}{X} = make X 1/1 white lifelink Soldiers, a great go-wide +
+    lifegain play. X is whatever mana you have LEFT AFTER paying the {G}{W}{W} base -- and at X=0
+    it makes ZERO Soldiers and is a wasted card. Only cast March when you can pay X of at least 2-3
+    (real mana and/or convoke creatures BEYOND the base cost); with just a couple of lands and one
+    or two creatures you cannot afford a worthwhile X -- deploy a creature instead and save March
+    for a turn your board is wide. Convoke lets tapped creatures pay part of X too, so a wide board
+    makes a BIG March. Tapping Emmara for convoke also triggers her free 1/1 lifelink Soldier.
+  Note: creatures you tap to convoke are TAPPED and cannot attack or block THIS turn -- convoke on a
+  turn you are pressing damage or need blockers only if the new board is worth the tapped bodies.
+IMPORTANT -- DO NOT RE-PICK A CAST THAT DID NOT RESOLVE. If you pick a spell and the SAME card is
+STILL IN YOUR HAND on your next decision this turn, you have ALREADY committed that play -- do NOT
+keep re-picking it. Deploy a cheaper creature, attack, or move on; re-casting the same spell over
+and over burns the whole turn while the opponent races you. One attempt per card per turn, then act.
+
+ATTACK EVERY TURN -- per-attacker test over the offered A-list. A creature ATTACKS if ANY of:
+no untapped blocker can kill it / it kills or trades up / the opponent has no untapped creatures.
+When the opponent has no untapped blocker, SWING WITH EVERYONE -- a 1/1 or 1/2 to the face is
+real progress. Declare "no attackers" ONLY when every listed attacker would die for zero gain.
+Do not spiral: pick the attackers and commit. EXCLUSION: the offered A-list already drops
+ineligible creatures. TRUST IT BOTH WAYS: if Lovestruck Beast is MISSING it is because you
+control no 1/1 (make a Human -- Heart's Desire / Castle Ardenvale -- to unlock it); if Lovestruck
+Beast IS listed, the engine has ALREADY confirmed you control a 1/1, so its condition is met --
+SWING it, do not re-derive the 1/1 rule or convince yourself it is ineligible and pass. A 5/5
+into an opponent with only a small blocker or a defender kills or trades up -- send it.
+
+BLOCKING -- read this before you panic under a big attack. Each of YOUR blockers may block AT MOST
+ONE attacker (you CANNOT pile one creature onto several attackers); several of your creatures may
+gang-block the same attacker. Answer with the offered B-to-A assignments and commit -- do not
+re-derive the rules. THE OFFERED B-LIST IS AUTHORITATIVE: any creature shown as a blocker (a
+B-line) is UNTAPPED and can block THIS turn -- even if the game log says it attacked earlier, or you
+control another creature of the SAME NAME that is tapped. The B-line points at the specific untapped
+copy; take the block it offers (especially a "you kill it, your blocker lives" block -- that is free
+removal). Do NOT talk yourself out of an offered block by re-deriving a creature's tapped state from
+the log. When you are facing LETHAL (their total attacking power >= your life): you do
+not have to block everything, only enough to survive. Block to bring the damage through BELOW your
+life total -- use your biggest creature to block-and-kill (it survives if its toughness beats their
+power), and chump the rest with your smallest, most expendable bodies (1/1 Soldiers/Humans). Save
+Lovestruck Beast and your real threats by having them block-to-kill rather than chump. If you have
+Unbreakable Formation and mana, casting it (indestructible) before damage saves every blocker.
+
+ROLE CHECK (rerun every turn on your life totals). Default = beatdown. If YOUR life is falling
+while theirs is not (a fast aggro race -- e.g. mono-red), switch to LIFELINK STABILIZE: make
+1/1 lifelink Soldiers (Emmara taps for one, Trostani makes two on entry, March makes X), block
+with them and gain life. Do this EARLY -- most of your losses are races you tried to stabilize one
+turn too late. When you are stabilizing (behind on the race), STOP feeding your small bodies into
+the attack: hold Edgewall Innkeeper (your draw engine) and your 1/1s BACK as blockers -- a 1-power
+swing that gives up a blocker is a bad trade when you are the one who dies first. Reserve Flourish/
+Unbreakable Formation for a defensive turn (blockers survive, lifelink Soldiers live to gain more)
+rather than an all-in swing you cannot afford. You STILL cast a creature every turn in both roles
+-- never go passive; in stabilize mode that creature is a blocker, not an attacker.
+
+PUMP AND CLOSE. Trostani Discordant gives your other creatures +1/+1 (an anthem -- cast it to
+grow the whole team). Unbreakable Formation cast in your MAIN phase gives every creature a
++1/+1 counter, vigilance, AND indestructible until end of turn -- cast it before your alpha
+strike, or in response to a board wipe to save your team. Flourish (Flower's back face,
+{4}{G}{W}) gives all your creatures +2/+2 until end of turn. Before a lethal swing, TRUST the
+printed [X/Y] on each creature -- it already includes anthems and counters; do not recompute
+power from base stats.
+
+MULLIGAN: keep 2-4 lands with green AND white reachable (Temple Garden, Once Upon a Time, and
+Flower all fix). Once Upon a Time is FREE if it is your first spell of the game -- cast it turn 1
+to dig for lands and creatures. Note: Temple Garden asks "pay 2 life" or "tap" as it enters --
+pay the 2 life to have it enter untapped when you want a play THIS turn; let it enter tapped only
+if you have no turn-1/2 use for the mana.

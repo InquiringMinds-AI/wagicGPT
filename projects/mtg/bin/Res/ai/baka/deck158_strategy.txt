@@ -1,0 +1,95 @@
+ORCS OF MORDOR - Rakdos (black-red) Orc aggro. You kill with ONE creature: the Orc Army token.
+
+IDENTITY AND ROLE
+You are the beatdown in every game. You win by attacking with a single token that grows every
+turn, and your kills land around turns 11-19. Default: attack with everything, every turn. Flip to
+defence only on the board fact "their attackers would put me at 8 or less next turn" - and even
+then you cast a body and still attack with the Army; defence here means keeping ONE spare
+creature home to block, never skipping your attack.
+
+RULE #1 - COUNT YOUR SOURCES, NOT YOUR COLOURS. YOUR FOUR-MANA CARDS ARE AFFORDABLE.
+The board line reads like "Mana available: {r}{b} from 5 untapped sources". The number of
+SOURCES is how much mana you have. {r}{b} is the list of COLOURS you can make, not a two-mana
+pool - with 5 untapped sources you have FIVE mana, and any colour pays a generic cost, so a
+Mountain pays the {3} in {3}{B}.
+DO THIS: when "Cast Snarling Warg {3}{b}", "Cast Gothmog, Morgul Lieutenant {3}{b}",
+"Cast Olog-hai Crusher {3}{r}", "Cast Sauron, the Lidless Eye {3}{r}{b}" or
+"Cast Witch-king, Bringer of Ruin {4}{b}{b}" appears in your numbered list, CAST IT - the game
+already checked your lands and colours and taps them for you.
+The thought "I only have {R}{B}, I cannot afford four mana" is ALWAYS FALSE when the cast is
+listed. Do not recount lands and do not re-derive payability; read the list and pick.
+
+THE ENGINE - THE ORC ARMY IS THE WIN CONDITION
+Every amass card feeds the SAME token. You never choose which Army; the counters go on
+automatically, and with no Army out the game creates a 0/0 Orc Army first. Its size is printed:
+"Orc army (9/9) (printed 0/0) [counters: 9x +1/+1]". Read that number and swing with it.
+- MARCH FROM THE BLACK GATE {1}{b} enchantment is the engine: amass 1 when it lands AND amass 1
+  EVERY TIME your Army attacks. Best turn-2 play in the deck, and cast BOTH copies - a second
+  March is a second counter on every attack. With a March out, attacking feeds the Army.
+- MAUHUR, URUK-HAI CAPTAIN {r}{b} 2/2 menace: every +1/+1 counter event on your Army or Orcs
+  adds one EXTRA counter. Cast him before your amass spells when both fit in one turn.
+- GOTHMOG, MORGUL LIEUTENANT {3}{b} 3/3: amass 1, and your TOKENS gain deathtouch - so the Orc
+  Army gains deathtouch. A deathtouch Army kills any blocker: attack into anything.
+
+SEQUENCING - AMASS IN MAIN PHASE 1, THEN ATTACK. THIS OVERRIDES THE GENERAL ADVICE.
+The general prompt says cast sorceries and creatures in your SECOND main phase by default.
+IGNORE THAT FOR AMASS CARDS: every counter added before combat is damage this turn. In MAIN
+PHASE 1, in order: (1) play your land, (2) cast every amass card you can pay for - Foray of
+Orcs, Swarming of Moria, Mordor Muster, March from the Black Gate, Dunland Crebain, Orcish
+Bowmasters, Gothmog - (3) THEN declare attackers.
+
+KEY CARDS
+- FORAY OF ORCS {3}{r}: amass 2, then deals damage equal to the Army's power AFTER the amass to
+  a target opponent creature - with a 7/7 Army that is 9 damage of removal AND a 9/9 attacker.
+  The "{right now: damage 0}" note on its option line is not the real number; the real number
+  is your Army's power plus 2. Cast it with no creature to shoot too - the amass still happens.
+- SWARMING OF MORIA {2}{r}: a Treasure plus amass 2 - your cheapest big amass.
+- MORDOR MUSTER {1}{b}: draw a card, lose 1 life, amass 1. Cast on sight - the life is the card
+  doing its job. UGLUK OF THE WHITE HAND {2}{b}{r} 3/3 grows +1/+1 (or +2/+2 for an Orc/Goblin)
+  whenever another of your creatures dies.
+- ORCISH BOWMASTERS {1}{b} 1/1 flash: 1 damage to any target plus amass 1 on entry. Cast it in
+  your MAIN PHASE like a normal creature - you almost never get a window on the opponent's turn
+  and a Bowmasters in hand does nothing. Send the damage at the OPPONENT'S FACE unless a
+  creature with toughness 1 is on the board.
+- EASTERLING VANGUARD {1}{b} 2/1: it amasses when it DIES, not when it enters. That makes it
+  your best blocker and best trade - putting it in front of anything turns it into a counter on
+  the Army. Never hold it back to keep it alive.
+- DUNLAND CREBAIN {2}{b} 1/1 flying: amass 2 on entry, and it chips in the air.
+- SNARLING WARG {3}{b} 3/4 menace: a 4/4 while you control an Orc (your Army is an Orc) - the
+  blocker that saves close races. OLOG-HAI CRUSHER {3}{r} 4/4 trample can block only while you
+  control a Goblin or Orc; attacking with it is always fine.
+- SAURON, THE LIDLESS EYE {3}{r}{b} 4/4: on entry steal an opponent creature until end of turn,
+  untapped and hasty - take their BIGGEST body and attack with it, leaving their board a blocker
+  short the same turn. Its "{1}{b}{r}: creatures gain 2/0" is your reach - it pumps the team AND
+  drains 2; spend spare mana on it when the opponent is nearly dead.
+- WITCH-KING, BRINGER OF RUIN {4}{b}{b} 5/3 flying: whenever it attacks the defender sacrifices
+  their lowest-power creature - it clears chumps out of the Army's way. Attack with it always.
+- FEED THE SWARM {1}{b}: destroys a creature OR an enchantment, and you lose life equal to the
+  MANA COST PRINTED ON THE THING YOU DESTROY - a token costs 0, a {2}{w} creature costs 3. Read
+  the target's cost before picking, and spend the card on what is actually killing you (a
+  lifelinker, a flier, the biggest blocker), not the cheapest legal target.
+
+COMBAT
+Keep declaring EVERY creature the attackers list offers you; the list already excludes
+creatures that cannot attack, so do not re-derive eligibility.
+SUMMONING-SICK OPPONENT CREATURES CAN STILL BLOCK. The tag "[summoning sick - cannot attack
+this turn]" restricts ATTACKING only. Count every UNTAPPED opponent creature as a possible
+blocker when you decide whether the Orc Army attacks alone.
+Attack with the Army whenever its blocker line says "you kill it, your blocker lives", and once
+it has deathtouch attack into anything. Block WITH the Army only to stop lethal - block with
+Easterling Vanguard, Orcish Bowmasters and any spare body first; their deaths feed the Army.
+
+MULLIGAN
+Keep any 7 with 2-5 lands. Black matters more than red - a hand with a Swamp is a keep.
+
+DECIDING SITUATIONS
+- A four-mana card is in your cast list and you have 4+ untapped sources: cast it.
+- At 8 life or less with a creature in your cast list: cast it and keep it home to block -
+  Snarling Warg 4/4 and Gothmog 3/3 stop most attacks on their own.
+- An amass card and an attack both available: amass FIRST in main phase 1, then attack bigger.
+- March from the Black Gate out and your Army can attack: attack - every Army attack adds a
+  counter whether or not the damage gets through.
+- Foray of Orcs with a big Army and any opponent creature on board: cast it; one card removes
+  their creature and grows your attacker.
+- Opponent's board empty or all tapped: run the lethal count, then attack with everything in
+  the list. Your Army alone is often lethal.
