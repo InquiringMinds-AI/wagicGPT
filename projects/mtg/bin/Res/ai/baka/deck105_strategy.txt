@@ -1,0 +1,101 @@
+INFECTED WOUNDS - BG INFECT (poison kill)
+
+YOU DO NOT KILL WITH LIFE. Every creature here has INFECT: its combat damage puts POISON
+COUNTERS on the opponent instead of reducing their life. 10 poison counters and they LOSE, at
+any life total. The general prompt's "you win by reducing the opponent's life from 20 to 0"
+DOES NOT APPLY TO THIS DECK - ignore it. Their life is not your target and their lifegain does
+nothing to you. You need TEN points of unblocked attack damage, total, ever. Every turn: add an
+infect body and swing with everything.
+
+== #1 RULE - AT THE BLOCKERS SEAM, YOUR CREATURES ARE THE CLOCK, NOT THE DEFENCE ==
+Every infect creature you lose blocking is poison you will never deal. Your life is a 20-point
+resource you are SPENDING; your creatures are the only thing that wins.
+At every "declare blockers" ask, read the engine's own line - "Your life: 20. Unblocked, these
+attackers deal up to 5 - you would be at 15 - NOT lethal". That "you would be at N" number is
+accurate for what your opponents do to you. One step:
+  * N is 9 or more -> answer "BLOCKS: none". Take it all; every body stays alive and untapped
+    for your attack.
+  * N is 8 or less, or the line says LETHAL -> block now: chump or trade with your SMALLEST
+    bodies, as many as it takes to survive the turn.
+Skithiryx and Putrefax are attackers only - never name them as blockers at any life total.
+The thought "blocking to remove a big threat is good" is FALSE here while you are at 9 or more
+life: killing their creature advances your clock by zero counters and costs you a body that
+would have advanced it. Their board only matters when it is about to kill you, and that line
+tells you when.
+
+== THE CLOCK - COUNT THE POISON ONCE, THEN STOP ==
+The board does not print the poison count. Work it out ONCE, in ONE clause, then move on:
+  OPPONENT'S POISON = every "Damage: N dealt by <one of YOUR creatures> to the opponent" line
+  in the GAME LOG, added up, + 1 for each of your Ichor Rats that entered the battlefield.
+  (A "Damage" line with no "Opponent's life -N" beside it is poison, not life.)
+Say "they are on 7 poison, 3 to go" and stop. Do not re-check it, do not reconcile it with
+their life total, and do not decide your count is wrong because their life is still 20 - THEIR
+LIFE STAYING AT 20 IS WHAT INFECT LOOKS LIKE WORKING. If the arithmetic is ever unclear, assume
+you are CLOSER than you think and attack with everything; that is the right play at any count.
+
+Standing loop, every one of your turns, in order:
+ 1. Play a land if a "Play <land>" option is listed.
+ 2. Cast the biggest infect creature the Cast list offers. If a Cast option is listed the engine
+    has already checked you can pay it - take it, do not recount your lands. Cast two if the
+    mana allows, before combat.
+ 3. Attack with every creature listed under "Your creatures that can attack" - that list is
+    already the eligible set, summoning-sick bodies are dropped for you. "ATTACK: none" only
+    when the list is empty.
+ 4. Mana left at end of turn is wasted. Spend it on step 2.
+
+== YOUR CARDS ==
+Plague Stinger {1}{B} 1/1 flying - unblockable unless they have a flyer or reach; 1 poison a
+  turn, all game. Your most reliable counter.
+Blight Mamba {1}{G} 1/1 - {1}{G}: Regenerate. Pay it rather than let it die in combat.
+Necropede {2} 1/1 artifact - when it dies you MAY put a -1/-1 counter on target creature: point
+  it at one of THEIRS, never your own.
+Ichorclaw Myr {2} 1/1 artifact - gets +2/+2 whenever it becomes BLOCKED, so it attacks as a
+  1/1 and becomes a 3/3 the moment they block it - it kills the blocker instead of dying.
+  Always attack with it; blocking it is bad for them.
+Contagious Nim {2}{B} 2/2 - 2 poison a swing. Cystbearer {2}{G} 2/3 - 2 poison, hardest of the
+  cheap bodies to kill.
+Ichor Rats {1}{B}{B} 2/1 - on entry EACH player gets a poison counter, you included. Cast it
+  anyway: +1 on them now plus 2 a turn beats 1 on you, and only you are racing to 10. Neither
+  counter is announced in the log - add both by hand.
+Tel-Jilad Fallen {2}{G}{G} 3/1, protection from artifacts - 3 poison a swing, and no artifact
+  creature can block it. Your best body against an artifact deck.
+Blackcleave Goblin {3}{B} 2/1 HASTE - attacks for 2 the turn you cast it.
+Corpse Cur {4} 2/2 - on entry you MAY return an infect creature from your graveyard to hand.
+  Always take it; take the HIGHEST POWER one offered.
+Skithiryx, the Blight Dragon {3}{B}{B} 4/4 flying - 4 of your 10 counters in one swing, and
+  almost nothing blocks a flyer. {B}: gains haste until end of turn, so on the turn you cast it,
+  if you have one more black mana, PAY IT AND ATTACK THAT TURN. {B}{B}: regenerate - pay it
+  rather than lose it. Skithiryx alive for two more turns is the game.
+Putrefax {3}{G}{G} 5/3 trample haste - it is SACRIFICED at the beginning of the end step, so it
+  exists for exactly one attack. Cast it and attack with it the SAME TURN, always: 5 poison is
+  half the game and trample means a chump block barely slows it.
+Hand of the Praetors {3}{B} 3/2 - your other infect creatures get +1/+1 (every attacker deals
+  one more poison), AND whenever you CAST an infect creature spell target player gets a poison
+  counter: point that at the OPPONENT every time. Cast it the turn you can, then keep casting
+  creatures. If it is not in your hand, nothing above changes.
+Relic Putrescence {2}{B} - enchant an ARTIFACT; when that artifact becomes tapped its controller
+  gets a poison counter. Put it on an OPPONENT'S artifact, preferring one that taps every turn
+  (a mana artifact or an artifact land). If the only legal targets are your own artifacts, cast
+  a creature instead - do not agonise.
+
+== MULLIGAN ==
+Your cheapest card costs TWO mana; this deck has no 1-drops at all, so "no one-drop" is never a
+reason to mulligan - you will never find one.
+KEEP any hand with 2, 3 or 4 lands and at least one creature. Every creature in the deck is a
+threat, so any creature counts. Mulligan only 0-1 lands, or 5+ lands, or no creature at all.
+AT MOST TWO MULLIGANS, then KEEP the best hand you are shown.
+Bottoming on a keep: bottom LANDS first - there are 35 in the deck and you will draw more. Keep
+every creature.
+
+== SITUATIONS THAT DECIDE THESE GAMES ==
+* At 20 life, they swing for 5 with one big creature -> "BLOCKS: none"; every body stays home
+  untapped and attacks on your turn.
+* At 12 life, the line says "you would be at 6 - NOT lethal" -> BLOCK; chump with your smallest
+  bodies until you survive. Below 9 life you need the turns.
+* You cast Skithiryx with one black mana left -> pay {B} for haste and attack for 4 now.
+* Putrefax is castable -> cast it and attack with it this turn; there is no next turn for it.
+* Corpse Cur enters with infect creatures in your graveyard -> take the return, biggest power.
+* Their life is going UP, they are on 23 -> nothing changed. Keep attacking; life is not the
+  number you are moving.
+* You are on 3 life and they are on 8 poison -> attack with everything. You win by landing two
+  more counters, not by holding a blocker back.

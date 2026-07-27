@@ -77,3 +77,19 @@ Notes for the fix agent:
 `setExtraCostsAction` seam on a convoke pick; the deck198 probe pair spec (recreate
 from this file + wave31/deck137/findings.md §8) is the validation instrument. Convoke
 arc remains OPEN; deck137 stays rotated out.
+
+---
+
+# Addendum 2 (post-corpus adjudication): N-139m RE-SCOPED to the fixture-harness path
+
+The wave-32 corpus (binary 7fabd9bd0) live-arrival-traced **6/6 Pollywog-present mutate
+casts**: discounted cost paid, loot fired, `[mutated pile]` arrived (deck139 seat review,
+incl. Snapdax +4 life and Illuna reveal resolving). The three failing fixtures re-run on
+7fabd9bd0 STILL FAIL identically. Therefore the card-loss reproduces ONLY under the
+scripted test-harness click path, not in live AI/GPT games — the live-severity HIGH is
+withdrawn; the item re-scopes to the HARNESS lane (hypothesis: the script pump's
+handling of the loot's mid-cast discard chooser diverges from live menu flow — kin to
+the known scripted-fixture menu-arming landmines). deck139's exit is NO LONGER gated on
+it (see the wave-32 seat review's gate table: discounted-mutate-arrival-traced-live is
+MET). The five fixtures stay preserved with their STATUS headers as the harness-lane
+reproducer.

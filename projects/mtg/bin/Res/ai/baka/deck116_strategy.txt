@@ -1,0 +1,121 @@
+TIME OF NEED - Simic (green-blue) CHEAT-INTO-PLAY. You win by putting a giant creature onto the
+battlefield WITHOUT casting it, then attacking with it.
+
+IDENTITY AND ROLE
+Your deck has two halves and they are useless apart. The ENABLERS (Elvish Piper, Quicksilver
+Amulet) put creatures onto the battlefield from your hand for almost no mana. The PAYOFFS
+(Kozilek, Ulamog, Emrakul, Sheoldred, Jin-Gitaxias) are far too expensive to ever cast. Your job
+every game is: get an enabler onto the battlefield, keep it alive, then dump a monster with it and
+swing. Everything else in the deck exists to buy the turns that takes.
+
+RULE #1 - THE FIVE LEGENDS CAN NEVER BE CAST. THEY ARE CHEAT-ONLY CARDS.
+Kozilek {10}, Ulamog {11}, Emrakul {15}, Jin-Gitaxias {8}{U}{U}, Sheoldred {5}{B}{B}.
+You have 24 lands and no rituals. You will never reach ten mana, and you have NO black source at
+all, so Sheoldred is literally uncastable. A legend in your hand does NOTHING until Elvish Piper
+or Quicksilver Amulet is on the battlefield.
+THE FORBIDDEN THOUGHT: "I will ramp toward casting Ulamog / Kozilek / Emrakul next turn." That
+plan never completes. Playing lands and casting Farseek to "get closer" to {11} is a wasted turn.
+DO THIS INSTEAD: whenever you hold a legend and have no enabler on the battlefield, spend the turn
+on an ENABLER or a real body - Cast Quicksilver Amulet, Cast Elvish Piper, Cast Kitchen Finks,
+Cast Thragtusk - never on another search spell.
+
+RULE #2 - ENABLER FIRST, MONSTER SECOND. THIS ORDER IS THE WHOLE DECK.
+When your list offers both "Cast Quicksilver Amulet {4}" (or "Cast Elvish Piper {3}{g}") AND a
+search spell (Time of Need, Fabricate, Farseek), ALWAYS CAST THE ENABLER. Reasons, in your words:
+- The enabler is live with any of your 20 creatures. The monster is a dead card without it.
+- The enabler must survive a full turn cycle before you can use it, so every turn you delay
+  casting it is a turn added to your clock.
+Corollary you must apply literally: DO NOT cast Fabricate to search for a Quicksilver Amulet when
+a Quicksilver Amulet is ALREADY IN YOUR HAND. Cast the one you are holding.
+Corollary: once ONE enabler is on the battlefield, a second Fabricate/Amulet is low value - cast a
+creature instead.
+
+RULE #3 - HOW THE CHEAT ACTUALLY WORKS, AND WHAT IT DOES NOT DO.
+Elvish Piper: {G}, Tap. Quicksilver Amulet: {4}, Tap. Both read "put a creature card from your
+hand onto the battlefield." The option appears in your numbered list as
+"Put in Play with Elvish Piper targeting <creature>". When you see that line, TAKE IT, and target
+the biggest creature in your hand.
+- The creature is PUT onto the battlefield, NOT CAST. Its "When you cast this spell" trigger DOES
+  NOT HAPPEN. Kozilek does NOT draw you four cards. Ulamog does NOT destroy a permanent. Emrakul
+  does NOT give you an extra turn. Do not plan around those triggers - you will never see them.
+- Everything else works normally. ENTERS-THE-BATTLEFIELD triggers fire (Thragtusk gains you 5,
+  Kitchen Finks gains you 2, Pelakka Wurm gains you 7). ANNIHILATOR fires when the creature
+  ATTACKS, and that is the win: Kozilek and Ulamog make the defender sacrifice FOUR permanents,
+  Emrakul SIX, before damage.
+- The creature can attack the turn after it arrives. So the plan is: cheat it in, then next turn
+  ATTACK WITH IT EVERY TURN. A 12/12 with annihilator 4 wins in two swings.
+- Both enablers need to have been on the battlefield since your last turn began before you can use
+  them. The activation is a PRIORITY option, not a main-phase cast option - it can appear in your
+  upkeep or in your main phase, so read every priority list you are given instead of passing.
+
+RULE #4 - ELVISH PIPER NEVER ATTACKS AND NEVER BLOCKS. NOT EVEN ONCE.
+Elvish Piper is a 1/1 body and your best engine card. In a block list it will be offered to you
+like this: "B1. Elvish Piper (1/1) - may block A1 (both die), A2 (your blocker dies, attacker
+lives)". BOTH of those outcomes lose you the game, because a Piper alive next turn puts a 12/12
+onto the battlefield and a Piper in the graveyard does nothing.
+DO THIS: when Elvish Piper is your only possible blocker, answer "no blockers" and TAKE THE
+DAMAGE. This holds even against infect creatures and poison counters. It holds at any life total
+above the incoming damage. The ONLY exception: the incoming damage kills you THIS combat and the
+block prevents it - then chump and survive.
+Same rule at the attack seam: never declare Elvish Piper as an attacker. Quicksilver Amulet is an
+artifact and cannot be attacked into, which is why it is the safer enabler when you hold both.
+
+RULE #5 - DEPLOY A BODY EVERY TURN YOU CAN. A SEARCH SPELL IS NOT A TURN.
+Your losses all look the same: turn 8, six lands, zero creatures on your battlefield, a hand full
+of tutored monsters. Time of Need, Fabricate, Farseek and Explore do not affect the board.
+THE FLOOR: in any casting window where a CREATURE or an ENABLER is offered - "Cast Kitchen Finks
+{1}{g/w}{g/w} (3/2)", "Cast Thragtusk {4}{g} (5/3)", "Cast Pelakka Wurm {4}{g}{g}{g} (7/7)",
+"Cast Elvish Piper {3}{g} (1/1)", "Cast Quicksilver Amulet {4}" - CAST IT. Prefer it over any
+search spell, at any life total, on any turn.
+Cast a search spell only when the window offers NO creature and NO enabler you can pay for.
+Kitchen Finks is your best early play: {1}{g/w}{g/w} is payable entirely with green mana (each
+{g/w} takes either colour), it is a 3/2 that gains you 2 life, and it comes BACK as a 2/1 the
+first time it dies. Never hold it.
+
+RULE #6 - COUNT YOUR LANDS BEFORE YOU MULLIGAN. YOUR LAND NAMES ARE NOT ALL "LAND".
+You lost a whole game to seven mulligans and a zero-card hand, every time saying "this hand has
+zero lands" about hands that held two or three.
+These are ALL LANDS and they all appear on your hand line with the word "land" in brackets:
+  Forest (land: taps for {G}) - green
+  Island (land: taps for {U}) - blue
+  Tropical Island (land: taps for {U}{G}) - BOTH colours, your best land
+  Hinterland Harbor - taps for {G} or {U}; enters untapped if you already control a Forest or
+    Island, otherwise tapped
+  Glimmerpost (land) - taps for {1} colourless, and gains you 1 life for each Glimmerpost/Locus
+    on the battlefield when it enters. It is a REAL LAND. It just makes colourless mana.
+DO THIS at the mulligan: count every hand card whose line contains "(land". Two or more lands with
+at least one green source (Forest, Tropical Island, Hinterland Harbor) is a KEEP. Three lands is
+always a KEEP. Mulligan only a hand with one land or none, and NEVER mulligan more than twice -
+a 5-card hand with lands beats a 7-card hand you shuffle away.
+
+RULE #7 - WHAT TO SEARCH FOR, WHEN YOU DO SEARCH.
+- FABRICATE {2}{U} finds an artifact. The only artifact in your deck is Quicksilver Amulet. Cast
+  it ONLY when you hold no enabler at all.
+- TIME OF NEED {1}{G} finds a legendary creature. Cast it ONLY when an enabler is ALREADY on your
+  battlefield or in your hand. Pick the biggest one you can dump: Emrakul (15/15 flying,
+  annihilator 6, and coloured removal spells cannot touch it) > Kozilek (12/12, annihilator 4) >
+  Ulamog (10/10 indestructible, annihilator 4) > Sheoldred (6/6, steals your creatures back from
+  the graveyard every upkeep and makes them sacrifice) > Jin-Gitaxias.
+- FARSEEK {1}{G} puts an Island or Tropical Island onto the battlefield tapped. It cannot find a
+  Forest. It does NOT draw a card.
+- EXPLORE {1}{G} draws a card and lets you play an extra land. URBAN EVOLUTION {3}{G}{U} draws
+  three and an extra land. Cast these when you have nothing better - never over a creature.
+- In a search list you will be shown your whole library, most of it marked
+  "[does NOT qualify]". Pick ONE card, from the lines marked [eligible]. Do not list several.
+
+RULE #8 - TRUST THE NUMBERS THE GAME PRINTS FOR YOU.
+The board shows "Mana available: N total (N untapped sources ...; colours you can make: {g}{u})".
+That number N is how much mana you have. Do not recount your lands and do not re-derive whether
+you can pay - if a Cast line is in your numbered list, the game has already checked it and will
+tap your lands for you. Read the printed (X/Y) on a creature and swing with it.
+
+SITUATION -> PLAY
+- Enabler on the battlefield, monster in hand -> take the Put in Play option, target the biggest.
+- Monster on the battlefield -> attack with it every turn. Annihilator strips their board first.
+- Enabler in hand, monster in hand -> cast the ENABLER.
+- No enabler anywhere, creature in hand -> cast the CREATURE.
+- No enabler and no creature -> cast Fabricate (for the Amulet) or Explore/Urban Evolution.
+- Elvish Piper is your only blocker -> no blockers, take the damage.
+- Big blocker available (Kozilek, Thragtusk, Pelakka Wurm) and the line says "you kill it, your
+  blocker lives" -> block.
+- Opening hand with two or more lands including a green source -> keep.

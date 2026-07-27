@@ -1,0 +1,108 @@
+MASTER OF ETHER - UB ARTIFACT AGGRO
+
+You win by turn 8-11 by putting cheap artifacts onto the battlefield EVERY turn and swinging with
+bodies that grow as the count grows - small on paper, large in play. Every turn is the same three
+actions: play a land, deploy every artifact you can, attack with everything the list offers. You are
+the beatdown in every matchup.
+
+=== RULE #1: YOUR FREE ARTIFACTS ARE FREE. CAST THEM THE TURN THEY APPEAR. ===
+Mox Jet, Mox Sapphire and Ornithopter cost {0}, and the game does NOT print a cost on a free card -
+"Cast Mox Jet" and "Cast Ornithopter (0/2)" are complete lines, not broken ones.
+PROCEDURE at every "which card do you cast now" ask: if the list contains Cast Mox Jet, Cast Mox
+Sapphire or Cast Ornithopter, TAKE IT - before anything else, with zero mana available, on turn 1,
+and again at the next ask if another is listed. Each is +1 to your artifact count, which is +1/+1 on
+Master of Etherium and +2/+2 on every Glaze Fiend.
+The thoughts "Moxes are not spells you can cast", "a Mox needs a land drop", "a Mox costs mana to
+cast" and "Ornithopter is low priority" are ALL FALSE. A card with no cost printed on its line
+costs {0}.
+
+=== RULE #2: ANY COLOUR PAYS A GENERIC COST. ===
+{1}, {2} and {3} are generic and ANY mana pays them - the {W} of Ancient Den, the {R} of Great
+Furnace and the {G} of Tree of Tales each pay the {2} of Silver Myr as well as a Swamp does. The
+"Mana available: N total" line gives you N to spend whatever colours follow it, and a printed "Cast
+Silver Myr {2}" option is one the game has already checked. The thought "I have {W} and {B}, so I
+cannot pay {1}" is ALWAYS FALSE.
+
+=== THE ARTIFACT COUNT IS YOUR ENGINE - READ IT, DO NOT COUNT IT ===
+The prompt prints "Artifacts in play: you N | opponent N". That N is the real number; never recount
+your board. Every artifact you deploy raises it, and so do your LANDS: Ancient Den, Great Furnace,
+Seat of the Synod, Tree of Tales and Vault of Whispers are artifact lands, so playing one is a free
++1. Island, Swamp, Academy Ruins and Tolarian Academy are not.
+Vedalken Archmage {2}{U}{U} is the one exception in your deck - it is NOT an artifact, so it does
+not raise N and Master does not pump it. It draws a card every time you cast an artifact spell, so
+cast it early and your free Moxes and Ornithopters replace themselves.
+
+=== SEQUENCING INSIDE ONE TURN - THIS IS WORTH DAMAGE ===
+1. Play your land first, and take an ARTIFACT land over Island or Swamp when both are offered - it
+   is a mana source AND a count.
+2. Then cast artifacts cheapest first until the list has none left: the free ones, then Steel Wall
+   {1}, Silver Myr {2}, Glaze Fiend {1}{B}, then the {3}s.
+3. THEN attack - everything from step 2 has already grown your attackers.
+Deploy in Main Phase 1, before combat: Glaze Fiend's bonus lasts only until end of turn, so an
+artifact cast in Main Phase 2 grew nothing.
+
+=== MASTER OF ETHERIUM - YOUR BEST CARD, AND ITS NUMBER IS ONE TOO SMALL ===
+"Cast Master of Etherium {2}{u} (N/N)" prints your CURRENT artifact count. Master is itself an
+artifact, so it LANDS ONE BIGGER than the line says - cast at (6/6) and a 7/7 arrives. Add 1 to the
+printed number when you plan damage.
+Cast it the first turn "Cast Master of Etherium" appears; do not wait for a bigger number, it grows
+on the battlefield too. It also gives every OTHER artifact creature +1/+1, so your Ornithopters
+start attacking for 1 and your Silver Myrs for 2 the moment it resolves. You run four copies and a
+second one makes the first bigger.
+
+=== TOLARIAN ACADEMY - ANSWER BY WINDOW ===
+"add blue mana for each artifact with Tolarian Academy [cost: Tap]" makes one blue per artifact - a
+huge number late - but mana disappears at the end of the step it was made in.
+- Upkeep prompt, yours or theirs: answer 0 (pass). The offer comes back.
+- Any prompt on the OPPONENT'S turn: answer 0 (pass).
+- YOUR Main Phase 1: take it only when you are casting something this turn.
+You never need to tap it by hand to afford a Cast option - a listed option is already payable.
+
+=== KEY CARDS ===
+Glaze Fiend {1}{B} - printed 0/1 flying, +2/+2 for each OTHER artifact that enters, until end of
+  turn. Its line shows the live number, e.g. "(4/5) (printed 0/1)" - attack with that number. It is
+  back to 0/1 on the opponent's turn, so it attacks and never blocks.
+Salvage Slasher {1}{B} - 1/1 plus +1/+0 per artifact card in YOUR graveyard; your artifacts dying
+  makes it bigger and the line shows the current power.
+Cathodion {3} - 3/3, and when it dies it adds {3} to your pool. Attack and block with it freely; the
+  mana comes back as "Already in pool: {c}{c}{c}" for you to spend.
+Steel Wall {1} - 0/4 defender: it never attacks and never appears on an attacker list. A wall and a
+  free +1 to the count; cast it turn 1 with nothing better to do.
+Yotian Soldier {3} - 1/4 vigilance: it attacks AND stays back to block the same turn. Send it.
+Nuisance Engine {3} - "{2}, Tap: create a 0/1 Pest artifact creature token". Each Pest is +1 to the
+  count and a free chump blocker. Activate in YOUR Main Phase 1 when you have {2} spare.
+Coiled Tinviper {3} - 2/1 first strike. An attacker.
+Scarecrone {3} - 1/2, "{4}, Tap: return target artifact creature from your graveyard to the
+  battlefield" - take it when a real body is in your graveyard. Academy Ruins' "{1}{U}, Tap: put
+  target artifact card from your graveyard on top of your library" costs your next draw, so use it
+  only on Master of Etherium or Akroma's Memorial.
+Akroma's Memorial {7} - gives ALL your creatures flying, first strike, vigilance, trample, haste and
+  protection from black and red. It ends games. Cast it the first turn it is listed; until then it
+  is your worst card in hand and the first card to bottom after a mulligan.
+
+=== ATTACKING ===
+Keep declaring every creature the attacker list offers - the list has already dropped everything
+that cannot attack. The one exception is written on the line itself: a creature tagged "[deals 0 -
+this attack deals no damage to the opponent]" adds nothing, so leave it home and send the rest.
+An attack taps that creature for the opponent's turn. When your life is 12 or less, add up what
+their UNTAPPED creatures swing back for: if that number is at or above your life, keep enough
+bodies home to block it and attack with the rest. Above 12 life, send everything offered.
+
+=== BLOCKING ===
+Steel Wall (0/4) and Yotian Soldier (1/4 vigilance) are your blockers - put them in front of the
+biggest attacker every turn, they survive it. Cathodion blocks and trades happily, its {3} comes
+back. Glaze Fiend stays out of blocks; on their turn it is a 0/1.
+
+=== MULLIGAN ===
+Keep any hand with two or more mana sources - the five artifact lands ARE lands, and Mox Jet and Mox
+Sapphire are free mana that count as sources. Mulligan at most twice, then KEEP the best hand.
+
+=== DECIDING SITUATIONS ===
+- A Mox or an Ornithopter is in your cast list: take it, this ask, whatever else is listed.
+- "Cast Master of Etherium" appears: take it, and plan for one more power than the line shows.
+- An artifact land and a basic are both offered: play the artifact land.
+- Your cast list still holds a payable artifact: cast it, then attack - not the reverse.
+- Tolarian Academy is offered in an upkeep: answer 0 and take it in your Main Phase 1 instead.
+- The attacker list shows creatures with no "[deals 0 ...]" tag: send all of them.
+- You are at 12 or less and their untapped creatures swing for your life total: hold blockers back
+  and attack with the rest.

@@ -82,7 +82,19 @@ literal "backside". deck152 focus.
 
 ## Corpus data
 
-- PRIMARY: (FILL AFTER RUN — outdir, win table, fallbacks, adjudications, crash scan)
+- **PRIMARY**: ~/.Wagic/ai/gpt/selfplay-runs/matchups-20260727-115847 — 21 games, binary
+  7fabd9bd0, -T 3000, REPPENALTY=1.05.
+- Win table: **105:6/6 (STEP-0 GUIDELESS PERFECTA — first ever by a Step-0 seat)**,
+  36:4/6, 158:3/6, 152:3/6, 146:2/6, 139:2/6, 116:1/6. **0 timeouts/draws, only 1 adj
+  at cap** (campaign low; 20 decisive gameends, integrity clean).
+- **ZERO crash signatures across all 21 stderr files** — with THREE new decks and i16
+  making the scan clean.
+- **Fallbacks: 3/1,117 (0.27%, ties campaign record) — ZERO defers, ZERO
+  truncated_abandoned**: 1 retracted_choice (158 vs139), 2 unparsed_reply (158 vs152,
+  139 vs152). The i5/i6 machinery produced zero silent burns; note: **zero
+  `validation_reject_reask` markers fired — no validation rejects even occurred in this
+  pool** (no convoke/X-stress decks), so i5 remains live-validated only by the probe.
+- Decision mix: 703 ask, 144 attackers, 96 priority, 59 blockers, 18 reveal, 15 bottom.
 
 ## Per-seat focus
 
