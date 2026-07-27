@@ -1,0 +1,108 @@
+YOUR DECK: Orzhov (white-black) dungeon MIDRANGE. You have premium flexible REMOVAL, sticky
+value creatures that VENTURE INTO THE DUNGEON, two planeswalkers, and lands that flip into
+spells so you never flood out. You are the BEATDOWN against slow/control decks (venture, grind
+value, close with planeswalkers) and the CONTROL against aggro (deploy blockers early, spend
+removal ON CURVE to survive, then take over). Read the opponent: if they are faster than you,
+your job is to trade and survive to the mid-game where your card quality wins. Do NOT sit on
+removal - a Vanishing Verse in hand while you die does nothing.
+
+YOUR MANA. You need BOTH white and black - most of your spells cost {B}{W} or a WB pip each.
+Shineshadow Snarl taps for {W} OR {B} (a single Snarl by itself gives you both colors -
+"Mana available: {b}{w} from 1 untapped source"). Brightclimb Pathway, Plains, Swamp, and Hive
+of the Eye Tyrant round out your colors. If a Cast option is listed, you CAN pay for it - do not
+decline a spell thinking you "lack the color." Play a land every turn you can.
+
+#1 RULE - SPEND YOUR REMOVAL ON THEIR BEST THREAT, ON TIME. You are a removal deck. When the
+opponent has a real creature or planeswalker out and you can answer it, DO IT - do not hold
+removal for a "better" target that may never come, especially against aggro where every extra
+turn they attack costs you life.
+- VANISHING VERSE ({W}{B}, instant): Exile target MONOCOLORED permanent - ANY mana value, any
+  type (creature, planeswalker, artifact, enchantment, even a monocolored land). This is your
+  best removal: it exiles (no death triggers, no recursion) and hits almost anything a
+  one-color opponent plays. Fire it on their biggest threat. It only fails to target a
+  MULTICOLORED (two+ color) permanent - a permanent whose cost shows TWO OR MORE colored pips.
+  A single-color card (one color of pip, e.g. {b} or {2}{w}) IS a legal target - the legal-
+  targets list on the Cast option is the ground truth; trust it over your own guess.
+- KAYA THE INEXORABLE ({3}{W}{B}, planeswalker, starts at 5 loyalty): her -3 EXILES ANY nonland
+  permanent (even multicolored - the thing Vanishing Verse can't hit). Land her and immediately
+  -3 their best threat when you are behind; she drops to 2 and survives. Use +1 (protect one of
+  your creatures) only when you are ahead and have no threat worth exiling.
+- SOUL SHATTER ({2}{B}, instant): the opponent SACRIFICES their highest-mana-value creature or
+  planeswalker. It does NOTHING if they control no creature/planeswalker - do not cast it into
+  an empty board (correctly declining this is right). Great answer to a hexproof/indestructible
+  bomb you can't target directly.
+- SILVERQUILL COMMAND ({2}{W}{B}, sorcery): choose TWO of - pump+fly a creature / reanimate a
+  MV<=2 creature from your graveyard / draw a card and drain 1 / opponent sacrifices a creature.
+  Against aggro, the edict mode + a defensive mode is a two-for-one blowout.
+- PELAKKA PREDATION: strip their best card - target player reveals their hand, you choose a
+  creature or planeswalker card, they discard it. Its back face is a land if you need the drop.
+
+VENTURE / THE DUNGEON. Several creatures "venture into the dungeon" when they enter or attack:
+Triumphant Adventurer (on attack), Nadaar (on enter AND attack), Acererak (on enter), Barrowin
+(on enter). Each venture enters the first room of a dungeon or advances to the next room.
+- WHICH DUNGEON: when you first venture (and again after you complete one) you CHOOSE one of
+  three dungeons. **Pick LOST MINE OF PHANDELVER by NAME** (answer with the dungeon's name -
+  the option NUMBERS are not fixed, so read the names, not "option 2"). Every one of Lost Mine's
+  rooms is pure UPSIDE for you: it makes a 1/1 Goblin (a free blocker), a Treasure (ramp/fix),
+  puts a +1/+1 counter on a creature, and drains the opponent - and it completes for a card
+  (Temple of Dumathoin: draw a card). Nothing in it costs YOU life.
+- Do NOT pick TOMB OF ANNIHILATION unless you are RACING and clearly ahead on life - every one
+  of its rooms makes BOTH players lose life or sacrifice, so it hurts you as much as them. Its
+  completion reward is a 4/4 deathtouch God (The Atropal), which is strong, but you pay life the
+  whole way there - only worth it when you are winning the race.
+- Do NOT pick DUNGEON OF THE MAD MAGE unless it is a slow grind and you want raw cards - it is
+  the longest dungeon (you will rarely finish it) but pure card advantage if you do.
+- COMPLETING A DUNGEON MATTERS AND IT WORKS: once you complete ANY dungeon, Nadaar gives ALL
+  your creatures a PERMANENT +1/+1 anthem, and Barrowin's attacks reanimate a MV<=3 creature
+  from your graveyard. So keep venturing to FINISH the dungeon - Lost Mine's short value path
+  gets you there. After you complete one, keep picking Lost Mine again to re-complete for more
+  cards while the anthem stays on.
+- ROOM BRANCHES now SHOW each room's effect (e.g. "goblin lair {room effect: Create a 1/1 red
+  Goblin creature token}", "dark pool {room effect: each opponent loses 1 life and you gain 1}").
+  Pick the room that MAKES A BODY (Goblin Lair) or DAMAGES the opponent (Dark Pool) over one
+  that only scries - the render tells you exactly what each does, so choose on the effect text.
+
+DEPLOY YOUR CHEAP THREATS AS BLOCKERS. Triumphant Adventurer is a 1/1 with DEATHTOUCH (and first
+strike on your turn) - cast it early; it trades with or blocks almost anything and it ventures
+every time it attacks. Do not hold it. Nadaar is a 3/3 vigilant body that ventures twice.
+
+PLANESWALKERS - USE THEM EVERY TURN THEY ARE OUT. A planeswalker that does nothing on your turn
+is wasted. The moment you can afford one, CAST IT - do not leave Lolth or Kaya rotting in hand
+while you flood; they are your best late-game engines. Each of your turns they are in play,
+activate an ability:
+- LOLTH, SPIDER QUEEN ({3}{B}{B}, starts at 4, and gains loyalty whenever a creature you control
+  dies): -3 makes two 2/1 Spiders with menace and reach (great blockers vs flyers AND attackers)
+  - use this first to build a board; 0 draws you a card and loses 1 life (take it most turns you
+  are not desperate for that life; do not just pass). -8 is the game-ending emblem.
+- KAYA: see #1 rule - her -3 is removal; do not leave her idle.
+
+CLOSE THE GAME. Once you are stable, PRESS - attack with Adventurer/Nadaar to venture and chip,
+grind with your planeswalkers, and finish. A game left even to the turn cap is a LOSS risk.
+Hive of the Eye Tyrant is a manland: pay {1}{B} to make it a 3/3 menace attacker when you have
+spare mana - a threat that dodges sorcery-speed removal.
+
+MULLIGAN: keep 2-5 lands with BOTH a white source and a black source (Shineshadow Snarl or
+Brightclimb Pathway each count as your fixing - a hand with a Snarl has both colors). A Swamp is
+a land; a Plains is a land - never call a hand with lands "no lands." Your MDFC cards (Emeria's
+Call, Agadeem's Awakening) can be played as LANDS - a hand with one of them has an extra land.
+Ship 0-1 land hands and all-land (6-7) hands. Prefer a hand with an early play or a removal spell
+over a pile of expensive bombs.
+
+DECIDING SITUATIONS (recognize -> do):
+- Opponent has a real creature/planeswalker and you can remove it, and you are not ahead ->
+  fire Vanishing Verse (monocolored target - trust the legal-targets list) or Kaya -3 (any
+  nonland) NOW; do not hold it.
+- You are choosing which dungeon to venture into -> answer LOST MINE OF PHANDELVER by name (not
+  Tomb), unless you are ahead and racing.
+- A room branch is offered -> read the {room effect} text; take the room that makes a body or
+  drains the opponent over a scry.
+- Triumphant Adventurer is castable and you are under pressure -> cast it; the deathtouch 1/1
+  blocks or trades with anything.
+- Soul Shatter is offered but the opponent controls no creature/planeswalker -> do not cast it.
+- Lolth or Kaya is castable in your hand -> CAST IT this turn; a bomb walker in hand does
+  nothing. Once one is on your battlefield on your turn -> activate an ability (Lolth -3 for
+  Spiders or 0 to draw; Kaya -3 to exile their threat) - do not pass with an idle planeswalker.
+- You have completed a dungeon and control Nadaar -> your team is +1/+1 (creatures render above
+  their printed stats); attack accordingly.
+- You are flooding / have spare lands in hand -> play Emeria's Call or Agadeem's Awakening as a
+  land; save the spell face for later.

@@ -1,0 +1,86 @@
+YOUR DECK: Bant (green-white with a light blue splash) HUMAN MIDRANGE. You win by putting
+Humans and Wolves on the board, making them bigger with lords and counters, and ATTACKING.
+Your removal (Fateful Absence, Brutal Cathar) clears blockers; your lords (Intrepid Adversary,
+Sigarda, Katilda) turn a modest board into a lethal one. This is a BEATDOWN deck that also
+grinds - your job is to deploy a creature almost every turn and swing with everything that can
+attack profitably.
+
+#1 RULE - TRUST THE "Mana available" LINE AND THE CAST LIST. DO NOT RE-DERIVE YOUR MANA.
+Your lands make several colors and many enter tapped, so it is easy to miscount. The prompt
+already did the math for you:
+- "Mana available: {g}{w} from N untapped sources" means those are the ONLY colors you can make
+  right now and you have N sources. If it says {w} only, you have NO green and NO blue this turn
+  - a {G} or {U} spell is NOT castable, no matter what is in your hand.
+- If a spell appears as a numbered "Cast ..." option, it IS payable right now - just pick it. If a
+  spell is NOT in your options, you cannot cast it this priority (wrong color, tapped lands, or a
+  card in HAND is a land you have not played yet - a land in hand is NOT a mana source).
+- NEVER answer with an action number that is not on the list. If your only listed action is
+  "Flip Side ..." (a cosmetic display toggle that casts nothing), the correct answer is 0 (pass).
+  Do not invent a "Cast" number - re-read the options and the mana line first.
+
+#2 RULE - DEVELOP A CREATURE EVERY TURN, THEN ATTACK WITH EVERYTHING THAT PROFITS.
+Every turn, in order: play a land, cast the biggest/most useful creature you can, then in combat
+run this test on EACH of your untapped, non-summoning-sick creatures:
+  ATTACK with it if ANY of these is true: the opponent has no untapped blocker; it has a flyer/
+  reach the opponent cannot block (Elite Spellbinder and Sigarda FLY); its toughness is higher
+  than the biggest thing that can block it; or the trade is even-or-better for you.
+Declare "no attackers" ONLY when every creature that could attack would simply die for nothing.
+- The board render already lists only creatures that CAN attack (summoning-sick and tapped ones
+  are tagged); do not re-derive eligibility, just apply the test to the listed creatures.
+- Your winning games came from escalating swings (Wolf, then Wolf + Intrepid Adversary, then add
+  Elite Spellbinder / Luminarch Aspirant / Katilda). Build the team and keep swinging.
+
+YOUR LORDS AND GROWTH - deploy these and the board snowballs:
+- INTREPID ADVERSARY ({1}{W}, 3/1, lifelink): when it enters you may pay {1}{W} any number of
+  times; each payment is a valor counter, and your creatures get +1/+1 for EACH valor counter.
+  Pay as many times as you can afford when you have a board to pump; if you have no spare mana or
+  no other creatures, take "don't add any counter" and just get the 3/1 lifelink body.
+- SIGARDA, CHAMPION OF LIGHT ({1}{G}{W}{W}, 4/4 FLYING TRAMPLE): your Humans get +1/+1 while she
+  is out. A flying trampler that also anthems the team - a premier threat, cast her on curve.
+- KATILDA, DAWNHART PRIME ({G}{W}, 1/1): your HUMAN creatures can each tap for one mana of their
+  own color - extra mana to double-spell. She also has protection from Werewolves. Her {4}{G}{W},
+  {T} ability puts a +1/+1 counter on EACH creature you control - a strong late-game pump.
+- LUMINARCH ASPIRANT ({1}{W}, 1/1): at the start of combat on YOUR turn it puts a +1/+1 counter
+  on a creature you control. Keep it alive - it grows your board for free every turn.
+- RANGER CLASS ({1}{G} enchantment): cast it for the 2/2 Wolf immediately. When you have spare
+  mana, LEVEL IT UP (the "level Counter with Ranger Class" option): Level 2 costs {1}{G} and puts
+  a +1/+1 counter on an attacking creature each combat; Level 3 costs {3}{G} and lets you cast
+  creatures off the top of your library. Level when you have nothing better to do with the mana.
+
+COVEN - you have three or more creatures with DIFFERENT POWERS. When that is true, AUGUR OF
+AUTUMN ({1}{G}{G}, 2/3) lets you cast creatures off the top of your library, and SIGARDA's attack
+trigger digs five cards for a Human. You usually reach Coven just by playing a mix of bodies -
+do not agonize over it; play your creatures and it turns on by itself.
+
+REMOVAL - use it on real threats, not chump targets:
+- FATEFUL ABSENCE ({1}{W}, instant): destroy a creature or planeswalker (they get a Clue). Save
+  it for the opponent's best creature or a planeswalker; do not spend it on a small/tapped body.
+- BRUTAL CATHAR ({2}{W}, 2/2 Human Werewolf): when it enters it EXILES an opponent creature until
+  Cathar leaves the battlefield - so the exiled creature COMES BACK if Cathar dies. Protect Cathar
+  (do not throw it into a bad block); losing it hands their creature back.
+
+WEREWOLVES / DAY-NIGHT: Brutal Cathar and Tovolar's Huntmaster ({4}{G}{G}, 6/6, enters making two
+2/2 Wolves) are "daybound." The battlefield shows "Day" or "Night". They flip to their stronger
+NIGHT side only if a whole turn passes with NO spells cast, and flip back if someone casts two
+spells in a turn - this rarely happens, so treat them as their day-side bodies (Cathar 2/2 with
+the exile, Huntmaster a 6/6 that makes two Wolves). If one does show its night face, its printed
+[X/Y] on the board is correct - trust it.
+
+TEFERI ({2}{W}{U}) is your ONLY blue card and blue is scarce. To cast him you need a blue source:
+DESERTED BEACH taps for {W} or {U} with no flipping, so lead on Beach when you want Teferi. You
+can also flip a Pathway to its blue face before playing it. Do not contort your mana for Teferi -
+he is a luxury; keep your GW curve on line first.
+
+MULLIGAN: keep any hand with two-plus lands and at least one early creature (Luminarch Aspirant,
+Intrepid Adversary, Ranger Class, Briarbridge Tracker). Two Ranger Classes + lands is keepable -
+one Wolf plus a leveling engine is a fine start. Mulligan only hands with no creatures at all or
+one that cannot make GW mana.
+
+MATCHUP POSTURE:
+- vs REMOVAL/GRIND decks (they kill your creatures one at a time): do not walk your whole hand
+  into their removal - deploy a threat, make them use a card, then deploy the next. Ranger Class,
+  Briarbridge's Clue, and Augur give you card advantage to out-grind them. Keep attacking so the
+  clock forces them to trade down.
+- vs AGGRO / go-wide: block early with your bigger bodies, use Fateful Absence / Brutal Cathar on
+  their best attacker, gain life with Intrepid Adversary's lifelink, then take over with your
+  lords. You are bigger and grindier - stabilize, then swing back.
