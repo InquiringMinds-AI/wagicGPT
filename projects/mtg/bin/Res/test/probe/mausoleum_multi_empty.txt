@@ -1,0 +1,43 @@
+# N-136a LIVE-PATH regression guard (the gap the 1-card empty_graveyard fixture
+# MISSED). Mausoleum Secrets, EMPTY graveyard, a MULTI-card library (mirrors the
+# vs152 wave-30 corpus: many revealed cards, 0 creatures dead). Its Undergrowth
+# gate target(<1>*[black;manacost<=type:creature:mygraveyard]|reveal) makes MV<=0
+# = NOTHING legal for option one, so toResolve() arms option TWO (the shuffle),
+# whose chooser is an unrestricted `*|reveal`. PRE-FIX the reveal seam read THAT
+# chooser as option-one eligibility -> offered all 8 cards "eligible" -> the model
+# picked the illegal MV4 Ritual, it was clicked, silently bounced, no-opped.
+# POST-FIX eligibility comes from option one's OWN predicate -> 0 eligible ->
+# enforcement drops the stub's Ritual pick (clicked=0) -> shuffle returns all 8 to
+# library; NOTHING reaches hand. Run (async stub stands in for decideReveal):
+#   echo probe/mausoleum_multi_empty.txt > Res/test/_x.txt
+#   env -u WAYLAND_DISPLAY -u DISPLAY WAGIC_HEADLESS=1 WAGIC_TESTSUITE=1 \
+#       WAGIC_TESTSUITE_THREADS=1 WAGIC_REVEAL_TEST_ASYNC="Ritual of Soot" \
+#       WAGIC_TESTSUITE_FILE=test/_x.txt ./wagic
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Mausoleum Secrets
+library:Ritual of Soot,Command the Dreadhorde,Swamp,Swamp,Dread Presence,Cavalier of Night,Knight of the Ebon Legion,Legion's End
+[PLAYER2]
+[DO]
+interactivereveal
+Mausoleum Secrets
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Mausoleum Secrets
+library:Ritual of Soot,Command the Dreadhorde,Swamp,Swamp,Dread Presence,Cavalier of Night,Knight of the Ebon Legion,Legion's End
+[PLAYER2]
+[END]

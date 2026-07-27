@@ -934,9 +934,15 @@ int ManaCost::getConvertedCost()
 
 int ManaCost::remove(int color, int value)
 {
-    assert (value >= 0);
+    assert (value >= 0);             // debug: stay LOUD if a caller passes a negative discount
+    if (value < 0)                   // release: a negative removal would ADD to the cost -- refuse
+        value = 0;
+    if (color < 0 || (size_t)color >= cost.size()) // defensive: never index past the live vector
+        return 0;
     int16_t toRemove = min(cost[color], (int16_t)value);
     cost[color] -= toRemove;
+    if (cost[color] < 0)             // release: clamp so corruption can't silently poison payment
+        cost[color] = 0;
     return 1;
 }
 
@@ -968,9 +974,20 @@ int ManaCost::remove(ManaCost * _cost)
         return 0;
     for ( int i = 0; i < Constants::NB_Colors; i++)
     {
+        // Defensive bound: cost is a vector sized to NB_Colors+1 by init(), but a malformed/
+        // under-sized ManaCost (or one built before Constants::NB_Colors was set) would make
+        // cost[i] an out-of-bounds read of garbage -- which can read NEGATIVE and trip the
+        // assert below (or silently poison payment in an NDEBUG build). This is the mutate-under-
+        // discount crash class (N-139h): the guarded arithmetic here cannot itself go negative
+        // (c - min(c,g) >= 0 for any c,g), so a negative component can ONLY arrive via such a
+        // read. Never index past the live vector.
+        if ((size_t)i >= cost.size())
+            break;
         int16_t toRemove = min(cost[i], (int16_t)_cost->getCost(i)); //we don't want to be negative
         cost[i] -= toRemove;
-        assert(cost[i] >= 0);
+        assert(cost[i] >= 0);        // debug: stay LOUD on a genuinely corrupt component
+        if (cost[i] < 0)             // release: clamp so corruption can't silently poison payment
+            cost[i] = 0;
     }
     return 1;
 }
@@ -1060,6 +1077,19 @@ int ManaCost::pay(ManaCost * _cost)
             }
         }
     }
+    //Defensive floor: the netting above can still leave a RESIDUAL negative when
+    //no other colour has surplus to absorb it (observed in the convoke-X payment,
+    //N-139h class: a March convoke that pays part of an X-cost with tapped
+    //creatures double-charges the pool by the convoke-covered pip, leaving the
+    //pool at -1). pay() has no can't-afford return (affordability is a guaranteed
+    //upstream precondition), so a residual negative is an ACCOUNTING ARTIFACT,
+    //not a real shortfall -- and a negative mana component silently corrupts every
+    //later canAfford. Clamp it, completing this loop's own "avoid negative values"
+    //intent and keeping ManaPool (a ManaCost) inside the no-component-negative
+    //invariant.
+    for (unsigned int i = 0; i < cost.size(); i++)
+        if (cost[i] < 0)
+            cost[i] = 0;
     delete diff;
     delete toPay;
     return result;

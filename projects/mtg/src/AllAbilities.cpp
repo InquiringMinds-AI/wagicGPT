@@ -682,9 +682,31 @@ void MTGRevealingCards::driveInteractiveReveal()
         //only accepts a subset, and the reveal seam surfaces that so the model
         //stops picking cards the chooser rejects (deck135 wave-19 R3/R4).
         //canTarget is exactly what the engine's click will accept.
+        //
+        //N-136a (deck136 wave-29/30): eligibility MUST be evaluated with option
+        //ONE's own target predicate - NOT the action layer's "current" target
+        //chooser (`tc`). On a multi-ability reveal whose option-one is gated and
+        //whose fail branch is a shuffle (Mausoleum Secrets:
+        //target(<1>*[black;manacost<=type:creature:mygraveyard]|reveal) ... option
+        //two = all(other *|reveal) moveto(mylibrary) and!(shuffle)), toResolve()
+        //picks the branch UP FRONT via countValidTargets: when the graveyard makes
+        //option one impossible it arms option TWO, whose chooser is an unrestricted
+        //`*|reveal` that accepts EVERY revealed card. Reading that as option-one
+        //eligibility offered the whole library (empty-graveyard Mausoleum: all 43
+        //"eligible"), so the empty-eligible no-ask never fired and an over-MV pick
+        //was clicked, silently bounced by option one's real chooser, and no-opped.
+        //Build option one's chooser from abilityOne's target() exactly as toResolve
+        //does, so the OFFER predicate is identical to the branch-selection predicate
+        //and to the click-time enforcement - they can no longer diverge by path.
+        TargetChooserFactory eligTcf(game);
+        vector<string> oneTarget = parseBetween(abilityOne, "target(", ")");
+        TargetChooser * oneTc = oneTarget.size()
+                                ? eligTcf.createTargetChooser(oneTarget[1].c_str(), source)
+                                : NULL;
+        TargetChooser * eligTc = oneTc ? oneTc : tc; //defensive: no target() -> prior behavior
         vector<bool> eligible(revealed.size(), true);
         for (size_t i = 0; i < revealed.size(); i++)
-            eligible[i] = tc->canTarget(revealed[i]);
+            eligible[i] = eligTc->canTarget(revealed[i]);
         //Reveal-source + chooser-arity for the ask framing (deck102 wave-20 E1).
         //A HAND reveal (Thoughtseize/Duress-class targeted discard,
         //revealzone(targetedpersonshand)) must be rendered as a hand, not "the
@@ -695,7 +717,10 @@ void MTGRevealingCards::driveInteractiveReveal()
         int revealSource = 0; //top of library
         if (RevealFromZone && string(RevealFromZone->getName()) == "hand")
             revealSource = (RevealFromZone->owner == ctrl) ? 2 : 1;
-        bool pickExactlyOne = (tc && tc->maxtargets == 1 && tc->targetMin);
+        //Arity from option one's own chooser (eligTc), consistent with the
+        //eligibility source above (a fixed <1> chooser = choose-ONE framing).
+        bool pickExactlyOne = (eligTc && eligTc->maxtargets == 1 && eligTc->targetMin);
+        SAFE_DELETE(oneTc); //eligible[] + pickExactlyOne captured; done with it
         vector<int> sel;
         int r;
 #ifdef TESTSUITE

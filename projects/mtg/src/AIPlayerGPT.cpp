@@ -188,6 +188,18 @@ string cardTextSnippet(MTGCardInstance * card, size_t maxLen)
 //RNG just by being rendered.
 string dynamicMagnitudes(MTGCardInstance * card)
 {
+    //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
+    //loyalty ability plus the emblem/transforms payload in one string, so this
+    //card-level scan cannot attribute a magnitude to the specific loyalty (or
+    //cast) option being offered - it grabbed Lolth's -8 emblem expression
+    //(damage:8minusoplifelostminusend) and stamped "{right now: damage 8}"
+    //(later "damage 4") onto her CAST and her +0/-3 loyalty options, none of
+    //which deal that damage. A walker's loyalty effects are plain-numeric
+    //loyalty costs already visible in the {card text} snippet, so an unscopable
+    //number this pass evaluates from a NON-offered sub-ability is worse than
+    //none (same spirit as skipping "rand"). Skip walkers.
+    if (card && card->hasType(Subtypes::TYPE_PLANESWALKER))
+        return "";
     static const struct { const char * key; const char * label; bool absValue; } kVerbs[] = {
         { "lifeleech:", "drains", true },
         { "damage:", "damage", true },
@@ -2078,6 +2090,76 @@ static AATurnSide * asTurnSide(MTGAbility * a)
     return NULL;
 }
 
+//The mana a land face taps for, read off its rules text ("{T}: Add {W}" ->
+//"{W}"; "{T}: Add {W} or {U}" -> "{W} or {U}"). Empty if the text produces no
+//mana. Used to name BOTH faces' colors on a modal-DFC LAND's flip options
+//(N-152a): a Pathway's back-face color is otherwise invisible until flipped.
+static string landTapMana(const string& text)
+{
+    string lc = text;
+    for (size_t i = 0; i < lc.size(); i++)
+        lc[i] = (char) tolower((unsigned char) lc[i]);
+    std::vector<string> syms;
+    size_t pos = 0;
+    //Anchor on "add {": the "// OtherFace" tail and any reminder text never
+    //carry a mana symbol right after the word "add", so only real produced
+    //mana is captured.
+    while ((pos = lc.find("add {", pos)) != string::npos)
+    {
+        size_t b = pos + 4; //the '{'
+        size_t e = lc.find('}', b);
+        if (e == string::npos)
+            break;
+        string sym = text.substr(b, e - b + 1); //original-case "{W}"
+        bool dup = false;
+        for (size_t k = 0; k < syms.size(); k++)
+            if (syms[k] == sym) { dup = true; break; }
+        if (!dup)
+            syms.push_back(sym);
+        //"Add {W} or {U}": keep scanning the same line for chained pips.
+        size_t nextAdd = lc.find("add {", e);
+        size_t orPip = lc.find(" or {", e);
+        if (orPip != string::npos && (nextAdd == string::npos || orPip < nextAdd))
+        {
+            size_t ob = orPip + 4, oe = lc.find('}', ob);
+            if (oe != string::npos)
+            {
+                string osym = text.substr(ob, oe - ob + 1);
+                bool od = false;
+                for (size_t k = 0; k < syms.size(); k++)
+                    if (syms[k] == osym) { od = true; break; }
+                if (!od)
+                    syms.push_back(osym);
+                pos = oe + 1;
+                continue;
+            }
+        }
+        pos = e + 1;
+    }
+    string out;
+    for (size_t k = 0; k < syms.size(); k++)
+        out += (k ? " or " : "") + syms[k];
+    return out;
+}
+
+//The other face's printed name from a DFC face's rules text tail ("{T}: Add
+//{G}. // Boulderloft Pathway" -> "Boulderloft Pathway"). Empty when the text
+//carries no "// " separator (a non-DFC card).
+static string dfcOtherFaceName(const string& text)
+{
+    size_t p = text.find("// ");
+    if (p == string::npos)
+        return "";
+    string name = text.substr(p + 3);
+    size_t nl = name.find_first_of("\r\n");
+    if (nl != string::npos)
+        name = name.substr(0, nl);
+    while (!name.empty() && (name[name.size() - 1] == ' '
+           || name[name.size() - 1] == '.' || name[name.size() - 1] == '\t'))
+        name.erase(name.size() - 1);
+    return name;
+}
+
 //A power/toughness-pump activation (Restless Apparition's "{W/B}{W/B}{W/B}:
 //gets +3/+3 until end of turn", and every ability of that CLASS) renders its
 //menu text as a bare "%i/%i" (APowerToughnessModifier) - which reads as a
@@ -2165,17 +2247,54 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             string otherName = (fc->isFlipped > 0) ? fc->nameOrig : ats->_SideName;
             if (!otherName.empty())
             {
-                out << " -> DISPLAY TOGGLE only: switches this hand card to show"
-                       " its other face \"" << otherName << "\"";
                 MTGCard * oc = MTGCollection()->getCardByName(otherName, fc->setId);
-                if (oc && oc->data && oc->data->getManaCost()
-                    && oc->data->getManaCost()->getConvertedCost())
-                    out << " (" << oc->data->getManaCost()->toString() << ")";
-                out << ". It does NOT cast anything and uses no stack. You"
-                       " usually do NOT need it: the Cast menu is where you cast,"
-                       " and it lists every face you can afford (the other face"
-                       " appears there as an alternative-cost cast). This only"
-                       " changes which face is displayed.";
+                bool otherIsLand = oc && oc->data && oc->data->isLand();
+                if (fc->isLand() && otherIsLand)
+                {
+                    //N-152a: a modal-DFC LAND (Pathway class). The old "you do
+                    //not need it, the Cast menu lists every face" text was a LIE
+                    //here (a land has no Cast menu). Name both faces + colors so
+                    //the pilot at least knows the other color exists - but be
+                    //HONEST about the engine limitation: verified live (deck199
+                    //probe) that flipping DOES swap the hand card's displayed
+                    //face, yet the flipped back face then FAILS to enter (the
+                    //land-drop offers "Play <back>" but the put-into-play
+                    //defers - the front-face isflipped==0 play-restriction
+                    //blocks the normal drop once flipped, and the engine's
+                    //autohand play path is not reachable from the AI land seam).
+                    //So flipping gains NOTHING playable; do not send the model
+                    //into a flip-then-fail loop. Display-only, stated plainly.
+                    string thisMana = landTapMana(fc->text);
+                    string otherMana = landTapMana(oc->data->text);
+                    out << " -> DISPLAY TOGGLE only (this is a modal double-faced"
+                           " land): it currently shows \"" << fc->getDisplayName() << "\"";
+                    if (!thisMana.empty())
+                        out << " (taps for " << thisMana << ")";
+                    out << "; its other face is \"" << otherName << "\"";
+                    if (!otherMana.empty())
+                        out << " (taps for " << otherMana << ")";
+                    out << ". Flipping only changes which face is DISPLAYED - it"
+                           " casts nothing, uses no stack, and gains you nothing"
+                           " playable: in this engine only the currently-shown"
+                           " face can actually be played as a land. Just play the"
+                           " current face.";
+                }
+                else
+                {
+                    //Standard DFC spell (Tergrid class): both faces cast from the
+                    //Cast menu (back via its alternative cost), so the toggle is
+                    //a true game no-op.
+                    out << " -> DISPLAY TOGGLE only: switches this hand card to show"
+                           " its other face \"" << otherName << "\"";
+                    if (oc && oc->data && oc->data->getManaCost()
+                        && oc->data->getManaCost()->getConvertedCost())
+                        out << " (" << oc->data->getManaCost()->toString() << ")";
+                    out << ". It does NOT cast anything and uses no stack. You"
+                           " usually do NOT need it: the Cast menu is where you cast,"
+                           " and it lists every face you can afford (the other face"
+                           " appears there as an alternative-cost cast). This only"
+                           " changes which face is displayed.";
+                }
             }
         }
     }
@@ -3236,6 +3355,31 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (!index)
     {
         DebugTrace("AIPlayerGPT[ph" << phase << "]: all actions pass-declined this turn; passing");
+        return NULL;
+    }
+    //N-152b: cosmetic-only priority window. When the ONLY non-pass options are
+    //modal-DFC Flip-Side display toggles (AATurnSide), the model can gain
+    //nothing here and demonstrably loses - it burns a full round trip (deck152:
+    //Tovolar's Huntmaster flipped a useless "backside" toggle across ~10
+    //consecutive windows at ~200s each) and the bare toggle is a fabrication
+    //attractor (vs136 seq27 hallucinated an off-menu "Cast Briarbridge Tracker"
+    //-> the corpus's one unparsed fallback). Auto-pass instead of asking. This
+    //never skips a real play: a modal-DFC LAND's other-color face is still
+    //reachable through its OWN play menu ("Play Land / Flip Side / Decline",
+    //where Flip Side is annotated as the route - N-152a), and a DFC spell's
+    //other face still casts from the Cast menu. The gate is exact: EVERY shown
+    //option must be a Flip-Side toggle; if any real action coexists, the toggle
+    //stays offered (annotated) and the model is asked as before.
+    bool allTurnSide = true;
+    for (size_t s = 0; s < shown.size(); s++)
+        if (!asTurnSide(shown[s]->ability))
+        {
+            allTurnSide = false;
+            break;
+        }
+    if (allTurnSide)
+    {
+        DebugTrace("AIPlayerGPT[ph" << phase << "]: only display-toggle (Flip Side) options; auto-passing without a model call");
         return NULL;
     }
     tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list) or \"CHOICE: 0 (pass)\"; then any brief reasoning; then your PLAN: line last.";
@@ -4366,12 +4510,58 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //already annotates the same pseudo-action "DISPLAY TOGGLE only" in describeAction.
     //Append-only text: the answer index and the req.optionTexts staleness key are
     //untouched.
+    //A "Play Land" option sitting beside "Flip Side" means this IS the modal-DFC
+    //LAND play menu (defaultPlayName is "Play Land" only for a land). deck152
+    //N-152a: the old "the Cast menu offers the other face" text was a LIE here
+    //(a land has no Cast menu). Name both faces + colors so the pilot knows the
+    //other color exists - but be HONEST: verified live (deck199 probe) that
+    //flipping swaps the DISPLAYED face yet the flipped back face then FAILS to
+    //enter (the land-drop offers "Play <back>" but the put-into-play defers -
+    //the front-face isflipped==0 restriction blocks the normal drop once
+    //flipped). So flipping gains nothing PLAYABLE; do not steer the model into a
+    //flip-then-fail loop. The non-land (spell) DFC keeps the true-no-op text.
+    bool landFaceMenu = false;
+    for (size_t i = 0; i < opts.size() && !landFaceMenu; i++)
+        if (opts[i] == "Play Land")
+            landFaceMenu = true;
+    string curFace, curMana, othFace, othMana;
+    if (landFaceMenu && ctx && ctx->isLand())
+    {
+        curFace = ctx->getDisplayName();
+        curMana = landTapMana(ctx->text);
+        othFace = dfcOtherFaceName(ctx->text);
+        if (!othFace.empty())
+        {
+            MTGCard * oc = MTGCollection()->getCardByName(othFace, ctx->setId);
+            if (oc && oc->data && oc->data->isLand())
+                othMana = landTapMana(oc->data->text);
+            else
+                othFace = ""; //other face is not a land - not the Pathway case
+        }
+    }
     for (size_t i = 0; i < opts.size(); i++)
         if (opts[i] == "Flip Side")
-            opts[i] += " [display toggle only - no game effect: switches which face this"
-                       " hand card shows; it casts nothing and uses no stack. The Cast menu"
-                       " is where you cast, and it offers the other face as an"
-                       " alternative-cost cast - you do not need this.]";
+        {
+            if (landFaceMenu && !othFace.empty())
+            {
+                opts[i] += " [DISPLAY TOGGLE only - this is a modal double-faced land."
+                           " It currently shows \"" + curFace + "\"";
+                if (!curMana.empty())
+                    opts[i] += " (taps for " + curMana + ")";
+                opts[i] += "; its other face is \"" + othFace + "\"";
+                if (!othMana.empty())
+                    opts[i] += " (taps for " + othMana + ")";
+                opts[i] += ". Flipping only changes which face is DISPLAYED; it casts"
+                           " nothing and gains nothing playable - in this engine only the"
+                           " currently-shown face can actually be played as a land. Choose"
+                           " Play Land to play the current face.]";
+            }
+            else
+                opts[i] += " [display toggle only - no game effect: switches which face this"
+                           " hand card shows; it casts nothing and uses no stack. The Cast menu"
+                           " is where you cast, and it offers the other face as an"
+                           " alternative-cost cast - you do not need this.]";
+        }
     //Dungeon room-BRANCH menu (deck146 N-146b): advancing WITHIN a dungeon offers
     //the next room as a bare name ("Veils of Fear" / "Oubliette") with ZERO effect
     //text - the deciding fact for the venture path is absent (standing P1/P4), and
@@ -7553,6 +7743,49 @@ void AIPlayerGPT::runParseSelfTest()
         bool sf1 = false;
         int cf1 = parseChoice("1 (Cast Card Normally)", 2, &dfcMenu, &sf1, NULL);
         CHECK(cf1 == 1 && !sf1, "W29-A modal-DFC: 'Cast Card Normally' still matches option 1 alongside the annotated Flip Side");
+    }
+
+    // ---- WAVE-31 (N-152a): the MDFC LAND flip annotations are ANSWER TARGETS.
+    // The play-land face menu ("Play Land / Flip Side / Decline") and the
+    // in-hand priority Flip-Side option now carry a land-aware tail naming both
+    // faces + colors. A bare "Play Land" / "Flip Side" echo must still bind, and
+    // the landTapMana / dfcOtherFaceName helpers that build the tail must read a
+    // Pathway's text correctly.
+    cout << "\n[W31-A] MDFC land flip annotations echo-match + helper extraction\n";
+    {
+        // landTapMana: pull the produced color(s) off a land face's rules text.
+        CHECK(landTapMana("{T}: Add {G}. // Boulderloft Pathway") == "{G}",
+              "W31-A landTapMana reads the front (G) face's tapped color");
+        CHECK(landTapMana("{T}: Add {W}. // Branchloft Pathway") == "{W}",
+              "W31-A landTapMana reads the back (W) face's tapped color");
+        CHECK(landTapMana("{T}: Add {W} or {U}.") == "{W} or {U}",
+              "W31-A landTapMana reads a two-color 'or' tap line");
+        CHECK(landTapMana("2/2 Wolf, no mana ability").empty(),
+              "W31-A landTapMana is empty for a face that produces no mana");
+        // dfcOtherFaceName: the other face's name from the "// X" tail.
+        CHECK(dfcOtherFaceName("{T}: Add {G}. // Boulderloft Pathway") == "Boulderloft Pathway",
+              "W31-A dfcOtherFaceName extracts the other face's printed name");
+        CHECK(dfcOtherFaceName("Whenever this enters, draw a card.").empty(),
+              "W31-A dfcOtherFaceName is empty for a non-DFC card (no '//')");
+
+        // The land-face play menu: the annotated Flip Side + Play Land still bind
+        // to their indices under the exact tail shape the code emits.
+        vector<string> landMenu;
+        landMenu.push_back("Play Land");
+        landMenu.push_back("Flip Side [DISPLAY TOGGLE only - this is a modal double-faced land."
+                           " It currently shows \"Branchloft Pathway\" (taps for {G}); its other"
+                           " face is \"Boulderloft Pathway\" (taps for {W}). Flipping only changes"
+                           " which face is DISPLAYED; it casts nothing and gains nothing playable -"
+                           " in this engine only the currently-shown face can actually be played as"
+                           " a land. Choose Play Land to play the current face.]");
+        landMenu.push_back("Decline - do nothing");
+        bool sfl = false;
+        int cfl = parseChoice("2 (Flip Side)", 3, &landMenu, &sfl, NULL);
+        cout << "     land-menu 'Flip Side' echo -> " << cfl << " (must be 2)\n";
+        CHECK(cfl == 2 && !sfl, "W31-A land-menu: a 'Flip Side' echo binds to its land-aware annotated option");
+        bool spl = false;
+        int cpl = parseChoice("1 (Play Land)", 3, &landMenu, &spl, NULL);
+        CHECK(cpl == 1 && !spl, "W31-A land-menu: 'Play Land' still binds to option 1 alongside the annotated Flip Side");
     }
 
     cout << "\n[W23-A2] absent-card bookend: a clean sibling CHOICE line beats a hallucinated middle one\n";

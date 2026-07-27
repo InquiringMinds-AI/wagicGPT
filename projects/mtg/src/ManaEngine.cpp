@@ -653,6 +653,47 @@ int ManaEngine::maxAnnounceableX(Player * p, ManaCost * baseWithX, int anytypeof
     else
         avail = potential->getConvertedCost() - baseWithX->getConvertedCost();
     delete potential;
+
+    //CONVOKE credits the X cap. Per CR 702.51, each creature tapped for convoke
+    //pays {1} of GENERIC mana or one mana of that creature's colour, and generic
+    //mana pays the {X} portion of an X-spell. So an X-spell with convoke can
+    //reach an X ABOVE what the mana pool alone affords, by the number of
+    //untapped creatures available to convoke. Convoke::offerable() already
+    //credits this when deciding to OFFER the cast; if the X cap does NOT, the
+    //engine offers a convoke X-spell but then builds only the X=0 option, so no
+    //ANNOUNCE_X ask ever fires and the offered cast silently no-ops (deck137
+    //March of the Multitudes: OFFERED every game, resolved to tokens only when
+    //the mana pool alone happened to reach X>=1). The downstream payment already
+    //supports it: after X is announced the cost is resolved to {base}+{X generic}
+    //and Convoke::getReduction/doPay reduce the generic pips with tapped
+    //creatures (vs152 t12 X=3 -> 3 Soldiers). Only a GENERIC X benefits: a strict
+    //coloured X (xColor>0, !anytypeofmana) is not helped by off-colour convoke
+    //mana, so leave that branch uncredited (never OVER-offer an unpayable X).
+    if ((baseWithX->xColor <= 0 || anytypeofmana) && baseWithX->extraCosts && p->game && p->game->inPlay)
+    {
+        bool hasConvoke = false;
+        for (size_t i = 0; i < baseWithX->extraCosts->costs.size(); i++)
+        {
+            if (dynamic_cast<Convoke*>(baseWithX->extraCosts->costs[i]))
+            {
+                hasConvoke = true;
+                break;
+            }
+        }
+        if (hasConvoke)
+        {
+            int convokers = 0;
+            MTGGameZone * z = p->game->inPlay;
+            for (int c = 0; c < z->nb_cards; c++)
+            {
+                MTGCardInstance * cc = z->cards[c];
+                if (cc && cc->isCreature() && !cc->isTapped() && !cc->isPhased)
+                    convokers++;
+            }
+            avail += convokers;
+        }
+    }
+
     if (avail < 0)
         avail = 0;
     if (avail > 20)

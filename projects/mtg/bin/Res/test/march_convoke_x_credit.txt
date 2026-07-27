@@ -1,0 +1,49 @@
+# GOLD COUNTERFACTUAL for the wave-31 convoke fix (two coupled fixes; deck137
+# offer-vs-resolution gap). PRE-FIX this FAILS two ways: (1) maxAnnounceableX did
+# not credit convoke, so on a mana-short pool the X cap was 0, `choice 2` fell out
+# of range and the cast was declined (0 tokens, March never hits the graveyard);
+# (2) even once X>=1 is reached, the convoke-X PAYMENT over-drew the pool by the
+# convoke-covered pip, leaving a negative component ("==Mana problem. Was
+# expecting 0 but got -1=="). POST-FIX both are closed: maxAnnounceableX credits
+# the 3 convokers so X=2 is announceable, and ManaCost::pay floors the residual
+# negative the netting loop can't absorb, so the pool balances to 0. Distinct from
+# march_convoke_x (pool {2}{G}{W}{W} covers the FULL cost, so it never exercised
+# either the cap credit or the shortfall payment and passed with or without fix).
+#
+# March of the Multitudes {X}{G}{W}{W}, convoke. DISCRIMINATING convoke-credit
+# witness for the wave-31 maxAnnounceableX fix (deck137 offer-vs-resolution gap):
+# the pool alone is EXACTLY {G}{W}{W} (CMC 3 = the base colored cost, X headroom
+# ZERO from mana), so the X-announce cap is decided ENTIRELY by whether convoke
+# credits the X. Per CR 702.51 each convoke creature pays {1} generic (or its
+# colour), and generic mana pays the {X} of an X-spell, so the 3 untapped
+# creatures let X reach up to 3. Script: mode menu choice 1 = convoke variant ->
+# announce X (choice 2 = X=2) -> tap the 3 creatures -> finish. Post-fix
+# maxAnnounceableX credits the 3 convokers so X=2 is an offered/announceable
+# value and resolves to 2 Soldier tokens; PRE-FIX maxAnnounceableX returned 0
+# (pool CMC 3 - base 3), so ONLY X=0 was built, `choice 2` fell out of range and
+# the cast was declined -> 0 tokens, March never reaches the graveyard -> this
+# ASSERT fails. (Unlike march_convoke_x, whose {2}{G}{W}{W} pool reaches X=2 on
+# mana alone and so passes with or without the fix.) The tap/residual split is
+# engine-chosen; this asserts only the load-bearing outcome.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Eager Cadet,Eager Cadet
+hand:March of the Multitudes
+manapool:{G}{W}{W}
+[PLAYER2]
+[DO]
+March of the Multitudes
+choice 1
+choice 2
+Grizzly Bears
+Eager Cadet
+Eager Cadet
+March of the Multitudes
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Eager Cadet,Eager Cadet,*,*
+graveyard:March of the Multitudes
+[PLAYER2]
+[END]
