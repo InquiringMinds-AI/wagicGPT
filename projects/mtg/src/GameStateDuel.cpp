@@ -1,10 +1,16 @@
 #include "PrecompiledHeader.h"
 
-#ifdef WAGIC_AUTODEMO
+//WAGIC_HWPROBE = the file-probe telemetry WITHOUT the selfplay/lang hijacks:
+//for real-hardware runs where a human drives the menus and we need the log.
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
 #include <pspsysmem.h>
 #include <stdarg.h>
 #include <malloc.h>
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
 #define WAGIC_SELFPLAY_ACTIVE 1
+#else
+#define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
+#endif
 static void wagicProbe(const char* fmt, ...)
 {
     FILE* f = fopen("User/wagic-probe.log", "a");
@@ -288,12 +294,21 @@ void GameStateDuel::Start()
             //DeckManager::EndInstance();
             decksneeded = 1;
 
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: human ctor begin");
+#endif
             deckmenu = NEW DeckMenu(DUEL_MENU_CHOOSE_DECK, this, Fonts::OPTION_FONT, "Choose a Deck",
                 GameStateDuel::selectedPlayerDeckId, true, false);
             deckmenu->enableDisplayDetailsOverride();
             DeckManager *deckManager = DeckManager::GetInstance();
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: ctor done, BuildDeckList begin");
+#endif
             vector<DeckMetaData *> playerDeckList = BuildDeckList(options.profileFile(), "", NULL, 0, mParent->gameType);
             int nbDecks = playerDeckList.size();
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: BuildDeckList done nbDecks=%d", nbDecks);
+#endif
 
             if (nbDecks)
                 decksneeded = 0;
@@ -302,6 +317,9 @@ void GameStateDuel::Start()
                 deckmenu->Add(MENUITEM_RANDOM_PLAYER, "Random", "Play with a random deck.");
 
             renderDeckMenu(deckmenu, playerDeckList);
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: renderDeckMenu done");
+#endif
             // save the changes to the player deck list maintained in DeckManager
             deckManager->updateMetaDataList(&playerDeckList, false);
             playerDeckList.clear();
@@ -326,7 +344,13 @@ void GameStateDuel::Start()
                 deckmenu->Add(MENUITEM_NEW_DECK, _("Create your Deck!").c_str(), desc);
             }
             premadeDeck = true;
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: premade fill begin");
+#endif
             fillDeckMenu(deckmenu, _("player/premade").c_str(), "", NULL, 0, mParent->gameType);
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: premade fill done");
+#endif
         }
         else if (gModRules.general.hasDeckEditor())
         {
@@ -501,7 +525,7 @@ void GameStateDuel::setGamePhase(int newGamePhase) {
     if (mGamePhase == newGamePhase)
         return;
 
-#ifdef WAGIC_AUTODEMO
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
     wagicProbe("duelphase %s -> %s", stateStrings[mGamePhase], stateStrings[newGamePhase]);
 #endif
 
@@ -556,10 +580,12 @@ void GameStateDuel::ThreadProc(void* inParam)
 
 void GameStateDuel::Update(float dt)
 {
-#ifdef WAGIC_AUTODEMO
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
     if (mGamePhase == DUEL_STATE_PLAY)
     {
+#ifdef WAGIC_AUTODEMO
         dt *= 4; // compress demo pacing for unattended emulator runs
+#endif
         static float probeAcc = 0;
         static int lastProbedTurn = -1;
         probeAcc += dt;
@@ -1441,6 +1467,9 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
           switch (controlId)
           {
               case CNOGMENU_ITEM_SINGLE_GAME:
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+                wagicProbe("cnog: single game chosen");
+#endif
                 tournament->setMatchType(1,MATCHMODE_FIXED);break;
               case CNOGMENU_ITEM_CONTINUE_TOURNAMENT:
                   if (cnogmenu) cnogmenu->Close();

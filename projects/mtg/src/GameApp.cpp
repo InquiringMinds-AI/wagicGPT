@@ -88,7 +88,7 @@ GameApp::~GameApp()
 }
 
 
-#ifdef WAGIC_AUTODEMO
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
 #include <stdio.h>
 static void gaMark(const char* m)
 {

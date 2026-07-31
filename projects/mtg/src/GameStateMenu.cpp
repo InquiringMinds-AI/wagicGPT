@@ -5,11 +5,15 @@
 
 #include "PrecompiledHeader.h"
 
-#ifdef WAGIC_AUTODEMO
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
 #include <pspsysmem.h>
 #include <stdarg.h>
 #include <malloc.h>
+#ifdef WAGIC_AUTODEMO
 #define WAGIC_SELFPLAY_ACTIVE 1
+#else
+#define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
+#endif
 static void wagicProbe(const char* fmt, ...)
 {
     FILE* f = fopen("User/wagic-probe.log", "a");
@@ -582,7 +586,7 @@ void GameStateMenu::Update(float dt)
 #ifdef _DEBUG
             int startTime = JGEGetTime();
 #endif
-#ifdef WAGIC_AUTODEMO
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
             wagicProbe("primitive %d/%d %s", primitivesLoadCounter, (int)primitives.size(), primitives[primitivesLoadCounter].c_str());
 #endif
             MTGCollection()->load(primitives[primitivesLoadCounter].c_str());
@@ -598,7 +602,7 @@ void GameStateMenu::Update(float dt)
         primitivesLoadCounter = primitives.size() + 1;
         if (mReadConf)
         {
-#ifdef WAGIC_AUTODEMO
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
             wagicProbe("set %s", mCurrentSetName.c_str());
 #endif
             MTGCollection()->load(mCurrentSetFileName.c_str(), mCurrentSetName.c_str());

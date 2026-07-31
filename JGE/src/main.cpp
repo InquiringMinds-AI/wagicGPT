@@ -302,7 +302,7 @@ u8 JGEGetAnalogY() { return jgeAnalogDeadzone(gCtrlPad.Ly); }
 //------------------------------------------------------------------------------------------------
 // The main loop
 
-#ifdef WAGIC_AUTODEMO
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
 #include <stdio.h>
 static void bootMark(const char* m)
 {

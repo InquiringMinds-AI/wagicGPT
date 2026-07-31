@@ -16,7 +16,7 @@
 
 vector<Rules *> Rules::RulesList = vector<Rules *>();
 
-#ifdef WAGIC_AUTODEMO
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
 #include <stdarg.h>
 static void rulesProbe(const char* fmt, ...)
 {
