@@ -1,5 +1,27 @@
 #include "PrecompiledHeader.h"
 
+#ifdef WAGIC_AUTODEMO
+#include <pspsysmem.h>
+#include <stdarg.h>
+#include <malloc.h>
+#define WAGIC_SELFPLAY_ACTIVE 1
+static void wagicProbe(const char* fmt, ...)
+{
+    FILE* f = fopen("ms0:/wagic-probe.log", "a");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    struct mallinfo mi = mallinfo();
+    fprintf(f, " used=%u arena=%u\n", (unsigned)mi.uordblks, (unsigned)mi.arena);
+    fclose(f);
+}
+#else
+#define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
+#endif
+
+
 #include "DeckMenu.h"
 #include "GameStateDuel.h"
 #include "utils.h"
@@ -223,7 +245,7 @@ void GameStateDuel::Start()
         // only reset "Played Games" and "Victories" info if we didn't come here from within a match
         tournament->Start();
 
-        if (getenv("WAGIC_SELFPLAY"))
+        if (WAGIC_SELFPLAY_ACTIVE)
         {
             //Headless self-play: skip the "how many games" + deck-choice menus
             //and boot straight into an endless AI-vs-AI demo. This replicates
@@ -479,6 +501,10 @@ void GameStateDuel::setGamePhase(int newGamePhase) {
     if (mGamePhase == newGamePhase)
         return;
 
+#ifdef WAGIC_AUTODEMO
+    wagicProbe("duelphase %s -> %s", stateStrings[mGamePhase], stateStrings[newGamePhase]);
+#endif
+
     if (mGamePhase)
         JGE::GetInstance()->SendCommand("leaveduelphase:" + string(stateStrings[mGamePhase]));
 
@@ -530,6 +556,19 @@ void GameStateDuel::ThreadProc(void* inParam)
 
 void GameStateDuel::Update(float dt)
 {
+#ifdef WAGIC_AUTODEMO
+    if (mGamePhase == DUEL_STATE_PLAY)
+    {
+        dt *= 4; // compress demo pacing for unattended emulator runs
+        static float probeAcc = 0;
+        probeAcc += dt;
+        if (probeAcc > 40)
+        {
+            probeAcc = 0;
+            wagicProbe("ingame turn=%d", game ? game->turn : -1);
+        }
+    }
+#endif
     switch (mGamePhase)
     {
     case DUEL_STATE_ERROR_NO_DECK:

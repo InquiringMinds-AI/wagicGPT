@@ -5,6 +5,28 @@
 
 #include "PrecompiledHeader.h"
 
+#ifdef WAGIC_AUTODEMO
+#include <pspsysmem.h>
+#include <stdarg.h>
+#include <malloc.h>
+#define WAGIC_SELFPLAY_ACTIVE 1
+static void wagicProbe(const char* fmt, ...)
+{
+    FILE* f = fopen("ms0:/wagic-probe.log", "a");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    struct mallinfo mi = mallinfo();
+    fprintf(f, " used=%u arena=%u\n", (unsigned)mi.uordblks, (unsigned)mi.arena);
+    fclose(f);
+}
+#else
+#define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
+#endif
+
+
 #include <math.h>
 
 #include "GameStateMenu.h"
@@ -531,6 +553,12 @@ void GameStateMenu::Update(float dt)
     switch (MENU_STATE_MAJOR & currentState)
     {
     case MENU_STATE_MAJOR_LANG:
+#ifdef WAGIC_AUTODEMO
+        wagicProbe("lang bypass");
+        options[Options::LANG].str = "en";
+        currentState = MENU_STATE_MAJOR_LOADING_CARDS;
+        break;
+#endif
         if (MENU_STATE_MINOR_NONE == (currentState & MENU_STATE_MINOR))
         {
             if (!subMenuController)
@@ -554,6 +582,9 @@ void GameStateMenu::Update(float dt)
 #ifdef _DEBUG
             int startTime = JGEGetTime();
 #endif
+#ifdef WAGIC_AUTODEMO
+            wagicProbe("primitive %d/%d %s", primitivesLoadCounter, (int)primitives.size(), primitives[primitivesLoadCounter].c_str());
+#endif
             MTGCollection()->load(primitives[primitivesLoadCounter].c_str());
 #if _DEBUG
             int endTime = JGEGetTime();
@@ -567,6 +598,9 @@ void GameStateMenu::Update(float dt)
         primitivesLoadCounter = primitives.size() + 1;
         if (mReadConf)
         {
+#ifdef WAGIC_AUTODEMO
+            wagicProbe("set %s", mCurrentSetName.c_str());
+#endif
             MTGCollection()->load(mCurrentSetFileName.c_str(), mCurrentSetName.c_str());
         }
         else
@@ -654,7 +688,7 @@ void GameStateMenu::Update(float dt)
             //translogs and controls how many games run.
             {
                 static bool autoSelfPlayTried = false;
-                if (!autoSelfPlayTried && getenv("WAGIC_SELFPLAY"))
+                if (!autoSelfPlayTried && WAGIC_SELFPLAY_ACTIVE)
                 {
                     autoSelfPlayTried = true;
                     fprintf(stderr, "WAGIC_SELFPLAY: auto-launching AI-vs-AI demo\n");
