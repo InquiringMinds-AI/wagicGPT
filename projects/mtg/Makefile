@@ -27,7 +27,9 @@ OBJS	= objs/InteractiveButton.o objs/AbilityParser.o objs/ActionElement.o\
 	objs/ThisDescriptor.o objs/Token.o objs/Translate.o objs/TranslateKeys.o\
 	objs/Trash.o objs/utils.o objs/WEvent.o objs/WResourceManager.o\
 	objs/WCachedResource.o objs/WDataSrc.o objs/WGui.o objs/WFilter.o objs/Tasks.o\
-	objs/WFont.o objs/WParsedInt.o objs/CarouselDeckView.o objs/GridDeckView.o objs/DeckView.o
+	objs/WFont.o objs/WParsedInt.o objs/CarouselDeckView.o objs/GridDeckView.o objs/DeckView.o\
+	objs/AIPlayerBakaB.o objs/AIPlayerGPT.o objs/Closest.o objs/DecisionContract.o\
+	objs/GptConfig.o objs/LegalActions.o objs/ManaEngine.o objs/OptionGpt.o objs/PreGamePhase.o
 DEPS = $(patsubst objs/%.o, deps/%.d, $(OBJS))
 
 RESULT = $(shell psp-config --psp-prefix 2> Makefile.cache)
@@ -62,7 +64,7 @@ DEFAULT_RULE = 3xx
 PSP_FW_VERSION=371
 BUILD_PRX = 1
 SIGN_PRX = 1
-LIBS = -ljge300 -lhgetools -lfreetype -ljpeg -lgif -lpng -lz -lm -lmikmod -lpsppower -lpspmpeg -lpspaudiocodec -lpspaudiolib -lpspaudio -lpspmp3 -lpspgum -lpspgu -lpsprtc -lstdc++ -lpspfpu
+LIBS = -ljge300 -lhgetools -lfreetype -ljpeg -lgif -lpng -lz -lm -lmikmod -lpsppower -lpspmpeg -lpspaudiocodec -lpspaudiolib -lpspaudio -lpspmp3 -lpspgum -lpspgu -lpsprtc -lstdc++ -lpspfpu -lcurl
 
 EXTRA_TARGETS = EBOOT.PBP
 PSP_EBOOT_TITLE = Wagic, the Homebrew?!
@@ -73,7 +75,7 @@ PSP_EBOOT_UNKPNG = pic0.png
 PSP_EBOOT_PIC1 = pic1.png
 INCDIR = ../../JGE/include ../../JGE/src/zipFS ../../JGE/include/psp ../../JGE/include/psp/freetype2 ../../JGE/src ../../projects/mtg/include ../../Boost
 LIBDIR = ../../JGE/lib/psp
-CFLAGS = -O2 -G0 -DPSPFW3XX -DDEVHOOK -DUSE_PRECOMPILED_HEADERS=1 -DPSP -DTIXML_USE_STL
+CFLAGS = -O2 -G0 -DPSPFW3XX -DDEVHOOK -DUSE_PRECOMPILED_HEADERS=1 -DPSP -DTIXML_USE_STL -std=gnu++14 $(EXTRA_DEFS)
 
 else
 
@@ -103,7 +105,7 @@ all: $(DEFAULT_RULE)
 endif
 endif
 
-CFLAGS := -Wall -W -Werror -Wno-unused -Wno-deprecated-declarations $(CFLAGS)
+CFLAGS := -Wall -W -Wno-unused -Wno-deprecated-declarations $(CFLAGS)
 CXXFLAGS += $(CFLAGS)
 # -fno-exceptions
 

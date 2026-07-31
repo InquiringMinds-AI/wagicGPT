@@ -30,7 +30,7 @@
 #ifndef WIN32
 
 // in JGBKFont.cpp
-extern void SwizzlePlot(u8* out, PIXEL_TYPE color, int i, int j, unsigned int width);
+extern void SwizzlePlot(u8* out, unsigned int color, int i, int j, unsigned int width);
 
 #endif
 

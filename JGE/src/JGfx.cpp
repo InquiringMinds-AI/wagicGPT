@@ -40,7 +40,7 @@ extern "C" {
 static unsigned int __attribute__((aligned(16))) list[262144];
 
 
-extern void SwizzlePlot(u8* out, PIXEL_TYPE color, int i, int j, unsigned int width);
+extern void SwizzlePlot(u8* out, unsigned int color, int i, int j, unsigned int width);
 
 void Swap(float *a, float *b)
 {

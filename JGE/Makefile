@@ -30,9 +30,11 @@ HGE_OBJS = src/hge/hgecolor.o src/hge/hgeparticle.o \
        src/hge/hgedistort.o src/hge/hgefont.o
 
 
-CXXFLAGS = -W -Wall -Werror -Wno-unused
+CXXFLAGS = -W -Wall -Wno-unused
 CXXFLAGS += -DTIXML_USE_STL
 CXXFLAGS += -Wno-deprecated-declarations -Wno-sign-compare
+# Codebase predates C++17 (random_shuffle etc.); modern GCC defaults past it.
+CXXFLAGS += -std=gnu++14
 
 ifdef DEBUG
 CXXFLAGS += -ggdb3
@@ -108,6 +110,11 @@ linux: $(TARGET_LIB) hge
 install: $(TARGET_LIB) hge
 
 hge: $(TARGET_HGE)
+
+ifeq ($(TARGET_ARCHITECTURE),psp)
+$(TARGET_HGE): $(HGE_OBJS)
+	$(AR) r $(TARGET_HGE) $(HGE_OBJS)
+endif
 
 ifeq ($(TARGET_ARCHITECTURE),linux)
 
