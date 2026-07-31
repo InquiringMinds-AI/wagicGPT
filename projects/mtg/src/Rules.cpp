@@ -16,6 +16,23 @@
 
 vector<Rules *> Rules::RulesList = vector<Rules *>();
 
+#ifdef WAGIC_AUTODEMO
+#include <stdarg.h>
+static void rulesProbe(const char* fmt, ...)
+{
+    FILE* f = fopen("User/wagic-probe.log", "a");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    fprintf(f, "\n");
+    fclose(f);
+}
+#else
+static inline void rulesProbe(const char*, ...) {}
+#endif
+
 //Sorting by displayName
 struct RulesMenuCmp{
     bool operator()(const Rules * a,const Rules * b) const{
@@ -25,9 +42,15 @@ struct RulesMenuCmp{
 
 Rules * Rules::getRulesByFilename(string _filename)
 {
+    //Case-insensitive: PSP memory-stick (FAT) directory scans return
+    //8.3-compatible names UPPERCASED (CLASSIC.TXT), so the stored filename
+    //may not byte-match a lowercase literal like "classic.txt".
+    std::transform(_filename.begin(), _filename.end(), _filename.begin(), ::tolower);
     for (size_t i = 0; i < RulesList.size(); ++i)
     {
-        if (RulesList[i]->filename == _filename)
+        string candidate = RulesList[i]->filename;
+        std::transform(candidate.begin(), candidate.end(), candidate.begin(), ::tolower);
+        if (candidate == _filename)
             return RulesList[i];
     }
     return NULL;
@@ -251,12 +274,16 @@ void Rules::addExtraRules(GameObserver* g)
         }
     }
 
+    rulesProbe("extraRules perplayer p0=%d p1=%d",
+        (int) initState.playerData[0].extraRules.size(), (int) initState.playerData[1].extraRules.size());
+    int parsedGlobal = 0, failedGlobal = 0;
     for (size_t j = 0; j < extraRules.size(); ++j)
     {
         AbilityFactory af(g);
         MTGAbility * a = af.parseMagicLine(extraRules[j], id++, NULL, &(g->ExtraRules[0]));
         if (a)
         {
+            parsedGlobal++;
             if (a->oneShot)
             {
                 a->resolve();
@@ -267,7 +294,17 @@ void Rules::addExtraRules(GameObserver* g)
                 a->addToGame();
             }
         }
+        else
+        {
+            failedGlobal++;
+            //NB: rule keywords (putinplayrule, attackrule, ...) install observers
+            //and return NULL by design - a NULL here is not necessarily a failure.
+            rulesProbe("extraRules parsed NULL: %.100s", extraRules[j].c_str());
+        }
     }
+    rulesProbe("extraRules global=%d parsed=%d failed=%d p0hand=%d p0handsize=%d p1handsize=%d",
+        (int) extraRules.size(), parsedGlobal, failedGlobal,
+        g->players[0]->game->hand->nb_cards, g->players[0]->handsize, g->players[1]->handsize);
 }
 
 Player * Rules::loadPlayerMomir(GameObserver* observer, int isAI)

@@ -561,11 +561,28 @@ void GameStateDuel::Update(float dt)
     {
         dt *= 4; // compress demo pacing for unattended emulator runs
         static float probeAcc = 0;
+        static int lastProbedTurn = -1;
         probeAcc += dt;
+        //Dense early telemetry: one probe per turn while the opening plays out.
+        if (game && game->turn <= 50 && game->turn != lastProbedTurn)
+        {
+            lastProbedTurn = game->turn;
+            probeAcc = 999;
+        }
         if (probeAcc > 40)
         {
             probeAcc = 0;
-            wagicProbe("ingame turn=%d", game ? game->turn : -1);
+            if (game && game->players[0] && game->players[1])
+            {
+                Player * p0 = game->players[0];
+                Player * p1 = game->players[1];
+                wagicProbe("ingame turn=%d ph=%d p0[life=%d lib=%d hand=%d play=%d gy=%d ex=%d] p1[life=%d lib=%d hand=%d play=%d gy=%d ex=%d]",
+                    game->turn, game->getCurrentGamePhase(),
+                    p0->life, p0->game->library->nb_cards, p0->game->hand->nb_cards, p0->game->inPlay->nb_cards, p0->game->graveyard->nb_cards, p0->game->exile->nb_cards,
+                    p1->life, p1->game->library->nb_cards, p1->game->hand->nb_cards, p1->game->inPlay->nb_cards, p1->game->graveyard->nb_cards, p1->game->exile->nb_cards);
+            }
+            else
+                wagicProbe("ingame turn=%d (players unset)", game ? game->turn : -1);
         }
     }
 #endif
