@@ -289,8 +289,14 @@ int JGEGetTime()
 
 static SceCtrlData gCtrlPad;
 
-u8 JGEGetAnalogX() { return gCtrlPad.Lx; }
-u8 JGEGetAnalogY() { return gCtrlPad.Ly; }
+//Generous deadzone: worn PSP sticks drift near center; deliberate pushes
+//far exceed +/-40. Wagic is d-pad-first, so this costs nothing.
+static inline u8 jgeAnalogDeadzone(u8 v)
+{
+    return (v > 88 && v < 168) ? 128 : v;
+}
+u8 JGEGetAnalogX() { return jgeAnalogDeadzone(gCtrlPad.Lx); }
+u8 JGEGetAnalogY() { return jgeAnalogDeadzone(gCtrlPad.Ly); }
 
 
 //------------------------------------------------------------------------------------------------
