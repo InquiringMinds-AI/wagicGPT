@@ -12,7 +12,7 @@
 #define WAGIC_SELFPLAY_ACTIVE 1
 static void wagicProbe(const char* fmt, ...)
 {
-    FILE* f = fopen("ms0:/wagic-probe.log", "a");
+    FILE* f = fopen("User/wagic-probe.log", "a");
     if (!f) return;
     va_list ap;
     va_start(ap, fmt);

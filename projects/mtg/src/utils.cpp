@@ -134,6 +134,21 @@ free(tab);
 
 // *** FUNCTIONS ***
 
+#ifdef PSP
+//Modern-toolchain PSP: exact O(1) queries from the bounded _sbrk in JGE main.cpp.
+//The historical malloc-probe loops are DELETED on PSP: GCC's allocation elision
+//turns them into infinite loops (they hung boot inside ResetCacheLimits).
+extern "C" unsigned int wagicHeapFreeBytes(void);
+extern "C" unsigned int wagicHeapLargestBlock(void);
+u32 ramAvailableLineareMax(void)
+{
+    return wagicHeapLargestBlock();
+}
+u32 ramAvailable(void)
+{
+    return wagicHeapFreeBytes();
+}
+#else
 u32 ramAvailableLineareMax(void)
 {
     u32 size, sizeblock;
@@ -144,7 +159,8 @@ u32 ramAvailableLineareMax(void)
     sizeblock = RAM_BLOCK;
 
 #ifdef PSP
-    int disableInterrupts = pspSdkDisableInterrupts();
+    //modern newlib malloc locks kernel lwmutexes; interrupts must stay ON
+    //int disableInterrupts = pspSdkDisableInterrupts();
 #endif
 
     // Check loop
@@ -170,7 +186,7 @@ u32 ramAvailableLineareMax(void)
     }
 
 #ifdef PSP
-    pspSdkEnableInterrupts(disableInterrupts);
+    //pspSdkEnableInterrupts(disableInterrupts);
 #endif
 
     return size;
@@ -187,7 +203,8 @@ u32 ramAvailable(void)
     count = 0;
 
 #ifdef PSP
-    int disableInterrupts = pspSdkDisableInterrupts();
+    //modern newlib malloc locks kernel lwmutexes; interrupts must stay ON
+    //int disableInterrupts = pspSdkDisableInterrupts();
 #endif
 
     // Check loop
@@ -227,10 +244,11 @@ u32 ramAvailable(void)
     }
 
 #ifdef PSP
-    pspSdkEnableInterrupts(disableInterrupts);
+    //pspSdkEnableInterrupts(disableInterrupts);
 #endif
     return size;
 }
+#endif //PSP
 
 /* String manipulation functions */
 string& trim(string& str)

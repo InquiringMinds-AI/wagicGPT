@@ -35,6 +35,8 @@ CXXFLAGS += -DTIXML_USE_STL
 CXXFLAGS += -Wno-deprecated-declarations -Wno-sign-compare
 # Codebase predates C++17 (random_shuffle etc.); modern GCC defaults past it.
 CXXFLAGS += -std=gnu++14
+CXXFLAGS += $(EXTRA_DEFS)
+CFLAGS += $(EXTRA_DEFS)
 
 ifdef DEBUG
 CXXFLAGS += -ggdb3
