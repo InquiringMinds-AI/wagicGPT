@@ -15,6 +15,9 @@ PNG_PATH := $(JGE_PATH)/Dependencies/libpng
 LOCAL_CFLAGS += -DLINUX -DANDROID -DSDL_CONFIG -DNETWORK_SUPPORT
 LOCAL_CFLAGS += -D_STLP_USE_SIMPLE_NODE_ALLOC -DTIXML_USE_STL
 LOCAL_CFLAGS += -D__arm__ -D_REENTRANT -D_GLIBCXX__PTHREADS
+# No libcurl port wired for Android yet: the GPT layer compiles in but its HTTP
+# transport reports failure -> AIPlayerGPT falls back to Baka (same as no endpoint).
+LOCAL_CFLAGS += -DWAGIC_NO_CURL
 LOCAL_STATIC_LIBRARIES := libpng libjpeg
 LOCAL_SHARED_LIBRARIES := SDL
 
@@ -36,6 +39,15 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
         $(MTG_PATH)/src/AIMomirPlayer.cpp \
         $(MTG_PATH)/src/AIPlayer.cpp \
         $(MTG_PATH)/src/AIPlayerBaka.cpp \
+        $(MTG_PATH)/src/AIPlayerBakaB.cpp \
+        $(MTG_PATH)/src/AIPlayerGPT.cpp \
+        $(MTG_PATH)/src/Closest.cpp \
+        $(MTG_PATH)/src/DecisionContract.cpp \
+        $(MTG_PATH)/src/GptConfig.cpp \
+        $(MTG_PATH)/src/LegalActions.cpp \
+        $(MTG_PATH)/src/ManaEngine.cpp \
+        $(MTG_PATH)/src/OptionGpt.cpp \
+        $(MTG_PATH)/src/PreGamePhase.cpp \
         $(MTG_PATH)/src/AIStats.cpp \
         $(MTG_PATH)/src/AllAbilities.cpp \
         $(MTG_PATH)/src/CardDescriptor.cpp \

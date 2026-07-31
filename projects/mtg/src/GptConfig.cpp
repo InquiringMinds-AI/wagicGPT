@@ -5,7 +5,9 @@
 #include "GptConfig.h"
 #include "JFileSystem.h"
 
+#ifndef WAGIC_NO_CURL
 #include <curl/curl.h>
+#endif
 #include <nlohmann/json.hpp>
 
 #include <cstdlib>
@@ -345,6 +347,15 @@ size_t gptPresetForUrl(const string& url)
 
 namespace
 {
+#ifdef WAGIC_NO_CURL
+//Platforms without a libcurl port yet (Android phase A): the transport reports
+//failure, which every GPT seam already treats as "fall back to Baka" - the
+//same behavior as an unreachable endpoint.
+string httpRequestImpl(const string&, const string&, long, const string&)
+{
+    return "";
+}
+#else
 size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * userp)
 {
     static_cast<string *>(userp)->append(static_cast<char *>(contents), size * nmemb);
@@ -391,6 +402,7 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
         return "";
     return response;
 }
+#endif //WAGIC_NO_CURL
 } //namespace
 
 string gptHttpGet(const string& url, long timeoutMs, const string& bearer)

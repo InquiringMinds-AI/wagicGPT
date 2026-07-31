@@ -31,7 +31,9 @@
 #include "DuelLayers.h"
 #include "PreGamePhase.h" //PreGamePhase::bottomTarget, driven by the self-test
 
+#ifndef WAGIC_NO_CURL
 #include <curl/curl.h>
+#endif
 #include <nlohmann/json.hpp>
 
 #include <cstdlib>
@@ -1894,7 +1896,9 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
+#ifndef WAGIC_NO_CURL
     curl_global_init(CURL_GLOBAL_DEFAULT);
+#endif
     //File config first, environment variables override.
     GptSettings cfg = GptSettings::load();
     mConfigUrls = cfg.urls;
