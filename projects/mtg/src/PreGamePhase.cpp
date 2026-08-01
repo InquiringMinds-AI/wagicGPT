@@ -10,6 +10,8 @@
 #include "WFont.h"
 #include "WResourceManager.h"
 #include "MTGDefinitions.h"
+#include "CardGui.h"
+#include "GameOptions.h"
 
 #include <algorithm>
 #include <sstream>
@@ -380,6 +382,33 @@ void PreGamePhase::Render()
         font->SetScale(DEFAULT_MAIN_FONT_SCALE);
         font->SetColor(ARGB(230, 255, 255, 200));
         font->DrawString("-- Pre-game: opening hands --", SCREEN_WIDTH / 2, 2, JGETEXT_CENTER);
+    }
+    //The keep/mulligan/bottoming/leyline menus are modal, so the hand-reveal key
+    //never reaches the hand layer and the choice would be blind. Render the
+    //deciding (human) player's hand under the menu.
+    if (mMenu && mIdx < 2)
+    {
+        Player * p = mOrder[mIdx];
+        if (p && p->isHuman() && p->game->hand->nb_cards)
+        {
+            MTGGameZone * h = p->game->hand;
+            const float scale = 0.32f;
+            const float cardW = scale * 200 + 2;
+            float spacing = cardW;
+            float total = spacing * h->nb_cards;
+            if (total > SCREEN_WIDTH - 20 && h->nb_cards > 1)
+            {
+                spacing = (SCREEN_WIDTH - 20 - cardW) / (h->nb_cards - 1);
+                total = spacing * (h->nb_cards - 1) + cardW;
+            }
+            float x = (SCREEN_WIDTH - total) / 2 + cardW / 2;
+            int mode = options[Options::DISABLECARDS].number ? DrawMode::kText : DrawMode::kNormal;
+            for (int i = 0; i < h->nb_cards; i++)
+            {
+                Pos pos(x + i * spacing, 212, scale * 285 / 250, 0.0, 255);
+                CardGui::DrawCard(h->cards[i], pos, mode, true);
+            }
+        }
     }
     if (mMenu)
         mMenu->Render();
