@@ -102,6 +102,12 @@ public class SDLActivity extends Activity implements OnKeyListener {
 
     //public final static String RES_FOLDER = Environment.getExternalStorageDirectory().getPath() + "/Wagic/Res/";
     public static String RES_FILENAME = "";
+
+    // Written into the APK by build-apk.sh alongside the pack itself; holds the
+    // pack's sha256. Comparing it against the installed pack's recorded id is
+    // what makes a new APK refresh the data with no version bookkeeping.
+    public static final String RES_PACK_ID_ASSET = "respack.sha256";
+    public static final String kInstalledPackIdPreference = "installedPackId";
     public static String databaseurl = "https://github.com/WagicProject/wagic/releases/latest/download/CardImageLinks.csv";
 
     // Preferences
@@ -482,16 +488,38 @@ public class SDLActivity extends Activity implements OnKeyListener {
         prefsEditor.commit();
     }
 
-    private void startDownload() {
-        String url = getResourceUrl();
-
+    // The core pack ships inside the APK, one pack per release, so the engine
+    // and the auto= script corpus it interprets can never drift apart. Nothing
+    // is fetched at runtime: the old path downloaded UPSTREAM's pack, which is
+    // the wrong data for this fork, and a partial download left a truncated zip
+    // sitting at the final filename with no way to notice.
+    private void installBundledRes() {
         if (!checkStorageState()) {
             Log.e(TAG, "Error in initializing storage space.");
             mSingleton.downloadError(
                 "Failed to initialize storage space for game. Please verify that your sdcard or internal memory is mounted properly.");
+            return;
         }
 
-        new DownloadFileAsync().execute(url);
+        new InstallResAsync().execute();
+    }
+
+    /** Identity of the pack built into this APK, or "" if unreadable. */
+    private String bundledPackId() {
+        InputStream in = null;
+
+        try {
+            in = getAssets().open(RES_PACK_ID_ASSET);
+
+            byte[] buf = new byte[128];
+            int n = in.read(buf);
+
+            return (n > 0) ? new String(buf, 0, n).trim() : "";
+        } catch (Exception e) {
+            return "";
+        } finally {
+            try { if (in != null) in.close(); } catch (IOException ignored) { }
+        }
     }
 
     public void downloadError(String errorMessage) {
@@ -968,7 +996,7 @@ public class SDLActivity extends Activity implements OnKeyListener {
         storage = settingsMenu.add(kStorageDataOptionsMenuId,
                 kStorageDataOptionsMenuId, Menu.NONE, "Storage Data Options");
         resource = settingsMenu.add(kdownloadResOptionsMenuId,
-                kdownloadResOptionsMenuId, Menu.NONE, "Download Core & Quit");
+                kdownloadResOptionsMenuId, Menu.NONE, "Reinstall Game Data");
 
     }
 
@@ -986,9 +1014,9 @@ public class SDLActivity extends Activity implements OnKeyListener {
         if (itemId == kStorageDataOptionsMenuId) {
             displayStorageOptions();
         } else if (itemId == kdownloadResOptionsMenuId) {
-            File oldRes = new File(getSystemStorageLocation() + RES_FILENAME);
-            oldRes.delete();
-            startDownload();
+            // Repair path for a corrupted pack. The install writes to a temp
+            // file and renames, so the existing pack is not deleted up front.
+            installBundledRes();
         } else if (itemId == 2) {
             importDeckOptions();
         } else if (itemId == 3) {
@@ -1023,7 +1051,7 @@ public class SDLActivity extends Activity implements OnKeyListener {
     public void showSettingsSubMenu() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Settings Menu");
-        String[] choices = { "Storage Data Options", "Download Core & Quit" };
+        String[] choices = { "Storage Data Options", "Reinstall Game Data" };
         builder.setItems(choices,
             new DialogInterface.OnClickListener() {
                 @Override
@@ -1075,7 +1103,7 @@ public class SDLActivity extends Activity implements OnKeyListener {
         switch (id) {
         case DIALOG_DOWNLOAD_PROGRESS:
             mProgressDialog = new ProgressDialog(this);
-            mProgressDialog.setMessage("Downloading resource files (" +
+            mProgressDialog.setMessage("Installing game data (" +
                 RES_FILENAME + ")");
             mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
             mProgressDialog.setCancelable(false);
@@ -1178,51 +1206,30 @@ public class SDLActivity extends Activity implements OnKeyListener {
 		prepareOptionMenu(null);
 }
 
-    public void forceResDownload(final File oldRes) {
-        AlertDialog.Builder resChooser = new AlertDialog.Builder(this);
-        final SDLActivity parent = this;
-
-        resChooser.setTitle("Do you want to download latest core file?");
-
-        resChooser.setPositiveButton("Yes",
-                new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        FrameLayout _videoLayout = new FrameLayout(parent);
-                        setContentView(_videoLayout,
-                                new LayoutParams(LayoutParams.FILL_PARENT,
-                                        LayoutParams.FILL_PARENT));
-                        oldRes.delete();
-                        startDownload();
-                    }
-                });
-
-        resChooser.setNegativeButton("No",
-                new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        mainDisplay();
-                    }
-                });
-
-        resChooser.create().show();
-    }
-
     public void initializeGame() {
-        String coreFileLocation = getSystemStorageLocation() + RES_FILENAME;
+        File file = new File(getSystemStorageLocation() + RES_FILENAME);
+        SharedPreferences settings = getSharedPreferences(kWagicSharedPreferencesKey,
+                MODE_PRIVATE);
+        String bundled = bundledPackId();
+        String installed = settings.getString(kInstalledPackIdPreference, "");
 
-        File file = new File(coreFileLocation);
+        // Reinstall when the pack is absent, or when this APK carries a pack the
+        // installed one is not. Only the core zip is replaced - loose set image
+        // packs beside it and everything under User/ are left alone.
+        boolean needsInstall = !file.exists()
+            || (bundled.length() > 0 && !bundled.equals(installed));
 
-        if (file.exists()) {
-            // Boot straight in - prompting every launch trained users to tap
-            // "Yes", which deletes their data and refetches upstream's core.
-            // Re-download lives in the options menu.
+        if (!needsInstall) {
             mainDisplay();
-        } else {
-            FrameLayout _videoLayout = new FrameLayout(this);
-            setContentView(_videoLayout,
-                new LayoutParams(LayoutParams.FILL_PARENT,
-                    LayoutParams.FILL_PARENT));
-            startDownload();
+
+            return;
         }
+
+        FrameLayout _videoLayout = new FrameLayout(this);
+        setContentView(_videoLayout,
+            new LayoutParams(LayoutParams.FILL_PARENT,
+                LayoutParams.FILL_PARENT));
+        installBundledRes();
     }
 
     // Events
@@ -1494,8 +1501,17 @@ public class SDLActivity extends Activity implements OnKeyListener {
         super.onConfigurationChanged(newConfig);
     }
 
-    class DownloadFileAsync extends AsyncTask<String, Integer, Long> {
-        private final String TAG = DownloadFileAsync.class.getCanonicalName();
+    /**
+     * Copies the core resource pack out of the APK's assets and onto storage.
+     *
+     * Staged through a .tmp file and renamed only on success, so an install
+     * interrupted by a kill or a full disk cannot leave a truncated zip sitting
+     * at the real filename - the failure mode the old downloader had, which was
+     * invisible because the launcher only checked that the file existed.
+     */
+    class InstallResAsync extends AsyncTask<Void, Integer, Boolean> {
+        private final String TAG = InstallResAsync.class.getCanonicalName();
+        private String packId = "";
 
         @Override
         protected void onPreExecute() {
@@ -1504,18 +1520,13 @@ public class SDLActivity extends Activity implements OnKeyListener {
         }
 
         @Override
-        protected Long doInBackground(String... aurl) {
-            int count;
-            long totalBytes = 0;
-            OutputStream output = null;
+        protected Boolean doInBackground(Void... unused) {
             InputStream input = null;
+            OutputStream output = null;
+            String storageLocation = mSingleton.getSystemStorageLocation();
+            File tmpFile = new File(storageLocation + RES_FILENAME + ".tmp");
 
             try {
-                //
-                // Prepare the sdcard folders in order to download the resource file
-                //
-                String storageLocation = mSingleton.getSystemStorageLocation();
-
                 File resDirectory = new File(storageLocation);
                 File userDirectory = new File(mSingleton.getUserStorageLocation());
 
@@ -1525,73 +1536,87 @@ public class SDLActivity extends Activity implements OnKeyListener {
                         "Failed to initialize system and user directories.");
                 }
 
-                URL url = new URL(aurl[0]);
-                String filename = url.getPath()
-                                     .substring(url.getPath().lastIndexOf('/') +
-                        1);
-                URLConnection conexion = url.openConnection();
-                conexion.connect();
+                packId = mSingleton.bundledPackId();
 
-                int lengthOfFile = conexion.getContentLength();
-                // Log.d(TAG, " Length of file: " + lengthOfFile);
-                input = new BufferedInputStream(url.openStream());
+                // The asset is deflated inside the APK, so its size is only
+                // known by reading it; progress is driven off the AssetManager
+                // stream's declared length where available.
+                input = new BufferedInputStream(
+                    mSingleton.getAssets().open(RES_FILENAME));
 
-                // create a File object for the output file
-                File outputFile = new File(resDirectory, filename);
+                int expected = input.available();
 
-                output = new FileOutputStream(outputFile);
+                output = new FileOutputStream(tmpFile);
 
-                byte[] data = new byte[1024];
+                byte[] data = new byte[65536];
+                long totalBytes = 0;
+                int count;
 
                 while ((count = input.read(data)) != -1) {
                     totalBytes += count;
-                    publishProgress((int) ((totalBytes * 100) / lengthOfFile));
                     output.write(data, 0, count);
+
+                    if (expected > 0) {
+                        publishProgress((int) Math.min(100,
+                            (totalBytes * 100) / expected));
+                    }
                 }
 
                 output.flush();
                 output.close();
+                output = null;
                 input.close();
+                input = null;
+
+                File postFile = new File(storageLocation + RES_FILENAME);
+
+                if (postFile.exists() && !postFile.delete()) {
+                    throw new Exception("Could not replace " + RES_FILENAME);
+                }
+
+                if (!tmpFile.renameTo(postFile)) {
+                    throw new Exception("Could not finalize " + RES_FILENAME);
+                }
+
+                return Boolean.TRUE;
             } catch (Exception e) {
-                String errorMessage = "An error happened while downloading the resources. It could be that our server is temporarily down, that your device is not connected to a network, or that we cannot write to " +
-                    mSingleton.getSystemStorageLocation() +
-                    ". Please check your phone settings and try again. For more help please go to http://wololo.net/forum/";
+                String errorMessage = "Could not install the game data to " +
+                    storageLocation +
+                    ". Please check that there is free space and that storage is writable.";
                 mSingleton.downloadError(errorMessage);
                 Log.e(TAG, errorMessage);
-                Log.e(TAG, e.getMessage());
-            }
+                Log.e(TAG, String.valueOf(e.getMessage()));
 
-            return Long.valueOf(totalBytes);
+                return Boolean.FALSE;
+            } finally {
+                try { if (output != null) output.close(); } catch (IOException ignored) { }
+                try { if (input != null) input.close(); } catch (IOException ignored) { }
+                tmpFile.delete();
+            }
         }
 
         protected void onProgressUpdate(Integer... progress) {
             if (progress[0] != mProgressDialog.getProgress()) {
-                // Log.d(TAG, "current progress : " + progress[0]);
                 mProgressDialog.setProgress(progress[0]);
             }
         }
 
         @Override
-        protected void onPostExecute(Long unused) {
-            if (mErrorHappened) {
-                dismissDialog(DIALOG_DOWNLOAD_PROGRESS);
+        protected void onPostExecute(Boolean ok) {
+            dismissDialog(DIALOG_DOWNLOAD_PROGRESS);
+
+            if (!ok.booleanValue() || mErrorHappened) {
                 showDialog(DIALOG_DOWNLOAD_ERROR);
 
                 return;
             }
 
-            // rename the temporary file into the final filename
-            String storageLocation = getSystemStorageLocation();
+            // Recorded only after the rename succeeded, so a failed install is
+            // retried on the next launch instead of being marked done.
+            SharedPreferences settings = getSharedPreferences(kWagicSharedPreferencesKey,
+                    MODE_PRIVATE);
+            settings.edit().putString(kInstalledPackIdPreference, packId).commit();
 
-            File preFile = new File(storageLocation + RES_FILENAME + ".tmp");
-            File postFile = new File(storageLocation + RES_FILENAME);
-
-            if (preFile.exists()) {
-                preFile.renameTo(postFile);
-            }
-
-            dismissDialog(DIALOG_DOWNLOAD_PROGRESS);
-            // Start game;
             mSingleton.mainDisplay();
         }
     }

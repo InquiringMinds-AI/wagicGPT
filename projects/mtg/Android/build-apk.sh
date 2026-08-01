@@ -11,6 +11,17 @@ PLATFORM="$SDK/platforms/android-36/android.jar"
 OUT=bin-modern
 rm -rf "$OUT" && mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/apk"
 
+# 0. Core resource pack -> assets/. Bundled, not downloaded: one pack per
+# release keeps the engine and the auto= script corpus it interprets in lockstep.
+# make-respack.py refuses to build if card art is staged under Res/sets/.
+PACK_NAME=$(../tools/make-respack.py --print-name)
+mkdir -p assets
+rm -f assets/Wagic-core-*.zip assets/respack.sha256
+../tools/make-respack.py -o "assets/$PACK_NAME"
+cut -d' ' -f1 "assets/$PACK_NAME.sha256" > assets/respack.sha256
+rm -f "assets/$PACK_NAME.sha256"
+echo "bundled $PACK_NAME ($(cut -c1-12 assets/respack.sha256))"
+
 # 1. Resources -> proto APK + R.java
 "$BT/aapt2" compile --dir res -o "$OUT/res.zip"
 "$BT/aapt2" link -o "$OUT/base.apk" -I "$PLATFORM" \
