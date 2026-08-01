@@ -11,6 +11,11 @@ contributors — see the upstream repository for full history.
   mapped every `AKEYCODE_BUTTON_*` to `SDL_SCANCODE_UNKNOWN`, so controller
   buttons on Android handhelds were silently dropped; their PSP-style mapping
   is applied in `JGE/Dependencies/SDL/src/video/android/SDL_androidkeyboard.c`.
+- **flounderbounder** (Wagic Discord, *"Android deck editor screen gestures
+  optimisation"*) — deck editor touch tuning for high-DPI screens: vertical
+  flick threshold raised (near-horizontal swipes were changing filters),
+  vertical scroll capped at one filter step per swipe, horizontal collection
+  browsing sped up (`GameStateDeckViewer.cpp`, `SDLActivity.java`).
 
 ## Field reports that drove fixes
 

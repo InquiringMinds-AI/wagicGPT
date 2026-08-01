@@ -2068,21 +2068,24 @@ void GameStateDeckViewer::OnScroll(int inXVelocity, int inYVelocity)
     bool flickUp = !flickHorizontal && (inYVelocity > 0) ? true : false;
     bool flickRight = flickHorizontal && (inXVelocity < 0) ? true : false;
     
+    //Touch tuning contributed by flounderbounder (Wagic Discord, "Android deck
+    //editor screen gestures optimisation"): on high-DPI screens the vertical
+    //swipe fired on near-horizontal flicks and jumped several filters at once,
+    //and horizontal browsing through big collections was too slow.
     if (flickHorizontal)
     {
         if(abs(inXVelocity) > 300)
         {
-            //FIXME: this 500 is a bit arbitrary
-            int numCards = (magnitude / 500) % 8;
+            int numCards = (magnitude / 300) % 8;
             mView->changePositionAnimated(flickRight ? numCards : - numCards);
         }
     }
     else
     {
-        if(abs(inYVelocity) > 300)
+        if(abs(inYVelocity) > 800)
         {
-            //FIXME: this 500 is a bit arbitrary
-            int numFilters = (magnitude / 500);
+            //exactly one filter step per deliberate vertical swipe
+            int numFilters = 1;
             mView->changeFilterAnimated(flickUp ? numFilters : - numFilters);
         }
     }

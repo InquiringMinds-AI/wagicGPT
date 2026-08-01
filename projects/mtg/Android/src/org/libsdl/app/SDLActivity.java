@@ -1924,7 +1924,10 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                 float xVelocity = mVelocityTracker.getXVelocity(0);
                 float yVelocity = mVelocityTracker.getYVelocity(0);
 
-                if ((Math.abs(xVelocity) > 300) || (Math.abs(yVelocity) > 300)) {
+                // Higher y threshold: near-horizontal swipes on high-DPI
+                // screens were dispatching as vertical flicks (flounderbounder,
+                // Wagic Discord).
+                if ((Math.abs(xVelocity) > 300) || (Math.abs(yVelocity) > 800)) {
                     SDLActivity.onNativeFlickGesture(xVelocity, yVelocity);
                 }
 
