@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.0)
+# CMake 4.x removed compatibility with minimums below 3.5. The range form keeps
+# policy behaviour pinned to what this file was written against while still
+# configuring under a modern CMake.
+cmake_minimum_required(VERSION 3.10...3.28)
 
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   if(DEFINED ENV{VITASDK})
@@ -11,16 +14,26 @@ endif()
 project(wagic C CXX)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
-# Project-local pinned vitaGL.
-# Upstream vitaGL had multiple symbol-renaming and API-adding commits between
-# Jan 14 2026 and Feb 1 2026 (`frag_buf`->`vgl_def_frag_buf`, `mvp_matrix`->
-# `vgl_mvp_matrix`, added `glVertexAttribDivisor`, etc.). The pre-Feb-28 system
-# libvitaGL.a (installed via vdpm in early January) was built BEFORE all those
-# changes. A wagic.elf linked against newer vitaGL silently fails to boot on
-# this Vita's CFW. Pin to commit `d4a8f9d` (Jan 10 2026), the last commit
-# before any of the rename/addition cascade. Build with NO_DEBUG=1 to match
-# the vitasdk-packages CI recipe (matches what the user's vdpm originally
-# installed). See vendor/vitaGL (gitignored) and BUILD_VITA.md for setup.
+# Project-local vitaGL, built from CURRENT upstream.
+#
+# The inherited port pinned this to d4a8f9d (Jan 10 2026) because a newer
+# vitaGL "silently failed to boot", citing a rename cascade
+# (`frag_buf`->`vgl_def_frag_buf`, `mvp_matrix`->`vgl_mvp_matrix`,
+# `glVertexAttribDivisor`). Owner ruling 2026-08-01: track current instead and
+# fix what actually breaks - newer vitaGL carries real improvements, the target
+# is a single fixed hardware profile, and the inherited port is prior art, not
+# a truth document.
+#
+# That pin is also weakly motivated on inspection: wagic calls only
+# vglSetParamBufferSize, vglUseTripleBuffering, vglUseCachedMem,
+# vglInitExtended, vglUseVram, vglWaitVblankStart and vglSwapBuffers. The named
+# renames are vitaGL-internal; `u_mvp_matrix` is wagic's own shader uniform.
+#
+# Built locally (vendor/, gitignored) rather than using the vdpm-installed
+# system copy so the version is ours to control and rebuild:
+#   cd vendor/vitaGL && make NO_DEBUG=1 -j8
+# If a boot failure ever IS traced to a vitaGL bump, bisect vendor/vitaGL and
+# record the offending commit here - do not silently re-pin to 2026.
 set(WAGIC_PINNED_VITAGL "${CMAKE_SOURCE_DIR}/vendor/vitaGL")
 if(EXISTS "${WAGIC_PINNED_VITAGL}/libvitaGL.a")
     message(STATUS "Using project-local pinned vitaGL at ${WAGIC_PINNED_VITAGL}")
@@ -213,6 +226,25 @@ set(MTG_SOURCES
   projects/mtg/src/WGui.cpp
   projects/mtg/src/WParsedInt.cpp
   projects/mtg/src/WResourceManager.cpp
+
+  # This fork's engine layer, absent from the original Vita port because that
+  # port predates it: engine-owned priority and legality (LegalActions),
+  # player-agnostic mana (ManaEngine), the frontend-agnostic
+  # DecisionRequest->Action contract (DecisionContract) that the PC UI, the PSP
+  # UI and the AI policies all consume as peers, and the pregame/mulligan state.
+  projects/mtg/src/LegalActions.cpp
+  projects/mtg/src/ManaEngine.cpp
+  projects/mtg/src/DecisionContract.cpp
+  projects/mtg/src/PreGamePhase.cpp
+
+  # The LLM opponent. Compiled here for the same reason the PSP Makefile
+  # compiles it: AIPlayerGPT is wired into the player/observer types, and the
+  # heuristic AI answers every decision it declines, so a build with no endpoint
+  # configured plays as pure Baka. The transport (JNetwork/JSocket/Downloader)
+  # is deliberately NOT built - same open question as the PSP network leg.
+  projects/mtg/src/AIPlayerGPT.cpp
+  projects/mtg/src/GptConfig.cpp
+  projects/mtg/src/OptionGpt.cpp
 )
 
 add_executable(${PROJECT_NAME}
@@ -333,9 +365,8 @@ vita-mksfoex -s TITLE_ID=${VITA_TITLEID} -s APP_VER=01.00 -s VERSION=01.00 -d AT
 #   oldthemes/             - deprecated, not referenced in game code
 rm -rf vpk_staging
 mkdir -p vpk_staging/Res
-(cd \"$SRCDIR/projects/mtg/bin/Res\" && \\
- zip -r -0 -q \"$BUILDDIR/vpk_staging/Res/core.zip\" * \\
-   -x 'test/*' 'missing_cards_by_sets/*' 'oldthemes/*')
+\"$SRCDIR/projects/mtg/tools/make-respack.py\" --compress stored --no-sha \\
+  -o \"$BUILDDIR/vpk_staging/Res/core.zip\"
 
 CORESIZE=\$(du -h \"$BUILDDIR/vpk_staging/Res/core.zip\" | cut -f1)
 echo \"Res/core.zip created: \$CORESIZE\"

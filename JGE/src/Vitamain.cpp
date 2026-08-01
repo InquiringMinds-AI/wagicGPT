@@ -208,7 +208,12 @@ static bool VitaInit()
     // Note: vglInitExtended aborts on failure (calls sceKernelExitProcess internally)
 
     // Post-init runtime configuration
-    vglUseVram(GL_TRUE);             // prefer VRAM for textures (faster GPU access)
+    //
+    // vglUseVram() was removed from vitaGL: VRAM-vs-RAM placement is no longer a
+    // post-init toggle, it is the ram_threshold argument to vglInitExtended
+    // above. Allocations are served from VRAM until that threshold is reached
+    // and spill to RAM after, which is what the old vglUseVram(GL_TRUE) was
+    // approximating - so the intent is preserved by the call above, not lost.
     vglWaitVblankStart(GL_TRUE);     // vsync on — prevents tearing
 
     debugLog("[3b] vglInitExtended OK");
