@@ -291,6 +291,14 @@ public class SDLActivity extends Activity implements OnKeyListener {
         setStorage.setPositiveButton("OK",
             new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int which) {
+                    // Persist even when the user tapped OK without touching the
+                    // (often single) radio item - otherwise the preference never
+                    // saves and this dialog re-appears on every launch.
+                    SharedPreferences prefs = getSharedPreferences(kWagicSharedPreferencesKey,
+                            MODE_PRIVATE);
+                    if (!prefs.contains(kStoreDataOnRemovableSdCardPreference)) {
+                        savePathPreference(0);
+                    }
                     initStorage();
 
                     if (mSurface == null) {
@@ -1195,7 +1203,10 @@ public class SDLActivity extends Activity implements OnKeyListener {
         File file = new File(coreFileLocation);
 
         if (file.exists()) {
-            forceResDownload(file);
+            // Boot straight in - prompting every launch trained users to tap
+            // "Yes", which deletes their data and refetches upstream's core.
+            // Re-download lives in the options menu.
+            mainDisplay();
         } else {
             FrameLayout _videoLayout = new FrameLayout(this);
             setContentView(_videoLayout,
@@ -1403,6 +1414,18 @@ public class SDLActivity extends Activity implements OnKeyListener {
             mAudioTrack.stop();
             mAudioTrack = null;
         }
+    }
+
+    @Override
+    public void onBackPressed() {
+        // Gesture-nav Back never reached the surface's key listener; route it
+        // to the game as the menu key instead of finishing the activity.
+        onNativeKeyDown(KeyEvent.KEYCODE_BACK);
+        mSurface.postDelayed(new Runnable() {
+            public void run() {
+                onNativeKeyUp(KeyEvent.KEYCODE_BACK);
+            }
+        }, 60);
     }
 
     public boolean onKey(View v, int keyCode, KeyEvent event) {
