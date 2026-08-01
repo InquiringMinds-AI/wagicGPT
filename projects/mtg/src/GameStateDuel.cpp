@@ -711,6 +711,20 @@ void GameStateDuel::Update(float dt)
         break;
 
     case DUEL_STATE_CHOOSE_DECK1:
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+        {
+            static Rules * lastProbedRules = (Rules*)-1;
+            if (mParent->rules != lastProbedRules)
+            {
+                lastProbedRules = mParent->rules;
+                wagicProbe("choose_deck1: rules=%p name=%s gamemode=%d canChooseDeck=%d",
+                    (void*)mParent->rules,
+                    mParent->rules ? mParent->rules->displayName.c_str() : "NULL",
+                    mParent->rules ? (int)mParent->rules->gamemode : -1,
+                    mParent->rules ? (int)mParent->rules->canChooseDeck() : -1);
+            }
+        }
+#endif
         if (!mParent->rules->canChooseDeck())
         {
             setGamePhase(DUEL_STATE_PLAY);
