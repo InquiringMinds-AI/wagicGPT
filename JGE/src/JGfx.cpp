@@ -113,6 +113,23 @@ static void FlushDeferredTextureFrees()
 	gDeferredFreesRam.clear();
 }
 
+static bool gInFrame = false;
+
+// A burst of load->evict cycles inside one frame transiently holds old+new
+// pixels (deferred frees wait for the frame's sceGuSync) until allocation
+// fails. Texture-pixel allocations route through here: on failure, reclaim
+// via TexMemCheckpoint and retry once.
+static void * TexAlloc(int size)
+{
+	void * p = memalign(16, size);
+	if (!p)
+	{
+		JRenderer::GetInstance()->TexMemCheckpoint();
+		p = memalign(16, size);
+	}
+	return p;
+}
+
 JTexture::~JTexture()
 {
 	if (mBits)
@@ -330,9 +347,28 @@ void JRenderer::DestroyRenderer()
 }
 
 
+void JRenderer::TexMemCheckpoint()
+{
+	if (gDeferredFreesRam.empty() && gDeferredFreesVram.empty())
+		return;
+	if (gInFrame)
+	{
+		sceGuFinish();
+		sceGuSync(0, 0);
+	}
+	FlushDeferredTextureFrees();
+	if (gInFrame)
+	{
+		sceGuStart(GU_DIRECT, list);
+		mCurrentTex = -1;    // fresh list: force texture/blend rebind
+		mCurrentBlend = -1;
+	}
+}
+
 void JRenderer::BeginScene()
 {
 	FlushDeferredTextureFrees();  // GE idle between frames — safe point
+	gInFrame = true;
 
 	sceGuStart(GU_DIRECT, list);
 
@@ -366,6 +402,7 @@ void JRenderer::EndScene()
 
 	sceGuSync(0,0);
 
+	gInFrame = false;
 	FlushDeferredTextureFrees();
 
 	if (mVsync)
@@ -1121,11 +1158,11 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
         videoRAMUsed = false;
         if (pixelSize == 2)
         {
-            bits16 = (u16*)memalign(16, size);
+            bits16 = (u16*)TexAlloc(size);
         }
         else
         {
-            bits32 = (u32*)memalign(16, size);
+            bits32 = (u32*)TexAlloc(size);
         }
     }
 
@@ -1134,8 +1171,8 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
     rgbadata32 = bits32;
     if (mSwizzle)
     {
-        if (rgbadata16) rgbadata16 = (u16*) memalign(16, size);
-        if (rgbadata32) rgbadata32 = (u32*) memalign(16, size);
+        if (rgbadata16) rgbadata16 = (u16*) TexAlloc(size);
+        if (rgbadata32) rgbadata32 = (u32*) TexAlloc(size);
         if(!rgbadata16 && !rgbadata32)
         {
             jpeg_destroy_decompress(&cinfo);
@@ -1153,7 +1190,7 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
         }
     }
 
-    scanline = (u8 *)malloc(cinfo.output_width * 3);
+    scanline = (u8 *)TexAlloc(cinfo.output_width * 3);
     if(!scanline)
     {
         jpeg_destroy_decompress(&cinfo);
@@ -1440,7 +1477,7 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char* filename, int mode,
   if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8) png_set_gray_1_2_4_to_8(png_ptr);
   if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS)) png_set_tRNS_to_alpha(png_ptr);
   png_set_filler(png_ptr, 0xff, PNG_FILLER_AFTER);
-  line = (u32*) malloc(width * 4);
+  line = (u32*) TexAlloc(width * 4);
   if (!line) {
     fileSystem->CloseFile();
     png_destroy_read_struct(&png_ptr, png_infopp_NULL, png_infopp_NULL);
@@ -1465,7 +1502,7 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char* filename, int mode,
     if (bits == NULL)
     {
       videoRAMUsed = false;
-      bits = (PIXEL_TYPE*) memalign(16, size);
+      bits = (PIXEL_TYPE*) TexAlloc(size);
     }
 
     PIXEL_TYPE* buffer = bits;
@@ -1662,7 +1699,7 @@ int JRenderer::image_readgif(void * handle, TextureInfo &textureInfo, DWORD * bg
 					if (bits == NULL)
 					{
 						videoRAMUsed = false;
-						bits = (PIXEL_TYPE*) memalign(16, size);
+						bits = (PIXEL_TYPE*) TexAlloc(size);
 					}
 
 					PIXEL_TYPE* buffer = bits;
@@ -1830,7 +1867,7 @@ JTexture* JRenderer::CreateTexture(int width, int height, int mode)
 		if (tex->mBits == NULL)
 		{
 			tex->mInVideoRAM = false;
-			tex->mBits = (PIXEL_TYPE*) memalign(16, size);
+			tex->mBits = (PIXEL_TYPE*) TexAlloc(size);
 		}
 
 		memset(tex->mBits, 0, size);
