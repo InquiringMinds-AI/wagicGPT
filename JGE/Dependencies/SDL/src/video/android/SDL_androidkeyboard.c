@@ -133,7 +133,11 @@ static SDL_Scancode Android_Keycodes[] = {
     SDL_SCANCODE_PAGEDOWN, /* AKEYCODE_PAGE_DOWN */
     SDL_SCANCODE_UNKNOWN, /* AKEYCODE_PICTSYMBOLS */
     SDL_SCANCODE_UNKNOWN, /* AKEYCODE_SWITCH_CHARSET */
-    SDL_SCANCODE_SPACE, /* AKEYCODE_BUTTON_A -> JGE_BTN_OK (community controller fix) */
+    /* Gamepad mapping contributed by flounderbounder (Wagic Discord,
+       "Buttons on Retroid Pocket 5"): these AKEYCODE_BUTTON_* entries were all
+       SDL_SCANCODE_UNKNOWN, silently dropping physical controller buttons on
+       Android handhelds. Layout mirrors the PSP controls. */
+    SDL_SCANCODE_SPACE, /* AKEYCODE_BUTTON_A -> JGE_BTN_OK */
     SDL_SCANCODE_I, /* AKEYCODE_BUTTON_B -> JGE_BTN_CANCEL */
     SDL_SCANCODE_UNKNOWN, /* AKEYCODE_BUTTON_C */
     SDL_SCANCODE_J, /* AKEYCODE_BUTTON_X -> JGE_BTN_PRI */
