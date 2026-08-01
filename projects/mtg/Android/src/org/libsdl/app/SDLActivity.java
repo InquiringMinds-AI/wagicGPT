@@ -1887,10 +1887,14 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
             case MotionEvent.ACTION_POINTER_UP:
                 y2 = event.getY();
                 float deltaY = y2 - y1;
-                if (deltaY > DELTA_Y) {
+                // Threshold proportional to view height: the old fixed 800px
+                // exceeded the whole screen height on landscape tablets, making
+                // the menu/back swipe physically impossible.
+                float swipeThreshold = v.getHeight() * 0.4f;
+                if (deltaY > swipeThreshold) {
                     parent.showOptionMenu(); // Emulate Android "optionmenu" button pressure (for devices without sidebar, e.g. like Android 10).
                     return true;
-                } else if (deltaY < -DELTA_Y){
+                } else if (deltaY < -swipeThreshold){
                     SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_BACK); // Emulate Android "back" button pressure (for devices without sidebar, e.g. like Android 10).
                     return true;
                 }

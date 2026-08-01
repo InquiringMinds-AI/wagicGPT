@@ -5,7 +5,9 @@ APP_CPPFLAGS += -frtti -fexceptions
 APP_CPPFLAGS += -std=gnu++14
 APP_ABI := arm64-v8a
 APP_PLATFORM := android-21
-APP_CFLAGS += -march=armv8.1-a
+# Baseline v8.0: v8.1 LSE atomics SIGILL on Cortex-A53 devices (Helio P22
+# tablets etc.) - first-boot crash in shared_ptr refcounts.
+APP_CFLAGS += -march=armv8-a
 # Vendored SDL (old) uses pre-C99-strict GLES1 prototypes; clang 17+ makes
 # implicit declarations a hard error by default.
 APP_CFLAGS += -Wno-implicit-function-declaration
