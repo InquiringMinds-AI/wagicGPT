@@ -22,6 +22,7 @@
 #include "../include/JLogger.h"
 
 #include <sstream>
+#include <vector>
 
 #ifdef __cplusplus
 extern "C" {
@@ -97,14 +98,29 @@ JTexture::JTexture()
   mTextureFormat = TEXTURE_FORMAT;
 }
 
+// The GE consumes texture memory asynchronously: cache eviction mid-frame frees
+// pixels the current display list still references, so the rasterizer reads
+// reused RAM (garbage tiles) and can wedge the GE. Frees queue here until the
+// sceGuSync at frame end.
+static std::vector<void*> gDeferredFreesRam;
+static std::vector<void*> gDeferredFreesVram;
+
+static void FlushDeferredTextureFrees()
+{
+	for (size_t i = 0; i < gDeferredFreesVram.size(); ++i) vfree(gDeferredFreesVram[i]);
+	for (size_t i = 0; i < gDeferredFreesRam.size(); ++i) free(gDeferredFreesRam[i]);
+	gDeferredFreesVram.clear();
+	gDeferredFreesRam.clear();
+}
+
 JTexture::~JTexture()
 {
 	if (mBits)
 	{
 		if (mInVideoRAM)
-			vfree(mBits);
+			gDeferredFreesVram.push_back(mBits);
 		else
-			free(mBits);
+			gDeferredFreesRam.push_back(mBits);
 	}
 }
 
@@ -316,6 +332,8 @@ void JRenderer::DestroyRenderer()
 
 void JRenderer::BeginScene()
 {
+	FlushDeferredTextureFrees();  // GE idle between frames — safe point
+
 	sceGuStart(GU_DIRECT, list);
 
 	if (m3DEnabled)
@@ -347,6 +365,8 @@ void JRenderer::EndScene()
 	sceGuFinish();
 
 	sceGuSync(0,0);
+
+	FlushDeferredTextureFrees();
 
 	if (mVsync)
 		sceDisplayWaitVblankStart();
