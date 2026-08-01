@@ -955,10 +955,18 @@ void ResourceManagerImpl::ResetCacheLimits()
 {
 #if defined PSP
     unsigned int ram = ramAvailable();
-    unsigned int myNewSize = ram - OPERATIONAL_SIZE + textureWCache.totalSize;
+    //Guard the historical unsigned underflow: with ram < OPERATIONAL_SIZE the
+    //subtraction wrapped to ~4GB and the cache stopped evicting until the heap
+    //was exhausted (2008-era callers don't check malloc failures).
+    unsigned int myNewSize;
+    if (ram < OPERATIONAL_SIZE)
+        myNewSize = TEXTURES_CACHE_MINSIZE;
+    else
+        myNewSize = ram - OPERATIONAL_SIZE + textureWCache.totalSize;
     if (myNewSize < TEXTURES_CACHE_MINSIZE)
     {
         DebugTrace( "Error, Not enough RAM for Cache: " << myNewSize << " - total Ram: " << ram);
+        myNewSize = TEXTURES_CACHE_MINSIZE;
     }
     textureWCache.Resize(MIN(myNewSize, HUGE_CACHE_LIMIT), MAX_CACHE_OBJECTS);
 #else
