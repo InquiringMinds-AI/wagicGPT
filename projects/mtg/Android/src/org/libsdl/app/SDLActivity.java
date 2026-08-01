@@ -380,9 +380,13 @@ public class SDLActivity extends Activity implements OnKeyListener {
         boolean hasRemovableMediaMounted = getRemovableMediaStorageState();
 
         if (!settings.contains(kStoreDataOnRemovableSdCardPreference)) {
-            if (hasRemovableMediaMounted) {
+            if (hasRemovableMediaMounted && !settings.getBoolean("storageAsked", false)) {
+                prefsEditor.putBoolean("storageAsked", true);
+                prefsEditor.commit();
                 displayStorageOptions();
             } else {
+                // No removable media, or the question was already answered once:
+                // built-in storage, and never ask again.
                 prefsEditor.putBoolean(kStoreDataOnRemovableSdCardPreference,
                     false);
                 prefsEditor.commit();
@@ -1414,6 +1418,21 @@ public class SDLActivity extends Activity implements OnKeyListener {
             mAudioTrack.stop();
             mAudioTrack = null;
         }
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        // Gesture-nav Back is delivered here on One UI; onBackPressed alone
+        // never fired. Route both edges to the game as the menu key.
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && mSurface != null) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                onNativeKeyDown(KeyEvent.KEYCODE_BACK);
+            } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                onNativeKeyUp(KeyEvent.KEYCODE_BACK);
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     @Override
