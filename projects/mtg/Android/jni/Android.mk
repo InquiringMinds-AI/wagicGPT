@@ -18,6 +18,9 @@ LOCAL_CFLAGS += -D__arm__ -D_REENTRANT -D_GLIBCXX__PTHREADS
 # No libcurl port wired for Android yet: the GPT layer compiles in but its HTTP
 # transport reports failure -> AIPlayerGPT falls back to Baka (same as no endpoint).
 LOCAL_CFLAGS += -DWAGIC_NO_CURL
+# The GPT layer's registration (options tab, AI factory) is gated on this;
+# without it the fork's sources compile but never activate.
+LOCAL_CFLAGS += -DWITH_GPT_AI
 LOCAL_STATIC_LIBRARIES := libpng libjpeg
 LOCAL_SHARED_LIBRARIES := SDL
 

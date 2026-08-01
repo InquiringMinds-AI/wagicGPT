@@ -215,6 +215,11 @@ GameStateDuel::~GameStateDuel()
 
 void GameStateDuel::Start()
 {
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+    wagicProbe("duel Start: gameType=%d p0=%d p1=%d opLevel=%d",
+        (int)mParent->gameType, (int)mParent->players[0], (int)mParent->players[1],
+        tournament ? tournament->getOpLevel() : -1);
+#endif
     JRenderer * renderer = JRenderer::GetInstance();
     renderer->EnableVSync(true);
     OpponentsDeckid = 0;

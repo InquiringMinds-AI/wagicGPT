@@ -64,7 +64,7 @@ DEFAULT_RULE = 3xx
 PSP_FW_VERSION=371
 BUILD_PRX = 1
 SIGN_PRX = 1
-LIBS = -ljge300 -lhgetools -lfreetype -ljpeg -lgif -lpng -lz -lm -lmikmod -lpsppower -lpspmpeg -lpspaudiocodec -lpspaudiolib -lpspaudio -lpspmp3 -lpspgum -lpspgu -lpsprtc -lstdc++ -lpspfpu -lcurl
+LIBS = -ljge300 -lhgetools -lfreetype -ljpeg -lgif -lpng -lz -lm -lmikmod -lpsppower -lpspmpeg -lpspaudiocodec -lpspaudiolib -lpspaudio -lpspmp3 -lpspgum -lpspgu -lpsprtc -lstdc++ -lpspfpu -lcurl -lmbedtls -lmbedx509 -lmbedcrypto
 
 EXTRA_TARGETS = EBOOT.PBP
 PSP_EBOOT_TITLE = Wagic, the Homebrew?!
@@ -75,7 +75,7 @@ PSP_EBOOT_UNKPNG = pic0.png
 PSP_EBOOT_PIC1 = pic1.png
 INCDIR = ../../JGE/include ../../JGE/src/zipFS ../../JGE/include/psp ../../JGE/include/psp/freetype2 ../../JGE/src ../../projects/mtg/include ../../Boost
 LIBDIR = ../../JGE/lib/psp
-CFLAGS = -O2 -G0 -DPSPFW3XX -DDEVHOOK -DUSE_PRECOMPILED_HEADERS=1 -DPSP -DTIXML_USE_STL -std=gnu++14 $(EXTRA_DEFS)
+CFLAGS = -O2 -G0 -DPSPFW3XX -DDEVHOOK -DUSE_PRECOMPILED_HEADERS=1 -DPSP -DTIXML_USE_STL -DWITH_GPT_AI -std=gnu++14 $(EXTRA_DEFS)
 
 else
 

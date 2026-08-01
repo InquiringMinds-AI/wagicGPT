@@ -1240,9 +1240,27 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
 }
 
 
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+#include <stdarg.h>
+static void gfxProbe(const char* fmt, ...)
+{
+    FILE* f = fopen("User/wagic-probe.log", "a");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    fprintf(f, "\n");
+    fclose(f);
+}
+#else
+#define gfxProbe(...) ((void)0)
+#endif
+
 JTexture* JRenderer::LoadTexture(const char* filename, int mode, int textureMode)
 {
     JLOG("JRenderer::LoadTexture");
+    gfxProbe("tex load: %s mode=%d", filename, mode);
     TextureInfo textureInfo;
     textureInfo.mVRAM = false;
     textureInfo.mBits = NULL;
@@ -1297,6 +1315,10 @@ JTexture* JRenderer::LoadTexture(const char* filename, int mode, int textureMode
     }
 
     JLOG("-- OK  -- JRenderer::LoadTexture");
+    gfxProbe("tex done: %s %dx%d vram=%d free=%u largest=%u", filename,
+        tex ? tex->mTexWidth : -1, tex ? tex->mTexHeight : -1,
+        tex ? (int)tex->mInVideoRAM : -1,
+        (unsigned)vmemavail(), (unsigned)vlargestblock());
     return tex;
 
 }
