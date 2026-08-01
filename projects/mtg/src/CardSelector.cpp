@@ -182,7 +182,12 @@ bool CardSelector::CheckUserInput(JButton key)
     if(!jge) return false;
     if(jge->GetLeftClickCoordinates(x, y))
     {
-        active = closest<CardSelectorTrue> (cards, limitor, static_cast<float> (x), static_cast<float> (y));
+        //A pointer names one specific card, so the limitor - which exists to
+        //bound D-PAD traversal to a zone - must not filter here. It used to,
+        //so with the hand open a tap on the board snapped to the nearest hand
+        //card instead, and closing the hand to reach the board cancelled any
+        //in-flight cast: targeted spells were uncastable on touch frontends.
+        active = closest<CardSelectorTrue> (cards, NULL, static_cast<float> (x), static_cast<float> (y));
     }
 
     switch (key)
