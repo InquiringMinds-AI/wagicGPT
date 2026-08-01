@@ -75,7 +75,7 @@ PSP_EBOOT_UNKPNG = pic0.png
 PSP_EBOOT_PIC1 = pic1.png
 INCDIR = ../../JGE/include ../../JGE/src/zipFS ../../JGE/include/psp ../../JGE/include/psp/freetype2 ../../JGE/src ../../projects/mtg/include ../../Boost
 LIBDIR = ../../JGE/lib/psp
-CFLAGS = -O2 -G0 -DPSPFW3XX -DDEVHOOK -DUSE_PRECOMPILED_HEADERS=1 -DPSP -DTIXML_USE_STL -DWITH_GPT_AI -std=gnu++14 $(EXTRA_DEFS)
+CFLAGS = -O2 -G0 -DPSPFW3XX -DDEVHOOK -DUSE_PRECOMPILED_HEADERS=1 -DPSP -DTIXML_USE_STL -DWITH_GPT_AI -std=gnu++14 -include ../../JGE/include/psp_noenv.h $(EXTRA_DEFS)
 
 else
 

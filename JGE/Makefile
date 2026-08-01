@@ -81,6 +81,9 @@ OBJS = $(GENERIC_OBJS) $(PSP_OBJS)
 TARGET_HGE = libhgetools.a
 INCDIR = include/psp include/psp/freetype2 ../Boost src/zipFS
 CXXFLAGS += -O2 -G0 -DPSP
+#Real-hardware getenv returns garbage (uninitialized environ) - neuter it.
+CXXFLAGS += -include include/psp_noenv.h
+CFLAGS += -include include/psp_noenv.h
 LIBDIR = lib/psp
 endif
 ifeq ($(TARGET_ARCHITECTURE),linux)
