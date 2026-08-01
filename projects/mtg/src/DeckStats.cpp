@@ -487,6 +487,9 @@ void StatsWrapper::updateStats(DeckDataWrapper *myDeck)
         }
 
         vector<string> abilitiesVector;
+#if defined (PSP)
+        current->data->materializeMagicText();
+#endif
         string thisstring = current->data->magicText;
         abilitiesVector = split(thisstring, '\n');
 

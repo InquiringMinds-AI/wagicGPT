@@ -34,13 +34,22 @@ SUPPORT_OBJECT_ANALYTICS(CardPrimitive)
 CardPrimitive::CardPrimitive()
     : colors(0)
 {
+#if defined (PSP)
+    mMagicMaterialized = false;
+#endif
     init();
 }
 
 CardPrimitive::CardPrimitive(CardPrimitive * source)
 {
+#if defined (PSP)
+    mMagicMaterialized = true;  // copies receive materialized content below
+#endif
     if(!source)
         return;
+#if defined (PSP)
+    source->materializeMagicText();  // universal seam: every in-game card copies through here
+#endif
     basicAbilities = source->basicAbilities;
     LKIbasicAbilities = source->basicAbilities;
 
@@ -316,8 +325,174 @@ int CardPrimitive::removeType(int id, int removeAll)
     return result;
 }
 
+#if defined (PSP)
+// ---- card-data sidecars (see CardPrimitive.h) ----
+// Two deploy-time file pairs at the Res root (NOT sets/primitives/ — that dir is
+// scanned and every file in it is parsed as card data):
+//   cardtext.{idx,dat} — display text (text= lines), fetched at render time.
+//   cardauto.{idx,dat} — raw auto*/anyzone lines, replayed through addMagicText
+//                        when a primitive is first used in a game.
+// idx: u32 count, then count * {u32 fnv1a(lowercased name), u32 offset, u32 len},
+//      sorted by hash (little-endian).
+// dat: entry at offset = lowercased name, '\n', payload; len covers the whole entry.
+// Hash collisions resolve by comparing the stored name.
+namespace
+{
+    struct SidecarEnt { unsigned int hash, offset, len; };
+
+    unsigned int sidecarFnv1a(const string& s)
+    {
+        unsigned int h = 2166136261u;
+        for (size_t i = 0; i < s.size(); ++i)
+        {
+            h ^= (unsigned char) s[i];
+            h *= 16777619u;
+        }
+        return h;
+    }
+
+    struct Sidecar
+    {
+        std::vector<SidecarEnt> idx;
+        bool tried;
+        FILE * dat;
+
+        Sidecar() : tried(false), dat(NULL) {}
+
+        void load(const char * idxPath, const char * datPath, const char * label)
+        {
+            tried = true;
+            FILE * f = fopen(idxPath, "rb");
+            unsigned int count = 0;
+            if (f)
+            {
+                if (fread(&count, 4, 1, f) == 1 && count && count < 200000)
+                {
+                    idx.resize(count);
+                    if (fread(&idx[0], sizeof(SidecarEnt), count, f) != count)
+                        idx.clear();
+                }
+                fclose(f);
+            }
+            if (idx.size())
+                dat = fopen(datPath, "rb");
+            if (!dat)
+                idx.clear();
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            FILE * p = fopen("User/wagic-probe.log", "a");
+            if (p)
+            {
+                fprintf(p, "%s sidecar: idx=%s count=%u dat=%s -> %s\n", label,
+                    f ? "open" : "MISSING", count, dat ? "open" : "MISSING",
+                    idx.empty() ? "OFFLOAD OFF" : "OFFLOAD ON");
+                fclose(p);
+            }
+#else
+            (void) label;
+#endif
+        }
+
+        bool fetch(const string& cardName, string& out)
+        {
+            if (idx.empty()) return false;
+            string lower = cardName;
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+            unsigned int h = sidecarFnv1a(lower);
+            size_t lo = 0, hi = idx.size();
+            while (lo < hi)
+            {
+                size_t mid = (lo + hi) / 2;
+                if (idx[mid].hash < h) lo = mid + 1;
+                else hi = mid;
+            }
+            for (; lo < idx.size() && idx[lo].hash == h; ++lo)
+            {
+                string buf;
+                buf.resize(idx[lo].len);
+                if (fseek(dat, idx[lo].offset, SEEK_SET)) return false;
+                if (fread(&buf[0], 1, buf.size(), dat) != buf.size()) return false;
+                size_t nl = buf.find('\n');
+                if (nl == string::npos) continue;
+                if (buf.compare(0, nl, lower)) continue;  // hash collision — try next
+                out = buf.substr(nl + 1);
+                return true;
+            }
+            return false;
+        }
+    };
+
+    Sidecar gTextSidecar;
+    Sidecar gAutoSidecar;
+    bool gMaterializing = false;  // addMagicText bypass during replay
+}
+
+bool CardPrimitive::textOffloadActive()
+{
+    if (!gTextSidecar.tried)
+        gTextSidecar.load("Res/cardtext.idx", "Res/cardtext.dat", "cardtext");
+    return !gTextSidecar.idx.empty();
+}
+
+bool CardPrimitive::fetchOffloadedText(const string& cardName, string& out)
+{
+    if (!textOffloadActive()) return false;
+    return gTextSidecar.fetch(cardName, out);
+}
+
+bool CardPrimitive::autoOffloadActive()
+{
+    if (!gAutoSidecar.tried)
+        gAutoSidecar.load("Res/cardauto.idx", "Res/cardauto.dat", "cardauto");
+    return !gAutoSidecar.idx.empty();
+}
+
+// Replay this primitive's auto*/anyzone lines from the sidecar, mirroring
+// MTGAllCards::processConfLine's three magic-text branches exactly.
+void CardPrimitive::materializeMagicText()
+{
+    if (mMagicMaterialized) return;
+    mMagicMaterialized = true;
+    if (!autoOffloadActive()) return;
+    string payload;
+    if (!gAutoSidecar.fetch(name, payload)) return;
+    gMaterializing = true;
+    size_t pos = 0;
+    while (pos < payload.size())
+    {
+        size_t end = payload.find('\n', pos);
+        if (end == string::npos) end = payload.size();
+        string line = payload.substr(pos, end - pos);
+        pos = end + 1;
+        size_t eq = line.find('=');
+        if (eq == string::npos || !eq) continue;
+        string key = line.substr(0, eq);
+        string val = line.substr(eq + 1);
+        if (key == "auto")
+            addMagicText(val);
+        else if (key.compare(0, 4, "auto") == 0)
+            addMagicText(val, key.substr(4));
+        else if (key == "anyzone")
+        {
+            addMagicText(val, "hand");
+            addMagicText(val, "library");
+            addMagicText(val, "graveyard");
+            addMagicText(val, "stack");
+            addMagicText(val, "exile");
+            addMagicText(val, "commandzone");
+            addMagicText(val, "reveal");
+            addMagicText(val, "sideboard");
+            addMagicText(val);
+        }
+    }
+    gMaterializing = false;
+}
+#endif
+
 void CardPrimitive::setText(const string& value)
 {
+#if defined (PSP)
+    if (textOffloadActive()) return;  // served from the sidecar at render time
+#endif
     text = value;
 }
 
@@ -331,6 +506,10 @@ void CardPrimitive::setText(const string& value)
 */
 const vector<string>& CardPrimitive::getFormattedText(bool noremove)
 {
+#if defined (PSP)
+    if (!text.size() && formattedText.empty())
+        fetchOffloadedText(name, text);  // miss (textless card) leaves text empty
+#endif
     if (!text.size())
         return formattedText;
 
@@ -354,6 +533,9 @@ const vector<string>& CardPrimitive::getFormattedText(bool noremove)
 
 void CardPrimitive::addMagicText(string value)
 {
+#if defined (PSP)
+    if (!gMaterializing && autoOffloadActive()) return;  // replayed from sidecar on first game use
+#endif
     std::transform(value.begin(), value.end(), value.begin(), ::tolower);
     if (magicText.size())
         magicText.append("\n");
@@ -362,6 +544,9 @@ void CardPrimitive::addMagicText(string value)
 
 void CardPrimitive::addMagicText(string value, string key)
 {
+#if defined (PSP)
+    if (!gMaterializing && autoOffloadActive()) return;  // replayed from sidecar on first game use
+#endif
     std::transform(value.begin(), value.end(), value.begin(), ::tolower);
     if (magicTexts[key].size())
         magicTexts[key].append("\n");

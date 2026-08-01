@@ -105,6 +105,18 @@ public:
 
     void setText(const string& value);
     const vector<string>& getFormattedText(bool noremove = false);
+#if defined (PSP)
+    // Display text and auto scripts live in deploy-time sidecars (cardtext/cardauto
+    // .idx/.dat at the Res root) instead of RAM — 26k resident strings don't fit
+    // the PSP heap. Absent sidecars = unchanged behavior. Auto scripts materialize
+    // into the primitive permanently the first time a game uses the card (the
+    // CardPrimitive copy-ctor seam every in-game card passes through).
+    static bool textOffloadActive();
+    static bool fetchOffloadedText(const string& cardName, string& out);
+    static bool autoOffloadActive();
+    void materializeMagicText();
+    bool mMagicMaterialized;
+#endif
 
     void addMagicText(string value);
     void addMagicText(string value, string zone);
