@@ -6,9 +6,11 @@
 #include <pspsysmem.h>
 #include <stdarg.h>
 #include <malloc.h>
-#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+#if defined(WAGIC_AUTODEMO)
 #define WAGIC_SELFPLAY_ACTIVE 1
 #else
+//HWPROBE builds must NOT hijack: a human drives the menus. (A build that gated
+//this on HWPROBE too ghost-played every Classic entry — the round-3/4 riddle.)
 #define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
 #endif
 static void wagicProbe(const char* fmt, ...)

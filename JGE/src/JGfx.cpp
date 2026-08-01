@@ -1335,10 +1335,18 @@ JTexture* JRenderer::LoadTexture(const char* filename, int mode, int textureMode
     }
 
     JLOG("-- OK  -- JRenderer::LoadTexture");
-    gfxProbe("tex done: %s %dx%d vram=%d free=%u largest=%u", filename,
-        tex ? tex->mTexWidth : -1, tex ? tex->mTexHeight : -1,
-        tex ? (int)tex->mInVideoRAM : -1,
-        (unsigned)vmemavail(), (unsigned)vlargestblock());
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+    {
+        struct mallinfo mi = mallinfo();
+        //bits pointer is the payload: does the GE choke on textures allocated
+        //above the phat 24MB user boundary (0x0A000000) on large-memory units?
+        gfxProbe("tex done: %s %dx%d vram=%d bits=%p vfree=%u used=%u", filename,
+            tex ? tex->mTexWidth : -1, tex ? tex->mTexHeight : -1,
+            tex ? (int)tex->mInVideoRAM : -1,
+            tex ? (void*)tex->mBits : NULL,
+            (unsigned)vmemavail(), (unsigned)mi.uordblks);
+    }
+#endif
     return tex;
 
 }
