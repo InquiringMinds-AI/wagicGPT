@@ -2179,107 +2179,31 @@ void JRenderer::FillPolygon(float x, float y, float size, int count, float start
 
 void JRenderer::DrawRoundRect( float x1,float y1, float w,float h,float radius,PIXEL_TYPE color )
 {
-	float x2=x1+w;
-	float y2=y1+h;
-	for(int i=-radius;i<y2-y1+radius; i++)
-	{
-		float q=radius;
-		float nextq = q+1;
-		if(i<0)
-		{
-			q=(float)sqrt(radius*radius - (-i)*(-i));
-			nextq=(float)sqrt(radius*radius - (-i+1)*(-i+1));
-		}
-		else if (i > y2-y1)
-		{
-			q=(float)sqrt(radius*radius - (i-(y2-y1))*(i-(y2-y1)));
-			nextq=(float)sqrt(radius*radius - (i+1-(y2-y1))*(i+1-(y2-y1)));
-		}
-		if (nextq == q) nextq = q+1;
-		if (i==-radius || i == y2-y1+radius-1){
-		  DrawLine(x1+(radius-q),y1+i+radius,x2+q+radius,y1+i+radius,color);
-		}else{
-		  DrawLine(x1+(radius-q),y1+i+radius,x1+(radius-nextq),y1+i+radius,color);
-		  DrawLine(x2+radius+q,y1+i+radius,x2+radius+nextq,y1+i+radius,color);
-		}
-	}
+	//PSP: the historical implementation drew the outline ONE DrawLine PER PIXEL
+	//ROW (hundreds of GU draw calls per call per frame - severe lag), and the
+	//fork's UI draws round rects on every full-size card, options panel and
+	//popup. At 480x272 a <=6px corner radius is barely visible: draw a plain
+	//4-line rectangle with bounded cost instead. (Callers pass x/y as the
+	//top-left of the un-rounded body; the historical shape spanned from
+	//x1..x1+w+2*radius horizontally, so keep that footprint.)
+	float x2 = x1 + w + 2 * radius;
+	float y2 = y1 + h + 2 * radius;
+	DrawLine(x1, y1, x2, y1, color);
+	DrawLine(x2, y1, x2, y2, color);
+	DrawLine(x2, y2, x1, y2, color);
+	DrawLine(x1, y2, x1, y1, color);
 }
 
 
 void JRenderer::FillRoundRect(float x, float y, float w, float h, float radius, PIXEL_TYPE color)
 {
-	x+=w+radius;
-	y+=radius;
-
-	struct VertexColor* vertices = (struct VertexColor*)sceGuGetMemory(182 * sizeof(struct VertexColor));
-
-	vertices[0].color = color;
-	vertices[0].x = x;
-	vertices[0].y = y;
-	vertices[0].z = 0.0f;
-
-	int angle = 359;
-	for(int i=0; i<45; i++)
-	{
-		vertices[i+1].color = color;
-		vertices[i+1].x = x+radius*COSF(angle);
-		vertices[i+1].y = y+radius*SINF(angle);
-		vertices[i+1].z = 0.0f;
-		angle -= 2;
-		if (angle < 0)
-			angle = 0;
-	}
-
-	x-=w;
-
-	for(int i=45; i<90; i++)
-	{
-		vertices[i+1].color = color;
-		vertices[i+1].x = x+radius*COSF(angle);
-		vertices[i+1].y = y+radius*SINF(angle);
-		vertices[i+1].z = 0.0f;
-		angle -= 2;
-		if (angle < 0)
-			angle = 0;
-	}
-
-	y+=h;
-	for(int i=90; i<135; i++)
-	{
-		vertices[i+1].color = color;
-		vertices[i+1].x = x+radius*COSF(angle);
-		vertices[i+1].y = y+radius*SINF(angle);
-		vertices[i+1].z = 0.0f;
-		angle -= 2;
-		if (angle < 0)
-			angle = 0;
-	}
-
-	x+=w;
-	for(int i=135; i<180; i++)
-	{
-		vertices[i+1].color = color;
-		vertices[i+1].x = x+radius*COSF(angle);
-		vertices[i+1].y = y+radius*SINF(angle);
-		vertices[i+1].z = 0.0f;
-		angle -= 2;
-		if (angle < 0)
-			angle = 0;
-	}
-
-	y-=h;
-	vertices[181].color = color;
-	vertices[181].x = x+radius*COSF(359);
-	vertices[181].y = y+radius*SINF(359);
-	vertices[181].z = 0.0f;
-
-	sceGuDisable(GU_TEXTURE_2D);
-	sceGuShadeModel(GU_SMOOTH);
-	sceGuAmbientColor(0xffffffff);
-	sceGuDrawArray(GU_TRIANGLE_FAN, TEXTURE_COLOR_FORMAT|GU_VERTEX_32BITF|GU_TRANSFORM_2D, 182, 0, vertices);
-	sceGuEnable(GU_TEXTURE_2D);
+	//PSP: replaced the historical 182-vertex triangle-fan (sceGuGetMemory from
+	//the display list on every call, every frame) with a single bounded quad.
+	//The fork draws filled round rects behind every full-size card and options
+	//panel; at 480x272 the missing corner rounding is barely visible. Footprint
+	//matches the historical shape: (x, y) top-left, w+2*radius by h+2*radius.
+	FillRect(x, y, w + 2 * radius, h + 2 * radius, color);
 }
-
 
 void JRenderer::SetImageFilter(JImageFilter* imageFilter)
 {

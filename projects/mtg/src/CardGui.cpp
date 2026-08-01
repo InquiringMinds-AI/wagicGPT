@@ -5,6 +5,23 @@
 
 #include "PrecompiledHeader.h"
 
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+#include <stdarg.h>
+static void cardProbe(const char* fmt, ...)
+{
+    FILE* f = fopen("User/wagic-probe.log", "a");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    fprintf(f, "\n");
+    fclose(f);
+}
+#else
+#define cardProbe(...) ((void)0)
+#endif
+
 #include "JGE.h"
 #include "CardGui.h"
 #include "ManaCostHybrid.h"
@@ -662,6 +679,14 @@ JQuadPtr CardGui::AlternateThumbQuad(MTGCard * card)
 
 void CardGui::AlternateRender(MTGCard * card, const Pos& pos)
 {
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+    static MTGCard * lastAlt = NULL;
+    if (card != lastAlt)
+    {
+        lastAlt = card;
+        cardProbe("altrender: %s", (card && card->data) ? card->data->getName().c_str() : "?");
+    }
+#endif
     // Draw the "unknown" card model
     JRenderer * renderer = JRenderer::GetInstance();
     JQuadPtr q;
@@ -1266,6 +1291,14 @@ void CardGui::TinyCropRender(MTGCard * card, const Pos& pos, JQuad * quad)
 //Renders a big card on screen. Defaults to the "alternate" rendering if no image is found
 void CardGui::RenderBig(MTGCard* card, const Pos& pos, bool thumb, bool noborder, bool gdv)
 {
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+    static MTGCard * lastBig = NULL;
+    if (card != lastBig)
+    {
+        lastBig = card;
+        cardProbe("renderbig: %s", (card && card->data) ? card->data->getName().c_str() : "?");
+    }
+#endif
     JRenderer * renderer = JRenderer::GetInstance();
     //GameObserver * game = GameObserver::GetInstance();
     //if((MTGCard*)game->mLayers->actionLayer()->currentActionCard != NULL)
