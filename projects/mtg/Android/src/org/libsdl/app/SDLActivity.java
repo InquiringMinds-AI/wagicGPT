@@ -1132,7 +1132,12 @@ public class SDLActivity extends Activity implements OnKeyListener {
 	private void enterImmersiveMode() {
 		final View decorView = getWindow().getDecorView();
 		decorView.setSystemUiVisibility(
-			View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+			// NOT _STICKY: sticky immersive consumes edge swipes to flash the
+			// system bars and never delivers the navigation event, so
+			// gesture-nav Back could not reach the game at all. Plain
+			// immersive reveals the bars on the first swipe; the Back gesture
+			// then works, and focus changes re-hide them.
+			View.SYSTEM_UI_FLAG_IMMERSIVE
 			| View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
 			| View.SYSTEM_UI_FLAG_FULLSCREEN
 			| View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
@@ -1427,8 +1432,15 @@ public class SDLActivity extends Activity implements OnKeyListener {
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && mSurface != null) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 onNativeKeyDown(KeyEvent.KEYCODE_BACK);
-            } else if (event.getAction() == KeyEvent.ACTION_UP) {
-                onNativeKeyUp(KeyEvent.KEYCODE_BACK);
+                // The engine detects a "click" only if the key is still held
+                // when a frame is drawn; a real Back sends down+up within the
+                // same frame, so the release must be deferred. (The in-game
+                // swipe worked precisely because it never sent an up at all.)
+                mSurface.postDelayed(new Runnable() {
+                    public void run() {
+                        onNativeKeyUp(KeyEvent.KEYCODE_BACK);
+                    }
+                }, 150);
             }
             return true;
         }
@@ -1937,7 +1949,13 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                     parent.showOptionMenu(); // Emulate Android "optionmenu" button pressure (for devices without sidebar, e.g. like Android 10).
                     return true;
                 } else if (deltaY < -swipeThreshold){
-                    SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_BACK); // Emulate Android "back" button pressure (for devices without sidebar, e.g. like Android 10).
+                    // Game menu (Back is bound to cancel instead).
+                    SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_MENU);
+                    v.postDelayed(new Runnable() {
+                        public void run() {
+                            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_MENU);
+                        }
+                    }, 150);
                     return true;
                 }
                 break;
