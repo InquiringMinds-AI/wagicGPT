@@ -4395,6 +4395,7 @@ int AIPlayerBaka::Act(float dt)
     }
     else
     {
+        bool completedPlay = !clickstream.empty();
         while(clickstream.size())
         {
             AIAction * action = clickstream.front();
@@ -4419,6 +4420,22 @@ int AIPlayerBaka::Act(float dt)
                     clickstream.pop();
                 }
             }
+        }
+        //Spectator pacing: the endless demo develops faster than a human can
+        //read the board, so hold this seat's next act after each completed
+        //play. Priority passes keep the normal quick timer, and harness
+        //contexts (suite/selfplay/headless, or WAGIC_DEMO_FAST=1 for live GUI
+        //engine tests) keep full engine speed.
+        if (completedPlay && observer && observer->gameType() == GAME_TYPE_DEMO
+            && !observer->mSuiteGame)
+        {
+            bool harness = false;
+#if !defined (PSP)
+            harness = getenv("WAGIC_DEMO_FAST") || getenv("WAGIC_TESTSUITE")
+                || getenv("WAGIC_HEADLESS") || getenv("WAGIC_SELFPLAY");
+#endif
+            if (!harness)
+                timer = 1.5f;
         }
     }
     return 1;
