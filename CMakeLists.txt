@@ -59,6 +59,12 @@ add_definitions(
   -DTIXML_USE_STL
   -DFORCE_GLES
   -DGL_OES_VERSION_1_1
+  # The LLM opponent. Without this the whole GPT layer preprocesses away and
+  # the build is Baka-only, which is not a shippable configuration for this
+  # project. The transport is libcurl, which VitaSDK already ships built
+  # against OpenSSL - so TLS is done in userspace and does not depend on the
+  # console's own SSL module.
+  -DWITH_GPT_AI
 )
 
 include_directories(
@@ -274,6 +280,12 @@ target_link_libraries(${PROJECT_NAME}
   freetype
   png
   jpeg
+  # HTTP transport for the LLM opponent. Link order matters for static libs:
+  # curl before its own dependencies. Taken from the SDK's libcurl.pc.
+  curl
+  ssl
+  crypto
+  zstd
   z
   m
   pthread
@@ -294,6 +306,15 @@ target_link_libraries(${PROJECT_NAME}
   SceKernelDmacMgr_stub
   SceKernelThreadMgr_stub
   SceIofilemgr_stub
+  # Network stubs required by libcurl (SDK libcurl.pc) and by the sceNet /
+  # sceNetCtl bring-up in Vitamain.cpp.
+  SceNet_stub
+  SceNetCtl_stub
+  SceRtc_stub
+  SceSysmem_stub
+  SceKernelModulemgr_stub
+  SceProcessmgr_stub
+  SceLibKernel_stub
 )
 
 # UNSAFE: skips the -s flag passed to vita-make-fself. Without UNSAFE, the

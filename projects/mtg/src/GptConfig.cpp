@@ -84,12 +84,30 @@ string b64decode(const string& in)
     return out;
 }
 
+//Root of the writable per-user config tree, with the platform's ".Wagic"
+//component already included. Empty means "nowhere writable" - callers must
+//treat that as "reads fall back to the bundled Res copy, writes fail".
+//
+//The Vita has no HOME. Its writable partition is ux0:data, and Vitamain.cpp
+//already creates ux0:data/Wagic at launch. Without this the options GUI could
+//never save an endpoint there, so the LLM opponent would be permanently
+//unconfigurable on that platform.
+static string gptUserRoot()
+{
+#ifdef VITA
+    return "ux0:data/Wagic";
+#else
+    const char * home = getenv("HOME");
+    return home ? string(home) + "/.Wagic" : string();
+#endif
+}
+
 string saltPath()
 {
-    const char * home = getenv("HOME");
-    if (!home)
+    const string root = gptUserRoot();
+    if (root.empty())
         return "";
-    return string(home) + "/.Wagic/ai/gpt/keysalt";
+    return root + "/ai/gpt/keysalt";
 }
 
 string loadOrCreateSalt()
@@ -124,10 +142,9 @@ string loadOrCreateSalt()
             salt += (char) (rand() & 0xFF);
     }
     //The directory chain may not exist yet on a first run.
-    const char * home = getenv("HOME");
-    if (home)
+    string dir = gptUserRoot();
+    if (!dir.empty())
     {
-        string dir = string(home) + "/.Wagic";
         mkdir(dir.c_str(), 0755);
         dir += "/ai"; mkdir(dir.c_str(), 0755);
         dir += "/gpt"; mkdir(dir.c_str(), 0755);
@@ -179,9 +196,10 @@ string deobfuscateKey(const string& stored)
 
 string gptReadAsset(const char * filename)
 {
-    if (const char * home = getenv("HOME"))
+    const string root = gptUserRoot();
+    if (!root.empty())
     {
-        string path = string(home) + "/.Wagic/ai/gpt/" + filename;
+        string path = root + "/ai/gpt/" + filename;
         std::ifstream f(path.c_str(), std::ios::binary);
         if (f)
         {
@@ -239,10 +257,9 @@ GptSettings GptSettings::load()
 
 bool GptSettings::save() const
 {
-    const char * home = getenv("HOME");
-    if (!home)
+    string dir = gptUserRoot();
+    if (dir.empty())
         return false;
-    string dir = string(home) + "/.Wagic";
     mkdir(dir.c_str(), 0755);
     dir += "/ai";
     mkdir(dir.c_str(), 0755);
