@@ -15,9 +15,13 @@ PNG_PATH := $(JGE_PATH)/Dependencies/libpng
 LOCAL_CFLAGS += -DLINUX -DANDROID -DSDL_CONFIG -DNETWORK_SUPPORT
 LOCAL_CFLAGS += -D_STLP_USE_SIMPLE_NODE_ALLOC -DTIXML_USE_STL
 LOCAL_CFLAGS += -D__arm__ -D_REENTRANT -D_GLIBCXX__PTHREADS
-# No libcurl port wired for Android yet: the GPT layer compiles in but its HTTP
-# transport reports failure -> AIPlayerGPT falls back to Baka (same as no endpoint).
-LOCAL_CFLAGS += -DWAGIC_NO_CURL
+# The GPT layer's HTTP transport is a JNI call into SDLActivity.gptHttpRequest
+# (HttpURLConnection) rather than libcurl: no curl/OpenSSL port to maintain, and
+# TLS rides the platform's own trust store and updates.
+# WAGIC_NO_CURL stays: it means literally "no libcurl in this build" and gates
+# the curl includes / curl_global_init. WAGIC_HTTP_JNI names the transport that
+# takes its place, and wins over the no-transport stub.
+LOCAL_CFLAGS += -DWAGIC_NO_CURL -DWAGIC_HTTP_JNI
 # The GPT layer's registration (options tab, AI factory) is gated on this;
 # without it the fork's sources compile but never activate.
 LOCAL_CFLAGS += -DWITH_GPT_AI

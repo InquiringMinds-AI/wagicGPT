@@ -96,6 +96,18 @@ static string gptUserRoot()
 {
 #ifdef VITA
     return "ux0:data/Wagic";
+#elif defined(ANDROID)
+    //An Android app process has no useful HOME, so $HOME/.Wagic would put the
+    //endpoint config somewhere unwritable and the LLM opponent would look
+    //unconfigurable. The engine already resolved the real user root through
+    //SDLActivity (internal storage, or the SD card when the user picked it) -
+    //every other Wagic file lives there, so the GPT config does too.
+    {
+        string root = JFileSystem::GetInstance()->GetUserRoot();
+        while (root.size() && root[root.size() - 1] == '/')
+            root.erase(root.size() - 1);
+        return root;
+    }
 #else
     const char * home = getenv("HOME");
     return home ? string(home) + "/.Wagic" : string();
@@ -378,17 +390,152 @@ size_t gptPresetForUrl(const string& url)
     return 0;
 }
 
+#ifdef WAGIC_HTTP_JNI
+//--- Android transport ------------------------------------------------------
+//
+//Android has no libcurl port in this tree, and does not need one: the platform
+//already ships a maintained TLS stack behind java.net.HttpURLConnection, which
+//also means system trust anchors and OS-level updates rather than a bundled CA
+//bundle we would have to keep fresh. The whole transport is therefore ONE
+//static Java method (SDLActivity.gptHttpRequest), called over JNI.
+//
+//Two JNI facts shape this code:
+// 1. FindClass on a thread ATTACHED FROM NATIVE resolves against the system
+//    class loader, which cannot see app classes - it would fail with
+//    ClassNotFoundException. The model call runs on exactly such a thread
+//    (AIPlayerGPT's detached worker), so the class reference is captured ONCE
+//    during JNI_OnLoad, where the loader is still the app's, and kept as a
+//    global ref.
+// 2. A natively-attached thread MUST detach before it exits or the VM aborts
+//    the process. We attach and detach around each call.
+#include <jni.h>
+
 namespace
 {
-#ifdef WAGIC_NO_CURL
-//Platforms without a libcurl port yet (Android phase A): the transport reports
-//failure, which every GPT seam already treats as "fall back to Baka" - the
-//same behavior as an unreachable endpoint.
+JavaVM * gGptJvm = NULL;
+jclass gGptActivityClass = NULL;
+} //namespace
+
+void gptAndroidCacheClass(JNIEnv * env)
+{
+    if (!env || gGptActivityClass)
+        return;
+    env->GetJavaVM(&gGptJvm);
+    jclass local = env->FindClass("org/libsdl/app/SDLActivity");
+    if (!local)
+    {
+        env->ExceptionClear();
+        gptLogLine("android transport: SDLActivity not found at load time");
+        return;
+    }
+    gGptActivityClass = (jclass) env->NewGlobalRef(local);
+    env->DeleteLocalRef(local);
+}
+
+namespace
+{
+string httpRequestImpl(const string& url, const string& postBody, long timeoutMs, const string& bearer)
+{
+    if (!gGptJvm || !gGptActivityClass)
+        return "";
+
+    JNIEnv * env = NULL;
+    bool attached = false;
+    jint status = gGptJvm->GetEnv((void **) &env, JNI_VERSION_1_4);
+    if (status == JNI_EDETACHED || status == JNI_ERR)
+    {
+        if (gGptJvm->AttachCurrentThread(&env, NULL) != JNI_OK)
+        {
+            gptLogLine("android transport: could not attach the calling thread");
+            return "";
+        }
+        attached = true;
+    }
+    if (!env)
+        return "";
+
+    string result;
+    jmethodID mid = env->GetStaticMethodID(
+        gGptActivityClass, "gptHttpRequest",
+        "(Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)Ljava/lang/String;");
+    if (!mid)
+    {
+        env->ExceptionClear();
+        gptLogLine("android transport: SDLActivity.gptHttpRequest is missing");
+    }
+    else
+    {
+        jstring jUrl = env->NewStringUTF(url.c_str());
+        jstring jBody = env->NewStringUTF(postBody.c_str());
+        jstring jKey = env->NewStringUTF(bearer.c_str());
+        jstring reply = (jstring) env->CallStaticObjectMethod(
+            gGptActivityClass, mid, jUrl, jBody, (jint) timeoutMs, jKey);
+        //An exception thrown across JNI stays pending and poisons every later
+        //call on this thread; the Java side already returns "" for failures, so
+        //anything pending here is a bug worth naming rather than swallowing.
+        if (env->ExceptionCheck())
+        {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+            gptLogLine("android transport: java side threw");
+        }
+        else if (reply)
+        {
+            const char * cstr = env->GetStringUTFChars(reply, NULL);
+            if (cstr)
+            {
+                result = cstr;
+                env->ReleaseStringUTFChars(reply, cstr);
+            }
+        }
+        //A silent empty reply is indistinguishable from a wrong IP, and the
+        //most likely causes on Android are platform policy (blocked cleartext)
+        //or an auth failure - both worth naming in the log a user can send us.
+        if (result.empty())
+        {
+            jmethodID errId = env->GetStaticMethodID(gGptActivityClass, "gptLastError",
+                                                     "()Ljava/lang/String;");
+            if (!errId)
+                env->ExceptionClear();
+            else
+            {
+                jstring why = (jstring) env->CallStaticObjectMethod(gGptActivityClass, errId);
+                if (env->ExceptionCheck())
+                    env->ExceptionClear();
+                else if (why)
+                {
+                    const char * cwhy = env->GetStringUTFChars(why, NULL);
+                    if (cwhy && *cwhy)
+                        gptLogLine(string("android transport failed: ") + cwhy);
+                    if (cwhy)
+                        env->ReleaseStringUTFChars(why, cwhy);
+                }
+                if (why) env->DeleteLocalRef(why);
+            }
+        }
+        if (reply) env->DeleteLocalRef(reply);
+        env->DeleteLocalRef(jKey);
+        env->DeleteLocalRef(jBody);
+        env->DeleteLocalRef(jUrl);
+    }
+
+    if (attached)
+        gGptJvm->DetachCurrentThread();
+    return result;
+}
+#elif defined(WAGIC_NO_CURL)
+namespace
+{
+//Platforms without any wired transport: the request reports failure, which
+//every GPT seam already treats as "fall back to Baka" - the same behavior as
+//an unreachable endpoint.
 string httpRequestImpl(const string&, const string&, long, const string&)
 {
     return "";
 }
 #else
+namespace
+{
 size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * userp)
 {
     static_cast<string *>(userp)->append(static_cast<char *>(contents), size * nmemb);
@@ -448,6 +595,24 @@ string gptHttpPost(const string& url, const string& body, long timeoutMs, const 
     return httpRequestImpl(url, body, timeoutMs, bearer);
 }
 
+namespace
+{
+//The name of a model in a listing reply. OpenAI-shaped servers use "id";
+//Ollama-shaped ones use "name" (and sometimes "model"); some list bare strings.
+string modelNameOf(const nlohmann::json& entry)
+{
+    if (entry.is_string())
+        return entry.get<string>();
+    if (!entry.is_object())
+        return "";
+    const char * keys[] = { "id", "name", "model" };
+    for (size_t i = 0; i < 3; ++i)
+        if (entry.contains(keys[i]) && entry[keys[i]].is_string())
+            return entry[keys[i]].get<string>();
+    return "";
+}
+} //namespace
+
 bool gptProbeEndpoint(const string& url, const string& key, string& modelOut, long timeoutMs)
 {
     modelOut.clear();
@@ -457,12 +622,31 @@ bool gptProbeEndpoint(const string& url, const string& key, string& modelOut, lo
     try
     {
         nlohmann::json models = nlohmann::json::parse(body);
-        //A real /v1/models reply carries a non-empty "data" array; an auth
-        //error ({"error":"Unauthorized"}) parses fine but is not usable.
-        if (!models.contains("data") || !models["data"].is_array() || models["data"].empty())
-            return false;
-        modelOut = models["data"][0]["id"].get<string>();
-        return true;
+        //A usable reply carries a non-empty list of models; an auth error
+        //({"error":"Unauthorized"}) parses fine but is not usable. The list
+        //lives under "data" on OpenAI-shaped servers and under "models" on
+        //Ollama-shaped ones (current llama-server emits both, "models" first),
+        //so accept either rather than betting the probe on one local server's
+        //choice of key. A listing entry names its model with "id", "name" or
+        //"model" depending on the same lineage, and some servers list plain
+        //strings.
+        const char * arrays[] = { "data", "models" };
+        for (size_t i = 0; i < 2; ++i)
+        {
+            if (!models.contains(arrays[i]) || !models[arrays[i]].is_array())
+                continue;
+            const nlohmann::json& list = models[arrays[i]];
+            for (nlohmann::json::const_iterator it = list.begin(); it != list.end(); ++it)
+            {
+                string name = modelNameOf(*it);
+                if (name.size())
+                {
+                    modelOut = name;
+                    return true;
+                }
+            }
+        }
+        return false;
     }
     catch (nlohmann::json::exception&)
     {

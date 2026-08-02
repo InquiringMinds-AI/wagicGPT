@@ -10,9 +10,16 @@
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <!-- Manual Res placement lives at <storage>/Wagic/Res; scoped storage would
        lock a target-29 app out of that path on Android 10+ without this. -->
+  <!-- The LLM opponent talks to an endpoint the USER names, and the common
+       cases are plain-HTTP local inference (a llama.cpp or Ollama box on the
+       LAN). Android blocks cleartext by default from target 28 on, which would
+       fail those before a packet left the device - and the GPT layer reads any
+       transport failure as "endpoint unreachable" and silently falls back to
+       the heuristic AI. HTTPS endpoints are unaffected by this flag. -->
   <application android:icon="@drawable/icon"
                android:label="@string/app_name"
                android:requestLegacyExternalStorage="true"
+               android:usesCleartextTraffic="true"
                android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
                
     <activity android:debuggable="false"

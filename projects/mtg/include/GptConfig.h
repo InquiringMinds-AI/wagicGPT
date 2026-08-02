@@ -105,6 +105,14 @@ std::string gptHttpPost(const std::string& url, const std::string& body, long ti
 //model list; modelOut receives the first advertised model id.
 bool gptProbeEndpoint(const std::string& url, const std::string& key, std::string& modelOut, long timeoutMs = 20000);
 
+#ifdef WAGIC_HTTP_JNI
+//Capture the app's SDLActivity class while the app class loader is still the
+//one in effect. MUST be called from JNI_OnLoad (or any Java-originated call);
+//the model-call worker is a native thread and cannot resolve app classes.
+#include <jni.h>
+void gptAndroidCacheClass(JNIEnv * env);
+#endif
+
 #endif //WITH_GPT_AI
 
 #endif //_GPTCONFIG_H_

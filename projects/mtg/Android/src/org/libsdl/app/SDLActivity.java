@@ -61,12 +61,14 @@ import net.wagic.utils.ImgDownloader;
 import net.wagic.utils.StorageOptions;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 
@@ -1307,6 +1309,85 @@ public class SDLActivity extends Activity implements OnKeyListener {
 
     public static String getUserFolderPath() {
         return mSingleton.getUserStorageLocation();
+    }
+
+    /**
+     * HTTP transport for the language-model opponent, called over JNI from the
+     * native GPT layer. There is no libcurl in this build: HttpURLConnection
+     * gives us the platform's own TLS stack, system trust anchors, and OS
+     * updates instead of a CA bundle shipped inside the APK.
+     *
+     * An empty body means GET; anything else is a JSON POST. The contract
+     * matches the native side exactly: the response body on HTTP 200, and an
+     * empty string for every failure - the GPT seams read that as "endpoint
+     * unreachable" and fall back to the heuristic AI.
+     *
+     * Always called from a native worker thread, never the UI thread, so the
+     * blocking I/O here is legal (and StrictMode-clean).
+     */
+    private static volatile String sGptLastError = "";
+
+    /**
+     * Why the last gptHttpRequest returned "". Read by the native side only
+     * when a call fails, so a user's gpt-log.txt names the cause (blocked
+     * cleartext, DNS, refused connection, HTTP 401) instead of showing an
+     * unexplained fall back to the heuristic AI.
+     */
+    public static String gptLastError() {
+        return sGptLastError;
+    }
+
+    public static String gptHttpRequest(String url, String body, int timeoutMs, String bearer) {
+        HttpURLConnection conn = null;
+        sGptLastError = "";
+        try {
+            conn = (HttpURLConnection) new URL(url).openConnection();
+            conn.setConnectTimeout(timeoutMs);
+            conn.setReadTimeout(timeoutMs);
+            conn.setRequestProperty("Accept", "application/json");
+            if (bearer != null && bearer.length() > 0) {
+                conn.setRequestProperty("Authorization", "Bearer " + bearer);
+            }
+            if (body != null && body.length() > 0) {
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Content-Type", "application/json");
+                byte[] payload = body.getBytes("UTF-8");
+                conn.setFixedLengthStreamingMode(payload.length);
+                OutputStream out = conn.getOutputStream();
+                out.write(payload);
+                out.flush();
+                out.close();
+            } else {
+                conn.setRequestMethod("GET");
+            }
+
+            int code = conn.getResponseCode();
+            if (code != 200) {
+                sGptLastError = "HTTP " + code;
+                return "";
+            }
+            InputStream in = conn.getInputStream();
+            ByteArrayOutputStream sink = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int read;
+            while ((read = in.read(buf)) > 0) {
+                sink.write(buf, 0, read);
+            }
+            in.close();
+            return new String(sink.toByteArray(), "UTF-8");
+        } catch (Exception e) {
+            // Deliberately broad: a transport failure of ANY kind is one
+            // outcome to the caller. Throwing back across JNI would leave a
+            // pending exception on a native thread.
+            sGptLastError = e.toString();
+            Log.v("SDL", "gptHttpRequest failed: " + e);
+            return "";
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
     }
 
     public static void jgeSendCommand(String command) {
