@@ -143,6 +143,10 @@ void GameStateOptions::Start()
     WDecoEnum * oASPhases = NEW WDecoEnum(NEW OptionInteger(Options::ASPHASES, "Phase Skip Automation", Constants::ASKIP_FULL, 1,
                     Constants::ASKIP_NONE, "", Constants::ASKIP_NONE));
     optionsList->Add(oASPhases);
+    //Off by default in this fork. The tutorial messages are modal, interrupt
+    //the duel, and repeat on every fresh profile; anyone who wants them can
+    //turn them on here.
+    optionsList->Add(NEW OptionInteger(Options::TUTORIALS, "Show tutorial messages"));
     optionsTabs->Add(optionsList);
 
     WDecoEnum * oFirstPlayer = NEW WDecoEnum(NEW OptionInteger(Options::FIRSTPLAYER, "First Turn Player", Constants::WHO_R, 1,

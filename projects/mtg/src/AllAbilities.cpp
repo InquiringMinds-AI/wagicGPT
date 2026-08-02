@@ -11472,6 +11472,25 @@ bool ATutorialMessage::CheckUserInput(JButton key)
 
 void ATutorialMessage::Update(float dt)
 {
+    //Retire the message instead of showing it when nobody can dismiss it, or
+    //when the player has asked not to see tutorials at all.
+    //
+    //The AI-only case is a hard lock, not a preference: these messages are
+    //modal, and message() ones are built with no show-limit, so in the endless
+    //demo (both seats AI) they cycle forever with nothing to close them.
+    //Retiring has to be done here rather than by setting mDontShow, because the
+    //path below returns early whenever another message owns the screen - two
+    //undismissable messages would then wait on each other.
+    const bool nobodyToDismiss = !game->players[0]->isHuman() && !game->players[1]->isHuman();
+    if (nobodyToDismiss || !options[Options::TUTORIALS].number)
+    {
+        if (game->mLayers->stackLayer()->getCurrentTutorial() == this)
+            game->mLayers->stackLayer()->setCurrentTutorial(0);
+        mDontShow = true;
+        forceDestroy = 1;
+        return;
+    }
+
     if (!game->mLayers->stackLayer()->getCurrentTutorial() && !mDontShow)
         game->mLayers->stackLayer()->setCurrentTutorial(this);
 

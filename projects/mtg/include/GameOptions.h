@@ -59,6 +59,7 @@ public:
         DISABLECARDS,
         MAX_GRADE,
         ASPHASES,
+        TUTORIALS,
         FIRSTPLAYER,
         KICKERPAYMENT,
         ECON_DIFFICULTY,
