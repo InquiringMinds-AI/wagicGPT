@@ -266,10 +266,15 @@ static const struct { LocalKeySym keysym; JButton keycode; } gDefaultBindings[] 
     { PSP_CTRL_LEFT,     JGE_BTN_LEFT },
     { PSP_CTRL_UP,       JGE_BTN_UP },
     { PSP_CTRL_DOWN,     JGE_BTN_DOWN },
-    { PSP_CTRL_CIRCLE,   JGE_BTN_OK },
+    //Cross confirms, Circle backs out - one layout on every platform this fork
+    //ships, rather than each port following its console's regional convention.
+    //Upstream used the Japanese assignment here (Circle to confirm), which meant
+    //the same fork felt inverted between a PSP and a Vita. Remapping stays
+    //available in Options > Controls for anyone who wants it the other way.
+    { PSP_CTRL_CROSS,    JGE_BTN_OK },
     { PSP_CTRL_TRIANGLE, JGE_BTN_CANCEL },
     { PSP_CTRL_SQUARE,   JGE_BTN_PRI },
-    { PSP_CTRL_CROSS,    JGE_BTN_SEC },
+    { PSP_CTRL_CIRCLE,   JGE_BTN_SEC },
     { PSP_CTRL_LTRIGGER, JGE_BTN_PREV },
     { PSP_CTRL_RTRIGGER, JGE_BTN_NEXT }
 };
