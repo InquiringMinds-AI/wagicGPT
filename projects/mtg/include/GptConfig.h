@@ -73,6 +73,13 @@ public:
 //user copy first, bundled Res copy as fallback. "" when neither exists.
 std::string gptReadAsset(const char * filename);
 
+//Append one line to <user root>/ai/gpt/gpt-log.txt.
+//DebugTrace is compiled out of release builds and, where it survives, writes to
+//stderr - which is invisible on a console. This is the channel that reaches a
+//user's bug report, so it is for the handful of events worth explaining after
+//the fact (the transport refusing to start, and the like), not chatter.
+void gptLogLine(const std::string& line);
+
 //Evaluation peek (config peek=1, or WAGIC_GPT_PEEK env override): reveal
 //the opponent's hand on click. Cached after the first call - flipping it
 //takes a restart, which is fine for a debugging aid.

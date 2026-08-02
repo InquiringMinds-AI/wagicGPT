@@ -194,6 +194,22 @@ string deobfuscateKey(const string& stored)
 }
 } //namespace
 
+void gptLogLine(const string& line)
+{
+    const string root = gptUserRoot();
+    if (root.empty())
+        return; //nowhere writable; nothing useful to do
+
+    string dir = root;
+    mkdir(dir.c_str(), 0755);
+    dir += "/ai";  mkdir(dir.c_str(), 0755);
+    dir += "/gpt"; mkdir(dir.c_str(), 0755);
+
+    std::ofstream f((dir + "/gpt-log.txt").c_str(), std::ios::app);
+    if (f)
+        f << line << "\n";
+}
+
 string gptReadAsset(const char * filename)
 {
     const string root = gptUserRoot();

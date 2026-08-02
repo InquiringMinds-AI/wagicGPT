@@ -1730,12 +1730,34 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         state->started = std::chrono::steady_clock::now();
     }
     long timeoutMs = mTimeoutMs;
-    std::thread([state, url, requestBody, key, timeoutMs]() {
-        string body = gptHttpPost(url, requestBody, timeoutMs, key);
-        std::lock_guard<std::mutex> g(state->mtx);
-        state->status = 2;
-        state->response = body;
-    }).detach();
+    try
+    {
+        std::thread([state, url, requestBody, key, timeoutMs]() {
+            string body = gptHttpPost(url, requestBody, timeoutMs, key);
+            std::lock_guard<std::mutex> g(state->mtx);
+            state->status = 2;
+            state->response = body;
+        }).detach();
+    }
+    catch (const std::exception& e)
+    {
+        //Constructing a std::thread THROWS when the platform refuses one -
+        //resource limits, a thread cap, or a libstdc++ whose gthreads layer is
+        //not active. Letting that escape calls std::terminate and aborts the
+        //process, which breaks the guarantee every other seam here keeps: a
+        //transport failure degrades to the heuristic AI, it never takes the game
+        //down. Publishing an empty reply is the same shape as an unreachable
+        //endpoint, so the caller falls back to Baka on its existing path.
+        {
+            std::lock_guard<std::mutex> g(state->mtx);
+            state->status = 2;
+            state->response.clear();
+        }
+        DebugTrace("AIPlayerGPT: could not start the worker thread (" << e.what()
+                   << "); falling back to the heuristic AI");
+        gptLogLine(string("worker thread refused: ") + e.what()
+                   + " - falling back to the heuristic AI");
+    }
     return kChoicePending;
 }
 
