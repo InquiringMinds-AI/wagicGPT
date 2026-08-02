@@ -264,6 +264,20 @@ add_executable(${PROJECT_NAME}
   ${MTG_SOURCES}
 )
 
+# std::thread threw "Enable multithreading to use std::thread" on hardware for
+# every AI decision (209 refusals in one session's gpt-log.txt), which is
+# libstdc++ reporting __gthread_active_p() == false. That check is a WEAK
+# reference to a pthread symbol: listing -lpthread is not enough, because
+# nothing in the program strongly references those archive members, so the weak
+# symbol resolves to 0 and libstdc++ takes its single-threaded path. Forcing the
+# proxy symbols in pulls the members and turns threading on. Which of the three
+# is the proxy depends on the libstdc++ build, so force all of them.
+target_link_options(${PROJECT_NAME} PRIVATE
+  -Wl,-u,pthread_create
+  -Wl,-u,pthread_cancel
+  -Wl,-u,pthread_key_create
+)
+
 target_link_libraries(${PROJECT_NAME}
   SDL2_mixer
   SDL2
