@@ -409,6 +409,27 @@ std::set<MTGCardInstance*> LegalActionsOracle::castableForDisplay(Player * p)
                 out.insert(card);
         }
     }
+
+    //legalCasts dedupes by name (same name+zone = one DECISION), which is
+    //right for the model's menu and wrong for a per-card display: only the
+    //first of duplicate copies came back, and its twin rendered faded - a
+    //false "uncastable" on a castable card. Same name in the same zone is
+    //the same cast, so spread each verdict across the copies. Lands are
+    //skipped: the loop above already judged every land instance itself.
+    for (int i = 0; i < p->game->hand->nb_cards; i++)
+    {
+        MTGCardInstance * card = p->game->hand->cards[i];
+        if (card->isLand() || out.count(card))
+            continue;
+        for (std::set<MTGCardInstance*>::iterator it = out.begin(); it != out.end(); ++it)
+        {
+            if (!(*it)->isLand() && (*it)->getDisplayName() == card->getDisplayName())
+            {
+                out.insert(card);
+                break;
+            }
+        }
+    }
     return out;
 }
 
