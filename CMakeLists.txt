@@ -45,8 +45,14 @@ else()
                     "Run vendor/vitaGL setup per BUILD_VITA.md.")
 endif()
 
-set(VITA_APP_NAME "Wagic: The Homebrew")
-set(VITA_TITLEID  "WAGC00001")
+set(VITA_APP_NAME "wagicGPT")
+# Own title id, not the inherited port's WAGC00001. The title id owns the
+# ux0:app/<id> directory and the LiveArea slot, so sharing one would install
+# this fork OVER a user's existing Wagic instead of beside it. Save data is
+# unaffected either way - it lives at ux0:data/Wagic, which both builds share.
+#
+# 42: the answer from a thinking machine, which is what this fork runs on.
+set(VITA_TITLEID  "WAGC00042")
 set(VITA_VERSION  "01.00")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -fexceptions")
