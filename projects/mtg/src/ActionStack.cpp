@@ -23,6 +23,29 @@ namespace
 {
     float kGamepadIconSize = 0.5f;
 
+    //Gamepad glyphs in iconspsp.png row 0: 0-3 d-pad, 4 CIRCLE, 5 triangle,
+    //6 SQUARE, 7 CROSS.
+    //
+    //Which glyph means "OK" is a REGIONAL convention, not a fixed fact -
+    //JTypes.h says so at the enum: JGE_BTN_OK is "Circle in Japan, Cross in
+    //Europe". The interrupt prompt used to hardcode CROSS for interrupt
+    //(JGE_BTN_SEC) and CIRCLE for no (JGE_BTN_OK), which was right for the
+    //Japanese PSP the code was written on. The Vita port maps Cross->OK and
+    //Circle->SEC (Vitamain.cpp), so on Vita both labels were exactly inverted:
+    //the prompt told the player to press Cross to interrupt when the button
+    //that actually interrupts is Circle. Square was never convention-dependent,
+    //which is why No-To-All alone looked right.
+    //
+    //Bind the glyphs to the mapping instead of to a region.
+#if defined(VITA)
+    const int kIconForOK  = 7; //Cross
+    const int kIconForSEC = 4; //Circle
+#else
+    const int kIconForOK  = 4; //Circle
+    const int kIconForSEC = 7; //Cross
+#endif
+    const int kIconForPRI = 6; //Square, both conventions
+
     std::string kInterruptMessageString("Interrupt?");
     std::string kInterruptString(": Interrupt");
     std::string kNoString(": No");
@@ -1577,7 +1600,7 @@ void ActionStack::Render()
             
             if (gModRules.game.canInterrupt())
             {
-                renderer->RenderQuad(pspIcons[7].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
+                renderer->RenderQuad(pspIcons[kIconForSEC].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
                 currentx+= kIconHorizontalOffset;
                 mFont->DrawString(_(kInterruptString), currentx, kIconVerticalOffset - 8);
                 currentx+= mFont->GetStringWidth(_(kInterruptString).c_str()) + kBeforeIconSpace;
@@ -1585,7 +1608,7 @@ void ActionStack::Render()
 
             noBtnXOffset = static_cast<int>(currentx);
             
-            renderer->RenderQuad(pspIcons[4].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
+            renderer->RenderQuad(pspIcons[kIconForOK].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
             currentx+= kIconHorizontalOffset;
             mFont->DrawString(_(kNoString), currentx, kIconVerticalOffset - 8);
             currentx+= mFont->GetStringWidth(_(kNoString).c_str()) + kBeforeIconSpace;
@@ -1593,7 +1616,7 @@ void ActionStack::Render()
             noToAllBtnXOffset = static_cast<int>(currentx);
             if (mObjects.size() > 1)
             {
-                renderer->RenderQuad(pspIcons[6].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
+                renderer->RenderQuad(pspIcons[kIconForPRI].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
                 currentx+= kIconHorizontalOffset;
                 mFont->DrawString(_(kNoToAllString), currentx, kIconVerticalOffset - 8);
                 currentx+= mFont->GetStringWidth(_(kNoToAllString).c_str()) + kBeforeIconSpace;
