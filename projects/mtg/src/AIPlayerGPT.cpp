@@ -1754,11 +1754,25 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         //transport failure degrades to the heuristic AI, it never takes the game
         //down. Publishing an empty reply is the same shape as an unreachable
         //endpoint, so the caller falls back to Baka on its existing path.
+        //Resolve THIS tick rather than reporting a round trip that does not
+        //exist. Returning kChoicePending here means "no action yet", and the
+        //only thing that stops an empty clickstream being committed as a pass
+        //is decisionPending(), which is true only while asyncBusy() - i.e.
+        //while status == 1. Publishing status = 2 synchronously and then
+        //claiming pending left the seam waiting and the gate reporting idle, so
+        //the engine passed the turn. Every decision became attempt-once,
+        //get-passed: on hardware that is an opponent that draws and passes
+        //forever, and in the harness 107 turns with both players still at 20
+        //life. Going straight back to idle with an empty reply is the same
+        //shape as a synchronous transport failure, which the seams already
+        //answer with the heuristic AI, in this tick.
         {
             std::lock_guard<std::mutex> g(state->mtx);
-            state->status = 2;
+            state->status = 0;
             state->response.clear();
+            state->prompt.clear();
         }
+        content.clear();
         DebugTrace("AIPlayerGPT: could not start the worker thread (" << e.what()
                    << "); falling back to the heuristic AI");
         //Log this ONCE. A platform that refuses one thread refuses all of them,
@@ -1775,6 +1789,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                        + " - falling back to the heuristic AI for every decision"
                        + " (logged once; this platform cannot start threads)");
         }
+        return 0; //answer now, with an empty reply -> the seam's heuristic
     }
     return kChoicePending;
 }
