@@ -55,8 +55,24 @@ set(VITA_APP_NAME "wagicGPT")
 set(VITA_TITLEID  "WAGC00042")
 set(VITA_VERSION  "01.00")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -fexceptions")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -std=c++11 -fexceptions")
+# -g and a kept frame pointer are for CRASH FORENSICS, not for debugging builds.
+# The Vita writes a psp2core dump on every crash, but a dump is only worth having
+# if it can be read: without -g, addr2line falls back to nearest-symbol across a
+# 48k-symbol static binary and confidently reports the wrong function (a real
+# 2026-08-02 dump "resolved" its stack to curl, SDL and GLSL frames). Without a
+# frame pointer the stack walk is guesswork on top of that.
+#
+# Neither flag changes codegen at -O2, but -g is NOT free on this platform: the
+# debug sections DO travel into the self unless it is stripped, and measured here
+# that took the self from 34 MB to 141 MB and the VPK from 40 MB to 76 MB. The
+# Vita loads the executable into memory, so shipping that would trade a
+# diagnosable crash for a memory problem. vita_create_self(... STRIPPED) below
+# passes -s to vita-elf-create, so the ELF in build_vita keeps its debug info for
+# addr2line while the console gets a stripped binary. Stripping does not move
+# addresses, so a dump from the shipped build symbolizes correctly against the
+# unstripped ELF sitting next to it.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -fno-omit-frame-pointer -fexceptions")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -fno-omit-frame-pointer -std=c++11 -fexceptions")
 
 add_definitions(
   -DVITA
@@ -344,7 +360,7 @@ target_link_libraries(${PROJECT_NAME}
 #
 # UNCOMPRESSED also matches the Feb 28 working format (self ~ velf size).
 # Belt-and-suspenders alongside the project-pinned vitaGL above.
-vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} UNCOMPRESSED UNSAFE)
+vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} UNCOMPRESSED UNSAFE STRIPPED)
 
 # Card images and VPK packaging.
 #
