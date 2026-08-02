@@ -330,6 +330,32 @@ namespace
             ManaCost * cost = aa->getCost();
             if (cost && cost->getConvertedCost() && !pMana->canAfford(cost, 0))
                 continue;
+            //Non-mana costs gate usability too: removing counters the card
+            //does not have, sacrificing with no legal fodder. Each cost's
+            //canPay carries the ENGINE's semantics, not the CR's - LifeCost,
+            //for one, allows paying down to (even past) zero, and the ring's
+            //only contract is "the click will be accepted". The engine's
+            //click gate asks ExtraCost::canPay after setExtraCostsAction, but
+            //that binding NULLs storedCard on the source - a mutation a
+            //display probe must not make - so bind only the source pointer
+            //each cost's canPay reads (idempotent for an ability's own
+            //source; canPay itself is read-only).
+            if (cost && cost->extraCosts)
+            {
+                bool extrasPayable = true;
+                for (size_t k = 0; k < cost->extraCosts->costs.size(); k++)
+                {
+                    ExtraCost * ec = cost->extraCosts->costs[k];
+                    ec->setSource(aa->source);
+                    if (!ec->canPay())
+                    {
+                        extrasPayable = false;
+                        break;
+                    }
+                }
+                if (!extrasPayable)
+                    continue;
+            }
             return true;
         }
         return false;

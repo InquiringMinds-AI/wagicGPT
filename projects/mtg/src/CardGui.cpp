@@ -342,8 +342,11 @@ void CardGui::Render()
                 }
                 if (card->hasUsableAbilityNow)
                 {
+                    //42, not the standard 43: a 2-unit rim reads clearly on
+                    //hardware (the invisibility floor was ~39) while keeping
+                    //the green visually inside the 46 attack halo.
                     highlightborder->SetColor(ARGB(210,80,235,170));
-                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (29 * actZ + 1) / 16, 42 * actZ / 16);
                 }
             }
             //tap preview: BLUE border on the battlefield producers the
