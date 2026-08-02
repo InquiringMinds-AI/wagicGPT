@@ -1271,6 +1271,41 @@ void GameObserver::gameStateBasedEffects()
             userRequestNextGamePhase();
     }
 
+    //A window where nothing is possible is not a window. If the human seat has
+    //no legal action in this phase, advance REGARDLESS of the ASPHASES posture -
+    //including ASKIP_NONE. The two mechanisms are deliberately orthogonal:
+    //ASPHASES is a userland knob governing stops where the player COULD act,
+    //and this rule removes only the stops where they could not. Folding this
+    //into a skip level instead would make one level quietly mean another.
+    //
+    //Deliberately biased toward stopping: hasAnyLegalAction answers true when
+    //unsure, because a wrongly-skipped window can lose a game while a spurious
+    //stop costs one keypress.
+    //
+    //Automation is off entirely for suite and loading games - they encode exact
+    //phase cadences that any skip would drift - which is the same reason
+    //skipLevel is forced to ASKIP_NONE for them above.
+    //Settled-stack guard as in the empty-blockers skip: a trigger still
+    //resolving has to keep the window open.
+    const bool automationAllowed = !(currentPlayer->playMode == Player::MODE_TEST_SUITE
+                                     || mSuiteGame || mLoading);
+    Player * humanSeat = !players[0]->isAI() ? players[0] : (!players[1]->isAI() ? players[1] : NULL);
+    if (automationAllowed && humanSeat && !isInterrupting
+        && !mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
+        && !mLayers->actionLayer()->menuObject && !targetChooser)
+    {
+        if (mNoActionTurn != turn || mNoActionPhase != mCurrentGamePhase
+            || mNoActionStep != (int) combatStep)
+        {
+            mNoActionTurn = turn;
+            mNoActionPhase = mCurrentGamePhase;
+            mNoActionStep = (int) combatStep;
+            mNoActionVerdict = LegalActionsOracle::hasAnyLegalAction(humanSeat);
+        }
+        if (!mNoActionVerdict)
+            userRequestNextGamePhase();
+    }
+
     this->LPWeffect = false;
     //WEventGameStateBasedChecked event checked
     receiveEvent(NEW WEventGameStateBasedChecked());

@@ -35,6 +35,7 @@ const string Options::optionNames[] = {
   "disable_cards",
   "maxGrade",
   "ASPhases",
+  "tutorials",
   "FirstPlayer",
   "KickerPay",
   "economic_difficulty",
@@ -505,11 +506,15 @@ GameOption * GameOptions::get(int optionID)
         case Options::ASPHASES:
             goEnum = NEW GameOptionEnum();
             goEnum->def = OptionASkipPhase::getInstance();
-            //First-launch default: the options menu advertises phase-skip
-            //automation as on, but an unset option read 0 (Off) - every
-            //auto-skip (untap/draw/combat-begin/empty attackers/...) was
-            //dead until the user saved the options screen once.
-            goEnum->number = Constants::ASKIP_SAFE;
+            //No first-launch override here on purpose. This is a userland knob
+            //with a declared default (the OptionInteger in GameStateOptions.cpp
+            //says ASKIP_NONE); forcing a different stored value made the option
+            //mean something other than what it declares, which is a preference
+            //baked into a default rather than a default. The friction that
+            //override was papering over is gone anyway: phases where the player
+            //has no legal action now skip regardless of this setting, so
+            //ASKIP_NONE means "stop wherever I can act" rather than "stop
+            //everywhere".
             go = goEnum;
             break;
         case Options::FIRSTPLAYER:

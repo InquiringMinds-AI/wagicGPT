@@ -82,6 +82,22 @@ public:
     //legally block at least one currently-declared attacker. Only
     //meaningful during the blockers step (attackers already declared).
     static bool hasLegalBlock(Player * defender);
+
+    //hasAnyLegalAction: can p do ANYTHING at all in the current phase? This
+    //is the predicate behind "a window where nothing is possible is not a
+    //window" - the engine skips such a stop regardless of the player's
+    //ASPHASES posture, because there is nothing there to decide.
+    //
+    //Phase-aware, because "an action" is not one thing: at a sorcery-speed
+    //window of your own turn it includes lands, sorcery-speed casts and
+    //sorcery-only abilities; in combat it includes declaring attackers or
+    //blockers; everywhere else it is an instant-speed response.
+    //
+    //DELIBERATELY PERMISSIVE, and the asymmetry is the reason: a false "no
+    //action" skips a window the player needed and can lose them the game,
+    //while a false "has an action" costs one keypress. When in doubt this
+    //answers true.
+    static bool hasAnyLegalAction(Player * p);
 };
 
 #endif

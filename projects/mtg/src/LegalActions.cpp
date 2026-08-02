@@ -287,6 +287,47 @@ namespace
         }
         return false;
     }
+
+    //Any activated ability of p's that could be used right now. Shared by
+    //hasInstantResponse and hasAnyLegalAction so there is ONE definition of
+    //"this ability is usable"; sorcerySpeedOk relaxes only the instant-speed
+    //restriction filter, and every other test is identical either way.
+    bool hasUsableActivatedAbility(Player * p, ManaCost * pMana, bool sorcerySpeedOk)
+    {
+        GameObserver * g = p->getObserver();
+        for (size_t i = 1; i < g->mLayers->actionLayer()->mObjects.size(); i++)
+        {
+            MTGAbility * a = (MTGAbility *) g->mLayers->actionLayer()->mObjects[i];
+            ActivatedAbility * aa = dynamic_cast<ActivatedAbility*>(a);
+            if (!aa || !aa->source)
+                continue;
+            if (aa->source->controller() != p)
+                continue;
+            if (aa->source->isPhased)
+                continue;
+            if (isWrappedManaProducer(aa))
+                continue; //making mana is not a response
+            //turn-scoped activations are wrong-turn regardless of speed
+            if (aa->restrictions == MTGAbility::PLAYER_TURN_ONLY && g->currentPlayer != p)
+                continue;
+            if (aa->restrictions == MTGAbility::OPPONENT_TURN_ONLY && g->currentPlayer == p)
+                continue;
+            //instant-speed usability only: sorcery-scoped activations are not
+            //responses at a priority window, but they ARE actions at a
+            //sorcery-speed window of the player's own main phase
+            if (!sorcerySpeedOk
+                && aa->restrictions != MTGAbility::NO_RESTRICTION && aa->restrictions != MTGAbility::PLAYER_TURN_ONLY
+                && aa->restrictions != MTGAbility::OPPONENT_TURN_ONLY)
+                continue;
+            if (aa->needsTapping && (aa->source->isTapped() || aa->source->hasSummoningSickness()))
+                continue;
+            ManaCost * cost = aa->getCost();
+            if (cost && cost->getConvertedCost() && !pMana->canAfford(cost, 0))
+                continue;
+            return true;
+        }
+        return false;
+    }
 }
 
 bool LegalActionsOracle::hasInstantResponse(Player * p)
@@ -302,35 +343,8 @@ bool LegalActionsOracle::hasInstantResponse(Player * p)
     pMana->add(p->getManaPool());
 
     bool any = !legalCasts(p, freePolicy, pMana, true).empty();
-
-    for (size_t i = 1; !any && i < g->mLayers->actionLayer()->mObjects.size(); i++)
-    {
-        MTGAbility * a = (MTGAbility *) g->mLayers->actionLayer()->mObjects[i];
-        ActivatedAbility * aa = dynamic_cast<ActivatedAbility*>(a);
-        if (!aa || !aa->source)
-            continue;
-        if (aa->source->controller() != p)
-            continue;
-        if (aa->source->isPhased)
-            continue;
-        if (isWrappedManaProducer(aa))
-            continue; //making mana is not a response
-        //instant-speed usability only: phase- and sorcery-scoped
-        //activations are not responses at a priority window
-        if (aa->restrictions == MTGAbility::PLAYER_TURN_ONLY && g->currentPlayer != p)
-            continue;
-        if (aa->restrictions == MTGAbility::OPPONENT_TURN_ONLY && g->currentPlayer == p)
-            continue;
-        if (aa->restrictions != MTGAbility::NO_RESTRICTION && aa->restrictions != MTGAbility::PLAYER_TURN_ONLY
-            && aa->restrictions != MTGAbility::OPPONENT_TURN_ONLY)
-            continue;
-        if (aa->needsTapping && (aa->source->isTapped() || aa->source->hasSummoningSickness()))
-            continue;
-        ManaCost * cost = aa->getCost();
-        if (cost && cost->getConvertedCost() && !pMana->canAfford(cost, 0))
-            continue;
-        any = true;
-    }
+    if (!any)
+        any = hasUsableActivatedAbility(p, pMana, false);
     delete pMana;
     return any;
 }
@@ -393,4 +407,46 @@ bool LegalActionsOracle::hasLegalBlock(Player * defender)
         }
     }
     return false;
+}
+
+bool LegalActionsOracle::hasAnyLegalAction(Player * p)
+{
+    GameObserver * g = p->getObserver();
+    const int phase = g->getCurrentGamePhase();
+    const bool myTurn = (g->currentPlayer == p);
+
+    //A hand over the limit at cleanup is a MANDATORY discard - the most
+    //load-bearing action there is, and it is neither a cast nor an ability.
+    if (phase == MTG_PHASE_CLEANUP && p->game->hand->nb_cards > 7)
+        return true;
+
+    //Combat declarations are actions in their own right, not casts. "No
+    //blocks" is a real declaration the owner makes deliberately, so a
+    //defender with any legal block still gets the step.
+    if (phase == MTG_PHASE_COMBATATTACKERS && myTurn && hasLegalAttacker(p))
+        return true;
+    if (phase == MTG_PHASE_COMBATBLOCKERS && !myTurn && hasLegalBlock(p))
+        return true;
+
+    //A sorcery-speed window of the player's own turn opens up everything the
+    //rest of the game forbids: lands, sorceries, creatures, and abilities
+    //that are only usable at sorcery speed.
+    const bool sorcerySpeed = myTurn
+        && (phase == MTG_PHASE_FIRSTMAIN || phase == MTG_PHASE_SECONDMAIN)
+        && g->mLayers->stackLayer()->count(0, NOT_RESOLVED) == 0;
+    if (sorcerySpeed)
+    {
+        if (!castableForDisplay(p).empty())
+            return true;
+        ManaEngine::FreeProducerPolicy freePolicy;
+        ManaCost * pMana = ManaEngine::potentialManaPermissive(p, freePolicy);
+        pMana->add(p->getManaPool());
+        const bool ability = hasUsableActivatedAbility(p, pMana, true);
+        delete pMana;
+        if (ability)
+            return true;
+    }
+
+    //Everything else reduces to "can this player respond at instant speed".
+    return hasInstantResponse(p);
 }

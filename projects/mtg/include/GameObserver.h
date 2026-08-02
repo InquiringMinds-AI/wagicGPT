@@ -84,6 +84,16 @@ class GameObserver{
   //even after the `ai` command flips both players to MODE_AI (the old
   //playMode==MODE_TEST_SUITE check stops seeing them at that point).
   bool mSuiteGame;
+  //Memo for the "a window with no legal action is not a window" phase skip.
+  //hasAnyLegalAction walks the hand, every mana producer and the whole action
+  //layer; the skip is evaluated on EVERY state-based check, which is far too
+  //often for that walk to run - it would be felt on the handhelds first.
+  //The verdict only needs recomputing on phase entry: a false verdict
+  //advances the phase immediately, and a true verdict is a stop the player is
+  //already sitting in. Defaults mean "the player can act", so a stale memo can
+  //only ever cost a stop, never skip a window.
+  int mNoActionTurn = -1, mNoActionPhase = -1, mNoActionStep = -1;
+  bool mNoActionVerdict = true;
   //Test-suite opt-in: a fixture's `interactivereveal` [DO] directive sets this
   //so an aicode= reveal/scry card drives its REAL interactive display (which
   //the scripted seat can operate) instead of the AI's headless aicode
