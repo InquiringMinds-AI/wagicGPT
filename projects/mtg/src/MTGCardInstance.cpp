@@ -73,6 +73,8 @@ MTGCardInstance::MTGCardInstance(MTGCard * card, MTGPlayerCards * arg_belongs_to
     forcedBorderB = 0;
     castableNow = 0;
     willPayForFocused = 0;
+    canAttackNow = 0;
+    hasUsableAbilityNow = 0;
     myconvertedcost = getManaCost()->getConvertedCost();
     revealedLast = NULL;
     MadnessPlay = false;

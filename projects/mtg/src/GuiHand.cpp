@@ -255,7 +255,17 @@ void GuiHandSelf::Update(float dt)
         Player * p = hand->owner;
         MTGGameZone * bf = p->game->inPlay;
         for (int i = 0; i < bf->nb_cards; i++)
+        {
             bf->cards[i]->willPayForFocused = 0;
+            //Availability signals for the battlefield, refreshed on the same
+            //throttled tick as castability so the whole board tells the player
+            //the same story at the same moment. Both are display-only: the
+            //engine still decides what is legal when the button is pressed.
+            bf->cards[i]->canAttackNow =
+                LegalActionsOracle::canDeclareAttacker(bf->cards[i]) ? 1 : 0;
+            bf->cards[i]->hasUsableAbilityNow =
+                LegalActionsOracle::hasUsableAbility(bf->cards[i]) ? 1 : 0;
+        }
         if (focused && focused->castableNow == 1 && focused->getManaCost()
             && !p->getManaPool()->canAfford(focused->getManaCost(), focused->has(Constants::ANYTYPEOFMANA)))
         {

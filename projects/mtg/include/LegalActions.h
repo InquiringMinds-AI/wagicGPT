@@ -98,6 +98,21 @@ public:
     //while a false "has an action" costs one keypress. When in doubt this
     //answers true.
     static bool hasAnyLegalAction(Player * p);
+
+    //PER-CARD display predicates. The set-level predicates above answer "does
+    //a decision exist"; these answer "is THIS card one of the reasons", which
+    //is what a border on a single card has to mean. Consumed by
+    //GuiHandSelf::Update to refresh the card's display-only flags.
+    //
+    //Unlike the permissive set predicates, these must be EXACT: a border that
+    //promises an action the engine then refuses is worse than no border, so
+    //canDeclareAttacker mirrors MTGAttackRule::isReactingToClick rather than
+    //approximating it. If that rule changes, this must follow.
+    static bool canDeclareAttacker(MTGCardInstance * card);
+    //hasUsableAbility: this permanent has an activated ability its controller
+    //could legally use AND afford right now. Making mana does not count - a
+    //land is not "doing something" in the sense a player cares to be shown.
+    static bool hasUsableAbility(MTGCardInstance * card);
 };
 
 #endif

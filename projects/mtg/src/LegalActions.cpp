@@ -292,7 +292,8 @@ namespace
     //hasInstantResponse and hasAnyLegalAction so there is ONE definition of
     //"this ability is usable"; sorcerySpeedOk relaxes only the instant-speed
     //restriction filter, and every other test is identical either way.
-    bool hasUsableActivatedAbility(Player * p, ManaCost * pMana, bool sorcerySpeedOk)
+    bool hasUsableActivatedAbility(Player * p, ManaCost * pMana, bool sorcerySpeedOk,
+                                   MTGCardInstance * only = NULL)
     {
         GameObserver * g = p->getObserver();
         for (size_t i = 1; i < g->mLayers->actionLayer()->mObjects.size(); i++)
@@ -300,6 +301,11 @@ namespace
             MTGAbility * a = (MTGAbility *) g->mLayers->actionLayer()->mObjects[i];
             ActivatedAbility * aa = dynamic_cast<ActivatedAbility*>(a);
             if (!aa || !aa->source)
+                continue;
+            //`only` narrows the same loop to one card so the per-card display
+            //predicate cannot drift from the set-level one - there is still
+            //exactly ONE definition of "this ability is usable".
+            if (only && aa->source != only)
                 continue;
             if (aa->source->controller() != p)
                 continue;
@@ -449,4 +455,51 @@ bool LegalActionsOracle::hasAnyLegalAction(Player * p)
 
     //Everything else reduces to "can this player respond at instant speed".
     return hasInstantResponse(p);
+}
+
+bool LegalActionsOracle::canDeclareAttacker(MTGCardInstance * card)
+{
+    //Mirrors MTGAttackRule::isReactingToClick's DECLARE branch exactly. Kept
+    //deliberately verbatim rather than simplified: this border promises the
+    //player that pressing the button will declare this creature, so the two
+    //must not be able to disagree. An already-declared attacker is excluded -
+    //it is no longer an available action, it is a state, and the engine
+    //already shows that state.
+    if (!card || !card->isCreature())
+        return false;
+    Player * p = card->controller();
+    if (!p)
+        return false;
+    GameObserver * g = p->getObserver();
+    if (!g || g->getCurrentGamePhase() != MTG_PHASE_COMBATATTACKERS)
+        return false;
+    if (p != g->currentPlayer || p != g->currentlyActing())
+        return false;
+    if (card->isPhased || card->isAttacker() || card->willattackpw)
+        return false;
+    return card->canAttack() && card->attackCost < 1;
+}
+
+bool LegalActionsOracle::hasUsableAbility(MTGCardInstance * card)
+{
+    if (!card)
+        return false;
+    Player * p = card->controller();
+    if (!p)
+        return false;
+    ManaEngine::FreeProducerPolicy freePolicy;
+    //Same permissive potential the response predicate uses: a dual land must
+    //offer both colours or an affordable ability reads as unaffordable.
+    ManaCost * pMana = ManaEngine::potentialManaPermissive(p, freePolicy);
+    pMana->add(p->getManaPool());
+    //sorcerySpeedOk is decided by the window, not the card: at the player's
+    //own sorcery-speed window a sorcery-scoped activation IS available.
+    GameObserver * g = p->getObserver();
+    const bool sorcerySpeedOk = g && g->currentPlayer == p
+        && !g->mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
+        && (g->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN
+            || g->getCurrentGamePhase() == MTG_PHASE_SECONDMAIN);
+    bool any = hasUsableActivatedAbility(p, pMana, sorcerySpeedOk, card);
+    delete pMana;
+    return any;
 }

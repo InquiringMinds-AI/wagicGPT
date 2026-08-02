@@ -316,8 +316,39 @@ void CardGui::Render()
                 highlightborder->SetColor(ARGB(220,250,205,60));
                 renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
             }
+            //availability on the battlefield, same language as the gold hand
+            //glow: a border means "you can act with this right now".
+            //ORANGE = can be declared an attacker, GREEN = has an activated
+            //ability you can use and afford.
+            //NESTED, not exclusive: a creature that can attack AND has a usable
+            //ability is telling the player two different things, and hiding one
+            //behind the other loses a signal. Two quads at IDENTICAL geometry
+            //would just blend into a muddy third colour, so the ability ring is
+            //drawn inset - concentric rings read as two signals, a blend does
+            //not. Attack is the outer ring: during the declare step it is the
+            //decision being asked for, and the outer edge carries further.
+            if (card && highlightborder && card->controller()
+                && card->controller()->game->inPlay->hasCard(card))
+            {
+                if (card->canAttackNow)
+                {
+                    highlightborder->SetColor(ARGB(220,255,120,60));
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                }
+                if (card->hasUsableAbilityNow)
+                {
+                    //Inset by ~10%. On a focused or previewed card the two
+                    //rings are plainly separate; on a small unfocused
+                    //battlefield card they merge into a two-tone edge, which
+                    //still reads as "more than one thing is available here".
+                    highlightborder->SetColor(ARGB(210,80,235,170));
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (27 * actZ + 1) / 16, 39 * actZ / 16);
+                }
+            }
             //tap preview: BLUE border on the battlefield producers the
-            //auto-tap plan would activate for the focused hand card
+            //auto-tap plan would activate for the focused hand card. Drawn
+            //AFTER the availability borders so the answer to "what does this
+            //cast cost me" wins over the standing state underneath it.
             if (card && card->willPayForFocused && highlightborder && card->controller()
                 && card->controller()->game->inPlay->hasCard(card))
             {
