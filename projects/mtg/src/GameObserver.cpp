@@ -1290,7 +1290,13 @@ void GameObserver::gameStateBasedEffects()
     const bool automationAllowed = !(currentPlayer->playMode == Player::MODE_TEST_SUITE
                                      || mSuiteGame || mLoading);
     Player * humanSeat = !players[0]->isAI() ? players[0] : (!players[1]->isAI() ? players[1] : NULL);
-    if (automationAllowed && humanSeat && !isInterrupting
+    //Only the human's OWN turn. userRequestNextGamePhase advances the phase
+    //globally, so firing this on the opponent's turn would rip the phase out
+    //from under the AI before its throttled Act got to play - every other skip
+    //here is turn-gated for the same reason. The opponent's turn is already
+    //covered by the reactive half: the priority window at userRequestNextGamePhase
+    //only opens when the non-acting player can actually respond.
+    if (automationAllowed && humanSeat && currentPlayer == humanSeat && !isInterrupting
         && !mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
         && !mLayers->actionLayer()->menuObject && !targetChooser)
     {

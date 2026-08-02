@@ -1732,6 +1732,12 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     long timeoutMs = mTimeoutMs;
     try
     {
+        //WAGIC_GPT_NOTHREAD: emulate a platform that refuses to start a thread.
+        //The Vita's libstdc++ has no active gthreads layer, so every model call
+        //there fails this way - a path that is otherwise unreachable on a
+        //desktop, and therefore untestable exactly where it is easiest to test.
+        if (getenv("WAGIC_GPT_NOTHREAD"))
+            throw std::runtime_error("thread creation disabled by WAGIC_GPT_NOTHREAD");
         std::thread([state, url, requestBody, key, timeoutMs]() {
             string body = gptHttpPost(url, requestBody, timeoutMs, key);
             std::lock_guard<std::mutex> g(state->mtx);
