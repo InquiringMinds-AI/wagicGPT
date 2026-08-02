@@ -264,20 +264,20 @@ add_executable(${PROJECT_NAME}
   ${MTG_SOURCES}
 )
 
-# std::thread threw "Enable multithreading to use std::thread" on hardware for
-# every AI decision (209 refusals in one session's gpt-log.txt), which is
-# libstdc++ reporting __gthread_active_p() == false. That check is a WEAK
-# reference to a pthread symbol: listing -lpthread is not enough, because
-# nothing in the program strongly references those archive members, so the weak
-# symbol resolves to 0 and libstdc++ takes its single-threaded path. Forcing the
-# proxy symbols in pulls the members and turns threading on. Which of the three
-# is the proxy depends on the libstdc++ build, so force all of them.
-target_link_options(${PROJECT_NAME} PRIVATE
-  -Wl,-u,pthread_create
-  -Wl,-u,pthread_cancel
-  -Wl,-u,pthread_key_create
-)
-
+# NOTE ON std::thread: it does NOT work in this build, and the fix is not a
+# link flag. Forcing the pthread proxy symbols in with -Wl,-u DID flip
+# libstdc++'s __gthread_active_p() to true - and that CRASHED THE GAME ON
+# LAUNCH, in __cxa_guard_acquire (the guard around the first function-local
+# static), locking a mutex that was never constructed. -u pulls in only the
+# named archive members, so the member holding pthread-embedded's global state
+# never came along: a half-linked pthread runtime, which is strictly worse than
+# none. Hardware evidence: psp2core 1785640291, data abort in
+# pthread_mutex_lock via __cxa_guard_acquire, debug.txt stopping right after
+# "[3e] network up".
+# Whole-archiving libpthread might resolve it, but the robust answer for the
+# async model-call worker is a native sceKernelCreateThread implementation that
+# does not depend on libstdc++'s threading model at all. Until then std::thread
+# construction throws, AIPlayerGPT catches it, and the heuristic AI answers.
 target_link_libraries(${PROJECT_NAME}
   SDL2_mixer
   SDL2
