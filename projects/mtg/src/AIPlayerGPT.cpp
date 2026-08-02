@@ -1761,8 +1761,20 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         }
         DebugTrace("AIPlayerGPT: could not start the worker thread (" << e.what()
                    << "); falling back to the heuristic AI");
-        gptLogLine(string("worker thread refused: ") + e.what()
-                   + " - falling back to the heuristic AI");
+        //Log this ONCE. A platform that refuses one thread refuses all of them,
+        //so the message is identical every time and repeats once per decision -
+        //209 and 344 identical lines in two Vita sessions. Writing it each time
+        //puts a file open/write/close on the game thread on the single platform
+        //where storage I/O per game event is a known cause of lag, to say
+        //something already known after the first line.
+        static bool refusalLogged = false;
+        if (!refusalLogged)
+        {
+            refusalLogged = true;
+            gptLogLine(string("worker thread refused: ") + e.what()
+                       + " - falling back to the heuristic AI for every decision"
+                       + " (logged once; this platform cannot start threads)");
+        }
     }
     return kChoicePending;
 }

@@ -212,10 +212,20 @@ void gptLogLine(const string& line)
     if (root.empty())
         return; //nowhere writable; nothing useful to do
 
-    string dir = root;
-    mkdir(dir.c_str(), 0755);
-    dir += "/ai";  mkdir(dir.c_str(), 0755);
-    dir += "/gpt"; mkdir(dir.c_str(), 0755);
+    const string dir = root + "/ai/gpt";
+    //The directory chain only has to be built once per run. It used to be three
+    //mkdir syscalls on EVERY line, which is invisible on a desktop and is not
+    //on a console: this runs on the game thread, and on the handhelds storage
+    //I/O per game event is a measured cause of lag.
+    static bool dirsReady = false;
+    if (!dirsReady)
+    {
+        string d = root;
+        mkdir(d.c_str(), 0755);
+        d += "/ai";  mkdir(d.c_str(), 0755);
+        d += "/gpt"; mkdir(d.c_str(), 0755);
+        dirsReady = true;
+    }
 
     std::ofstream f((dir + "/gpt-log.txt").c_str(), std::ios::app);
     if (f)
