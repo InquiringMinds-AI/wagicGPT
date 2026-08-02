@@ -123,6 +123,55 @@ CardSelector::Target* CardSelector::fetchMemory(SelectorMemory& memory)
     return closest<CardSelectorTrue> (cards, limitor, memory.x, memory.y);
 }
 
+bool CardSelector::SelectNextInZone(LimitorFunctor<PlayGuiObject>* inLimitor,
+                                    CardView::SelectorZone zone, MTGCardInstance* skip)
+{
+    //Deterministic cursor advance. Three deliberate differences from firing a
+    //synthetic direction press through closest():
+    //  - orders by the card's TARGET position (x,y), not its animated one, so a
+    //    caller that re-lays-out the board in the same click still gets the
+    //    layout the player is looking at;
+    //  - does NOT skip cards that are still fading in (closest() drops anything
+    //    with actA < 32), so the same press cannot land differently depending on
+    //    when in an animation it arrives;
+    //  - a no-op when nothing qualifies, rather than silently returning the
+    //    current selection and letting the caller believe it moved.
+    if (!active)
+        return false;
+
+    PlayGuiObject* best = NULL;
+    for (vector<Target*>::iterator it = cards.begin(); it != cards.end(); ++it)
+    {
+        PlayGuiObject* candidate = *it;
+        if (candidate == active)
+            continue;
+        CardView* view = dynamic_cast<CardView*> (candidate);
+        if (!view || view->owner != zone)
+            continue;
+        if (skip && view->getCard() == skip)
+            continue;
+        if (inLimitor && !inLimitor->select(candidate))
+            continue;
+        //Strictly later than the current selection in reading order.
+        if (candidate->x < active->x || (candidate->x == active->x && candidate->y <= active->y))
+            continue;
+        if (!best || candidate->x < best->x || (candidate->x == best->x && candidate->y < best->y))
+            best = candidate;
+    }
+
+    if (!best)
+        return false;
+
+    PlayGuiObject* oldactive = active;
+    active = best;
+    oldactive->zoom = 1.0f;
+    active->zoom = 1.4f;
+    oldactive->Leaving(JGE_BTN_NONE);
+    active->Entering();
+    timer = 800;
+    return true;
+}
+
 void CardSelector::Push()
 {
     memoryStack.push(SelectorMemory(active));

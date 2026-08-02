@@ -2258,15 +2258,18 @@ int MTGAttackRule::reactToClick(MTGCardInstance * card)
 {
     if (!isReactingToClick(card))
         return 0;
-    //Graphically select the next card that can attack
+    //Declaring advances the cursor to the next creature that can still be
+    //declared, so a d-pad player can keep pressing to send several attackers.
+    //This used to fire a SYNTHETIC RIGHT PRESS, which was nondeterministic three
+    //ways: closest() skips anything still fading in (actA < 32), it silently
+    //returns the current selection when nothing qualifies, and CheckUserInput's
+    //zone-memory/edge-fallback can carry the cursor off the battlefield entirely.
+    //So the same press moved the cursor or not depending on animation timing, and
+    //the player's next press sometimes landed on whatever was underneath.
+    //SelectNextInZone is ordered, blind to fade state, cannot leave the zone, and
+    //is a no-op when nothing else can attack.
     if (!card->isAttacker())
-    {
-        game->getCardSelector()->PushLimitor();
-        game->getCardSelector()->Limit(this, CardView::playZone);
-        game->getCardSelector()->CheckUserInput(JGE_BTN_RIGHT);
-        game->getCardSelector()->Limit(NULL, CardView::playZone);
-        game->getCardSelector()->PopLimitor();
-    }
+        game->getCardSelector()->SelectNextInZone(this, CardView::playZone, card);
     
     card->toggleAttacker();
     return 1;
@@ -2329,15 +2332,18 @@ int MTGPlaneswalkerAttackRule::reactToClick(MTGCardInstance * card)
 {
     if (!isReactingToClick(card))
         return 0;
-    //Graphically select the next card that can attack
+    //Declaring advances the cursor to the next creature that can still be
+    //declared, so a d-pad player can keep pressing to send several attackers.
+    //This used to fire a SYNTHETIC RIGHT PRESS, which was nondeterministic three
+    //ways: closest() skips anything still fading in (actA < 32), it silently
+    //returns the current selection when nothing qualifies, and CheckUserInput's
+    //zone-memory/edge-fallback can carry the cursor off the battlefield entirely.
+    //So the same press moved the cursor or not depending on animation timing, and
+    //the player's next press sometimes landed on whatever was underneath.
+    //SelectNextInZone is ordered, blind to fade state, cannot leave the zone, and
+    //is a no-op when nothing else can attack.
     if (!card->isAttacker())
-    {
-        game->getCardSelector()->PushLimitor();
-        game->getCardSelector()->Limit(this, CardView::playZone);
-        game->getCardSelector()->CheckUserInput(JGE_BTN_RIGHT);
-        game->getCardSelector()->Limit(NULL, CardView::playZone);
-        game->getCardSelector()->PopLimitor();
-    }
+        game->getCardSelector()->SelectNextInZone(this, CardView::playZone, card);
 
     if(card->willattackpw)
     {
