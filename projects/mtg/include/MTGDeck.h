@@ -138,6 +138,7 @@ public:
     int countByType(const string& _type);
     int countByColor(int color);
     int countBySet(int setId);
+    void countBySets(vector<int>& counts);
     int totalCards();
     int randomCardId();
 

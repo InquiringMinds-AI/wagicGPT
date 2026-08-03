@@ -643,6 +643,22 @@ int MTGAllCards::randomCardId()
     return ids[id];
 }
 
+//One pass for every set's count. checkProfile wanted the best-stocked set and
+//was calling countBySet once per set, so the whole collection was walked 336
+//times over - the single hottest thing in a headless game's profile.
+void MTGAllCards::countBySets(vector<int>& counts)
+{
+    for (size_t i = 0; i < counts.size(); ++i)
+        counts[i] = 0;
+    map<int, MTGCard *>::iterator it;
+    for (it = collection.begin(); it != collection.end(); it++)
+    {
+        MTGCard * c = it->second;
+        if (c && c->setId >= 0 && (size_t) c->setId < counts.size())
+            counts[c->setId]++;
+    }
+}
+
 int MTGAllCards::countBySet(int setId)
 {
     int result = 0;

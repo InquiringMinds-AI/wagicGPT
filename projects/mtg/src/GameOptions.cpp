@@ -853,22 +853,35 @@ void GameSettings::checkProfile()
         createProfileFolders();
     }
 
-    //Find the set for which we have the most variety
-    int setId = -1;
-    int maxcards = 0;
+    //Does the player already have a set unlocked? The old form asked this and
+    //"which set has the most cards" in one loop, computing a full-collection
+    //count for every set it passed on the way - all of it discarded the moment
+    //an unlocked set turned up, which is the normal case. Ask the cheap
+    //question first; the counts are only needed when the answer is no.
     int ok = 0;
     for (int i = 0; i < setlist.size(); i++)
     {
-        int value = MTGCollection()->countBySet(i);
-        if (value > maxcards)
-        {
-            maxcards = value;
-            setId = i;
-        }
         if (options[Options::optionSet(i)].number)
         {
             ok = 1;
             break;
+        }
+    }
+
+    int setId = -1;
+    if (!ok)
+    {
+        //Find the set for which we have the most variety, in one pass.
+        vector<int> counts(setlist.size(), 0);
+        MTGCollection()->countBySets(counts);
+        int maxcards = 0;
+        for (size_t i = 0; i < counts.size(); i++)
+        {
+            if (counts[i] > maxcards)
+            {
+                maxcards = counts[i];
+                setId = (int) i;
+            }
         }
     }
     if (!ok && setId >= 0)
