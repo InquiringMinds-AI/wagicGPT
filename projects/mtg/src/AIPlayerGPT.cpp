@@ -2977,8 +2977,8 @@ string AIPlayerGPT::serializeGameState()
     //games. The engine has the number and shows it to the human.
     out << poisonStatusLine(this->poisonCount, opp ? opp->poisonCount : 0);
     //Re-baseline the narration's delta tracker off the live totals. A poison
-    //DECREASE fires no event at all (AllAbilities.cpp: no event on poison loss),
-    //so without this a later gain would report a
+    //DECREASE fires no event at all (AllAbilities.cpp carries the engine's own
+    //"todo loses poison event"), so without this a later gain would report a
     //delta measured from a total that no longer exists. The status line above
     //is always built from the live counts, so this is the natural sync point.
     //Heal DOWNWARD only: a tracked total above the live one can only mean a

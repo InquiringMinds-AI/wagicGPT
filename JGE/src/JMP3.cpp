@@ -227,8 +227,7 @@ bool JMP3::update() {
       return false;
    }
 #ifdef MP3_SUPPORT   
-	static const int kMaxDecodeRetries = 8;
-	int retry = kMaxDecodeRetries;
+	int retry = 8;//FIXME:magic number
 	JMP3_update_start:
 
    if (!m_paused) {

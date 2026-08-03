@@ -140,6 +140,7 @@ void MTGPack::countCards()
 }
 void MTGPack::load(string filename)
 {
+    //TODO Placeholder until XML format available.
     TiXmlDocument packfile(filename.c_str());
     if (!packfile.LoadFile())
         return;

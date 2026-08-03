@@ -921,11 +921,9 @@ public:
 protected:
     void clearArgs();
     void addArg(string display, string code);
-    vector<pair<string, string> > tempArgs; //linear per-lookup scan; fine at current arg counts
+    vector<pair<string, string> > tempArgs; //TODO FIXME this is inefficient
     bool bFinished;
     int recolorTo;
-    string mMessage; //Transient status message (e.g. "No results - filters cleared").
-    float mMessageTimer;
     WSrcCards* source;
     SimpleMenu* subMenu;
     WGuiList * list;

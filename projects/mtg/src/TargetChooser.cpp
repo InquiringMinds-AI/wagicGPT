@@ -1476,7 +1476,7 @@ TargetChooser * TargetChooserFactory::createTargetChooser(MTGCardInstance * card
     if (card->alias)
     {
         id = card->alias;
-        //target spec deliberately stays the card's own target= line; only the hardcoded-behavior id comes from the alias
+        //TODO load target as well... ?
     }
     TargetChooser * tc = createTargetChooser(s, card);
     if (tc) return tc;
@@ -1756,7 +1756,7 @@ bool CardTargetChooser::equals(TargetChooser * tc)
     if (!ctc)
         return false;
     
-    if (validTarget != ctc->validTarget) //pointer compare is sufficient: equals() is only used for play-restriction matching, where previous-incarnation drift can't occur
+    if (validTarget != ctc->validTarget) //todo, check also previous cards, see "cantarget"...
         return false;
 
     return TargetZoneChooser::equals(tc);
@@ -1974,8 +1974,7 @@ bool DescriptorTargetChooser::equals(TargetChooser * tc)
     if (!dtc)
         return false;
     
-    //Gap: the CardDescriptors are not compared — two choosers with different descriptors over the same zones
-    //compare equal, which can miscount casts in play-restriction matching; CardDescriptor has no equals().
+    //TODO Descriptors need to have an "equals" method too -_-
 
     return TargetZoneChooser::equals(tc);
 }
@@ -2063,23 +2062,7 @@ bool TargetZoneChooser::equals(TargetChooser * tc)
     TargetZoneChooser  * tzc = dynamic_cast<TargetZoneChooser  *> (tc);
     if (!tzc)
         return false;
-
-    //canonicalize ALL_ZONES: a zone list containing ALL_ZONES targets everything (see canTarget),
-    //so any extra enumerated zones alongside it are redundant and must not break equality
-    bool allZones = false, tzcAllZones = false;
-    for (int i = 0; i < nbzones; ++i)
-        if (zones[i] == MTGGameZone::ALL_ZONES)
-            allZones = true;
-    for (int i = 0; i < tzc->nbzones; ++i)
-        if (tzc->zones[i] == MTGGameZone::ALL_ZONES)
-            tzcAllZones = true;
-    if (allZones || tzcAllZones)
-    {
-        if (allZones != tzcAllZones)
-            return false;
-        return TargetChooser::equals(tc);
-    }
-
+    
     if (nbzones!= tzc->nbzones)
         return false;
 
@@ -2096,6 +2079,8 @@ bool TargetZoneChooser::equals(TargetChooser * tc)
         if (counts[zones[i]] || counts[tzc->zones[i]])
             return false;
     }
+
+    //TODO: ALL_ZONES should be equivalent to something actually targetting all zones...
 
     return TargetChooser::equals(tc);
 }

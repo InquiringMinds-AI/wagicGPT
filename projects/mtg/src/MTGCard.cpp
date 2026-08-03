@@ -1,6 +1,7 @@
 //------------------------------------------------------
 //MTGCard Class
 //-------------------------------------------------
+//TODO Fill BasicAbilities
 
 #include "PrecompiledHeader.h"
 

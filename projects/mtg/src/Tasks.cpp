@@ -6,6 +6,9 @@
 #include "AIPlayer.h"
 #include "DeckMetaData.h"
 
+// Todo remove this dependency!
+#include "AIPlayerBaka.h"
+
 #include "Translate.h"
 #include "MTGDefinitions.h"
 #include <JRenderer.h>
@@ -13,11 +16,6 @@
 #include "utils.h"
 
 vector<string> Task::sAIDeckNames;
-
-// Daily reward degradation: each day the reward shrinks to this fraction of itself...
-static const float kTaskRewardDecay = 0.9f;
-// ...but never below this floor.
-static const int kTaskMinReward = 33;
 
 /*---------------- Task -----------------*/
 
@@ -148,10 +146,10 @@ void Task::setExpiration(int _expiresIn)
 void Task::passOneDay()
 {
     expiresIn--;
-    reward = (int) (getReward() * kTaskRewardDecay);
-    if (reward < kTaskMinReward)
+    reward = (int) (getReward() * 0.9); // Todo: degradation and minreward constants
+    if (reward < 33)
     {
-        reward = kTaskMinReward;
+        reward = 33;
     }
 }
 
@@ -184,7 +182,10 @@ void Task::LoadAIDeckNames()
             {
                 found = 1;
                 nbDecks++;
-                sAIDeckNames.push_back(readDeckName(stream.str()));
+                // TODO: Creating MTGDeck only for getting decks name. Find an easier way.
+                MTGDeck * mtgd = NEW MTGDeck(stream.str().c_str(), NULL, 1);
+                sAIDeckNames.push_back(mtgd->meta_name);
+                delete mtgd;
             }
         }
     }
@@ -385,7 +386,7 @@ void TaskList::removeTask(Task *task)
     }
     else
     {
-        // not in list: nothing to do
+        // TODO: task not found handling.
     }
 }
 
@@ -433,10 +434,7 @@ void TaskList::End()
 
 void TaskList::passOneDay()
 {
-    // Expired tasks are deleted silently: there is no notification channel at
-    // this call site (day-advance runs outside any render state), so telling
-    // the player "you have failed the task" would need a queued message the
-    // task screen displays on next open.
+    // TODO: "You have failed the task" message to the user when accepted task expires
     for (vector<Task*>::iterator it = tasks.begin(); it != tasks.end();)
     {
         (*it)->passOneDay();
@@ -455,9 +453,7 @@ void TaskList::passOneDay()
 void TaskList::getDoneTasks(GameObserver* observer, GameApp * _app, vector<Task*>* result)
 {
     result->clear();
-    // Returns every satisfied task. Tasks are active from the moment they are generated and pay
-    // out on completion -- there is deliberately no accept-a-task mechanic. The `accepted` flag
-    // stays a reserved slot in the save format (see persistentAttribs) so existing saves parse.
+    // TODO: Return only accepted tasks
     for (vector<Task*>::iterator it = tasks.begin(); it != tasks.end(); it++)
     {
         if ((*it)->isDone(observer, _app))
@@ -575,6 +571,9 @@ void TaskList::Render()
 
 void TaskList::addRandomTask(int)
 {
+    // TODO: Weighted random (rarity of tasks)
+    //       - based on counts of finished tasks?
+    //         Winning a task several times may slightly lessen the probability of it being generated
     string s(TASKS_ALL);
     char taskType[2];
     sprintf(taskType, "%c", s[rand() % s.length()]);
@@ -638,9 +637,9 @@ string TaskWinAgainst::getShortDesc()
 
 bool TaskWinAgainst::isDone(GameObserver* observer, GameApp *)
 {
-    Player * opp = observer->players[1];
-    return ((opp) && (!observer->players[0]->isAI()) && (opp->isAI()) && (observer->didWin(observer->players[0])) // Human player wins
-                    && (opp->deckId == opponent));
+    AIPlayerBaka * baka = (AIPlayerBaka*) observer->players[1];
+    return ((baka) && (!observer->players[0]->isAI()) && (observer->players[1]->isAI()) && (observer->didWin(observer->players[0])) // Human player wins
+                    && (baka->deckId == opponent));
 }
 
 /*----------- TaskSlaughter -------------*/
@@ -1140,16 +1139,16 @@ void TaskPacifism::randomize()
 /* ------------ Task template ------------ 
 
  TaskXX::TaskXX() : Task(TASK_XX) {
- // <fill in>
+ // TODO: Implement
  }
 
  int TaskXX::computeReward() {
- // <fill in>
+ // TODO: Implement
  return 100;
  }
 
  string TaskXX::createDesc() {
- // <fill in>
+ // TODO: Implement
  char buffer[4096];
 
  switch (rand()%2) {
@@ -1164,19 +1163,19 @@ void TaskPacifism::randomize()
  }
 
  string TaskXX::getShortDesc(){
- // <fill in>
+ // TODO: Implement
  char buffer[4096];
  sprintf(buffer, _("%s").c_str(), getOpponentName().c_str());
  return buffer;
  }
 
  bool TaskXX::isDone(GameObserver* observer, GameApp * _app) {
- // <fill in>
+ // TODO: Implement
  return (!observer->players[0]->isAI()) && (observer->players[1]->isAI()) && (observer->gameOver != _p1) // Human player wins
  }
 
  void TaskXX::storeCustomAttribs() {
- // <fill in>
+ // TODO: Implement
  char buff[256];
  persistentAttribs.push_back(VarXX);
 
@@ -1185,13 +1184,13 @@ void TaskPacifism::randomize()
  }
 
  void TaskXX::restoreCustomAttribs() {
- // <fill in>
+ // TODO: Implement
  VarXX = persistentAttribs[COMMON_ATTRIBS_COUNT];
  VarXY = atoi(persistentAttribs[COMMON_ATTRIBS_COUNT+1].c_str());
  }
 
  void TaskXX::randomize() {
- // <fill in>
+ // TODO: Implement
  VarXX = rand()%10 + 1;
  Task::randomize();
  }

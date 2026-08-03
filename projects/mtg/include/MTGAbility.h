@@ -58,7 +58,7 @@ private:
      ManaCost* mCost;
 
 protected:
-    std::string menuText;
+    char menuText[256];
 
     GameObserver * game;
 
@@ -214,6 +214,7 @@ public:
 #endif
 
     /*Poor man's casting */
+    /* Todo replace that crap with dynamic casting */
     enum 
     {
         UNKNOWN = 0,
@@ -329,7 +330,6 @@ public:
     string castRestriction;
 
     ActivatedAbility(GameObserver* observer, int id, MTGCardInstance* card, ManaCost* _cost = NULL, int _restrictions = NO_RESTRICTION, string limit = "", MTGAbility* sideEffect = NULL, string usesBeforeSideEffects = "",string castRestriction = "");
-    //convenience overload: castRestriction without the positional limit/sideEffect/usesBeforeSideEffects placeholders
     virtual ~ActivatedAbility();
 
     virtual void Update(float dt)

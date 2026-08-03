@@ -199,7 +199,7 @@ void GameApp::Create()
 #endif
     LOG("---Gettings menuicons.png quads");
    
-    //Load all icons from gModRules and save in manaIcons
+    //Load all icons from gModRules and save in manaIcons -> todo. Change the icons positions on menuicons.png to avoid use item->mColorId
     vector<ModRulesBackGroundCardGuiItem *>items = gModRules.cardgui.background;
     for(size_t i= 0; i < items.size(); i ++)
     {

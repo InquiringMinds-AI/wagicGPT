@@ -31,6 +31,8 @@ hgeParticleSystem* DeckMenu::stars = NULL;
 
 //
 //  For the additional info window, maximum characters per line is roughly 30 characters across.
+//  TODO:        
+//    *** Need to make this configurable in a file somewhere to allow for class reuse
 
 DeckMenu::DeckMenu(int id, JGuiListener* listener, int fontId, const string _title, const int&, bool showDetailsOverride, bool chooseOpponent) :
 JGuiController(JGE::GetInstance(), id, listener), fontId(fontId), mShowDetailsScreen( showDetailsOverride )

@@ -272,7 +272,7 @@ void GameStateShop::cancelCard(int controlId)
 }
 void GameStateShop::cancelBooster(int)
 {
-    return; //No-op: unlike cancelCard, ignoring a booster gives no discount — boosters have no per-booster pricelist entry to adjust (price comes from a global multiplier).
+    return; //TODO FIXME Tie boosters into pricelist.
 }
 void GameStateShop::purchaseCard(int controlId)
 {
@@ -939,7 +939,7 @@ void ShopBooster::randomize(MTGPacks * packlist)
     if (!setlist.size())
         return;
     if (packlist && setlist.size() > 10)
-    { //custom packs appear once >10 sets are unlocked, at CHANCE_CUSTOM_PACK odds
+    { //FIXME make these an unlockable item.
         int rnd = rand() % 100;
         if (rnd <= Constants::CHANCE_CUSTOM_PACK)
         {

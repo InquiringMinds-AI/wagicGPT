@@ -14,6 +14,7 @@ class AIHints;
 class AIPlayerBakaB: public AIPlayerBaka{
 protected:
     int orderBlockers();
+    int combatDamages();
     int interruptIfICan();
     int chooseAttackers();
     int chooseBlockers();

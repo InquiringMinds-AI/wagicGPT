@@ -299,7 +299,7 @@ void CardPrimitive::addType(int id)
     types.push_back(id);
 }
 
-//only call on copies (instances, descriptors, dummies) - never on a database primitive
+//TODO Definitely move some of these functions to CardInstance. There is no reason to remove a type from an CardPrimitive since they represent the Database
 //Removes a type from the types of a given card
 //If removeAll is true, removes all occurences of this type, otherwise only removes the first occurence
 int CardPrimitive::removeType(string value, int removeAll)

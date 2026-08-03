@@ -664,7 +664,7 @@ bool WCSortCollector::operator()(const MTGCard*l, const MTGCard*r)
     int isArt = (int) l->data->hasType(Subtypes::TYPE_ARTIFACT) - (int) r->data->hasType(Subtypes::TYPE_ARTIFACT);
     int isLand = (int) l->data->hasType(Subtypes::TYPE_LAND) - (int) r->data->hasType(Subtypes::TYPE_LAND);
 
-    //Nested comparator cascade for the collection-browser sort.
+    //Nested if hell. TODO: Farm these out to their own objects as a user-defined filter/sort system.
     if (!isLand)
     {
         int isBasic = (int) l->data->hasType("Basic") - (int) r->data->hasType("Basic");

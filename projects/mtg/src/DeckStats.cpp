@@ -581,6 +581,7 @@ void StatsWrapper::updateStats(DeckDataWrapper *myDeck)
     this->avgSpellCost = (this->countSpells <= 0) ? 0 : (float) this->totalSpellCost / this->countSpells;
 
     // Probabilities
+    // TODO: this could be optimized by reusing results
     for (int i = 0; i < Constants::STATS_FOR_TURNS; i++)
     {
         this->noLandsProbInTurn[i] = noLuck(this->cardCount, this->countLands, 7 + i) * 100;

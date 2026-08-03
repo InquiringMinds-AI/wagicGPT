@@ -1468,7 +1468,7 @@ int AAAlterPoison::resolve()
             {
                 WEvent * e = NEW WEventplayerPoisoned(pTarget, poison); // Added an event when player receives any poison counter.
                 game->receiveEvent(e);
-            }//no event on poison loss; add one only when a card needs to trigger on it
+            }//todo loses poison event
         }
     }
     return 0;
@@ -1994,7 +1994,7 @@ int AAAlterEnergy::resolve()
                 {
                     WEvent * e = NEW WEventplayerEnergized(pTarget, energy);
                     game->receiveEvent(e);
-                }//no event on energy loss; add one only when a card needs to trigger on it
+                }//todo loses enegy event
             }
         }
     }
@@ -2039,7 +2039,7 @@ int AAAlterExperience::resolve()
                 {
                     WEvent * e = NEW WEventplayerExperienced(pTarget, experience);
                     game->receiveEvent(e);
-                }//no event on experience loss; add one only when a card needs to trigger on it
+                }//todo loses experience event
             }
         }
     }
@@ -3310,7 +3310,7 @@ const string AACounter::getMenuText()
         menu.append(buffer);
     }
 
-    menuText = menu;
+    snprintf(menuText, sizeof(menuText), "%s", menu.c_str());
     return menuText;
 }
 
@@ -4431,10 +4431,11 @@ int GenericPaidAbility::resolve()
     if (selection.size())
     {
         bool must = baseAbilityStrSplit.size() > 1 ? true : false;
+        //todo get increased - reduced cost if asAlternate cost to cast using castcard
         if(asAlternate)
         {
             must = true;
-            //apply cost increasers/reducers and the Trinisphere floor to the alternate cost
+            //cost increase - reduce + trinisphere effect ability todo...
             optionalCost = ((MTGCardInstance *)target)->computeNewCost(((MTGCardInstance *)target),optionalCost,optionalCost);
             if(optionalCost->extraCosts)
             {
@@ -5823,7 +5824,7 @@ int AAFlip::testDestroy()
 const string AAFlip::getMenuText()
 {
     string s = flipStats;
-    menuText = "Transform:" + s;
+    snprintf(menuText, sizeof(menuText), "Transform:%s", s.c_str());
     return menuText;
 }
 
@@ -9037,7 +9038,7 @@ const string ATransformer::getMenuText()
     if(menutext.size())
         return menutext.c_str();
     string s = menu;
-    menuText = "Becomes " + s;
+    snprintf(menuText, sizeof(menuText), "Becomes %s", s.c_str());
     return menuText;
 }
 
@@ -11534,7 +11535,7 @@ void ATutorialMessage::Update(float dt)
     //Below this only affects "text" mode
     if (!mUserCloseRequest && mY < 0)
     {
-        mY = -SCREEN_HEIGHT + (SCREEN_HEIGHT * mElapsed / 0.75f);
+        mY = -SCREEN_HEIGHT + (SCREEN_HEIGHT * mElapsed / 0.75f); //Todo: more physical drop-in.
         if (mY >= 0)
             mY = 0;
     }
@@ -11546,8 +11547,7 @@ void ATutorialMessage::Update(float dt)
 
 void ATutorialMessage::ButtonPressed(int, int)
 {
-    //Dismisses this one message and records it as seen. Suppressing tutorials
-    //wholesale is the secondary button's job, handled in CheckUserInput.
+    //TODO : cancel ALL tips/tutorials for JGE_BTN_SEC?
     if (mLimit)
     {
         string optionName = getOptionName();

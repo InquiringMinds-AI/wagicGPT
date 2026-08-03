@@ -230,7 +230,7 @@ bool GameOption::isDefault()
 
 PIXEL_TYPE GameOption::asColor(PIXEL_TYPE fallback)
 {
-    unsigned char color[4] = { 0, 0, 0, 255 };
+    unsigned char color[4];
     string temp;
     int subpixel = 0;
 
@@ -258,14 +258,12 @@ PIXEL_TYPE GameOption::asColor(PIXEL_TYPE fallback)
         temp += str[i];
     }
 
-    if (temp == "")
-        return fallback; //Trailing comma or empty last component.
-    color[subpixel] = (unsigned char) atoi(temp.c_str());
-
-    //Accept only fully-specified colors: R,G,B (alpha defaults to 255) or R,G,B,A.
-    if (subpixel != 2 && subpixel != 3)
-        return fallback;
-
+    if (temp != "")
+        color[subpixel] = (unsigned char) atoi(temp.c_str());
+    if (subpixel == 2)
+        color[3] = 255;
+    
+    // TODO: WARNING - not all the values of color may be initialized at this point.  Do we need to initialize the array to some value?
     return ARGB(color[3],color[0],color[1],color[2]);
 }
 
@@ -1177,6 +1175,7 @@ bool GameOptionAward::read(string input)
     if (w != string::npos)
         viewed = true;
 
+    //TODO: Something cleaner.
     int tvals[5];
     int i;
     for (i = 0; i < 5; i++)
@@ -1250,7 +1249,7 @@ bool GameOptionAward::giveAward()
     achieved = time(NULL);
     viewed = false;
     number = 1;
-    options.save(); // eager save: awards are one-shot and must survive a crash
+    options.save(); //TODO - Consider efficiency of this placement.
     return true;
 }
 

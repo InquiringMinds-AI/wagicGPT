@@ -45,8 +45,7 @@ void GuiPhaseBar::DrawGlyph(JQuad *inQuad, int phaseId, float x, float y, float 
 GuiPhaseBar::GuiPhaseBar(DuelLayers* duelLayers) :
     GuiLayer(duelLayers->getObserver()), PlayGuiObject(80, 0, 106, 0, false),
     displayedPhaseId(0), angle(0.0f), zoomFactor(zoom_small), angleEasing(angle),
-    zoomFactorEasing(zoomFactor), mpDuelLayers(duelLayers),
-    mBannerPhaseId(-1), mBannerCurrentPlayer(NULL), mBannerActingPlayer(NULL)
+    zoomFactorEasing(zoomFactor), mpDuelLayers(duelLayers)
 {
     if(duelLayers->getObserver()->getResourceManager())
     {
@@ -124,57 +123,46 @@ void GuiPhaseBar::Render()
 
     //print phase name
     WFont * font = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
+    string currentP = _("your turn");
+    string interrupt = "";
+    if (observer->currentPlayer == mpDuelLayers->getRenderedPlayerOpponent())
+    {
+        currentP = _("opponent's turn");
+    }
     font->SetColor(ARGB(255, 255, 255, 255));
     if (observer->currentlyActing() && observer->currentlyActing()->isAI())
     {
         font->SetColor(ARGB(255, 128, 128, 128));
     }
-
-    //the formatted banner only changes on phase / turn-player / interruption changes: rebuild it on key change only
-    int currentPhaseId = observer->phaseRing->getCurrentPhase()->id;
-    if (currentPhaseId != mBannerPhaseId || observer->currentPlayer != mBannerCurrentPlayer
-                    || observer->currentlyActing() != mBannerActingPlayer)
+    if (observer->currentlyActing() != observer->currentPlayer)
     {
-        mBannerPhaseId = currentPhaseId;
-        mBannerCurrentPlayer = observer->currentPlayer;
-        mBannerActingPlayer = observer->currentlyActing();
-
-        string currentP = _("your turn");
-        string interrupt = "";
-        if (observer->currentPlayer == mpDuelLayers->getRenderedPlayerOpponent())
+        if (observer->currentPlayer == mpDuelLayers->getRenderedPlayer())
         {
-            currentP = _("opponent's turn");
+            interrupt = _(" - ") + _("opponent plays");
         }
-        if (observer->currentlyActing() != observer->currentPlayer)
+        else
         {
-            if (observer->currentPlayer == mpDuelLayers->getRenderedPlayer())
-            {
-                interrupt = _(" - ") + _("opponent plays");
-            }
-            else
-            {
-                interrupt = _(" - ") + _("you play");
-            }
+            interrupt = _(" - ") + _("you play");
         }
-
-        char buf[200];
-        //running this string through translate returns gibberish even though we defined the variables in the lang.txt
-        //the conversion from phase bar phases to mtg phases is x%kPhases + 1
-        //string phaseNameToTranslate = observer->phaseRing->phaseName(displayedPhaseId%kPhases + 1);
-        string phaseNameToTranslate = observer->phaseRing->phaseName(currentPhaseId);
-        phaseNameToTranslate = _(phaseNameToTranslate);
-        sprintf(buf, _("(%s%s) %s").c_str(), currentP.c_str(), interrupt.c_str(),phaseNameToTranslate.c_str());
-        mBannerText = buf;
     }
+
+    char buf[200];
+    //running this string through translate returns gibberish even though we defined the variables in the lang.txt
+    //the conversion from phase bar phases to mtg phases is x%kPhases + 1
+    //todo: just to this when the displayedPhaseId updates
+    //string phaseNameToTranslate = observer->phaseRing->phaseName(displayedPhaseId%kPhases + 1);
+    string phaseNameToTranslate = observer->phaseRing->phaseName(observer->phaseRing->getCurrentPhase()->id);
+    phaseNameToTranslate = _(phaseNameToTranslate);
+    sprintf(buf, _("(%s%s) %s").c_str(), currentP.c_str(), interrupt.c_str(),phaseNameToTranslate.c_str());
 #if !defined (PSP)
     if(phaseinfo.get())
     {//fix phaseinfo graphics... should look nice now...
-        float testW = ((font->GetStringWidth(mBannerText.c_str()))*2) - SCREEN_WIDTH_F;
+        float testW = ((font->GetStringWidth(buf))*2) - SCREEN_WIDTH_F;
         phaseinfo->SetHotSpot(testW+40.f, 0);
         JRenderer::GetInstance()->RenderQuad(phaseinfo.get(),0,0,0,SCREEN_WIDTH_F / phaseinfo->mWidth, SCREEN_HEIGHT_F / phaseinfo->mHeight);
     }
 #endif
-    font->DrawString(mBannerText.c_str(), SCREEN_WIDTH - 5, 2, JGETEXT_RIGHT);
+    font->DrawString(buf, SCREEN_WIDTH - 5, 2, JGETEXT_RIGHT);
 }
 
 int GuiPhaseBar::receiveEventMinus(WEvent *e)

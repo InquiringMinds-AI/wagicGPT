@@ -93,9 +93,7 @@ MTGCardInstance::MTGCardInstance(MTGCard * card, MTGPlayerCards * arg_belongs_to
         //it was leaving a dangling pointer which leads to
         //a total crash on "cleanup()" calls from garbage zone.
         //snapshots are created for extra cost, they are used for abilities contained after the cost through storecard variable.
-        //a correct fix would store an exact deep copy of the card in its current state; that requires
-        //cloning the CardPrimitive-owned pointer members (restrictions etc.) instead of aliasing them.
-        //until then storedCard aliases this card and sees post-cost state mutations.
+        //TODO:fix this correctly. I want this to use an exact copy of the card in its current state for stored.
         //making it safe_delete these "copies" leads to the same crash, as they are still pointing to the original data.
         MTGCardInstance * snapShot = this;
         //below is how we used to handle this.
@@ -1833,6 +1831,7 @@ int MTGCardInstance::toggleDefenser(MTGCardInstance * opponent)
             {
                 if(opponent->view != NULL)
                 {
+                //todo: quote wololo "change this into a cool blinking effects when opposing creature has cursor focus."
                     opponent->view->actZ += .8f;
                     opponent->view->actT -= .2f;
                 }

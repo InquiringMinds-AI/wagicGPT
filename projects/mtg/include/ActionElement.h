@@ -48,7 +48,6 @@ public:
     ActionElement(int id);
     ActionElement(const ActionElement& copyFromMe);
     TargetChooser * getActionTc(){return tc;}
-    void stopWaiting();
     virtual void setActionTC(TargetChooser * newTc = NULL){this->tc = newTc;}
     virtual ~ActionElement();
     virtual int isReactingToTargetClick(Targetable * card);

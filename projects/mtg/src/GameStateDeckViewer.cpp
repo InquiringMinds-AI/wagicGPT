@@ -56,7 +56,7 @@ GameStateDeckViewer::GameStateDeckViewer(GameApp* parent) :
     sb_cmd_dng_Button = NEW InteractiveButton(NULL, kSBActionId, Fonts::MAIN_FONT, "View SB", (SCREEN_WIDTH_F/ 2) - 35, SCREEN_HEIGHT_F - 20, JGE_BTN_CTRL);
     filterButton = NEW InteractiveButton(NULL, kFilterButtonId, Fonts::MAIN_FONT, "Filter", (SCREEN_WIDTH_F - 116), SCREEN_HEIGHT_F - 20, JGE_BTN_SOUND);
     menuButton = NEW InteractiveButton(NULL, kMenuButtonId, Fonts::MAIN_FONT, "Menu", (SCREEN_WIDTH_F - 76), SCREEN_HEIGHT_F - 20, JGE_BTN_MENU);
-    // JGE_BTN_MAX may lack a physical mapping on some targets (PSP's button set is smaller than the JGE logical set), leaving this on-screen button unpressable there.
+    //TODO: Check if that button is available:
     toggleViewButton = NEW InteractiveButton(NULL, kSwitchViewButton, Fonts::MAIN_FONT, "Grid", (SCREEN_WIDTH_F/ 2) + 50, SCREEN_HEIGHT_F - 20, JGE_BTN_MAX);
     toggleUpButton = NEW InteractiveButton(NULL, kToggleUpButton, Fonts::MAIN_FONT, "UP", 10, 25, JGE_BTN_DOWN);
     toggleDownButton = NEW InteractiveButton(NULL, kToggleDownButton, Fonts::MAIN_FONT, "DN", SCREEN_WIDTH_F-25, 25, JGE_BTN_UP);
@@ -1553,7 +1553,7 @@ void GameStateDeckViewer::renderOnScreenMenu()
             posY = 70;
             posX = 20;
 
-            // Single page only: at 19 rows per column and 155px column advance, roughly 3 columns (~57 decks) fit on screen — a full AI deck roster overflows and draws off-screen.
+            // ToDo: Multiple pages when too many AI decks are present
             for (int i = 0; i < (int) mStatsWrapper->aiDeckStats.size(); i++)
             {
                 sprintf(buffer, _("%.14s").c_str(), mStatsWrapper->aiDeckNames.at(i).c_str());

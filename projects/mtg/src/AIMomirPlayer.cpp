@@ -110,7 +110,7 @@ int AIMomirPlayer::computeActions()
                 if (card && (canPutLandsIntoPlay == PlayRestriction::CAN_PLAY))
                 {
                     MTGAbility * putIntoPlay = observer->mLayers->actionLayer()->getAbility(MTGAbility::PUT_INTO_PLAY);
-                    AIAction * a = NEW AIAction(this, putIntoPlay, card);
+                    AIAction * a = NEW AIAction(this, putIntoPlay, card); //TODO putinplay action
                     clickstream.push(a);
                     return 1;
                 }

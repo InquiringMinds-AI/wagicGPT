@@ -450,7 +450,7 @@ RankingContainer AIHints::findActions(AIHint * hint)
             MTGCardInstance * card = mPlayer->game->inPlay->cards[j];
             if (a->isReactingToClick(card, a->getCost()))
             {
-                mPlayer->createAbilityTargets(a, card, ranking);
+                mPlayer->createAbilityTargets(a, card, ranking); //TODO make that function static?
                 break; //For performance... ?
             }
         }
@@ -528,8 +528,7 @@ string AIHints::constraintsNotFulfilled(AIAction * action, AIHint * hint, ManaCo
 
         }
 
-        //Gap: only missing colored mana is diagnosed above; extra costs (sacrifice/discard/counters),
-        //X announcements, and restriction failures all fall through to this opaque answer.
+        //TODO, handle more cases where the cost cannot be paid
         return "not supported, can't afford cost for some reason";
     }
 

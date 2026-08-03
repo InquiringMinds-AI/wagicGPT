@@ -255,7 +255,7 @@ void JMD2Model::CalculateNormal(float *p1, float *p2, float *p3)
 #elif (!defined GL_ES_VERSION_2_0) && (!defined GL_VERSION_2_0)
    glNormal3f(result[0]/length, result[1]/length, result[2]/length);
 #else
-   //GL2 path unimplemented - JMD2Model has no in-game users
+   // FIXME
 #endif
 #else
     cerr << p1 << " " << p2 << " " << p3 << endl;
@@ -484,7 +484,7 @@ void JMD2Model::Render()
 #if !defined (PSP)
 
 #if (defined GL_ES_VERSION_2_0) || (defined GL_VERSION_2_0)
-        //GL2 path unimplemented - JMD2Model has no in-game users
+        // FIXME
 #elif (defined GL_ES_VERSION_1_1) || (defined GL_VERSION_1_1) || (defined GL_VERSION_ES_CM_1_1) || (defined GL_OES_VERSION_1_1)
         glEnableClientState(GL_VERTEX_ARRAY);
         glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -539,7 +539,7 @@ void JMD2Model::Render()
 		// render properly textured triangle
 
 #if (defined GL_ES_VERSION_2_0) || (defined GL_VERSION_2_0)
-        //GL2 path unimplemented - JMD2Model has no in-game users
+        // FIXME
 #elif (defined GL_ES_VERSION_1_1) || (defined GL_VERSION_1_1) || (defined GL_VERSION_ES_CM_1_1) || (defined GL_OES_VERSION_1_1)
                 float vertex_data[]={
                 vertex[0].x, vertex[0].y, vertex[0].z,
@@ -573,7 +573,7 @@ void JMD2Model::Render()
 
         }
 #if (defined GL_ES_VERSION_2_0) || (defined GL_VERSION_2_0)
-        //GL2 path unimplemented - JMD2Model has no in-game users
+        // FIXME
 #elif (defined GL_ES_VERSION_1_1) || (defined GL_VERSION_1_1) || (defined GL_VERSION_ES_CM_1_1) || (defined GL_OES_VERSION_1_1)
         glDrawArrays(GL_TRIANGLES,0,3); // seems suspicious to put that here, should probably be in the loop
 #else

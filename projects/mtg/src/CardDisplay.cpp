@@ -284,7 +284,7 @@ void CardDisplay::Render(bool norect)
         }
     }
 
-    // zone-browse popups handle their own selection, separate from CardSelector
+    //TODO: CardSelector should handle the graveyard and the library in the future...
     if (mObjects.size() && mObjects[mCurr] != NULL)
     {
         mObjects[mCurr]->Render();

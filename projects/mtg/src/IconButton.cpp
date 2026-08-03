@@ -82,6 +82,7 @@ void IconButton::Render()
         WFont * mFont = WResourceManager::Instance()->GetWFont(mFontId);
         PIXEL_TYPE backup = mFont->GetColor();
         mFont->SetColor(ARGB(255,0,0,0));
+        //TODO adapt if mTextRelativeX/Y/align are negative/positive
         mFont->DrawString(mText.c_str(), relX + mTextRelativeX  , relY + mTextRelativeY , JGETEXT_CENTER);
         mFont->SetColor(backup);
     }

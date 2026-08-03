@@ -928,6 +928,8 @@ MTGCardInstance * MTGGameZone::removeCard(MTGCardInstance * card, int createCopy
             nb_cards--;
             cards.erase(cards.begin() + i);
             MTGCardInstance * copy = card;
+            //if (card->isToken) //TODO better than this ?
+            //  return card;
             //card->lastController = card->controller();
             if(!card)
                 return NULL;

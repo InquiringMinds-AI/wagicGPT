@@ -808,7 +808,7 @@ Player * Rules::initPlayer(GameObserver *g, int playerId)
             return NULL;
         }
     }
-    if (!p) return NULL;
+    //TODO p may still be NULL, what do we do to handle this? Above switch has no default case to handle the case where p is NULL 
     p->phaseRing = initState.playerData[playerId].player->phaseRing;
     p->offerInterruptOnPhase = initState.playerData[playerId].player->offerInterruptOnPhase;
     return p;
@@ -853,15 +853,12 @@ void Rules::initPlayers(GameObserver *g)
             g->players.push_back(p);
         MTGDeck * deck = buildDeck(i);
         
-        if (deck && p)
+        if (deck)
         {
+            // TODO: p may be NULL, initPlayer(g, i) may return NULL, what do we do in this case?
             p->game->initDeck(deck);
             SAFE_DELETE(deck);
             p->game->setOwner(p);
-        }
-        else
-        {
-            SAFE_DELETE(deck);
         }
     }
 }

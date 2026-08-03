@@ -459,11 +459,7 @@ int JFileSystem::ReadFile(void *buffer, int size)
             return 0;
         }
         mZipFile.read((char *) buffer, size);
-        if (mZipFile.gcount() != (std::streamsize)size)
-        {
-            mZipFile.clear();
-            return 0;
-        }
+        //TODO what if can't read
         return size;
     }
 

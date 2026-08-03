@@ -28,6 +28,7 @@ public:
     int year; //The year the set was released.
     int block; //For future use by tournament mode, etc.
     int total;//total cards
+    //TODO Way to group cards by name, rather than mtgid.
 
     void count(MTGCard * c);
 

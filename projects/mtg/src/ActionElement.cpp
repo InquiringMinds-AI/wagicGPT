@@ -31,11 +31,6 @@ ActionElement::~ActionElement()
     SAFE_DELETE(tc);
 }
 
-void ActionElement::stopWaiting()
-{
-    waitingForAnswer = 0;
-}
-
 int ActionElement::isReactingToTargetClick(Targetable * object)
 {
     if (MTGCardInstance * cObject = dynamic_cast<MTGCardInstance *>(object))

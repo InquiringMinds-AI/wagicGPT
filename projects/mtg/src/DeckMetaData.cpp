@@ -14,9 +14,10 @@ DeckMetaData::DeckMetaData(const string& filename, bool isAI)
     : mFilename(filename), mGamesPlayed(0), mVictories(0), mPercentVictories(0), mDifficulty(0),
       mDeckLoaded(false), mStatsLoaded(false), mIsAI(isAI)
 {
-    // Not deferrable: the deck list is sorted by name and filtered on the commander and unlock
-    // tags, so every listed deck's header is needed before the menu can be built. Only the
-    // header is parsed here — the card lines are never resolved against the card database.
+    // TODO, figure out how we can defer this to later - currently, 
+    // there's a catch 22, as we sort the deck list alphabetically, so we need to open the deck file
+    // to get its name.  This means that for the opponent list, we crack open 106 files just to read the deck name
+    //, which is the bulk of the remaining 4 second delay we see the first time we try to pick an opponent on the first match
     LoadDeck();
 }
 

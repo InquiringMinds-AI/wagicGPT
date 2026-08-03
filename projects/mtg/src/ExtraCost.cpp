@@ -1692,7 +1692,7 @@ CounterCost * CounterCost::clone() const
     if (counter)
         ec->counter = NEW Counter(counter->target, counter->name.c_str(), counter->power, counter->toughness);
 
-    //counter may legitimately be NULL pre-payment; clone preserves NULL and only copies nb when a counter exists
+    //TODO: counter can be NULL at this point, what do we set ec->counter->nb to if it is?
     if (ec->counter != NULL)
         ec->counter->nb = counter->nb;
     
@@ -1842,6 +1842,7 @@ ExtraCosts * ExtraCosts::clone() const
 
 void ExtraCosts::Render()
 {
+    //TODO cool window and stuff...
     for (size_t i = 0; i < costs.size(); i++)
     {
         costs[i]->Render();
@@ -1866,7 +1867,7 @@ int ExtraCosts::reset()
     if (source)
         source->storedCard = NULL;
     source = NULL;
-    //Set all payments to "unset" (the long-standing gap): stored payment
+    //Set all payments to "unset" (the long-standing TODO): stored payment
     //targets are raw pointers that dangle once the creatures leave play, and
     //a stale set makes later offer probes walk freed memory (probe-198
     //SIGSEGV). Whatever path abandons or completes a cast, the costs come
@@ -1963,7 +1964,7 @@ int ExtraCosts::doPay()
     int result = 0;
     for (size_t i = 0; i < costs.size(); i++)
     {
-        if(costs[i]->target)
+        if(costs[i]->target)//todo deprecate this let gameobserver control this.
         {
             costs[i]->target->isExtraCostTarget = false;
         }

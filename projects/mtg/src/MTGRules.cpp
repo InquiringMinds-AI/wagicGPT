@@ -2009,8 +2009,8 @@ int MTGBestowRule::reactToClick(MTGCardInstance * card)
 {
     if (!isReactingToClick(card))
         return 0;
-    //newCost is the card's cached Bestow cost (a plain member accessor): deleting it here crashes.
-    //The old memleak claim predates the cached accessors and is unverified; if a leak remains it is downstream of reactToClick.
+    //this new method below in all alternative cost type causes a memleak, however, you cant safedelete the cost here as it cause a crash
+    //TODO::::we need to get to the source of this leak and fix it.
     ManaCost * newCost = card->getManaCost()->getBestow();
     if(!newCost) return 0;
     if (newCost->extraCosts)
@@ -2107,7 +2107,7 @@ ostream& MTGAttackCostRule::toString(ostream& out) const
 
 const string MTGAttackCostRule::getMenuText()
 {
-    menuText = scost;
+    sprintf(menuText, "%s", scost.c_str());
     return menuText;
 }
 
@@ -2186,7 +2186,7 @@ ostream& MTGBlockCostRule::toString(ostream& out) const
 
 const string MTGBlockCostRule::getMenuText()
 {
-    menuText = scost;
+    sprintf(menuText, "%s", scost.c_str());
     return menuText;
 }
 
