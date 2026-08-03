@@ -677,6 +677,12 @@ void TestSuite::initGame(GameObserver* g)
     //TestSuiteGame constructor's - flag it here too so the ASPHASES
     //auto-skips stay off for scripted cadences
     g->mSuiteGame = true;
+    //Suite scripts encode MENU GEOMETRY: the kicker ask-first default adds a
+    //"cast with kicker" entry to every kickable card's menu, shifting every
+    //scripted `choice N` on those cards. Pin the legacy always-pay behaviour
+    //for suite games so historical scripts keep their indexes; the ask-first
+    //path gets its own dedicated tests.
+    options[Options::KICKERPAYMENT].number = OptionKicker::KICKER_ALWAYS;
     //The first test runs slowly, the other ones run faster.
     //This way a human can see what happens when testing a specific file,
     // or go faster when it comes to the whole test suite.
@@ -1567,6 +1573,8 @@ TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
     filename = _filename;
     observer = new GameObserver();
     observer->mSuiteGame = true; //keep ASPHASES auto-skips off even after `ai` flips playModes
+    //same menu-geometry pin as the main-thread suite path (see TestSuite::initGame)
+    options[Options::KICKERPAYMENT].number = OptionKicker::KICKER_ALWAYS;
 
     initState.cleanup(this);
     endState.cleanup(this);

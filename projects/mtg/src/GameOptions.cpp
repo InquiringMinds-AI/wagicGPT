@@ -525,6 +525,12 @@ GameOption * GameOptions::get(int optionID)
         case Options::KICKERPAYMENT:
             goEnum = NEW GameOptionEnum();
             goEnum->def = OptionKicker::getInstance();
+            //Default ASK, not always-pay. Always-pay was calibrated for the
+            //pre-auto-tap UX, where floating the kicker mana WAS the intent
+            //signal; with auto-tap the player never floats, so a flexible
+            //spend's intent can only come from an explicit ask. A saved
+            //profile value still overrides this.
+            goEnum->number = OptionKicker::KICKER_CHOICE;
             go = goEnum;
             break;
         case Options::KEY_BINDINGS:
