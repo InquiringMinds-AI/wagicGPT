@@ -440,12 +440,20 @@ int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
     //only covers the remainder, and tapping stops the moment the pool covers
     //the cost. Known limitation: X costs stop at the base cost - tap extra
     //lands manually for a bigger X (the decision-contract rework owns this).
-    if (!player->isAI() && card->getManaCost()
-        && !player->getManaPool()->canAfford(card->getManaCost(), card->has(Constants::ANYTYPEOFMANA)))
+    if (!player->isAI() && card->getManaCost())
     {
         //colored needs first, then generic fillers, stop at coverage -
-        //the raw plan order overpaid (see ManaEngine::autoTapForCost)
-        ManaEngine::autoTapForCost(player, card, card->getManaCost(), card->has(Constants::ANYTYPEOFMANA));
+        //the raw plan order overpaid (see ManaEngine::autoTapForCost).
+        //When the kicker branch below will fire (kicked chosen, or the
+        //always-kick option), tap for base+kicker so the pool snapshot it
+        //prices the kick against actually holds the kick.
+        ManaCost * costToTap = NEW ManaCost(card->getManaCost());
+        if (card->getManaCost()->getKicker() && !card->getManaCost()->getKicker()->isMulti
+            && (card->kicked || OptionKicker::KICKER_ALWAYS == options[Options::KICKERPAYMENT].number))
+            costToTap->add(card->getManaCost()->getKicker());
+        if (!player->getManaPool()->canAfford(costToTap, card->has(Constants::ANYTYPEOFMANA)))
+            ManaEngine::autoTapForCost(player, card, costToTap, card->has(Constants::ANYTYPEOFMANA));
+        delete costToTap;
     }
     ManaCost * cost = card->getManaCost();
     ManaCost * playerMana = player->getManaPool();
@@ -777,7 +785,28 @@ int MTGKickerRule::isReactingToClick(MTGCardInstance * card, ManaCost *)
         withKickerCost->Dump();
 #endif
         if (playerMana->canAfford(withKickerCost,card->has(Constants::ANYTYPEOFMANA)))
+        {
+            delete withKickerCost;
             return 1;
+        }
+        //Auto-tap parity (non-AI): the base cast rule counts free untapped
+        //producers toward castability, but this menu priced the kick off the
+        //FLOATING pool alone - so building up lands without pre-tapping never
+        //offered the kick at all. The taps happen in reactToClick.
+        if (!player->isAI())
+        {
+            ManaEngine::FreeProducerPolicy freePolicy;
+            ManaCost * potential = ManaEngine::potentialMana(player, freePolicy, card);
+            potential->add(playerMana);
+            bool affordable = potential->canAfford(withKickerCost, card->has(Constants::ANYTYPEOFMANA)) != 0;
+            delete potential;
+            if (affordable)
+            {
+                delete withKickerCost;
+                return 1;
+            }
+        }
+        delete withKickerCost;
     }
     return 0;
 }
@@ -806,6 +835,24 @@ int MTGKickerRule::reactToClick(MTGCardInstance * card)
         return 0;
     }
 
+    //Auto-tap for the FULL kicked cost (non-AI): this path never inherited
+    //the base rule's auto-tap, so the kick priced itself off the floating
+    //pool alone. Tap for base+kicker (multikicker: as many kicks as untapped
+    //producers can honour) BEFORE the pool snapshot below, so the payment
+    //loop sees the mana the menu promised.
+    if (!player->isAI() && card->getManaCost()->getKicker())
+    {
+        //Base + ONE kick, for multikicker too - deliberately NOT max-kicks:
+        //the floating pool is the player's kick-count selector (pre-tap more
+        //to kick more), and a max-greedy tap would both seize mana the
+        //player meant to reserve and go wild on big-mana boards. Choosing
+        //the kicker menu entry guarantees at least the one kick it names.
+        ManaCost * kickTarget = NEW ManaCost(card->getManaCost());
+        kickTarget->add(card->getManaCost()->getKicker());
+        if (!player->getManaPool()->canAfford(kickTarget, card->has(Constants::ANYTYPEOFMANA)))
+            ManaEngine::autoTapForCost(player, card, kickTarget, card->has(Constants::ANYTYPEOFMANA));
+        delete kickTarget;
+    }
     ManaCost * previousManaPool = NEW ManaCost(player->getManaPool());
     int payResult = player->getManaPool()->pay(card->getManaCost());
     if (card->getManaCost()->getKicker())
