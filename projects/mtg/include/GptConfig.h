@@ -38,6 +38,11 @@ public:
                               //is only sent when != 1.0). Sampling change,
                               //corpus-validate before defaulting on
     int timeoutSecs;          //per-call HTTP timeout for model completions
+    int patienceSecs;         //seconds a call may be in flight before the duel
+                              //offers "keep waiting / play without the LLM".
+                              //NOT the same job as timeoutSecs: that bounds a
+                              //dead connection, this bounds how long a person
+                              //sits watching one. 0 = never ask
     int translog;             //0/1: dump every decision (prompt+reply) to
                               //~/.Wagic/ai/gpt/logs/*.jsonl - prompt-tuning
                               //raw material, and future training data for a

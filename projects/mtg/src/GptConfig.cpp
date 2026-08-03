@@ -20,7 +20,7 @@ using std::string;
 using std::vector;
 
 GptSettings::GptSettings()
-    : enabled(0), thinking(-1), maxTokens(-1), repetitionPenalty(1.0), timeoutSecs(120), translog(0), telemetry(-1), peek(0)
+    : enabled(0), thinking(-1), maxTokens(-1), repetitionPenalty(1.0), timeoutSecs(600), patienceSecs(60), translog(0), telemetry(-1), peek(0)
 {
 }
 
@@ -283,12 +283,19 @@ GptSettings GptSettings::load()
         else if (k == "maxtokens" || k == "max_reply_tokens") cfg.maxTokens = atol(v.c_str());
         else if (k == "repetition_penalty") cfg.repetitionPenalty = atof(v.c_str());
         else if (k == "timeout") cfg.timeoutSecs = atoi(v.c_str());
+        else if (k == "patience") cfg.patienceSecs = atoi(v.c_str());
         else if (k == "translog") cfg.translog = (v != "0" && v != "off") ? 1 : 0;
         else if (k == "telemetry") cfg.telemetry = (v != "0" && v != "off") ? 1 : 0;
         else if (k == "peek") cfg.peek = (v != "0" && v != "off") ? 1 : 0;
     }
     if (cfg.timeoutSecs < 5)
         cfg.timeoutSecs = 5;
+    //0 means "never ask", any other too-small value would prompt faster than
+    //a normal decision completes and turn the dialog into the annoyance.
+    if (cfg.patienceSecs < 0)
+        cfg.patienceSecs = 0;
+    else if (cfg.patienceSecs > 0 && cfg.patienceSecs < 10)
+        cfg.patienceSecs = 10;
     cfg.key = deobfuscateKey(cfg.key);
     return cfg;
 }
@@ -325,6 +332,7 @@ bool GptSettings::save() const
     if (repetitionPenalty != 1.0)
         f << "repetition_penalty=" << repetitionPenalty << "\n";
     f << "timeout=" << timeoutSecs << "\n";
+    f << "patience=" << patienceSecs << "\n";
     if (translog)
         f << "translog=1\n";
     if (telemetry >= 0)
@@ -339,7 +347,8 @@ bool GptSettings::operator==(const GptSettings& o) const
     return enabled == o.enabled && urls == o.urls && model == o.model && key == o.key
         && thinking == o.thinking && maxTokens == o.maxTokens
         && repetitionPenalty == o.repetitionPenalty
-        && timeoutSecs == o.timeoutSecs && translog == o.translog && telemetry == o.telemetry
+        && timeoutSecs == o.timeoutSecs && patienceSecs == o.patienceSecs
+        && translog == o.translog && telemetry == o.telemetry
         && peek == o.peek;
 }
 

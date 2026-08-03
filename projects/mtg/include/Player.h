@@ -162,6 +162,24 @@ public:
         return false;
     }
 
+    //An AI that answers over a network can stall for an unbounded time on a
+    //slow or wedged endpoint. Freezing the duel behind an HTTP timeout the
+    //player cannot see is not an option, so the frontend asks: keep waiting,
+    //or finish the duel against the built-in AI. Only AIPlayerGPT ever says
+    //a prompt is due; every other player is always ready or already local.
+    virtual bool aiPatiencePromptDue()
+    {
+        return false;
+    }
+
+    //keepWaiting true re-arms the wait (the player is asked again after
+    //another full window rather than committed to an unbounded one);
+    //false switches the remote AI off for the rest of the duel.
+    virtual void aiPatiencePromptAnswer(bool keepWaiting)
+    {
+        (void) keepWaiting;
+    }
+
     bool isHuman()
     {
         return (playMode == MODE_HUMAN);

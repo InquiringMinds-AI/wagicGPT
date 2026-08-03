@@ -43,7 +43,11 @@ GptOptionsList::GptOptionsList()
     Add(NEW OptionGptText(&cfg.model, "Model", "(auto-detect)"));
     Add(NEW OptionGptText(&cfg.key, "API key", "(none)", true));
     Add(NEW OptionGptBool(&cfg.thinking, "Thinking mode (stronger, slower)"));
-    Add(NEW OptionGptNumber(&cfg.timeoutSecs, "Call timeout (seconds)", 15, 300, 15));
+    //Generous by design: the patience prompt is what bounds how long a PERSON
+    //waits, so this only has to be long enough that "keep waiting" can still
+    //land an answer, and short enough to eventually release a dead socket.
+    Add(NEW OptionGptNumber(&cfg.timeoutSecs, "Call timeout (seconds)", 30, 600, 30));
+    Add(NEW OptionGptNumber(&cfg.patienceSecs, "Ask after waiting (seconds)", 0, 300, 15, "Never"));
     Add(NEW OptionGptTest(&cfg));
     Add(NEW OptionGptConsent(&cfg.telemetry, "Contribute anonymized game data"));
     //Full disclosure for the consent above (and its save-time ask):

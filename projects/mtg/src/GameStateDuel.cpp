@@ -103,7 +103,10 @@ enum ENUM_DUEL_MENUS
     DUEL_MENU_CHOOSE_OPPONENT,
     DUEL_MENU_DETAILED_DECK1_INFO,
     DUEL_MENU_CHOOSE_NUMBER_OF_GAMES,
-    DUEL_MENU_DETAILED_DECK2_INFO
+    DUEL_MENU_DETAILED_DECK2_INFO,
+    //"the opponent is taking a long time" - keep waiting, or finish the
+    //duel against the built-in AI
+    DUEL_MENU_LLM_PATIENCE
 };
 
 enum ENUM_CNOGMENU_ITEMS
@@ -176,6 +179,7 @@ GameState(parent, "duel")
     deckmenu = NULL;
     opponentMenu = NULL;
     menu = NULL;
+    mPatiencePlayer = NULL;
     popupScreen = NULL;
     mGamePhase = DUEL_STATE_UNSET;
     taskList = NEW TaskList();
@@ -429,6 +433,8 @@ void GameStateDuel::loadTestSuitePlayers()
 void GameStateDuel::End()
 {
     DebugTrace("Ending GameStateDuel");
+    //Borrowed pointer into a game that is about to go away.
+    mPatiencePlayer = NULL;
 
 #ifdef TRACK_OBJECT_USAGE
     ObjectAnalytics::DumpStatistics();
@@ -949,6 +955,30 @@ void GameStateDuel::Update(float dt)
         //run a "post update" init call in the rules. This is for things such as Manapool, which gets emptied in the update
         // That's mostly because of a legacy bug, where we use the update sequence for some things when we should use events (such as phase changes)
         mParent->rules->postUpdateInit(game);
+
+        //A remote AI opponent can stall on a slow or wedged endpoint. Rather
+        //than freeze the duel behind an HTTP timeout the player never sees,
+        //offer the way out: keep waiting, or finish against the built-in AI.
+        //Only when a human is actually sitting there - self-play batches and
+        //the test suite must never stop for a dialog nobody can answer.
+        if (!menu && mParent->players[0] == PLAYER_TYPE_HUMAN)
+        {
+            for (size_t pi = 0; pi < game->players.size(); pi++)
+            {
+                Player * p = game->players[pi];
+                if (!p || !p->aiPatiencePromptDue())
+                    continue;
+                mPatiencePlayer = p;
+                menu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(),
+                                      DUEL_MENU_LLM_PATIENCE, this, Fonts::MENU_FONT,
+                                      SCREEN_WIDTH / 2 - 100, 25,
+                                      "The opponent is taking a long time");
+                menu->Add(MENUITEM_LLM_KEEP_WAITING, "Keep waiting");
+                menu->Add(MENUITEM_LLM_SWITCH_OFF, "Play without the LLM");
+                setGamePhase(DUEL_STATE_MENU);
+                break;
+            }
+        }
 
 #ifdef NETWORK_SUPPORT
         if(mParent->mpNetwork) ((NetworkGameObserver*)game)->synchronize();
@@ -1481,6 +1511,20 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
     int aiDeckSize = deckManager->getAIDeckOrderList()->size();
     switch (controllerId)
     {
+
+        case DUEL_MENU_LLM_PATIENCE:
+        {
+            //Either answer resumes play; the difference is whether the remote
+            //AI is still in the duel. Answering also resets the wait clock, so
+            //"keep waiting" buys another window rather than silencing the
+            //prompt for good.
+            if (mPatiencePlayer)
+                mPatiencePlayer->aiPatiencePromptAnswer(controlId == MENUITEM_LLM_KEEP_WAITING);
+            mPatiencePlayer = NULL;
+            menu->Close();
+            setGamePhase(DUEL_STATE_CANCEL);
+            break;
+        }
 
         case DUEL_MENU_CHOOSE_NUMBER_OF_GAMES:  // We're in the "Choose number of Games" menu
         {

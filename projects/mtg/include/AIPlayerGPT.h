@@ -84,6 +84,14 @@ public:
     virtual bool decisionPending(float dt);
     virtual void Render();
 
+    //The patience prompt. A call still in flight after mPatienceLimit
+    //seconds is one a human has been staring at for a full minute with no
+    //way to act, so the duel screen offers the choice out. The HTTP timeout
+    //stays what it always was - a liveness bound on a dead endpoint - and
+    //stops being the thing a player waits on.
+    virtual bool aiPatiencePromptDue();
+    virtual void aiPatiencePromptAnswer(bool keepWaiting);
+
     //feeds the game narrative to the agent transcript
     virtual int receiveEvent(WEvent * event);
 
@@ -262,6 +270,11 @@ private:
     std::shared_ptr<AsyncState> mAsyncState;
     float mThinkTime; //seconds the current request has been in flight (for the indicator)
     long mTimeoutMs;  //per-call HTTP timeout (config timeout= / WAGIC_GPT_TIMEOUT)
+    //Seconds in flight before the duel screen offers "keep waiting / play
+    //without the LLM". Distinct from mTimeoutMs on purpose: that one bounds
+    //a dead connection, this one bounds how long a person is asked to sit
+    //and watch. 0 disables the prompt (config patience= / WAGIC_GPT_PATIENCE).
+    float mPatienceLimit;
 
     //Transient in-duel notice ("no endpoint reachable", "model timed out"),
     //drawn by Render for a few seconds. Frame-based decay: Render runs per
@@ -269,6 +282,17 @@ private:
     string mNotice;
     int mNoticeTicks;
     void setNotice(const string& text, float seconds);
+
+    //A transient notice is easy to miss - one line, five seconds, top of the
+    //screen, while the player is looking at their hand. noticeFallback shows
+    //the same message AND lights a standing marker, so a decision the model
+    //did not make is visible after the flash is gone. Use it only where the
+    //heuristic AI actually answered instead of the model; a RE-ASK is not a
+    //fallback and counting one would overstate how badly things are going.
+    void noticeFallback(const string& text, float seconds);
+    int mFallbackCount;   //heuristic-answered decisions this duel
+    int mDegradedTicks;   //frames the standing marker stays lit; self-clearing
+                          //so a model that recovers stops being accused
 
     //Turn whose combat already had its bundled blocking declaration - the
     //whole combat is decided in ONE model reply, so once executed nothing
