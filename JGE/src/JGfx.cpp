@@ -349,20 +349,30 @@ void JRenderer::DestroyRenderer()
 
 void JRenderer::TexMemCheckpoint()
 {
+	// NEVER mid-frame. The first version of this reclaimed by sceGuFinish/Sync-ing
+	// the in-flight display list and starting a fresh one with texture and blend
+	// state invalidated. That is only sane if allocation failure is exceptional -
+	// and on the screen that needs it most it is the steady state: the deck editor
+	// measured 40.4 MiB used of a 43.07 MiB heap on hardware, 2.7 MiB free, so this
+	// fired continuously and the partial frame was torn down and redrawn forever.
+	// That was the deck-editor menu<->carousel loop (isolated on device 2026-08-03
+	// by reverting the commit that introduced this function).
+	//
+	// In-frame, let the allocation fail. The texture is absent for ONE frame and
+	// loads on the next, after the normal end-of-frame sync has released the old
+	// pixels - which is the behaviour that shipped before this function existed. A
+	// card face missing for a frame is an incomparably cheaper failure than
+	// destroying the frame being drawn.
+	//
+	// Out of frame - resource loading, deck-list building, screen transitions -
+	// there is no list to destroy, so reclaiming is free and keeps the point of the
+	// original change: deferred frees waiting on a sync should not be able to
+	// starve an allocation that the memory is actually available for.
+	if (gInFrame)
+		return;
 	if (gDeferredFreesRam.empty() && gDeferredFreesVram.empty())
 		return;
-	if (gInFrame)
-	{
-		sceGuFinish();
-		sceGuSync(0, 0);
-	}
 	FlushDeferredTextureFrees();
-	if (gInFrame)
-	{
-		sceGuStart(GU_DIRECT, list);
-		mCurrentTex = -1;    // fresh list: force texture/blend rebind
-		mCurrentBlend = -1;
-	}
 }
 
 void JRenderer::BeginScene()

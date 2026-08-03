@@ -968,13 +968,6 @@ void ResourceManagerImpl::ResetCacheLimits()
         DebugTrace( "Error, Not enough RAM for Cache: " << myNewSize << " - total Ram: " << ram);
         myNewSize = TEXTURES_CACHE_MINSIZE;
     }
-    //Burst headroom: mode-switch reload storms and demo starts need transient
-    //room for decode temp buffers + frame-deferred frees; the free-minus-5MB
-    //formula left too little slack once card images arrived. 8MB of thumbnails
-    //keeps ~500 cards resident - far more than any screen shows at once.
-    const unsigned int PSP_TEXCACHE_HARD_CAP = 8000000;
-    if (myNewSize > PSP_TEXCACHE_HARD_CAP)
-        myNewSize = PSP_TEXCACHE_HARD_CAP;
     textureWCache.Resize(MIN(myNewSize, HUGE_CACHE_LIMIT), MAX_CACHE_OBJECTS);
 #else
 #ifdef FORCE_LOW_CACHE_MEMORY
