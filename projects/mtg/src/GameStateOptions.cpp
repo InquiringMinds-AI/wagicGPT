@@ -442,6 +442,13 @@ void GameStateOptions::ButtonPressed(int controllerId, int controlId)
             break;
         case GameStateOptionsConst::kResetTutorialsID:
             options.resetTutorialMessages();
+            //The reset switches tutorials back on; the toggle a row above
+            //caches its value, so refresh the tab's rows from the live
+            //options. Not the mReload path - that re-reads the profile from
+            //disk, which would discard the flip on Vita, where the save is
+            //deferred.
+            if (optionsTabs)
+                optionsTabs->Reload();
             if (mResetTutorialsLabel)
                 mResetTutorialsLabel->setDisplay("Tutorial messages reset");
             break;

@@ -691,10 +691,15 @@ int GameSettings::resetTutorialMessages()
     if (globalOptions)
         cleared += globalOptions->resetTutorialMessages();
 
+    //Asking for the messages back means asking to see them: clearing the
+    //seen-state alone would leave a player who turned tutorials off (the
+    //secondary button does exactly that) staring at a reset that changes
+    //nothing visible.
+    (*this)[Options::TUTORIALS].number = 1;
+
 #if !defined(VITA)
     // On Vita this NAND flush takes 1-3s; rely on the next regular save instead.
-    if (cleared)
-        save();
+    save();
 #endif
 
     return cleared;
