@@ -340,6 +340,15 @@ void CardGui::Render()
                     highlightborder->SetColor(ARGB(220,255,120,60));
                     renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (33 * actZ + 1) / 16, 46 * actZ / 16);
                 }
+                //Blocking gets the SAME orange halo as attacking: both mean
+                //"this creature can enter combat right now", and the two can
+                //never appear at the same time (attack ring = your combat,
+                //block ring = the opponent's), so one colour carries one idea.
+                if (card->canBlockNow)
+                {
+                    highlightborder->SetColor(ARGB(220,255,120,60));
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (33 * actZ + 1) / 16, 46 * actZ / 16);
+                }
                 if (card->hasUsableAbilityNow)
                 {
                     //42, not the standard 43: a 2-unit rim reads clearly on

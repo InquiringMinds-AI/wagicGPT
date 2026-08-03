@@ -462,6 +462,36 @@ bool LegalActionsOracle::hasLegalBlock(Player * defender)
     return false;
 }
 
+bool LegalActionsOracle::canDeclareBlocker(MTGCardInstance * card)
+{
+    //Mirrors MTGBlockRule::isReactingToClick (the click gate) plus the
+    //owner's display requirement: a ring means "this creature can block AND
+    //there is an attacker it could legally block" - a blocker with no legal
+    //assignment would open a menu that cycles to nothing.
+    Player * p = card->controller();
+    GameObserver * g = p->getObserver();
+    if (g->getCurrentGamePhase() != MTG_PHASE_COMBATBLOCKERS)
+        return false;
+    Player * attackerP = g->currentPlayer;
+    if (attackerP == p)
+        return false; //only the defending seat declares blockers
+    if (g->isInterrupting)
+        return false;
+    //attack triggers resolve before blocks are declared - same stack gate
+    //as the click rule
+    if (g->mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED))
+        return false;
+    if (card->isPhased || !card->canBlock() || card->blockCost >= 1)
+        return false;
+    MTGCardInstance * attacker = NULL;
+    while ((attacker = attackerP->game->inPlay->getNextAttacker(attacker)))
+    {
+        if (card->canBlock(attacker))
+            return true;
+    }
+    return false;
+}
+
 bool LegalActionsOracle::hasAnyLegalAction(Player * p)
 {
     GameObserver * g = p->getObserver();

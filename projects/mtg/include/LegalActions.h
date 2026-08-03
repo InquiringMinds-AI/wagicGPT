@@ -113,6 +113,11 @@ public:
     //could legally use AND afford right now. Making mana does not count - a
     //land is not "doing something" in the sense a player cares to be shown.
     static bool hasUsableAbility(MTGCardInstance * card);
+    //canDeclareBlocker: defending player's creature that can block AND has
+    //at least one attacker it could legally block, in the declare-blockers
+    //window. Mirrors MTGBlockRule::isReactingToClick plus the has-a-target
+    //requirement. Display-only consumer, like the two above.
+    static bool canDeclareBlocker(MTGCardInstance * card);
 };
 
 #endif

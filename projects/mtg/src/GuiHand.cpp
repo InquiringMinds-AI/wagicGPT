@@ -265,6 +265,8 @@ void GuiHandSelf::Update(float dt)
                 LegalActionsOracle::canDeclareAttacker(bf->cards[i]) ? 1 : 0;
             bf->cards[i]->hasUsableAbilityNow =
                 LegalActionsOracle::hasUsableAbility(bf->cards[i]) ? 1 : 0;
+            bf->cards[i]->canBlockNow =
+                LegalActionsOracle::canDeclareBlocker(bf->cards[i]) ? 1 : 0;
         }
         if (focused && focused->castableNow == 1 && focused->getManaCost()
             && !p->getManaPool()->canAfford(focused->getManaCost(), focused->has(Constants::ANYTYPEOFMANA)))

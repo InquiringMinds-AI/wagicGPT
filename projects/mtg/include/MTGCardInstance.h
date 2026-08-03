@@ -317,6 +317,8 @@ public:
                           //attacker right now
     int hasUsableAbilityNow;//battlefield permanent with an activated ability
                           //its controller could use AND afford right now
+    int canBlockNow;      //defending creature that could block at least one
+                          //current attacker in the declare-blockers window
     int myconvertedcost;
     ManaCost * computeNewCost(MTGCardInstance * card,ManaCost * oldCost, ManaCost * refCost,bool noTrinisphere = false, bool bestow = false);
     int countTrini;
