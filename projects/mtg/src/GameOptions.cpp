@@ -454,6 +454,30 @@ GameOption * GameOptions::factorNewGameOption(string optionName, string value)
     return result;
 }
 
+const string GameOptions::kTutorialOptionPrefix = "tuto_";
+
+int GameOptions::resetTutorialMessages()
+{
+    int cleared = 0;
+    const size_t prefixLength = kTutorialOptionPrefix.size();
+
+    for (map<string, GameOption *>::iterator it = unknownMap.begin(); it != unknownMap.end(); it++)
+    {
+        if (!it->second)
+            continue;
+        if (it->first.compare(0, prefixLength, kTutorialOptionPrefix) != 0)
+            continue;
+        if (!it->second->number && !it->second->str.size())
+            continue;
+
+        it->second->number = 0;
+        it->second->str = "";
+        cleared++;
+    }
+
+    return cleared;
+}
+
 GameOption * GameOptions::get(string optionName)
 {
    if (!unknownMap[optionName])
@@ -654,6 +678,26 @@ bool GameSettings::newAward()
             return true;
     }
     return false;
+}
+
+int GameSettings::resetTutorialMessages()
+{
+    int cleared = 0;
+
+    //The counters are written through operator[](string), which resolves to the
+    //profile; older files may still carry them globally, so sweep both.
+    if (profileOptions)
+        cleared += profileOptions->resetTutorialMessages();
+    if (globalOptions)
+        cleared += globalOptions->resetTutorialMessages();
+
+#if !defined(VITA)
+    // On Vita this NAND flush takes 1-3s; rely on the next regular save instead.
+    if (cleared)
+        save();
+#endif
+
+    return cleared;
 }
 
 GameOption GameSettings::invalid_option = GameOption(0);

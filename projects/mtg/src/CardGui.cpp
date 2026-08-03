@@ -700,23 +700,40 @@ void CardGui::Render()
 
 JQuadPtr CardGui::AlternateThumbQuad(MTGCard * card)
 {
-    JQuadPtr q;
-    vector<ModRulesBackGroundCardGuiItem *>items = gModRules.cardgui.background;
-    ModRulesBackGroundCardGuiItem * item;
+    // Called once per visible art-less card per frame (and for every card when DISABLECARDS is
+    // set), so the per-call cost has to stay near zero on PSP/Vita.
+    const vector<ModRulesBackGroundCardGuiItem *>& items = gModRules.cardgui.background;
     int numItems = (int)items.size();
-    if (card->data->countColors() > 1)
+    if (!numItems) return JQuadPtr();
+
+    // The rendered output is determined solely by the colour bucket, and a permanent's colours
+    // are mutable during a duel (CardPrimitive::setColor/removeColor), so the bucket is
+    // recomputed every call and is the cache key. Keying by card identity would show stale art
+    // after a colour-changing effect.
+    int index = (card->data->countColors() > 1) ? numItems - 1 : card->data->getColor();
+    if (index < 0 || index >= numItems) index = 0;
+
+    // One entry per background item (8 in modrules.xml), filled on demand: bounded by the mod
+    // rules, not by the number of cards seen, so it cannot grow over a long session.
+    static vector<JQuadPtr> sAlternateThumbs;
+    if ((int)sAlternateThumbs.size() != numItems)
+        sAlternateThumbs.assign(numItems, JQuadPtr());
+
+    JQuadPtr q = sAlternateThumbs[index];
+    if (!q.get())
     {
-         item = items[numItems-1];
+        // RETRIEVE_MANAGE deadbolts the texture the way GameApp pins back_thumb.jpg and the mana
+        // icons: the entry is held in the resource manager's managed map rather than the
+        // evictable cache, so ClearUnlocked/RemoveOldest cannot free it under this quad, and
+        // WCachedTexture::Refresh (theme or profile change) repoints the quad's texture in
+        // place. The quads are 28x40, so pinning at most one per colour is negligible VRAM.
+        const string& thumbFile = items[index]->mDisplayThumb;
+        q = WResourceManager::Instance()->RetrieveQuad(thumbFile, 0, 0, 0, 0, "altthumb_" + thumbFile, RETRIEVE_MANAGE);
+        if (!q.get()) return q;
+        sAlternateThumbs[index] = q;
     }
-    else
-    {
-        item = items[card->data->getColor()];
-    }
-    
-    
-    q = WResourceManager::Instance()->RetrieveTempQuad(item->mDisplayThumb);
-    items.clear();  
-    if (q && q->mTex)
+
+    if (q->mTex)
         q->SetHotSpot(static_cast<float> (q->mTex->mWidth / 2), static_cast<float> (q->mTex->mHeight / 2));
     return q;
 }

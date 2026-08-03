@@ -19,13 +19,14 @@ namespace GameStateOptionsConst
     const int kReloadID = 5;
     const int kTelemetryYesID = 6;
     const int kTelemetryNoID = 7;
+    const int kResetTutorialsID = 8;
     const int kTelemetryMenuID = -103;
 }
 
 static std::string kBgFile = "";
 
 GameStateOptions::GameStateOptions(GameApp* parent) :
-    GameState(parent, "options"), mReload(false), grabber(NULL), optionsMenu(NULL), optionsTabs(NULL)
+    GameState(parent, "options"), mReload(false), grabber(NULL), mResetTutorialsLabel(NULL), optionsMenu(NULL), optionsTabs(NULL)
 {
 #ifdef WITH_GPT_AI
     gptTab = NULL;
@@ -147,6 +148,12 @@ void GameStateOptions::Start()
     //the duel, and repeat on every fresh profile; anyone who wants them can
     //turn them on here.
     optionsList->Add(NEW OptionInteger(Options::TUTORIALS, "Show tutorial messages"));
+    //Action row, not a value row: there is nothing to store, and the button
+    //idiom ("New Profile" above) is the only one this screen has for a verb.
+    //The label doubles as the acknowledgement - it is swapped for a done
+    //message once pressed, since the reset leaves nothing else on screen.
+    mResetTutorialsLabel = NEW WGuiHeader("Reset tutorial messages");
+    optionsList->Add(NEW WGuiButton(mResetTutorialsLabel, -102, GameStateOptionsConst::kResetTutorialsID, this));
     optionsTabs->Add(optionsList);
 
     WDecoEnum * oFirstPlayer = NEW WDecoEnum(NEW OptionInteger(Options::FIRSTPLAYER, "First Turn Player", Constants::WHO_R, 1,
@@ -179,6 +186,7 @@ void GameStateOptions::Start()
 void GameStateOptions::End()
 {
     JRenderer::GetInstance()->EnableVSync(false);
+    mResetTutorialsLabel = NULL; //owned (and deleted) by optionsTabs
     SAFE_DELETE(optionsTabs);
     SAFE_DELETE(optionsMenu);
 #ifdef WITH_GPT_AI
@@ -431,6 +439,11 @@ void GameStateOptions::ButtonPressed(int controllerId, int controlId)
             break;
         case GameStateOptionsConst::kReloadID:
             mReload = true;
+            break;
+        case GameStateOptionsConst::kResetTutorialsID:
+            options.resetTutorialMessages();
+            if (mResetTutorialsLabel)
+                mResetTutorialsLabel->setDisplay("Tutorial messages reset");
             break;
         }
 #ifdef WITH_GPT_AI

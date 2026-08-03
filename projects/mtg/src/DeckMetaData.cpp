@@ -14,24 +14,77 @@ DeckMetaData::DeckMetaData(const string& filename, bool isAI)
     : mFilename(filename), mGamesPlayed(0), mVictories(0), mPercentVictories(0), mDifficulty(0),
       mDeckLoaded(false), mStatsLoaded(false), mIsAI(isAI)
 {
-    // Eager load, not deferrable as-is: the deck list is sorted alphabetically, so the deck file
-    // must be opened here just to get its name. For the opponent list that means cracking open
-    // 106 files only to read deck names — the bulk of the ~4 second delay the first time an
-    // opponent is picked on the first match.
+    // Not deferrable: the deck list is sorted by name and filtered on the commander and unlock
+    // tags, so every listed deck's header is needed before the menu can be built. Only the
+    // header is parsed here — the card lines are never resolved against the card database.
     LoadDeck();
+}
+
+bool DeckMetaData::ReadFileMetaData(const string& filename, string& name, string& description,
+                                    string& unlockRequirements, bool& isCommanderDeck)
+{
+    size_t slash = filename.find_last_of("/");
+    size_t dot = filename.find(".");
+    name = filename.substr(slash + 1, dot - slash - 1);
+    description = "";
+    unlockRequirements = "";
+    isCommanderDeck = false;
+
+    // Deck files carry accented bytes in whatever encoding they were authored in; they are
+    // handled as opaque bytes here, exactly as MTGDeck does.
+    std::string contents;
+    if (!JFileSystem::GetInstance()->readIntoString(filename, contents))
+        return false;
+
+    isCommanderDeck = (contents.find("#CMD:") != string::npos);
+
+    std::stringstream stream(contents);
+    std::string s;
+    while (std::getline(stream, s))
+    {
+        if (!s.size()) continue;
+        if (s[s.size() - 1] == '\r') s.erase(s.size() - 1); //Handle DOS files
+        if (!s.size()) continue;
+        if (s[0] != '#') continue;
+
+        size_t found = s.find("NAME:");
+        if (found != string::npos)
+        {
+            name = s.substr(found + 5);
+            continue;
+        }
+        found = s.find("DESC:");
+        if (found != string::npos)
+        {
+            if (description.size()) description.append("\n");
+            description.append(s.substr(found + 5));
+            continue;
+        }
+        found = s.find("UNLOCK:");
+        if (found != string::npos)
+        {
+            unlockRequirements = s.substr(found + 7);
+            continue;
+        }
+    }
+
+    return true;
 }
 
 void DeckMetaData::LoadDeck()
 {
     if (!mDeckLoaded)
     {
-        MTGDeck deck(mFilename.c_str(), NULL, 1);
-        mName = trim(deck.meta_name);
-        mDescription = trim(deck.meta_desc);
-        mDeckId = atoi((mFilename.substr(mFilename.find("deck") + 4, mFilename.find(".txt"))).c_str());
-        mCommanderDeck = deck.meta_commander; //Added to read the command tag in deck's metafile.
+        string metaName, metaDescription, metaUnlockRequirements;
+        bool metaCommander = false;
+        ReadFileMetaData(mFilename, metaName, metaDescription, metaUnlockRequirements, metaCommander);
 
-        vector<string> requirements = split(deck.meta_unlockRequirements, ',');
+        mName = trim(metaName);
+        mDescription = trim(metaDescription);
+        mDeckId = atoi((mFilename.substr(mFilename.find("deck") + 4, mFilename.find(".txt"))).c_str());
+        mCommanderDeck = metaCommander; //Added to read the command tag in deck's metafile.
+
+        vector<string> requirements = split(metaUnlockRequirements, ',');
         for(size_t i = 0; i < requirements.size(); ++i)
         {
             mUnlockRequirements.push_back(Options::getID(requirements[i]));

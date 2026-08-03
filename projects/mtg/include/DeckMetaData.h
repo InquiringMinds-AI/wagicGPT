@@ -38,6 +38,12 @@ public:
     void LoadDeck();
     void LoadStats();
 
+    // Reads a deck file's comment-line metadata with MTGDeck's exact semantics, so listing
+    // decks never constructs an MTGDeck. Card lines are skipped, not resolved.
+    // Returns false if the file could not be read; the outputs still hold their defaults.
+    static bool ReadFileMetaData(const string& filename, string& name, string& description,
+                                 string& unlockRequirements, bool& isCommanderDeck);
+
     // Accessors
     bool isCommanderDeck(); //Added to read the command tag in deck's metafile.
     string getFilename();

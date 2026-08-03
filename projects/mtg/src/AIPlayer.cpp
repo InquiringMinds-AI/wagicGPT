@@ -243,15 +243,27 @@ AIPlayer * AIPlayerFactory::createAIPlayer(GameObserver *observer, MTGAllCards *
         sprintf(deckFileSmall, "ai_baka_deck%i", deckid);
     }
 
+    AIPlayer * ai = createAIPlayerFromDeckFile(observer, collection, opponent, deckFile, deckFileSmall, avatarFilename);
+    if (ai)
+        ai->deckId = deckid;
+    return ai;
+}
+
+//The single construction point for every AI opponent: it decides AIPlayerGPT vs AIPlayerBaka,
+//so any caller routed through here honours the player's configured AI.
+AIPlayer * AIPlayerFactory::createAIPlayerFromDeckFile(GameObserver *observer, MTGAllCards * collection, Player * opponent,
+                                                      const string& deckFile, const string& deckFileSmall,
+                                                      const string& avatarFilename)
+{
     int deckSetting = EASY;
-    if ( opponent ) 
+    if ( opponent )
     {
         bool isOpponentAI = opponent->isAI() == 1;
         DeckMetaData *meta = observer->getDeckManager()->getDeckMetaDataByFilename( opponent->deckFile, isOpponentAI);
         if ( meta && meta->getVictoryPercentage() >= 65)
             deckSetting = HARD;
     }
-    
+
     // AIPlayerBaka will delete MTGDeck when it's time
     AIPlayerBaka * baka = NULL;
 #ifdef WITH_GPT_AI
@@ -260,7 +272,6 @@ AIPlayer * AIPlayerFactory::createAIPlayer(GameObserver *observer, MTGAllCards *
 #endif
     if (!baka)
         baka = NEW AIPlayerBaka(observer, deckFile, deckFileSmall, avatarFilename, NEW MTGDeck(deckFile, collection,0, deckSetting));
-    baka->deckId = deckid;
     baka->comboHint = NULL;
     if (baka->opponent() && baka->opponent()->isHuman())
         baka->setFastTimerMode(false);

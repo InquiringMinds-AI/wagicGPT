@@ -4,6 +4,7 @@
 #include "Player.h"
 #include "Tasks.h"
 #include "AIPlayer.h"
+#include "DeckMetaData.h"
 
 #include "Translate.h"
 #include "MTGDefinitions.h"
@@ -162,28 +163,9 @@ void Task::passOneDay()
 // start with '#', so scanning stops at the first non-comment line.
 static string readDeckName(const string & deckFile)
 {
-    size_t slash = deckFile.find_last_of("/");
-    size_t dot = deckFile.find(".");
-    string name = deckFile.substr(slash + 1, dot - slash - 1);
-
-    std::string contents;
-    if (JFileSystem::GetInstance()->readIntoString(deckFile, contents))
-    {
-        std::stringstream stream(contents);
-        std::string s;
-        while (std::getline(stream, s))
-        {
-            if (!s.size()) continue;
-            if (s[s.size() - 1] == '\r') s.erase(s.size() - 1); //Handle DOS files
-            if (!s.size()) continue;
-            if (s[0] != '#') break;
-            size_t found = s.find("NAME:");
-            if (found != string::npos)
-            {
-                name = s.substr(found + 5);
-            }
-        }
-    }
+    string name, description, unlockRequirements;
+    bool isCommanderDeck = false;
+    DeckMetaData::ReadFileMetaData(deckFile, name, description, unlockRequirements, isCommanderDeck);
     return name;
 }
 
@@ -473,9 +455,9 @@ void TaskList::passOneDay()
 void TaskList::getDoneTasks(GameObserver* observer, GameApp * _app, vector<Task*>* result)
 {
     result->clear();
-    // Returns every satisfied task: the `accepted` flag is persisted but no
-    // code path ever sets it true (there is no accept-a-task mechanic), so
-    // all generated tasks are effectively active and pay out on completion.
+    // Returns every satisfied task. Tasks are active from the moment they are generated and pay
+    // out on completion -- there is deliberately no accept-a-task mechanic. The `accepted` flag
+    // stays a reserved slot in the save format (see persistentAttribs) so existing saves parse.
     for (vector<Task*>::iterator it = tasks.begin(); it != tasks.end(); it++)
     {
         if ((*it)->isDone(observer, _app))

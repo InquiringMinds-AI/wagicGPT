@@ -11443,7 +11443,9 @@ ATutorialMessage::ATutorialMessage(GameObserver* observer, MTGCardInstance * sou
 string ATutorialMessage::getOptionName()
 {
     std::stringstream out;
-    out << "tuto_";
+    //Shared with GameOptions::resetTutorialMessages(), which clears every key
+    //carrying this prefix.
+    out << GameOptions::kTutorialOptionPrefix;
     out << hash_djb2(mMessage.c_str());
     return out.str();
 }
@@ -11457,7 +11459,22 @@ bool ATutorialMessage::CheckUserInput(JButton key)
 {
     if (mUserCloseRequest) return false;
 
-    if(key == JGE_BTN_SEC || key == JGE_BTN_OK)
+    if(key == JGE_BTN_SEC)
+    {
+        //The secondary button is the "stop showing me these" control: it turns
+        //tutorials off wholesale rather than dismissing this one message.
+        //Update() retires every live message once the option is off.
+        options[Options::TUTORIALS].number = 0;
+#if !defined(VITA)
+        // On Vita this NAND flush takes 1-3s; rely on end-of-duel save instead.
+        options.save();
+#endif
+        mElapsed = 0;
+        mUserCloseRequest = true;
+        return true;
+    }
+
+    if(key == JGE_BTN_OK)
     {
         ButtonPressed(0, 1);
         return true;
@@ -11529,7 +11546,8 @@ void ATutorialMessage::Update(float dt)
 
 void ATutorialMessage::ButtonPressed(int, int)
 {
-    //Open UX question (handheld ports): should the secondary button suppress all tutorials instead of dismissing one message?
+    //Dismisses this one message and records it as seen. Suppressing tutorials
+    //wholesale is the secondary button's job, handled in CheckUserInput.
     if (mLimit)
     {
         string optionName = getOptionName();
