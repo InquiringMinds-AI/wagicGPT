@@ -713,6 +713,17 @@ JQuadPtr CardGui::AlternateThumbQuad(MTGCard * card)
     int index = (card->data->countColors() > 1) ? numItems - 1 : card->data->getColor();
     if (index < 0 || index >= numItems) index = 0;
 
+#if defined(PSP)
+    // NO cache and NO pinning here. RETRIEVE_MANAGE holds a texture in the resource manager's
+    // managed map, where ClearUnlocked/RemoveOldest can never reclaim it - and on PSP
+    // allocation pressure is the mechanism behind very nearly every behaviour that differs
+    // from the other platforms. An unevictable texture is the wrong trade on the one target
+    // that has no headroom to spend, however small it looks: what gets pinned is the whole
+    // decoded texture, not the 28x40 region the quad draws from. The temp quad is what this
+    // function used before the cache, it stays evictable, and the lookup it costs is cheaper
+    // than the memory it saves.
+    JQuadPtr q = WResourceManager::Instance()->RetrieveTempQuad(items[index]->mDisplayThumb);
+#else
     // One entry per background item (8 in modrules.xml), filled on demand: bounded by the mod
     // rules, not by the number of cards seen, so it cannot grow over a long session.
     static vector<JQuadPtr> sAlternateThumbs;
@@ -726,14 +737,15 @@ JQuadPtr CardGui::AlternateThumbQuad(MTGCard * card)
         // icons: the entry is held in the resource manager's managed map rather than the
         // evictable cache, so ClearUnlocked/RemoveOldest cannot free it under this quad, and
         // WCachedTexture::Refresh (theme or profile change) repoints the quad's texture in
-        // place. The quads are 28x40, so pinning at most one per colour is negligible VRAM.
+        // place.
         const string& thumbFile = items[index]->mDisplayThumb;
         q = WResourceManager::Instance()->RetrieveQuad(thumbFile, 0, 0, 0, 0, "altthumb_" + thumbFile, RETRIEVE_MANAGE);
         if (!q.get()) return q;
         sAlternateThumbs[index] = q;
     }
+#endif
 
-    if (q->mTex)
+    if (q && q->mTex)
         q->SetHotSpot(static_cast<float> (q->mTex->mWidth / 2), static_cast<float> (q->mTex->mHeight / 2));
     return q;
 }

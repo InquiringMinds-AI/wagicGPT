@@ -446,12 +446,24 @@ int JFileSystem::ReadFile(void *buffer, int size)
         assert(mZipFile);
         if((size_t)size > mCurrentFileInZip->m_Size) //only support "store" method for zip inside zips
             return 0;
+        //Each call seeks to the member start, so reads here are independent of
+        //each other - but the stream's error state is NOT. One short read sets
+        //eofbit, and every later seekg/read on the same stream then fails,
+        //turning a single bad read into "no resource ever loads again". Clear
+        //before seeking so a failure stays local to the file that caused it.
+        mZipFile.clear();
         std::streamoff offset = zip_file_system::filesystem::SkipLFHdr(mZipFile, mCurrentFileInZip->m_Offset);
         if (!mZipFile.seekg(offset))
+        {
+            mZipFile.clear();
             return 0;
+        }
         mZipFile.read((char *) buffer, size);
         if (mZipFile.gcount() != (std::streamsize)size)
+        {
+            mZipFile.clear();
             return 0;
+        }
         return size;
     }
 

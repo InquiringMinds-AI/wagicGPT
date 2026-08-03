@@ -131,7 +131,18 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 #define PIXEL_TYPE DWORD
+//NOT for PSP. The PSP block further down defines its own ARGB with red and
+//blue swapped, because the GU wants ABGR8888 - but it does so under
+//#ifndef ARGB, which this define had already satisfied, so the PSP macro was
+//dead code and every colour literal reached the hardware byte-reversed.
+//Invisible almost everywhere: card art is a texture and carries its own
+//format, and most of the UI is white or grey, where r == b makes the swap a
+//no-op. It shows only on saturated colours written in code - which is why the
+//new availability borders were the first thing to expose it, the attack ring
+//rendering blue instead of orange on hardware.
+#if !defined(PSP)
 #define ARGB(a, r, g, b)		((PIXEL_TYPE)((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
+#endif
 #define RGBA(r, g, b, a)		((PIXEL_TYPE)((a) << 24) | ((b) << 16) | ((g) << 8) | (r))
 #if defined(VITA)
 #define TEXTURE_FORMAT			1  // GU_PSM_8888 (must match define below)
