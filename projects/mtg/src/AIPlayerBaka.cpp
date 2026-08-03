@@ -3221,7 +3221,23 @@ MTGCardInstance * AIPlayerBaka::activateCombo()
         }
         SAFE_DELETE(hintTc);
     }
-    if(payTheManaCost(totalCost,0,nextCardToPlay,gotPayments)) //Fix crash when nextCardToPlay is null.
+    //Affordability CHECK only - no payment. This used to payTheManaCost the
+    //whole totalmananeeded here, and then the normal cast path paid the piece
+    //AGAIN, queueing duplicate producer clicks; the second click on an
+    //already-tapped producer refuses, and a refused payment click aborts the
+    //rest of the plan (the wave-20 stall guard) - so the combo card was never
+    //cast and the pre-floated mana sat in the pool every turn (live-observed:
+    //deck15 floating {B}{B} for Fear, Fear never cast). The cast path is the
+    //single payer; each combo piece pays its own cost when it is cast.
+    bool comboAffordable = !totalCost->getConvertedCost();
+    if (!comboAffordable)
+    {
+        ManaCost * avail = getPotentialMana();
+        avail->add(this->getManaPool());
+        comboAffordable = avail->canAfford(totalCost, 0) != 0;
+        SAFE_DELETE(avail);
+    }
+    if(comboAffordable)
     {
         if(comboCards.size())
         {
