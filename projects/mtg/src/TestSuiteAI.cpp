@@ -228,7 +228,7 @@ int TestSuiteAI::Act(float)
         //[AI] tests, so AIPlayerBaka's dt-paced timer saw schedule-dependent
         //values. Per-instance matches what a solo run sees.
         suite->aiMaxCalls--;
-        suite->timerLimit = SLOW_TEST; //TODO Remove this limitation when AI is not using a stupid timer anymore...
+        suite->timerLimit = SLOW_TEST; //SLOW_TEST compensates for AIPlayerBaka's dt-paced internal timer; removable only when Baka's pacing becomes call-driven.
         AIPlayerBaka::Act(aiActCounter++);//dt);
     }
     if (playMode == MODE_HUMAN)

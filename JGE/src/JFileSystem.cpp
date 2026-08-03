@@ -450,7 +450,8 @@ int JFileSystem::ReadFile(void *buffer, int size)
         if (!mZipFile.seekg(offset))
             return 0;
         mZipFile.read((char *) buffer, size);
-        //TODO what if can't read
+        if (mZipFile.gcount() != (std::streamsize)size)
+            return 0;
         return size;
     }
 

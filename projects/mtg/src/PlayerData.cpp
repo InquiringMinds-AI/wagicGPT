@@ -35,7 +35,7 @@ void PlayerData::init()
         }
         else
         {
-            //TODO error management
+            //empty/corrupt save: keep the default credits value
         }
 
         //Story Saves

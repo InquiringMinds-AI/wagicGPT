@@ -72,7 +72,7 @@ const KeyRep& translateKey(LocalKeySym key)
     if (!str)
     {
         str = NEW char[11];
-        sprintf(str, "%lu", (long unsigned int)key);  //TODO: Wagic is not supposed to know that a key actually is an unsingned long, so this part should probably be platform specific (move to JGE ?)
+        sprintf(str, "%lu", (long unsigned int)key);  //last-resort fallback: print the raw keysym value when the platform provides no name
     }
     const KeyRep k = make_pair(str, static_cast<JQuad*>(NULL));
     fattable[key] = k;

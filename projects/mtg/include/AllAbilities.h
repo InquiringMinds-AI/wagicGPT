@@ -2827,7 +2827,7 @@ public:
 
     const string getMenuText()
     {
-        sprintf(menuText,"Protection from %s",tcstr.c_str());
+        menuText = "Protection from " + tcstr;
         return menuText;
     }
     
@@ -3154,7 +3154,9 @@ public:
             else
                 wppt = NEW WParsedPT(cReplaceString(PT, " nonstatic", ""),NULL,(MTGCardInstance *) source);
         }
-        sprintf(menuText, "%i/%i", wppt->power.getValue(), wppt->toughness.getValue());
+        char buf[32];
+        sprintf(buf, "%i/%i", wppt->power.getValue(), wppt->toughness.getValue());
+        menuText = buf;
         return menuText;
     }
     APowerToughnessModifier * clone() const
@@ -3755,7 +3757,6 @@ public:
 
     int resolve()
     {
-        //TODO check if ability is oneShot ?
         updateTargets();
         cards.clear();
         players.clear();
@@ -4100,7 +4101,7 @@ public:
         andAbility = NULL;
         cID = tnum;
         if (!multiplier) this->multiplier = NEW WParsedInt(1);
-        //TODO this is a copy/past of other code that's all around the place, everything should be in a dedicated parser class;
+        //duplicated keyword-scan parsing (same pattern appears at several parse sites); a dedicated parser class would centralize it
 
         for (int j = 0; j < Constants::NB_BASIC_ABILITIES; j++)
         {
@@ -4340,7 +4341,7 @@ public:
 
     const string getMenuText()
     {
-        sprintf(menuText, "Create %s", name.c_str());
+        menuText = "Create " + name;
         return menuText;
     }
 
@@ -4626,7 +4627,6 @@ public:
 
     int resolve()
     {
-        //TODO check if ability is oneShot ?
         updateTargets();
         cards.clear();
         players.clear();
@@ -4777,7 +4777,6 @@ public:
 
     int resolve()
     {
-        //TODO check if ability is oneShot ?
         int matches;
         matches = td->match(source);
         if (matches > 0)
@@ -5195,7 +5194,9 @@ public:
     int resolve();
     const string getMenuText()
     {
-        sprintf(menuText, "%i", value);
+        char buf[16];
+        sprintf(buf, "%i", value);
+        menuText = buf;
         return menuText;
     };
     AAWhatsX * clone() const;

@@ -659,7 +659,6 @@ int MTGAllCards::countBySet(int setId)
     return result;
 }
 
-//TODO more efficient way ?
 int MTGAllCards::countByType(const string &_type)
 {
     int type_id = findType(_type);
@@ -753,7 +752,7 @@ CardPrimitive * MTGAllCards::addPrimitive(CardPrimitive * primitive, MTGCard * c
     if (primitives.find(key) != primitives.end())
     {
         //ERROR
-        //Todo move the deletion somewhere else ?
+        //conflict: this function owns the rejected primitive and must free it
         DebugTrace("MTGDECK: primitives conflict: "<< key);
         SAFE_DELETE(primitive);
         return NULL;

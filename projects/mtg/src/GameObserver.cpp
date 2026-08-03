@@ -1783,7 +1783,11 @@ int GameObserver::cardClick(MTGCardInstance * card, Targetable * object, bool lo
 
         if (ORDER == combatStep)
         {
-            //TODO it is possible at this point that card is NULL. if so, what do we return since card->defenser would result in a crash?
+            if (!card || !card->defenser)
+            {
+                toReturn = 1;
+                break;
+            }
             card->defenser->raiseBlockerRankOrder(card);
             toReturn = 1;
             break;
@@ -2052,7 +2056,6 @@ Player * GameObserver::currentlyActing()
     return currentActionPlayer;
 }
 
-//TODO CORRECT THIS MESS
 int GameObserver::targetListIsSet(MTGCardInstance * card)
 {
     if (targetChooser == NULL)

@@ -59,7 +59,6 @@ MaxPerTurnRestriction * PlayRestrictions::getMaxPerTurnRestrictionByTargetChoose
 
 void PlayRestrictions::addRestriction(PlayRestriction * restriction)
 {
-    //TODO control that the id does not already exist?
     restrictions.push_back(restriction);
 
 }

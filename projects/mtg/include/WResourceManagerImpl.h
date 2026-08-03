@@ -199,7 +199,7 @@ public:
     WFont* GetWFont(int id);
     void RemoveWFonts();
 
-    //Wrapped from JSoundSystem. TODO: Privatize.
+    //Wrapped from JSoundSystem.
     JMusic * ssLoadMusic(const char *fileName);
 
     //Resets the cache limits on when it starts to purge data.

@@ -44,7 +44,6 @@ string WStyle::stylized(string filename)
 void StyleManager::loadRules()
 {
     killRules();
-    //TODO Placeholder until XML format available.
     string filename = WResourceManager::Instance()->graphicsFile("style.txt");
 
     std::string xmlBuffer;

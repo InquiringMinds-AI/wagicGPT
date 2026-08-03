@@ -55,8 +55,7 @@ void SimplePopup::Render()
 
     r->FillRoundRect(mX+modX+3, mY + 7, 190.f, 148.f, 0, ARGB( 240, 15, 15, 15 ) );
 
-    // currently causes a crash on the PSP when drawing the corners.
-    // TODO: clean up the image ot make it loook cleaner. Find solution to load gfx to not crash PSP
+    // drawBoundingBox corner rendering crashes the PSP; the popup uses the statsholder background instead.
 #if 0
     r->DrawRoundRect(mX, mY + 2, mWidth + 11, textHeight - 12, 2.0f, ARGB( 255, 125, 255, 0) );
     drawBoundingBox( mX-3, mY, mWidth + 3, textHeight );

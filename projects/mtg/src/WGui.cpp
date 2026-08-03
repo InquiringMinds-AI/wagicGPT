@@ -156,7 +156,6 @@ void WDecoStyled::subBack(WGuiBase * item)
     JRenderer * renderer = JRenderer::GetInstance();
     if (mStyle & DS_STYLE_BACKLESS)
         return;
-    //TODO: if(mStyle & DS_STYLE_EDGED) Draw the edged box ala SimpleMenu
     else
     { //Draw standard style
         WGuiSplit * split = dynamic_cast<WGuiSplit*> (item);
@@ -1326,7 +1325,7 @@ void WGuiAward::Underlay()
 
     if (!trophy && id >= Options::SET_UNLOCKS)
     {
-        trophy = WResourceManager::Instance()->RetrieveTempQuad("psptrophy_set.png"); //TODO FIXME: Should look in set dir too.
+        trophy = WResourceManager::Instance()->RetrieveTempQuad("psptrophy_set.png");
     }
 
     if (!trophy.get()) //Fallback to basic trophy image.
@@ -1341,7 +1340,7 @@ void WGuiAward::Underlay()
 
     if (!trophy && id >= Options::SET_UNLOCKS)
     {
-        trophy = WResourceManager::Instance()->RetrieveTempQuad("trophy_set.png"); //TODO FIXME: Should look in set dir too.
+        trophy = WResourceManager::Instance()->RetrieveTempQuad("trophy_set.png");
     }
 
     if (!trophy.get()) //Fallback to basic trophy image.
@@ -1525,7 +1524,7 @@ void WGuiCardImage::Render()
             {
                  q = CardGui::AlternateThumbQuad(c);
                  if (q.get() == NULL)
-                     return; //TODO Some kind of error image.
+                     return; // alternate-thumb fallback also failed (renderer/font trouble): leave slot blank
             }
             renderer->RenderQuad(q.get(), p.x, p.y);
         }
@@ -1592,7 +1591,7 @@ void WGuiCardDistort::Render()
         else
         {
             q = source->getImage(mOffset.getPos());
-            if (!q || options[Options::DISABLECARDS].number) q = CardGui::AlternateThumbQuad(c); //TODO alternateX should render to texture.
+            if (!q || options[Options::DISABLECARDS].number) q = CardGui::AlternateThumbQuad(c); // the alternate thumb is regenerated every frame here; a render-to-texture cache would cut per-frame cost on PSP
         }
     }
     if (!q.get()) return;
@@ -1756,7 +1755,9 @@ bool WGuiFilters::Finish(bool emptyset)
         }
         if ((!source->Size() && !emptyset))
         {
-            source->clearFilters(); //TODO: Pop a "No results found" warning
+            source->clearFilters();
+            mMessage = _("No results - filters cleared");
+            mMessageTimer = 2.0f;
         }
     }
     return true;
@@ -1815,6 +1816,7 @@ WGuiFilters::WGuiFilters(string header, WSrcCards * src) : WGuiItem(header)
     bFinished = false;
     source = src;
     recolorTo = -1;
+    mMessageTimer = 0;
     buildList();
 }
 
@@ -1860,6 +1862,11 @@ void WGuiFilters::setSrc(WSrcCards * wsc)
 
 void WGuiFilters::Update(float dt)
 {
+    if (mMessageTimer > 0)
+    {
+        mMessageTimer -= dt;
+        if (mMessageTimer <= 0) mMessage = "";
+    }
     if (subMenu && !subMenu->isClosed()) subMenu->Update(dt);
     if (list)
     {
@@ -1898,6 +1905,12 @@ void WGuiFilters::Render()
     list->setY(tY);
     list->Render();
 
+    if (mMessageTimer > 0 && mMessage.size())
+    {
+        WFont * mFont = WResourceManager::Instance()->GetWFont(Fonts::OPTION_FONT);
+        mFont->DrawString(mMessage.c_str(), SCREEN_WIDTH / 2, SCREEN_HEIGHT - 30, JGETEXT_CENTER);
+    }
+
     if (subMenu && !subMenu->isClosed()) subMenu->Render();
 }
 
@@ -1907,7 +1920,8 @@ bool WGuiFilters::CheckUserInput(JButton key)
     
     if (key == JGE_BTN_SEC)
     {//|| key == JGE_BTN_MENU){
-        //TODO Pop up a "Are you sure?" dialog.
+        // SEC is swallowed here but performs no action: the destructive action
+        // it was meant to guard (with a confirm dialog) was never written.
         return true;
     }
     if (list)

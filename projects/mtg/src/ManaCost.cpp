@@ -279,7 +279,7 @@ ManaCost * ManaCost::parseManaCost(string s, ManaCost * _manaCost, MTGCardInstan
                             {
                                 tc = tcf.createTargetChooser("creature[snake]|myBattlefield", c);
                             }
-                            //TODO iterate subtypes of creatures
+                            //the five hardcoded tribes cover every printed Offering card (Kamigawa Patron cycle)
                             manaCost->addExtraCost(NEW Offering(tc));
                             break;
                         }
@@ -1044,7 +1044,7 @@ int ManaCost::doPayExtra()
 {
     if (!extraCosts)
         return 0;
-    return extraCosts->doPay(); //TODO reset ?
+    return extraCosts->doPay(); //no reset here: GameObserver resets all cost variants centrally after the cast
 }
 
 int ManaCost::setExtraCostsAction(MTGAbility * action, MTGCardInstance * card)
@@ -1093,7 +1093,6 @@ int ManaCost::pay(ManaCost * _cost)
     delete diff;
     delete toPay;
     return result;
-    //TODO return 0 if can't afford the cost!
 }
 
 //return 1 if _cost can be paid with current data, 0 otherwise

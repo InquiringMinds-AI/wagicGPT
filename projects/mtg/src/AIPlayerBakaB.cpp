@@ -137,13 +137,6 @@ int AIPlayerBakaB::affectCombatDamages(CombatStep step)
     return AIPlayerBaka::affectCombatDamages(step);
 }
 
-//TODO: Deprecate combatDamages
-int AIPlayerBakaB::combatDamages()
-{
-    return AIPlayerBaka::combatDamages();
-}
-
-
 //
 // General
 //

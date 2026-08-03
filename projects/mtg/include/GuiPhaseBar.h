@@ -8,6 +8,8 @@
 
 #include "Easing.h"
 
+class Player;
+
 class GuiPhaseBar: public GuiLayer, public PlayGuiObject
 {
 private:
@@ -21,6 +23,13 @@ private:
     OutQuadEasing angleEasing;
     InOutQuadEasing zoomFactorEasing;
     DuelLayers* mpDuelLayers;
+
+    //Cached phase banner: the translated/formatted string only changes on phase,
+    //turn-player, or interruption changes, not every frame.
+    string mBannerText;
+    int mBannerPhaseId;
+    Player* mBannerCurrentPlayer;
+    Player* mBannerActingPlayer;
 
     void DrawGlyph(JQuad *inQuad, int phaseId, float x, float y, float scale, float z);
 public:

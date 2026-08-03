@@ -159,7 +159,7 @@ void OptionProfile::populate()
 {
     string temp = options[Options::ACTIVE_PROFILE].str;
     if (value >= selections.size())
-    { //TODO fail gracefully.
+    { // out-of-range selection: keep previous profile
         return;
     }
     options[Options::ACTIVE_PROFILE].str = selections[value];

@@ -304,7 +304,6 @@ public:
      */
     virtual CardZone* EnterZone(JButton inDirection)
     {
-        // TODO, check if the hand is flattened
         if (mCards.size())
         {
             if (inDirection == JGE_BTN_UP)
@@ -532,7 +531,7 @@ bool Navigator::CheckUserInput(JButton inKey)
 
 bool Navigator::CheckUserInput(int x, int y)
 {
-    // TODO - figure out what to do with mouse support
+    // mouse input is not handled here; Navigator is never instantiated (CardSelector is the live selector)
     return false;
 }
 

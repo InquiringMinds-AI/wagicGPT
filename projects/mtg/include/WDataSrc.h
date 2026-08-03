@@ -89,7 +89,6 @@ public:
         return -1;
     }
 
-    //TODO FIXME: Need a "not a valid button" define.
     virtual void Update(float dt)
     {
         mLastInput += dt;

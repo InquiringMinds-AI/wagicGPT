@@ -1,12 +1,13 @@
 #ifndef _AISTATS_H_
 #define _AISTATS_H_
 
-#define STATS_PLAYER_MULTIPLIER 15
-#define STATS_CREATURE_MULTIPLIER 10
+//weights applied to observed damage when crediting a card's stat value (see AIStats.cpp)
+#define STATS_PLAYER_MULTIPLIER 15   //damage dealt to the AI player itself
+#define STATS_CREATURE_MULTIPLIER 10 //lethal damage to one of the AI's creatures
 
 //floats
-#define STATS_AURA_MULTIPLIER 0.9f
-#define STATS_LORD_MULTIPLIER 0.5f
+#define STATS_AURA_MULTIPLIER 0.9f //aura attached to the damage source gets almost full credit
+#define STATS_LORD_MULTIPLIER 0.5f //lords affecting the source split half credit between them
 
 #include <list>
 #include <string>

@@ -10,9 +10,7 @@
 #include "Player.h"
 
 // The purpose of this method is to create a listing of decks to be used for the input menu
-// by default, the list will be sorted by name
-// TODO: revise sorting strategy to allow other types of sorting.  Currently, it is hardwired to use
-//    sortByName to do the sorting.  This was done since the menu item display is done in insertion order.
+// The deck list is sorted by name (sortByName); the menu displays items in insertion order.
 
 vector<DeckMetaData *> GameState::fillDeckMenu(DeckMenu * _menu, const string& path, const string& smallDeckPrefix,
                 Player * statsPlayer, int maxDecks, GameType type, bool showall)

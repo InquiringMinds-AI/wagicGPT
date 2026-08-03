@@ -33,7 +33,7 @@ public:
     Player * player;
     int id;
     MTGCardInstance * click;
-    MTGCardInstance * target; // TODO Improve
+    MTGCardInstance * target;
     vector<Targetable*>mAbilityTargets;
     Targetable * playerAbilityTarget;
     //player targeting through abilities is handled completely seperate from spell targeting.
@@ -80,7 +80,7 @@ protected:
 
 public:
 
-    //These variables are used by TestSuite and Rules.cpp... TODO change that?
+    //shared with TestSuite and Rules.cpp
     int agressivity;
     bool forceBestAbilityUse;
 

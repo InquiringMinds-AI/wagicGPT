@@ -57,7 +57,6 @@ bool JSpline::Load(const char *filename, float xscale, float yscale)
 
 
 	TiXmlNode* node = 0;
-	//TiXmlElement* todoElement = 0;
 	TiXmlElement* element;
 
 	node = doc.RootElement();

@@ -5,9 +5,6 @@
 #include "Tasks.h"
 #include "AIPlayer.h"
 
-// Todo remove this dependency!
-#include "AIPlayerBaka.h"
-
 #include "Translate.h"
 #include "MTGDefinitions.h"
 #include <JRenderer.h>
@@ -15,6 +12,11 @@
 #include "utils.h"
 
 vector<string> Task::sAIDeckNames;
+
+// Daily reward degradation: each day the reward shrinks to this fraction of itself...
+static const float kTaskRewardDecay = 0.9f;
+// ...but never below this floor.
+static const int kTaskMinReward = 33;
 
 /*---------------- Task -----------------*/
 
@@ -145,14 +147,45 @@ void Task::setExpiration(int _expiresIn)
 void Task::passOneDay()
 {
     expiresIn--;
-    reward = (int) (getReward() * 0.9); // Todo: degradation and minreward constants
-    if (reward < 33)
+    reward = (int) (getReward() * kTaskRewardDecay);
+    if (reward < kTaskMinReward)
     {
-        reward = 33;
+        reward = kTaskMinReward;
     }
 }
 
 // AI deck buffering code
+
+// Read just the deck's display name from its "#NAME:" header line, without
+// constructing a full MTGDeck. Mirrors MTGDeck's meta_name defaulting: the
+// filename stem is used when no #NAME: header is present. Header lines all
+// start with '#', so scanning stops at the first non-comment line.
+static string readDeckName(const string & deckFile)
+{
+    size_t slash = deckFile.find_last_of("/");
+    size_t dot = deckFile.find(".");
+    string name = deckFile.substr(slash + 1, dot - slash - 1);
+
+    std::string contents;
+    if (JFileSystem::GetInstance()->readIntoString(deckFile, contents))
+    {
+        std::stringstream stream(contents);
+        std::string s;
+        while (std::getline(stream, s))
+        {
+            if (!s.size()) continue;
+            if (s[s.size() - 1] == '\r') s.erase(s.size() - 1); //Handle DOS files
+            if (!s.size()) continue;
+            if (s[0] != '#') break;
+            size_t found = s.find("NAME:");
+            if (found != string::npos)
+            {
+                name = s.substr(found + 5);
+            }
+        }
+    }
+    return name;
+}
 
 void Task::LoadAIDeckNames()
 {
@@ -169,10 +202,7 @@ void Task::LoadAIDeckNames()
             {
                 found = 1;
                 nbDecks++;
-                // TODO: Creating MTGDeck only for getting decks name. Find an easier way.
-                MTGDeck * mtgd = NEW MTGDeck(stream.str().c_str(), NULL, 1);
-                sAIDeckNames.push_back(mtgd->meta_name);
-                delete mtgd;
+                sAIDeckNames.push_back(readDeckName(stream.str()));
             }
         }
     }
@@ -373,7 +403,7 @@ void TaskList::removeTask(Task *task)
     }
     else
     {
-        // TODO: task not found handling.
+        // not in list: nothing to do
     }
 }
 
@@ -421,7 +451,10 @@ void TaskList::End()
 
 void TaskList::passOneDay()
 {
-    // TODO: "You have failed the task" message to the user when accepted task expires
+    // Expired tasks are deleted silently: there is no notification channel at
+    // this call site (day-advance runs outside any render state), so telling
+    // the player "you have failed the task" would need a queued message the
+    // task screen displays on next open.
     for (vector<Task*>::iterator it = tasks.begin(); it != tasks.end();)
     {
         (*it)->passOneDay();
@@ -440,7 +473,9 @@ void TaskList::passOneDay()
 void TaskList::getDoneTasks(GameObserver* observer, GameApp * _app, vector<Task*>* result)
 {
     result->clear();
-    // TODO: Return only accepted tasks
+    // Returns every satisfied task: the `accepted` flag is persisted but no
+    // code path ever sets it true (there is no accept-a-task mechanic), so
+    // all generated tasks are effectively active and pay out on completion.
     for (vector<Task*>::iterator it = tasks.begin(); it != tasks.end(); it++)
     {
         if ((*it)->isDone(observer, _app))
@@ -558,9 +593,6 @@ void TaskList::Render()
 
 void TaskList::addRandomTask(int)
 {
-    // TODO: Weighted random (rarity of tasks)
-    //       - based on counts of finished tasks?
-    //         Winning a task several times may slightly lessen the probability of it being generated
     string s(TASKS_ALL);
     char taskType[2];
     sprintf(taskType, "%c", s[rand() % s.length()]);
@@ -624,9 +656,9 @@ string TaskWinAgainst::getShortDesc()
 
 bool TaskWinAgainst::isDone(GameObserver* observer, GameApp *)
 {
-    AIPlayerBaka * baka = (AIPlayerBaka*) observer->players[1];
-    return ((baka) && (!observer->players[0]->isAI()) && (observer->players[1]->isAI()) && (observer->didWin(observer->players[0])) // Human player wins
-                    && (baka->deckId == opponent));
+    Player * opp = observer->players[1];
+    return ((opp) && (!observer->players[0]->isAI()) && (opp->isAI()) && (observer->didWin(observer->players[0])) // Human player wins
+                    && (opp->deckId == opponent));
 }
 
 /*----------- TaskSlaughter -------------*/
@@ -1126,16 +1158,16 @@ void TaskPacifism::randomize()
 /* ------------ Task template ------------ 
 
  TaskXX::TaskXX() : Task(TASK_XX) {
- // TODO: Implement
+ // <fill in>
  }
 
  int TaskXX::computeReward() {
- // TODO: Implement
+ // <fill in>
  return 100;
  }
 
  string TaskXX::createDesc() {
- // TODO: Implement
+ // <fill in>
  char buffer[4096];
 
  switch (rand()%2) {
@@ -1150,19 +1182,19 @@ void TaskPacifism::randomize()
  }
 
  string TaskXX::getShortDesc(){
- // TODO: Implement
+ // <fill in>
  char buffer[4096];
  sprintf(buffer, _("%s").c_str(), getOpponentName().c_str());
  return buffer;
  }
 
  bool TaskXX::isDone(GameObserver* observer, GameApp * _app) {
- // TODO: Implement
+ // <fill in>
  return (!observer->players[0]->isAI()) && (observer->players[1]->isAI()) && (observer->gameOver != _p1) // Human player wins
  }
 
  void TaskXX::storeCustomAttribs() {
- // TODO: Implement
+ // <fill in>
  char buff[256];
  persistentAttribs.push_back(VarXX);
 
@@ -1171,13 +1203,13 @@ void TaskPacifism::randomize()
  }
 
  void TaskXX::restoreCustomAttribs() {
- // TODO: Implement
+ // <fill in>
  VarXX = persistentAttribs[COMMON_ATTRIBS_COUNT];
  VarXY = atoi(persistentAttribs[COMMON_ATTRIBS_COUNT+1].c_str());
  }
 
  void TaskXX::randomize() {
- // TODO: Implement
+ // <fill in>
  VarXX = rand()%10 + 1;
  Task::randomize();
  }

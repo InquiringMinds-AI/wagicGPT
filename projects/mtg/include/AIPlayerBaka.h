@@ -79,7 +79,6 @@ typedef std::map<OrderedAIAction, int, CmpAbilities> RankingContainer;
 class AIPlayerBaka: public AIPlayer{
  protected:
     virtual int orderBlockers();
-    virtual int combatDamages();
     virtual int interruptIfICan();
     virtual int chooseAttackers();
     virtual int chooseBlockers();

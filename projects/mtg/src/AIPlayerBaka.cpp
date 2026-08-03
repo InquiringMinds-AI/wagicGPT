@@ -136,7 +136,7 @@ int OrderedAIAction::getEfficiency()
             {
                 efficiency = 95;
             }
-            //TODO If the card is the target of a damage spell                      
+            //Gap: scoring is combat-only; a damage spell on the stack targeting this card does not raise it.
             break;
         }
     case MTGAbility::STANDARD_PREVENT:
@@ -175,7 +175,7 @@ int OrderedAIAction::getEfficiency()
                     }
                 }
             }
-            //TODO If the card is the target of a damage spell
+            //Gap: scoring is combat-only; a damage spell on the stack targeting this card does not raise it.
             break;
         }
     case MTGAbility::STANDARD_EQUIP:
@@ -283,7 +283,7 @@ int OrderedAIAction::getEfficiency()
             if(!target && !dynamic_cast<ALord*> (a) && (((MTGCardInstance *)a->source)->hasSubtype(Subtypes::TYPE_AURA) || ((MTGCardInstance *)a->source)->hasSubtype(Subtypes::TYPE_EQUIPMENT)))
             {
                 if(a->source->target)
-                    coreAbilityCardTarget = a->source->target; //TODO use intermediate value?
+                    coreAbilityCardTarget = a->source->target; //score the pump on the card the aura/equipment is attached to
                 target = a->source;
             }
             else //if(how to know cards like Basking Rootwalla that pump themselves)
@@ -822,7 +822,7 @@ int OrderedAIAction::getRevealedEfficiency(MTGAbility * ability2)
             {
                 eff2 = 95;
             }
-            //TODO If the card is the target of a damage spell
+            //Gap: scoring is combat-only; a damage spell on the stack targeting this card does not raise it.
             break;
         }
     case MTGAbility::STANDARD_PREVENT:
@@ -861,7 +861,7 @@ int OrderedAIAction::getRevealedEfficiency(MTGAbility * ability2)
                     }
                 }
             }
-            //TODO If the card is the target of a damage spell
+            //Gap: scoring is combat-only; a damage spell on the stack targeting this card does not raise it.
             break;
         }
     case MTGAbility::STANDARD_EQUIP:
@@ -969,7 +969,7 @@ int OrderedAIAction::getRevealedEfficiency(MTGAbility * ability2)
             if(!target && !dynamic_cast<ALord*> (a) && (((MTGCardInstance *)a->source)->hasSubtype(Subtypes::TYPE_AURA) || ((MTGCardInstance *)a->source)->hasSubtype(Subtypes::TYPE_EQUIPMENT)))
             {
                 if(a->source->target)
-                    coreAbilityCardTarget = a->source->target; //TODO use intermediate value?
+                    coreAbilityCardTarget = a->source->target; //score the pump on the card the aura/equipment is attached to
                 target = a->source;
             }
             if (!target && !dynamic_cast<ALord*> (a))
@@ -2026,7 +2026,8 @@ int AIPlayerBaka::selectAbility()
     RankingContainer ranking;
     list<int>::iterator it;
     vector<MTGAbility*>abilityPayment = vector<MTGAbility*>();
-    //This loop is extrmely inefficient. TODO: optimize!
+    //Perf gap (PSP-relevant): this scan is O(actionLayer objects x inPlay cards) with a click-probe per pair.
+    //The mana side already moved to ManaEngine; the remaining fix is driving the scan from the LegalActionsOracle enumeration.
     ManaCost * totalPotentialMana = getPotentialMana();
     totalPotentialMana->add(this->getManaPool());
     for (size_t i = 1; i < observer->mLayers->actionLayer()->mObjects.size(); i++)
@@ -2471,7 +2472,7 @@ int AIPlayerBaka::chooseTarget(TargetChooser * _tc, Player * forceTarget,MTGCard
         observer->currentActionPlayer = tc->Owner;
         //this is a hack, but if we hit this condition we are locked in a infinate loop
         //so lets give the tc to its owner
-        //todo:find the root cause of this.
+        //root cause unknown: some path installs a TargetChooser under the wrong acting player (a decision-ownership inversion).
         DebugTrace("AIPLAYER: Error, was asked to chose targets but I don't own the source of the targetController\n");
         return 0;
     }
@@ -3275,7 +3276,7 @@ void AIPlayerBaka::initTimer()
 
 int AIPlayerBaka::computeActions()
 {
-    /*Zeth fox:TODO:rewrite this entire function, It's a mess.
+    /*Zeth fox: this entire function needs a rewrite, It's a mess.
     I made it far to complicated for what it does and is prone to error and inefficiency.
     Ai run's certain part's when it doesn't need to and run's certain actions when it shouldn't, 
     and it is far to easy to cripple the ai even with what appears to be a minor change to this function;
@@ -3291,7 +3292,7 @@ int AIPlayerBaka::computeActions()
     {
         int doThis = selectMenuOption();
 
-        // FIXME, action logging is broken in the multiplechoice case.
+        // Gap: action logging misses multiple-choice picks — ButtonPressedOnMultipleChoice never emits "choice N" (ActionLayer).
         if(doThis >= 0)
         {
             if(object->abilitiesMenu->isMultipleChoice)
@@ -3578,7 +3579,7 @@ int AIPlayerBaka::computeActions()
                     }
 
                     if(nextCardToPlay == NULL)//check if there is a free card to play, play it....
-                    {//TODO: add potential mana if we can pay if there is a cost increaser in play
+                    {//Gap: a cost increaser makes a "free" card cost >0 and it is skipped outright; ManaEngine::potentialMana could check whether the surcharge is payable.
                         CardDescriptor cd;
                         if (game->hand->hasAbility(Constants::PAYZERO))
                         {
@@ -3590,7 +3591,7 @@ int AIPlayerBaka::computeActions()
                             if (freecard && (canCastCard == PlayRestriction::CAN_PLAY) && freecard->has(Constants::PAYZERO) && (freecard->getIncreasedManaCost()->getConvertedCost() < 1))
                             {
                                 MTGAbility * castFreeCard = observer->mLayers->actionLayer()->getAbility(MTGAbility::PAYZERO_COST);
-                                AIAction * aa = NEW AIAction(this, castFreeCard, freecard); //TODO putinplay action
+                                AIAction * aa = NEW AIAction(this, castFreeCard, freecard);
                                 clickstream.push(aa);
                                 break;
                             }
@@ -3605,7 +3606,7 @@ int AIPlayerBaka::computeActions()
                             if (freecard && (canCastCard == PlayRestriction::CAN_PLAY) && freecard->has(Constants::PAYZERO) && freecard->has(Constants::CANPLAYFROMGRAVEYARD) && (freecard->getIncreasedManaCost()->getConvertedCost() < 1) && (!freecard->isCDA))
                             {
                                 MTGAbility * castFreeCard = observer->mLayers->actionLayer()->getAbility(MTGAbility::PAYZERO_COST);
-                                AIAction * aa = NEW AIAction(this, castFreeCard, freecard); //TODO putinplay action
+                                AIAction * aa = NEW AIAction(this, castFreeCard, freecard);
                                 clickstream.push(aa);
                                 break;
                             }
@@ -3620,7 +3621,7 @@ int AIPlayerBaka::computeActions()
                             if (freecard && (canCastCard == PlayRestriction::CAN_PLAY) && freecard->has(Constants::PAYZERO) && freecard->has(Constants::CANPLAYFROMEXILE) && (freecard->getIncreasedManaCost()->getConvertedCost() < 1) && (!freecard->isCDA))
                             {
                                 MTGAbility * castFreeCard = observer->mLayers->actionLayer()->getAbility(MTGAbility::PAYZERO_COST);
-                                AIAction * aa = NEW AIAction(this, castFreeCard, freecard); //TODO putinplay action
+                                AIAction * aa = NEW AIAction(this, castFreeCard, freecard);
                                 clickstream.push(aa);
                                 break;
                             }
@@ -3635,7 +3636,7 @@ int AIPlayerBaka::computeActions()
                             if (freecard && (canCastCard == PlayRestriction::CAN_PLAY) && freecard->has(Constants::PAYZERO) && (freecard->getIncreasedManaCost()->getConvertedCost() < 1) && (!freecard->isCDA))
                             {
                                 MTGAbility * castFreeCard = observer->mLayers->actionLayer()->getAbility(MTGAbility::PAYZERO_COST);
-                                AIAction * aa = NEW AIAction(this, castFreeCard, freecard); //TODO putinplay action
+                                AIAction * aa = NEW AIAction(this, castFreeCard, freecard);
                                 clickstream.push(aa);
                                 break;
                             }
@@ -4203,7 +4204,7 @@ int AIPlayerBaka::orderBlockers()
     if (ORDER == observer->combatStep && observer->currentPlayer == this)
     {
         DebugTrace("AIPLAYER: order blockers");
-        observer->userRequestNextGamePhase(); //TODO clever rank of blockers
+        observer->userRequestNextGamePhase(); //Baka keeps declaration order; AIPlayerGPT::orderBlockers overrides this seam with model-chosen damage ordering.
         return 1;
     }
 
@@ -4217,22 +4218,6 @@ int AIPlayerBaka::affectCombatDamages(CombatStep step)
         gc->autoaffectDamage(*attacker, step);
     return 1;
 }
-
-//TODO: Deprecate combatDamages
-int AIPlayerBaka::combatDamages()
-{
-    int currentGamePhase =  observer->getCurrentGamePhase();
-
-    if (currentGamePhase == MTG_PHASE_COMBATBLOCKERS)
-        return orderBlockers();
-
-    if (currentGamePhase != MTG_PHASE_COMBATDAMAGE)
-        return 0;
-
-    return 0;
-
-}
-
 
 //
 // General
@@ -4341,10 +4326,8 @@ int AIPlayerBaka::Act(float dt)
     }
     initTimer();
 
-    if (combatDamages())
-    {
-        return 0;
-    }
+    if (currentGamePhase == MTG_PHASE_COMBATBLOCKERS && orderBlockers())
+        return 1;
     interruptIfICan();
 
     //computeActions only when i have priority

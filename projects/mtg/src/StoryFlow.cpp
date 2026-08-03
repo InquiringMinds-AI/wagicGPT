@@ -5,7 +5,8 @@
 #include "WResourceManager.h"
 #include "AIPlayer.h"
 
-//TODO remove this dependency
+//Story mode constructs AIPlayerBaka directly (see StoryDuel::init), bypassing AIPlayerFactory —
+//story opponents are therefore always the heuristic AI, never AIPlayerGPT.
 #include "AIPlayerBaka.h"
 
 #include "Rules.h"

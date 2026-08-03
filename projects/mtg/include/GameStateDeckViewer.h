@@ -21,8 +21,7 @@
 
 class DeckView;
 
-// TODO: need a better name for MENU_FIRST_MENU, this is reused for the 1st submenu of
-// available options in the duel menu
+// MENU_FIRST_MENU is reused for the 1st submenu of available options in the duel menu
 enum
 {
     MENU_CARD_PURCHASE = 2,
@@ -39,7 +38,6 @@ enum
 };
 
 // enums for menu options
-// TODO: make these enums a little more descriptive. (ie should reflect what menu they are attached to )
 enum DECK_VIEWER_MENU_ITEMS
 {
     MENU_ITEM_NEW_DECK = -30,

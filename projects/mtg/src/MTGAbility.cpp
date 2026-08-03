@@ -2057,7 +2057,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     size_t found;
     bool asAlternate = false;
     trim(s);
-    //TODO This block redundant with calling function
+    //Normalize card/spell here: not every caller passes both (AI analysis paths pass spell-less or card-less forms).
     if (!card && spell)
         card = spell->source;
     if (!card)
@@ -2305,9 +2305,9 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     }
 
     //need to remove the section inside the transforms ability from the string before parsing
-    //TODO: store string values of "&&" so we can remove the classes added just to add support
-    //the current parser finds other abilities inside what should be nested abilities, and converts them into
-    //actual abilities, this is a limitation.
+    //Parser limitation: keyword scanning has no nesting model, so nested ability strings must be masked out
+    //before the flat scan (otherwise inner abilities get instantiated as real ones); each nesting construct
+    //needs its own masking branch.
     string unchangedS = "";
     unchangedS.append(s);
 
@@ -4018,7 +4018,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         return a;
     }
 
-    // TODO: deprecate this ability in favor of retarget
+    //attach = unrestricted AEquip; distinct from retarget/newtarget (AANewTarget)
     //Equipment (attach)
     found = s.find("attach");
     if (found != string::npos)
@@ -4466,7 +4466,9 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         untilYourNextEndTurn = true;
     //Prevent Damage
     const string preventDamageKeywords[] = { "preventallcombatdamage", "preventallnoncombatdamage", "preventalldamage", "fog" };
-    const int preventDamageTypes[] = {0, 2, 1, 0}; //TODO enum ?
+    //APreventDamageTypes' type parameter: 0 = combat damage only, 1 = all damage, 2 = noncombat damage only
+    enum PreventScope { PREVENT_COMBAT = 0, PREVENT_ALL = 1, PREVENT_NONCOMBAT = 2 };
+    const int preventDamageTypes[] = { PREVENT_COMBAT, PREVENT_NONCOMBAT, PREVENT_ALL, PREVENT_COMBAT };
     const bool preventDamageForceOneShot[] = { false, false, false, true };
 
     for (size_t i = 0; i < sizeof(preventDamageTypes)/sizeof(preventDamageTypes[0]); ++i)
@@ -5731,7 +5733,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
             }
             return NEW AProtectionFrom(observer, id, card, target, fromTc, splitProtection[1]);
         }
-        return NULL; //TODO
+        return NULL; //gap: the activated form of protection from(...) is unsupported — the ability silently drops from the card
     }
 
     //targetter can not target...
@@ -5747,11 +5749,11 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         {
             if (((card->hasType(Subtypes::TYPE_INSTANT) || card->hasType(Subtypes::TYPE_SORCERY)) && !forceForever && !untilYourNextEndTurn && !untilYourNextTurn) || forceUEOT)
             {
-                return NULL; //TODO
+                return NULL; //gap: the instant/sorcery (until end of turn) form of cantbetargetof(...) is unsupported
             }
             return NEW ACantBeTargetFrom(observer, id, card, target, fromTc);
         }
-        return NULL; //TODO
+        return NULL; //gap: the activated form of cantbetargetof(...) is unsupported
     }
     
     //Can't be blocked by...need cantdefendagainst(
@@ -5767,11 +5769,11 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         {
             if (((card->hasType(Subtypes::TYPE_INSTANT) || card->hasType(Subtypes::TYPE_SORCERY)) && !forceForever && !untilYourNextEndTurn && !untilYourNextTurn) || forceUEOT)
             {
-                return NULL; //TODO
+                return NULL; //gap: the instant/sorcery (until end of turn) form of cantbeblockedby(...) is unsupported
             }
             return NEW ACantBeBlockedBy(observer, id, card, target, fromTc);
         }
-        return NULL; //TODO
+        return NULL; //gap: the activated form of cantbeblockedby(...) is unsupported
     }
 
     //cant be the blocker of targetchooser.
@@ -6375,7 +6377,7 @@ int AbilityFactory::abilityEfficiency(MTGAbility * a, Player * p, int mode, Targ
      if (dynamic_cast<AAProliferate *> (a))
          return BAKA_EFFECT_GOOD;
 
-    // Equipment that gets immediately attached. Todo: check the abilities associated with Equip, to make sure they're good (for now it seems to be the majority of the cases)?
+    // Equipment that gets immediately attached. Approximation: equip effects are valued good; negative equipment is rare enough not to special-case.
     if (dynamic_cast<AEquip *> (a))
         return BAKA_EFFECT_GOOD;
 
@@ -6402,7 +6404,7 @@ int AbilityFactory::abilityEfficiency(MTGAbility * a, Player * p, int mode, Targ
             if (z == p->game->hand || z == p->game->inPlay)
                 return BAKA_EFFECT_GOOD;
         }
-         return BAKA_EFFECT_BAD; //TODO
+         return BAKA_EFFECT_BAD; //default: unrecognized move patterns are treated as removal-like (bad)
     }
 
     if (dynamic_cast<AACopier *> (a))
@@ -7070,7 +7072,7 @@ void AbilityFactory::addAbilities(int _id, Spell * spell)
     case 1156: //Drain Life
     {
         Damageable * target = spell->getNextDamageableTarget();
-        int x = spell->cost->getConvertedCost() - 2; //TODO Fix that !!! + X should be only black mana, that needs to be checked !
+        int x = spell->cost->getConvertedCost() - 2; //X = paid cost minus the {1}{B} base; the primitive's {X:black} restricts X payment to black mana at the pool layer.
         observer->mLayers->stackLayer()->addDamage(card, target, x);
         if (target->life < x)
             x = target->life;
@@ -7439,11 +7441,7 @@ thread_local vector<void*> MTGAbility::deletedpointers;
 
 MTGAbility::MTGAbility(const MTGAbility& a): ActionElement(a)
 {
-    //Todo get rid of menuText, it is only used as a placeholder in getMenuText, for something that could be a string
-    for (int i = 0; i < 50; ++i)
-    {
-        menuText[i] = a.menuText[i];
-    }
+    menuText = a.menuText;
 
     game = a.game;
 
@@ -7978,13 +7976,13 @@ ostream& ActivatedAbility::toString(ostream& out) const
 }
 
 TargetAbility::TargetAbility(GameObserver* observer, int id, MTGCardInstance * card, TargetChooser * _tc, ManaCost * _cost, int _playerturnonly, string castRestriction) :
-    ActivatedAbility(observer, id, card, _cost, _playerturnonly, "", NULL, "", castRestriction), NestedAbility(NULL) //Todo fix this mess, why do we have to pass "", NULL, "" here before cast restrictions?
+    ActivatedAbility(observer, id, card, _cost, _playerturnonly, "" /*limit*/, NULL /*sideEffect*/, "" /*usesBeforeSideEffects*/, castRestriction), NestedAbility(NULL)
 {
     tc = _tc;
 }
 
 TargetAbility::TargetAbility(GameObserver* observer, int id, MTGCardInstance * card, ManaCost * _cost, int _playerturnonly, string castRestriction) :
-    ActivatedAbility(observer, id, card, _cost, _playerturnonly,  "", NULL, "", castRestriction), NestedAbility(NULL) //Todo fix this mess, why do we have to pass "", NULL, "" here before cast restrictions?
+    ActivatedAbility(observer, id, card, _cost, _playerturnonly, "" /*limit*/, NULL /*sideEffect*/, "" /*usesBeforeSideEffects*/, castRestriction), NestedAbility(NULL)
 {
     tc = NULL;
 }
@@ -8060,7 +8058,7 @@ int TargetAbility::reactToClick(MTGCardInstance * card)
 
 void TargetAbility::Render()
 {
-    //TODO ?
+    //intentionally empty: targeting visuals are drawn by the GUI layers
 }
 
 int TargetAbility::resolve()

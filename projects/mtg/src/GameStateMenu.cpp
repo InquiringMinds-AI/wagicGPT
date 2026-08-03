@@ -716,7 +716,7 @@ void GameStateMenu::Update(float dt)
             for (size_t i = 0; i < items.size(); ++i)
             {
                 if (mEngine->GetButtonState(items[i]->mKey) && items[i]->getMatchingGameState())
-                     mParent->DoTransition(TRANSITION_FADE, items[i]->getMatchingGameState()); //TODO: Add the transition as a parameter in the rules file
+                     mParent->DoTransition(TRANSITION_FADE, items[i]->getMatchingGameState());
             }
             break;
          }
@@ -1009,8 +1009,6 @@ void GameStateMenu::ButtonPressed(int controllerId, int controlId)
 #else
                 subMenuController->Add(SUBMENUITEM_1PLAYER, _("Play Game").c_str());
 #endif
-                // TODO Put 2 players mode back
-                // This requires to fix the hand (to accept 2 players) OR to implement network game
 #ifdef NETWORK_SUPPORT
                 subMenuController->Add(SUBMENUITEM_2PLAYERS, "2 Players");
 #endif //NETWORK_SUPPORT
@@ -1114,7 +1112,7 @@ void GameStateMenu::ButtonPressed(int controllerId, int controlId)
             default: //Game modes
             this->hasChosenGameType = true;
             mParent->rules = Rules::RulesList[controlId - SUBMENUITEM_END_OFFSET];
-            mParent->gameType = (mParent->rules->gamemode); //TODO can we get rid of gameType in the long run, since it is also stored in the rules object ?
+            mParent->gameType = (mParent->rules->gamemode); // gameType duplicates rules->gamemode — two sources of truth that must be kept in sync (~51 call sites read gameType)
             subMenuController->Close();
             currentState = MENU_STATE_MAJOR_DUEL | MENU_STATE_MINOR_SUBMENU_CLOSING;
             break;

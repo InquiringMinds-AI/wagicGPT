@@ -32,7 +32,7 @@ class JTexture;
 class Task
 {
 protected:
-    int reward; // TODO: Complex rewards. Be consistent with other planned modes with rewards.
+    int reward;
     int opponent;
     bool accepted;
     char type;
@@ -52,7 +52,6 @@ protected:
 
 public:
     // variable to store and method to obtain names of AI decks
-    //!! Todo: This should _really_ be handled elsewhere (dedicated class?)
     static vector<string> sAIDeckNames;
     static void LoadAIDeckNames();
     static int getAIDeckCount();

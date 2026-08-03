@@ -255,7 +255,7 @@ int ActionLayer::cancelCurrentAction()
         return 0;
     if (cantCancel && ae->getActionTc()->validTargetsExist())
         return 0;
-    ae->waitingForAnswer = 0; //TODO MOVE THIS IN ActionElement
+    ae->stopWaiting();
     setCurrentWaitingAction(NULL);
     return 1;
 }
@@ -344,7 +344,6 @@ bool ActionLayer::getMenuIdFromCardAbility(MTGCardInstance *card, MTGAbility *ab
         return true;
 }
 
-//TODO Simplify with only object !!!
 int ActionLayer::isReactingToClick(MTGCardInstance * card)
 {
     int result = 0;
@@ -490,6 +489,11 @@ void ActionLayer::doReactTo(int menuIndex)
         DebugTrace("ActionLayer::doReactTo " << controlid);
         if (abilitiesMenu && abilitiesMenu->isMultipleChoice)
         {
+            //multiple-choice picks bypass ButtonPressed, so log the choice here
+            //with the same format ButtonPressed uses, or replays desync.
+            stringstream stream;
+            stream << "choice " << menuIndex;
+            observer->logAction(observer->currentActionPlayer, stream.str());
             return ButtonPressedOnMultipleChoice(menuIndex);
         }
         ButtonPressed(0, controlid);

@@ -40,7 +40,7 @@ int JMusic::getPlayTime(){
 #ifdef VITA
   return 0; // SDL_mixer doesn't provide precise position
 #elif defined WITH_FMOD
-  return static_cast<int>(FSOUND_GetCurrentPosition(JSoundSystem::GetInstance()->mChannel) / 44.1); //todo more generic, here it's only 44kHz
+  return static_cast<int>(FSOUND_GetCurrentPosition(JSoundSystem::GetInstance()->mChannel) / 44.1); //FMOD path assumes 44.1kHz; dead on current build targets
 #else
   return 0;
 #endif

@@ -6,7 +6,27 @@
 #include "MTGCardInstance.h"
 #include "WEvent.h"
 #include "AllAbilities.h"
-//TODO:better comments this is too cryptic to work on by anyone but original coder.
+
+/*
+ AIStats: per-card damage statistics used to bias AIPlayerBaka's threat assessment.
+
+ An AIStat holds, for one card (keyed by MTGId), the accumulated weighted damage
+ that card has been responsible for against this AIStats' owner ("value") and how
+ many times it was seen ("occurences"). Stats are fed from WEventDamage events
+ (receiveEvent): the damage source gets credit, and so do auras attached to it
+ (STATS_AURA_MULTIPLIER) and lords affecting it (STATS_LORD_MULTIPLIER split
+ across the lords). Damage to the player weighs more than lethal damage to a
+ creature (STATS_PLAYER_MULTIPLIER vs STATS_CREATURE_MULTIPLIER, see AIStats.h).
+
+ The list is kept sorted by value/occurences (compare_aistats), so the front of
+ the list is "the most dangerous cards I have seen this deck use". isInTop()
+ answers whether a card ranks among the top threats and drives block/target
+ decisions. Stats persist per opponent deck: load()/save() round-trip a plain
+ text file (3 lines per stat: card id, halved value, direct flag); a missing
+ file just means an empty history. Render() is a debug overlay of the top ten.
+*/
+
+//rank by average damage per occurrence, most dangerous first
 bool compare_aistats(AIStat * first, AIStat * second)
 {
     float damage1 = static_cast<float> (first->value / first->occurences);

@@ -2129,8 +2129,7 @@ void CardGui::RenderCountersBig(MTGCard * mtgcard, const Pos& pos, int drawMode)
         char buf[512];
         bool renderText = true;
         string gfx = "";
-        //TODO cache the gfx fetch results?
-        if (c->name.size()) 
+        if (c->name.size())
         {
             if (c->nb < 6) //we only render a counter's specific quad if there are 5 counters of this type or less. Otherwise we will use the generic one
             {

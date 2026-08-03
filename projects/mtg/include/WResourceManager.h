@@ -120,7 +120,7 @@ public:
     virtual WFont* LoadWFont(const string& inFontname, int inFontHeight, int inFontID) = 0;
     virtual WFont* GetWFont(int id) = 0;
 
-    //Wrapped from JSoundSystem. TODO: Privatize.
+    //Wrapped from JSoundSystem.
     virtual JMusic * ssLoadMusic(const char *fileName) = 0;
 
     //Resets the cache limits on when it starts to purge data.

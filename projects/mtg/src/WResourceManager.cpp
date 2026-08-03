@@ -619,17 +619,6 @@ string ResourceManagerImpl::graphicsFile(const string& filename)
         sprintf(buf, "themes/%s/%s", theme.c_str(), filename.c_str());
         if (fileOK(buf)) return buf;
     }
-    /*
-    //FIXME Put back when we're using modes.
-    //Failure. Check mode graphics
-    string mode = options[Options::ACTIVE_MODE].str;
-
-    if(mode != "" && mode != "Default"){
-    sprintf(buf,"modes/%s/graphics/%s",mode.c_str(),filename.c_str());
-    if(fileOK(buf,true))
-    return buf;
-    }
-    */
     //Failure. Check graphics
     char graphdir[512];
     sprintf(graphdir, "graphics/%s", filename.c_str());
@@ -673,18 +662,6 @@ string ResourceManagerImpl::avatarFile(const string& filename)
         sprintf(buf, "themes/%s/%s", theme.c_str(), filename.c_str());
         if (fileOK(buf)) return buf;
     }
-    /*
-    //FIXME Put back when we're using modes.
-    //Failure. Check mode graphics
-    string mode = options[Options::ACTIVE_MODE].str;
-
-    if(mode != "" && mode != "Default"){
-    sprintf(buf,"modes/%s/graphics/%s",mode.c_str(),filename.c_str());
-    if(fileOK(buf,true))
-    return buf;
-    }
-    */
-
     //Failure. Check Baka
     sprintf(buf, "ai/baka/avatars/%s", filename.c_str());
     if (fileOK(buf)) return buf;
@@ -736,17 +713,6 @@ string ResourceManagerImpl::cardFile(const string& filename)
         }
     }
 
-    //FIXME Put back when we're using modes.
-    /*
-    //Failure. Check mode
-    string mode = options[Options::ACTIVE_MODE].str;
-
-    if(mode != "" && mode != "Default"){
-    sprintf(buf,"modes/%s/sets/%s",mode.c_str(),filename.c_str());
-    if(fileOK(buf,true))
-    return buf;
-    }
-    */
     //Failure. Assume it's in a zip file?
     if (!set.size())
     { //Didn't fill "set" string, so do it now.
@@ -787,17 +753,6 @@ string ResourceManagerImpl::musicFile(const string& filename)
         if (fileOK(buf)) return buf;
     }
 
-    /*
-    //FIXME Put back when we're using modes.
-    //Failure. Check mode
-    string mode = options[Options::ACTIVE_MODE].str;
-
-    if(mode != "" && mode != "Default"){
-    sprintf(buf,"modes/%s/sound/%s",mode.c_str(),filename.c_str());
-    if(fileOK(buf,true))
-    return buf;
-    }*/
-
     //Failure. Check sound
     char defdir[512];
     sprintf(defdir, "sound/%s", filename.c_str());
@@ -824,16 +779,6 @@ string ResourceManagerImpl::sfxFile(const string& filename)
         if (fileOK(buf)) return buf;
     }
 
-    /*
-    //FIXME: Put back when we're using modes.
-    //Failure. Check mode
-    string mode = options[Options::ACTIVE_MODE].str;
-    if(mode != "" && mode != "Default"){
-    sprintf(buf,"modes/%s/sound/sfx/%s",mode.c_str(),filename.c_str());
-    if(fileOK(buf,true))
-    return buf;
-    }
-    */
     //Failure. Check sound
     char defdir[512];
     sprintf(defdir, "sound/sfx/%s", filename.c_str());
