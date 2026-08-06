@@ -17,6 +17,8 @@
 
 #include "fileio.h"		// I/O facilities
 
+#include <sstream>		// istringstream (in-memory central-directory parse)
+
 
 #if defined (WIN32)
 #include <sys/types.h>
@@ -513,16 +515,43 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
     }
     else
     {
-	    if (! File.seekg(CentralDir(File)))
+        //Parsing the central directory in place costs ~20 tiny reads plus
+        //seeks PER ENTRY, and each seek discards the stream buffer - measured
+        //at up to 5 SECONDS per set zip on PSP memory stick (loadprobe,
+        //2026-08-06). Instead: locate the directory, pull it into memory with
+        //ONE bulk read (tens of KB), and run the same header parsers on an
+        //in-memory stream.
+        streamoff cdOffset = CentralDir(File);
+        if (cdOffset < streamoff(0))
         {
             File.close();
             return false;
         }
+        if (! File.seekg(0, ios::end))
+        {
+            File.close();
+            return false;
+        }
+        streamoff cdSize = File.tellg() - cdOffset;
+        if (cdSize <= 0 || ! File.seekg(cdOffset))
+        {
+            File.close();
+            return false;
+        }
+        string cdBuf((size_t)cdSize, '\0');
+        File.read(&cdBuf[0], cdSize);
+        if (File.gcount() != (streamsize)cdSize)
+        {
+            File.close();
+            return false;
+        }
+        File.close();
+        istringstream cdStream(cdBuf, ios::in | ios::binary);
 
 	    // Check every headers within the zip file
 	    file_header FileHdr;
 
-	    while ((NextHeader(File) == FILE) && (FileHdr.ReadHeader(File))) {
+	    while ((NextHeader(cdStream) == FILE) && (FileHdr.ReadHeader(cdStream))) {
 
 		    // Include files into Files map
 		    const char * Name = &(* FileHdr.m_Filename.begin());
@@ -539,7 +568,6 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
 		    }
 	    }
 
-	    File.close();
         return (target.size() ? true : false);
     }
 
