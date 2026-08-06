@@ -231,6 +231,7 @@ void CardGui::Render()
             {
                 white->SetColor(ARGB(255,230,50,50));
                 renderer->RenderQuad(white.get(), actX, actY, actT, 30 * actZ / 16, 42 * actZ / 16);
+                white->SetColor(ARGB(255,255,255,255));//shared quad - restore
             }
         }
 
@@ -258,6 +259,7 @@ void CardGui::Render()
             {
                 white->SetColor(ARGB(255,0,0,255));
                 renderer->RenderQuad(white.get(), actX, actY, actT, 30 * actZ / 16, 42 * actZ / 16);
+                white->SetColor(ARGB(255,255,255,255));//shared quad - restore
             }
         }
     }
@@ -510,12 +512,17 @@ void CardGui::Render()
         JQuadPtr rMask = card->getObserver()->getResourceManager()->GetQuad("white");
         rMask->SetColor(ARGB(128,255,0,0));//red
         renderer->RenderQuad(rMask.get(), actX, actY, actT, (27 * actZ + 1) / 16, 40 * actZ / 16);
+        rMask->SetColor(ARGB(255,255,255,255));//"white" is ONE shared cached JQuad (GameApp.cpp registers it
+        //from shadows.png). SetColor mutates that shared object permanently, so every later user of
+        //GetQuad("white") - in this screen or any other - inherited this tint until something else
+        //overwrote it. Restore it.
     }
     if(tc && tc->source && tc->source->view && tc->source->view->actZ >= 1.3 && card == tc->source)//paint the source green while infocus.
     {
         JQuadPtr gMask = card->getObserver()->getResourceManager()->GetQuad("white");
         gMask->SetColor(ARGB(128,0,255,0));//green
         renderer->RenderQuad(gMask.get(), actX, actY, actT, (27 * actZ + 1) / 16, 40 * actZ / 16);
+        gMask->SetColor(ARGB(255,255,255,255));//see the red mask above: shared quad, restore the tint.
     }
 
     //draws the numbers power/toughness
