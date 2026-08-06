@@ -1,0 +1,37 @@
+#The owner's exact scenario (live-play, 2026-08-06): Winding Constrictor is
+#CAST and its own arrival triggers evolve. As a paper triggered ability the
+#evolve trigger resolves AFTER Constrictor is fully on the battlefield, so the
+#rider applies: 1 counter + 1 = 2. This only works with evolve modeled as a
+#real stacked trigger (TrEvolve + AACounter via GenericTriggeredAbility) -
+#the old immediate evolve added the counter inside the zone-change dispatch,
+#before Spell::resolve had registered Constrictor's abilities.
+#Cloudfin Raptor 0/1 + 2 counters = 2/3, hits for 2. Exactly 2: 1 = rider
+#missed, 3 = double-fire.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Cloudfin Raptor
+hand:Winding Constrictor
+manapool:{B}{G}
+[PLAYER2]
+life:20
+[DO]
+winding constrictor
+next
+#begin
+next
+#attackers
+cloudfin raptor
+next
+#blockers
+next
+#damage
+next
+#end combat
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Winding Constrictor,Cloudfin Raptor
+[PLAYER2]
+life:18
+[END]

@@ -1069,3 +1069,5 @@ legions_end_phantom_chooser_wave28.txt
 march_plain_x.txt
 march_convoke_x.txt
 march_convoke_x_credit.txt
+winding_constrictor_evolve_rider.txt
+winding_constrictor_evolve_race.txt

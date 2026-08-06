@@ -104,36 +104,45 @@ int Damage::resolve()
             if(damage < 0)
                 damage = 0;
         }
+        //These loops place/remove N counters as ONE rules event, so they are
+        //_batchManaged with a single WEventTotalCounters after - a plus-rider
+        //(Winding Constrictor) must see "N counters" once, not N times.
         if ((_target)->has(Constants::WILTING))
         {
             for (int j = damage; j > 0; j--)
             {
-                (_target)->counters->addCounter(-1, -1);
+                (_target)->counters->addCounter("", -1, -1, false, false, source, true);
             }
+            (_target)->counters->emitTotalCountersEvent("", -1, -1, true, damage, source);
             damage = 0;
         }
         if ((_target)->has(Constants::VIGOR))
         {
             for (int j = damage; j > 0; j--)
             {
-                (_target)->counters->addCounter(1, 1);
+                (_target)->counters->addCounter("", 1, 1, false, false, source, true);
             }
+            (_target)->counters->emitTotalCountersEvent("", 1, 1, true, damage, source);
             damage = 0;
         }
         if ((_target)->has(Constants::NONCOMBATVIGOR) && typeOfDamage != DAMAGE_COMBAT)
         {
             for (int j = damage; j > 0; j--)
             {
-                (_target)->counters->addCounter(1, 1);
+                (_target)->counters->addCounter("", 1, 1, false, false, source, true);
             }
+            (_target)->counters->emitTotalCountersEvent("", 1, 1, true, damage, source);
             damage = 0;
         }
         if ((_target)->has(Constants::HYDRA))
         {
+            int removed = 0;
             for (int j = damage; j > 0; j--)
             {
-                (_target)->counters->removeCounter(1, 1);
+                if ((_target)->counters->removeCounter("", 1, 1, false, false, source, true))
+                    removed++;
             }
+            (_target)->counters->emitTotalCountersEvent("", 1, 1, false, removed, source);
             damage = 0;
         }
         if (!damage)
@@ -164,8 +173,9 @@ int Damage::resolve()
                 if(((Player*)target)->game->library->nb_cards)
                     ((Player*)target)->game->putInZone(((Player*)target)->game->library->cards[((Player*)target)->game->library->nb_cards - 1], ((Player*)target)->game->library, ((Player*)target)->game->graveyard);
 
-                source->counters->addCounter(1, 1);
+                source->counters->addCounter("", 1, 1, false, false, source, true);
             }
+            source->counters->emitTotalCountersEvent("", 1, 1, true, damage, source);
             damage = 0;
         }
         if (!damage)
@@ -184,8 +194,9 @@ int Damage::resolve()
         MTGCardInstance * _target = (MTGCardInstance *) target;
         for (int i = 0; i < damage; i++)
         {
-            _target->counters->addCounter(-1, -1);
+            _target->counters->addCounter("", -1, -1, false, false, source, true);
         }
+        _target->counters->emitTotalCountersEvent("", -1, -1, true, damage, source);
         if(_target->toughness <= 0 && _target->has(Constants::INDESTRUCTIBLE))
             _target->toGrave(true); // The indestructible creatures can have different destination zone after death.
     }

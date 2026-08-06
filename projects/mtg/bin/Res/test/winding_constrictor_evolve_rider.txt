@@ -1,0 +1,43 @@
+#Winding Constrictor: "If one or more counters would be put on an artifact or
+#creature you control, that many plus one ... are put on it instead."
+#Regression (owner live-play, 2026-08-06): evolve added its counter through raw
+#Counters::addCounter, which emitted no WEventTotalCounters, so the Constrictor
+#rider never fired - 1 counter instead of 2.
+#With Constrictor SETTLED, cast Grizzly Bears (2/2): Cloudfin Raptor (0/1)
+#evolves (power 2 > 0), 1 counter + rider 1 = 2 -> 2/3 flier, hits for 2.
+#Exactly 2: 1 = rider missed, 3 = rider double-fired.
+#(Cloudfin Raptor, not Experiment One: Experiment One's regenerate ability
+#becomes activatable with 2 counters banked, so the suite's attacker click
+#opens the ability menu instead of declaring the attack.)
+#KNOWN RESIDUAL (docketed, not tested here): the rider misses events raised
+#during its OWN resolution (e.g. Constrictor itself entering triggers evolve) -
+#Spell::resolve registers abilities only after putInZone's zone event, and
+#evolve is immediate rather than stacked.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Winding Constrictor,Cloudfin Raptor
+hand:Grizzly Bears
+manapool:{1}{G}
+[PLAYER2]
+life:20
+[DO]
+grizzly bears
+next
+#begin
+next
+#attackers
+cloudfin raptor
+next
+#blockers
+next
+#damage
+next
+#end combat
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Winding Constrictor,Cloudfin Raptor,Grizzly Bears
+[PLAYER2]
+life:18
+[END]

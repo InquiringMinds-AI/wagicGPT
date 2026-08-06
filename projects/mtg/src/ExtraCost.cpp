@@ -1779,7 +1779,7 @@ int CounterCost::doPay()
         int totalcounters = 0;
         for (int i = 0; i < counter->nb; i++)
         {
-            target->counters->addCounter(counter->name.c_str(), counter->power, counter->toughness);
+            target->counters->addCounter(counter->name.c_str(), counter->power, counter->toughness, false, false, NULL, true);
             totalcounters++;
         }
         WEvent * w = NEW WEventTotalCounters(target->counters, counter->name.c_str(), counter->power, counter->toughness, true, false, totalcounters, true, source);
@@ -1797,7 +1797,7 @@ int CounterCost::doPay()
         int totalcounters = 0;
         for (int i = 0; i < -counter->nb; i++)
         {
-            target->counters->removeCounter(counter->name.c_str(), counter->power, counter->toughness);
+            target->counters->removeCounter(counter->name.c_str(), counter->power, counter->toughness, false, false, NULL, true);
             totalcounters++;
         }
         WEvent * w = NEW WEventTotalCounters(target->counters, counter->name.c_str(), counter->power, counter->toughness, false, true, totalcounters, true, source);

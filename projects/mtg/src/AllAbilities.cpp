@@ -3230,7 +3230,7 @@ AACounter::AACounter(GameObserver* observer, int id, MTGCardInstance * source, M
                     }
                     if(!maxNb || (maxNb && currentAmount < maxNb))
                     {
-                        _target->counters->addCounter(name.c_str(), power, toughness, noevent, false, source);
+                        _target->counters->addCounter(name.c_str(), power, toughness, noevent, false, source, true);
                         totalcounters++;
                     }
                 }
@@ -3247,7 +3247,7 @@ AACounter::AACounter(GameObserver* observer, int id, MTGCardInstance * source, M
                 {
                     while (_target->next)
                         _target = _target->next;
-                    _target->counters->removeCounter(name.c_str(), power, toughness, noevent, false, source);
+                    _target->counters->removeCounter(name.c_str(), power, toughness, noevent, false, source, true);
                     totalcounters++;
                 }
                 if (!noevent)

@@ -1730,7 +1730,10 @@ public:
                 for(int i = 0; i < plus; i++)
                     e->targetCard->counters->removeCounter(e->name.c_str(),e->power,e->toughness,true,true,e->source);
             }
-            e->source->thatmuch = e->totalamount + plus;
+            //e->source can be NULL: engine paths (evolve, wither...) emit the
+            //total-counters event without a causing card since 2026-08-06.
+            if (e->source)
+                e->source->thatmuch = e->totalamount + plus;
             this->source->thatmuch = e->totalamount + plus;
         }
         else if (duplicate){
@@ -1741,7 +1744,8 @@ public:
                 for(int i = 0; i < e->totalamount; i++)
                     e->targetCard->counters->removeCounter(e->name.c_str(),e->power,e->toughness,true,true,e->source);
             }
-            e->source->thatmuch = e->totalamount * 2;
+            if (e->source)
+                e->source->thatmuch = e->totalamount * 2;
             this->source->thatmuch = e->totalamount * 2;
         }
         else if (half){
@@ -1756,10 +1760,12 @@ public:
                 for(int i = 0; i < amount; i++)
                     e->targetCard->counters->addCounter(e->name.c_str(),e->power,e->toughness,true,true,e->source);
             }
-            e->source->thatmuch = e->totalamount - amount;
+            if (e->source)
+                e->source->thatmuch = e->totalamount - amount;
             this->source->thatmuch = e->totalamount - amount;
         } else {
-            e->source->thatmuch = e->totalamount;
+            if (e->source)
+                e->source->thatmuch = e->totalamount;
             this->source->thatmuch = e->totalamount;
         }
         triggeredTurn = game->turn;
@@ -7265,33 +7271,46 @@ public:
 };
 
 //Evole ability
-class AEvolveAbility: public MTGAbility
+//Evolve is a TRIGGERED ability (rules 702.100): "Whenever a creature you
+//control enters, if it has greater power or toughness than this creature,
+//put a +1/+1 counter on this creature." Until 2026-08-06 it was modeled as an
+//immediate receiveEvent that added the counter inside the zone-change
+//dispatch - before the entering spell's own abilities were registered
+//(Spell::resolve calls addAbilities only after putInZone), so a Winding
+//Constrictor entering and triggering evolve could never apply its own rider.
+//As a Trigger wrapped in GenericTriggeredAbility (see the "evolve" branch in
+//AbilityFactory), the counter rides the stack and resolves after
+//registration, like the paper card.
+class TrEvolve: public Trigger
 {
 public:
-    AEvolveAbility(GameObserver* observer, int _id, MTGCardInstance * _source) :
-        MTGAbility(observer, _id, _source)
+    TrEvolve(GameObserver* observer, int id, MTGCardInstance * source) :
+        Trigger(observer, id, source, false)
     {
     }
-        int receiveEvent(WEvent * event)
-        {
-            WEventZoneChange * enters = dynamic_cast<WEventZoneChange *> (event);
-            if (enters && enters->to == enters->card->controller()->game->inPlay) {
-                if(enters->from != enters->card->controller()->game->inPlay && enters->from != enters->card->controller()->opponent()->game->inPlay) { //cards changing from inplay to inplay don't re-enter battlefield
-                    if(enters->card->controller() == source->controller() && enters->card->isCreature())
-                    {
-                        if(enters->card != source && (enters->card->power > source->power || enters->card->toughness > source->toughness))
-                        {
-                            source->counters->addCounter(1,1);
-                        }
-                    }
-                }
-            }
-            return 1;
-        }
 
-    AEvolveAbility * clone() const
+    int triggerOnEventImpl(WEvent * event)
     {
-        return NEW AEvolveAbility(*this);
+        WEventZoneChange * enters = dynamic_cast<WEventZoneChange *> (event);
+        if (!enters || !enters->card)
+            return 0;
+        if (enters->to != enters->card->controller()->game->inPlay)
+            return 0;
+        //cards changing from inplay to inplay don't re-enter battlefield
+        if (enters->from == enters->card->controller()->game->inPlay || enters->from == enters->card->controller()->opponent()->game->inPlay)
+            return 0;
+        if (enters->card->controller() != source->controller() || !enters->card->isCreature())
+            return 0;
+        if (enters->card == source)
+            return 0;
+        if (enters->card->power > source->power || enters->card->toughness > source->toughness)
+            return 1;
+        return 0;
+    }
+
+    TrEvolve * clone() const
+    {
+        return NEW TrEvolve(*this);
     }
 };
 
