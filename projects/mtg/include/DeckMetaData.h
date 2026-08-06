@@ -50,6 +50,11 @@ public:
     string getDescription();
     string getName();
     string getAvatarFilename();
+    // Existence of the avatar image, checked with file stats (not a texture
+    // load) and cached for the object's lifetime. DeckMenuItem used to answer
+    // this question with RetrieveTexture - a full JPEG decode per menu item
+    // per menu construction, measured at ~1.4s for the 19-deck opponent menu.
+    bool avatarExists();
     string getColorIndex();
     string getStatsSummary();
     vector<int> getUnlockRequirements();
@@ -71,6 +76,8 @@ public:
     bool mDeckLoaded;
     bool mStatsLoaded;
     bool mIsAI;
+    bool mAvatarChecked;
+    bool mAvatarFound;
 };
 
 

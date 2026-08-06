@@ -5,6 +5,7 @@
 #include "MTGDeck.h"
 #include "utils.h"
 #include "Translate.h"
+#include "WResourceManager.h"
 
 //Possible improvements:
 //Merge this with DeckStats
@@ -12,7 +13,7 @@
 
 DeckMetaData::DeckMetaData(const string& filename, bool isAI)
     : mFilename(filename), mGamesPlayed(0), mVictories(0), mPercentVictories(0), mDifficulty(0),
-      mDeckLoaded(false), mStatsLoaded(false), mIsAI(isAI)
+      mDeckLoaded(false), mStatsLoaded(false), mIsAI(isAI), mAvatarChecked(false), mAvatarFound(false)
 {
     // TODO, figure out how we can defer this to later - currently, 
     // there's a catch 22, as we sort the deck list alphabetically, so we need to open the deck file
@@ -193,6 +194,20 @@ vector<int> DeckMetaData::getUnlockRequirements()
 string DeckMetaData::getAvatarFilename()
 {
     return mAvatarFilename;
+}
+
+bool DeckMetaData::avatarExists()
+{
+    if (!mAvatarChecked)
+    {
+        // graphicsFile runs the theme/graphics/sets fallback cascade with file
+        // stats and returns a non-existent default path on total failure, so
+        // one more fileOK on its result answers "would the renderer find it".
+        WResourceManager * wres = WResourceManager::Instance();
+        mAvatarFound = wres->fileOK(wres->graphicsFile(mAvatarFilename));
+        mAvatarChecked = true;
+    }
+    return mAvatarFound;
 }
 
 string DeckMetaData::getColorIndex()

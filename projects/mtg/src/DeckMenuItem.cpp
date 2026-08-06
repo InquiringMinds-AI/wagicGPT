@@ -51,9 +51,12 @@ DeckMenuItem::DeckMenuItem(DeckMenu* _parent, int id, int fontId, string text, f
     if (mMetaData && mMetaData->getAvatarFilename().size() > 0)
     {
         mImageFilename = mMetaData->getAvatarFilename();
-        if(!(WResourceManager::Instance()->RetrieveTexture(mImageFilename))) 
+        //Existence check only - the old RetrieveTexture test decoded every
+        //avatar JPEG per menu construction (~1.4s for the 19-deck opponent
+        //menu on PSP). The actual texture loads lazily at render time.
+        if(!mMetaData->avatarExists())
             mImageFilename = "baka.jpg"; // if the AI deck has no specific avatar we will display the default "baka.jpg" image.
-    } 
+    }
     else 
     {
         // this is a non-deck menu item (ie "Random", "Cancel", etc

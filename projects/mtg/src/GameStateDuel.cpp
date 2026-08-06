@@ -1014,7 +1014,9 @@ void GameStateDuel::Update(float dt)
 
         if (!game->isStarted())
         {
+            wagicMenuMark("startGame begin");
             game->startGame(mParent->gameType, mParent->rules);
+            wagicMenuMark("startGame done");
 
             //start of in game music code
             musictrack = "";
@@ -1910,7 +1912,9 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
             }
             else if (controlId != MENUITEM_EVIL_TWIN && aiDeckSize > 0) // evil twin
                 deckNumber = deckManager->getAIDeckOrderList()->at(controlId - 1)->getDeckId();
+            wagicMenuMark("ai loadPlayer begin deck=%d", deckNumber);
             game->loadPlayer(1, mParent->players[1], deckNumber, premadeDeck);
+            wagicMenuMark("ai loadPlayer done");
             tournament->addDeck(1,deckNumber,mParent->players[1]);
             setAISpeed();
             OpponentsDeckid = deckNumber;
@@ -2007,7 +2011,9 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
                 vector<DeckMetaData *> * playerDeck = deckManager->getPlayerDeckOrderList();
                 if (!premadeDeck && controlId > 0)
                     deckNumber = playerDeck->at(controlId - 1)->getDeckId();
+                wagicMenuMark("human loadPlayer begin deck=%d", deckNumber);
                 game->loadPlayer(0, mParent->players[0], deckNumber, premadeDeck);
+                wagicMenuMark("human loadPlayer done");
                 tournament->addDeck(0,deckNumber,mParent->players[0]);
                 playerDeck = NULL;
             }
