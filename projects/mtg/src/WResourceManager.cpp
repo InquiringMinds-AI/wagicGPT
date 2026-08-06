@@ -472,6 +472,25 @@ void ResourceManagerImpl::ClearUnlocked()
     psiWCache.ClearUnlocked();
 }
 
+//WAGIC_MEMPROBE telemetry (see WResourceManager.h). Cheap counter reads only.
+//cacheItems / cacheBytes  = the EVICTABLE cache: what ClearUnlocked actually frees.
+//managedCount             = entries in the permanent managed map: ClearUnlocked never
+//                           walks it, so anything inserted per match grows without bound.
+//unreclaimableBytes       = totalSize - cacheSize, i.e. every byte held OUTSIDE the
+//                           evictable cache (managed map + locked entries). This is the
+//                           number the debug overlay calls "man"; if it climbs across
+//                           matches, that is the leak.
+void ResourceManagerImpl::MemProbeStats(unsigned int* cacheItems, unsigned long* managedCount,
+                                        unsigned long* cacheBytes, unsigned long* unreclaimableBytes)
+{
+    if (cacheItems)  *cacheItems  = textureWCache.cacheItems;
+    if (managedCount) *managedCount = (unsigned long) textureWCache.managed.size();
+    if (cacheBytes)  *cacheBytes  = textureWCache.cacheSize;
+    if (unreclaimableBytes)
+        *unreclaimableBytes = (textureWCache.totalSize > textureWCache.cacheSize)
+                              ? (textureWCache.totalSize - textureWCache.cacheSize) : 0;
+}
+
 void ResourceManagerImpl::Release(JSample * sample)
 {
     if (!sample) return;

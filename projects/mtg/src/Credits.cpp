@@ -168,6 +168,63 @@ Credits::~Credits()
     kBgFile = ""; //Reset the chosen background.
 }
 
+//WAGIC_WINPROBE: opt-in timing telemetry for the victory-screen transition
+//(compile with -DWAGIC_WINPROBE; appends to User/wagic-probe.log). This is the
+//instrument that found the ~15s PSP victory lockup was 196 AI-deck files being
+//opened on the Memory Stick (2026-08-03). Kept compiled-out: the remaining cost
+//on that screen is the ~1.9s playerdata save, still unfixed.
+//
+//Marks accumulate IN MEMORY and are written in ONE fopen at the end. Per-mark
+//logging would be Memory Stick I/O inside the very transition being timed - the
+//same instrument-destroys-its-own-reading trap called out in the deck probe.
+#if defined(WAGIC_WINPROBE)
+#include <sys/time.h>
+#include <stdio.h>
+namespace {
+struct WinMark { const char* label; unsigned ms; };
+WinMark gWinMarks[24];
+int gWinCount = 0;
+unsigned long long gWinLast = 0;
+unsigned long long winNowMs()
+{
+    struct timeval tv; gettimeofday(&tv, NULL);
+    return (unsigned long long) tv.tv_sec * 1000ull + (unsigned long long) tv.tv_usec / 1000ull;
+}
+void winStart() { gWinCount = 0; gWinLast = winNowMs(); }
+void winMark(const char* label)
+{
+    unsigned long long now = winNowMs();
+    if (gWinCount < 24)
+    {
+        gWinMarks[gWinCount].label = label;
+        gWinMarks[gWinCount].ms = (unsigned)(now - gWinLast);
+        gWinCount++;
+    }
+    gWinLast = now;
+}
+void winFlush()
+{
+    FILE* f = fopen("User/wagic-probe.log", "a");
+    if (!f) return;
+    unsigned total = 0;
+    for (int i = 0; i < gWinCount; i++)
+    {
+        fprintf(f, "victory: %-20s %6u ms\n", gWinMarks[i].label, gWinMarks[i].ms);
+        total += gWinMarks[i].ms;
+    }
+    fprintf(f, "victory: TOTAL %u ms\n", total);
+    fclose(f);
+}
+}
+#define WIN_START() winStart()
+#define WIN_MARK(l) winMark(l)
+#define WIN_FLUSH() winFlush()
+#else
+#define WIN_START() do {} while (0)
+#define WIN_MARK(l) do {} while (0)
+#define WIN_FLUSH() do {} while (0)
+#endif
+
 void Credits::compute(GameObserver* g, GameApp * _app)
 {
     if (!g->turn)
@@ -182,7 +239,9 @@ void Credits::compute(GameObserver* g, GameApp * _app)
     if (p1->isAI())
         return;
 
+    WIN_START();
     PlayerData * playerdata = NEW PlayerData(MTGCollection());
+    WIN_MARK("PlayerData ctor");
     if (p2->isAI() && g->didWin(p1))
     {
         gameLength = time(0) - g->startedAt;
@@ -253,6 +312,7 @@ void Credits::compute(GameObserver* g, GameApp * _app)
         // <Tasks handling>
         vector<Task*> finishedTasks;
         playerdata->taskList->getDoneTasks(g, _app, &finishedTasks);
+        WIN_MARK("getDoneTasks");
 
         char buffer[512];
 
@@ -270,6 +330,7 @@ void Credits::compute(GameObserver* g, GameApp * _app)
             DeckStats * stats = DeckStats::GetInstance();
             stats->load(p1->GetCurrentDeckStatsFile());
             unlocked = isDifficultyUnlocked(stats);
+            WIN_MARK("u:deckstats+diff");
             if (unlocked)
             {
                 unlockedTextureName = "unlocked.png";
@@ -280,7 +341,12 @@ void Credits::compute(GameObserver* g, GameApp * _app)
             {
                 for (map<string, Unlockable *>::iterator it = Unlockable::unlockables.begin(); it !=  Unlockable::unlockables.end(); ++it) {
                     Unlockable * award = it->second;
-                    if (award->tryToUnlock(g))
+                    bool gotIt = award->tryToUnlock(g);
+                    //Per-award timing: 10 awards cost ~5.0s total, so ~500ms each for a
+                    //one-line condition. Naming each one shows whether the cost is spread
+                    //or concentrated in a single pathological condition string.
+                    WIN_MARK(it->first.c_str());
+                    if (gotIt)
                     {
                         unlocked = 1;
                         unlockedString = award->getValue("unlock_text");
@@ -290,6 +356,8 @@ void Credits::compute(GameObserver* g, GameApp * _app)
                 }
             }
             
+            WIN_MARK("u:unlockables");
+
             if (!unlocked)
             {
                 if ((unlocked = isEvilTwinUnlocked()))
@@ -325,12 +393,15 @@ void Credits::compute(GameObserver* g, GameApp * _app)
                 }
             }
 
+            WIN_MARK("u:unlock chain");
+
             if (unlocked && options[Options::SFXVOLUME].number > 0)
             {
                 WResourceManager::Instance()->PlaySample("bonus.wav");
             }
 
         }
+        WIN_MARK("unlock checks");
 
         vector<CreditBonus *>::iterator it;
         if (bonus.size())
@@ -350,6 +421,7 @@ void Credits::compute(GameObserver* g, GameApp * _app)
             playerdata->taskList->addRandomTask();
             playerdata->taskList->addRandomTask();
         }
+        WIN_MARK("tasks");
 
     }
     else
@@ -359,6 +431,8 @@ void Credits::compute(GameObserver* g, GameApp * _app)
     }
 
     playerdata->save();
+    WIN_MARK("playerdata save");
+    WIN_FLUSH();
     SAFE_DELETE(playerdata);
 }
 

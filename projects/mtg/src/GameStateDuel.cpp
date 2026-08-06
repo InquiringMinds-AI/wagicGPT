@@ -1,5 +1,20 @@
 #include "PrecompiledHeader.h"
 
+//WAGIC_MEMPROBE: opt-in heap/cache telemetry at every duel phase transition
+//(compile with -DWAGIC_MEMPROBE; writes User/wagic-memprobe.log). This is the
+//instrument that root-caused the 2026-08-04 cross-match crash-to-off: heapUsed
+//returned to baseline every match while the arena ratcheted up, and keepcost ~0
+//proved the free space was fragmented, not trimmable. Kept compiled-out because
+//the next round of PSP memory work will need the same numbers.
+#if defined(WAGIC_MEMPROBE)
+#include <stdarg.h>
+#include <malloc.h>
+//Definition lives further down, after the includes that declare WResourceManager.
+static void wagicMemProbe(const char* tag);
+#else
+#define wagicMemProbe(x) ((void)0)
+#endif
+
 //WAGIC_HWPROBE = the file-probe telemetry WITHOUT the selfplay/lang hijacks:
 //for real-hardware runs where a human drives the menus and we need the log.
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
@@ -534,6 +549,35 @@ void GameStateDuel::ConstructOpponentMenu()
     }
 }
 
+#if defined(WAGIC_MEMPROBE)
+//WAGIC_MEMPROBE telemetry writer.
+//UNRECLAIMABLE_KB = totalSize - cacheSize = every byte held OUTSIDE the evictable
+//cache (permanent managed map + locked entries). ClearUnlocked() cannot touch it,
+//so if it climbs across matches while the owner returns to the main menu between
+//them, that is the accumulation.
+static void wagicMemProbe(const char* tag)
+{
+    FILE* f = fopen("User/wagic-memprobe.log", "a");
+    if (!f) return;
+    unsigned int items = 0; unsigned long managed = 0, cacheB = 0, unrec = 0;
+    WResourceManager::Instance()->MemProbeStats(&items, &managed, &cacheB, &unrec);
+    struct mallinfo mi = mallinfo();
+    //keepcost = bytes releasable to the OS by malloc_trim RIGHT NOW (the free chunk at
+    //the TOP of the heap). This is the whole question for lever 3: the 2026-08-04 probe
+    //showed heapUsed returns to baseline between matches while arena ratchets up and
+    //never comes back. If keepcost is large, that retained space is at the top and a
+    //malloc_trim(0) between matches breaks the ratchet outright. If keepcost is small,
+    //the free space is stranded beneath live allocations and trimming cannot help.
+    //fordblks = ALL free space in the arena, trimmable or not; the gap between the two
+    //is the fragmentation.
+    fprintf(f, "%-28s items=%u managed=%lu cacheKB=%lu UNRECLAIMABLE_KB=%lu heapUsedKB=%u arenaKB=%u freeKB=%u KEEPCOST_KB=%u\n",
+            tag, items, managed, cacheB / 1024, unrec / 1024,
+            (unsigned)(mi.uordblks / 1024), (unsigned)(mi.arena / 1024),
+            (unsigned)(mi.fordblks / 1024), (unsigned)(mi.keepcost / 1024));
+    fclose(f);
+}
+#endif
+
 void GameStateDuel::setGamePhase(int newGamePhase) {
     if (mGamePhase == newGamePhase)
         return;
@@ -541,6 +585,7 @@ void GameStateDuel::setGamePhase(int newGamePhase) {
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
     wagicProbe("duelphase %s -> %s", stateStrings[mGamePhase], stateStrings[newGamePhase]);
 #endif
+    wagicMemProbe(stateStrings[newGamePhase]);
 
     if (mGamePhase)
         JGE::GetInstance()->SendCommand("leaveduelphase:" + string(stateStrings[mGamePhase]));

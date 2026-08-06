@@ -97,6 +97,13 @@ public:
     //Manual clear of the cache
     virtual void ClearUnlocked() = 0;
 
+    //WAGIC_MEMPROBE: opt-in heap/cache telemetry (compile with -DWAGIC_MEMPROBE).
+    //Reports what ClearUnlocked can and cannot reclaim. Default no-op so only the
+    //real implementation has to answer. Built for the 2026-08-04 cross-match hunt;
+    //kept because the PSP memory war is not over.
+    virtual void MemProbeStats(unsigned int* /*cacheItems*/, unsigned long* /*managedCount*/,
+                               unsigned long* /*cacheBytes*/, unsigned long* /*unreclaimableBytes*/) {}
+
     virtual unsigned int nowTime() = 0;
 
     virtual JQuadPtr GetQuad(const string &quadName) = 0;
