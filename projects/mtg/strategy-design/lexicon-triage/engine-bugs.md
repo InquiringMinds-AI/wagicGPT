@@ -552,3 +552,32 @@ the alternative-cost cast) or routed through the same forcetype flip so it can't
 deploy the front face. Both live in engine flip/cast machinery gated by the
 MODE_TEST_SUITE divergence above; they need live (non-suite) validation the
 harness can't provide. Reassess when the modal-DFC surface is next touched.
+
+## Buffed creature dies when the buff wears off (CR 514.2, found on PSP live play 2026-08-03)
+
+R-CLEANUP-BUFF-DEATH. Owner, live: a 1/1 goblin under a +1/+1 UEOT buff took 1
+combat damage, then DIED at end of turn when the buff expired. CR 514.2/514.3:
+damage removal and until-end-of-turn expiry are ONE simultaneous turn-based
+action with no SBA check between them; the engine does them separately with a
+lethal check in the gap.
+
+MECHANISM (read from source, NOT yet reproduced in a fixture):
+- `MTGCardInstance::addToToughness` models damage as reduced `life`
+  (`toughness += value; life += value; doDamageTest = 1;`).
+- `InstantAbility::testDestroy` (MTGAbility.cpp ~L8274) expires UEOT effects at
+  MTG_PHASE_AFTER_EOT; `APowerToughnessModifier` removal calls
+  `addToToughness(-N)`, which decrements `life` and arms the damage test.
+- Trace: base 1/1 (life 1) -> buffed 2/2 (life 2) -> 1 damage (life 1) -> buff
+  expires (life 0) -> `afterDamage()` destroys. WRONG: at cleanup the damage
+  should be removed in the same action.
+
+BLOCKING QUESTION, resolve before any fix: WHERE does per-turn damage removal
+live? `GameObserver::cleanupPhase()` -> `MTGCardInstance::cleanup()` does NOT
+touch `life`; a src-wide search for `life = toughness` finds only constructors,
+regeneration, and one-off effects. Either damage removal is somewhere unfound,
+or creature damage persists across turns (which would make THIS bug one face of
+a bigger one). FIX DIRECTION (unbuilt): restore `life` toward `toughness` at
+cleanup in the same action as UEOT expiry, lethal check suppressed across the
+pair (`skipDamageTestOnce` is the natural hook). Engine rules code: full
+single-threaded suite + a regression fixture required. Platform-independent —
+affects desktop/Vita/PSP equally; only DISCOVERED on PSP.
