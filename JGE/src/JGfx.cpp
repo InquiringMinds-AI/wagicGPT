@@ -140,7 +140,13 @@ static bool gInFrame = false;
 // are counted - the fallback is a pressure gauge, not an error. If the carve
 // itself fails at init, everything falls back and behaviour is exactly the
 // old allocator.
-#define TEXPOOL_BYTES      (8u * 1024u * 1024u)
+// 8 -> 10 MB (2026-08-06): the card-DB diet reclaimed ~4.2 MB of general
+// heap (side-table d7a89c890 + printings index 0e68bf5ed, measured on
+// hardware), and match-end arena sits ~9 MB under the ceiling. 2 MB of that
+// margin goes back to textures so the cache cap can rise 5 -> 6.5 MB - the
+// re-decode churn (match lag spikes, per-card shop freezes) was the cost of
+// a cache smaller than a match's art working set.
+#define TEXPOOL_BYTES      (10u * 1024u * 1024u)
 #define TEXPOOL_MIN_SHIFT  15                          /* order 0 = 32 KB */
 #define TEXPOOL_MAX_ORDER  4                           /* 32 KB << 4 = 512 KB */
 #define TEXPOOL_UNITS      (TEXPOOL_BYTES >> TEXPOOL_MIN_SHIFT)
