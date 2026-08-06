@@ -642,7 +642,7 @@ void GameStateMenu::Update(float dt)
             Translator::GetInstance()->tempValues.clear();
 
             DebugTrace(std::endl << "==" << std::endl <<
-                            "Total MTGCards: " << MTGCollection()->collection.size() << std::endl <<
+                            "Total MTGCards: " << MTGCollection()->printingsCount() << std::endl <<
                             "Total CardPrimitives: " << MTGCollection()->primitives.size() << std::endl << "==");
 
             //Force default, if necessary.

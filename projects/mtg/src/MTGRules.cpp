@@ -2913,7 +2913,7 @@ MTGMomirRule::MTGMomirRule(GameObserver* observer, int _id, MTGAllCards * _colle
     {
         for (size_t i = 0; i < collection->ids.size(); i++)
         {
-            MTGCard * card = collection->collection[collection->ids[i]];
+            MTGCard * card = collection->getCardById(collection->ids[i]);
             if (card->data->isCreature() && (card->getRarity() != Constants::RARITY_T) && //remove tokens
                 card->setId != MTGSets::INTERNAL_SET //remove cards that are defined in primitives. Those are workarounds (usually tokens) and should only be used internally
                 )
@@ -3088,7 +3088,7 @@ MTGStoneHewerRule::MTGStoneHewerRule(GameObserver* observer, int _id, MTGAllCard
     {
         for (size_t i = 0; i < collection->ids.size(); i++)
         {
-            MTGCard * card = collection->collection[collection->ids[i]];
+            MTGCard * card = collection->getCardById(collection->ids[i]);
             if (card->data->hasSubtype("equipment") && (card->getRarity() != Constants::RARITY_T) && //remove tokens
                 card->setId != MTGSets::INTERNAL_SET //remove cards that are defined in primitives. Those are workarounds (usually tokens) and should only be used internally
                 )
