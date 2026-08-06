@@ -5,7 +5,6 @@
 
 #include "Threading.h"
 #include <queue>
-#include <deque>
 #include <set>
 
 
@@ -43,12 +42,6 @@ public:
 
     virtual void QueueRequest(const std::string& inFilePath, int inSubmode, int inCacheID) = 0;
 
-    // Called once per frame from the main loop. Threaded retrievers decode on
-    // their worker thread and ignore this; unthreaded ones drain here.
-    virtual void Service(int /*inMaxDecodes*/)
-    {
-    }
-
 protected:
 
     WCache<WCachedTexture,JTexture>& mTextureCache;
@@ -72,60 +65,12 @@ public:
     }
 
     /*
-    **  No worker thread, but decoding inline stalls the render pass for the full
-    **  JPEG decode. Instead, queue the request and drain a bounded number per
-    **  frame from Service() (called by the main loop). RetrieveCard re-requests a
-    **  missing card every frame it stays visible, so refreshing a duplicate to the
-    **  back of the deque makes the back end "what is on screen right now" — Service
-    **  drains newest-first.
+    **  In a non-threaded model, simply pass on the request to the texture cache directly
     */
     void QueueRequest(const std::string& inFilePath, int inSubmode, int inCacheID)
     {
-        if (mRequestLookup.find(inCacheID) != mRequestLookup.end())
-        {
-            // Already queued: refresh to the back (newest) so visible cards win.
-            for (std::deque<CacheRequest>::iterator it = mRequestQueue.begin(); it != mRequestQueue.end(); ++it)
-            {
-                if (it->cacheID == inCacheID)
-                {
-                    CacheRequest request = *it;
-                    mRequestQueue.erase(it);
-                    mRequestQueue.push_back(request);
-                    break;
-                }
-            }
-            return;
-        }
-
-        mRequestLookup.insert(inCacheID);
-        mRequestQueue.push_back(CacheRequest(inFilePath, inSubmode, inCacheID));
-
-        // Drop the oldest (least recently visible) requests beyond the cap; they
-        // re-queue themselves if still on screen.
-        while (mRequestQueue.size() > kMaxQueuedRequests)
-        {
-            mRequestLookup.erase(mRequestQueue.front().cacheID);
-            mRequestQueue.pop_front();
-        }
+        mTextureCache.LoadIntoCache(inCacheID, inFilePath, inSubmode);
     }
-
-    void Service(int inMaxDecodes)
-    {
-        while (inMaxDecodes-- > 0 && !mRequestQueue.empty())
-        {
-            CacheRequest request = mRequestQueue.back();
-            mRequestQueue.pop_back();
-            mRequestLookup.erase(request.cacheID);
-            mTextureCache.LoadIntoCache(request.cacheID, request.filename, request.submode);
-        }
-    }
-
-protected:
-
-    static const size_t kMaxQueuedRequests = 16;
-
-    std::deque<CacheRequest> mRequestQueue;
-    std::set<int> mRequestLookup;
 };
 
 /**

@@ -228,15 +228,6 @@ bool ResourceManagerImpl::IsThreaded()
     return CacheEngine::IsThreaded();
 }
 
-void ResourceManagerImpl::ServiceCacheRequests()
-{
-    // One decode per frame keeps the frame-time cost of a card-art JPEG decode
-    // bounded; at PSP frame rates that still clears a full hand in a fraction
-    // of a second. No-op for the threaded retriever.
-    if (CacheEngine::Instance())
-        CacheEngine::Instance()->Service(1);
-}
-
 JQuadPtr ResourceManagerImpl::RetrieveCard(MTGCard * card, int style, int submode)
 {
     //Cards are never, ever resource managed, so just check cache.

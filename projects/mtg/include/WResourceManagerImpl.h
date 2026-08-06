@@ -145,7 +145,6 @@ public:
     virtual ~ResourceManagerImpl();
 
     bool IsThreaded();
-    void ServiceCacheRequests();
 
     JQuadPtr RetrieveCard(MTGCard * card, int style = RETRIEVE_NORMAL,int submode = CACHE_NORMAL);
     JQuadPtr RetrieveCardToken(MTGCard * card, int style = RETRIEVE_NORMAL,int submode = CACHE_NORMAL, int tId = 0);

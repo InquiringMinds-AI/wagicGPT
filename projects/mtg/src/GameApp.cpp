@@ -411,10 +411,6 @@ void GameApp::Update()
     if (dt > 35.0f) // min 30 FPS ;)
         dt = 35.0f;
 
-    // Drain at most one queued card-art decode per frame (PSP/Vita unthreaded
-    // cache; no-op elsewhere) so first-view art loads without a render stall.
-    WResourceManager::Instance()->ServiceCacheRequests();
-
     TransitionBase * mTrans = NULL;
     if (mCurrentState)
     {
