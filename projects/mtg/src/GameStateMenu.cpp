@@ -5,6 +5,10 @@
 
 #include "PrecompiledHeader.h"
 
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+#include <malloc.h>
+#endif
+
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
 #include <pspsysmem.h>
 #include <stdarg.h>
@@ -590,6 +594,24 @@ void GameStateMenu::Update(float dt)
             wagicProbe("primitive %d/%d %s", primitivesLoadCounter, (int)primitives.size(), primitives[primitivesLoadCounter].c_str());
 #endif
             MTGCollection()->load(primitives[primitivesLoadCounter].c_str());
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+            //Boot-transient tracker: the primitives/sets load is the largest
+            //heap spike in the program and its true size has only ever been
+            //bounded by which pool carves crashed. One line per 25 primitives
+            //survives a mid-load crash-to-off and turns the bound into a number.
+            if (primitivesLoadCounter % 25 == 0)
+            {
+                struct mallinfo bootMi = mallinfo();
+                FILE * bootF = fopen("User/wagic-memprobe.log", "a");
+                if (bootF)
+                {
+                    fprintf(bootF, "boot: primitive %d/%d arenaKB=%u usedKB=%u\n",
+                            primitivesLoadCounter, (int) primitives.size(),
+                            (unsigned)(bootMi.arena / 1024), (unsigned)(bootMi.uordblks / 1024));
+                    fclose(bootF);
+                }
+            }
+#endif
 #if _DEBUG
             int endTime = JGEGetTime();
             int elapsedTime = (endTime - startTime);

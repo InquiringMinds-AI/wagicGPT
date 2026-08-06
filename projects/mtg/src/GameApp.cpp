@@ -88,7 +88,7 @@ GameApp::~GameApp()
 }
 
 
-#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE) || defined(WAGIC_MEMPROBE)
 #include <stdio.h>
 static void gaMark(const char* m)
 {
@@ -107,6 +107,15 @@ void GameApp::Create()
 #elif defined (PSP)
     pspFpuSetEnable(0); //disable FPU Exceptions until we find where the FPU errors come from
     pspDebugScreenPrintf("Wagic:Loading resources...");
+    //Carve the texture slab pool FIRST, while the heap is empty: the carve is
+    //guaranteed contiguous here, every texture the program loads lives inside
+    //it, and the primitives-load transient below gets the entire remaining
+    //heap - both alternative carve points crashed the device (see
+    //JGE/src/JGfx.cpp texPoolInit).
+    {
+        extern void wagicTexPoolInit();
+        wagicTexPoolInit();
+    }
 #endif
 #endif //QT_CONFIG
     //_CrtSetBreakAlloc(368);

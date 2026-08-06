@@ -570,10 +570,27 @@ static void wagicMemProbe(const char* tag)
     //the free space is stranded beneath live allocations and trimming cannot help.
     //fordblks = ALL free space in the arena, trimmable or not; the gap between the two
     //is the fragmentation.
+#if defined(PSP)
+    //Slab-pool telemetry (JGE/src/JGfx.cpp): free space inside the pool, the
+    //largest request it can serve, and the fallback counters - the fallbacks
+    //are the gauge that says the pool or the cache cap needs retuning.
+    {
+        extern void wagicTexPoolProbe(unsigned * freeKB, unsigned * largestKB);
+        extern int gTexPoolFallbacks, gTexPoolOversize;
+        unsigned poolFreeKB = 0, poolLargestKB = 0;
+        wagicTexPoolProbe(&poolFreeKB, &poolLargestKB);
+        fprintf(f, "%-28s items=%u managed=%lu cacheKB=%lu UNRECLAIMABLE_KB=%lu heapUsedKB=%u arenaKB=%u freeKB=%u KEEPCOST_KB=%u poolFreeKB=%u poolLargestKB=%u poolFallbacks=%d poolOversize=%d\n",
+                tag, items, managed, cacheB / 1024, unrec / 1024,
+                (unsigned)(mi.uordblks / 1024), (unsigned)(mi.arena / 1024),
+                (unsigned)(mi.fordblks / 1024), (unsigned)(mi.keepcost / 1024),
+                poolFreeKB, poolLargestKB, gTexPoolFallbacks, gTexPoolOversize);
+    }
+#else
     fprintf(f, "%-28s items=%u managed=%lu cacheKB=%lu UNRECLAIMABLE_KB=%lu heapUsedKB=%u arenaKB=%u freeKB=%u KEEPCOST_KB=%u\n",
             tag, items, managed, cacheB / 1024, unrec / 1024,
             (unsigned)(mi.uordblks / 1024), (unsigned)(mi.arena / 1024),
             (unsigned)(mi.fordblks / 1024), (unsigned)(mi.keepcost / 1024));
+#endif
     fclose(f);
 }
 #endif
