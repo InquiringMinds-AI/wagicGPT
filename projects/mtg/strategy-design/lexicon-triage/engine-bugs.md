@@ -581,3 +581,36 @@ cleanup in the same action as UEOT expiry, lethal check suppressed across the
 pair (`skipDamageTestOnce` is the natural hook). Engine rules code: full
 single-threaded suite + a regression fixture required. Platform-independent —
 affects desktop/Vita/PSP equally; only DISCOVERED on PSP.
+
+## Counter-addition events split into two classes; replacement-style counter triggers miss most engine paths (found 2026-08-06, live PSP play)
+
+SYMPTOM (owner report): Winding Constrictor on the battlefield, Experiment One
+evolves (Winding Constrictor's own ETB triggered evolve) -> Experiment One got
+1 counter, not 2. Oracle: Constrictor is a REPLACEMENT ("that many plus one").
+
+MECHANISM (read from source, confirmed at each hop, not yet fixtured):
+- Wagic models Constrictor/Doubling-Season-style effects NOT as replacements
+  but as triggers: `@totalcounteradded(any) ... plus(N)` -> `TrTotalCounter`
+  (AllAbilities.h ~L1694), which consumes `WEventTotalCounters` and adds the
+  extra counters after the fact.
+- `WEventTotalCounters` is emitted from exactly TWO places: `AACounter` (the
+  script `counter(...)` ability, AllAbilities.cpp ~L3239/3255) and the
+  counter-cost path (ExtraCost.cpp ~L1785/1803).
+- Every OTHER engine path adds counters via raw `Counters::addCounter(...)`,
+  which emits only the low-level `WEventCounters` that `TrTotalCounter` cannot
+  see. 23 such sites across 8 files: AEvolveAbility (`source->counters->
+  addCounter(1,1)`, AllAbilities.h ~L7284) = the reported case; also sites in
+  Damage.cpp, MTGRules.cpp, MTGGameZones.cpp, MTGCardInstance.cpp,
+  ActionStack.cpp, ExtraCost.cpp, AllAbilities.cpp. So evolve, and plausibly
+  persist/undying/ETB-counters/poison paths, are all invisible to Constrictor,
+  Doubling Season, Hardened Scales, Corpsejack Menace, energy/experience
+  plus-riders, etc.
+
+FIX DIRECTION (unbuilt; choose ONE consistently): (a) emit
+`WEventTotalCounters` from `Counters::addCounter` itself (single choke point;
+must dedupe against AACounter's own emission or every scripted counter(...)
+double-fires — likely gate the AACounter/ExtraCost emissions off, or add a
+noTotalEvent flag the two current emitters set), or (b) touch all 23 raw
+sites (sprawling, will rot). (a) is the structural fix. Engine rules code:
+full single-threaded suite + a Constrictor+evolve regression fixture (the
+owner's exact scenario) before ship. Platform-independent; discovered on PSP.
