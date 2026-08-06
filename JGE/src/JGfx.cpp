@@ -330,8 +330,13 @@ void wagicTexPoolProbe(unsigned * freeKB, unsigned * largestKB)
 //texture request rides the fallback path, exactly the old allocator.
 void wagicTexPoolInit()
 {
+	//WAGIC_NO_TEXPOOL: A/B switch, not a code path for release. Skips the carve
+	//so every texture rides the counted fallback (memalign) - the pre-pool
+	//allocator exactly - while cap/probes/everything else stay constant.
+#if !defined(WAGIC_NO_TEXPOOL)
 	if (!gTexPoolInitTried)
 		texPoolInit();
+#endif
 }
 
 static void * TexAlloc(int size)
