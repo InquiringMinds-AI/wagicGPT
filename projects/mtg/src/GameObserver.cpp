@@ -1296,9 +1296,19 @@ void GameObserver::gameStateBasedEffects()
     //here is turn-gated for the same reason. The opponent's turn is already
     //covered by the reactive half: the priority window at userRequestNextGamePhase
     //only opens when the non-acting player can actually respond.
+    //The turn gate above is not enough on its own: the AI's BLOCKER declaration
+    //happens on the HUMAN's turn. During declare-blockers currentPlayer is the
+    //attacking human, so with no instant in hand this skip would advance combat
+    //before the defender's throttled Act ever declared a block - the AI was not
+    //declining to block, its window was being skipped (live-observed on PSP,
+    //2026-08-06: blocks present below this rule, absent above it). Hold whenever
+    //the OTHER seat has a combat declaration due; pendingCombatDecision is the
+    //engine's existing authority on exactly that question.
+    Player * otherSeat = humanSeat ? ((humanSeat == players[0]) ? players[1] : players[0]) : NULL;
     if (automationAllowed && humanSeat && currentPlayer == humanSeat && !isInterrupting
         && !mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
-        && !mLayers->actionLayer()->menuObject && !targetChooser)
+        && !mLayers->actionLayer()->menuObject && !targetChooser
+        && (!otherSeat || pendingCombatDecision(otherSeat) == COMBAT_DECISION_NONE))
     {
         if (mNoActionTurn != turn || mNoActionPhase != mCurrentGamePhase
             || mNoActionStep != (int) combatStep)
