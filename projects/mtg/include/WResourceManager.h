@@ -73,6 +73,12 @@ public:
     }
 
     virtual bool IsThreaded() = 0;
+
+    // Drains queued card-art decodes (unthreaded platforms). Call once per frame.
+    virtual void ServiceCacheRequests()
+    {
+    }
+
     void PlaySample(const string& fileName) {
         JSample*sample = RetrieveSample(fileName);
         if(sample) {
