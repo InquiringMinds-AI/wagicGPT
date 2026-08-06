@@ -987,6 +987,17 @@ void ResourceManagerImpl::ResetCacheLimits()
         DebugTrace( "Error, Not enough RAM for Cache: " << myNewSize << " - total Ram: " << ram);
         myNewSize = TEXTURES_CACHE_MINSIZE;
     }
+    //Hard cap. The formula above sizes the cache to ALL free heap less a fixed
+    //reserve - an overcommit on the measured 43 MiB hardware heap: uncapped, a duel's
+    //decks + abilities + GPT layer no longer fit and the PSP powers off (isolated on
+    //device 2026-08-03). The 2026-08-04 memprobe then showed WHY the cap matters even
+    //with no leak anywhere: match 1's texture churn fragments the arena, so bounding
+    //the cache bounds the HIGH-WATER MARK - the only lever under fragmentation - and
+    //a capped build degrades to lag where an uncapped one dies. 8 MB is the value the
+    //hardware rounds ran; revisit only with a slab allocator behind TexAlloc.
+    const unsigned int PSP_TEXCACHE_HARD_CAP = 8000000;
+    if (myNewSize > PSP_TEXCACHE_HARD_CAP)
+        myNewSize = PSP_TEXCACHE_HARD_CAP;
     textureWCache.Resize(MIN(myNewSize, HUGE_CACHE_LIMIT), MAX_CACHE_OBJECTS);
 #else
 #ifdef FORCE_LOW_CACHE_MEMORY
