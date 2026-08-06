@@ -373,7 +373,9 @@ bool GuiCombat::CheckUserInput(JButton key)
             }
             else if (ATK == cursor_pos)
             {
-                if (!activeAtk->blockers.empty())
+                //Render() guards this same pointer with `if (activeAtk)`, and the
+                //cancel path above can leave cursor_pos == ATK with activeAtk NULL.
+                if (activeAtk && !activeAtk->blockers.empty())
                 {
                     active = activeAtk->blockers.front();
                     active->zoom = kZoom_level3;
@@ -388,7 +390,14 @@ bool GuiCombat::CheckUserInput(JButton key)
         case JGE_BTN_CANCEL:
             if (BLK == cursor_pos)
             {
-                oldActive->zoom = kZoom_level2;
+                //oldActive is a copy of `active` taken at entry, and `active` is set
+                //to NULL by the JGE_BTN_PRI/NEXT/PREV cases below. The block right
+                //after this switch already guards it - `if (oldActive && ...)` - so
+                //this write was the one path in the function that assumed non-NULL.
+                //Reported as a crash on PSP when cancelling during damage assignment
+                //against two blockers (2026-08-03).
+                if (oldActive)
+                    oldActive->zoom = kZoom_level2;
                 active = activeAtk;
                 cursor_pos = ATK;
             }
