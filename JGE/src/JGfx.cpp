@@ -127,6 +127,28 @@ static void * TexAlloc(int size)
 		JRenderer::GetInstance()->TexMemCheckpoint();
 		p = memalign(16, size);
 	}
+	// Zero it. Texture buffers are allocated at the POWER-OF-TWO bucket size
+	// (getNextPower2(w) * getNextPower2(h)), but the loaders only write the
+	// image's own w*h pixels - so every pixel to the right of and below the
+	// image was uninitialised heap, and got rendered. That is the green block
+	// that sat under the deck-select menu for five builds: not a fill, not an
+	// asset, just whatever the allocator handed back. It moved or vanished
+	// whenever the heap layout changed, which is exactly why it survived every
+	// attempt to find the code that drew it.
+	//
+	// Cost is one clear per texture LOAD (not per frame), and it also removes
+	// the garbage that edge filtering pulls in from the pad column/row.
+	if (p)
+		memset(p, 0, size);
+	return p;
+}
+
+// Same contract for the video-RAM path, which does not go through TexAlloc.
+static void * VTexAlloc(int size)
+{
+	void * p = valloc(size);
+	if (p)
+		memset(p, 0, size);
 	return p;
 }
 
@@ -1153,11 +1175,11 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
 
         if (pixelSize == 2)
         {
-            bits16 = (u16*)valloc(size);
+            bits16 = (u16*)VTexAlloc(size);
         }
         else
         {
-            bits32 = (u32*)valloc(size);
+            bits32 = (u32*)VTexAlloc(size);
         }
         videoRAMUsed = true;
     }
@@ -1505,7 +1527,7 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char* filename, int mode,
   {
     if (useVideoRAM)
     {
-      bits = (PIXEL_TYPE*) valloc(size);
+      bits = (PIXEL_TYPE*) VTexAlloc(size);
       videoRAMUsed = true;
     }
 
@@ -1513,6 +1535,17 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char* filename, int mode,
     {
       videoRAMUsed = false;
       bits = (PIXEL_TYPE*) TexAlloc(size);
+    }
+
+    //Out of texture memory. TexMemCheckpoint deliberately does not reclaim
+    //mid-frame, so TexAlloc can legitimately return NULL here - bail out the
+    //same way the swizzle-buffer allocation below does rather than carry a
+    //NULL pointer through the decode.
+    if (bits == NULL)
+    {
+      fileSystem->CloseFile();
+      png_destroy_read_struct(&png_ptr, png_infopp_NULL, png_infopp_NULL);
+      return JGE_ERR_MALLOC_FAILED;
     }
 
     PIXEL_TYPE* buffer = bits;
@@ -1701,7 +1734,7 @@ int JRenderer::image_readgif(void * handle, TextureInfo &textureInfo, DWORD * bg
 						//bits = (PIXEL_TYPE*) (0x04000000+0x40000000+mCurrentPointer);
 						//mCurrentPointer += size;
 
-						bits = (PIXEL_TYPE*) valloc(size);
+						bits = (PIXEL_TYPE*) VTexAlloc(size);
 						videoRAMUsed = true;
 					}
 					//else
@@ -1710,6 +1743,16 @@ int JRenderer::image_readgif(void * handle, TextureInfo &textureInfo, DWORD * bg
 					{
 						videoRAMUsed = false;
 						bits = (PIXEL_TYPE*) TexAlloc(size);
+					}
+
+					//Same as the PNG path: without this, the swizzle branch below
+					//allocates its own buffer and leaves p32 non-NULL while bits stays
+					//NULL, so the copy dereferences it.
+					if (bits == NULL)
+					{
+						free((void *)LineIn);
+						DGifCloseFile(GifFileIn);
+						return 1;
 					}
 
 					PIXEL_TYPE* buffer = bits;
@@ -1870,7 +1913,7 @@ JTexture* JRenderer::CreateTexture(int width, int height, int mode)
 		if (useVideoRAM)
 		{
 			tex->mInVideoRAM = true;
-			tex->mBits = (PIXEL_TYPE*) valloc(size);
+			tex->mBits = (PIXEL_TYPE*) VTexAlloc(size);
 		}
 
 		//else
@@ -1878,6 +1921,17 @@ JTexture* JRenderer::CreateTexture(int width, int height, int mode)
 		{
 			tex->mInVideoRAM = false;
 			tex->mBits = (PIXEL_TYPE*) TexAlloc(size);
+		}
+
+		//Still NULL means the heap is exhausted. TexMemCheckpoint does not reclaim
+		//mid-frame by design, so under PSP memory pressure this is a NORMAL outcome,
+		//not an exceptional one - and memset'ing NULL is what turned it into a crash
+		//(deck editor, 2026-08-03). Callers already handle a NULL texture: the `new`
+		//above can fail the same way.
+		if (tex->mBits == NULL)
+		{
+			delete tex;
+			return NULL;
 		}
 
 		memset(tex->mBits, 0, size);
