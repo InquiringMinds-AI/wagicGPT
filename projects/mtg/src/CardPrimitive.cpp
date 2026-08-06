@@ -26,6 +26,53 @@ namespace
         }
         return count;
     }
+
+    //Sparse-field side-table: these five strings are populated on <2% of the
+    //27k resident primitives, so per-object members wasted ~3.3 MB of empty
+    //string headers on the PSP. Only populated cards get an entry here.
+    //Leaked on purpose (never destroyed): primitives can outlive static
+    //destruction order, and erase() against a destroyed map is UB at exit.
+    struct RareStrings
+    {
+        string doubleFaced;
+        string AICustomCode;
+        string CrewAbility;
+        string PhasedOutAbility;
+        string ModularValue;
+    };
+    typedef map<const CardPrimitive *, RareStrings> RareStringsTable;
+
+    RareStringsTable & rareStringsTable()
+    {
+        static RareStringsTable * table = NEW RareStringsTable();
+        return *table;
+    }
+
+    const string kNoRareString;
+
+    void setRareString(const CardPrimitive * p, string RareStrings::*field, const string & value)
+    {
+        string v = value;
+        std::transform(v.begin(), v.end(), v.begin(), ::tolower);
+        RareStringsTable & table = rareStringsTable();
+        RareStringsTable::iterator it = table.find(p);
+        if (it == table.end())
+        {
+            if (v.empty())
+                return;
+            it = table.insert(std::make_pair(p, RareStrings())).first;
+        }
+        it->second.*field = v;
+    }
+
+    const string & getRareString(const CardPrimitive * p, const string RareStrings::*field)
+    {
+        RareStringsTable & table = rareStringsTable();
+        RareStringsTable::const_iterator it = table.find(p);
+        if (it == table.end())
+            return kNoRareString;
+        return it->second.*field;
+    }
 }
 
 
@@ -70,11 +117,11 @@ CardPrimitive::CardPrimitive(CardPrimitive * source)
     formattedText = source->formattedText;
     setName(source->name);
 
-    setdoubleFaced(source->doubleFaced);
-    setAICustomCode(source->AICustomCode);
-    setCrewAbility(source->CrewAbility);
-    setPhasedOutAbility(source->PhasedOutAbility);
-    setModularValue(source->ModularValue);
+    setdoubleFaced(source->getdoubleFaced());
+    setAICustomCode(source->getAICustomCode());
+    setCrewAbility(source->getCrewAbility());
+    setPhasedOutAbility(source->getPhasedOutAbility());
+    setModularValue(source->getModularValue());
     power = source->power;
     toughness = source->toughness;
     restrictions = source->restrictions ? source->restrictions->clone() : NULL;
@@ -91,6 +138,7 @@ CardPrimitive::CardPrimitive(CardPrimitive * source)
 CardPrimitive::~CardPrimitive()
 {
     SAFE_DELETE(restrictions);
+    rareStringsTable().erase(this);
 }
 
 int CardPrimitive::init()
@@ -555,57 +603,52 @@ void CardPrimitive::addMagicText(string value, string key)
 
 void CardPrimitive::setdoubleFaced(const string& value)
 {
-    doubleFaced = value;
-    std::transform(doubleFaced.begin(), doubleFaced.end(), doubleFaced.begin(), ::tolower);
+    setRareString(this, &RareStrings::doubleFaced, value);
 }
 
 const string& CardPrimitive::getdoubleFaced() const
 {
-    return doubleFaced;
+    return getRareString(this, &RareStrings::doubleFaced);
 }
 
 void CardPrimitive::setAICustomCode(const string& value)
 {
-    AICustomCode = value;
-    std::transform(AICustomCode.begin(), AICustomCode.end(), AICustomCode.begin(), ::tolower);
+    setRareString(this, &RareStrings::AICustomCode, value);
 }
 
 const string& CardPrimitive::getAICustomCode() const
 {
-    return AICustomCode;
+    return getRareString(this, &RareStrings::AICustomCode);
 }
 
 void CardPrimitive::setCrewAbility(const string& value)
 {
-    CrewAbility = value;
-    std::transform(CrewAbility.begin(), CrewAbility.end(), CrewAbility.begin(), ::tolower);
+    setRareString(this, &RareStrings::CrewAbility, value);
 }
 
 const string& CardPrimitive::getCrewAbility() const
 {
-    return CrewAbility;
+    return getRareString(this, &RareStrings::CrewAbility);
 }
 
 void CardPrimitive::setPhasedOutAbility(const string& value)
 {
-    PhasedOutAbility = value;
-    std::transform(PhasedOutAbility.begin(), PhasedOutAbility.end(), PhasedOutAbility.begin(), ::tolower);
+    setRareString(this, &RareStrings::PhasedOutAbility, value);
 }
 
 const string& CardPrimitive::getPhasedOutAbility() const
 {
-    return PhasedOutAbility;
+    return getRareString(this, &RareStrings::PhasedOutAbility);
 }
 
 void CardPrimitive::setModularValue(const string& value)
 {
-    ModularValue = value;
-    std::transform(ModularValue.begin(), ModularValue.end(), ModularValue.begin(), ::tolower);
+    setRareString(this, &RareStrings::ModularValue, value);
 }
 
 const string& CardPrimitive::getModularValue() const
 {
-    return ModularValue;
+    return getRareString(this, &RareStrings::ModularValue);
 }
 
 void CardPrimitive::setName(const string& value)

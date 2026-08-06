@@ -71,19 +71,19 @@ public:
     int toughness;
     int suspendedTime;
     int dredgeAmount;
-    string doubleFaced;
+    //doubleFaced/AICustomCode/CrewAbility/PhasedOutAbility/ModularValue are
+    //populated on <2% of cards but a std::string member costs 24 bytes empty
+    //on the 32-bit PSP - 5 of them across 27k resident primitives was 3.3 MB
+    //of empty string headers. Storage lives in a side-table in
+    //CardPrimitive.cpp keyed by primitive; only populated cards pay.
     void setdoubleFaced(const string& value);
     const string& getdoubleFaced() const;
-    string AICustomCode;
     void setAICustomCode(const string& value);
     const string& getAICustomCode() const;
-    string CrewAbility;
     void setCrewAbility(const string& value);
     const string& getCrewAbility() const;
-    string PhasedOutAbility;
     void setPhasedOutAbility(const string& value);
     const string& getPhasedOutAbility() const;
-    string ModularValue;
     void setModularValue(const string& value);
     const string& getModularValue() const;
 

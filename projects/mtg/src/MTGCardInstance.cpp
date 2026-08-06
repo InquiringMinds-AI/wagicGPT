@@ -176,11 +176,11 @@ void MTGCardInstance::copy(MTGCardInstance * card, bool nolegend)
     alias = data->alias;
     copiedID = card->copiedID;
     copiedSetID = card->setId;
-    doubleFaced = data->doubleFaced;
-    AICustomCode = data->AICustomCode;
-    CrewAbility = data->CrewAbility;
-    ModularValue = data->ModularValue;
-    PhasedOutAbility = data->PhasedOutAbility;
+    setdoubleFaced(data->getdoubleFaced());
+    setAICustomCode(data->getAICustomCode());
+    setCrewAbility(data->getCrewAbility());
+    setModularValue(data->getModularValue());
+    setPhasedOutAbility(data->getPhasedOutAbility());
     origpower = card->origpower;//for flip
     origtoughness = card->origtoughness;//for flip
     TokenAndAbility = card->TokenAndAbility;//token andAbility
