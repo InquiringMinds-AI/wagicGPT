@@ -54,8 +54,24 @@ The content that users should not be touching.
 
 JFileSystem* JFileSystem::mInstance = NULL;
 
+#if defined(PSP) && defined(WAGIC_MEMPROBE)
+//Load-probe accumulators (read by JGfx.cpp's LoadJPG probe). Zip attach and
+//central-directory parse costs land BEFORE LoadJPG entry (cardFile resolves
+//the path first), so per-load attribution is done by delta-since-last-load.
+#include <pspkernel.h>
+unsigned int gLoadProbeAttachUs = 0;  //time spent switching zips in AttachZipFile
+unsigned int gLoadProbeAttachN = 0;   //zip switches (same-zip early-outs not counted)
+unsigned int gLoadProbeParseUs = 0;   //time spent parsing central dirs in preloadZip
+unsigned int gLoadProbeParseN = 0;
+unsigned int gLoadProbeWipeN = 0;     //clearZipCache() full-cache wipes
+#endif
+
 JZipCache::JZipCache()
+    : lastUse(0)
 {}
+
+//LRU tick for the zip-directory cache; bumped on every cache touch.
+static unsigned int gZipCacheTick = 0;
 
 JZipCache::~JZipCache()
 {
@@ -72,20 +88,43 @@ void JFileSystem::preloadZip(const string& filename)
     map<string,JZipCache *>::iterator it = mZipCache.find(filename);
     if (it != mZipCache.end()) return;
 
-    // Zip directory cache limit.  PSP original: 4500 entries (~200KB).
-    // Vita has 256MB RAM so we cache much more, which avoids expensive zip
-    // central-directory re-parsing when browsing large card collections.
-#if defined(VITA)
-    const int zipCacheLimit = 80000;   // ~3.6MB, covers all 75k+ card entries
-#else
-    const int zipCacheLimit = 4500;    // PSP / desktop original
+#if defined(PSP) && defined(WAGIC_MEMPROBE)
+    unsigned int probeT0 = sceKernelGetSystemTimeLow();
 #endif
-    if (mZipCachedElementsCount > zipCacheLimit)
+
+    // Zip directory cache limit.  PSP original: 4500 entries (~200KB) with a
+    // WIPE-EVERYTHING eviction — measured on hardware 2026-08-06: 31 full
+    // wipes in one short session, each forcing central-directory re-parses
+    // that cost up to 5 SECONDS per set on the memory stick. Now: bigger cap
+    // + per-zip LRU eviction, so browsing evicts the stalest set instead of
+    // nuking the cache.
+#if defined(VITA)
+    const unsigned int zipCacheLimit = 80000;   // ~3.6MB, covers all 75k+ card entries
+#elif defined(PSP)
+    const unsigned int zipCacheLimit = 12000;   // ~0.5-1MB of the diet's heap margin
+#else
+    const unsigned int zipCacheLimit = 12000;
+#endif
+    while (mZipCachedElementsCount > zipCacheLimit && mZipCache.size() > 1)
     {
-        clearZipCache();
+        map<string,JZipCache *>::iterator victim = mZipCache.end();
+        for (map<string,JZipCache *>::iterator lru = mZipCache.begin(); lru != mZipCache.end(); ++lru)
+        {
+            if (lru->first == filename) continue;
+            if (victim == mZipCache.end() || lru->second->lastUse < victim->second->lastUse)
+                victim = lru;
+        }
+        if (victim == mZipCache.end()) break;
+        mZipCachedElementsCount -= victim->second->dir.size();
+        delete victim->second;
+        mZipCache.erase(victim);
+#if defined(PSP) && defined(WAGIC_MEMPROBE)
+        gLoadProbeWipeN++;   //now counts single-zip LRU evictions, not full wipes
+#endif
     }
 
     JZipCache * cache = new JZipCache();
+    cache->lastUse = ++gZipCacheTick;
     mZipCache[filename] = cache;
 
     if (!mZipAvailable || !mZipFile) {
@@ -101,6 +140,11 @@ void JFileSystem::preloadZip(const string& filename)
     {
         DetachZipFile();
     }
+
+#if defined(PSP) && defined(WAGIC_MEMPROBE)
+    gLoadProbeParseUs += sceKernelGetSystemTimeLow() - probeT0;
+    gLoadProbeParseN++;
+#endif
 }
 
 
@@ -284,6 +328,9 @@ bool JFileSystem::AttachZipFile(const string &zipfile, char *password /* = NULL 
             return true;
     }
 #endif
+#if defined(PSP) && defined(WAGIC_MEMPROBE)
+    unsigned int probeT0 = sceKernelGetSystemTimeLow();
+#endif
     mZipFileName = zipfile;
     mPassword = password;
 
@@ -304,6 +351,10 @@ bool JFileSystem::AttachZipFile(const string &zipfile, char *password /* = NULL 
             return false;
     }
     mZipAvailable = true;
+#if defined(PSP) && defined(WAGIC_MEMPROBE)
+    gLoadProbeAttachUs += sceKernelGetSystemTimeLow() - probeT0;
+    gLoadProbeAttachN++;
+#endif
     return true;
 
 }
@@ -412,6 +463,7 @@ bool JFileSystem::OpenFile(const string &filename)
         return openForRead(mFile, filename);
     }
     JZipCache * zc = it->second;
+    zc->lastUse = ++gZipCacheTick;
     map<string,  zip_file_system::filesystem::limited_file_info>::iterator it2 = zc->dir.find(filename);
     if (it2 == zc->dir.end())
     {

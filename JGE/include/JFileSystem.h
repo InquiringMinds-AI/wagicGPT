@@ -26,7 +26,7 @@ public:
   JZipCache();
   ~JZipCache();
   map<string, zip_file_system::filesystem::limited_file_info> dir;
-  
+  unsigned int lastUse;   //LRU tick, bumped on every OpenFile hit
 };
 
 class JFileSystem {

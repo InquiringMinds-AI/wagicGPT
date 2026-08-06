@@ -165,26 +165,82 @@ int gTexPoolOversize = 0;    /* probe-visible */
 //worker, so the freelists need a real lock; the critical sections are a few
 //dozen instructions.
 #if defined(WAGIC_MEMPROBE)
+static unsigned int gCrumbUs = 0;
+#endif
+#if defined(WAGIC_MEMPROBE) && defined(WAGIC_POOLCRUMB)
 //Breadcrumb channel for the 2026-08-06 hardware-only first-pool-use crash:
 //fopen/append/fclose per line so the last line before a crash-to-off names
 //the dying step. Proven channel (User/ lands on ms0 next to the EBOOT).
+//⚠ MEASURED COST (loadprobe, 2026-08-06): ~690ms PER CARD LOAD — arm this
+//only for an active crash hunt, never in a build meant to be played.
+//gCrumbUs tracks the stick-I/O cost of the crumbs themselves so the load
+//probe can report stage timings net of probe overhead.
 static void texPoolCrumb(const char * fmt, unsigned a, unsigned b)
 {
+	unsigned int t0 = sceKernelGetSystemTimeLow();
 	FILE * f = fopen("User/wagic-poolcrumb.log", "a");
-	if (!f) return;
-	fprintf(f, fmt, a, b);
-	fclose(f);
+	if (f)
+	{
+		fprintf(f, fmt, a, b);
+		fclose(f);
+	}
+	gCrumbUs += sceKernelGetSystemTimeLow() - t0;
 }
 static void texPoolCrumbS(const char * fmt, const char * s)
 {
+	unsigned int t0 = sceKernelGetSystemTimeLow();
 	FILE * f = fopen("User/wagic-poolcrumb.log", "a");
-	if (!f) return;
-	fprintf(f, fmt, s ? s : "?");
-	fclose(f);
+	if (f)
+	{
+		fprintf(f, fmt, s ? s : "?");
+		fclose(f);
+	}
+	gCrumbUs += sceKernelGetSystemTimeLow() - t0;
 }
 #else
 #define texPoolCrumb(fmt, a, b) ((void)0)
 #define texPoolCrumbS(fmt, s) ((void)0)
+#endif
+
+#if defined(WAGIC_MEMPROBE)
+//Per-load stage-timing probe (User/wagic-loadprobe.log). Buffered and
+//batch-flushed so the probe's own stick I/O stays out of the numbers it
+//reports; worst case a power-off loses the last <16 lines.
+extern unsigned int gLoadProbeAttachUs, gLoadProbeAttachN;
+extern unsigned int gLoadProbeParseUs, gLoadProbeParseN;
+extern unsigned int gLoadProbeWipeN;
+static char gLoadProbeBuf[8192];
+static int gLoadProbeLen = 0;
+static int gLoadProbeLines = 0;
+static void loadProbeFlush()
+{
+	if (!gLoadProbeLen) return;
+	FILE * f = fopen("User/wagic-loadprobe.log", "a");
+	if (f)
+	{
+		fwrite(gLoadProbeBuf, 1, gLoadProbeLen, f);
+		fclose(f);
+	}
+	gLoadProbeLen = 0;
+	gLoadProbeLines = 0;
+}
+static void loadProbeLine(const char * filename, int rawsize,
+	unsigned openUs, unsigned readUs, unsigned decUs, unsigned finUs,
+	unsigned attUs, unsigned attN, unsigned prsUs, unsigned prsN,
+	unsigned wipeN, unsigned crumbUs)
+{
+	int room = (int)sizeof(gLoadProbeBuf) - gLoadProbeLen;
+	if (room < 256) loadProbeFlush();
+	room = (int)sizeof(gLoadProbeBuf) - gLoadProbeLen;
+	int n = snprintf(gLoadProbeBuf + gLoadProbeLen, room,
+		"ld %s sz=%d open=%u read=%u dec=%u fin=%u att=%u/%u prs=%u/%u wipe=%u crumb=%u\n",
+		filename ? filename : "?", rawsize,
+		openUs, readUs, decUs, finUs, attUs, attN, prsUs, prsN, wipeN, crumbUs);
+	if (n > 0 && n < room) gLoadProbeLen += n;
+	if (++gLoadProbeLines >= 16) loadProbeFlush();
+}
+#else
+#define loadProbeFlush() ((void)0)
 #endif
 
 static void texPoolLock()   { if (gTexPoolSema >= 0) sceKernelWaitSema(gTexPoolSema, 1, NULL); }
@@ -438,6 +494,7 @@ JRenderer* JRenderer::GetInstance()
 
 void JRenderer::Destroy()
 {
+	loadProbeFlush();
 	if (mInstance)
 	{
 		mInstance->DestroyRenderer();
@@ -1352,6 +1409,10 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
 {
 	texPoolCrumbS("jpg: begin %s\n", filename);
   JLOG("JRenderer::LoadJPG");
+#if defined(WAGIC_MEMPROBE)
+	unsigned int probeT0 = sceKernelGetSystemTimeLow();
+	unsigned int probeTOpen = 0, probeTRead = 0, probeTDec = 0;
+#endif
 	textureInfo.mBits = NULL;
 
 	bool useVideoRAM = (mode == TEX_TYPE_USE_VRAM);
@@ -1372,6 +1433,10 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
                 return;
         }
 
+#if defined(WAGIC_MEMPROBE)
+        probeTOpen = sceKernelGetSystemTimeLow();
+#endif
+
         rawsize = fileSystem->GetFileSize();
 
         rawdata = new u8[rawsize];
@@ -1385,6 +1450,10 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
         fileSystem->ReadFile(rawdata, rawsize);
         fileSystem->CloseFile();
 
+#if defined(WAGIC_MEMPROBE)
+        probeTRead = sceKernelGetSystemTimeLow();
+#endif
+
 
         cinfo.err = jpeg_std_error(&jerr);
         jpeg_create_decompress(&cinfo);
@@ -1393,6 +1462,12 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
 
 
 	jpeg_read_header(&cinfo, true);
+
+	//JDCT_ISLOW (the default) measured ~235ms median per card on the PSP's
+	//333MHz MIPS (loadprobe 2026-08-06). IFAST + plain upsampling trade
+	//accuracy no one can see at PSP screen scale for a large decode speedup.
+	cinfo.dct_method = JDCT_IFAST;
+	cinfo.do_fancy_upsampling = FALSE;
 
 	jpeg_start_decompress(&cinfo);
 
@@ -1533,6 +1608,9 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
     }
 
 	TexFree(scanline);
+#if defined(WAGIC_MEMPROBE)
+	probeTDec = sceKernelGetSystemTimeLow();
+#endif
 	texPoolCrumb("jpg: decoded\n", 0, 0);
 
     try
@@ -1567,6 +1645,25 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
     jpeg_destroy_decompress(&cinfo);
     delete [] rawdata;
     JLOG("-- OK  -- JRenderer::LoadJPG");
+#if defined(WAGIC_MEMPROBE)
+	{
+		//Deltas since the previous load line attribute the zip attach/parse
+		//work (which runs in cardFile, before this function) to this load.
+		unsigned int tFin = sceKernelGetSystemTimeLow();
+		static unsigned int lastAttachUs = 0, lastAttachN = 0;
+		static unsigned int lastParseUs = 0, lastParseN = 0;
+		static unsigned int lastWipeN = 0, lastCrumbUs = 0;
+		loadProbeLine(filename, rawsize,
+			probeTOpen - probeT0, probeTRead - probeTOpen,
+			probeTDec - probeTRead, tFin - probeTDec,
+			gLoadProbeAttachUs - lastAttachUs, gLoadProbeAttachN - lastAttachN,
+			gLoadProbeParseUs - lastParseUs, gLoadProbeParseN - lastParseN,
+			gLoadProbeWipeN - lastWipeN, gCrumbUs - lastCrumbUs);
+		lastAttachUs = gLoadProbeAttachUs; lastAttachN = gLoadProbeAttachN;
+		lastParseUs = gLoadProbeParseUs; lastParseN = gLoadProbeParseN;
+		lastWipeN = gLoadProbeWipeN; lastCrumbUs = gCrumbUs;
+	}
+#endif
 	texPoolCrumb("jpg: return\n", 0, 0);
 }
 
