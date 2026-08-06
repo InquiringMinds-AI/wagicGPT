@@ -186,7 +186,11 @@ void GameStateDeckViewer::toggleSB_CMD_DNG()
 void GameStateDeckViewer::updateDecks()
 {
     SAFE_DELETE(welcome_menu);
-    welcome_menu = NEW DeckEditorMenu(MENU_DECK_SELECTION, this, Fonts::OPTION_FONT, "Choose Deck To Edit");
+    //No title on the deck-selection screen. The title box is 180px wide and centred
+    //at x=110, so on PSP this string was clipped ("hoose Deck To Edit") and it sat on
+    //top of the deck art. The screen is self-evident without it. (DeckMenu::Render
+    //already skips an empty title.)
+    welcome_menu = NEW DeckEditorMenu(MENU_DECK_SELECTION, this, Fonts::OPTION_FONT, "");
     vector<DeckMetaData *> playerDeckList = fillDeckMenu(welcome_menu, options.profileFile(), "", NULL, 0, GAME_TYPE_CLASSIC, true); // Show all decks in deck editor menu...
 
     newDeckname = "";
@@ -217,8 +221,57 @@ void GameStateDeckViewer::buildEditorMenu()
     deckMenu->Add(MENU_ITEM_EDITOR_CANCEL, _("Cancel"), _("Close menu."));
 }
 
+//Deck-editor probe channel (opt-in: compile with -DWAGIC_DECKPROBE). The editor is the densest allocator in the app and the one screen
+//that loops on hardware, and it had no probes at all - every memory figure this
+//project has for the PSP came from PPSSPP. These log the REAL heap at every
+//stage transition, so the loop writes its own trace.
+//WAGIC_DECKPROBE is DELIBERATELY its own switch, not part of WAGIC_HWPROBE.
+//HWPROBE also turns on gfxProbe, which fopen/append/fcloses the log on EVERY
+//TEXTURE LOAD - in the deck editor, the screen that loads textures continuously,
+//that is relentless Memory Stick I/O. It would slow the editor to a crawl and
+//change the timing of the very failure being measured, which is the classic way
+//an instrument destroys its own reading. This switch writes a handful of lines
+//per session instead, and is capped below so a stage oscillation cannot turn it
+//into the same problem.
+#if defined(WAGIC_DECKPROBE)
+#include <malloc.h>
+#include <stdarg.h>
+#if defined(PSP)
+//Bounded _sbrk in JGE/src/main.cpp owns the heap, so these are arithmetic, not
+//probing (the SDK's probe idiom is deleted by allocation elision under GCC 15).
+extern "C" unsigned int wagicHeapFreeBytes(void);
+extern "C" unsigned int wagicHeapLargestBlock(void);
+#endif
+static void deckProbe(const char* fmt, ...)
+{
+    //Hard cap. The failure under measurement is a stage OSCILLATION, so the
+    //write rate is set by the bug, not by the code - unbounded, this would
+    //become the per-texture logging it was written to avoid. 200 lines is far
+    //more than enough to see the trend and cannot flood the stick.
+    static int sWrites = 0;
+    if (sWrites >= 200) return;
+    sWrites++;
+    FILE* f = fopen("User/wagic-probe.log", "a");
+    if (!f) return;
+    va_list ap; va_start(ap, fmt); vfprintf(f, fmt, ap); va_end(ap);
+    struct mallinfo mi = mallinfo();
+#if defined(PSP)
+    fprintf(f, " used=%u arena=%u heapfree=%u largest=%u\n",
+            (unsigned) mi.uordblks, (unsigned) mi.arena,
+            wagicHeapFreeBytes(), wagicHeapLargestBlock());
+#else
+    fprintf(f, " used=%u arena=%u\n", (unsigned) mi.uordblks, (unsigned) mi.arena);
+#endif
+    fclose(f);
+}
+#define DECK_PROBE(...) deckProbe(__VA_ARGS__)
+#else
+#define DECK_PROBE(...) do {} while (0)
+#endif
+
 void GameStateDeckViewer::Start()
 {
+    DECK_PROBE("deckviewer: Start");
     hudAlpha = 0;
     mSwitching = false;
     subMenu = NULL;
@@ -648,7 +701,19 @@ void GameStateDeckViewer::toggleView()
 }
 
 void GameStateDeckViewer::Update(float dt)
-{   
+{
+    //One line per stage CHANGE, not per frame: the menu<->carousel loop is a
+    //stage oscillation, so this records each flip with the heap at that moment.
+    //If memory is falling across flips the loop is eviction thrash; if it is
+    //flat, the loop is a state-machine fault and memory is a red herring.
+    {
+        static int sLastProbedStage = -999;
+        if ((int) mStage != sLastProbedStage)
+        {
+            sLastProbedStage = (int) mStage;
+            DECK_PROBE("deckviewer: stage=%d", (int) mStage);
+        }
+    }
     if (options.keypadActive())
     {
         options.keypadUpdate(dt);
@@ -1609,12 +1674,20 @@ void GameStateDeckViewer::Render()
     /*if (mView->deck() == myDeck && mStage != STAGE_MENU)
         renderDeckBackground();*/
 #else
-    JTexture * wpTex = WResourceManager::Instance()->RetrieveTexture("pspbgdeckeditor.jpg");
-    if (wpTex)
-    {
-        JQuadPtr wpQuad = WResourceManager::Instance()->RetrieveTempQuad("pspbgdeckeditor.jpg");
-        JRenderer::GetInstance()->RenderQuad(wpQuad.get(), 0, 0, 0, SCREEN_WIDTH_F / wpQuad->mWidth, SCREEN_HEIGHT_F / wpQuad->mHeight);
-    }
+    //PSP: no background image. This used to RetrieveTexture("pspbgdeckeditor.jpg")
+    //EVERY FRAME, and a full-screen JPEG cannot coexist with the carousel's
+    //thumbnails in the texture cache: the background evicted the thumbnails, the
+    //thumbnails evicted the background, and each swap re-decoded a JPEG out of the
+    //zip. Observed on hardware 2026-08-03 as the deck editor freezing in bursts
+    //until the background stopped coming back, after which it ran normally.
+    //
+    //Dropping it is also the better screen. The panel darkening that makes the text
+    //readable is a filled translucent rect, not this image, so it is unaffected, and
+    //the cards showing through are legible on their own. Owner's call after seeing it.
+    //
+    //(The removed code also called RenderQuad(wpQuad.get(), ...) with no null check,
+    //unlike the non-PSP branch above - the same NULL dereference family as the
+    //TexAlloc callers in JGfx.cpp.)
     /*if (mView->deck() == myDeck && mStage != STAGE_MENU)
         renderDeckBackground();*/
 #endif
