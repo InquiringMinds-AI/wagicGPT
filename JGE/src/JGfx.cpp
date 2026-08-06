@@ -105,10 +105,12 @@ JTexture::JTexture()
 static std::vector<void*> gDeferredFreesRam;
 static std::vector<void*> gDeferredFreesVram;
 
+static void TexFree(void * p);
+
 static void FlushDeferredTextureFrees()
 {
 	for (size_t i = 0; i < gDeferredFreesVram.size(); ++i) vfree(gDeferredFreesVram[i]);
-	for (size_t i = 0; i < gDeferredFreesRam.size(); ++i) free(gDeferredFreesRam[i]);
+	for (size_t i = 0; i < gDeferredFreesRam.size(); ++i) TexFree(gDeferredFreesRam[i]);
 	gDeferredFreesVram.clear();
 	gDeferredFreesRam.clear();
 }
@@ -119,27 +121,251 @@ static bool gInFrame = false;
 // pixels (deferred frees wait for the frame's sceGuSync) until allocation
 // fails. Texture-pixel allocations route through here: on failure, reclaim
 // via TexMemCheckpoint and retry once.
+//---------------------------------------------------------------------------
+// Texture-pixel slab pool.
+//
+// WHY: the 2026-08-06 memprobe proved the cross-match crash-to-off is heap
+// FRAGMENTATION, not a leak: after one match the arena holds 6-7 MB of free
+// space shattered into fragments no 256 KB card texture can use, so every
+// texture load extends the arena toward the ~44 MB ceiling until the PSP
+// powers off. Texture pixels are the only allocation class with that shape -
+// large, uniform, high-churn - so they get their own region, carved once,
+// where a freed slot is exactly reusable forever and the general heap never
+// sees texture churn again.
+//
+// Shape: a bounded buddy allocator, orders 32 KB..512 KB, over one 8 MB
+// region. The orders mirror the real texture population: 32 KB thumbnails,
+// 256 KB card faces (180x250 -> 256x256), 512 KB chrome (480x255 -> 512x256).
+// Oversize or pool-exhausted requests fall back to the old memalign path and
+// are counted - the fallback is a pressure gauge, not an error. If the carve
+// itself fails at init, everything falls back and behaviour is exactly the
+// old allocator.
+#define TEXPOOL_BYTES      (8u * 1024u * 1024u)
+#define TEXPOOL_MIN_SHIFT  15                          /* order 0 = 32 KB */
+#define TEXPOOL_MAX_ORDER  4                           /* 32 KB << 4 = 512 KB */
+#define TEXPOOL_UNITS      (TEXPOOL_BYTES >> TEXPOOL_MIN_SHIFT)
+
+static u8 *  gTexPoolBase = NULL;
+static int   gTexPoolInitTried = 0;
+static int   gTexPoolFreeHead[TEXPOOL_MAX_ORDER + 1];
+static short gTexPoolNext[TEXPOOL_UNITS];
+static signed char gTexPoolFreeOrder[TEXPOOL_UNITS];   /* order if a FREE block heads here, else -1 */
+static signed char gTexPoolAllocOrder[TEXPOOL_UNITS];  /* order if a LIVE block heads here, else -1 */
+static SceUID gTexPoolSema = -1;
+int gTexPoolFallbacks = 0;   /* probe-visible */
+int gTexPoolOversize = 0;    /* probe-visible */
+
+//CreateTexture runs on the main thread while card decodes run on the cache
+//worker, so the freelists need a real lock; the critical sections are a few
+//dozen instructions.
+#if defined(WAGIC_MEMPROBE)
+//Breadcrumb channel for the 2026-08-06 hardware-only first-pool-use crash:
+//fopen/append/fclose per line so the last line before a crash-to-off names
+//the dying step. Proven channel (User/ lands on ms0 next to the EBOOT).
+static void texPoolCrumb(const char * fmt, unsigned a, unsigned b)
+{
+	FILE * f = fopen("User/wagic-poolcrumb.log", "a");
+	if (!f) return;
+	fprintf(f, fmt, a, b);
+	fclose(f);
+}
+static void texPoolCrumbS(const char * fmt, const char * s)
+{
+	FILE * f = fopen("User/wagic-poolcrumb.log", "a");
+	if (!f) return;
+	fprintf(f, fmt, s ? s : "?");
+	fclose(f);
+}
+#else
+#define texPoolCrumb(fmt, a, b) ((void)0)
+#define texPoolCrumbS(fmt, s) ((void)0)
+#endif
+
+static void texPoolLock()   { if (gTexPoolSema >= 0) sceKernelWaitSema(gTexPoolSema, 1, NULL); }
+static void texPoolUnlock() { if (gTexPoolSema >= 0) sceKernelSignalSema(gTexPoolSema, 1); }
+
+static void texPoolInit()
+{
+	gTexPoolInitTried = 1;
+	//Timing is load-bearing BOTH ways, each learned from a crash-to-off
+	//(2026-08-06): carving lazily at first texture put the carve in front of
+	//the primitives-load transient, which needs ~35 MB to itself; carving at
+	//the MENU left the boot-era textures on the general heap so the pool was
+	//pure addition and the duel-init spike went over the ceiling at "Play".
+	//So: carve at APP START, before anything loads - the heap is empty, the
+	//carve is guaranteed contiguous, and every texture the program ever loads
+	//lives in the pool the general heap never has to host.
+	texPoolCrumb("carve: begin bytes=%u units=%u\n", TEXPOOL_BYTES, (unsigned) TEXPOOL_UNITS);
+	u8 * base = (u8 *) memalign(16, TEXPOOL_BYTES);
+	texPoolCrumb("carve: memalign=%08x\n", (unsigned) base, 0);
+	if (!base)
+		return;
+	for (int o = 0; o <= TEXPOOL_MAX_ORDER; ++o) gTexPoolFreeHead[o] = -1;
+	for (int u = 0; u < (int) TEXPOOL_UNITS; ++u)
+	{
+		gTexPoolFreeOrder[u] = -1;
+		gTexPoolAllocOrder[u] = -1;
+	}
+	const int top = 1 << TEXPOOL_MAX_ORDER;
+	for (int u = (int) TEXPOOL_UNITS - top; u >= 0; u -= top)
+	{
+		gTexPoolNext[u] = (short) gTexPoolFreeHead[TEXPOOL_MAX_ORDER];
+		gTexPoolFreeHead[TEXPOOL_MAX_ORDER] = u;
+		gTexPoolFreeOrder[u] = TEXPOOL_MAX_ORDER;
+	}
+	texPoolCrumb("carve: lists ready\n", 0, 0);
+	gTexPoolSema = sceKernelCreateSema("wagictexpool", 0, 1, 1, NULL);
+	texPoolCrumb("carve: sema=%d\n", (unsigned) gTexPoolSema, 0);
+	//Publish LAST: the cache worker thread calls texPoolAlloc concurrently and
+	//gates on gTexPoolBase - setting it before the freelists exist hands out
+	//wild pointers.
+	gTexPoolBase = base;
+}
+
+static void * texPoolAlloc(int size)
+{
+	if (!gTexPoolBase || size <= 0)
+		return NULL;
+	if (size > (1 << (TEXPOOL_MIN_SHIFT + TEXPOOL_MAX_ORDER)))
+	{
+		++gTexPoolOversize;
+		return NULL;
+	}
+	int order = 0;
+	while ((1 << (TEXPOOL_MIN_SHIFT + order)) < size) ++order;
+	texPoolLock();
+	int o = order;
+	while (o <= TEXPOOL_MAX_ORDER && gTexPoolFreeHead[o] < 0) ++o;
+	if (o > TEXPOOL_MAX_ORDER)
+	{
+		texPoolUnlock();
+		return NULL;
+	}
+	int u = gTexPoolFreeHead[o];
+	gTexPoolFreeHead[o] = gTexPoolNext[u];
+	gTexPoolFreeOrder[u] = -1;
+	while (o > order)   /* split down, freeing the upper buddy at each level */
+	{
+		--o;
+		int buddy = u + (1 << o);
+		gTexPoolNext[buddy] = (short) gTexPoolFreeHead[o];
+		gTexPoolFreeHead[o] = buddy;
+		gTexPoolFreeOrder[buddy] = (signed char) o;
+	}
+	gTexPoolAllocOrder[u] = (signed char) order;
+	texPoolUnlock();
+	return gTexPoolBase + ((unsigned) u << TEXPOOL_MIN_SHIFT);
+}
+
+static void texPoolFree(void * p)
+{
+	int u = (int) (((u8 *) p - gTexPoolBase) >> TEXPOOL_MIN_SHIFT);
+	texPoolLock();
+	int o = gTexPoolAllocOrder[u];
+	gTexPoolAllocOrder[u] = -1;
+	if (o < 0)
+	{
+		//Double-free or a pointer that never headed a live block: drop it
+		//rather than corrupt the freelists.
+		texPoolUnlock();
+		return;
+	}
+	while (o < TEXPOOL_MAX_ORDER)
+	{
+		int buddy = u ^ (1 << o);
+		if (gTexPoolFreeOrder[buddy] != o)
+			break;
+		int prev = -1, it = gTexPoolFreeHead[o];
+		while (it >= 0 && it != buddy) { prev = it; it = gTexPoolNext[it]; }
+		if (it < 0)
+			break;
+		if (prev < 0) gTexPoolFreeHead[o] = gTexPoolNext[buddy];
+		else          gTexPoolNext[prev] = gTexPoolNext[buddy];
+		gTexPoolFreeOrder[buddy] = -1;
+		if (buddy < u) u = buddy;
+		++o;
+	}
+	gTexPoolNext[u] = (short) gTexPoolFreeHead[o];
+	gTexPoolFreeHead[o] = u;
+	gTexPoolFreeOrder[u] = (signed char) o;
+	texPoolUnlock();
+}
+
+static int texPoolOwns(void * p)
+{
+	return gTexPoolBase && (u8 *) p >= gTexPoolBase && (u8 *) p < gTexPoolBase + TEXPOOL_BYTES;
+}
+
+//The free counterpart of TexAlloc: pool blocks go back to the pool, everything
+//else (fallback allocations, pre-pool pointers) to the general heap.
+static void TexFree(void * p)
+{
+	if (!p) return;
+	if (texPoolOwns(p)) texPoolFree(p);
+	else free(p);
+}
+
+//Probe hook (WAGIC_MEMPROBE builds print these): pool free space and the
+//largest request the pool could satisfy right now.
+void wagicTexPoolProbe(unsigned * freeKB, unsigned * largestKB)
+{
+	unsigned freeB = 0, largest = 0;
+	if (gTexPoolBase)
+	{
+		texPoolLock();
+		for (int o = 0; o <= TEXPOOL_MAX_ORDER; ++o)
+			for (int it = gTexPoolFreeHead[o]; it >= 0; it = gTexPoolNext[it])
+			{
+				unsigned b = 1u << (TEXPOOL_MIN_SHIFT + o);
+				freeB += b;
+				if (b > largest) largest = b;
+			}
+		texPoolUnlock();
+	}
+	if (freeKB) *freeKB = freeB / 1024;
+	if (largestKB) *largestKB = largest / 1024;
+}
+
+//Called by the game layer once set loading completes; until then every
+//texture request rides the fallback path, exactly the old allocator.
+void wagicTexPoolInit()
+{
+	if (!gTexPoolInitTried)
+		texPoolInit();
+}
+
 static void * TexAlloc(int size)
 {
-	void * p = memalign(16, size);
+#if defined(WAGIC_MEMPROBE)
+	static int sTraceLeft = 40;   //first forty allocations, then silence
+	if (sTraceLeft > 0) { --sTraceLeft; texPoolCrumb("texalloc: size=%u\n", (unsigned) size, 0); }
+#endif
+	void * p = texPoolAlloc(size);
+#if defined(WAGIC_MEMPROBE)
+	if (sTraceLeft >= 0 && sTraceLeft < 40) texPoolCrumb("texalloc: got=%08x pool=%u\n", (unsigned) p, p ? (unsigned) texPoolOwns(p) : 0);
+#endif
 	if (!p)
 	{
-		JRenderer::GetInstance()->TexMemCheckpoint();
+		//Fallback: the old path, counted. Oversize textures and a saturated
+		//pool land here and fragment the general heap as before - the
+		//counters are the signal that the pool needs retuning.
+		++gTexPoolFallbacks;
 		p = memalign(16, size);
+		if (!p)
+		{
+			JRenderer::GetInstance()->TexMemCheckpoint();
+			p = memalign(16, size);
+		}
 	}
-	// Zero it. Texture buffers are allocated at the POWER-OF-TWO bucket size
-	// (getNextPower2(w) * getNextPower2(h)), but the loaders only write the
-	// image's own w*h pixels - so every pixel to the right of and below the
-	// image was uninitialised heap, and got rendered. That is the green block
-	// that sat under the deck-select menu for five builds: not a fill, not an
-	// asset, just whatever the allocator handed back. It moved or vanished
-	// whenever the heap layout changed, which is exactly why it survived every
-	// attempt to find the code that drew it.
-	//
-	// Cost is one clear per texture LOAD (not per frame), and it also removes
-	// the garbage that edge filtering pulls in from the pad column/row.
+	// Zero it. Pool slots are recycled dirty, and texture buffers are sized at
+	// the POWER-OF-TWO bucket while loaders only write the image's own w*h
+	// pixels - unzeroed, the pad column and row render as garbage (the roaming
+	// green block, 2026-08-03). One clear per texture LOAD, not per frame.
 	if (p)
 		memset(p, 0, size);
+#if defined(WAGIC_MEMPROBE)
+	if (sTraceLeft >= 0 && sTraceLeft < 40) texPoolCrumb("texalloc: zeroed\n", 0, 0);
+#endif
 	return p;
 }
 
@@ -147,8 +373,10 @@ static void * TexAlloc(int size)
 static void * VTexAlloc(int size)
 {
 	void * p = valloc(size);
+	texPoolCrumb("vtex: size=%u got=%08x\n", (unsigned) size, (unsigned) p);
 	if (p)
 		memset(p, 0, size);
+	texPoolCrumb("vtex: zeroed\n", 0, 0);
 	return p;
 }
 
@@ -1111,6 +1339,7 @@ int JRenderer::PixelSize(int textureMode){
 
 void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode, int textureMode)
 {
+	texPoolCrumbS("jpg: begin %s\n", filename);
   JLOG("JRenderer::LoadJPG");
 	textureInfo.mBits = NULL;
 
@@ -1215,8 +1444,8 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
             }
             else
             {
-                if (bits16) free(bits16);
-                if (bits32) free(bits32);
+                if (bits16) TexFree(bits16);
+                if (bits32) TexFree(bits32);
             }
             return;
         }
@@ -1234,15 +1463,15 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
         }
         else
         {
-            if (bits16) free(bits16);
-            if (bits32) free(bits32);
+            if (bits16) TexFree(bits16);
+            if (bits32) TexFree(bits32);
         }
         if (mSwizzle)
         {
             if (rgbadata16)
-                free(rgbadata16);
+                TexFree(rgbadata16);
             if (rgbadata32)
-                free(rgbadata32);
+                TexFree(rgbadata32);
         }
         return;
     }
@@ -1292,7 +1521,8 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
         if (currRow16)  currRow16+= tw;
     }
 
-	free(scanline);
+	TexFree(scanline);
+	texPoolCrumb("jpg: decoded\n", 0, 0);
 
     try
     {
@@ -1305,11 +1535,11 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
     {
         if (rgbadata16){
             swizzle_fast((u8*)bits16, (const u8*)rgbadata16, tw*pixelSize, th/*cinfo.output_height*/);
-            free (rgbadata16);
+            TexFree(rgbadata16);
         }
         if (rgbadata32){
             swizzle_fast((u8*)bits32, (const u8*)rgbadata32, tw*pixelSize, th/*cinfo.output_height*/);
-            free (rgbadata32);
+            TexFree(rgbadata32);
         }
     }
 
@@ -1326,6 +1556,7 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename, int mode
     jpeg_destroy_decompress(&cinfo);
     delete [] rawdata;
     JLOG("-- OK  -- JRenderer::LoadJPG");
+	texPoolCrumb("jpg: return\n", 0, 0);
 }
 
 
@@ -1349,6 +1580,7 @@ static void gfxProbe(const char* fmt, ...)
 JTexture* JRenderer::LoadTexture(const char* filename, int mode, int textureMode)
 {
     JLOG("JRenderer::LoadTexture");
+    texPoolCrumbS("load: %s\n", filename);
     gfxProbe("tex load: %s mode=%d", filename, mode);
     TextureInfo textureInfo;
     textureInfo.mVRAM = false;
@@ -1464,6 +1696,7 @@ void ReadPngLine( png_structp& png_ptr, u32_ptr& line, png_uint_32 width, int pi
 //------------------------------------------------------------------------------------------------
 int JRenderer::LoadPNG(TextureInfo &textureInfo, const char* filename, int mode, int textureMode)
 {
+	texPoolCrumbS("png: begin %s\n", filename);
   //JLOG("JRenderer::LoadPNG: ");
   //JLOG(filename);
   textureInfo.mBits = NULL;
@@ -1628,7 +1861,8 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char* filename, int mode,
   }
 
   //JLOG("Freeing line");
-  free (line);
+  TexFree(line);
+  texPoolCrumb("png: decoded\n", 0, 0);
   //JLOG("Reading end");
   png_read_end(png_ptr, info_ptr);
   //JLOG("Destroying read struct");
@@ -1657,7 +1891,7 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char* filename, int mode,
     if (videoRAMUsed)
       vfree(bits);
     else
-      free(bits);
+      TexFree(bits);
     return JGE_ERR_GENERIC;
   }
 
@@ -1783,7 +2017,7 @@ int JRenderer::image_readgif(void * handle, TextureInfo &textureInfo, DWORD * bg
 							if (videoRAMUsed)
 								vfree(bits);
 							else
-								free(bits);
+								TexFree(bits);
 
 							if (mSwizzle)
 								free((void *)p32);
@@ -1805,7 +2039,7 @@ int JRenderer::image_readgif(void * handle, TextureInfo &textureInfo, DWORD * bg
 					if (mSwizzle)
 					{
 						swizzle_fast((u8*)bits, (const u8*)buffer, textureInfo.mTexWidth*sizeof(PIXEL_TYPE), textureInfo.mTexHeight/*GifFileIn->Image.Height*/);
-						free (buffer);
+						TexFree(buffer);
 					}
 
 					done = true;
@@ -1822,7 +2056,7 @@ int JRenderer::image_readgif(void * handle, TextureInfo &textureInfo, DWORD * bg
 						if (videoRAMUsed)
 							vfree(textureInfo.mBits);
 						else
-							free((void *)textureInfo.mBits);
+							TexFree((void *)textureInfo.mBits);
 						textureInfo.mBits = NULL;
 					}
 					if(LineIn != NULL)
@@ -1838,7 +2072,7 @@ int JRenderer::image_readgif(void * handle, TextureInfo &textureInfo, DWORD * bg
 							if (videoRAMUsed)
 								vfree(textureInfo.mBits);
 							else
-								free((void *)textureInfo.mBits);
+								TexFree((void *)textureInfo.mBits);
 							textureInfo.mBits = NULL;
 						}
 						if(LineIn != NULL)
