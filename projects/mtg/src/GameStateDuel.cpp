@@ -11,8 +11,41 @@
 #include <malloc.h>
 //Definition lives further down, after the includes that declare WResourceManager.
 static void wagicMemProbe(const char* tag);
+
+//Menu-transition timing probe (User/wagic-menuprobe.log): each line reports
+//the delta since the PREVIOUS mark, so bracketing marks time the step between
+//them. Menu events are rare (a handful per transition) - per-line fopen is
+//fine here; `last` is re-read after the write so probe I/O never pollutes the
+//next delta. Built for the 2026-08-06 owner report: "play game > deck select"
+//and "deck select > opponent select" temp-freeze.
+#if defined(PSP)
+#include <pspkernel.h>
+static unsigned int menuNowUs() { return sceKernelGetSystemTimeLow(); }
+#else
+#include <ctime>
+static unsigned int menuNowUs() { return (unsigned int)clock(); }
+#endif
+static void wagicMenuMark(const char* fmt, ...)
+{
+    static unsigned int last = 0;
+    unsigned int now = menuNowUs();
+    FILE* f = fopen("User/wagic-menuprobe.log", "a");
+    if (f)
+    {
+        unsigned int d = last ? now - last : 0;
+        fprintf(f, "+%6u.%03ums ", d / 1000, d % 1000);
+        va_list ap;
+        va_start(ap, fmt);
+        vfprintf(f, fmt, ap);
+        va_end(ap);
+        fprintf(f, "\n");
+        fclose(f);
+    }
+    last = menuNowUs();
+}
 #else
 #define wagicMemProbe(x) ((void)0)
+#define wagicMenuMark(...) ((void)0)
 #endif
 
 //WAGIC_HWPROBE = the file-probe telemetry WITHOUT the selfplay/lang hijacks:
@@ -241,6 +274,7 @@ void GameStateDuel::Start()
         (int)mParent->gameType, (int)mParent->players[0], (int)mParent->players[1],
         tournament ? tournament->getOpLevel() : -1);
 #endif
+    wagicMenuMark("duel Start begin");
     JRenderer * renderer = JRenderer::GetInstance();
     renderer->EnableVSync(true);
     OpponentsDeckid = 0;
@@ -323,15 +357,18 @@ void GameStateDuel::Start()
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
             wagicProbe("deckmenu: human ctor begin");
 #endif
+            wagicMenuMark("deckmenu ctor begin");
             deckmenu = NEW DeckMenu(DUEL_MENU_CHOOSE_DECK, this, Fonts::OPTION_FONT, "Choose a Deck",
                 GameStateDuel::selectedPlayerDeckId, true, false);
             deckmenu->enableDisplayDetailsOverride();
             DeckManager *deckManager = DeckManager::GetInstance();
+            wagicMenuMark("deckmenu ctor done, BuildDeckList begin");
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
             wagicProbe("deckmenu: ctor done, BuildDeckList begin");
 #endif
             vector<DeckMetaData *> playerDeckList = BuildDeckList(options.profileFile(), "", NULL, 0, mParent->gameType);
             int nbDecks = playerDeckList.size();
+            wagicMenuMark("BuildDeckList done nbDecks=%d", nbDecks);
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
             wagicProbe("deckmenu: BuildDeckList done nbDecks=%d", nbDecks);
 #endif
@@ -346,9 +383,11 @@ void GameStateDuel::Start()
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
             wagicProbe("deckmenu: renderDeckMenu done");
 #endif
+            wagicMenuMark("renderDeckMenu done");
             // save the changes to the player deck list maintained in DeckManager
             deckManager->updateMetaDataList(&playerDeckList, false);
             playerDeckList.clear();
+            wagicMenuMark("updateMetaDataList done");
 
             break;
         }
@@ -414,6 +453,7 @@ void GameStateDuel::Start()
     }
 
     mEngine->ResetInput();
+    wagicMenuMark("duel Start end");
 }
 
 void GameStateDuel::initRand(unsigned int seed)
@@ -493,8 +533,10 @@ void GameStateDuel::ConstructOpponentMenu()
 {
     if (opponentMenu == NULL)
     {
+        wagicMenuMark("opponentMenu ctor begin");
         opponentMenu = NEW DeckMenu(DUEL_MENU_CHOOSE_OPPONENT, this, Fonts::OPTION_FONT, "Choose Opponent",
             GameStateDuel::selectedAIDeckId, true, true);
+        wagicMenuMark("opponentMenu ctor done");
 
         int nbUnlockedDecks = options[Options::CHEATMODEAIDECK].number ? 1000 : options[Options::AIDECKS_UNLOCKED].number;
         if ((mParent->gameType == GAME_TYPE_COMMANDER || mParent->gameType == GAME_TYPE_CLASSIC || mParent->gameType == GAME_TYPE_DEMO) && mParent->players[1] == PLAYER_TYPE_CPU)
@@ -541,11 +583,14 @@ void GameStateDuel::ConstructOpponentMenu()
         DeckManager * deckManager = DeckManager::GetInstance();
         vector<DeckMetaData*> opponentDeckList;
 
+        wagicMenuMark("opponent fillDeckMenu begin");
         opponentDeckList = fillDeckMenu(opponentMenu, "ai/baka", "ai_baka", game->getPlayer(0), nbUnlockedDecks, mParent->gameType);
+        wagicMenuMark("opponent fillDeckMenu done nbDecks=%d", (int)opponentDeckList.size());
         deckManager->updateMetaDataList(&opponentDeckList, true);
         tournament->setAvailableDecks(opponentDeckList.size());
         opponentMenu->Add(MENUITEM_CANCEL, "Cancel", _("Choose a different player deck").c_str());
         opponentDeckList.clear();
+        wagicMenuMark("opponentMenu done");
     }
 }
 
@@ -602,6 +647,7 @@ void GameStateDuel::setGamePhase(int newGamePhase) {
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
     wagicProbe("duelphase %s -> %s", stateStrings[mGamePhase], stateStrings[newGamePhase]);
 #endif
+    wagicMenuMark("phase %s -> %s", stateStrings[mGamePhase], stateStrings[newGamePhase]);
     wagicMemProbe(stateStrings[newGamePhase]);
 
     if (mGamePhase)
