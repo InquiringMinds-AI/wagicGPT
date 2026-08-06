@@ -995,7 +995,13 @@ void ResourceManagerImpl::ResetCacheLimits()
     //the cache bounds the HIGH-WATER MARK - the only lever under fragmentation - and
     //a capped build degrades to lag where an uncapped one dies. 8 MB is the value the
     //hardware rounds ran; revisit only with a slab allocator behind TexAlloc.
-    const unsigned int PSP_TEXCACHE_HARD_CAP = 8000000;
+    //5 MB, tuned against the measured pool gauges (2026-08-06 hardware round):
+    //resident textures = cache + pinned/managed (1.9 MB measured) + in-flight
+    //must fit the 8 MB pool or loads spill to the fallback path and fragment
+    //the general heap. 5 + 1.9 + 0.7 < 8, and the round that ran cap=4 showed
+    //2.2 MB of pool idle at peak while the small cache caused constant
+    //re-decode lag - the spare belongs to the cache.
+    const unsigned int PSP_TEXCACHE_HARD_CAP = 5000000;
     if (myNewSize > PSP_TEXCACHE_HARD_CAP)
         myNewSize = PSP_TEXCACHE_HARD_CAP;
     textureWCache.Resize(MIN(myNewSize, HUGE_CACHE_LIMIT), MAX_CACHE_OBJECTS);
