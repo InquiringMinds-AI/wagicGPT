@@ -75,7 +75,17 @@ PSP_EBOOT_UNKPNG = pic0.png
 PSP_EBOOT_PIC1 = pic1.png
 INCDIR = ../../JGE/include ../../JGE/src/zipFS ../../JGE/include/psp ../../JGE/include/psp/freetype2 ../../JGE/src ../../projects/mtg/include ../../Boost
 LIBDIR = ../../JGE/lib/psp
-CFLAGS = -O2 -G0 -DPSPFW3XX -DDEVHOOK -DUSE_PRECOMPILED_HEADERS=1 -DPSP -DTIXML_USE_STL -DWITH_GPT_AI -std=gnu++14 -include ../../JGE/include/psp_noenv.h $(EXTRA_DEFS)
+#GPT layer on PSP: in by default (the LLM path is the project's point), but the
+#binary loads whole into a ~44 MB heap and the layer is ~2 MB of it, dead weight
+#until the PSP has a network path. `make PSP_GPT=0` builds the lean variant for
+#memory-margin experiments; every GPT source is #ifdef WITH_GPT_AI-wrapped, so
+#the objects compile empty and the link is unchanged.
+ifeq ($(PSP_GPT),0)
+PSP_GPT_DEF =
+else
+PSP_GPT_DEF = -DWITH_GPT_AI
+endif
+CFLAGS = -O2 -G0 -DPSPFW3XX -DDEVHOOK -DUSE_PRECOMPILED_HEADERS=1 -DPSP -DTIXML_USE_STL $(PSP_GPT_DEF) -std=gnu++14 -include ../../JGE/include/psp_noenv.h $(EXTRA_DEFS)
 
 else
 
