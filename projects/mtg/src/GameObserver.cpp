@@ -480,17 +480,42 @@ void GameObserver::resetStartupGame()
 //    DebugTrace(startupGameSerialized);
 }
 
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+#include <pspkernel.h>
+#include <stdio.h>
+//startGame stage timer: appends to the menuprobe log; delta since previous
+//sg mark. Built for the 2026-08-07 docket item (startGame 1.7-2.8s).
+static void sgMark(const char * tag)
+{
+    static unsigned int last = 0;
+    unsigned int now = sceKernelGetSystemTimeLow();
+    FILE * f = fopen("User/wagic-menuprobe.log", "a");
+    if (f)
+    {
+        unsigned int d = last ? now - last : 0;
+        fprintf(f, "+%6u.%03ums   sg %s\n", d / 1000, d % 1000, tag);
+        fclose(f);
+    }
+    last = sceKernelGetSystemTimeLow();
+}
+#else
+#define sgMark(x) ((void)0)
+#endif
+
 void GameObserver::startGame(GameType gtype, Rules * rules)
 {
+    sgMark("begin");
     mGameType = gtype;
     turn = 0;
     mRules = rules;
     if (rules) 
         rules->initPlayers(this);
+    sgMark("initPlayers");
 
     options.automaticStyle(players[0], players[1]);
 
     mLayers = NEW DuelLayers(this);
+    sgMark("DuelLayers");
 
     currentPlayerId = 0;
     currentPlayer = players[currentPlayerId];
@@ -501,6 +526,7 @@ void GameObserver::startGame(GameType gtype, Rules * rules)
 
     if (rules) 
         rules->initGame(this);
+    sgMark("initGame");
 
     //CR pre-game procedure (opening hands + London mulligan + 103.6
     //actions) runs before turn 1 of real/selfplay/demo games. Suite games
@@ -524,7 +550,8 @@ void GameObserver::startGame(GameType gtype, Rules * rules)
             WResourceManager::Instance()->RetrieveCard(players[0]->game->hand->cards[i], CACHE_THUMB);
             WResourceManager::Instance()->RetrieveCard(players[0]->game->hand->cards[i]);
         }
-    }
+     }
+    sgMark("hand preload");
 
     startedAt = time(0);
 

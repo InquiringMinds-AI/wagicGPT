@@ -1763,7 +1763,9 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
                 int deck = tournament->getRandomDeck(false, mParent->gameType);
                 if (deck>0)
                 {
+                    wagicMenuMark("random-ai loadPlayer begin deck=%d", deck);
                     game->loadPlayer(1, mParent->players[1], deck);
+                    wagicMenuMark("random-ai loadPlayer done");
                     tournament->addDeck(1,game->players.at(1)->deckId,mParent->players[1]);
                 }
             }
@@ -1779,7 +1781,9 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
                 int deck = tournament->getRandomDeck(true, mParent->gameType);
                 if (deck>0)
                 {
+                    wagicMenuMark("random-ai-hard loadPlayer begin deck=%d", deck);
                     game->loadPlayer(1, mParent->players[1], deck, premadeDeck);
+                    wagicMenuMark("random-ai-hard loadPlayer done");
                     tournament->addDeck(1,game->players.at(1)->deckId,mParent->players[1]);
                 }
             }
