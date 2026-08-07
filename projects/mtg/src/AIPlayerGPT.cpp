@@ -2007,9 +2007,13 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
                                                  : (cfg.translog == 1 || cfg.telemetry == 1);
     if (translog)
     {
-        if (const char * home = getenv("HOME"))
+        //gptUserRoot, NOT getenv("HOME"): this was the fifth raw-HOME site
+        //(the Aug 1 sweep fixed four) and it silently disabled the translog
+        //on Vita - the one platform where a decision log is hardest to
+        //recover any other way.
+        string dir = gptUserRoot();
+        if (!dir.empty())
         {
-            string dir = string(home) + "/.Wagic";
             mkdir(dir.c_str(), 0755);
             dir += "/ai"; mkdir(dir.c_str(), 0755);
             dir += "/gpt"; mkdir(dir.c_str(), 0755);

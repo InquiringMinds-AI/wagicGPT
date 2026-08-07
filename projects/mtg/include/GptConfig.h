@@ -83,6 +83,13 @@ public:
 //user copy first, bundled Res copy as fallback. "" when neither exists.
 std::string gptReadAsset(const char * filename);
 
+//Root of the writable per-user config tree (".Wagic" component included);
+//"" = nowhere writable. Platform-aware: $HOME/.Wagic on desktop,
+//ux0:data/Wagic on Vita, the engine's resolved root on Android. EVERY
+//writable GPT path must come from here - a raw getenv("HOME") is silently
+//empty on the consoles (the translog was lost on Vita to exactly that).
+std::string gptUserRoot();
+
 //Append one line to <user root>/ai/gpt/gpt-log.txt.
 //DebugTrace is compiled out of release builds and, where it survives, writes to
 //stderr - which is invisible on a console. This is the channel that reaches a
