@@ -863,6 +863,14 @@ void Rules::initPlayers(GameObserver *g)
     }
 }
 
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+//startGame stage timer (defined in GameObserver.cpp) — the initGame bracket
+//measured a flat ~1064ms/match (2026-08-07); these sub-marks attribute it.
+extern void sgMark(const char * tag);
+#else
+#define sgMark(x) ((void)0)
+#endif
+
 void Rules::initGame(GameObserver *g, bool currentPlayerSet)
 {
     DebugTrace("RULES Init Game\n");
@@ -884,6 +892,7 @@ void Rules::initGame(GameObserver *g, bool currentPlayerSet)
     g->phaseRing->goToPhase(0, g->currentPlayer, false);
     g->phaseRing->goToPhase(initState.phase, g->currentPlayer);
     g->setCurrentGamePhase(initState.phase);
+    sgMark("ig goToPhase");
 
     for (int i = 0; i < 2; i++)
     {
@@ -957,7 +966,9 @@ void Rules::initGame(GameObserver *g, bool currentPlayerSet)
             }
         }
     }
+    sgMark("ig zones");
     addExtraRules(g);
+    sgMark("ig addExtraRules");
 
     postUpdateInitDone = false;
 DebugTrace("RULES Init Game Done !\n");
