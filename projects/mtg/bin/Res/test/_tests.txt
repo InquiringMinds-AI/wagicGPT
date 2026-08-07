@@ -1074,3 +1074,5 @@ winding_constrictor_evolve_race.txt
 rootborn_defenses_combat_trick.txt
 rootborn_defenses_damage_interrupt.txt
 rootborn_defenses_damagestack_ask.txt
+rootborn_defenses_first_strike.txt
+rootborn_defenses_survives_cleanup.txt

@@ -260,6 +260,41 @@ void GameObserver::nextGamePhase()
 
     if (mCurrentGamePhase == MTG_PHASE_AFTER_EOT)
     {
+        //CR 514.2 backstop (2026-08-07): damage removal and "until end of
+        //turn" expiry must be SIMULTANEOUS. The scripted heal (@each
+        //cleanup ... resetDamage in rules/*.txt) resolves through the
+        //stack; live play's phase auto-skip (ASKIP, forced OFF in suite
+        //games) can pull the whole cleanup->AFTER_EOT->next-turn transit
+        //into one synchronous chain before that trigger resolves - the
+        //actionLayer Update below then strips ueot effects, BEFORE_BEGIN
+        //garbage-collects the unresolved trigger, and the next SBA pass
+        //destroys creatures whose lethal marked damage was about to be
+        //removed (live: Rootborn Defenses survivors dying at end of
+        //turn). Heal synchronously before ueot retirement; mirrors
+        //AAResetDamage::resolve() including its exceptions.
+        for (int rdp = 0; rdp < 2; rdp++)
+        {
+            MTGGameZone * rdz = players[rdp]->game->inPlay;
+            for (int rdi = 0; rdi < rdz->nb_cards; rdi++)
+            {
+                MTGCardInstance * rdc = rdz->cards[rdi];
+                if (rdc->has(Constants::NODAMAGEREMOVED))
+                    continue;
+                if (!rdc->isCreature() && rdc->hasType(Subtypes::TYPE_PLANESWALKER))
+                {
+                    if (rdc->counters && rdc->counters->hasCounter("loyalty", 0, 0))
+                        rdc->life = rdc->counters->hasCounter("loyalty", 0, 0)->nb;
+                }
+                else if (!rdc->isCreature() && rdc->hasType(Subtypes::TYPE_BATTLE))
+                {
+                    if (rdc->counters && rdc->counters->hasCounter("defense", 0, 0))
+                        rdc->life = rdc->counters->hasCounter("defense", 0, 0)->nb;
+                }
+                else
+                    rdc->life = rdc->toughness;
+            }
+        }
+
         int handmodified = 0;
         handmodified = currentPlayer->handsize+currentPlayer->handmodifier;
         //Auto Hand cleaning, in case the player didn't do it himself
@@ -485,7 +520,7 @@ void GameObserver::resetStartupGame()
 #include <stdio.h>
 //startGame stage timer: appends to the menuprobe log; delta since previous
 //sg mark. Built for the 2026-08-07 docket item (startGame 1.7-2.8s).
-static void sgMark(const char * tag)
+void sgMark(const char * tag)
 {
     static unsigned int last = 0;
     unsigned int now = sceKernelGetSystemTimeLow();

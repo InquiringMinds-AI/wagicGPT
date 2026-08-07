@@ -1,0 +1,48 @@
+#NAME: Rootborn-protected creature survives past cleanup (CR 514.2)
+#DESC: Owner live observation 2026-08-07 (3rd Rootborn incident, the decisive
+#DESC: one): his protected 1/1 survived combat, killed its blocker, then went
+#DESC: to the graveyard AT END OF TURN. Hypothesis (his): marked damage
+#DESC: removal races the ueot indestructible expiry. CR 514.2: damage removal
+#DESC: and until-end-of-turn expiry happen SIMULTANEOUSLY in cleanup — a
+#DESC: creature must never be seen with damage still marked but its ueot
+#DESC: protection gone. This fixture crosses the turn boundary: the Knight
+#DESC: (2/1 first strike, 3 marked damage under indestructible) must still be
+#DESC: on the battlefield at the next untap.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Youthful Knight
+hand:Rootborn Defenses
+manapool:{2}{W}
+life:20
+[PLAYER2]
+inplay:Rhox War Monk
+life:20
+[DO]
+rootborn defenses
+next
+#begin
+next
+#attackers
+youthful knight
+next
+#blockers
+rhox war monk
+youthful knight
+next
+#first strike damage
+next
+#regular damage
+next
+#end combat
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+inplay:Youthful Knight
+graveyard:Rootborn Defenses
+life:20
+[PLAYER2]
+inplay:Rhox War Monk
+life:23
+[END]

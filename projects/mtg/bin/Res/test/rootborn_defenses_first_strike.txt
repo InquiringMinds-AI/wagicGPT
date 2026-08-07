@@ -1,0 +1,44 @@
+#NAME: Rootborn Defenses protects a first striker through both damage steps
+#DESC: Owner report 2026-08-07 (exact repro of the live incident): cast
+#DESC: Rootborn Defenses in first main, swing Youthful Knight (2/1 first
+#DESC: strike) into a Rhox War Monk (3/4 lifelink) block. Combat gets a
+#DESC: first-strike damage step (Knight deals 2) then a regular step (Rhox
+#DESC: deals 3 to the Knight). Indestructible must carry the Knight through
+#DESC: the SECOND damage step; on the PSP it died there.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Youthful Knight
+hand:Rootborn Defenses
+manapool:{2}{W}
+life:20
+[PLAYER2]
+inplay:Rhox War Monk
+life:20
+[DO]
+rootborn defenses
+next
+#begin
+next
+#attackers
+youthful knight
+next
+#blockers
+rhox war monk
+youthful knight
+next
+#first strike damage
+next
+#regular damage
+next
+#end combat
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Youthful Knight
+graveyard:Rootborn Defenses
+life:20
+[PLAYER2]
+inplay:Rhox War Monk
+life:23
+[END]

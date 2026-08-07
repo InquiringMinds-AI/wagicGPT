@@ -2547,6 +2547,14 @@ public:
             assert(value < 2);
             _target->basicAbilities.set(ability, value > 0);
 
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+            {
+                extern void wagicRuleProbe(const char * fmt, ...);
+                if (ability == (int)Constants::INDESTRUCTIBLE)
+                    wagicRuleProbe("grant indest %s was=%d", _target->getName().c_str(), (int)stateBeforeActivation);
+            }
+#endif
+
             //Once this object is LIVE in the game the grant is applied, so it
             //must never take the resolve() path below. InstantAbility::Update
             //runs `init = resolve()` while init == 0, and resolve() puts a COPY
@@ -2621,6 +2629,13 @@ public:
     int destroy()
     {
         MTGCardInstance * _target = (MTGCardInstance *) target;
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+        {
+            extern void wagicRuleProbe(const char * fmt, ...);
+            if (_target && ability == (int)Constants::INDESTRUCTIBLE)
+                wagicRuleProbe("ungrant indest %s restore=%d", _target->getName().c_str(), (int)stateBeforeActivation);
+        }
+#endif
         if (_target)
             _target->basicAbilities.set(ability, stateBeforeActivation);
         return 1;
