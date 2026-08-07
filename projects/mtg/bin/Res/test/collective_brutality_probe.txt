@@ -1,0 +1,37 @@
+#NAME: Collective Brutality plain cast — probe which modes are offered
+#DESC: Owner report 2026-08-07: plain cast (no escalate), AI hand mostly
+#DESC: full, menu offered only modes 2 and 3 — mode 1 (opponent reveals,
+#DESC: you choose an instant/sorcery, they discard) never appears. This
+#DESC: fixture just casts it with WAGIC_MAYPROBE prints active; the
+#DESC: stderr trace names each MayAbility menu and its skip verdict.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Collective Brutality
+manapool:{1}{B}
+life:20
+[PLAYER2]
+hand:Lightning Bolt,Grizzly Bears,Plains
+inplay:Craw Wurm
+life:20
+[DO]
+collective brutality
+choice 0
+choice 0
+choice 0
+lightning bolt
+next
+next
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+graveyard:Collective Brutality
+life:20
+[PLAYER2]
+inplay:Craw Wurm
+hand:Grizzly Bears,Plains
+graveyard:Lightning Bolt
+life:20
+[END]

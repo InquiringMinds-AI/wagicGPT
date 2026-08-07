@@ -2342,12 +2342,23 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     }
 
     bool chooseoppo = false;
+    //An "alternative " branch line is DEFERRED: its body re-parses at cast
+    //when that alternative cost is chosen, so nothing at load-time consumes a
+    //payload stashed from it. The stranded payload then leaves the factory's
+    //storedAbilityString dirty, which silently disables the stash for every
+    //LATER line of the same card - Collective Brutality's plain-cast mode 1
+    //lost its reveal this way (the nested optionone target( was hoisted into
+    //the mode's target chooser, which points at the empty pre-reveal zone,
+    //and MayAbility's valid-targets gate dropped the mode from the menu).
+    //Leave deferred lines' payloads in place for their cast-time parse.
+    bool deferredAlternative = StartsWith(s, "alternative");
+
     vector<string> splitChoose = parseBetween(s, "chooseaname ", " chooseend", false);
     if(!splitChoose.size()){
         splitChoose = parseBetween(s, "chooseanameopp ", " chooseend", false);
         chooseoppo = true;
     }
-    if (splitChoose.size() && storedAbilityString.empty())
+    if (splitChoose.size() && storedAbilityString.empty() && !deferredAlternative)
     {
         storedAbilityString = splitChoose[1];
         size_t pos1 = s.find("transforms(("); // Try to handle chooseaname ability inside ability$! or transforms keywords.
@@ -2370,7 +2381,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     }
 
     vector<string> splitGrant = parseBetween(s, "grant ", " grantend", false);
-    if (splitGrant.size() && storedAbilityString.empty())
+    if (splitGrant.size() && storedAbilityString.empty() && !deferredAlternative)
     {
         storedAbilityString = splitGrant[1];
         size_t pos1 = s.find("transforms(("); // Try to handle grant ability inside ability$! or transforms keywords.
@@ -2390,7 +2401,12 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     }
 
     vector<string> splitRevealx = parseBetween(s, "reveal:", " revealend", false);
-    if (!abilfound.size() && !transfound.size() && splitRevealx.size() && storedAbilityString.empty())
+#ifndef PSP
+    if (splitRevealx.size() && getenv("WAGIC_MAYPROBE"))
+        fprintf(stderr, "STASHGATE abil=%d trans=%d storedEmpty=%d | %.70s\n",
+                (int)abilfound.size(), (int)transfound.size(), (int)storedAbilityString.empty(), s.c_str());
+#endif
+    if (!abilfound.size() && !transfound.size() && splitRevealx.size() && storedAbilityString.empty() && !deferredAlternative)
     {
         storedAbilityString = splitRevealx[1];
         size_t pos1 = s.find("transforms(("); // Try to handle reveal ability inside ability$! or transforms keywords.
@@ -2410,7 +2426,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     }
 
     vector<string> splitScryx = parseBetween(s, "scry:", " scryend", false);
-    if (splitScryx.size() && storedAbilityString.empty())
+    if (splitScryx.size() && storedAbilityString.empty() && !deferredAlternative)
     {
         storedAbilityString = splitScryx[1];
         size_t pos1 = s.find("transforms(("); // Try to handle scry ability inside ability$! or transforms keywords.
