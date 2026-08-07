@@ -84,15 +84,9 @@ string b64decode(const string& in)
     return out;
 }
 
-//Root of the writable per-user config tree, with the platform's ".Wagic"
-//component already included. Empty means "nowhere writable" - callers must
-//treat that as "reads fall back to the bundled Res copy, writes fail".
-//
-//The Vita has no HOME. Its writable partition is ux0:data, and Vitamain.cpp
-//already creates ux0:data/Wagic at launch. Without this the options GUI could
-//never save an endpoint there, so the LLM opponent would be permanently
-//unconfigurable on that platform.
-static string gptUserRoot()
+//(gptUserRoot moved above the namespace - it is part of the public seam now;
+//see GptConfig.h.)
+static string gptUserRootImpl()
 {
 #ifdef VITA
     return "ux0:data/Wagic";
@@ -116,7 +110,7 @@ static string gptUserRoot()
 
 string saltPath()
 {
-    const string root = gptUserRoot();
+    const string root = gptUserRootImpl();
     if (root.empty())
         return "";
     return root + "/ai/gpt/keysalt";
@@ -154,7 +148,7 @@ string loadOrCreateSalt()
             salt += (char) (rand() & 0xFF);
     }
     //The directory chain may not exist yet on a first run.
-    string dir = gptUserRoot();
+    string dir = gptUserRootImpl();
     if (!dir.empty())
     {
         mkdir(dir.c_str(), 0755);
@@ -206,9 +200,14 @@ string deobfuscateKey(const string& stored)
 }
 } //namespace
 
+string gptUserRoot()
+{
+    return gptUserRootImpl();
+}
+
 void gptLogLine(const string& line)
 {
-    const string root = gptUserRoot();
+    const string root = gptUserRootImpl();
     if (root.empty())
         return; //nowhere writable; nothing useful to do
 
@@ -234,7 +233,7 @@ void gptLogLine(const string& line)
 
 string gptReadAsset(const char * filename)
 {
-    const string root = gptUserRoot();
+    const string root = gptUserRootImpl();
     if (!root.empty())
     {
         string path = root + "/ai/gpt/" + filename;
@@ -303,7 +302,7 @@ GptSettings GptSettings::load()
 
 bool GptSettings::save() const
 {
-    string dir = gptUserRoot();
+    string dir = gptUserRootImpl();
     if (dir.empty())
         return false;
     mkdir(dir.c_str(), 0755);
