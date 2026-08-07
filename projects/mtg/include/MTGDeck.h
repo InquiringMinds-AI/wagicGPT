@@ -267,6 +267,9 @@ public:
     void replaceCMD(vector<string> newCMD = vector<string>());
     void replaceDNG(vector<string> newDNG = vector<string>());
     string getFilename();
+    //Deterministic digest of savable state (main cards + SB/CMD/DNG + meta).
+    //Used to skip the save when nothing changed (PlayerData victory path).
+    string stateFingerprint();
     int save();
     int save(const string& destFileName, bool useExpandedDescriptions, const string& deckTitle, const string& deckDesc);
     MTGCard * getCardById(int id);

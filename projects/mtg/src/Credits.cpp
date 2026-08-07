@@ -182,7 +182,7 @@ Credits::~Credits()
 #include <stdio.h>
 namespace {
 struct WinMark { const char* label; unsigned ms; };
-WinMark gWinMarks[24];
+WinMark gWinMarks[32];
 int gWinCount = 0;
 unsigned long long gWinLast = 0;
 unsigned long long winNowMs()
@@ -190,11 +190,13 @@ unsigned long long winNowMs()
     struct timeval tv; gettimeofday(&tv, NULL);
     return (unsigned long long) tv.tv_sec * 1000ull + (unsigned long long) tv.tv_usec / 1000ull;
 }
+}
+//External linkage: PlayerData.cpp marks its save components through these.
 void winStart() { gWinCount = 0; gWinLast = winNowMs(); }
 void winMark(const char* label)
 {
     unsigned long long now = winNowMs();
-    if (gWinCount < 24)
+    if (gWinCount < 32)
     {
         gWinMarks[gWinCount].label = label;
         gWinMarks[gWinCount].ms = (unsigned)(now - gWinLast);
@@ -214,7 +216,6 @@ void winFlush()
     }
     fprintf(f, "victory: TOTAL %u ms\n", total);
     fclose(f);
-}
 }
 #define WIN_START() winStart()
 #define WIN_MARK(l) winMark(l)
