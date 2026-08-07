@@ -1075,6 +1075,17 @@ int ActionStack::receiveEventPlus(WEvent * event)
 
 bool ActionStack::wouldOfferWindow(Player * p, Interruptible * action)
 {
+    //CR 502.4 / 117.3a: no player receives priority during the untap step -
+    //never offer a response window there. The engine used to grant the ask
+    //(hasInstantResponse saw untapped lands) while every tap/cast inside it
+    //was correctly refused by the phase rules: a window no one can use
+    //(owner incident 2026-08-07, Lightning Helix at opponent's untap). The
+    //slot the player actually wants - resolve after untapping, before upkeep
+    //effects resolve - is the upkeep ask: spells stack ABOVE the pending
+    //upkeep triggers and resolve first.
+    if (observer->getCurrentGamePhase() == MTG_PHASE_UNTAP)
+        return false;
+
     //Own casts/abilities auto-yield by default; the INTERRUPTMY* options
     //opt back in to being offered windows on your own actions.
     if (action && action->source && action->source->controller() == p)
