@@ -282,6 +282,7 @@ GptSettings GptSettings::load()
         else if (k == "thinking") cfg.thinking = (v != "0" && v != "off") ? 1 : 0;
         else if (k == "maxtokens" || k == "max_reply_tokens") cfg.maxTokens = atol(v.c_str());
         else if (k == "repetition_penalty") cfg.repetitionPenalty = atof(v.c_str());
+        else if (k == "provider_only") cfg.providerOnly = v;
         else if (k == "timeout") cfg.timeoutSecs = atoi(v.c_str());
         else if (k == "patience") cfg.patienceSecs = atoi(v.c_str());
         else if (k == "translog") cfg.translog = (v != "0" && v != "off") ? 1 : 0;
@@ -331,6 +332,8 @@ bool GptSettings::save() const
         f << "max_reply_tokens=" << maxTokens << "\n";
     if (repetitionPenalty != 1.0)
         f << "repetition_penalty=" << repetitionPenalty << "\n";
+    if (!providerOnly.empty())
+        f << "provider_only=" << providerOnly << "\n";
     f << "timeout=" << timeoutSecs << "\n";
     f << "patience=" << patienceSecs << "\n";
     if (translog)
@@ -347,6 +350,7 @@ bool GptSettings::operator==(const GptSettings& o) const
     return enabled == o.enabled && urls == o.urls && model == o.model && key == o.key
         && thinking == o.thinking && maxTokens == o.maxTokens
         && repetitionPenalty == o.repetitionPenalty
+        && providerOnly == o.providerOnly
         && timeoutSecs == o.timeoutSecs && patienceSecs == o.patienceSecs
         && translog == o.translog && telemetry == o.telemetry
         && peek == o.peek;

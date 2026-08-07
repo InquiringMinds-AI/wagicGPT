@@ -34,6 +34,11 @@ public:
                               //length (config key max_reply_tokens, legacy
                               //alias maxtokens) - a decode-side truncation
                               //guard against 12-16k-char spirals
+    std::string providerOnly; //OpenRouter provider pinning (config key
+                              //provider_only, comma-separated provider names):
+                              //sent as provider:{only:[...],allow_fallbacks:
+                              //false} so routing NEVER falls back to a
+                              //provider the user did not name. Empty = off.
     double repetitionPenalty; //vLLM repetition_penalty; 1.0 = OFF (the field
                               //is only sent when != 1.0). Sampling change,
                               //corpus-validate before defaulting on

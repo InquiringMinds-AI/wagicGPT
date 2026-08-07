@@ -1984,6 +1984,9 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     mRepetitionPenalty = cfg.repetitionPenalty;
     if (const char * rp = getenv("WAGIC_GPT_REPPENALTY"))
         mRepetitionPenalty = atof(rp);
+    mProviderOnly = cfg.providerOnly;
+    if (const char * po = getenv("WAGIC_GPT_PROVIDER"))
+        mProviderOnly = po;
     mApiKey = cfg.key;
     mTimeoutMs = 1000L * cfg.timeoutSecs;
     if (const char * key = getenv("WAGIC_GPT_KEY"))
@@ -3557,6 +3560,27 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //and must be corpus-validated before it is ever defaulted on).
     if (mRepetitionPenalty != 1.0 && mEndpoint.find("api.openai.com") == string::npos)
         request["repetition_penalty"] = mRepetitionPenalty;
+
+    //OpenRouter provider pinning (config provider_only=Name[,Name...]). The
+    //user named exactly which upstream providers may serve them - send the
+    //list with fallbacks DISABLED so a routing miss is a visible error, never
+    //a silent detour through an unnamed provider. Same unknown-field rule as
+    //above: omitted for api.openai.com.
+    if (!mProviderOnly.empty() && mEndpoint.find("api.openai.com") == string::npos)
+    {
+        json only = json::array();
+        std::istringstream ps(mProviderOnly);
+        string p;
+        while (std::getline(ps, p, ','))
+        {
+            p.erase(0, p.find_first_not_of(" \t"));
+            p.erase(p.find_last_not_of(" \t") + 1);
+            if (!p.empty())
+                only.push_back(p);
+        }
+        if (!only.empty())
+            request["provider"] = {{"only", only}, {"allow_fallbacks", false}};
+    }
 
     return request.dump();
 }
