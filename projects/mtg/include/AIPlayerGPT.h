@@ -433,6 +433,7 @@ private:
     string mConfigModel;
     long mMaxTokens; // -1 = use the built-in/thinking-dependent default
     double mRepetitionPenalty; // vLLM repetition_penalty; 1.0 = OFF (not sent)
+    string mProviderOnly; // OpenRouter provider pin, comma-separated; "" = off
 
     //the per-duel head of every request; empty until first built
     string mSystemPrompt;
