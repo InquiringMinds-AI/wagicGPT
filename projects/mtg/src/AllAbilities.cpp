@@ -7812,6 +7812,16 @@ void MayAbility::Update(float dt)
                 return;
             }
         }
+#ifndef PSP
+        if (getenv("WAGIC_MAYPROBE"))
+        {
+            TargetAbility * dta = dynamic_cast<TargetAbility *>(ability);
+            fprintf(stderr, "MAYPROBE src=%s menu='%s' must=%d isTA=%d valid=%d max=%d\n",
+                    source ? source->getName().c_str() : "?", getMenuText().c_str(), (int)must,
+                    dta ? 1 : 0, dta ? (int)dta->getActionTc()->validTargetsExist() : -1,
+                    dta ? dta->getActionTc()->maxtargets : -1);
+        }
+#endif
         if (TargetAbility * ta = dynamic_cast<TargetAbility *>(ability))
         {
             if (!ta->getActionTc()->validTargetsExist() || ta->getActionTc()->maxtargets == 0)
