@@ -526,8 +526,8 @@ void Credits::startAsyncFlush()
     mFlushDone = false;
     mFlushStarted = true;
     WIN_CRUMB("async:start");
-    mFlushThread = boost::thread(FlushProc, this);
 #if defined (PSP)
+    mFlushThread = boost::thread(FlushProc, this);
     if (!mFlushThread.started())
     {
         //sceKernelCreateThread CAN fail here (thread stacks come from the
@@ -539,6 +539,23 @@ void Credits::startAsyncFlush()
         WIN_CRUMB("async:create-failed, inline flush");
         flushPendingSave();
         mFlushDone = true;
+    }
+#else
+    try
+    {
+        mFlushThread = boost::thread(FlushProc, this);
+    }
+    catch (...)
+    {
+        //On Vita boost::thread is std::thread and CONSTRUCTION THROWS - no
+        //working pthread runtime is linked (see the NOTE ON std::thread in
+        //CMakeLists.txt; hardware-proven, AIPlayerGPT handles the same throw).
+        //Fall back to a synchronous flush. mFlushStarted must go back to
+        //false: no thread object exists, so ensureFlushed() must never try to
+        //join one (std::thread::join on a non-joinable object terminates).
+        flushPendingSave();
+        mFlushDone = true;
+        mFlushStarted = false;
     }
 #endif
 }
