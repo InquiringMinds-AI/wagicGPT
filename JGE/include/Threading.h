@@ -239,7 +239,7 @@ namespace boost
 
     public:
 
-        thread()
+        thread() : mThreadProcID(0)
         {
         }
 
@@ -250,7 +250,12 @@ namespace boost
             CallbackData callbackData(mThreadInfo);
 
             LOG("Creating SCE Thread");
-            mThreadProcID = sceKernelCreateThread( typeid(a1).name(), thread::ThreadProc, 0x15, 0x40000, PSP_THREAD_ATTR_USER, NULL);
+            //Stack is 64KB, NOT more: PSP_HEAP_SIZE_KB(-256) leaves only ~256KB
+            //of partition memory outside the malloc heap, and thread stacks
+            //come from there - the original 0x40000 request could never be
+            //satisfied and failed silently. Callers MUST check started():
+            //creation failure is a real, reachable path on PSP.
+            mThreadProcID = sceKernelCreateThread( typeid(a1).name(), thread::ThreadProc, 0x15, 0x10000, PSP_THREAD_ATTR_USER, NULL);
             if (mThreadProcID > 0)
             {
                 sceKernelStartThread(mThreadProcID, sizeof(CallbackData), &callbackData);
@@ -261,9 +266,16 @@ namespace boost
         {
         }
 
+        //True if the underlying SCE thread was actually created and started.
+        bool started() const
+        {
+            return mThreadProcID > 0;
+        }
+
         void join()
         {
-            sceKernelTerminateDeleteThread(mThreadProcID);
+            if (mThreadProcID > 0)
+                sceKernelTerminateDeleteThread(mThreadProcID);
         }
 
     private:

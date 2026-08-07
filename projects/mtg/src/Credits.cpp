@@ -33,7 +33,7 @@ bool Unlockable::isUnlocked() {
     return (options[id].number != 0);
 }
 
-bool Unlockable::tryToUnlock(GameObserver * game) {
+bool Unlockable::tryToUnlock(GameObserver * game, bool deferSave) {
     if (isUnlocked())
         return false;
 
@@ -69,8 +69,8 @@ bool Unlockable::tryToUnlock(GameObserver * game) {
     string id = getValue("id");
     assert(id.size() > 0);
 
-    GameOptionAward* goa = (GameOptionAward*) &options[id]; 
-    goa->giveAward();
+    GameOptionAward* goa = (GameOptionAward*) &options[id];
+    goa->giveAward(deferSave);
     return true;
 }
 
@@ -150,6 +150,11 @@ Credits::Credits()
     p1 = NULL;
     p2 = NULL;
     observer = NULL;
+    mPendingPlayerData = NULL;
+    mPendingOptionsSave = false;
+    mRenderCount = 0;
+    mFlushStarted = false;
+    mFlushDone = false;
     mTournament=false;
     mMatch=false;
     mPlayerWin=false;
@@ -161,6 +166,9 @@ Credits::Credits()
 
 Credits::~Credits()
 {
+    //Safety net: wait out any in-flight worker flush, then persist anything
+    //still pending - the deferred writes must never be lost.
+    ensureFlushed();
     for (unsigned int i = 0; i < bonus.size(); ++i)
         if (bonus[i])
             delete bonus[i];
@@ -226,6 +234,26 @@ void winFlush()
 #define WIN_FLUSH() do {} while (0)
 #endif
 
+//Immediate-append breadcrumbs for the async-flush lifecycle. Unlike WIN_MARK
+//(in-memory, one write at the end) these hit the Memory Stick per event, so a
+//hang or crash between events leaves the trail readable - that is their whole
+//point: the 2026-08-07 lockup was only diagnosable because the flush block was
+//ABSENT from the probe log, and these crumbs turn that inference into a fact.
+#if defined(WAGIC_WINPROBE) && defined(PSP)
+static void winCrumb(const char * s)
+{
+    FILE * f = fopen("User/wagic-crumb.log", "a");
+    if (f)
+    {
+        fprintf(f, "%s\n", s);
+        fclose(f);
+    }
+}
+#define WIN_CRUMB(s) winCrumb(s)
+#else
+#define WIN_CRUMB(s) do {} while (0)
+#endif
+
 void Credits::compute(GameObserver* g, GameApp * _app)
 {
     if (!g->turn)
@@ -239,6 +267,13 @@ void Credits::compute(GameObserver* g, GameApp * _app)
     //no credits when the AI plays :)
     if (p1->isAI())
         return;
+
+    //If a previous game's deferred save is somehow still pending or mid-write
+    //(multi-game flows can re-enter compute() on the same object), finish it
+    //NOW: the PlayerData ctor below reads collection/tasks back from disk, and
+    //reading before the pending write lands would silently discard that game's
+    //results.
+    ensureFlushed();
 
     WIN_START();
     PlayerData * playerdata = NEW PlayerData(MTGCollection());
@@ -336,13 +371,14 @@ void Credits::compute(GameObserver* g, GameApp * _app)
             {
                 unlockedTextureName = "unlocked.png";
                 goa = (GameOptionAward*) &options[Options::DIFFICULTY_MODE_UNLOCKED];
-                goa->giveAward();
+                if (goa->giveAward(true))
+                    mPendingOptionsSave = true;
             }
             else
             {
                 for (map<string, Unlockable *>::iterator it = Unlockable::unlockables.begin(); it !=  Unlockable::unlockables.end(); ++it) {
                     Unlockable * award = it->second;
-                    bool gotIt = award->tryToUnlock(g);
+                    bool gotIt = award->tryToUnlock(g, true);
                     //Per-award timing: 10 awards cost ~5.0s total, so ~500ms each for a
                     //one-line condition. Naming each one shows whether the cost is spread
                     //or concentrated in a single pathological condition string.
@@ -350,6 +386,7 @@ void Credits::compute(GameObserver* g, GameApp * _app)
                     if (gotIt)
                     {
                         unlocked = 1;
+                        mPendingOptionsSave = true;
                         unlockedString = award->getValue("unlock_text");
                         unlockedTextureName = award->getValue("unlock_img");
                         break;
@@ -365,22 +402,26 @@ void Credits::compute(GameObserver* g, GameApp * _app)
                 {
                     unlockedTextureName = "eviltwin_unlocked.png";
                     goa = (GameOptionAward*) &options[Options::EVILTWIN_MODE_UNLOCKED];
-                    goa->giveAward();
+                    if (goa->giveAward(true))
+                        mPendingOptionsSave = true;
                 }
                 else if ((unlocked = isCommanderUnlocked()))
                 {
                     unlockedTextureName = "commander_unlocked.png";
                     goa = (GameOptionAward*) &options[Options::COMMANDER_MODE_UNLOCKED];
-                    goa->giveAward();
+                    if (goa->giveAward(true))
+                        mPendingOptionsSave = true;
                 }
                 else if ((unlocked = isRandomDeckUnlocked()))
                 {
                     unlockedTextureName = "randomdeck_unlocked.png";
                     goa = (GameOptionAward*) &options[Options::RANDOMDECK_MODE_UNLOCKED];
-                    goa->giveAward();
+                    if (goa->giveAward(true))
+                        mPendingOptionsSave = true;
                 }
-                else if ((unlocked = unlockRandomSet()))
+                else if ((unlocked = unlockRandomSet(false, true)))
                 {
+                    mPendingOptionsSave = true; //nonzero return = a set was newly granted
                     unlockedTextureName = "set_unlocked.png";
                     MTGSetInfo * si = setlist.getInfo(unlocked - 1);
                     if (si)
@@ -389,7 +430,7 @@ void Credits::compute(GameObserver* g, GameApp * _app)
                 else if ((unlocked = IsMoreAIDecksUnlocked(stats)))
                 {
                     options[Options::AIDECKS_UNLOCKED].number += 10;
-                    options.save();
+                    mPendingOptionsSave = true;
                     unlockedTextureName = "ai_unlocked.png";
                 }
             }
@@ -431,10 +472,98 @@ void Credits::compute(GameObserver* g, GameApp * _app)
         playerdata->taskList->passOneDay();
     }
 
-    playerdata->save();
-    WIN_MARK("playerdata save");
+    //Persistence is DEFERRED: stash the dirty PlayerData (and the pending
+    //options flag set above) and let Render() flush once the victory screen is
+    //visible. The saves are the dominant cost of this whole function (~1.2-2.6s
+    //of Memory Stick writes measured 2026-08-07) and used to run before the
+    //final duel frame was replaced - i.e. as a freeze.
     WIN_FLUSH();
-    SAFE_DELETE(playerdata);
+    mPendingPlayerData = playerdata;
+    mRenderCount = 0;
+}
+
+//Flush the writes compute() deferred. Called from Render() one frame after the
+//victory screen is first presented, and from the destructor as a safety net.
+void Credits::flushPendingSave()
+{
+    if (!mPendingPlayerData && !mPendingOptionsSave)
+        return;
+    WIN_START();
+    if (mPendingOptionsSave)
+    {
+        //One coalesced save covers every award granted with deferSave=true
+        //this match (each used to pay its own ~1.3s options.save()).
+        options.save();
+        mPendingOptionsSave = false;
+    }
+    WIN_MARK("flush:options");
+    if (mPendingPlayerData)
+    {
+        mPendingPlayerData->save();
+        SAFE_DELETE(mPendingPlayerData);
+    }
+    WIN_MARK("flush:playerdata");
+    WIN_FLUSH();
+}
+
+//Worker-thread entry point (see Threading.h's documented one-void*-param form).
+void Credits::FlushProc(void * inParam)
+{
+    WIN_CRUMB("worker:enter");
+    Credits * self = reinterpret_cast<Credits *>(inParam);
+    self->flushPendingSave();
+    self->mFlushDone = true;
+    WIN_CRUMB("worker:done");
+}
+
+//Spawn the worker that performs the deferred writes. Main thread keeps
+//rendering and polling input meanwhile; call only via readyToFlush() (which
+//refuses while a worker is already started).
+void Credits::startAsyncFlush()
+{
+    if (mFlushStarted)
+        return;
+    mFlushDone = false;
+    mFlushStarted = true;
+    WIN_CRUMB("async:start");
+    mFlushThread = boost::thread(FlushProc, this);
+#if defined (PSP)
+    if (!mFlushThread.started())
+    {
+        //sceKernelCreateThread CAN fail here (thread stacks come from the
+        //~256KB of partition memory PSP_HEAP_SIZE_KB(-256) leaves free, and
+        //the first async build proved it: silent failure = mFlushDone never
+        //set = the victory screen's exit gate waited forever). Fall back to
+        //a synchronous flush: a visible freeze, but never a lockup and never
+        //lost match results.
+        WIN_CRUMB("async:create-failed, inline flush");
+        flushPendingSave();
+        mFlushDone = true;
+    }
+#endif
+}
+
+//Bring the object to a fully-persisted, no-worker state: wait for an in-flight
+//worker, reclaim its thread, then synchronously flush anything still pending.
+void Credits::ensureFlushed()
+{
+    if (mFlushStarted)
+    {
+        //Bounded wait: a wedged worker must not turn into a second lockup.
+        //After the bound, PSP join() terminate-deletes the stuck thread and the
+        //sync flush below redoes whatever it had not finished (pending flags
+        //are only cleared AFTER each write completes, so nothing is lost -
+        //worst case a torn file gets rewritten whole).
+        int waitedMs = 0;
+        while (!mFlushDone && waitedMs < 30000)
+        {
+            boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+            waitedMs += 5;
+        }
+        mFlushThread.join();
+        mFlushStarted = false;
+    }
+    flushPendingSave(); //no-op if the worker (or an earlier call) did the work
 }
 
 /////// Tournament Mod ///////////
@@ -613,6 +742,11 @@ void Credits::Render()
 {
     if (!p1)
         return;
+    //Count presented frames only. The deferred-save flush is driven from
+    //GameStateDuel::Update once readyToFlush() - flushing HERE, mid
+    //display-list build, crashed the PSP to off (2026-08-07, first defer build).
+    if (mRenderCount < 2)
+        mRenderCount++;
     JRenderer * r = JRenderer::GetInstance();
 #if !defined (PSP)
     //Now it's possibile to randomly use up to 10 background images for post-match credits (if random index is 0, it will be rendered the default "bgdeckeditor.jpg" image).
@@ -846,19 +980,19 @@ int Credits::addCardToCollection(int cardId)
     return result;
 }
 
-int Credits::unlockSetByName(string name)
+int Credits::unlockSetByName(string name, bool deferSave)
 {
     int setId = setlist.findSet(name);
     if (setId < 0)
         return 0;
 
     GameOptionAward* goa = (GameOptionAward*) &options[Options::optionSet(setId)];
-    goa->giveAward(); //persists internally; no second options.save() (see unlockRandomSet)
+    goa->giveAward(deferSave); //persists internally unless deferred; no second options.save() (see unlockRandomSet)
     return setId + 1; //We add 1 here to show success/failure. Be sure to subtract later.
 
 }
 
-int Credits::unlockRandomSet(bool force)
+int Credits::unlockRandomSet(bool force, bool deferSave)
 {
     int setId = WRand() % setlist.size();
 
@@ -884,10 +1018,10 @@ int Credits::unlockRandomSet(bool force)
 
     WIN_MARK("ur:roll");
     GameOptionAward* goa = (GameOptionAward*) &options[Options::optionSet(setId)];
-    //giveAward() persists via options.save() itself - the explicit second
-    //save here doubled the Memory Stick cost of every set unlock (~1.25s
-    //per save measured 2026-08-07).
-    goa->giveAward();
+    //giveAward() persists via options.save() itself (unless deferred) - the
+    //explicit second save here doubled the Memory Stick cost of every set
+    //unlock (~1.25s per save measured 2026-08-07).
+    goa->giveAward(deferSave);
     WIN_MARK("ur:giveAward");
     return setId + 1; //We add 1 here to show success/failure. Be sure to subtract later.
 }

@@ -1241,7 +1241,7 @@ bool GameOptionAward::write(std::ofstream * file, string name)
     (*file) << writer;
     return true;
 }
-bool GameOptionAward::giveAward()
+bool GameOptionAward::giveAward(bool deferSave)
 {
     if (number)
         return false;
@@ -1249,7 +1249,8 @@ bool GameOptionAward::giveAward()
     achieved = time(NULL);
     viewed = false;
     number = 1;
-    options.save(); //TODO - Consider efficiency of this placement.
+    if (!deferSave)
+        options.save(); //TODO - Consider efficiency of this placement.
     return true;
 }
 
