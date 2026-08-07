@@ -154,7 +154,11 @@ public:
     virtual string menuStr();
     virtual bool write(std::ofstream * file, string name);
     virtual bool read(string input);
-    virtual bool giveAward(); //Returns false if already awarded
+    //Returns false if already awarded. deferSave=true grants the award without
+    //the internal options.save() - the CALLER then owns persisting options
+    //(used by the victory screen to batch all award writes into one deferred
+    //save after the screen has rendered).
+    virtual bool giveAward(bool deferSave = false);
     virtual bool isViewed();
 
     virtual void setViewed(bool v = true)

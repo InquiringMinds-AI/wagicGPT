@@ -182,6 +182,9 @@ private:
 #endif
 
     Credits * credits;
+    //Confirm pressed on the victory screen while the deferred save was still
+    //writing - honored as soon as the flush completes (see DUEL_STATE_END).
+    bool mEndExitPending;
     int mGamePhase;
     GameObserver * game;
     DeckMenu * deckmenu;

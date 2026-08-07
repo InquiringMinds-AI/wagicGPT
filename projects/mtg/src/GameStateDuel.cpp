@@ -258,6 +258,7 @@ GameState(parent, "duel")
 #endif
 
     credits = NULL;
+    mEndExitPending = false;
 }
 
 GameStateDuel::~GameStateDuel()
@@ -302,6 +303,7 @@ void GameStateDuel::Start()
 
     setGamePhase(DUEL_STATE_CHOOSE_DECK1);
     credits = NEW Credits();
+    mEndExitPending = false;
 
     // match mode is available in classic and demo mode.
     // in both modes player 1 is from type PLAYER_TYPE_CPU
@@ -1386,6 +1388,33 @@ void GameStateDuel::Update(float dt)
         }
         mParent->DoTransition(TRANSITION_FADE, GAME_STATE_MENU);
 
+        break;
+    case DUEL_STATE_END:
+        //Kick the end-of-match saves compute() deferred onto a worker thread
+        //once the victory screen has been presented for two frames. The main
+        //loop keeps rendering and polling input during the write, so a confirm
+        //pressed mid-save LATCHES here and the transition fires the moment the
+        //flush completes - no second press. (History: flushing synchronously
+        //inside Credits::Render(), mid display-list build, crashed the PSP to
+        //off - 2026-08-07.)
+        if (credits && credits->readyToFlush())
+            credits->startAsyncFlush();
+        if (JGE_BTN_OK == mEngine->ReadButton())
+            mEndExitPending = true;
+        if (credits && credits->flushInProgress())
+        {
+            //Donate CPU to the flush worker every tick: PSP scheduling is
+            //strict-priority and the main loop doesn't reliably block (mVsync
+            //defaults off), so without this the lower-priority worker can
+            //starve indefinitely. 10ms/frame still renders and polls input
+            //responsively while giving the worker real time.
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        }
+        if (mEndExitPending && !(credits && credits->flushInProgress()))
+        {
+            mEndExitPending = false;
+            mParent->SetNextState(GAME_STATE_MENU);
+        }
         break;
     default:
         if (JGE_BTN_OK == mEngine->ReadButton()) mParent->SetNextState(GAME_STATE_MENU);
