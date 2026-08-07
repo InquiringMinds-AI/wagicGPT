@@ -521,8 +521,10 @@ void GameObserver::startGame(GameType gtype, Rules * rules)
     currentPlayer = players[currentPlayerId];
     currentActionPlayer = currentPlayer;
     phaseRing = NEW PhaseRing(this);
+    sgMark("phaseRing");
 
     resetStartupGame();
+    sgMark("serialize");
 
     if (rules) 
         rules->initGame(this);
