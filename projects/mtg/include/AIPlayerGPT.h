@@ -267,6 +267,11 @@ private:
     //a shared_ptr copy, so a game that ends mid-request cannot leave the
     //thread writing into freed memory.
     struct AsyncState;
+    //The worker's heap-allocated capture set + entry point, shaped for
+    //gptSpawnWorker's bare function+void* contract (the least common
+    //denominator across its platform implementations - see GptConfig.h).
+    struct WorkerCtx;
+    static void WorkerMain(void * p);
     std::shared_ptr<AsyncState> mAsyncState;
     float mThinkTime; //seconds the current request has been in flight (for the indicator)
     long mTimeoutMs;  //per-call HTTP timeout (config timeout= / WAGIC_GPT_TIMEOUT)

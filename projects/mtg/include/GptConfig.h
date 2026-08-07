@@ -106,6 +106,38 @@ size_t gptPresetForUrl(const std::string& url);
 std::string gptHttpGet(const std::string& url, long timeoutMs, const std::string& bearer);
 std::string gptHttpPost(const std::string& url, const std::string& body, long timeoutMs, const std::string& bearer);
 
+//--- Platform threading seam ---------------------------------------------
+//Vita's libstdc++ has no active gthreads layer: std::thread construction
+//THROWS and std::mutex lock/unlock are NO-OPS. The model-call worker
+//therefore needs BOTH primitives supplied natively there - a real thread
+//without a real mutex is a data race on AsyncState, worse than the Baka
+//fallback it replaces. PSP task #6 (WiFi transport) will ride this same
+//seam. Elsewhere both types delegate to the std library.
+
+//Run fn(ctx) on a detached background thread. False when the platform
+//refuses (caller keeps ownership of ctx and must fall back synchronously).
+//Honors WAGIC_GPT_NOTHREAD (desktop emulation of a threadless platform).
+bool gptSpawnWorker(void (*fn)(void *), void * ctx);
+
+#if defined (VITA)
+//BasicLockable over a kernel mutex; std::lock_guard works with it as-is.
+class GptMutex
+{
+public:
+    GptMutex();
+    ~GptMutex();
+    void lock();
+    void unlock();
+private:
+    int mId; //SceUID
+    GptMutex(const GptMutex&);
+    GptMutex& operator=(const GptMutex&);
+};
+#else
+#include <mutex>
+typedef std::mutex GptMutex;
+#endif
+
 //Probe url + "/v1/models". True when the endpoint answers with a usable
 //model list; modelOut receives the first advertised model id.
 bool gptProbeEndpoint(const std::string& url, const std::string& key, std::string& modelOut, long timeoutMs = 20000);

@@ -1664,7 +1664,10 @@ string describeTarget(Player * me, Targetable * t)
 //only it still references, then frees it.
 struct AIPlayerGPT::AsyncState
 {
-    std::mutex mtx;
+    //GptMutex, not std::mutex: on Vita std::mutex operations are NO-OPS
+    //(inactive gthreads layer), which was harmless while no worker could
+    //start but is a real race now that gptSpawnWorker supplies one.
+    GptMutex mtx;
     int status;      //0 idle, 1 in flight, 2 done (answer not yet consumed)
     string prompt;   //the userMsg the in-flight/done request was built for
     string response; //raw HTTP body once status == 2
@@ -1672,16 +1675,40 @@ struct AIPlayerGPT::AsyncState
     AsyncState() : status(0) {}
 };
 
+//Heap-allocated capture set for the HTTP worker. The worker owns and frees
+//it; the shared_ptr inside keeps AsyncState alive if the player is destroyed
+//mid-request.
+struct AIPlayerGPT::WorkerCtx
+{
+    std::shared_ptr<AsyncState> state;
+    string url;
+    string requestBody;
+    string key;
+    long timeoutMs;
+};
+
+void AIPlayerGPT::WorkerMain(void * p)
+{
+    WorkerCtx * ctx = reinterpret_cast<WorkerCtx *>(p);
+    string body = gptHttpPost(ctx->url, ctx->requestBody, ctx->timeoutMs, ctx->key);
+    {
+        std::lock_guard<GptMutex> g(ctx->state->mtx);
+        ctx->state->response = body;
+        ctx->state->status = 2;
+    }
+    delete ctx;
+}
+
 bool AIPlayerGPT::asyncBusy() const
 {
-    std::lock_guard<std::mutex> g(mAsyncState->mtx);
+    std::lock_guard<GptMutex> g(mAsyncState->mtx);
     return mAsyncState->status == 1;
 }
 
 int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 {
     {
-        std::lock_guard<std::mutex> g(mAsyncState->mtx);
+        std::lock_guard<GptMutex> g(mAsyncState->mtx);
         if (mAsyncState->status == 1)
             return kChoicePending; //one request at a time; whatever asked, wait
         if (mAsyncState->status == 2)
@@ -1723,41 +1750,37 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     string key = mApiKey;
     std::shared_ptr<AsyncState> state = mAsyncState;
     {
-        std::lock_guard<std::mutex> g(state->mtx);
+        std::lock_guard<GptMutex> g(state->mtx);
         state->status = 1;
         state->prompt = userMsg;
         state->response.clear();
         state->started = std::chrono::steady_clock::now();
     }
     long timeoutMs = mTimeoutMs;
-    try
+    //The worker runs through gptSpawnWorker - the platform threading seam.
+    //On Vita that is a native sceKernelCreateThread (std::thread construction
+    //throws there - no active gthreads layer); elsewhere it is a detached
+    //std::thread. WAGIC_GPT_NOTHREAD (checked inside the seam) emulates a
+    //refusing platform on desktop, where the refusal path is otherwise
+    //unreachable and therefore untestable exactly where it is easiest to test.
+    WorkerCtx * ctx = NEW WorkerCtx();
+    ctx->state = state;
+    ctx->url = url;
+    ctx->requestBody = requestBody;
+    ctx->key = key;
+    ctx->timeoutMs = timeoutMs;
+    if (!gptSpawnWorker(WorkerMain, ctx))
     {
-        //WAGIC_GPT_NOTHREAD: emulate a platform that refuses to start a thread.
-        //The Vita's libstdc++ has no active gthreads layer, so every model call
-        //there fails this way - a path that is otherwise unreachable on a
-        //desktop, and therefore untestable exactly where it is easiest to test.
-        if (getenv("WAGIC_GPT_NOTHREAD"))
-            throw std::runtime_error("thread creation disabled by WAGIC_GPT_NOTHREAD");
-        std::thread([state, url, requestBody, key, timeoutMs]() {
-            string body = gptHttpPost(url, requestBody, timeoutMs, key);
-            std::lock_guard<std::mutex> g(state->mtx);
-            state->status = 2;
-            state->response = body;
-        }).detach();
-    }
-    catch (const std::exception& e)
-    {
-        //Constructing a std::thread THROWS when the platform refuses one -
-        //resource limits, a thread cap, or a libstdc++ whose gthreads layer is
-        //not active. Letting that escape calls std::terminate and aborts the
-        //process, which breaks the guarantee every other seam here keeps: a
-        //transport failure degrades to the heuristic AI, it never takes the game
-        //down. Publishing an empty reply is the same shape as an unreachable
-        //endpoint, so the caller falls back to Baka on its existing path.
-        //Resolve THIS tick rather than reporting a round trip that does not
-        //exist. Returning kChoicePending here means "no action yet", and the
-        //only thing that stops an empty clickstream being committed as a pass
-        //is decisionPending(), which is true only while asyncBusy() - i.e.
+        delete ctx;
+        //The platform refused a thread - resource limits, a thread cap, or an
+        //inactive threading runtime. The guarantee every other seam here keeps
+        //must hold: a transport failure degrades to the heuristic AI, it never
+        //takes the game down. Publishing an empty reply is the same shape as an
+        //unreachable endpoint, so the caller falls back to Baka on its existing
+        //path. Resolve THIS tick rather than reporting a round trip that does
+        //not exist. Returning kChoicePending here means "no action yet", and
+        //the only thing that stops an empty clickstream being committed as a
+        //pass is decisionPending(), which is true only while asyncBusy() - i.e.
         //while status == 1. Publishing status = 2 synchronously and then
         //claiming pending left the seam waiting and the gate reporting idle, so
         //the engine passed the turn. Every decision became attempt-once,
@@ -1767,14 +1790,13 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         //shape as a synchronous transport failure, which the seams already
         //answer with the heuristic AI, in this tick.
         {
-            std::lock_guard<std::mutex> g(state->mtx);
+            std::lock_guard<GptMutex> g(state->mtx);
             state->status = 0;
             state->response.clear();
             state->prompt.clear();
         }
         content.clear();
-        DebugTrace("AIPlayerGPT: could not start the worker thread (" << e.what()
-                   << "); falling back to the heuristic AI");
+        DebugTrace("AIPlayerGPT: could not start the worker thread; falling back to the heuristic AI");
         //Log this ONCE. A platform that refuses one thread refuses all of them,
         //so the message is identical every time and repeats once per decision -
         //209 and 344 identical lines in two Vita sessions. Writing it each time
@@ -1785,7 +1807,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         if (!refusalLogged)
         {
             refusalLogged = true;
-            gptLogLine(string("worker thread refused: ") + e.what()
+            gptLogLine(string("worker thread refused")
                        + " - falling back to the heuristic AI for every decision"
                        + " (logged once; this platform cannot start threads)");
         }

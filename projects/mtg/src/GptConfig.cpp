@@ -614,6 +614,107 @@ string gptHttpPost(const string& url, const string& body, long timeoutMs, const 
     return httpRequestImpl(url, body, timeoutMs, bearer);
 }
 
+//--- Platform threading seam (see GptConfig.h) -----------------------------
+#if defined (VITA)
+
+#include <psp2/kernel/threadmgr.h>
+
+GptMutex::GptMutex()
+{
+    mId = sceKernelCreateMutex("gpt_mutex", 0, 0, NULL);
+}
+
+GptMutex::~GptMutex()
+{
+    if (mId >= 0)
+        sceKernelDeleteMutex(mId);
+}
+
+void GptMutex::lock()
+{
+    if (mId >= 0)
+        sceKernelLockMutex(mId, 1, NULL);
+}
+
+void GptMutex::unlock()
+{
+    if (mId >= 0)
+        sceKernelUnlockMutex(mId, 1);
+}
+
+namespace
+{
+struct SpawnArgs
+{
+    void (*fn)(void *);
+    void * ctx;
+};
+
+int gptWorkerEntry(SceSize args, void * argp)
+{
+    //sceKernelStartThread copied SpawnArgs onto this thread's stack.
+    SpawnArgs a = *reinterpret_cast<SpawnArgs *>(argp);
+    a.fn(a.ctx);
+    //Detached semantics: the thread frees itself on exit.
+    sceKernelExitDeleteThread(0);
+    return 0;
+}
+} //namespace
+
+bool gptSpawnWorker(void (*fn)(void *), void * ctx)
+{
+    if (getenv("WAGIC_GPT_NOTHREAD"))
+        return false;
+    //Priority 0x10000100 = the process default; the worker spends its life
+    //blocked in curl I/O, so it does not contend with the render loop.
+    //64KB stack: curl + OpenSSL handshake depth, measured generously.
+    SceUID id = sceKernelCreateThread("gpt_worker", gptWorkerEntry, 0x10000100, 0x10000, 0, 0, NULL);
+    if (id < 0)
+        return false;
+    SpawnArgs a;
+    a.fn = fn;
+    a.ctx = ctx;
+    if (sceKernelStartThread(id, sizeof(a), &a) < 0)
+    {
+        sceKernelDeleteThread(id);
+        return false;
+    }
+    return true;
+}
+
+#elif defined (PSP)
+
+//No worker until task #6 wires sceNet bring-up; when it does, implement this
+//with sceKernelCreateThread like the Vita branch (PSP's libstdc++ may not even
+//declare std::thread - its gthreads layer is absent, same as Vita's).
+bool gptSpawnWorker(void (*)(void *), void *)
+{
+    return false;
+}
+
+#else //desktop and everything with a working std::thread
+
+#include <thread>
+
+bool gptSpawnWorker(void (*fn)(void *), void * ctx)
+{
+    if (getenv("WAGIC_GPT_NOTHREAD"))
+        return false;
+    try
+    {
+        std::thread(fn, ctx).detach();
+        return true;
+    }
+    catch (const std::exception&)
+    {
+        //Platform refused a thread (resource limits, inactive gthreads
+        //layer). The caller degrades to its synchronous path.
+        return false;
+    }
+}
+
+#endif //platform threading seam
+
 namespace
 {
 //The name of a model in a listing reply. OpenAI-shaped servers use "id";
