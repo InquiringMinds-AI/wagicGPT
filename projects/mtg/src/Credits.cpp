@@ -852,8 +852,7 @@ int Credits::unlockSetByName(string name)
         return 0;
 
     GameOptionAward* goa = (GameOptionAward*) &options[Options::optionSet(setId)];
-    goa->giveAward();
-    options.save();
+    goa->giveAward(); //persists internally; no second options.save() (see unlockRandomSet)
     return setId + 1; //We add 1 here to show success/failure. Be sure to subtract later.
 
 }
@@ -882,9 +881,13 @@ int Credits::unlockRandomSet(bool force)
     if (1 == options[Options::optionSet(setId)].number)
         return 0;
 
+    WIN_MARK("ur:roll");
     GameOptionAward* goa = (GameOptionAward*) &options[Options::optionSet(setId)];
+    //giveAward() persists via options.save() itself - the explicit second
+    //save here doubled the Memory Stick cost of every set unlock (~1.25s
+    //per save measured 2026-08-07).
     goa->giveAward();
-    options.save();
+    WIN_MARK("ur:giveAward");
     return setId + 1; //We add 1 here to show success/failure. Be sure to subtract later.
 }
 
