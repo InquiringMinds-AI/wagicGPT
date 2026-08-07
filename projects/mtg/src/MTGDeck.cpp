@@ -1608,6 +1608,27 @@ int MTGDeck::save()
     return save(filename, false, meta_name, meta_desc);
 }
 
+string MTGDeck::stateFingerprint()
+{
+    std::ostringstream o;
+    for (map<int, int>::iterator it = cards.begin(); it != cards.end(); ++it)
+        o << it->first << ':' << it->second << ';';
+    o << '|';
+    vector<string> v = Sideboard;
+    sort(v.begin(), v.end());
+    for (size_t k = 0; k < v.size(); k++) o << v[k] << ';';
+    o << '|';
+    v = CommandZone;
+    sort(v.begin(), v.end());
+    for (size_t k = 0; k < v.size(); k++) o << v[k] << ';';
+    o << '|';
+    v = DungeonZone;
+    sort(v.begin(), v.end());
+    for (size_t k = 0; k < v.size(); k++) o << v[k] << ';';
+    o << '|' << meta_name << '|' << meta_desc;
+    return o.str();
+}
+
 int MTGDeck::save(const string& destFileName, bool useExpandedDescriptions, const string& deckTitle, const string& deckDesc)
 {
     string tmp = destFileName;

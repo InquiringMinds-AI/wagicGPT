@@ -15,6 +15,7 @@ PlayerData::PlayerData(MTGAllCards * allcards)
 
     //COLLECTION
     if (allcards) collection = NEW MTGDeck(options.profileFile(PLAYER_COLLECTION).c_str(), allcards);
+    if (collection) mCollectionFP = collection->stateFingerprint();
 }
 
 void PlayerData::init()
@@ -78,8 +79,27 @@ int PlayerData::save()
 
         file.close();
     }
-    if (collection) collection->save();
+#if defined(WAGIC_WINPROBE) && defined(PSP)
+    {
+        extern void winMark(const char * label);
+        winMark("pd:player.dat");
+        if (collection && collection->stateFingerprint() != mCollectionFP)
+        {
+            collection->save();
+            mCollectionFP = collection->stateFingerprint();
+        }
+        winMark("pd:collection");
+        taskList->save();
+        winMark("pd:tasks");
+    }
+#else
+    if (collection && collection->stateFingerprint() != mCollectionFP)
+    {
+        collection->save();
+        mCollectionFP = collection->stateFingerprint();
+    }
     taskList->save();
+#endif
     return 1;
 }
 
