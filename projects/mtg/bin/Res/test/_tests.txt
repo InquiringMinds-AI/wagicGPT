@@ -1071,3 +1071,6 @@ march_convoke_x.txt
 march_convoke_x_credit.txt
 winding_constrictor_evolve_rider.txt
 winding_constrictor_evolve_race.txt
+rootborn_defenses_combat_trick.txt
+rootborn_defenses_damage_interrupt.txt
+rootborn_defenses_damagestack_ask.txt

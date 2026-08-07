@@ -1793,8 +1793,15 @@ int GameObserver::cardClick(MTGCardInstance * card, Targetable * object, bool lo
 
         if (ORDER == combatStep)
         {
-            //TODO it is possible at this point that card is NULL. if so, what do we return since card->defenser would result in a crash?
-            card->defenser->raiseBlockerRankOrder(card);
+            //Damage-assignment order is a turn-based action (CR 509.2-509.3):
+            //no player has priority during the ordering interaction, so ALL
+            //clicks are consumed here - clicks on a blocker reorder it,
+            //anything else (hand cards included) is deliberately ignored.
+            //The defenser guard fixes a NULL deref: this used to call
+            //card->defenser->raiseBlockerRankOrder unconditionally, UB for
+            //every non-blocker click that landed in this step.
+            if (card && card->defenser)
+                card->defenser->raiseBlockerRankOrder(card);
             toReturn = 1;
             break;
         }

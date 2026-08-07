@@ -1,0 +1,42 @@
+#NAME: Rootborn Defenses saves a creature from lethal combat damage
+#DESC: Owner report 2026-08-06: cast Rootborn Defenses during combat, creature
+#DESC: destroyed by combat damage anyway. Oracle: "Populate. Creatures you
+#DESC: control are indestructible this turn." Script grants
+#DESC: all(creature|myBattlefield) indestructible ueot, plus an interactive
+#DESC: populate line. Cast in first main ("this turn" covers all of combat),
+#DESC: then Bears attack into a Craw Wurm block: Bears must survive.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Rootborn Defenses
+manapool:{2}{W}
+life:20
+[PLAYER2]
+inplay:Craw Wurm
+life:20
+[DO]
+rootborn defenses
+next
+#begin
+next
+#attackers
+grizzly bears
+next
+#blockers
+craw wurm
+grizzly bears
+next
+#damage
+next
+#end combat
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Grizzly Bears
+graveyard:Rootborn Defenses
+life:20
+[PLAYER2]
+inplay:Craw Wurm
+life:20
+[END]

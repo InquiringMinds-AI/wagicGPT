@@ -1,0 +1,45 @@
+#NAME: Rootborn Defenses cast in the combat-damage interrupt window
+#DESC: Owner report 2026-08-06: cast Rootborn Defenses as a combat trick, the
+#DESC: creature was destroyed by combat damage anyway. The main-phase cast
+#DESC: passes (rootborn_defenses_combat_trick.txt), so this pins the
+#DESC: interrupt-window cast: Bears attack, Craw Wurm blocks, Rootborn is cast
+#DESC: at the interrupt-ask ON the damage stack (declining the earlier phase-
+#DESC: advance ask). Cast feedback happens live (mana taps, card leaves hand)
+#DESC: so the spell must also RESOLVE before the damage does.
+#DESC: must survive.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Grizzly Bears,Plains,Snow-Covered Plains,Swamp
+hand:Rootborn Defenses
+life:20
+[PLAYER2]
+inplay:Craw Wurm
+life:20
+[DO]
+Grizzly Bears
+next
+#blockers
+Craw Wurm
+Grizzly Bears
+next
+#decline the phase-advance ask, cast at the DamageStack ask itself
+no
+yes
+Plains
+Snow-Covered Plains
+Swamp
+Rootborn Defenses
+endinterruption
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Plains,Snow-Covered Plains,Swamp
+graveyard:Rootborn Defenses
+life:20
+[PLAYER2]
+inplay:Craw Wurm
+life:20
+[END]
