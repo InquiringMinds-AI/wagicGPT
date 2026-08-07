@@ -142,7 +142,7 @@ bool JGBKFont::Init(const char* engFileName, const char* chnFileName, int fontsi
 
 #if defined (WIN32) || defined (LINUX)
 #else
-void SwizzlePlot(u8* out, PIXEL_TYPE color, int i, int j, unsigned int width)
+void SwizzlePlot(u8* out, unsigned int color, int i, int j, unsigned int width)
 {
 	unsigned int rowblocks = (width >> 4);
 

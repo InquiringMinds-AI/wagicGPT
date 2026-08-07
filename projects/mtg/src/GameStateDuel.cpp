@@ -1,5 +1,83 @@
 #include "PrecompiledHeader.h"
 
+//WAGIC_MEMPROBE: opt-in heap/cache telemetry at every duel phase transition
+//(compile with -DWAGIC_MEMPROBE; writes User/wagic-memprobe.log). This is the
+//instrument that root-caused the 2026-08-04 cross-match crash-to-off: heapUsed
+//returned to baseline every match while the arena ratcheted up, and keepcost ~0
+//proved the free space was fragmented, not trimmable. Kept compiled-out because
+//the next round of PSP memory work will need the same numbers.
+#if defined(WAGIC_MEMPROBE)
+#include <stdarg.h>
+#include <malloc.h>
+//Definition lives further down, after the includes that declare WResourceManager.
+static void wagicMemProbe(const char* tag);
+
+//Menu-transition timing probe (User/wagic-menuprobe.log): each line reports
+//the delta since the PREVIOUS mark, so bracketing marks time the step between
+//them. Menu events are rare (a handful per transition) - per-line fopen is
+//fine here; `last` is re-read after the write so probe I/O never pollutes the
+//next delta. Built for the 2026-08-06 owner report: "play game > deck select"
+//and "deck select > opponent select" temp-freeze.
+#if defined(PSP)
+#include <pspkernel.h>
+static unsigned int menuNowUs() { return sceKernelGetSystemTimeLow(); }
+#else
+#include <ctime>
+static unsigned int menuNowUs() { return (unsigned int)clock(); }
+#endif
+static void wagicMenuMark(const char* fmt, ...)
+{
+    static unsigned int last = 0;
+    unsigned int now = menuNowUs();
+    FILE* f = fopen("User/wagic-menuprobe.log", "a");
+    if (f)
+    {
+        unsigned int d = last ? now - last : 0;
+        fprintf(f, "+%6u.%03ums ", d / 1000, d % 1000);
+        va_list ap;
+        va_start(ap, fmt);
+        vfprintf(f, fmt, ap);
+        va_end(ap);
+        fprintf(f, "\n");
+        fclose(f);
+    }
+    last = menuNowUs();
+}
+#else
+#define wagicMemProbe(x) ((void)0)
+#define wagicMenuMark(...) ((void)0)
+#endif
+
+//WAGIC_HWPROBE = the file-probe telemetry WITHOUT the selfplay/lang hijacks:
+//for real-hardware runs where a human drives the menus and we need the log.
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+#include <pspsysmem.h>
+#include <stdarg.h>
+#include <malloc.h>
+#if defined(WAGIC_AUTODEMO)
+#define WAGIC_SELFPLAY_ACTIVE 1
+#else
+//HWPROBE builds must NOT hijack: a human drives the menus. (A build that gated
+//this on HWPROBE too ghost-played every Classic entry — the round-3/4 riddle.)
+#define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
+#endif
+static void wagicProbe(const char* fmt, ...)
+{
+    FILE* f = fopen("User/wagic-probe.log", "a");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    struct mallinfo mi = mallinfo();
+    fprintf(f, " used=%u arena=%u\n", (unsigned)mi.uordblks, (unsigned)mi.arena);
+    fclose(f);
+}
+#else
+#define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
+#endif
+
+
 #include "DeckMenu.h"
 #include "GameStateDuel.h"
 #include "utils.h"
@@ -73,7 +151,10 @@ enum ENUM_DUEL_MENUS
     DUEL_MENU_CHOOSE_OPPONENT,
     DUEL_MENU_DETAILED_DECK1_INFO,
     DUEL_MENU_CHOOSE_NUMBER_OF_GAMES,
-    DUEL_MENU_DETAILED_DECK2_INFO
+    DUEL_MENU_DETAILED_DECK2_INFO,
+    //"the opponent is taking a long time" - keep waiting, or finish the
+    //duel against the built-in AI
+    DUEL_MENU_LLM_PATIENCE
 };
 
 enum ENUM_CNOGMENU_ITEMS
@@ -146,6 +227,7 @@ GameState(parent, "duel")
     deckmenu = NULL;
     opponentMenu = NULL;
     menu = NULL;
+    mPatiencePlayer = NULL;
     popupScreen = NULL;
     mGamePhase = DUEL_STATE_UNSET;
     taskList = NEW TaskList();
@@ -187,6 +269,12 @@ GameStateDuel::~GameStateDuel()
 
 void GameStateDuel::Start()
 {
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+    wagicProbe("duel Start: gameType=%d p0=%d p1=%d opLevel=%d",
+        (int)mParent->gameType, (int)mParent->players[0], (int)mParent->players[1],
+        tournament ? tournament->getOpLevel() : -1);
+#endif
+    wagicMenuMark("duel Start begin");
     JRenderer * renderer = JRenderer::GetInstance();
     renderer->EnableVSync(true);
     OpponentsDeckid = 0;
@@ -223,7 +311,7 @@ void GameStateDuel::Start()
         // only reset "Played Games" and "Victories" info if we didn't come here from within a match
         tournament->Start();
 
-        if (getenv("WAGIC_SELFPLAY"))
+        if (WAGIC_SELFPLAY_ACTIVE)
         {
             //Headless self-play: skip the "how many games" + deck-choice menus
             //and boot straight into an endless AI-vs-AI demo. This replicates
@@ -266,12 +354,24 @@ void GameStateDuel::Start()
             //DeckManager::EndInstance();
             decksneeded = 1;
 
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: human ctor begin");
+#endif
+            wagicMenuMark("deckmenu ctor begin");
             deckmenu = NEW DeckMenu(DUEL_MENU_CHOOSE_DECK, this, Fonts::OPTION_FONT, "Choose a Deck",
                 GameStateDuel::selectedPlayerDeckId, true, false);
             deckmenu->enableDisplayDetailsOverride();
             DeckManager *deckManager = DeckManager::GetInstance();
+            wagicMenuMark("deckmenu ctor done, BuildDeckList begin");
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: ctor done, BuildDeckList begin");
+#endif
             vector<DeckMetaData *> playerDeckList = BuildDeckList(options.profileFile(), "", NULL, 0, mParent->gameType);
             int nbDecks = playerDeckList.size();
+            wagicMenuMark("BuildDeckList done nbDecks=%d", nbDecks);
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: BuildDeckList done nbDecks=%d", nbDecks);
+#endif
 
             if (nbDecks)
                 decksneeded = 0;
@@ -280,9 +380,14 @@ void GameStateDuel::Start()
                 deckmenu->Add(MENUITEM_RANDOM_PLAYER, "Random", "Play with a random deck.");
 
             renderDeckMenu(deckmenu, playerDeckList);
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: renderDeckMenu done");
+#endif
+            wagicMenuMark("renderDeckMenu done");
             // save the changes to the player deck list maintained in DeckManager
             deckManager->updateMetaDataList(&playerDeckList, false);
             playerDeckList.clear();
+            wagicMenuMark("updateMetaDataList done");
 
             break;
         }
@@ -304,7 +409,13 @@ void GameStateDuel::Start()
                 deckmenu->Add(MENUITEM_NEW_DECK, _("Create your Deck!").c_str(), desc);
             }
             premadeDeck = true;
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: premade fill begin");
+#endif
             fillDeckMenu(deckmenu, _("player/premade").c_str(), "", NULL, 0, mParent->gameType);
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("deckmenu: premade fill done");
+#endif
         }
         else if (gModRules.general.hasDeckEditor())
         {
@@ -342,6 +453,7 @@ void GameStateDuel::Start()
     }
 
     mEngine->ResetInput();
+    wagicMenuMark("duel Start end");
 }
 
 void GameStateDuel::initRand(unsigned int seed)
@@ -376,6 +488,8 @@ void GameStateDuel::loadTestSuitePlayers()
 void GameStateDuel::End()
 {
     DebugTrace("Ending GameStateDuel");
+    //Borrowed pointer into a game that is about to go away.
+    mPatiencePlayer = NULL;
 
 #ifdef TRACK_OBJECT_USAGE
     ObjectAnalytics::DumpStatistics();
@@ -419,8 +533,10 @@ void GameStateDuel::ConstructOpponentMenu()
 {
     if (opponentMenu == NULL)
     {
+        wagicMenuMark("opponentMenu ctor begin");
         opponentMenu = NEW DeckMenu(DUEL_MENU_CHOOSE_OPPONENT, this, Fonts::OPTION_FONT, "Choose Opponent",
             GameStateDuel::selectedAIDeckId, true, true);
+        wagicMenuMark("opponentMenu ctor done");
 
         int nbUnlockedDecks = options[Options::CHEATMODEAIDECK].number ? 1000 : options[Options::AIDECKS_UNLOCKED].number;
         if ((mParent->gameType == GAME_TYPE_COMMANDER || mParent->gameType == GAME_TYPE_CLASSIC || mParent->gameType == GAME_TYPE_DEMO) && mParent->players[1] == PLAYER_TYPE_CPU)
@@ -467,17 +583,72 @@ void GameStateDuel::ConstructOpponentMenu()
         DeckManager * deckManager = DeckManager::GetInstance();
         vector<DeckMetaData*> opponentDeckList;
 
+        wagicMenuMark("opponent fillDeckMenu begin");
         opponentDeckList = fillDeckMenu(opponentMenu, "ai/baka", "ai_baka", game->getPlayer(0), nbUnlockedDecks, mParent->gameType);
+        wagicMenuMark("opponent fillDeckMenu done nbDecks=%d", (int)opponentDeckList.size());
         deckManager->updateMetaDataList(&opponentDeckList, true);
         tournament->setAvailableDecks(opponentDeckList.size());
         opponentMenu->Add(MENUITEM_CANCEL, "Cancel", _("Choose a different player deck").c_str());
         opponentDeckList.clear();
+        wagicMenuMark("opponentMenu done");
     }
 }
+
+#if defined(WAGIC_MEMPROBE)
+//WAGIC_MEMPROBE telemetry writer.
+//UNRECLAIMABLE_KB = totalSize - cacheSize = every byte held OUTSIDE the evictable
+//cache (permanent managed map + locked entries). ClearUnlocked() cannot touch it,
+//so if it climbs across matches while the owner returns to the main menu between
+//them, that is the accumulation.
+static void wagicMemProbe(const char* tag)
+{
+    FILE* f = fopen("User/wagic-memprobe.log", "a");
+    if (!f) return;
+    unsigned int items = 0; unsigned long managed = 0, cacheB = 0, unrec = 0;
+    WResourceManager::Instance()->MemProbeStats(&items, &managed, &cacheB, &unrec);
+    struct mallinfo mi = mallinfo();
+    //keepcost = bytes releasable to the OS by malloc_trim RIGHT NOW (the free chunk at
+    //the TOP of the heap). This is the whole question for lever 3: the 2026-08-04 probe
+    //showed heapUsed returns to baseline between matches while arena ratchets up and
+    //never comes back. If keepcost is large, that retained space is at the top and a
+    //malloc_trim(0) between matches breaks the ratchet outright. If keepcost is small,
+    //the free space is stranded beneath live allocations and trimming cannot help.
+    //fordblks = ALL free space in the arena, trimmable or not; the gap between the two
+    //is the fragmentation.
+#if defined(PSP)
+    //Slab-pool telemetry (JGE/src/JGfx.cpp): free space inside the pool, the
+    //largest request it can serve, and the fallback counters - the fallbacks
+    //are the gauge that says the pool or the cache cap needs retuning.
+    {
+        extern void wagicTexPoolProbe(unsigned * freeKB, unsigned * largestKB);
+        extern int gTexPoolFallbacks, gTexPoolOversize;
+        unsigned poolFreeKB = 0, poolLargestKB = 0;
+        wagicTexPoolProbe(&poolFreeKB, &poolLargestKB);
+        fprintf(f, "%-28s items=%u managed=%lu cacheKB=%lu UNRECLAIMABLE_KB=%lu heapUsedKB=%u arenaKB=%u freeKB=%u KEEPCOST_KB=%u poolFreeKB=%u poolLargestKB=%u poolFallbacks=%d poolOversize=%d\n",
+                tag, items, managed, cacheB / 1024, unrec / 1024,
+                (unsigned)(mi.uordblks / 1024), (unsigned)(mi.arena / 1024),
+                (unsigned)(mi.fordblks / 1024), (unsigned)(mi.keepcost / 1024),
+                poolFreeKB, poolLargestKB, gTexPoolFallbacks, gTexPoolOversize);
+    }
+#else
+    fprintf(f, "%-28s items=%u managed=%lu cacheKB=%lu UNRECLAIMABLE_KB=%lu heapUsedKB=%u arenaKB=%u freeKB=%u KEEPCOST_KB=%u\n",
+            tag, items, managed, cacheB / 1024, unrec / 1024,
+            (unsigned)(mi.uordblks / 1024), (unsigned)(mi.arena / 1024),
+            (unsigned)(mi.fordblks / 1024), (unsigned)(mi.keepcost / 1024));
+#endif
+    fclose(f);
+}
+#endif
 
 void GameStateDuel::setGamePhase(int newGamePhase) {
     if (mGamePhase == newGamePhase)
         return;
+
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+    wagicProbe("duelphase %s -> %s", stateStrings[mGamePhase], stateStrings[newGamePhase]);
+#endif
+    wagicMenuMark("phase %s -> %s", stateStrings[mGamePhase], stateStrings[newGamePhase]);
+    wagicMemProbe(stateStrings[newGamePhase]);
 
     if (mGamePhase)
         JGE::GetInstance()->SendCommand("leaveduelphase:" + string(stateStrings[mGamePhase]));
@@ -530,6 +701,38 @@ void GameStateDuel::ThreadProc(void* inParam)
 
 void GameStateDuel::Update(float dt)
 {
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+    if (mGamePhase == DUEL_STATE_PLAY)
+    {
+#ifdef WAGIC_AUTODEMO
+        dt *= 4; // compress demo pacing for unattended emulator runs
+#endif
+        static float probeAcc = 0;
+        static int lastProbedTurn = -1;
+        probeAcc += dt;
+        //Dense early telemetry: one probe per turn while the opening plays out.
+        if (game && game->turn <= 50 && game->turn != lastProbedTurn)
+        {
+            lastProbedTurn = game->turn;
+            probeAcc = 999;
+        }
+        if (probeAcc > 40)
+        {
+            probeAcc = 0;
+            if (game && game->players[0] && game->players[1])
+            {
+                Player * p0 = game->players[0];
+                Player * p1 = game->players[1];
+                wagicProbe("ingame turn=%d ph=%d p0[life=%d lib=%d hand=%d play=%d gy=%d ex=%d] p1[life=%d lib=%d hand=%d play=%d gy=%d ex=%d]",
+                    game->turn, game->getCurrentGamePhase(),
+                    p0->life, p0->game->library->nb_cards, p0->game->hand->nb_cards, p0->game->inPlay->nb_cards, p0->game->graveyard->nb_cards, p0->game->exile->nb_cards,
+                    p1->life, p1->game->library->nb_cards, p1->game->hand->nb_cards, p1->game->inPlay->nb_cards, p1->game->graveyard->nb_cards, p1->game->exile->nb_cards);
+            }
+            else
+                wagicProbe("ingame turn=%d (players unset)", game ? game->turn : -1);
+        }
+    }
+#endif
     switch (mGamePhase)
     {
     case DUEL_STATE_ERROR_NO_DECK:
@@ -624,6 +827,20 @@ void GameStateDuel::Update(float dt)
         break;
 
     case DUEL_STATE_CHOOSE_DECK1:
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+        {
+            static Rules * lastProbedRules = (Rules*)-1;
+            if (mParent->rules != lastProbedRules)
+            {
+                lastProbedRules = mParent->rules;
+                wagicProbe("choose_deck1: rules=%p name=%s gamemode=%d canChooseDeck=%d",
+                    (void*)mParent->rules,
+                    mParent->rules ? mParent->rules->displayName.c_str() : "NULL",
+                    mParent->rules ? (int)mParent->rules->gamemode : -1,
+                    mParent->rules ? (int)mParent->rules->canChooseDeck() : -1);
+            }
+        }
+#endif
         if (!mParent->rules->canChooseDeck())
         {
             setGamePhase(DUEL_STATE_PLAY);
@@ -797,7 +1014,9 @@ void GameStateDuel::Update(float dt)
 
         if (!game->isStarted())
         {
+            wagicMenuMark("startGame begin");
             game->startGame(mParent->gameType, mParent->rules);
+            wagicMenuMark("startGame done");
 
             //start of in game music code
             musictrack = "";
@@ -847,6 +1066,30 @@ void GameStateDuel::Update(float dt)
         //run a "post update" init call in the rules. This is for things such as Manapool, which gets emptied in the update
         // That's mostly because of a legacy bug, where we use the update sequence for some things when we should use events (such as phase changes)
         mParent->rules->postUpdateInit(game);
+
+        //A remote AI opponent can stall on a slow or wedged endpoint. Rather
+        //than freeze the duel behind an HTTP timeout the player never sees,
+        //offer the way out: keep waiting, or finish against the built-in AI.
+        //Only when a human is actually sitting there - self-play batches and
+        //the test suite must never stop for a dialog nobody can answer.
+        if (!menu && mParent->players[0] == PLAYER_TYPE_HUMAN)
+        {
+            for (size_t pi = 0; pi < game->players.size(); pi++)
+            {
+                Player * p = game->players[pi];
+                if (!p || !p->aiPatiencePromptDue())
+                    continue;
+                mPatiencePlayer = p;
+                menu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(),
+                                      DUEL_MENU_LLM_PATIENCE, this, Fonts::MENU_FONT,
+                                      SCREEN_WIDTH / 2 - 100, 25,
+                                      "The opponent is taking a long time");
+                menu->Add(MENUITEM_LLM_KEEP_WAITING, "Keep waiting");
+                menu->Add(MENUITEM_LLM_SWITCH_OFF, "Play without the LLM");
+                setGamePhase(DUEL_STATE_MENU);
+                break;
+            }
+        }
 
 #ifdef NETWORK_SUPPORT
         if(mParent->mpNetwork) ((NetworkGameObserver*)game)->synchronize();
@@ -1380,11 +1623,28 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
     switch (controllerId)
     {
 
+        case DUEL_MENU_LLM_PATIENCE:
+        {
+            //Either answer resumes play; the difference is whether the remote
+            //AI is still in the duel. Answering also resets the wait clock, so
+            //"keep waiting" buys another window rather than silencing the
+            //prompt for good.
+            if (mPatiencePlayer)
+                mPatiencePlayer->aiPatiencePromptAnswer(controlId == MENUITEM_LLM_KEEP_WAITING);
+            mPatiencePlayer = NULL;
+            menu->Close();
+            setGamePhase(DUEL_STATE_CANCEL);
+            break;
+        }
+
         case DUEL_MENU_CHOOSE_NUMBER_OF_GAMES:  // We're in the "Choose number of Games" menu
         {
           switch (controlId)
           {
               case CNOGMENU_ITEM_SINGLE_GAME:
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+                wagicProbe("cnog: single game chosen");
+#endif
                 tournament->setMatchType(1,MATCHMODE_FIXED);break;
               case CNOGMENU_ITEM_CONTINUE_TOURNAMENT:
                   if (cnogmenu) cnogmenu->Close();
@@ -1503,7 +1763,9 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
                 int deck = tournament->getRandomDeck(false, mParent->gameType);
                 if (deck>0)
                 {
+                    wagicMenuMark("random-ai loadPlayer begin deck=%d", deck);
                     game->loadPlayer(1, mParent->players[1], deck);
+                    wagicMenuMark("random-ai loadPlayer done");
                     tournament->addDeck(1,game->players.at(1)->deckId,mParent->players[1]);
                 }
             }
@@ -1519,7 +1781,9 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
                 int deck = tournament->getRandomDeck(true, mParent->gameType);
                 if (deck>0)
                 {
+                    wagicMenuMark("random-ai-hard loadPlayer begin deck=%d", deck);
                     game->loadPlayer(1, mParent->players[1], deck, premadeDeck);
+                    wagicMenuMark("random-ai-hard loadPlayer done");
                     tournament->addDeck(1,game->players.at(1)->deckId,mParent->players[1]);
                 }
             }
@@ -1652,7 +1916,9 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
             }
             else if (controlId != MENUITEM_EVIL_TWIN && aiDeckSize > 0) // evil twin
                 deckNumber = deckManager->getAIDeckOrderList()->at(controlId - 1)->getDeckId();
+            wagicMenuMark("ai loadPlayer begin deck=%d", deckNumber);
             game->loadPlayer(1, mParent->players[1], deckNumber, premadeDeck);
+            wagicMenuMark("ai loadPlayer done");
             tournament->addDeck(1,deckNumber,mParent->players[1]);
             setAISpeed();
             OpponentsDeckid = deckNumber;
@@ -1749,7 +2015,9 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
                 vector<DeckMetaData *> * playerDeck = deckManager->getPlayerDeckOrderList();
                 if (!premadeDeck && controlId > 0)
                     deckNumber = playerDeck->at(controlId - 1)->getDeckId();
+                wagicMenuMark("human loadPlayer begin deck=%d", deckNumber);
                 game->loadPlayer(0, mParent->players[0], deckNumber, premadeDeck);
+                wagicMenuMark("human loadPlayer done");
                 tournament->addDeck(0,deckNumber,mParent->players[0]);
                 playerDeck = NULL;
             }

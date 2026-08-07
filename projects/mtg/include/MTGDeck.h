@@ -31,6 +31,7 @@ public:
     //TODO Way to group cards by name, rather than mtgid.
 
     void count(MTGCard * c);
+    void uncount(MTGCard * c); //exact inverse, for printings dedupe rollback
 
     int totalCards();
     string getName();
@@ -119,11 +120,25 @@ public:
         READ_METADATA = 2,
     };
     vector<int> ids;
-    map<int, MTGCard *> collection;
+    //Printings index. Replaces map<int, MTGCard*>: a tree node costs ~36
+    //bytes on the 32-bit PSP vs 8 bytes per vector entry — ~2 MB across
+    //74,808 printings. Loads APPEND (unsorted, dup ids tolerated);
+    //ensurePrintingsSorted() stable-sorts, resolves id collisions with
+    //first-in-wins exactly like the old map's reject-at-insert (rollback of
+    //setinfo/ids/total_cards for the loser), then lookups binary-search.
+    //Every read path must go through ensurePrintingsSorted() first.
+    vector<std::pair<int, MTGCard *> > printings;
+    bool printingsSorted;
+    boost::mutex mPrintingsMutex; //sort guard; separate from mMutex (non-recursive, held by getCardByName callers)
+    void ensurePrintingsSorted();
     map<string, CardPrimitive *> primitives;
     map<string, bool> limitedCardsMap; //used by parser in case of limited card list
     MTGCard * _(int id);
     MTGCard * getCardById(int id);
+    //Read access to the printings index for external full-collection scans
+    //(deck editor sources, boot stats). Both ensure the sort/dedupe ran.
+    size_t printingsCount();
+    MTGCard * printingAt(size_t i);
 
 #ifdef TESTSUITE
     void prefetchCardNameCache();
@@ -139,6 +154,7 @@ public:
     int countByType(const string& _type);
     int countByColor(int color);
     int countBySet(int setId);
+    void countBySets(vector<int>& counts);
     int totalCards();
     int randomCardId();
 

@@ -17,6 +17,34 @@
 
 using namespace std;
 
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+#include <pspkernel.h>
+#include <stdio.h>
+#include <stdarg.h>
+//Rootborn live-incident telemetry (2026-08-07): the owner's creature died to
+//combat damage under an active indestructible ueot grant on the PSP, but the
+//exact-repro fixture passes on desktop. Log every creature death at the
+//toGrave gate (the one chokepoint where the indestructible bit decides) and
+//every INDESTRUCTIBLE grant/ungrant, so the next live occurrence tells us
+//whether the grant never applied, expired early, or was bypassed (forced).
+void wagicRuleProbe(const char * fmt, ...)
+{
+    FILE * f = fopen("User/wagic-ruleprobe.log", "a");
+    if (!f) return;
+    unsigned int t = sceKernelGetSystemTimeLow();
+    fprintf(f, "%u.%03u ", t / 1000000, (t / 1000) % 1000);
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    fprintf(f, "\n");
+    fclose(f);
+}
+#define RULEPROBE(...) wagicRuleProbe(__VA_ARGS__)
+#else
+#define RULEPROBE(...) ((void)0)
+#endif
+
 SUPPORT_OBJECT_ANALYTICS(MTGCardInstance)
 
 MTGCardInstance MTGCardInstance::AnyCard = MTGCardInstance();
@@ -73,6 +101,9 @@ MTGCardInstance::MTGCardInstance(MTGCard * card, MTGPlayerCards * arg_belongs_to
     forcedBorderB = 0;
     castableNow = 0;
     willPayForFocused = 0;
+    canAttackNow = 0;
+    hasUsableAbilityNow = 0;
+    canBlockNow = 0;
     myconvertedcost = getManaCost()->getConvertedCost();
     revealedLast = NULL;
     MadnessPlay = false;
@@ -173,11 +204,11 @@ void MTGCardInstance::copy(MTGCardInstance * card, bool nolegend)
     alias = data->alias;
     copiedID = card->copiedID;
     copiedSetID = card->setId;
-    doubleFaced = data->doubleFaced;
-    AICustomCode = data->AICustomCode;
-    CrewAbility = data->CrewAbility;
-    ModularValue = data->ModularValue;
-    PhasedOutAbility = data->PhasedOutAbility;
+    setdoubleFaced(data->getdoubleFaced());
+    setAICustomCode(data->getAICustomCode());
+    setCrewAbility(data->getCrewAbility());
+    setModularValue(data->getModularValue());
+    setPhasedOutAbility(data->getPhasedOutAbility());
     origpower = card->origpower;//for flip
     origtoughness = card->origtoughness;//for flip
     TokenAndAbility = card->TokenAndAbility;//token andAbility
@@ -537,6 +568,9 @@ int MTGCardInstance::totem(bool noregen)
 }
 int MTGCardInstance::toGrave( bool forced )
 {
+    if (isCreature())
+        RULEPROBE("toGrave %s forced=%d indest=%d life=%d", getName().c_str(), (int)forced,
+                  (int)basicAbilities[(int)Constants::INDESTRUCTIBLE], life);
     if(basicAbilities[(int)Constants::INDESTRUCTIBLE] && !forced)
         return 0; // Fixed bug for indestructible creatures that have to go different zone after death.
 

@@ -35,6 +35,7 @@ const string Options::optionNames[] = {
   "disable_cards",
   "maxGrade",
   "ASPhases",
+  "tutorials",
   "FirstPlayer",
   "KickerPay",
   "economic_difficulty",
@@ -451,6 +452,30 @@ GameOption * GameOptions::factorNewGameOption(string optionName, string value)
     return result;
 }
 
+const string GameOptions::kTutorialOptionPrefix = "tuto_";
+
+int GameOptions::resetTutorialMessages()
+{
+    int cleared = 0;
+    const size_t prefixLength = kTutorialOptionPrefix.size();
+
+    for (map<string, GameOption *>::iterator it = unknownMap.begin(); it != unknownMap.end(); it++)
+    {
+        if (!it->second)
+            continue;
+        if (it->first.compare(0, prefixLength, kTutorialOptionPrefix) != 0)
+            continue;
+        if (!it->second->number && !it->second->str.size())
+            continue;
+
+        it->second->number = 0;
+        it->second->str = "";
+        cleared++;
+    }
+
+    return cleared;
+}
+
 GameOption * GameOptions::get(string optionName)
 {
    if (!unknownMap[optionName])
@@ -505,11 +530,15 @@ GameOption * GameOptions::get(int optionID)
         case Options::ASPHASES:
             goEnum = NEW GameOptionEnum();
             goEnum->def = OptionASkipPhase::getInstance();
-            //First-launch default: the options menu advertises phase-skip
-            //automation as on, but an unset option read 0 (Off) - every
-            //auto-skip (untap/draw/combat-begin/empty attackers/...) was
-            //dead until the user saved the options screen once.
-            goEnum->number = Constants::ASKIP_SAFE;
+            //No first-launch override here on purpose. This is a userland knob
+            //with a declared default (the OptionInteger in GameStateOptions.cpp
+            //says ASKIP_NONE); forcing a different stored value made the option
+            //mean something other than what it declares, which is a preference
+            //baked into a default rather than a default. The friction that
+            //override was papering over is gone anyway: phases where the player
+            //has no legal action now skip regardless of this setting, so
+            //ASKIP_NONE means "stop wherever I can act" rather than "stop
+            //everywhere".
             go = goEnum;
             break;
         case Options::FIRSTPLAYER:
@@ -520,6 +549,12 @@ GameOption * GameOptions::get(int optionID)
         case Options::KICKERPAYMENT:
             goEnum = NEW GameOptionEnum();
             goEnum->def = OptionKicker::getInstance();
+            //Default ASK, not always-pay. Always-pay was calibrated for the
+            //pre-auto-tap UX, where floating the kicker mana WAS the intent
+            //signal; with auto-tap the player never floats, so a flexible
+            //spend's intent can only come from an explicit ask. A saved
+            //profile value still overrides this.
+            goEnum->number = OptionKicker::KICKER_CHOICE;
             go = goEnum;
             break;
         case Options::KEY_BINDINGS:
@@ -641,6 +676,31 @@ bool GameSettings::newAward()
             return true;
     }
     return false;
+}
+
+int GameSettings::resetTutorialMessages()
+{
+    int cleared = 0;
+
+    //The counters are written through operator[](string), which resolves to the
+    //profile; older files may still carry them globally, so sweep both.
+    if (profileOptions)
+        cleared += profileOptions->resetTutorialMessages();
+    if (globalOptions)
+        cleared += globalOptions->resetTutorialMessages();
+
+    //Asking for the messages back means asking to see them: clearing the
+    //seen-state alone would leave a player who turned tutorials off (the
+    //secondary button does exactly that) staring at a reset that changes
+    //nothing visible.
+    (*this)[Options::TUTORIALS].number = 1;
+
+#if !defined(VITA)
+    // On Vita this NAND flush takes 1-3s; rely on the next regular save instead.
+    save();
+#endif
+
+    return cleared;
 }
 
 GameOption GameSettings::invalid_option = GameOption(0);
@@ -791,22 +851,35 @@ void GameSettings::checkProfile()
         createProfileFolders();
     }
 
-    //Find the set for which we have the most variety
-    int setId = -1;
-    int maxcards = 0;
+    //Does the player already have a set unlocked? The old form asked this and
+    //"which set has the most cards" in one loop, computing a full-collection
+    //count for every set it passed on the way - all of it discarded the moment
+    //an unlocked set turned up, which is the normal case. Ask the cheap
+    //question first; the counts are only needed when the answer is no.
     int ok = 0;
     for (int i = 0; i < setlist.size(); i++)
     {
-        int value = MTGCollection()->countBySet(i);
-        if (value > maxcards)
-        {
-            maxcards = value;
-            setId = i;
-        }
         if (options[Options::optionSet(i)].number)
         {
             ok = 1;
             break;
+        }
+    }
+
+    int setId = -1;
+    if (!ok)
+    {
+        //Find the set for which we have the most variety, in one pass.
+        vector<int> counts(setlist.size(), 0);
+        MTGCollection()->countBySets(counts);
+        int maxcards = 0;
+        for (size_t i = 0; i < counts.size(); i++)
+        {
+            if (counts[i] > maxcards)
+            {
+                maxcards = counts[i];
+                setId = (int) i;
+            }
         }
     }
     if (!ok && setId >= 0)

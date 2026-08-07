@@ -252,3 +252,12 @@ build/
 
 # Backup files
 *~.nib
+
+# Playable build outputs. The runnable game ships in ONE release carrying every
+# platform, never in the tree - a repo that also serves binaries makes it
+# ambiguous which build a bug report is against.
+/projects/mtg/EBOOT.PBP
+/projects/mtg/wagic.elf
+/projects/mtg/wagic.prx
+/projects/mtg/PARAM.SFO
+/build_vita/

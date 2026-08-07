@@ -132,15 +132,15 @@ MTGCard * WSrcCards::getCard(int offset, bool ignore)
 
 int WSrcCards::loadMatches(MTGAllCards* ac)
 {
-    map<int, MTGCard *>::iterator it;
     int count = 0;
     if (!ac) return count;
 
-    for (it = ac->collection.begin(); it != ac->collection.end(); it++)
+    for (size_t i = 0; i < ac->printingsCount(); i++)
     {
-        if (it->second && (matchesFilters(it->second)))
+        MTGCard * c = ac->printingAt(i);
+        if (c && (matchesFilters(c)))
         {
-            cards.push_back(it->second);
+            cards.push_back(c);
             count++;
         }
     }
@@ -387,7 +387,6 @@ WSrcUnlockedCards::WSrcUnlockedCards(float delay) :
     WSrcCards(delay)
 {
     MTGAllCards * ac = MTGCollection();
-    map<int, MTGCard*>::iterator it;
 
     char * unlocked = NULL;
     unlocked = (char *) calloc(setlist.size(), sizeof(char));
@@ -397,15 +396,16 @@ WSrcUnlockedCards::WSrcUnlockedCards(float delay) :
         unlocked[i] = options[Options::optionSet(i)].number;
     }
 
-    for (it = ac->collection.begin(); it != ac->collection.end(); it++)
+    for (size_t i = 0; i < ac->printingsCount(); i++)
     {
+        MTGCard * c = ac->printingAt(i);
         if(!options[Options::SHOWTOKENS].number)
         {//dont show tokens & negative id's
-            if (it->second && unlocked[it->second->setId] && (it->second->getId() > 0) && (it->second->getRarity() != Constants::RARITY_T)) cards.push_back(it->second);
+            if (c && unlocked[c->setId] && (c->getId() > 0) && (c->getRarity() != Constants::RARITY_T)) cards.push_back(c);
         }
         else
         {//show but you cant add
-            if (it->second && unlocked[it->second->setId]) cards.push_back(it->second);
+            if (c && unlocked[c->setId]) cards.push_back(c);
         }
     }
     if (unlocked)

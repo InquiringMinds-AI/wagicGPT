@@ -4,6 +4,7 @@
 #include "Player.h"
 #include "Tasks.h"
 #include "AIPlayer.h"
+#include "DeckMetaData.h"
 
 // Todo remove this dependency!
 #include "AIPlayerBaka.h"
@@ -154,40 +155,76 @@ void Task::passOneDay()
 
 // AI deck buffering code
 
+// Read just the deck's display name from its "#NAME:" header line, without
+// constructing a full MTGDeck. Mirrors MTGDeck's meta_name defaulting: the
+// filename stem is used when no #NAME: header is present. Header lines all
+// start with '#', so scanning stops at the first non-comment line.
+static string readDeckName(const string & deckFile)
+{
+    string name, description, unlockRequirements;
+    bool isCommanderDeck = false;
+    DeckMetaData::ReadFileMetaData(deckFile, name, description, unlockRequirements, isCommanderDeck);
+    return name;
+}
+
+//This used to walk every ai/baka/deckN.txt and OPEN AND READ each one to build
+//the full name list, then answer a question about a single deck from it. On PSP
+//that is 196 fileExists plus 196 open/read/close on the Memory Stick, measured
+//at 9.0 SECONDS inside the victory screen (WINPROBE, 2026-08-03) - task
+//generation is what triggers it, which is why the stall was intermittent: it
+//only fires when the player has fewer than 6 tasks.
+//
+//Two observations kill almost all of that work:
+//  1. getAIDeckCount returns MIN(AIDECKS_UNLOCKED, total), so every file probed
+//     beyond the unlocked ceiling was counted and then discarded. Stop at the
+//     ceiling. Probing continues incrementally if the ceiling later rises
+//     (IsMoreAIDecksUnlocked adds 10), and stops permanently once a file is
+//     genuinely missing.
+//  2. getAIDeckName needs ONE name. Read that one file.
+//
+//sAIDeckNames is now a sparse per-id cache (empty string = not yet read).
 void Task::LoadAIDeckNames()
 {
-    if (sAIDeckNames.empty())
-    {
-        int found = 1;
-        int nbDecks = 0;
-        while (found)
-        {
-            found = 0;
-            std::ostringstream stream;
-            stream << "ai/baka" << "/deck" << nbDecks + 1 << ".txt";
-            if (fileExists(stream.str().c_str()))
-            {
-                found = 1;
-                nbDecks++;
-                // TODO: Creating MTGDeck only for getting decks name. Find an easier way.
-                MTGDeck * mtgd = NEW MTGDeck(stream.str().c_str(), NULL, 1);
-                sAIDeckNames.push_back(mtgd->meta_name);
-                delete mtgd;
-            }
-        }
-    }
+    //Retained because the header declares it; the eagerer load it used to do is
+    //what this change removes. Names are fetched per id in getAIDeckName.
 }
 
 int Task::getAIDeckCount()
 {
-    LoadAIDeckNames();
-    return MIN((size_t) options[Options::AIDECKS_UNLOCKED].number, sAIDeckNames.size());
+    static int sFound = 0;        //decks confirmed present so far
+    static bool sExhausted = false; //hit a genuinely missing file
+
+    int ceiling = options[Options::AIDECKS_UNLOCKED].number;
+    if (ceiling < 0) ceiling = 0;
+
+    while (!sExhausted && sFound < ceiling)
+    {
+        std::ostringstream stream;
+        stream << "ai/baka" << "/deck" << sFound + 1 << ".txt";
+        if (!fileExists(stream.str().c_str()))
+        {
+            sExhausted = true;
+            break;
+        }
+        sFound++;
+    }
+
+    return MIN(ceiling, sFound);
 }
 
 string Task::getAIDeckName(int id)
 {
-    LoadAIDeckNames();
-    return ((unsigned int) id <= sAIDeckNames.size()) ? sAIDeckNames.at(id - 1) : "<Undefined>";
+    if (id < 1) return "<Undefined>";
+
+    if ((int) sAIDeckNames.size() < id) sAIDeckNames.resize(id);
+    if (sAIDeckNames[id - 1].size()) return sAIDeckNames[id - 1];
+
+    std::ostringstream stream;
+    stream << "ai/baka" << "/deck" << id << ".txt";
+    if (!fileExists(stream.str().c_str())) return "<Undefined>";
+
+    sAIDeckNames[id - 1] = readDeckName(stream.str());
+    return sAIDeckNames[id - 1];
 }
 
 // End of AI deck buffering code

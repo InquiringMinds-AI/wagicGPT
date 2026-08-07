@@ -51,9 +51,12 @@ DeckMenuItem::DeckMenuItem(DeckMenu* _parent, int id, int fontId, string text, f
     if (mMetaData && mMetaData->getAvatarFilename().size() > 0)
     {
         mImageFilename = mMetaData->getAvatarFilename();
-        if(!(WResourceManager::Instance()->RetrieveTexture(mImageFilename))) 
+        //Existence check only - the old RetrieveTexture test decoded every
+        //avatar JPEG per menu construction (~1.4s for the 19-deck opponent
+        //menu on PSP). The actual texture loads lazily at render time.
+        if(!mMetaData->avatarExists())
             mImageFilename = "baka.jpg"; // if the AI deck has no specific avatar we will display the default "baka.jpg" image.
-    } 
+    }
     else 
     {
         // this is a non-deck menu item (ie "Random", "Cancel", etc
@@ -119,7 +122,7 @@ void DeckMenuItem::RenderWithOffset(float yOffset)
         JTexture * tex = WResourceManager::Instance()->RetrieveTexture("new.png");
         if (tex)
         {
-            JQuadPtr quad = WResourceManager::Instance()->RetrieveQuad("new.png", 2.0f, 2.0f, tex->mWidth - 0.0f, tex->mHeight - 0.0f); //avoids weird rectangle aroudn the texture because of bilinear filtering
+            JQuadPtr quad = WResourceManager::Instance()->RetrieveQuad("new.png", 2.0f, 2.0f, tex->mWidth - 4.0f, tex->mHeight - 4.0f); //avoids weird rectangle around the texture because of bilinear filtering. The -4.0f matters: new.png is 32x24 in a 32x32 texture, so starting at (2,2) with the FULL width sampled out to (34,26) - past the image on both axes. The sibling call above always had the -4.0f and this comment; this one did not.
             quad->SetHotSpot(quad->mWidth/2.0f, quad->mHeight/2.0f);
             float x = mX + min(ITEM_PX_WIDTH - quad->mWidth, getWidth() )/2 + quad->mWidth/2;
             if (quad) JRenderer::GetInstance()->RenderQuad(quad.get(), x , mY + yOffset + quad->mHeight/2, 0, 16.f / quad->mWidth, 12.f / quad->mHeight);

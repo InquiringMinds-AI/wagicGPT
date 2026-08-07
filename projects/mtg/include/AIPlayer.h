@@ -111,6 +111,11 @@ public:
 class AIPlayerFactory{
  public:
   AIPlayer * createAIPlayer(GameObserver *observer, MTGAllCards * collection, Player * opponent, int deckid = 0);
+  //Entry point for callers that own an explicit deck path (campaign/story decks live outside
+  //the ai/baka/deckN.txt numbering, so they have no deckid to resolve).
+  AIPlayer * createAIPlayerFromDeckFile(GameObserver *observer, MTGAllCards * collection, Player * opponent,
+                                        const string& deckFile, const string& deckFileSmall,
+                                        const string& avatarFilename = "");
 #ifdef AI_CHANGE_TESTING
   AIPlayer * createAIPlayerTest(GameObserver *observer, MTGAllCards * collection, Player * opponent, string folder);
 #endif

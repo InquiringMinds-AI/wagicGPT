@@ -260,6 +260,41 @@ void GameObserver::nextGamePhase()
 
     if (mCurrentGamePhase == MTG_PHASE_AFTER_EOT)
     {
+        //CR 514.2 backstop (2026-08-07): damage removal and "until end of
+        //turn" expiry must be SIMULTANEOUS. The scripted heal (@each
+        //cleanup ... resetDamage in rules/*.txt) resolves through the
+        //stack; live play's phase auto-skip (ASKIP, forced OFF in suite
+        //games) can pull the whole cleanup->AFTER_EOT->next-turn transit
+        //into one synchronous chain before that trigger resolves - the
+        //actionLayer Update below then strips ueot effects, BEFORE_BEGIN
+        //garbage-collects the unresolved trigger, and the next SBA pass
+        //destroys creatures whose lethal marked damage was about to be
+        //removed (live: Rootborn Defenses survivors dying at end of
+        //turn). Heal synchronously before ueot retirement; mirrors
+        //AAResetDamage::resolve() including its exceptions.
+        for (int rdp = 0; rdp < 2; rdp++)
+        {
+            MTGGameZone * rdz = players[rdp]->game->inPlay;
+            for (int rdi = 0; rdi < rdz->nb_cards; rdi++)
+            {
+                MTGCardInstance * rdc = rdz->cards[rdi];
+                if (rdc->has(Constants::NODAMAGEREMOVED))
+                    continue;
+                if (!rdc->isCreature() && rdc->hasType(Subtypes::TYPE_PLANESWALKER))
+                {
+                    if (rdc->counters && rdc->counters->hasCounter("loyalty", 0, 0))
+                        rdc->life = rdc->counters->hasCounter("loyalty", 0, 0)->nb;
+                }
+                else if (!rdc->isCreature() && rdc->hasType(Subtypes::TYPE_BATTLE))
+                {
+                    if (rdc->counters && rdc->counters->hasCounter("defense", 0, 0))
+                        rdc->life = rdc->counters->hasCounter("defense", 0, 0)->nb;
+                }
+                else
+                    rdc->life = rdc->toughness;
+            }
+        }
+
         int handmodified = 0;
         handmodified = currentPlayer->handsize+currentPlayer->handmodifier;
         //Auto Hand cleaning, in case the player didn't do it himself
@@ -480,27 +515,55 @@ void GameObserver::resetStartupGame()
 //    DebugTrace(startupGameSerialized);
 }
 
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+#include <pspkernel.h>
+#include <stdio.h>
+//startGame stage timer: appends to the menuprobe log; delta since previous
+//sg mark. Built for the 2026-08-07 docket item (startGame 1.7-2.8s).
+void sgMark(const char * tag)
+{
+    static unsigned int last = 0;
+    unsigned int now = sceKernelGetSystemTimeLow();
+    FILE * f = fopen("User/wagic-menuprobe.log", "a");
+    if (f)
+    {
+        unsigned int d = last ? now - last : 0;
+        fprintf(f, "+%6u.%03ums   sg %s\n", d / 1000, d % 1000, tag);
+        fclose(f);
+    }
+    last = sceKernelGetSystemTimeLow();
+}
+#else
+#define sgMark(x) ((void)0)
+#endif
+
 void GameObserver::startGame(GameType gtype, Rules * rules)
 {
+    sgMark("begin");
     mGameType = gtype;
     turn = 0;
     mRules = rules;
     if (rules) 
         rules->initPlayers(this);
+    sgMark("initPlayers");
 
     options.automaticStyle(players[0], players[1]);
 
     mLayers = NEW DuelLayers(this);
+    sgMark("DuelLayers");
 
     currentPlayerId = 0;
     currentPlayer = players[currentPlayerId];
     currentActionPlayer = currentPlayer;
     phaseRing = NEW PhaseRing(this);
+    sgMark("phaseRing");
 
     resetStartupGame();
+    sgMark("serialize");
 
     if (rules) 
         rules->initGame(this);
+    sgMark("initGame");
 
     //CR pre-game procedure (opening hands + London mulligan + 103.6
     //actions) runs before turn 1 of real/selfplay/demo games. Suite games
@@ -524,7 +587,8 @@ void GameObserver::startGame(GameType gtype, Rules * rules)
             WResourceManager::Instance()->RetrieveCard(players[0]->game->hand->cards[i], CACHE_THUMB);
             WResourceManager::Instance()->RetrieveCard(players[0]->game->hand->cards[i]);
         }
-    }
+     }
+    sgMark("hand preload");
 
     startedAt = time(0);
 
@@ -1271,6 +1335,57 @@ void GameObserver::gameStateBasedEffects()
             userRequestNextGamePhase();
     }
 
+    //A window where nothing is possible is not a window. If the human seat has
+    //no legal action in this phase, advance REGARDLESS of the ASPHASES posture -
+    //including ASKIP_NONE. The two mechanisms are deliberately orthogonal:
+    //ASPHASES is a userland knob governing stops where the player COULD act,
+    //and this rule removes only the stops where they could not. Folding this
+    //into a skip level instead would make one level quietly mean another.
+    //
+    //Deliberately biased toward stopping: hasAnyLegalAction answers true when
+    //unsure, because a wrongly-skipped window can lose a game while a spurious
+    //stop costs one keypress.
+    //
+    //Automation is off entirely for suite and loading games - they encode exact
+    //phase cadences that any skip would drift - which is the same reason
+    //skipLevel is forced to ASKIP_NONE for them above.
+    //Settled-stack guard as in the empty-blockers skip: a trigger still
+    //resolving has to keep the window open.
+    const bool automationAllowed = !(currentPlayer->playMode == Player::MODE_TEST_SUITE
+                                     || mSuiteGame || mLoading);
+    Player * humanSeat = !players[0]->isAI() ? players[0] : (!players[1]->isAI() ? players[1] : NULL);
+    //Only the human's OWN turn. userRequestNextGamePhase advances the phase
+    //globally, so firing this on the opponent's turn would rip the phase out
+    //from under the AI before its throttled Act got to play - every other skip
+    //here is turn-gated for the same reason. The opponent's turn is already
+    //covered by the reactive half: the priority window at userRequestNextGamePhase
+    //only opens when the non-acting player can actually respond.
+    //The turn gate above is not enough on its own: the AI's BLOCKER declaration
+    //happens on the HUMAN's turn. During declare-blockers currentPlayer is the
+    //attacking human, so with no instant in hand this skip would advance combat
+    //before the defender's throttled Act ever declared a block - the AI was not
+    //declining to block, its window was being skipped (live-observed on PSP,
+    //2026-08-06: blocks present below this rule, absent above it). Hold whenever
+    //the OTHER seat has a combat declaration due; pendingCombatDecision is the
+    //engine's existing authority on exactly that question.
+    Player * otherSeat = humanSeat ? ((humanSeat == players[0]) ? players[1] : players[0]) : NULL;
+    if (automationAllowed && humanSeat && currentPlayer == humanSeat && !isInterrupting
+        && !mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
+        && !mLayers->actionLayer()->menuObject && !targetChooser
+        && (!otherSeat || pendingCombatDecision(otherSeat) == COMBAT_DECISION_NONE))
+    {
+        if (mNoActionTurn != turn || mNoActionPhase != mCurrentGamePhase
+            || mNoActionStep != (int) combatStep)
+        {
+            mNoActionTurn = turn;
+            mNoActionPhase = mCurrentGamePhase;
+            mNoActionStep = (int) combatStep;
+            mNoActionVerdict = LegalActionsOracle::hasAnyLegalAction(humanSeat);
+        }
+        if (!mNoActionVerdict)
+            userRequestNextGamePhase();
+    }
+
     this->LPWeffect = false;
     //WEventGameStateBasedChecked event checked
     receiveEvent(NEW WEventGameStateBasedChecked());
@@ -1742,8 +1857,15 @@ int GameObserver::cardClick(MTGCardInstance * card, Targetable * object, bool lo
 
         if (ORDER == combatStep)
         {
-            //TODO it is possible at this point that card is NULL. if so, what do we return since card->defenser would result in a crash?
-            card->defenser->raiseBlockerRankOrder(card);
+            //Damage-assignment order is a turn-based action (CR 509.2-509.3):
+            //no player has priority during the ordering interaction, so ALL
+            //clicks are consumed here - clicks on a blocker reorder it,
+            //anything else (hand cards included) is deliberately ignored.
+            //The defenser guard fixes a NULL deref: this used to call
+            //card->defenser->raiseBlockerRankOrder unconditionally, UB for
+            //every non-blocker click that landed in this step.
+            if (card && card->defenser)
+                card->defenser->raiseBlockerRankOrder(card);
             toReturn = 1;
             break;
         }

@@ -80,6 +80,10 @@ public:
 
 #if defined (PSP)
   int PixelSize(int textureMode);
+  // Emergency mid-frame reclaim of deferred texture frees: closes the in-flight
+  // display list, syncs the GE, frees, reopens a fresh list. Called when a
+  // texture allocation fails under load/evict burst pressure.
+  void TexMemCheckpoint();
 #endif
 
 	//////////////////////////////////////////////////////////////////////////

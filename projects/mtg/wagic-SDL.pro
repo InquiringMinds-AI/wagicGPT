@@ -20,8 +20,13 @@ unix:QMAKE_CXXFLAGS += -std=gnu++14
 unix:DEFINES += WITH_GPT_AI
 unix:INCLUDEPATH += include/thirdparty
 unix:LIBS += -lcurl
-OBJECTS_DIR = objs
-MOC_DIR = objs
+# objs-sdl, NOT objs: the PSP container build writes MIPS objects into objs/,
+# and a desktop link that picks them up dies with "relocations in generic ELF"
+# (or the PSP link dies on x86 objects - it bit in BOTH directions on
+# 2026-08-06). Separate dirs per target end the cross-contamination; qmake's
+# PCH artifacts follow OBJECTS_DIR so those separate too.
+OBJECTS_DIR = objs-sdl
+MOC_DIR = objs-sdl
 DESTDIR = bin
 
 macx|unix:LIBS += -lz -lboost_thread

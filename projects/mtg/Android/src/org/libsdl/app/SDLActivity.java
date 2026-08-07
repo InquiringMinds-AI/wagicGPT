@@ -61,12 +61,14 @@ import net.wagic.utils.ImgDownloader;
 import net.wagic.utils.StorageOptions;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 
@@ -102,6 +104,12 @@ public class SDLActivity extends Activity implements OnKeyListener {
 
     //public final static String RES_FOLDER = Environment.getExternalStorageDirectory().getPath() + "/Wagic/Res/";
     public static String RES_FILENAME = "";
+
+    // Written into the APK by build-apk.sh alongside the pack itself; holds the
+    // pack's sha256. Comparing it against the installed pack's recorded id is
+    // what makes a new APK refresh the data with no version bookkeeping.
+    public static final String RES_PACK_ID_ASSET = "respack.sha256";
+    public static final String kInstalledPackIdPreference = "installedPackId";
     public static String databaseurl = "https://github.com/WagicProject/wagic/releases/latest/download/CardImageLinks.csv";
 
     // Preferences
@@ -291,6 +299,14 @@ public class SDLActivity extends Activity implements OnKeyListener {
         setStorage.setPositiveButton("OK",
             new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int which) {
+                    // Persist even when the user tapped OK without touching the
+                    // (often single) radio item - otherwise the preference never
+                    // saves and this dialog re-appears on every launch.
+                    SharedPreferences prefs = getSharedPreferences(kWagicSharedPreferencesKey,
+                            MODE_PRIVATE);
+                    if (!prefs.contains(kStoreDataOnRemovableSdCardPreference)) {
+                        savePathPreference(0);
+                    }
                     initStorage();
 
                     if (mSurface == null) {
@@ -372,9 +388,13 @@ public class SDLActivity extends Activity implements OnKeyListener {
         boolean hasRemovableMediaMounted = getRemovableMediaStorageState();
 
         if (!settings.contains(kStoreDataOnRemovableSdCardPreference)) {
-            if (hasRemovableMediaMounted) {
+            if (hasRemovableMediaMounted && !settings.getBoolean("storageAsked", false)) {
+                prefsEditor.putBoolean("storageAsked", true);
+                prefsEditor.commit();
                 displayStorageOptions();
             } else {
+                // No removable media, or the question was already answered once:
+                // built-in storage, and never ask again.
                 prefsEditor.putBoolean(kStoreDataOnRemovableSdCardPreference,
                     false);
                 prefsEditor.commit();
@@ -470,16 +490,38 @@ public class SDLActivity extends Activity implements OnKeyListener {
         prefsEditor.commit();
     }
 
-    private void startDownload() {
-        String url = getResourceUrl();
-
+    // The core pack ships inside the APK, one pack per release, so the engine
+    // and the auto= script corpus it interprets can never drift apart. Nothing
+    // is fetched at runtime: the old path downloaded UPSTREAM's pack, which is
+    // the wrong data for this fork, and a partial download left a truncated zip
+    // sitting at the final filename with no way to notice.
+    private void installBundledRes() {
         if (!checkStorageState()) {
             Log.e(TAG, "Error in initializing storage space.");
             mSingleton.downloadError(
                 "Failed to initialize storage space for game. Please verify that your sdcard or internal memory is mounted properly.");
+            return;
         }
 
-        new DownloadFileAsync().execute(url);
+        new InstallResAsync().execute();
+    }
+
+    /** Identity of the pack built into this APK, or "" if unreadable. */
+    private String bundledPackId() {
+        InputStream in = null;
+
+        try {
+            in = getAssets().open(RES_PACK_ID_ASSET);
+
+            byte[] buf = new byte[128];
+            int n = in.read(buf);
+
+            return (n > 0) ? new String(buf, 0, n).trim() : "";
+        } catch (Exception e) {
+            return "";
+        } finally {
+            try { if (in != null) in.close(); } catch (IOException ignored) { }
+        }
     }
 
     public void downloadError(String errorMessage) {
@@ -956,7 +998,7 @@ public class SDLActivity extends Activity implements OnKeyListener {
         storage = settingsMenu.add(kStorageDataOptionsMenuId,
                 kStorageDataOptionsMenuId, Menu.NONE, "Storage Data Options");
         resource = settingsMenu.add(kdownloadResOptionsMenuId,
-                kdownloadResOptionsMenuId, Menu.NONE, "Download Core & Quit");
+                kdownloadResOptionsMenuId, Menu.NONE, "Reinstall Game Data");
 
     }
 
@@ -974,9 +1016,9 @@ public class SDLActivity extends Activity implements OnKeyListener {
         if (itemId == kStorageDataOptionsMenuId) {
             displayStorageOptions();
         } else if (itemId == kdownloadResOptionsMenuId) {
-            File oldRes = new File(getSystemStorageLocation() + RES_FILENAME);
-            oldRes.delete();
-            startDownload();
+            // Repair path for a corrupted pack. The install writes to a temp
+            // file and renames, so the existing pack is not deleted up front.
+            installBundledRes();
         } else if (itemId == 2) {
             importDeckOptions();
         } else if (itemId == 3) {
@@ -1011,7 +1053,7 @@ public class SDLActivity extends Activity implements OnKeyListener {
     public void showSettingsSubMenu() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Settings Menu");
-        String[] choices = { "Storage Data Options", "Download Core & Quit" };
+        String[] choices = { "Storage Data Options", "Reinstall Game Data" };
         builder.setItems(choices,
             new DialogInterface.OnClickListener() {
                 @Override
@@ -1063,7 +1105,7 @@ public class SDLActivity extends Activity implements OnKeyListener {
         switch (id) {
         case DIALOG_DOWNLOAD_PROGRESS:
             mProgressDialog = new ProgressDialog(this);
-            mProgressDialog.setMessage("Downloading resource files (" +
+            mProgressDialog.setMessage("Installing game data (" +
                 RES_FILENAME + ")");
             mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
             mProgressDialog.setCancelable(false);
@@ -1120,7 +1162,12 @@ public class SDLActivity extends Activity implements OnKeyListener {
 	private void enterImmersiveMode() {
 		final View decorView = getWindow().getDecorView();
 		decorView.setSystemUiVisibility(
-			View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+			// NOT _STICKY: sticky immersive consumes edge swipes to flash the
+			// system bars and never delivers the navigation event, so
+			// gesture-nav Back could not reach the game at all. Plain
+			// immersive reveals the bars on the first swipe; the Back gesture
+			// then works, and focus changes re-hide them.
+			View.SYSTEM_UI_FLAG_IMMERSIVE
 			| View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
 			| View.SYSTEM_UI_FLAG_FULLSCREEN
 			| View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
@@ -1161,48 +1208,30 @@ public class SDLActivity extends Activity implements OnKeyListener {
 		prepareOptionMenu(null);
 }
 
-    public void forceResDownload(final File oldRes) {
-        AlertDialog.Builder resChooser = new AlertDialog.Builder(this);
-        final SDLActivity parent = this;
-
-        resChooser.setTitle("Do you want to download latest core file?");
-
-        resChooser.setPositiveButton("Yes",
-                new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        FrameLayout _videoLayout = new FrameLayout(parent);
-                        setContentView(_videoLayout,
-                                new LayoutParams(LayoutParams.FILL_PARENT,
-                                        LayoutParams.FILL_PARENT));
-                        oldRes.delete();
-                        startDownload();
-                    }
-                });
-
-        resChooser.setNegativeButton("No",
-                new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        mainDisplay();
-                    }
-                });
-
-        resChooser.create().show();
-    }
-
     public void initializeGame() {
-        String coreFileLocation = getSystemStorageLocation() + RES_FILENAME;
+        File file = new File(getSystemStorageLocation() + RES_FILENAME);
+        SharedPreferences settings = getSharedPreferences(kWagicSharedPreferencesKey,
+                MODE_PRIVATE);
+        String bundled = bundledPackId();
+        String installed = settings.getString(kInstalledPackIdPreference, "");
 
-        File file = new File(coreFileLocation);
+        // Reinstall when the pack is absent, or when this APK carries a pack the
+        // installed one is not. Only the core zip is replaced - loose set image
+        // packs beside it and everything under User/ are left alone.
+        boolean needsInstall = !file.exists()
+            || (bundled.length() > 0 && !bundled.equals(installed));
 
-        if (file.exists()) {
-            forceResDownload(file);
-        } else {
-            FrameLayout _videoLayout = new FrameLayout(this);
-            setContentView(_videoLayout,
-                new LayoutParams(LayoutParams.FILL_PARENT,
-                    LayoutParams.FILL_PARENT));
-            startDownload();
+        if (!needsInstall) {
+            mainDisplay();
+
+            return;
         }
+
+        FrameLayout _videoLayout = new FrameLayout(this);
+        setContentView(_videoLayout,
+            new LayoutParams(LayoutParams.FILL_PARENT,
+                LayoutParams.FILL_PARENT));
+        installBundledRes();
     }
 
     // Events
@@ -1280,6 +1309,85 @@ public class SDLActivity extends Activity implements OnKeyListener {
 
     public static String getUserFolderPath() {
         return mSingleton.getUserStorageLocation();
+    }
+
+    /**
+     * HTTP transport for the language-model opponent, called over JNI from the
+     * native GPT layer. There is no libcurl in this build: HttpURLConnection
+     * gives us the platform's own TLS stack, system trust anchors, and OS
+     * updates instead of a CA bundle shipped inside the APK.
+     *
+     * An empty body means GET; anything else is a JSON POST. The contract
+     * matches the native side exactly: the response body on HTTP 200, and an
+     * empty string for every failure - the GPT seams read that as "endpoint
+     * unreachable" and fall back to the heuristic AI.
+     *
+     * Always called from a native worker thread, never the UI thread, so the
+     * blocking I/O here is legal (and StrictMode-clean).
+     */
+    private static volatile String sGptLastError = "";
+
+    /**
+     * Why the last gptHttpRequest returned "". Read by the native side only
+     * when a call fails, so a user's gpt-log.txt names the cause (blocked
+     * cleartext, DNS, refused connection, HTTP 401) instead of showing an
+     * unexplained fall back to the heuristic AI.
+     */
+    public static String gptLastError() {
+        return sGptLastError;
+    }
+
+    public static String gptHttpRequest(String url, String body, int timeoutMs, String bearer) {
+        HttpURLConnection conn = null;
+        sGptLastError = "";
+        try {
+            conn = (HttpURLConnection) new URL(url).openConnection();
+            conn.setConnectTimeout(timeoutMs);
+            conn.setReadTimeout(timeoutMs);
+            conn.setRequestProperty("Accept", "application/json");
+            if (bearer != null && bearer.length() > 0) {
+                conn.setRequestProperty("Authorization", "Bearer " + bearer);
+            }
+            if (body != null && body.length() > 0) {
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Content-Type", "application/json");
+                byte[] payload = body.getBytes("UTF-8");
+                conn.setFixedLengthStreamingMode(payload.length);
+                OutputStream out = conn.getOutputStream();
+                out.write(payload);
+                out.flush();
+                out.close();
+            } else {
+                conn.setRequestMethod("GET");
+            }
+
+            int code = conn.getResponseCode();
+            if (code != 200) {
+                sGptLastError = "HTTP " + code;
+                return "";
+            }
+            InputStream in = conn.getInputStream();
+            ByteArrayOutputStream sink = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int read;
+            while ((read = in.read(buf)) > 0) {
+                sink.write(buf, 0, read);
+            }
+            in.close();
+            return new String(sink.toByteArray(), "UTF-8");
+        } catch (Exception e) {
+            // Deliberately broad: a transport failure of ANY kind is one
+            // outcome to the caller. Throwing back across JNI would leave a
+            // pending exception on a native thread.
+            sGptLastError = e.toString();
+            Log.v("SDL", "gptHttpRequest failed: " + e);
+            return "";
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
     }
 
     public static void jgeSendCommand(String command) {
@@ -1405,6 +1513,40 @@ public class SDLActivity extends Activity implements OnKeyListener {
         }
     }
 
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        // Gesture-nav Back is delivered here on One UI; onBackPressed alone
+        // never fired. Route both edges to the game as the menu key.
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && mSurface != null) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                onNativeKeyDown(KeyEvent.KEYCODE_BACK);
+                // The engine detects a "click" only if the key is still held
+                // when a frame is drawn; a real Back sends down+up within the
+                // same frame, so the release must be deferred. (The in-game
+                // swipe worked precisely because it never sent an up at all.)
+                mSurface.postDelayed(new Runnable() {
+                    public void run() {
+                        onNativeKeyUp(KeyEvent.KEYCODE_BACK);
+                    }
+                }, 150);
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public void onBackPressed() {
+        // Gesture-nav Back never reached the surface's key listener; route it
+        // to the game as the menu key instead of finishing the activity.
+        onNativeKeyDown(KeyEvent.KEYCODE_BACK);
+        mSurface.postDelayed(new Runnable() {
+            public void run() {
+                onNativeKeyUp(KeyEvent.KEYCODE_BACK);
+            }
+        }, 60);
+    }
+
     public boolean onKey(View v, int keyCode, KeyEvent event) {
         if ((keyCode == KeyEvent.KEYCODE_MENU) &&
                 (KeyEvent.ACTION_DOWN == event.getAction())) {
@@ -1440,8 +1582,17 @@ public class SDLActivity extends Activity implements OnKeyListener {
         super.onConfigurationChanged(newConfig);
     }
 
-    class DownloadFileAsync extends AsyncTask<String, Integer, Long> {
-        private final String TAG = DownloadFileAsync.class.getCanonicalName();
+    /**
+     * Copies the core resource pack out of the APK's assets and onto storage.
+     *
+     * Staged through a .tmp file and renamed only on success, so an install
+     * interrupted by a kill or a full disk cannot leave a truncated zip sitting
+     * at the real filename - the failure mode the old downloader had, which was
+     * invisible because the launcher only checked that the file existed.
+     */
+    class InstallResAsync extends AsyncTask<Void, Integer, Boolean> {
+        private final String TAG = InstallResAsync.class.getCanonicalName();
+        private String packId = "";
 
         @Override
         protected void onPreExecute() {
@@ -1450,18 +1601,13 @@ public class SDLActivity extends Activity implements OnKeyListener {
         }
 
         @Override
-        protected Long doInBackground(String... aurl) {
-            int count;
-            long totalBytes = 0;
-            OutputStream output = null;
+        protected Boolean doInBackground(Void... unused) {
             InputStream input = null;
+            OutputStream output = null;
+            String storageLocation = mSingleton.getSystemStorageLocation();
+            File tmpFile = new File(storageLocation + RES_FILENAME + ".tmp");
 
             try {
-                //
-                // Prepare the sdcard folders in order to download the resource file
-                //
-                String storageLocation = mSingleton.getSystemStorageLocation();
-
                 File resDirectory = new File(storageLocation);
                 File userDirectory = new File(mSingleton.getUserStorageLocation());
 
@@ -1471,73 +1617,87 @@ public class SDLActivity extends Activity implements OnKeyListener {
                         "Failed to initialize system and user directories.");
                 }
 
-                URL url = new URL(aurl[0]);
-                String filename = url.getPath()
-                                     .substring(url.getPath().lastIndexOf('/') +
-                        1);
-                URLConnection conexion = url.openConnection();
-                conexion.connect();
+                packId = mSingleton.bundledPackId();
 
-                int lengthOfFile = conexion.getContentLength();
-                // Log.d(TAG, " Length of file: " + lengthOfFile);
-                input = new BufferedInputStream(url.openStream());
+                // The asset is deflated inside the APK, so its size is only
+                // known by reading it; progress is driven off the AssetManager
+                // stream's declared length where available.
+                input = new BufferedInputStream(
+                    mSingleton.getAssets().open(RES_FILENAME));
 
-                // create a File object for the output file
-                File outputFile = new File(resDirectory, filename);
+                int expected = input.available();
 
-                output = new FileOutputStream(outputFile);
+                output = new FileOutputStream(tmpFile);
 
-                byte[] data = new byte[1024];
+                byte[] data = new byte[65536];
+                long totalBytes = 0;
+                int count;
 
                 while ((count = input.read(data)) != -1) {
                     totalBytes += count;
-                    publishProgress((int) ((totalBytes * 100) / lengthOfFile));
                     output.write(data, 0, count);
+
+                    if (expected > 0) {
+                        publishProgress((int) Math.min(100,
+                            (totalBytes * 100) / expected));
+                    }
                 }
 
                 output.flush();
                 output.close();
+                output = null;
                 input.close();
+                input = null;
+
+                File postFile = new File(storageLocation + RES_FILENAME);
+
+                if (postFile.exists() && !postFile.delete()) {
+                    throw new Exception("Could not replace " + RES_FILENAME);
+                }
+
+                if (!tmpFile.renameTo(postFile)) {
+                    throw new Exception("Could not finalize " + RES_FILENAME);
+                }
+
+                return Boolean.TRUE;
             } catch (Exception e) {
-                String errorMessage = "An error happened while downloading the resources. It could be that our server is temporarily down, that your device is not connected to a network, or that we cannot write to " +
-                    mSingleton.getSystemStorageLocation() +
-                    ". Please check your phone settings and try again. For more help please go to http://wololo.net/forum/";
+                String errorMessage = "Could not install the game data to " +
+                    storageLocation +
+                    ". Please check that there is free space and that storage is writable.";
                 mSingleton.downloadError(errorMessage);
                 Log.e(TAG, errorMessage);
-                Log.e(TAG, e.getMessage());
-            }
+                Log.e(TAG, String.valueOf(e.getMessage()));
 
-            return Long.valueOf(totalBytes);
+                return Boolean.FALSE;
+            } finally {
+                try { if (output != null) output.close(); } catch (IOException ignored) { }
+                try { if (input != null) input.close(); } catch (IOException ignored) { }
+                tmpFile.delete();
+            }
         }
 
         protected void onProgressUpdate(Integer... progress) {
             if (progress[0] != mProgressDialog.getProgress()) {
-                // Log.d(TAG, "current progress : " + progress[0]);
                 mProgressDialog.setProgress(progress[0]);
             }
         }
 
         @Override
-        protected void onPostExecute(Long unused) {
-            if (mErrorHappened) {
-                dismissDialog(DIALOG_DOWNLOAD_PROGRESS);
+        protected void onPostExecute(Boolean ok) {
+            dismissDialog(DIALOG_DOWNLOAD_PROGRESS);
+
+            if (!ok.booleanValue() || mErrorHappened) {
                 showDialog(DIALOG_DOWNLOAD_ERROR);
 
                 return;
             }
 
-            // rename the temporary file into the final filename
-            String storageLocation = getSystemStorageLocation();
+            // Recorded only after the rename succeeded, so a failed install is
+            // retried on the next launch instead of being marked done.
+            SharedPreferences settings = getSharedPreferences(kWagicSharedPreferencesKey,
+                    MODE_PRIVATE);
+            settings.edit().putString(kInstalledPackIdPreference, packId).commit();
 
-            File preFile = new File(storageLocation + RES_FILENAME + ".tmp");
-            File postFile = new File(storageLocation + RES_FILENAME);
-
-            if (preFile.exists()) {
-                preFile.renameTo(postFile);
-            }
-
-            dismissDialog(DIALOG_DOWNLOAD_PROGRESS);
-            // Start game;
             mSingleton.mainDisplay();
         }
     }
@@ -1887,11 +2047,21 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
             case MotionEvent.ACTION_POINTER_UP:
                 y2 = event.getY();
                 float deltaY = y2 - y1;
-                if (deltaY > DELTA_Y) {
+                // Threshold proportional to view height: the old fixed 800px
+                // exceeded the whole screen height on landscape tablets, making
+                // the menu/back swipe physically impossible.
+                float swipeThreshold = v.getHeight() * 0.4f;
+                if (deltaY > swipeThreshold) {
                     parent.showOptionMenu(); // Emulate Android "optionmenu" button pressure (for devices without sidebar, e.g. like Android 10).
                     return true;
-                } else if (deltaY < -DELTA_Y){
-                    SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_BACK); // Emulate Android "back" button pressure (for devices without sidebar, e.g. like Android 10).
+                } else if (deltaY < -swipeThreshold){
+                    // Game menu (Back is bound to cancel instead).
+                    SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_MENU);
+                    v.postDelayed(new Runnable() {
+                        public void run() {
+                            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_MENU);
+                        }
+                    }, 150);
                     return true;
                 }
                 break;
@@ -1924,7 +2094,10 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                 float xVelocity = mVelocityTracker.getXVelocity(0);
                 float yVelocity = mVelocityTracker.getYVelocity(0);
 
-                if ((Math.abs(xVelocity) > 300) || (Math.abs(yVelocity) > 300)) {
+                // Higher y threshold: near-horizontal swipes on high-DPI
+                // screens were dispatching as vertical flicks (flounderbounder,
+                // Wagic Discord).
+                if ((Math.abs(xVelocity) > 300) || (Math.abs(yVelocity) > 800)) {
                     SDLActivity.onNativeFlickGesture(xVelocity, yVelocity);
                 }
 

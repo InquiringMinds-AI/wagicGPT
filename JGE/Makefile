@@ -30,9 +30,13 @@ HGE_OBJS = src/hge/hgecolor.o src/hge/hgeparticle.o \
        src/hge/hgedistort.o src/hge/hgefont.o
 
 
-CXXFLAGS = -W -Wall -Werror -Wno-unused
+CXXFLAGS = -W -Wall -Wno-unused
 CXXFLAGS += -DTIXML_USE_STL
 CXXFLAGS += -Wno-deprecated-declarations -Wno-sign-compare
+# Codebase predates C++17 (random_shuffle etc.); modern GCC defaults past it.
+CXXFLAGS += -std=gnu++14
+CXXFLAGS += $(EXTRA_DEFS)
+CFLAGS += $(EXTRA_DEFS)
 
 ifdef DEBUG
 CXXFLAGS += -ggdb3
@@ -77,6 +81,9 @@ OBJS = $(GENERIC_OBJS) $(PSP_OBJS)
 TARGET_HGE = libhgetools.a
 INCDIR = include/psp include/psp/freetype2 ../Boost src/zipFS
 CXXFLAGS += -O2 -G0 -DPSP
+#Real-hardware getenv returns garbage (uninitialized environ) - neuter it.
+CXXFLAGS += -include include/psp_noenv.h
+CFLAGS += -include include/psp_noenv.h
 LIBDIR = lib/psp
 endif
 ifeq ($(TARGET_ARCHITECTURE),linux)
@@ -108,6 +115,29 @@ linux: $(TARGET_LIB) hge
 install: $(TARGET_LIB) hge
 
 hge: $(TARGET_HGE)
+
+ifeq ($(TARGET_ARCHITECTURE),psp)
+#ar's r (replace-or-insert) never EVICTS: members whose sources left the objects
+#list survive in the archive forever, so builds of the same commit differ by
+#session history. This is the stale-library defect that poisoned the 2026-08-03
+#bisect (one binary carried two definitions of the same macro). Delete the
+#archive before rebuilding it so its contents are exactly the current objects.
+$(TARGET_HGE): $(HGE_OBJS)
+	$(RM) -f $(TARGET_HGE)
+	$(AR) r $(TARGET_HGE) $(HGE_OBJS)
+
+#Same defect, same fix for libjge300.a - this overrides the PSPSDK build.mak
+#recipe ($(AR) cru with no delete); the "overriding recipe" warning make prints
+#is expected and deliberate.
+$(TARGET_LIB): $(OBJS)
+	$(RM) -f $(TARGET_LIB)
+	$(AR) cru $(TARGET_LIB) $(OBJS)
+
+#build.mak's clean removes $(FINAL_TARGET) and $(OBJS) but knows nothing about
+#the hge archive; EXTRA_CLEAN is its extension point. With this, `make clean`
+#inside the pspdev container is a REAL clean - no more hand-rm'ing .a files.
+EXTRA_CLEAN += $(TARGET_HGE)
+endif
 
 ifeq ($(TARGET_ARCHITECTURE),linux)
 

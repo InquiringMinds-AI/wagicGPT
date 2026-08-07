@@ -169,14 +169,12 @@ JLOG("Start JMP3::load");
       sceIoLseek32(m_fileHandle, 0, SEEK_SET);
 	  m_fileSize = fileSize;
     int id3tagsize = GetID3TagSize((char*)filename.c_str());
-      initArgs.unk1 = 0;
-      initArgs.unk2 = 0;
       initArgs.mp3StreamStart = id3tagsize;
       initArgs.mp3StreamEnd = fileSize-(id3tagsize);
       initArgs.mp3BufSize = m_inBufferSize;
-      initArgs.mp3Buf = (SceVoid*) m_inBuffer;
+      initArgs.mp3Buf = (SceUChar8*) m_inBuffer;
       initArgs.pcmBufSize = m_outBufferSize;
-      initArgs.pcmBuf = (SceVoid*) m_outBuffer;
+      initArgs.pcmBuf = (SceUChar8*) m_outBuffer;
 
       m_mp3Handle = sceMp3ReserveMp3Handle(&initArgs);
       if (m_mp3Handle < 0)

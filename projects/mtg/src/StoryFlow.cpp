@@ -311,7 +311,12 @@ void StoryDuel::init()
 
     sprintf(deckFile, "%s/opponent_deck.txt", folder);
     sprintf(deckFileSmall, "campaign_ennemy_%s_%s", mParent->folder.c_str(), pageId.c_str());
-    game->loadPlayer(1, NEW AIPlayerBaka(game, deckFile, deckFileSmall, "baka.jpg"));
+    //Route through the factory so a story opponent is whatever AI the player configured, like any
+    //other duel. Campaign decks carry an explicit path rather than an ai/baka deck number, and their
+    //strategy guide resolves off that path (opponent_deck.txt -> opponent_deck_strategy.txt).
+    AIPlayerFactory playerCreator;
+    game->loadPlayer(1, playerCreator.createAIPlayerFromDeckFile(game, MTGCollection(), game->players[0],
+                                                                deckFile, deckFileSmall, "baka.jpg"));
 
     string rulesFile = folder;
     rulesFile.append("/rules.txt");

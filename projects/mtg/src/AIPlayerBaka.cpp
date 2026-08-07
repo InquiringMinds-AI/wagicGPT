@@ -65,6 +65,144 @@ int OrderedAIAction::getEfficiency(AADamager * aad)
     return 0;
 }
 
+//Damage a card's own script promises on resolution, read the way the engine
+//will read it. magicText is the auto= lines joined by '\n' (CardPrimitive::
+//addMagicText), so the shapes that can be trusted here are the untriggered
+//single-amount ones: a '@'-prefixed line fires on some LATER event rather than
+//when the spell resolves, the damage:type: forms are mass damage with no single
+//target, "x" is only meaningful after announcement, and an expression naming
+//rand would draw the game RNG just by being evaluated. Everything else is
+//measured with the same WParsedInt the resolution uses. Skipping a shape costs
+//an answer the AI would have had; guessing one wastes a real card, so every
+//uncertain shape is skipped.
+static int scriptedDamageOnResolve(MTGCardInstance * source)
+{
+    if (!source)
+        return 0;
+    string mt = source->magicText;
+    for (size_t i = 0; i < mt.size(); i++)
+        mt[i] = (char) tolower((unsigned char) mt[i]);
+
+    int total = 0;
+    size_t lineStart = 0;
+    while (lineStart <= mt.size())
+    {
+        size_t lineEnd = mt.find('\n', lineStart);
+        if (lineEnd == string::npos)
+            lineEnd = mt.size();
+        string line = mt.substr(lineStart, lineEnd - lineStart);
+        lineStart = lineEnd + 1;
+
+        size_t firstChar = line.find_first_not_of(" \t\r");
+        if (firstChar == string::npos || line[firstChar] == '@')
+            continue;
+
+        size_t pos = line.find("damage:");
+        if (pos == string::npos)
+            continue;
+        string amount = line.substr(pos + 7);
+        size_t stop = amount.find_first_of(" \t\r");
+        if (stop != string::npos)
+            amount = amount.substr(0, stop);
+        if (amount.empty() || amount.find(':') != string::npos
+            || amount.find("rand") != string::npos || amount == "x")
+            continue;
+
+        if (amount.find_first_not_of("0123456789") == string::npos)
+        {
+            total += atoi(amount.c_str());
+            continue;
+        }
+        WParsedInt parsed(amount, NULL, source);
+        int value = parsed.getValue();
+        if (value > 0)
+            total += value;
+    }
+    return total;
+}
+
+//Damage already on the stack and aimed at this card.
+//
+//The regenerate and prevent scoring below only ever looked at combat, so a burn
+//spell about to resolve on a creature raised neither - Baka sat on a
+//regeneration that would have saved the card. The gap became reachable when
+//priority moved engine-side: the AI now reliably holds priority while a spell
+//waits on the stack, which is exactly the window these answers are for.
+//
+//Two shapes are counted, because they are the two whose magnitude is knowable
+//before resolution: an ability on the stack whose core is an AADamager aimed
+//here (the engine hands over the exact number), and a spell on the stack that
+//targets this card and whose script carries an untriggered damage clause.
+static int pendingStackDamageTo(GameObserver * observer, MTGCardInstance * card)
+{
+    if (!observer || !card || !observer->mLayers)
+        return 0;
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return 0;
+
+    int total = 0;
+    Interruptible * item = NULL;
+    while ((item = stack->getNext(item, 0, NOT_RESOLVED)))
+    {
+        if (StackAbility * stacked = dynamic_cast<StackAbility *>(item))
+        {
+            MTGAbility * core = AbilityFactory::getCoreAbility(stacked->ability);
+            AADamager * damager = dynamic_cast<AADamager *>(core);
+            if (damager && dynamic_cast<MTGCardInstance *>(damager->getTarget()) == card)
+                total += damager->getDamage();
+            continue;
+        }
+
+        Spell * spell = dynamic_cast<Spell *>(item);
+        if (!spell || !spell->source)
+            continue;
+        bool aimedHere = false;
+        MTGCardInstance * spellTarget = NULL;
+        while ((spellTarget = spell->getNextCardTarget(spellTarget)))
+        {
+            if (spellTarget == card)
+            {
+                aimedHere = true;
+                break;
+            }
+        }
+        if (aimedHere)
+            total += scriptedDamageOnResolve(spell->source);
+    }
+    return total;
+}
+
+//A regeneration shield this card is already about to get.
+//
+//regenerateTokens only rises when the ability RESOLVES, so between activation
+//and resolution the card still reads as unshielded. getEfficiency's own
+//`stack has this ability` guard covers the ability that was activated, but not
+//a SECOND regeneration aimed at the same card - a card with two regenerate
+//abilities, or a second permanent offering one - and one threat only ever
+//needs one shield, so the second is a wasted card and wasted mana.
+static bool regenerationPendingFor(GameObserver * observer, MTGCardInstance * card)
+{
+    if (!observer || !card || !observer->mLayers)
+        return false;
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return false;
+
+    Interruptible * item = NULL;
+    while ((item = stack->getNext(item, 0, NOT_RESOLVED)))
+    {
+        StackAbility * stacked = dynamic_cast<StackAbility *>(item);
+        if (!stacked)
+            continue;
+        MTGAbility * core = AbilityFactory::getCoreAbility(stacked->ability);
+        if (core && core->aType == MTGAbility::STANDARD_REGENERATE
+            && dynamic_cast<MTGCardInstance *>(core->target) == card)
+            return true;
+    }
+    return false;
+}
+
 // In this function, target represents the target of the currentAIAction object, while coreAbilityCardTarget is the target of the ability of this AIAction object
 // I can't remember as I type this in which condition we use one or the other for this function, if you find out please replace this comment
 int OrderedAIAction::getEfficiency()
@@ -132,11 +270,24 @@ int OrderedAIAction::getEfficiency()
 
             if (!coreAbilityCardTarget->regenerateTokens && currentPhase == MTG_PHASE_COMBATBLOCKERS
                 && (coreAbilityCardTarget->defenser || coreAbilityCardTarget->blockers.size())
+                && !regenerationPendingFor(g, coreAbilityCardTarget)
                 )
             {
                 efficiency = 95;
             }
-            //TODO If the card is the target of a damage spell                      
+            else if (!coreAbilityCardTarget->regenerateTokens
+                     && !regenerationPendingFor(g, coreAbilityCardTarget))
+            {
+                //A regeneration shield replaces the destruction that lethal
+                //damage causes, so it answers a burn spell exactly as it
+                //answers a lethal blocker - and the stack is the only place
+                //that damage is visible before it lands. life is the card's
+                //REMAINING toughness (damage is subtracted from it), so lethal
+                //is measured against that, not the printed value.
+                int pendingDamage = pendingStackDamageTo(g, coreAbilityCardTarget);
+                if (pendingDamage > 0 && pendingDamage >= coreAbilityCardTarget->life)
+                    efficiency = 95;
+            }
             break;
         }
     case MTGAbility::STANDARD_PREVENT:
@@ -175,7 +326,22 @@ int OrderedAIAction::getEfficiency()
                     }
                 }
             }
-            //TODO If the card is the target of a damage spell
+            else if (p == target->controller() && target->controller()->isAI())
+            {
+                //Off-combat answer: damage already on the stack aimed at this
+                //card. Prevention only earns its card if it turns lethal into
+                //survivable - preventing 2 of a 5-damage bolt on a 3-toughness
+                //creature loses the creature AND the prevention.
+                int pendingDamage = pendingStackDamageTo(g, target);
+                if (pendingDamage > 0 && (pendingDamage - target->preventable) >= target->life)
+                {
+                    AADamagePrevent * prevention = dynamic_cast<AADamagePrevent *>(a);
+                    int wouldPrevent = prevention ? prevention->preventing : 0;
+                    if (wouldPrevent > 0
+                        && (target->life + target->preventable + wouldPrevent - pendingDamage) > 0)
+                        efficiency = 20 * (target->DangerRanking());
+                }
+            }
             break;
         }
     case MTGAbility::STANDARD_EQUIP:
@@ -818,11 +984,24 @@ int OrderedAIAction::getRevealedEfficiency(MTGAbility * ability2)
 
             if (!coreAbilityCardTarget->regenerateTokens && currentPhase == MTG_PHASE_COMBATBLOCKERS
                 && (coreAbilityCardTarget->defenser || coreAbilityCardTarget->blockers.size())
+                && !regenerationPendingFor(g, coreAbilityCardTarget)
                 )
             {
                 eff2 = 95;
             }
-            //TODO If the card is the target of a damage spell
+            else if (!coreAbilityCardTarget->regenerateTokens
+                     && !regenerationPendingFor(g, coreAbilityCardTarget))
+            {
+                //A regeneration shield replaces the destruction that lethal
+                //damage causes, so it answers a burn spell exactly as it
+                //answers a lethal blocker - and the stack is the only place
+                //that damage is visible before it lands. life is the card's
+                //REMAINING toughness (damage is subtracted from it), so lethal
+                //is measured against that, not the printed value.
+                int pendingDamage = pendingStackDamageTo(g, coreAbilityCardTarget);
+                if (pendingDamage > 0 && pendingDamage >= coreAbilityCardTarget->life)
+                    eff2 = 95;
+            }
             break;
         }
     case MTGAbility::STANDARD_PREVENT:
@@ -861,7 +1040,22 @@ int OrderedAIAction::getRevealedEfficiency(MTGAbility * ability2)
                     }
                 }
             }
-            //TODO If the card is the target of a damage spell
+            else if (p == target->controller() && target->controller()->isAI())
+            {
+                //Off-combat answer: damage already on the stack aimed at this
+                //card. Prevention only earns its card if it turns lethal into
+                //survivable - preventing 2 of a 5-damage bolt on a 3-toughness
+                //creature loses the creature AND the prevention.
+                int pendingDamage = pendingStackDamageTo(g, target);
+                if (pendingDamage > 0 && (pendingDamage - target->preventable) >= target->life)
+                {
+                    AADamagePrevent * prevention = dynamic_cast<AADamagePrevent *>(a);
+                    int wouldPrevent = prevention ? prevention->preventing : 0;
+                    if (wouldPrevent > 0
+                        && (target->life + target->preventable + wouldPrevent - pendingDamage) > 0)
+                        eff2 = 20 * (target->DangerRanking());
+                }
+            }
             break;
         }
     case MTGAbility::STANDARD_EQUIP:
@@ -3221,7 +3415,23 @@ MTGCardInstance * AIPlayerBaka::activateCombo()
         }
         SAFE_DELETE(hintTc);
     }
-    if(payTheManaCost(totalCost,0,nextCardToPlay,gotPayments)) //Fix crash when nextCardToPlay is null.
+    //Affordability CHECK only - no payment. This used to payTheManaCost the
+    //whole totalmananeeded here, and then the normal cast path paid the piece
+    //AGAIN, queueing duplicate producer clicks; the second click on an
+    //already-tapped producer refuses, and a refused payment click aborts the
+    //rest of the plan (the wave-20 stall guard) - so the combo card was never
+    //cast and the pre-floated mana sat in the pool every turn (live-observed:
+    //deck15 floating {B}{B} for Fear, Fear never cast). The cast path is the
+    //single payer; each combo piece pays its own cost when it is cast.
+    bool comboAffordable = !totalCost->getConvertedCost();
+    if (!comboAffordable)
+    {
+        ManaCost * avail = getPotentialMana();
+        avail->add(this->getManaPool());
+        comboAffordable = avail->canAfford(totalCost, 0) != 0;
+        SAFE_DELETE(avail);
+    }
+    if(comboAffordable)
     {
         if(comboCards.size())
         {
@@ -4395,6 +4605,7 @@ int AIPlayerBaka::Act(float dt)
     }
     else
     {
+        bool completedPlay = !clickstream.empty();
         while(clickstream.size())
         {
             AIAction * action = clickstream.front();
@@ -4419,6 +4630,22 @@ int AIPlayerBaka::Act(float dt)
                     clickstream.pop();
                 }
             }
+        }
+        //Spectator pacing: the endless demo develops faster than a human can
+        //read the board, so hold this seat's next act after each completed
+        //play. Priority passes keep the normal quick timer, and harness
+        //contexts (suite/selfplay/headless, or WAGIC_DEMO_FAST=1 for live GUI
+        //engine tests) keep full engine speed.
+        if (completedPlay && observer && observer->gameType() == GAME_TYPE_DEMO
+            && !observer->mSuiteGame)
+        {
+            bool harness = false;
+#if !defined (PSP)
+            harness = getenv("WAGIC_DEMO_FAST") || getenv("WAGIC_TESTSUITE")
+                || getenv("WAGIC_HEADLESS") || getenv("WAGIC_SELFPLAY");
+#endif
+            if (!harness)
+                timer = 1.5f;
         }
     }
     return 1;

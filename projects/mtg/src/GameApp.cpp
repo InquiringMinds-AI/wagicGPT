@@ -87,6 +87,17 @@ GameApp::~GameApp()
     WResourceManager::Terminate();
 }
 
+
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE) || defined(WAGIC_MEMPROBE)
+#include <stdio.h>
+static void gaMark(const char* m)
+{
+    FILE* f = fopen("User/wagic-boot.log", "a");
+    if (f) { fprintf(f, "GA %s\n", m); fclose(f); }
+}
+#else
+#define gaMark(m)
+#endif
 void GameApp::Create()
 {
     srand((unsigned int) time(0)); // initialize random
@@ -96,6 +107,15 @@ void GameApp::Create()
 #elif defined (PSP)
     pspFpuSetEnable(0); //disable FPU Exceptions until we find where the FPU errors come from
     pspDebugScreenPrintf("Wagic:Loading resources...");
+    //Carve the texture slab pool FIRST, while the heap is empty: the carve is
+    //guaranteed contiguous here, every texture the program loads lives inside
+    //it, and the primitives-load transient below gets the entire remaining
+    //heap - both alternative carve points crashed the device (see
+    //JGE/src/JGfx.cpp texPoolInit).
+    {
+        extern void wagicTexPoolInit();
+        wagicTexPoolInit();
+    }
 #endif
 #endif //QT_CONFIG
     //_CrtSetBreakAlloc(368);
@@ -140,10 +160,12 @@ void GameApp::Create()
         }
     }
 
+    gaMark("modrules");
     LOG("Loading Modrules");
     //Load Mod Rules before everything else
     gModRules.load("rules/modrules.xml");
 
+    gaMark("unlockables");
     LOG("Loading Unlockables");
     //Load awards (needs to be loaded before any option are accessed)
     Unlockable::load();
@@ -152,26 +174,32 @@ void GameApp::Create()
     options.theGame = this;
 
     //Ensure that options are partially loaded before loading files.
+    gaMark("reloadProfile");
     LOG("options.reloadProfile()");
     options.reloadProfile();
 
 
     //Setup Cache before calling any gfx/sfx functions
+    gaMark("ResetCacheLimits");
     WResourceManager::Instance()->ResetCacheLimits();
 
 
+    gaMark("musiccheck");
     LOG("Checking for music files");
     //Test for Music files presence
     JFileSystem * jfs = JFileSystem::GetInstance();
     HasMusic = jfs->FileExists(WResourceManager::Instance()->musicFile("Track0.mp3")) && jfs->FileExists(WResourceManager::Instance()->musicFile("Track1.mp3"));
     
+    gaMark("collection");
     LOG("Init Collection");
     MTGAllCards::getInstance();
 
+    gaMark("rules");
     LOG("Loading rules");
     Rules::loadAllRules();
 
 
+    gaMark("textures");
     LOG("Loading Textures");
     LOG("--Loading menuicons.png");
     WResourceManager::Instance()->RetrieveTexture("menuicons.png", RETRIEVE_MANAGE);
@@ -201,6 +229,7 @@ void GameApp::Create()
         if (manaIcons[i].get())
             manaIcons[i]->SetHotSpot(16, 16);
 
+    gaMark("backjpg");
     LOG("--Loading back.jpg");
     WResourceManager::Instance()->RetrieveTexture("back.jpg", RETRIEVE_MANAGE);
     JQuadPtr jq = WResourceManager::Instance()->RetrieveQuad("back.jpg", 0, 0, 0, 0, kGenericCardID, RETRIEVE_MANAGE);
@@ -219,6 +248,7 @@ void GameApp::Create()
     if (jq)
         jq->SetHotSpot(16, 16);
 
+    gaMark("fonts");
     LOG("--Loading fonts");
     string lang = options[Options::LANG].str;
     std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
@@ -226,6 +256,7 @@ void GameApp::Create()
     Translator::GetInstance()->init();
     // The translator is ready now.
 
+    gaMark("varioustex");
     LOG("--Loading various textures");
     // Load in this function only textures that are used frequently throughout the game. These textures will constantly stay in Ram, so be frugal
     WResourceManager::Instance()->RetrieveTexture("phasebar.png", RETRIEVE_MANAGE);

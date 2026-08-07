@@ -3230,7 +3230,7 @@ AACounter::AACounter(GameObserver* observer, int id, MTGCardInstance * source, M
                     }
                     if(!maxNb || (maxNb && currentAmount < maxNb))
                     {
-                        _target->counters->addCounter(name.c_str(), power, toughness, noevent, false, source);
+                        _target->counters->addCounter(name.c_str(), power, toughness, noevent, false, source, true);
                         totalcounters++;
                     }
                 }
@@ -3247,7 +3247,7 @@ AACounter::AACounter(GameObserver* observer, int id, MTGCardInstance * source, M
                 {
                     while (_target->next)
                         _target = _target->next;
-                    _target->counters->removeCounter(name.c_str(), power, toughness, noevent, false, source);
+                    _target->counters->removeCounter(name.c_str(), power, toughness, noevent, false, source, true);
                     totalcounters++;
                 }
                 if (!noevent)
@@ -11444,7 +11444,9 @@ ATutorialMessage::ATutorialMessage(GameObserver* observer, MTGCardInstance * sou
 string ATutorialMessage::getOptionName()
 {
     std::stringstream out;
-    out << "tuto_";
+    //Shared with GameOptions::resetTutorialMessages(), which clears every key
+    //carrying this prefix.
+    out << GameOptions::kTutorialOptionPrefix;
     out << hash_djb2(mMessage.c_str());
     return out.str();
 }
@@ -11458,7 +11460,22 @@ bool ATutorialMessage::CheckUserInput(JButton key)
 {
     if (mUserCloseRequest) return false;
 
-    if(key == JGE_BTN_SEC || key == JGE_BTN_OK)
+    if(key == JGE_BTN_SEC)
+    {
+        //The secondary button is the "stop showing me these" control: it turns
+        //tutorials off wholesale rather than dismissing this one message.
+        //Update() retires every live message once the option is off.
+        options[Options::TUTORIALS].number = 0;
+#if !defined(VITA)
+        // On Vita this NAND flush takes 1-3s; rely on end-of-duel save instead.
+        options.save();
+#endif
+        mElapsed = 0;
+        mUserCloseRequest = true;
+        return true;
+    }
+
+    if(key == JGE_BTN_OK)
     {
         ButtonPressed(0, 1);
         return true;
@@ -11472,6 +11489,25 @@ bool ATutorialMessage::CheckUserInput(JButton key)
 
 void ATutorialMessage::Update(float dt)
 {
+    //Retire the message instead of showing it when nobody can dismiss it, or
+    //when the player has asked not to see tutorials at all.
+    //
+    //The AI-only case is a hard lock, not a preference: these messages are
+    //modal, and message() ones are built with no show-limit, so in the endless
+    //demo (both seats AI) they cycle forever with nothing to close them.
+    //Retiring has to be done here rather than by setting mDontShow, because the
+    //path below returns early whenever another message owns the screen - two
+    //undismissable messages would then wait on each other.
+    const bool nobodyToDismiss = !game->players[0]->isHuman() && !game->players[1]->isHuman();
+    if (nobodyToDismiss || !options[Options::TUTORIALS].number)
+    {
+        if (game->mLayers->stackLayer()->getCurrentTutorial() == this)
+            game->mLayers->stackLayer()->setCurrentTutorial(0);
+        mDontShow = true;
+        forceDestroy = 1;
+        return;
+    }
+
     if (!game->mLayers->stackLayer()->getCurrentTutorial() && !mDontShow)
         game->mLayers->stackLayer()->setCurrentTutorial(this);
 
@@ -11499,13 +11535,13 @@ void ATutorialMessage::Update(float dt)
     //Below this only affects "text" mode
     if (!mUserCloseRequest && mY < 0)
     {
-        mY = -SCREEN_HEIGHT + (SCREEN_HEIGHT * mElapsed / 0.75f); //Todo: more physical drop-in.
+        mY = -SCREEN_HEIGHT + (SCREEN_HEIGHT * mElapsed / 0.12f);
         if (mY >= 0)
             mY = 0;
     }
     else if (mUserCloseRequest && mY > -SCREEN_HEIGHT)
     {
-        mY = -(SCREEN_HEIGHT * mElapsed / 0.75f);
+        mY = -(SCREEN_HEIGHT * mElapsed / 0.12f);
     }
 }
 
@@ -11516,8 +11552,10 @@ void ATutorialMessage::ButtonPressed(int, int)
     {
         string optionName = getOptionName();
         options[optionName].number = options[optionName].number + 1;
-#if !defined(VITA)
-        // On Vita this NAND flush takes 1-3s; rely on end-of-duel save instead.
+#if !defined(VITA) && !defined(PSP)
+        // On Vita this NAND flush takes 1-3s, and the PSP Memory Stick is no
+        // better - it stalled visibly on every dismissal. Rely on the
+        // end-of-duel save instead.
         options.save();
 #endif
     }
@@ -11533,7 +11571,12 @@ void ATutorialMessage::Render()
     if (mY < -SCREEN_HEIGHT)
         return;
 
-    if (!mBgTex)
+    //mObjects.empty() is load-bearing: in text mode mBgTex is deliberately never
+    //assigned (taskboard.png was 1 MiB pinned to decorate a text box), so !mBgTex
+    //alone stays true forever and this block allocated a fresh IconButton EVERY
+    //FRAME the message was up. The continue button is built once; that is the
+    //real condition.
+    if (!mBgTex && mObjects.empty())
     {
         if (mIsImage)
         {
@@ -11550,31 +11593,21 @@ void ATutorialMessage::Render()
                 Add(iconButton);
             }
 
-            if (options[Options::SFXVOLUME].number > 0)
-            {
-                game->getResourceManager()->PlaySample("tutorial.wav");
-            }
+            //No sting on appearance - it fires on every message and reads as
+            //nagging rather than as information.
         }
         else
         {
-            mBgTex = game->getResourceManager()->RetrieveTexture("taskboard.png", RETRIEVE_LOCK);
-
-            float unitH = static_cast<float> (mBgTex->mHeight / 4);
-            float unitW = static_cast<float> (mBgTex->mWidth / 4);
-            if (unitH == 0 || unitW == 0) return;
-
-            if (mBgTex)
-            {
-                mBg[0] = NEW JQuad(mBgTex, 0, 0, unitW, unitH);
-                mBg[1] = NEW JQuad(mBgTex, unitW, 0, unitW * 2, unitH);
-                mBg[2] = NEW JQuad(mBgTex, unitW * 3, 0, unitW, unitH);
-                mBg[3] = NEW JQuad(mBgTex, 0, unitH, unitW, unitH * 2);
-                mBg[4] = NEW JQuad(mBgTex, unitW, unitH, unitW * 2, unitH * 2);
-                mBg[5] = NEW JQuad(mBgTex, unitW * 3, unitH, unitW, unitH * 2);
-                mBg[6] = NEW JQuad(mBgTex, 0, unitH * 3, unitW, unitH);
-                mBg[7] = NEW JQuad(mBgTex, unitW, unitH * 3, unitW * 2, unitH);
-                mBg[8] = NEW JQuad(mBgTex, unitW * 3, unitH * 3, unitW, unitH);
-            }
+            //No board image. taskboard.png is 512x512 and was retrieved with
+            //RETRIEVE_LOCK - one MiB PINNED for the life of the process, on a
+            //43 MiB heap, to decorate a text box. mBgTex stays NULL, which falls
+            //through to the drawn-panel branch in Render() below: that branch was
+            //already written as the no-texture fallback (two translucent FillRects
+            //plus the same title and text), so nothing new has to be drawn.
+            //
+            //The removed code also read mBgTex->mHeight BEFORE its own NULL check
+            //- the same dereference-without-checking family as the TexAlloc
+            //callers in JGfx.cpp.
 
             //Continue Button
             JQuadPtr quad =  game->getResourceManager()->RetrieveQuad("iconspsp.png", 4 * 32, 0, 32, 32, "iconpsp4", RETRIEVE_MANAGE);
@@ -11582,13 +11615,7 @@ void ATutorialMessage::Render()
             IconButton * iconButton = NEW IconButton(1, this, quad.get(), SCREEN_WIDTH_F / 2,  SCREEN_HEIGHT_F - 60, 0.7f, Fonts::MAGIC_FONT, _("continue"), 0, 16, true);
             Add(iconButton);
 
-            mSH = 64 / unitH;
-            mSW = 64 / unitW;
-
-            if (options[Options::SFXVOLUME].number > 0)
-            {
-                game->getResourceManager()->PlaySample("chain.wav");
-            }
+            //No sting on appearance - it fired on every message.
         }
     }
 

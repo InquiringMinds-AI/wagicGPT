@@ -31,7 +31,9 @@
 #include "DuelLayers.h"
 #include "PreGamePhase.h" //PreGamePhase::bottomTarget, driven by the self-test
 
+#ifndef WAGIC_NO_CURL
 #include <curl/curl.h>
+#endif
 #include <nlohmann/json.hpp>
 
 #include <cstdlib>
@@ -1728,12 +1730,67 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         state->started = std::chrono::steady_clock::now();
     }
     long timeoutMs = mTimeoutMs;
-    std::thread([state, url, requestBody, key, timeoutMs]() {
-        string body = gptHttpPost(url, requestBody, timeoutMs, key);
-        std::lock_guard<std::mutex> g(state->mtx);
-        state->status = 2;
-        state->response = body;
-    }).detach();
+    try
+    {
+        //WAGIC_GPT_NOTHREAD: emulate a platform that refuses to start a thread.
+        //The Vita's libstdc++ has no active gthreads layer, so every model call
+        //there fails this way - a path that is otherwise unreachable on a
+        //desktop, and therefore untestable exactly where it is easiest to test.
+        if (getenv("WAGIC_GPT_NOTHREAD"))
+            throw std::runtime_error("thread creation disabled by WAGIC_GPT_NOTHREAD");
+        std::thread([state, url, requestBody, key, timeoutMs]() {
+            string body = gptHttpPost(url, requestBody, timeoutMs, key);
+            std::lock_guard<std::mutex> g(state->mtx);
+            state->status = 2;
+            state->response = body;
+        }).detach();
+    }
+    catch (const std::exception& e)
+    {
+        //Constructing a std::thread THROWS when the platform refuses one -
+        //resource limits, a thread cap, or a libstdc++ whose gthreads layer is
+        //not active. Letting that escape calls std::terminate and aborts the
+        //process, which breaks the guarantee every other seam here keeps: a
+        //transport failure degrades to the heuristic AI, it never takes the game
+        //down. Publishing an empty reply is the same shape as an unreachable
+        //endpoint, so the caller falls back to Baka on its existing path.
+        //Resolve THIS tick rather than reporting a round trip that does not
+        //exist. Returning kChoicePending here means "no action yet", and the
+        //only thing that stops an empty clickstream being committed as a pass
+        //is decisionPending(), which is true only while asyncBusy() - i.e.
+        //while status == 1. Publishing status = 2 synchronously and then
+        //claiming pending left the seam waiting and the gate reporting idle, so
+        //the engine passed the turn. Every decision became attempt-once,
+        //get-passed: on hardware that is an opponent that draws and passes
+        //forever, and in the harness 107 turns with both players still at 20
+        //life. Going straight back to idle with an empty reply is the same
+        //shape as a synchronous transport failure, which the seams already
+        //answer with the heuristic AI, in this tick.
+        {
+            std::lock_guard<std::mutex> g(state->mtx);
+            state->status = 0;
+            state->response.clear();
+            state->prompt.clear();
+        }
+        content.clear();
+        DebugTrace("AIPlayerGPT: could not start the worker thread (" << e.what()
+                   << "); falling back to the heuristic AI");
+        //Log this ONCE. A platform that refuses one thread refuses all of them,
+        //so the message is identical every time and repeats once per decision -
+        //209 and 344 identical lines in two Vita sessions. Writing it each time
+        //puts a file open/write/close on the game thread on the single platform
+        //where storage I/O per game event is a known cause of lag, to say
+        //something already known after the first line.
+        static bool refusalLogged = false;
+        if (!refusalLogged)
+        {
+            refusalLogged = true;
+            gptLogLine(string("worker thread refused: ") + e.what()
+                       + " - falling back to the heuristic AI for every decision"
+                       + " (logged once; this platform cannot start threads)");
+        }
+        return 0; //answer now, with an empty reply -> the seam's heuristic
+    }
     return kChoicePending;
 }
 
@@ -1889,12 +1946,14 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0)
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
+#ifndef WAGIC_NO_CURL
     curl_global_init(CURL_GLOBAL_DEFAULT);
+#endif
     //File config first, environment variables override.
     GptSettings cfg = GptSettings::load();
     mConfigUrls = cfg.urls;
@@ -1911,6 +1970,11 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
         mTimeoutMs = 1000L * atol(to);
     if (mTimeoutMs < 5000)
         mTimeoutMs = 5000;
+    mPatienceLimit = (float) cfg.patienceSecs;
+    if (const char * pt = getenv("WAGIC_GPT_PATIENCE"))
+        mPatienceLimit = (float) atof(pt);
+    if (mPatienceLimit < 0)
+        mPatienceLimit = 0;
     mThinking = getenv("WAGIC_GPT_THINKING") ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
     //Telemetry consent implies local decision logging: the log IS the data
     //a future contribution/upload mechanism would share.
@@ -1955,6 +2019,16 @@ void AIPlayerGPT::setNotice(const string& text, float seconds)
 {
     mNotice = text;
     mNoticeTicks = (int) (seconds * 60); //decremented per rendered frame
+}
+
+//The model did not answer this decision; the heuristic did. Say so, and keep
+//saying so quietly for a while after the notice fades - a run of fallbacks is
+//a different thing from one, and the player deserves to see which they are in.
+void AIPlayerGPT::noticeFallback(const string& text, float seconds)
+{
+    setNotice(text, seconds);
+    mFallbackCount++;
+    mDegradedTicks = 45 * 60; //~45s since the last one; lapses if it recovers
 }
 
 //One header record per seat log: decks, names, and a game_id BOTH seats
@@ -4498,7 +4572,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             retracted = true;
         }
         if (content.empty())
-            setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
+            noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
         {
             narrateDecision("You: " + describeAction(*shown[choice - 1]));
@@ -4633,7 +4707,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
         retracted = true;
     }
     if (content.empty())
-        setNotice("model reply failed or timed out - the heuristic decides", 5.0f);
+        noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
         //first line of the question only: multi-line asks (damage order)
         //would bloat a narration that persists all game
@@ -5267,7 +5341,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         opts.erase(opts.begin() + pick);
         if (lastChance)
         {
-            setNotice("that cast could not be completed - the heuristic decides", 5.0f);
+            noticeFallback("that cast could not be completed - the heuristic decides", 5.0f);
             return AIPlayerBaka::FindCardToPlay(pMana, type);
         }
         setNotice("that cast could not be completed - asking again", 5.0f);
@@ -5413,6 +5487,36 @@ bool AIPlayerGPT::decisionPending(float dt)
     return false;
 }
 
+//A call still in flight after the patience window is one a person has been
+//watching with no way to act. The duel screen asks rather than deciding for
+//them. No re-entry guard is needed: raising the prompt moves the duel into
+//its menu phase, which stops calling game->Update, so mThinkTime freezes
+//until the answer comes back and resets it.
+bool AIPlayerGPT::aiPatiencePromptDue()
+{
+    if (mEndpoint.empty() || mPatienceLimit <= 0)
+        return false;
+    return asyncBusy() && mThinkTime >= mPatienceLimit;
+}
+
+void AIPlayerGPT::aiPatiencePromptAnswer(bool keepWaiting)
+{
+    //Re-arm rather than commit: waiting buys one more window, not an
+    //unbounded one, so the choice comes back if the model is truly wedged.
+    mThinkTime = 0;
+    if (keepWaiting)
+        return;
+    //Switch off for the rest of the duel. Clearing the endpoint is the same
+    //state a player with no endpoint configured is in: decisionPending goes
+    //false, all seams fall through to AIPlayerBaka, and isInteractiveAI goes
+    //false so card-data "ishuman" gates hand the heuristic AI its dice-roll
+    //lines back. The in-flight worker is left alone - AsyncState is a
+    //shared_ptr, so the detached thread stays safe and its answer is simply
+    //never read.
+    mEndpoint.clear();
+    setNotice("LLM opponent off - the built-in AI is playing", 6.0f);
+}
+
 void AIPlayerGPT::Render()
 {
     AIPlayerBaka::Render();
@@ -5427,6 +5531,29 @@ void AIPlayerGPT::Render()
         font->SetColor(ARGB(230, 255, 190, 120));
         font->DrawString(mNotice.c_str(), SCREEN_WIDTH / 2, 12, JGETEXT_CENTER);
     }
+    //A standing marker, because the notice above is one line for five seconds
+    //at the top of the screen while the player is looking at their hand at the
+    //bottom of it - faithfully emitted and easily never seen. Two distinct
+    //facts, never both: the LLM is OFF for the rest of this duel (switched off,
+    //or no endpoint was ever reachable), or it is answering but has been
+    //falling back. The second lapses on its own, so a model that recovers
+    //stops being accused; a marker that latched forever would become wallpaper
+    //and put us right back at effectively-silent failure.
+    if (mDegradedTicks > 0)
+        mDegradedTicks--;
+    if (mEndpoint.empty())
+    {
+        font->SetColor(ARGB(200, 255, 150, 150));
+        font->DrawString("LLM off - built-in AI", 4, SCREEN_HEIGHT - 12, JGETEXT_LEFT);
+    }
+    else if (mDegradedTicks > 0)
+    {
+        char dbuf[48];
+        sprintf(dbuf, "LLM: %d fallback%s", mFallbackCount, mFallbackCount == 1 ? "" : "s");
+        font->SetColor(ARGB(190, 255, 200, 120));
+        font->DrawString(dbuf, 4, SCREEN_HEIGHT - 12, JGETEXT_LEFT);
+    }
+
     //The visible answer to "is it frozen or thinking?": a small animated
     //line whenever this player's model call is in flight.
     if (mEndpoint.empty() || !asyncBusy())
@@ -7322,7 +7449,7 @@ int AIPlayerGPT::chooseAttackers()
         //Unusable reply: the heuristic declares this turn's attack instead.
         writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
                       "", content.empty() ? "empty_reply" : "unparsed_reply", &shownLines);
-        setNotice("model reply failed - the heuristic attacks", 5.0f);
+        noticeFallback("model reply failed - the heuristic attacks", 5.0f);
         mAttacksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseAttackers();
     }
@@ -7674,7 +7801,7 @@ int AIPlayerGPT::chooseBlockers()
         {
             writeTransLog("blockers", userMsg, content, 0, (int) blockers.size(),
                           "", "truncated_abandoned_heuristic", &shownLines);
-            setNotice("model reply cut off mid-reversal - the heuristic blocks", 5.0f);
+            noticeFallback("model reply cut off mid-reversal - the heuristic blocks", 5.0f);
             mBlocksDoneTurn = observer->turn;
             DebugTrace("AIPlayerGPT: truncated-abandoned commit with no legal assignment"
                        " -> heuristic declares blockers");
@@ -7684,7 +7811,7 @@ int AIPlayerGPT::chooseBlockers()
         DecisionManager::applyDeclareBlockers(req, none);
         writeTransLog("blockers", userMsg, content, 0, (int) blockers.size(),
                       "no blockers", "truncated_abandoned", &shownLines);
-        setNotice("model reply cut off mid-reversal - no blocks (safe default)", 5.0f);
+        noticeFallback("model reply cut off mid-reversal - no blocks (safe default)", 5.0f);
         narrateDecision("You declared no blockers");
         mBlocksDoneTurn = observer->turn;
         DebugTrace("AIPlayerGPT: truncated-abandoned block commit -> safe no-blocks default");
@@ -7752,7 +7879,7 @@ int AIPlayerGPT::chooseBlockers()
         //Unusable reply: the heuristic declares this combat instead.
         writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
                       "", content.empty() ? "empty_reply" : "unparsed_reply", &shownLines);
-        setNotice("model reply failed - the heuristic blocks", 5.0f);
+        noticeFallback("model reply failed - the heuristic blocks", 5.0f);
         mBlocksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseBlockers();
     }
@@ -7795,7 +7922,7 @@ int AIPlayerGPT::chooseBlockers()
     {
         writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
                       "", "all_assignments_illegal", &shownLines, blockSource);
-        setNotice("every block the model asked for was illegal - the heuristic blocks", 5.0f);
+        noticeFallback("every block the model asked for was illegal - the heuristic blocks", 5.0f);
         mBlocksDoneTurn = observer->turn;
         DebugTrace("AIPlayerGPT: all " << intended << " assignment(s) illegal -> heuristic declares blockers");
         return AIPlayerBaka::chooseBlockers();
@@ -8078,7 +8205,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         //nothing to option one - every card keeps option two).
         writeTransLog("reveal", userMsg, content, result, (int) revealed.size(),
                       "", content.empty() ? "empty_reply" : "unparsed_reply", &names);
-        setNotice("model reply failed - reveal kept the default", 5.0f);
+        noticeFallback("model reply failed - reveal kept the default", 5.0f);
         return -1;
     }
 
@@ -8293,6 +8420,10 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottom(int need, int chosenSoFar, in
         //Enforce EXACTLY the owed count: the model under-picked or failed ->
         //fill with the highest-cost cards not already chosen (the heuristic
         //policy). We already capped above, so over-picks are trimmed.
+        //This was the one seam that fell back to the heuristic and said
+        //nothing - every other decision announces it, so this one does too.
+        if (result < 0 || (int) mPregameBottomQueue.size() < remaining)
+            noticeFallback("model reply failed - the heuristic bottoms cards", 5.0f);
         while ((int) mPregameBottomQueue.size() < remaining)
         {
             MTGCardInstance * fill = NULL;

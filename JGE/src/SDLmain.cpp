@@ -370,7 +370,11 @@ static const struct { LocalKeySym keysym; JButton keycode; } gDefaultBindings[] 
 	*/
 
 	/* Android customs */
-	{ SDLK_AC_BACK,       JGE_BTN_MENU },
+	//Android Back = cancel / back one step (platform convention). The game
+	//menu has its own gesture (swipe up -> KEYCODE_MENU) so the two do not
+	//collide.
+	{ SDLK_AC_BACK,       JGE_BTN_SEC },
+	{ SDLK_MENU,          JGE_BTN_MENU },
 	/* Android/maemo volume button mapping */
 	{ SDLK_VOLUMEUP,      JGE_BTN_PREV },
 	{ SDLK_VOLUMEDOWN,    JGE_BTN_SEC},

@@ -26,6 +26,53 @@ namespace
         }
         return count;
     }
+
+    //Sparse-field side-table: these five strings are populated on <2% of the
+    //27k resident primitives, so per-object members wasted ~3.3 MB of empty
+    //string headers on the PSP. Only populated cards get an entry here.
+    //Leaked on purpose (never destroyed): primitives can outlive static
+    //destruction order, and erase() against a destroyed map is UB at exit.
+    struct RareStrings
+    {
+        string doubleFaced;
+        string AICustomCode;
+        string CrewAbility;
+        string PhasedOutAbility;
+        string ModularValue;
+    };
+    typedef map<const CardPrimitive *, RareStrings> RareStringsTable;
+
+    RareStringsTable & rareStringsTable()
+    {
+        static RareStringsTable * table = NEW RareStringsTable();
+        return *table;
+    }
+
+    const string kNoRareString;
+
+    void setRareString(const CardPrimitive * p, string RareStrings::*field, const string & value)
+    {
+        string v = value;
+        std::transform(v.begin(), v.end(), v.begin(), ::tolower);
+        RareStringsTable & table = rareStringsTable();
+        RareStringsTable::iterator it = table.find(p);
+        if (it == table.end())
+        {
+            if (v.empty())
+                return;
+            it = table.insert(std::make_pair(p, RareStrings())).first;
+        }
+        it->second.*field = v;
+    }
+
+    const string & getRareString(const CardPrimitive * p, const string RareStrings::*field)
+    {
+        RareStringsTable & table = rareStringsTable();
+        RareStringsTable::const_iterator it = table.find(p);
+        if (it == table.end())
+            return kNoRareString;
+        return it->second.*field;
+    }
 }
 
 
@@ -34,13 +81,22 @@ SUPPORT_OBJECT_ANALYTICS(CardPrimitive)
 CardPrimitive::CardPrimitive()
     : colors(0)
 {
+#if defined (PSP)
+    mMagicMaterialized = false;
+#endif
     init();
 }
 
 CardPrimitive::CardPrimitive(CardPrimitive * source)
 {
+#if defined (PSP)
+    mMagicMaterialized = true;  // copies receive materialized content below
+#endif
     if(!source)
         return;
+#if defined (PSP)
+    source->materializeMagicText();  // universal seam: every in-game card copies through here
+#endif
     basicAbilities = source->basicAbilities;
     LKIbasicAbilities = source->basicAbilities;
 
@@ -61,11 +117,11 @@ CardPrimitive::CardPrimitive(CardPrimitive * source)
     formattedText = source->formattedText;
     setName(source->name);
 
-    setdoubleFaced(source->doubleFaced);
-    setAICustomCode(source->AICustomCode);
-    setCrewAbility(source->CrewAbility);
-    setPhasedOutAbility(source->PhasedOutAbility);
-    setModularValue(source->ModularValue);
+    setdoubleFaced(source->getdoubleFaced());
+    setAICustomCode(source->getAICustomCode());
+    setCrewAbility(source->getCrewAbility());
+    setPhasedOutAbility(source->getPhasedOutAbility());
+    setModularValue(source->getModularValue());
     power = source->power;
     toughness = source->toughness;
     restrictions = source->restrictions ? source->restrictions->clone() : NULL;
@@ -82,6 +138,7 @@ CardPrimitive::CardPrimitive(CardPrimitive * source)
 CardPrimitive::~CardPrimitive()
 {
     SAFE_DELETE(restrictions);
+    rareStringsTable().erase(this);
 }
 
 int CardPrimitive::init()
@@ -316,8 +373,174 @@ int CardPrimitive::removeType(int id, int removeAll)
     return result;
 }
 
+#if defined (PSP)
+// ---- card-data sidecars (see CardPrimitive.h) ----
+// Two deploy-time file pairs at the Res root (NOT sets/primitives/ — that dir is
+// scanned and every file in it is parsed as card data):
+//   cardtext.{idx,dat} — display text (text= lines), fetched at render time.
+//   cardauto.{idx,dat} — raw auto*/anyzone lines, replayed through addMagicText
+//                        when a primitive is first used in a game.
+// idx: u32 count, then count * {u32 fnv1a(lowercased name), u32 offset, u32 len},
+//      sorted by hash (little-endian).
+// dat: entry at offset = lowercased name, '\n', payload; len covers the whole entry.
+// Hash collisions resolve by comparing the stored name.
+namespace
+{
+    struct SidecarEnt { unsigned int hash, offset, len; };
+
+    unsigned int sidecarFnv1a(const string& s)
+    {
+        unsigned int h = 2166136261u;
+        for (size_t i = 0; i < s.size(); ++i)
+        {
+            h ^= (unsigned char) s[i];
+            h *= 16777619u;
+        }
+        return h;
+    }
+
+    struct Sidecar
+    {
+        std::vector<SidecarEnt> idx;
+        bool tried;
+        FILE * dat;
+
+        Sidecar() : tried(false), dat(NULL) {}
+
+        void load(const char * idxPath, const char * datPath, const char * label)
+        {
+            tried = true;
+            FILE * f = fopen(idxPath, "rb");
+            unsigned int count = 0;
+            if (f)
+            {
+                if (fread(&count, 4, 1, f) == 1 && count && count < 200000)
+                {
+                    idx.resize(count);
+                    if (fread(&idx[0], sizeof(SidecarEnt), count, f) != count)
+                        idx.clear();
+                }
+                fclose(f);
+            }
+            if (idx.size())
+                dat = fopen(datPath, "rb");
+            if (!dat)
+                idx.clear();
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            FILE * p = fopen("User/wagic-probe.log", "a");
+            if (p)
+            {
+                fprintf(p, "%s sidecar: idx=%s count=%u dat=%s -> %s\n", label,
+                    f ? "open" : "MISSING", count, dat ? "open" : "MISSING",
+                    idx.empty() ? "OFFLOAD OFF" : "OFFLOAD ON");
+                fclose(p);
+            }
+#else
+            (void) label;
+#endif
+        }
+
+        bool fetch(const string& cardName, string& out)
+        {
+            if (idx.empty()) return false;
+            string lower = cardName;
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+            unsigned int h = sidecarFnv1a(lower);
+            size_t lo = 0, hi = idx.size();
+            while (lo < hi)
+            {
+                size_t mid = (lo + hi) / 2;
+                if (idx[mid].hash < h) lo = mid + 1;
+                else hi = mid;
+            }
+            for (; lo < idx.size() && idx[lo].hash == h; ++lo)
+            {
+                string buf;
+                buf.resize(idx[lo].len);
+                if (fseek(dat, idx[lo].offset, SEEK_SET)) return false;
+                if (fread(&buf[0], 1, buf.size(), dat) != buf.size()) return false;
+                size_t nl = buf.find('\n');
+                if (nl == string::npos) continue;
+                if (buf.compare(0, nl, lower)) continue;  // hash collision — try next
+                out = buf.substr(nl + 1);
+                return true;
+            }
+            return false;
+        }
+    };
+
+    Sidecar gTextSidecar;
+    Sidecar gAutoSidecar;
+    bool gMaterializing = false;  // addMagicText bypass during replay
+}
+
+bool CardPrimitive::textOffloadActive()
+{
+    if (!gTextSidecar.tried)
+        gTextSidecar.load("Res/cardtext.idx", "Res/cardtext.dat", "cardtext");
+    return !gTextSidecar.idx.empty();
+}
+
+bool CardPrimitive::fetchOffloadedText(const string& cardName, string& out)
+{
+    if (!textOffloadActive()) return false;
+    return gTextSidecar.fetch(cardName, out);
+}
+
+bool CardPrimitive::autoOffloadActive()
+{
+    if (!gAutoSidecar.tried)
+        gAutoSidecar.load("Res/cardauto.idx", "Res/cardauto.dat", "cardauto");
+    return !gAutoSidecar.idx.empty();
+}
+
+// Replay this primitive's auto*/anyzone lines from the sidecar, mirroring
+// MTGAllCards::processConfLine's three magic-text branches exactly.
+void CardPrimitive::materializeMagicText()
+{
+    if (mMagicMaterialized) return;
+    mMagicMaterialized = true;
+    if (!autoOffloadActive()) return;
+    string payload;
+    if (!gAutoSidecar.fetch(name, payload)) return;
+    gMaterializing = true;
+    size_t pos = 0;
+    while (pos < payload.size())
+    {
+        size_t end = payload.find('\n', pos);
+        if (end == string::npos) end = payload.size();
+        string line = payload.substr(pos, end - pos);
+        pos = end + 1;
+        size_t eq = line.find('=');
+        if (eq == string::npos || !eq) continue;
+        string key = line.substr(0, eq);
+        string val = line.substr(eq + 1);
+        if (key == "auto")
+            addMagicText(val);
+        else if (key.compare(0, 4, "auto") == 0)
+            addMagicText(val, key.substr(4));
+        else if (key == "anyzone")
+        {
+            addMagicText(val, "hand");
+            addMagicText(val, "library");
+            addMagicText(val, "graveyard");
+            addMagicText(val, "stack");
+            addMagicText(val, "exile");
+            addMagicText(val, "commandzone");
+            addMagicText(val, "reveal");
+            addMagicText(val, "sideboard");
+            addMagicText(val);
+        }
+    }
+    gMaterializing = false;
+}
+#endif
+
 void CardPrimitive::setText(const string& value)
 {
+#if defined (PSP)
+    if (textOffloadActive()) return;  // served from the sidecar at render time
+#endif
     text = value;
 }
 
@@ -331,6 +554,10 @@ void CardPrimitive::setText(const string& value)
 */
 const vector<string>& CardPrimitive::getFormattedText(bool noremove)
 {
+#if defined (PSP)
+    if (!text.size() && formattedText.empty())
+        fetchOffloadedText(name, text);  // miss (textless card) leaves text empty
+#endif
     if (!text.size())
         return formattedText;
 
@@ -354,6 +581,9 @@ const vector<string>& CardPrimitive::getFormattedText(bool noremove)
 
 void CardPrimitive::addMagicText(string value)
 {
+#if defined (PSP)
+    if (!gMaterializing && autoOffloadActive()) return;  // replayed from sidecar on first game use
+#endif
     std::transform(value.begin(), value.end(), value.begin(), ::tolower);
     if (magicText.size())
         magicText.append("\n");
@@ -362,6 +592,9 @@ void CardPrimitive::addMagicText(string value)
 
 void CardPrimitive::addMagicText(string value, string key)
 {
+#if defined (PSP)
+    if (!gMaterializing && autoOffloadActive()) return;  // replayed from sidecar on first game use
+#endif
     std::transform(value.begin(), value.end(), value.begin(), ::tolower);
     if (magicTexts[key].size())
         magicTexts[key].append("\n");
@@ -370,57 +603,52 @@ void CardPrimitive::addMagicText(string value, string key)
 
 void CardPrimitive::setdoubleFaced(const string& value)
 {
-    doubleFaced = value;
-    std::transform(doubleFaced.begin(), doubleFaced.end(), doubleFaced.begin(), ::tolower);
+    setRareString(this, &RareStrings::doubleFaced, value);
 }
 
 const string& CardPrimitive::getdoubleFaced() const
 {
-    return doubleFaced;
+    return getRareString(this, &RareStrings::doubleFaced);
 }
 
 void CardPrimitive::setAICustomCode(const string& value)
 {
-    AICustomCode = value;
-    std::transform(AICustomCode.begin(), AICustomCode.end(), AICustomCode.begin(), ::tolower);
+    setRareString(this, &RareStrings::AICustomCode, value);
 }
 
 const string& CardPrimitive::getAICustomCode() const
 {
-    return AICustomCode;
+    return getRareString(this, &RareStrings::AICustomCode);
 }
 
 void CardPrimitive::setCrewAbility(const string& value)
 {
-    CrewAbility = value;
-    std::transform(CrewAbility.begin(), CrewAbility.end(), CrewAbility.begin(), ::tolower);
+    setRareString(this, &RareStrings::CrewAbility, value);
 }
 
 const string& CardPrimitive::getCrewAbility() const
 {
-    return CrewAbility;
+    return getRareString(this, &RareStrings::CrewAbility);
 }
 
 void CardPrimitive::setPhasedOutAbility(const string& value)
 {
-    PhasedOutAbility = value;
-    std::transform(PhasedOutAbility.begin(), PhasedOutAbility.end(), PhasedOutAbility.begin(), ::tolower);
+    setRareString(this, &RareStrings::PhasedOutAbility, value);
 }
 
 const string& CardPrimitive::getPhasedOutAbility() const
 {
-    return PhasedOutAbility;
+    return getRareString(this, &RareStrings::PhasedOutAbility);
 }
 
 void CardPrimitive::setModularValue(const string& value)
 {
-    ModularValue = value;
-    std::transform(ModularValue.begin(), ModularValue.end(), ModularValue.begin(), ::tolower);
+    setRareString(this, &RareStrings::ModularValue, value);
 }
 
 const string& CardPrimitive::getModularValue() const
 {
-    return ModularValue;
+    return getRareString(this, &RareStrings::ModularValue);
 }
 
 void CardPrimitive::setName(const string& value)

@@ -3,7 +3,9 @@
 
 #include "zfsystem.h"
 #include <string>
-using zip_file_system::filesystem;
+//No bare "filesystem" name at global scope: libc++ (Android NDK) declares
+//namespace std::filesystem even in C++14 mode, and "using namespace std" below
+//makes any unqualified use ambiguous. Uses are fully qualified instead.
 using zip_file_system::izfstream;
 using namespace std;
 
@@ -23,14 +25,14 @@ class JZipCache {
 public:
   JZipCache();
   ~JZipCache();
-  map<string, filesystem::limited_file_info> dir;
-  
+  map<string, zip_file_system::filesystem::limited_file_info> dir;
+  unsigned int lastUse;   //LRU tick, bumped on every OpenFile hit
 };
 
 class JFileSystem {
 private:
     string mSystemFSPath, mUserFSPath;
-    filesystem * mSystemFS, * mUserFS;
+    zip_file_system::filesystem * mSystemFS, * mUserFS;
 	static JFileSystem* mInstance;
     izfstream mFile;
 
@@ -42,7 +44,7 @@ private:
 	bool mZipAvailable;
   	void preloadZip(const string& filename);
 	izfstream mZipFile;
-    filesystem::limited_file_info * mCurrentFileInZip;
+    zip_file_system::filesystem::limited_file_info * mCurrentFileInZip;
 
     std::vector<std::string>& scanRealFolder(const std::string& folderName, std::vector<std::string>& results);
 

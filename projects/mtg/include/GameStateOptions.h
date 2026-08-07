@@ -7,6 +7,7 @@
 
 class GameApp;
 class WGuiTabMenu;
+class WGuiHeader;
 class SimpleMenu;
 class SimplePad;
 #ifdef WITH_GPT_AI
@@ -31,6 +32,10 @@ private:
     float timer;
     bool mReload;
     KeybGrabber* grabber;
+    //Label of the "Reset tutorial messages" action row. Owned by the button
+    //that decorates it (and so by optionsTabs); held only to swap the text for
+    //an acknowledgement, and dropped in End() with the rest of the tab tree.
+    WGuiHeader * mResetTutorialsLabel;
 #ifdef WITH_GPT_AI
     //Telemetry consent: asked once, on saving with a newly set-up endpoint
     //(never re-asked after a decision). Owned by this screen because modal

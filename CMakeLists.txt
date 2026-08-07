@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.0)
+# CMake 4.x removed compatibility with minimums below 3.5. The range form keeps
+# policy behaviour pinned to what this file was written against while still
+# configuring under a modern CMake.
+cmake_minimum_required(VERSION 3.10...3.28)
 
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   if(DEFINED ENV{VITASDK})
@@ -11,16 +14,26 @@ endif()
 project(wagic C CXX)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
-# Project-local pinned vitaGL.
-# Upstream vitaGL had multiple symbol-renaming and API-adding commits between
-# Jan 14 2026 and Feb 1 2026 (`frag_buf`->`vgl_def_frag_buf`, `mvp_matrix`->
-# `vgl_mvp_matrix`, added `glVertexAttribDivisor`, etc.). The pre-Feb-28 system
-# libvitaGL.a (installed via vdpm in early January) was built BEFORE all those
-# changes. A wagic.elf linked against newer vitaGL silently fails to boot on
-# this Vita's CFW. Pin to commit `d4a8f9d` (Jan 10 2026), the last commit
-# before any of the rename/addition cascade. Build with NO_DEBUG=1 to match
-# the vitasdk-packages CI recipe (matches what the user's vdpm originally
-# installed). See vendor/vitaGL (gitignored) and BUILD_VITA.md for setup.
+# Project-local vitaGL, built from CURRENT upstream.
+#
+# The inherited port pinned this to d4a8f9d (Jan 10 2026) because a newer
+# vitaGL "silently failed to boot", citing a rename cascade
+# (`frag_buf`->`vgl_def_frag_buf`, `mvp_matrix`->`vgl_mvp_matrix`,
+# `glVertexAttribDivisor`). Owner ruling 2026-08-01: track current instead and
+# fix what actually breaks - newer vitaGL carries real improvements, the target
+# is a single fixed hardware profile, and the inherited port is prior art, not
+# a truth document.
+#
+# That pin is also weakly motivated on inspection: wagic calls only
+# vglSetParamBufferSize, vglUseTripleBuffering, vglUseCachedMem,
+# vglInitExtended, vglUseVram, vglWaitVblankStart and vglSwapBuffers. The named
+# renames are vitaGL-internal; `u_mvp_matrix` is wagic's own shader uniform.
+#
+# Built locally (vendor/, gitignored) rather than using the vdpm-installed
+# system copy so the version is ours to control and rebuild:
+#   cd vendor/vitaGL && make NO_DEBUG=1 -j8
+# If a boot failure ever IS traced to a vitaGL bump, bisect vendor/vitaGL and
+# record the offending commit here - do not silently re-pin to 2026.
 set(WAGIC_PINNED_VITAGL "${CMAKE_SOURCE_DIR}/vendor/vitaGL")
 if(EXISTS "${WAGIC_PINNED_VITAGL}/libvitaGL.a")
     message(STATUS "Using project-local pinned vitaGL at ${WAGIC_PINNED_VITAGL}")
@@ -32,12 +45,34 @@ else()
                     "Run vendor/vitaGL setup per BUILD_VITA.md.")
 endif()
 
-set(VITA_APP_NAME "Wagic: The Homebrew")
-set(VITA_TITLEID  "WAGC00001")
+set(VITA_APP_NAME "wagicGPT")
+# Own title id, not the inherited port's WAGC00001. The title id owns the
+# ux0:app/<id> directory and the LiveArea slot, so sharing one would install
+# this fork OVER a user's existing Wagic instead of beside it. Save data is
+# unaffected either way - it lives at ux0:data/Wagic, which both builds share.
+#
+# 42: the answer from a thinking machine, which is what this fork runs on.
+set(VITA_TITLEID  "WAGC00042")
 set(VITA_VERSION  "01.00")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -fexceptions")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -std=c++11 -fexceptions")
+# -g and a kept frame pointer are for CRASH FORENSICS, not for debugging builds.
+# The Vita writes a psp2core dump on every crash, but a dump is only worth having
+# if it can be read: without -g, addr2line falls back to nearest-symbol across a
+# 48k-symbol static binary and confidently reports the wrong function (a real
+# 2026-08-02 dump "resolved" its stack to curl, SDL and GLSL frames). Without a
+# frame pointer the stack walk is guesswork on top of that.
+#
+# Neither flag changes codegen at -O2, but -g is NOT free on this platform: the
+# debug sections DO travel into the self unless it is stripped, and measured here
+# that took the self from 34 MB to 141 MB and the VPK from 40 MB to 76 MB. The
+# Vita loads the executable into memory, so shipping that would trade a
+# diagnosable crash for a memory problem. vita_create_self(... STRIPPED) below
+# passes -s to vita-elf-create, so the ELF in build_vita keeps its debug info for
+# addr2line while the console gets a stripped binary. Stripping does not move
+# addresses, so a dump from the shipped build symbolizes correctly against the
+# unstripped ELF sitting next to it.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -fno-omit-frame-pointer -fexceptions")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -fno-omit-frame-pointer -std=c++11 -fexceptions")
 
 add_definitions(
   -DVITA
@@ -46,6 +81,12 @@ add_definitions(
   -DTIXML_USE_STL
   -DFORCE_GLES
   -DGL_OES_VERSION_1_1
+  # The LLM opponent. Without this the whole GPT layer preprocesses away and
+  # the build is Baka-only, which is not a shippable configuration for this
+  # project. The transport is libcurl, which VitaSDK already ships built
+  # against OpenSSL - so TLS is done in userspace and does not depend on the
+  # console's own SSL module.
+  -DWITH_GPT_AI
 )
 
 include_directories(
@@ -213,6 +254,25 @@ set(MTG_SOURCES
   projects/mtg/src/WGui.cpp
   projects/mtg/src/WParsedInt.cpp
   projects/mtg/src/WResourceManager.cpp
+
+  # This fork's engine layer, absent from the original Vita port because that
+  # port predates it: engine-owned priority and legality (LegalActions),
+  # player-agnostic mana (ManaEngine), the frontend-agnostic
+  # DecisionRequest->Action contract (DecisionContract) that the PC UI, the PSP
+  # UI and the AI policies all consume as peers, and the pregame/mulligan state.
+  projects/mtg/src/LegalActions.cpp
+  projects/mtg/src/ManaEngine.cpp
+  projects/mtg/src/DecisionContract.cpp
+  projects/mtg/src/PreGamePhase.cpp
+
+  # The LLM opponent. Compiled here for the same reason the PSP Makefile
+  # compiles it: AIPlayerGPT is wired into the player/observer types, and the
+  # heuristic AI answers every decision it declines, so a build with no endpoint
+  # configured plays as pure Baka. The transport (JNetwork/JSocket/Downloader)
+  # is deliberately NOT built - same open question as the PSP network leg.
+  projects/mtg/src/AIPlayerGPT.cpp
+  projects/mtg/src/GptConfig.cpp
+  projects/mtg/src/OptionGpt.cpp
 )
 
 add_executable(${PROJECT_NAME}
@@ -220,6 +280,20 @@ add_executable(${PROJECT_NAME}
   ${MTG_SOURCES}
 )
 
+# NOTE ON std::thread: it does NOT work in this build, and the fix is not a
+# link flag. Forcing the pthread proxy symbols in with -Wl,-u DID flip
+# libstdc++'s __gthread_active_p() to true - and that CRASHED THE GAME ON
+# LAUNCH, in __cxa_guard_acquire (the guard around the first function-local
+# static), locking a mutex that was never constructed. -u pulls in only the
+# named archive members, so the member holding pthread-embedded's global state
+# never came along: a half-linked pthread runtime, which is strictly worse than
+# none. Hardware evidence: psp2core 1785640291, data abort in
+# pthread_mutex_lock via __cxa_guard_acquire, debug.txt stopping right after
+# "[3e] network up".
+# Whole-archiving libpthread might resolve it, but the robust answer for the
+# async model-call worker is a native sceKernelCreateThread implementation that
+# does not depend on libstdc++'s threading model at all. Until then std::thread
+# construction throws, AIPlayerGPT catches it, and the heuristic AI answers.
 target_link_libraries(${PROJECT_NAME}
   SDL2_mixer
   SDL2
@@ -242,6 +316,12 @@ target_link_libraries(${PROJECT_NAME}
   freetype
   png
   jpeg
+  # HTTP transport for the LLM opponent. Link order matters for static libs:
+  # curl before its own dependencies. Taken from the SDK's libcurl.pc.
+  curl
+  ssl
+  crypto
+  zstd
   z
   m
   pthread
@@ -262,6 +342,15 @@ target_link_libraries(${PROJECT_NAME}
   SceKernelDmacMgr_stub
   SceKernelThreadMgr_stub
   SceIofilemgr_stub
+  # Network stubs required by libcurl (SDK libcurl.pc) and by the sceNet /
+  # sceNetCtl bring-up in Vitamain.cpp.
+  SceNet_stub
+  SceNetCtl_stub
+  SceRtc_stub
+  SceSysmem_stub
+  SceKernelModulemgr_stub
+  SceProcessmgr_stub
+  SceLibKernel_stub
 )
 
 # UNSAFE: skips the -s flag passed to vita-make-fself. Without UNSAFE, the
@@ -271,7 +360,7 @@ target_link_libraries(${PROJECT_NAME}
 #
 # UNCOMPRESSED also matches the Feb 28 working format (self ~ velf size).
 # Belt-and-suspenders alongside the project-pinned vitaGL above.
-vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} UNCOMPRESSED UNSAFE)
+vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} UNCOMPRESSED UNSAFE STRIPPED)
 
 # Card images and VPK packaging.
 #
@@ -333,9 +422,8 @@ vita-mksfoex -s TITLE_ID=${VITA_TITLEID} -s APP_VER=01.00 -s VERSION=01.00 -d AT
 #   oldthemes/             - deprecated, not referenced in game code
 rm -rf vpk_staging
 mkdir -p vpk_staging/Res
-(cd \"$SRCDIR/projects/mtg/bin/Res\" && \\
- zip -r -0 -q \"$BUILDDIR/vpk_staging/Res/core.zip\" * \\
-   -x 'test/*' 'missing_cards_by_sets/*' 'oldthemes/*')
+\"$SRCDIR/projects/mtg/tools/make-respack.py\" --compress stored --no-sha \\
+  -o \"$BUILDDIR/vpk_staging/Res/core.zip\"
 
 CORESIZE=\$(du -h \"$BUILDDIR/vpk_staging/Res/core.zip\" | cut -f1)
 echo \"Res/core.zip created: \$CORESIZE\"

@@ -11,6 +11,7 @@ using std::vector;
 
 class PlayGuiObject;
 class DuelLayers;
+class MTGCardInstance;
 
 // The X lib annoyingly defines True to be 1, leading to
 // hard to understand syntax errors. Not using it, so it's
@@ -45,6 +46,17 @@ public:
     virtual void Limit(LimitorFunctor<PlayGuiObject>* inLimitor, CardView::SelectorZone inZone) = 0;
     virtual void Push() = 0;
     virtual void Pop() = 0;
+    //Move the cursor to the next candidate in a zone, in stable reading order.
+    //This exists so game rules can advance the selection WITHOUT firing a
+    //synthetic direction press: that route measures screen distance, and a rule
+    //that also re-lays-out the board (declaring an attacker does) ends up
+    //measuring against coordinates its own click just moved. Returns false and
+    //leaves the cursor alone when there is no candidate.
+    virtual bool SelectNextInZone(LimitorFunctor<PlayGuiObject>*, CardView::SelectorZone,
+                                  MTGCardInstance* = NULL)
+    {
+        return false;
+    }
     virtual int GetDrawMode()
     {
         return mDrawMode;
@@ -87,6 +99,8 @@ public:
     void Render();
     void Push();
     void Pop();
+    bool SelectNextInZone(LimitorFunctor<PlayGuiObject>* limitor, CardView::SelectorZone zone,
+                          MTGCardInstance* skip = NULL);
 
     void Limit(LimitorFunctor<PlayGuiObject>* limitor, CardView::SelectorZone);
     void PushLimitor();

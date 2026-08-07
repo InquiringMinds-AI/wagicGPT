@@ -160,6 +160,9 @@ public:
     bool RemoveOldest();
 
     void ClearUnlocked(); //Remove unlocked items.
+    //WAGIC_MEMPROBE telemetry (see WResourceManager.h).
+    void MemProbeStats(unsigned int* cacheItems, unsigned long* managedCount,
+                       unsigned long* cacheBytes, unsigned long* unreclaimableBytes);
     void Refresh();       //Refreshes all files in cache, for when mode/profile changes.
 
     unsigned int nowTime();

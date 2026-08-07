@@ -15,8 +15,8 @@
 
 #include <boost/thread/mutex.hpp>
 #elif defined(PSP)
-#include <boost/bind.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
+#include <functional>
 
 #include "pspthreadman.h"
 
@@ -182,7 +182,7 @@ namespace boost
             virtual void run() = 0;
         };
 
-        typedef boost::shared_ptr<detail::thread_data_base> thread_data_ptr;
+        typedef std::shared_ptr<detail::thread_data_base> thread_data_ptr;
 
         template<typename F>
         class thread_data : public detail::thread_data_base
@@ -244,7 +244,7 @@ namespace boost
         }
 
         template <class F,class A1>
-        thread(F f, A1 a1) : mThreadInfo(make_thread_info(boost::bind(boost::type<void>(), f, a1)))
+        thread(F f, A1 a1) : mThreadInfo(make_thread_info(std::bind(f, a1)))
         {
             LOG("Calling bind on threadproc func");
             CallbackData callbackData(mThreadInfo);

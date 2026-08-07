@@ -266,10 +266,15 @@ static const struct { LocalKeySym keysym; JButton keycode; } gDefaultBindings[] 
     { PSP_CTRL_LEFT,     JGE_BTN_LEFT },
     { PSP_CTRL_UP,       JGE_BTN_UP },
     { PSP_CTRL_DOWN,     JGE_BTN_DOWN },
-    { PSP_CTRL_CIRCLE,   JGE_BTN_OK },
+    //Cross confirms, Circle backs out - one layout on every platform this fork
+    //ships, rather than each port following its console's regional convention.
+    //Upstream used the Japanese assignment here (Circle to confirm), which meant
+    //the same fork felt inverted between a PSP and a Vita. Remapping stays
+    //available in Options > Controls for anyone who wants it the other way.
+    { PSP_CTRL_CROSS,    JGE_BTN_OK },
     { PSP_CTRL_TRIANGLE, JGE_BTN_CANCEL },
     { PSP_CTRL_SQUARE,   JGE_BTN_PRI },
-    { PSP_CTRL_CROSS,    JGE_BTN_SEC },
+    { PSP_CTRL_CIRCLE,   JGE_BTN_SEC },
     { PSP_CTRL_LTRIGGER, JGE_BTN_PREV },
     { PSP_CTRL_RTRIGGER, JGE_BTN_NEXT }
 };
@@ -289,12 +294,69 @@ int JGEGetTime()
 
 static SceCtrlData gCtrlPad;
 
-u8 JGEGetAnalogX() { return gCtrlPad.Lx; }
-u8 JGEGetAnalogY() { return gCtrlPad.Ly; }
+//Generous deadzone: worn PSP sticks drift near center; deliberate pushes
+//far exceed +/-40. Wagic is d-pad-first, so this costs nothing.
+static inline u8 jgeAnalogDeadzone(u8 v)
+{
+    return (v > 88 && v < 168) ? 128 : v;
+}
+u8 JGEGetAnalogX() { return jgeAnalogDeadzone(gCtrlPad.Lx); }
+u8 JGEGetAnalogY() { return jgeAnalogDeadzone(gCtrlPad.Ly); }
 
 
 //------------------------------------------------------------------------------------------------
 // The main loop
+
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+#include <stdio.h>
+static void bootMark(const char* m)
+{
+    FILE* f = fopen("User/wagic-boot.log", "a");
+    if (f) { fprintf(f, "%s\n", m); fclose(f); }
+}
+#else
+#define bootMark(m)
+#endif
+
+//------------------------------------------------------------------------------
+//Heap runtime: bounded _sbrk replacement + O(1) free-RAM query.
+//The SDK probe-based ramAvailable() idiom is unusable under modern GCC:
+//allocation elision legally deletes malloc/free-and-check loops, turning the
+//probes into infinite loops. This _sbrk owns the heap bounds instead, so free
+//RAM is arithmetic, not probing. PSP_HEAP_SIZE_KB(-256) semantics preserved.
+#include <pspsysmem.h>
+#include <malloc.h>
+#include <errno.h>
+static char* g_heapStart = NULL;
+static char* g_heapEnd = NULL;
+static char* g_heapPtr = NULL;
+extern "C" void* _sbrk(ptrdiff_t incr)
+{
+    if (!g_heapStart)
+    {
+        SceSize sz = sceKernelMaxFreeMemSize() - 256 * 1024;
+        SceUID id = sceKernelAllocPartitionMemory(PSP_MEMORY_PARTITION_USER, "wagic_heap", PSP_SMEM_Low, sz, NULL);
+        if (id < 0) { errno = ENOMEM; return (void*)-1; }
+        g_heapStart = (char*)sceKernelGetBlockHeadAddr(id);
+        g_heapEnd = g_heapStart + sz;
+        g_heapPtr = g_heapStart;
+    }
+    if (g_heapPtr + incr > g_heapEnd || g_heapPtr + incr < g_heapStart) { errno = ENOMEM; return (void*)-1; }
+    char* prev = g_heapPtr;
+    g_heapPtr += incr;
+    return prev;
+}
+extern "C" unsigned int wagicHeapFreeBytes(void)
+{
+    struct mallinfo mi = mallinfo();
+    unsigned int unclaimed = (unsigned int)(g_heapEnd - g_heapPtr);
+    return unclaimed + (unsigned int)mi.fordblks;
+}
+extern "C" unsigned int wagicHeapLargestBlock(void)
+{
+    //largest contiguous: at least the unclaimed tail (free-list max unknown)
+    return (unsigned int)(g_heapEnd - g_heapPtr);
+}
 int main(int argc, char *argv[])
 {
     pspDebugScreenInit();
@@ -305,6 +367,7 @@ int main(int argc, char *argv[])
 
     pspDebugScreenPrintf("JGE:Loading application...");
 
+    bootMark("m1 debugscreen");
     JLOG("SetupCallbacks()");
     SetupCallbacks();
 #ifdef DEVHOOK
@@ -313,6 +376,7 @@ int main(int argc, char *argv[])
 #endif
     g_engine = NULL;
 
+    bootMark("m2 callbacks+exch");
     JGameLauncher* launcher = new JGameLauncher();
 
     u32 flags = launcher->GetInitFlags();
@@ -326,14 +390,17 @@ int main(int argc, char *argv[])
     g_engine->SetARGV(argc, argv);
     JGECreateDefaultBindings();
 
+    bootMark("m3 engine+bindings");
     JLOG("Create Game");
     game = launcher->GetGameApp();
     game->Create();
 
+    bootMark("m4 GameApp::Create done");
     JLOG("Run Game");
     g_engine->SetApp(game);
     g_engine->Run();
 
+    bootMark("m5 Run returned");
     game->Destroy();
     delete game;
     game = NULL;

@@ -251,6 +251,15 @@ void DeckMenu::Render()
     JQuadPtr avatarholder;
     JQuadPtr menupanel;
     JQuadPtr menuholder;
+    //These three are drawn ONLY under inDeckMenu (see the three RenderQuad sites
+    //below), and inDeckMenu is false in the DECK EDITOR - DeckEditorMenu sets
+    //backgroundName to "menubgdeckeditor" while this tests for "DeckMenuBackdrop".
+    //Loading them unconditionally therefore cost 1.28 MB resident on PSP for quads
+    //that are never drawn there, re-requested every frame so they stayed hot in the
+    //texture cache while the card thumbnails were being evicted around them.
+    const bool wantChrome = backgroundName.find("DeckMenuBackdrop") != string::npos;
+    if (wantChrome)
+    {
 #if defined (PSP)
     avatarholder = WResourceManager::Instance()->RetrieveTempQuad("pspavatarholder.png");//new graphics avatarholder for PSP
     menupanel = WResourceManager::Instance()->RetrieveTempQuad("pspmenupanel.jpg");//new graphics menupanel for PSP
@@ -265,7 +274,8 @@ void DeckMenu::Render()
         menupanel = WResourceManager::Instance()->RetrieveTempQuad("menupanel.jpg");//new graphics menupanel for player
     menuholder = WResourceManager::Instance()->RetrieveTempQuad("menuholder.png");//new graphics menuholder
 #endif
-    bool inDeckMenu = backgroundName.find("DeckMenuBackdrop") != string::npos;
+    }
+    const bool inDeckMenu = wantChrome;
     float modAvatarX = 0.f;
     float modAvatarY = 0.f;
 

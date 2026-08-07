@@ -207,7 +207,11 @@ public:
     //threaded suite's random std::length_error / double-free aborts.
     //Ability trees never cross threads, so per-thread lists preserve
     //the double-delete-guard semantics exactly.
+#ifdef PSP
+    static vector<void *> deletedpointers; //single game thread on PSP; emutls is boot-fragile
+#else
     static thread_local vector<void *> deletedpointers;
+#endif
 
     /*Poor man's casting */
     /* Todo replace that crap with dynamic casting */

@@ -38,12 +38,23 @@ public:
     void LoadDeck();
     void LoadStats();
 
+    // Reads a deck file's comment-line metadata with MTGDeck's exact semantics, so listing
+    // decks never constructs an MTGDeck. Card lines are skipped, not resolved.
+    // Returns false if the file could not be read; the outputs still hold their defaults.
+    static bool ReadFileMetaData(const string& filename, string& name, string& description,
+                                 string& unlockRequirements, bool& isCommanderDeck);
+
     // Accessors
     bool isCommanderDeck(); //Added to read the command tag in deck's metafile.
     string getFilename();
     string getDescription();
     string getName();
     string getAvatarFilename();
+    // Existence of the avatar image, checked with file stats (not a texture
+    // load) and cached for the object's lifetime. DeckMenuItem used to answer
+    // this question with RetrieveTexture - a full JPEG decode per menu item
+    // per menu construction, measured at ~1.4s for the 19-deck opponent menu.
+    bool avatarExists();
     string getColorIndex();
     string getStatsSummary();
     vector<int> getUnlockRequirements();
@@ -65,6 +76,8 @@ public:
     bool mDeckLoaded;
     bool mStatsLoaded;
     bool mIsAI;
+    bool mAvatarChecked;
+    bool mAvatarFound;
 };
 
 

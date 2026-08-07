@@ -98,7 +98,7 @@ Counters::~Counters()
     }
 }
 
-int Counters::addCounter(const char * _name, int _power, int _toughness, bool _noevent, bool duplicated, MTGCardInstance * _source)
+int Counters::addCounter(const char * _name, int _power, int _toughness, bool _noevent, bool duplicated, MTGCardInstance * _source, bool _batchManaged)
 {
     /*420.5n If a permanent has both a +1/+1 counter and a -1/-1 counter on it, N +1/+1 and N -1/-1 counters are removed from it, where N is the smaller of the number of +1/+1 and -1/-1 counters on it.*/
     GameObserver *g = target->getObserver();
@@ -117,6 +117,8 @@ int Counters::addCounter(const char * _name, int _power, int _toughness, bool _n
                     WEvent * j = NEW WEventCounters(this,_name,_power,_toughness,true,false,_source);
                     dynamic_cast<WEventCounters*>(j)->targetCard = this->target;
                     g->receiveEvent(j);
+                    if (!_batchManaged)
+                        emitTotalCountersEvent(_name, _power, _toughness, true, 1, _source);
                 }
                 delete(e);
                 return mCount;
@@ -131,6 +133,8 @@ int Counters::addCounter(const char * _name, int _power, int _toughness, bool _n
             WEvent * w = NEW WEventCounters(this,_name,_power,_toughness,true,false,_source);
             dynamic_cast<WEventCounters*>(w)->targetCard = this->target;
             g->receiveEvent(w);
+            if (!_batchManaged)
+                emitTotalCountersEvent(_name, _power, _toughness, true, 1, _source);
         }
         /*the damage test should be handled on game state based effect i think*/
         //this->target->doDamageTest = 1;
@@ -138,6 +142,21 @@ int Counters::addCounter(const char * _name, int _power, int _toughness, bool _n
     }
     delete(e);
     return mCount;
+}
+
+//One WEventTotalCounters for a whole batch. This is the event TrTotalCounter
+//(the plus-rider cards: Winding Constrictor, Doubling Season riders, ...)
+//consumes. Until 2026-08-06 only AACounter and CounterCost emitted it, so
+//counters added by any other engine path (evolve, wither/infect, persist,
+//undying...) were invisible to those cards.
+void Counters::emitTotalCountersEvent(const char * _name, int _power, int _toughness, bool added, int totalamount, MTGCardInstance * _source)
+{
+    if (totalamount <= 0)
+        return;
+    GameObserver *g = target->getObserver();
+    WEvent * w = NEW WEventTotalCounters(this, _name, _power, _toughness, added, !added, totalamount, false, _source);
+    dynamic_cast<WEventTotalCounters*>(w)->targetCard = this->target;
+    g->receiveEvent(w);
 }
 
 int Counters::addCounter(int _power, int _toughness)
@@ -163,7 +182,7 @@ int Counters::init()
     return 1;
 }
 
-int Counters::removeCounter(const char * _name, int _power, int _toughness, bool _noevent, bool duplicated, MTGCardInstance * _source)
+int Counters::removeCounter(const char * _name, int _power, int _toughness, bool _noevent, bool duplicated, MTGCardInstance * _source, bool _batchManaged)
 {
     for (int i = 0; i < mCount; i++)
     {
@@ -180,6 +199,8 @@ int Counters::removeCounter(const char * _name, int _power, int _toughness, bool
                 WEvent * e = NEW WEventCounters(this,_name,_power,_toughness,false,true,_source);
                 dynamic_cast<WEventCounters*>(e)->targetCard = this->target;
                 g->receiveEvent(e);
+                if (!_batchManaged)
+                    emitTotalCountersEvent(_name, _power, _toughness, false, 1, _source);
             }
             // special case: when the last time counter is removed from non-suspended card
             // sacrifice that card

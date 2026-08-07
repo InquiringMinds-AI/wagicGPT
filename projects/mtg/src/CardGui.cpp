@@ -5,6 +5,23 @@
 
 #include "PrecompiledHeader.h"
 
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+#include <stdarg.h>
+static void cardProbe(const char* fmt, ...)
+{
+    FILE* f = fopen("User/wagic-probe.log", "a");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    fprintf(f, "\n");
+    fclose(f);
+}
+#else
+#define cardProbe(...) ((void)0)
+#endif
+
 #include "JGE.h"
 #include "CardGui.h"
 #include "ManaCostHybrid.h"
@@ -214,6 +231,7 @@ void CardGui::Render()
             {
                 white->SetColor(ARGB(255,230,50,50));
                 renderer->RenderQuad(white.get(), actX, actY, actT, 30 * actZ / 16, 42 * actZ / 16);
+                white->SetColor(ARGB(255,255,255,255));//shared quad - restore
             }
         }
 
@@ -241,6 +259,7 @@ void CardGui::Render()
             {
                 white->SetColor(ARGB(255,0,0,255));
                 renderer->RenderQuad(white.get(), actX, actY, actT, 30 * actZ / 16, 42 * actZ / 16);
+                white->SetColor(ARGB(255,255,255,255));//shared quad - restore
             }
         }
     }
@@ -299,8 +318,52 @@ void CardGui::Render()
                 highlightborder->SetColor(ARGB(220,250,205,60));
                 renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
             }
+            //availability on the battlefield, same language as the gold hand
+            //glow: a border means "you can act with this right now".
+            //ORANGE = can be declared an attacker, GREEN = has an activated
+            //ability you can use and afford.
+            //NESTED, and the nesting MUST GO OUTWARD. These quads are drawn
+            //BEHIND the card art, so the only part a player ever sees is the
+            //rim that protrudes past it: the art is 38 units tall and every
+            //visible border here is 43, i.e. a ~2.5-unit rim per side. An
+            //INSET ring is not a subtler signal, it is an invisible one - a
+            //first attempt at 39 left half a unit of rim and never appeared on
+            //hardware at all, which read as "the predicate is broken" when the
+            //predicate was fine.
+            //
+            //So: ability keeps the standard 43 rim, and attack takes a wider
+            //46 halo OUTSIDE it. A card with both shows orange around green;
+            //a card with one looks like every other signal in the game.
+            if (card && highlightborder && card->controller()
+                && card->controller()->game->inPlay->hasCard(card))
+            {
+                if (card->canAttackNow)
+                {
+                    highlightborder->SetColor(ARGB(220,255,120,60));
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (33 * actZ + 1) / 16, 46 * actZ / 16);
+                }
+                //Blocking gets the SAME orange halo as attacking: both mean
+                //"this creature can enter combat right now", and the two can
+                //never appear at the same time (attack ring = your combat,
+                //block ring = the opponent's), so one colour carries one idea.
+                if (card->canBlockNow)
+                {
+                    highlightborder->SetColor(ARGB(220,255,120,60));
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (33 * actZ + 1) / 16, 46 * actZ / 16);
+                }
+                if (card->hasUsableAbilityNow)
+                {
+                    //42, not the standard 43: a 2-unit rim reads clearly on
+                    //hardware (the invisibility floor was ~39) while keeping
+                    //the green visually inside the 46 attack halo.
+                    highlightborder->SetColor(ARGB(210,80,235,170));
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (29 * actZ + 1) / 16, 42 * actZ / 16);
+                }
+            }
             //tap preview: BLUE border on the battlefield producers the
-            //auto-tap plan would activate for the focused hand card
+            //auto-tap plan would activate for the focused hand card. Drawn
+            //AFTER the availability borders so the answer to "what does this
+            //cast cost me" wins over the standing state underneath it.
             if (card && card->willPayForFocused && highlightborder && card->controller()
                 && card->controller()->game->inPlay->hasCard(card))
             {
@@ -449,12 +512,17 @@ void CardGui::Render()
         JQuadPtr rMask = card->getObserver()->getResourceManager()->GetQuad("white");
         rMask->SetColor(ARGB(128,255,0,0));//red
         renderer->RenderQuad(rMask.get(), actX, actY, actT, (27 * actZ + 1) / 16, 40 * actZ / 16);
+        rMask->SetColor(ARGB(255,255,255,255));//"white" is ONE shared cached JQuad (GameApp.cpp registers it
+        //from shadows.png). SetColor mutates that shared object permanently, so every later user of
+        //GetQuad("white") - in this screen or any other - inherited this tint until something else
+        //overwrote it. Restore it.
     }
     if(tc && tc->source && tc->source->view && tc->source->view->actZ >= 1.3 && card == tc->source)//paint the source green while infocus.
     {
         JQuadPtr gMask = card->getObserver()->getResourceManager()->GetQuad("white");
         gMask->SetColor(ARGB(128,0,255,0));//green
         renderer->RenderQuad(gMask.get(), actX, actY, actT, (27 * actZ + 1) / 16, 40 * actZ / 16);
+        gMask->SetColor(ARGB(255,255,255,255));//see the red mask above: shared quad, restore the tint.
     }
 
     //draws the numbers power/toughness
@@ -639,22 +707,51 @@ void CardGui::Render()
 
 JQuadPtr CardGui::AlternateThumbQuad(MTGCard * card)
 {
-    JQuadPtr q;
-    vector<ModRulesBackGroundCardGuiItem *>items = gModRules.cardgui.background;
-    ModRulesBackGroundCardGuiItem * item;
+    // Called once per visible art-less card per frame (and for every card when DISABLECARDS is
+    // set), so the per-call cost has to stay near zero on PSP/Vita.
+    const vector<ModRulesBackGroundCardGuiItem *>& items = gModRules.cardgui.background;
     int numItems = (int)items.size();
-    if (card->data->countColors() > 1)
+    if (!numItems) return JQuadPtr();
+
+    // The rendered output is determined solely by the colour bucket, and a permanent's colours
+    // are mutable during a duel (CardPrimitive::setColor/removeColor), so the bucket is
+    // recomputed every call and is the cache key. Keying by card identity would show stale art
+    // after a colour-changing effect.
+    int index = (card->data->countColors() > 1) ? numItems - 1 : card->data->getColor();
+    if (index < 0 || index >= numItems) index = 0;
+
+#if defined(PSP)
+    // NO cache and NO pinning here. RETRIEVE_MANAGE holds a texture in the resource manager's
+    // managed map, where ClearUnlocked/RemoveOldest can never reclaim it - and on PSP
+    // allocation pressure is the mechanism behind very nearly every behaviour that differs
+    // from the other platforms. An unevictable texture is the wrong trade on the one target
+    // that has no headroom to spend, however small it looks: what gets pinned is the whole
+    // decoded texture, not the 28x40 region the quad draws from. The temp quad is what this
+    // function used before the cache, it stays evictable, and the lookup it costs is cheaper
+    // than the memory it saves.
+    JQuadPtr q = WResourceManager::Instance()->RetrieveTempQuad(items[index]->mDisplayThumb);
+#else
+    // One entry per background item (8 in modrules.xml), filled on demand: bounded by the mod
+    // rules, not by the number of cards seen, so it cannot grow over a long session.
+    static vector<JQuadPtr> sAlternateThumbs;
+    if ((int)sAlternateThumbs.size() != numItems)
+        sAlternateThumbs.assign(numItems, JQuadPtr());
+
+    JQuadPtr q = sAlternateThumbs[index];
+    if (!q.get())
     {
-         item = items[numItems-1];
+        // RETRIEVE_MANAGE deadbolts the texture the way GameApp pins back_thumb.jpg and the mana
+        // icons: the entry is held in the resource manager's managed map rather than the
+        // evictable cache, so ClearUnlocked/RemoveOldest cannot free it under this quad, and
+        // WCachedTexture::Refresh (theme or profile change) repoints the quad's texture in
+        // place.
+        const string& thumbFile = items[index]->mDisplayThumb;
+        q = WResourceManager::Instance()->RetrieveQuad(thumbFile, 0, 0, 0, 0, "altthumb_" + thumbFile, RETRIEVE_MANAGE);
+        if (!q.get()) return q;
+        sAlternateThumbs[index] = q;
     }
-    else
-    {
-        item = items[card->data->getColor()];
-    }
-    
-    
-    q = WResourceManager::Instance()->RetrieveTempQuad(item->mDisplayThumb);
-    items.clear();  
+#endif
+
     if (q && q->mTex)
         q->SetHotSpot(static_cast<float> (q->mTex->mWidth / 2), static_cast<float> (q->mTex->mHeight / 2));
     return q;
@@ -662,6 +759,14 @@ JQuadPtr CardGui::AlternateThumbQuad(MTGCard * card)
 
 void CardGui::AlternateRender(MTGCard * card, const Pos& pos)
 {
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+    static MTGCard * lastAlt = NULL;
+    if (card != lastAlt)
+    {
+        lastAlt = card;
+        cardProbe("altrender: %s", (card && card->data) ? card->data->getName().c_str() : "?");
+    }
+#endif
     // Draw the "unknown" card model
     JRenderer * renderer = JRenderer::GetInstance();
     JQuadPtr q;
@@ -1266,6 +1371,14 @@ void CardGui::TinyCropRender(MTGCard * card, const Pos& pos, JQuad * quad)
 //Renders a big card on screen. Defaults to the "alternate" rendering if no image is found
 void CardGui::RenderBig(MTGCard* card, const Pos& pos, bool thumb, bool noborder, bool gdv)
 {
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+    static MTGCard * lastBig = NULL;
+    if (card != lastBig)
+    {
+        lastBig = card;
+        cardProbe("renderbig: %s", (card && card->data) ? card->data->getName().c_str() : "?");
+    }
+#endif
     JRenderer * renderer = JRenderer::GetInstance();
     //GameObserver * game = GameObserver::GetInstance();
     //if((MTGCard*)game->mLayers->actionLayer()->currentActionCard != NULL)

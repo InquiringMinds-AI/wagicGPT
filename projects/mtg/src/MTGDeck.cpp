@@ -435,6 +435,7 @@ void MTGAllCards::init()
     tempCard = NULL;
     tempPrimitive = NULL;
     total_cards = 0;
+    printingsSorted = true; //vacuously sorted while empty
     initCounters();
     izfstream limitedFile;
     if (JFileSystem::GetInstance()->openForRead(limitedFile, "LimitedCardList.txt"))
@@ -610,9 +611,9 @@ MTGAllCards::MTGAllCards()
 
 MTGAllCards::~MTGAllCards()
 {
-    for (map<int, MTGCard *>::iterator it = collection.begin(); it != collection.end(); it++)
-        delete (it->second);
-    collection.clear();
+    for (size_t i = 0; i < printings.size(); i++)
+        delete (printings[i].second);
+    printings.clear();
     ids.clear();
 
     for (map<string, CardPrimitive *>::iterator it = primitives.begin(); it != primitives.end(); it++)
@@ -643,14 +644,29 @@ int MTGAllCards::randomCardId()
     return ids[id];
 }
 
+//One pass for every set's count. checkProfile wanted the best-stocked set and
+//was calling countBySet once per set, so the whole collection was walked 336
+//times over - the single hottest thing in a headless game's profile.
+void MTGAllCards::countBySets(vector<int>& counts)
+{
+    ensurePrintingsSorted();
+    for (size_t i = 0; i < counts.size(); ++i)
+        counts[i] = 0;
+    for (size_t i = 0; i < printings.size(); i++)
+    {
+        MTGCard * c = printings[i].second;
+        if (c && c->setId >= 0 && (size_t) c->setId < counts.size())
+            counts[c->setId]++;
+    }
+}
+
 int MTGAllCards::countBySet(int setId)
 {
+    ensurePrintingsSorted();
     int result = 0;
-    map<int, MTGCard *>::iterator it;
-
-    for (it = collection.begin(); it != collection.end(); it++)
+    for (size_t i = 0; i < printings.size(); i++)
     {
-        MTGCard * c = it->second;
+        MTGCard * c = printings[i].second;
         if (c->setId == setId)
         {
             result++;
@@ -664,11 +680,11 @@ int MTGAllCards::countByType(const string &_type)
 {
     int type_id = findType(_type);
 
+    ensurePrintingsSorted();
     int result = 0;
-    map<int, MTGCard *>::iterator it;
-    for (it = collection.begin(); it != collection.end(); it++)
+    for (size_t i = 0; i < printings.size(); i++)
     {
-        MTGCard * c = it->second;
+        MTGCard * c = printings[i].second;
         if (c->data->hasType(type_id))
         {
             result++;
@@ -681,14 +697,14 @@ int MTGAllCards::countByColor(int color)
 {
     if (colorsCount[color] == 0)
     {
+        ensurePrintingsSorted();
         for (int i = 0; i < Constants::NB_Colors; i++)
         {
             colorsCount[i] = 0;
         }
-        map<int, MTGCard *>::iterator it;
-        for (it = collection.begin(); it != collection.end(); it++)
+        for (size_t i = 0; i < printings.size(); i++)
         {
-            MTGCard * c = it->second;
+            MTGCard * c = printings[i].second;
             int j = c->data->getColor();
 
             colorsCount[j]++;
@@ -706,16 +722,6 @@ bool MTGAllCards::addCardToCollection(MTGCard * card, int setId)
 {
     card->setId = setId;
     int newId = card->getId();
-    if (collection.find(newId) != collection.end())
-    {
-#if defined (_DEBUG)
-        string cardName = card->data ? card->data->name : card->getImageName();
-        string setName = setId != -1 ? setlist.getInfo(setId)->getName() : "";
-        DebugTrace("warning, card id collision! : " << newId << " -> " << cardName << "(" << setName << ")");
-#endif
-        SAFE_DELETE(card);
-        return false;
-    }
 
     //Don't add cards that don't have a primitive
     if (!card->data)
@@ -723,13 +729,66 @@ bool MTGAllCards::addCardToCollection(MTGCard * card, int setId)
         SAFE_DELETE(card);
         return false;
     }
+    //Dup ids (3 exist in the shipped sets) are admitted here and resolved
+    //first-in-wins by ensurePrintingsSorted() - a per-insert find would cost
+    //O(n) or a shadow set; the deferred dedupe rolls this accounting back
+    //exactly for the losers.
     ids.push_back(newId);
-
-    collection[newId] = card; //Push card into collection.
+    printings.push_back(std::make_pair(newId, card));
+    printingsSorted = false;
     MTGSetInfo * si = setlist.getInfo(setId);
     if (si) si->count(card); //Count card in set info
     ++total_cards;
     return true;
+}
+
+namespace { //ensurePrintingsSorted helpers
+    struct PrintingIdLess
+    {
+        bool operator()(const std::pair<int, MTGCard *> & a, const std::pair<int, MTGCard *> & b) const
+        {
+            return a.first < b.first;
+        }
+    };
+}
+
+void MTGAllCards::ensurePrintingsSorted()
+{
+    if (printingsSorted) return;
+    //Own mutex, NOT mMutex: getCardByName holds mMutex while calling
+    //getCardById, and boost::mutex does not recurse.
+    boost::mutex::scoped_lock lock(mPrintingsMutex);
+    if (printingsSorted) return; //raced another sorter
+    //stable_sort: insertion order preserved among equal ids, so the dedupe
+    //below keeps the FIRST-loaded printing - the old map's reject-at-insert
+    //semantics exactly.
+    std::stable_sort(printings.begin(), printings.end(), PrintingIdLess());
+    size_t w = 0;
+    for (size_t r = 0; r < printings.size(); ++r)
+    {
+        if (w && printings[r].first == printings[w - 1].first)
+        {
+            MTGCard * dup = printings[r].second;
+#if defined (_DEBUG)
+            string cardName = dup->data ? dup->data->name : dup->getImageName();
+            string setName = dup->setId != -1 ? setlist.getInfo(dup->setId)->getName() : "";
+            DebugTrace("warning, card id collision! : " << printings[r].first << " -> " << cardName << "(" << setName << ")");
+#endif
+            //Roll back addCardToCollection's accounting for the loser.
+            MTGSetInfo * si = setlist.getInfo(dup->setId);
+            if (si) si->uncount(dup);
+            --total_cards;
+            vector<int>::iterator idIt = std::find(ids.begin(), ids.end(), dup->getId());
+            if (idIt != ids.end()) ids.erase(idIt);
+            SAFE_DELETE(dup);
+        }
+        else
+        {
+            printings[w++] = printings[r];
+        }
+    }
+    printings.resize(w);
+    printingsSorted = true;
 }
 
 CardPrimitive * MTGAllCards::addPrimitive(CardPrimitive * primitive, MTGCard * card)
@@ -775,12 +834,27 @@ CardPrimitive * MTGAllCards::addPrimitive(CardPrimitive * primitive, MTGCard * c
     return primitive;
 }
 
+size_t MTGAllCards::printingsCount()
+{
+    ensurePrintingsSorted();
+    return printings.size();
+}
+
+MTGCard * MTGAllCards::printingAt(size_t i)
+{
+    ensurePrintingsSorted();
+    return i < printings.size() ? printings[i].second : NULL;
+}
+
 MTGCard * MTGAllCards::getCardById(int id)
 {
-    map<int, MTGCard *>::iterator it = collection.find(id);
-    if (it != collection.end())
+    ensurePrintingsSorted();
+    std::pair<int, MTGCard *> probe(id, (MTGCard *) NULL);
+    vector<std::pair<int, MTGCard *> >::iterator it =
+        std::lower_bound(printings.begin(), printings.end(), probe, PrintingIdLess());
+    if (it != printings.end() && it->first == id)
     {
-        return (it->second);
+        return it->second;
     }
     return 0;
 }
@@ -806,11 +880,12 @@ bool MTGAllCards::loadTestPrimitives(const string& configFile, string& error)
     std::set<int> fileIds;
     std::set<string> fileNames;
     std::set<string> productionNames;
-    for (map<int, MTGCard *>::const_iterator it = collection.begin(); it != collection.end(); ++it)
+    ensurePrintingsSorted();
+    for (size_t i = 0; i < printings.size(); i++)
     {
-        if (!it->second || !it->second->data)
+        if (!printings[i].second || !printings[i].second->data)
             continue;
-        string name = it->second->data->name;
+        string name = printings[i].second->data->name;
         std::transform(name.begin(), name.end(), name.begin(), ::tolower);
         productionNames.insert(name);
     }
@@ -882,7 +957,7 @@ bool MTGAllCards::loadTestPrimitives(const string& configFile, string& error)
                 error = "duplicate test name '" + name + "'";
                 return false;
             }
-            if (collection.find(id) != collection.end())
+            if (getCardById(id))
             {
                 error = "test id " + to_string(id) + " collides with a production card";
                 return false;
@@ -952,10 +1027,10 @@ bool MTGAllCards::loadTestPrimitives(const string& configFile, string& error)
 
 void MTGAllCards::prefetchCardNameCache()
 {
-    map<int, MTGCard *>::iterator it;
-    for (it = collection.begin(); it != collection.end(); it++)
+    ensurePrintingsSorted();
+    for (size_t i = 0; i < printings.size(); i++)
     {
-        MTGCard * c = it->second;
+        MTGCard * c = printings[i].second;
 
         //Name only
         string cardName = c->data->name;
@@ -1006,11 +1081,11 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
         return result;
     }
 
-    map<int, MTGCard *>::iterator it;
+    ensurePrintingsSorted();
     if(forcedSetId != -1){
-        for (it = collection.begin(); it != collection.end(); it++)
+        for (size_t i = 0; i < printings.size(); i++)
         {
-            MTGCard * c = it->second;
+            MTGCard * c = printings[i].second;
             if (forcedSetId != c->setId) continue;
             string cardName = c->data->name;
             std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
@@ -1039,9 +1114,9 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
     }
 
     bool nameMatchedButSetDropped = false;
-    for (it = collection.begin(); it != collection.end(); it++)
+    for (size_t i = 0; i < printings.size(); i++)
     {
-        MTGCard * c = it->second;
+        MTGCard * c = printings[i].second;
         string cardName = c->data->name;
         std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
         if (setId != -1 && setId != c->setId)
@@ -1918,6 +1993,35 @@ void MTGSetInfo::count(MTGCard*c)
     }
 
     counts[MTGSetInfo::TOTAL_CARDS]++;
+}
+
+//Exact inverse of count(); used by MTGAllCards::ensurePrintingsSorted to roll
+//back the optimistic accounting of an id-collision loser.
+void MTGSetInfo::uncount(MTGCard*c)
+{
+    if (!c) return;
+
+    switch (c->getRarity())
+    {
+    case Constants::RARITY_M:
+        counts[MTGSetInfo::MYTHIC]--;
+        break;
+    case Constants::RARITY_R:
+        counts[MTGSetInfo::RARE]--;
+        break;
+    case Constants::RARITY_U:
+        counts[MTGSetInfo::UNCOMMON]--;
+        break;
+    case Constants::RARITY_C:
+        counts[MTGSetInfo::COMMON]--;
+        break;
+    default:
+    case Constants::RARITY_L:
+        counts[MTGSetInfo::LAND]--;
+        break;
+    }
+
+    counts[MTGSetInfo::TOTAL_CARDS]--;
 }
 
 int MTGSetInfo::totalCards()

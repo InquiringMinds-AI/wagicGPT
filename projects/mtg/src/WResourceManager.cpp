@@ -472,6 +472,25 @@ void ResourceManagerImpl::ClearUnlocked()
     psiWCache.ClearUnlocked();
 }
 
+//WAGIC_MEMPROBE telemetry (see WResourceManager.h). Cheap counter reads only.
+//cacheItems / cacheBytes  = the EVICTABLE cache: what ClearUnlocked actually frees.
+//managedCount             = entries in the permanent managed map: ClearUnlocked never
+//                           walks it, so anything inserted per match grows without bound.
+//unreclaimableBytes       = totalSize - cacheSize, i.e. every byte held OUTSIDE the
+//                           evictable cache (managed map + locked entries). This is the
+//                           number the debug overlay calls "man"; if it climbs across
+//                           matches, that is the leak.
+void ResourceManagerImpl::MemProbeStats(unsigned int* cacheItems, unsigned long* managedCount,
+                                        unsigned long* cacheBytes, unsigned long* unreclaimableBytes)
+{
+    if (cacheItems)  *cacheItems  = textureWCache.cacheItems;
+    if (managedCount) *managedCount = (unsigned long) textureWCache.managed.size();
+    if (cacheBytes)  *cacheBytes  = textureWCache.cacheSize;
+    if (unreclaimableBytes)
+        *unreclaimableBytes = (textureWCache.totalSize > textureWCache.cacheSize)
+                              ? (textureWCache.totalSize - textureWCache.cacheSize) : 0;
+}
+
 void ResourceManagerImpl::Release(JSample * sample)
 {
     if (!sample) return;
@@ -955,11 +974,37 @@ void ResourceManagerImpl::ResetCacheLimits()
 {
 #if defined PSP
     unsigned int ram = ramAvailable();
-    unsigned int myNewSize = ram - OPERATIONAL_SIZE + textureWCache.totalSize;
+    //Guard the historical unsigned underflow: with ram < OPERATIONAL_SIZE the
+    //subtraction wrapped to ~4GB and the cache stopped evicting until the heap
+    //was exhausted (2008-era callers don't check malloc failures).
+    unsigned int myNewSize;
+    if (ram < OPERATIONAL_SIZE)
+        myNewSize = TEXTURES_CACHE_MINSIZE;
+    else
+        myNewSize = ram - OPERATIONAL_SIZE + textureWCache.totalSize;
     if (myNewSize < TEXTURES_CACHE_MINSIZE)
     {
         DebugTrace( "Error, Not enough RAM for Cache: " << myNewSize << " - total Ram: " << ram);
+        myNewSize = TEXTURES_CACHE_MINSIZE;
     }
+    //Hard cap. The formula above sizes the cache to ALL free heap less a fixed
+    //reserve - an overcommit on the measured 43 MiB hardware heap: uncapped, a duel's
+    //decks + abilities + GPT layer no longer fit and the PSP powers off (isolated on
+    //device 2026-08-03). The 2026-08-04 memprobe then showed WHY the cap matters even
+    //with no leak anywhere: match 1's texture churn fragments the arena, so bounding
+    //the cache bounds the HIGH-WATER MARK - the only lever under fragmentation - and
+    //a capped build degrades to lag where an uncapped one dies. 8 MB is the value the
+    //hardware rounds ran; revisit only with a slab allocator behind TexAlloc.
+    //6.5 MB against the 10 MB pool (2026-08-06, after the card-DB diet bought
+    //the margin): resident textures = cache + pinned/managed (1.9 MB measured)
+    //+ in-flight must fit the pool or loads spill to the fallback path and
+    //fragment the general heap. 6.5 + 1.9 + 0.7 < 10. The 5 MB cap on the
+    //8 MB pool was measured (crumb logs) re-decoding card art continuously
+    //through match play and per-view in the shop - the cap, not the pool,
+    //was the lag; a cache smaller than a match's art working set thrashes.
+    const unsigned int PSP_TEXCACHE_HARD_CAP = 6500000;
+    if (myNewSize > PSP_TEXCACHE_HARD_CAP)
+        myNewSize = PSP_TEXCACHE_HARD_CAP;
     textureWCache.Resize(MIN(myNewSize, HUGE_CACHE_LIMIT), MAX_CACHE_OBJECTS);
 #else
 #ifdef FORCE_LOW_CACHE_MEMORY

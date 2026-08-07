@@ -5,6 +5,36 @@
 
 #include "PrecompiledHeader.h"
 
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+#include <malloc.h>
+#endif
+
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+#include <pspsysmem.h>
+#include <stdarg.h>
+#include <malloc.h>
+#ifdef WAGIC_AUTODEMO
+#define WAGIC_SELFPLAY_ACTIVE 1
+#else
+#define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
+#endif
+static void wagicProbe(const char* fmt, ...)
+{
+    FILE* f = fopen("User/wagic-probe.log", "a");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    struct mallinfo mi = mallinfo();
+    fprintf(f, " used=%u arena=%u\n", (unsigned)mi.uordblks, (unsigned)mi.arena);
+    fclose(f);
+}
+#else
+#define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
+#endif
+
+
 #include <math.h>
 
 #include "GameStateMenu.h"
@@ -531,6 +561,12 @@ void GameStateMenu::Update(float dt)
     switch (MENU_STATE_MAJOR & currentState)
     {
     case MENU_STATE_MAJOR_LANG:
+#ifdef WAGIC_AUTODEMO
+        wagicProbe("lang bypass");
+        options[Options::LANG].str = "en";
+        currentState = MENU_STATE_MAJOR_LOADING_CARDS;
+        break;
+#endif
         if (MENU_STATE_MINOR_NONE == (currentState & MENU_STATE_MINOR))
         {
             if (!subMenuController)
@@ -554,7 +590,28 @@ void GameStateMenu::Update(float dt)
 #ifdef _DEBUG
             int startTime = JGEGetTime();
 #endif
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("primitive %d/%d %s", primitivesLoadCounter, (int)primitives.size(), primitives[primitivesLoadCounter].c_str());
+#endif
             MTGCollection()->load(primitives[primitivesLoadCounter].c_str());
+#if defined(WAGIC_MEMPROBE) && defined(PSP)
+            //Boot-transient tracker: the primitives/sets load is the largest
+            //heap spike in the program and its true size has only ever been
+            //bounded by which pool carves crashed. One line per 25 primitives
+            //survives a mid-load crash-to-off and turns the bound into a number.
+            if (primitivesLoadCounter % 25 == 0)
+            {
+                struct mallinfo bootMi = mallinfo();
+                FILE * bootF = fopen("User/wagic-memprobe.log", "a");
+                if (bootF)
+                {
+                    fprintf(bootF, "boot: primitive %d/%d arenaKB=%u usedKB=%u\n",
+                            primitivesLoadCounter, (int) primitives.size(),
+                            (unsigned)(bootMi.arena / 1024), (unsigned)(bootMi.uordblks / 1024));
+                    fclose(bootF);
+                }
+            }
+#endif
 #if _DEBUG
             int endTime = JGEGetTime();
             int elapsedTime = (endTime - startTime);
@@ -567,6 +624,9 @@ void GameStateMenu::Update(float dt)
         primitivesLoadCounter = primitives.size() + 1;
         if (mReadConf)
         {
+#if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+            wagicProbe("set %s", mCurrentSetName.c_str());
+#endif
             MTGCollection()->load(mCurrentSetFileName.c_str(), mCurrentSetName.c_str());
         }
         else
@@ -582,7 +642,7 @@ void GameStateMenu::Update(float dt)
             Translator::GetInstance()->tempValues.clear();
 
             DebugTrace(std::endl << "==" << std::endl <<
-                            "Total MTGCards: " << MTGCollection()->collection.size() << std::endl <<
+                            "Total MTGCards: " << MTGCollection()->printingsCount() << std::endl <<
                             "Total CardPrimitives: " << MTGCollection()->primitives.size() << std::endl << "==");
 
             //Force default, if necessary.
@@ -654,7 +714,7 @@ void GameStateMenu::Update(float dt)
             //translogs and controls how many games run.
             {
                 static bool autoSelfPlayTried = false;
-                if (!autoSelfPlayTried && getenv("WAGIC_SELFPLAY"))
+                if (!autoSelfPlayTried && WAGIC_SELFPLAY_ACTIVE)
                 {
                     autoSelfPlayTried = true;
                     fprintf(stderr, "WAGIC_SELFPLAY: auto-launching AI-vs-AI demo\n");

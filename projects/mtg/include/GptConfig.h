@@ -38,6 +38,11 @@ public:
                               //is only sent when != 1.0). Sampling change,
                               //corpus-validate before defaulting on
     int timeoutSecs;          //per-call HTTP timeout for model completions
+    int patienceSecs;         //seconds a call may be in flight before the duel
+                              //offers "keep waiting / play without the LLM".
+                              //NOT the same job as timeoutSecs: that bounds a
+                              //dead connection, this bounds how long a person
+                              //sits watching one. 0 = never ask
     int translog;             //0/1: dump every decision (prompt+reply) to
                               //~/.Wagic/ai/gpt/logs/*.jsonl - prompt-tuning
                               //raw material, and future training data for a
@@ -73,6 +78,13 @@ public:
 //user copy first, bundled Res copy as fallback. "" when neither exists.
 std::string gptReadAsset(const char * filename);
 
+//Append one line to <user root>/ai/gpt/gpt-log.txt.
+//DebugTrace is compiled out of release builds and, where it survives, writes to
+//stderr - which is invisible on a console. This is the channel that reaches a
+//user's bug report, so it is for the handful of events worth explaining after
+//the fact (the transport refusing to start, and the like), not chatter.
+void gptLogLine(const std::string& line);
+
 //Evaluation peek (config peek=1, or WAGIC_GPT_PEEK env override): reveal
 //the opponent's hand on click. Cached after the first call - flipping it
 //takes a restart, which is fine for a debugging aid.
@@ -97,6 +109,14 @@ std::string gptHttpPost(const std::string& url, const std::string& body, long ti
 //Probe url + "/v1/models". True when the endpoint answers with a usable
 //model list; modelOut receives the first advertised model id.
 bool gptProbeEndpoint(const std::string& url, const std::string& key, std::string& modelOut, long timeoutMs = 20000);
+
+#ifdef WAGIC_HTTP_JNI
+//Capture the app's SDLActivity class while the app class loader is still the
+//one in effect. MUST be called from JNI_OnLoad (or any Java-originated call);
+//the model-call worker is a native thread and cannot resolve app classes.
+#include <jni.h>
+void gptAndroidCacheClass(JNIEnv * env);
+#endif
 
 #endif //WITH_GPT_AI
 

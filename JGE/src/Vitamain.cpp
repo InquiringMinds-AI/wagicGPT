@@ -12,6 +12,9 @@
 #include <psp2/io/stat.h>
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
+#include <psp2/sysmodule.h>
+#include <psp2/net/net.h>
+#include <psp2/net/netctl.h>
 
 #include <vitaGL.h>
 #include <SDL2/SDL.h>
@@ -185,6 +188,49 @@ static void EnsureUserDirs()
     sceIoMkdir("ux0:data/Wagic/settings", 0777);
 }
 
+// Bring up the network stack so the LLM opponent's HTTP transport (libcurl, in
+// projects/mtg/src/GptConfig.cpp) has sockets to work with. Unlike the PSP, the
+// Vita's system software owns the wifi association, so there is no access-point
+// join to drive here - loading the Net module and initialising sceNet/sceNetCtl
+// is the whole job.
+//
+// Deliberately NON-FATAL. Every GPT seam treats a transport failure as "fall
+// back to Baka", so a console with no wifi must still boot and play; it just
+// plays the heuristic AI.
+static void VitaNetInit()
+{
+    static char netMem[1 * 1024 * 1024];
+
+    if (sceSysmoduleLoadModule(SCE_SYSMODULE_NET) < 0)
+    {
+        debugLog("[3e] sceSysmoduleLoadModule(NET) failed - LLM opponent unavailable");
+        return;
+    }
+
+    SceNetInitParam netInit;
+    memset(&netInit, 0, sizeof(netInit));
+    netInit.memory = netMem;
+    netInit.size   = sizeof(netMem);
+    netInit.flags  = 0;
+
+    // A non-zero return is usually SCE_NET_ERROR_EBUSY, meaning something else
+    // already initialised the stack - that is success for our purposes, so only
+    // a genuine failure should stop us calling sceNetCtlInit.
+    int rc = sceNetInit(&netInit);
+    if (rc < 0 && rc != (int)SCE_NET_ERROR_EBUSY)
+    {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "[3e] sceNetInit failed: 0x%08X", (unsigned)rc);
+        debugLog(buf);
+        return;
+    }
+
+    if (sceNetCtlInit() < 0)
+        debugLog("[3e] sceNetCtlInit failed - LLM opponent unavailable");
+    else
+        debugLog("[3e] network up");
+}
+
 static bool VitaInit()
 {
     debugLog("[3b] Configuring vitaGL");
@@ -208,7 +254,12 @@ static bool VitaInit()
     // Note: vglInitExtended aborts on failure (calls sceKernelExitProcess internally)
 
     // Post-init runtime configuration
-    vglUseVram(GL_TRUE);             // prefer VRAM for textures (faster GPU access)
+    //
+    // vglUseVram() was removed from vitaGL: VRAM-vs-RAM placement is no longer a
+    // post-init toggle, it is the ram_threshold argument to vglInitExtended
+    // above. Allocations are served from VRAM until that threshold is reached
+    // and spill to RAM after, which is what the old vglUseVram(GL_TRUE) was
+    // approximating - so the intent is preserved by the call above, not lost.
     vglWaitVblankStart(GL_TRUE);     // vsync on — prevents tearing
 
     debugLog("[3b] vglInitExtended OK");
@@ -234,6 +285,9 @@ static bool VitaInit()
     {
         debugLog("[3d] SDL_Init(AUDIO) OK");
     }
+
+    debugLog("[3e] Bringing up the network stack");
+    VitaNetInit();
 
     // Setup OpenGL state (matches SDLmain.cpp initialization)
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);

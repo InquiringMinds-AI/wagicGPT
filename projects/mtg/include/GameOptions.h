@@ -59,6 +59,7 @@ public:
         DISABLECARDS,
         MAX_GRADE,
         ASPHASES,
+        TUTORIALS,
         FIRSTPLAYER,
         KICKERPAYMENT,
         ECON_DIFFICULTY,
@@ -374,8 +375,16 @@ public:
     GameOption * get(string optionName);
     GameOption& operator[](int);
     GameOption& operator[](string);
+    //Clears the per-message "already seen" counters written by ATutorialMessage
+    //(the "tuto_<hash>" keys, which live in unknownMap because they are not
+    //named options). Returns how many were cleared. Zeroed rather than erased:
+    //save() only writes entries with a value, so a zeroed key drops out of the
+    //file and reads back as never-shown.
+    int resetTutorialMessages();
     GameOptions(string filename);
     ~GameOptions();
+
+    static const string kTutorialOptionPrefix;
 
 private:
     vector<GameOption*> values;
@@ -443,6 +452,10 @@ public:
     }
 
     bool newAward();
+
+    //Makes every already-dismissed tutorial message eligible to show again.
+    //Returns how many messages were reset.
+    int resetTutorialMessages();
 
     //These return a filepath accurate to the current mode/profile/theme, and can
     //optionally fallback to a file within a certain directory. 

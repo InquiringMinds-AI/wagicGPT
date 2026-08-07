@@ -2,3 +2,9 @@
 /bin
 /libs
 
+/bin-modern
+/obj
+# Built by build-apk.sh from the Res tree; never committed (25MB, and it is
+# a derived artifact of bin/Res).
+/assets/Wagic-core-*.zip
+/assets/respack.sha256

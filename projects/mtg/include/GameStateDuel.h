@@ -187,6 +187,9 @@ private:
     DeckMenu * deckmenu;
     DeckMenu * opponentMenu;
     SimpleMenu * menu;
+    //The player whose slow model call raised the patience prompt, so the
+    //answer goes back to the one that asked. Borrowed, never owned.
+    Player * mPatiencePlayer;
     TaskList * taskList;
     SimplePopup * popupScreen; // used for informational screens, modal
     static int selectedPlayerDeckId;
@@ -285,6 +288,8 @@ public:
         MENUITEM_TASKBOARD = -33,
         MENUITEM_TOGGLE_SELECT_ALL = -34,
         MENUITEM_CONFIRM_SELECT_ALL = -35,
+        MENUITEM_LLM_KEEP_WAITING = -36,
+        MENUITEM_LLM_SWITCH_OFF = -37,
         MENUITEM_MORE_INFO = kInfoMenuID
     };
 

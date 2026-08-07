@@ -287,6 +287,79 @@ namespace
         }
         return false;
     }
+
+    //Any activated ability of p's that could be used right now. Shared by
+    //hasInstantResponse and hasAnyLegalAction so there is ONE definition of
+    //"this ability is usable"; sorcerySpeedOk relaxes only the instant-speed
+    //restriction filter, and every other test is identical either way.
+    bool hasUsableActivatedAbility(Player * p, ManaCost * pMana, bool sorcerySpeedOk,
+                                   MTGCardInstance * only = NULL)
+    {
+        GameObserver * g = p->getObserver();
+        for (size_t i = 1; i < g->mLayers->actionLayer()->mObjects.size(); i++)
+        {
+            MTGAbility * a = (MTGAbility *) g->mLayers->actionLayer()->mObjects[i];
+            ActivatedAbility * aa = dynamic_cast<ActivatedAbility*>(a);
+            if (!aa || !aa->source)
+                continue;
+            //`only` narrows the same loop to one card so the per-card display
+            //predicate cannot drift from the set-level one - there is still
+            //exactly ONE definition of "this ability is usable".
+            if (only && aa->source != only)
+                continue;
+            if (aa->source->controller() != p)
+                continue;
+            if (aa->source->isPhased)
+                continue;
+            if (isWrappedManaProducer(aa))
+                continue; //making mana is not a response
+            //turn-scoped activations are wrong-turn regardless of speed
+            if (aa->restrictions == MTGAbility::PLAYER_TURN_ONLY && g->currentPlayer != p)
+                continue;
+            if (aa->restrictions == MTGAbility::OPPONENT_TURN_ONLY && g->currentPlayer == p)
+                continue;
+            //instant-speed usability only: sorcery-scoped activations are not
+            //responses at a priority window, but they ARE actions at a
+            //sorcery-speed window of the player's own main phase
+            if (!sorcerySpeedOk
+                && aa->restrictions != MTGAbility::NO_RESTRICTION && aa->restrictions != MTGAbility::PLAYER_TURN_ONLY
+                && aa->restrictions != MTGAbility::OPPONENT_TURN_ONLY)
+                continue;
+            if (aa->needsTapping && (aa->source->isTapped() || aa->source->hasSummoningSickness()))
+                continue;
+            ManaCost * cost = aa->getCost();
+            if (cost && cost->getConvertedCost() && !pMana->canAfford(cost, 0))
+                continue;
+            //Non-mana costs gate usability too: removing counters the card
+            //does not have, sacrificing with no legal fodder. Each cost's
+            //canPay carries the ENGINE's semantics, not the CR's - LifeCost,
+            //for one, allows paying down to (even past) zero, and the ring's
+            //only contract is "the click will be accepted". The engine's
+            //click gate asks ExtraCost::canPay after setExtraCostsAction, but
+            //that binding NULLs storedCard on the source - a mutation a
+            //display probe must not make - so bind only the source pointer
+            //each cost's canPay reads (idempotent for an ability's own
+            //source; canPay itself is read-only).
+            if (cost && cost->extraCosts)
+            {
+                bool extrasPayable = true;
+                for (size_t k = 0; k < cost->extraCosts->costs.size(); k++)
+                {
+                    ExtraCost * ec = cost->extraCosts->costs[k];
+                    ec->setSource(aa->source);
+                    if (!ec->canPay())
+                    {
+                        extrasPayable = false;
+                        break;
+                    }
+                }
+                if (!extrasPayable)
+                    continue;
+            }
+            return true;
+        }
+        return false;
+    }
 }
 
 bool LegalActionsOracle::hasInstantResponse(Player * p)
@@ -302,35 +375,8 @@ bool LegalActionsOracle::hasInstantResponse(Player * p)
     pMana->add(p->getManaPool());
 
     bool any = !legalCasts(p, freePolicy, pMana, true).empty();
-
-    for (size_t i = 1; !any && i < g->mLayers->actionLayer()->mObjects.size(); i++)
-    {
-        MTGAbility * a = (MTGAbility *) g->mLayers->actionLayer()->mObjects[i];
-        ActivatedAbility * aa = dynamic_cast<ActivatedAbility*>(a);
-        if (!aa || !aa->source)
-            continue;
-        if (aa->source->controller() != p)
-            continue;
-        if (aa->source->isPhased)
-            continue;
-        if (isWrappedManaProducer(aa))
-            continue; //making mana is not a response
-        //instant-speed usability only: phase- and sorcery-scoped
-        //activations are not responses at a priority window
-        if (aa->restrictions == MTGAbility::PLAYER_TURN_ONLY && g->currentPlayer != p)
-            continue;
-        if (aa->restrictions == MTGAbility::OPPONENT_TURN_ONLY && g->currentPlayer == p)
-            continue;
-        if (aa->restrictions != MTGAbility::NO_RESTRICTION && aa->restrictions != MTGAbility::PLAYER_TURN_ONLY
-            && aa->restrictions != MTGAbility::OPPONENT_TURN_ONLY)
-            continue;
-        if (aa->needsTapping && (aa->source->isTapped() || aa->source->hasSummoningSickness()))
-            continue;
-        ManaCost * cost = aa->getCost();
-        if (cost && cost->getConvertedCost() && !pMana->canAfford(cost, 0))
-            continue;
-        any = true;
-    }
+    if (!any)
+        any = hasUsableActivatedAbility(p, pMana, false);
     delete pMana;
     return any;
 }
@@ -363,6 +409,27 @@ std::set<MTGCardInstance*> LegalActionsOracle::castableForDisplay(Player * p)
                 out.insert(card);
         }
     }
+
+    //legalCasts dedupes by name (same name+zone = one DECISION), which is
+    //right for the model's menu and wrong for a per-card display: only the
+    //first of duplicate copies came back, and its twin rendered faded - a
+    //false "uncastable" on a castable card. Same name in the same zone is
+    //the same cast, so spread each verdict across the copies. Lands are
+    //skipped: the loop above already judged every land instance itself.
+    for (int i = 0; i < p->game->hand->nb_cards; i++)
+    {
+        MTGCardInstance * card = p->game->hand->cards[i];
+        if (card->isLand() || out.count(card))
+            continue;
+        for (std::set<MTGCardInstance*>::iterator it = out.begin(); it != out.end(); ++it)
+        {
+            if (!(*it)->isLand() && (*it)->getDisplayName() == card->getDisplayName())
+            {
+                out.insert(card);
+                break;
+            }
+        }
+    }
     return out;
 }
 
@@ -393,4 +460,123 @@ bool LegalActionsOracle::hasLegalBlock(Player * defender)
         }
     }
     return false;
+}
+
+bool LegalActionsOracle::canDeclareBlocker(MTGCardInstance * card)
+{
+    //Mirrors MTGBlockRule::isReactingToClick (the click gate) plus the
+    //owner's display requirement: a ring means "this creature can block AND
+    //there is an attacker it could legally block" - a blocker with no legal
+    //assignment would open a menu that cycles to nothing.
+    Player * p = card->controller();
+    GameObserver * g = p->getObserver();
+    if (g->getCurrentGamePhase() != MTG_PHASE_COMBATBLOCKERS)
+        return false;
+    Player * attackerP = g->currentPlayer;
+    if (attackerP == p)
+        return false; //only the defending seat declares blockers
+    if (g->isInterrupting)
+        return false;
+    //attack triggers resolve before blocks are declared - same stack gate
+    //as the click rule
+    if (g->mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED))
+        return false;
+    if (card->isPhased || !card->canBlock() || card->blockCost >= 1)
+        return false;
+    MTGCardInstance * attacker = NULL;
+    while ((attacker = attackerP->game->inPlay->getNextAttacker(attacker)))
+    {
+        if (card->canBlock(attacker))
+            return true;
+    }
+    return false;
+}
+
+bool LegalActionsOracle::hasAnyLegalAction(Player * p)
+{
+    GameObserver * g = p->getObserver();
+    const int phase = g->getCurrentGamePhase();
+    const bool myTurn = (g->currentPlayer == p);
+
+    //A hand over the limit at cleanup is a MANDATORY discard - the most
+    //load-bearing action there is, and it is neither a cast nor an ability.
+    if (phase == MTG_PHASE_CLEANUP && p->game->hand->nb_cards > 7)
+        return true;
+
+    //Combat declarations are actions in their own right, not casts. "No
+    //blocks" is a real declaration the owner makes deliberately, so a
+    //defender with any legal block still gets the step.
+    if (phase == MTG_PHASE_COMBATATTACKERS && myTurn && hasLegalAttacker(p))
+        return true;
+    if (phase == MTG_PHASE_COMBATBLOCKERS && !myTurn && hasLegalBlock(p))
+        return true;
+
+    //A sorcery-speed window of the player's own turn opens up everything the
+    //rest of the game forbids: lands, sorceries, creatures, and abilities
+    //that are only usable at sorcery speed.
+    const bool sorcerySpeed = myTurn
+        && (phase == MTG_PHASE_FIRSTMAIN || phase == MTG_PHASE_SECONDMAIN)
+        && g->mLayers->stackLayer()->count(0, NOT_RESOLVED) == 0;
+    if (sorcerySpeed)
+    {
+        if (!castableForDisplay(p).empty())
+            return true;
+        ManaEngine::FreeProducerPolicy freePolicy;
+        ManaCost * pMana = ManaEngine::potentialManaPermissive(p, freePolicy);
+        pMana->add(p->getManaPool());
+        const bool ability = hasUsableActivatedAbility(p, pMana, true);
+        delete pMana;
+        if (ability)
+            return true;
+    }
+
+    //Everything else reduces to "can this player respond at instant speed".
+    return hasInstantResponse(p);
+}
+
+bool LegalActionsOracle::canDeclareAttacker(MTGCardInstance * card)
+{
+    //Mirrors MTGAttackRule::isReactingToClick's DECLARE branch exactly. Kept
+    //deliberately verbatim rather than simplified: this border promises the
+    //player that pressing the button will declare this creature, so the two
+    //must not be able to disagree. An already-declared attacker is excluded -
+    //it is no longer an available action, it is a state, and the engine
+    //already shows that state.
+    if (!card || !card->isCreature())
+        return false;
+    Player * p = card->controller();
+    if (!p)
+        return false;
+    GameObserver * g = p->getObserver();
+    if (!g || g->getCurrentGamePhase() != MTG_PHASE_COMBATATTACKERS)
+        return false;
+    if (p != g->currentPlayer || p != g->currentlyActing())
+        return false;
+    if (card->isPhased || card->isAttacker() || card->willattackpw)
+        return false;
+    return card->canAttack() && card->attackCost < 1;
+}
+
+bool LegalActionsOracle::hasUsableAbility(MTGCardInstance * card)
+{
+    if (!card)
+        return false;
+    Player * p = card->controller();
+    if (!p)
+        return false;
+    ManaEngine::FreeProducerPolicy freePolicy;
+    //Same permissive potential the response predicate uses: a dual land must
+    //offer both colours or an affordable ability reads as unaffordable.
+    ManaCost * pMana = ManaEngine::potentialManaPermissive(p, freePolicy);
+    pMana->add(p->getManaPool());
+    //sorcerySpeedOk is decided by the window, not the card: at the player's
+    //own sorcery-speed window a sorcery-scoped activation IS available.
+    GameObserver * g = p->getObserver();
+    const bool sorcerySpeedOk = g && g->currentPlayer == p
+        && !g->mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
+        && (g->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN
+            || g->getCurrentGamePhase() == MTG_PHASE_SECONDMAIN);
+    bool any = hasUsableActivatedAbility(p, pMana, sorcerySpeedOk, card);
+    delete pMana;
+    return any;
 }
