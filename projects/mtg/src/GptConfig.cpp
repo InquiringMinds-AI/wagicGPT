@@ -8,6 +8,16 @@
 #ifndef WAGIC_NO_CURL
 #include <curl/curl.h>
 #endif
+#if defined(PSP)
+//The PSP has no always-on IP stack: sockets only exist after the net modules
+//are loaded and the access point association (an XMB connection profile) is
+//brought up - see pspEnsureNetwork below.
+#include <pspsdk.h>
+#include <pspkernel.h>
+#include <psputility.h>
+#include <pspnet.h>
+#include <pspnet_apctl.h>
+#endif
 #include <nlohmann/json.hpp>
 
 #include <cstdlib>
@@ -590,8 +600,46 @@ size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * user
     return size * nmemb;
 }
 
+#if defined(PSP)
+//Bring the PSP's network up once per launch: load the net modules, init the
+//inet stack, associate with XMB connection profile 1, and wait for an IP.
+//One attempt only - a failed association (wrong profile, out of range,
+//incompatible security) costs one bounded wait, not one per decision; the
+//user retries by fixing the profile and relaunching. The wait itself is
+//generous: WPA association plus DHCP on this hardware can take a while.
+static int gPspNetState = 0; //0 untried, 1 up, -1 failed
+static bool pspEnsureNetwork()
+{
+    if (gPspNetState) return gPspNetState > 0;
+    gPspNetState = -1;
+    sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
+    sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
+    if (pspSdkInetInit() != 0)
+        return false;
+    if (sceNetApctlConnect(1) != 0)
+        return false;
+    for (int i = 0; i < 600; i++) //30s ceiling, 50ms per poll
+    {
+        int state = 0;
+        if (sceNetApctlGetState(&state) != 0)
+            return false;
+        if (state == PSP_NET_APCTL_STATE_GOT_IP)
+        {
+            gPspNetState = 1;
+            return true;
+        }
+        sceKernelDelayThread(50 * 1000);
+    }
+    return false;
+}
+#endif
+
 string httpRequestImpl(const string& url, const string& postBody, long timeoutMs, const string& bearer)
 {
+#if defined(PSP)
+    if (!pspEnsureNetwork())
+        return "";
+#endif
     CURL * curl = curl_easy_init();
     if (!curl)
         return "";
