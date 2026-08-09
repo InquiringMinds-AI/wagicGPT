@@ -58,7 +58,7 @@ static void wagicProbe(const char* fmt, ...)
 #include <JNetwork.h>
 #endif//NETWORK_SUPPORT
 
-static const char* GAME_VERSION = "WTH?! " WAGIC_VERSION_STRING " - wololo.net";
+static const char* GAME_VERSION = "wagicGPT " WAGICGPT_VERSION_STRING " - github.com/InquiringMinds-AI";
 
 enum ENUM_MENU_STATE_MAJOR
 {
@@ -278,7 +278,7 @@ void GameStateMenu::fillScroller()
     sprintf(buff2, _("You have unlocked %i expansions out of %i").c_str(), nbunlocked, setlist.size());
     scroller->Add(buff2);
 
-    scroller->Add(_("More cards and mods at http://wololo.net/wagic"));
+    scroller->Add(_("wagicGPT source at github.com/InquiringMinds-AI/wagicGPT"));
 
     scrollerSet = 1;
     scroller->setRandom();

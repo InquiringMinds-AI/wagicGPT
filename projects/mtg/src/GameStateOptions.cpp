@@ -401,7 +401,12 @@ void GameStateOptions::Render()
     }
 #endif
     const char * const CreditsText[] = {
-        "Wagic, The Homebrew?! by Wololo",
+        "wagicGPT by InquiringMinds-AI",
+        "a fork of Wagic, The Homebrew?! by Wololo",
+        "",
+        "wagicGPT Dev:",
+        "InquiringMinds-AI",
+        "bren17 - native Vita port",
         "",
         "Updates, new cards, and more on the Wagic Discord",
         "Many thanks to the people who help this project",
@@ -434,6 +439,7 @@ void GameStateOptions::Render()
         "Source:",
         "http://code.google.com/p/wagic (2009-2013)",
         "https://github.com/WagicProject/wagic (2013- )",
+        "https://github.com/InquiringMinds-AI/wagicGPT (2026- )",
         "",
         "Developed with the JGE++ Library",
         "SFX From www.soundsnap.com",
