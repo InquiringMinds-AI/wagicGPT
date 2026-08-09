@@ -120,6 +120,11 @@ static string gptUserRootImpl()
             root.erase(root.size() - 1);
         return root;
     }
+#elif defined(PSP)
+    //No HOME on the PSP - an empty root here silently disabled config saves
+    //AND gpt-log.txt. The writable per-user tree is User/ next to the EBOOT
+    //(cwd), the same place the rest of the game writes its user files.
+    return "User";
 #else
     const char * home = getenv("HOME");
     return home ? string(home) + "/.Wagic" : string();
@@ -614,21 +619,42 @@ static bool pspEnsureNetwork()
     gPspNetState = -1;
     sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
     sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
-    if (pspSdkInetInit() != 0)
+    int rc = pspSdkInetInit();
+    if (rc != 0)
+    {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "psp net: inet init failed %08x", (unsigned) rc);
+        gptLogLine(buf);
         return false;
-    if (sceNetApctlConnect(1) != 0)
+    }
+    rc = sceNetApctlConnect(1);
+    if (rc != 0)
+    {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "psp net: apctl connect(1) failed %08x", (unsigned) rc);
+        gptLogLine(buf);
         return false;
+    }
+    int state = 0;
     for (int i = 0; i < 600; i++) //30s ceiling, 50ms per poll
     {
-        int state = 0;
         if (sceNetApctlGetState(&state) != 0)
+        {
+            gptLogLine("psp net: apctl state poll failed");
             return false;
+        }
         if (state == PSP_NET_APCTL_STATE_GOT_IP)
         {
             gPspNetState = 1;
+            gptLogLine("psp net: associated, got IP");
             return true;
         }
         sceKernelDelayThread(50 * 1000);
+    }
+    {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "psp net: association timeout at state %d", state);
+        gptLogLine(buf);
     }
     return false;
 }
