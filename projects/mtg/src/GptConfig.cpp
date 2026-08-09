@@ -616,30 +616,16 @@ size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * user
 static int gPspStackState = 0; //0 untried, 1 up, -1 failed
 static int gPspNetState = 0;   //0 untried, 1 up, -1 failed
 
+//The stack itself comes up first thing in main() (JGE/src/main.cpp
+//netStackBoot - loading the net modules any later hangs the boot); this just
+//reads the verdict it left.
+extern "C" int gWagicPspNetStack;
 static void pspNetStackInit()
 {
     if (gPspStackState) return;
-    int rc1 = sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
-    int rc2 = sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
-    if (rc1 != 0 || rc2 != 0)
-    {
-        char buf[80];
-        snprintf(buf, sizeof(buf), "psp net: module load failed %08x/%08x",
-                 (unsigned) rc1, (unsigned) rc2);
-        gptLogLine(buf);
-        gPspStackState = -1;
-        return;
-    }
-    int rc = pspSdkInetInit();
-    if (rc != 0)
-    {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "psp net: inet init failed %08x", (unsigned) rc);
-        gptLogLine(buf);
-        gPspStackState = -1;
-        return;
-    }
-    gPspStackState = 1;
+    gPspStackState = (gWagicPspNetStack > 0) ? 1 : -1;
+    if (gPspStackState < 0)
+        gptLogLine("psp net: stack failed at boot (see User/wagic-netboot.log)");
 }
 static bool pspEnsureNetwork()
 {

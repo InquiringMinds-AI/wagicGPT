@@ -3,6 +3,7 @@
 #include <pspdebug.h>
 #include <psppower.h>
 #include <pspsdk.h>
+#include <psputility.h>
 #include <pspaudiocodec.h>
 #include <pspaudio.h>
 #include <pspaudiolib.h>
@@ -363,6 +364,35 @@ extern "C" unsigned int wagicHeapLargestBlock(void)
     //largest contiguous: at least the unclaimed tail (free-list max unknown)
     return (unsigned int)(g_heapEnd - g_heapPtr);
 }
+//Network stack state, read by the GPT transport (GptConfig.cpp): 0 = never
+//attempted, 1 = up, -1 = failed. The stack MUST come up here, first thing in
+//main - the canonical net-homebrew order. Loading the net modules later
+//(from GameApp::Create, after the engine was up) hung the boot outright.
+extern "C" int gWagicPspNetStack = 0;
+static void netMark(const char * m)
+{
+    FILE * f = fopen("User/wagic-netboot.log", "a");
+    if (f) { fprintf(f, "%s\n", m); fclose(f); }
+}
+static void netStackBoot()
+{
+    char b[96];
+    netMark("boot: loading net modules");
+    int r1 = sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
+    int r2 = sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
+    snprintf(b, sizeof(b), "boot: modules %08x/%08x", (unsigned) r1, (unsigned) r2);
+    netMark(b);
+    if (r1 != 0 || r2 != 0)
+    {
+        gWagicPspNetStack = -1;
+        return;
+    }
+    int r = pspSdkInetInit();
+    snprintf(b, sizeof(b), "boot: inet init %08x", (unsigned) r);
+    netMark(b);
+    gWagicPspNetStack = (r == 0) ? 1 : -1;
+}
+
 int main(int argc, char *argv[])
 {
     pspDebugScreenInit();
@@ -374,6 +404,7 @@ int main(int argc, char *argv[])
     pspDebugScreenPrintf("JGE:Loading application...");
 
     bootMark("m1 debugscreen");
+    netStackBoot();
     JLOG("SetupCallbacks()");
     SetupCallbacks();
 #ifdef DEVHOOK
