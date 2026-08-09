@@ -895,7 +895,10 @@ void JRenderer::EndScene()
     checkGlError();
     glFlush ();
     checkGlError();
-#ifdef VITA
+#if defined(VITA) && defined(WAGIC_VITA_FBDUMP)
+    //DIAGNOSTIC BUILDS ONLY (-DWAGIC_VITA_FBDUMP): even dormant, this
+    //block costs a per-frame counter and a gate-file stat every ~5s -
+    //release builds compile it out entirely (owner request 2026-08-09).
     //On-device framebuffer dumps, gated by the presence of
     //ux0:data/Wagic/fbdump.on (create/delete it over FTP). Every 90th frame
     //is written to ux0:data/Wagic/fbdump/f<0..7>.ppm (rolling ring of 8) -
