@@ -401,13 +401,18 @@ void GptSettings::setPrimaryUrl(const string& u)
 //key=, and the whole exchange is handled by gptCodexComplete.
 static const GptPreset kPresets[] = {
     { "Custom", "" },
-#if !defined(PSP)
-    //PSP transport is plain-HTTP to a LAN companion bridge only: no TLS rules
-    //out every https:// provider, and 127.0.0.1 is the PSP itself - so Custom
-    //(the user's bridge URL) is the only connection type that can work there.
+#if !defined(PSP) && !defined(VITA)
+    //Handhelds can't host the model: 127.0.0.1 is the device itself, so the
+    //local-server presets only make sense where a server can actually run.
     { "Local llama.cpp", "http://127.0.0.1:8080" },
     { "Local Ollama", "http://127.0.0.1:11434" },
     { "LM Studio", "http://127.0.0.1:1234" },
+#endif
+#if !defined(PSP)
+    //PSP transport is plain-HTTP to a LAN companion bridge only: no TLS rules
+    //out every https:// provider too - so Custom (the user's bridge URL) is
+    //the only connection type that can work there. The Vita keeps these: its
+    //curl/TLS stack drives them for real.
     { "OpenRouter", "https://openrouter.ai/api" },
     { "OpenAI", "https://api.openai.com" },
     { "OpenAI subscription", "https://chatgpt.com/backend-api/codex" },
