@@ -29,7 +29,7 @@ OBJS	= objs/InteractiveButton.o objs/AbilityParser.o objs/ActionElement.o\
 	objs/WCachedResource.o objs/WDataSrc.o objs/WGui.o objs/WFilter.o objs/Tasks.o\
 	objs/WFont.o objs/WParsedInt.o objs/CarouselDeckView.o objs/GridDeckView.o objs/DeckView.o\
 	objs/AIPlayerBakaB.o objs/AIPlayerGPT.o objs/Closest.o objs/DecisionContract.o\
-	objs/GptConfig.o objs/LegalActions.o objs/ManaEngine.o objs/OptionGpt.o objs/PreGamePhase.o
+	objs/GptConfig.o objs/qrcodegen.o objs/LegalActions.o objs/ManaEngine.o objs/OptionGpt.o objs/PreGamePhase.o
 DEPS = $(patsubst objs/%.o, deps/%.d, $(OBJS))
 
 RESULT = $(shell psp-config --psp-prefix 2> Makefile.cache)

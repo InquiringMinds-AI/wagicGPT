@@ -20,6 +20,9 @@
 //where GptMutex is a kernel mutex precisely because std::mutex is a no-op
 //there - lock_guard is just RAII over whatever BasicLockable it is given.
 #include <mutex>
+//Sign-in worker pacing on non-Vita platforms (Vita sleeps via the kernel).
+#include <thread>
+#include <chrono>
 
 using std::string;
 using std::vector;
@@ -1265,6 +1268,316 @@ bool gptSpawnWorker(void (*fn)(void *), void * ctx)
 }
 
 #endif //platform threading seam
+
+//=== In-client ChatGPT sign-in (device-code flow) ===========================
+//
+//Runs the same beta flow Codex CLI uses (paths verified against openai/codex
+//and proven live 2026-08-09 - note the /api/accounts/ segment the early
+//research digest dropped):
+//  1. POST {AUTH}/api/accounts/deviceauth/usercode  {"client_id"}
+//     -> {device_auth_id, user_code|usercode, interval}
+//  2. show user_code + a QR of {AUTH}/codex/device; the user approves from
+//     any modern browser (their phone - consoles cannot render that SPA)
+//  3. poll POST {AUTH}/api/accounts/deviceauth/token {device_auth_id,
+//     user_code}; 403/404 = still pending
+//     -> {authorization_code, code_challenge, code_verifier} (the PKCE pair
+//     is SERVER-generated in this flow)
+//  4. exchange: POST {AUTH}/oauth/token, form-encoded, redirect_uri =
+//     {AUTH}/deviceauth/callback (device flow - NOT the localhost callback)
+//  5. persist tokens + the account id (from the id_token's JWT claims) as
+//     oai-auth.json, then drop the in-memory auth cache so the next
+//     completion (and Test connection) reads the fresh login.
+
+#if !defined(WAGIC_HTTP_JNI) && !defined(WAGIC_NO_CURL)
+namespace
+{
+const char * kOaiAuthBase = "https://auth.openai.com";
+
+void oaiSleepMs(int ms)
+{
+#if defined (VITA)
+    sceKernelDelayThread(ms * 1000);
+#else
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+#endif
+}
+
+string urlEncode(const string& s)
+{
+    static const char * hex = "0123456789ABCDEF";
+    string out;
+    for (size_t i = 0; i < s.size(); i++)
+    {
+        unsigned char c = (unsigned char) s[i];
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+            out += (char) c;
+        else
+        {
+            out += '%';
+            out += hex[c >> 4];
+            out += hex[c & 15];
+        }
+    }
+    return out;
+}
+
+//JWT payload: base64URL (-_ alphabet, unpadded) - translate and reuse the
+//standard decoder above.
+nlohmann::json jwtPayload(const string& token)
+{
+    size_t a = token.find('.');
+    size_t b = (a == string::npos) ? string::npos : token.find('.', a + 1);
+    if (a == string::npos || b == string::npos)
+        return nlohmann::json();
+    string part = token.substr(a + 1, b - a - 1);
+    for (size_t i = 0; i < part.size(); i++)
+    {
+        if (part[i] == '-') part[i] = '+';
+        else if (part[i] == '_') part[i] = '/';
+    }
+    while (part.size() % 4)
+        part += '=';
+    try
+    {
+        return nlohmann::json::parse(b64decode(part));
+    }
+    catch (nlohmann::json::exception&)
+    {
+        return nlohmann::json();
+    }
+}
+
+struct OaiSignInCtx
+{
+    std::shared_ptr<GptOaiSignIn> st;
+};
+
+void oaiFail(std::shared_ptr<GptOaiSignIn>& st, const string& why)
+{
+    gptLogLine("sign-in failed: " + why);
+    std::lock_guard<GptMutex> g(st->mtx);
+    st->error = why;
+    st->status = 3;
+}
+
+void OaiSignInMain(void * p)
+{
+    OaiSignInCtx * ctx = static_cast<OaiSignInCtx *>(p);
+    std::shared_ptr<GptOaiSignIn> st = ctx->st;
+    delete ctx;
+
+    vector<string> jsonHdr;
+    jsonHdr.push_back("Content-Type: application/json");
+    long code = 0;
+    string respHeaders;
+
+    //1. user code
+    nlohmann::json req = {{"client_id", kCodexClientId}};
+    string body = httpRequestFull(string(kOaiAuthBase) + "/api/accounts/deviceauth/usercode",
+                                  req.dump(), 30000, jsonHdr, code, respHeaders);
+    if (code != 200)
+    {
+        oaiFail(st, "could not get a sign-in code (HTTP " + std::to_string(code) + "): " + body.substr(0, 160));
+        return;
+    }
+    string deviceAuthId, userCode;
+    long intervalSecs = 5;
+    try
+    {
+        nlohmann::json j = nlohmann::json::parse(body);
+        deviceAuthId = j.value("device_auth_id", "");
+        userCode = j.contains("user_code") ? j.value("user_code", "") : j.value("usercode", "");
+        //codex tolerates number-or-string here; so do we.
+        if (j.contains("interval"))
+            intervalSecs = j["interval"].is_number() ? j["interval"].get<long>()
+                                                     : atol(j["interval"].get<string>().c_str());
+    }
+    catch (nlohmann::json::exception&)
+    {
+    }
+    if (deviceAuthId.empty() || userCode.empty())
+    {
+        oaiFail(st, "sign-in code reply had no code: " + body.substr(0, 160));
+        return;
+    }
+    if (intervalSecs < 2) intervalSecs = 2;
+    if (intervalSecs > 30) intervalSecs = 30;
+    {
+        std::lock_guard<GptMutex> g(st->mtx);
+        st->userCode = userCode;
+        st->verifyUrl = string(kOaiAuthBase) + "/codex/device";
+        st->status = 1;
+    }
+
+    //3. poll until approved, cancelled, or the 15-minute code expiry
+    string authorizationCode, codeVerifier;
+    long waitedMs = 0;
+    const long kExpiryMs = 16L * 60L * 1000L;
+    for (;;)
+    {
+        for (long s = 0; s < intervalSecs * 1000; s += 250)
+        {
+            oaiSleepMs(250);
+            std::lock_guard<GptMutex> g(st->mtx);
+            if (st->cancel)
+                return; //silent: the user backed out on purpose
+        }
+        waitedMs += intervalSecs * 1000;
+        if (waitedMs > kExpiryMs)
+        {
+            oaiFail(st, "the sign-in code expired (15 minutes) - start again");
+            return;
+        }
+        nlohmann::json poll = {{"device_auth_id", deviceAuthId}, {"user_code", userCode}};
+        body = httpRequestFull(string(kOaiAuthBase) + "/api/accounts/deviceauth/token",
+                               poll.dump(), 30000, jsonHdr, code, respHeaders);
+        if (code == 403 || code == 404)
+            continue; //still waiting on the phone
+        if (code != 200)
+        {
+            oaiFail(st, "sign-in poll failed (HTTP " + std::to_string(code) + "): " + body.substr(0, 160));
+            return;
+        }
+        try
+        {
+            nlohmann::json j = nlohmann::json::parse(body);
+            authorizationCode = j.value("authorization_code", "");
+            codeVerifier = j.value("code_verifier", "");
+        }
+        catch (nlohmann::json::exception&)
+        {
+        }
+        if (authorizationCode.empty() || codeVerifier.empty())
+        {
+            oaiFail(st, "approval reply was missing the exchange material: " + body.substr(0, 160));
+            return;
+        }
+        break;
+    }
+
+    //4. PKCE exchange (form-encoded, device-flow redirect)
+    string form = string("grant_type=authorization_code")
+        + "&code=" + urlEncode(authorizationCode)
+        + "&redirect_uri=" + urlEncode(string(kOaiAuthBase) + "/deviceauth/callback")
+        + "&client_id=" + urlEncode(kCodexClientId)
+        + "&code_verifier=" + urlEncode(codeVerifier);
+    vector<string> formHdr;
+    formHdr.push_back("Content-Type: application/x-www-form-urlencoded");
+    body = httpRequestFull(string(kOaiAuthBase) + "/oauth/token", form, 30000, formHdr, code, respHeaders);
+    if (code != 200)
+    {
+        oaiFail(st, "token exchange failed (HTTP " + std::to_string(code) + "): " + body.substr(0, 160));
+        return;
+    }
+    nlohmann::json tokens;
+    try
+    {
+        tokens = nlohmann::json::parse(body);
+    }
+    catch (nlohmann::json::exception&)
+    {
+        oaiFail(st, "token exchange returned unparseable JSON");
+        return;
+    }
+    if (!tokens.contains("access_token"))
+    {
+        oaiFail(st, "token exchange reply had no access token");
+        return;
+    }
+
+    //5. account id + plan from the id_token claims, then persist
+    string accountId, plan;
+    if (tokens.contains("id_token") && tokens["id_token"].is_string())
+    {
+        nlohmann::json claims = jwtPayload(tokens["id_token"].get<string>());
+        if (claims.contains("https://api.openai.com/auth"))
+        {
+            const nlohmann::json& auth = claims["https://api.openai.com/auth"];
+            accountId = auth.value("chatgpt_account_id", "");
+            plan = auth.value("chatgpt_plan_type", "");
+        }
+    }
+    if (accountId.empty())
+    {
+        oaiFail(st, "signed in, but the id token carried no chatgpt_account_id");
+        return;
+    }
+
+    string root = gptUserRoot();
+    if (root.empty())
+    {
+        oaiFail(st, "nowhere writable to store the login");
+        return;
+    }
+    string dir = root;
+    mkdir(dir.c_str(), 0755);
+    dir += "/ai"; mkdir(dir.c_str(), 0755);
+    dir += "/gpt"; mkdir(dir.c_str(), 0755);
+    string path = dir + "/oai-auth.json";
+    nlohmann::json doc = {
+        {"tokens", tokens},
+        {"minted_at", (long) time(NULL)},
+        {"chatgpt_account_id", accountId},
+    };
+    {
+        std::ofstream f(path.c_str(), std::ios::binary | std::ios::trunc);
+        if (!f)
+        {
+            oaiFail(st, "could not write " + path);
+            return;
+        }
+        f << doc.dump(1) << "\n";
+    }
+    chmod(path.c_str(), 0600);
+
+    //Drop the in-memory auth cache: it may be remembering "no auth file" (or
+    //the OLD login) from before this sign-in, and it is only ever read under
+    //the same mutex.
+    {
+        std::lock_guard<GptMutex> g(codexMutex());
+        CodexAuth& a = codexAuth();
+        a.loaded = false;
+        a.doc = nlohmann::json();
+        a.path.clear();
+        a.access.clear();
+        a.refresh.clear();
+        a.accountId.clear();
+        a.mintedAt = 0;
+        a.expiresIn = 0;
+    }
+
+    gptLogLine("signed in to ChatGPT (plan: " + (plan.empty() ? string("unknown") : plan) + ")");
+    std::lock_guard<GptMutex> g(st->mtx);
+    st->plan = plan;
+    st->status = 2;
+}
+} //namespace
+
+bool gptOaiSignInStart(std::shared_ptr<GptOaiSignIn> state)
+{
+    OaiSignInCtx * ctx = new OaiSignInCtx(); //plain new: the worker deletes it
+    ctx->st = state;
+    if (!gptSpawnWorker(&OaiSignInMain, ctx))
+    {
+        delete ctx;
+        //The flow waits on a human for up to 15 minutes - it cannot run
+        //synchronously on the game thread, so no thread means no sign-in.
+        std::lock_guard<GptMutex> g(state->mtx);
+        state->error = "this platform cannot run the sign-in in the background";
+        state->status = 3;
+        return false;
+    }
+    return true;
+}
+#else
+bool gptOaiSignInStart(std::shared_ptr<GptOaiSignIn> state)
+{
+    std::lock_guard<GptMutex> g(state->mtx);
+    state->error = "no TLS transport on this platform";
+    state->status = 3;
+    return false;
+}
+#endif //sign-in transport gate
 
 namespace
 {

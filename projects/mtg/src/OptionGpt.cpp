@@ -29,6 +29,7 @@ GptOptionsList::GptOptionsList()
     : WGuiList("GPT")
 {
     modelPickerWanted = false;
+    signInWanted = false;
     cfg = GptSettings::load();
     if (cfg.urls.empty())
         cfg.urls.push_back("http://127.0.0.1:8080");
@@ -46,6 +47,7 @@ GptOptionsList::GptOptionsList()
     //owner's ruling that provider control must be reachable from the couch.
     Add(NEW OptionGptTextUnlessCodex(&cfg, &cfg.providerOnly, "Provider pin (OpenRouter)", "(any provider)"));
     Add(NEW OptionGptTextUnlessCodex(&cfg, &cfg.key, "API key", "(none)", true));
+    Add(NEW OptionGptSignIn(this));
     Add(NEW OptionGptReasoning(&cfg));
     //Generous by design: the patience prompt is what bounds how long a PERSON
     //waits, so this only has to be long enough that "keep waiting" can still
@@ -315,6 +317,36 @@ void OptionGptReasoning::updateValue()
             at = i;
     size_t next = (at + 1) % (n + 1);
     mCfg->reasoningEffort = (next == n) ? "" : kTiers[next];
+}
+
+//--- sign-in row (subscription preset) ---------------------------------------
+
+OptionGptSignIn::OptionGptSignIn(GptOptionsList * list)
+    : WGuiItem("ChatGPT sign-in"), mList(list)
+{
+}
+
+void OptionGptSignIn::Render()
+{
+    WFont * font = WResourceManager::Instance()->GetWFont(Fonts::OPTION_FONT);
+    font->SetColor(getColor(WGuiColor::TEXT));
+    font->DrawString(_(displayValue).c_str(), x + 2, y + 3);
+    if (!gptCodexEndpoint(mList->cfg.primaryUrl()))
+    {
+        drawValue(font, "(subscription preset only)", x, y, width);
+        return;
+    }
+    //Presence, not validity: an expired login still refreshes itself on the
+    //next call, so "signed in" is the honest summary of having material.
+    string why;
+    drawValue(font, gptCodexAuthPresent(why) ? "signed in (press to sign in again)"
+                                             : "press to sign in", x, y, width);
+}
+
+void OptionGptSignIn::updateValue()
+{
+    if (gptCodexEndpoint(mList->cfg.primaryUrl()))
+        mList->signInWanted = true;
 }
 
 //--- rows a preset does not consume ------------------------------------------

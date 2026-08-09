@@ -51,6 +51,7 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
         $(MTG_PATH)/src/Closest.cpp \
         $(MTG_PATH)/src/DecisionContract.cpp \
         $(MTG_PATH)/src/GptConfig.cpp \
+        $(MTG_PATH)/src/qrcodegen.cpp \
         $(MTG_PATH)/src/LegalActions.cpp \
         $(MTG_PATH)/src/ManaEngine.cpp \
         $(MTG_PATH)/src/OptionGpt.cpp \

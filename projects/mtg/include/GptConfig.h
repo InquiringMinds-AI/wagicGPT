@@ -21,6 +21,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 class GptSettings
 {
@@ -184,6 +185,32 @@ private:
 #include <mutex>
 typedef std::mutex GptMutex;
 #endif
+
+//--- in-client ChatGPT sign-in (device-code flow) ---------------------------
+//The subscription preset's login, run entirely from the game: request a user
+//code, show it (plus a QR of the entry page) on screen, poll until the user
+//approves from their phone browser, then persist the tokens where
+//gptCodexComplete reads them. Endpoints match openai/codex and were proven
+//live 2026-08-09; the entry page is a modern SPA no console browser renders,
+//which is exactly why the flow needs no browser on THIS device.
+
+struct GptOaiSignIn
+{
+    GptMutex mtx;
+    int status;    //0 starting, 1 code ready (userCode/verifyUrl set),
+                   //2 signed in (plan set), 3 failed (error set)
+    bool cancel;   //set by the UI; the worker exits at the next poll slice
+    std::string userCode;
+    std::string verifyUrl;
+    std::string plan;
+    std::string error;
+    GptOaiSignIn() : status(0), cancel(false) {}
+};
+
+//Launch the sign-in worker. False (state already marked failed, with the
+//reason) when this platform has no TLS transport or refuses a thread - the
+//flow cannot run synchronously, it waits on a human for up to 15 minutes.
+bool gptOaiSignInStart(std::shared_ptr<GptOaiSignIn> state);
 
 //Probe url + "/v1/models". True when the endpoint answers with a usable
 //model list; modelOut receives the first advertised model id. On the Codex

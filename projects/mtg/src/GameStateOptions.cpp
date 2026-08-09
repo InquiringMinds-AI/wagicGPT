@@ -11,6 +11,9 @@
 #include "SimplePad.h"
 #include "Translate.h"
 #include <mutex> //std::lock_guard over GptMutex (Vita seam)
+#ifdef WITH_GPT_AI
+#include "qrcodegen.hpp"
+#endif
 
 namespace GameStateOptionsConst
 {
@@ -325,6 +328,11 @@ void GameStateOptions::Update(float dt)
                 gptTab->modelPickerWanted = false;
                 startModelPicker();
             }
+            if (gptTab && gptTab->signInWanted)
+            {
+                gptTab->signInWanted = false;
+                startOaiSignIn();
+            }
 #endif
             break;
         }
@@ -338,6 +346,9 @@ void GameStateOptions::Update(float dt)
             break;
         case SHOW_MODEL_PICKER:
             updateModelPicker(dt);
+            break;
+        case SHOW_OAI_SIGNIN:
+            updateOaiSignIn(dt);
             break;
 #endif
         }
@@ -478,6 +489,8 @@ void GameStateOptions::Render()
         else if (modelPickerMenu)
             modelPickerMenu->Render();
     }
+    if (mState == SHOW_OAI_SIGNIN)
+        renderOaiSignIn();
 #endif
 
     if (options.keypadActive())
@@ -739,6 +752,120 @@ void GameStateOptions::updateModelPicker(float dt)
     }
     if (modelPickerMenu)
         modelPickerMenu->Update(dt);
+}
+void GameStateOptions::startOaiSignIn()
+{
+    oaiSignIn = std::make_shared<GptOaiSignIn>();
+    mState = SHOW_OAI_SIGNIN;
+    gptOaiSignInStart(oaiSignIn); //on refusal the state is already marked failed
+}
+
+void GameStateOptions::updateOaiSignIn(float dt)
+{
+    (void) dt;
+    //Back cancels at every stage; any button dismisses a terminal state.
+    int status;
+    {
+        std::lock_guard<GptMutex> g(oaiSignIn->mtx);
+        status = oaiSignIn->status;
+    }
+    JButton key;
+    while ((key = JGE::GetInstance()->ReadButton()))
+    {
+        bool leave = (key == JGE_BTN_SEC || key == JGE_BTN_MENU)
+                     || (status >= 2 && key != JGE_BTN_NONE);
+        if (leave)
+        {
+            {
+                std::lock_guard<GptMutex> g(oaiSignIn->mtx);
+                oaiSignIn->cancel = true; //no-op once the worker finished
+            }
+            //A completed sign-in changes what the GPT tab rows should show
+            //(signed-in status; Test connection now meaningful) - the rows
+            //read live state, so returning is enough.
+            mState = SHOW_OPTIONS;
+            return;
+        }
+    }
+}
+
+void GameStateOptions::renderOaiSignIn()
+{
+    int status;
+    std::string userCode, verifyUrl, plan, error;
+    {
+        std::lock_guard<GptMutex> g(oaiSignIn->mtx);
+        status = oaiSignIn->status;
+        userCode = oaiSignIn->userCode;
+        verifyUrl = oaiSignIn->verifyUrl;
+        plan = oaiSignIn->plan;
+        error = oaiSignIn->error;
+    }
+    JRenderer * r = JRenderer::GetInstance();
+    WFont * font = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
+    font->SetColor(ARGB(255, 255, 255, 255));
+
+    if (status == 0)
+    {
+        font->DrawString(_("Requesting a sign-in code...").c_str(), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, JGETEXT_CENTER);
+        return;
+    }
+    if (status == 3)
+    {
+        font->DrawString(_("Sign-in failed").c_str(), SCREEN_WIDTH / 2, 90, JGETEXT_CENTER);
+        font->DrawString(error.c_str(), SCREEN_WIDTH / 2, 130, JGETEXT_CENTER);
+        font->DrawString(_("Press any button").c_str(), SCREEN_WIDTH / 2, 200, JGETEXT_CENTER);
+        return;
+    }
+    if (status == 2)
+    {
+        font->DrawString(_("Signed in to ChatGPT").c_str(), SCREEN_WIDTH / 2, 110, JGETEXT_CENTER);
+        if (plan.size())
+            font->DrawString((std::string(_("Plan: ")) + plan).c_str(), SCREEN_WIDTH / 2, 140, JGETEXT_CENTER);
+        font->DrawString(_("Press any button").c_str(), SCREEN_WIDTH / 2, 200, JGETEXT_CENTER);
+        return;
+    }
+
+    //status 1: the QR (right) + instructions and the code (left).
+    //The QR encodes ONLY the verified entry-page URL; the code itself is
+    //typed on the phone - keep it big and unmistakable.
+    font->DrawString(_("Scan with your phone:").c_str(), 24, 40);
+    font->DrawString(verifyUrl.c_str(), 24, 64);
+    font->DrawString(_("then enter this code:").c_str(), 24, 104);
+    WFont * big = WResourceManager::Instance()->GetWFont(Fonts::MAGIC_FONT);
+    big->SetColor(ARGB(255, 255, 255, 120));
+    float oldScale = big->GetScale();
+    big->SetScale(1.6f);
+    big->DrawString(userCode.c_str(), 24, 132);
+    big->SetScale(oldScale);
+    font->DrawString(_("Waiting for approval... (Back cancels)").c_str(), 24, 200);
+
+    try
+    {
+        using qrcodegen::QrCode;
+        const QrCode qr = QrCode::encodeText(verifyUrl.c_str(), QrCode::Ecc::MEDIUM);
+        //Fit into the right half: quiet zone of 4 modules per side, integer
+        //pixel scale so modules stay square and scannable.
+        const int quiet = 4;
+        const int cells = qr.getSize() + 2 * quiet;
+        int scale = (int) ((SCREEN_HEIGHT - 40) / cells);
+        if (scale < 2) scale = 2;
+        const float side = (float) (cells * scale);
+        const float x0 = SCREEN_WIDTH - side - 24;
+        const float y0 = (SCREEN_HEIGHT - side) / 2;
+        r->FillRect(x0, y0, side, side, ARGB(255, 255, 255, 255));
+        for (int yy = 0; yy < qr.getSize(); yy++)
+            for (int xx = 0; xx < qr.getSize(); xx++)
+                if (qr.getModule(xx, yy))
+                    r->FillRect(x0 + (float) ((xx + quiet) * scale),
+                                y0 + (float) ((yy + quiet) * scale),
+                                (float) scale, (float) scale, ARGB(255, 0, 0, 0));
+    }
+    catch (const std::exception&)
+    {
+        //Encoding a constant URL cannot realistically fail; if it somehow
+        //does, the typed URL above is the fallback the screen already shows.
+    }
 }
 #endif //WITH_GPT_AI
 

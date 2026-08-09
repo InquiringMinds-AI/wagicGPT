@@ -31,7 +31,8 @@ private:
         SHOW_OPTIONS_MENU,
         SAVE,
         SHOW_TELEMETRY_CONSENT,
-        SHOW_MODEL_PICKER
+        SHOW_MODEL_PICKER,
+        SHOW_OAI_SIGNIN
     };
     float timer;
     bool mReload;
@@ -64,6 +65,14 @@ private:
     void updateModelPicker(float dt);
     void buildPickerIndex();
     void buildPickerMenu();
+
+    //In-client ChatGPT sign-in: full-panel QR + user code + poll status.
+    //The worker owns its state via shared_ptr (leaving the screen mid-poll
+    //just sets cancel and walks away).
+    std::shared_ptr<struct GptOaiSignIn> oaiSignIn;
+    void startOaiSignIn();
+    void updateOaiSignIn(float dt);
+    void renderOaiSignIn();
 #endif
 
 public:

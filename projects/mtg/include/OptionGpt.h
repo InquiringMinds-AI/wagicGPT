@@ -40,6 +40,9 @@ public:
     //modal picker menus (screen-level UI lives at the screen, like the
     //telemetry consent ask).
     bool modelPickerWanted;
+    //Set by the sign-in row (subscription preset); consumed the same way -
+    //the device-code screen (QR + user code + poll) is screen-level UI.
+    bool signInWanted;
 
     //Telemetry consent negotiation: asked once, on saving with a newly
     //set-up endpoint, never re-asked after a decision. The modal itself is
@@ -157,6 +160,20 @@ public:
 
 protected:
     GptSettings * mCfg;
+};
+
+//Sign-in row (subscription preset only): shows whether a ChatGPT login is
+//present and, on press, raises the device-code screen. On other presets it
+//says so and does nothing - auth there is the API key row.
+class OptionGptSignIn: public WGuiItem
+{
+public:
+    OptionGptSignIn(GptOptionsList * list);
+    virtual void Render();
+    virtual void updateValue();
+
+protected:
+    GptOptionsList * mList;
 };
 
 //Free-text row that a given preset does not consume: renders its value

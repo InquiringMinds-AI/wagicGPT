@@ -65,6 +65,7 @@ SOURCES += \
         src/DecisionContract.cpp\
         src/AIPlayerGPT.cpp\
         src/GptConfig.cpp\
+        src/qrcodegen.cpp\
         src/OptionGpt.cpp\
         src/AIStats.cpp\
         src/AllAbilities.cpp\
@@ -190,6 +191,7 @@ HEADERS  += \
         include/DecisionContract.h\
         include/AIPlayerGPT.h\
         include/GptConfig.h\
+        include/qrcodegen.hpp\
         include/OptionGpt.h\
         include/AIPlayerBakaB.h\
         include/DeckEditorMenu.h\
