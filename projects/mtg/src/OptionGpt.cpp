@@ -40,6 +40,10 @@ GptOptionsList::GptOptionsList()
     Add(NEW OptionGptPreset(&cfg));
     Add(NEW OptionGptText(&cfg.urls[0], "Endpoint URL"));
     Add(NEW OptionGptText(&cfg.model, "Model", "(auto-detect)"));
+    //OpenRouter routing pin: comma-separated provider names, sent as
+    //provider:{only:[...],allow_fallbacks:false}. Config-file-only until the
+    //owner's ruling that provider control must be reachable from the couch.
+    Add(NEW OptionGptText(&cfg.providerOnly, "Provider pin (OpenRouter)", "(any provider)"));
     Add(NEW OptionGptText(&cfg.key, "API key", "(none)", true));
     Add(NEW OptionGptBool(&cfg.thinking, "Thinking mode (stronger, slower)"));
     //Generous by design: the patience prompt is what bounds how long a PERSON
