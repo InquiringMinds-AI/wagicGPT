@@ -826,20 +826,13 @@ void GameStateOptions::renderOaiSignIn()
         return;
     }
 
-    //status 1: the QR (right) + instructions and the code (left).
-    //The QR encodes ONLY the verified entry-page URL; the code itself is
-    //typed on the phone - keep it big and unmistakable.
-    font->DrawString(_("Scan with your phone:").c_str(), 24, 40);
-    font->DrawString(verifyUrl.c_str(), 24, 64);
-    font->DrawString(_("then enter this code:").c_str(), 24, 104);
-    WFont * big = WResourceManager::Instance()->GetWFont(Fonts::MAGIC_FONT);
-    big->SetColor(ARGB(255, 255, 255, 120));
-    float oldScale = big->GetScale();
-    big->SetScale(1.6f);
-    big->DrawString(userCode.c_str(), 24, 132);
-    big->SetScale(oldScale);
-    font->DrawString(_("Waiting for approval... (Back cancels)").c_str(), 24, 200);
+    //status 1: the QR (right) + instructions, address and code (left).
+    //The QR is only a shortcut to the same address: the address renders as
+    //text too, for users without a QR reader or signing in from a PC. The
+    //code sits alone in a bordered box so it cannot be mistaken for prose.
 
+    //QR first - its white backdrop must never paint over the text column.
+    float qrLeft = (float) SCREEN_WIDTH - 24;
     try
     {
         using qrcodegen::QrCode;
@@ -853,6 +846,7 @@ void GameStateOptions::renderOaiSignIn()
         const float side = (float) (cells * scale);
         const float x0 = SCREEN_WIDTH - side - 24;
         const float y0 = (SCREEN_HEIGHT - side) / 2;
+        qrLeft = x0;
         r->FillRect(x0, y0, side, side, ARGB(255, 255, 255, 255));
         for (int yy = 0; yy < qr.getSize(); yy++)
             for (int xx = 0; xx < qr.getSize(); xx++)
@@ -864,8 +858,56 @@ void GameStateOptions::renderOaiSignIn()
     catch (const std::exception&)
     {
         //Encoding a constant URL cannot realistically fail; if it somehow
-        //does, the typed URL above is the fallback the screen already shows.
+        //does, the typed address below is the fallback the screen shows.
     }
+
+    const float colX = 24;
+    const float colW = qrLeft - colX - 12;
+
+    //Draw a line shrunk just enough to fit the text column (GetStringWidth
+    //already includes the current scale).
+    struct Fit
+    {
+        static void draw(WFont * f, const std::string& s, float x, float y, float maxW, int align = JGETEXT_LEFT)
+        {
+            float old = f->GetScale();
+            float w = f->GetStringWidth(s.c_str());
+            if (w > maxW && w > 0)
+                f->SetScale(old * maxW / w);
+            f->DrawString(s, x, y, align);
+            f->SetScale(old);
+        }
+    };
+
+    //The scheme is noise on-screen; every browser accepts the bare host.
+    std::string showUrl = verifyUrl;
+    if (showUrl.compare(0, 8, "https://") == 0)
+        showUrl = showUrl.substr(8);
+
+    Fit::draw(font, _("On your phone or PC, go to:"), colX, 30, colW);
+    font->SetColor(ARGB(255, 255, 230, 120));
+    Fit::draw(font, showUrl, colX, 52, colW);
+    font->SetColor(ARGB(255, 255, 255, 255));
+    Fit::draw(font, _("(or scan the QR code)"), colX, 76, colW);
+    Fit::draw(font, _("then enter this code:"), colX, 100, colW);
+
+    //The code, alone in a high-contrast box.
+    const float boxY = 118;
+    const float boxH = 46;
+    r->FillRect(colX, boxY, colW, boxH, ARGB(255, 12, 12, 20));
+    r->DrawRect(colX, boxY, colW, boxH, ARGB(255, 255, 230, 120));
+    WFont * big = WResourceManager::Instance()->GetWFont(Fonts::MAGIC_FONT);
+    big->SetColor(ARGB(255, 255, 235, 140));
+    float oldScale = big->GetScale();
+    big->SetScale(1.8f);
+    float codeW = big->GetStringWidth(userCode.c_str());
+    if (codeW > colW - 16 && codeW > 0)
+        big->SetScale(1.8f * (colW - 16) / codeW);
+    big->DrawString(userCode, colX + colW / 2, boxY + 12, JGETEXT_CENTER);
+    big->SetScale(oldScale);
+
+    Fit::draw(font, _("Waiting for approval..."), colX, 192, colW);
+    Fit::draw(font, _("(Back cancels)"), colX, 214, colW);
 }
 #endif //WITH_GPT_AI
 
