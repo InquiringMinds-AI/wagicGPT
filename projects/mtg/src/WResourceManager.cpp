@@ -35,6 +35,22 @@ namespace
     boost::mutex sCacheMutex;
     // mutex meant to protect against unthread-safe calls into JFileSystem, etc.
     boost::mutex sLoadFunctionMutex;
+
+    //Miss ledger for bounded, SPACED load retries (Vita missing-art hunt,
+    //2026-08-09). A failed load used to park NULL in the cache map on its
+    //FIRST 404 - permanent for the session. But the handheld async reader
+    //races the main thread through JFileSystem (the sLoadFunctionMutex
+    //comment below documents the hazard; the main thread doesn't take that
+    //lock), so a 404 can be a TRANSIENT casualty of concurrent IO, and one
+    //bad moment left a byte-perfect card artless all session. Failures now
+    //tombstone only after kMissTombstoneAt strikes, spaced kMissRetryMs
+    //apart so the retries escape the busy window that caused the failure.
+    //Guarded by sCacheMutex. Shared across cache instances: makeID
+    //collisions across caches at worst cost one extra retry.
+    std::map<int, int> sMissCounts;
+    std::map<int, unsigned int> sMissTime;
+    const int kMissTombstoneAt = 3;
+    const unsigned int kMissRetryMs = 1200;
 }
 
 WResourceManager* WResourceManager::sInstance = NULL;
@@ -1310,7 +1326,19 @@ cacheItem* WCache<cacheItem, cacheActual>::Get(int id, const string& filename, i
         assert(it != managed.end());
 
 #if defined(PSP) || defined(VITA)
-        CacheEngine::Instance()->QueueRequest(filename, submode, lookup);
+        //Space out retries of a recently-failed load: re-queueing every
+        //frame would burn all its strikes inside the same busy-IO window
+        //that failed it (see the miss ledger above).
+        bool queueLoad = true;
+        {
+            boost::mutex::scoped_lock lock(sCacheMutex);
+            std::map<int, int>::iterator mc = sMissCounts.find(lookup);
+            if (mc != sMissCounts.end()
+                && (unsigned int) JGEGetTime() - sMissTime[lookup] < kMissRetryMs)
+                queueLoad = false;
+        }
+        if (queueLoad)
+            CacheEngine::Instance()->QueueRequest(filename, submode, lookup);
 #endif
         return it->second;
     }
@@ -1347,11 +1375,25 @@ cacheItem* WCache<cacheItem, cacheActual>::LoadIntoCache(int id, const string& f
     }
     else
     {
-        if (mError == CACHE_ERROR_404 || item)
+        if (item)
         {
             boost::mutex::scoped_lock lock(sCacheMutex);
             cache[id] = item;
+            sMissCounts.erase(id); //a success clears the strike record
+            sMissTime.erase(id);
             DebugTrace("inserted item ptr " << ToHex(item) << " at index " << id);
+        }
+        else if (mError == CACHE_ERROR_404)
+        {
+            //Bounded negative caching (see the miss ledger at the top of
+            //this file): only a repeatedly-failing load earns the NULL
+            //tombstone; earlier strikes leave the id uncached so a later
+            //attempt can succeed once the transient IO storm passes.
+            boost::mutex::scoped_lock lock(sCacheMutex);
+            int strikes = ++sMissCounts[id];
+            sMissTime[id] = (unsigned int) JGEGetTime();
+            if (strikes >= kMissTombstoneAt)
+                cache[id] = NULL;
         }
     }
 

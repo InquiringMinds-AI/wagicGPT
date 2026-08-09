@@ -182,9 +182,27 @@ void JFileSystem::preloadZip(const string& filename)
     //opening a second handle to the same file: the second open is what
     //fails on the Vita under fd pressure (ziplog reason=open, 2026-08-09),
     //and it was pure waste besides. Path-based parse stays as the fallback.
-    if (mUserFS->PreloadZip(mZipFile, cache->dir)
-        || mUserFS->PreloadZip(filename.c_str(), cache->dir)
-        || (mSystemFS && mSystemFS->PreloadZip(filename.c_str(), cache->dir)))
+    //Each attempt's failure reason is recorded SEPARATELY - the first
+    //ziplog round was masked by last-reason-wins across the chain.
+    bool parsed = false;
+    string reasons;
+    if (mUserFS->PreloadZip(mZipFile, cache->dir))
+        parsed = true;
+    else
+    {
+        reasons = string(" stream:") + zip_file_system::filesystem::PreloadZipFailReason();
+        if (mUserFS->PreloadZip(filename.c_str(), cache->dir))
+            parsed = true;
+        else
+        {
+            reasons += string(" user:") + zip_file_system::filesystem::PreloadZipFailReason();
+            if (mSystemFS && mSystemFS->PreloadZip(filename.c_str(), cache->dir))
+                parsed = true;
+            else if (mSystemFS)
+                reasons += string(" sys:") + zip_file_system::filesystem::PreloadZipFailReason();
+        }
+    }
+    if (parsed)
     {
         mZipCachedElementsCount+= cache->dir.size();
         zipFailCounts.erase(filename); //a success clears the strike record
@@ -192,10 +210,9 @@ void JFileSystem::preloadZip(const string& filename)
     else
     {
         int fails = ++zipFailCounts[filename];
-        char tail[96];
-        snprintf(tail, sizeof(tail), " reason=%s strike=%d",
-                 zip_file_system::filesystem::PreloadZipFailReason(), fails);
-        zipDiagLog(this, "zip-parse-fail " + filename + tail);
+        char tail[32];
+        snprintf(tail, sizeof(tail), " strike=%d", fails);
+        zipDiagLog(this, "zip-parse-fail " + filename + reasons + tail);
         DetachZipFile();
         if (fails < 5)
         {
