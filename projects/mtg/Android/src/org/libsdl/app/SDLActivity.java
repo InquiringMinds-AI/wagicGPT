@@ -1203,10 +1203,40 @@ public class SDLActivity extends Activity implements OnKeyListener {
 		mSingleton = this;
 		mContext = this.getApplicationContext();
 		RES_FILENAME = getResourceName();
+		if (ensureAllFilesAccess())
+			startStorageFlow();
+}
+
+	private boolean mAwaitingAllFilesAccess = false;
+
+	//Android 11+ enforces scoped storage regardless of our target SDK, so the
+	//raw <storage>/Wagic tree (manual Res drops, browsable saves) needs the
+	//"All files access" toggle. Send the user straight to it; onResume picks
+	//the flow back up once granted.
+	private boolean ensureAllFilesAccess() {
+		if (android.os.Build.VERSION.SDK_INT < 30
+				|| Environment.isExternalStorageManager())
+			return true;
+		mAwaitingAllFilesAccess = true;
+		android.widget.Toast.makeText(this,
+			"Wagic keeps its files in a browsable Wagic/ folder - allow \"All files access\" and come back.",
+			android.widget.Toast.LENGTH_LONG).show();
+		try {
+			startActivity(new android.content.Intent(
+				android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+				android.net.Uri.parse("package:" + getPackageName())));
+		} catch (Exception e) {
+			startActivity(new android.content.Intent(
+				android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+		}
+		return false;
+	}
+
+	private void startStorageFlow() {
 		StorageOptions.determineStorageOptions(mContext);
 		checkStorageLocationPreference();
 		prepareOptionMenu(null);
-}
+	}
 
     public void initializeGame() {
         File file = new File(getSystemStorageLocation() + RES_FILENAME);
@@ -1246,6 +1276,12 @@ public class SDLActivity extends Activity implements OnKeyListener {
     protected void onResume() {
         // Log.d(TAG, "onResume()");
         super.onResume();
+        if (mAwaitingAllFilesAccess
+                && (android.os.Build.VERSION.SDK_INT < 30
+                    || Environment.isExternalStorageManager())) {
+            mAwaitingAllFilesAccess = false;
+            startStorageFlow();
+        }
         SDLActivity.nativeResume();
     }
 

@@ -6,6 +6,11 @@
           package="net.wagic.app">
   <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+  <!-- Android 11+ enforces scoped storage even at target 29: the raw
+       <storage>/Wagic tree this port is built around (manual Res drops, save
+       transfers, browsable user files) needs All-files access there. The app
+       routes the user to the one-toggle Settings screen on first run. -->
+  <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <!-- Manual Res placement lives at <storage>/Wagic/Res; scoped storage would

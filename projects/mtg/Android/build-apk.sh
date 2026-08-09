@@ -31,7 +31,7 @@ echo "bundled $PACK_NAME ($(cut -c1-12 assets/respack.sha256))"
 # 2. Java -> classes (bundled jars: zip4j, jsoup, json-simple)
 JARS=$(ls libs/*.jar | tr '\n' ':')
 find src "$OUT/gen" -name '*.java' > "$OUT/sources.txt"
-javac -source 8 -target 8 -bootclasspath "$PLATFORM" \
+javac -J-Xss16m -source 8 -target 8 -bootclasspath "$PLATFORM" \
     -classpath "$PLATFORM:$JARS" -d "$OUT/classes" @"$OUT/sources.txt" 2> >(grep -v 'source value 8' >&2 || true)
 
 # 3. Dex (app classes + bundled jars)
