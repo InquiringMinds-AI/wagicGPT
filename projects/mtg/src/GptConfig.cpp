@@ -619,8 +619,17 @@ static int gPspNetState = 0;   //0 untried, 1 up, -1 failed
 static void pspNetStackInit()
 {
     if (gPspStackState) return;
-    sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
-    sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
+    int rc1 = sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
+    int rc2 = sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
+    if (rc1 != 0 || rc2 != 0)
+    {
+        char buf[80];
+        snprintf(buf, sizeof(buf), "psp net: module load failed %08x/%08x",
+                 (unsigned) rc1, (unsigned) rc2);
+        gptLogLine(buf);
+        gPspStackState = -1;
+        return;
+    }
     int rc = pspSdkInetInit();
     if (rc != 0)
     {

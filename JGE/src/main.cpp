@@ -35,8 +35,9 @@
 #ifdef DEVHOOK
 PSP_MODULE_INFO(JGEApp_Title, 0, 1, 1);
 PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER);
-//256 is not enough for the network to correctly start,
-// let's find an appropriate value the day JGE has working network
+//The real heap bound lives in the custom _sbrk below (MaxFreeMemSize minus
+//the firmware's network allowance); this macro only governs the SDK sbrk,
+//which that _sbrk replaces.
 PSP_HEAP_SIZE_KB(-256);
 
 #else
@@ -334,7 +335,12 @@ extern "C" void* _sbrk(ptrdiff_t incr)
 {
     if (!g_heapStart)
     {
-        SceSize sz = sceKernelMaxFreeMemSize() - 256 * 1024;
+        //The slack left here is all the RAM the FIRMWARE gets: net modules
+        //(sceUtilityLoadNetModule) and sceNetInit's pool load into the user
+        //partition OUTSIDE this heap. At 256KB they failed with
+        //LIBRARY_NOT_FOUND/NO_MEMORY (2026-08-09, first live LLM transport);
+        //1.5MB is the conventional allowance for net-enabled homebrew.
+        SceSize sz = sceKernelMaxFreeMemSize() - 1536 * 1024;
         SceUID id = sceKernelAllocPartitionMemory(PSP_MEMORY_PARTITION_USER, "wagic_heap", PSP_SMEM_Low, sz, NULL);
         if (id < 0) { errno = ENOMEM; return (void*)-1; }
         g_heapStart = (char*)sceKernelGetBlockHeadAddr(id);
