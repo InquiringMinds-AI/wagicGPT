@@ -693,7 +693,31 @@ int GuiCombat::receiveEventMinus(WEvent* e)
                 return 0; // Why do I take this twice ? >.>
             if (!observer->currentPlayer->displayStack())
             {
-                observer->nextCombatStep();
+                //An interactive AI attacker makes its own ordering decision
+                //(AIPlayerGPT::orderBlockers), so arm the step for it when
+                //any attacker is multi-blocked - but with cursor_pos left at
+                //NONE: CheckUserInput has no turn-owner gate, and the
+                //defending human must not steer or fast-forward the
+                //attacker's ordering. With cursor NONE the ordering UI never
+                //renders either; the AI permutes the blockers vector
+                //directly. Heuristic AIs keep the historical skip
+                //(declaration order).
+                bool aiOrders = false;
+                if (observer->currentPlayer->isInteractiveAI())
+                    for (inner_iterator it = attackers.begin(); it != attackers.end(); ++it)
+                        if (1 < (*it)->blockers.size())
+                        {
+                            aiOrders = true;
+                            break;
+                        }
+                if (!aiOrders)
+                {
+                    observer->nextCombatStep();
+                    return 1;
+                }
+                active = activeAtk = NULL;
+                cursor_pos = NONE;
+                step = ORDER;
                 return 1;
             }
             for (inner_iterator it = attackers.begin(); it != attackers.end(); ++it)
