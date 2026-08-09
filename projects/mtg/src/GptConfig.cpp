@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cstdlib>
+#include <ctime>
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
@@ -383,7 +384,10 @@ void GptSettings::setPrimaryUrl(const string& u)
 }
 
 //Provider base URLs are long-lived: these have been stable for years.
-//The game appends /v1/models and /v1/chat/completions.
+//The game appends /v1/models and /v1/chat/completions - except the
+//"OpenAI subscription" preset, whose base is the Codex backend: the request
+//path is /responses, auth comes from the device-code token file rather than
+//key=, and the whole exchange is handled by gptCodexComplete.
 static const GptPreset kPresets[] = {
     { "Custom", "" },
     { "Local llama.cpp", "http://127.0.0.1:8080" },
@@ -391,6 +395,7 @@ static const GptPreset kPresets[] = {
     { "LM Studio", "http://127.0.0.1:1234" },
     { "OpenRouter", "https://openrouter.ai/api" },
     { "OpenAI", "https://api.openai.com" },
+    { "OpenAI subscription", "https://chatgpt.com/backend-api/codex" },
     { "Anthropic", "https://api.anthropic.com" },
     { "Groq", "https://api.groq.com/openai" },
     { "Mistral", "https://api.mistral.ai" },
@@ -617,6 +622,516 @@ string gptHttpPost(const string& url, const string& body, long timeoutMs, const 
     return httpRequestImpl(url, body, timeoutMs, bearer);
 }
 
+//--- Full-control POST (ChatGPT-subscription transport) ---------------------
+//The Codex backend needs caller-supplied headers and the caller needs the HTTP
+//status and response headers back (401 drives a token refresh; the x-codex-*
+//headers carry the plan-usage gauge). Curl-only: on platforms without curl the
+//call reports transport failure, which degrades to Baka exactly like an
+//unreachable endpoint - the subscription preset simply is not available there.
+namespace
+{
+#if !defined(WAGIC_HTTP_JNI) && !defined(WAGIC_NO_CURL)
+size_t curlHeaderToString(void * contents, size_t size, size_t nmemb, void * userp)
+{
+    static_cast<string *>(userp)->append(static_cast<char *>(contents), size * nmemb);
+    return size * nmemb;
+}
+
+string httpRequestFull(const string& url, const string& postBody, long timeoutMs,
+                       const vector<string>& reqHeaders, long& httpCode, string& respHeaders)
+{
+    httpCode = 0;
+    respHeaders.clear();
+    CURL * curl = curl_easy_init();
+    if (!curl)
+        return "";
+
+    string response;
+    struct curl_slist * headers = NULL;
+    for (size_t i = 0; i < reqHeaders.size(); i++)
+        headers = curl_slist_append(headers, reqHeaders[i].c_str());
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlWriteToString);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curlHeaderToString);
+    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &respHeaders);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 5000L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeoutMs);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    if (!postBody.empty())
+    {
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postBody.c_str());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long) postBody.size());
+    }
+    if (headers)
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+
+    if (headers)
+        curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK)
+    {
+        httpCode = 0;
+        return "";
+    }
+    //Unlike httpRequestImpl, the body comes back on EVERY status: the error
+    //payload ({"detail": ...}) is how the caller tells a wrong route from an
+    //expired token from a rate limit.
+    return response;
+}
+#else
+string httpRequestFull(const string&, const string&, long,
+                       const vector<string>&, long& httpCode, string& respHeaders)
+{
+    httpCode = 0;
+    respHeaders.clear();
+    return "";
+}
+#endif
+} //namespace
+
+//=== ChatGPT-subscription backend (Codex Responses API) =====================
+//
+//The "OpenAI subscription" preset talks to the SAME backend Codex CLI uses:
+//POST https://chatgpt.com/backend-api/codex/responses, authorized by the OAuth
+//tokens a ChatGPT plan account mints through the device-code flow. Everything
+//below was verified live 2026-08-09 (Voyager probes) and against the
+//openai/codex source, because earlier research digests were wrong twice:
+// - The endpoint takes ONLY Codex-shaped fields. stream:false is REJECTED
+//   ("Stream must be set to true") and max_output_tokens is REJECTED
+//   ("Unsupported parameter"), so replies are always SSE and there is no
+//   decode-side truncation cap on this preset.
+// - The minimal header set suffices - no attestation headers. originator and
+//   the User-Agent are Codex-fingerprint-coupled constants; if the backend
+//   ever starts challenging, they are the first thing to revisit.
+// - Refresh: POST https://auth.openai.com/oauth/token, JSON body
+//   {client_id, grant_type:"refresh_token", refresh_token} (codex-rs
+//   login/src/auth/manager.rs). Refresh tokens ROTATE, and reusing a stale one
+//   is a hard error (refresh_token_reused) - which is why every auth mutation
+//   here is serialized under one mutex and persisted immediately.
+// - An HTML body on any of these calls means the WEB tier answered: wrong
+//   route or blocked, never a model reply.
+//
+//Auth material lives in oai-auth.json (shape: {"tokens":{access_token,
+//refresh_token,id_token,expires_in,...},"minted_at":N,"chatgpt_account_id":S})
+//under <user root>/ai/gpt/, with a desktop fallback to ~/.config/wagic-oai/
+//(auth.json + sibling account.json) where the device-code scripts mint it.
+//No in-client device-code flow yet: the file is provisioned externally.
+
+namespace
+{
+const char * kCodexClientId = "app_EMoamEEZ73f0CkXaXp7hrann";
+const char * kCodexTokenUrl = "https://auth.openai.com/oauth/token";
+const char * kCodexOriginator = "codex_cli_rs";
+const char * kCodexUserAgent = "codex_cli_rs/0.45.0 (Ubuntu 24.04.2 LTS; x86_64) WindowsTerminal";
+
+//All auth state (file cache + rotation) behind one mutex: two AI seats can
+//complete concurrently, and a double-refresh with the same rotated-out token
+//would invalidate the whole login.
+GptMutex& codexMutex()
+{
+    static GptMutex m;
+    return m;
+}
+
+struct CodexAuth
+{
+    bool loaded;
+    nlohmann::json doc;   //the whole auth file, mutated in place on refresh
+    string path;          //where doc came from / gets written back
+    string access;
+    string refresh;
+    string accountId;
+    long mintedAt;        //epoch seconds; 0 unknown
+    long expiresIn;       //seconds; 0 unknown
+    CodexAuth() : loaded(false), mintedAt(0), expiresIn(0) {}
+};
+
+CodexAuth& codexAuth()
+{
+    static CodexAuth a;
+    return a;
+}
+
+//Pull the useful fields out of whatever auth-file shape we were handed.
+void codexReadDoc(CodexAuth& a)
+{
+    a.access.clear();
+    a.refresh.clear();
+    a.mintedAt = 0;
+    a.expiresIn = 0;
+    try
+    {
+        const nlohmann::json& d = a.doc;
+        const nlohmann::json& t = d.contains("tokens") ? d["tokens"] : d;
+        if (t.contains("access_token") && t["access_token"].is_string())
+            a.access = t["access_token"].get<string>();
+        if (t.contains("refresh_token") && t["refresh_token"].is_string())
+            a.refresh = t["refresh_token"].get<string>();
+        if (t.contains("expires_in") && t["expires_in"].is_number())
+            a.expiresIn = t["expires_in"].get<long>();
+        if (d.contains("minted_at") && d["minted_at"].is_number())
+            a.mintedAt = d["minted_at"].get<long>();
+        if (d.contains("chatgpt_account_id") && d["chatgpt_account_id"].is_string())
+            a.accountId = d["chatgpt_account_id"].get<string>();
+    }
+    catch (nlohmann::json::exception&)
+    {
+    }
+}
+
+bool codexLoadFile(CodexAuth& a, const string& path)
+{
+    std::ifstream f(path.c_str(), std::ios::binary);
+    if (!f)
+        return false;
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    try
+    {
+        a.doc = nlohmann::json::parse(ss.str());
+    }
+    catch (nlohmann::json::exception&)
+    {
+        return false;
+    }
+    a.path = path;
+    codexReadDoc(a);
+    return !a.access.empty() || !a.refresh.empty();
+}
+
+//Locate + parse auth material. Caller holds codexMutex().
+bool codexEnsureLoaded(string& whyNot)
+{
+    CodexAuth& a = codexAuth();
+    if (a.loaded)
+    {
+        if (a.access.empty() && a.refresh.empty())
+        {
+            whyNot = "no usable tokens in " + (a.path.empty() ? string("any auth file") : a.path);
+            return false;
+        }
+        return true;
+    }
+
+    vector<string> candidates;
+    string root = gptUserRoot();
+    if (!root.empty())
+        candidates.push_back(root + "/ai/gpt/oai-auth.json");
+    if (const char * home = getenv("HOME"))
+        candidates.push_back(string(home) + "/.config/wagic-oai/auth.json");
+
+    for (size_t i = 0; i < candidates.size(); i++)
+    {
+        if (!codexLoadFile(a, candidates[i]))
+            continue;
+        //The device-code scripts keep the account id in a SIBLING account.json.
+        if (a.accountId.empty())
+        {
+            size_t slash = candidates[i].find_last_of('/');
+            if (slash != string::npos)
+            {
+                std::ifstream acc((candidates[i].substr(0, slash) + "/account.json").c_str());
+                if (acc)
+                {
+                    std::ostringstream ss;
+                    ss << acc.rdbuf();
+                    try
+                    {
+                        nlohmann::json j = nlohmann::json::parse(ss.str());
+                        if (j.contains("chatgpt_account_id") && j["chatgpt_account_id"].is_string())
+                            a.accountId = j["chatgpt_account_id"].get<string>();
+                    }
+                    catch (nlohmann::json::exception&)
+                    {
+                    }
+                }
+            }
+        }
+        a.loaded = true;
+        if (a.accountId.empty())
+        {
+            whyNot = "auth file found but no chatgpt_account_id (need account.json or the field inline)";
+            return false;
+        }
+        return true;
+    }
+    a.loaded = true; //remember the miss; a new file takes a restart, like peek
+    whyNot = "no oai-auth.json found (checked ";
+    for (size_t i = 0; i < candidates.size(); i++)
+        whyNot += (i ? ", " : "") + candidates[i];
+    whyNot += ")";
+    return false;
+}
+
+//Persist the (rotated) tokens back where they came from. Caller holds the mutex.
+void codexSave(CodexAuth& a)
+{
+    if (a.path.empty())
+        return;
+    std::ofstream f(a.path.c_str(), std::ios::binary | std::ios::trunc);
+    if (f)
+    {
+        f << a.doc.dump(1) << "\n";
+        f.close();
+        chmod(a.path.c_str(), 0600);
+    }
+}
+
+//Refresh the access token. Caller holds the mutex. Rotates and persists.
+bool codexRefresh(CodexAuth& a, string& err)
+{
+    if (a.refresh.empty())
+    {
+        err = "no refresh token";
+        return false;
+    }
+    nlohmann::json body = {
+        {"client_id", kCodexClientId},
+        {"grant_type", "refresh_token"},
+        {"refresh_token", a.refresh},
+    };
+    vector<string> headers;
+    headers.push_back("Content-Type: application/json");
+    long code = 0;
+    string respHeaders;
+    string resp = httpRequestFull(kCodexTokenUrl, body.dump(), 30000, headers, code, respHeaders);
+    if (code != 200)
+    {
+        err = "token refresh failed (HTTP " + std::to_string(code) + "): " + resp.substr(0, 200);
+        return false;
+    }
+    try
+    {
+        nlohmann::json j = nlohmann::json::parse(resp);
+        nlohmann::json& t = a.doc.contains("tokens") ? a.doc["tokens"] : a.doc;
+        if (j.contains("access_token") && j["access_token"].is_string())
+            t["access_token"] = j["access_token"];
+        if (j.contains("refresh_token") && j["refresh_token"].is_string())
+            t["refresh_token"] = j["refresh_token"];
+        if (j.contains("id_token") && j["id_token"].is_string())
+            t["id_token"] = j["id_token"];
+        a.doc["minted_at"] = (long) time(NULL);
+        if (!a.accountId.empty())
+            a.doc["chatgpt_account_id"] = a.accountId;
+        codexReadDoc(a);
+        codexSave(a);
+        return !a.access.empty();
+    }
+    catch (nlohmann::json::exception&)
+    {
+        err = "token refresh returned unparseable JSON";
+        return false;
+    }
+}
+
+//Last plan-usage percent the backend reported (x-codex-primary-used-percent).
+string& codexUsedPercentRef()
+{
+    static string pct;
+    return pct;
+}
+
+//Case-insensitive single-header lookup in a raw response-header blob.
+string headerValue(const string& respHeaders, const string& name)
+{
+    string low = respHeaders;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    string needle = name + ":";
+    size_t pos = 0;
+    while ((pos = low.find(needle, pos)) != string::npos)
+    {
+        //Header names start a line.
+        if (pos != 0 && low[pos - 1] != '\n')
+        {
+            pos += needle.size();
+            continue;
+        }
+        size_t vs = pos + needle.size();
+        size_t ve = respHeaders.find('\n', vs);
+        string v = respHeaders.substr(vs, ve == string::npos ? string::npos : ve - vs);
+        while (!v.empty() && (v[0] == ' ' || v[0] == '\t'))
+            v.erase(0, 1);
+        while (!v.empty() && (v[v.size() - 1] == '\r' || v[v.size() - 1] == ' '))
+            v.erase(v.size() - 1);
+        return v;
+    }
+    return "";
+}
+} //namespace
+
+//The model the preset answers with when the user has not configured one.
+const char * const kGptCodexDefaultModel = "gpt-5.6-luna";
+
+bool gptCodexEndpoint(const string& url)
+{
+    return url.find("chatgpt.com/backend-api") != string::npos;
+}
+
+bool gptCodexAuthPresent(string& whyNot)
+{
+    std::lock_guard<GptMutex> g(codexMutex());
+    return codexEnsureLoaded(whyNot);
+}
+
+string gptCodexUsedPercent()
+{
+    std::lock_guard<GptMutex> g(codexMutex());
+    return codexUsedPercentRef();
+}
+
+string gptCodexExtractText(const string& sse)
+{
+    //The completed event's output array arrives EMPTY on this backend (probed
+    //2026-08-09): the text rides response.output_text.done (one per content
+    //part), with the .delta stream as the incremental form. Prefer the done
+    //events, fall back to accumulated deltas, then to the completed event's
+    //output array in case the backend ever starts populating it.
+    string dones, deltas, completed;
+    std::istringstream ss(sse);
+    string line;
+    while (std::getline(ss, line))
+    {
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line.erase(line.size() - 1);
+        if (line.compare(0, 5, "data:") != 0)
+            continue;
+        size_t s = 5;
+        while (s < line.size() && line[s] == ' ')
+            s++;
+        try
+        {
+            nlohmann::json j = nlohmann::json::parse(line.substr(s));
+            string type = j.value("type", "");
+            if (type == "response.output_text.done")
+                dones += j.value("text", "");
+            else if (type == "response.output_text.delta")
+                deltas += j.value("delta", "");
+            else if (type == "response.completed" && j.contains("response"))
+            {
+                const nlohmann::json& out = j["response"].value("output", nlohmann::json::array());
+                for (nlohmann::json::const_iterator it = out.begin(); it != out.end(); ++it)
+                {
+                    if (it->value("type", "") != "message" || !it->contains("content"))
+                        continue;
+                    const nlohmann::json& content = (*it)["content"];
+                    for (nlohmann::json::const_iterator c = content.begin(); c != content.end(); ++c)
+                        if (c->value("type", "") == "output_text")
+                            completed += c->value("text", "");
+                }
+            }
+        }
+        catch (nlohmann::json::exception&)
+        {
+            //Non-JSON data lines (or a truncated tail) are skipped, not fatal.
+        }
+    }
+    if (!dones.empty())
+        return dones;
+    if (!deltas.empty())
+        return deltas;
+    return completed;
+}
+
+string gptCodexComplete(const string& url, const string& requestBody, long timeoutMs, string& errOut)
+{
+    errOut.clear();
+    string access, accountId;
+    {
+        std::lock_guard<GptMutex> g(codexMutex());
+        if (!codexEnsureLoaded(errOut))
+            return "";
+        CodexAuth& a = codexAuth();
+        //Proactive refresh an hour before known expiry - cheaper than paying a
+        //401 round trip on a game decision.
+        if (a.mintedAt > 0 && a.expiresIn > 0
+            && (long) time(NULL) > a.mintedAt + a.expiresIn - 3600 && !a.refresh.empty())
+        {
+            string rerr;
+            if (!codexRefresh(a, rerr) && a.access.empty())
+            {
+                errOut = rerr;
+                return "";
+            }
+        }
+        access = a.access;
+        accountId = a.accountId;
+    }
+    if (access.empty())
+    {
+        errOut = "no access token";
+        return "";
+    }
+
+    vector<string> headers;
+    headers.push_back("Authorization: Bearer " + access);
+    headers.push_back("chatgpt-account-id: " + accountId);
+    headers.push_back("Content-Type: application/json");
+    headers.push_back(string("originator: ") + kCodexOriginator);
+    headers.push_back("OpenAI-Beta: responses=experimental");
+    headers.push_back(string("User-Agent: ") + kCodexUserAgent);
+    headers.push_back("Accept: text/event-stream");
+
+    long code = 0;
+    string respHeaders;
+    string body = httpRequestFull(url, requestBody, timeoutMs, headers, code, respHeaders);
+
+    if (code == 401)
+    {
+        //Expired or revoked access token: refresh once and retry. Another seat
+        //may have refreshed while we were in flight - only refresh if the token
+        //we used is still the current one.
+        {
+            std::lock_guard<GptMutex> g(codexMutex());
+            CodexAuth& a = codexAuth();
+            if (a.access == access)
+            {
+                string rerr;
+                if (!codexRefresh(a, rerr))
+                {
+                    errOut = "authorization rejected and " + rerr;
+                    return "";
+                }
+            }
+            access = a.access;
+        }
+        headers[0] = "Authorization: Bearer " + access;
+        body = httpRequestFull(url, requestBody, timeoutMs, headers, code, respHeaders);
+    }
+
+    if (code != 200)
+    {
+        if (code == 0)
+            errOut = "transport failure (no connection, or no TLS transport on this platform)";
+        else if (!body.empty() && body[0] == '<')
+            errOut = "HTTP " + std::to_string(code) + " from the web tier (wrong route or blocked)";
+        else if (code == 429)
+            errOut = "rate limited by the plan window: " + body.substr(0, 200);
+        else
+            errOut = "HTTP " + std::to_string(code) + ": " + body.substr(0, 200);
+        return "";
+    }
+
+    string pct = headerValue(respHeaders, "x-codex-primary-used-percent");
+    if (!pct.empty())
+    {
+        std::lock_guard<GptMutex> g(codexMutex());
+        codexUsedPercentRef() = pct;
+    }
+
+    string text = gptCodexExtractText(body);
+    if (text.empty())
+        errOut = "no output text in the response stream";
+    return text;
+}
+
 //--- Platform threading seam (see GptConfig.h) -----------------------------
 #if defined (VITA)
 
@@ -739,6 +1254,38 @@ string modelNameOf(const nlohmann::json& entry)
 bool gptProbeEndpoint(const string& url, const string& key, string& modelOut, long timeoutMs)
 {
     modelOut.clear();
+    //The Codex backend has no /v1/models. The honest probe is a minimal
+    //completion: it proves auth, route and the SSE path end-to-end for a few
+    //tokens (~25 total against a 7-day plan window).
+    if (gptCodexEndpoint(url))
+    {
+        string why;
+        if (!gptCodexAuthPresent(why))
+        {
+            gptLogLine("subscription probe: " + why);
+            return false;
+        }
+        nlohmann::json ping = {
+            {"model", kGptCodexDefaultModel},
+            {"instructions", "Reply with the word ok."},
+            {"input", nlohmann::json::array({
+                {{"type", "message"}, {"role", "user"},
+                 {"content", nlohmann::json::array({{{"type", "input_text"}, {"text", "ok?"}}})}},
+            })},
+            {"reasoning", {{"effort", "none"}}},
+            {"store", false},
+            {"stream", true},
+        };
+        string err;
+        string text = gptCodexComplete(url + "/responses", ping.dump(), timeoutMs, err);
+        if (text.empty())
+        {
+            gptLogLine("subscription probe failed: " + err);
+            return false;
+        }
+        modelOut = kGptCodexDefaultModel;
+        return true;
+    }
     string body = gptHttpGet(url + "/v1/models", timeoutMs, key);
     if (body.empty())
         return false;

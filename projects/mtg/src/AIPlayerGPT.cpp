@@ -1685,12 +1685,45 @@ struct AIPlayerGPT::WorkerCtx
     string requestBody;
     string key;
     long timeoutMs;
+    bool codex; //ChatGPT-subscription preset: /responses + SSE, not chat completions
+    WorkerCtx() : timeoutMs(0), codex(false) {}
 };
 
 void AIPlayerGPT::WorkerMain(void * p)
 {
     WorkerCtx * ctx = reinterpret_cast<WorkerCtx *>(p);
-    string body = gptHttpPost(ctx->url, ctx->requestBody, ctx->timeoutMs, ctx->key);
+    string body;
+    if (ctx->codex)
+    {
+        //The subscription backend answers in the Responses shape over SSE.
+        //gptCodexComplete owns auth/refresh and hands back the assistant
+        //text; wrapping it in the chat-completions envelope here lets
+        //pollCompletion and every downstream reply parser stay unchanged.
+        string err;
+        string text = gptCodexComplete(ctx->url, ctx->requestBody, ctx->timeoutMs, err);
+        if (!text.empty())
+        {
+            json wrapped = {{"choices", json::array({{{"message", {{"content", text}}}}})}};
+            body = wrapped.dump();
+        }
+        else
+        {
+            //Empty body = the seams' existing transport-failure path (Baka
+            //answers). Log the WHY once per distinct cause, not per decision.
+            //Mutex-guarded: both selfplay seats can fail concurrently, and a
+            //racing write to a shared string is UB, not just a double log.
+            static GptMutex logMtx;
+            static string lastErr;
+            std::lock_guard<GptMutex> lg(logMtx);
+            if (err != lastErr)
+            {
+                lastErr = err;
+                gptLogLine("subscription request failed: " + err);
+            }
+        }
+    }
+    else
+        body = gptHttpPost(ctx->url, ctx->requestBody, ctx->timeoutMs, ctx->key);
     {
         std::lock_guard<GptMutex> g(ctx->state->mtx);
         ctx->state->response = body;
@@ -1733,6 +1766,20 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                         content.clear();
                     }
                 }
+                //Subscription preset: the backend prices every reply against a
+                //rolling plan window and reports the gauge on each response.
+                //Surface it when it moves - a player burning their ChatGPT plan
+                //on a card game deserves to see the meter, and a static gauge
+                //re-noticed every decision would be wallpaper.
+                if (gptCodexEndpoint(mEndpoint))
+                {
+                    string pct = gptCodexUsedPercent();
+                    if (!pct.empty() && pct != mCodexPctNotified)
+                    {
+                        mCodexPctNotified = pct;
+                        setNotice("ChatGPT plan: " + pct + "% of the weekly limit used", 6.0f);
+                    }
+                }
                 return 0;
             }
             //An answer for a prompt the game state has moved past (should
@@ -1746,7 +1793,8 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     //Idle: build the request on the game thread (the prompt members are not
     //shared with the worker) and launch the round trip in the background.
     string requestBody = buildRequestBody(userMsg);
-    string url = mEndpoint + "/v1/chat/completions";
+    bool codex = gptCodexEndpoint(mEndpoint);
+    string url = codex ? mEndpoint + "/responses" : mEndpoint + "/v1/chat/completions";
     string key = mApiKey;
     std::shared_ptr<AsyncState> state = mAsyncState;
     {
@@ -1769,6 +1817,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     ctx->requestBody = requestBody;
     ctx->key = key;
     ctx->timeoutMs = timeoutMs;
+    ctx->codex = codex;
     if (!gptSpawnWorker(WorkerMain, ctx))
     {
         delete ctx;
@@ -3514,6 +3563,32 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 
 string AIPlayerGPT::buildRequestBody(const string& userMsg)
 {
+    //ChatGPT-subscription preset: the Codex backend speaks the Responses
+    //shape, not chat completions - system prompt rides "instructions", the
+    //user message rides "input". The backend REJECTS any field Codex CLI
+    //does not send (probed 2026-08-09: max_output_tokens and stream:false
+    //are both 400s), so this body carries ONLY the six accepted fields; the
+    //truncation guard has no decode-side cap here and relies on the reply
+    //protocol's brevity pressure. reasoning.effort must be set explicitly:
+    //the default (medium) is the same hidden-reasoning latency trap the
+    //OpenRouter fix closed - thinking maps to "low", non-thinking to
+    //"minimal".
+    if (gptCodexEndpoint(mEndpoint))
+    {
+        json request = {
+            {"model", mModel.empty() ? string(kGptCodexDefaultModel) : mModel},
+            {"instructions", mSystemPrompt},
+            {"input", json::array({
+                {{"type", "message"}, {"role", "user"},
+                 {"content", json::array({{{"type", "input_text"}, {"text", userMsg}}})}},
+            })},
+            {"reasoning", {{"effort", mThinking ? "low" : "none"}}},
+            {"store", false},
+            {"stream", true},
+        };
+        return request.dump();
+    }
+
     //Exactly two messages, always: the per-duel head and the assembled
     //decision tail. No transcript - the narration inside the user message
     //carries the history, and its append-only front keeps the prefix
@@ -10733,6 +10808,62 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(cl.find("2 lands, 5 spells") != string::npos
               && cl.find("no coloured sources") != string::npos,
               "W33-N139n colourless lands are counted as lands with an explicit colour verdict");
+    }
+
+    // ---- OpenAI-subscription adapter: Codex SSE text extraction ----
+    // The backend answers ONLY as an SSE stream (stream:false is a 400), and
+    // its response.completed event arrives with an EMPTY output array - the
+    // text rides response.output_text.done / .delta (probed 2026-08-09).
+    cout << "\n[CODEX-SSE] assistant text out of a Codex Responses SSE stream\n";
+    {
+        // The normal healthy stream: deltas plus a final done event carrying
+        // the full text. done wins; the deltas must NOT double the text.
+        string sse =
+            "event: response.output_text.delta\n"
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"CHOICE\"}\n\n"
+            "event: response.output_text.delta\n"
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\": 1 (Cast Example Card)\"}\n\n"
+            "event: response.output_text.done\n"
+            "data: {\"type\":\"response.output_text.done\",\"text\":\"CHOICE: 1 (Cast Example Card)\"}\n\n"
+            "event: response.completed\n"
+            "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[]}}\n";
+        string t = gptCodexExtractText(sse);
+        cout << "     healthy stream -> \"" << t << "\"\n";
+        CHECK(t == "CHOICE: 1 (Cast Example Card)",
+              "CODEX-SSE done event wins and deltas do not double the text");
+        // Two content parts: their done events concatenate in stream order.
+        string two =
+            "data: {\"type\":\"response.output_text.done\",\"text\":\"CHOICE: 2\"}\n"
+            "data: {\"type\":\"response.output_text.done\",\"text\":\"\\nPLAN: hold up mana.\"}\n";
+        CHECK(gptCodexExtractText(two) == "CHOICE: 2\nPLAN: hold up mana.",
+              "CODEX-SSE two content parts concatenate in order");
+        // A stream cut before the done event: the deltas are the salvage.
+        string cut =
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"BLOCKS: \"}\n"
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"B1:A1\"}\n";
+        CHECK(gptCodexExtractText(cut) == "BLOCKS: B1:A1",
+              "CODEX-SSE a cut stream salvages the accumulated deltas");
+        // CRLF line endings (curl hands the wire bytes through untouched).
+        string crlf =
+            "data: {\"type\":\"response.output_text.done\",\"text\":\"CHOICE: 0 (pass)\"}\r\n";
+        CHECK(gptCodexExtractText(crlf) == "CHOICE: 0 (pass)",
+              "CODEX-SSE CRLF-terminated data lines parse");
+        // Future-proofing: a completed event that DOES carry output is honored
+        // when no output_text events exist.
+        string comp =
+            "data: {\"type\":\"response.completed\",\"response\":{\"output\":["
+            "{\"type\":\"reasoning\",\"summary\":[]},"
+            "{\"type\":\"message\",\"role\":\"assistant\",\"content\":["
+            "{\"type\":\"output_text\",\"text\":\"ATTACK: A1\"}]}]}}\n";
+        CHECK(gptCodexExtractText(comp) == "ATTACK: A1",
+              "CODEX-SSE completed-event output is the fallback extraction");
+        // NEGATIVES: an HTML body (web tier / wrong route) and garbage data
+        // lines yield an EMPTY string - the seams' transport-failure shape -
+        // never a fabricated answer.
+        CHECK(gptCodexExtractText("<html><body>Just a moment...</body></html>").empty(),
+              "CODEX-SSE an HTML body extracts to empty (falls back to the heuristic)");
+        CHECK(gptCodexExtractText("data: {not json at all\ndata: 42\n").empty(),
+              "CODEX-SSE unparseable data lines are skipped, not answers");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

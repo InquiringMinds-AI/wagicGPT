@@ -427,6 +427,9 @@ private:
     string mModel;
     string mApiKey;
     bool mThinking;
+    //Subscription preset: last plan-usage percent already noticed to the
+    //player, so the gauge is surfaced when it MOVES, not every decision.
+    string mCodexPctNotified;
     //from ai/gpt/endpoints.txt (the per-user copy shadows the shipped one);
     //environment variables override these
     vector<string> mConfigUrls;

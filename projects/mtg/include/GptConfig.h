@@ -118,6 +118,28 @@ size_t gptPresetForUrl(const std::string& url);
 std::string gptHttpGet(const std::string& url, long timeoutMs, const std::string& bearer);
 std::string gptHttpPost(const std::string& url, const std::string& body, long timeoutMs, const std::string& bearer);
 
+//--- ChatGPT-subscription backend (Codex Responses API) --------------------
+//The "OpenAI subscription" preset: OAuth tokens from the ChatGPT device-code
+//flow instead of key=, request path /responses instead of /v1/chat/completions,
+//replies always SSE (the backend rejects stream:false). See the implementation
+//block in GptConfig.cpp for the verified endpoint/header/shape facts.
+
+//True when url points at the Codex backend (chatgpt.com/backend-api).
+bool gptCodexEndpoint(const std::string& url);
+//Model used when the config names none.
+extern const char * const kGptCodexDefaultModel;
+//True when usable subscription auth material was found; whyNot names the gap.
+bool gptCodexAuthPresent(std::string& whyNot);
+//Blocking round trip (worker thread): POST a Responses-shaped body to the full
+//url, refreshing the access token when needed. Returns the assistant text, or
+//"" with errOut set. Thread-safe across concurrent AI seats.
+std::string gptCodexComplete(const std::string& url, const std::string& requestBody,
+                             long timeoutMs, std::string& errOut);
+//Assistant text out of a Codex SSE stream (exposed for the parse self-test).
+std::string gptCodexExtractText(const std::string& sse);
+//Last plan-usage percent the backend reported ("" until a reply carried one).
+std::string gptCodexUsedPercent();
+
 //--- Platform threading seam ---------------------------------------------
 //Vita's libstdc++ has no active gthreads layer: std::thread construction
 //THROWS and std::mutex lock/unlock are NO-OPS. The model-call worker
