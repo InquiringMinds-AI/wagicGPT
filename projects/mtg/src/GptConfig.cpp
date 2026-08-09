@@ -17,6 +17,8 @@
 #include <psputility.h>
 #include <pspnet.h>
 #include <pspnet_apctl.h>
+//Set by netStackBoot in JGE/src/main.cpp: 0 never attempted, 1 up, -1 failed.
+extern "C" int gWagicPspNetStack;
 #endif
 #include <nlohmann/json.hpp>
 
@@ -618,8 +620,8 @@ static int gPspNetState = 0;   //0 untried, 1 up, -1 failed
 
 //The stack itself comes up first thing in main() (JGE/src/main.cpp
 //netStackBoot - loading the net modules any later hangs the boot); this just
-//reads the verdict it left.
-extern "C" int gWagicPspNetStack;
+//reads the verdict it left (declared at file scope above - an extern "C"
+//inside the anonymous namespace picks up internal linkage).
 static void pspNetStackInit()
 {
     if (gPspStackState) return;
