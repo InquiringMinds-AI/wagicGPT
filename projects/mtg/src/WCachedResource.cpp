@@ -223,8 +223,14 @@ bool WCachedTexture::Attempt(const string& filename, int submode, int & error)
             realname = WResourceManager::Instance()->graphicsFile(realname);
     }
 
-    //Apply pixel mode
+    //Apply pixel mode. NOT on Vita: vitaGL's GL_UNSIGNED_SHORT_5_5_5_1
+    //handling scrambles the channel layout - the deck-select backdrop
+    //rendered as per-pixel green/magenta speckle (2026-08-09) - and with
+    //112MB of shared VRAM the Vita has no need of 16-bit savings. Full
+    //RGBA8888 costs ~0.5MB extra per backdrop and renders correctly.
+#ifndef VITA
     if (submode & TEXTURE_SUB_5551) format = GU_PSM_5551;
+#endif
 
     if (!realname.size())
     {

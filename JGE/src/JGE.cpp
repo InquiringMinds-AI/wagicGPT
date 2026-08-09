@@ -228,9 +228,37 @@ void JGE::Update(float dt)
         it->second -= dt;
     }
 
+#if !defined(PSP) && !defined(VITA) && !defined(ANDROID)
+    //WAGIC_KEYSCRIPT="frame:btn,frame:btn,...": inject button presses at
+    //absolute frame numbers - drives menus in offscreen/fbdump runs where
+    //no real input exists (visual-defect reproduction, 2026-08-09). Button
+    //ids are the raw JButton enum values.
+    {
+        static const char * script = getenv("WAGIC_KEYSCRIPT");
+        if (script && *script)
+        {
+            static unsigned int frame = 0;
+            static const char * cursor = NULL;
+            if (!cursor) cursor = script;
+            frame++;
+            while (*cursor)
+            {
+                unsigned int f = 0; int btn = 0;
+                if (sscanf(cursor, "%u:%d", &f, &btn) != 2)
+                    break;
+                if (f > frame)
+                    break;
+                PressKey((JButton) btn);
+                const char * comma = strchr(cursor, ',');
+                cursor = comma ? comma + 1 : cursor + strlen(cursor);
+            }
+        }
+    }
+#endif
+
     if (mApp != NULL)
         mApp->Update();
-    
+
     oldHolds = holds;
 }
 

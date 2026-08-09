@@ -29,6 +29,10 @@ extern "C" {
 #endif
 #endif //IOS
 
+#ifdef VITA
+#include <psp2/io/stat.h>
+#endif
+#include <vector>
 #include "../../include/JGE.h"
 #include "../../include/JRenderer.h"
 #include "../../include/JResourceManager.h"
@@ -891,6 +895,104 @@ void JRenderer::EndScene()
     checkGlError();
     glFlush ();
     checkGlError();
+#ifdef VITA
+    //On-device framebuffer dumps, gated by the presence of
+    //ux0:data/Wagic/fbdump.on (create/delete it over FTP). Every 90th frame
+    //is written to ux0:data/Wagic/fbdump/f<0..7>.ppm (rolling ring of 8) -
+    //pixel-exact evidence for visual defects that photographs of the panel
+    //cannot give (2026-08-09: menu dots, battlefield 1px line). The gate
+    //file is stat'ed once every 300 frames; overhead when absent is nil.
+    {
+        static int gateCounter = 0;
+        static bool gateOn = false;
+        static int frameCounter = 0;
+        static int slot = 0;
+        if (++gateCounter >= 300 || gateCounter == 1)
+        {
+            gateCounter = 1;
+            FILE * g = fopen("ux0:data/Wagic/fbdump.on", "rb");
+            gateOn = (g != NULL);
+            if (g) fclose(g);
+            if (gateOn) sceIoMkdir("ux0:data/Wagic/fbdump", 0777);
+        }
+        //Each capture stalls the render thread for a memory-stick write -
+        //at the original 90-frame cadence that froze the game every 1.5s
+        //(owner: "about to hurl my vita against a wall"). Now: one capture
+        //every ~10s, at most 8 per app launch.
+        static int totalDumps = 0;
+        if (gateOn && totalDumps < 8 && ++frameCounter >= 600)
+        {
+            frameCounter = 0;
+            totalDumps++;
+            int w = 960, h = 544;
+            static std::vector<unsigned char> px;
+            px.resize((size_t) w * h * 4);
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, &px[0]);
+            char path[128];
+            snprintf(path, sizeof(path), "ux0:data/Wagic/fbdump/f%d.ppm", slot);
+            slot = (slot + 1) % 8;
+            FILE * fp = fopen(path, "wb");
+            if (fp)
+            {
+                fprintf(fp, "P6\n%d %d\n255\n", w, h);
+                std::vector<unsigned char> row((size_t) w * 3);
+                for (int y = h - 1; y >= 0; y--)
+                {
+                    const unsigned char * s = &px[(size_t) y * w * 4];
+                    for (int x = 0; x < w; x++)
+                    {
+                        row[x*3] = s[x*4]; row[x*3+1] = s[x*4+1]; row[x*3+2] = s[x*4+2];
+                    }
+                    fwrite(&row[0], 1, row.size(), fp);
+                }
+                fclose(fp);
+            }
+        }
+    }
+#endif
+#if !defined(VITA) && !defined(PSP)
+    //WAGIC_FBDUMP=<prefix>: write frame N (WAGIC_FBDUMP_FRAME, default 180)
+    //of the backbuffer as a PPM and exit. Works under SDL's offscreen video
+    //driver, so any rendered screen can be inspected with NO window - the
+    //visual-defect loop's substitute for eyes (2026-08-09, main-menu
+    //particle dots). Dev diagnostic; costs one getenv per frame when unset.
+    {
+        static const char * dumpPrefix = getenv("WAGIC_FBDUMP");
+        if (dumpPrefix && *dumpPrefix)
+        {
+            static int frameNo = 0;
+            static int target = -1;
+            if (target < 0)
+            {
+                const char * f = getenv("WAGIC_FBDUMP_FRAME");
+                target = (f && atoi(f) > 0) ? atoi(f) : 180;
+            }
+            ++frameNo;
+            bool burstDone = frameNo >= target + 400;
+            if (frameNo >= target && (frameNo - target) % 40 == 0 && !burstDone)
+            {
+                int w = (int) mActualWidth, h = (int) mActualHeight;
+                std::vector<unsigned char> px((size_t) w * h * 3);
+                glPixelStorei(GL_PACK_ALIGNMENT, 1);
+                glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, &px[0]);
+                char path[512];
+                snprintf(path, sizeof(path), "%s-f%d.ppm", dumpPrefix, frameNo);
+                FILE * fp = fopen(path, "wb");
+                if (fp)
+                {
+                    fprintf(fp, "P6\n%d %d\n255\n", w, h);
+                    for (int y = h - 1; y >= 0; y--) //GL rows are bottom-up
+                        fwrite(&px[(size_t) y * w * 3], 1, (size_t) w * 3, fp);
+                    fclose(fp);
+                    fprintf(stderr, "WAGIC_FBDUMP wrote %s\n", path);
+                }
+            }
+            if (burstDone)
+                exit(0);
+        }
+    }
+#endif
 }
 
 void JRenderer::BindTexture(JTexture *tex)

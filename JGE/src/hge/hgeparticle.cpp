@@ -148,9 +148,15 @@ void hgeParticleSystem::Update(float fDeltaTime)
     particle->fAge += fDeltaTime;
     if(particle->fAge >= particle->fTerminalAge)
     {
+      //Erase the particle that actually expired. This used to pop_front()
+      //regardless: terminal ages are random, so a mid-list particle expiring
+      //first killed a still-alive particle and left the expired one behind
+      //as a ZOMBIE integrating past its terminal age - size drifting past
+      //fSizeEnd toward degenerate values, color past its end color - which
+      //rendered as stray bright dots around emitters (the main-menu flame,
+      //most visibly on the Vita where burstier frame times overshoot more).
       nParticlesAlive--;
-      ++particle;
-      mParticleBuffer.pop_front();
+      particle = mParticleBuffer.erase(particle);
       continue;
     }
 
