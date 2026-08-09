@@ -151,11 +151,29 @@ void JFileSystem::preloadZip(const string& filename)
     cache->lastUse = ++gZipCacheTick;
     mZipCache[filename] = cache;
 
+    //A failed attach or parse used to leave the just-inserted EMPTY cache
+    //in the map forever: every later lookup found it, missed, and the whole
+    //set silently rendered no-art frames until restart (the Vita's missing
+    //card art, hunted 2026-08-09 - the parse fails transiently on-device).
+    //Now the empty entry is dropped so the next request retries, with a
+    //budget: a PERSISTENTLY failing zip must not re-parse per request
+    //(a parse costs seconds on PSP memory stick), so after 5 strikes the
+    //empty entry stays as a deliberate session tombstone.
+    static map<string, int> zipFailCounts;
+
     if (!mZipAvailable || !mZipFile) {
 		AttachZipFile(filename);
 		if (!mZipAvailable || !mZipFile)
 		{
-		    zipDiagLog(this, "zip-attach-fail " + filename);
+		    int fails = ++zipFailCounts[filename];
+		    char tail[48];
+		    snprintf(tail, sizeof(tail), " strike=%d", fails);
+		    zipDiagLog(this, "zip-attach-fail " + filename + tail);
+		    if (fails < 5)
+		    {
+		        delete mZipCache[filename];
+		        mZipCache.erase(filename);
+		    }
 		    return;
 		}
 	}
@@ -163,11 +181,21 @@ void JFileSystem::preloadZip(const string& filename)
     if ((mUserFS->PreloadZip(filename.c_str(), cache->dir) || (mSystemFS && mSystemFS->PreloadZip(filename.c_str(), cache->dir))))
     {
         mZipCachedElementsCount+= cache->dir.size();
+        zipFailCounts.erase(filename); //a success clears the strike record
     }
     else
     {
-        zipDiagLog(this, "zip-parse-fail " + filename);
+        int fails = ++zipFailCounts[filename];
+        char tail[96];
+        snprintf(tail, sizeof(tail), " reason=%s strike=%d",
+                 zip_file_system::filesystem::PreloadZipFailReason(), fails);
+        zipDiagLog(this, "zip-parse-fail " + filename + tail);
         DetachZipFile();
+        if (fails < 5)
+        {
+            delete mZipCache[filename];
+            mZipCache.erase(filename);
+        }
     }
 
 #if defined(PSP) && defined(WAGIC_MEMPROBE)

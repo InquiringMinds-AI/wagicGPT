@@ -469,16 +469,27 @@ void filesystem::InsertZip(const char * Filename, const size_t PackID)
 }
 
 
+static char gPreloadFailReason[64] = "";
+
+const char * filesystem::PreloadZipFailReason()
+{
+    return gPreloadFailReason;
+}
+
 bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info>& target)
 {
 	zipfile_info ZipInfo;
+	gPreloadFailReason[0] = '\0';
 
 	// Open zip
 	izfstream File;
     File.open(Filename, this);
 
 	if (! File)
+	{
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "open");
 		return false;
+	}
 
 	// Find the start of the central directory
     if (File.Zipped())
@@ -511,6 +522,8 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
 	    }
 
 	    File.close();
+        if (!target.size())
+            snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "noentries");
         return (target.size() ? true : false);
     }
     else
@@ -524,17 +537,20 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
         streamoff cdOffset = CentralDir(File);
         if (cdOffset < streamoff(0))
         {
+            snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd");
             File.close();
             return false;
         }
         if (! File.seekg(0, ios::end))
         {
+            snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "seekend");
             File.close();
             return false;
         }
         streamoff cdSize = File.tellg() - cdOffset;
         if (cdSize <= 0 || ! File.seekg(cdOffset))
         {
+            snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "cdseek size=%ld", (long) cdSize);
             File.close();
             return false;
         }
@@ -542,6 +558,8 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
         File.read(&cdBuf[0], cdSize);
         if (File.gcount() != (streamsize)cdSize)
         {
+            snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "shortread got=%ld want=%ld",
+                     (long) File.gcount(), (long) cdSize);
             File.close();
             return false;
         }
@@ -568,6 +586,8 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
 		    }
 	    }
 
+        if (!target.size())
+            snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "noentries");
         return (target.size() ? true : false);
     }
 

@@ -23,7 +23,7 @@
 //     misrepresented as being the original software.
 //  3. This notice may not be removed or altered from any source distribution.
 //
-//  Tanguy FautrÅE
+//  Tanguy FautrÔøΩE
 //  softdev@telenet.be
 //
 //////////////////////////////////////////////////////////////////////
@@ -152,6 +152,10 @@ public:
     bool DirExists(const std::string & folderName);
     bool FileExists(const std::string & fileName);
     bool PreloadZip(const char * Filename, std::map<std::string, limited_file_info>& target);
+    //Why the last PreloadZip returned false, for the caller's diagnostics
+    //("open", "eocd", "seekend", "cdseek", "shortread got=X want=Y",
+    //"noentries") - the legs are indistinguishable from outside otherwise.
+    static const char * PreloadZipFailReason();
     static std::string getCurrentZipName();
     static filesystem * getCurrentFS();
     static std::streamoff SkipLFHdr(std::istream & File, std::streamoff LFHdrPos);
