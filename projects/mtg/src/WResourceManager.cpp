@@ -12,6 +12,10 @@
 #include "WFont.h"
 
 #include <typeinfo>
+#include <set>
+#ifdef WITH_GPT_AI
+#include "GptConfig.h"
+#endif
 
 #ifdef FORCE_LOW_CACHE_MEMORY
 //#define FORCE_LOW_CACHE_MEMORY
@@ -255,6 +259,26 @@ JQuadPtr ResourceManagerImpl::RetrieveCard(MTGCard * card, int style, int submod
     JQuadPtr jq = RetrieveQuad(filename, 0, 0, 0, 0, "", style, submode | TEXTURE_SUB_5551, id);
 
     lastError = textureWCache.mError;
+#ifdef WITH_GPT_AI
+    if (!jq && lastError != CACHE_ERROR_NONE)
+    {
+        //Failure-visibility for card art: a pack owner whose card silently
+        //renders the no-art frame cannot tell a missing file from a decode
+        //or allocation failure. Name the stage, once per (file, error) per
+        //session: 1=404 lookup, 2=bad decode/texture, 3=alloc. Capped so a
+        //packless install (where every card 404s by design) cannot balloon
+        //the log.
+        static std::set<string> logged;
+        if (logged.size() < 200)
+        {
+            char line[640];
+            snprintf(line, sizeof(line), "art-fail %s err=%d%s", filename.c_str(), lastError,
+                     (style == RETRIEVE_THUMB || (submode & TEXTURE_SUB_THUMB)) ? " (thumb)" : "");
+            if (logged.insert(line).second)
+                gptLogLine(line);
+        }
+    }
+#endif
     if (jq)
     {
         jq->SetHotSpot(static_cast<float> (jq->mTex->mWidth / 2), static_cast<float> (jq->mTex->mHeight / 2));
@@ -1127,13 +1151,13 @@ cacheItem* WCache<cacheItem, cacheActual>::AttemptNew(const string& filename, in
         //No such file. Fail
         if (mError == CACHE_ERROR_404)
         {
-            DebugTrace("AttemptNew failed to load. Deleting cache item " << ToHex(item));
+            DebugTrace("AttemptNew failed to load (404): " << filename);
             SAFE_DELETE(item);
             return NULL;
         }
         else
         {
-            DebugTrace("AttemptNew failed to load (not a 404 error). Deleting cache item " << ToHex(item));
+            DebugTrace("AttemptNew failed to load (not a 404 error): " << filename);
             SAFE_DELETE(item);
             mError = CACHE_ERROR_BAD;
             return NULL;
