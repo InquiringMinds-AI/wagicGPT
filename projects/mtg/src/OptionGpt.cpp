@@ -218,6 +218,10 @@ void OptionGptPreset::updateValue()
 {
     size_t count = 0;
     const GptPreset * presets = gptPresets(count);
+    //A single-entry table (PSP: Custom only) has nothing to cycle to, and the
+    //wrap branch below would blank the user's typed URL on every press.
+    if (count <= 1)
+        return;
     bool wasCodex = gptCodexEndpoint(mCfg->primaryUrl());
     size_t next = (gptPresetForUrl(mCfg->primaryUrl()) + 1) % count;
     //"Custom" keeps whatever URL is entered; a named preset writes its URL.

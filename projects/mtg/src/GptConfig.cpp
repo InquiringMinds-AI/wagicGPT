@@ -401,6 +401,10 @@ void GptSettings::setPrimaryUrl(const string& u)
 //key=, and the whole exchange is handled by gptCodexComplete.
 static const GptPreset kPresets[] = {
     { "Custom", "" },
+#if !defined(PSP)
+    //PSP transport is plain-HTTP to a LAN companion bridge only: no TLS rules
+    //out every https:// provider, and 127.0.0.1 is the PSP itself - so Custom
+    //(the user's bridge URL) is the only connection type that can work there.
     { "Local llama.cpp", "http://127.0.0.1:8080" },
     { "Local Ollama", "http://127.0.0.1:11434" },
     { "LM Studio", "http://127.0.0.1:1234" },
@@ -412,6 +416,7 @@ static const GptPreset kPresets[] = {
     { "Mistral", "https://api.mistral.ai" },
     { "DeepSeek", "https://api.deepseek.com" },
     { "xAI", "https://api.x.ai" },
+#endif
 };
 
 const GptPreset * gptPresets(size_t& count)
