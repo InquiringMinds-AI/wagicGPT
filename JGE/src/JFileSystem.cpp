@@ -178,7 +178,13 @@ void JFileSystem::preloadZip(const string& filename)
 		}
 	}
 
-    if ((mUserFS->PreloadZip(filename.c_str(), cache->dir) || (mSystemFS && mSystemFS->PreloadZip(filename.c_str(), cache->dir))))
+    //Parse through the ALREADY-OPEN attach handle (mZipFile) instead of
+    //opening a second handle to the same file: the second open is what
+    //fails on the Vita under fd pressure (ziplog reason=open, 2026-08-09),
+    //and it was pure waste besides. Path-based parse stays as the fallback.
+    if (mUserFS->PreloadZip(mZipFile, cache->dir)
+        || mUserFS->PreloadZip(filename.c_str(), cache->dir)
+        || (mSystemFS && mSystemFS->PreloadZip(filename.c_str(), cache->dir)))
     {
         mZipCachedElementsCount+= cache->dir.size();
         zipFailCounts.erase(filename); //a success clears the strike record

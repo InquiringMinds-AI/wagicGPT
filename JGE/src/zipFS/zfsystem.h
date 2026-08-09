@@ -152,6 +152,12 @@ public:
     bool DirExists(const std::string & folderName);
     bool FileExists(const std::string & fileName);
     bool PreloadZip(const char * Filename, std::map<std::string, limited_file_info>& target);
+    //Parse an ALREADY-OPEN zip stream instead of opening a second handle to
+    //the same file - a second open of an already-held file fails on the Vita
+    //under fd pressure (ziplog reason=open, 2026-08-09), and the caller
+    //(JFileSystem::preloadZip) always holds the file open as the attach
+    //handle anyway. Leaves the stream open; clears its state on exit.
+    bool PreloadZip(izfstream & File, std::map<std::string, limited_file_info>& target);
     //Why the last PreloadZip returned false, for the caller's diagnostics
     //("open", "eocd", "seekend", "cdseek", "shortread got=X want=Y",
     //"noentries") - the legs are indistinguishable from outside otherwise.

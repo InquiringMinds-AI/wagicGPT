@@ -478,12 +478,27 @@ const char * filesystem::PreloadZipFailReason()
 
 bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info>& target)
 {
-	zipfile_info ZipInfo;
 	gPreloadFailReason[0] = '\0';
 
 	// Open zip
 	izfstream File;
     File.open(Filename, this);
+
+	if (! File)
+	{
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "open");
+		return false;
+	}
+
+	bool ok = PreloadZip(File, target);
+	File.close();
+	return ok;
+}
+
+bool filesystem::PreloadZip(izfstream & File, map<string, limited_file_info>& target)
+{
+	zipfile_info ZipInfo;
+	gPreloadFailReason[0] = '\0';
 
 	if (! File)
 	{
@@ -497,7 +512,7 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
         streamoff realBeginOfFile =  SkipLFHdr(CurrentZipFile, File.getOffset());
         if (! CurrentZipFile.seekg(CentralDirZipped(CurrentZipFile, realBeginOfFile, File.getCompSize())))
         {
-            File.close();
+            File.clear(); //caller owns the stream - leave it open
             return false;
         }
 
@@ -521,7 +536,7 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
 		    }
 	    }
 
-	    File.close();
+	    File.clear(); //caller owns the stream - leave it open
         if (!target.size())
             snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "noentries");
         return (target.size() ? true : false);
@@ -538,20 +553,20 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
         if (cdOffset < streamoff(0))
         {
             snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd");
-            File.close();
+            File.clear(); //caller owns the stream - leave it open
             return false;
         }
         if (! File.seekg(0, ios::end))
         {
             snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "seekend");
-            File.close();
+            File.clear(); //caller owns the stream - leave it open
             return false;
         }
         streamoff cdSize = File.tellg() - cdOffset;
         if (cdSize <= 0 || ! File.seekg(cdOffset))
         {
             snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "cdseek size=%ld", (long) cdSize);
-            File.close();
+            File.clear(); //caller owns the stream - leave it open
             return false;
         }
         string cdBuf((size_t)cdSize, '\0');
@@ -560,10 +575,10 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
         {
             snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "shortread got=%ld want=%ld",
                      (long) File.gcount(), (long) cdSize);
-            File.close();
+            File.clear(); //caller owns the stream - leave it open
             return false;
         }
-        File.close();
+        File.clear(); //caller owns the stream - leave it open
         istringstream cdStream(cdBuf, ios::in | ios::binary);
 
 	    // Check every headers within the zip file
