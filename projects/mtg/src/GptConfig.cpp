@@ -16,6 +16,10 @@
 #include <sstream>
 #include <sys/stat.h>
 #include <cstring>
+//std::lock_guard for the codex auth mutex. Header-only, so safe on Vita too,
+//where GptMutex is a kernel mutex precisely because std::mutex is a no-op
+//there - lock_guard is just RAII over whatever BasicLockable it is given.
+#include <mutex>
 
 using std::string;
 using std::vector;
