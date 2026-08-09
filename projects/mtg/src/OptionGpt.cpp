@@ -206,7 +206,8 @@ void OptionGptText::updateValue()
 {
     //The on-screen keyboard edits the bound string in place: SimplePad
     //writes *dest on confirm (the New Profile / network address pattern).
-    SimplePad * pad = options.keypadStart(*mBind, mBind);
+    //URLs and API keys need digits and punctuation - show the numpad row.
+    SimplePad * pad = options.keypadStart(*mBind, mBind, true, true);
     if (pad)
         pad->title = displayValue;
 }

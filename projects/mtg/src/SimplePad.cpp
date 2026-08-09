@@ -116,6 +116,15 @@ SimplePad::SimplePad()
     linkKeys(KPD_DOT, KPD_9, KPD_LEFT);
     keys[KPD_DOT]->adjacency[KPD_DOWN] = KPD_DEL;
 
+    //':' and '/' complete the character set a URL needs (the numpad row is
+    //shown for URL/key entry, where dots alone don't get you to a port).
+    k = Add(_(":"), KPD_COLON);
+    linkKeys(KPD_COLON, KPD_DOT, KPD_LEFT);
+    keys[KPD_COLON]->adjacency[KPD_DOWN] = KPD_DEL;
+    k = Add(_("/"), KPD_SLASH);
+    linkKeys(KPD_SLASH, KPD_COLON, KPD_LEFT);
+    keys[KPD_SLASH]->adjacency[KPD_DOWN] = KPD_DEL;
+
     keys[KPD_8]->adjacency[KPD_DOWN] = KPD_DEL;
     keys[KPD_9]->adjacency[KPD_DOWN] = KPD_DEL;
 
@@ -172,6 +181,16 @@ void SimplePad::pressKey(unsigned char key)
         if (cursor < buffer.size()) cursor++;
         buffer.insert(cursor, ".");
     }
+    else if (key == KPD_COLON)
+    {
+        if (cursor < buffer.size()) cursor++;
+        buffer.insert(cursor, ":");
+    }
+    else if (key == KPD_SLASH)
+    {
+        if (cursor < buffer.size()) cursor++;
+        buffer.insert(cursor, "/");
+    }
     else if (key == KPD_SPACE)
     {
         if (cursor < buffer.size()) cursor++;
@@ -222,7 +241,7 @@ void SimplePad::CancelEdit()
 }
 void SimplePad::MoveSelection(unsigned char moveto)
 {
-    if (!bShowNumpad && moveto >= KPD_0 && moveto <= KPD_9)
+    if (!bShowNumpad && moveto >= KPD_0 && moveto <= KPD_SLASH)
         moveto = KPD_INPUT;
     else if (!bShowCancel && moveto == KPD_CANCEL) moveto = KPD_SPACE;
 
@@ -442,7 +461,7 @@ void SimplePad::Render()
         if (keys[x])
         {
 
-            if ((x == KPD_CANCEL && !bShowCancel) || (x >= KPD_0 && x <= KPD_DOT && !bShowNumpad)) continue;
+            if ((x == KPD_CANCEL && !bShowCancel) || (x >= KPD_0 && x <= KPD_SLASH && !bShowNumpad)) continue;
 
             switch (x)
             {
