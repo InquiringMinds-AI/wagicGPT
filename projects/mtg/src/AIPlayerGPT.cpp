@@ -3556,6 +3556,17 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     if (mEndpoint.find("api.openai.com") == string::npos)
         request["chat_template_kwargs"] = {{"enable_thinking", mThinking}};
 
+    //OpenRouter ignores chat_template_kwargs, so hybrid-reasoning models
+    //think anyway. Measured on deepseek-v4-flash-0731 (pinned first-party):
+    //~3.5k HIDDEN reasoning tokens per decision behind a ~140-token answer
+    //(40-50s wall), and reasoning spirals that hit max_tokens spend the whole
+    //budget before any content - the reply comes back EMPTY and the decision
+    //falls back to the heuristic. Their unified reasoning field is the switch
+    //that actually works there: the same decision replayed 41.9s -> 2.2s.
+    //Scoped to openrouter.ai - the field is their extension.
+    if (mEndpoint.find("openrouter.ai") != string::npos)
+        request["reasoning"] = {{"enabled", mThinking ? true : false}};
+
     //Repetition damping (decode-side guard against 12-16k-char spirals).
     //vLLM accepts repetition_penalty as a non-standard top-level field; the
     //official OpenAI API rejects unknown top-level params with a 400, so omit
