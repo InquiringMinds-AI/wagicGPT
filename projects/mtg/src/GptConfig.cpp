@@ -287,6 +287,7 @@ GptSettings GptSettings::load()
         else if (k == "maxtokens" || k == "max_reply_tokens") cfg.maxTokens = atol(v.c_str());
         else if (k == "repetition_penalty") cfg.repetitionPenalty = atof(v.c_str());
         else if (k == "provider_only") cfg.providerOnly = v;
+        else if (k == "reasoning_effort") cfg.reasoningEffort = v;
         else if (k == "timeout") cfg.timeoutSecs = atoi(v.c_str());
         else if (k == "patience") cfg.patienceSecs = atoi(v.c_str());
         else if (k == "translog") cfg.translog = (v != "0" && v != "off") ? 1 : 0;
@@ -338,6 +339,8 @@ bool GptSettings::save() const
         f << "repetition_penalty=" << repetitionPenalty << "\n";
     if (!providerOnly.empty())
         f << "provider_only=" << providerOnly << "\n";
+    if (!reasoningEffort.empty())
+        f << "reasoning_effort=" << reasoningEffort << "\n";
     f << "timeout=" << timeoutSecs << "\n";
     f << "patience=" << patienceSecs << "\n";
     if (translog)
@@ -355,6 +358,7 @@ bool GptSettings::operator==(const GptSettings& o) const
         && thinking == o.thinking && maxTokens == o.maxTokens
         && repetitionPenalty == o.repetitionPenalty
         && providerOnly == o.providerOnly
+        && reasoningEffort == o.reasoningEffort
         && timeoutSecs == o.timeoutSecs && patienceSecs == o.patienceSecs
         && translog == o.translog && telemetry == o.telemetry
         && peek == o.peek;
@@ -974,6 +978,31 @@ string headerValue(const string& respHeaders, const string& name)
 //The model the preset answers with when the user has not configured one.
 const char * const kGptCodexDefaultModel = "gpt-5.6-luna";
 
+//Established by probing 2026-08-09: these four answer; everything else
+//(-fast/-codex variants included) is refused for ChatGPT accounts. Peer
+//options for the end user - listed in probe order, no ranking implied.
+static const char * const kCodexModelIds[] = {
+    "gpt-5.6-luna",
+    "gpt-5.6-terra",
+    "gpt-5.6-sol",
+    "gpt-5.5",
+};
+
+const char * const * gptCodexModels(size_t& count)
+{
+    count = sizeof(kCodexModelIds) / sizeof(kCodexModelIds[0]);
+    return kCodexModelIds;
+}
+
+bool gptCodexEffortValid(const string& s)
+{
+    static const char * const kTiers[] = { "none", "low", "medium", "high", "xhigh", "max" };
+    for (size_t i = 0; i < sizeof(kTiers) / sizeof(kTiers[0]); i++)
+        if (s == kTiers[i])
+            return true;
+    return false;
+}
+
 bool gptCodexEndpoint(const string& url)
 {
     return url.find("chatgpt.com/backend-api") != string::npos;
@@ -1255,12 +1284,14 @@ string modelNameOf(const nlohmann::json& entry)
 }
 } //namespace
 
-bool gptProbeEndpoint(const string& url, const string& key, string& modelOut, long timeoutMs)
+bool gptProbeEndpoint(const string& url, const string& key, string& modelOut, long timeoutMs, const string& modelHint)
 {
     modelOut.clear();
     //The Codex backend has no /v1/models. The honest probe is a minimal
     //completion: it proves auth, route and the SSE path end-to-end for a few
-    //tokens (~25 total against a 7-day plan window).
+    //tokens (~25 total against a 7-day plan window). It runs against the
+    //CONFIGURED model when one is set - probing a default here once masked a
+    //stale foreign model id that would have failed every live decision.
     if (gptCodexEndpoint(url))
     {
         string why;
@@ -1269,8 +1300,9 @@ bool gptProbeEndpoint(const string& url, const string& key, string& modelOut, lo
             gptLogLine("subscription probe: " + why);
             return false;
         }
+        string model = modelHint.empty() ? string(kGptCodexDefaultModel) : modelHint;
         nlohmann::json ping = {
-            {"model", kGptCodexDefaultModel},
+            {"model", model},
             {"instructions", "Reply with the word ok."},
             {"input", nlohmann::json::array({
                 {{"type", "message"}, {"role", "user"},
@@ -1287,7 +1319,7 @@ bool gptProbeEndpoint(const string& url, const string& key, string& modelOut, lo
             gptLogLine("subscription probe failed: " + err);
             return false;
         }
-        modelOut = kGptCodexDefaultModel;
+        modelOut = model;
         return true;
     }
     string body = gptHttpGet(url + "/v1/models", timeoutMs, key);

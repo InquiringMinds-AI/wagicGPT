@@ -427,6 +427,9 @@ private:
     string mModel;
     string mApiKey;
     bool mThinking;
+    //Codex-backend reasoning tier (config reasoning_effort / WAGIC_GPT_EFFORT,
+    //validated against the server's set); empty = the built-in default (low).
+    string mReasoningEffort;
     //Subscription preset: last plan-usage percent already noticed to the
     //player, so the gauge is surfaced when it MOVES, not every decision.
     string mCodexPctNotified;

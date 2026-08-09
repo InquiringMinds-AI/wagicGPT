@@ -39,6 +39,12 @@ public:
                               //sent as provider:{only:[...],allow_fallbacks:
                               //false} so routing NEVER falls back to a
                               //provider the user did not name. Empty = off.
+    std::string reasoningEffort; //Codex-backend reasoning tier (config key
+                              //reasoning_effort): one of the server's own
+                              //set - none/low/medium/high/xhigh/max. Empty =
+                              //the built-in default (low). Only sent on the
+                              //"OpenAI subscription" preset; the thinking
+                              //flag covers every other provider family.
     double repetitionPenalty; //vLLM repetition_penalty; 1.0 = OFF (the field
                               //is only sent when != 1.0). Sampling change,
                               //corpus-validate before defaulting on
@@ -128,6 +134,13 @@ std::string gptHttpPost(const std::string& url, const std::string& body, long ti
 bool gptCodexEndpoint(const std::string& url);
 //Model used when the config names none.
 extern const char * const kGptCodexDefaultModel;
+//The models a ChatGPT account may use on this backend (no /v1/models exists;
+//this list was established by probing - the backend 400s anything else with
+//"not supported when using Codex with a ChatGPT account").
+const char * const * gptCodexModels(size_t& count);
+//True when s is one of the backend's reasoning tiers (none/low/medium/high/
+//xhigh/max - the server's own enumeration; there is no "minimal").
+bool gptCodexEffortValid(const std::string& s);
 //True when usable subscription auth material was found; whyNot names the gap.
 bool gptCodexAuthPresent(std::string& whyNot);
 //Blocking round trip (worker thread): POST a Responses-shaped body to the full
@@ -173,8 +186,11 @@ typedef std::mutex GptMutex;
 #endif
 
 //Probe url + "/v1/models". True when the endpoint answers with a usable
-//model list; modelOut receives the first advertised model id.
-bool gptProbeEndpoint(const std::string& url, const std::string& key, std::string& modelOut, long timeoutMs = 20000);
+//model list; modelOut receives the first advertised model id. On the Codex
+//backend (no /v1/models) the probe is a minimal real completion instead,
+//run against modelHint when given - so "Test connection" exercises the model
+//the game will actually use, not a default that can mask a bad config.
+bool gptProbeEndpoint(const std::string& url, const std::string& key, std::string& modelOut, long timeoutMs = 20000, const std::string& modelHint = "");
 
 #ifdef WAGIC_HTTP_JNI
 //Capture the app's SDLActivity class while the app class loader is still the

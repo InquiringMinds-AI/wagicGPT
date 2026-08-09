@@ -2050,6 +2050,16 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     if (mPatienceLimit < 0)
         mPatienceLimit = 0;
     mThinking = getenv("WAGIC_GPT_THINKING") ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
+    mReasoningEffort = cfg.reasoningEffort;
+    if (const char * re = getenv("WAGIC_GPT_EFFORT"))
+        mReasoningEffort = re;
+    //Only the server's own tiers pass; anything else falls to the built-in
+    //default rather than 400-ing every decision on a typo.
+    if (!mReasoningEffort.empty() && !gptCodexEffortValid(mReasoningEffort))
+    {
+        gptLogLine("reasoning_effort '" + mReasoningEffort + "' is not one of none/low/medium/high/xhigh/max - using the default");
+        mReasoningEffort.clear();
+    }
     //Telemetry consent implies local decision logging: the log IS the data
     //a future contribution/upload mechanism would share.
     bool translog = getenv("WAGIC_GPT_TRANSLOG") ? envFlag("WAGIC_GPT_TRANSLOG")
@@ -2332,6 +2342,25 @@ void AIPlayerGPT::resolveEndpoint()
             mModel = mConfigModel;
         else
             mModel = firstModel;
+        //The Codex backend accepts exactly its verified roster. A foreign id
+        //can sit in a config the GUI never re-touches (a preset saved by an
+        //older build, a hand edit), and it would fail EVERY decision while
+        //looking configured. Heal to the default and say so, rather than play
+        //a whole match on the heuristic with a plausible-looking config.
+        if (gptCodexEndpoint(mEndpoint) && !mModel.empty())
+        {
+            bool inRoster = false;
+            size_t n = 0;
+            const char * const * roster = gptCodexModels(n);
+            for (size_t j = 0; j < n; j++)
+                if (mModel == roster[j])
+                    inRoster = true;
+            if (!inRoster)
+            {
+                gptLogLine("model '" + mModel + "' is not available on the subscription backend - using " + kGptCodexDefaultModel);
+                mModel = kGptCodexDefaultModel;
+            }
+        }
         return;
     }
 }
@@ -3571,10 +3600,12 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //truncation guard has no decode-side cap here and relies on the reply
     //protocol's brevity pressure. reasoning.effort must be set explicitly:
     //the default (medium) is the same hidden-reasoning latency trap the
-    //OpenRouter fix closed - thinking maps to "low", non-thinking to
-    //"minimal".
+    //OpenRouter fix closed. The configured tier wins; unset means "low"
+    //(some reasoning, sane latency), and the thinking flag - which belongs
+    //to the other provider families - is not consulted here at all.
     if (gptCodexEndpoint(mEndpoint))
     {
+        string effort = mReasoningEffort.empty() ? string("low") : mReasoningEffort;
         json request = {
             {"model", mModel.empty() ? string(kGptCodexDefaultModel) : mModel},
             {"instructions", mSystemPrompt},
@@ -3582,7 +3613,7 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
                 {{"type", "message"}, {"role", "user"},
                  {"content", json::array({{{"type", "input_text"}, {"text", userMsg}}})}},
             })},
-            {"reasoning", {{"effort", mThinking ? "low" : "none"}}},
+            {"reasoning", {{"effort", effort}}},
             {"store", false},
             {"stream", true},
         };

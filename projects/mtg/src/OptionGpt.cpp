@@ -39,13 +39,13 @@ GptOptionsList::GptOptionsList()
     Add(NEW OptionGptBool(&cfg.enabled, "LLM opponent", "Off (heuristic AI)", "On"));
     Add(NEW OptionGptPreset(&cfg));
     Add(NEW OptionGptText(&cfg.urls[0], "Endpoint URL"));
-    Add(NEW OptionGptText(&cfg.model, "Model", "(auto-detect)"));
+    Add(NEW OptionGptModel(&cfg));
     //OpenRouter routing pin: comma-separated provider names, sent as
     //provider:{only:[...],allow_fallbacks:false}. Config-file-only until the
     //owner's ruling that provider control must be reachable from the couch.
-    Add(NEW OptionGptText(&cfg.providerOnly, "Provider pin (OpenRouter)", "(any provider)"));
-    Add(NEW OptionGptText(&cfg.key, "API key", "(none)", true));
-    Add(NEW OptionGptBool(&cfg.thinking, "Thinking mode (stronger, slower)"));
+    Add(NEW OptionGptTextUnlessCodex(&cfg, &cfg.providerOnly, "Provider pin (OpenRouter)", "(any provider)"));
+    Add(NEW OptionGptTextUnlessCodex(&cfg, &cfg.key, "API key", "(none)", true));
+    Add(NEW OptionGptReasoning(&cfg));
     //Generous by design: the patience prompt is what bounds how long a PERSON
     //waits, so this only has to be long enough that "keep waiting" can still
     //land an answer, and short enough to eventually release a dead socket.
@@ -215,12 +215,148 @@ void OptionGptPreset::updateValue()
 {
     size_t count = 0;
     const GptPreset * presets = gptPresets(count);
+    bool wasCodex = gptCodexEndpoint(mCfg->primaryUrl());
     size_t next = (gptPresetForUrl(mCfg->primaryUrl()) + 1) % count;
     //"Custom" keeps whatever URL is entered; a named preset writes its URL.
     if (next != 0)
         mCfg->setPrimaryUrl(presets[next].url);
     else if (gptPresetForUrl(mCfg->primaryUrl()) == count - 1)
         mCfg->setPrimaryUrl(""); //wrap past the last preset into editable Custom
+
+    //Crossing the subscription boundary invalidates the model id: the codex
+    //roster exists nowhere else, and a foreign id (deepseek/..., a local
+    //gguf name) fails every live decision there while the probe - which
+    //would use the default - reports OK. Seen live on the Vita: an
+    //OpenRouter model id rode a preset switch and only the probe's default
+    //masked it. Clearing to auto-detect is the honest reset; entering the
+    //codex preset auto-detect means the default model.
+    bool isCodex = gptCodexEndpoint(mCfg->primaryUrl());
+    if (wasCodex != isCodex)
+    {
+        bool inRoster = false;
+        size_t n = 0;
+        const char * const * roster = gptCodexModels(n);
+        for (size_t i = 0; i < n; i++)
+            if (mCfg->model == roster[i])
+                inRoster = true;
+        if ((isCodex && !inRoster) || (wasCodex && inRoster))
+            mCfg->model.clear();
+    }
+}
+
+//--- model row (preset-aware) -----------------------------------------------
+
+OptionGptModel::OptionGptModel(GptSettings * cfg)
+    : OptionGptText(&cfg->model, "Model", "(auto-detect)"), mCfg(cfg)
+{
+}
+
+void OptionGptModel::Render()
+{
+    if (!gptCodexEndpoint(mCfg->primaryUrl()))
+    {
+        OptionGptText::Render();
+        return;
+    }
+    WFont * font = WResourceManager::Instance()->GetWFont(Fonts::OPTION_FONT);
+    font->SetColor(getColor(WGuiColor::TEXT));
+    font->DrawString(_(displayValue).c_str(), x + 2, y + 3);
+    drawValue(font, mCfg->model.empty() ? string("(") + kGptCodexDefaultModel + ")"
+                                        : mCfg->model, x, y, width);
+}
+
+void OptionGptModel::updateValue()
+{
+    if (!gptCodexEndpoint(mCfg->primaryUrl()))
+    {
+        OptionGptText::updateValue(); //free text via the on-screen keyboard
+        return;
+    }
+    //The subscription backend accepts exactly the verified roster - cycling
+    //beats a keyboard that can only produce a 400. Peer options, no ranking:
+    //the order is the probe order, and "(auto-detect)" = the default model.
+    size_t n = 0;
+    const char * const * roster = gptCodexModels(n);
+    size_t at = n; //"not in roster" == the empty/auto slot
+    for (size_t i = 0; i < n; i++)
+        if (mCfg->model == roster[i])
+            at = i;
+    size_t next = (at + 1) % (n + 1); //the extra slot is "" (auto)
+    mCfg->model = (next == n) ? "" : roster[next];
+}
+
+//--- reasoning row (preset-aware) --------------------------------------------
+
+OptionGptReasoning::OptionGptReasoning(GptSettings * cfg)
+    : WGuiItem("Thinking mode (stronger, slower)"), mCfg(cfg)
+{
+}
+
+void OptionGptReasoning::Render()
+{
+    WFont * font = WResourceManager::Instance()->GetWFont(Fonts::OPTION_FONT);
+    font->SetColor(getColor(WGuiColor::TEXT));
+    if (gptCodexEndpoint(mCfg->primaryUrl()))
+    {
+        font->DrawString(_("Reasoning effort").c_str(), x + 2, y + 3);
+        drawValue(font, mCfg->reasoningEffort.empty() ? "(low)" : mCfg->reasoningEffort,
+                  x, y, width);
+        return;
+    }
+    font->DrawString(_(displayValue).c_str(), x + 2, y + 3);
+    drawValue(font, mCfg->thinking ? "On" : "Off", x, y, width);
+}
+
+void OptionGptReasoning::updateValue()
+{
+    if (!gptCodexEndpoint(mCfg->primaryUrl()))
+    {
+        mCfg->thinking = mCfg->thinking ? 0 : 1;
+        return;
+    }
+    //The server's own tier enumeration, plus the empty default slot. All six
+    //are offered even where the latency cost is severe - the plan window and
+    //the wait are the user's to spend.
+    static const char * const kTiers[] = { "none", "low", "medium", "high", "xhigh", "max" };
+    const size_t n = sizeof(kTiers) / sizeof(kTiers[0]);
+    size_t at = n;
+    for (size_t i = 0; i < n; i++)
+        if (mCfg->reasoningEffort == kTiers[i])
+            at = i;
+    size_t next = (at + 1) % (n + 1);
+    mCfg->reasoningEffort = (next == n) ? "" : kTiers[next];
+}
+
+//--- rows a preset does not consume ------------------------------------------
+
+OptionGptTextUnlessCodex::OptionGptTextUnlessCodex(GptSettings * cfg, string * bind,
+                                                   string label, string emptyText, bool secret)
+    : OptionGptText(bind, label, emptyText, secret), mCfg(cfg)
+{
+}
+
+void OptionGptTextUnlessCodex::Render()
+{
+    if (!gptCodexEndpoint(mCfg->primaryUrl()))
+    {
+        OptionGptText::Render();
+        return;
+    }
+    //The subscription preset authenticates from the device-code token file
+    //and routes first-party - neither an API key nor an OpenRouter provider
+    //pin ever reaches the wire. Saying so beats hiding the row or letting an
+    //edit pretend to matter.
+    WFont * font = WResourceManager::Instance()->GetWFont(Fonts::OPTION_FONT);
+    font->SetColor(getColor(WGuiColor::TEXT));
+    font->DrawString(_(displayValue).c_str(), x + 2, y + 3);
+    drawValue(font, "(not used with this preset)", x, y, width);
+}
+
+void OptionGptTextUnlessCodex::updateValue()
+{
+    if (!gptCodexEndpoint(mCfg->primaryUrl()))
+        OptionGptText::updateValue();
+    //under the codex preset the row is informational; no keyboard
 }
 
 //--- test connection --------------------------------------------------------
@@ -242,13 +378,15 @@ struct ProbeCtx
     std::shared_ptr<OptionGptTest::ProbeState> state;
     string url;
     string key;
+    string modelHint; //the configured model - the probe must test what a
+                      //duel would use, or it masks a bad model id
 };
 
 void ProbeMain(void * p)
 {
     ProbeCtx * ctx = static_cast<ProbeCtx *>(p);
     string model;
-    bool ok = gptProbeEndpoint(ctx->url, ctx->key, model, 6000);
+    bool ok = gptProbeEndpoint(ctx->url, ctx->key, model, 6000, ctx->modelHint);
     {
         std::lock_guard<GptMutex> g(ctx->state->mtx);
         ctx->state->status = 2;
@@ -295,6 +433,7 @@ void OptionGptTest::updateValue()
     ctx->state = mProbe;
     ctx->url = mCfg->primaryUrl();
     ctx->key = mCfg->key;
+    ctx->modelHint = mCfg->model;
     if (!gptSpawnWorker(&ProbeMain, ctx))
     {
         //No worker thread on this platform: probe synchronously. The options

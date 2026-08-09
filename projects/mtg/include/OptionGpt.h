@@ -108,11 +108,58 @@ protected:
 };
 
 //Provider preset row: cycles the curated endpoint list, writing the URL
-//into the settings; shows "Custom" when the URL matches no preset.
+//into the settings; shows "Custom" when the URL matches no preset. Crossing
+//the subscription-preset boundary also clears a model id that does not
+//belong on the new provider - a carried-over foreign id passes no probe but
+//would fail every live decision.
 class OptionGptPreset: public WGuiItem
 {
 public:
     OptionGptPreset(GptSettings * cfg);
+    virtual void Render();
+    virtual void updateValue();
+
+protected:
+    GptSettings * mCfg;
+};
+
+//Model row, preset-aware: free text everywhere except the subscription
+//preset, where the backend has no model listing and accepts exactly four
+//ids - there it cycles that verified roster instead of opening a keyboard.
+class OptionGptModel: public OptionGptText
+{
+public:
+    OptionGptModel(GptSettings * cfg);
+    virtual void Render();
+    virtual void updateValue();
+
+protected:
+    GptSettings * mCfg;
+};
+
+//Reasoning row, preset-aware: the subscription backend takes an explicit
+//effort tier (the server's own set), every other provider family a boolean
+//thinking toggle. One knob, rendered in whichever vocabulary the current
+//provider actually speaks.
+class OptionGptReasoning: public WGuiItem
+{
+public:
+    OptionGptReasoning(GptSettings * cfg);
+    virtual void Render();
+    virtual void updateValue();
+
+protected:
+    GptSettings * mCfg;
+};
+
+//Free-text row that a given preset does not consume: renders its value
+//greyed to "(not used with this preset)" and refuses to open the keyboard
+//there, instead of pretending the field means something.
+class OptionGptTextUnlessCodex: public OptionGptText
+{
+public:
+    OptionGptTextUnlessCodex(GptSettings * cfg, string * bind, string label,
+                             string emptyText = "", bool secret = false);
     virtual void Render();
     virtual void updateValue();
 
