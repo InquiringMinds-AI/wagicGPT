@@ -774,108 +774,100 @@ streamoff filesystem::CentralDir(istream & File) const
 {
 	using io_facilities::readvar;
 
-	//Failure diagnostics (Vita art hunt 2026-08-09: identical bytes parse on
-	//desktop and fail here on-device - which leg, and what the stream READ,
-	//is the discriminating evidence). stage: how deep the best candidate
-	//got. sig1: the very first 4 bytes read at end-22 - if that is not the
-	//EOCD signature for a zip whose file HAS it there, the stream is
-	//delivering wrong data and the parser was never the problem.
-	int stage = 0;
-	unsigned int sig1 = 0;
-	long tellStart = -2, tellCmt = -2;
-
-	// Look for the "end of central dir" header. Start minimum 22 bytes before end.
-	if (! File.seekg(-22, ios::end))
+	//Bulk-read the whole possible EOCD region (last 64KB+22) in ONE read and
+	//scan it in memory. The original walked backward with seekg(-4/-5,
+	//ios::cur) micro-steps and read the 22-byte EOCD ending EXACTLY at EOF -
+	//and on the Vita's newlib that sequence fails deterministically for some
+	//files (ziplog 2026-08-09: stage=1 sig1=06054b50 - correct bytes at the
+	//correct place, then the -4 relative seek / exact-EOF header read dies).
+	//An in-memory scan leaves the runtime nothing to fumble, and replaces up
+	//to ~16k seek+read pairs with one read (a win on PSP memory stick too).
+	if (! File.seekg(0, ios::end))
 	{
 		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@seekend");
 		return -1;
 	}
-
-	streamoff EndPos;
-	streamoff StartPos = File.tellg();
-	tellStart = (long) StartPos;
-
-	if (StartPos == streamoff(0))
+	streamoff fileSize = File.tellg();
+	if (fileSize < streamoff(22))
 	{
-		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@start0");
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@tiny size=%ld", (long) fileSize);
+		return -1;
+	}
+	streamoff tailLen = streamoff(22 + 65536);
+	if (tailLen > fileSize)
+		tailLen = fileSize;
+	if (! File.seekg(fileSize - tailLen))
+	{
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@tailseek");
+		return -1;
+	}
+	string tail((size_t) tailLen, '\0');
+	File.read(&tail[0], tailLen);
+	if (File.gcount() != (streamsize) tailLen)
+	{
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
+		         "eocd@tailread got=%ld want=%ld", (long) File.gcount(), (long) tailLen);
+		return -1;
+	}
+	const unsigned char * buf = (const unsigned char *) tail.data();
+	const streamoff tailBase = fileSize - tailLen; //file offset of buf[0]
+
+	//Scan backward from the last possible EOCD start (comment grows the
+	//distance from EOF). Little-endian field reads, alignment-safe.
+	int stage = 0;
+	unsigned int sig1 = ((unsigned int) buf[tailLen - 22])
+	                  | ((unsigned int) buf[tailLen - 21] << 8)
+	                  | ((unsigned int) buf[tailLen - 20] << 16)
+	                  | ((unsigned int) buf[tailLen - 19] << 24);
+	for (streamoff i = tailLen - 22; i >= 0; i--)
+	{
+		const unsigned char * p = buf + i;
+		unsigned int sig = ((unsigned int) p[0]) | ((unsigned int) p[1] << 8)
+		                 | ((unsigned int) p[2] << 16) | ((unsigned int) p[3] << 24);
+		if (sig != (unsigned int) ENDOFDIR)
+			continue;
+		if (stage < 1) stage = 1;
+		unsigned int nbDisks      = ((unsigned int) p[4])  | ((unsigned int) p[5] << 8);
+		unsigned int dirDisk      = ((unsigned int) p[6])  | ((unsigned int) p[7] << 8);
+		unsigned int localEntries = ((unsigned int) p[8])  | ((unsigned int) p[9] << 8);
+		unsigned int totalEntries = ((unsigned int) p[10]) | ((unsigned int) p[11] << 8);
+		unsigned int dirOffset    = ((unsigned int) p[16]) | ((unsigned int) p[17] << 8)
+		                          | ((unsigned int) p[18] << 16) | ((unsigned int) p[19] << 24);
+		unsigned int commentSize  = ((unsigned int) p[20]) | ((unsigned int) p[21] << 8);
+		if (stage < 2) stage = 2;
+		// Invariants: single-disk archive
+		if (nbDisks != 0 || dirDisk != 0 || localEntries != totalEntries)
+			continue;
+		if (stage < 3) stage = 3;
+		// Comment must end exactly at EOF
+		if (tailBase + i + streamoff(22) + streamoff(commentSize) != fileSize)
+			continue;
+		if (stage < 4) stage = 4;
+		// The offset must lead to a central-directory FILE header
+		if (streamoff(dirOffset) >= fileSize)
+			continue;
+		if (! File.seekg(streamoff(dirOffset)))
+		{
+			snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
+			         "eocd@cdseek off=%ld", (long) dirOffset);
+			return -1;
+		}
+		unsigned int cdSig = 0;
+		if (! readvar(File, cdSig, 4))
+		{
+			snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@cdread");
+			return -1;
+		}
+		if (cdSig == (unsigned int) FILE)
+			return streamoff(dirOffset);
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
+		         "eocd@cdsig got=%08x", cdSig);
 		return -1;
 	}
 
-	if (StartPos <= streamoff(65536))
-		EndPos = 1;
-	else
-		EndPos = StartPos - streamoff(65536);
-
-	// Start the scan
-	bool first = true;
-	do {
-		unsigned int RawSignature;
-
-		if (! readvar(File, RawSignature, 4))
-		{
-			snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
-			         "eocd@read pos=%ld", (long) File.tellg());
-			return -1;
-		}
-		if (first)
-		{
-			sig1 = RawSignature;
-			first = false;
-		}
-
-		eofcd_header Header;
-		streampos Pos = File.tellg();
-
-		// Found a potential "eofcd" header?
-		if (RawSignature == ENDOFDIR)
-		{
-			if (stage < 1) stage = 1;
-			if ((File.seekg(-4, ios::cur)) && (Header.ReadHeader(File))) {
-			if (stage < 2) stage = 2;
-
-			// Check invariant values (1 disk only)
-			if ((Header.m_NbDisks == 0) && (0 == Header.m_DirDisk) && (Header.m_LocalEntries == Header.m_TotalEntries)) {
-				if (stage < 3) stage = 3;
-
-				// Check comment ends at eof
-				if (! File.seekg(-1, ios::end))
-				{
-					snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@cmtseek");
-					return -1;
-				}
-				tellCmt = (long) File.tellg();
-				if ((File.tellg() + streamoff(1)) == (Pos + streamoff(Header.m_CommentSize + 22 - 4))) {
-					if (stage < 4) stage = 4;
-
-					// Check the start offset leads to a correct directory/file header;
-					if (! File.seekg(Header.m_Offset))
-					{
-						snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
-						         "eocd@cdseek off=%ld", (long) Header.m_Offset);
-						return -1;
-					}
-					if (! readvar(File, RawSignature, 4))
-					{
-						snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@cdread");
-						return -1;
-					}
-					if (RawSignature == FILE)
-						return Header.m_Offset;
-					snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
-					         "eocd@cdsig got=%08x", RawSignature);
-					return -1;
-				}
-			}
-			}
-		}
-
-		File.seekg(Pos);
-
-	} while ((File.seekg(-5, ios::cur)) && (File.tellg() > EndPos));
-
 	snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
-	         "eocd@scanout stage=%d sig1=%08x start=%ld cmt=%ld",
-	         stage, sig1, tellStart, tellCmt);
+	         "eocd@scanout stage=%d sig1=%08x size=%ld",
+	         stage, sig1, (long) fileSize);
     return -1;
 }
 
