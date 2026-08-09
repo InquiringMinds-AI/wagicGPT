@@ -49,8 +49,8 @@ namespace
     //collisions across caches at worst cost one extra retry.
     std::map<int, int> sMissCounts;
     std::map<int, unsigned int> sMissTime;
-    const int kMissTombstoneAt = 3;
-    const unsigned int kMissRetryMs = 1200;
+    const int kMissTombstoneAt = 5;
+    const unsigned int kMissRetryMs = 3000;
 }
 
 WResourceManager* WResourceManager::sInstance = NULL;
@@ -1328,17 +1328,28 @@ cacheItem* WCache<cacheItem, cacheActual>::Get(int id, const string& filename, i
 #if defined(PSP) || defined(VITA)
         //Space out retries of a recently-failed load: re-queueing every
         //frame would burn all its strikes inside the same busy-IO window
-        //that failed it (see the miss ledger above).
-        bool queueLoad = true;
+        //that failed it (see the miss ledger above). While a card is
+        //between retries, return NULL - not the generic card BACK - so
+        //CardGui falls to the text frame, which at least tells the player
+        //what the card does (owner report 2026-08-09: a face-down card is
+        //strictly worse than the readable no-art frame).
+        bool knownFailing = false;
         {
             boost::mutex::scoped_lock lock(sCacheMutex);
             std::map<int, int>::iterator mc = sMissCounts.find(lookup);
-            if (mc != sMissCounts.end()
-                && (unsigned int) JGEGetTime() - sMissTime[lookup] < kMissRetryMs)
-                queueLoad = false;
+            if (mc != sMissCounts.end())
+            {
+                knownFailing = true;
+                if ((unsigned int) JGEGetTime() - sMissTime[lookup] >= kMissRetryMs)
+                    CacheEngine::Instance()->QueueRequest(filename, submode, lookup);
+            }
         }
-        if (queueLoad)
-            CacheEngine::Instance()->QueueRequest(filename, submode, lookup);
+        if (knownFailing)
+        {
+            mError = CACHE_ERROR_404;
+            return NULL;
+        }
+        CacheEngine::Instance()->QueueRequest(filename, submode, lookup);
 #endif
         return it->second;
     }

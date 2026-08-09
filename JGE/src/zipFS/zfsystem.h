@@ -162,6 +162,9 @@ public:
     //("open", "eocd", "seekend", "cdseek", "shortread got=X want=Y",
     //"noentries") - the legs are indistinguishable from outside otherwise.
     static const char * PreloadZipFailReason();
+    //errno of the most recent failed open in this fs ("file absent" vs
+    //"the OS refused" - EMFILE is the handheld art-hunt suspect).
+    static int LastOpenErrno();
     static std::string getCurrentZipName();
     static filesystem * getCurrentFS();
     static std::streamoff SkipLFHdr(std::istream & File, std::streamoff LFHdrPos);

@@ -42,6 +42,7 @@ The content that users should not be touching.
 #include "../include/JLogger.h"
 #include <set>
 #include <cstdio>
+#include <cerrno>
 #include <dirent.h>
 
 #ifdef QT_CONFIG
@@ -423,7 +424,21 @@ bool JFileSystem::AttachZipFile(const string &zipfile, char *password /* = NULL 
     openForRead(mZipFile, mZipFileName);
 
     if (!mZipFile)
+    {
+        //The one leg the 2026-08-09 art hunt found UNINSTRUMENTED: cardFile's
+        //primary attach failing silently into the loose-file fallthrough.
+        //ENOENT is routine (loose installs have no set zips) - anything else
+        //means the OS refused an open of a file that exists.
+        int e = zip_file_system::filesystem::LastOpenErrno();
+        if (e != 0 && e != ENOENT)
+        {
+            char line[96];
+            snprintf(line, sizeof(line), "zip-attach-fail %s errno=%d",
+                     zipfile.c_str(), e);
+            zipDiagLog(this, line);
+        }
         return false;
+    }
 
 
     //A hack for a zip inside a zip: instead we open the zip containing it

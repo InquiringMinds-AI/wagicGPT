@@ -18,6 +18,7 @@
 #include "fileio.h"		// I/O facilities
 
 #include <sstream>		// istringstream (in-memory central-directory parse)
+#include <cerrno>
 
 
 #if defined (WIN32)
@@ -44,6 +45,12 @@ filesystem * filesystem::pCurrentFS = NULL;
 std::vector<filesystem::pooledBuffer *> filesystem::m_Buffers;
 
 static const int STORED = 0;
+
+//errno from the most recent failed open inside this filesystem - separates
+//"file absent" (ENOENT, routine on loose installs) from "the OS refused the
+//open" (EMFILE fd exhaustion, the Vita art-hunt suspect). Best-effort,
+//single-threaded semantics like the rest of this file's statics.
+static int gLastOpenErrno = 0;
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -184,10 +191,11 @@ void filesystem::Open(izfstream & File, const char * Filename)
 
 		// Link the izfile object with an opened filebuf
         filebuf * FileBuf = new filebuf;
+		errno = 0;
 		FileBuf->open(FullPath.c_str(), ios::binary | ios::in);
 
 		if (FileBuf->is_open()) {
-#ifdef USE_ZBUFFER_POOL 
+#ifdef USE_ZBUFFER_POOL
 			File.rdbuf(FileBuf);
 #else
             delete File.rdbuf(FileBuf);
@@ -196,6 +204,13 @@ void filesystem::Open(izfstream & File, const char * Filename)
 			File.m_FilePath = Filename;
 			File.m_FullFilePath = FullPath;
 			File.m_Zipped = false;
+		}
+		else
+		{
+			//This used to leak the filebuf on every failed open - under
+			//fd-pressure retry loops that is a steady bleed.
+			gLastOpenErrno = errno;
+			delete FileBuf;
 		}
 
 	// File is maybe zipped
@@ -368,14 +383,23 @@ std::vector<std::string>& filesystem::scanfolder(const std::string& folderName, 
 // File System Protected Member Functions
 //////////////////////////////////////////////////////////////////////
 
+int filesystem::LastOpenErrno()
+{
+    return gLastOpenErrno;
+}
+
 bool filesystem::FileNotZipped(const char * FilePath) const
 {
 	//return io_facilities::search_iterator(FilePath);
 	// follow new search_iterator implementation
+	errno = 0;
 	std::ifstream File(FilePath);
 
 	if (! File)
+	{
+		gLastOpenErrno = errno;
 		return false;
+	}
 
 	return true;
 }
@@ -469,7 +493,7 @@ void filesystem::InsertZip(const char * Filename, const size_t PackID)
 }
 
 
-static char gPreloadFailReason[64] = "";
+static char gPreloadFailReason[96] = "";
 
 const char * filesystem::PreloadZipFailReason()
 {
@@ -486,7 +510,7 @@ bool filesystem::PreloadZip(const char * Filename, map<string, limited_file_info
 
 	if (! File)
 	{
-		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "open");
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "open errno=%d", gLastOpenErrno);
 		return false;
 	}
 
@@ -502,7 +526,7 @@ bool filesystem::PreloadZip(izfstream & File, map<string, limited_file_info>& ta
 
 	if (! File)
 	{
-		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "open");
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "open errno=%d", gLastOpenErrno);
 		return false;
 	}
 
@@ -552,7 +576,8 @@ bool filesystem::PreloadZip(izfstream & File, map<string, limited_file_info>& ta
         streamoff cdOffset = CentralDir(File);
         if (cdOffset < streamoff(0))
         {
-            snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd");
+            if (!gPreloadFailReason[0])
+                snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd");
             File.clear(); //caller owns the stream - leave it open
             return false;
         }
@@ -749,13 +774,32 @@ streamoff filesystem::CentralDir(istream & File) const
 {
 	using io_facilities::readvar;
 
+	//Failure diagnostics (Vita art hunt 2026-08-09: identical bytes parse on
+	//desktop and fail here on-device - which leg, and what the stream READ,
+	//is the discriminating evidence). stage: how deep the best candidate
+	//got. sig1: the very first 4 bytes read at end-22 - if that is not the
+	//EOCD signature for a zip whose file HAS it there, the stream is
+	//delivering wrong data and the parser was never the problem.
+	int stage = 0;
+	unsigned int sig1 = 0;
+	long tellStart = -2, tellCmt = -2;
+
 	// Look for the "end of central dir" header. Start minimum 22 bytes before end.
-	if (! File.seekg(-22, ios::end)) return -1;
+	if (! File.seekg(-22, ios::end))
+	{
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@seekend");
+		return -1;
+	}
 
 	streamoff EndPos;
 	streamoff StartPos = File.tellg();
+	tellStart = (long) StartPos;
 
-	if (StartPos == streamoff(0)) return -1;
+	if (StartPos == streamoff(0))
+	{
+		snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@start0");
+		return -1;
+	}
 
 	if (StartPos <= streamoff(65536))
 		EndPos = 1;
@@ -763,30 +807,65 @@ streamoff filesystem::CentralDir(istream & File) const
 		EndPos = StartPos - streamoff(65536);
 
 	// Start the scan
+	bool first = true;
 	do {
 		unsigned int RawSignature;
 
-		if (! readvar(File, RawSignature, 4)) return -1;
+		if (! readvar(File, RawSignature, 4))
+		{
+			snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
+			         "eocd@read pos=%ld", (long) File.tellg());
+			return -1;
+		}
+		if (first)
+		{
+			sig1 = RawSignature;
+			first = false;
+		}
 
 		eofcd_header Header;
 		streampos Pos = File.tellg();
 
 		// Found a potential "eofcd" header?
-		if ((RawSignature == ENDOFDIR) && (File.seekg(-4, ios::cur)) && (Header.ReadHeader(File))) {
+		if (RawSignature == ENDOFDIR)
+		{
+			if (stage < 1) stage = 1;
+			if ((File.seekg(-4, ios::cur)) && (Header.ReadHeader(File))) {
+			if (stage < 2) stage = 2;
 
 			// Check invariant values (1 disk only)
 			if ((Header.m_NbDisks == 0) && (0 == Header.m_DirDisk) && (Header.m_LocalEntries == Header.m_TotalEntries)) {
+				if (stage < 3) stage = 3;
 
 				// Check comment ends at eof
-				if (! File.seekg(-1, ios::end)) return -1;
+				if (! File.seekg(-1, ios::end))
+				{
+					snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@cmtseek");
+					return -1;
+				}
+				tellCmt = (long) File.tellg();
 				if ((File.tellg() + streamoff(1)) == (Pos + streamoff(Header.m_CommentSize + 22 - 4))) {
+					if (stage < 4) stage = 4;
 
 					// Check the start offset leads to a correct directory/file header;
-					if (! File.seekg(Header.m_Offset)) return -1;
-					if (! readvar(File, RawSignature, 4)) return -1;
+					if (! File.seekg(Header.m_Offset))
+					{
+						snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
+						         "eocd@cdseek off=%ld", (long) Header.m_Offset);
+						return -1;
+					}
+					if (! readvar(File, RawSignature, 4))
+					{
+						snprintf(gPreloadFailReason, sizeof(gPreloadFailReason), "eocd@cdread");
+						return -1;
+					}
 					if (RawSignature == FILE)
 						return Header.m_Offset;
+					snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
+					         "eocd@cdsig got=%08x", RawSignature);
+					return -1;
 				}
+			}
 			}
 		}
 
@@ -794,6 +873,9 @@ streamoff filesystem::CentralDir(istream & File) const
 
 	} while ((File.seekg(-5, ios::cur)) && (File.tellg() > EndPos));
 
+	snprintf(gPreloadFailReason, sizeof(gPreloadFailReason),
+	         "eocd@scanout stage=%d sig1=%08x start=%ld cmt=%ld",
+	         stage, sig1, tellStart, tellCmt);
     return -1;
 }
 
