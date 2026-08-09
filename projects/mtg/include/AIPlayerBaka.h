@@ -76,9 +76,15 @@ public:
 typedef std::map<OrderedAIAction, int, CmpAbilities> RankingContainer;
 
 
+struct AttackerDamaged;
+
 class AIPlayerBaka: public AIPlayer{
  protected:
     virtual int orderBlockers();
+    //Permute atk->blockers so autoaffectDamage's lethal-first walk kills
+    //as many blockers as this attacker's damage affords. Shared by the
+    //heuristic ORDER step and AIPlayerGPT's fallback path.
+    void heuristicDamageOrder(AttackerDamaged * atk);
     virtual int combatDamages();
     virtual int interruptIfICan();
     virtual int chooseAttackers();

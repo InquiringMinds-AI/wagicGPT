@@ -4392,12 +4392,86 @@ int AIPlayerBaka::chooseBlockers()
     return 1;
 }
 
+void AIPlayerBaka::heuristicDamageOrder(AttackerDamaged * atk)
+{
+    if (!atk || !atk->card || atk->blockers.size() < 2)
+        return;
+    int budget = atk->card->power;
+    if (budget < 1)
+        return; //no damage to order
+    const bool deathtouch = atk->card->has(Constants::DEATHTOUCH) || atk->card->has(Constants::PERPETUALDEATHTOUCH);
+
+    //Damage needed to kill each blocker, per autoaffectDamage's own math
+    //(MIN(damage, toughness); deathtouch kills at 1). Blockers damage
+    //cannot kill go last.
+    struct Candidate
+    {
+        DefenserDamaged * blocker;
+        int cost;
+    };
+    vector<Candidate> killable;
+    vector<DefenserDamaged *> unkillable;
+    for (size_t i = 0; i < atk->blockers.size(); i++)
+    {
+        DefenserDamaged * b = atk->blockers[i];
+        int cost = 0;
+        if (b->card && !b->card->has(Constants::INDESTRUCTIBLE)
+            && !b->card->protectedAgainst(atk->card))
+        {
+            cost = deathtouch ? 1 : b->card->toughness;
+            if (cost < 1)
+                cost = 1;
+        }
+        if (cost)
+        {
+            Candidate c = { b, cost };
+            killable.push_back(c);
+        }
+        else
+            unkillable.push_back(b);
+    }
+    //Greedy max-kill subset: cheapest kills first buy the most deaths;
+    //among equal costs, kill the biggest power first.
+    std::stable_sort(killable.begin(), killable.end(),
+                     [](const Candidate& a, const Candidate& b)
+                     {
+                         if (a.cost != b.cost)
+                             return a.cost < b.cost;
+                         int pa = a.blocker->card ? a.blocker->card->power : 0;
+                         int pb = b.blocker->card ? b.blocker->card->power : 0;
+                         return pa > pb;
+                     });
+    vector<DefenserDamaged *> kills;
+    vector<DefenserDamaged *> rest = unkillable;
+    for (size_t i = 0; i < killable.size(); i++)
+    {
+        if (killable[i].cost <= budget)
+        {
+            kills.push_back(killable[i].blocker);
+            budget -= killable[i].cost;
+        }
+        else
+            rest.push_back(killable[i].blocker);
+    }
+    if (kills.empty())
+        return; //nothing dies whatever the order - keep declaration order
+    kills.insert(kills.end(), rest.begin(), rest.end());
+    atk->blockers = kills;
+}
+
 int AIPlayerBaka::orderBlockers()
 {
     if (ORDER == observer->combatStep && observer->currentPlayer == this)
     {
         DebugTrace("AIPLAYER: order blockers");
-        observer->userRequestNextGamePhase(); //TODO clever rank of blockers
+        GuiCombat * gc = observer->mLayers->combatLayer();
+        for (size_t a = 0; a < gc->attackers.size(); a++)
+        {
+            AttackerDamaged * atk = gc->attackers[a];
+            if (atk->card && atk->card->controller() == this)
+                heuristicDamageOrder(atk);
+        }
+        observer->userRequestNextGamePhase();
         return 1;
     }
 

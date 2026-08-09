@@ -5564,13 +5564,20 @@ int AIPlayerGPT::orderBlockers()
                 return 1; //stay in the ORDER step; re-poll next tick
             if (pick < 0)
             {
-                deferred = true; //keep the declaration order
+                deferred = true; //model did not decide
                 break;
             }
             ordered.push_back(remaining[pick]);
             remaining.erase(remaining.begin() + pick);
         }
-        if (!deferred && ordered.size())
+        if (deferred)
+        {
+            //Fall back to the heuristic ranking, not to declaration order:
+            //declaration order is the DEFENDER's choice, and keeping it
+            //hands the attacker's CR 510.1a decision to the opponent.
+            heuristicDamageOrder(atk);
+        }
+        else if (ordered.size())
         {
             ordered.push_back(remaining[0]);
             atk->blockers = ordered;
