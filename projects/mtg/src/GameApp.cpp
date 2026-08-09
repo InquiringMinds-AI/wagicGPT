@@ -116,15 +116,6 @@ void GameApp::Create()
         extern void wagicTexPoolInit();
         wagicTexPoolInit();
     }
-#if defined(WITH_GPT_AI)
-    {
-        //Same carve-early law as the texture pool: the net stack's pool
-        //allocation fails with NO_MEMORY once the game has loaded, so it
-        //must come up now. Association with the access point stays lazy.
-        extern void wagicGptNetStackInit();
-        wagicGptNetStackInit();
-    }
-#endif
 #endif
 #endif //QT_CONFIG
     //_CrtSetBreakAlloc(368);

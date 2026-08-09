@@ -8,18 +8,6 @@
 #ifndef WAGIC_NO_CURL
 #include <curl/curl.h>
 #endif
-#if defined(PSP)
-//The PSP has no always-on IP stack: sockets only exist after the net modules
-//are loaded and the access point association (an XMB connection profile) is
-//brought up - see pspEnsureNetwork below.
-#include <pspsdk.h>
-#include <pspkernel.h>
-#include <psputility.h>
-#include <pspnet.h>
-#include <pspnet_apctl.h>
-//Set by netStackBoot in JGE/src/main.cpp: 0 never attempted, 1 up, -1 failed.
-extern "C" int gWagicPspNetStack;
-#endif
 #include <nlohmann/json.hpp>
 
 #include <cstdlib>
@@ -607,75 +595,8 @@ size_t curlWriteToString(void * contents, size_t size, size_t nmemb, void * user
     return size * nmemb;
 }
 
-#if defined(PSP)
-//Bring the PSP's network up once per launch: the stack (modules + inet pool)
-//comes up at APP START while the heap is empty - sceNetInit's pool
-//allocation fails with NO_MEMORY (80020190, proven from the options menu)
-//once the game has loaded, the same carve-early law as the texture pool.
-//Association with XMB connection profile 1 stays lazy on the first request
-//(the access point may not exist at boot). One association attempt per
-//launch - a failed one costs one bounded wait, not one per decision.
-static int gPspStackState = 0; //0 untried, 1 up, -1 failed
-static int gPspNetState = 0;   //0 untried, 1 up, -1 failed
-
-//The stack itself comes up first thing in main() (JGE/src/main.cpp
-//netStackBoot - loading the net modules any later hangs the boot); this just
-//reads the verdict it left (declared at file scope above - an extern "C"
-//inside the anonymous namespace picks up internal linkage).
-static void pspNetStackInit()
-{
-    if (gPspStackState) return;
-    gPspStackState = (gWagicPspNetStack > 0) ? 1 : -1;
-    if (gPspStackState < 0)
-        gptLogLine("psp net: stack failed at boot (see User/wagic-netboot.log)");
-}
-static bool pspEnsureNetwork()
-{
-    if (gPspNetState) return gPspNetState > 0;
-    gPspNetState = -1;
-    if (gPspStackState == 0)
-        pspNetStackInit(); //fallback; the real call is at app start
-    if (gPspStackState < 0)
-        return false; //stack never came up; reason already logged
-    int rc = sceNetApctlConnect(1);
-    if (rc != 0)
-    {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "psp net: apctl connect(1) failed %08x", (unsigned) rc);
-        gptLogLine(buf);
-        return false;
-    }
-    int state = 0;
-    for (int i = 0; i < 600; i++) //30s ceiling, 50ms per poll
-    {
-        if (sceNetApctlGetState(&state) != 0)
-        {
-            gptLogLine("psp net: apctl state poll failed");
-            return false;
-        }
-        if (state == PSP_NET_APCTL_STATE_GOT_IP)
-        {
-            gPspNetState = 1;
-            gptLogLine("psp net: associated, got IP");
-            return true;
-        }
-        sceKernelDelayThread(50 * 1000);
-    }
-    {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "psp net: association timeout at state %d", state);
-        gptLogLine(buf);
-    }
-    return false;
-}
-#endif
-
 string httpRequestImpl(const string& url, const string& postBody, long timeoutMs, const string& bearer)
 {
-#if defined(PSP)
-    if (!pspEnsureNetwork())
-        return "";
-#endif
     CURL * curl = curl_easy_init();
     if (!curl)
         return "";
@@ -716,14 +637,6 @@ string httpRequestImpl(const string& url, const string& postBody, long timeoutMs
 }
 #endif //WAGIC_NO_CURL
 } //namespace
-
-#if defined(PSP)
-//GameApp calls this at app start (heap empty - see pspNetStackInit above).
-void wagicGptNetStackInit()
-{
-    pspNetStackInit();
-}
-#endif
 
 string gptHttpGet(const string& url, long timeoutMs, const string& bearer)
 {

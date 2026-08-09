@@ -3,7 +3,6 @@
 #include <pspdebug.h>
 #include <psppower.h>
 #include <pspsdk.h>
-#include <psputility.h>
 #include <pspaudiocodec.h>
 #include <pspaudio.h>
 #include <pspaudiolib.h>
@@ -36,9 +35,8 @@
 #ifdef DEVHOOK
 PSP_MODULE_INFO(JGEApp_Title, 0, 1, 1);
 PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER);
-//The real heap bound lives in the custom _sbrk below (MaxFreeMemSize minus
-//the firmware's network allowance); this macro only governs the SDK sbrk,
-//which that _sbrk replaces.
+//256 is not enough for the network to correctly start,
+// let's find an appropriate value the day JGE has working network
 PSP_HEAP_SIZE_KB(-256);
 
 #else
@@ -336,12 +334,7 @@ extern "C" void* _sbrk(ptrdiff_t incr)
 {
     if (!g_heapStart)
     {
-        //The slack left here is all the RAM the FIRMWARE gets: net modules
-        //(sceUtilityLoadNetModule) and sceNetInit's pool load into the user
-        //partition OUTSIDE this heap. At 256KB they failed with
-        //LIBRARY_NOT_FOUND/NO_MEMORY (2026-08-09, first live LLM transport);
-        //1.5MB is the conventional allowance for net-enabled homebrew.
-        SceSize sz = sceKernelMaxFreeMemSize() - 1536 * 1024;
+        SceSize sz = sceKernelMaxFreeMemSize() - 256 * 1024;
         SceUID id = sceKernelAllocPartitionMemory(PSP_MEMORY_PARTITION_USER, "wagic_heap", PSP_SMEM_Low, sz, NULL);
         if (id < 0) { errno = ENOMEM; return (void*)-1; }
         g_heapStart = (char*)sceKernelGetBlockHeadAddr(id);
@@ -364,35 +357,6 @@ extern "C" unsigned int wagicHeapLargestBlock(void)
     //largest contiguous: at least the unclaimed tail (free-list max unknown)
     return (unsigned int)(g_heapEnd - g_heapPtr);
 }
-//Network stack state, read by the GPT transport (GptConfig.cpp): 0 = never
-//attempted, 1 = up, -1 = failed. The stack MUST come up here, first thing in
-//main - the canonical net-homebrew order. Loading the net modules later
-//(from GameApp::Create, after the engine was up) hung the boot outright.
-extern "C" int gWagicPspNetStack = 0;
-static void netMark(const char * m)
-{
-    FILE * f = fopen("User/wagic-netboot.log", "a");
-    if (f) { fprintf(f, "%s\n", m); fclose(f); }
-}
-static void netStackBoot()
-{
-    char b[96];
-    netMark("boot: loading net modules");
-    int r1 = sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
-    int r2 = sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
-    snprintf(b, sizeof(b), "boot: modules %08x/%08x", (unsigned) r1, (unsigned) r2);
-    netMark(b);
-    if (r1 != 0 || r2 != 0)
-    {
-        gWagicPspNetStack = -1;
-        return;
-    }
-    int r = pspSdkInetInit();
-    snprintf(b, sizeof(b), "boot: inet init %08x", (unsigned) r);
-    netMark(b);
-    gWagicPspNetStack = (r == 0) ? 1 : -1;
-}
-
 int main(int argc, char *argv[])
 {
     pspDebugScreenInit();
@@ -404,7 +368,6 @@ int main(int argc, char *argv[])
     pspDebugScreenPrintf("JGE:Loading application...");
 
     bootMark("m1 debugscreen");
-    netStackBoot();
     JLOG("SetupCallbacks()");
     SetupCallbacks();
 #ifdef DEVHOOK
