@@ -192,6 +192,12 @@ typedef std::mutex GptMutex;
 //the game will actually use, not a default that can mask a bad config.
 bool gptProbeEndpoint(const std::string& url, const std::string& key, std::string& modelOut, long timeoutMs = 20000, const std::string& modelHint = "");
 
+//Every model id the endpoint advertises (/v1/models; the Codex backend has
+//no listing, so its verified static roster is returned there). Blocking -
+//call from a worker thread. Order preserved, duplicates dropped. False on
+//transport failure or an answer with no usable ids.
+bool gptListModels(const std::string& url, const std::string& key, std::vector<std::string>& out, long timeoutMs = 20000);
+
 #ifdef WAGIC_HTTP_JNI
 //Capture the app's SDLActivity class while the app class loader is still the
 //one in effect. MUST be called from JNI_OnLoad (or any Java-originated call);

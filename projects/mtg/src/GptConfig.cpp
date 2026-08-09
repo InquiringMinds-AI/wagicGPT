@@ -1360,4 +1360,52 @@ bool gptProbeEndpoint(const string& url, const string& key, string& modelOut, lo
     }
 }
 
+bool gptListModels(const string& url, const string& key, vector<string>& out, long timeoutMs)
+{
+    out.clear();
+    //The Codex backend advertises nothing; its roster is the verified
+    //constant list (see gptCodexModels).
+    if (gptCodexEndpoint(url))
+    {
+        size_t n = 0;
+        const char * const * roster = gptCodexModels(n);
+        for (size_t i = 0; i < n; i++)
+            out.push_back(roster[i]);
+        return true;
+    }
+    string body = gptHttpGet(url + "/v1/models", timeoutMs, key);
+    if (body.empty())
+        return false;
+    try
+    {
+        nlohmann::json models = nlohmann::json::parse(body);
+        //Same two listing shapes as the probe above; here EVERY id is
+        //collected, order preserved (a provider's ordering is often newest
+        //or most-used first - information a re-sort would destroy).
+        const char * arrays[] = { "data", "models" };
+        for (size_t i = 0; i < 2 && out.empty(); ++i)
+        {
+            if (!models.contains(arrays[i]) || !models[arrays[i]].is_array())
+                continue;
+            const nlohmann::json& list = models[arrays[i]];
+            for (nlohmann::json::const_iterator it = list.begin(); it != list.end(); ++it)
+            {
+                string name = modelNameOf(*it);
+                if (name.empty())
+                    continue;
+                bool dup = false;
+                for (size_t k = 0; k < out.size() && !dup; k++)
+                    dup = (out[k] == name);
+                if (!dup)
+                    out.push_back(name);
+            }
+        }
+        return !out.empty();
+    }
+    catch (nlohmann::json::exception&)
+    {
+        return false;
+    }
+}
+
 #endif //WITH_GPT_AI

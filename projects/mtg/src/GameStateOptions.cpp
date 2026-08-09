@@ -10,6 +10,7 @@
 #include "SimpleMenu.h"
 #include "SimplePad.h"
 #include "Translate.h"
+#include <mutex> //std::lock_guard over GptMutex (Vita seam)
 
 namespace GameStateOptionsConst
 {
@@ -21,7 +22,60 @@ namespace GameStateOptionsConst
     const int kTelemetryNoID = 7;
     const int kResetTutorialsID = 8;
     const int kTelemetryMenuID = -103;
+#ifdef WITH_GPT_AI
+    const int kModelPickerMenuID = -104;
+    //Item ids inside the picker menus: list indexes start at 0, so the
+    //specials live far above any real catalog size.
+    const int kPickerManualID = 900001;
+    const int kPickerBackID = 900002;
+    const int kPickerCancelID = 900003;
+#endif
 }
+
+#ifdef WITH_GPT_AI
+namespace
+{
+//Picker phases and deferred-build requests (menus are only built in Update).
+enum { PICKER_FETCHING, PICKER_VENDORS, PICKER_MODELS };
+enum { kPickerBuildNone = -1, kPickerBuildVendors = -2 }; //>= 0: models of that bucket
+} //namespace
+
+//Shared state between the screen and the /v1/models fetch worker. The worker
+//owns a shared_ptr copy, so leaving the options screen mid-fetch is safe: the
+//worker finishes writing into memory only it still references.
+struct GptModelFetch
+{
+    GptMutex mtx;
+    int status; //1 in flight, 2 done
+    bool ok;
+    std::vector<std::string> models;
+    GptModelFetch() : status(1), ok(false) {}
+};
+
+namespace
+{
+struct ModelFetchCtx
+{
+    std::shared_ptr<GptModelFetch> state;
+    std::string url;
+    std::string key;
+};
+
+void ModelFetchMain(void * p)
+{
+    ModelFetchCtx * ctx = static_cast<ModelFetchCtx *>(p);
+    std::vector<std::string> models;
+    bool ok = gptListModels(ctx->url, ctx->key, models, 20000);
+    {
+        std::lock_guard<GptMutex> g(ctx->state->mtx);
+        ctx->state->models.swap(models);
+        ctx->state->ok = ok;
+        ctx->state->status = 2;
+    }
+    delete ctx;
+}
+} //namespace
+#endif //WITH_GPT_AI
 
 static std::string kBgFile = "";
 
@@ -31,6 +85,10 @@ GameStateOptions::GameStateOptions(GameApp* parent) :
 #ifdef WITH_GPT_AI
     gptTab = NULL;
     telemetryMenu = NULL;
+    modelPickerMenu = NULL;
+    pickerPhase = PICKER_FETCHING;
+    pickerBuildFor = kPickerBuildNone;
+    pickerVendorAt = 0;
 #endif
 }
 
@@ -192,6 +250,8 @@ void GameStateOptions::End()
 #ifdef WITH_GPT_AI
     gptTab = NULL; //owned (and deleted) by optionsTabs
     SAFE_DELETE(telemetryMenu);
+    SAFE_DELETE(modelPickerMenu);
+    modelFetch.reset(); //a worker still in flight keeps its own reference
 #endif
     kBgFile = ""; //Reset the chosen background.
 }
@@ -257,6 +317,15 @@ void GameStateOptions::Update(float dt)
                         mState = SHOW_OPTIONS_MENU;
                 }
             optionsTabs->Update(dt);
+#ifdef WITH_GPT_AI
+            //The GPT tab's Model row raises this flag; the picker itself is
+            //screen-level UI (a modal menu chain), so it lives here.
+            if (gptTab && gptTab->modelPickerWanted)
+            {
+                gptTab->modelPickerWanted = false;
+                startModelPicker();
+            }
+#endif
             break;
         }
         case SHOW_OPTIONS_MENU:
@@ -266,6 +335,9 @@ void GameStateOptions::Update(float dt)
         case SHOW_TELEMETRY_CONSENT:
             if (telemetryMenu)
                 telemetryMenu->Update(dt);
+            break;
+        case SHOW_MODEL_PICKER:
+            updateModelPicker(dt);
             break;
 #endif
         }
@@ -395,6 +467,17 @@ void GameStateOptions::Render()
 #ifdef WITH_GPT_AI
     if (mState == SHOW_TELEMETRY_CONSENT && telemetryMenu)
         telemetryMenu->Render();
+    if (mState == SHOW_MODEL_PICKER)
+    {
+        if (pickerPhase == PICKER_FETCHING)
+        {
+            WFont * font = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
+            font->SetColor(ARGB(255, 255, 255, 255));
+            font->DrawString(_("Fetching the model list...").c_str(), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, JGETEXT_CENTER);
+        }
+        else if (modelPickerMenu)
+            modelPickerMenu->Render();
+    }
 #endif
 
     if (options.keypadActive())
@@ -463,11 +546,201 @@ void GameStateOptions::ButtonPressed(int controllerId, int controlId)
         //freed in End() or replaced on the next ask.
         mState = SAVE; //resume the save that triggered the ask
     }
+    else if (controllerId == GameStateOptionsConst::kModelPickerMenuID)
+    {
+        //Same UAF rule as the telemetry menu: NEVER rebuild or delete the
+        //menu from inside its own callback - record what to build and let
+        //updateModelPicker do it next frame.
+        if (controlId == GameStateOptionsConst::kPickerCancelID)
+            mState = SHOW_OPTIONS;
+        else if (controlId == GameStateOptionsConst::kPickerManualID)
+        {
+            mState = SHOW_OPTIONS;
+            if (gptTab)
+            {
+                SimplePad * pad = options.keypadStart(gptTab->cfg.model, &gptTab->cfg.model);
+                if (pad)
+                    pad->title = "Model";
+            }
+        }
+        else if (controlId == GameStateOptionsConst::kPickerBackID)
+        {
+            pickerPhase = PICKER_VENDORS;
+            pickerBuildFor = kPickerBuildVendors;
+        }
+        else if (pickerPhase == PICKER_VENDORS)
+        {
+            if (controlId >= 0 && controlId < (int) pickerVendors.size())
+            {
+                pickerPhase = PICKER_MODELS;
+                pickerBuildFor = controlId;
+            }
+        }
+        else if (pickerPhase == PICKER_MODELS && gptTab)
+        {
+            if (pickerVendorAt < (int) pickerVendorModels.size()
+                && controlId >= 0 && controlId < (int) pickerVendorModels[pickerVendorAt].size())
+            {
+                gptTab->cfg.model = pickerModels[pickerVendorModels[pickerVendorAt][controlId]];
+                mState = SHOW_OPTIONS;
+            }
+        }
+    }
 #endif
     else
         optionsTabs->ButtonPressed(controllerId, controlId);
 }
 ;
+
+#ifdef WITH_GPT_AI
+void GameStateOptions::startModelPicker()
+{
+    if (!gptTab)
+        return;
+    pickerModels.clear();
+    pickerVendors.clear();
+    pickerVendorModels.clear();
+    pickerVendorAt = 0;
+    pickerPhase = PICKER_FETCHING;
+    pickerBuildFor = kPickerBuildNone;
+    mState = SHOW_MODEL_PICKER;
+
+    modelFetch = std::make_shared<GptModelFetch>();
+    ModelFetchCtx * ctx = new ModelFetchCtx(); //plain new: ModelFetchMain deletes it
+    ctx->state = modelFetch;
+    ctx->url = gptTab->cfg.primaryUrl();
+    ctx->key = gptTab->cfg.key;
+    if (!gptSpawnWorker(&ModelFetchMain, ctx))
+        ModelFetchMain(ctx); //threadless platform: fetch synchronously (probe precedent)
+}
+
+//Bucket the fetched ids by the vendor prefix before '/' - OpenRouter-style
+//catalogs (300+ ids) become ~50 buckets of navigable size, while unprefixed
+//catalogs (api.openai.com, local servers) collapse into one bucket and the
+//vendor step is skipped entirely.
+void GameStateOptions::buildPickerIndex()
+{
+    pickerVendors.clear();
+    pickerVendorModels.clear();
+    for (size_t i = 0; i < pickerModels.size(); i++)
+    {
+        size_t slash = pickerModels[i].find('/');
+        std::string vendor = (slash == std::string::npos) ? std::string("(unprefixed)")
+                                                          : pickerModels[i].substr(0, slash);
+        size_t at = pickerVendors.size();
+        for (size_t v = 0; v < pickerVendors.size(); v++)
+            if (pickerVendors[v] == vendor)
+                at = v;
+        if (at == pickerVendors.size())
+        {
+            pickerVendors.push_back(vendor);
+            pickerVendorModels.push_back(std::vector<int>());
+        }
+        pickerVendorModels[at].push_back((int) i);
+    }
+}
+
+void GameStateOptions::buildPickerMenu()
+{
+    SAFE_DELETE(modelPickerMenu);
+    bool manualEntry = gptTab && !gptCodexEndpoint(gptTab->cfg.primaryUrl());
+    if (pickerBuildFor == kPickerBuildVendors)
+    {
+        modelPickerMenu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(),
+            GameStateOptionsConst::kModelPickerMenuID, this, Fonts::MENU_FONT, 50, 60,
+            "Model vendor", 9);
+        for (size_t v = 0; v < pickerVendors.size(); v++)
+        {
+            char label[128];
+            sprintf(label, "%s (%d)", pickerVendors[v].c_str(), (int) pickerVendorModels[v].size());
+            modelPickerMenu->Add((int) v, label);
+        }
+        if (manualEntry)
+            modelPickerMenu->Add(GameStateOptionsConst::kPickerManualID, "Type manually...");
+        modelPickerMenu->Add(GameStateOptionsConst::kPickerCancelID, "Cancel");
+    }
+    else
+    {
+        pickerVendorAt = pickerBuildFor;
+        const std::vector<int>& bucket = pickerVendorModels[pickerVendorAt];
+        modelPickerMenu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(),
+            GameStateOptionsConst::kModelPickerMenuID, this, Fonts::MENU_FONT, 50, 60,
+            pickerVendors[pickerVendorAt].c_str(), 9);
+        for (size_t i = 0; i < bucket.size(); i++)
+        {
+            //Show the id without its vendor prefix - the menu title carries it.
+            const std::string& id = pickerModels[bucket[i]];
+            size_t slash = id.find('/');
+            modelPickerMenu->Add((int) i, (slash == std::string::npos ? id : id.substr(slash + 1)).c_str());
+        }
+        if (pickerVendors.size() > 1)
+            modelPickerMenu->Add(GameStateOptionsConst::kPickerBackID, "Back to vendors");
+        if (manualEntry)
+            modelPickerMenu->Add(GameStateOptionsConst::kPickerManualID, "Type manually...");
+        modelPickerMenu->Add(GameStateOptionsConst::kPickerCancelID, "Cancel");
+    }
+}
+
+void GameStateOptions::updateModelPicker(float dt)
+{
+    if (pickerPhase == PICKER_FETCHING)
+    {
+        //The fetch worker owns the state; poll it. Back/secondary cancels a
+        //slow fetch rather than trapping the user on a spinner.
+        JButton key;
+        while ((key = JGE::GetInstance()->ReadButton()))
+            if (key == JGE_BTN_SEC || key == JGE_BTN_MENU)
+            {
+                mState = SHOW_OPTIONS;
+                return;
+            }
+        int status = 0;
+        bool ok = false;
+        if (modelFetch)
+        {
+            std::lock_guard<GptMutex> g(modelFetch->mtx);
+            status = modelFetch->status;
+            ok = modelFetch->ok;
+            if (status == 2)
+                pickerModels = modelFetch->models;
+        }
+        if (status != 2)
+            return;
+        if (!ok || pickerModels.empty())
+        {
+            //No listing (endpoint down, or a server that just does not
+            //advertise): manual entry is the honest remainder.
+            if (gptTab)
+            {
+                SimplePad * pad = options.keypadStart(gptTab->cfg.model, &gptTab->cfg.model);
+                if (pad)
+                    pad->title = "Model (no listing - type it)";
+            }
+            mState = SHOW_OPTIONS;
+            return;
+        }
+        buildPickerIndex();
+        //A single bucket makes a vendor step pure friction - skip it.
+        if (pickerVendors.size() == 1)
+        {
+            pickerPhase = PICKER_MODELS;
+            pickerBuildFor = 0;
+        }
+        else
+        {
+            pickerPhase = PICKER_VENDORS;
+            pickerBuildFor = kPickerBuildVendors;
+        }
+    }
+    if (pickerBuildFor != kPickerBuildNone)
+    {
+        buildPickerMenu();
+        pickerBuildFor = kPickerBuildNone;
+    }
+    if (modelPickerMenu)
+        modelPickerMenu->Update(dt);
+}
+#endif //WITH_GPT_AI
 
 void GameStateOptions::GrabKeyboard(KeybGrabber* g)
 {

@@ -4,6 +4,9 @@
 #include <JGE.h>
 #include <JGui.h>
 #include "GameState.h"
+#include <memory>
+#include <string>
+#include <vector>
 
 class GameApp;
 class WGuiTabMenu;
@@ -27,7 +30,8 @@ private:
         SHOW_OPTIONS,
         SHOW_OPTIONS_MENU,
         SAVE,
-        SHOW_TELEMETRY_CONSENT
+        SHOW_TELEMETRY_CONSENT,
+        SHOW_MODEL_PICKER
     };
     float timer;
     bool mReload;
@@ -42,6 +46,24 @@ private:
     //menus live at the screen level.
     GptOptionsList * gptTab;
     SimpleMenu * telemetryMenu;
+
+    //Model picker: raised by the GPT tab's Model row; the model list is
+    //polled from the endpoint on a worker thread, then presented vendor-first
+    //(the id prefix before '/') so a 300-model catalog stays navigable on a
+    //d-pad. Menus are (re)built only from Update - never from their own
+    //ButtonPressed (the codebase's delete-in-callback UAF trap).
+    std::shared_ptr<struct GptModelFetch> modelFetch;
+    SimpleMenu * modelPickerMenu;
+    std::vector<std::string> pickerModels;               //fetched ids, provider order
+    std::vector<std::string> pickerVendors;              //bucket labels
+    std::vector<std::vector<int> > pickerVendorModels;   //bucket -> indexes into pickerModels
+    int pickerPhase;      //fetching / vendor list / model list
+    int pickerBuildFor;   //menu to (re)build next Update; kPickerBuildNone when current
+    int pickerVendorAt;   //bucket the model list is showing
+    void startModelPicker();
+    void updateModelPicker(float dt);
+    void buildPickerIndex();
+    void buildPickerMenu();
 #endif
 
 public:

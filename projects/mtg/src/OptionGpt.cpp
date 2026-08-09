@@ -28,6 +28,7 @@ void drawValue(WFont * font, const string& value, float x, float y, float width)
 GptOptionsList::GptOptionsList()
     : WGuiList("GPT")
 {
+    modelPickerWanted = false;
     cfg = GptSettings::load();
     if (cfg.urls.empty())
         cfg.urls.push_back("http://127.0.0.1:8080");
@@ -39,7 +40,7 @@ GptOptionsList::GptOptionsList()
     Add(NEW OptionGptBool(&cfg.enabled, "LLM opponent", "Off (heuristic AI)", "On"));
     Add(NEW OptionGptPreset(&cfg));
     Add(NEW OptionGptText(&cfg.urls[0], "Endpoint URL"));
-    Add(NEW OptionGptModel(&cfg));
+    Add(NEW OptionGptModel(this));
     //OpenRouter routing pin: comma-separated provider names, sent as
     //provider:{only:[...],allow_fallbacks:false}. Config-file-only until the
     //owner's ruling that provider control must be reachable from the couch.
@@ -246,8 +247,8 @@ void OptionGptPreset::updateValue()
 
 //--- model row (preset-aware) -----------------------------------------------
 
-OptionGptModel::OptionGptModel(GptSettings * cfg)
-    : OptionGptText(&cfg->model, "Model", "(auto-detect)"), mCfg(cfg)
+OptionGptModel::OptionGptModel(GptOptionsList * list)
+    : OptionGptText(&list->cfg.model, "Model", "(auto-detect)"), mList(list), mCfg(&list->cfg)
 {
 }
 
@@ -267,22 +268,11 @@ void OptionGptModel::Render()
 
 void OptionGptModel::updateValue()
 {
-    if (!gptCodexEndpoint(mCfg->primaryUrl()))
-    {
-        OptionGptText::updateValue(); //free text via the on-screen keyboard
-        return;
-    }
-    //The subscription backend accepts exactly the verified roster - cycling
-    //beats a keyboard that can only produce a 400. Peer options, no ranking:
-    //the order is the probe order, and "(auto-detect)" = the default model.
-    size_t n = 0;
-    const char * const * roster = gptCodexModels(n);
-    size_t at = n; //"not in roster" == the empty/auto slot
-    for (size_t i = 0; i < n; i++)
-        if (mCfg->model == roster[i])
-            at = i;
-    size_t next = (at + 1) % (n + 1); //the extra slot is "" (auto)
-    mCfg->model = (next == n) ? "" : roster[next];
+    //The screen owns the picker (modal menus are screen-level UI); this row
+    //only raises its hand. The picker polls /v1/models where a listing
+    //exists, shows the verified roster on the subscription preset, and
+    //keeps manual keyboard entry as an item for endpoints that misreport.
+    mList->modelPickerWanted = true;
 }
 
 //--- reasoning row (preset-aware) --------------------------------------------

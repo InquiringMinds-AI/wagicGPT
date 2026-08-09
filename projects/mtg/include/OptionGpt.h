@@ -36,6 +36,11 @@ public:
     GptSettings cfg;     //working copy the rows bind to
     GptSettings loadedCfg; //snapshot for only-write-when-changed
 
+    //Set by the Model row; consumed by GameStateOptions, which owns the
+    //modal picker menus (screen-level UI lives at the screen, like the
+    //telemetry consent ask).
+    bool modelPickerWanted;
+
     //Telemetry consent negotiation: asked once, on saving with a newly
     //set-up endpoint, never re-asked after a decision. The modal itself is
     //owned by GameStateOptions (screen-level menus live there).
@@ -123,17 +128,19 @@ protected:
     GptSettings * mCfg;
 };
 
-//Model row, preset-aware: free text everywhere except the subscription
-//preset, where the backend has no model listing and accepts exactly four
-//ids - there it cycles that verified roster instead of opening a keyboard.
+//Model row: pressing it asks the screen for the model picker - a polled
+///v1/models listing presented vendor-first (the subscription preset lists
+//its verified static roster instead). Manual keyboard entry survives as a
+//picker item, not as this row's default.
 class OptionGptModel: public OptionGptText
 {
 public:
-    OptionGptModel(GptSettings * cfg);
+    OptionGptModel(GptOptionsList * list);
     virtual void Render();
     virtual void updateValue();
 
 protected:
+    GptOptionsList * mList;
     GptSettings * mCfg;
 };
 
