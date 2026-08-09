@@ -40,6 +40,8 @@ The content that users should not be touching.
 #include "../include/JGE.h"
 #include "../include/JFileSystem.h"
 #include "../include/JLogger.h"
+#include <set>
+#include <cstdio>
 #include <dirent.h>
 
 #ifdef QT_CONFIG
@@ -81,6 +83,28 @@ JZipCache::~JZipCache()
 void JFileSystem::Pause() 
 {
     zip_file_system::filesystem::closeTempFiles();
+}
+
+//Zip-path failure breadcrumbs (see the card-art no-show hunt, 2026-08-09):
+//a lookup that fails inside the zip machinery is invisible to the caller
+//beyond "404", and on the handhelds that has meant weeks of a byte-perfect
+//pack rendering no-art frames with nothing to read. One deduped line per
+//event, capped, straight into the user root so it survives without any
+//game-layer plumbing.
+static void zipDiagLog(JFileSystem * fs, const string& line)
+{
+    static std::set<string> logged;
+    if (logged.size() >= 100 || !logged.insert(line).second)
+        return;
+    string path = fs->GetUserRoot();
+    if (path.size() && path[path.size() - 1] != '/' && path[path.size() - 1] != '\\')
+        path += '/';
+    path += "wagic-ziplog.txt";
+    FILE * f = fopen(path.c_str(), "a");
+    if (!f)
+        return;
+    fprintf(f, "%s\n", line.c_str());
+    fclose(f);
 }
 
 void JFileSystem::preloadZip(const string& filename)
@@ -129,7 +153,11 @@ void JFileSystem::preloadZip(const string& filename)
 
     if (!mZipAvailable || !mZipFile) {
 		AttachZipFile(filename);
-		if (!mZipAvailable || !mZipFile) return;
+		if (!mZipAvailable || !mZipFile)
+		{
+		    zipDiagLog(this, "zip-attach-fail " + filename);
+		    return;
+		}
 	}
 
     if ((mUserFS->PreloadZip(filename.c_str(), cache->dir) || (mSystemFS && mSystemFS->PreloadZip(filename.c_str(), cache->dir))))
@@ -138,6 +166,7 @@ void JFileSystem::preloadZip(const string& filename)
     }
     else
     {
+        zipDiagLog(this, "zip-parse-fail " + filename);
         DetachZipFile();
     }
 
@@ -467,6 +496,22 @@ bool JFileSystem::OpenFile(const string &filename)
     map<string,  zip_file_system::filesystem::limited_file_info>::iterator it2 = zc->dir.find(filename);
     if (it2 == zc->dir.end())
     {
+        //dir=0 means the attach/parse failed earlier and left an empty
+        //cache (see preloadZip); dir>0 means the parse ran but dropped
+        //this entry. The two point at entirely different defects. Scoped
+        //to card-art keys inside set zips: every open probes the attached
+        //zip first, so routine lookups (zone icons, mana symbols, sounds)
+        //miss here by design and would drown the breadcrumb cap. Card art
+        //keys are "<numeric id>.jpg" and "thumbnails/<id>.jpg".
+        if (mZipFileName.compare(0, 5, "sets/") == 0
+            && filename.size()
+            && (isdigit((unsigned char) filename[0])
+                || filename.compare(0, 11, "thumbnails/") == 0))
+        {
+            char n[64];
+            snprintf(n, sizeof(n), " dir=%u", (unsigned) zc->dir.size());
+            zipDiagLog(this, "zip-entry-miss " + mZipFileName + " " + filename + n);
+        }
         /*DetachZipFile();
         return OpenFile(filename); */
         return openForRead(mFile, filename);
