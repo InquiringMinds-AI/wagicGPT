@@ -75,15 +75,16 @@ PSP_EBOOT_UNKPNG = pic0.png
 PSP_EBOOT_PIC1 = pic1.png
 INCDIR = ../../JGE/include ../../JGE/src/zipFS ../../JGE/include/psp ../../JGE/include/psp/freetype2 ../../JGE/src ../../projects/mtg/include ../../Boost
 LIBDIR = ../../JGE/lib/psp
-#GPT layer on PSP: in by default (the LLM path is the project's point), but the
-#binary loads whole into a ~44 MB heap and the layer is ~2 MB of it, dead weight
-#until the PSP has a network path. `make PSP_GPT=0` builds the lean variant for
-#memory-margin experiments; every GPT source is #ifdef WITH_GPT_AI-wrapped, so
-#the objects compile empty and the link is unchanged.
-ifeq ($(PSP_GPT),0)
-PSP_GPT_DEF =
-else
+#GPT layer on PSP: OUT by default. The PSP cannot bring its network up under
+#this engine (the full bring-up attempt and its failure ladder live on the
+#'psp' branch), so the LLM opponent is ~2 MB of dead weight in a ~44 MB heap
+#and its settings tab offers nothing usable. `make PSP_GPT=1` builds it back
+#in for experiments; every GPT source is #ifdef WITH_GPT_AI-wrapped, so the
+#objects compile empty and the link is unchanged.
+ifeq ($(PSP_GPT),1)
 PSP_GPT_DEF = -DWITH_GPT_AI
+else
+PSP_GPT_DEF =
 endif
 CFLAGS = -O2 -G0 -DPSPFW3XX -DDEVHOOK -DUSE_PRECOMPILED_HEADERS=1 -DPSP -DTIXML_USE_STL $(PSP_GPT_DEF) -std=gnu++14 -include ../../JGE/include/psp_noenv.h $(EXTRA_DEFS)
 
