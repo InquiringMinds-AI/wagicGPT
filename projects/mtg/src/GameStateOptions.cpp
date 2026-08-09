@@ -402,7 +402,7 @@ void GameStateOptions::Render()
 #endif
     const char * const CreditsText[] = {
         "wagicGPT by InquiringMinds-AI",
-        "a fork of Wagic, The Homebrew?! by Wololo",
+        "forked from Wagic, The Homebrew?! by Wololo",
         "",
         "Updates, new cards, and more on the Wagic Discord",
         "Many thanks to the people who help this project",
