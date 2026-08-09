@@ -32,7 +32,13 @@ GptOptionsList::GptOptionsList()
     signInWanted = false;
     cfg = GptSettings::load();
     if (cfg.urls.empty())
+#if defined(PSP)
+        //127.0.0.1 is the PSP itself; the endpoint is always a LAN bridge the
+        //user types in, so seed the row empty rather than with a self-address.
+        cfg.urls.push_back("");
+#else
         cfg.urls.push_back("http://127.0.0.1:8080");
+#endif
     if (cfg.thinking < 0) cfg.thinking = 0;
     if (cfg.maxTokens < 0) cfg.maxTokens = 0;
     loadedCfg = cfg;
@@ -45,9 +51,15 @@ GptOptionsList::GptOptionsList()
     //OpenRouter routing pin: comma-separated provider names, sent as
     //provider:{only:[...],allow_fallbacks:false}. Config-file-only until the
     //owner's ruling that provider control must be reachable from the couch.
+#if !defined(PSP)
+    //Both rows govern providers the PSP transport can never reach (no TLS):
+    //the OpenRouter routing pin and the ChatGPT-subscription sign-in.
     Add(NEW OptionGptTextUnlessCodex(&cfg, &cfg.providerOnly, "Provider pin (OpenRouter)", "(any provider)"));
+#endif
     Add(NEW OptionGptTextUnlessCodex(&cfg, &cfg.key, "API key", "(none)", true));
+#if !defined(PSP)
     Add(NEW OptionGptSignIn(this));
+#endif
     Add(NEW OptionGptReasoning(&cfg));
     //Generous by design: the patience prompt is what bounds how long a PERSON
     //waits, so this only has to be long enough that "keep waiting" can still
