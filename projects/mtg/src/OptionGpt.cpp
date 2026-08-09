@@ -7,8 +7,7 @@
 #include "WFont.h"
 #include "WResourceManager.h"
 
-#include <thread>
-#include <mutex>
+#include <mutex> //std::lock_guard; the mutex itself is GptMutex (Vita seam)
 
 namespace
 {
@@ -224,11 +223,36 @@ void OptionGptPreset::updateValue()
 
 struct OptionGptTest::ProbeState
 {
-    std::mutex mtx;
+    GptMutex mtx; //NOT std::mutex - a no-op on Vita, and a real worker
+                  //without a real lock is a data race on this struct
     int status; //0 idle, 1 running, 2 done
     string result;
     ProbeState() : status(0) {}
 };
+
+namespace
+{
+//Context handed to the probe worker; owned by ProbeMain (deleted there).
+struct ProbeCtx
+{
+    std::shared_ptr<OptionGptTest::ProbeState> state;
+    string url;
+    string key;
+};
+
+void ProbeMain(void * p)
+{
+    ProbeCtx * ctx = static_cast<ProbeCtx *>(p);
+    string model;
+    bool ok = gptProbeEndpoint(ctx->url, ctx->key, model, 6000);
+    {
+        std::lock_guard<GptMutex> g(ctx->state->mtx);
+        ctx->state->status = 2;
+        ctx->state->result = ok ? ("OK - serving " + model) : "unreachable / no usable reply";
+    }
+    delete ctx;
+}
+} //namespace
 
 OptionGptTest::OptionGptTest(GptSettings * cfg)
     : WGuiItem("Test connection"), mCfg(cfg), mProbe(std::make_shared<ProbeState>())
@@ -242,7 +266,7 @@ void OptionGptTest::Render()
     font->DrawString(_(displayValue).c_str(), x + 2, y + 3);
     string status;
     {
-        std::lock_guard<std::mutex> g(mProbe->mtx);
+        std::lock_guard<GptMutex> g(mProbe->mtx);
         status = (mProbe->status == 1) ? "testing..." : mProbe->result;
     }
     if (status.empty())
@@ -253,35 +277,26 @@ void OptionGptTest::Render()
 void OptionGptTest::updateValue()
 {
     {
-        std::lock_guard<std::mutex> g(mProbe->mtx);
+        std::lock_guard<GptMutex> g(mProbe->mtx);
         if (mProbe->status == 1)
             return; //already running
         mProbe->status = 1;
         mProbe->result.clear();
     }
-    string url = mCfg->primaryUrl();
-    string key = mCfg->key;
-    std::shared_ptr<ProbeState> state = mProbe;
-    try
+    //gptSpawnWorker, NOT std::thread: this was the site the Vita seam port
+    //missed - std::thread construction throws there, so "Test connection"
+    //reported "cannot test: no worker thread" on the one platform where the
+    //user most needs to check an endpoint from the couch.
+    ProbeCtx * ctx = new ProbeCtx(); //plain new: ProbeMain deletes it, possibly on the worker
+    ctx->state = mProbe;
+    ctx->url = mCfg->primaryUrl();
+    ctx->key = mCfg->key;
+    if (!gptSpawnWorker(&ProbeMain, ctx))
     {
-        std::thread([state, url, key]() {
-            string model;
-            bool ok = gptProbeEndpoint(url, key, model, 6000);
-            std::lock_guard<std::mutex> g(state->mtx);
-            state->status = 2;
-            state->result = ok ? ("OK - serving " + model) : "unreachable / no usable reply";
-        }).detach();
-    }
-    catch (const std::exception& e)
-    {
-        //See AIPlayerGPT: an unstartable thread must not abort the process. Here
-        //it also has to say so out loud - this runs from the options screen, and
-        //a silent failure would read as "the endpoint is bad" when the endpoint
-        //was never contacted.
-        std::lock_guard<std::mutex> g(state->mtx);
-        state->status = 2;
-        state->result = string("cannot test: no worker thread (") + e.what() + ")";
-        gptLogLine(string("probe thread refused: ") + e.what());
+        //No worker thread on this platform: probe synchronously. The options
+        //screen stalls for up to the 6s probe timeout, but it comes back with
+        //a real answer - better than refusing to test at all.
+        ProbeMain(ctx);
     }
 }
 
