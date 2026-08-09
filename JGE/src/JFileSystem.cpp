@@ -123,7 +123,13 @@ void JFileSystem::preloadZip(const string& filename)
     // + per-zip LRU eviction, so browsing evicts the stalest set instead of
     // nuking the cache.
 #if defined(VITA)
-    const unsigned int zipCacheLimit = 80000;   // ~3.6MB, covers all 75k+ card entries
+    //Every card contributes TWO entries (full + thumbnail), so the real
+    //population of a full 336-set pack is ~155k - the old 80000 was sized
+    //to the card count and silently ran LRU eviction the Vita's RAM never
+    //needed. Every evicted set is a central-dir re-parse on next access,
+    //and each re-parse is another exposure of the async-vs-main-thread
+    //JFileSystem race. ~7.5MB of a machine with hundreds free.
+    const unsigned int zipCacheLimit = 168000;  // full+thumb entries for 77k cards, with headroom
 #elif defined(PSP)
     const unsigned int zipCacheLimit = 12000;   // ~0.5-1MB of the diet's heap margin
 #else
