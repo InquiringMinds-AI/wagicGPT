@@ -294,7 +294,7 @@ void CardGui::Render()
             else
                 fakeborder->SetColor(ARGB((int)(actA),15,15,15));
 
-            renderer->RenderQuad(fakeborder.get(), actX, actY, actT, (29 * actZ + 1) / 16, 42 * actZ / 16);
+            renderer->RenderQuad(fakeborder.get(), actX, actY, actT, (31 * actZ + 1) / 16, 42 * actZ / 16);
         }
         //draw border for highlighting
         if (game)
@@ -302,12 +302,12 @@ void CardGui::Render()
             if (card && card->forcedBorderA && highlightborder)
             {
                 highlightborder->SetColor(ARGB(95,255,0,0));
-                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (32 * actZ + 1) / 16, 43 * actZ / 16);
             }
             if (card && card->forcedBorderB && highlightborder)
             {
                 highlightborder->SetColor(ARGB(95,0,245,0));
-                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (32 * actZ + 1) / 16, 43 * actZ / 16);
             }
             //castability glow: GOLD border behind a hand card its owner
             //could legally play right now (drawn here so it shows with
@@ -316,7 +316,7 @@ void CardGui::Render()
                 && card->controller()->game->hand->hasCard(card))
             {
                 highlightborder->SetColor(ARGB(220,250,205,60));
-                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (32 * actZ + 1) / 16, 43 * actZ / 16);
             }
             //availability on the battlefield, same language as the gold hand
             //glow: a border means "you can act with this right now".
@@ -340,7 +340,7 @@ void CardGui::Render()
                 if (card->canAttackNow)
                 {
                     highlightborder->SetColor(ARGB(220,255,120,60));
-                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (33 * actZ + 1) / 16, 46 * actZ / 16);
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (35 * actZ + 1) / 16, 46 * actZ / 16);
                 }
                 //Blocking gets the SAME orange halo as attacking: both mean
                 //"this creature can enter combat right now", and the two can
@@ -349,7 +349,7 @@ void CardGui::Render()
                 if (card->canBlockNow)
                 {
                     highlightborder->SetColor(ARGB(220,255,120,60));
-                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (33 * actZ + 1) / 16, 46 * actZ / 16);
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (35 * actZ + 1) / 16, 46 * actZ / 16);
                 }
                 if (card->hasUsableAbilityNow)
                 {
@@ -357,7 +357,7 @@ void CardGui::Render()
                     //hardware (the invisibility floor was ~39) while keeping
                     //the green visually inside the 46 attack halo.
                     highlightborder->SetColor(ARGB(210,80,235,170));
-                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (29 * actZ + 1) / 16, 42 * actZ / 16);
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (31 * actZ + 1) / 16, 42 * actZ / 16);
                 }
             }
             //tap preview: BLUE border on the battlefield producers the
@@ -368,21 +368,21 @@ void CardGui::Render()
                 && card->controller()->game->inPlay->hasCard(card))
             {
                 highlightborder->SetColor(ARGB(200,80,170,255));
-                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (32 * actZ + 1) / 16, 43 * actZ / 16);
             }
             if(card->myPair && card->myPair->isInPlay(game) && highlightborder)
             {
                 if(mHasFocus)
                 {
                     highlightborder->SetColor(ARGB(200,7,98,248));
-                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (32 * actZ + 1) / 16, 43 * actZ / 16);
                 }
                 if(CardView* cv = dynamic_cast<CardView*>(card->myPair->view))
                 {
                     if(cv->mHasFocus)
                     {
                         highlightborder->SetColor(ARGB(200,57,28,248));
-                        renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                        renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (32 * actZ + 1) / 16, 43 * actZ / 16);
                     }
                 }
             }
@@ -395,7 +395,7 @@ void CardGui::Render()
                     else
                         highlightborder->SetColor(ARGB(200,57,28,248));
 
-                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                    renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (32 * actZ + 1) / 16, 43 * actZ / 16);
                 }
                 if(CardView* cv = dynamic_cast<CardView*>(card->shackled->view))
                 {
@@ -406,12 +406,40 @@ void CardGui::Render()
                         else
                             highlightborder->SetColor(ARGB(200,57,28,248));
 
-                        renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (30 * actZ + 1) / 16, 43 * actZ / 16);
+                        renderer->RenderQuad(highlightborder.get(), actX, actY, actT, (32 * actZ + 1) / 16, 43 * actZ / 16);
                     }
                 }
             }
         }
         //draw the card image
+        //WAGIC_ALTLOG (Android: flag file User/altlog.on, output next to it):
+        //log every art-less battlefield render with the id/set/image the
+        //load wanted - turns "some cards have no art" into an exact list.
+        {
+            static FILE * altOut = NULL;
+            static int altState = 0;
+            if (alternate && altState >= 0)
+            {
+                if (altState == 0)
+                {
+                    if (getenv("WAGIC_ALTLOG"))
+                        { altOut = stderr; altState = 1; }
+#ifdef ANDROID
+                    else if (access("/sdcard/Wagic/User/altlog.on", F_OK) == 0)
+                        { altOut = fopen("/sdcard/Wagic/User/altlog.txt", "a"); altState = altOut ? 1 : -1; }
+#endif
+                    else altState = -1;
+                }
+                if (altState == 1)
+                {
+                    fprintf(altOut, "altlog id=%d set=%s img=%s card=%s x=%.1f y=%.1f z=%.3f a=%.0f\n",
+                            card->getMTGId(),
+                            (card->setId >= 0) ? setlist[card->setId].c_str() : "?",
+                            card->getImageName().c_str(), card->name.c_str(), actX, actY, actZ, actA);
+                    fflush(altOut);
+                }
+            }
+        }
         renderer->RenderQuad(quad.get(), actX, actY, actT, scale, scale);
     }
 

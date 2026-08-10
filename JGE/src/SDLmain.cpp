@@ -9,6 +9,9 @@
 #endif
 
 #include "../include/JGE.h"
+#if !defined(WIN32) && !defined(PSP) && !defined(VITA) && !defined(IOS)
+#include <sys/resource.h>
+#endif
 #include "../include/JTypes.h"
 #include "../include/JApp.h"
 #include "../include/JFileSystem.h"
@@ -527,6 +530,62 @@ void SdlApp::OnUpdate()
 	if(g_engine)
 		g_engine->Render();
 
+	//WAGIC_FRAMEDUMP=<dir>[:N]: write every Nth rendered frame (default 1)
+	//as a PPM into <dir> - the capture side of visual-defect reproduction
+	//(WAGIC_KEYSCRIPT in JGE::Update is the input side). Read BEFORE the
+	//swap so the dump is the frame just composed, not the stale back buffer.
+	{
+		static const char * dumpSpec = getenv("WAGIC_FRAMEDUMP");
+		if (dumpSpec && *dumpSpec)
+		{
+			static string dumpDir;
+			static int every = 1;
+			static unsigned int frameNo = 0;
+			if (dumpDir.empty())
+			{
+				dumpDir = dumpSpec;
+				size_t colon = dumpDir.rfind(':');
+				if (colon != string::npos)
+				{
+					every = atoi(dumpDir.c_str() + colon + 1);
+					if (every < 1) every = 1;
+					dumpDir.erase(colon);
+				}
+			}
+			frameNo++;
+			//Draw-attribution runs: mark frame boundaries in the thin/draw
+			//log so each dumped frame's draw list can be isolated.
+			{
+				static const char * tl = getenv("WAGIC_THINLOG");
+				if (tl && getenv("WAGIC_DRAWLOG"))
+				{
+					FILE * mf = fopen(tl, "a");
+					if (mf) { fprintf(mf, "FRAME %u\n", frameNo); fclose(mf); }
+				}
+			}
+			if (frameNo % every == 0)
+			{
+				int w = (int) JRenderer::GetInstance()->GetActualWidth();
+				int h = (int) JRenderer::GetInstance()->GetActualHeight();
+				static std::vector<unsigned char> px;
+				px.resize((size_t) w * h * 3);
+				glPixelStorei(GL_PACK_ALIGNMENT, 1);
+				glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, px.data());
+				char name[512];
+				snprintf(name, sizeof(name), "%s/frame-%06u.ppm", dumpDir.c_str(), frameNo);
+				FILE * f = fopen(name, "wb");
+				if (f)
+				{
+					fprintf(f, "P6\n%d %d\n255\n", w, h);
+					//glReadPixels is bottom-up; write rows reversed.
+					for (int row = h - 1; row >= 0; row--)
+						fwrite(px.data() + (size_t) row * w * 3, 1, (size_t) w * 3, f);
+					fclose(f);
+				}
+			}
+		}
+	}
+
 	SDL_GL_SwapWindow(window);
 }
 
@@ -733,6 +792,22 @@ void SdlApp::OnTouchEvent(const SDL_TouchFingerEvent& event)
 bool SdlApp::OnInit()
 {
 	int window_w, window_h;
+
+#if !defined(WIN32) && !defined(PSP) && !defined(VITA) && !defined(IOS)
+	//Art loading opens set zips in bursts (330+ sets); under a 1024-fd soft
+	//limit the burst exhausts descriptors and the affected cards silently
+	//render art-less (proven: same game, art-less under LimitNOFILE=1024,
+	//complete under 16384 - 2026-08-10). Raise the soft limit to the hard
+	//limit; the steady-state usage stays tiny either way.
+	{
+		struct rlimit rl;
+		if (getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur < rl.rlim_max)
+		{
+			rl.rlim_cur = rl.rlim_max;
+			setrlimit(RLIMIT_NOFILE, &rl);
+		}
+	}
+#endif
 
 	//WAGIC_HEADLESS: no window, no GL context. SDL's dummy video driver
 	//satisfies init on a machine with no display; every GL touch is skipped

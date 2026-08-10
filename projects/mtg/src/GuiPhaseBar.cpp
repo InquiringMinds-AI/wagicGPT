@@ -156,10 +156,23 @@ void GuiPhaseBar::Render()
     sprintf(buf, _("(%s%s) %s").c_str(), currentP.c_str(), interrupt.c_str(),phaseNameToTranslate.c_str());
 #if !defined (PSP)
     if(phaseinfo.get())
-    {//fix phaseinfo graphics... should look nice now...
-        float testW = ((font->GetStringWidth(buf))*2) - SCREEN_WIDTH_F;
-        phaseinfo->SetHotSpot(testW+40.f, 0);
-        JRenderer::GetInstance()->RenderQuad(phaseinfo.get(),0,0,0,SCREEN_WIDTH_F / phaseinfo->mWidth, SCREEN_HEIGHT_F / phaseinfo->mHeight);
+    {
+        //The phase-name backdrop. The old code stretched the whole 960x544
+        //texture (transparent except the bar strip at its top-right) across
+        //the screen and slid it sideways by a hotspot derived from the text
+        //width. For short phase names the slide pushed the quad's left edge
+        //into the middle of the screen, and sampling at that edge reads the
+        //texture's power-of-two padding - zeroed on desktop drivers,
+        //GARBAGE on Android/Vita GLES - which drew a faint full-height
+        //vertical line plus a bottom seam: the long-lived "1px battlefield
+        //line" (root-caused 2026-08-10). Draw only the bar strip, at the
+        //same on-screen position the slide used to produce.
+        const float texW = 960.0f, texH = 544.0f;
+        const float sx = SCREEN_WIDTH_F / texW, sy = SCREEN_HEIGHT_F / texH;
+        phaseinfo->SetTextureRect(472.0f, 0.0f, texW - 472.0f, 36.0f);
+        phaseinfo->SetHotSpot(0, 0);
+        float barX = SCREEN_WIDTH_F - 19.5f - font->GetStringWidth(buf);
+        JRenderer::GetInstance()->RenderQuad(phaseinfo.get(), barX, 0, 0, sx, sy);
     }
 #endif
     font->DrawString(buf, SCREEN_WIDTH - 5, 2, JGETEXT_RIGHT);

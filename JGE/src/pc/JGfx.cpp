@@ -1075,10 +1075,70 @@ void JRenderer::FlushQuadBatch()
 }
 #endif
 
+//WAGIC_THINLOG=<file>: append every draw call whose screen footprint is a
+//thin long strip (<=2.5px one axis, >=18px the other) - the shape of the
+//stray 1px battlefield line (visual-defect hunt, 2026-08-10). On Android,
+//where env vars can't be set, the gate is the flag file
+///sdcard/Wagic/User/thinlog.on and output goes next to it.
+static FILE * jgeThinLogFile()
+{
+    static FILE * f = NULL;
+    static int state = 0;
+    if (state == 0)
+    {
+        const char * p = getenv("WAGIC_THINLOG");
+#ifdef ANDROID
+        if (!p && access("/sdcard/Wagic/User/thinlog.on", F_OK) == 0)
+            p = "/sdcard/Wagic/User/thinlog.txt";
+#endif
+        if (p && *p) { f = fopen(p, "a"); state = f ? 1 : -1; }
+        else state = -1;
+    }
+    return f;
+}
+static void jgeThinLog(const char * kind, float x, float y, float w, float h,
+                       unsigned int color, int tex)
+{
+    float aw = fabsf(w), ah = fabsf(h);
+    if (!((aw <= 2.5f && ah >= 18.0f) || (ah <= 2.5f && aw >= 18.0f)))
+        return;
+    FILE * f = jgeThinLogFile();
+    if (!f) return;
+    fprintf(f, "t=%u %s x=%.1f y=%.1f w=%.2f h=%.2f c=%08x tex=%d\n",
+            JGEGetTime(), kind, x, y, w, h, color, tex);
+    fflush(f);
+}
+
 void JRenderer::RenderQuad(JQuad* quad, float xo, float yo, float angle, float xScale, float yScale)
 {
     if (jgeHeadless()) return;
     checkGlError();
+    jgeThinLog("quad", xo, yo, quad->mWidth * xScale, quad->mHeight * yScale, 0,
+               quad->mTex ? (int) quad->mTex->mTexId : -2);
+    //WAGIC_DRAWLOG (needs WAGIC_THINLOG for the file): dump EVERY quad draw -
+    //position, scales, angle, hotspot, texture - so an artifact pixel in a
+    //dumped frame can be attributed to the exact draw that painted it.
+    if (getenv("WAGIC_DRAWLOG"))
+    {
+        FILE * df = jgeThinLogFile();
+        if (df)
+            fprintf(df, "q x=%.1f y=%.1f sx=%.3f sy=%.3f ang=%.3f qw=%.0f qh=%.0f hx=%.1f hy=%.1f tex=%p\n",
+                    xo, yo, xScale, yScale, angle, quad->mWidth, quad->mHeight,
+                    quad->mHotSpotX, quad->mHotSpotY, (void *) quad->mTex);
+    }
+    //anisotropic draw: a card-shaped quad squashed to a strip - footprint
+    //aspect far from the quad's natural aspect (the 1px-line hunt).
+    if (jgeThinLogFile())
+    {
+        float ax = fabsf(xScale), ay = fabsf(yScale);
+        if ((ax < 0.45f * ay || ay < 0.45f * ax) && quad->mWidth * ax >= 0.5f
+            && quad->mWidth >= 8 && quad->mHeight >= 8)
+            fprintf(jgeThinLogFile(),
+                    "t=%u aniso x=%.1f y=%.1f sx=%.3f sy=%.3f ang=%.3f qw=%.0f qh=%.0f tex=%d\n",
+                    JGEGetTime(), xo, yo, xScale, yScale, angle,
+                    quad->mWidth, quad->mHeight,
+                    quad->mTex ? (int) quad->mTex->mTexId : -2);
+    }
 
     //yo = SCREEN_HEIGHT-yo-1;//-(quad->mHeight);
     float width = quad->mWidth;
@@ -1447,6 +1507,7 @@ void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE
 {
     if (jgeHeadless()) return;
     checkGlError();
+    jgeThinLog("fill", x, y, width, height, color, -1);
 
     y = SCREEN_HEIGHT_F - y - height;
 
@@ -1554,6 +1615,7 @@ void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE
 void JRenderer::DrawRect(float x, float y, float width, float height, PIXEL_TYPE color)
 {
     if (jgeHeadless()) return;
+    jgeThinLog("rect", x, y, width, height, color, -1);
     checkGlError();
 
     y = SCREEN_HEIGHT_F - y - height;
@@ -1757,6 +1819,7 @@ void JRenderer::DrawLine(float x1, float y1, float x2, float y2, PIXEL_TYPE colo
 {
     if (jgeHeadless()) return;
     checkGlError();
+    jgeThinLog("line", x1, y1, x2 - x1, y2 - y1, color, -1);
     //	glLineWidth (mLineWidth);
     JColor col;
     col.color = color;
@@ -3307,6 +3370,7 @@ void JRenderer::DrawPolygon(float* x, float* y, int count, PIXEL_TYPE color)
 void JRenderer::DrawLine(float x1, float y1, float x2, float y2, float lineWidth, PIXEL_TYPE color)
 {
     if (jgeHeadless()) return;
+    jgeThinLog("linew", x1, y1, x2 - x1, y2 - y1, color, (int) lineWidth);
     float dy=y2-y1;
     float dx=x2-x1;
     if(dy==0 && dx==0)
