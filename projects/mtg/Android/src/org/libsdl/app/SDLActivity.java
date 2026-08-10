@@ -2103,14 +2103,26 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                 break;
         }
 
+        // Per-pointer dispatch. The old loop sent the SAME masked action for
+        // EVERY pointer, so with a second finger resting on the screen (a
+        // holding thumb, a palm edge) a tap's DOWN/UP got duplicated onto
+        // pointer 0 at the RESTING finger's coordinates - phantom presses at
+        // a stationary point while the real tap (index 1) was discarded by
+        // the native layer. DOWN/UP now go only to the pointer that acted;
+        // MOVE goes to every pointer (that is what a move event means).
+        int actionMasked = event.getActionMasked();
+        int actionIndex = event.getActionIndex();
         for (int index = 0; index < event.getPointerCount(); ++index) {
-            int action = event.getActionMasked();
+            if (actionMasked != MotionEvent.ACTION_MOVE && index != actionIndex)
+                continue;
             float x = event.getX(index);
             float y = event.getY(index);
             float p = event.getPressure(index);
 
-            // TODO: Anything else we need to pass?
-            SDLActivity.onNativeTouch(index, action, x, y, p);
+            // Stable pointer id, not the loop index: indexes compact when a
+            // finger lifts, which would rename the surviving fingers mid-
+            // gesture and confuse the native active-finger tracking.
+            SDLActivity.onNativeTouch(event.getPointerId(index), actionMasked, x, y, p);
         }
 
         // account for 'flick' type gestures by monitoring velocity

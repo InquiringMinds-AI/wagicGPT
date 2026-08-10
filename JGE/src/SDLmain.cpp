@@ -589,6 +589,27 @@ void SdlApp::OnUpdate()
 	SDL_GL_SwapWindow(window);
 }
 
+//WAGIC_PADLOG (Android: flag file User/padlog.on): platform half of the
+//on-screen-keyboard input trace - what SDL actually delivers. Pairs with the
+//SimplePad-side PADLOG to bisect "keyboard unresponsive" between layers.
+static FILE * jgePadlogFile()
+{
+    static FILE * out = NULL;
+    static int state = 0;
+    if (state == 0)
+    {
+        if (getenv("WAGIC_PADLOG"))
+            { out = stderr; state = 1; }
+#ifdef ANDROID
+        else if (access("/sdcard/Wagic/User/padlog.on", F_OK) == 0)
+            { out = fopen("/sdcard/Wagic/User/padlog.txt", "a"); state = out ? 1 : -1; }
+#endif
+        else state = -1;
+    }
+    return (state == 1) ? out : NULL;
+}
+#define JGEPADLOG(...) do { FILE * f_ = jgePadlogFile(); if (f_) { fprintf(f_, __VA_ARGS__); fflush(f_); } } while (0)
+
 void SdlApp::OnKeyPressed(const SDL_KeyboardEvent& event)
 {
 	//Text-entry capture (the on-screen keyboard is open and a physical
@@ -596,6 +617,8 @@ void SdlApp::OnKeyPressed(const SDL_KeyboardEvent& event)
 	//buttons, so text entry never fights the game's key bindings.
 	//Printable characters arrive through SDL_TEXTINPUT; only the edit
 	//controls are taken from the raw key events here.
+	JGEPADLOG("sdl key type=%d sym=%d textinput=%d\n",
+	          (int)event.type, (int)event.keysym.sym, g_engine->TextInputActive() ? 1 : 0);
 	if (g_engine->TextInputActive())
 	{
 		if (event.type == SDL_KEYDOWN)
@@ -604,7 +627,10 @@ void SdlApp::OnKeyPressed(const SDL_KeyboardEvent& event)
 				g_engine->PushTextChar('\b');
 			else if (event.keysym.sym == SDLK_RETURN || event.keysym.sym == SDLK_KP_ENTER)
 				g_engine->PushTextChar('\n');
-			else if (event.keysym.sym == SDLK_ESCAPE)
+			//Android hardware back = SDLK_AC_BACK: cancel the edit, same as
+			//Escape. Before this it fell through and was swallowed - back
+			//"did nothing" while the on-screen keyboard was open.
+			else if (event.keysym.sym == SDLK_ESCAPE || event.keysym.sym == SDLK_AC_BACK)
 				g_engine->PushTextChar(0x1b);
 		}
 		return;
@@ -742,12 +768,24 @@ void SdlApp::OnMouseClicked(const SDL_MouseButtonEvent& event)
 	}
 }
 
+
 void SdlApp::OnTouchEvent(const SDL_TouchFingerEvent& event)
 {
-    // only respond to the first finger for mouse type movements - any additional finger
-    // should be ignored, and will come through instead as a multigesture event
-    if (event.fingerId == 0)
+    JGEPADLOG("sdl touch type=%d finger=%d x=%.1f y=%.1f\n",
+              (int)event.type, (int)event.fingerId, (float)event.x, (float)event.y);
+    // Track ONE active finger, latest-down wins. The old filter honored only
+    // fingerId 0, so with a second finger resting on the screen (holding
+    // thumb, palm edge) every real tap arrived as finger 1 and was discarded
+    // wholesale - the UI looked completely unresponsive. Adopting the most
+    // recent FINGERDOWN as the pointer keeps single-finger behavior identical
+    // and makes taps work regardless of what else is touching the glass.
+    static int sActiveFinger = -1;
+    if (event.type == SDL_FINGERDOWN)
+        sActiveFinger = (int)event.fingerId;
+    if ((int)event.fingerId == (sActiveFinger < 0 ? 0 : sActiveFinger))
     {
+        if (event.type == SDL_FINGERUP)
+            sActiveFinger = -1;
         if (event.y >= viewPort.y &&
             event.y <= viewPort.y + viewPort.h &&
             event.x >= viewPort.x &&
@@ -775,6 +813,7 @@ void SdlApp::OnTouchEvent(const SDL_TouchFingerEvent& event)
                     if (abs(mMouseDownX - event.x) < kHitzonePliancy && abs(mMouseDownY - event.y) < kHitzonePliancy)
                     {
                     	DebugTrace("Pressing OK BUtton");
+                        JGEPADLOG("sdl tap -> JGE_BTN_OK\n");
                         g_engine->HoldKey_NoRepeat(JGE_BTN_OK);
                     }
                 }

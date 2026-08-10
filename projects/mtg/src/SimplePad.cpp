@@ -8,6 +8,27 @@
 #define ALPHA_COLUMNS 8
 #define ALPHA_ROWS 8
 
+//WAGIC_PADLOG (Android: flag file User/padlog.on, output next to it): trace
+//what input actually reaches the on-screen keyboard - clicks seen, buttons
+//read, keys pressed. Diagnostic for "keyboard unresponsive" reports.
+static FILE * padlogFile()
+{
+    static FILE * out = NULL;
+    static int state = 0;
+    if (state == 0)
+    {
+        if (getenv("WAGIC_PADLOG"))
+            { out = stderr; state = 1; }
+#ifdef ANDROID
+        else if (access("/sdcard/Wagic/User/padlog.on", F_OK) == 0)
+            { out = fopen("/sdcard/Wagic/User/padlog.txt", "a"); state = out ? 1 : -1; }
+#endif
+        else state = -1;
+    }
+    return (state == 1) ? out : NULL;
+}
+#define PADLOG(...) do { FILE * f_ = padlogFile(); if (f_) { fprintf(f_, __VA_ARGS__); fflush(f_); } } while (0)
+
 #define KPD_UP 0
 #define KPD_DOWN 1
 #define KPD_LEFT 2
@@ -260,6 +281,7 @@ void SimplePad::Update(float)
     char typed;
     while (mEngine->PopTextChar(typed))
     {
+        PADLOG("pad textchar 0x%02x\n", (unsigned char)typed);
         if (typed == '\n')
         {
             Finish();
@@ -290,11 +312,15 @@ void SimplePad::Update(float)
             }
         }
 
+        PADLOG("pad click x=%d y=%d -> key %d (%s)\n", x, y, n,
+               (n >= 0 && n < nbitems && keys[n]) ? keys[n]->displayValue.c_str() : "?");
         MoveSelection(n);
         JGE::GetInstance()->LeftClickedProcessed();
     }
 
     JButton key = mEngine->ReadButton();
+    if (key != JGE_BTN_NONE)
+        PADLOG("pad button %d selected=%d\n", (int)key, selected);
 
     //Start button changes capslock setting.
     if (key == JGE_BTN_MENU)
@@ -330,7 +356,11 @@ void SimplePad::Update(float)
     }
 
     //These bits require a valid key...
-    if (selected >= 0 && selected < nbitems && keys[selected]) if (key == JGE_BTN_OK) pressKey(keys[selected]->id);
+    if (selected >= 0 && selected < nbitems && keys[selected]) if (key == JGE_BTN_OK)
+    {
+        PADLOG("pad pressKey id=%d (%s)\n", keys[selected]->id, keys[selected]->displayValue.c_str());
+        pressKey(keys[selected]->id);
+    }
     if (buffer.size() > 0 && key == JGE_BTN_SEC) buffer = buffer.substr(0, buffer.size() - 1);
     if (buffer.size() && key == JGE_BTN_PREV)
     {
@@ -355,6 +385,7 @@ void SimplePad::Update(float)
 }
 void SimplePad::Start(string value, string * _dest)
 {
+    PADLOG("pad start value='%s'\n", value.c_str());
     bActive = true;
     bCanceled = false;
     buffer = value;
