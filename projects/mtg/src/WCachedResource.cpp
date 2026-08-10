@@ -247,10 +247,13 @@ bool WCachedTexture::Attempt(const string& filename, int submode, int & error)
         if (!fileExists(realname.c_str())) error = CACHE_ERROR_404;
         return false;
     }
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     //Draw-attribution runs (WAGIC_DRAWLOG): map texture ids to files so the
     //renderer's per-draw log can name what each draw painted.
     if (getenv("WAGIC_DRAWLOG"))
         fprintf(stderr, "texmap ptr=%p file=%s\n", (void *) texture, realname.c_str());
+#endif //_DEBUG || WAGIC_DEVLOGS
+
 
     error = CACHE_ERROR_NONE;
     return true;

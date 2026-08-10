@@ -412,6 +412,7 @@ void CardGui::Render()
             }
         }
         //draw the card image
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
         //WAGIC_ALTLOG (Android: flag file User/altlog.on, output next to it):
         //log every art-less battlefield render with the id/set/image the
         //load wanted - turns "some cards have no art" into an exact list.
@@ -440,6 +441,8 @@ void CardGui::Render()
                 }
             }
         }
+#endif //_DEBUG || WAGIC_DEVLOGS
+
         renderer->RenderQuad(quad.get(), actX, actY, actT, scale, scale);
     }
 

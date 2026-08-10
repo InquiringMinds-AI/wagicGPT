@@ -228,7 +228,7 @@ void JGE::Update(float dt)
         it->second -= dt;
     }
 
-#if !defined(PSP) && !defined(VITA) && !defined(ANDROID)
+#if !defined(PSP) && !defined(VITA) && !defined(ANDROID) && (defined(_DEBUG) || defined(WAGIC_DEVLOGS))
     //WAGIC_KEYSCRIPT="frame:btn,frame:btn,...": inject button presses at
     //absolute frame numbers - drives menus in offscreen/fbdump runs where
     //no real input exists (visual-defect reproduction, 2026-08-09). Button

@@ -25,6 +25,10 @@ LOCAL_CFLAGS += -DWAGIC_NO_CURL -DWAGIC_HTTP_JNI
 # The GPT layer's registration (options tab, AI factory) is gated on this;
 # without it the fork's sources compile but never activate.
 LOCAL_CFLAGS += -DWITH_GPT_AI
+# ALPHA ONLY: keep the flag-file diagnostics (padlog/altlog/thinlog) compiled
+# in while the Android port is being debugged on real devices. Diagnostics do
+# not belong in release builds - REMOVE this line for any release APK.
+LOCAL_CFLAGS += -DWAGIC_DEVLOGS
 LOCAL_STATIC_LIBRARIES := libpng libjpeg
 LOCAL_SHARED_LIBRARIES := SDL
 

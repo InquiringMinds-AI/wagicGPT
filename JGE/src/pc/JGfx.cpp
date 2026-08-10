@@ -1075,6 +1075,7 @@ void JRenderer::FlushQuadBatch()
 }
 #endif
 
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
 //WAGIC_THINLOG=<file>: append every draw call whose screen footprint is a
 //thin long strip (<=2.5px one axis, >=18px the other) - the shape of the
 //stray 1px battlefield line (visual-defect hunt, 2026-08-10). On Android,
@@ -1108,11 +1109,18 @@ static void jgeThinLog(const char * kind, float x, float y, float w, float h,
             JGEGetTime(), kind, x, y, w, h, color, tex);
     fflush(f);
 }
+#else
+static inline FILE * jgeThinLogFile() { return NULL; }
+static inline void jgeThinLog(const char *, float, float, float, float,
+                              unsigned int, int) {}
+#endif //_DEBUG || WAGIC_DEVLOGS
+
 
 void JRenderer::RenderQuad(JQuad* quad, float xo, float yo, float angle, float xScale, float yScale)
 {
     if (jgeHeadless()) return;
     checkGlError();
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     jgeThinLog("quad", xo, yo, quad->mWidth * xScale, quad->mHeight * yScale, 0,
                quad->mTex ? (int) quad->mTex->mTexId : -2);
     //WAGIC_DRAWLOG (needs WAGIC_THINLOG for the file): dump EVERY quad draw -
@@ -1139,6 +1147,8 @@ void JRenderer::RenderQuad(JQuad* quad, float xo, float yo, float angle, float x
                     quad->mWidth, quad->mHeight,
                     quad->mTex ? (int) quad->mTex->mTexId : -2);
     }
+#endif //_DEBUG || WAGIC_DEVLOGS
+
 
     //yo = SCREEN_HEIGHT-yo-1;//-(quad->mHeight);
     float width = quad->mWidth;
@@ -1507,7 +1517,9 @@ void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE
 {
     if (jgeHeadless()) return;
     checkGlError();
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     jgeThinLog("fill", x, y, width, height, color, -1);
+#endif //_DEBUG || WAGIC_DEVLOGS
 
     y = SCREEN_HEIGHT_F - y - height;
 
@@ -1615,7 +1627,9 @@ void JRenderer::FillRect(float x, float y, float width, float height, PIXEL_TYPE
 void JRenderer::DrawRect(float x, float y, float width, float height, PIXEL_TYPE color)
 {
     if (jgeHeadless()) return;
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     jgeThinLog("rect", x, y, width, height, color, -1);
+#endif //_DEBUG || WAGIC_DEVLOGS
     checkGlError();
 
     y = SCREEN_HEIGHT_F - y - height;
@@ -1819,7 +1833,9 @@ void JRenderer::DrawLine(float x1, float y1, float x2, float y2, PIXEL_TYPE colo
 {
     if (jgeHeadless()) return;
     checkGlError();
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     jgeThinLog("line", x1, y1, x2 - x1, y2 - y1, color, -1);
+#endif //_DEBUG || WAGIC_DEVLOGS
     //	glLineWidth (mLineWidth);
     JColor col;
     col.color = color;
@@ -3370,7 +3386,9 @@ void JRenderer::DrawPolygon(float* x, float* y, int count, PIXEL_TYPE color)
 void JRenderer::DrawLine(float x1, float y1, float x2, float y2, float lineWidth, PIXEL_TYPE color)
 {
     if (jgeHeadless()) return;
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
     jgeThinLog("linew", x1, y1, x2 - x1, y2 - y1, color, (int) lineWidth);
+#endif //_DEBUG || WAGIC_DEVLOGS
     float dy=y2-y1;
     float dx=x2-x1;
     if(dy==0 && dx==0)

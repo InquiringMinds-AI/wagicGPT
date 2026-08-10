@@ -530,6 +530,7 @@ void SdlApp::OnUpdate()
 	if(g_engine)
 		g_engine->Render();
 
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
 	//WAGIC_FRAMEDUMP=<dir>[:N]: write every Nth rendered frame (default 1)
 	//as a PPM into <dir> - the capture side of visual-defect reproduction
 	//(WAGIC_KEYSCRIPT in JGE::Update is the input side). Read BEFORE the
@@ -585,6 +586,8 @@ void SdlApp::OnUpdate()
 			}
 		}
 	}
+#endif //_DEBUG || WAGIC_DEVLOGS
+
 
 	SDL_GL_SwapWindow(window);
 }
@@ -592,6 +595,8 @@ void SdlApp::OnUpdate()
 //WAGIC_PADLOG (Android: flag file User/padlog.on): platform half of the
 //on-screen-keyboard input trace - what SDL actually delivers. Pairs with the
 //SimplePad-side PADLOG to bisect "keyboard unresponsive" between layers.
+//Dev builds only - diagnostics are compiled out of release builds.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
 static FILE * jgePadlogFile()
 {
     static FILE * out = NULL;
@@ -609,6 +614,9 @@ static FILE * jgePadlogFile()
     return (state == 1) ? out : NULL;
 }
 #define JGEPADLOG(...) do { FILE * f_ = jgePadlogFile(); if (f_) { fprintf(f_, __VA_ARGS__); fflush(f_); } } while (0)
+#else
+#define JGEPADLOG(...) ((void)0)
+#endif //_DEBUG || WAGIC_DEVLOGS
 
 void SdlApp::OnKeyPressed(const SDL_KeyboardEvent& event)
 {

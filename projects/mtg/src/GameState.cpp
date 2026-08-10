@@ -8,6 +8,31 @@
 #include "DeckMetaData.h"
 #include "DeckManager.h"
 #include "Player.h"
+#include "JFileSystem.h"
+
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+//WAGIC_PADLOG (Android: flag file User/padlog.on): deck-list slice of the
+//input/UI trace - why does the 1P chooser see no decks when the files exist?
+static FILE * deckPadlogFile()
+{
+    static FILE * out = NULL;
+    static int state = 0;
+    if (state == 0)
+    {
+        if (getenv("WAGIC_PADLOG"))
+            { out = stderr; state = 1; }
+#ifdef ANDROID
+        else if (access("/sdcard/Wagic/User/padlog.on", F_OK) == 0)
+            { out = fopen("/sdcard/Wagic/User/padlog.txt", "a"); state = out ? 1 : -1; }
+#endif
+        else state = -1;
+    }
+    return (state == 1) ? out : NULL;
+}
+#define DECKLISTLOG(...) do { FILE * f_ = deckPadlogFile(); if (f_) { fprintf(f_, __VA_ARGS__); fflush(f_); } } while (0)
+#else
+#define DECKLISTLOG(...) ((void)0)
+#endif //_DEBUG || WAGIC_DEVLOGS
 
 // The purpose of this method is to create a listing of decks to be used for the input menu
 // by default, the list will be sorted by name
@@ -38,6 +63,9 @@ vector<DeckMetaData *> GameState::BuildDeckList(const string& path, const string
         std::ostringstream filename;
         filename << path << "/deck" << nbDecks << ".txt";
         DeckMetaData * meta = deckManager->getDeckMetaDataByFilename(filename.str(), isAI);
+        DECKLISTLOG("decklist probe '%s' userroot='%s' exists=%d meta=%p\n",
+                    filename.str().c_str(), JFileSystem::GetInstance()->GetUserRoot().c_str(),
+                    (int)FileExists(filename.str()), (void*)meta);
 
         if (meta)
         {

@@ -52,6 +52,29 @@ namespace
     std::string kNoToAllString(": No To All");
     static const float kIconVerticalOffset = 24;
 
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //WAGIC_PADLOG (Android: flag file User/padlog.on): interrupt-offer slice
+    //of the input trace - same gate as the SimplePad/SDLmain halves.
+    FILE * jgePadlogFile()
+    {
+        static FILE * out = NULL;
+        static int state = 0;
+        if (state == 0)
+        {
+            if (getenv("WAGIC_PADLOG"))
+                { out = stderr; state = 1; }
+#ifdef ANDROID
+            else if (access("/sdcard/Wagic/User/padlog.on", F_OK) == 0)
+                { out = fopen("/sdcard/Wagic/User/padlog.txt", "a"); state = out ? 1 : -1; }
+#endif
+            else state = -1;
+        }
+        return (state == 1) ? out : NULL;
+    }
+#else
+    inline FILE * jgePadlogFile() { return NULL; }
+#endif //_DEBUG || WAGIC_DEVLOGS
+
 }
 
 /*
@@ -887,6 +910,9 @@ ActionStack::ActionStack(GameObserver* game)
     mode = ACTIONSTACK_STANDARD;
     checked = 0;
     lastActionController = NULL;
+    interruptBtnXOffset = noBtnXOffset = noToAllBtnXOffset = interruptDialogWidth = 0;
+    interruptDialogX = 0;
+    interruptDialogHeight = 0;
 
     if(!observer->getResourceManager()) return;
     for (int i = 0; i < 8; ++i)
@@ -1307,18 +1333,30 @@ void ActionStack::endOfInterruption(bool log)
 
 JButton ActionStack::handleInterruptRequest( JButton inputKey, int& x, int& y )
 {
-    if ( gModRules.game.canInterrupt() && y >= 10 && y < (kIconVerticalOffset + 16))
+    //Touch-first mapping (2026-08-10). The old hit test honored only the thin
+    //strip of button-hint labels (y 10..40): tapping the "Interrupt?" title
+    //text (y<10), a stack item, or anywhere near-but-not-on a label fell
+    //through unmapped - the offer branch consumed the click and the tap's
+    //trailing JGE_BTN_OK then DECLINED. On a touchscreen that read as "the
+    //interrupt button declines". Now the No / No to All labels keep their
+    //zones and the REST of the dialog - title, Interrupt label, stack items -
+    //is one big Interrupt target; taps outside the dialog still decline.
+    if (!gModRules.game.canInterrupt())
+        return inputKey;
+
+    if (y >= 10 && y < (kIconVerticalOffset + 16))
     {
-        if (x >= interruptBtnXOffset && x < noBtnXOffset )
-            return JGE_BTN_SEC;
-        
         if (x >= noBtnXOffset && x < noToAllBtnXOffset)
             return JGE_BTN_OK;
-        
+
         if (x >= noToAllBtnXOffset && x < interruptDialogWidth)
             return JGE_BTN_PRI;
     }
-    
+
+    int dialogRight = interruptDialogX + 224; //x0-7 .. x0+width+17, width=200
+    if (interruptDialogHeight > 0 && x >= interruptDialogX && x < dialogRight && y >= 0 && y < interruptDialogHeight)
+        return JGE_BTN_SEC;
+
     return inputKey;
 }
 
@@ -1335,8 +1373,25 @@ bool ActionStack::CheckUserInput(JButton inputKey)
             if(observer->getInput()->GetLeftClickCoordinates(x, y))
             {
                 key = handleInterruptRequest(inputKey, x, y);
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+                if (FILE * f = jgePadlogFile())
+                {
+                    fprintf(f, "stack offer click x=%d y=%d in=%d -> key=%d (dialog x=%d..%d h=%d)\n",
+                            x, y, (int)inputKey, (int)key, interruptDialogX, interruptDialogX + 224, interruptDialogHeight);
+                    fflush(f);
+                }
+#endif //_DEBUG || WAGIC_DEVLOGS
+
             }
-            
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+            else if (inputKey != JGE_BTN_NONE)
+            {
+                if (FILE * f = jgePadlogFile())
+                    { fprintf(f, "stack offer bare key=%d\n", (int)inputKey); fflush(f); }
+            }
+#endif //_DEBUG || WAGIC_DEVLOGS
+
+
             if (JGE_BTN_SEC == key && gModRules.game.canInterrupt())
             {
                 setIsInterrupting(askIfWishesToInterrupt);
@@ -1585,6 +1640,11 @@ void ActionStack::Render()
         renderer->DrawRect(x0 - 6, y0+34.5f, width + 15, height - 19.5f, ARGB(255,89,89,89));
         //stack border
         renderer->DrawRect(x0 - 7, y0+2, width + 17, height + 14, ARGB(255,240,240,240));
+
+        //remember the dialog rect for the touch hit test (see
+        //handleInterruptRequest): the WHOLE dialog is the Interrupt target.
+        interruptDialogX = static_cast<int>(x0 - 7);
+        interruptDialogHeight = static_cast<int>(y0 + height + 16);
         
         std::ostringstream stream;
         // WALDORF - changed "interrupt ?" to "Interrupt?". Don't display count down

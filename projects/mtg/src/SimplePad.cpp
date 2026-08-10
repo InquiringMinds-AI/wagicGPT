@@ -11,6 +11,8 @@
 //WAGIC_PADLOG (Android: flag file User/padlog.on, output next to it): trace
 //what input actually reaches the on-screen keyboard - clicks seen, buttons
 //read, keys pressed. Diagnostic for "keyboard unresponsive" reports.
+//Dev builds only - diagnostics are compiled out of release builds.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
 static FILE * padlogFile()
 {
     static FILE * out = NULL;
@@ -28,6 +30,9 @@ static FILE * padlogFile()
     return (state == 1) ? out : NULL;
 }
 #define PADLOG(...) do { FILE * f_ = padlogFile(); if (f_) { fprintf(f_, __VA_ARGS__); fflush(f_); } } while (0)
+#else
+#define PADLOG(...) ((void)0)
+#endif //_DEBUG || WAGIC_DEVLOGS
 
 #define KPD_UP 0
 #define KPD_DOWN 1
