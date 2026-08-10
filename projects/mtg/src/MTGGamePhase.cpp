@@ -2,6 +2,8 @@
 
 #include "MTGGamePhase.h"
 #include "GuiPhaseBar.h"
+#include "ActionStack.h"
+#include "Player.h"
 
 MTGGamePhase::MTGGamePhase(GameObserver* g, int id) :
     ActionElement(id), observer(g)
@@ -38,6 +40,28 @@ bool MTGGamePhase::NextGamePhase()
 {
     if (activity == Inactive)
     {
+        //Touch devices reach this through the phase-bar tap (GameObserver
+        //routes GuiPhaseBar clicks here directly), which bypasses the layer
+        //key dispatch - so the interrupt-state exits in
+        //ActionStack::CheckUserInput never see the gesture. With
+        //interruptSeconds at its default 0 an open interrupt question then
+        //waits forever while userRequestNextGamePhase silently refuses
+        //(anything NOT_RESOLVED on the stack), and a touch-only player has
+        //no way out: live softlock on Android, escapable only because the
+        //hardware back key happens to emit JGE_BTN_SEC. Advancing the phase
+        //while an interrupt question is open for a human MEANS "no / pass
+        //priority" - hand the gesture to the stack layer as the decline
+        //key, the same reading the right-click fix gave the key road.
+        //AI-owned windows are excluded: a tap must not close the window an
+        //LLM opponent is still thinking in.
+        ActionStack * stack = observer->mLayers->stackLayer();
+        Player * asked = stack->askIfWishesToInterrupt;
+        Player * interrupting = observer->isInterrupting;
+        if ((asked && !asked->isAI()) || (!asked && interrupting && !interrupting->isAI()))
+        {
+            JButton trigger = (options[Options::REVERSETRIGGERS].number ? JGE_BTN_NEXT : JGE_BTN_PREV);
+            return stack->CheckUserInput(trigger);
+        }
         if (observer->currentActionPlayer == observer->currentlyActing())
         {
             activity = Active;
