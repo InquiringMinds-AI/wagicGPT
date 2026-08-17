@@ -651,12 +651,15 @@ string gptHttpPost(const string& url, const string& body, long timeoutMs, const 
 //--- Full-control POST (ChatGPT-subscription transport) ---------------------
 //The Codex backend needs caller-supplied headers and the caller needs the HTTP
 //status and response headers back (401 drives a token refresh; the x-codex-*
-//headers carry the plan-usage gauge). Curl-only: on platforms without curl the
-//call reports transport failure, which degrades to Baka exactly like an
-//unreachable endpoint - the subscription preset simply is not available there.
+//headers carry the plan-usage gauge). Available wherever the platform has a
+//TLS-capable transport: curl on desktop/Vita, the Java HttpURLConnection
+//bridge on Android (GPT_HAVE_HTTP_FULL marks both). On the rest (PSP: no TLS
+//at all) the call reports transport failure, which degrades to Baka exactly
+//like an unreachable endpoint - the subscription preset is not available.
 namespace
 {
 #if !defined(WAGIC_HTTP_JNI) && !defined(WAGIC_NO_CURL)
+#define GPT_HAVE_HTTP_FULL 1
 size_t curlHeaderToString(void * contents, size_t size, size_t nmemb, void * userp)
 {
     static_cast<string *>(userp)->append(static_cast<char *>(contents), size * nmemb);
@@ -710,6 +713,100 @@ string httpRequestFull(const string& url, const string& postBody, long timeoutMs
     //payload ({"detail": ...}) is how the caller tells a wrong route from an
     //expired token from a rate limit.
     return response;
+}
+#elif defined(WAGIC_HTTP_JNI)
+#define GPT_HAVE_HTTP_FULL 1
+//Android: the same contract over the Java transport (SDLActivity
+//.gptHttpRequestFull -> {status, response headers, body}). HttpURLConnection
+//does TLS against the system trust anchors, so everything the curl variant
+//reaches, this reaches too. Failures come back as status 0 with the cause in
+//the Java-side log. Attach/detach and the cached class ref follow the same
+//JNI rules as httpRequestImpl above.
+string httpRequestFull(const string& url, const string& postBody, long timeoutMs,
+                       const vector<string>& reqHeaders, long& httpCode, string& respHeaders)
+{
+    httpCode = 0;
+    respHeaders.clear();
+    if (!gGptJvm || !gGptActivityClass)
+        return "";
+
+    JNIEnv * env = NULL;
+    bool attached = false;
+    jint status = gGptJvm->GetEnv((void **) &env, JNI_VERSION_1_4);
+    if (status == JNI_EDETACHED || status == JNI_ERR)
+    {
+        if (gGptJvm->AttachCurrentThread(&env, NULL) != JNI_OK)
+        {
+            gptLogLine("android transport: could not attach the calling thread");
+            return "";
+        }
+        attached = true;
+    }
+    if (!env)
+        return "";
+
+    string body;
+    jmethodID mid = env->GetStaticMethodID(
+        gGptActivityClass, "gptHttpRequestFull",
+        "(Ljava/lang/String;Ljava/lang/String;I[Ljava/lang/String;)[Ljava/lang/String;");
+    if (!mid)
+    {
+        env->ExceptionClear();
+        gptLogLine("android transport: SDLActivity.gptHttpRequestFull is missing");
+    }
+    else
+    {
+        jstring jUrl = env->NewStringUTF(url.c_str());
+        jstring jBody = env->NewStringUTF(postBody.c_str());
+        //java/lang/String lives on the bootclasspath, so FindClass resolves it
+        //even from a natively-attached thread (unlike app classes - see the
+        //class-caching note above).
+        jclass strCls = env->FindClass("java/lang/String");
+        jobjectArray jHdrs = env->NewObjectArray((jsize) reqHeaders.size(), strCls, NULL);
+        for (size_t i = 0; i < reqHeaders.size(); i++)
+        {
+            jstring h = env->NewStringUTF(reqHeaders[i].c_str());
+            env->SetObjectArrayElement(jHdrs, (jsize) i, h);
+            env->DeleteLocalRef(h);
+        }
+        jobjectArray ret = (jobjectArray) env->CallStaticObjectMethod(
+            gGptActivityClass, mid, jUrl, jBody, (jint) timeoutMs, jHdrs);
+        if (env->ExceptionCheck())
+        {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+            gptLogLine("android transport: java side threw (full request)");
+        }
+        else if (ret && env->GetArrayLength(ret) >= 3)
+        {
+            string parts[3];
+            for (jsize i = 0; i < 3; i++)
+            {
+                jstring js = (jstring) env->GetObjectArrayElement(ret, i);
+                if (!js)
+                    continue;
+                const char * cstr = env->GetStringUTFChars(js, NULL);
+                if (cstr)
+                {
+                    parts[i] = cstr;
+                    env->ReleaseStringUTFChars(js, cstr);
+                }
+                env->DeleteLocalRef(js);
+            }
+            httpCode = atol(parts[0].c_str());
+            respHeaders = parts[1];
+            body = parts[2];
+        }
+        if (ret) env->DeleteLocalRef(ret);
+        if (jHdrs) env->DeleteLocalRef(jHdrs);
+        if (strCls) env->DeleteLocalRef(strCls);
+        env->DeleteLocalRef(jBody);
+        env->DeleteLocalRef(jUrl);
+    }
+
+    if (attached)
+        gGptJvm->DetachCurrentThread();
+    return body;
 }
 #else
 string httpRequestFull(const string&, const string&, long,
@@ -1303,7 +1400,7 @@ bool gptSpawnWorker(void (*fn)(void *), void * ctx)
 //     oai-auth.json, then drop the in-memory auth cache so the next
 //     completion (and Test connection) reads the fresh login.
 
-#if !defined(WAGIC_HTTP_JNI) && !defined(WAGIC_NO_CURL)
+#ifdef GPT_HAVE_HTTP_FULL
 namespace
 {
 const char * kOaiAuthBase = "https://auth.openai.com";

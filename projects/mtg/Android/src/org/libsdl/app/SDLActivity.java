@@ -1426,6 +1426,84 @@ public class SDLActivity extends Activity implements OnKeyListener {
         }
     }
 
+    /**
+     * Full-control variant for the ChatGPT-subscription transport: the caller
+     * supplies every request header (nothing is added here, not even a
+     * Content-Type - OAuth token exchange posts form-encoded bodies), and gets
+     * back { HTTP status, response headers as "Key: value" CRLF lines, body }.
+     * The body is read even on error statuses because the JSON error payload
+     * is how the native side tells a wrong route from an expired token; a
+     * transport failure of any kind returns status "0" with the cause in
+     * gptLastError. Same threading contract as gptHttpRequest above.
+     */
+    public static String[] gptHttpRequestFull(String url, String body, int timeoutMs, String[] headers) {
+        HttpURLConnection conn = null;
+        sGptLastError = "";
+        try {
+            conn = (HttpURLConnection) new URL(url).openConnection();
+            conn.setConnectTimeout(timeoutMs);
+            conn.setReadTimeout(timeoutMs);
+            if (headers != null) {
+                for (String h : headers) {
+                    if (h == null) continue;
+                    int colon = h.indexOf(':');
+                    if (colon > 0) {
+                        conn.setRequestProperty(h.substring(0, colon).trim(), h.substring(colon + 1).trim());
+                    }
+                }
+            }
+            if (body != null && body.length() > 0) {
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                byte[] payload = body.getBytes("UTF-8");
+                conn.setFixedLengthStreamingMode(payload.length);
+                OutputStream out = conn.getOutputStream();
+                out.write(payload);
+                out.flush();
+                out.close();
+            } else {
+                conn.setRequestMethod("GET");
+            }
+
+            int code = conn.getResponseCode();
+            StringBuilder respHeaders = new StringBuilder();
+            for (int i = 0; ; i++) {
+                String k = conn.getHeaderFieldKey(i);
+                String v = conn.getHeaderField(i);
+                if (k == null && v == null) break; // end of headers
+                if (k != null && v != null) {      // k == null is the status line
+                    respHeaders.append(k).append(": ").append(v).append("\r\n");
+                }
+            }
+
+            InputStream in;
+            try {
+                in = (code >= 400) ? conn.getErrorStream() : conn.getInputStream();
+            } catch (IOException e) {
+                in = conn.getErrorStream();
+            }
+            ByteArrayOutputStream sink = new ByteArrayOutputStream();
+            if (in != null) {
+                byte[] buf = new byte[8192];
+                int read;
+                while ((read = in.read(buf)) > 0) {
+                    sink.write(buf, 0, read);
+                }
+                in.close();
+            }
+            return new String[] { String.valueOf(code), respHeaders.toString(), new String(sink.toByteArray(), "UTF-8") };
+        } catch (Exception e) {
+            // Same rule as gptHttpRequest: never let an exception cross JNI.
+            sGptLastError = e.toString();
+            Log.v("SDL", "gptHttpRequestFull failed: " + e);
+            return new String[] { "0", "", "" };
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
     public static void jgeSendCommand(String command) {
         mSingleton.sendCommand(COMMAND_JGE_MSG, command);
     }
