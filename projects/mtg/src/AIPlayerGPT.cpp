@@ -157,13 +157,15 @@ const char * kReplyProtocol =
     "corrected answer; the LAST well-formed answer line is the one taken. If instead you realize "
     "your answer was a mistake and are unsure, it is fine to stop - the game's own reliable player "
     "will step in.\n"
-    "Then, on the LAST line of your reply, a line starting with PLAN:, write your complete game "
-    "plan from here on - CONCISE, a few sentences of intent, not an analysis.\n"
+    "Then, ONLY IF your plan has changed, on the LAST line of your reply, a line starting with "
+    "PLAN:, write your complete game plan from here on - CONCISE, a few sentences of intent, not "
+    "an analysis. If your plan is unchanged, OMIT the PLAN line entirely - your last stated plan "
+    "carries forward automatically and will be shown to you again.\n"
     "Nothing you write is kept except that PLAN line. At your next decision you will see only the "
     "game log, the current board, your last PLAN line, and the new choices - your reasoning and "
-    "your earlier plans will have dropped out of context. So every PLAN must be complete and "
-    "self-contained: state your full current plan, or your full revised plan if the situation "
-    "changed. Never write a fragment like \"continue as before\".\n";
+    "your earlier plans will have dropped out of context. So every PLAN you do write must be "
+    "complete and self-contained: state your full current plan, or your full revised plan if the "
+    "situation changed. Never write a fragment like \"continue as before\".\n";
 
 //The card's rules text, single-line and bounded, for option/target lines:
 //the deciding fact belongs ON the choice, not in a distant deck blob (the
@@ -4693,7 +4695,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         DebugTrace("AIPlayerGPT[ph" << phase << "]: only display-toggle (Flip Side) options; auto-passing without a model call");
         return NULL;
     }
-    tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list) or \"CHOICE: 0 (pass)\"; then any brief reasoning; then your PLAN: line last.";
+    tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list) or \"CHOICE: 0 (pass)\"; then any brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
@@ -4858,7 +4860,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
         tail << (i + 1) << ". " << options[i] << "\n";
-    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list); then any brief reasoning; then your PLAN: line last.";
+    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list); then any brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -7578,7 +7580,7 @@ int AIPlayerGPT::chooseAttackers()
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
             " attack with nobody this turn; then any brief reasoning; then your"
-            " PLAN: line last.";
+            " PLAN: line last (only if your plan changed - omit it to keep your current plan).";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -7951,7 +7953,8 @@ int AIPlayerGPT::chooseBlockers()
             " FIRST line write BLOCKS: followed by the assignments, comma-separated,"
             " e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\", or exactly \"BLOCKS: none\" to"
             " block with nobody this turn; then any brief reasoning; then your PLAN:"
-            " line last.";
+            " line last (only if your plan changed - omit it to keep your current"
+            " plan).";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -8312,12 +8315,12 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
         tail << "On the FIRST line write PUT: followed by the ONE card number you"
                 " choose (e.g. \"PUT: 2\")"
              << (eligCount == 0 ? ", or \"PUT: none\" if none qualify" : "")
-             << "; then any brief reasoning; then your PLAN: line last.";
+             << "; then any brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
     else
         tail << "On the FIRST line write PUT: followed by the card numbers you send to \""
              << optOneLabel << "\", comma-separated (e.g. \"PUT: 1, 3\"), or exactly"
                 " \"PUT: none\" to send none there (every revealed card then goes to \""
-             << optTwoLabel << "\"); then any brief reasoning; then your PLAN: line last.";
+             << optTwoLabel << "\"); then any brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
     return tail.str();
 }
 
@@ -8552,7 +8555,7 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
     }
     tail << "On the FIRST line write PUT: followed by the " << remaining << " card number"
          << (remaining == 1 ? "" : "s") << " you send to the bottom, comma-separated (e.g. \"PUT: "
-         << (remaining == 1 ? "3" : "3, 5") << "\"); then brief reasoning; then your PLAN: line last.";
+         << (remaining == 1 ? "3" : "3, 5") << "\"); then brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
     return tail.str();
 }
 
@@ -9816,6 +9819,15 @@ void AIPlayerGPT::runParseSelfTest()
             trunc += "I keep re-deriving my mana base and which lands make blue versus black here,\n";
         cout << "     truncated (no PLAN, len " << trunc.size() << ") natural? " << replyTerminatedNaturally(trunc) << " (must be 0)\n";
         CHECK(!replyTerminatedNaturally(trunc), "W25-2 a long no-PLAN reply is classified TRUNCATED (answer-first kept)");
+        // Omit-when-unchanged (2026-08-17): the protocol now tells the model to
+        // DROP the PLAN line when its plan is unchanged, so a short compliant
+        // reply with no PLAN: is the COMMON shape, not an edge case. It must
+        // classify NATURAL (last-answer precedence, prior plan carried), and a
+        // short mid-word cut must still classify truncated.
+        string noplan = "CHOICE: 2 (Cast Example Card)\nCurve play, nothing changed.";
+        CHECK(replyTerminatedNaturally(noplan), "OMIT short no-PLAN reply ending on punctuation is NATURALLY terminated");
+        string shortcut = "CHOICE: 2 (Cast Example Card)\nBecause the opp";
+        CHECK(!replyTerminatedNaturally(shortcut), "OMIT short no-PLAN mid-word cut is still TRUNCATED");
         // The deck109 CoT-hijack ATTACK reply still yields the FIRST declaration
         // (answer-first), NOT the trailing bare-number CoT line - unchanged.
         vector<string> anames;
