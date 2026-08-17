@@ -1677,6 +1677,32 @@ struct AIPlayerGPT::AsyncState
 
 //Heap-allocated capture set for the HTTP worker. The worker owns and frees
 //it; the shared_ptr inside keeps AsyncState alive if the player is destroyed
+//WAGIC_PADLOG (Android: flag file User/padlog.on): async-lifecycle slice of
+//the input/UI trace - spawn/publish/consume/stale transitions, to pin the
+//"opponent is thinking forever with no worker thread" stall (2026-08-17).
+//Dev builds only - diagnostics are compiled out of release builds.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+static FILE * gptPadlogFile()
+{
+    static FILE * out = NULL;
+    static int state = 0;
+    if (state == 0)
+    {
+        if (getenv("WAGIC_PADLOG"))
+            { out = stderr; state = 1; }
+#ifdef ANDROID
+        else if (access("/sdcard/Wagic/User/padlog.on", F_OK) == 0)
+            { out = fopen("/sdcard/Wagic/User/padlog.txt", "a"); state = out ? 1 : -1; }
+#endif
+        else state = -1;
+    }
+    return (state == 1) ? out : NULL;
+}
+#define GPTASYNCLOG(...) do { FILE * f_ = gptPadlogFile(); if (f_) { fprintf(f_, __VA_ARGS__); fflush(f_); } } while (0)
+#else
+#define GPTASYNCLOG(...) ((void)0)
+#endif //_DEBUG || WAGIC_DEVLOGS
+
 //mid-request.
 struct AIPlayerGPT::WorkerCtx
 {
@@ -1723,12 +1749,16 @@ void AIPlayerGPT::WorkerMain(void * p)
         }
     }
     else
+    {
+        GPTASYNCLOG("gpt worker start url=%s body=%zu\n", ctx->url.c_str(), ctx->requestBody.size());
         body = gptHttpPost(ctx->url, ctx->requestBody, ctx->timeoutMs, ctx->key);
+    }
     {
         std::lock_guard<GptMutex> g(ctx->state->mtx);
         ctx->state->response = body;
         ctx->state->status = 2;
     }
+    GPTASYNCLOG("gpt worker publish bytes=%zu\n", body.size());
     delete ctx;
 }
 
@@ -1771,6 +1801,8 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 //Surface it when it moves - a player burning their ChatGPT plan
                 //on a card game deserves to see the meter, and a static gauge
                 //re-noticed every decision would be wallpaper.
+                GPTASYNCLOG("gpt consume body=%zu content=%zu latency=%ldms\n",
+                            body.size(), content.size(), mLastLatencyMs);
                 if (gptCodexEndpoint(mEndpoint))
                 {
                     string pct = gptCodexUsedPercent();
@@ -1785,6 +1817,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             //An answer for a prompt the game state has moved past (should
             //not happen while the AI neither acts nor passes; drop safely).
             DebugTrace("AIPlayerGPT: dropping stale async answer");
+            GPTASYNCLOG("gpt stale drop (prompt moved) resp=%zu\n", mAsyncState->response.size());
             mAsyncState->status = 0;
             mAsyncState->response.clear();
         }
@@ -1804,6 +1837,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         state->response.clear();
         state->started = std::chrono::steady_clock::now();
     }
+    GPTASYNCLOG("gpt spawn ask prompt=%zu endpoint=%s\n", userMsg.size(), mEndpoint.c_str());
     long timeoutMs = mTimeoutMs;
     //The worker runs through gptSpawnWorker - the platform threading seam.
     //On Vita that is a native sceKernelCreateThread (std::thread construction

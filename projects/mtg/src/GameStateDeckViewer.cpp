@@ -918,7 +918,9 @@ void GameStateDeckViewer::Update(float dt)
         JButton key = mEngine->ReadButton();
         if (filterMenu)
         {
-            if (key == JGE_BTN_CTRL)
+            //JGE_BTN_SEC = Android hardware back; close the filter bar like
+            //the dedicated close key (see GameStateShop for the touch trap).
+            if (key == JGE_BTN_CTRL || key == JGE_BTN_SEC)
             {
                 //useFilter = 0;
                 filterMenu->Finish(true);

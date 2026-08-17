@@ -1345,6 +1345,21 @@ void GameStateDuel::Update(float dt)
         break;
 #endif //NETWORK_SUPPORT
     case DUEL_STATE_MENU:
+        //The LLM-patience prompt answers ITSELF the moment the model's reply
+        //arrives. The prompt freezes game->Update, so the reply that would
+        //end the wait could never be consumed while the menu sat open - on a
+        //touch device left face-up that read as the game hanging forever
+        //(root-caused live 2026-08-17: worker published, consume only fired
+        //after a human dismissed the menu, 312s later). aiPatiencePromptDue
+        //goes false exactly when the in-flight call completes.
+        if (mPatiencePlayer && menu && !mPatiencePlayer->aiPatiencePromptDue())
+        {
+            mPatiencePlayer->aiPatiencePromptAnswer(true);
+            mPatiencePlayer = NULL;
+            menu->Close();
+            setGamePhase(DUEL_STATE_CANCEL);
+            break;
+        }
         menu->Update(dt);
         break;
     case DUEL_STATE_MENU_TO_SCORE:

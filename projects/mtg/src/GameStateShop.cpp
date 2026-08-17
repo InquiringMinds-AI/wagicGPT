@@ -555,7 +555,11 @@ void GameStateShop::Update(float dt)
         }
         if (filterMenu)
         {
-            if (btn == JGE_BTN_CTRL)
+            //JGE_BTN_SEC: hardware back on Android. The filter bar's own
+            //widgets are d-pad-first and swallow SEC, so without this a touch
+            //player who opened "Ask about..." had NO way back out of it -
+            //close it exactly like the dedicated close key.
+            if (btn == JGE_BTN_CTRL || btn == JGE_BTN_SEC)
             {
                 needLoad = filterMenu->Finish();
                 filterMenu->Update(dt);
