@@ -31,6 +31,7 @@ protected:
     void shiftLeft();
     void shiftRight( DamagerDamaged* oldActive );
     bool didClickOnButton( Pos buttonPosition, int& x, int& y);
+    void unsetCursorIfOwnedBy(AttackerDamaged* d);
     int resolve();
 
 public:

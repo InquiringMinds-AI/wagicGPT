@@ -616,6 +616,26 @@ int GuiCombat::receiveEventPlus(WEvent* e)
     }
     return 0;
 }
+//~AttackerDamaged deletes its DefenserDamaged blockers, so a cursor pointer
+//at the attacker OR any of its blockers dies with it. Trashing one without
+//clearing these leaves Update/CommandLine chasing freed memory.
+void GuiCombat::unsetCursorIfOwnedBy(AttackerDamaged* d)
+{
+    if (activeAtk == d)
+        activeAtk = NULL;
+    if (active == d)
+    {
+        active = NULL;
+        return;
+    }
+    for (vector<DefenserDamaged*>::iterator q = d->blockers.begin(); q != d->blockers.end(); ++q)
+        if (active == *q)
+        {
+            active = NULL;
+            return;
+        }
+}
+
 int GuiCombat::receiveEventMinus(WEvent* e)
 {
     if (WEventZoneChange* event = dynamic_cast<WEventZoneChange*>(e))
@@ -625,8 +645,7 @@ int GuiCombat::receiveEventMinus(WEvent* e)
                 if ((*it)->card == event->card->previous || (*it)->card == event->card)
                 {
                     AttackerDamaged* d = *it;
-                    if (activeAtk == *it)
-                        activeAtk = NULL;
+                    unsetCursorIfOwnedBy(d);
                     attackers.erase(it);
                     observer->mTrash->trash(d);
                     return 1;
@@ -636,6 +655,8 @@ int GuiCombat::receiveEventMinus(WEvent* e)
                         if ((*q)->card == event->card->previous || (*q)->card == event->card)
                         {
                             DefenserDamaged* d = *q;
+                            if (active == d)
+                                active = NULL;
                             (*it)->blockers.erase(q);
                             observer->mTrash->trash(d);
                             return 1;
@@ -650,6 +671,7 @@ int GuiCombat::receiveEventMinus(WEvent* e)
             if ((*it)->card == event->card)
             {
                 AttackerDamaged* d = *it;
+                unsetCursorIfOwnedBy(d);
                 attackers.erase(it);
                 observer->mTrash->trash(d);
                 return 1;
@@ -664,6 +686,8 @@ int GuiCombat::receiveEventMinus(WEvent* e)
                     if ((*q)->card == event->card)
                     {
                         DefenserDamaged* d = *q;
+                        if (active == d)
+                            active = NULL;
                         (*it)->blockers.erase(q);
                         observer->mTrash->trash(d);
                         return 1;
