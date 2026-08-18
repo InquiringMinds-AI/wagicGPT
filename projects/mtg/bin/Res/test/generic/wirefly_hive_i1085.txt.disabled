@@ -1,7 +1,11 @@
 #Wirefly Hive (#1085) - DEFERRED without a probe: coin-flip cards are benched
 #until the threaded-suite path unification (main vs workers consume different
 #RNG prefixes; jack_in_the_mox precedent).
-#DATA BUG visible by inspection (fix when flips become testable): the
-#lose-branch is "loseability sacrifice loseabilityend" - it sacrifices the
-#HIVE. Oracle: "If you lose the flip, destroy all permanents named Wirefly"
-#- should be destroy all(*[Wirefly]|battlefield), the Hive survives.
+#DATA BUG fixed 2026-08-18: the lose branch is now
+#all(*[Wirefly]|battlefield) destroy (was: sacrifice, which sacked the HIVE).
+#ORDERING IS LOAD-BEARING: flip branches only support the all-FIRST shape
+#("all(X) destroy", the Puppet's Verdict idiom) - the action-first form
+#("destroy all(X)") makes the whole ability unparseable and the card dead to
+#activation. A parser guard that allowed action-first was tried and reverted
+#the same day: it broke Puppet's Verdict, whose parse depends on the lord
+#keyword being seen inside the branch. Write branches all-first.

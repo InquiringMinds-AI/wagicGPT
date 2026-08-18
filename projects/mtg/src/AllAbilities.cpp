@@ -4133,6 +4133,8 @@ int AASetCoin::resolve()
     {
         AbilityFactory af(game);
         abilityAltered = af.parseMagicLine(abilityWin, 0, NULL, _target);
+        if (!abilityAltered)
+            return 0; //a branch that fails to parse must not crash the flip/roll
         abilityAltered->canBeInterrupted = false;
         if(abilityAltered->oneShot)
         {
@@ -4157,6 +4159,8 @@ int AASetCoin::resolve()
     {
         AbilityFactory af(game);
         abilityAltered = af.parseMagicLine(abilityLose, 0, NULL, _target);
+        if (!abilityAltered)
+            return 0; //a branch that fails to parse must not crash the flip/roll
         abilityAltered->canBeInterrupted = false;
         if(abilityAltered->oneShot)
         {
@@ -4289,6 +4293,8 @@ int AASetDie::resolve()
     {
         AbilityFactory af(game);
         abilityAltered = af.parseMagicLine(abilityWin, 0, NULL, _target);
+        if (!abilityAltered)
+            return 0; //a branch that fails to parse must not crash the flip/roll
         abilityAltered->canBeInterrupted = false;
         if(abilityAltered->oneShot)
         {
@@ -4315,6 +4321,8 @@ int AASetDie::resolve()
     {
         AbilityFactory af(game);
         abilityAltered = af.parseMagicLine(abilityLose, 0, NULL, _target);
+        if (!abilityAltered)
+            return 0; //a branch that fails to parse must not crash the flip/roll
         abilityAltered->canBeInterrupted = false;
         if(abilityAltered->oneShot)
         {
