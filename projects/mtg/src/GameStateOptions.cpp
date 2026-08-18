@@ -807,6 +807,12 @@ void GameStateOptions::renderOaiSignIn()
     WFont * font = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
     font->SetColor(ARGB(255, 255, 255, 255));
 
+    //This screen draws over the options list, and without a scrim the typed
+    //address lands on top of similar-sized option text and becomes unreadable
+    //(owner-reported on the tablet). One dark wash under every state; the QR
+    //keeps its own white backdrop on top of it.
+    r->FillRect(0, 0, (float) SCREEN_WIDTH, (float) SCREEN_HEIGHT, ARGB(235, 10, 10, 14));
+
     if (status == 0)
     {
         font->DrawString(_("Requesting a sign-in code...").c_str(), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, JGETEXT_CENTER);
