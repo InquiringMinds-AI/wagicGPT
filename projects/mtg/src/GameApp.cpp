@@ -102,7 +102,7 @@ void GameApp::Create()
 {
     srand((unsigned int) time(0)); // initialize random
 #if !defined(QT_CONFIG) && !defined(IOS)
-#if defined (WIN32)
+#if defined (WIN32) && defined (_MSC_VER) //debug-CRT leak checks are MSVC-only
     _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #elif defined (PSP)
     pspFpuSetEnable(0); //disable FPU Exceptions until we find where the FPU errors come from

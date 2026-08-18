@@ -15,6 +15,12 @@
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#define GPT_MKDIR(p) _mkdir(p) //Windows mkdir takes no mode argument
+#else
+#define GPT_MKDIR(p) mkdir((p), 0755)
+#endif
 #include <cstring>
 //std::lock_guard for the codex auth mutex. Header-only, so safe on Vita too,
 //where GptMutex is a kernel mutex precisely because std::mutex is a no-op
@@ -164,9 +170,9 @@ string loadOrCreateSalt()
     string dir = gptUserRootImpl();
     if (!dir.empty())
     {
-        mkdir(dir.c_str(), 0755);
-        dir += "/ai"; mkdir(dir.c_str(), 0755);
-        dir += "/gpt"; mkdir(dir.c_str(), 0755);
+        GPT_MKDIR(dir.c_str());
+        dir += "/ai"; GPT_MKDIR(dir.c_str());
+        dir += "/gpt"; GPT_MKDIR(dir.c_str());
     }
     std::ofstream f(path.c_str(), std::ios::binary | std::ios::trunc);
     if (f)
@@ -233,9 +239,9 @@ void gptLogLine(const string& line)
     if (!dirsReady)
     {
         string d = root;
-        mkdir(d.c_str(), 0755);
-        d += "/ai";  mkdir(d.c_str(), 0755);
-        d += "/gpt"; mkdir(d.c_str(), 0755);
+        GPT_MKDIR(d.c_str());
+        d += "/ai";  GPT_MKDIR(d.c_str());
+        d += "/gpt"; GPT_MKDIR(d.c_str());
         dirsReady = true;
     }
 
@@ -319,11 +325,11 @@ bool GptSettings::save() const
     string dir = gptUserRootImpl();
     if (dir.empty())
         return false;
-    mkdir(dir.c_str(), 0755);
+    GPT_MKDIR(dir.c_str());
     dir += "/ai";
-    mkdir(dir.c_str(), 0755);
+    GPT_MKDIR(dir.c_str());
     dir += "/gpt";
-    mkdir(dir.c_str(), 0755);
+    GPT_MKDIR(dir.c_str());
 
     std::ofstream f((dir + "/endpoints.txt").c_str(), std::ios::trunc);
     if (!f)
@@ -1622,9 +1628,9 @@ void OaiSignInMain(void * p)
         return;
     }
     string dir = root;
-    mkdir(dir.c_str(), 0755);
-    dir += "/ai"; mkdir(dir.c_str(), 0755);
-    dir += "/gpt"; mkdir(dir.c_str(), 0755);
+    GPT_MKDIR(dir.c_str());
+    dir += "/ai"; GPT_MKDIR(dir.c_str());
+    dir += "/gpt"; GPT_MKDIR(dir.c_str());
     string path = dir + "/oai-auth.json";
     nlohmann::json doc = {
         {"tokens", tokens},

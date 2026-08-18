@@ -862,8 +862,8 @@ bool SdlApp::OnInit()
 	//renderer-free, so logic - test suite, self-play - runs unchanged.
 	if (getenv("WAGIC_HEADLESS"))
 	{
-		setenv("SDL_VIDEODRIVER", "dummy", 1);
-		setenv("SDL_AUDIODRIVER", "dummy", 1);
+		SDL_setenv("SDL_VIDEODRIVER", "dummy", 1); //SDL_setenv: setenv is POSIX-only
+		SDL_setenv("SDL_AUDIODRIVER", "dummy", 1);
 		if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
 		{
 			return false;

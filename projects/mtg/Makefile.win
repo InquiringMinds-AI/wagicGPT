@@ -1,0 +1,683 @@
+# Makefile.win - Windows cross-build (mingw-w64) of the SDL2 backend.
+# Mirrors Makefile.sdl's translation-unit list (the qmake Linux build is the
+# reference); regenerate the WIN_OBJECTS list from Makefile.sdl if sources
+# change there. Build: make -f Makefile.win -j8   (needs mingw-w64-gcc +
+# mingw-w64-{sdl2,zlib,libpng,libjpeg-turbo,giflib,curl} from AUR).
+CROSS   ?= x86_64-w64-mingw32-
+# DEBUG=1 builds the suite-enabled dev flavor (-D_DEBUG turns on TESTSUITE
+# via config.h) into its own object dir; default is the release distributable.
+ifdef DEBUG
+FLAVOR   = -D_DEBUG
+OBJTAG   = -dbg
+EXETAG   = -dbg
+else
+FLAVOR   =
+OBJTAG   =
+EXETAG   =
+endif
+CXX      = $(CROSS)g++
+CC       = $(CROSS)gcc
+SYSROOT  = /usr/x86_64-w64-mingw32
+OBJDIR   = objs-win$(OBJTAG)
+BINDIR   = bin
+
+DEFINES  = $(FLAVOR) -DSDL_CONFIG -DLINUX -DNOMINMAX -D_CRT_SECURE_NO_WARNINGS \
+           -DNETWORK_SUPPORT -DTIXML_USE_STL -DWITH_GPT_AI -DWIN32_CROSS
+INCLUDES = -Iinclude -Iinclude/thirdparty -I../../JGE/include \
+           -I../../JGE/src/zipFS -I../../Boost \
+           -I$(SYSROOT)/include/SDL2 -I$(SYSROOT)/include
+
+WARN     = -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unused-value
+CXXFLAGS = -O2 -std=gnu++14 $(WARN) $(DEFINES) $(INCLUDES)
+CFLAGS   = -O2 $(DEFINES) $(INCLUDES)
+LDFLAGS  = -L$(SYSROOT)/lib -mwindows
+LIBS     = -lmingw32 -lSDL2main -lSDL2 -lcurl -lpng -ljpeg -lgif -lz \
+           -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -limm32 -lole32 \
+           -loleaut32 -lversion -lsetupapi -lshell32
+
+TARGET   = $(BINDIR)/wagic$(EXETAG).exe
+
+WIN_OBJECTS = \
+	$(OBJDIR)/AbilityParser.o \
+	$(OBJDIR)/ActionElement.o \
+	$(OBJDIR)/ActionLayer.o \
+	$(OBJDIR)/ActionStack.o \
+	$(OBJDIR)/AIHints.o \
+	$(OBJDIR)/AIMomirPlayer.o \
+	$(OBJDIR)/AIPlayer.o \
+	$(OBJDIR)/AIPlayerBaka.o \
+	$(OBJDIR)/ManaEngine.o \
+	$(OBJDIR)/LegalActions.o \
+	$(OBJDIR)/DecisionContract.o \
+	$(OBJDIR)/AIPlayerGPT.o \
+	$(OBJDIR)/GptConfig.o \
+	$(OBJDIR)/qrcodegen.o \
+	$(OBJDIR)/OptionGpt.o \
+	$(OBJDIR)/AIStats.o \
+	$(OBJDIR)/AllAbilities.o \
+	$(OBJDIR)/CardDescriptor.o \
+	$(OBJDIR)/CardDisplay.o \
+	$(OBJDIR)/CardGui.o \
+	$(OBJDIR)/CardPrimitive.o \
+	$(OBJDIR)/CardSelector.o \
+	$(OBJDIR)/CarouselDeckView.o \
+	$(OBJDIR)/Counters.o \
+	$(OBJDIR)/Credits.o \
+	$(OBJDIR)/Damage.o \
+	$(OBJDIR)/DamagerDamaged.o \
+	$(OBJDIR)/DeckDataWrapper.o \
+	$(OBJDIR)/DeckEditorMenu.o \
+	$(OBJDIR)/DeckManager.o \
+	$(OBJDIR)/DeckMenu.o \
+	$(OBJDIR)/DeckMenuItem.o \
+	$(OBJDIR)/DeckMetaData.o \
+	$(OBJDIR)/DeckStats.o \
+	$(OBJDIR)/DeckView.o \
+	$(OBJDIR)/DuelLayers.o \
+	$(OBJDIR)/ExtraCost.o \
+	$(OBJDIR)/GameApp.o \
+	$(OBJDIR)/GameLauncher.o \
+	$(OBJDIR)/GameObserver.o \
+	$(OBJDIR)/GameOptions.o \
+	$(OBJDIR)/GameStateAwards.o \
+	$(OBJDIR)/GameState.o \
+	$(OBJDIR)/GameStateDeckViewer.o \
+	$(OBJDIR)/GameStateDuel.o \
+	$(OBJDIR)/GameStateMenu.o \
+	$(OBJDIR)/GameStateOptions.o \
+	$(OBJDIR)/GameStateShop.o \
+	$(OBJDIR)/GameStateStory.o \
+	$(OBJDIR)/GameStateTransitions.o \
+	$(OBJDIR)/GridDeckView.o \
+	$(OBJDIR)/GuiAvatars.o \
+	$(OBJDIR)/GuiBackground.o \
+	$(OBJDIR)/GuiCardsController.o \
+	$(OBJDIR)/GuiCombat.o \
+	$(OBJDIR)/GuiFrame.o \
+	$(OBJDIR)/GuiHand.o \
+	$(OBJDIR)/GuiLayers.o \
+	$(OBJDIR)/GuiMana.o \
+	$(OBJDIR)/GuiPhaseBar.o \
+	$(OBJDIR)/GuiPlay.o \
+	$(OBJDIR)/GuiStatic.o \
+	$(OBJDIR)/IconButton.o \
+	$(OBJDIR)/InteractiveButton.o \
+	$(OBJDIR)/ManaCost.o \
+	$(OBJDIR)/ManaCostHybrid.o \
+	$(OBJDIR)/MenuItem.o \
+	$(OBJDIR)/ModRules.o \
+	$(OBJDIR)/MTGAbility.o \
+	$(OBJDIR)/MTGCard.o \
+	$(OBJDIR)/MTGCardInstance.o \
+	$(OBJDIR)/MTGDeck.o \
+	$(OBJDIR)/MTGDefinitions.o \
+	$(OBJDIR)/MTGGamePhase.o \
+	$(OBJDIR)/MTGGameZones.o \
+	$(OBJDIR)/MTGPack.o \
+	$(OBJDIR)/MTGRules.o \
+	$(OBJDIR)/ObjectAnalytics.o \
+	$(OBJDIR)/OptionItem.o \
+	$(OBJDIR)/PhaseRing.o \
+	$(OBJDIR)/Player.o \
+	$(OBJDIR)/PreGamePhase.o \
+	$(OBJDIR)/PlayerData.o \
+	$(OBJDIR)/PlayGuiObject.o \
+	$(OBJDIR)/PlayGuiObjectController.o \
+	$(OBJDIR)/PlayRestrictions.o \
+	$(OBJDIR)/Pos.o \
+	$(OBJDIR)/PriceList.o \
+	$(OBJDIR)/ReplacementEffects.o \
+	$(OBJDIR)/Rules.o \
+	$(OBJDIR)/SimpleButton.o \
+	$(OBJDIR)/SimpleMenu.o \
+	$(OBJDIR)/SimpleMenuItem.o \
+	$(OBJDIR)/SimplePad.o \
+	$(OBJDIR)/SimplePopup.o \
+	$(OBJDIR)/StoryFlow.o \
+	$(OBJDIR)/Subtypes.o \
+	$(OBJDIR)/StyleManager.o \
+	$(OBJDIR)/TargetChooser.o \
+	$(OBJDIR)/TargetsList.o \
+	$(OBJDIR)/Tasks.o \
+	$(OBJDIR)/TextScroller.o \
+	$(OBJDIR)/ThisDescriptor.o \
+	$(OBJDIR)/Token.o \
+	$(OBJDIR)/Translate.o \
+	$(OBJDIR)/TranslateKeys.o \
+	$(OBJDIR)/Trash.o \
+	$(OBJDIR)/utils.o \
+	$(OBJDIR)/WCachedResource.o \
+	$(OBJDIR)/WDataSrc.o \
+	$(OBJDIR)/WEvent.o \
+	$(OBJDIR)/WFilter.o \
+	$(OBJDIR)/WFont.o \
+	$(OBJDIR)/WGui.o \
+	$(OBJDIR)/WParsedInt.o \
+	$(OBJDIR)/WResourceManager.o \
+	$(OBJDIR)/AIPlayerBakaB.o \
+	$(OBJDIR)/TestSuiteAI.o \
+	$(OBJDIR)/Downloader.o \
+	$(OBJDIR)/Encoding.o \
+	$(OBJDIR)/JAnimator.o \
+	$(OBJDIR)/JApp.o \
+	$(OBJDIR)/JDistortionMesh.o \
+	$(OBJDIR)/JFileSystem.o \
+	$(OBJDIR)/JGameObject.o \
+	$(OBJDIR)/JGE.o \
+	$(OBJDIR)/JGui.o \
+	$(OBJDIR)/JLogger.o \
+	$(OBJDIR)/JLBFont.o \
+	$(OBJDIR)/JOBJModel.o \
+	$(OBJDIR)/JParticle.o \
+	$(OBJDIR)/JParticleEffect.o \
+	$(OBJDIR)/JParticleEmitter.o \
+	$(OBJDIR)/JParticleSystem.o \
+	$(OBJDIR)/JResourceManager.o \
+	$(OBJDIR)/JSpline.o \
+	$(OBJDIR)/JNetwork.o \
+	$(OBJDIR)/JSocket.o \
+	$(OBJDIR)/JSprite.o \
+	$(OBJDIR)/Vector2D.o \
+	$(OBJDIR)/tinystr.o \
+	$(OBJDIR)/tinyxml.o \
+	$(OBJDIR)/tinyxmlerror.o \
+	$(OBJDIR)/tinyxmlparser.o \
+	$(OBJDIR)/hgecolor.o \
+	$(OBJDIR)/hgedistort.o \
+	$(OBJDIR)/hgefont.o \
+	$(OBJDIR)/hgeparticle.o \
+	$(OBJDIR)/hgerect.o \
+	$(OBJDIR)/hgevector.o \
+	$(OBJDIR)/zfsystem.o \
+	$(OBJDIR)/ziphdr.o \
+	$(OBJDIR)/zstream.o \
+	$(OBJDIR)/SDLmain.o \
+	$(OBJDIR)/JMD2Model.o \
+	$(OBJDIR)/JGfx.o \
+	$(OBJDIR)/JSfx.o
+
+all: $(TARGET)
+
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+$(WIN_OBJECTS): | $(OBJDIR)
+
+$(TARGET): $(WIN_OBJECTS)
+	$(CXX) -o $@ $(WIN_OBJECTS) $(LDFLAGS) $(LIBS)
+
+clean:
+	rm -rf $(OBJDIR) $(TARGET)
+
+.PHONY: all clean
+
+$(OBJDIR)/AbilityParser.o: src/AbilityParser.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ActionElement.o: src/ActionElement.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ActionLayer.o: src/ActionLayer.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ActionStack.o: src/ActionStack.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIHints.o: src/AIHints.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIMomirPlayer.o: src/AIMomirPlayer.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIPlayer.o: src/AIPlayer.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIPlayerBaka.o: src/AIPlayerBaka.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ManaEngine.o: src/ManaEngine.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/LegalActions.o: src/LegalActions.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DecisionContract.o: src/DecisionContract.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIPlayerGPT.o: src/AIPlayerGPT.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GptConfig.o: src/GptConfig.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/qrcodegen.o: src/qrcodegen.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/OptionGpt.o: src/OptionGpt.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIStats.o: src/AIStats.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AllAbilities.o: src/AllAbilities.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/CardDescriptor.o: src/CardDescriptor.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/CardDisplay.o: src/CardDisplay.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/CardGui.o: src/CardGui.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/CardPrimitive.o: src/CardPrimitive.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/CardSelector.o: src/CardSelector.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/CarouselDeckView.o: src/CarouselDeckView.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Counters.o: src/Counters.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Credits.o: src/Credits.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Damage.o: src/Damage.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DamagerDamaged.o: src/DamagerDamaged.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DeckDataWrapper.o: src/DeckDataWrapper.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DeckEditorMenu.o: src/DeckEditorMenu.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DeckManager.o: src/DeckManager.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DeckMenu.o: src/DeckMenu.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DeckMenuItem.o: src/DeckMenuItem.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DeckMetaData.o: src/DeckMetaData.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DeckStats.o: src/DeckStats.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DeckView.o: src/DeckView.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/DuelLayers.o: src/DuelLayers.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ExtraCost.o: src/ExtraCost.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameApp.o: src/GameApp.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameLauncher.o: src/GameLauncher.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameObserver.o: src/GameObserver.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameOptions.o: src/GameOptions.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameStateAwards.o: src/GameStateAwards.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameState.o: src/GameState.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameStateDeckViewer.o: src/GameStateDeckViewer.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameStateDuel.o: src/GameStateDuel.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameStateMenu.o: src/GameStateMenu.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameStateOptions.o: src/GameStateOptions.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameStateShop.o: src/GameStateShop.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameStateStory.o: src/GameStateStory.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GameStateTransitions.o: src/GameStateTransitions.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GridDeckView.o: src/GridDeckView.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiAvatars.o: src/GuiAvatars.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiBackground.o: src/GuiBackground.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiCardsController.o: src/GuiCardsController.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiCombat.o: src/GuiCombat.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiFrame.o: src/GuiFrame.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiHand.o: src/GuiHand.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiLayers.o: src/GuiLayers.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiMana.o: src/GuiMana.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiPhaseBar.o: src/GuiPhaseBar.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiPlay.o: src/GuiPlay.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/GuiStatic.o: src/GuiStatic.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/IconButton.o: src/IconButton.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/InteractiveButton.o: src/InteractiveButton.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ManaCost.o: src/ManaCost.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ManaCostHybrid.o: src/ManaCostHybrid.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MenuItem.o: src/MenuItem.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ModRules.o: src/ModRules.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MTGAbility.o: src/MTGAbility.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MTGCard.o: src/MTGCard.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MTGCardInstance.o: src/MTGCardInstance.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MTGDeck.o: src/MTGDeck.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MTGDefinitions.o: src/MTGDefinitions.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MTGGamePhase.o: src/MTGGamePhase.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MTGGameZones.o: src/MTGGameZones.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MTGPack.o: src/MTGPack.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/MTGRules.o: src/MTGRules.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ObjectAnalytics.o: src/ObjectAnalytics.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/OptionItem.o: src/OptionItem.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/PhaseRing.o: src/PhaseRing.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Player.o: src/Player.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/PreGamePhase.o: src/PreGamePhase.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/PlayerData.o: src/PlayerData.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/PlayGuiObject.o: src/PlayGuiObject.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/PlayGuiObjectController.o: src/PlayGuiObjectController.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/PlayRestrictions.o: src/PlayRestrictions.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Pos.o: src/Pos.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/PriceList.o: src/PriceList.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ReplacementEffects.o: src/ReplacementEffects.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Rules.o: src/Rules.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/SimpleButton.o: src/SimpleButton.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/SimpleMenu.o: src/SimpleMenu.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/SimpleMenuItem.o: src/SimpleMenuItem.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/SimplePad.o: src/SimplePad.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/SimplePopup.o: src/SimplePopup.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/StoryFlow.o: src/StoryFlow.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Subtypes.o: src/Subtypes.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/StyleManager.o: src/StyleManager.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/TargetChooser.o: src/TargetChooser.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/TargetsList.o: src/TargetsList.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Tasks.o: src/Tasks.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/TextScroller.o: src/TextScroller.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ThisDescriptor.o: src/ThisDescriptor.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Token.o: src/Token.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Translate.o: src/Translate.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/TranslateKeys.o: src/TranslateKeys.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Trash.o: src/Trash.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/utils.o: src/utils.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/WCachedResource.o: src/WCachedResource.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/WDataSrc.o: src/WDataSrc.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/WEvent.o: src/WEvent.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/WFilter.o: src/WFilter.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/WFont.o: src/WFont.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/WGui.o: src/WGui.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/WParsedInt.o: src/WParsedInt.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/WResourceManager.o: src/WResourceManager.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/AIPlayerBakaB.o: src/AIPlayerBakaB.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/TestSuiteAI.o: src/TestSuiteAI.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Downloader.o: ../../JGE/src/Downloader.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Encoding.o: ../../JGE/src/Encoding.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JAnimator.o: ../../JGE/src/JAnimator.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JApp.o: ../../JGE/src/JApp.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JDistortionMesh.o: ../../JGE/src/JDistortionMesh.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JFileSystem.o: ../../JGE/src/JFileSystem.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JGameObject.o: ../../JGE/src/JGameObject.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JGE.o: ../../JGE/src/JGE.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JGui.o: ../../JGE/src/JGui.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JLogger.o: ../../JGE/src/JLogger.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JLBFont.o: ../../JGE/src/JLBFont.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JOBJModel.o: ../../JGE/src/JOBJModel.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JParticle.o: ../../JGE/src/JParticle.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JParticleEffect.o: ../../JGE/src/JParticleEffect.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JParticleEmitter.o: ../../JGE/src/JParticleEmitter.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JParticleSystem.o: ../../JGE/src/JParticleSystem.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JResourceManager.o: ../../JGE/src/JResourceManager.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JSpline.o: ../../JGE/src/JSpline.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JNetwork.o: ../../JGE/src/JNetwork.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JSocket.o: ../../JGE/src/pc/JSocket.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JSprite.o: ../../JGE/src/JSprite.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/Vector2D.o: ../../JGE/src/Vector2D.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/tinystr.o: ../../JGE/src/tinyxml/tinystr.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/tinyxml.o: ../../JGE/src/tinyxml/tinyxml.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/tinyxmlerror.o: ../../JGE/src/tinyxml/tinyxmlerror.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/tinyxmlparser.o: ../../JGE/src/tinyxml/tinyxmlparser.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/hgecolor.o: ../../JGE/src/hge/hgecolor.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/hgedistort.o: ../../JGE/src/hge/hgedistort.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/hgefont.o: ../../JGE/src/hge/hgefont.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/hgeparticle.o: ../../JGE/src/hge/hgeparticle.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/hgerect.o: ../../JGE/src/hge/hgerect.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/hgevector.o: ../../JGE/src/hge/hgevector.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/zfsystem.o: ../../JGE/src/zipFS/zfsystem.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/ziphdr.o: ../../JGE/src/zipFS/ziphdr.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/zstream.o: ../../JGE/src/zipFS/zstream.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/SDLmain.o: ../../JGE/src/SDLmain.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JMD2Model.o: ../../JGE/src/JMD2Model.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JGfx.o: ../../JGE/src/pc/JGfx.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJDIR)/JSfx.o: ../../JGE/src/pc/JSfx.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<

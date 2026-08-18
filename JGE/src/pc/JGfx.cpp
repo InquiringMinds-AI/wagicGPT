@@ -39,7 +39,8 @@ extern "C" {
 #include "../../include/JFileSystem.h"
 #include "../../include/JAssert.h"
 
-#if (defined WIN32) && (!defined QT_CONFIG)
+#if (defined WIN32) && (!defined QT_CONFIG) && (!defined __GNUC__)
+//MSVC has no __attribute__; gcc (incl. mingw) must keep the real one
 #ifndef __attribute__
 #define __attribute__((a))
 #endif

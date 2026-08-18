@@ -45,6 +45,12 @@
 #include <thread>
 #include <mutex>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#define GPT_MKDIR(p) _mkdir(p) //Windows mkdir takes no mode argument
+#else
+#define GPT_MKDIR(p) mkdir((p), 0755)
+#endif
 #include <ctime>
 
 using json = nlohmann::json;
@@ -2109,10 +2115,10 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
         string dir = gptUserRoot();
         if (!dir.empty())
         {
-            mkdir(dir.c_str(), 0755);
-            dir += "/ai"; mkdir(dir.c_str(), 0755);
-            dir += "/gpt"; mkdir(dir.c_str(), 0755);
-            dir += "/logs"; mkdir(dir.c_str(), 0755);
+            GPT_MKDIR(dir.c_str());
+            dir += "/ai"; GPT_MKDIR(dir.c_str());
+            dir += "/gpt"; GPT_MKDIR(dir.c_str());
+            dir += "/logs"; GPT_MKDIR(dir.c_str());
             std::ostringstream p;
             p << dir << "/" << time(NULL) << "-" << deckfileSmall << "-" << (void *) this << ".jsonl";
             mTransLogPath = p.str();

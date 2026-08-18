@@ -34,7 +34,9 @@
 #include "QSoundEffect"
 #elif defined WIN32
 #include <windows.h>
-#define WITH_FMOD
+#ifdef _MSC_VER
+#define WITH_FMOD //FMOD only ships with the VS2010 build; mingw uses the silent stub
+#endif
 #elif defined (PSP)
 #include <pspgu.h>
 #include <pspkernel.h>
