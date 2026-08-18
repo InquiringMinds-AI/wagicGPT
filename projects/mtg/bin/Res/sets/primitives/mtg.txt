@@ -1338,7 +1338,7 @@ type=Artifact
 [/card]
 [card]
 name=Aether Sting
-auto=@movedTo(creature|opponentstack):life:-1 opponent
+auto=@movedTo(creature|opponentstack):damage:1 opponent
 text=Whenever an opponent casts a creature spell, Aether Sting deals 1 damage to that player.
 mana={3}{R}
 type=Enchantment
@@ -3566,6 +3566,7 @@ toughness=6
 [card]
 name=Ancient Hydra
 auto=fading:5
+auto={1}{C(0/0,-1,Fade)}:damage:1 target(anytarget)
 text=Fading 5 (This creature enters with five fade counters on it. At the beginning of your upkeep, remove a fade counter from it. If you can't, sacrifice it.) -- {1}, Remove a fade counter from Ancient Hydra: Ancient Hydra deals 1 damage to any target.
 mana={4}{R}
 type=Creature
@@ -6393,7 +6394,7 @@ type=Artifact
 [card]
 name=Ashes to Ashes
 auto=target(<2>creature[-artifact]) moveTo(exile)
-auto=life:-5 controller
+auto=damage:5 controller
 restriction=type(creature[-artifact]|battlefield)~morethan~1
 text=Exile two target nonartifact creatures. Ashes to Ashes deals 5 damage to you.
 mana={1}{B}{B}
@@ -7999,6 +8000,7 @@ toughness=4
 [/card]
 [card]
 name=Axelrod Gunnarson
+abilities=trample
 auto=@vampired(creature) from(this):damage:1 target(player,planeswalker)
 auto=@vampired(creature) from(this):life:1 controller
 text=Trample -- Whenever a creature dealt damage by Axelrod Gunnarson this turn dies, you gain 1 life and Axelrod Gunnarson deals 1 damage to target player or planeswalker.
@@ -28191,7 +28193,7 @@ type=Sorcery
 [/card]
 [card]
 name=Delif's Cone
-auto={T}{S}:target(other creature|mybattlefield) transforms((,newability[@combat(notblocked) source(this) once:fog from(this) ueot])) ueot
+auto={T}{S}:target(other creature|mybattlefield) transforms((,newability[@combat(notblocked) source(this) once:may fog from(this) && dynamicability<!powerlifegain srccontroller!>])) ueot
 text={T}, Sacrifice Delif's Cone: This turn, when target creature you control attacks and isn't blocked, you may gain life equal to its power. If you do, it assigns no combat damage this turn.
 mana={0}
 type=Artifact
@@ -29545,6 +29547,7 @@ toughness=2
 [card]
 name=Dimir House Guard
 abilities=fear
+auto={S(creature|myBattlefield)}:regenerate
 aicode=activate target(*[manacost=4]|mylibrary) moveto(hand)
 autohand={1}{B}{B}{discard}:name(search card) Reveal:type:*:mylibrary revealzone(mylibrary) optionone name(choose card) target(<1>*[manacost=4]|reveal) transforms((,newability[all(other *|reveal) moveto(mylibrary) and!(shuffle)!],newability[moveto(hand)])) optiononeend optiontwo name(shuffle) bottomoflibrary target(<1>*|reveal) and!( all(*|reveal) bottomoflibrary and!(shuffle)! )! optiontwoend revealend asSorcery
 text=Fear (This creature can't be blocked except by artifact creatures and/or black creatures.) -- Sacrifice a creature: Regenerate Dimir House Guard. -- Transmute {1}{B}{B} ({1}{B}{B}, Discard this card: Search your library for a card with the same mana value as this card, reveal it, and put it into your hand. Then shuffle. Transmute only as a sorcery.)
@@ -30124,6 +30127,7 @@ type=Instant
 [card]
 name=Dispersal Shield
 target=*[manacost<=convertedcost:highest:*:mybattlefield]|stack
+auto=fizzle
 text=Counter target spell if its mana value is less than or equal to the highest mana value among permanents you control.
 mana={1}{U}
 type=Instant
@@ -36462,6 +36466,7 @@ toughness=2
 [/card]
 [card]
 name=Entropic Specter
+abilities=flying
 anyzone=type:*:opponenthand/type:*:opponenthand cdaactive
 auto=@damageof(player) from(this):ability$!name(discard) target(*|myhand) reject!$ controller
 auto=@damagefoeof(player) from(this):ability$!name(discard) target(*|myhand) reject!$ opponent
@@ -47496,7 +47501,7 @@ toughness=2
 [/card]
 [card]
 name=Goblin Bomb
-auto={C(0/0,-5,Fuse)}:damage:20 target(player,planeswalker)
+auto={C(0/0,-5,Fuse)}{S}:damage:20 target(player,planeswalker)
 auto=@each my upkeep:may flipacoin winability counter(0/0,1,Fuse) winabilityend loseability counter(0/0,-1,Fuse) loseabilityend flipend
 text=At the beginning of your upkeep, you may flip a coin. If you win the flip, put a fuse counter on this enchantment. If you lose the flip, remove a fuse counter from this enchantment. -- Remove five fuse counters from this enchantment and sacrifice it: It deals 20 damage to target player or planeswalker.
 mana={1}{R}
@@ -53503,6 +53508,7 @@ toughness=2
 [/card]
 [card]
 name=Hedron Alignment
+abilities=hexproof
 aicode=activate transforms((,newability[all(*[zpos<=1]|mylibrary) transforms((,newability[may name(Put on bottom of library) moveto(myreveal) and!( bottomoflibrary )!])) oneshot])) oneshot
 auto=@each my upkeep:aslongas(Hedron Alignment|myhand) aslongas(Hedron Alignment|mygraveyard) aslongas(Hedron Alignment|myexile) aslongas(Hedron Alignment|mybattlefield) wingame controller
 auto={1}{U}:name(Scry 1) _SCRY1_
@@ -64208,7 +64214,8 @@ toughness=2
 [/card]
 [card]
 name=Kore Line-Slinger
-text={T}:tap target(creature[power<=3])
+auto={T}:tap target(creature[power<=3])
+text={T}: Tap target creature with power 3 or less.
 mana={1}{W}
 type=Creature
 subtype=Kor Scout
@@ -69849,8 +69856,8 @@ type=Instant
 [/card]
 [card]
 name=Magnetic Mine
-auto=@movedTo(other artifact|graveyard) from(opponentbattlefield):life:-2 opponent
-auto=@movedTo(other artifact|graveyard) from(mybattlefield):life:-2 controller
+auto=@movedTo(other artifact|graveyard) from(opponentbattlefield):damage:2 opponent
+auto=@movedTo(other artifact|graveyard) from(mybattlefield):damage:2 controller
 text=Whenever another artifact is put into a graveyard from the battlefield, Magnetic Mine deals 2 damage to that artifact's controller.
 mana={4}
 type=Artifact
@@ -97598,8 +97605,8 @@ type=Land
 [card]
 name=Ruric Thar, the Unbowed
 abilities=vigilance,reach,mustattack
-auto=@movedTo(*[-creature]|mystack):life:-6 controller
-auto=@movedTo(*[-creature]|opponentstack):life:-6 opponent
+auto=@movedTo(*[-creature]|mystack):damage:6 controller
+auto=@movedTo(*[-creature]|opponentstack):damage:6 opponent
 text=Ruric Thar, the Unbowed attacks each combat if able. -- Whenever a player casts a noncreature spell, Ruric Thar deals 6 damage to that player
 mana={4}{R}{G}
 type=Legendary Creature
@@ -109699,7 +109706,7 @@ toughness=1
 [card]
 name=Soul Shred
 target=creature[-black]
-auto=destroy
+auto=damage:3
 auto=life:3 controller
 text=Soul Shred deals 3 damage to target nonblack creature. You gain 3 life.
 mana={3}{B}{B}
@@ -111481,8 +111488,8 @@ type=Enchantment
 [/card]
 [card]
 name=Spirit Flare
-target=creature|mybattlefield
-auto=transforms((,newability[dynamicability<!powerstrike!> target(creature[attacking;blocking]|opponentbattlefield)]))
+target=creature[-tapped]|mybattlefield
+auto=tap && transforms((,newability[dynamicability<!powerstrike!> target(creature[attacking;blocking]|opponentbattlefield)]))
 flashback={L:3}{1}{W}
 text=Tap target untapped creature you control. If you do, it deals damage equal to its power to target attacking or blocking creature an opponent controls. -- Flashback - {1}{W}, Pay 3 life. (You may cast this card from your graveyard for its flashback cost. Then exile it.)
 mana={3}{W}
@@ -115798,7 +115805,7 @@ toughness=2
 [card]
 name=Sunscorch Regent
 abilities=flying
-auto=@movedto(*|opponentstack):counter(1/1)
+auto=@movedto(*|opponentstack):counter(1/1) && life:1 controller
 text=Flying -- Whenever an opponent casts a spell, put a +1/+1 counter on Sunscorch Regent and you gain 1 life.
 mana={3}{W}{W}
 type=Creature
@@ -133175,7 +133182,7 @@ toughness=3
 name=Westvale Abbey
 auto={T}:Add{1}
 auto={5}{T}{L:1}:token(Human Cleric,creature Human Cleric,1/1,white,black)
-auto={5}{T}{S(creature|mybattlefield)}{S(creature|mybattlefield)}{S(creature|mybattlefield)}{S(creature|mybattlefield)}{S(creature|mybattlefield)}:flip(Ormendahl, Profane Prince)
+auto={5}{T}{S(creature|mybattlefield)}{S(creature|mybattlefield)}{S(creature|mybattlefield)}{S(creature|mybattlefield)}{S(creature|mybattlefield)}:flip(Ormendahl, Profane Prince) && untap
 text={T}: Add {1}. -- {5}, {T}, Pay 1 life: Put a 1/1 white and black Human Cleric creature token onto the battlefield. -- {5}, {T}, Sacrifice five creatures: Transform Westvale Abbey, then untap it.
 type=Land
 [/card]
@@ -134744,7 +134751,7 @@ toughness=3
 [/card]
 [card]
 name=Wirefly Hive
-auto={3}{T}:flipacoin winability token(Wirefly,Artifact Creature Wirefly,2/2,flying) winabilityend loseability sacrifice loseabilityend flipend
+auto={3}{T}:flipacoin winability token(Wirefly,Artifact Creature Wirefly,2/2,flying) winabilityend loseability destroy all(wirefly|battlefield) loseabilityend flipend
 text={3}, {T}: Flip a coin. If you win the flip, put a 2/2 colorless Insect artifact creature token with flying named Wirefly onto the battlefield. If you lose the flip, destroy all permanents named Wirefly.
 mana={3}
 type=Artifact
