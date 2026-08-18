@@ -1,0 +1,27 @@
+#Granted-strike damage (powerstrike) is creature-sourced through the normal
+#damage pipeline, so the striker's keywords apply: Vampire Nighthawk (2/3
+#deathtouch lifelink) bites Hill Giant (3/3) - 2 deathtouch damage kills it
+#and lifelink gains 2 (life 22). Companion to rabid_bite_powerstrike.txt.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:vampire nighthawk
+hand:rabid bite
+manapool:{1}{G}
+life:20
+[PLAYER2]
+inplay:hill giant
+[DO]
+rabid bite
+vampire nighthawk
+hill giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:vampire nighthawk
+graveyard:rabid bite
+manapool:{0}
+life:22
+[PLAYER2]
+graveyard:hill giant
+[END]

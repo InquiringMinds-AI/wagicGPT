@@ -109,6 +109,7 @@ generic/adarkar_unicorn_upkeep_i1085.txt
 generic/adarkar_unicorn_mainphase_i1085.txt
 generic/westvale_abbey_five_sacrifices.txt
 generic/rabid_bite_powerstrike.txt
+generic/rabid_bite_strike_keywords.txt
 generic/spirit_flare_cast.txt
 generic/westvale_abbey_offer_gate.txt
 generic/westvale_abbey_sac_dedup.txt
