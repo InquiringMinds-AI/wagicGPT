@@ -2051,6 +2051,43 @@ MTGAbility * AbilityFactory::getCoreAbility(MTGAbility * a)
 //Parses a string and returns the corresponding MTGAbility object
 //Returns NULL if parsing failed
 //Beware, Spell CAN be null when the function is called by the AI trying to analyze the effects of a given card
+//A keyword found inside a coin-flip/die-roll branch span (winability ...
+//winabilityend / loseability ... loseabilityend) belongs to the branch's own
+//flip-time parse (AASetCoin/AASetDie re-parse the span body when the flip
+//resolves). The load-time scans must skip such matches, or the whole
+//flipacoin/rolldie line is captured before its parser ever sees it and the
+//coin never flips (Wirefly Hive, Puppet's Verdict, Winter Sky).
+static size_t findOutsideCoinBranches(const string& s, const string& kw)
+{
+    size_t from = 0;
+    for (;;)
+    {
+        size_t found = s.find(kw, from);
+        if (found == string::npos)
+            return string::npos;
+        bool inside = false;
+        static const char* const opens[] = { "winability ", "loseability " };
+        static const char* const closes[] = { " winabilityend", " loseabilityend" };
+        for (int k = 0; k < 2; ++k)
+        {
+            size_t o = s.find(opens[k]);
+            if (o == string::npos)
+                continue;
+            size_t c = s.find(closes[k], o);
+            if (c == string::npos)
+                continue;
+            if (found > o && found < c)
+            {
+                inside = true;
+                break;
+            }
+        }
+        if (!inside)
+            return found;
+        from = found + 1;
+    }
+}
+
 MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTGCardInstance *card, bool activated, bool forceUEOT,
                                             MTGGameZone * dest)
 {
@@ -2992,7 +3029,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     size_t lord = string::npos;
     for (size_t j = 0; j < kLordKeywordsCount; ++j)
     {
-        size_t found2 = s.find(kLordKeywords[j]);
+        size_t found2 = findOutsideCoinBranches(s, kLordKeywords[j]);
         if (found2 != string::npos && ((found == string::npos) || found2 < found))
         {
             lord = found2;
@@ -3115,7 +3152,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     }
 
     //Multiple abilities for ONE cost
-    found = s.find("&&");
+    found = findOutsideCoinBranches(s, "&&");
     if (found != string::npos)
     {
         SAFE_DELETE(tc);
@@ -3140,7 +3177,7 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
     i = -1;
     for (size_t j = 0; j < kLordKeywordsCount; ++j)
     {
-        size_t found2 = s.find(kLordKeywords[j]);
+        size_t found2 = findOutsideCoinBranches(s, kLordKeywords[j]);
         if (found2 != string::npos && ((found == string::npos) || found2 < found))
         {
             found = found2;

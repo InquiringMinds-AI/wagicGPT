@@ -1,11 +1,13 @@
-#Wirefly Hive (#1085) - DEFERRED without a probe: coin-flip cards are benched
-#until the threaded-suite path unification (main vs workers consume different
-#RNG prefixes; jack_in_the_mox precedent).
-#DATA BUG fixed 2026-08-18: the lose branch is now
-#all(*[Wirefly]|battlefield) destroy (was: sacrifice, which sacked the HIVE).
-#ORDERING IS LOAD-BEARING: flip branches only support the all-FIRST shape
-#("all(X) destroy", the Puppet's Verdict idiom) - the action-first form
-#("destroy all(X)") makes the whole ability unparseable and the card dead to
-#activation. A parser guard that allowed action-first was tried and reverted
-#the same day: it broke Puppet's Verdict, whose parse depends on the lord
-#keyword being seen inside the branch. Write branches all-first.
+#Wirefly Hive (#1085) - BENCHED on RNG: the flip outcome diverges zone counts
+#(win creates a Wirefly token, lose has none to destroy) and suite asserts are
+#strict per-zone counts with no any-count syntax, so no single fixture holds.
+#VERIFIED LIVE 2026-08-18 via desktop probe: activation pays {3}{T}, coin
+#flips, WIN parses+creates the token (battlefield 1->2), LOSE parses clean.
+#The engine seam is gated by lexicon/trigger_coinflipped_branch.txt instead.
+#ENGINE FIX 2026-08-18 (the real root cause): load-time lord/&& scans now skip
+#winability/loseability span content (findOutsideCoinBranches, MTGAbility.cpp).
+#Before that, all( inside a branch got the whole line lord-hijacked at load
+#and the coin NEVER flipped - for ANY card with a lord keyword in a branch
+#(Wirefly Hive, Puppet's Verdict, Winter Sky).
+#DATA: lose branch stays all-FIRST (all(*[Wirefly]|battlefield) destroy), the
+#idiom branch strings lord-parse into at flip time (Puppet's Verdict shape).

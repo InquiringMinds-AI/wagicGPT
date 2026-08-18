@@ -10,6 +10,7 @@ manapool:{1}{R}{R}
 [PLAYER2]
 [DO]
 puppet's verdict
+choice 0
 [ASSERT]
 FIRSTMAIN
 [PLAYER1]
