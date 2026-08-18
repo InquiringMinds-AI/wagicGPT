@@ -18,6 +18,9 @@ The Action Stack contains all information for Game Events that can be interrupte
 #include "AllAbilities.h"
 #include "CardSelector.h"
 #include <typeinfo>
+#ifdef VITA
+#include <psp2/ctrl.h>
+#endif
 
 namespace
 {
@@ -26,25 +29,46 @@ namespace
     //Gamepad glyphs in iconspsp.png row 0: 0-3 d-pad, 4 CIRCLE, 5 triangle,
     //6 SQUARE, 7 CROSS.
     //
-    //Which glyph means "OK" is a REGIONAL convention, not a fixed fact -
-    //JTypes.h says so at the enum: JGE_BTN_OK is "Circle in Japan, Cross in
-    //Europe". The interrupt prompt used to hardcode CROSS for interrupt
-    //(JGE_BTN_SEC) and CIRCLE for no (JGE_BTN_OK), which was right for the
-    //Japanese PSP the code was written on. The Vita port maps Cross->OK and
-    //Circle->SEC (Vitamain.cpp), so on Vita both labels were exactly inverted:
-    //the prompt told the player to press Cross to interrupt when the button
-    //that actually interrupts is Circle. Square was never convention-dependent,
-    //which is why No-To-All alone looked right.
-    //
-    //Bind the glyphs to the mapping instead of to a region.
-#if defined(VITA)
-    const int kIconForOK  = 7; //Cross
-    const int kIconForSEC = 4; //Circle
+    //The fork binds Cross->OK / Circle->SEC / Square->PRI on every pad
+    //platform it ships (JGE/src/main.cpp gDefaultBindings, Vitamain.cpp
+    //gVitaButtonMap) - the defaults below follow that layout. But bindings
+    //are RUNTIME state (Options > Controls remaps persist), so on the pad
+    //platforms the prompt asks the live binding table which physical button
+    //owns each action and draws THAT glyph. A hardcoded glyph told a PSP
+    //player to press Cross to interrupt while Cross was bound to decline.
+    const int kIconForOKDefault  = 7; //Cross
+    const int kIconForSECDefault = 4; //Circle
+    const int kIconForPRIDefault = 6; //Square
+
+    int iconForBoundKey(JButton btn, int fallback)
+    {
+#if defined(PSP) || defined(VITA)
+        JGE* engine = JGE::GetInstance();
+        if (engine)
+            for (JGE::keybindings_it it = engine->KeyBindings_begin(); it != engine->KeyBindings_end(); ++it)
+            {
+                if (it->second != btn)
+                    continue;
+                switch (it->first)
+                {
+#if defined(PSP)
+                case PSP_CTRL_CIRCLE:   return 4;
+                case PSP_CTRL_TRIANGLE: return 5;
+                case PSP_CTRL_SQUARE:   return 6;
+                case PSP_CTRL_CROSS:    return 7;
 #else
-    const int kIconForOK  = 4; //Circle
-    const int kIconForSEC = 7; //Cross
+                case SCE_CTRL_CIRCLE:   return 4;
+                case SCE_CTRL_TRIANGLE: return 5;
+                case SCE_CTRL_SQUARE:   return 6;
+                case SCE_CTRL_CROSS:    return 7;
 #endif
-    const int kIconForPRI = 6; //Square, both conventions
+                default:
+                    break; //bound to a key with no face-button glyph - keep looking
+                }
+            }
+#endif
+        return fallback;
+    }
 
     std::string kInterruptMessageString("Interrupt?");
     std::string kInterruptString(": Interrupt");
@@ -1666,9 +1690,12 @@ void ActionStack::Render()
   
         //Render "interrupt?" text + possible actions
         {
+            const int kIconForSEC = iconForBoundKey(JGE_BTN_SEC, kIconForSECDefault);
+            const int kIconForOK  = iconForBoundKey(JGE_BTN_OK,  kIconForOKDefault);
+            const int kIconForPRI = iconForBoundKey(JGE_BTN_PRI, kIconForPRIDefault);
             float currentx = x0 + 10;
             interruptBtnXOffset = static_cast<int>(currentx);
-            
+
             if (gModRules.game.canInterrupt())
             {
                 renderer->RenderQuad(pspIcons[kIconForSEC].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
