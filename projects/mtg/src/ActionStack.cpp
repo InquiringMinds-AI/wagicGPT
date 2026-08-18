@@ -944,7 +944,10 @@ ActionStack::ActionStack(GameObserver* game)
         std::ostringstream stream;
         stream << "iconspsp" << i;
         pspIcons[i] = observer->getResourceManager()->RetrieveQuad("iconspsp.png", (float) i * 32, 0, 32, 32, stream.str(), RETRIEVE_MANAGE);
-        pspIcons[i]->SetHotSpot(16, 16);
+        //RETRIEVE_MANAGE returns an empty ptr when the texture cache cannot
+        //promote (cache full) - a missing icon must degrade to text, not crash.
+        if (pspIcons[i])
+            pspIcons[i]->SetHotSpot(16, 16);
     }
 }
 
@@ -1698,7 +1701,8 @@ void ActionStack::Render()
 
             if (gModRules.game.canInterrupt())
             {
-                renderer->RenderQuad(pspIcons[kIconForSEC].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
+                if (pspIcons[kIconForSEC])
+                    renderer->RenderQuad(pspIcons[kIconForSEC].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
                 currentx+= kIconHorizontalOffset;
                 mFont->DrawString(_(kInterruptString), currentx, kIconVerticalOffset - 8);
                 currentx+= mFont->GetStringWidth(_(kInterruptString).c_str()) + kBeforeIconSpace;
@@ -1706,7 +1710,8 @@ void ActionStack::Render()
 
             noBtnXOffset = static_cast<int>(currentx);
             
-            renderer->RenderQuad(pspIcons[kIconForOK].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
+            if (pspIcons[kIconForOK])
+                renderer->RenderQuad(pspIcons[kIconForOK].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
             currentx+= kIconHorizontalOffset;
             mFont->DrawString(_(kNoString), currentx, kIconVerticalOffset - 8);
             currentx+= mFont->GetStringWidth(_(kNoString).c_str()) + kBeforeIconSpace;
@@ -1714,7 +1719,8 @@ void ActionStack::Render()
             noToAllBtnXOffset = static_cast<int>(currentx);
             if (mObjects.size() > 1)
             {
-                renderer->RenderQuad(pspIcons[kIconForPRI].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
+                if (pspIcons[kIconForPRI])
+                    renderer->RenderQuad(pspIcons[kIconForPRI].get(), currentx, kIconVerticalOffset - 2, 0, kGamepadIconSize, kGamepadIconSize);
                 currentx+= kIconHorizontalOffset;
                 mFont->DrawString(_(kNoToAllString), currentx, kIconVerticalOffset - 8);
                 currentx+= mFont->GetStringWidth(_(kNoToAllString).c_str()) + kBeforeIconSpace;
