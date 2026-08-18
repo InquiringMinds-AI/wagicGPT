@@ -1,0 +1,26 @@
+#Westvale Abbey dedup guard (ExtraCosts::tryToSetPayment): clicking the SAME
+#creature for every sacrifice component must NOT pay the cost - before the
+#guard, one body paid all five {S(creature)} components and the abbey
+#transformed off a single sacrifice. The stuck payment leaves the board and
+#the mana pool intact.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:westvale abbey,grizzly bears,hill giant,air elemental,giant spider,wall of wood
+manapool:{5}
+[PLAYER2]
+[DO]
+westvale abbey
+choice 2
+grizzly bears
+grizzly bears
+grizzly bears
+grizzly bears
+grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:westvale abbey,grizzly bears,hill giant,air elemental,giant spider,wall of wood
+manapool:{5}
+[PLAYER2]
+[END]

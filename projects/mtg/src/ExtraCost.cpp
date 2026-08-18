@@ -1910,6 +1910,13 @@ int ExtraCosts::tryToSetPayment(MTGCardInstance * card)
                     }
                     else if (SacrificeCost * checking = dynamic_cast<SacrificeCost*>(costs[k]))
                     {
+                        //a creature already committed to another targeted sacrifice
+                        //component cannot be committed again - five {S(creature)}
+                        //components need five bodies (Westvale Abbey transformed off
+                        //a single sacrifice before this check)
+                        SacrificeCost * paying = dynamic_cast<SacrificeCost*>(costs[i]);
+                        if (paying && costs[k] != costs[i] && paying->tc && checking->tc)
+                            return 0;
                         for (size_t sacCheck = 0; sacCheck < costs.size(); sacCheck++)
                         {
                             SacrificeCost * checking2 = dynamic_cast<SacrificeCost*>(costs[sacCheck]);

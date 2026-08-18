@@ -1,0 +1,26 @@
+#Westvale Abbey: {5},{T},Sac five creatures: transform. Five DISTINCT bodies
+#pay the five {S(creature)} components; all five land in the graveyard and the
+#abbey transforms into Ormendahl (asserted as the single remaining permanent -
+#comma in "Ormendahl, Profane Prince" clashes with the zone-list separator).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:westvale abbey,grizzly bears,hill giant,air elemental,giant spider,wall of wood
+manapool:{5}
+[PLAYER2]
+[DO]
+westvale abbey
+choice 2
+grizzly bears
+hill giant
+air elemental
+giant spider
+wall of wood
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:*
+graveyard:grizzly bears,hill giant,air elemental,giant spider,wall of wood
+manapool:{0}
+[PLAYER2]
+[END]
