@@ -1,0 +1,23 @@
+#Spirit Flare smoke: castable, taps its target. The strike half (deals power
+#damage to an attacking/blocking opponent creature) rides the Rabid Bite
+#granted-powerstrike idiom - see rabid_bite_powerstrike.txt; combat staging
+#for the [attacking;blocking] filter is not expressible in this harness
+#(goto cannot cross the turn boundary to an opponent attack).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:savannah lions
+hand:spirit flare
+manapool:{3}{W}
+[PLAYER2]
+[DO]
+spirit flare
+savannah lions
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:savannah lions
+graveyard:spirit flare
+manapool:{0}
+[PLAYER2]
+[END]

@@ -111489,7 +111489,7 @@ type=Enchantment
 [card]
 name=Spirit Flare
 target=creature[-tapped]|mybattlefield
-auto=tap && transforms((,newability[dynamicability<!powerstrike!> target(creature[attacking;blocking]|opponentbattlefield)]))
+auto=tap && transforms((,newability[dynamicability<!powerstrike!> target(creature[attacking;blocking]|opponentbattlefield)])) ueot
 flashback={L:3}{1}{W}
 text=Tap target untapped creature you control. If you do, it deals damage equal to its power to target attacking or blocking creature an opponent controls. -- Flashback - {1}{W}, Pay 3 life. (You may cast this card from your graveyard for its flashback cost. Then exile it.)
 mana={3}{W}

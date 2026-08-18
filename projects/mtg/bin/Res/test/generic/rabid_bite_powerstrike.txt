@@ -1,0 +1,27 @@
+#Rabid Bite: the granted-strike idiom (transforms((,newability[
+#dynamicability<!powerstrike!> target(...)])) forever) must actually deal the
+#damage - a DURATION (forever or ueot) is LOAD-BEARING: bare transforms(( ))
+#expires with the spell's own resolution and the strike never happens (Spirit
+#Flare shipped bare and stalled after the tap, 2026-08-18; it uses ueot now). Flow: cast, pick
+#your creature, then pick the victim - no re-click of your creature needed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears
+hand:rabid bite
+manapool:{1}{G}
+[PLAYER2]
+inplay:merfolk of the pearl trident
+[DO]
+rabid bite
+grizzly bears
+merfolk of the pearl trident
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears
+graveyard:rabid bite
+manapool:{0}
+[PLAYER2]
+graveyard:merfolk of the pearl trident
+[END]
