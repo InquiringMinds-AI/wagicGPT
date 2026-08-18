@@ -40487,7 +40487,7 @@ toughness=3
 [card]
 name=Fill with Fright
 aicode=activate transforms((,newability[name(Choose which player will discard) target(player) ability$!name(Discard 2 cards) name(Discard 2 cards) target(<2>*|myhand) reject!$ targetedplayer ueot])) oneshot
-auto=scry:2 scrycore delayed name(Choose which player will discard) target(player) ability$!name(Discard 2 cards) name(Discard 2 cards) target(<2>*|myhand) reject!$ targetedplayer scrycoreend scryend
+auto=scry:2 scrycore delayed dontshow name(Choose which player will discard) target(player) ability$!name(Discard 2 cards) name(Discard 2 cards) target(<2>*|myhand) reject!$ targetedplayer scrycoreend scryend
 text=Target player discards two cards. -- Scry 2. (To scry 2, look at the top two cards of your library, then put any number of them on the bottom of your library and the rest on top in any order.)
 mana={3}{B}
 type=Sorcery
@@ -42828,7 +42828,7 @@ toughness=2
 [card]
 name=Foresee
 aicode=activate transforms((,newability[draw:2 controller])) oneshot
-auto=name(Scry 4 and draw) scry:4 scrycore delayed draw:2 controller scrycoreend scryend
+auto=name(Scry 4 and draw) scry:4 scrycore delayed dontshow draw:2 controller scrycoreend scryend
 text=Scry 4, then draw two cards. (To scry 4, look at the top four cards of your library, then put any number of them on the bottom of your library and the rest on top in any order.)
 mana={3}{U}
 type=Sorcery
@@ -46880,7 +46880,7 @@ toughness=3
 [card]
 name=Glimmer of Genius
 aicode=activate transforms((,newability[draw:2 controller])) oneshot
-auto=name(Scry 2 and draw) scry:2 scrycore delayed draw:2 controller scrycoreend scryend
+auto=name(Scry 2 and draw) scry:2 scrycore delayed dontshow draw:2 controller scrycoreend scryend
 auto=alterenergy:2 controller
 text=Scry 2, then draw two cards. You get {E}{E} (two energy counters).
 mana={3}{U}
@@ -82668,7 +82668,7 @@ type=Enchantment
 [card]
 name=Opt
 aicode=activate transforms((,newability[draw:1 controller])) oneshot
-auto=name(Scry 1 and draw) scry:1 scrycore delayed draw:1 controller scrycoreend scryend
+auto=name(Scry 1 and draw) scry:1 scrycore delayed dontshow draw:1 controller scrycoreend scryend
 text=Scry 1. -- Draw a card.
 mana={U}
 type=Instant
@@ -82717,7 +82717,7 @@ toughness=2
 [card]
 name=Oracle's Insight
 target=creature
-auto=teach(creature) {t}:scry:1 scrycore delayed draw:1 controller scrycoreend scryend
+auto=teach(creature) {t}:scry:1 scrycore delayed dontshow draw:1 controller scrycoreend scryend
 text=Enchant creature -- Enchanted creature has "{T}: Scry 1, then draw a card." (To scry 1, look at the top card of your library, then you may put that card on the bottom of your library.)
 mana={3}{U}
 type=Enchantment
@@ -88225,7 +88225,7 @@ type=Instant
 [card]
 name=Preordain
 aicode=activate transforms((,newability[draw:1 controller])) oneshot
-auto=scry:2 scrycore delayed draw:1 controller scrycoreend scryend
+auto=scry:2 scrycore delayed dontshow draw:1 controller scrycoreend scryend
 text=Scry 2, then draw a card. (To scry 2, look at the top two cards of your library, then put any number of them on the bottom of your library and the rest on top in any order.)
 mana={U}
 type=Sorcery
@@ -92697,7 +92697,7 @@ type=Instant
 [card]
 name=Read the Bones
 aicode=activate transforms((,newability[draw:2 controller],newability[life:-2 controller])) oneshot
-auto=scry:2 scrycore delayed draw:2 controller && life:-2 controller scrycoreend scryend
+auto=scry:2 scrycore delayed dontshow draw:2 controller && life:-2 controller scrycoreend scryend
 text=Scry 2, then draw two cards. You lose 2 life. (To scry 2, look at the top two cards of your library, then put any number of them on the bottom of your library and the rest on top in any order.)
 mana={2}{B}
 type=Sorcery
@@ -101078,7 +101078,7 @@ type=Land
 [card]
 name=Sea God's Revenge
 aicode=activate transforms((,newability[target(<upto:3>creature|opponentbattlefield) moveto(hand)])) oneshot
-auto=scry:1 scrycore delayed target(<upto:3>creature|opponentbattlefield) moveto(hand) scrycoreend scryend
+auto=scry:1 scrycore delayed dontshow target(<upto:3>creature|opponentbattlefield) moveto(hand) scrycoreend scryend
 text=Return up to three target creatures your opponents control to their owners' hands. Scry 1. (Look at the top card of your library. You may put that card on the bottom of your library.)
 mana={5}{U}
 type=Sorcery
@@ -115208,7 +115208,7 @@ type=Instant
 [card]
 name=Sudden Storm
 aicode=activate transforms((,newability[target(<upto:2>creature|battlefield) freeze])) oneshot
-auto=scry:1 scrycore delayed target(<upto:2>creature|battlefield) freeze scrycoreend scryend
+auto=scry:1 scrycore delayed dontshow target(<upto:2>creature|battlefield) freeze scrycoreend scryend
 text=Tap up to two target creatures. Those creatures don't untap during their controllers' next untap steps. Scry 1. (Look at the top card of your library. You may put that card on the bottom of your library.)
 mana={3}{U}
 type=Instant
@@ -125176,7 +125176,7 @@ toughness=5
 [card]
 name=Ugin's Insight
 aicode=activate transforms((,newability[draw:3 controller])) oneshot
-auto=name(Scry cards) scry:convertedcost:highest:*:mybattlefield scrycore delayed draw:3 controller scrycoreend scryend
+auto=name(Scry cards) scry:convertedcost:highest:*:mybattlefield scrycore delayed dontshow draw:3 controller scrycoreend scryend
 text=Scry X, where X is the highest mana value among permanents you control, then draw three cards.
 mana={3}{U}{U}
 type=Sorcery
