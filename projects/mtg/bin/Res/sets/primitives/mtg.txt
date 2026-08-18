@@ -46879,8 +46879,8 @@ toughness=3
 [/card]
 [card]
 name=Glimmer of Genius
-aicode=activate transforms((,newability[draw:2 controller])) oneshot
-auto=name(Scry 2 and draw) scry:2 scrycore delayed dontshow draw:2 controller scrycoreend scryend
+aicode=activate transforms((,newability[draw:2 controller],newability[alterenergy:2 controller])) oneshot
+auto=name(Scry 2 and draw) scry:2 scrycore delayed dontshow draw:2 controller && alterenergy:2 controller scrycoreend scryend
 auto=alterenergy:2 controller
 text=Scry 2, then draw two cards. You get {E}{E} (two energy counters).
 mana={3}{U}
