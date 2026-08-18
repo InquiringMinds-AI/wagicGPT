@@ -1,0 +1,26 @@
+#Westvale Abbey offer gate (ExtraCosts::canPay distinct-candidate check):
+#with only ONE creature the five-sacrifice transform must NOT be offered -
+#before the check, every {S(creature)} component independently said "a
+#candidate exists" and the menu offered a transform that could never be paid.
+#Menu without transform: 0=Add 1 mana, 1=Create human cleric, 2=Cancel.
+#choice 2 cancels cleanly (mana refunded, abbey untapped), then the
+#re-activation buys the cleric: token on board, {5} spent, 1 life paid.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:westvale abbey,grizzly bears
+manapool:{5}
+[PLAYER2]
+[DO]
+westvale abbey
+choice 2
+westvale abbey
+choice 1
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:westvale abbey,grizzly bears,*
+manapool:{0}
+life:19
+[PLAYER2]
+[END]

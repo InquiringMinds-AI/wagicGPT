@@ -1963,6 +1963,54 @@ int ExtraCosts::canPay()
             return 0;
         }
     }
+    //Component groups that each consume a DIFFERENT card (tryToSetPayment
+    //rejects committing one card twice) need as many distinct candidates as
+    //components - per-component canPay only proves one candidate each, so
+    //Westvale Abbey's five {S(creature)} components were offered as payable
+    //off a single creature. Checked per group: targeted sacrifices, targeted
+    //taps (cross-group reuse of one card stays allowed, as at payment).
+    for (int pass = 0; pass < 2; pass++)
+    {
+        std::vector<ExtraCost *> group;
+        for (size_t i = 0; i < costs.size(); i++)
+        {
+            bool member = (pass == 0) ? (dynamic_cast<SacrificeCost *>(costs[i]) != NULL)
+                                      : (dynamic_cast<TapTargetCost *>(costs[i]) != NULL);
+            if (member && costs[i]->tc)
+                group.push_back(costs[i]);
+        }
+        if (group.size() < 2)
+            continue;
+        GameObserver * g = group[0]->source ? group[0]->source->getObserver() : NULL;
+        if (!g)
+            continue;
+        size_t candidates = 0;
+        for (int p = 0; p < 2; p++)
+        {
+            MTGGameZone * z = g->players[p]->game->inPlay;
+            for (int k = 0; k < z->nb_cards; k++)
+            {
+                MTGCardInstance * c = z->cards[k];
+                if (!c)
+                    continue;
+                for (size_t gi = 0; gi < group.size(); gi++)
+                {
+                    TapTargetCost * tt = dynamic_cast<TapTargetCost *>(group[gi]);
+                    if (tt && (c->isTapped() || (tt->crew && c->has(Constants::CANTCREW))))
+                        continue;
+                    if (!tt && c->has(Constants::CANTBESACRIFIED))
+                        continue;
+                    if (group[gi]->tc->canTarget(c))
+                    {
+                        candidates++;
+                        break;
+                    }
+                }
+            }
+        }
+        if (candidates < group.size())
+            return 0;
+    }
     return 1;
 }
 

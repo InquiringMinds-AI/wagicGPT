@@ -108,6 +108,7 @@ generic/deathtouch_taught_i1142.txt
 generic/adarkar_unicorn_upkeep_i1085.txt
 generic/adarkar_unicorn_mainphase_i1085.txt
 generic/westvale_abbey_five_sacrifices.txt
+generic/westvale_abbey_offer_gate.txt
 generic/westvale_abbey_sac_dedup.txt
 generic/aegar_spell_excess_i1085.txt
 generic/alrund_hand_buff_i1085.txt
