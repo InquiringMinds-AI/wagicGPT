@@ -262,3 +262,14 @@ project has already been bitten by exactly that, as the 40s mystery latency behi
    rather than a shave, and `tools/selfplay-harness.sh` — which pinned
    `WAGIC_GPT_TIMEOUT=240` unconditionally and would have overridden it for the whole A/B
    corpus — now defaults to 420 under `--thinking`. Explicit env/config still wins.
+
+**ORCHESTRATOR NOTE, wave-34 corpus launch (2026-08-19):** pre-corpus probe (109v133,
+--thinking, -j 1) PASSED the reasoning gate (36/36 decisions captured at both seats;
+replies collapsed to p50 44 chars; one live budget_hit recovered by the forced close;
+0 fallbacks) but measured native thinking LONGER than the prose it replaced (p50 ~12k
+chars ≈ 3.5k tokens; latency p50 16s → ~80s solo). The 3000s cap would adjudicate most
+games AND censor the thinking-length distribution the calibration exists to measure —
+so the wave-34 corpus runs at **-T 7200** (deviation from "hold both levers",
+calibration-forced; -j 3 and REPPENALTY held). Cap-sensitive game-outcome comparisons
+vs wave-33 are accordingly OFF the table for this corpus; decision-level metrics remain
+the A/B currency.
