@@ -144,3 +144,13 @@ Five cross-cutting directives for the fix agents, before the list:
 - **N-36f** (generic-payability belief at deck36) -- **belief ABSENT 0/201, representation
   unchanged.** Recorded as steady state, NOT closed as an item: it cost a false decline at deck152
   this wave (#19).
+
+---
+
+**OWNER NOTE ON #1a/#1c (2026-08-19, post-synthesis):** latency is not the concern —
+"that's a whole other issue." The available bound, held in reserve rather than shipped
+as a default: **a reasoning BUDGET with a forced answer** (Qwen thinking supports
+capping think tokens and injecting the close-of-thinking marker so the model must
+answer from what it has; the Codex backend's effort tiers are the analogous knob).
+Per the generous-defaults rule this ships UNBOUNDED; the budget is the documented
+lever to pull only if the A/B shows runaway native thinking, not a starting clamp.
