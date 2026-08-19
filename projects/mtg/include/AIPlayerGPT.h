@@ -497,6 +497,28 @@ private:
     string mRetryDoneBase;
     long mRetryFirstLatencyMs;
     bool mLastRetry;
+
+    //NATIVE REASONING (wave-34 #1a/#1b). With the post-answer scratch block
+    //gone from the reply protocol, the auditable reasoning is the model's own
+    //thinking window - captured here, written to the translog, and BOUNDED.
+    //mLastReasoning: the last reply's thinking, from message.reasoning_content
+    //or from an inline <think> block, whichever the server produced. Consumed
+    //(cleared) by the translog write, like mLastLatencyMs.
+    string mLastReasoning;
+    //The last reply was REASONING-ONLY: an unclosed <think>, i.e. the thinking
+    //budget (or max_tokens) cut the reply before any answer. Never parsed as
+    //an answer; it triggers the forced close instead.
+    bool mLastReasoningOnly;
+    bool mLastFinishLength;  //the last reply stopped at the token cap
+    bool mLastBudgetHit;     //a forced close fired for this decision (translog
+                             //reasoning_budget_hit) - the A/B's count of how
+                             //often the budget actually bound
+    //The truncated thinking handed back to the model on the forced close, with
+    //its "</think>" injected by the request builder.
+    string mForceClosePrefill;
+    //Thinking-window budget in TOKENS, thinking mode only (config
+    //reasoning_budget / WAGIC_GPT_REASONING_BUDGET; 0 or less = unbounded).
+    long mReasoningBudget;
 };
 
 #endif //WITH_GPT_AI

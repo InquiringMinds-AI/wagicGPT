@@ -46,6 +46,13 @@ public:
                               //the built-in default (low). Only sent on the
                               //"OpenAI subscription" preset; the thinking
                               //flag covers every other provider family.
+    long reasoningBudget;     //thinking-window budget in TOKENS (config key
+                              //reasoning_budget, env WAGIC_GPT_REASONING_BUDGET).
+                              //-1 unset = the built-in default (8000); 0 or
+                              //less = unbounded. Only meaningful with thinking
+                              //ON: it caps the model's NATIVE reasoning window
+                              //and, when the cap binds, the client forces the
+                              //answer out rather than losing the decision
     double repetitionPenalty; //vLLM repetition_penalty; 1.0 = OFF (the field
                               //is only sent when != 1.0). Sampling change,
                               //corpus-validate before defaulting on

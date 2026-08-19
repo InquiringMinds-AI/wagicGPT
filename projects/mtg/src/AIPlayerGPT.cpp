@@ -1768,6 +1768,92 @@ void AIPlayerGPT::WorkerMain(void * p)
     delete ctx;
 }
 
+//NATIVE REASONING CAPTURE (wave-34 #1b(A)). With the post-answer scratch
+//block gone from the protocol, the reasoning the dev loop audits comes from
+//the model's own thinking window - and the server decides where it lands.
+//A vLLM running a reasoning parser for the served model puts it in
+//message.reasoning_content and hands back clean content; one that does NOT
+//leaves the raw "<think> ... </think>" inline at the head of content. Both
+//happen on this stack, so the client implements BOTH paths unconditionally
+//rather than betting on the server's configuration.
+//
+//This splits an inline block out of `content` into `reasoning`:
+//  * a leading "<think>" closed by "</think>"  -> reasoning = the block,
+//    content = what follows (the answer);
+//  * no opening tag but a "</think>" present   -> the opener was consumed by
+//    the chat template (a real vLLM shape): everything before it is reasoning;
+//  * UNCLOSED "<think>"                        -> the reply is REASONING-ONLY
+//    (truncation, or a model that opened and never closed). Returns FALSE with
+//    content EMPTIED: think text must never be parsed as an answer - a
+//    truncated deliberation ends mid-arithmetic and its stray integers are
+//    exactly what the index scanners latch onto. The caller re-asks.
+//Everything downstream - every length meter, every answer scanner, the
+//translog `reply` field - then runs on the STRIPPED text, or the fields would
+//be measuring thinking tokens instead of reply tokens.
+//Internal slot key for the forced-close (phase-2) request. It only has to be
+//a string no assembled prompt can equal - the async slot keys on it, and
+//buildRequestBody recognises it, strips it, and rebuilds the SAME user
+//message with the assistant prefill appended.
+static const char * kForceCloseTag = "\x01wagic-force-close\x01";
+
+//The answer reserve, in tokens: everything the reply itself needs once the
+//thinking window is spent. Derived from this corpus, not guessed - p95 PLAN
+//line 592 chars (~200 tokens) + p95 coded choice line 74 chars (~30 tokens),
+//with margin. It is both the head-room added to the thinking budget in phase
+//1 and the whole cap of the phase-2 forced close.
+static const long kAnswerReserveTokens = 400;
+
+//Default thinking budget, in tokens, when thinking is ON and nothing is
+//configured. The formula (owner, 2026-08-19) is b = 1.5 * (t - p - c) where t
+//is the time bound expressed as tokens; at a 240s bound and ~30 tok/s that
+//gives 10450. The owner set the shipped starting value at a flat 8000
+//("oof. thats a lot. lets make it 8000"). Config/env override it; 0 or less
+//means unbounded (the pre-budget behaviour).
+static const long kDefaultReasoningBudget = 8000;
+
+//Which endpoints accept an assistant prefill (vLLM's continue_final_message /
+//llama.cpp's equivalent). The subscription (Codex) and OpenRouter paths keep
+//reasoning server-side - there is nothing for the client to close - and
+//api.openai.com rejects unknown top-level fields with a 400, which would turn
+//every budget hit into a lost decision instead of a forced answer.
+static bool gptForceCloseSupported(const string& endpoint)
+{
+    if (gptCodexEndpoint(endpoint))
+        return false;
+    return endpoint.find("api.openai.com") == string::npos
+        && endpoint.find("openrouter.ai") == string::npos;
+}
+
+static bool splitReasoningBlock(string& content, string& reasoning)
+{
+    size_t head = content.find_first_not_of(" \t\r\n");
+    if (head == string::npos)
+        return true; //empty/whitespace reply: the transport-failure path owns it
+    bool opensWithThink = (content.compare(head, 7, "<think>") == 0);
+    size_t close = content.find("</think>");
+    if (!opensWithThink && close == string::npos)
+        return true; //no thinking block in this reply at all
+    if (close == string::npos)
+    {
+        //Opened and never closed: reasoning-only.
+        string r = content.substr(head + 7);
+        size_t rs = r.find_first_not_of(" \t\r\n");
+        reasoning = (rs == string::npos) ? string() : r.substr(rs);
+        content.clear();
+        return false;
+    }
+    size_t rStart = opensWithThink ? head + 7 : 0;
+    string r = content.substr(rStart, close - rStart);
+    size_t rs = r.find_first_not_of(" \t\r\n");
+    size_t re = r.find_last_not_of(" \t\r\n");
+    if (rs != string::npos)
+        reasoning = r.substr(rs, re - rs + 1);
+    string rest = content.substr(close + 8);
+    size_t as = rest.find_first_not_of(" \t\r\n");
+    content = (as == string::npos) ? string() : rest.substr(as);
+    return true;
+}
+
 bool AIPlayerGPT::asyncBusy() const
 {
     std::lock_guard<GptMutex> g(mAsyncState->mtx);
@@ -1790,17 +1876,49 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 mAsyncState->status = 0;
                 mAsyncState->response.clear();
                 content.clear();
+                mLastReasoningOnly = false;
                 if (!body.empty())
                 {
                     try
                     {
                         json reply = json::parse(body);
-                        content = reply["choices"][0]["message"]["content"].get<string>();
+                        json choice0 = reply["choices"][0];
+                        content = choice0["message"]["content"].is_string()
+                                  ? choice0["message"]["content"].get<string>() : string();
+                        //PATH 1: the server ran a reasoning parser for this
+                        //model - the thinking arrives in its own field and
+                        //`content` is already clean. Log it verbatim.
+                        if (choice0["message"].contains("reasoning_content")
+                            && choice0["message"]["reasoning_content"].is_string())
+                        {
+                            string rc = choice0["message"]["reasoning_content"].get<string>();
+                            if (!rc.empty())
+                                mLastReasoning = rc;
+                        }
+                        //Decode stopped at the cap: with a thinking budget in
+                        //force this is the expected phase-1 exit, and the
+                        //unclosed-think test below decides whether the answer
+                        //still has to be forced out of the model.
+                        mLastFinishLength = (choice0.contains("finish_reason")
+                                             && choice0["finish_reason"].is_string()
+                                             && choice0["finish_reason"].get<string>() == "length");
                     }
                     catch (json::exception&)
                     {
                         content.clear();
                     }
+                }
+                //PATH 2 (unconditional, whatever path 1 found): an inline
+                //"<think> ... </think>" the server did not parse out. Strip it
+                //into the same field so every scanner downstream measures REPLY
+                //text. An unclosed block empties `content` - reasoning-only, and
+                //the caller forces the answer rather than parsing think text.
+                {
+                    string inlineReasoning;
+                    if (!splitReasoningBlock(content, inlineReasoning))
+                        mLastReasoningOnly = true;
+                    if (!inlineReasoning.empty())
+                        mLastReasoning = inlineReasoning;
                 }
                 //Subscription preset: the backend prices every reply against a
                 //rolling plan window and reports the gauge on each response.
@@ -2021,6 +2139,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
             mRetryDoneBase = userMsg;
             mRetryActivePrompt.clear();
             mRetryBase.clear();
+            mForceClosePrefill.clear();
             mRetryFirstLatencyMs = -1;
             mLastRetry = true;
             return 0;
@@ -2028,6 +2147,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         //Decision changed under a pending retry: drop it, poll the new decision.
         mRetryActivePrompt.clear();
         mRetryBase.clear();
+        mForceClosePrefill.clear();
         mRetryFirstLatencyMs = -1;
     }
 
@@ -2036,6 +2156,33 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         return kChoicePending;
 
     mLastRetry = false;
+    //BUDGET-FORCED ANSWER (wave-34 #1a/#1b, owner ruling 2026-08-19). Native
+    //thinking is BOUNDED, and a bound whose only mechanism is max_tokens loses
+    //the decision - the reply comes back mid-thought with no answer at all,
+    //which is exactly the truncation class that already costs this project
+    //decisions. So the budget is two-phase: phase 1 decodes with
+    //max_tokens = budget + the answer reserve; if it comes back with an
+    //UNCLOSED <think> (the reply is reasoning-only), phase 2 hands the model
+    //its own truncated thinking back with the "</think>" close INJECTED and a
+    //tight answer-sized cap, so it must answer from what it already has. This
+    //is Qwen's documented budget-forcing pattern, expressed through vLLM's
+    //assistant-prefill (continue_final_message) rather than a raw /v1/
+    //completions prompt render, because the client has no copy of the chat
+    //template and a mis-rendered prompt would be a silent quality change.
+    //Scoped to endpoints that accept the prefill (local vLLM/llama.cpp): the
+    //subscription and OpenRouter paths hide their reasoning entirely and have
+    //nothing to close, and api.openai.com 400s unknown fields.
+    if (mLastReasoningOnly && userMsg != mRetryDoneBase && gptForceCloseSupported(mEndpoint))
+    {
+        mRetryFirstLatencyMs = mLastLatencyMs;
+        mRetryBase = userMsg;
+        mForceClosePrefill = mLastReasoning;
+        mRetryActivePrompt = string(kForceCloseTag) + userMsg;
+        mLastBudgetHit = true;
+        setNotice("thinking hit its budget - asking for the answer", 3.0f);
+        DebugTrace("AIPlayerGPT: unclosed <think> (budget/truncation); forcing the answer");
+        return kChoicePending; //next tick polls the forced-close request
+    }
     //Fire ONE answer-locked retry iff the reply is decode-garbage AND this
     //decision's retry has not already been spent. isDecodeGarbage is
     //conservative - ordinary unparsed replies (real prose, no coded line) are
@@ -2058,7 +2205,8 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
-      mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0)
+      mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
+      mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false), mReasoningBudget(0)
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
@@ -2090,6 +2238,23 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     if (mPatienceLimit < 0)
         mPatienceLimit = 0;
     mThinking = getenv("WAGIC_GPT_THINKING") ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
+    //Thinking budget: configured value wins, else the shipped default, and
+    //only in thinking mode (a non-thinking reply has no window to bound).
+    mReasoningBudget = (cfg.reasoningBudget >= 0) ? cfg.reasoningBudget : kDefaultReasoningBudget;
+    if (const char * rb = getenv("WAGIC_GPT_REASONING_BUDGET"))
+        mReasoningBudget = atol(rb);
+    if (!mThinking)
+        mReasoningBudget = 0;
+    //Timeout FLOOR for thinking mode, applied only to the DEFAULT. Worst case
+    //is the whole budget decoded at this stack's ~30 tok/s: (8000 + 230) / 30
+    //~= 275s, so a shorter default would turn every budget-spending decision
+    //into a transport timeout - a latency bound masquerading as a model
+    //failure. An explicit timeout (env or config) is the user's call and is
+    //never raised over their head; the built-in default (600s) already clears
+    //this floor, so the guard exists for a future default, not for today.
+    if (mThinking && mReasoningBudget > 0 && !getenv("WAGIC_GPT_TIMEOUT")
+        && cfg.timeoutSecs == GptSettings().timeoutSecs && mTimeoutMs < 330000)
+        mTimeoutMs = 330000;
     mReasoningEffort = cfg.reasoningEffort;
     if (const char * re = getenv("WAGIC_GPT_EFFORT"))
         mReasoningEffort = re;
@@ -2294,6 +2459,27 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         mLastRetry = false;
     }
     mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
+    //NATIVE REASONING (wave-34 #1b(A)): the model's own thinking for THIS
+    //decision, from message.reasoning_content or from an inline <think> block -
+    //captured on both paths because the server decides which one we get. This
+    //is what seat review reads in place of the deleted post-answer scratch
+    //text, so an absent field means the model genuinely returned none, not
+    //that the client only implemented the other path. `reply` above is the
+    //STRIPPED text, so every length/answer meter measures reply tokens.
+    if (!mLastReasoning.empty())
+    {
+        rec["reasoning"] = mLastReasoning;
+        mLastReasoning.clear();
+    }
+    //The thinking budget bound on this decision and the answer had to be
+    //forced out of the model (phase-2 close). Counting these is how the A/B
+    //tells "the budget is never reached" from "the budget is shaping every
+    //decision".
+    if (mLastBudgetHit)
+    {
+        rec["reasoning_budget_hit"] = true;
+        mLastBudgetHit = false;
+    }
     //Narration delta: the game events that landed since the previous
     //record. A consumed cast's outcome (resolved/countered/died) shows up
     //here on the NEXT record - machine-readable without re-parsing prompts.
@@ -3632,6 +3818,13 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 
 string AIPlayerGPT::buildRequestBody(const string& userMsg)
 {
+    //Phase-2 of the thinking budget: the same decision prompt, plus the
+    //model's own truncated thinking with its "</think>" close injected, so
+    //the next tokens it decodes MUST be the answer. The slot key carries the
+    //tag; the request carries the base prompt.
+    bool forceClose = (userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0);
+    const string baseMsg = forceClose ? userMsg.substr(strlen(kForceCloseTag)) : userMsg;
+
     //ChatGPT-subscription preset: the Codex backend speaks the Responses
     //shape, not chat completions - system prompt rides "instructions", the
     //user message rides "input". The backend REJECTS any field Codex CLI
@@ -3666,7 +3859,18 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //cacheable across the whole game.
     json messages = json::array();
     messages.push_back({{"role", "system"}, {"content", mSystemPrompt}});
-    messages.push_back({{"role", "user"}, {"content", userMsg}});
+    messages.push_back({{"role", "user"}, {"content", baseMsg}});
+    if (forceClose)
+    {
+        //ASSISTANT PREFILL, not a new instruction. The model resumes its own
+        //turn from the closed thinking block, so what it writes next is the
+        //answer it would have written had it finished thinking - no
+        //re-deliberation, no fresh prompt to spiral on. add_generation_prompt
+        //must be false alongside continue_final_message or the template opens
+        //a second assistant turn and the prefill becomes context, not prefix.
+        messages.push_back({{"role", "assistant"},
+                            {"content", "<think>\n" + mForceClosePrefill + "\n</think>\n\n"}});
+    }
 
     //Room for scratch reasoning + the complete PLAN + the trailing answer
     //line. The answer-last contract makes truncation COSTLY (a cut reply
@@ -3677,6 +3881,15 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //generous; the protocol text carries the brevity pressure, and the
     //truncation guard turns any residual cut into a safe heuristic answer.
     long maxTokens = 4096;
+    //THINKING BUDGET (owner ruling 2026-08-19). Thinking tokens are decode
+    //tokens, so an unbounded native window is an unbounded decision. The
+    //budget is a TOKEN COUNT for the thinking window; the request cap is that
+    //plus the answer reserve (the p95 PLAN line + the coded choice line +
+    //margin), so a model that spends its whole budget still has room to
+    //answer - and when it does not, the forced close above recovers the
+    //answer instead of losing the decision.
+    if (mThinking && mReasoningBudget > 0)
+        maxTokens = mReasoningBudget + kAnswerReserveTokens;
     if (mMaxTokens > 0)
         maxTokens = mMaxTokens;
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
@@ -3685,7 +3898,7 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //to fail fast to the heuristic instead of burning another long spiral. This
     //wins over any larger configured/env default for the retry request only.
     if (!mRetryActivePrompt.empty() && userMsg == mRetryActivePrompt)
-        maxTokens = 512;
+        maxTokens = forceClose ? kAnswerReserveTokens : 512;
 
     json request = {
         {"model", mModel},
@@ -3714,7 +3927,12 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //parameters with a 400, which would silently degrade every decision to
     //the heuristic - omit the field there.
     if (mEndpoint.find("api.openai.com") == string::npos)
-        request["chat_template_kwargs"] = {{"enable_thinking", mThinking}};
+        request["chat_template_kwargs"] = {{"enable_thinking", forceClose ? false : mThinking}};
+    if (forceClose)
+    {
+        request["continue_final_message"] = true;
+        request["add_generation_prompt"] = false;
+    }
 
     //OpenRouter ignores chat_template_kwargs, so hybrid-reasoning models
     //think anyway. Measured on deepseek-v4-flash-0731 (pinned first-party):
@@ -10965,6 +11183,55 @@ void AIPlayerGPT::runParseSelfTest()
               "CODEX-SSE an HTML body extracts to empty (falls back to the heuristic)");
         CHECK(gptCodexExtractText("data: {not json at all\ndata: 42\n").empty(),
               "CODEX-SSE unparseable data lines are skipped, not answers");
+    }
+
+    // ==== WAVE-34 step-1 (decision-flow lane) cases ====
+
+    // ---- #1b(A): native reasoning capture, BOTH server paths ----
+    cout << "\n[W34-1b] the thinking block is captured, and never parsed as an answer\n";
+    {
+        // POSITIVE: an inline block the server did not parse out. The block
+        // leaves `content`, the answer stays, and the reasoning is kept whole.
+        string c = "<think>Option 2 trades badly, so option 1.</think>CHOICE: 1 (Cast Mordor Muster)";
+        string r;
+        bool ok = splitReasoningBlock(c, r);
+        cout << "     inline think -> content=\"" << c << "\" reasoning=\"" << r << "\"\n";
+        CHECK(ok && c == "CHOICE: 1 (Cast Mordor Muster)",
+              "W34-1b an inline <think> block is stripped off the answer");
+        CHECK(r == "Option 2 trades badly, so option 1.",
+              "W34-1b the stripped thinking is captured verbatim for the translog");
+        // The opener eaten by the chat template (a real vLLM shape): the text
+        // before </think> is still reasoning, not an answer.
+        string c2 = "I should hold up mana here.</think>CHOICE: 0 (pass)";
+        string r2;
+        CHECK(splitReasoningBlock(c2, r2) && c2 == "CHOICE: 0 (pass)"
+              && r2 == "I should hold up mana here.",
+              "W34-1b a closing tag with no opener still splits reasoning from answer");
+        // NEGATIVE: an ordinary reply is byte-untouched and captures nothing.
+        string c3 = "CHOICE: 2 (Cast Ichor Rats)\nPLAN: race on poison.";
+        string r3;
+        CHECK(splitReasoningBlock(c3, r3) && c3 == "CHOICE: 2 (Cast Ichor Rats)\nPLAN: race on poison."
+              && r3.empty(),
+              "W34-1b NEGATIVE a reply with no thinking block is passed through unchanged");
+        // UNCLOSED: reasoning-only. The answer-shaped text INSIDE the thinking
+        // must not survive as an answer - this is the budget-truncation shape,
+        // and its stray integers are exactly what the index scanners latch on.
+        string c4 = "<think>Maybe CHOICE: 3 (Cast Emrakul)? No, wait, 15 mana. Let me count again";
+        string r4;
+        bool ok4 = splitReasoningBlock(c4, r4);
+        CHECK(!ok4 && c4.empty(),
+              "W34-1b an UNCLOSED <think> is reasoning-only: the content is emptied, never parsed");
+        CHECK(r4.find("Cast Emrakul") != string::npos,
+              "W34-1b the truncated thinking is still captured (it is the forced close's prefill)");
+        CHECK(!hasCodedAnswerLine(c4),
+              "W34-1b NEGATIVE no coded answer survives an unclosed think block");
+        // Every length/answer meter runs on the STRIPPED text: a PLAN: and a
+        // CHOICE: inside the thinking must not score as reply text.
+        string c5 = "<think>PLAN: ignore me, and lots of hidden deliberation</think>CHOICE: 1\nPLAN: go.";
+        string r5;
+        splitReasoningBlock(c5, r5);
+        CHECK(postPlanOverrun(c5) == 0 && hasCodedAnswerLine(c5),
+              "W34-1b the overrun/answer scanners measure the STRIPPED reply, not the thinking");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
