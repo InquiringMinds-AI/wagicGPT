@@ -1899,6 +1899,19 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                         //force this is the expected phase-1 exit, and the
                         //unclosed-think test below decides whether the answer
                         //still has to be forced out of the model.
+                        //The server's OWN reasoning-token count when it
+                        //reports one (vLLM/OpenAI shape:
+                        //usage.completion_tokens_details.reasoning_tokens).
+                        //Preferred over the client's char count because the
+                        //budget is denominated in TOKENS - the first corpus
+                        //under this budget is a CALIBRATION run and the next
+                        //budget is read straight off this distribution.
+                        if (reply.contains("usage")
+                            && reply["usage"].contains("completion_tokens_details")
+                            && reply["usage"]["completion_tokens_details"].contains("reasoning_tokens")
+                            && reply["usage"]["completion_tokens_details"]["reasoning_tokens"].is_number())
+                            mLastReasoningTokens =
+                                reply["usage"]["completion_tokens_details"]["reasoning_tokens"].get<long>();
                         mLastFinishLength = (choice0.contains("finish_reason")
                                              && choice0["finish_reason"].is_string()
                                              && choice0["finish_reason"].get<string>() == "length");
@@ -2026,12 +2039,20 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 //A line-leading coded answer label (CHOICE:/ATTACK:/BLOCKS:/PUT:) with SOME
 //payload after it. Used only by the garbage detector: if the model emitted any
 //such line, the normal parse + salvage can work it and we must NOT retry.
-static bool hasCodedAnswerLine(const string& content)
+//ONE scanner for every line-leading coded answer (CHOICE:/ATTACK:/BLOCKS:/
+//PUT:) in a reply, so the garbage detector, the retraction flag and the
+//wave-34 protocol instruments all agree on what counts as an answer line.
+//Returns how many there are; optionally hands back where the FIRST one's line
+//ends (the post-answer meter's origin) and the normalised payload of the first
+//and last (whether the reply ended on the answer it began with).
+static int scanCodedAnswerLines(const string& content, size_t * firstLineEnd,
+                                string * firstPayload, string * lastPayload)
 {
     static const char * kLabels[] = { "choice:", "attack:", "blocks:", "put:" };
     string low = content;
     for (size_t i = 0; i < low.size(); i++)
         low[i] = (char) tolower((unsigned char) low[i]);
+    int count = 0;
     size_t lineStart = 0;
     while (lineStart <= low.size())
     {
@@ -2050,15 +2071,46 @@ static bool hasCodedAnswerLine(const string& content)
                 //require a non-space payload char after the label
                 size_t p = s + len;
                 while (p < end && (low[p] == ' ' || low[p] == '\t')) p++;
-                if (p < end)
-                    return true;
+                if (p >= end)
+                    break;
+                count++;
+                //Normalised payload: the label plus the rest of the line, one
+                //space between tokens, so "CHOICE: 2 (Yotian Soldier)" and
+                //"CHOICE:  2  (Yotian Soldier)" are the SAME answer and
+                //"CHOICE: 1 (Akroma's Memorial)" is a different one.
+                string pay;
+                bool sp = false;
+                for (size_t q = s; q < end; q++)
+                {
+                    char c = low[q];
+                    if (c == ' ' || c == '\t' || c == '\r')
+                        sp = !pay.empty();
+                    else
+                    {
+                        if (sp) pay += ' ';
+                        sp = false;
+                        pay += c;
+                    }
+                }
+                if (count == 1)
+                {
+                    if (firstLineEnd) *firstLineEnd = end;
+                    if (firstPayload) *firstPayload = pay;
+                }
+                if (lastPayload) *lastPayload = pay;
+                break;
             }
         }
         if (lineEnd == string::npos)
             break;
         lineStart = lineEnd + 1;
     }
-    return false;
+    return count;
+}
+
+static bool hasCodedAnswerLine(const string& content)
+{
+    return scanCodedAnswerLines(content, NULL, NULL, NULL) > 0;
 }
 
 bool AIPlayerGPT::isDecodeGarbage(const string& content)
@@ -2206,7 +2258,8 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
-      mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false), mReasoningBudget(0)
+      mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false), mReasoningBudget(0),
+      mLastReasoningTokens(-1), mLastDroppedAssignments(-1)
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
@@ -2413,6 +2466,48 @@ static long postPlanOverrun(const string& reply)
     return (long) (last - lineEnd);
 }
 
+//post_answer_overrun: the chars a reply wrote AFTER the end of its FIRST
+//line-leading coded answer. THIS is the quantity the owner ruling is about,
+//and post_plan_overrun is not: post_plan_overrun measures from the PLAN line,
+//which the protocol put LAST, so it saw 5.3% of the real tail at deck116 and
+//scored a flat 0 on a 13,326-char reply that simply omitted its PLAN. It is
+//also format-blind in a way this is not - a reply with no PLAN line and a
+//reply that ended at its answer are indistinguishable to it and identical
+//(0) here only when the reply really did stop. Measured on the STRIPPED reply
+//(post-</think>), like every other meter, or it would count thinking tokens.
+static long postAnswerOverrun(const string& reply)
+{
+    size_t lineEnd = string::npos;
+    if (scanCodedAnswerLines(reply, &lineEnd, NULL, NULL) < 1 || lineEnd == string::npos)
+        return 0; //no coded answer at all: the empty/unparsed classes name that
+    size_t last = reply.find_last_not_of(" \t\r\n");
+    if (last == string::npos || last <= lineEnd)
+        return 0;
+    return (long) (last - lineEnd);
+}
+
+//answer_replaced: the reply ended on a DIFFERENT answer than it began with -
+//the model answered, kept writing, and re-answered. 45/1,209 replies did this
+//in wave 33 (one the deciding play of a win, one a fatal reversal), and NO
+//shipped field could see it: commit_retracted only counts retractions that
+//reached the heuristic. Under the wave-34 protocol this population is
+//designed to vanish, so its going to zero is the change LANDING, not an
+//improvement - which is exactly why it has to be counted on both arms.
+static bool answerReplaced(const string& reply)
+{
+    string first, last;
+    int n = scanCodedAnswerLines(reply, NULL, &first, &last);
+    return n > 1 && first != last;
+}
+
+//coded_answers: how many line-leading coded answer lines the reply carried.
+//The denominator answer_replaced needs, and on its own the cheapest read of
+//whether the one-line protocol is being followed at all.
+static int codedAnswerCount(const string& reply)
+{
+    return scanCodedAnswerLines(reply, NULL, NULL, NULL);
+}
+
 //commit_retracted: TRUE when the reply DID emit a line-leading coded answer
 //(CHOICE:/ATTACK:/BLOCKS:/PUT:) and the retraction machinery then refused to
 //execute it - i.e. the model answered and then took its answer back, so the
@@ -2476,7 +2571,20 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (!mLastReasoning.empty())
     {
         rec["reasoning"] = mLastReasoning;
+        //The LENGTH, separately, because the 8000-token budget is a
+        //calibration value the owner expects to tune DOWN: the next budget is
+        //read off this distribution (p95/p99 by decision kind) against the
+        //reasoning_budget_hit rate, and doing that from the text field alone
+        //means re-measuring every record. reasoning_tokens is the server's own
+        //number when it reports one - the budget is denominated in tokens, so
+        //prefer it and fall back to chars.
+        rec["reasoning_chars"] = (long) mLastReasoning.size();
         mLastReasoning.clear();
+    }
+    if (mLastReasoningTokens >= 0)
+    {
+        rec["reasoning_tokens"] = mLastReasoningTokens;
+        mLastReasoningTokens = -1;
     }
     //The thinking budget bound on this decision and the answer had to be
     //forced out of the model (phase-2 close). Counting these is how the A/B
@@ -2504,12 +2612,32 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //the record count without inferring absence.
     rec["post_plan_overrun"] = postPlanOverrun(reply);
     rec["commit_retracted"] = commitRetracted(fallback, reply);
+    //WAVE-34 #1b(B), instrument only - no behaviour rides these. They measure
+    //the boundary the phenomenon actually has (post-ANSWER, not post-PLAN) and
+    //the first-vs-last-label divergence the shipped fields were blind to.
+    //Written on EVERY record, present or zero, so a seat review can divide by
+    //the record count without inferring absence.
+    rec["post_answer_overrun"] = postAnswerOverrun(reply);
+    rec["answer_replaced"] = answerReplaced(reply);
+    rec["coded_answers"] = codedAnswerCount(reply);
     //Assignments the combat validator pruned as illegal on this record.
     if (!mLastPrunedPairs.empty())
     {
         rec["pruned_pairs"] = mLastPrunedPairs;
         mLastPrunedPairs.clear();
     }
+    //dropped_assignments (blocker records only): every B:A pair the reply
+    //asked for that did NOT reach the battlefield - dropped by the PARSER as
+    //out-of-range or as a second attacker for a blocker already assigned, or
+    //pruned by the apply site as illegal. pruned_pairs saw only the second
+    //half, which is why it is written on ~one record in a corpus; the silent
+    //half is the one that costs games (deck139 vs105 s24: four "Illuna blocks
+    //X" pairs, three dropped by first-wins, 7 poison connected, game over).
+    //A record with 0 here is a reply whose whole intent was executed.
+    if (strcmp(kind, "blockers") == 0 && mLastDroppedAssignments >= 0)
+        rec["dropped_assignments"] = mLastDroppedAssignments;
+    if (strcmp(kind, "blockers") == 0)
+        mLastDroppedAssignments = -1;
     //Provenance for an answer recovered by prose-intent salvage (no coded
     //line existed) - so corpus review can audit every prose salvage.
     if (choiceSource)
@@ -7122,8 +7250,10 @@ static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * at
 static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
                             const vector<string> * optionNames);
 static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
-                                 const vector<string> * blockerNames, const vector<string> * attackerNames,
-                                 const vector<vector<int> > * legalPerBlocker);
+                                 const vector<string> * blockerNames = NULL,
+                                 const vector<string> * attackerNames = NULL,
+                                 const vector<vector<int> > * legalPerBlocker = NULL,
+                                 int * dropped = NULL);
 
 //Every line of a reply whose FIRST token (after markdown decoration) is the
 //given answer label, as the text AFTER the label to end of line, in reply
@@ -7953,9 +8083,10 @@ int AIPlayerGPT::chooseAttackers()
 //given). Ambiguous/no-match drops THAT assignment only; already-coded
 //assignments and the first-wins rule are respected.
 static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
-                                 const vector<string> * blockerNames = NULL,
-                                 const vector<string> * attackerNames = NULL,
-                                 const vector<vector<int> > * legalPerBlocker = NULL)
+                                 const vector<string> * blockerNames,
+                                 const vector<string> * attackerNames,
+                                 const vector<vector<int> > * legalPerBlocker,
+                                 int * dropped)
 {
     out.assign(nBlockers, 0); //0 = no block; else attacker number
     int pairs = 0;
@@ -7984,11 +8115,21 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                  || content.compare(j, 4, "NONE") == 0)
             a = 0;
         if (a < 0 || b < 1 || b > (int) nBlockers || a > (int) nAttackers)
+        {
+            //A well-formed "B#:" whose numbers name nobody on this board. It
+            //asked for something and got nothing - count it (wave-34 #1b(B)).
+            if (dropped && b >= 1)
+                (*dropped)++;
             continue;
+        }
         if (out[b - 1] != 0)
+        {
+            if (dropped)
+                (*dropped)++;
             continue; //first assignment wins: a creature blocks at most one
                       //attacker, so ignore a later "B1:A3" after "B1:A1"
                       //(the model occasionally double-assigns one blocker).
+        }
         out[b - 1] = a;
         pairs++;
     }
@@ -8036,7 +8177,15 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                 }
                 int bMatch = uniqueNameMatch(leftWords, *blockerNames, nBlockers, NULL, nameOrdinal(leftSeg));
                 if (bMatch < 0 || out[bMatch] != 0)
+                {
+                    //A named pair that resolves to a blocker already spoken
+                    //for is the gang-of-one shape: "Illuna blocks A, Illuna
+                    //blocks B, ..." - first-wins is correct, and the three
+                    //discarded intents were previously invisible.
+                    if (dropped && bMatch >= 0)
+                        (*dropped)++;
                     break; //no unique blocker, or already assigned by a code
+                }
                 const vector<int> * allowed = (legalPerBlocker && (size_t) bMatch < legalPerBlocker->size())
                                               ? &(*legalPerBlocker)[bMatch] : NULL;
                 //"#N" on the attacker half ("Saproling (1/1) #1") disambiguates
@@ -8054,7 +8203,11 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                 if (aMatch < 0 && allowed)
                     aMatch = uniqueNameMatch(rightWords, *attackerNames, nAttackers, NULL, nameOrdinal(rightSeg));
                 if (aMatch < 0)
+                {
+                    if (dropped)
+                        (*dropped)++;
                     break; //ambiguous / unmatched attacker -> drop this one only
+                }
                 out[bMatch] = aMatch + 1;
                 pairs++;
                 break;
@@ -8224,8 +8377,14 @@ int AIPlayerGPT::chooseBlockers()
                 if (attackers[k] == legal[i][j])
                     legalIdx[i].push_back((int) k);
     vector<int> pick;
+    //Per-decision assignment bookkeeping (wave-34 #1b(B)). Reset here so a
+    //previous combat's prunes can never leak onto this record, and count the
+    //parser's own silent drops - the half pruned_pairs never saw.
+    mLastPrunedPairs.clear();
+    mLastDroppedAssignments = 0;
     int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick,
-                                                             &blockerNames, &attackerNames, &legalIdx);
+                                                             &blockerNames, &attackerNames, &legalIdx,
+                                                             &mLastDroppedAssignments);
 
     //WAVE-29 N-18e: the reply committed a block in an early coded line, then
     //reasoned itself OUT of blocking but was cut off by the token ceiling before
@@ -8356,6 +8515,7 @@ int AIPlayerGPT::chooseBlockers()
             //it is the only legality gate the name-form parse relies on - so
             //record what it pruned rather than losing it (wave-33 N-152j).
             pruned += (pruned.empty() ? "" : "; ") + blockers[i]->name + " -> " + chosen->name;
+            mLastDroppedAssignments++;
             continue;
         }
         act.blocks.push_back(std::make_pair(blockers[i], chosen));
@@ -11239,6 +11399,89 @@ void AIPlayerGPT::runParseSelfTest()
         splitReasoningBlock(c5, r5);
         CHECK(postPlanOverrun(c5) == 0 && hasCodedAnswerLine(c5),
               "W34-1b the overrun/answer scanners measure the STRIPPED reply, not the thinking");
+    }
+
+    // ---- #1b(B): the fields that measure the boundary the phenomenon HAS ----
+    cout << "\n[W34-1b-B] post_answer_overrun / answer_replaced / coded_answers\n";
+    {
+        // The protocol-compliant reply: one answer, one plan, nothing after.
+        string clean = "CHOICE: 1 (Cast Mordor Muster {1}{b})\nPLAN: build the army.";
+        //The count excludes the answer line's own newline, matching
+        //post_plan_overrun's convention (its 69-char case above).
+        CHECK(postAnswerOverrun(clean) == (long) strlen("PLAN: build the army."),
+              "W34-1b-B a two-line compliant reply scores exactly its PLAN line as post-answer text");
+        CHECK(codedAnswerCount(clean) == 1 && !answerReplaced(clean),
+              "W34-1b-B one answer line, and it was never replaced");
+        // The deck116 shape the SHIPPED field could not see: a long tail after
+        // the answer with NO plan line at all. post_plan_overrun scores 0 here
+        // (nothing to overrun); post_answer_overrun scores the real tail.
+        string noPlanTail = "CHOICE: 2 (Cast Ichor Rats)\nWait, let me reconsider the whole board again.";
+        CHECK(postPlanOverrun(noPlanTail) == 0,
+              "W34-1b-B the shipped post_plan_overrun is blind to a no-PLAN tail (documented, not fixed)");
+        CHECK(postAnswerOverrun(noPlanTail) == (long) strlen("Wait, let me reconsider the whole board again."),
+              "W34-1b-B post_answer_overrun measures that same tail exactly");
+        // NEGATIVE: no coded answer at all -> 0, not a length. The empty and
+        // unparsed fallback classes already name that population.
+        CHECK(postAnswerOverrun("I think I will just hold everything back this turn.") == 0
+              && codedAnswerCount("I think I will just hold everything back this turn.") == 0,
+              "W34-1b-B NEGATIVE a reply with no coded answer scores 0 and counts 0");
+        // The deck36 vs146 s18 shape: answered, kept writing, re-answered
+        // DIFFERENTLY. 45/1,209 replies corpus-wide; no shipped field saw it.
+        string replaced = "CHOICE: 2 (Yotian Soldier)\nOn reflection the Memorial is stronger here.\n"
+                          "CHOICE: 1 (Akroma's Memorial)";
+        CHECK(codedAnswerCount(replaced) == 2 && answerReplaced(replaced),
+              "W34-1b-B a reply that ends on a different answer than it began with is answer_replaced");
+        // NEGATIVE: the model REPEATED its answer verbatim (a loop, not a
+        // change of mind) - two coded lines, but no replacement.
+        string repeated = "CHOICE: 1 (Cast Ichor Rats)\nblah blah\nCHOICE:  1  (Cast Ichor Rats)";
+        CHECK(codedAnswerCount(repeated) == 2 && !answerReplaced(repeated),
+              "W34-1b-B NEGATIVE a re-stated identical answer is not a replacement (whitespace-normalised)");
+        // The meters run on the STRIPPED reply: thinking that contains coded
+        // lines must not count as answers (the split happens upstream).
+        string think = "<think>CHOICE: 3 maybe? no.</think>CHOICE: 1 (Cast Mordor Muster)";
+        string r;
+        splitReasoningBlock(think, r);
+        CHECK(codedAnswerCount(think) == 1 && !answerReplaced(think) && postAnswerOverrun(think) == 0,
+              "W34-1b-B coded lines inside the thinking never count as answers");
+    }
+
+    // ---- #1b(B) + N-139y: dropped_assignments counts the SILENT half ----
+    cout << "\n[W34-1b-B] every block the reply asked for and did not get is counted\n";
+    {
+        vector<string> bn; bn.push_back("Illuna");
+        vector<string> an; an.push_back("Cystbearer"); an.push_back("Hand of the Praetors");
+        an.push_back("Ichorclaw Myr");
+        vector<vector<int> > legal(1); legal[0].push_back(0); legal[0].push_back(1); legal[0].push_back(2);
+        vector<int> out;
+        int dropped = 0;
+        // deck139 vs105 s24: ONE blocker named against FOUR attackers. First
+        // wins is correct; the three discarded intents were invisible, and
+        // 7 poison connected through them.
+        int pairs = parseBlockAssignments(
+            "BLOCKS: Illuna blocks Cystbearer, Illuna blocks Hand of the Praetors,"
+            " Illuna blocks Ichorclaw Myr", 1, 3, out, &bn, &an, &legal, &dropped);
+        cout << "     gang-of-one: pairs=" << pairs << " dropped=" << dropped << "\n";
+        CHECK(pairs == 1 && out[0] == 1 && dropped == 2,
+              "W34-1b-B the two blocks first-wins discarded are COUNTED, not silent");
+        // Coded form: a duplicate and an out-of-range blocker label.
+        vector<int> out2;
+        int dropped2 = 0;
+        int pairs2 = parseBlockAssignments("BLOCKS: B1:A1, B1:A2, B5:A1", 2, 2, out2,
+                                           NULL, NULL, NULL, &dropped2);
+        CHECK(pairs2 == 1 && out2[0] == 1 && dropped2 == 2,
+              "W34-1b-B a duplicate B# and an out-of-range B# each count as a dropped assignment");
+        // NEGATIVE: a clean multi-blocker declaration drops nothing.
+        vector<int> out3;
+        int dropped3 = 0;
+        int pairs3 = parseBlockAssignments("BLOCKS: B1:A2, B2:A1", 2, 2, out3, NULL, NULL, NULL, &dropped3);
+        CHECK(pairs3 == 2 && dropped3 == 0,
+              "W34-1b-B NEGATIVE a fully executable declaration drops nothing");
+        // NEGATIVE: an explicit "none" is a decision, not a drop.
+        vector<int> out4;
+        int dropped4 = 0;
+        parseBlockAssignments("BLOCKS: B1:none, B2:none", 2, 2, out4, NULL, NULL, NULL, &dropped4);
+        CHECK(dropped4 == 0,
+              "W34-1b-B NEGATIVE declining with B#:none is not a dropped assignment");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

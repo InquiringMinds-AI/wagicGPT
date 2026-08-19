@@ -510,6 +510,12 @@ private:
     //an answer; it triggers the forced close instead.
     bool mLastReasoningOnly;
     bool mLastFinishLength;  //the last reply stopped at the token cap
+    long mLastReasoningTokens; //the server's own reasoning-token count when it
+                             //reports one (-1 = it did not); the budget is in
+                             //tokens, so this is the calibration number
+    int mLastDroppedAssignments; //blocker seam: B:A pairs the reply asked for
+                             //that never reached the battlefield (parser drops
+                             //+ apply-site prunes). -1 = not a blocker record
     bool mLastBudgetHit;     //a forced close fired for this decision (translog
                              //reasoning_budget_hit) - the A/B's count of how
                              //often the budget actually bound
