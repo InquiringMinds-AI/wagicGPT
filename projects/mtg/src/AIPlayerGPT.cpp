@@ -1854,10 +1854,69 @@ static bool splitReasoningBlock(string& content, string& reasoning)
     return true;
 }
 
+static bool hasCodedAnswerLine(const string& content); //defined below
+
+//THE ANSWER CAN ARRIVE IN THE REASONING FIELD (live-probed against Spark's
+//vLLM 0.23.1rc1 + qwen35, 2026-08-19). The server's reasoning parser
+//classifies by GENERATED tokens only: on the forced close, the "</think>" we
+//PREFILL is never generated, so the parser never sees a thinking block end and
+//routes the ENTIRE phase-2 generation into `message.reasoning` with `content`
+//null - even though the injected close did its job on the MODEL, which
+//answered immediately ("\n\nCHOICE: 1"). Throwing that away would lose exactly
+//the decision the budget machinery exists to rescue.
+//
+//So: when content is empty and the reasoning field ENDS on a coded answer
+//line, that line is the answer. Anchored to the END deliberately - phase-1
+//mid-thinking text is full of answer-shaped candidates the model was still
+//weighing ("maybe CHOICE: 3? no, 15 mana"), and those must NEVER be parsed.
+//A reply cut off at the token cap (finish_reason == length) is mid-thought by
+//definition and is refused here whatever it looks like; the forced close is
+//the only path that recovers it.
+//Returns the answer text (from the last coded answer line onward), or empty.
+static string answerTailFromReasoning(const string& reasoning)
+{
+    size_t lineStart = 0, answerAt = string::npos;
+    while (lineStart <= reasoning.size())
+    {
+        size_t lineEnd = reasoning.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? reasoning.size() : lineEnd;
+        string line = reasoning.substr(lineStart, end - lineStart);
+        if (hasCodedAnswerLine(line))
+            answerAt = lineStart;
+        else
+        {
+            //Anything substantive AFTER the last coded line means the model
+            //kept thinking past it - that candidate was not its final word.
+            size_t sig = line.find_first_not_of(" \t\r");
+            if (sig != string::npos && answerAt != string::npos)
+                answerAt = string::npos;
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    if (answerAt == string::npos)
+        return string();
+    return reasoning.substr(answerAt);
+}
+
 bool AIPlayerGPT::asyncBusy() const
 {
     std::lock_guard<GptMutex> g(mAsyncState->mtx);
     return mAsyncState->status == 1;
+}
+
+//THE NO-ANSWER CLASSES ARE NOT ALL THE SAME FAILURE. "empty_reply" has always
+//meant TRANSPORT: nothing came back, or the endpoint is down - the reply body
+//was empty. With a server-side reasoning parser, a reply can arrive complete,
+//well-formed and paid for, with content null because the whole generation was
+//filed as thinking (a budget hit, or a model that spent its window without
+//committing). Calling that "empty_reply" would put a MODEL behaviour into the
+//bucket a seat review reads as an infrastructure fault - and the wave-34 A/B
+//is scored on exactly this distinction. reasoning_only names it.
+const char * AIPlayerGPT::noAnswerClass() const
+{
+    return mLastReasoning.empty() ? "empty_reply" : "reasoning_only";
 }
 
 int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
@@ -1877,6 +1936,12 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 mAsyncState->response.clear();
                 content.clear();
                 mLastReasoningOnly = false;
+                mLastFinishLength = false;
+                //Is this the forced close (phase 2)? Its slot key carries the
+                //tag, and the answer-recovery rule below is scoped by it.
+                const bool forceClosePoll =
+                    (userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0);
+                string fieldReasoning;
                 if (!body.empty())
                 {
                     try
@@ -1885,16 +1950,22 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                         json choice0 = reply["choices"][0];
                         content = choice0["message"]["content"].is_string()
                                   ? choice0["message"]["content"].get<string>() : string();
-                        //PATH 1: the server ran a reasoning parser for this
-                        //model - the thinking arrives in its own field and
-                        //`content` is already clean. Log it verbatim.
+                        //PATH 1: the server ran a reasoning parser - the
+                        //thinking arrives in its own field and `content` comes
+                        //back ALREADY stripped (no inline <think> reaches the
+                        //client at all). The field NAME is not settled across
+                        //builds: the OpenAI-compatible spelling is
+                        //reasoning_content, and Spark's vLLM 0.23.1rc1 answers
+                        //with plain `reasoning` (live-probed 2026-08-19). Read
+                        //both, in that order, rather than betting on one - the
+                        //cost of guessing wrong is a corpus with an empty
+                        //reasoning column and a blind seat review.
                         if (choice0["message"].contains("reasoning_content")
                             && choice0["message"]["reasoning_content"].is_string())
-                        {
-                            string rc = choice0["message"]["reasoning_content"].get<string>();
-                            if (!rc.empty())
-                                mLastReasoning = rc;
-                        }
+                            fieldReasoning = choice0["message"]["reasoning_content"].get<string>();
+                        else if (choice0["message"].contains("reasoning")
+                                 && choice0["message"]["reasoning"].is_string())
+                            fieldReasoning = choice0["message"]["reasoning"].get<string>();
                         //Decode stopped at the cap: with a thinking budget in
                         //force this is the expected phase-1 exit, and the
                         //unclosed-think test below decides whether the answer
@@ -1931,8 +2002,44 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                     if (!splitReasoningBlock(content, inlineReasoning))
                         mLastReasoningOnly = true;
                     if (!inlineReasoning.empty())
-                        mLastReasoning = inlineReasoning;
+                        fieldReasoning = inlineReasoning;
                 }
+                //ROUTING. With a parser active there is no inline block to
+                //test, so "the reply is reasoning-only" has a second, and on
+                //this stack the NORMAL, shape: content empty + reasoning
+                //non-empty. That is what a phase-1 budget hit looks like
+                //(finish_reason == "length"), and it is also what phase 2 looks
+                //like - except phase 2's reasoning IS the answer.
+                if (content.empty() && !fieldReasoning.empty())
+                {
+                    string tail = answerTailFromReasoning(fieldReasoning);
+                    if (forceClosePoll)
+                    {
+                        //Phase 2: the generation is the answer, wherever the
+                        //parser filed it. Keep phase 1's thinking as the
+                        //audit record rather than overwriting it with the
+                        //answer text.
+                        content = tail.empty() ? fieldReasoning : tail;
+                        fieldReasoning.clear();
+                    }
+                    else if (!mLastFinishLength && !tail.empty())
+                    {
+                        //Phase 1, ran to a natural stop, and its thinking ENDS
+                        //on a coded answer line: the model answered inside the
+                        //thinking window (no separate content). Take that line,
+                        //keep the thinking. A cap-truncated reply is refused
+                        //here - mid-thought candidates are not answers.
+                        content = tail;
+                    }
+                    else
+                    {
+                        //Genuinely no answer yet: reasoning-only. The forced
+                        //close is the recovery, not the heuristic.
+                        mLastReasoningOnly = true;
+                    }
+                }
+                if (!fieldReasoning.empty())
+                    mLastReasoning = fieldReasoning;
                 //Subscription preset: the backend prices every reply against a
                 //rolling plan window and reports the gauge on each response.
                 //Surface it when it moves - a player burning their ChatGPT plan
@@ -4144,6 +4251,13 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //The official OpenAI API is the exception: it REJECTS unknown top-level
     //parameters with a 400, which would silently degrade every decision to
     //the heuristic - omit the field there.
+    //Sent UNCONDITIONALLY (outside api.openai.com), in BOTH directions, and
+    //that matters more than it looks: live-probed 2026-08-19, this model's
+    //server-side default is thinking ON - a request with no
+    //chat_template_kwargs generated into the reasoning field. So the
+    //thinking-OFF arm of the A/B is only actually OFF because this line
+    //explicitly says false; omitting the field when the config says off would
+    //have run BOTH arms with thinking on and produced a null result.
     if (mEndpoint.find("api.openai.com") == string::npos)
         request["chat_template_kwargs"] = {{"enable_thinking", forceClose ? false : mThinking}};
     if (forceClose)
@@ -5319,7 +5433,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 mPassDeclineCount[isFetchCrackLine(shownLines[s])
                                   ? fetchLineKey(shownLines[s]) : shownLines[s]]++;
         {
-            const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
+            const char * fb = (choice >= 0) ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
                           : (choice == 0 ? string("pass") : string());
             writeTransLog("priority", userMsg, content, choice, index, chosen, fb, &shownLines);
@@ -5434,7 +5548,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     mAskCache[askKey] = choice;
     {
         bool valid = choice >= 1 && choice <= (int) options.size();
-        const char * fb = valid ? NULL : (content.empty() ? "empty_reply" : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
+        const char * fb = valid ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
         writeTransLog("ask", userMsg, content, choice, (int) options.size(),
                       valid ? options[choice - 1] : string(), fb, &options);
     }
@@ -8175,7 +8289,7 @@ int AIPlayerGPT::chooseAttackers()
     {
         //Unusable reply: the heuristic declares this turn's attack instead.
         writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
-                      "", content.empty() ? "empty_reply" : "unparsed_reply", &shownLines);
+                      "", content.empty() ? noAnswerClass() : "unparsed_reply", &shownLines);
         noticeFallback("model reply failed - the heuristic attacks", 5.0f);
         mAttacksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseAttackers();
@@ -8634,7 +8748,7 @@ int AIPlayerGPT::chooseBlockers()
     {
         //Unusable reply: the heuristic declares this combat instead.
         writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
-                      "", content.empty() ? "empty_reply" : "unparsed_reply", &shownLines);
+                      "", content.empty() ? noAnswerClass() : "unparsed_reply", &shownLines);
         noticeFallback("model reply failed - the heuristic blocks", 5.0f);
         mBlocksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseBlockers();
@@ -8961,7 +9075,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         //Unusable reply: the display falls back to its safe default (send
         //nothing to option one - every card keeps option two).
         writeTransLog("reveal", userMsg, content, result, (int) revealed.size(),
-                      "", content.empty() ? "empty_reply" : "unparsed_reply", &names);
+                      "", content.empty() ? noAnswerClass() : "unparsed_reply", &names);
         noticeFallback("model reply failed - reveal kept the default", 5.0f);
         return -1;
     }
@@ -9201,7 +9315,7 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottom(int need, int chosenSoFar, in
             mPregameBottomQueue.push_back(fill);
         }
         writeTransLog("bottom", userMsg, content, result, (int) hand.size(), chosen,
-                      result < 0 ? (content.empty() ? "empty_reply" : "unparsed_reply") : NULL,
+                      result < 0 ? (content.empty() ? noAnswerClass() : "unparsed_reply") : NULL,
                       &names);
         mPregameBottomAsked = true;
         mPregameBottomForMulls = need;
@@ -11731,6 +11845,36 @@ void AIPlayerGPT::runParseSelfTest()
         string keep = "+2/+2 until EOT (2/2 -> 4/4) targeting Grizzly Bears (printed 2/2)";
         CHECK(stripNarrationDecoration(keep) == keep,
               "W34-docket3 NEGATIVE stats, deltas and targets are identity and stay");
+    }
+
+    // ---- live-probe conformance: the answer can arrive in the REASONING field
+    cout << "\n[W34-probe] a coded answer at the END of the reasoning field is the answer\n";
+    {
+        // The verified phase-2 shape: prefill "<think>...</think>\n" + continue
+        // -> reasoning = "\n\nCHOICE: 1", content = null. The parser classifies
+        // by GENERATED tokens, so our injected close is invisible to it - but
+        // the model answered immediately, which is the point.
+        CHECK(answerTailFromReasoning("\n\nCHOICE: 1") == "CHOICE: 1",
+              "W34-probe the forced close's answer is recovered from the reasoning field");
+        // Answered inside the thinking window, then stopped: the trailing coded
+        // line is the answer.
+        string ended = "Option 2 trades badly.\nSo I take the Muster.\nCHOICE: 1 (Cast Mordor Muster)";
+        CHECK(answerTailFromReasoning(ended) == "CHOICE: 1 (Cast Mordor Muster)",
+              "W34-probe thinking that ENDS on a coded line yields that line");
+        // NEGATIVE, the one that matters: a mid-thinking candidate the model
+        // was still weighing is NOT an answer. This is the shape a phase-1
+        // budget hit produces, and parsing it would commit a choice the model
+        // explicitly talked itself out of.
+        string midThought = "Maybe CHOICE: 3 (Cast Emrakul)?\nNo wait, that is 15 mana and I have 4.";
+        CHECK(answerTailFromReasoning(midThought).empty(),
+              "W34-probe NEGATIVE a candidate followed by more thinking is never an answer");
+        // NEGATIVE: thinking with no coded line at all yields nothing.
+        CHECK(answerTailFromReasoning("I count four lands and a Bowmasters in hand.").empty(),
+              "W34-probe NEGATIVE reasoning with no coded line yields no answer");
+        // Two coded lines with nothing after: last wins, as everywhere else.
+        string two = "CHOICE: 2 (Yotian Soldier)\nCHOICE: 1 (Akroma's Memorial)";
+        CHECK(answerTailFromReasoning(two) == "CHOICE: 1 (Akroma's Memorial)",
+              "W34-probe the LAST coded line wins here too");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

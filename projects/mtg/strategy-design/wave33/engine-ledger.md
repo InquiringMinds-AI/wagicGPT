@@ -186,6 +186,40 @@ position it replaced.** His derivation, and then his override of it:
    server's own count when it reports one — the budget is denominated in tokens, so the
    next budget is read off *this* distribution: p95/p99 by decision kind against the
    `reasoning_budget_hit` rate), and `reasoning_budget_hit` when a forced close fired.
+
+**LIVE-PROBED against the real endpoint (Spark vLLM 0.23.1rc1 + qwen35, 2026-08-19) —
+three facts that overturned plausible defaults, and what each one changed:**
+
+- **The field is `message.reasoning`, not `reasoning_content`**, and with the parser active
+  `content` arrives ALREADY stripped — no inline `<think>` ever reaches the client. Capture
+  now reads `reasoning_content` → `reasoning` → inline `<think>` fallback, in that order.
+  Betting on the OpenAI spelling alone would have produced a corpus with an empty reasoning
+  column and a blind seat review — the exact failure #1b exists to prevent.
+- **Server-side default thinking is ON for this model** (a request with no
+  `chat_template_kwargs` generated into `reasoning`). So the thinking-OFF arm is only OFF
+  because the client sends `enable_thinking: false` EXPLICITLY; it does, unconditionally
+  outside api.openai.com. Omitting the field on the OFF arm would have run both arms with
+  thinking on and produced a null A/B.
+- **The reasoning parser classifies by GENERATED tokens only.** `continue_final_message` is
+  accepted, but our PREFILLED `</think>` is never generated, so the whole phase-2 generation
+  lands in `reasoning` with `content` null (verified: prefill + continue → `reasoning` =
+  `"\n\nCHOICE: 1"`). The injected close still does its job on the MODEL — it answered
+  immediately — just not on the server's field routing. So the answer candidate is `content`
+  when non-empty, else the tail of `reasoning` **from its last coded answer line, and only
+  when nothing substantive follows that line**. Anchored to the end deliberately: phase-1
+  mid-thinking text is full of candidates the model was still weighing, and a reply that
+  stopped at the cap (`finish_reason == "length"`) is mid-thought by definition and is
+  refused whatever it looks like.
+- Consequences recorded: a **phase-1 budget hit** on this build reads as
+  `finish_reason == "length"` + empty content + non-empty reasoning (there is no inline
+  block to test, so that shape — not an unclosed `<think>` — is the normal detector).
+  `usage` carries **no** `reasoning_tokens` on this build (prompt/completion/total only, and
+  `completion_tokens` covers thinking+reply combined), so `reasoning_chars` is the working
+  length metric; the `reasoning_tokens` read stays as forward compatibility.
+- **New fallback class `reasoning_only`.** `empty_reply` has always meant TRANSPORT — nothing
+  came back. A reply that arrives complete and paid for with `content` null because the whole
+  generation was filed as thinking is a MODEL behaviour, and scoring it as an endpoint fault
+  would corrupt the one distinction the A/B turns on. Seats read `reasoning_only` separately.
 4. **Timeout ≥ the full two-phase worst case.** The HTTP timeout is the ONLY watchdog that
    falls back to the heuristic (the patience window raises a human prompt and never decides
    on its own — verified, and it is gated on a human seat so self-play never sees it).

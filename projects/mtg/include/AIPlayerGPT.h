@@ -505,6 +505,11 @@ private:
     //or from an inline <think> block, whichever the server produced. Consumed
     //(cleared) by the translog write, like mLastLatencyMs.
     string mLastReasoning;
+    //"empty_reply" (transport: nothing came back) vs "reasoning_only" (a
+    //complete reply whose whole generation was filed as thinking). Same
+    //outcome - the heuristic answers - but a seat review must not read a model
+    //behaviour as an endpoint fault.
+    const char * noAnswerClass() const;
     //The last reply was REASONING-ONLY: an unclosed <think>, i.e. the thinking
     //budget (or max_tokens) cut the reply before any answer. Never parsed as
     //an answer; it triggers the forced close instead.
