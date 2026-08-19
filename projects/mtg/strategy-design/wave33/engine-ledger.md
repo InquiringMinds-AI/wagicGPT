@@ -154,3 +154,44 @@ capping think tokens and injecting the close-of-thinking marker so the model mus
 answer from what it has; the Codex backend's effort tiers are the analogous knob).
 Per the generous-defaults rule this ships UNBOUNDED; the budget is the documented
 lever to pull only if the A/B shows runaway native thinking, not a starting clamp.
+
+**SUPERSEDED — OWNER RULING, 2026-08-19 (later the same day, during wave-34 step 1).
+The budget is BOUNDED FROM THE START; the paragraph above stands only as the
+position it replaced.** His derivation, and then his override of it:
+
+- **t** = the time bound expressed as tokens = `WAGIC_GPT_TIMEOUT 240s x ~30 tok/s` = **7200**
+- **p** = max expected PLAN = p95 592 chars => **200 tokens**
+- **c** = the coded choice line = p95 74 chars => **30 tokens**
+- **a** = t - p - c = **6970**;  **b = 1.5a ≈ 10450 tokens** of reasoning budget
+- **his override on that number: "oof. thats a lot. lets make it 8000"** — so the SHIPPED
+  starting budget is a flat **8000**, and it is explicitly a **first-round CALIBRATION
+  value**: *"we'll almost certainly tune this lower... one round with this budget should
+  give us a better idea of where the budget limit should actually be."*
+
+**Shipped in wave-34 step 1** (`AIPlayerGPT.cpp`, `GptConfig.*`):
+
+1. `reasoning_budget=` in endpoints.txt / `WAGIC_GPT_REASONING_BUDGET`, default **8000**
+   when thinking is ON, 0-or-less = unbounded. Thinking OFF is untouched in every respect.
+2. **Budget-then-FORCE-ANSWER, two-phase** — a bare `max_tokens` truncation that loses the
+   answer is not acceptable. Phase 1 caps at `budget + 400` (the answer reserve: p95 PLAN
+   200 + choice line 30 + margin). If that reply comes back with an **UNCLOSED `<think>`**,
+   phase 2 re-sends the same decision with the model's own truncated thinking as an
+   **assistant prefill** with `</think>` injected and a 400-token cap, so it must answer
+   from what it has. Qwen's documented budget-forcing pattern, expressed through vLLM's
+   `continue_final_message` rather than a raw `/v1/completions` prompt render — the client
+   holds no copy of the chat template, and a mis-rendered prompt would be a silent quality
+   change. Scoped to endpoints that accept a prefill (not Codex, not OpenRouter, not
+   api.openai.com — those hide reasoning entirely and have nothing to close).
+3. **Translog:** `reasoning` (verbatim), `reasoning_chars`, `reasoning_tokens` (the
+   server's own count when it reports one — the budget is denominated in tokens, so the
+   next budget is read off *this* distribution: p95/p99 by decision kind against the
+   `reasoning_budget_hit` rate), and `reasoning_budget_hit` when a forced close fired.
+4. **Timeout ≥ the full two-phase worst case.** The HTTP timeout is the ONLY watchdog that
+   falls back to the heuristic (the patience window raises a human prompt and never decides
+   on its own — verified, and it is gated on a human seat so self-play never sees it).
+   Worst case at ~30 tok/s: phase 1 = prefill (~10-20s) + (8000 + ~230) tokens ≈ **295s**;
+   a budget hit adds phase 2 = re-prefill of prompt + thinking (~15-25s) + ~400 tokens
+   ≈ **40s**; total ≈ **335-360s**. Thinking-mode default is therefore **420s**, a margin
+   rather than a shave, and `tools/selfplay-harness.sh` — which pinned
+   `WAGIC_GPT_TIMEOUT=240` unconditionally and would have overridden it for the whole A/B
+   corpus — now defaults to 420 under `--thinking`. Explicit env/config still wins.
