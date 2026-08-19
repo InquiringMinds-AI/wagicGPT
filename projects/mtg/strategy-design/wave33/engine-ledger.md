@@ -338,3 +338,16 @@ full Q->A echo emitter ("Pre-game mulligan decision (London mulligan). ... ? -> 
 this hand" → "You kept your opening hand"); (7) token creation should attribute its
 creator ("March from the Black Gate created a 0/0 Orc Army token" vs bare
 "created -> battlefield").
+
+**OWNER DOCTRINE — zone attention + the log's zone duty (2026-08-19):** primary focus
+(rendered in CURRENT SITUATION, always): STACK, BATTLEFIELD, both LIFE totals, LIBRARY
+counts, HAND (own contents / opponent count). Graveyard and exile are NOT rendered in
+state — "the historical log is the optimal method to present graveyard and exile
+state" (conditional-attention zones, consulted only when interacting). CONSEQUENCES for
+the wave-35 narration rewrite: (a) death/discard/exile/countered events are
+LOAD-BEARING zone records, not flavor — completeness of those emitters is a zone-
+integrity requirement; (b) the 24k narration trim drops early zone events — when the
+trim fires, the trim marker must carry a compact zone digest of what fell off. PARKED
+(owner's road-not-taken, cache-motivated): per-card draw-chance/held-chance rendering;
+note if ever revisited that CURRENT SITUATION is already the uncached tail, so a
+compact remaining-copies form costs tail tokens, not cache.
