@@ -328,3 +328,13 @@ shapes change); the information content of consumed decisions is KEPT (what was
 decided + its consequence), only the register changes. Validate on the wave-35 corpus:
 zero "A choice is required" / "TARGET CHOICE" / "->" zone-arrow strings in any GAME
 LOG section.
+ADDENDUM (full-file audit of the same example): (4) `stack -> graveyard` is AMBIGUOUS
+between resolved and countered — identical line for both outcomes; the register fix
+must distinguish ("<X> resolved" / "<X> was countered") — this is informational, not
+stylistic; (5) counter-source attribution is path-inconsistent (line 42 has
+[from March from the Black Gate]; lines 65/67, same Army, other trigger paths, have NO
+source) — sweep all WEventCounters narration paths; (6) the mulligan ask is another
+full Q->A echo emitter ("Pre-game mulligan decision (London mulligan). ... ? -> Keep
+this hand" → "You kept your opening hand"); (7) token creation should attribute its
+creator ("March from the Black Gate created a 0/0 Orc Army token" vs bare
+"created -> battlefield").
