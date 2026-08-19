@@ -288,3 +288,16 @@ measured under a 120s HTTP timeout and its fallbacks were timeout artifacts; und
 generous guards the quality cost may be zero. Validate on the first high-j corpus:
 fallback rate + decision-quality spot-check vs a -j 3 baseline before adopting as
 standing.
+
+**OWNER METHOD — derive the wall-clock guard from measured throughput (2026-08-19):**
+guard(j) = worst_case_response_tokens / per_stream_tok_s_p10(j) x 1.5, where
+worst_case = reasoning_budget + reply (p95 PLAN+answer) + phase-2 (~630 tok), and the
+p10 (slowest-decile) per-stream rate is MEASURED at the target concurrency, never
+assumed. Live wave-34 measurement at -j 3 (61 decisions): p50 36.5 tok/s, p10 19.8
+=> guard(3) ~= 671s. FINDING: the hand-set 420s thinking timeout is BELOW the derived
+guard — a full-budget decision at slow-decile rate can fall back mid-thinking (rare:
+budget_hit ~1/36 in the probe; visible as counted fallbacks). Wave-35: set the timeout
+FROM this formula at whatever -j is chosen (measure tok/s(j) first — a short sweep or
+the previous corpus's translogs); per-stream p10 will drop as -j rises, so guard scales
+up as concurrency scales up. The tuned (smaller) budget shrinks worst_case and pulls
+the guard back down — the three knobs move together.
