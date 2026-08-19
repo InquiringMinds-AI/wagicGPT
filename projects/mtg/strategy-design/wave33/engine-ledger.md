@@ -362,3 +362,9 @@ decisions where the pilot reasoned wrongly/expensively about draw odds, remainin
 copies, or topdecks, where a rendered count would have changed the outcome (note the
 info is DERIVABLE today: decklists are in the system prompt, deaths/discards in the
 log — this is a representation shortcut, priced by observed derivation failures).
+OWNER PRIOR ON THE MEASUREMENT (2026-08-19, his Magic judgment — binds the reading):
+"you can play at a very high level of magic without a firm grasp of the probabilities
+of your deck mid game. its more important during construction, but during play it's
+just a sliver of the pie." So the ADOPTION BAR is HIGH: recurring GAME-COSTING misses,
+not the mere presence of imperfect draw reasoning (which reviewers will always find).
+Expected outcome: stays parked.
