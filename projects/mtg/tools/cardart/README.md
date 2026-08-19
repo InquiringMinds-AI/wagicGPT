@@ -1,20 +1,23 @@
 # cardart — card-art res-set toolkit
 
-One pipeline: **fetch once into the master pool, then pack per platform.**
+One pipeline: **fetch once into a local pool, then pack per platform.**
 
 ```
 ./fetch-art.py                 # fill/refresh the pool from Scryfall (skip-existing)
-./pack-psp.sh                  # -> ~/Projects/wagic-card-packs/psp/sets/<SET>/<SET>.zip
+./pack-psp.sh                  # -> ./wagic-card-packs/psp/sets/<SET>/<SET>.zip
 ./pack-vita.sh                 #    same layout, per platform
 ./pack-android.sh
 ./pack-windows.sh
 ./pack-linux.sh
 ```
 
+Requirements: `python3` (stdlib only) for the fetcher; `bash`, ImageMagick
+(`magick`) and `zip` for the packers.
+
 Each pack zip carries full art (`<id>.jpg`) **and** thumbnails
 (`thumbnails/<id>.jpg`) and drops into the platform's User dir as
-`sets/<SET>/<SET>.zip` — the engine's AttachZipFile path finds it with no
-code change. Thumbnails are always derived from the full-size pool art.
+`sets/<SET>/<SET>.zip` — the engine reads art from inside the zip with no
+further setup. Thumbnails are always derived from the full-size pool art.
 
 | platform | full art | thumb | why |
 |---|---|---|---|
@@ -24,23 +27,29 @@ code change. Thumbnails are always derived from the full-size pool art.
 | windows | pool copy | 114x166 q85 | no recompress loss on desktop |
 | linux | pool copy | 114x166 q85 | ditto |
 
-- Pool: `projects/mtg/bin/User/sets[/sets.hidden]/<SET>/<id>.jpg` (auto-detected;
-  the dev pool hides as `sets.hidden` so the dev build boots artless).
-- Fetch source: Scryfall (WotC Fan Content Policy), by multiverse id from
-  `Res/sets/<SET>/_cards.dat`, `image_uris.large`, throttled >=120 ms/request.
-  Foreign-only ids borrow the English printing by name; no-English cards skip
-  (engine text fallback). Misses land in `misses.txt`.
-- Id->URL map: reuses `User/_bulk_map_large.json` from the 2026-08 campaign;
-  `--rebuild-map` streams a fresh ~2 GB Scryfall bulk file (needed when new
-  sets are added).
-- Useful env: `SETS="10E TSP"` (whitelist), `SRC`/`OUT`, `JOBS`,
-  `FULL_GEOM`/`FULL_Q`/`THUMB_GEOM`/`THUMB_Q`. Already-built set zips are
-  skipped — delete a zip to rebuild it.
-- Device copy: `psp-work/fix-card-zips.sh` (PSP stick), `deploy-vita.sh`/FTP
-  (Vita), adb push (Android).
+- Pool location: auto-detected at `projects/mtg/bin/User/sets[/sets.hidden]`
+  relative to the repo root, or point anywhere with `--pool` (fetcher) /
+  `POOL_BASE` (packers). Layout: `<SET>/<id>.jpg`, full size.
+- Fetch source: Scryfall (per the WotC Fan Content Policy), by multiverse id
+  from `Res/sets/<SET>/_cards.dat`, `image_uris.large`, throttled
+  >=120 ms/request — leave the throttle alone, it's the polite minimum.
+  Foreign-only ids borrow the English printing by name; cards with no English
+  printing on Scryfall are skipped (the engine renders a text frame).
+  Misses are listed in `misses.txt` in the pool.
+- Id->URL map: a local cache (`_bulk_map_large.json`) maps multiverse ids to
+  image URLs in bulk. Without it the fetcher resolves ids one request at a
+  time, which works but is slower; `--rebuild-map` streams Scryfall's bulk
+  data file (~2 GB, not kept) to build it — worth it for a full-pool run,
+  and needed again only when new sets appear.
+- Useful env for packers: `SETS="10E TSP"` (whitelist), `POOL_BASE`/`SRC`,
+  `OUT`, `JOBS`, `FULL_GEOM`/`FULL_Q`/`THUMB_GEOM`/`THUMB_Q`. Already-built
+  set zips are skipped — delete a zip to rebuild it.
+- Getting packs onto a device: copy each `sets/<SET>/<SET>.zip` into the
+  platform's user tree keeping the layout — `PSP/GAME/WAGIC/User/sets/` (PSP,
+  USB), `ux0:data/Wagic/sets/` (Vita, FTP), `/sdcard/Wagic/User/sets/`
+  (Android). Desktop can also skip packing entirely: fetch straight into the
+  install's `User/sets` and the loose jpgs render as-is.
 
-Supersedes `psp-work/make-psp-cards.sh` + `make-vita-cards.sh` (kept; their
-headers hold the full geometry derivations).
-
-**WOTC-derived scans: local + his devices only. Never committed, never in a
-release artifact.**
+**Card scans are WotC-derived content: fetch them for your own use. They are
+never committed to this repository and never included in a release
+artifact.**
