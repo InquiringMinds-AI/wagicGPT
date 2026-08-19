@@ -123,6 +123,14 @@ static string gptUserRootImpl()
     return "User";
 #else
     const char * home = getenv("HOME");
+#ifdef _WIN32
+    //Native Windows rarely sets HOME (Wine/Proton passes it through, cmd.exe
+    //does not) - an empty root would silently disable config saves AND
+    //gpt-log.txt, making the LLM opponent look unconfigurable. USERPROFILE
+    //is the Windows spelling of the same directory.
+    if (!home || !*home)
+        home = getenv("USERPROFILE");
+#endif
     return home ? string(home) + "/.Wagic" : string();
 #endif
 }
