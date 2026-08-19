@@ -56,6 +56,13 @@ public:
     string nameOrig;
     string backSide;
     string partner;
+    //N-152k: `manaCost` is a VALUE member, so every card owns a cost object and
+    //an absent `mana=` line is indistinguishable from `mana={0}` by inspecting
+    //the object. This flag records whether a printed mana cost was ever parsed
+    //onto this card - false for transformed back faces, day/night designations
+    //and tokens, true for a genuine {0} card (the Moxen). The render layer needs
+    //the distinction: "{0}" on a card that HAS no cost is a false fact.
+    bool hasPrintedManaCost;
     int init();
 
     uint8_t colors;

@@ -516,10 +516,24 @@ string keywordList(MTGCardInstance * card)
 //Lands and tokens are excluded: neither is cast for a mana cost, and "{0}" on a
 //Forest would be a new false fact rather than a restored one.
 //Pure core, so the {0} restoration is provable in PARSETEST without a card.
-string manaCostTokenText(const string& costString, bool castForMana)
+//N-152k (wave-33 deck152/deck158/deck139, 194 false renders): the N-36b guard
+//restored "{0}" from a FALSY converted cost, but the engine gives every card a
+//ManaCost VALUE member, so "cost object exists and is zero" (a Mox: 222 correct
+//renders) and "this card never had a printed cost at all" (a transformed back
+//face, a day/night designation: 166 false renders at one seat) reach the emitter
+//identically. The data separates them cleanly - Moxen carry `mana={0}` in the
+//primitives, back faces and designations carry no `mana=` line - so the parser
+//records that fact (CardPrimitive::hasPrintedManaCost) and the emitter reads it.
+//"{0}" means "castable for free" to the pilot, which on a back face contradicts
+//the Flip Side annotation three lines away; the truthful render for a card with
+//no printed cost is NO cost token (never a deleted-token silence on a card that
+//HAS one - that is N-36b, which this must not regress).
+string manaCostTokenText(const string& costString, bool castForMana, bool hasPrintedCost)
 {
     if (!costString.empty())
         return " " + costString;
+    if (!hasPrintedCost)
+        return "";
     return castForMana ? " {0}" : "";
 }
 
@@ -531,7 +545,8 @@ string manaCostToken(MTGCardInstance * card)
     if (!cost)
         return "";
     //carries its own braces; "" for a zero cost, "{x}" for an X-only cost
-    return manaCostTokenText(cost->toString(), !card->isLand() && !card->isToken);
+    return manaCostTokenText(cost->toString(), !card->isLand() && !card->isToken,
+                             card->hasPrintedManaCost);
 }
 
 //Primary type for non-creature option/target lines (a discard pick needs
@@ -10648,13 +10663,13 @@ void AIPlayerGPT::runParseSelfTest()
     // ---- N-36b: a {0} cost is a cost, not an absence ----
     cout << "\n[W33-N36b] {0} renders instead of being deleted by the falsy-zero guard\n";
     {
-        CHECK(manaCostTokenText("{2}{b}", true) == " {2}{b}",
+        CHECK(manaCostTokenText("{2}{b}", true, true) == " {2}{b}",
               "W33-N36b an ordinary cost renders unchanged");
-        CHECK(manaCostTokenText("", true) == " {0}",
+        CHECK(manaCostTokenText("", true, true) == " {0}",
               "W33-N36b an EMPTY cost string on a castable card renders {0}");
-        CHECK(manaCostTokenText("", false) == "",
+        CHECK(manaCostTokenText("", false, true) == "",
               "W33-N36b a land/token gets no synthesized {0}");
-        CHECK(manaCostTokenText("{x}", true) == " {x}",
+        CHECK(manaCostTokenText("{x}", true, true) == " {x}",
               "W33-N36b an X-only cost (also converted-0) survives as {x}, not {0}");
         // Echo shape: a Mox cast line now carries a {0} the reply may echo back.
         vector<string> opts;
@@ -10666,6 +10681,34 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(c == 1 && !stale, "W33-N36b a cast echo carrying the new {0} token still binds");
         int c2 = parseChoice("2 (Cast nothing right now)", 2, &opts, &stale, NULL);
         CHECK(c2 == 2 && !stale, "W33-N36b the decline option is unaffected by the {0} token");
+    }
+
+    // ---- N-152k: a cost that is ABSENT is not a cost of zero ----
+    cout << "\n[W34-N152k] no printed cost renders no token; a real {0} still renders\n";
+    {
+        // POSITIVE (the branch that was broken): a transformed back face and a
+        // day/night designation have NO `mana=` line at all - no cost token.
+        CHECK(manaCostTokenText("", true, /*hasPrintedCost*/false) == "",
+              "W34-N152k a transformed back face (no printed cost) renders NO {0}");
+        CHECK(manaCostTokenText("", false, false) == "",
+              "W34-N152k a designation marker renders NO {0}");
+        // NEGATIVE GUARD (the i5/N-36b branch that works and must not regress).
+        CHECK(manaCostTokenText("", true, true) == " {0}",
+              "W34-N152k a Mox (mana={0}, a real zero cost) still renders {0}");
+        // A card with no printed cost that somehow carries a cost STRING keeps
+        // the string: a rendered fact beats the flag (never delete a real cost).
+        CHECK(manaCostTokenText("{1}{g}", true, false) == " {1}{g}",
+              "W34-N152k a non-empty cost string is never suppressed by the flag");
+        // Echo shape: the battlefield line for a back face is now bare, and a
+        // reply echoing the bare name must still bind its option.
+        vector<string> opts;
+        opts.push_back("Moonrage Brute (3/3) [first strike, nightbound]");
+        opts.push_back("Mox Jet {0} [artifact]");
+        bool stale = false;
+        int c = parseChoice("1 (Moonrage Brute)", 2, &opts, &stale, NULL);
+        CHECK(c == 1 && !stale, "W34-N152k a bare-name echo binds the cost-less back face option");
+        int c2 = parseChoice("2 (Mox Jet {0})", 2, &opts, &stale, NULL);
+        CHECK(c2 == 2 && !stale, "W34-N152k the {0} Mox option still binds by its cost token");
     }
 
     // ---- N-152d layer 2: the printed-face discriminator ----

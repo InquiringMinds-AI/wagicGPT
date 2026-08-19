@@ -188,6 +188,7 @@ void MTGCardInstance::copy(MTGCardInstance * card, bool nolegend)
     colors = data->colors;
 
     manaCost.copy(data->getManaCost());
+    hasPrintedManaCost = data->hasPrintedManaCost; //N-152k: travels with the cost
 
     setText(data->text); //The text is retrieved from the data anyways
     setName(data->name);

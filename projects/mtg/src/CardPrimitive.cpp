@@ -104,6 +104,7 @@ CardPrimitive::CardPrimitive(CardPrimitive * source)
         types.push_back(source->types[i]);
     colors = source->colors;
     manaCost.copy(source->getManaCost());
+    hasPrintedManaCost = source->hasPrintedManaCost; //N-152k: travels with the cost
     //reducedCost.copy(source->getReducedManaCost());
     //increasedCost.copy(source->getIncreasedManaCost());
     if(source->getManaCost()->getAlternative())
@@ -157,6 +158,7 @@ int CardPrimitive::init()
 
     power = 0;
     toughness = 0;
+    hasPrintedManaCost = false; //N-152k: set only by setManaCost / copy
     return 1;
 }
 
@@ -277,6 +279,7 @@ int CardPrimitive::countColors()
 
 void CardPrimitive::setManaCost(const string& s)
 {
+    hasPrintedManaCost = true; //N-152k: a `mana=` line exists on this card
     ManaCost::parseManaCost(s, &manaCost);
     for (int i = Constants::MTG_COLOR_GREEN; i <= Constants::MTG_COLOR_WHITE; i++)
     {
