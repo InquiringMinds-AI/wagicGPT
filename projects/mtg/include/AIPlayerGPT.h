@@ -180,6 +180,20 @@ protected:
     //a different quantity once the count is clamped - and the model argued
     //with the contradiction out loud (200 s, 12.5k chars, one ask).
     int  mPregameMullsSeen;
+    //N-158r: TRUE only while one of the three pregame asks (mulligan, London
+    //bottoming, leyline) is assembling its prompt. The hand-only pregame frame
+    //is gated on THIS, not on observer->turn - the turn counter is still 0
+    //through the on-the-play player's whole first turn, so its first land drop
+    //was served the opening-hand frame with no board and no mana line.
+    //Set/cleared by PregameAskScope; the asks are re-entered every tick while a
+    //model call is in flight, so the flag is re-armed on each poll.
+    bool mInPregameAsk;
+    struct PregameAskScope
+    {
+        AIPlayerGPT * p;
+        PregameAskScope(AIPlayerGPT * _p) : p(_p) { p->mInPregameAsk = true; }
+        ~PregameAskScope() { p->mInPregameAsk = false; }
+    };
     string buildPregameBottomAskText(const vector<MTGCardInstance*>& hand, int need,
                                      int alreadyBottomed);
 
