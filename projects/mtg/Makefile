@@ -130,7 +130,9 @@ log: CXXFLAGS += -DDOLOG
 ifeq ($(TARGET_ARCHITECTURE),psp)
 include $(PSPSDK)/lib/build.mak
 
-EXTRA_CLEAN += PrecompiledHeader.h.gch ../../projects/mtg/include/PrecompiledHeader.h.gch
+#A stale deps/%.d that under-lists headers silently skips rebuilds - the same
+#incremental-taint class as the stale archives. Clean must take the dep files.
+EXTRA_CLEAN += PrecompiledHeader.h.gch ../../projects/mtg/include/PrecompiledHeader.h.gch $(DEPS)
 
 log: all
 debug: all

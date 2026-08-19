@@ -134,9 +134,10 @@ $(TARGET_LIB): $(OBJS)
 	$(AR) cru $(TARGET_LIB) $(OBJS)
 
 #build.mak's clean removes $(FINAL_TARGET) and $(OBJS) but knows nothing about
-#the hge archive; EXTRA_CLEAN is its extension point. With this, `make clean`
-#inside the pspdev container is a REAL clean - no more hand-rm'ing .a files.
-EXTRA_CLEAN += $(TARGET_HGE)
+#the hge archive OR its objects; EXTRA_CLEAN is its extension point. With
+#this, `make clean` inside the pspdev container is a REAL clean - no more
+#hand-rm'ing .a or .o files.
+EXTRA_CLEAN += $(TARGET_HGE) $(HGE_OBJS)
 endif
 
 ifeq ($(TARGET_ARCHITECTURE),linux)
