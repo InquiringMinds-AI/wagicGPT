@@ -15,6 +15,16 @@ and plays the answer. If the model is slow, wrong, or unreachable, the built-in
 heuristic AI answers instead, per decision. The game never blocks on the
 network.
 
+The fork isn't only the opponent — playing against something smart made the
+rough edges of playing *at all* obvious, so the GUI has picked up a stack of
+quality-of-life changes over stock Wagic: casting auto-taps the right lands
+(exact payment, abilities too, with a preview of what's about to tap), cards
+you can actually afford are marked as such, priority auto-passes through the
+phases where you have nothing to do instead of stopping to ask, prompts show
+the buttons that are really bound to the actions, and the game paces combat
+so a human defender isn't rushed by an AI attacker. If you knew old Wagic:
+it's the same game with much less clicking-to-say-nothing.
+
 The mental model for everything below:
 
 ```
