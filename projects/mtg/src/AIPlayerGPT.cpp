@@ -1856,6 +1856,27 @@ static bool splitReasoningBlock(string& content, string& reasoning)
 
 static bool hasCodedAnswerLine(const string& content); //defined below
 
+//HIDDEN REASONING IS NORMAL, NOT A FAULT. Some providers reason and never
+//return the trace: OpenAI and Anthropic withhold raw chain-of-thought as
+//policy, and OpenRouter can hide it depending on the upstream - which this
+//project has already been bitten by once, as the 40s mystery latency behind a
+//140-token answer (71f4f615c). The reply is complete and correct; only the
+//audit copy is missing.
+//
+//So this shape - reasoning REQUESTED, content non-empty, no reasoning field
+//anywhere - parses exactly as the thinking-off path does, and is recorded as
+//`reasoning_hidden` so review can tell "reasoned invisibly" from "did not
+//reason". It is the INVERSE of reasoning_only (content empty, reasoning
+//present) and must never be confused with it. Nothing in this client gates
+//parsing, fallback or any assertion on reasoning being present: the "reasoning
+//present at both seats before the corpus runs" rule is a Spark/dev-loop
+//precondition for the A/B, not a client invariant - encoding it here would
+//turn every OpenAI/Anthropic user's game into a heuristic-only game.
+static bool reasoningHiddenShape(bool requested, const string& content, const string& reasoning)
+{
+    return requested && !content.empty() && reasoning.empty();
+}
+
 //THE ANSWER CAN ARRIVE IN THE REASONING FIELD (live-probed against Spark's
 //vLLM 0.23.1rc1 + qwen35, 2026-08-19). The server's reasoning parser
 //classifies by GENERATED tokens only: on the forced close, the "</think>" we
@@ -1914,6 +1935,19 @@ bool AIPlayerGPT::asyncBusy() const
 //committing). Calling that "empty_reply" would put a MODEL behaviour into the
 //bucket a seat review reads as an infrastructure fault - and the wave-34 A/B
 //is scored on exactly this distinction. reasoning_only names it.
+//Did THIS endpoint's request ask for reasoning at all? The thinking flag
+//covers the vLLM/llama.cpp/OpenRouter families; the subscription (Codex)
+//backend has no thinking flag and instead carries an effort tier, where unset
+//means the built-in default (low) and only an explicit "none" is off. Used
+//solely to tell a WITHHELD trace from a reply that never reasoned - never to
+//gate parsing.
+bool AIPlayerGPT::reasoningRequested() const
+{
+    if (gptCodexEndpoint(mEndpoint))
+        return mReasoningEffort != "none";
+    return mThinking;
+}
+
 const char * AIPlayerGPT::noAnswerClass() const
 {
     return mLastReasoning.empty() ? "empty_reply" : "reasoning_only";
@@ -2040,6 +2074,15 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 }
                 if (!fieldReasoning.empty())
                     mLastReasoning = fieldReasoning;
+                //Reasoning was asked for and the provider kept it. Recorded,
+                //never treated as a failure: the answer is right there in
+                //content and is parsed exactly as the thinking-off path parses
+                //it. Latency still carries the invisible decode cost (the
+                //translog's own latency_ms), so a record with
+                //reasoning_hidden + a long round trip is a WITHHELD trace, not
+                //a defect class - that pair is precisely how this shape is told
+                //apart from a fast non-thinking reply.
+                mLastReasoningHidden = reasoningHiddenShape(reasoningRequested(), content, mLastReasoning);
                 //Subscription preset: the backend prices every reply against a
                 //rolling plan window and reports the gauge on each response.
                 //Surface it when it moves - a player burning their ChatGPT plan
@@ -2331,7 +2374,14 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
     //Scoped to endpoints that accept the prefill (local vLLM/llama.cpp): the
     //subscription and OpenRouter paths hide their reasoning entirely and have
     //nothing to close, and api.openai.com 400s unknown fields.
-    if (mLastReasoningOnly && userMsg != mRetryDoneBase && gptForceCloseSupported(mEndpoint))
+    //`content.empty()` is stated explicitly rather than left implied by
+    //mLastReasoningOnly: the forced close prefills the model's own trace back
+    //to it, which is IMPOSSIBLE on a provider that withheld the trace, and a
+    //content-bearing reply needs no rescue in the first place. Belt and
+    //braces with gptForceCloseSupported(), which already excludes the
+    //hidden-trace endpoints by name.
+    if (mLastReasoningOnly && content.empty() && !mLastReasoning.empty()
+        && userMsg != mRetryDoneBase && gptForceCloseSupported(mEndpoint))
     {
         mRetryFirstLatencyMs = mLastLatencyMs;
         mRetryBase = userMsg;
@@ -2366,7 +2416,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false), mReasoningBudget(0),
-      mLastReasoningTokens(-1), mLastDroppedAssignments(-1)
+      mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false)
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
@@ -2692,6 +2742,15 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     {
         rec["reasoning_tokens"] = mLastReasoningTokens;
         mLastReasoningTokens = -1;
+    }
+    //Reasoning requested, answer delivered, trace withheld by the provider.
+    //Without this marker the A/B cannot separate "reasoned invisibly" from
+    //"did not reason": both write no reasoning field, and only one of them is
+    //paying for thinking tokens.
+    if (mLastReasoningHidden)
+    {
+        rec["reasoning_hidden"] = true;
+        mLastReasoningHidden = false;
     }
     //The thinking budget bound on this decision and the answer had to be
     //forced out of the model (phase-2 close). Counting these is how the A/B
@@ -11875,6 +11934,44 @@ void AIPlayerGPT::runParseSelfTest()
         string two = "CHOICE: 2 (Yotian Soldier)\nCHOICE: 1 (Akroma's Memorial)";
         CHECK(answerTailFromReasoning(two) == "CHOICE: 1 (Akroma's Memorial)",
               "W34-probe the LAST coded line wins here too");
+    }
+
+    // ---- hidden reasoning: the provider reasoned and kept the trace ----
+    cout << "\n[W34-hidden] a withheld thinking trace is a NORMAL reply, not a failure\n";
+    {
+        // OpenAI/Anthropic withhold raw chain-of-thought as policy; OpenRouter
+        // can hide it depending on the upstream (this project's own 40s mystery
+        // latency behind a 140-token answer, 71f4f615c). The answer is right
+        // there in content and must parse exactly as the thinking-off path does.
+        string content = "CHOICE: 2 (Cast Ichor Rats)\nPLAN: race on poison.";
+        CHECK(reasoningHiddenShape(true, content, ""),
+              "W34-hidden thinking requested + content + no trace = the hidden shape");
+        // It is the INVERSE of reasoning_only and must never be read as it:
+        // that shape is EMPTY content with reasoning present.
+        CHECK(!reasoningHiddenShape(true, "", "still deliberating about the fetchland"),
+              "W34-hidden NEGATIVE content-empty-with-reasoning is reasoning_only, not hidden");
+        // Thinking OFF: an ordinary terse reply is not a withheld trace.
+        CHECK(!reasoningHiddenShape(false, content, ""),
+              "W34-hidden NEGATIVE with thinking off there is no trace to withhold");
+        // A provider that DID return the trace is not hiding it.
+        CHECK(!reasoningHiddenShape(true, content, "Option 1 is worse on board."),
+              "W34-hidden NEGATIVE a returned trace is not a hidden one");
+        // The reply itself parses with nothing special about it - no reasoning
+        // block to split, an answer where an answer belongs, plan carried.
+        string c = content;
+        string r;
+        CHECK(splitReasoningBlock(c, r) && c == content && r.empty(),
+              "W34-hidden a content-only reply passes through the splitter untouched");
+        vector<string> opts;
+        opts.push_back("Cast Mordor Muster {1}{b}");
+        opts.push_back("Cast Ichor Rats {2}{b}");
+        bool stale = false;
+        CHECK(parseChoice("2 (Cast Ichor Rats)", 2, &opts, &stale, NULL) == 2 && !stale,
+              "W34-hidden the answer in a hidden-trace reply binds like any other");
+        // And no answer-recovery machinery engages: there is no reasoning field
+        // to mine, and content was never empty.
+        CHECK(answerTailFromReasoning("").empty(),
+              "W34-hidden NEGATIVE no reasoning field means nothing to recover from");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

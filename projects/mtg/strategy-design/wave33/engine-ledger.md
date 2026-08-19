@@ -220,6 +220,39 @@ three facts that overturned plausible defaults, and what each one changed:**
   came back. A reply that arrives complete and paid for with `content` null because the whole
   generation was filed as thinking is a MODEL behaviour, and scoring it as an endpoint fault
   would corrupt the one distinction the A/B turns on. Seats read `reasoning_only` separately.
+
+**HIDDEN-TRACE PROVIDERS (owner requirement, 2026-08-19) — the third reasoning shape, and the
+one that governs what ships to USERS rather than what the dev loop measures:**
+
+Some providers reason and never return the trace: OpenAI and Anthropic withhold raw
+chain-of-thought as policy, and OpenRouter can hide it depending on the upstream — this
+project has already been bitten by exactly that, as the 40s mystery latency behind a
+140-token answer (`71f4f615c`). The client now treats this as NORMAL:
+
+- **Shape:** reasoning requested + `content` NON-EMPTY + no trace anywhere (no
+  `message.reasoning`, no `reasoning_content`, no inline `<think>`). It parses exactly as the
+  thinking-off path parses, and is marked **`reasoning_hidden`** in the translog. It is the
+  INVERSE of `reasoning_only` (empty content, trace present) and is never conflated with it.
+  Without the marker the A/B cannot separate *"reasoned invisibly"* from *"did not reason"* —
+  both write no reasoning field, and only one of them is paying for thinking tokens.
+- **No parse or fallback anywhere gates on reasoning being present.** The *"reasoning present
+  and non-empty at BOTH seats before the corpus runs"* rule (deck152's condition, adopted at
+  #1b) is a **Spark/dev-loop precondition for the A/B**, not a client invariant — encoding it
+  in the client would turn every OpenAI/Anthropic user's game into a heuristic-only game.
+- **The two-phase forced close cannot exist on a hidden-trace provider** (there is no trace to
+  prefill), and is guarded twice: `gptForceCloseSupported()` excludes those endpoints by name,
+  and the fire condition now states `content.empty() && !reasoning.empty()` explicitly rather
+  than leaving it implied — a content-bearing reply needs no rescue in the first place.
+- **`reasoning_budget` therefore applies only where a raw thinking channel exists** (vLLM /
+  llama.cpp families). On the subscription (Codex) backend the budget's analogue is the
+  existing `reasoning_effort` tier, which is what that adapter already sends; on OpenRouter the
+  unified `reasoning` switch is the only lever. The config key is inert on all of them, and
+  `reasoningRequested()` reads the Codex tier rather than the thinking flag so a withheld trace
+  is still recognised there.
+- **Latency accounting:** hidden reasoning still costs decode time, invisibly. `latency_ms`
+  already carries it; the pair to read is `reasoning_hidden` + a long round trip = a WITHHELD
+  trace, never a defect class. `reasoning_chars` 0 on such a record means nothing was returned,
+  not that nothing was spent.
 4. **Timeout ≥ the full two-phase worst case.** The HTTP timeout is the ONLY watchdog that
    falls back to the heuristic (the patience window raises a human prompt and never decides
    on its own — verified, and it is gated on a human seat so self-play never sees it).

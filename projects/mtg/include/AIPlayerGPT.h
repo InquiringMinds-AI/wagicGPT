@@ -510,6 +510,15 @@ private:
     //outcome - the heuristic answers - but a seat review must not read a model
     //behaviour as an endpoint fault.
     const char * noAnswerClass() const;
+    //Was reasoning asked for on this endpoint (thinking flag, or the Codex
+    //effort tier)? Only ever used to tell a WITHHELD trace from a reply that
+    //never reasoned - parsing and fallback never consult it.
+    bool reasoningRequested() const;
+    //Reasoning was requested, the answer arrived, and the provider withheld the
+    //trace (OpenAI/Anthropic policy; OpenRouter depending on upstream). Normal,
+    //parsed like any other reply, and marked reasoning_hidden in the translog.
+    //The INVERSE of reasoning_only - never conflate the two.
+    bool mLastReasoningHidden;
     //The last reply was REASONING-ONLY: an unclosed <think>, i.e. the thinking
     //budget (or max_tokens) cut the reply before any answer. Never parsed as
     //an answer; it triggers the forced close instead.
