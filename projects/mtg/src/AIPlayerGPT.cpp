@@ -2416,7 +2416,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false), mReasoningBudget(0),
-      mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false)
+      mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
+      mInPregameAsk(false)
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
@@ -3026,7 +3027,17 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
     //both double-lists the hand at the mulligan prompt. Suppress the GAME LOG
     //here only - the flush above still keeps the line in mNarration, so the
     //first real (turn 1+) decision logs the opening hand as history.
-    bool pregame = (observer && observer->turn == 0);
+    //N-158r: gate the hand-only pregame frame on the ASK, not on the clock.
+    //`observer->turn == 0` is a PROXY for "this is a pregame decision" that is
+    //correct on the draw and wrong on the play: the player on the play takes
+    //their whole first turn while turn is still 0, so an ordinary first land
+    //drop was served serializePregameState() - no battlefield, no opponent
+    //board, no "Mana available:" line - under a hand-wide satisfiability header
+    //that is true across the game and false for that turn. The model spent
+    //214.5 s and 14,570 chars trying to reconcile the contradiction on a
+    //three-option land drop (deck158 vs116 seq 2, 3/3 on-the-play games).
+    //mInPregameAsk is set by the three pregame entry points themselves.
+    bool pregame = mInPregameAsk;
     if (!mNarration.empty() && !pregame)
         u << "GAME LOG (everything that has happened so far):\n" << mNarration << "\n";
     //N-146k, OWNER DIRECTIVE (2026-07-27): the pregame asks (mulligan, London
@@ -9181,6 +9192,7 @@ int AIPlayerGPT::pregameMulliganDecision(int mullsTaken)
     mPregameMullsSeen = mullsTaken; //the true count, for the bottom ask (N-139i)
     if (mEndpoint.empty())
         return AIPlayerBaka::pregameMulliganDecision(mullsTaken);
+    PregameAskScope pregameScope(this); //N-158r: the hand-only frame is ask-scoped
     std::ostringstream q;
     int keepSize = startingHandSize() - mullsTaken;
     q << "Pre-game mulligan decision (London mulligan). You have a fresh "
@@ -9207,6 +9219,7 @@ int AIPlayerGPT::pregameLeylineDecision(MTGCardInstance * card)
 {
     if (mEndpoint.empty() || !card)
         return AIPlayerBaka::pregameLeylineDecision(card);
+    PregameAskScope pregameScope(this); //N-158r
     std::ostringstream q;
     q << "Pre-game action (CR 103.6): you may begin the game with " << card->name
       << " already on the battlefield (its static ability is live for the whole"
@@ -9283,6 +9296,7 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottom(int need, int chosenSoFar, in
     status = 0;
     if (mEndpoint.empty())
         return AIPlayerBaka::pregameChooseBottom(need, chosenSoFar, status);
+    PregameAskScope pregameScope(this); //N-158r
 
     //ONE bundled ask per keep; then pop the queued cards one per call. `need`
     //is the TOTAL owed for this keep and is stable across the loop since the

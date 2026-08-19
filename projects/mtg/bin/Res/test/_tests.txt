@@ -1083,3 +1083,6 @@ rootborn_defenses_damagestack_ask.txt
 rootborn_defenses_first_strike.txt
 rootborn_defenses_survives_cleanup.txt
 collective_brutality_probe.txt
+generic/amulet_upkeep_activation.txt
+generic/amulet_upkeep_activation_opponent_turn.txt
+generic/legend_second_copy_castable.txt

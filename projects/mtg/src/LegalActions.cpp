@@ -63,8 +63,12 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
                 continue;
             if (zone == p->game->exile && !card->has(Constants::CANPLAYFROMEXILE))
                 continue;
-            if (card->hasType(Subtypes::TYPE_LEGENDARY) && p->game->inPlay->findByName(card->name))
-                continue;
+            //N-152g: the "legend rule" is NOT a casting restriction. CR 704.5j
+            //is a state-based action checked after the spell RESOLVES, and
+            //MTGNewLegend implements it (the controller picks which copy to
+            //keep, the rest go to the graveyard). Suppressing the cast hid a
+            //legal and often correct play - recasting a legend to re-trigger
+            //its ETB, or to replace a shrunken/enchanted copy.
             if (p->game->playRestrictions->canPutIntoZone(card, p->game->stack) == PlayRestriction::CANT_PLAY)
                 continue;
             if (!payable(p, policy, card, pMana))
@@ -253,8 +257,9 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalLandPlays(Player * p)
                 continue;
             if (zone == p->game->exile && !card->has(Constants::CANPLAYFROMEXILE))
                 continue;
-            if (card->hasType(Subtypes::TYPE_LEGENDARY) && p->game->inPlay->findByName(card->name))
-                continue;
+            //N-152g: same as the spell rung above - CR 704.5j is a state-based
+            //action, not a restriction on playing the land. A second Tolarian
+            //Academy is a legal land drop; the SBA then bins one of them.
             if (p->game->playRestrictions->canPutIntoZone(card, p->game->inPlay) == PlayRestriction::CANT_PLAY)
                 continue;
             string key = card->getDisplayName() + scans[s].label;
