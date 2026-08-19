@@ -256,9 +256,13 @@ What we most want to hear about, in rough order of value:
    report here is a *pattern, not a card*: can you describe the behavior
    that should be different without naming a specific card? "It never holds
    mana for instants", "it trades its best creature for my worst", "it
-   plays out its whole hand into an obvious board wipe". Rules like that we
-   can act on globally. A repro with specific cards on top is still
-   appreciated — pattern to aim at, example to verify against.
+   plays out its whole hand into an obvious board wipe". This is a policy,
+   not a preference: the heuristic AI is tuned card-agnostically, and we
+   will not special-case its behavior for individual cards — a report that
+   only makes sense as "handle card X differently" can't be acted on, while
+   a behavioral rule improves every game it ever plays. A repro with
+   specific cards on top is still appreciated — pattern to aim at, example
+   to verify against.
 
 How to send it: **GitHub issues** at the wagicGPT repository — one issue per
 thing, logs attached rather than screenshotted where possible. If you're an
