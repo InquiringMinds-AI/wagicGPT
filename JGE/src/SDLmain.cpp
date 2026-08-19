@@ -466,6 +466,10 @@ bool InitGame(void)
 
 void DestroyGame(void)
 {
+	//Init can fail before InitGame ever runs (window/GL context refused);
+	//tearing down a game that never started must not become a null deref.
+	if (!g_engine)
+		return;
 	g_engine->SetApp(NULL);
 	if (g_app)
 	{
@@ -902,10 +906,10 @@ bool SdlApp::OnInit()
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,  	    16);
 	SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE,		    32);
 
-	SDL_GL_SetAttribute(SDL_GL_ACCUM_RED_SIZE,	    8);
-	SDL_GL_SetAttribute(SDL_GL_ACCUM_GREEN_SIZE,	8);
-	SDL_GL_SetAttribute(SDL_GL_ACCUM_BLUE_SIZE,	    8);
-	SDL_GL_SetAttribute(SDL_GL_ACCUM_ALPHA_SIZE,	8);
+	//No accumulation buffer: nothing in the renderer uses one, and requesting
+	//accum bits makes pixel-format selection FAIL outright on strict WGL
+	//drivers and under Proton/Wine - the window never opens and the game
+	//dies before its first frame (Windows-alpha triage, 2026-08-19).
 
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS,  1);
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES,  2);
@@ -913,22 +917,38 @@ bool SdlApp::OnInit()
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 
+#ifdef ANDROID
+	const Uint32 kWindowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS;
+#else
+	const Uint32 kWindowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
+#endif
 	window = SDL_CreateWindow(g_launcher->GetName(),
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		window_w, window_h,
-#ifdef ANDROID
-		SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS);
-#else
-		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-#endif
-	if (!window)
+		window_w, window_h, kWindowFlags);
+	if (window)
+		glContext = SDL_GL_CreateContext(window);
+	if (!window || !glContext)
 	{
-		return false;
+		//Multisample is a nice-to-have; on drivers whose pixel-format search
+		//rejects it the game must still open. Retry once without it.
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+		if (window)
+			SDL_DestroyWindow(window);
+		window = SDL_CreateWindow(g_launcher->GetName(),
+			SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+			window_w, window_h, kWindowFlags);
+		glContext = window ? SDL_GL_CreateContext(window) : NULL;
 	}
-
-	glContext = SDL_GL_CreateContext(window);
-	if (!glContext)
+	if (!window || !glContext)
 	{
+		//A silent exit here reads as "nothing happened" to the player; name
+		//the failing stage and the driver's own reason.
+		fprintf(stderr, "wagic: could not create a window/GL context: %s\n", SDL_GetError());
+#ifndef ANDROID //the Android port's trimmed SDL has no messagebox; logcat carries the line above
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Wagic",
+			"Could not create an OpenGL window. Please update your graphics drivers.", NULL);
+#endif
 		return false;
 	}
 	SDL_GL_SetSwapInterval(1);
