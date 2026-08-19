@@ -64,6 +64,20 @@ struct WEventCounters : public WEvent {
   bool added;
   bool removed;
   MTGCardInstance * source;
+  //N-105f: GameObserver::receiveEvent QUEUES events while one is being
+  //dispatched, so N counters applied by a single damage event are all narrated
+  //AFTER the whole batch has landed - a reader of the target's live P/T sees the
+  //post-batch pair on every line ("(now -3/0)" three times for a 0/3 taking
+  //three -1/-1 counters). Capture the state this counter settled at, at fire
+  //time, so the narration can print the step this line actually is. `nb` is the
+  //family's count after this counter (a dungeon's Explore step, a run of +1/+1).
+  int settledPower;
+  int settledToughness;
+  int settledNb;
+  bool stateCaptured;
+  //Read targetCard's post-this-counter state into the fields above. Called
+  //right after targetCard is set and the counter has been applied.
+  void captureTargetState(int nb);
   WEventCounters(Counters *counter,string name,int power, int toughness,bool added = false, bool removed = false, MTGCardInstance * source = NULL);
   using WEvent::getTarget;
   virtual Targetable * getTarget(int target);

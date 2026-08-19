@@ -565,6 +565,27 @@ string legibleKeywordName(const string& engineName)
     return engineName;
 }
 
+//N-105f (wave-33 deck105 + deck158, every multi-counter infect combat): the
+//counter line's "(now X/Y)" used to read the target's LIVE power/toughness.
+//That is right for a lone counter, but GameObserver::receiveEvent queues events
+//raised while one is dispatching, so the N counters of one damage event are all
+//narrated after the whole batch has been applied - a 0/3 taking three -1/-1
+//counters narrated "(now -3/0)" three times, and the append-only log stopped
+//being replayable (intermediate toughness decides first strike and multi-blocker
+//orderings). The event now carries the state its own counter settled at; prefer
+//it, and fall back to the live pair for any event that predates the capture.
+//Pure, so the monotone run is provable in PARSETEST without a game.
+string counterAppliedTag(bool targetIsCreature, bool stateCaptured,
+                         int settledP, int settledT, int liveP, int liveT)
+{
+    if (!targetIsCreature)
+        return "";
+    std::ostringstream o;
+    o << " (now " << (stateCaptured ? settledP : liveP) << "/"
+      << (stateCaptured ? settledT : liveT) << ")";
+    return o.str();
+}
+
 //The set keyword abilities (flying, first strike, can't block...) - the
 //LIVE effective set, including granted/lost ones printed text cannot show.
 string keywordList(MTGCardInstance * card)
@@ -3151,8 +3172,10 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         else if (e->power || e->toughness)
             out << ": " << (e->power >= 0 ? "+" : "") << e->power << "/"
                 << (e->toughness >= 0 ? "+" : "") << e->toughness;
-        if (e->targetCard->isCreature())
-            out << " (now " << e->targetCard->power << "/" << e->targetCard->toughness << ")";
+        //N-105f: the state THIS counter settled at, not the post-batch pair.
+        out << counterAppliedTag(e->targetCard->isCreature(), e->stateCaptured,
+                                 e->settledPower, e->settledToughness,
+                                 e->targetCard->power, e->targetCard->toughness);
         //N-158l: the source attribution rendered an EMPTY "[from ]" in 38 distinct
         //prompts - always right after "- Your Mordor Muster: stack -> graveyard".
         //A sorcery that has already finished resolving is in the graveyard by the
@@ -10790,6 +10813,32 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(c == 1 && !stale, "W34-N152k a bare-name echo binds the cost-less back face option");
         int c2 = parseChoice("2 (Mox Jet {0})", 2, &opts, &stale, NULL);
         CHECK(c2 == 2 && !stale, "W34-N152k the {0} Mox option still binds by its cost token");
+    }
+
+    // ---- N-105f: a batched counter run narrates its own step, not the batch's end ----
+    cout << "\n[W34-N105f] each counter line carries the P/T that counter settled at\n";
+    {
+        // deck105 repro: Cystbearer (3/4) infect damage to a 0/3 Arboreal Grazer.
+        // The three events are dispatched AFTER all three counters have landed,
+        // so the LIVE pair is -3/0 on all three lines.
+        string l1 = counterAppliedTag(true, true, -1, 2, -3, 0);
+        string l2 = counterAppliedTag(true, true, -2, 1, -3, 0);
+        string l3 = counterAppliedTag(true, true, -3, 0, -3, 0);
+        cout << "     " << l1 << l2 << l3 << "\n";
+        CHECK(l1 == " (now -1/2)" && l2 == " (now -2/1)" && l3 == " (now -3/0)",
+              "W34-N105f a 3-counter batch narrates -1/2, -2/1, -3/0 - strictly monotone");
+        CHECK(!(l1 == l2 || l2 == l3),
+              "W34-N105f no two consecutive lines of one batch print the same (now X/Y)");
+        // NEGATIVE (the pre-fix shape, pinned as what must not come back): with no
+        // captured state every line falls back to the post-batch pair.
+        CHECK(counterAppliedTag(true, false, 0, 0, -3, 0) == " (now -3/0)",
+              "W34-N105f control: an uncaptured event still reads the live pair");
+        // The +1/+1 control path (already correct) is unchanged.
+        CHECK(counterAppliedTag(true, true, 4, 4, 5, 5) == " (now 4/4)",
+              "W34-N105f a +1/+1 run reports its own step too");
+        // A non-creature (a dungeon taking an Explore counter) gets no P/T tail.
+        CHECK(counterAppliedTag(false, true, 0, 0, 0, 0).empty(),
+              "W34-N105f a non-creature counter line carries no (now X/Y)");
     }
 
     // ---- N-158s: a magnitude on a targeted rider needs a legal target ----

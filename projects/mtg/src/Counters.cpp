@@ -47,6 +47,7 @@ int Counter::cancelCounter(int power, int toughness, MTGCardInstance * _source)
         this->nb--;
         WEvent * t = NEW WEventCounters(NULL,"",power*-1,toughness*-1,false,true,_source);
         dynamic_cast<WEventCounters*>(t)->targetCard = this->target;
+        dynamic_cast<WEventCounters*>(t)->captureTargetState(this->nb); //N-105f
         g->receiveEvent(t);
         this->target->counters->removeCounter(power,toughness);
     }
@@ -116,6 +117,9 @@ int Counters::addCounter(const char * _name, int _power, int _toughness, bool _n
                 {
                     WEvent * j = NEW WEventCounters(this,_name,_power,_toughness,true,false,_source);
                     dynamic_cast<WEventCounters*>(j)->targetCard = this->target;
+                    //N-105f: this counter is applied; the dispatch may be
+                    //deferred behind a batch, so settle the state HERE.
+                    dynamic_cast<WEventCounters*>(j)->captureTargetState(counters[i]->nb);
                     g->receiveEvent(j);
                     if (!_batchManaged)
                         emitTotalCountersEvent(_name, _power, _toughness, true, 1, _source);
@@ -132,6 +136,7 @@ int Counters::addCounter(const char * _name, int _power, int _toughness, bool _n
         {
             WEvent * w = NEW WEventCounters(this,_name,_power,_toughness,true,false,_source);
             dynamic_cast<WEventCounters*>(w)->targetCard = this->target;
+            dynamic_cast<WEventCounters*>(w)->captureTargetState(counter->nb); //N-105f
             g->receiveEvent(w);
             if (!_batchManaged)
                 emitTotalCountersEvent(_name, _power, _toughness, true, 1, _source);
@@ -198,6 +203,7 @@ int Counters::removeCounter(const char * _name, int _power, int _toughness, bool
             {
                 WEvent * e = NEW WEventCounters(this,_name,_power,_toughness,false,true,_source);
                 dynamic_cast<WEventCounters*>(e)->targetCard = this->target;
+                dynamic_cast<WEventCounters*>(e)->captureTargetState(counters[i]->nb); //N-105f
                 g->receiveEvent(e);
                 if (!_batchManaged)
                     emitTotalCountersEvent(_name, _power, _toughness, false, 1, _source);
