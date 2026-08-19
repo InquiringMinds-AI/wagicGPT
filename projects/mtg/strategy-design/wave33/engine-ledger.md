@@ -301,3 +301,30 @@ FROM this formula at whatever -j is chosen (measure tok/s(j) first — a short s
 the previous corpus's translogs); per-stream p10 will drop as -j rises, so guard scales
 up as concurrency scales up. The tuned (smaller) budget shrinks worst_case and pulls
 the guard back down — the three knobs move together.
+
+**OWNER RULING — GAME-LOG NARRATION REGISTER (2026-08-19, P0 for wave-35 step 1):**
+"the historical log should be like 'you drew _' or 'you cast _ targeting _' or
+'_ resolved' or 'opponents _ died' etc. this present history is nothing like i
+intended." Source evidence: ~/Downloads/wagicgpt-prompt-example.txt (surfaced by
+another session). The log must read as PAST-TENSE DECLARATIVE GAME EVENTS. Three
+offending classes observed in one 96-line prompt:
+(1) raw zone mechanics ("Your Arboreal Grazer: hand -> stack") → "You cast Arboreal
+    Grazer" / "<X> resolved"; library->hand → "You drew <X>" (opponent's stays
+    count-only: "Opponent drew a card");
+(2) consumed-ask ECHOES — generic header + full decorated option text ("A choice is
+    required - choose an option: -> pay 2 life [this permanent then enters ...
+    UNTAPPED - usable ... this turn]") → record the CONSEQUENCE, naming the subject:
+    "Stomping Ground entered untapped (you paid 2 life)". The bracketed guidance
+    annotations are decision-time surfaces and NEVER enter history (extends the
+    shipped stripNarrationDecoration to this emitter — the ledger #14(b) menu-echo
+    half lane A deferred);
+(3) question-text echoes on target choices (instructional parentheticals, rules-text
+    tails) → "You targeted <X> with <source>'s <ability>" (fold into the cast line
+    where it is a cast: "you cast _ targeting _").
+IMPLEMENTATION NOTES: this is the model's perception layer corpus-wide — per-emitter
+sweep with the HL5 discipline (enumerate every narrateDecision/appendNarration caller
++ every zone-change narration branch); ship narration goldens in PARSETEST (echo
+shapes change); the information content of consumed decisions is KEPT (what was
+decided + its consequence), only the register changes. Validate on the wave-35 corpus:
+zero "A choice is required" / "TARGET CHOICE" / "->" zone-arrow strings in any GAME
+LOG section.
