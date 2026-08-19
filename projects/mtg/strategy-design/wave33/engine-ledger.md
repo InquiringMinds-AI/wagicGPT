@@ -355,4 +355,10 @@ asks/game = 9-15k tokens/game (owner: "potentially quite alot of tokens") — fa
 value-per-token criterion at the always-on position. The surviving shape is
 CONDITIONAL: render draw math only on asks where it IS the decision (mulligan, scry/
 surveil order, tutor picks, draw-spell pricing), possibly scoped to guide-named engine
-cards.
+cards. OWNER STANCE (2026-08-19): "might be worth doing. im not ruling it out... theres
+a cost, and that it is worth paying that cost is not clear to me" — ADJUDICATE BY
+MEASUREMENT, not priors: the wave-34/35 reviewer briefs carry a counting question —
+decisions where the pilot reasoned wrongly/expensively about draw odds, remaining
+copies, or topdecks, where a rendered count would have changed the outcome (note the
+info is DERIVABLE today: decklists are in the system prompt, deaths/discards in the
+log — this is a representation shortcut, priced by observed derivation failures).
