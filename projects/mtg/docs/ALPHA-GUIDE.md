@@ -212,18 +212,31 @@ That's not a platitude; it's the actual engineering plan.
 
 What we most want to hear about, in rough order of value:
 
-1. **Crashes.** Platform, what you were doing, and the artifact: on PSP the
-   game writes `exception.log` next to the EBOOT — attach it, it has the
-   registers. Elsewhere, whatever your platform captured (a terminal message,
-   logcat, the Windows error dialog text).
+1. **Crashes.** Platform, what you were doing, and the artifact — every
+   platform leaves one, here is where yours is:
+   - *PSP*: the game writes `exception.log` next to the EBOOT
+     (`PSP/GAME/WAGIC/exception.log`) — attach it, it has the registers.
+   - *Vita*: the OS writes a core dump on crash — grab the newest
+     `psp2core-*.psp2dmp` from `ux0:data/` (zip it, they compress well).
+   - *Android*: `adb logcat` output from around the crash if you can get
+     it; the crash line names the faulting library and address.
+   - *Windows*: the error dialog text, plus — if it dies with no dialog —
+     rerun from a terminal as `wagic.exe > wagic-log.txt 2>&1` and attach
+     the file.
+   - *Linux*: rerun `./wagic.sh` from a terminal and attach what it prints;
+     on systemd distros `coredumpctl info wagic` after the crash gives the
+     stack that we'd otherwise have to guess.
 2. **The LLM opponent playing badly in a specific way.** Not "it's dumb" —
    *what it did and what a human would have done*. "It gang-blocked into an
    obvious trick", "it held removal all game", "it attacked into lethal
    backswing". These reports steer the prompt design directly. Decision-level
    evidence is gold: set `translog=1` in `endpoints.txt` and the game writes
    every decision — prompt, reply, and outcome — to `ai/gpt/logs/*.jsonl`.
-   Attach the game's file. (Heads-up: those files contain full prompts,
-   including your deck lists. Nothing else personal is in them.)
+   If you answered yes to "Contribute anonymized game data" in the GPT tab,
+   these logs are already being written — that consent enables exactly this
+   logging, nothing separate. Attach the game's file. (Heads-up: those files
+   contain full prompts, including your deck lists. Nothing else personal is
+   in them.)
 3. **A card doing the wrong thing.** Name the card, the board state, what
    happened, what the printed card says should happen. One card per report.
 4. **Setup friction.** Anywhere this guide lied to you, or a step that took
