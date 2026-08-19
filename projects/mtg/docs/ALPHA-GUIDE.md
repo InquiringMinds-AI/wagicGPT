@@ -246,6 +246,19 @@ What we most want to hear about, in rough order of value:
 5. **Model reports.** Which model, which provider, and how it played. The
    opponent's quality varies enormously by model, and the map of "what plays
    well" is exactly the thing only many people with many setups can draw.
+6. **GUI feedback.** Three questions, take any of them: what could be
+   better? what isn't working right — and *how* is it wrong (what you did,
+   what it showed, what you expected)? and what could it do that it doesn't?
+   The interface has PSP bones and we know it; specific irritations beat
+   general impressions, because specific things can be fixed.
+7. **The built-in (heuristic) AI.** This is the opponent on PSP and the
+   fallback everywhere, so its general behavior matters. The most useful
+   report here is a *pattern, not a card*: can you describe the behavior
+   that should be different without naming a specific card? "It never holds
+   mana for instants", "it trades its best creature for my worst", "it
+   plays out its whole hand into an obvious board wipe". Rules like that we
+   can act on globally. A repro with specific cards on top is still
+   appreciated — pattern to aim at, example to verify against.
 
 How to send it: **GitHub issues** at the wagicGPT repository — one issue per
 thing, logs attached rather than screenshotted where possible. If you're an
