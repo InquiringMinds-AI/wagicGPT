@@ -319,6 +319,69 @@ static MTGCardInstance * findMyArmy(MTGCardInstance * card)
     return NULL;
 }
 
+//N-158s: read the `target(...)` spec that immediately follows a magnitude
+//clause in the card script, if there is one. `pos` is the offset just past the
+//magnitude expression in `script`. Returns "" when the next token is not a
+//target spec (an untargeted magnitude, which stays ungated). Pure, so the
+//scanner is provable in PARSETEST without a game.
+string riderTargetSpec(const string& script, size_t pos)
+{
+    while (pos < script.size() && (script[pos] == ' ' || script[pos] == '\t'))
+        pos++;
+    //"notaTarget(...)" and "targetedplayer(...)" are NOT a target spec for this
+    //purpose: only the literal `target(` clause names a chosen target.
+    if (script.compare(pos, 7, "target(") != 0 && script.compare(pos, 7, "Target(") != 0)
+        return "";
+    size_t open = pos + 7;
+    size_t close = script.find(')', open);
+    if (close == string::npos)
+        return "";
+    return script.substr(open, close - open);
+}
+
+//N-158s (wave-33 deck158, HIGH): does `spec` have at least one legal target on
+//the CURRENT board? Foray of Orcs rendered "{right now: Army 6/6 -> 8/8,
+//damage 8}" into an opponent board with zero creatures and the pilot cited the
+//annotation BY NAME as its authority for eight points of face damage that the
+//resolution cannot deliver. A magnitude on a targeted rider is an assertion
+//that the effect will occur, so it must be gated on the rider being able to
+//occur. Fail OPEN (return true) when no chooser can be built: an unevaluable
+//spec is not evidence of an empty target set.
+static bool riderHasLegalTarget(MTGCardInstance * card, const string& spec)
+{
+    if (!card || spec.empty())
+        return true;
+    GameObserver * obs = card->getObserver();
+    if (!obs || !obs->players[0] || !obs->players[1])
+        return true;
+    TargetChooserFactory tcf(obs);
+    TargetChooser * tc = tcf.createTargetChooser(spec, card);
+    if (!tc)
+        return true;
+    bool found = false;
+    for (int pi = 0; pi < 2 && !found; pi++)
+    {
+        Player * pp = obs->players[pi];
+        if (!pp || !pp->game)
+            continue;
+        MTGGameZone * zz[] = { pp->game->inPlay, pp->game->graveyard, pp->game->hand,
+                               pp->game->exile, pp->game->library, pp->game->stack,
+                               pp->game->commandzone };
+        for (int zi = 0; zi < 7 && !found; zi++)
+            if (zz[zi] && tc->targetsZone(zz[zi]))
+                for (int cj = 0; cj < zz[zi]->nb_cards; cj++)
+                    if (tc->canTarget(zz[zi]->cards[cj]))
+                    {
+                        found = true;
+                        break;
+                    }
+        if (!found && tc->canTarget(pp))
+            found = true;
+    }
+    SAFE_DELETE(tc);
+    return found;
+}
+
 string dynamicMagnitudes(MTGCardInstance * card)
 {
     //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
@@ -399,6 +462,24 @@ string dynamicMagnitudes(MTGCardInstance * card)
                 continue;
             if (!seen.insert(string(kVerbs[v].key) + expr).second)
                 continue;
+            //N-158s: a magnitude on a TARGETED rider asserts that the effect
+            //will occur. Foray of Orcs' "damage 8" rendered against an empty
+            //opponent board and the pilot cited the tag by name as its
+            //authority for 8 face damage the resolution cannot deal. Gate the
+            //clause on the rider having a legal target - and SAY SO rather than
+            //going silent: an omitted clause is a gap the model fills with
+            //invented rules (the trust doctrine's own lesson from N-36b), and
+            //the qualifier carries no magnitude for it to reuse.
+            {
+                string tspec = riderTargetSpec(card->magicText, start + expr.size());
+                if (!tspec.empty() && !riderHasLegalTarget(card, tspec))
+                {
+                    out << (count ? ", " : "") << kVerbs[v].label
+                        << " cannot happen: no legal target on the board right now";
+                    count++;
+                    continue;
+                }
+            }
             //An expression reading the SOURCE's own power/toughness is
             //unevaluable when the source is not a creature: a sorcery has power
             //0, and "damage 0" printed with authority is worse than no
@@ -482,6 +563,27 @@ string legibleKeywordName(const string& engineName)
     return engineName;
 }
 
+//N-105f (wave-33 deck105 + deck158, every multi-counter infect combat): the
+//counter line's "(now X/Y)" used to read the target's LIVE power/toughness.
+//That is right for a lone counter, but GameObserver::receiveEvent queues events
+//raised while one is dispatching, so the N counters of one damage event are all
+//narrated after the whole batch has been applied - a 0/3 taking three -1/-1
+//counters narrated "(now -3/0)" three times, and the append-only log stopped
+//being replayable (intermediate toughness decides first strike and multi-blocker
+//orderings). The event now carries the state its own counter settled at; prefer
+//it, and fall back to the live pair for any event that predates the capture.
+//Pure, so the monotone run is provable in PARSETEST without a game.
+string counterAppliedTag(bool targetIsCreature, bool stateCaptured,
+                         int settledP, int settledT, int liveP, int liveT)
+{
+    if (!targetIsCreature)
+        return "";
+    std::ostringstream o;
+    o << " (now " << (stateCaptured ? settledP : liveP) << "/"
+      << (stateCaptured ? settledT : liveT) << ")";
+    return o.str();
+}
+
 //The set keyword abilities (flying, first strike, can't block...) - the
 //LIVE effective set, including granted/lost ones printed text cannot show.
 string keywordList(MTGCardInstance * card)
@@ -514,10 +616,24 @@ string keywordList(MTGCardInstance * card)
 //Lands and tokens are excluded: neither is cast for a mana cost, and "{0}" on a
 //Forest would be a new false fact rather than a restored one.
 //Pure core, so the {0} restoration is provable in PARSETEST without a card.
-string manaCostTokenText(const string& costString, bool castForMana)
+//N-152k (wave-33 deck152/deck158/deck139, 194 false renders): the N-36b guard
+//restored "{0}" from a FALSY converted cost, but the engine gives every card a
+//ManaCost VALUE member, so "cost object exists and is zero" (a Mox: 222 correct
+//renders) and "this card never had a printed cost at all" (a transformed back
+//face, a day/night designation: 166 false renders at one seat) reach the emitter
+//identically. The data separates them cleanly - Moxen carry `mana={0}` in the
+//primitives, back faces and designations carry no `mana=` line - so the parser
+//records that fact (CardPrimitive::hasPrintedManaCost) and the emitter reads it.
+//"{0}" means "castable for free" to the pilot, which on a back face contradicts
+//the Flip Side annotation three lines away; the truthful render for a card with
+//no printed cost is NO cost token (never a deleted-token silence on a card that
+//HAS one - that is N-36b, which this must not regress).
+string manaCostTokenText(const string& costString, bool castForMana, bool hasPrintedCost)
 {
     if (!costString.empty())
         return " " + costString;
+    if (!hasPrintedCost)
+        return "";
     return castForMana ? " {0}" : "";
 }
 
@@ -529,7 +645,8 @@ string manaCostToken(MTGCardInstance * card)
     if (!cost)
         return "";
     //carries its own braces; "" for a zero cost, "{x}" for an X-only cost
-    return manaCostTokenText(cost->toString(), !card->isLand() && !card->isToken);
+    return manaCostTokenText(cost->toString(), !card->isLand() && !card->isToken,
+                             card->hasPrintedManaCost);
 }
 
 //Primary type for non-creature option/target lines (a discard pick needs
@@ -1433,6 +1550,72 @@ bool ciStartsWith(const string& s, const string& name)
         if (tolower((unsigned char) s[i]) != tolower((unsigned char) name[i]))
             return false;
     return true;
+}
+
+//---- N-146n (wave-33 deck146, HIGH, the corpus's largest latency driver) -------
+//The room-branch menu rendered two room names and their effects and NOTHING
+//about where in the dungeon the pilot stood: not which dungeon, not the step,
+//not where the offered rooms sit in the dungeon's own room list. Three of the
+//corpus's four worst reasoning spirals are that reconstruction - 200-214s each,
+//9k-15k characters, one of them concluding an option name must be "a typo in
+//the prompt's options list", another hand-counting Explore counters turn by
+//turn to locate itself. The venture state is engine-side and knowable (the
+//active dungeon lives in the command zone and carries its Explore counters), so
+//this is a surface defect: under the trust doctrine the model owes the surface
+//belief and the surface owes it the truth, and an underspecified menu that
+//forces re-derivation of engine state is the same failure family as a
+//wrong-scope statement.
+//  WORDING DISCIPLINE: state only what the engine knows. A dungeon's rooms
+//BRANCH, so "room 2 of 5" as a claim about the PATH would be false (Tomb of
+//Annihilation prints five rooms and a run visits four); the position is
+//therefore always scoped to the printed room LIST, and the branching is said
+//out loud so the model does not read the list as a route. Pure over their
+//inputs, so PARSETEST proves the emitted shapes without a game.
+string dungeonRoomPositionTag(const string& dungeonName, size_t index, size_t total)
+{
+    if (!total || index >= total)
+        return "";
+    std::ostringstream o;
+    o << " (room " << (index + 1) << " of " << total << " in " << dungeonName
+      << "'s printed room list)";
+    return o.str();
+}
+
+string dungeonRoomBranchHeader(const string& dungeonName, int exploreCount,
+                               const std::vector<std::pair<string, string> >& rooms)
+{
+    std::ostringstream o;
+    o << "DUNGEON ROOM CHOICE - you are venturing in " << dungeonName << ".";
+    if (exploreCount > 0)
+        o << " This is venture step " << exploreCount << " of your current run"
+             " through it (" << dungeonName << " carries " << exploreCount
+          << " Explore counter" << (exploreCount == 1 ? "" : "s") << ").";
+    o << " You are choosing which ROOM you enter now - this is not a target and"
+         " not a card to cast.";
+    if (!rooms.empty())
+    {
+        o << " " << dungeonName << "'s rooms, in printed order:";
+        for (size_t i = 0; i < rooms.size(); i++)
+            o << " " << (i + 1) << ". " << rooms[i].first << (i + 1 == rooms.size() ? "." : ";");
+        o << " Dungeon paths BRANCH, so a run does not enter every room and the"
+             " printed order is not a route.";
+    }
+    o << " The options below are the only rooms you may enter at this step, and"
+         " each one's effect is stated on its own line.";
+    return o.str();
+}
+
+//The narration line for one Explore counter landing on a dungeon. The generic
+//counter line ("Counter added to Tomb of Annihilation: Explore") gave the pilot
+//nothing to count with except its own bookkeeping - which is exactly what the
+//spirals above were doing. `step` is the dungeon's Explore count after this one.
+string ventureStepLine(bool mine, const string& dungeonName, int step)
+{
+    std::ostringstream o;
+    o << (mine ? "You venture into " : "Opponent ventures into ") << dungeonName;
+    if (step > 0)
+        o << ": venture step " << step << " of that run";
+    return o.str();
 }
 
 //One targetable thing, described for the model's target menu.
@@ -3570,6 +3753,23 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //engine sends this event AFTER applying the counter (Counters::addCounter
         //increments, then fires), so the permanent's CURRENT P/T is the settled
         //result: print it and there is no arithmetic left to do.
+        //N-146n: an Explore counter landing on a dungeon IS the venture. The
+        //generic counter line ("Counter added to Tomb of Annihilation: Explore")
+        //made the step number something the model had to count for itself, turn
+        //by turn, and it did - at 200s a time. Name the act and the step.
+        if (e->added && e->targetCard->hasType(Subtypes::TYPE_DUNGEON)
+            && ciStartsWith(e->name, "explore"))
+        {
+            //Whose venture: the dungeon sits in its owner's command zone, so
+            //the ZONE is the authority here (controller() is the battlefield
+            //notion and a command-zone card is not on a battlefield).
+            Player * dngOwner = (e->targetCard->currentZone && e->targetCard->currentZone->owner)
+                                ? e->targetCard->currentZone->owner
+                                : e->targetCard->controller();
+            return ventureStepLine(dngOwner == this,
+                                   e->targetCard->getDisplayName(),
+                                   e->stateCaptured ? e->settledNb : 0);
+        }
         out << (e->added ? "Counter added to " : "Counter removed from ")
             << e->targetCard->getDisplayName() << instanceHandle(e->targetCard);
         if (!e->name.empty() && e->name != " ")
@@ -3577,8 +3777,10 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         else if (e->power || e->toughness)
             out << ": " << (e->power >= 0 ? "+" : "") << e->power << "/"
                 << (e->toughness >= 0 ? "+" : "") << e->toughness;
-        if (e->targetCard->isCreature())
-            out << " (now " << e->targetCard->power << "/" << e->targetCard->toughness << ")";
+        //N-105f: the state THIS counter settled at, not the post-batch pair.
+        out << counterAppliedTag(e->targetCard->isCreature(), e->stateCaptured,
+                                 e->settledPower, e->settledToughness,
+                                 e->targetCard->power, e->targetCard->toughness);
         //N-158l: the source attribution rendered an EMPTY "[from ]" in 38 distinct
         //prompts - always right after "- Your Mordor Muster: stack -> graveyard".
         //A sorcery that has already finished resolving is in the graveyard by the
@@ -6759,17 +6961,35 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //room effect. Self-gating: only options whose text matches a room name of the
     //active dungeon are touched, so every other bare-name menu is untouched.
     //Append-only - the answer index and req.optionTexts (staleness key) are unchanged.
+    //N-146n: the effect text alone still left the model unable to say WHERE it
+    //was. Add the position of each offered room in the dungeon's printed room
+    //list, and (below) replace the generic header with one that names the
+    //dungeon, the venture step, and the branching. Still append-only per option:
+    //the answer index and req.optionTexts (the staleness key) are unchanged.
+    string dungeonRoomHeader;
     if (MTGCardInstance * dng = activeDungeon(game))
     {
         std::vector<std::pair<string, string> > rooms;
         parseDungeonRooms(dng->text, rooms);
+        string dngName = dng->getDisplayName();
+        bool anyRoomOption = false;
         for (size_t i = 0; i < opts.size(); i++)
             for (size_t r = 0; r < rooms.size(); r++)
                 if (ciStartsWith(opts[i], rooms[r].first))
                 {
+                    opts[i] += dungeonRoomPositionTag(dngName, r, rooms.size());
                     opts[i] += " {room effect: " + rooms[r].second + "}";
+                    anyRoomOption = true;
                     break;
                 }
+        if (anyRoomOption)
+        {
+            int explores = 0;
+            if (dng->counters)
+                if (Counter * ec = dng->counters->hasCounter("Explore", 0, 0))
+                    explores = ec->nb;
+            dungeonRoomHeader = dungeonRoomBranchHeader(dngName, explores, rooms);
+        }
     }
     //N-139a (wave-29 deck139): the mutate OVER/UNDER placement menu ("Mutate Over"/
     //"Mutate Under") and the cast-mode sub-menu's "mutate" option reached the model
@@ -6836,6 +7056,12 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //N-139a: a mutate placement menu overrides the generic header with a role header.
     if (mutatePlaceMenu)
         decision = mutateOverUnderHeader(ctxName);
+    //N-146n: a room-branch menu says which dungeon and which venture step it is.
+    //The generic header ("Choose an option for Tomb of Annihilation:") named the
+    //dungeon but nothing else, and the position is the fact the spirals were
+    //re-deriving.
+    if (!dungeonRoomHeader.empty())
+        decision = dungeonRoomHeader;
     //Thread the source card as the pending source (as ANNOUNCE_X does): the model
     //often echoes "<verb> <source card>" against a bare option ("Tap Temple
     //Garden" vs "tap"), and INDEX-WINS treats a source-naming echo as a
@@ -11375,13 +11601,13 @@ void AIPlayerGPT::runParseSelfTest()
     // ---- N-36b: a {0} cost is a cost, not an absence ----
     cout << "\n[W33-N36b] {0} renders instead of being deleted by the falsy-zero guard\n";
     {
-        CHECK(manaCostTokenText("{2}{b}", true) == " {2}{b}",
+        CHECK(manaCostTokenText("{2}{b}", true, true) == " {2}{b}",
               "W33-N36b an ordinary cost renders unchanged");
-        CHECK(manaCostTokenText("", true) == " {0}",
+        CHECK(manaCostTokenText("", true, true) == " {0}",
               "W33-N36b an EMPTY cost string on a castable card renders {0}");
-        CHECK(manaCostTokenText("", false) == "",
+        CHECK(manaCostTokenText("", false, true) == "",
               "W33-N36b a land/token gets no synthesized {0}");
-        CHECK(manaCostTokenText("{x}", true) == " {x}",
+        CHECK(manaCostTokenText("{x}", true, true) == " {x}",
               "W33-N36b an X-only cost (also converted-0) survives as {x}, not {0}");
         // Echo shape: a Mox cast line now carries a {0} the reply may echo back.
         vector<string> opts;
@@ -11393,6 +11619,167 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(c == 1 && !stale, "W33-N36b a cast echo carrying the new {0} token still binds");
         int c2 = parseChoice("2 (Cast nothing right now)", 2, &opts, &stale, NULL);
         CHECK(c2 == 2 && !stale, "W33-N36b the decline option is unaffected by the {0} token");
+    }
+
+    // ---- N-152k: a cost that is ABSENT is not a cost of zero ----
+    cout << "\n[W34-N152k] no printed cost renders no token; a real {0} still renders\n";
+    {
+        // POSITIVE (the branch that was broken): a transformed back face and a
+        // day/night designation have NO `mana=` line at all - no cost token.
+        CHECK(manaCostTokenText("", true, /*hasPrintedCost*/false) == "",
+              "W34-N152k a transformed back face (no printed cost) renders NO {0}");
+        CHECK(manaCostTokenText("", false, false) == "",
+              "W34-N152k a designation marker renders NO {0}");
+        // NEGATIVE GUARD (the i5/N-36b branch that works and must not regress).
+        CHECK(manaCostTokenText("", true, true) == " {0}",
+              "W34-N152k a Mox (mana={0}, a real zero cost) still renders {0}");
+        // A card with no printed cost that somehow carries a cost STRING keeps
+        // the string: a rendered fact beats the flag (never delete a real cost).
+        CHECK(manaCostTokenText("{1}{g}", true, false) == " {1}{g}",
+              "W34-N152k a non-empty cost string is never suppressed by the flag");
+        // Echo shape: the battlefield line for a back face is now bare, and a
+        // reply echoing the bare name must still bind its option.
+        vector<string> opts;
+        opts.push_back("Moonrage Brute (3/3) [first strike, nightbound]");
+        opts.push_back("Mox Jet {0} [artifact]");
+        bool stale = false;
+        int c = parseChoice("1 (Moonrage Brute)", 2, &opts, &stale, NULL);
+        CHECK(c == 1 && !stale, "W34-N152k a bare-name echo binds the cost-less back face option");
+        int c2 = parseChoice("2 (Mox Jet {0})", 2, &opts, &stale, NULL);
+        CHECK(c2 == 2 && !stale, "W34-N152k the {0} Mox option still binds by its cost token");
+    }
+
+    // ---- N-146n: the room-branch menu states where in the dungeon you are ----
+    cout << "\n[W34-N146n] the dungeon room-branch ask names the dungeon, the step and the position\n";
+    {
+        // Tomb of Annihilation's text=, verbatim from borderline.txt.
+        string tomb = "Trapped Entry - Each player loses 1 life. -- Veils of Fear - Each"
+                      " player loses 2 life unless they discard a card. -- Sandfall Cell -"
+                      " Each player loses 2 life unless they sacrifice an artifact, a"
+                      " creature, or a land. -- Oubliette - Discard a card and sacrifice an"
+                      " artifact, a creature, and a land. -- Cradle of the Death God -"
+                      " Create The Atropal, a legendary 4/4 black God Horror creature token"
+                      " with deathtouch.";
+        std::vector<std::pair<string, string> > rooms;
+        parseDungeonRooms(tomb, rooms);
+        CHECK(rooms.size() == 5, "W34-N146n the 5 Tomb rooms parse for the position tag");
+        // The vs116 seq35 specimen: options were "veils of fear" / "oubliette",
+        // bare, and the reply spent 9,091 characters deciding whether "Oubliette"
+        // was a typo. Both now carry their place in the printed list.
+        string t1 = dungeonRoomPositionTag("Tomb of Annihilation", 1, rooms.size());
+        string t2 = dungeonRoomPositionTag("Tomb of Annihilation", 3, rooms.size());
+        cout << "     " << t1 << " /" << t2 << "\n";
+        CHECK(t1 == " (room 2 of 5 in Tomb of Annihilation's printed room list)",
+              "W34-N146n a room option carries its printed-list position");
+        CHECK(t2 == " (room 4 of 5 in Tomb of Annihilation's printed room list)",
+              "W34-N146n the second branch option carries its own position");
+        // NEGATIVE: an out-of-range or empty room list annotates nothing.
+        CHECK(dungeonRoomPositionTag("Tomb of Annihilation", 7, rooms.size()).empty()
+              && dungeonRoomPositionTag("Tomb of Annihilation", 0, 0).empty(),
+              "W34-N146n no position is invented when the room list cannot place it");
+        string hdr = dungeonRoomBranchHeader("Tomb of Annihilation", 2, rooms);
+        cout << "     " << hdr << "\n";
+        CHECK(hdr.find("Tomb of Annihilation") != string::npos
+              && hdr.find("venture step 2") != string::npos,
+              "W34-N146n the header names the dungeon AND the venture step");
+        CHECK(hdr.find("BRANCH") != string::npos
+              && hdr.find("printed order is not a route") != string::npos,
+              "W34-N146n the header says the printed order is not the path");
+        CHECK(hdr.find("Sandfall Cell") != string::npos,
+              "W34-N146n the header lists every room, including ones not offered"
+              " (the vs116 spiral asked where Sandfall Cell had gone)");
+        // NEGATIVE: with the explore count unknown, no step is asserted.
+        string hdr0 = dungeonRoomBranchHeader("Tomb of Annihilation", 0, rooms);
+        CHECK(hdr0.find("venture step") == string::npos,
+              "W34-N146n an unknown explore count asserts no step number");
+        // The narration half: the venture itself, with its step.
+        CHECK(ventureStepLine(true, "Tomb of Annihilation", 2)
+              == "You venture into Tomb of Annihilation: venture step 2 of that run",
+              "W34-N146n venturing narrates as a venture, with the step");
+        CHECK(ventureStepLine(false, "Lost Mine of Phandelver", 1)
+              == "Opponent ventures into Lost Mine of Phandelver: venture step 1 of that run",
+              "W34-N146n the opponent's venture is narrated from the same helper");
+        CHECK(ventureStepLine(true, "Tomb of Annihilation", 0)
+              == "You venture into Tomb of Annihilation",
+              "W34-N146n an uncaptured step number is omitted, never guessed");
+        // Echo shape: the option now carries a position tag AND a room effect;
+        // a bare room-name echo must still bind, and the wrong room must not.
+        vector<string> opts;
+        opts.push_back("Veils of Fear" + t1
+                       + " {room effect: Each player loses 2 life unless they discard a card.}");
+        opts.push_back("Oubliette" + t2
+                       + " {room effect: Discard a card and sacrifice an artifact, a creature, and a land.}");
+        bool stale = false;
+        int c = parseChoice("2 (Oubliette)", 2, &opts, &stale, NULL);
+        CHECK(c == 2 && !stale, "W34-N146n a bare room-name echo binds through the position tag");
+        int c2 = parseChoice("1 (Veils of Fear (room 2 of 5 in Tomb of Annihilation's"
+                             " printed room list))", 2, &opts, &stale, NULL);
+        CHECK(c2 == 1 && !stale, "W34-N146n an echo that repeats the position tag binds too");
+    }
+
+    // ---- N-105f: a batched counter run narrates its own step, not the batch's end ----
+    cout << "\n[W34-N105f] each counter line carries the P/T that counter settled at\n";
+    {
+        // deck105 repro: Cystbearer (3/4) infect damage to a 0/3 Arboreal Grazer.
+        // The three events are dispatched AFTER all three counters have landed,
+        // so the LIVE pair is -3/0 on all three lines.
+        string l1 = counterAppliedTag(true, true, -1, 2, -3, 0);
+        string l2 = counterAppliedTag(true, true, -2, 1, -3, 0);
+        string l3 = counterAppliedTag(true, true, -3, 0, -3, 0);
+        cout << "     " << l1 << l2 << l3 << "\n";
+        CHECK(l1 == " (now -1/2)" && l2 == " (now -2/1)" && l3 == " (now -3/0)",
+              "W34-N105f a 3-counter batch narrates -1/2, -2/1, -3/0 - strictly monotone");
+        CHECK(!(l1 == l2 || l2 == l3),
+              "W34-N105f no two consecutive lines of one batch print the same (now X/Y)");
+        // NEGATIVE (the pre-fix shape, pinned as what must not come back): with no
+        // captured state every line falls back to the post-batch pair.
+        CHECK(counterAppliedTag(true, false, 0, 0, -3, 0) == " (now -3/0)",
+              "W34-N105f control: an uncaptured event still reads the live pair");
+        // The +1/+1 control path (already correct) is unchanged.
+        CHECK(counterAppliedTag(true, true, 4, 4, 5, 5) == " (now 4/4)",
+              "W34-N105f a +1/+1 run reports its own step too");
+        // A non-creature (a dungeon taking an Explore counter) gets no P/T tail.
+        CHECK(counterAppliedTag(false, true, 0, 0, 0, 0).empty(),
+              "W34-N105f a non-creature counter line carries no (now X/Y)");
+    }
+
+    // ---- N-158s: a magnitude on a targeted rider needs a legal target ----
+    cout << "\n[W34-N158s] the targeted-rider scanner finds the spec a magnitude belongs to\n";
+    {
+        // Foray of Orcs, verbatim from borderline.txt: the damage clause is a
+        // targeted rider inside the amass transform.
+        string foray = "newability[name(Damage creature) damage:power "
+                       "target(creature|opponentbattlefield)])) forever";
+        size_t at = foray.find("damage:power") + strlen("damage:power");
+        CHECK(riderTargetSpec(foray, at) == "creature|opponentbattlefield",
+              "W34-N158s the target spec following a magnitude is read off the script");
+        // NEGATIVE: an untargeted magnitude is not gated (no spec to find).
+        string gary = "lifeleech:type:mana{b}:mybattlefieldplus0plusend all(player)";
+        size_t at2 = gary.find("lifeleech:") + strlen("lifeleech:");
+        size_t endTok = gary.find(' ', at2);
+        CHECK(riderTargetSpec(gary, endTok).empty(),
+              "W34-N158s an untargeted magnitude yields no spec and stays ungated");
+        // NEGATIVE: notaTarget() is not a chosen target and must not be read as one.
+        string amass = "counter(1/1.2) notaTarget(army|myBattlefield)";
+        size_t at3 = amass.find("counter(1/1.2)") + strlen("counter(1/1.2)");
+        CHECK(riderTargetSpec(amass, at3).empty(),
+              "W34-N158s notaTarget( is not a target spec");
+        // The magnitude label the emitter substitutes when the target set is empty
+        // carries NO number for the pilot to reuse as face damage.
+        string qualifier = "damage cannot happen: no legal target on the board right now";
+        CHECK(qualifier.find("damage 8") == string::npos
+              && qualifier.find("no legal target") != string::npos,
+              "W34-N158s the empty-target qualifier asserts no magnitude");
+        // Echo shape: the qualified option line still binds when echoed back.
+        vector<string> opts;
+        opts.push_back("Cast Foray of Orcs {3}{r} {right now: Army 6/6 -> 8/8, "
+                       + qualifier + "}");
+        opts.push_back("Cast nothing right now");
+        bool stale = false;
+        int c = parseChoice("1 (Cast Foray of Orcs)", 2, &opts, &stale, NULL);
+        CHECK(c == 1 && !stale, "W34-N158s a cast echo binds through the new qualifier tail");
+        int c2 = parseChoice("2 (Cast nothing right now)", 2, &opts, &stale, NULL);
+        CHECK(c2 == 2 && !stale, "W34-N158s the decline option is unaffected by the qualifier");
     }
 
     // ---- N-152d layer 2: the printed-face discriminator ----

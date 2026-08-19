@@ -5634,6 +5634,11 @@ int AAFlip::resolve()
                 _target->getManaCost()->resetCosts();
                 if(myFlip->getManaCost())
                     _target->getManaCost()->copy(myFlip->getManaCost());
+                //N-152k: the back face's PRINTED-cost status travels with the
+                //cost it just adopted. A transformed back face has no `mana=`
+                //line, and without this the render kept the front face's flag
+                //and printed a false "{0}" on the transformed permanent.
+                _target->hasPrintedManaCost = myFlip->hasPrintedManaCost;
             }
             _target->spellTargetType = myFlip->spellTargetType; // Fix to prevent flipped auras go to graveyard.
             _target->colors = myFlip->colors;

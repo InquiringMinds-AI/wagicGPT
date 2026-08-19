@@ -44,8 +44,21 @@ WEventCardUpdate::WEventCardUpdate(MTGCardInstance * card) :
 ;
 
 WEventCounters::WEventCounters(Counters *counter, string name, int power, int toughness, bool added, bool removed, MTGCardInstance* source) :
-WEvent(),counter(counter),name(name),power(power),toughness(toughness),added(added),removed(removed),source(source)
+WEvent(),counter(counter),name(name),power(power),toughness(toughness),added(added),removed(removed),source(source),
+settledPower(0),settledToughness(0),settledNb(0),stateCaptured(false)
 {
+}
+
+//N-105f: see the header - the queued dispatch makes the target's LIVE P/T
+//post-batch by the time a batched counter line is narrated.
+void WEventCounters::captureTargetState(int nb)
+{
+    if (!targetCard)
+        return;
+    settledPower = targetCard->power;
+    settledToughness = targetCard->toughness;
+    settledNb = nb;
+    stateCaptured = true;
 }
 
 WEventTotalCounters::WEventTotalCounters(Counters *counter, string name, int power, int toughness, bool added, bool removed, int totalamount, bool iscost, MTGCardInstance* source) :
