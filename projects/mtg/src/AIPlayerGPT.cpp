@@ -2995,6 +2995,41 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
     return found;
 }
 
+//WHICH "PLAN:" IS THE CURRENT PLAN (wave-34 #3, N-36e). Case-insensitive, and
+//the colon is required so prose like "I plan to attack" cannot truncate the
+//reply. The CONSUMER anchors LAST: a reply that stated a plan, kept
+//deliberating and then stated a REVISED plan carries two markers, and taking
+//the first carried the ABANDONED plan forward while discarding the committed
+//one - with the abandoned text running on through the retracted deliberation,
+//which is how 53% of deck36's prompts came to carry a >400-char plan field
+//(vs105 s35: markers at char 501 and char 5,359; the next prompt was fed
+//1,424 chars beginning at 501). parseChoice already anchors LAST on the answer
+//label and is right; every consumer of a reply now agrees. A marker that sits
+//AFTER the trailing answer label is part of that line's tail, not a new plan,
+//so it does not supersede. `firstOut` receives the FIRST marker, which is what
+//the reply-SHAPE tests want (did the reply lead with its plan?) and what
+//postPlanOverrun keeps using - as a TAIL METER the first plan is the right
+//origin, and it deliberately does not move.
+static size_t findPlanMarker(const string& text, size_t labelLineStart, size_t * firstOut)
+{
+    size_t pos = string::npos, first = string::npos;
+    for (size_t i = 0; i + 5 <= text.size(); i++)
+    {
+        if (tolower((unsigned char) text[i]) == 'p' && tolower((unsigned char) text[i + 1]) == 'l'
+            && tolower((unsigned char) text[i + 2]) == 'a' && tolower((unsigned char) text[i + 3]) == 'n'
+            && text[i + 4] == ':')
+        {
+            if (first == string::npos)
+                first = i;
+            if (labelLineStart == string::npos || i < labelLineStart || pos == string::npos)
+                pos = i;
+        }
+    }
+    if (firstOut)
+        *firstOut = first;
+    return pos;
+}
+
 string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabel)
 {
     //Drop any inline think block first (same as parseChoice).
@@ -3027,19 +3062,10 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         }
     }
 
-    //Find the "PLAN:" marker, case-insensitive; the colon is required so
-    //prose like "I plan to attack" before the choice cannot truncate it.
-    size_t pos = string::npos;
-    for (size_t i = 0; i + 5 <= text.size(); i++)
-    {
-        if (tolower((unsigned char) text[i]) == 'p' && tolower((unsigned char) text[i + 1]) == 'l'
-            && tolower((unsigned char) text[i + 2]) == 'a' && tolower((unsigned char) text[i + 3]) == 'n'
-            && text[i + 4] == ':')
-        {
-            pos = i;
-            break;
-        }
-    }
+    //The current plan: LAST marker (see findPlanMarker). firstPos is the
+    //reply-shape probe used further down, not the plan.
+    size_t firstPos = string::npos;
+    size_t pos = findPlanMarker(text, labelLineStart, &firstPos);
     if (pos == string::npos)
     {
         //No plan stated: keep the previous one. The answer segment (when
@@ -3106,13 +3132,13 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     //integers hijack the choice. A reply that leads with something else is
     //the legacy head-first shape: the head is the decision.
     size_t head = text.find_first_not_of(" \t\r\n");
-    if (head != string::npos && pos == head)
+    if (head != string::npos && firstPos == head)
         return string();
     //Same ramble guard as above: a legacy head is a short answer line, not
     //pages of prose ahead of a PLAN: marker.
-    if (pos > 300)
+    if (firstPos > 300)
         return string();
-    return text.substr(0, pos);
+    return text.substr(0, firstPos);
 }
 
 int AIPlayerGPT::receiveEvent(WEvent * event)
@@ -4178,6 +4204,35 @@ static string stripRenderAnnotationsLc(const string& s)
     return r;
 }
 
+//RENDER VOCABULARY: words that appear in the board/hand/option ANNOTATIONS
+//rather than in any card's name - zone tags, tap state, counter and stat
+//furniture. They are not identifying, and treating them as identity words is
+//how a wholly stale echo passed the staleness guard: deck146 vs116 seq34
+//answered a DUNGEON menu with "CHOICE: 1 (Nadaar, Selfless Paladin #1 (5/5)
+//[vigilance] [your battlefield])" - seq33's answer, carried in as YOUR PLAN -
+//and the echo shared "your"/"battlefield" with the offered option text, which
+//branch (a) reads as "the label is consistent with this option, trust the
+//index". It committed Tomb of Annihilation against the guide's teach, and the
+//room chain that followed cost two 200s+ spirals and the game hit the cap.
+//Filtered out of the ECHO's significant words only: dropping them can make an
+//echo MATCH an option (which honours the model's intent) but can never make a
+//foreign name look consistent with one.
+static bool isRenderVocabWord(const string& w)
+{
+    static const char * kVocab[] = {
+        "your", "yours", "opponent", "opponents", "battlefield", "graveyard",
+        "library", "exile", "hand", "tapped", "untapped", "printed", "counter",
+        "counters", "creature", "creatures", "artifact", "artifacts",
+        "enchantment", "permanent", "permanents", "player", "life", "cost",
+        "costs", "text", "card", "cards", "attacking", "blocking", "summoning",
+        "sickness", "right", "now", "this", "that", "turn", "mana", "available"
+    };
+    for (size_t i = 0; i < sizeof(kVocab) / sizeof(kVocab[0]); i++)
+        if (w == kVocab[i])
+            return true;
+    return false;
+}
+
 int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                              const std::vector<string> * optionTexts,
                              bool * staleEcho,
@@ -4224,6 +4279,36 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
         //the LAST "(...)" following a digit on the answer-ish tail
         size_t close = text.rfind(')');
         size_t open = (close == string::npos) ? string::npos : text.rfind('(', close);
+        //NESTED PARENTHETICAL REPAIR. Walking back from the last ')' finds the
+        //INNERMOST '(' when the echoed name carries its own parentheses -
+        //"CHOICE: 1 (Nadaar, Selfless Paladin #1 (5/5) [vigilance])" yielded
+        //the echo "5/5) [vigilance]", i.e. the render furniture with the card
+        //NAME cut off, so the staleness test ran on the wrong string. If the
+        //captured span contains an unmatched ')', the real opener is further
+        //left; step back until the span balances.
+        while (open != string::npos && open > 0)
+        {
+            int depth = 0;
+            bool unmatched = false;
+            for (size_t q = open + 1; q < close && !unmatched; q++)
+            {
+                if (text[q] == '(')
+                    depth++;
+                else if (text[q] == ')')
+                {
+                    if (depth == 0)
+                        unmatched = true;
+                    else
+                        depth--;
+                }
+            }
+            if (!unmatched)
+                break;
+            size_t prev = text.rfind('(', open - 1);
+            if (prev == string::npos || prev == open)
+                break;
+            open = prev;
+        }
         if (open != string::npos && close != string::npos && close > open + 1)
         {
             string echo = text.substr(open + 1, close - open - 1);
@@ -4280,7 +4365,8 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                     //reduce to these tokens.
                     if (w.size() >= 4 && w != "cast" && w != "with" && w != "play"
                         && w != "pass" && w != "none" && w != "hold" && w != "done"
-                        && w != "skip" && w != "decline" && w != "nobody")
+                        && w != "skip" && w != "decline" && w != "nobody"
+                        && !isRenderVocabWord(w))
                         words.push_back(w);
                     w.clear();
                 }
@@ -11482,6 +11568,82 @@ void AIPlayerGPT::runParseSelfTest()
         parseBlockAssignments("BLOCKS: B1:none, B2:none", 2, 2, out4, NULL, NULL, NULL, &dropped4);
         CHECK(dropped4 == 0,
               "W34-1b-B NEGATIVE declining with B#:none is not a dropped assignment");
+    }
+
+    // ---- #3 / N-36e: the plan CONSUMER anchors LAST, like every other consumer
+    cout << "\n[W34-N36e] a revised plan supersedes the abandoned one\n";
+    {
+        // deck36 vs105 s35: two PLAN: lines, the first abandoned mid-reply.
+        string two = "CHOICE: 1 (Cast Ichor Rats)\n"
+                     "PLAN: race on poison and hold removal.\n"
+                     "Actually the board says otherwise.\n"
+                     "PLAN: stabilise first, then race.";
+        size_t first = string::npos;
+        size_t pos = findPlanMarker(two, string::npos, &first);
+        cout << "     markers: first=" << (long) first << " current=" << (long) pos << "\n";
+        CHECK(pos == two.rfind("PLAN:") && first == two.find("PLAN:") && pos != first,
+              "W34-N36e the CURRENT plan is the LAST PLAN: line, not the abandoned first");
+        CHECK(postPlanOverrun(two) > 0,
+              "W34-N36e the tail meter still measures from the FIRST plan (deliberately unmoved)");
+        // NEGATIVE: one plan line - first and last are the same marker.
+        string one = "CHOICE: 2 (Cast Mordor Muster)\nPLAN: build the army.";
+        size_t f1 = string::npos;
+        CHECK(findPlanMarker(one, string::npos, &f1) == one.find("PLAN:") && f1 == one.find("PLAN:"),
+              "W34-N36e NEGATIVE a single-plan reply is unaffected");
+        // NEGATIVE: no plan at all -> npos, and the omission semantics
+        // (f46dd58ee: the previous plan carries forward) are untouched.
+        size_t f2 = string::npos;
+        CHECK(findPlanMarker("CHOICE: 0 (pass)", string::npos, &f2) == string::npos && f2 == string::npos,
+              "W34-N36e NEGATIVE an omitted PLAN is still an omission, never a marker");
+        // A "PLAN:" that sits AFTER the trailing answer label belongs to that
+        // line's tail, not to the plan - the earlier real plan stays current.
+        string tail = "PLAN: hold up mana and counter the bomb.\nCHOICE: 1 (Hold) PLAN: nonsense";
+        size_t labelLine = tail.find("CHOICE:");
+        size_t f3 = string::npos;
+        CHECK(findPlanMarker(tail, labelLine, &f3) == tail.find("PLAN:"),
+              "W34-N36e a PLAN: inside the answer line's tail does not supersede the real plan");
+    }
+
+    // ---- #3 / N-146m: an index whose NAME names no option is NOT an answer
+    cout << "\n[W34-N146m] a stale echo cannot commit a real choice by index\n";
+    {
+        // deck146 vs116 seq34, exactly: a DUNGEON menu answered with seq33's
+        // answer, carried in as YOUR PLAN. The name anchors to nothing here.
+        vector<string> dungeons;
+        dungeons.push_back("Tomb of Annihilation {room effect: enter the trapped room on your battlefield}");
+        dungeons.push_back("Lost Mine of Phandelver {room effect: cave in - a creature you control gets +1/+1}");
+        dungeons.push_back("Dungeon of the Mad Mage {room effect: secret door on the battlefield}");
+        bool stale = false;
+        int c = parseChoice("1 (Nadaar, Selfless Paladin #1 (5/5) [vigilance] [your battlefield])",
+                            3, &dungeons, &stale, NULL);
+        cout << "     stale dungeon answer -> " << c << " (must be -1) stale=" << (int) stale << "\n";
+        CHECK(c == -1 && stale,
+              "W34-N146m a parenthetical naming NO offered option is a rejection, not option 1");
+        // The two halves of that fix, each on its own:
+        // (a) the nested parenthetical must not cut the card NAME off the echo.
+        vector<string> creatures;
+        creatures.push_back("Grizzly Bears (2/2) [your battlefield]");
+        creatures.push_back("Nadaar, Selfless Paladin (5/5) [vigilance] [your battlefield]");
+        bool st2 = false;
+        int c2 = parseChoice("1 (Nadaar, Selfless Paladin #1 (5/5) [vigilance] [your battlefield])",
+                             2, &creatures, &st2, NULL);
+        cout << "     nested-paren echo against the real option -> " << c2 << " (must be 2)\n";
+        CHECK(c2 == 2 && !st2,
+              "W34-N146m the repaired echo still REMAPS to the option it actually names");
+        // (b) render vocabulary shared with an option is not agreement.
+        CHECK(isRenderVocabWord("battlefield") && isRenderVocabWord("your")
+              && !isRenderVocabWord("nadaar") && !isRenderVocabWord("annihilation"),
+              "W34-N146m zone/state words are render furniture; card words are identity");
+        // NEGATIVE, the guard that must stay green: an ordinary correct answer
+        // whose echo names its own option still binds, annotations and all.
+        bool st3 = false;
+        int c3 = parseChoice("1 (Tomb of Annihilation)", 3, &dungeons, &st3, NULL);
+        CHECK(c3 == 1 && !st3,
+              "W34-N146m NEGATIVE a correct in-context answer binds unchanged");
+        // NEGATIVE: a deliberate pass carries no name and is never stale.
+        bool st4 = false;
+        CHECK(parseChoice("0 (pass)", 3, &dungeons, &st4, NULL) == 0 && !st4,
+              "W34-N146m NEGATIVE CHOICE: 0 (pass) is a decision, not a stale echo");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
