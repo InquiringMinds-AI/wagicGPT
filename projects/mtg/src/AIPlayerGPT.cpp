@@ -3237,9 +3237,17 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //by turn, and it did - at 200s a time. Name the act and the step.
         if (e->added && e->targetCard->hasType(Subtypes::TYPE_DUNGEON)
             && ciStartsWith(e->name, "explore"))
-            return ventureStepLine(e->targetCard->controller() == this,
+        {
+            //Whose venture: the dungeon sits in its owner's command zone, so
+            //the ZONE is the authority here (controller() is the battlefield
+            //notion and a command-zone card is not on a battlefield).
+            Player * dngOwner = (e->targetCard->currentZone && e->targetCard->currentZone->owner)
+                                ? e->targetCard->currentZone->owner
+                                : e->targetCard->controller();
+            return ventureStepLine(dngOwner == this,
                                    e->targetCard->getDisplayName(),
                                    e->stateCaptured ? e->settledNb : 0);
+        }
         out << (e->added ? "Counter added to " : "Counter removed from ")
             << e->targetCard->getDisplayName() << instanceHandle(e->targetCard);
         if (!e->name.empty() && e->name != " ")
