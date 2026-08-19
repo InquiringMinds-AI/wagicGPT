@@ -2245,16 +2245,23 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
         mReasoningBudget = atol(rb);
     if (!mThinking)
         mReasoningBudget = 0;
-    //Timeout FLOOR for thinking mode, applied only to the DEFAULT. Worst case
-    //is the whole budget decoded at this stack's ~30 tok/s: (8000 + 230) / 30
-    //~= 275s, so a shorter default would turn every budget-spending decision
-    //into a transport timeout - a latency bound masquerading as a model
-    //failure. An explicit timeout (env or config) is the user's call and is
-    //never raised over their head; the built-in default (600s) already clears
-    //this floor, so the guard exists for a future default, not for today.
+    //Timeout FLOOR for thinking mode, applied only to the DEFAULT. The HTTP
+    //timeout is the ONLY watchdog that falls back to the heuristic (the
+    //patience window raises a human prompt and never decides on its own), so
+    //it has to sit ABOVE the worst case a decision can legitimately take -
+    //otherwise the budget machinery gets cut off rescuing exactly the
+    //decisions it exists for. Worst case, budgeted end to end at this stack's
+    //~30 tok/s: phase 1 = prompt prefill (~10-20s at corpus prompt sizes) +
+    //(8000 thinking + ~230 reply) tokens ~= 295s; a budget hit then adds
+    //phase 2 = re-prefill of prompt + the 8k of thinking (~15-25s) + ~400
+    //tokens ~= 40s. Total ~= 335-360s, and each phase is its own request. 420s
+    //keeps a real margin over that rather than shaving it. An explicit timeout
+    //(env or config) is the user's call and is never raised over their head;
+    //the built-in default (600s) already clears this floor, so the guard is
+    //for a future default, not for today.
     if (mThinking && mReasoningBudget > 0 && !getenv("WAGIC_GPT_TIMEOUT")
-        && cfg.timeoutSecs == GptSettings().timeoutSecs && mTimeoutMs < 330000)
-        mTimeoutMs = 330000;
+        && cfg.timeoutSecs == GptSettings().timeoutSecs && mTimeoutMs < 420000)
+        mTimeoutMs = 420000;
     mReasoningEffort = cfg.reasoningEffort;
     if (const char * re = getenv("WAGIC_GPT_EFFORT"))
         mReasoningEffort = re;
