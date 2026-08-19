@@ -321,6 +321,69 @@ static MTGCardInstance * findMyArmy(MTGCardInstance * card)
     return NULL;
 }
 
+//N-158s: read the `target(...)` spec that immediately follows a magnitude
+//clause in the card script, if there is one. `pos` is the offset just past the
+//magnitude expression in `script`. Returns "" when the next token is not a
+//target spec (an untargeted magnitude, which stays ungated). Pure, so the
+//scanner is provable in PARSETEST without a game.
+string riderTargetSpec(const string& script, size_t pos)
+{
+    while (pos < script.size() && (script[pos] == ' ' || script[pos] == '\t'))
+        pos++;
+    //"notaTarget(...)" and "targetedplayer(...)" are NOT a target spec for this
+    //purpose: only the literal `target(` clause names a chosen target.
+    if (script.compare(pos, 7, "target(") != 0 && script.compare(pos, 7, "Target(") != 0)
+        return "";
+    size_t open = pos + 7;
+    size_t close = script.find(')', open);
+    if (close == string::npos)
+        return "";
+    return script.substr(open, close - open);
+}
+
+//N-158s (wave-33 deck158, HIGH): does `spec` have at least one legal target on
+//the CURRENT board? Foray of Orcs rendered "{right now: Army 6/6 -> 8/8,
+//damage 8}" into an opponent board with zero creatures and the pilot cited the
+//annotation BY NAME as its authority for eight points of face damage that the
+//resolution cannot deliver. A magnitude on a targeted rider is an assertion
+//that the effect will occur, so it must be gated on the rider being able to
+//occur. Fail OPEN (return true) when no chooser can be built: an unevaluable
+//spec is not evidence of an empty target set.
+static bool riderHasLegalTarget(MTGCardInstance * card, const string& spec)
+{
+    if (!card || spec.empty())
+        return true;
+    GameObserver * obs = card->getObserver();
+    if (!obs || !obs->players[0] || !obs->players[1])
+        return true;
+    TargetChooserFactory tcf(obs);
+    TargetChooser * tc = tcf.createTargetChooser(spec, card);
+    if (!tc)
+        return true;
+    bool found = false;
+    for (int pi = 0; pi < 2 && !found; pi++)
+    {
+        Player * pp = obs->players[pi];
+        if (!pp || !pp->game)
+            continue;
+        MTGGameZone * zz[] = { pp->game->inPlay, pp->game->graveyard, pp->game->hand,
+                               pp->game->exile, pp->game->library, pp->game->stack,
+                               pp->game->commandzone };
+        for (int zi = 0; zi < 7 && !found; zi++)
+            if (zz[zi] && tc->targetsZone(zz[zi]))
+                for (int cj = 0; cj < zz[zi]->nb_cards; cj++)
+                    if (tc->canTarget(zz[zi]->cards[cj]))
+                    {
+                        found = true;
+                        break;
+                    }
+        if (!found && tc->canTarget(pp))
+            found = true;
+    }
+    SAFE_DELETE(tc);
+    return found;
+}
+
 string dynamicMagnitudes(MTGCardInstance * card)
 {
     //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
@@ -401,6 +464,24 @@ string dynamicMagnitudes(MTGCardInstance * card)
                 continue;
             if (!seen.insert(string(kVerbs[v].key) + expr).second)
                 continue;
+            //N-158s: a magnitude on a TARGETED rider asserts that the effect
+            //will occur. Foray of Orcs' "damage 8" rendered against an empty
+            //opponent board and the pilot cited the tag by name as its
+            //authority for 8 face damage the resolution cannot deal. Gate the
+            //clause on the rider having a legal target - and SAY SO rather than
+            //going silent: an omitted clause is a gap the model fills with
+            //invented rules (the trust doctrine's own lesson from N-36b), and
+            //the qualifier carries no magnitude for it to reuse.
+            {
+                string tspec = riderTargetSpec(card->magicText, start + expr.size());
+                if (!tspec.empty() && !riderHasLegalTarget(card, tspec))
+                {
+                    out << (count ? ", " : "") << kVerbs[v].label
+                        << " cannot happen: no legal target on the board right now";
+                    count++;
+                    continue;
+                }
+            }
             //An expression reading the SOURCE's own power/toughness is
             //unevaluable when the source is not a creature: a sorcery has power
             //0, and "damage 0" printed with authority is worse than no
@@ -10709,6 +10790,45 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(c == 1 && !stale, "W34-N152k a bare-name echo binds the cost-less back face option");
         int c2 = parseChoice("2 (Mox Jet {0})", 2, &opts, &stale, NULL);
         CHECK(c2 == 2 && !stale, "W34-N152k the {0} Mox option still binds by its cost token");
+    }
+
+    // ---- N-158s: a magnitude on a targeted rider needs a legal target ----
+    cout << "\n[W34-N158s] the targeted-rider scanner finds the spec a magnitude belongs to\n";
+    {
+        // Foray of Orcs, verbatim from borderline.txt: the damage clause is a
+        // targeted rider inside the amass transform.
+        string foray = "newability[name(Damage creature) damage:power "
+                       "target(creature|opponentbattlefield)])) forever";
+        size_t at = foray.find("damage:power") + strlen("damage:power");
+        CHECK(riderTargetSpec(foray, at) == "creature|opponentbattlefield",
+              "W34-N158s the target spec following a magnitude is read off the script");
+        // NEGATIVE: an untargeted magnitude is not gated (no spec to find).
+        string gary = "lifeleech:type:mana{b}:mybattlefieldplus0plusend all(player)";
+        size_t at2 = gary.find("lifeleech:") + strlen("lifeleech:");
+        size_t endTok = gary.find(' ', at2);
+        CHECK(riderTargetSpec(gary, endTok).empty(),
+              "W34-N158s an untargeted magnitude yields no spec and stays ungated");
+        // NEGATIVE: notaTarget() is not a chosen target and must not be read as one.
+        string amass = "counter(1/1.2) notaTarget(army|myBattlefield)";
+        size_t at3 = amass.find("counter(1/1.2)") + strlen("counter(1/1.2)");
+        CHECK(riderTargetSpec(amass, at3).empty(),
+              "W34-N158s notaTarget( is not a target spec");
+        // The magnitude label the emitter substitutes when the target set is empty
+        // carries NO number for the pilot to reuse as face damage.
+        string qualifier = "damage cannot happen: no legal target on the board right now";
+        CHECK(qualifier.find("damage 8") == string::npos
+              && qualifier.find("no legal target") != string::npos,
+              "W34-N158s the empty-target qualifier asserts no magnitude");
+        // Echo shape: the qualified option line still binds when echoed back.
+        vector<string> opts;
+        opts.push_back("Cast Foray of Orcs {3}{r} {right now: Army 6/6 -> 8/8, "
+                       + qualifier + "}");
+        opts.push_back("Cast nothing right now");
+        bool stale = false;
+        int c = parseChoice("1 (Cast Foray of Orcs)", 2, &opts, &stale, NULL);
+        CHECK(c == 1 && !stale, "W34-N158s a cast echo binds through the new qualifier tail");
+        int c2 = parseChoice("2 (Cast nothing right now)", 2, &opts, &stale, NULL);
+        CHECK(c2 == 2 && !stale, "W34-N158s the decline option is unaffected by the qualifier");
     }
 
     // ---- N-152d layer 2: the printed-face discriminator ----
