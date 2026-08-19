@@ -273,3 +273,18 @@ so the wave-34 corpus runs at **-T 7200** (deviation from "hold both levers",
 calibration-forced; -j 3 and REPPENALTY held). Cap-sensitive game-outcome comparisons
 vs wave-33 are accordingly OFF the table for this corpus; decision-level metrics remain
 the A/B currency.
+
+**OWNER DIRECTIVE — wave-35+ corpus throughput shape (2026-08-19):** "dial in the
+permitted reasoning length, make the wall clock guard very generous, then push
+concurrency up — otherwise we're losing a lot of throughput and paying it in wallclock
+time." Concretely: (1) tune reasoning_budget from the wave-34 calibration distribution
+(p99 by decision kind + budget_hit rate); (2) BOTH wall-clock guards go very generous —
+the per-decision fallback timeout scales with contention (at -j 8 expect 3-4x solo
+latency: think ~900s+, never the tight default), and the game cap likewise (-T 14400
+class); (3) THEN raise -j (Spark's batched decode raises aggregate tok/s with
+concurrency; ceiling = max-num-seqs 16, request load cannot trip Spark's power
+ceiling). RE-ADJUDICATE the old "-j 6 halves decision quality" caution — it was
+measured under a 120s HTTP timeout and its fallbacks were timeout artifacts; under
+generous guards the quality cost may be zero. Validate on the first high-j corpus:
+fallback rate + decision-quality spot-check vs a -j 3 baseline before adopting as
+standing.
