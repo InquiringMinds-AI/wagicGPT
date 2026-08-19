@@ -253,9 +253,14 @@ What we most want to hear about, in rough order of value:
    you three tries — especially on platforms/models we don't own. If your
    agent did the setup, its transcript of what went wrong is a perfectly good
    report.
-5. **Model reports.** Which model, which provider, and how it played. The
-   opponent's quality varies enormously by model, and the map of "what plays
-   well" is exactly the thing only many people with many setups can draw.
+5. **Model reports.** Which model, which provider, and how it played. A
+   pleasant surprise from our own testing: even small 4B-class local models
+   play a solid, coherent game — across a 4B, a 122B, and a frontier hosted
+   model, the difference we could actually perceive was mostly response
+   time. How model choice really affects play — say, whether bigger models
+   adapt better to decks nobody wrote a strategy guide for — is an open
+   question, and the map of it is exactly the thing only many people with
+   many setups can draw.
 6. **GUI feedback.** Three questions, take any of them: what could be
    better? what isn't working right — and *how* is it wrong (what you did,
    what it showed, what you expected)? and what could it do that it doesn't?
