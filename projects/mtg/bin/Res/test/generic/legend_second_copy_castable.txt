@@ -1,0 +1,37 @@
+#Wave-32/33 ledger N-152g -- casting a legend while a same-name copy is on the
+#battlefield was SUPPRESSED at the oracle (LegalActions.cpp: the spell rung and
+#the land rung both skipped any legendary whose name was already in play).
+#
+#RULES-WRONG: the "legend rule" is CR 704.5j, a STATE-BASED ACTION applied after
+#the spell resolves - the controller keeps one copy and the rest go to the
+#graveyard. MTGNewLegend implements exactly that. Nothing in the rules forbids
+#casting the second copy, and doing so is often correct (re-trigger an ETB,
+#replace a shrunken or stolen copy, empty the hand before a discard).
+#
+#WITNESS: Jasmine Boreal (a vanilla legendary creature) is on the battlefield
+#and a second copy is in hand with five untapped sources. PRE-FIX the cast is
+#never offered, so the second copy sits in hand all game. POST-FIX it is cast,
+#it resolves, and the state-based action leaves exactly ONE Jasmine Boreal on
+#the battlefield and one in the graveyard.
+FORCEABILITY
+AICALLS 120
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Jasmine Boreal,Snow-Covered Forest,Snow-Covered Plains,Snow-Covered Island,Snow-Covered Swamp,Snow-Covered Mountain
+hand:Jasmine Boreal
+life:20
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+[ASSERT]
+combatbegins
+[PLAYER1]
+inplay:Jasmine Boreal,Snow-Covered Forest,Snow-Covered Plains,Snow-Covered Island,Snow-Covered Swamp,Snow-Covered Mountain
+graveyard:Jasmine Boreal
+life:20
+[PLAYER2]
+life:20
+[END]
