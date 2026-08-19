@@ -154,3 +154,111 @@ capping think tokens and injecting the close-of-thinking marker so the model mus
 answer from what it has; the Codex backend's effort tiers are the analogous knob).
 Per the generous-defaults rule this ships UNBOUNDED; the budget is the documented
 lever to pull only if the A/B shows runaway native thinking, not a starting clamp.
+
+**SUPERSEDED — OWNER RULING, 2026-08-19 (later the same day, during wave-34 step 1).
+The budget is BOUNDED FROM THE START; the paragraph above stands only as the
+position it replaced.** His derivation, and then his override of it:
+
+- **t** = the time bound expressed as tokens = `WAGIC_GPT_TIMEOUT 240s x ~30 tok/s` = **7200**
+- **p** = max expected PLAN = p95 592 chars => **200 tokens**
+- **c** = the coded choice line = p95 74 chars => **30 tokens**
+- **a** = t - p - c = **6970**;  **b = 1.5a ≈ 10450 tokens** of reasoning budget
+- **his override on that number: "oof. thats a lot. lets make it 8000"** — so the SHIPPED
+  starting budget is a flat **8000**, and it is explicitly a **first-round CALIBRATION
+  value**: *"we'll almost certainly tune this lower... one round with this budget should
+  give us a better idea of where the budget limit should actually be."*
+
+**Shipped in wave-34 step 1** (`AIPlayerGPT.cpp`, `GptConfig.*`):
+
+1. `reasoning_budget=` in endpoints.txt / `WAGIC_GPT_REASONING_BUDGET`, default **8000**
+   when thinking is ON, 0-or-less = unbounded. Thinking OFF is untouched in every respect.
+2. **Budget-then-FORCE-ANSWER, two-phase** — a bare `max_tokens` truncation that loses the
+   answer is not acceptable. Phase 1 caps at `budget + 400` (the answer reserve: p95 PLAN
+   200 + choice line 30 + margin). If that reply comes back with an **UNCLOSED `<think>`**,
+   phase 2 re-sends the same decision with the model's own truncated thinking as an
+   **assistant prefill** with `</think>` injected and a 400-token cap, so it must answer
+   from what it has. Qwen's documented budget-forcing pattern, expressed through vLLM's
+   `continue_final_message` rather than a raw `/v1/completions` prompt render — the client
+   holds no copy of the chat template, and a mis-rendered prompt would be a silent quality
+   change. Scoped to endpoints that accept a prefill (not Codex, not OpenRouter, not
+   api.openai.com — those hide reasoning entirely and have nothing to close).
+3. **Translog:** `reasoning` (verbatim), `reasoning_chars`, `reasoning_tokens` (the
+   server's own count when it reports one — the budget is denominated in tokens, so the
+   next budget is read off *this* distribution: p95/p99 by decision kind against the
+   `reasoning_budget_hit` rate), and `reasoning_budget_hit` when a forced close fired.
+
+**LIVE-PROBED against the real endpoint (Spark vLLM 0.23.1rc1 + qwen35, 2026-08-19) —
+three facts that overturned plausible defaults, and what each one changed:**
+
+- **The field is `message.reasoning`, not `reasoning_content`**, and with the parser active
+  `content` arrives ALREADY stripped — no inline `<think>` ever reaches the client. Capture
+  now reads `reasoning_content` → `reasoning` → inline `<think>` fallback, in that order.
+  Betting on the OpenAI spelling alone would have produced a corpus with an empty reasoning
+  column and a blind seat review — the exact failure #1b exists to prevent.
+- **Server-side default thinking is ON for this model** (a request with no
+  `chat_template_kwargs` generated into `reasoning`). So the thinking-OFF arm is only OFF
+  because the client sends `enable_thinking: false` EXPLICITLY; it does, unconditionally
+  outside api.openai.com. Omitting the field on the OFF arm would have run both arms with
+  thinking on and produced a null A/B.
+- **The reasoning parser classifies by GENERATED tokens only.** `continue_final_message` is
+  accepted, but our PREFILLED `</think>` is never generated, so the whole phase-2 generation
+  lands in `reasoning` with `content` null (verified: prefill + continue → `reasoning` =
+  `"\n\nCHOICE: 1"`). The injected close still does its job on the MODEL — it answered
+  immediately — just not on the server's field routing. So the answer candidate is `content`
+  when non-empty, else the tail of `reasoning` **from its last coded answer line, and only
+  when nothing substantive follows that line**. Anchored to the end deliberately: phase-1
+  mid-thinking text is full of candidates the model was still weighing, and a reply that
+  stopped at the cap (`finish_reason == "length"`) is mid-thought by definition and is
+  refused whatever it looks like.
+- Consequences recorded: a **phase-1 budget hit** on this build reads as
+  `finish_reason == "length"` + empty content + non-empty reasoning (there is no inline
+  block to test, so that shape — not an unclosed `<think>` — is the normal detector).
+  `usage` carries **no** `reasoning_tokens` on this build (prompt/completion/total only, and
+  `completion_tokens` covers thinking+reply combined), so `reasoning_chars` is the working
+  length metric; the `reasoning_tokens` read stays as forward compatibility.
+- **New fallback class `reasoning_only`.** `empty_reply` has always meant TRANSPORT — nothing
+  came back. A reply that arrives complete and paid for with `content` null because the whole
+  generation was filed as thinking is a MODEL behaviour, and scoring it as an endpoint fault
+  would corrupt the one distinction the A/B turns on. Seats read `reasoning_only` separately.
+
+**HIDDEN-TRACE PROVIDERS (owner requirement, 2026-08-19) — the third reasoning shape, and the
+one that governs what ships to USERS rather than what the dev loop measures:**
+
+Some providers reason and never return the trace: OpenAI and Anthropic withhold raw
+chain-of-thought as policy, and OpenRouter can hide it depending on the upstream — this
+project has already been bitten by exactly that, as the 40s mystery latency behind a
+140-token answer (`71f4f615c`). The client now treats this as NORMAL:
+
+- **Shape:** reasoning requested + `content` NON-EMPTY + no trace anywhere (no
+  `message.reasoning`, no `reasoning_content`, no inline `<think>`). It parses exactly as the
+  thinking-off path parses, and is marked **`reasoning_hidden`** in the translog. It is the
+  INVERSE of `reasoning_only` (empty content, trace present) and is never conflated with it.
+  Without the marker the A/B cannot separate *"reasoned invisibly"* from *"did not reason"* —
+  both write no reasoning field, and only one of them is paying for thinking tokens.
+- **No parse or fallback anywhere gates on reasoning being present.** The *"reasoning present
+  and non-empty at BOTH seats before the corpus runs"* rule (deck152's condition, adopted at
+  #1b) is a **Spark/dev-loop precondition for the A/B**, not a client invariant — encoding it
+  in the client would turn every OpenAI/Anthropic user's game into a heuristic-only game.
+- **The two-phase forced close cannot exist on a hidden-trace provider** (there is no trace to
+  prefill), and is guarded twice: `gptForceCloseSupported()` excludes those endpoints by name,
+  and the fire condition now states `content.empty() && !reasoning.empty()` explicitly rather
+  than leaving it implied — a content-bearing reply needs no rescue in the first place.
+- **`reasoning_budget` therefore applies only where a raw thinking channel exists** (vLLM /
+  llama.cpp families). On the subscription (Codex) backend the budget's analogue is the
+  existing `reasoning_effort` tier, which is what that adapter already sends; on OpenRouter the
+  unified `reasoning` switch is the only lever. The config key is inert on all of them, and
+  `reasoningRequested()` reads the Codex tier rather than the thinking flag so a withheld trace
+  is still recognised there.
+- **Latency accounting:** hidden reasoning still costs decode time, invisibly. `latency_ms`
+  already carries it; the pair to read is `reasoning_hidden` + a long round trip = a WITHHELD
+  trace, never a defect class. `reasoning_chars` 0 on such a record means nothing was returned,
+  not that nothing was spent.
+4. **Timeout ≥ the full two-phase worst case.** The HTTP timeout is the ONLY watchdog that
+   falls back to the heuristic (the patience window raises a human prompt and never decides
+   on its own — verified, and it is gated on a human seat so self-play never sees it).
+   Worst case at ~30 tok/s: phase 1 = prefill (~10-20s) + (8000 + ~230) tokens ≈ **295s**;
+   a budget hit adds phase 2 = re-prefill of prompt + thinking (~15-25s) + ~400 tokens
+   ≈ **40s**; total ≈ **335-360s**. Thinking-mode default is therefore **420s**, a margin
+   rather than a shave, and `tools/selfplay-harness.sh` — which pinned
+   `WAGIC_GPT_TIMEOUT=240` unconditionally and would have overridden it for the whole A/B
+   corpus — now defaults to 420 under `--thinking`. Explicit env/config still wins.

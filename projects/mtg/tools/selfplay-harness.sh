@@ -118,7 +118,12 @@ ls "$LOGDIR"/*.jsonl 2>/dev/null | sort > "$BEFORE_LIST"
 echo "== selfplay harness (matchups) =="
 echo "  pool   : $POOL"
 echo "  games  : $NGAMES ($(( ${#DECKS[@]} * (${#DECKS[@]} - 1) / 2 )) pairings x $REPS reps), $JOBS concurrent"
-echo "  model  : $MODEL @ $URL (thinking=$THINKING)"
+# The HTTP timeout is the only watchdog that falls back to the heuristic, so it
+# must clear the worst case a decision can take. With --thinking that is the
+# two-phase budget path (8000-token thinking window + the forced-answer close,
+# ~335-360s at ~30 tok/s); without it, the terse-reply default stands.
+if [ "$THINKING" = "1" ]; then DEFAULT_GPT_TIMEOUT=420; else DEFAULT_GPT_TIMEOUT=240; fi
+echo "  model  : $MODEL @ $URL (thinking=$THINKING, gpt timeout=${WAGIC_GPT_TIMEOUT:-$DEFAULT_GPT_TIMEOUT}s)"
 echo "  caps   : ${TOTAL_CAP_S}s total, ${GAME_TIMEOUT_S}s/game (fastclock=$FASTCLOCK)"
 echo "  outdir : $OUTDIR"
 
@@ -138,7 +143,7 @@ run_one_game() {
         WAGIC_SELFPLAY_DECK0="$d0" WAGIC_SELFPLAY_DECK1="$d2" \
         WAGIC_AI=gpt WAGIC_GPT_URL="$URL" WAGIC_GPT_MODEL="$MODEL" WAGIC_GPT_KEY="$KEY" \
         WAGIC_GPT_THINKING="$THINKING" WAGIC_GPT_TRANSLOG=1 \
-        WAGIC_GPT_TIMEOUT="${WAGIC_GPT_TIMEOUT:-240}" \
+        WAGIC_GPT_TIMEOUT="${WAGIC_GPT_TIMEOUT:-$DEFAULT_GPT_TIMEOUT}" \
         ./wagic > "$elog" 2>&1
     local resline; resline=$(grep -E 'WAGIC_SELFPLAY_RESULT winner=' "$elog" | tail -1)
     local winner life0 life1 turn

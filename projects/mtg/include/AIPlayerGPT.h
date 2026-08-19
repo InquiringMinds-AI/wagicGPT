@@ -497,6 +497,48 @@ private:
     string mRetryDoneBase;
     long mRetryFirstLatencyMs;
     bool mLastRetry;
+
+    //NATIVE REASONING (wave-34 #1a/#1b). With the post-answer scratch block
+    //gone from the reply protocol, the auditable reasoning is the model's own
+    //thinking window - captured here, written to the translog, and BOUNDED.
+    //mLastReasoning: the last reply's thinking, from message.reasoning_content
+    //or from an inline <think> block, whichever the server produced. Consumed
+    //(cleared) by the translog write, like mLastLatencyMs.
+    string mLastReasoning;
+    //"empty_reply" (transport: nothing came back) vs "reasoning_only" (a
+    //complete reply whose whole generation was filed as thinking). Same
+    //outcome - the heuristic answers - but a seat review must not read a model
+    //behaviour as an endpoint fault.
+    const char * noAnswerClass() const;
+    //Was reasoning asked for on this endpoint (thinking flag, or the Codex
+    //effort tier)? Only ever used to tell a WITHHELD trace from a reply that
+    //never reasoned - parsing and fallback never consult it.
+    bool reasoningRequested() const;
+    //Reasoning was requested, the answer arrived, and the provider withheld the
+    //trace (OpenAI/Anthropic policy; OpenRouter depending on upstream). Normal,
+    //parsed like any other reply, and marked reasoning_hidden in the translog.
+    //The INVERSE of reasoning_only - never conflate the two.
+    bool mLastReasoningHidden;
+    //The last reply was REASONING-ONLY: an unclosed <think>, i.e. the thinking
+    //budget (or max_tokens) cut the reply before any answer. Never parsed as
+    //an answer; it triggers the forced close instead.
+    bool mLastReasoningOnly;
+    bool mLastFinishLength;  //the last reply stopped at the token cap
+    long mLastReasoningTokens; //the server's own reasoning-token count when it
+                             //reports one (-1 = it did not); the budget is in
+                             //tokens, so this is the calibration number
+    int mLastDroppedAssignments; //blocker seam: B:A pairs the reply asked for
+                             //that never reached the battlefield (parser drops
+                             //+ apply-site prunes). -1 = not a blocker record
+    bool mLastBudgetHit;     //a forced close fired for this decision (translog
+                             //reasoning_budget_hit) - the A/B's count of how
+                             //often the budget actually bound
+    //The truncated thinking handed back to the model on the forced close, with
+    //its "</think>" injected by the request builder.
+    string mForceClosePrefill;
+    //Thinking-window budget in TOKENS, thinking mode only (config
+    //reasoning_budget / WAGIC_GPT_REASONING_BUDGET; 0 or less = unbounded).
+    long mReasoningBudget;
 };
 
 #endif //WITH_GPT_AI

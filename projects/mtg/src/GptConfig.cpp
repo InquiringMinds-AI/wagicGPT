@@ -34,7 +34,7 @@ using std::string;
 using std::vector;
 
 GptSettings::GptSettings()
-    : enabled(0), thinking(-1), maxTokens(-1), repetitionPenalty(1.0), timeoutSecs(600), patienceSecs(60), translog(0), telemetry(-1), peek(0)
+    : enabled(0), thinking(-1), maxTokens(-1), reasoningBudget(-1), repetitionPenalty(1.0), timeoutSecs(600), patienceSecs(60), translog(0), telemetry(-1), peek(0)
 {
 }
 
@@ -307,6 +307,7 @@ GptSettings GptSettings::load()
         else if (k == "enabled") cfg.enabled = (v != "0" && v != "off") ? 1 : 0;
         else if (k == "thinking") cfg.thinking = (v != "0" && v != "off") ? 1 : 0;
         else if (k == "maxtokens" || k == "max_reply_tokens") cfg.maxTokens = atol(v.c_str());
+        else if (k == "reasoning_budget") cfg.reasoningBudget = atol(v.c_str());
         else if (k == "repetition_penalty") cfg.repetitionPenalty = atof(v.c_str());
         else if (k == "provider_only") cfg.providerOnly = v;
         else if (k == "reasoning_effort") cfg.reasoningEffort = v;
@@ -359,6 +360,8 @@ bool GptSettings::save() const
         f << "max_reply_tokens=" << maxTokens << "\n";
     if (repetitionPenalty != 1.0)
         f << "repetition_penalty=" << repetitionPenalty << "\n";
+    if (reasoningBudget >= 0)
+        f << "reasoning_budget=" << reasoningBudget << "\n";
     if (!providerOnly.empty())
         f << "provider_only=" << providerOnly << "\n";
     if (!reasoningEffort.empty())
@@ -378,6 +381,7 @@ bool GptSettings::operator==(const GptSettings& o) const
 {
     return enabled == o.enabled && urls == o.urls && model == o.model && key == o.key
         && thinking == o.thinking && maxTokens == o.maxTokens
+        && reasoningBudget == o.reasoningBudget
         && repetitionPenalty == o.repetitionPenalty
         && providerOnly == o.providerOnly
         && reasoningEffort == o.reasoningEffort

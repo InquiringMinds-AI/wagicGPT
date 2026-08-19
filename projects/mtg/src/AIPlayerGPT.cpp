@@ -151,24 +151,22 @@ const char * kExampleFakeCardLc = "example card";
 //the contract the parsers and the plan carry-forward depend on.
 const char * kReplyProtocol =
     "\nHOW TO REPLY (every decision):\n"
-    "Put your ANSWER on the VERY FIRST line, using exactly the label the decision asks for "
-    "(CHOICE: for numbered choices, ATTACK: for attack declarations, BLOCKS: for block "
-    "assignments). Format: the label, then the NUMBER of your choice FROM THE LIST, then that "
-    "option's name in parentheses - CHOICE: <number> (<action name exactly as listed>). For "
-    "example, \"CHOICE: 3 (Cast Example Card)\" (Example Card is a placeholder - always copy the "
-    "real number and name from the options in front of you, never this example's). Answer first "
-    "so a long reply can never lose it.\n"
-    "After the answer line you may think the decision through briefly if you need to - that scratch "
-    "text is discarded. If that thinking changes your mind, write a NEW answer line with the "
-    "corrected answer; the LAST well-formed answer line is the one taken. If instead you realize "
-    "your answer was a mistake and are unsure, it is fine to stop - the game's own reliable player "
-    "will step in.\n"
-    "Then, ONLY IF your plan has changed, on the LAST line of your reply, a line starting with "
-    "PLAN:, write your complete game plan from here on - CONCISE, a few sentences of intent, not "
-    "an analysis. If your plan is unchanged, OMIT the PLAN line entirely - your last stated plan "
-    "carries forward automatically and will be shown to you again.\n"
+    "Your reply is ONE line, or TWO when your plan changed. Nothing else.\n"
+    "LINE 1 is your ANSWER, using exactly the label the decision asks for (CHOICE: for numbered "
+    "choices, ATTACK: for attack declarations, BLOCKS: for block assignments). Format: the label, "
+    "then the NUMBER of your choice FROM THE LIST, then that option's name in parentheses - "
+    "CHOICE: <number> (<action name exactly as listed>). For example, \"CHOICE: 3 (Cast Example "
+    "Card)\" (Example Card is a placeholder - always copy the real number and name from the options "
+    "in front of you, never this example's).\n"
+    "LINE 2, ONLY IF your plan has changed: a line starting with PLAN:, holding your complete game "
+    "plan from here on - CONCISE, a few sentences of intent, not an analysis. If your plan is "
+    "unchanged, OMIT the PLAN line entirely - your last stated plan carries forward automatically "
+    "and will be shown to you again.\n"
+    "Write no reasoning, no commentary, no restatement of the board and no working in the reply "
+    "itself: think the decision through BEFORE you answer, then give only the answer. (If you do "
+    "write more than one answer line, the LAST well-formed answer line is the one taken.)\n"
     "Nothing you write is kept except that PLAN line. At your next decision you will see only the "
-    "game log, the current board, your last PLAN line, and the new choices - your reasoning and "
+    "game log, the current board, your last PLAN line, and the new choices - your thinking and "
     "your earlier plans will have dropped out of context. So every PLAN you do write must be "
     "complete and self-contained: state your full current plan, or your full revised plan if the "
     "situation changed. Never write a fragment like \"continue as before\".\n";
@@ -1770,10 +1768,189 @@ void AIPlayerGPT::WorkerMain(void * p)
     delete ctx;
 }
 
+//NATIVE REASONING CAPTURE (wave-34 #1b(A)). With the post-answer scratch
+//block gone from the protocol, the reasoning the dev loop audits comes from
+//the model's own thinking window - and the server decides where it lands.
+//A vLLM running a reasoning parser for the served model puts it in
+//message.reasoning_content and hands back clean content; one that does NOT
+//leaves the raw "<think> ... </think>" inline at the head of content. Both
+//happen on this stack, so the client implements BOTH paths unconditionally
+//rather than betting on the server's configuration.
+//
+//This splits an inline block out of `content` into `reasoning`:
+//  * a leading "<think>" closed by "</think>"  -> reasoning = the block,
+//    content = what follows (the answer);
+//  * no opening tag but a "</think>" present   -> the opener was consumed by
+//    the chat template (a real vLLM shape): everything before it is reasoning;
+//  * UNCLOSED "<think>"                        -> the reply is REASONING-ONLY
+//    (truncation, or a model that opened and never closed). Returns FALSE with
+//    content EMPTIED: think text must never be parsed as an answer - a
+//    truncated deliberation ends mid-arithmetic and its stray integers are
+//    exactly what the index scanners latch onto. The caller re-asks.
+//Everything downstream - every length meter, every answer scanner, the
+//translog `reply` field - then runs on the STRIPPED text, or the fields would
+//be measuring thinking tokens instead of reply tokens.
+//Internal slot key for the forced-close (phase-2) request. It only has to be
+//a string no assembled prompt can equal - the async slot keys on it, and
+//buildRequestBody recognises it, strips it, and rebuilds the SAME user
+//message with the assistant prefill appended.
+static const char * kForceCloseTag = "\x01wagic-force-close\x01";
+
+//The answer reserve, in tokens: everything the reply itself needs once the
+//thinking window is spent. Derived from this corpus, not guessed - p95 PLAN
+//line 592 chars (~200 tokens) + p95 coded choice line 74 chars (~30 tokens),
+//with margin. It is both the head-room added to the thinking budget in phase
+//1 and the whole cap of the phase-2 forced close.
+static const long kAnswerReserveTokens = 400;
+
+//Default thinking budget, in tokens, when thinking is ON and nothing is
+//configured. The formula (owner, 2026-08-19) is b = 1.5 * (t - p - c) where t
+//is the time bound expressed as tokens; at a 240s bound and ~30 tok/s that
+//gives 10450. The owner set the shipped starting value at a flat 8000
+//("oof. thats a lot. lets make it 8000"). Config/env override it; 0 or less
+//means unbounded (the pre-budget behaviour).
+static const long kDefaultReasoningBudget = 8000;
+
+//Which endpoints accept an assistant prefill (vLLM's continue_final_message /
+//llama.cpp's equivalent). The subscription (Codex) and OpenRouter paths keep
+//reasoning server-side - there is nothing for the client to close - and
+//api.openai.com rejects unknown top-level fields with a 400, which would turn
+//every budget hit into a lost decision instead of a forced answer.
+static bool gptForceCloseSupported(const string& endpoint)
+{
+    if (gptCodexEndpoint(endpoint))
+        return false;
+    return endpoint.find("api.openai.com") == string::npos
+        && endpoint.find("openrouter.ai") == string::npos;
+}
+
+static bool splitReasoningBlock(string& content, string& reasoning)
+{
+    size_t head = content.find_first_not_of(" \t\r\n");
+    if (head == string::npos)
+        return true; //empty/whitespace reply: the transport-failure path owns it
+    bool opensWithThink = (content.compare(head, 7, "<think>") == 0);
+    size_t close = content.find("</think>");
+    if (!opensWithThink && close == string::npos)
+        return true; //no thinking block in this reply at all
+    if (close == string::npos)
+    {
+        //Opened and never closed: reasoning-only.
+        string r = content.substr(head + 7);
+        size_t rs = r.find_first_not_of(" \t\r\n");
+        reasoning = (rs == string::npos) ? string() : r.substr(rs);
+        content.clear();
+        return false;
+    }
+    size_t rStart = opensWithThink ? head + 7 : 0;
+    string r = content.substr(rStart, close - rStart);
+    size_t rs = r.find_first_not_of(" \t\r\n");
+    size_t re = r.find_last_not_of(" \t\r\n");
+    if (rs != string::npos)
+        reasoning = r.substr(rs, re - rs + 1);
+    string rest = content.substr(close + 8);
+    size_t as = rest.find_first_not_of(" \t\r\n");
+    content = (as == string::npos) ? string() : rest.substr(as);
+    return true;
+}
+
+static bool hasCodedAnswerLine(const string& content); //defined below
+
+//HIDDEN REASONING IS NORMAL, NOT A FAULT. Some providers reason and never
+//return the trace: OpenAI and Anthropic withhold raw chain-of-thought as
+//policy, and OpenRouter can hide it depending on the upstream - which this
+//project has already been bitten by once, as the 40s mystery latency behind a
+//140-token answer (71f4f615c). The reply is complete and correct; only the
+//audit copy is missing.
+//
+//So this shape - reasoning REQUESTED, content non-empty, no reasoning field
+//anywhere - parses exactly as the thinking-off path does, and is recorded as
+//`reasoning_hidden` so review can tell "reasoned invisibly" from "did not
+//reason". It is the INVERSE of reasoning_only (content empty, reasoning
+//present) and must never be confused with it. Nothing in this client gates
+//parsing, fallback or any assertion on reasoning being present: the "reasoning
+//present at both seats before the corpus runs" rule is a Spark/dev-loop
+//precondition for the A/B, not a client invariant - encoding it here would
+//turn every OpenAI/Anthropic user's game into a heuristic-only game.
+static bool reasoningHiddenShape(bool requested, const string& content, const string& reasoning)
+{
+    return requested && !content.empty() && reasoning.empty();
+}
+
+//THE ANSWER CAN ARRIVE IN THE REASONING FIELD (live-probed against Spark's
+//vLLM 0.23.1rc1 + qwen35, 2026-08-19). The server's reasoning parser
+//classifies by GENERATED tokens only: on the forced close, the "</think>" we
+//PREFILL is never generated, so the parser never sees a thinking block end and
+//routes the ENTIRE phase-2 generation into `message.reasoning` with `content`
+//null - even though the injected close did its job on the MODEL, which
+//answered immediately ("\n\nCHOICE: 1"). Throwing that away would lose exactly
+//the decision the budget machinery exists to rescue.
+//
+//So: when content is empty and the reasoning field ENDS on a coded answer
+//line, that line is the answer. Anchored to the END deliberately - phase-1
+//mid-thinking text is full of answer-shaped candidates the model was still
+//weighing ("maybe CHOICE: 3? no, 15 mana"), and those must NEVER be parsed.
+//A reply cut off at the token cap (finish_reason == length) is mid-thought by
+//definition and is refused here whatever it looks like; the forced close is
+//the only path that recovers it.
+//Returns the answer text (from the last coded answer line onward), or empty.
+static string answerTailFromReasoning(const string& reasoning)
+{
+    size_t lineStart = 0, answerAt = string::npos;
+    while (lineStart <= reasoning.size())
+    {
+        size_t lineEnd = reasoning.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? reasoning.size() : lineEnd;
+        string line = reasoning.substr(lineStart, end - lineStart);
+        if (hasCodedAnswerLine(line))
+            answerAt = lineStart;
+        else
+        {
+            //Anything substantive AFTER the last coded line means the model
+            //kept thinking past it - that candidate was not its final word.
+            size_t sig = line.find_first_not_of(" \t\r");
+            if (sig != string::npos && answerAt != string::npos)
+                answerAt = string::npos;
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    if (answerAt == string::npos)
+        return string();
+    return reasoning.substr(answerAt);
+}
+
 bool AIPlayerGPT::asyncBusy() const
 {
     std::lock_guard<GptMutex> g(mAsyncState->mtx);
     return mAsyncState->status == 1;
+}
+
+//THE NO-ANSWER CLASSES ARE NOT ALL THE SAME FAILURE. "empty_reply" has always
+//meant TRANSPORT: nothing came back, or the endpoint is down - the reply body
+//was empty. With a server-side reasoning parser, a reply can arrive complete,
+//well-formed and paid for, with content null because the whole generation was
+//filed as thinking (a budget hit, or a model that spent its window without
+//committing). Calling that "empty_reply" would put a MODEL behaviour into the
+//bucket a seat review reads as an infrastructure fault - and the wave-34 A/B
+//is scored on exactly this distinction. reasoning_only names it.
+//Did THIS endpoint's request ask for reasoning at all? The thinking flag
+//covers the vLLM/llama.cpp/OpenRouter families; the subscription (Codex)
+//backend has no thinking flag and instead carries an effort tier, where unset
+//means the built-in default (low) and only an explicit "none" is off. Used
+//solely to tell a WITHHELD trace from a reply that never reasoned - never to
+//gate parsing.
+bool AIPlayerGPT::reasoningRequested() const
+{
+    if (gptCodexEndpoint(mEndpoint))
+        return mReasoningEffort != "none";
+    return mThinking;
+}
+
+const char * AIPlayerGPT::noAnswerClass() const
+{
+    return mLastReasoning.empty() ? "empty_reply" : "reasoning_only";
 }
 
 int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
@@ -1792,18 +1969,120 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 mAsyncState->status = 0;
                 mAsyncState->response.clear();
                 content.clear();
+                mLastReasoningOnly = false;
+                mLastFinishLength = false;
+                //Is this the forced close (phase 2)? Its slot key carries the
+                //tag, and the answer-recovery rule below is scoped by it.
+                const bool forceClosePoll =
+                    (userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0);
+                string fieldReasoning;
                 if (!body.empty())
                 {
                     try
                     {
                         json reply = json::parse(body);
-                        content = reply["choices"][0]["message"]["content"].get<string>();
+                        json choice0 = reply["choices"][0];
+                        content = choice0["message"]["content"].is_string()
+                                  ? choice0["message"]["content"].get<string>() : string();
+                        //PATH 1: the server ran a reasoning parser - the
+                        //thinking arrives in its own field and `content` comes
+                        //back ALREADY stripped (no inline <think> reaches the
+                        //client at all). The field NAME is not settled across
+                        //builds: the OpenAI-compatible spelling is
+                        //reasoning_content, and Spark's vLLM 0.23.1rc1 answers
+                        //with plain `reasoning` (live-probed 2026-08-19). Read
+                        //both, in that order, rather than betting on one - the
+                        //cost of guessing wrong is a corpus with an empty
+                        //reasoning column and a blind seat review.
+                        if (choice0["message"].contains("reasoning_content")
+                            && choice0["message"]["reasoning_content"].is_string())
+                            fieldReasoning = choice0["message"]["reasoning_content"].get<string>();
+                        else if (choice0["message"].contains("reasoning")
+                                 && choice0["message"]["reasoning"].is_string())
+                            fieldReasoning = choice0["message"]["reasoning"].get<string>();
+                        //Decode stopped at the cap: with a thinking budget in
+                        //force this is the expected phase-1 exit, and the
+                        //unclosed-think test below decides whether the answer
+                        //still has to be forced out of the model.
+                        //The server's OWN reasoning-token count when it
+                        //reports one (vLLM/OpenAI shape:
+                        //usage.completion_tokens_details.reasoning_tokens).
+                        //Preferred over the client's char count because the
+                        //budget is denominated in TOKENS - the first corpus
+                        //under this budget is a CALIBRATION run and the next
+                        //budget is read straight off this distribution.
+                        if (reply.contains("usage")
+                            && reply["usage"].contains("completion_tokens_details")
+                            && reply["usage"]["completion_tokens_details"].contains("reasoning_tokens")
+                            && reply["usage"]["completion_tokens_details"]["reasoning_tokens"].is_number())
+                            mLastReasoningTokens =
+                                reply["usage"]["completion_tokens_details"]["reasoning_tokens"].get<long>();
+                        mLastFinishLength = (choice0.contains("finish_reason")
+                                             && choice0["finish_reason"].is_string()
+                                             && choice0["finish_reason"].get<string>() == "length");
                     }
                     catch (json::exception&)
                     {
                         content.clear();
                     }
                 }
+                //PATH 2 (unconditional, whatever path 1 found): an inline
+                //"<think> ... </think>" the server did not parse out. Strip it
+                //into the same field so every scanner downstream measures REPLY
+                //text. An unclosed block empties `content` - reasoning-only, and
+                //the caller forces the answer rather than parsing think text.
+                {
+                    string inlineReasoning;
+                    if (!splitReasoningBlock(content, inlineReasoning))
+                        mLastReasoningOnly = true;
+                    if (!inlineReasoning.empty())
+                        fieldReasoning = inlineReasoning;
+                }
+                //ROUTING. With a parser active there is no inline block to
+                //test, so "the reply is reasoning-only" has a second, and on
+                //this stack the NORMAL, shape: content empty + reasoning
+                //non-empty. That is what a phase-1 budget hit looks like
+                //(finish_reason == "length"), and it is also what phase 2 looks
+                //like - except phase 2's reasoning IS the answer.
+                if (content.empty() && !fieldReasoning.empty())
+                {
+                    string tail = answerTailFromReasoning(fieldReasoning);
+                    if (forceClosePoll)
+                    {
+                        //Phase 2: the generation is the answer, wherever the
+                        //parser filed it. Keep phase 1's thinking as the
+                        //audit record rather than overwriting it with the
+                        //answer text.
+                        content = tail.empty() ? fieldReasoning : tail;
+                        fieldReasoning.clear();
+                    }
+                    else if (!mLastFinishLength && !tail.empty())
+                    {
+                        //Phase 1, ran to a natural stop, and its thinking ENDS
+                        //on a coded answer line: the model answered inside the
+                        //thinking window (no separate content). Take that line,
+                        //keep the thinking. A cap-truncated reply is refused
+                        //here - mid-thought candidates are not answers.
+                        content = tail;
+                    }
+                    else
+                    {
+                        //Genuinely no answer yet: reasoning-only. The forced
+                        //close is the recovery, not the heuristic.
+                        mLastReasoningOnly = true;
+                    }
+                }
+                if (!fieldReasoning.empty())
+                    mLastReasoning = fieldReasoning;
+                //Reasoning was asked for and the provider kept it. Recorded,
+                //never treated as a failure: the answer is right there in
+                //content and is parsed exactly as the thinking-off path parses
+                //it. Latency still carries the invisible decode cost (the
+                //translog's own latency_ms), so a record with
+                //reasoning_hidden + a long round trip is a WITHHELD trace, not
+                //a defect class - that pair is precisely how this shape is told
+                //apart from a fast non-thinking reply.
+                mLastReasoningHidden = reasoningHiddenShape(reasoningRequested(), content, mLastReasoning);
                 //Subscription preset: the backend prices every reply against a
                 //rolling plan window and reports the gauge on each response.
                 //Surface it when it moves - a player burning their ChatGPT plan
@@ -1910,12 +2189,20 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 //A line-leading coded answer label (CHOICE:/ATTACK:/BLOCKS:/PUT:) with SOME
 //payload after it. Used only by the garbage detector: if the model emitted any
 //such line, the normal parse + salvage can work it and we must NOT retry.
-static bool hasCodedAnswerLine(const string& content)
+//ONE scanner for every line-leading coded answer (CHOICE:/ATTACK:/BLOCKS:/
+//PUT:) in a reply, so the garbage detector, the retraction flag and the
+//wave-34 protocol instruments all agree on what counts as an answer line.
+//Returns how many there are; optionally hands back where the FIRST one's line
+//ends (the post-answer meter's origin) and the normalised payload of the first
+//and last (whether the reply ended on the answer it began with).
+static int scanCodedAnswerLines(const string& content, size_t * firstLineEnd,
+                                string * firstPayload, string * lastPayload)
 {
     static const char * kLabels[] = { "choice:", "attack:", "blocks:", "put:" };
     string low = content;
     for (size_t i = 0; i < low.size(); i++)
         low[i] = (char) tolower((unsigned char) low[i]);
+    int count = 0;
     size_t lineStart = 0;
     while (lineStart <= low.size())
     {
@@ -1934,15 +2221,46 @@ static bool hasCodedAnswerLine(const string& content)
                 //require a non-space payload char after the label
                 size_t p = s + len;
                 while (p < end && (low[p] == ' ' || low[p] == '\t')) p++;
-                if (p < end)
-                    return true;
+                if (p >= end)
+                    break;
+                count++;
+                //Normalised payload: the label plus the rest of the line, one
+                //space between tokens, so "CHOICE: 2 (Yotian Soldier)" and
+                //"CHOICE:  2  (Yotian Soldier)" are the SAME answer and
+                //"CHOICE: 1 (Akroma's Memorial)" is a different one.
+                string pay;
+                bool sp = false;
+                for (size_t q = s; q < end; q++)
+                {
+                    char c = low[q];
+                    if (c == ' ' || c == '\t' || c == '\r')
+                        sp = !pay.empty();
+                    else
+                    {
+                        if (sp) pay += ' ';
+                        sp = false;
+                        pay += c;
+                    }
+                }
+                if (count == 1)
+                {
+                    if (firstLineEnd) *firstLineEnd = end;
+                    if (firstPayload) *firstPayload = pay;
+                }
+                if (lastPayload) *lastPayload = pay;
+                break;
             }
         }
         if (lineEnd == string::npos)
             break;
         lineStart = lineEnd + 1;
     }
-    return false;
+    return count;
+}
+
+static bool hasCodedAnswerLine(const string& content)
+{
+    return scanCodedAnswerLines(content, NULL, NULL, NULL) > 0;
 }
 
 bool AIPlayerGPT::isDecodeGarbage(const string& content)
@@ -2023,6 +2341,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
             mRetryDoneBase = userMsg;
             mRetryActivePrompt.clear();
             mRetryBase.clear();
+            mForceClosePrefill.clear();
             mRetryFirstLatencyMs = -1;
             mLastRetry = true;
             return 0;
@@ -2030,6 +2349,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         //Decision changed under a pending retry: drop it, poll the new decision.
         mRetryActivePrompt.clear();
         mRetryBase.clear();
+        mForceClosePrefill.clear();
         mRetryFirstLatencyMs = -1;
     }
 
@@ -2038,6 +2358,40 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         return kChoicePending;
 
     mLastRetry = false;
+    //BUDGET-FORCED ANSWER (wave-34 #1a/#1b, owner ruling 2026-08-19). Native
+    //thinking is BOUNDED, and a bound whose only mechanism is max_tokens loses
+    //the decision - the reply comes back mid-thought with no answer at all,
+    //which is exactly the truncation class that already costs this project
+    //decisions. So the budget is two-phase: phase 1 decodes with
+    //max_tokens = budget + the answer reserve; if it comes back with an
+    //UNCLOSED <think> (the reply is reasoning-only), phase 2 hands the model
+    //its own truncated thinking back with the "</think>" close INJECTED and a
+    //tight answer-sized cap, so it must answer from what it already has. This
+    //is Qwen's documented budget-forcing pattern, expressed through vLLM's
+    //assistant-prefill (continue_final_message) rather than a raw /v1/
+    //completions prompt render, because the client has no copy of the chat
+    //template and a mis-rendered prompt would be a silent quality change.
+    //Scoped to endpoints that accept the prefill (local vLLM/llama.cpp): the
+    //subscription and OpenRouter paths hide their reasoning entirely and have
+    //nothing to close, and api.openai.com 400s unknown fields.
+    //`content.empty()` is stated explicitly rather than left implied by
+    //mLastReasoningOnly: the forced close prefills the model's own trace back
+    //to it, which is IMPOSSIBLE on a provider that withheld the trace, and a
+    //content-bearing reply needs no rescue in the first place. Belt and
+    //braces with gptForceCloseSupported(), which already excludes the
+    //hidden-trace endpoints by name.
+    if (mLastReasoningOnly && content.empty() && !mLastReasoning.empty()
+        && userMsg != mRetryDoneBase && gptForceCloseSupported(mEndpoint))
+    {
+        mRetryFirstLatencyMs = mLastLatencyMs;
+        mRetryBase = userMsg;
+        mForceClosePrefill = mLastReasoning;
+        mRetryActivePrompt = string(kForceCloseTag) + userMsg;
+        mLastBudgetHit = true;
+        setNotice("thinking hit its budget - asking for the answer", 3.0f);
+        DebugTrace("AIPlayerGPT: unclosed <think> (budget/truncation); forcing the answer");
+        return kChoicePending; //next tick polls the forced-close request
+    }
     //Fire ONE answer-locked retry iff the reply is decode-garbage AND this
     //decision's retry has not already been spent. isDecodeGarbage is
     //conservative - ordinary unparsed replies (real prose, no coded line) are
@@ -2060,7 +2414,9 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
-      mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0)
+      mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
+      mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false), mReasoningBudget(0),
+      mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false)
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
@@ -2092,6 +2448,30 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     if (mPatienceLimit < 0)
         mPatienceLimit = 0;
     mThinking = getenv("WAGIC_GPT_THINKING") ? envFlag("WAGIC_GPT_THINKING") : (cfg.thinking == 1);
+    //Thinking budget: configured value wins, else the shipped default, and
+    //only in thinking mode (a non-thinking reply has no window to bound).
+    mReasoningBudget = (cfg.reasoningBudget >= 0) ? cfg.reasoningBudget : kDefaultReasoningBudget;
+    if (const char * rb = getenv("WAGIC_GPT_REASONING_BUDGET"))
+        mReasoningBudget = atol(rb);
+    if (!mThinking)
+        mReasoningBudget = 0;
+    //Timeout FLOOR for thinking mode, applied only to the DEFAULT. The HTTP
+    //timeout is the ONLY watchdog that falls back to the heuristic (the
+    //patience window raises a human prompt and never decides on its own), so
+    //it has to sit ABOVE the worst case a decision can legitimately take -
+    //otherwise the budget machinery gets cut off rescuing exactly the
+    //decisions it exists for. Worst case, budgeted end to end at this stack's
+    //~30 tok/s: phase 1 = prompt prefill (~10-20s at corpus prompt sizes) +
+    //(8000 thinking + ~230 reply) tokens ~= 295s; a budget hit then adds
+    //phase 2 = re-prefill of prompt + the 8k of thinking (~15-25s) + ~400
+    //tokens ~= 40s. Total ~= 335-360s, and each phase is its own request. 420s
+    //keeps a real margin over that rather than shaving it. An explicit timeout
+    //(env or config) is the user's call and is never raised over their head;
+    //the built-in default (600s) already clears this floor, so the guard is
+    //for a future default, not for today.
+    if (mThinking && mReasoningBudget > 0 && !getenv("WAGIC_GPT_TIMEOUT")
+        && cfg.timeoutSecs == GptSettings().timeoutSecs && mTimeoutMs < 420000)
+        mTimeoutMs = 420000;
     mReasoningEffort = cfg.reasoningEffort;
     if (const char * re = getenv("WAGIC_GPT_EFFORT"))
         mReasoningEffort = re;
@@ -2243,6 +2623,48 @@ static long postPlanOverrun(const string& reply)
     return (long) (last - lineEnd);
 }
 
+//post_answer_overrun: the chars a reply wrote AFTER the end of its FIRST
+//line-leading coded answer. THIS is the quantity the owner ruling is about,
+//and post_plan_overrun is not: post_plan_overrun measures from the PLAN line,
+//which the protocol put LAST, so it saw 5.3% of the real tail at deck116 and
+//scored a flat 0 on a 13,326-char reply that simply omitted its PLAN. It is
+//also format-blind in a way this is not - a reply with no PLAN line and a
+//reply that ended at its answer are indistinguishable to it and identical
+//(0) here only when the reply really did stop. Measured on the STRIPPED reply
+//(post-</think>), like every other meter, or it would count thinking tokens.
+static long postAnswerOverrun(const string& reply)
+{
+    size_t lineEnd = string::npos;
+    if (scanCodedAnswerLines(reply, &lineEnd, NULL, NULL) < 1 || lineEnd == string::npos)
+        return 0; //no coded answer at all: the empty/unparsed classes name that
+    size_t last = reply.find_last_not_of(" \t\r\n");
+    if (last == string::npos || last <= lineEnd)
+        return 0;
+    return (long) (last - lineEnd);
+}
+
+//answer_replaced: the reply ended on a DIFFERENT answer than it began with -
+//the model answered, kept writing, and re-answered. 45/1,209 replies did this
+//in wave 33 (one the deciding play of a win, one a fatal reversal), and NO
+//shipped field could see it: commit_retracted only counts retractions that
+//reached the heuristic. Under the wave-34 protocol this population is
+//designed to vanish, so its going to zero is the change LANDING, not an
+//improvement - which is exactly why it has to be counted on both arms.
+static bool answerReplaced(const string& reply)
+{
+    string first, last;
+    int n = scanCodedAnswerLines(reply, NULL, &first, &last);
+    return n > 1 && first != last;
+}
+
+//coded_answers: how many line-leading coded answer lines the reply carried.
+//The denominator answer_replaced needs, and on its own the cheapest read of
+//whether the one-line protocol is being followed at all.
+static int codedAnswerCount(const string& reply)
+{
+    return scanCodedAnswerLines(reply, NULL, NULL, NULL);
+}
+
 //commit_retracted: TRUE when the reply DID emit a line-leading coded answer
 //(CHOICE:/ATTACK:/BLOCKS:/PUT:) and the retraction machinery then refused to
 //execute it - i.e. the model answered and then took its answer back, so the
@@ -2296,6 +2718,49 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         mLastRetry = false;
     }
     mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
+    //NATIVE REASONING (wave-34 #1b(A)): the model's own thinking for THIS
+    //decision, from message.reasoning_content or from an inline <think> block -
+    //captured on both paths because the server decides which one we get. This
+    //is what seat review reads in place of the deleted post-answer scratch
+    //text, so an absent field means the model genuinely returned none, not
+    //that the client only implemented the other path. `reply` above is the
+    //STRIPPED text, so every length/answer meter measures reply tokens.
+    if (!mLastReasoning.empty())
+    {
+        rec["reasoning"] = mLastReasoning;
+        //The LENGTH, separately, because the 8000-token budget is a
+        //calibration value the owner expects to tune DOWN: the next budget is
+        //read off this distribution (p95/p99 by decision kind) against the
+        //reasoning_budget_hit rate, and doing that from the text field alone
+        //means re-measuring every record. reasoning_tokens is the server's own
+        //number when it reports one - the budget is denominated in tokens, so
+        //prefer it and fall back to chars.
+        rec["reasoning_chars"] = (long) mLastReasoning.size();
+        mLastReasoning.clear();
+    }
+    if (mLastReasoningTokens >= 0)
+    {
+        rec["reasoning_tokens"] = mLastReasoningTokens;
+        mLastReasoningTokens = -1;
+    }
+    //Reasoning requested, answer delivered, trace withheld by the provider.
+    //Without this marker the A/B cannot separate "reasoned invisibly" from
+    //"did not reason": both write no reasoning field, and only one of them is
+    //paying for thinking tokens.
+    if (mLastReasoningHidden)
+    {
+        rec["reasoning_hidden"] = true;
+        mLastReasoningHidden = false;
+    }
+    //The thinking budget bound on this decision and the answer had to be
+    //forced out of the model (phase-2 close). Counting these is how the A/B
+    //tells "the budget is never reached" from "the budget is shaping every
+    //decision".
+    if (mLastBudgetHit)
+    {
+        rec["reasoning_budget_hit"] = true;
+        mLastBudgetHit = false;
+    }
     //Narration delta: the game events that landed since the previous
     //record. A consumed cast's outcome (resolved/countered/died) shows up
     //here on the NEXT record - machine-readable without re-parsing prompts.
@@ -2313,12 +2778,32 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //the record count without inferring absence.
     rec["post_plan_overrun"] = postPlanOverrun(reply);
     rec["commit_retracted"] = commitRetracted(fallback, reply);
+    //WAVE-34 #1b(B), instrument only - no behaviour rides these. They measure
+    //the boundary the phenomenon actually has (post-ANSWER, not post-PLAN) and
+    //the first-vs-last-label divergence the shipped fields were blind to.
+    //Written on EVERY record, present or zero, so a seat review can divide by
+    //the record count without inferring absence.
+    rec["post_answer_overrun"] = postAnswerOverrun(reply);
+    rec["answer_replaced"] = answerReplaced(reply);
+    rec["coded_answers"] = codedAnswerCount(reply);
     //Assignments the combat validator pruned as illegal on this record.
     if (!mLastPrunedPairs.empty())
     {
         rec["pruned_pairs"] = mLastPrunedPairs;
         mLastPrunedPairs.clear();
     }
+    //dropped_assignments (blocker records only): every B:A pair the reply
+    //asked for that did NOT reach the battlefield - dropped by the PARSER as
+    //out-of-range or as a second attacker for a blocker already assigned, or
+    //pruned by the apply site as illegal. pruned_pairs saw only the second
+    //half, which is why it is written on ~one record in a corpus; the silent
+    //half is the one that costs games (deck139 vs105 s24: four "Illuna blocks
+    //X" pairs, three dropped by first-wins, 7 poison connected, game over).
+    //A record with 0 here is a reply whose whole intent was executed.
+    if (strcmp(kind, "blockers") == 0 && mLastDroppedAssignments >= 0)
+        rec["dropped_assignments"] = mLastDroppedAssignments;
+    if (strcmp(kind, "blockers") == 0)
+        mLastDroppedAssignments = -1;
     //Provenance for an answer recovered by prose-intent salvage (no coded
     //line existed) - so corpus review can audit every prose salvage.
     if (choiceSource)
@@ -2676,6 +3161,41 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
     return found;
 }
 
+//WHICH "PLAN:" IS THE CURRENT PLAN (wave-34 #3, N-36e). Case-insensitive, and
+//the colon is required so prose like "I plan to attack" cannot truncate the
+//reply. The CONSUMER anchors LAST: a reply that stated a plan, kept
+//deliberating and then stated a REVISED plan carries two markers, and taking
+//the first carried the ABANDONED plan forward while discarding the committed
+//one - with the abandoned text running on through the retracted deliberation,
+//which is how 53% of deck36's prompts came to carry a >400-char plan field
+//(vs105 s35: markers at char 501 and char 5,359; the next prompt was fed
+//1,424 chars beginning at 501). parseChoice already anchors LAST on the answer
+//label and is right; every consumer of a reply now agrees. A marker that sits
+//AFTER the trailing answer label is part of that line's tail, not a new plan,
+//so it does not supersede. `firstOut` receives the FIRST marker, which is what
+//the reply-SHAPE tests want (did the reply lead with its plan?) and what
+//postPlanOverrun keeps using - as a TAIL METER the first plan is the right
+//origin, and it deliberately does not move.
+static size_t findPlanMarker(const string& text, size_t labelLineStart, size_t * firstOut)
+{
+    size_t pos = string::npos, first = string::npos;
+    for (size_t i = 0; i + 5 <= text.size(); i++)
+    {
+        if (tolower((unsigned char) text[i]) == 'p' && tolower((unsigned char) text[i + 1]) == 'l'
+            && tolower((unsigned char) text[i + 2]) == 'a' && tolower((unsigned char) text[i + 3]) == 'n'
+            && text[i + 4] == ':')
+        {
+            if (first == string::npos)
+                first = i;
+            if (labelLineStart == string::npos || i < labelLineStart || pos == string::npos)
+                pos = i;
+        }
+    }
+    if (firstOut)
+        *firstOut = first;
+    return pos;
+}
+
 string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabel)
 {
     //Drop any inline think block first (same as parseChoice).
@@ -2708,19 +3228,10 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         }
     }
 
-    //Find the "PLAN:" marker, case-insensitive; the colon is required so
-    //prose like "I plan to attack" before the choice cannot truncate it.
-    size_t pos = string::npos;
-    for (size_t i = 0; i + 5 <= text.size(); i++)
-    {
-        if (tolower((unsigned char) text[i]) == 'p' && tolower((unsigned char) text[i + 1]) == 'l'
-            && tolower((unsigned char) text[i + 2]) == 'a' && tolower((unsigned char) text[i + 3]) == 'n'
-            && text[i + 4] == ':')
-        {
-            pos = i;
-            break;
-        }
-    }
+    //The current plan: LAST marker (see findPlanMarker). firstPos is the
+    //reply-shape probe used further down, not the plan.
+    size_t firstPos = string::npos;
+    size_t pos = findPlanMarker(text, labelLineStart, &firstPos);
     if (pos == string::npos)
     {
         //No plan stated: keep the previous one. The answer segment (when
@@ -2787,13 +3298,13 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     //integers hijack the choice. A reply that leads with something else is
     //the legacy head-first shape: the head is the decision.
     size_t head = text.find_first_not_of(" \t\r\n");
-    if (head != string::npos && pos == head)
+    if (head != string::npos && firstPos == head)
         return string();
     //Same ramble guard as above: a legacy head is a short answer line, not
     //pages of prose ahead of a PLAN: marker.
-    if (pos > 300)
+    if (firstPos > 300)
         return string();
-    return text.substr(0, pos);
+    return text.substr(0, firstPos);
 }
 
 int AIPlayerGPT::receiveEvent(WEvent * event)
@@ -3417,6 +3928,63 @@ static bool ptPumpModifierDelta(MTGAbility * a, int& dp, int& dt, bool& ueot,
     return true;
 }
 
+//NARRATED DECISIONS CARRY THE CHOICE, NOT THE OFFER (owner docket 3, wave-34).
+//An option line is a live decision surface: {card text: "..."}, [cost: ...]
+//and the evaluated {right now: ...} magnitude are there to be decided ON. The
+//narrated COPY of a decision already taken is history - "what did I do" - and
+//every one of those annotations is re-served, per consumed decision, for the
+//rest of the game, on a prompt that is already the largest thing in the
+//request. Wrong by architecture, and measured small (deck36: 72/201 prompts,
+//mean 81 chars; deck105 ~320 chars/line), so this is a hygiene fix, not a
+//latency one - the estimate is stated honestly rather than sold.
+//
+//Only the annotation FURNITURE goes. Anything that identifies WHAT was chosen
+//- the name, the P/T, the pump delta, the target - is untouched, and the
+//OPTION lines the model chooses from are not touched at all: they still carry
+//everything. Brace/bracket depth is counted because a card's text legitimately
+//contains "{T}" and "{2}", so a naive scan to the first '}' would cut a
+//snippet in half and leave its tail in the log.
+static string stripNarrationDecoration(const string& in)
+{
+    string out;
+    for (size_t i = 0; i < in.size(); )
+    {
+        bool drop = false;
+        char openCh = in[i];
+        if (openCh == '{')
+            drop = (in.compare(i, 12, "{card text: ") == 0) || (in.compare(i, 12, "{right now: ") == 0);
+        else if (openCh == '[')
+            drop = (in.compare(i, 7, "[cost: ") == 0);
+        if (!drop)
+        {
+            out += in[i++];
+            continue;
+        }
+        char closeCh = (openCh == '{') ? '}' : ']';
+        int depth = 0;
+        size_t j = i;
+        for (; j < in.size(); j++)
+        {
+            if (in[j] == openCh)
+                depth++;
+            else if (in[j] == closeCh && --depth == 0)
+            {
+                j++;
+                break;
+            }
+        }
+        i = j;
+        //Leave no double space where the annotation stood.
+        while (!out.empty() && out[out.size() - 1] == ' ' && i < in.size() && in[i] == ' ')
+            i++;
+    }
+    //A trailing space left by an annotation at the end of the line.
+    size_t last = out.find_last_not_of(' ');
+    if (last != string::npos)
+        out.erase(last + 1);
+    return out;
+}
+
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 {
     std::ostringstream out;
@@ -3634,6 +4202,13 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 
 string AIPlayerGPT::buildRequestBody(const string& userMsg)
 {
+    //Phase-2 of the thinking budget: the same decision prompt, plus the
+    //model's own truncated thinking with its "</think>" close injected, so
+    //the next tokens it decodes MUST be the answer. The slot key carries the
+    //tag; the request carries the base prompt.
+    bool forceClose = (userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0);
+    const string baseMsg = forceClose ? userMsg.substr(strlen(kForceCloseTag)) : userMsg;
+
     //ChatGPT-subscription preset: the Codex backend speaks the Responses
     //shape, not chat completions - system prompt rides "instructions", the
     //user message rides "input". The backend REJECTS any field Codex CLI
@@ -3668,7 +4243,18 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //cacheable across the whole game.
     json messages = json::array();
     messages.push_back({{"role", "system"}, {"content", mSystemPrompt}});
-    messages.push_back({{"role", "user"}, {"content", userMsg}});
+    messages.push_back({{"role", "user"}, {"content", baseMsg}});
+    if (forceClose)
+    {
+        //ASSISTANT PREFILL, not a new instruction. The model resumes its own
+        //turn from the closed thinking block, so what it writes next is the
+        //answer it would have written had it finished thinking - no
+        //re-deliberation, no fresh prompt to spiral on. add_generation_prompt
+        //must be false alongside continue_final_message or the template opens
+        //a second assistant turn and the prefill becomes context, not prefix.
+        messages.push_back({{"role", "assistant"},
+                            {"content", "<think>\n" + mForceClosePrefill + "\n</think>\n\n"}});
+    }
 
     //Room for scratch reasoning + the complete PLAN + the trailing answer
     //line. The answer-last contract makes truncation COSTLY (a cut reply
@@ -3679,6 +4265,15 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //generous; the protocol text carries the brevity pressure, and the
     //truncation guard turns any residual cut into a safe heuristic answer.
     long maxTokens = 4096;
+    //THINKING BUDGET (owner ruling 2026-08-19). Thinking tokens are decode
+    //tokens, so an unbounded native window is an unbounded decision. The
+    //budget is a TOKEN COUNT for the thinking window; the request cap is that
+    //plus the answer reserve (the p95 PLAN line + the coded choice line +
+    //margin), so a model that spends its whole budget still has room to
+    //answer - and when it does not, the forced close above recovers the
+    //answer instead of losing the decision.
+    if (mThinking && mReasoningBudget > 0)
+        maxTokens = mReasoningBudget + kAnswerReserveTokens;
     if (mMaxTokens > 0)
         maxTokens = mMaxTokens;
     if (const char * mt = getenv("WAGIC_GPT_MAXTOKENS"))
@@ -3687,7 +4282,7 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //to fail fast to the heuristic instead of burning another long spiral. This
     //wins over any larger configured/env default for the retry request only.
     if (!mRetryActivePrompt.empty() && userMsg == mRetryActivePrompt)
-        maxTokens = 512;
+        maxTokens = forceClose ? kAnswerReserveTokens : 512;
 
     json request = {
         {"model", mModel},
@@ -3695,14 +4290,40 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
         {"max_tokens", maxTokens},
         {"temperature", 0.5},
     };
+    //SAMPLING FOLLOWS THE MODE (wave-34 #1a). Native thinking and the terse
+    //non-thinking reply are two different decode regimes and the model card
+    //prescribes different sampling for each; shipping thinking under the
+    //non-thinking numbers is a confound the A/B cannot separate from the
+    //protocol change itself. Thinking ON -> the thinking preset (temp 0.6 /
+    //top_p 0.95); OFF -> the settled non-thinking default (temp 0.5, top_p
+    //unset), byte-identical to every corpus before this one. No top_k /
+    //presence_penalty is sent in either mode (none ever was here);
+    //repetition_penalty is orthogonal to the mode and rides both, below.
+    if (mThinking)
+    {
+        request["temperature"] = 0.6;
+        request["top_p"] = 0.95;
+    }
     //Qwen-style thinking toggle. Unknown-field-tolerant providers
     //(OpenRouter etc.) ignore this; local vLLM/llama.cpp honor it, keyed
     //or not. Matters: qwen3.6 thinks by default (~6x decision latency).
     //The official OpenAI API is the exception: it REJECTS unknown top-level
     //parameters with a 400, which would silently degrade every decision to
     //the heuristic - omit the field there.
+    //Sent UNCONDITIONALLY (outside api.openai.com), in BOTH directions, and
+    //that matters more than it looks: live-probed 2026-08-19, this model's
+    //server-side default is thinking ON - a request with no
+    //chat_template_kwargs generated into the reasoning field. So the
+    //thinking-OFF arm of the A/B is only actually OFF because this line
+    //explicitly says false; omitting the field when the config says off would
+    //have run BOTH arms with thinking on and produced a null result.
     if (mEndpoint.find("api.openai.com") == string::npos)
-        request["chat_template_kwargs"] = {{"enable_thinking", mThinking}};
+        request["chat_template_kwargs"] = {{"enable_thinking", forceClose ? false : mThinking}};
+    if (forceClose)
+    {
+        request["continue_final_message"] = true;
+        request["add_generation_prompt"] = false;
+    }
 
     //OpenRouter ignores chat_template_kwargs, so hybrid-reasoning models
     //think anyway. Measured on deepseek-v4-flash-0731 (pinned first-party):
@@ -3813,6 +4434,35 @@ static string stripRenderAnnotationsLc(const string& s)
     return r;
 }
 
+//RENDER VOCABULARY: words that appear in the board/hand/option ANNOTATIONS
+//rather than in any card's name - zone tags, tap state, counter and stat
+//furniture. They are not identifying, and treating them as identity words is
+//how a wholly stale echo passed the staleness guard: deck146 vs116 seq34
+//answered a DUNGEON menu with "CHOICE: 1 (Nadaar, Selfless Paladin #1 (5/5)
+//[vigilance] [your battlefield])" - seq33's answer, carried in as YOUR PLAN -
+//and the echo shared "your"/"battlefield" with the offered option text, which
+//branch (a) reads as "the label is consistent with this option, trust the
+//index". It committed Tomb of Annihilation against the guide's teach, and the
+//room chain that followed cost two 200s+ spirals and the game hit the cap.
+//Filtered out of the ECHO's significant words only: dropping them can make an
+//echo MATCH an option (which honours the model's intent) but can never make a
+//foreign name look consistent with one.
+static bool isRenderVocabWord(const string& w)
+{
+    static const char * kVocab[] = {
+        "your", "yours", "opponent", "opponents", "battlefield", "graveyard",
+        "library", "exile", "hand", "tapped", "untapped", "printed", "counter",
+        "counters", "creature", "creatures", "artifact", "artifacts",
+        "enchantment", "permanent", "permanents", "player", "life", "cost",
+        "costs", "text", "card", "cards", "attacking", "blocking", "summoning",
+        "sickness", "right", "now", "this", "that", "turn", "mana", "available"
+    };
+    for (size_t i = 0; i < sizeof(kVocab) / sizeof(kVocab[0]); i++)
+        if (w == kVocab[i])
+            return true;
+    return false;
+}
+
 int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                              const std::vector<string> * optionTexts,
                              bool * staleEcho,
@@ -3859,6 +4509,36 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
         //the LAST "(...)" following a digit on the answer-ish tail
         size_t close = text.rfind(')');
         size_t open = (close == string::npos) ? string::npos : text.rfind('(', close);
+        //NESTED PARENTHETICAL REPAIR. Walking back from the last ')' finds the
+        //INNERMOST '(' when the echoed name carries its own parentheses -
+        //"CHOICE: 1 (Nadaar, Selfless Paladin #1 (5/5) [vigilance])" yielded
+        //the echo "5/5) [vigilance]", i.e. the render furniture with the card
+        //NAME cut off, so the staleness test ran on the wrong string. If the
+        //captured span contains an unmatched ')', the real opener is further
+        //left; step back until the span balances.
+        while (open != string::npos && open > 0)
+        {
+            int depth = 0;
+            bool unmatched = false;
+            for (size_t q = open + 1; q < close && !unmatched; q++)
+            {
+                if (text[q] == '(')
+                    depth++;
+                else if (text[q] == ')')
+                {
+                    if (depth == 0)
+                        unmatched = true;
+                    else
+                        depth--;
+                }
+            }
+            if (!unmatched)
+                break;
+            size_t prev = text.rfind('(', open - 1);
+            if (prev == string::npos || prev == open)
+                break;
+            open = prev;
+        }
         if (open != string::npos && close != string::npos && close > open + 1)
         {
             string echo = text.substr(open + 1, close - open - 1);
@@ -3915,7 +4595,8 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                     //reduce to these tokens.
                     if (w.size() >= 4 && w != "cast" && w != "with" && w != "play"
                         && w != "pass" && w != "none" && w != "hold" && w != "done"
-                        && w != "skip" && w != "decline" && w != "nobody")
+                        && w != "skip" && w != "decline" && w != "nobody"
+                        && !isRenderVocabWord(w))
                         words.push_back(w);
                     w.clear();
                 }
@@ -4701,7 +5382,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         DebugTrace("AIPlayerGPT[ph" << phase << "]: only display-toggle (Flip Side) options; auto-passing without a model call");
         return NULL;
     }
-    tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list) or \"CHOICE: 0 (pass)\"; then any brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
+    tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list) or \"CHOICE: 0 (pass)\"; then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
@@ -4784,7 +5465,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
         {
-            narrateDecision("You: " + describeAction(*shown[choice - 1]));
+            narrateDecision("You: " + stripNarrationDecoration(describeAction(*shown[choice - 1])));
             //Consume-on-choose: a taken land fetch is done for the turn -
             //an identical line (a second copy of the same fetch, or the
             //same crack re-proposed at a different land) re-asking at the
@@ -4811,7 +5492,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 mPassDeclineCount[isFetchCrackLine(shownLines[s])
                                   ? fetchLineKey(shownLines[s]) : shownLines[s]]++;
         {
-            const char * fb = (choice >= 0) ? NULL : (content.empty() ? "empty_reply" : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
+            const char * fb = (choice >= 0) ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
                           : (choice == 0 ? string("pass") : string());
             writeTransLog("priority", userMsg, content, choice, index, chosen, fb, &shownLines);
@@ -4866,7 +5547,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
         tail << (i + 1) << ". " << options[i] << "\n";
-    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list); then any brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
+    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list); then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -4920,12 +5601,13 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
         //first line of the question only: multi-line asks (damage order)
         //would bloat a narration that persists all game
-        narrateDecision(decision.substr(0, decision.find('\n')) + " -> " + options[choice - 1]);
+        narrateDecision(decision.substr(0, decision.find('\n')) + " -> "
+                        + stripNarrationDecoration(options[choice - 1]));
 
     mAskCache[askKey] = choice;
     {
         bool valid = choice >= 1 && choice <= (int) options.size();
-        const char * fb = valid ? NULL : (content.empty() ? "empty_reply" : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
+        const char * fb = valid ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
         writeTransLog("ask", userMsg, content, choice, (int) options.size(),
                       valid ? options[choice - 1] : string(), fb, &options);
     }
@@ -6885,8 +7567,10 @@ static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * at
 static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
                             const vector<string> * optionNames);
 static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
-                                 const vector<string> * blockerNames, const vector<string> * attackerNames,
-                                 const vector<vector<int> > * legalPerBlocker);
+                                 const vector<string> * blockerNames = NULL,
+                                 const vector<string> * attackerNames = NULL,
+                                 const vector<vector<int> > * legalPerBlocker = NULL,
+                                 int * dropped = NULL);
 
 //Every line of a reply whose FIRST token (after markdown decoration) is the
 //given answer label, as the text AFTER the label to end of line, in reply
@@ -7585,8 +8269,8 @@ int AIPlayerGPT::chooseAttackers()
     }
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
-            " attack with nobody this turn; then any brief reasoning; then your"
-            " PLAN: line last (only if your plan changed - omit it to keep your current plan).";
+            " attack with nobody this turn; then, ONLY if your plan changed, a"
+            " final PLAN: line. Write nothing else.";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -7664,7 +8348,7 @@ int AIPlayerGPT::chooseAttackers()
     {
         //Unusable reply: the heuristic declares this turn's attack instead.
         writeTransLog("attackers", userMsg, content, result, (int) attackers.size(),
-                      "", content.empty() ? "empty_reply" : "unparsed_reply", &shownLines);
+                      "", content.empty() ? noAnswerClass() : "unparsed_reply", &shownLines);
         noticeFallback("model reply failed - the heuristic attacks", 5.0f);
         mAttacksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseAttackers();
@@ -7716,9 +8400,10 @@ int AIPlayerGPT::chooseAttackers()
 //given). Ambiguous/no-match drops THAT assignment only; already-coded
 //assignments and the first-wins rule are respected.
 static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
-                                 const vector<string> * blockerNames = NULL,
-                                 const vector<string> * attackerNames = NULL,
-                                 const vector<vector<int> > * legalPerBlocker = NULL)
+                                 const vector<string> * blockerNames,
+                                 const vector<string> * attackerNames,
+                                 const vector<vector<int> > * legalPerBlocker,
+                                 int * dropped)
 {
     out.assign(nBlockers, 0); //0 = no block; else attacker number
     int pairs = 0;
@@ -7747,11 +8432,21 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                  || content.compare(j, 4, "NONE") == 0)
             a = 0;
         if (a < 0 || b < 1 || b > (int) nBlockers || a > (int) nAttackers)
+        {
+            //A well-formed "B#:" whose numbers name nobody on this board. It
+            //asked for something and got nothing - count it (wave-34 #1b(B)).
+            if (dropped && b >= 1)
+                (*dropped)++;
             continue;
+        }
         if (out[b - 1] != 0)
+        {
+            if (dropped)
+                (*dropped)++;
             continue; //first assignment wins: a creature blocks at most one
                       //attacker, so ignore a later "B1:A3" after "B1:A1"
                       //(the model occasionally double-assigns one blocker).
+        }
         out[b - 1] = a;
         pairs++;
     }
@@ -7799,7 +8494,15 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                 }
                 int bMatch = uniqueNameMatch(leftWords, *blockerNames, nBlockers, NULL, nameOrdinal(leftSeg));
                 if (bMatch < 0 || out[bMatch] != 0)
+                {
+                    //A named pair that resolves to a blocker already spoken
+                    //for is the gang-of-one shape: "Illuna blocks A, Illuna
+                    //blocks B, ..." - first-wins is correct, and the three
+                    //discarded intents were previously invisible.
+                    if (dropped && bMatch >= 0)
+                        (*dropped)++;
                     break; //no unique blocker, or already assigned by a code
+                }
                 const vector<int> * allowed = (legalPerBlocker && (size_t) bMatch < legalPerBlocker->size())
                                               ? &(*legalPerBlocker)[bMatch] : NULL;
                 //"#N" on the attacker half ("Saproling (1/1) #1") disambiguates
@@ -7817,7 +8520,11 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                 if (aMatch < 0 && allowed)
                     aMatch = uniqueNameMatch(rightWords, *attackerNames, nAttackers, NULL, nameOrdinal(rightSeg));
                 if (aMatch < 0)
+                {
+                    if (dropped)
+                        (*dropped)++;
                     break; //ambiguous / unmatched attacker -> drop this one only
+                }
                 out[bMatch] = aMatch + 1;
                 pairs++;
                 break;
@@ -7958,9 +8665,8 @@ int AIPlayerGPT::chooseBlockers()
             " attacker. Blockers you do not mention stay out of combat.\nOn the"
             " FIRST line write BLOCKS: followed by the assignments, comma-separated,"
             " e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\", or exactly \"BLOCKS: none\" to"
-            " block with nobody this turn; then any brief reasoning; then your PLAN:"
-            " line last (only if your plan changed - omit it to keep your current"
-            " plan).";
+            " block with nobody this turn; then, ONLY if your plan changed, a final"
+            " PLAN: line. Write nothing else.";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -7988,8 +8694,14 @@ int AIPlayerGPT::chooseBlockers()
                 if (attackers[k] == legal[i][j])
                     legalIdx[i].push_back((int) k);
     vector<int> pick;
+    //Per-decision assignment bookkeeping (wave-34 #1b(B)). Reset here so a
+    //previous combat's prunes can never leak onto this record, and count the
+    //parser's own silent drops - the half pruned_pairs never saw.
+    mLastPrunedPairs.clear();
+    mLastDroppedAssignments = 0;
     int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick,
-                                                             &blockerNames, &attackerNames, &legalIdx);
+                                                             &blockerNames, &attackerNames, &legalIdx,
+                                                             &mLastDroppedAssignments);
 
     //WAVE-29 N-18e: the reply committed a block in an early coded line, then
     //reasoned itself OUT of blocking but was cut off by the token ceiling before
@@ -8095,7 +8807,7 @@ int AIPlayerGPT::chooseBlockers()
     {
         //Unusable reply: the heuristic declares this combat instead.
         writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
-                      "", content.empty() ? "empty_reply" : "unparsed_reply", &shownLines);
+                      "", content.empty() ? noAnswerClass() : "unparsed_reply", &shownLines);
         noticeFallback("model reply failed - the heuristic blocks", 5.0f);
         mBlocksDoneTurn = observer->turn;
         return AIPlayerBaka::chooseBlockers();
@@ -8120,6 +8832,7 @@ int AIPlayerGPT::chooseBlockers()
             //it is the only legality gate the name-form parse relies on - so
             //record what it pruned rather than losing it (wave-33 N-152j).
             pruned += (pruned.empty() ? "" : "; ") + blockers[i]->name + " -> " + chosen->name;
+            mLastDroppedAssignments++;
             continue;
         }
         act.blocks.push_back(std::make_pair(blockers[i], chosen));
@@ -8321,12 +9034,12 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
         tail << "On the FIRST line write PUT: followed by the ONE card number you"
                 " choose (e.g. \"PUT: 2\")"
              << (eligCount == 0 ? ", or \"PUT: none\" if none qualify" : "")
-             << "; then any brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
+             << "; then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
     else
         tail << "On the FIRST line write PUT: followed by the card numbers you send to \""
              << optOneLabel << "\", comma-separated (e.g. \"PUT: 1, 3\"), or exactly"
                 " \"PUT: none\" to send none there (every revealed card then goes to \""
-             << optTwoLabel << "\"); then any brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
+             << optTwoLabel << "\"); then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
     return tail.str();
 }
 
@@ -8421,7 +9134,7 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         //Unusable reply: the display falls back to its safe default (send
         //nothing to option one - every card keeps option two).
         writeTransLog("reveal", userMsg, content, result, (int) revealed.size(),
-                      "", content.empty() ? "empty_reply" : "unparsed_reply", &names);
+                      "", content.empty() ? noAnswerClass() : "unparsed_reply", &names);
         noticeFallback("model reply failed - reveal kept the default", 5.0f);
         return -1;
     }
@@ -8561,7 +9274,7 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
     }
     tail << "On the FIRST line write PUT: followed by the " << remaining << " card number"
          << (remaining == 1 ? "" : "s") << " you send to the bottom, comma-separated (e.g. \"PUT: "
-         << (remaining == 1 ? "3" : "3, 5") << "\"); then brief reasoning; then your PLAN: line last (only if your plan changed - omit it to keep your current plan).";
+         << (remaining == 1 ? "3" : "3, 5") << "\"); then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
     return tail.str();
 }
 
@@ -8661,7 +9374,7 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottom(int need, int chosenSoFar, in
             mPregameBottomQueue.push_back(fill);
         }
         writeTransLog("bottom", userMsg, content, result, (int) hand.size(), chosen,
-                      result < 0 ? (content.empty() ? "empty_reply" : "unparsed_reply") : NULL,
+                      result < 0 ? (content.empty() ? noAnswerClass() : "unparsed_reply") : NULL,
                       &names);
         mPregameBottomAsked = true;
         mPregameBottomForMulls = need;
@@ -10954,6 +11667,311 @@ void AIPlayerGPT::runParseSelfTest()
               "CODEX-SSE an HTML body extracts to empty (falls back to the heuristic)");
         CHECK(gptCodexExtractText("data: {not json at all\ndata: 42\n").empty(),
               "CODEX-SSE unparseable data lines are skipped, not answers");
+    }
+
+    // ==== WAVE-34 step-1 (decision-flow lane) cases ====
+
+    // ---- #1b(A): native reasoning capture, BOTH server paths ----
+    cout << "\n[W34-1b] the thinking block is captured, and never parsed as an answer\n";
+    {
+        // POSITIVE: an inline block the server did not parse out. The block
+        // leaves `content`, the answer stays, and the reasoning is kept whole.
+        string c = "<think>Option 2 trades badly, so option 1.</think>CHOICE: 1 (Cast Mordor Muster)";
+        string r;
+        bool ok = splitReasoningBlock(c, r);
+        cout << "     inline think -> content=\"" << c << "\" reasoning=\"" << r << "\"\n";
+        CHECK(ok && c == "CHOICE: 1 (Cast Mordor Muster)",
+              "W34-1b an inline <think> block is stripped off the answer");
+        CHECK(r == "Option 2 trades badly, so option 1.",
+              "W34-1b the stripped thinking is captured verbatim for the translog");
+        // The opener eaten by the chat template (a real vLLM shape): the text
+        // before </think> is still reasoning, not an answer.
+        string c2 = "I should hold up mana here.</think>CHOICE: 0 (pass)";
+        string r2;
+        CHECK(splitReasoningBlock(c2, r2) && c2 == "CHOICE: 0 (pass)"
+              && r2 == "I should hold up mana here.",
+              "W34-1b a closing tag with no opener still splits reasoning from answer");
+        // NEGATIVE: an ordinary reply is byte-untouched and captures nothing.
+        string c3 = "CHOICE: 2 (Cast Ichor Rats)\nPLAN: race on poison.";
+        string r3;
+        CHECK(splitReasoningBlock(c3, r3) && c3 == "CHOICE: 2 (Cast Ichor Rats)\nPLAN: race on poison."
+              && r3.empty(),
+              "W34-1b NEGATIVE a reply with no thinking block is passed through unchanged");
+        // UNCLOSED: reasoning-only. The answer-shaped text INSIDE the thinking
+        // must not survive as an answer - this is the budget-truncation shape,
+        // and its stray integers are exactly what the index scanners latch on.
+        string c4 = "<think>Maybe CHOICE: 3 (Cast Emrakul)? No, wait, 15 mana. Let me count again";
+        string r4;
+        bool ok4 = splitReasoningBlock(c4, r4);
+        CHECK(!ok4 && c4.empty(),
+              "W34-1b an UNCLOSED <think> is reasoning-only: the content is emptied, never parsed");
+        CHECK(r4.find("Cast Emrakul") != string::npos,
+              "W34-1b the truncated thinking is still captured (it is the forced close's prefill)");
+        CHECK(!hasCodedAnswerLine(c4),
+              "W34-1b NEGATIVE no coded answer survives an unclosed think block");
+        // Every length/answer meter runs on the STRIPPED text: a PLAN: and a
+        // CHOICE: inside the thinking must not score as reply text.
+        string c5 = "<think>PLAN: ignore me, and lots of hidden deliberation</think>CHOICE: 1\nPLAN: go.";
+        string r5;
+        splitReasoningBlock(c5, r5);
+        CHECK(postPlanOverrun(c5) == 0 && hasCodedAnswerLine(c5),
+              "W34-1b the overrun/answer scanners measure the STRIPPED reply, not the thinking");
+    }
+
+    // ---- #1b(B): the fields that measure the boundary the phenomenon HAS ----
+    cout << "\n[W34-1b-B] post_answer_overrun / answer_replaced / coded_answers\n";
+    {
+        // The protocol-compliant reply: one answer, one plan, nothing after.
+        string clean = "CHOICE: 1 (Cast Mordor Muster {1}{b})\nPLAN: build the army.";
+        //The count excludes the answer line's own newline, matching
+        //post_plan_overrun's convention (its 69-char case above).
+        CHECK(postAnswerOverrun(clean) == (long) strlen("PLAN: build the army."),
+              "W34-1b-B a two-line compliant reply scores exactly its PLAN line as post-answer text");
+        CHECK(codedAnswerCount(clean) == 1 && !answerReplaced(clean),
+              "W34-1b-B one answer line, and it was never replaced");
+        // The deck116 shape the SHIPPED field could not see: a long tail after
+        // the answer with NO plan line at all. post_plan_overrun scores 0 here
+        // (nothing to overrun); post_answer_overrun scores the real tail.
+        string noPlanTail = "CHOICE: 2 (Cast Ichor Rats)\nWait, let me reconsider the whole board again.";
+        CHECK(postPlanOverrun(noPlanTail) == 0,
+              "W34-1b-B the shipped post_plan_overrun is blind to a no-PLAN tail (documented, not fixed)");
+        CHECK(postAnswerOverrun(noPlanTail) == (long) strlen("Wait, let me reconsider the whole board again."),
+              "W34-1b-B post_answer_overrun measures that same tail exactly");
+        // NEGATIVE: no coded answer at all -> 0, not a length. The empty and
+        // unparsed fallback classes already name that population.
+        CHECK(postAnswerOverrun("I think I will just hold everything back this turn.") == 0
+              && codedAnswerCount("I think I will just hold everything back this turn.") == 0,
+              "W34-1b-B NEGATIVE a reply with no coded answer scores 0 and counts 0");
+        // The deck36 vs146 s18 shape: answered, kept writing, re-answered
+        // DIFFERENTLY. 45/1,209 replies corpus-wide; no shipped field saw it.
+        string replaced = "CHOICE: 2 (Yotian Soldier)\nOn reflection the Memorial is stronger here.\n"
+                          "CHOICE: 1 (Akroma's Memorial)";
+        CHECK(codedAnswerCount(replaced) == 2 && answerReplaced(replaced),
+              "W34-1b-B a reply that ends on a different answer than it began with is answer_replaced");
+        // NEGATIVE: the model REPEATED its answer verbatim (a loop, not a
+        // change of mind) - two coded lines, but no replacement.
+        string repeated = "CHOICE: 1 (Cast Ichor Rats)\nblah blah\nCHOICE:  1  (Cast Ichor Rats)";
+        CHECK(codedAnswerCount(repeated) == 2 && !answerReplaced(repeated),
+              "W34-1b-B NEGATIVE a re-stated identical answer is not a replacement (whitespace-normalised)");
+        // The meters run on the STRIPPED reply: thinking that contains coded
+        // lines must not count as answers (the split happens upstream).
+        string think = "<think>CHOICE: 3 maybe? no.</think>CHOICE: 1 (Cast Mordor Muster)";
+        string r;
+        splitReasoningBlock(think, r);
+        CHECK(codedAnswerCount(think) == 1 && !answerReplaced(think) && postAnswerOverrun(think) == 0,
+              "W34-1b-B coded lines inside the thinking never count as answers");
+    }
+
+    // ---- #1b(B) + N-139y: dropped_assignments counts the SILENT half ----
+    cout << "\n[W34-1b-B] every block the reply asked for and did not get is counted\n";
+    {
+        vector<string> bn; bn.push_back("Illuna");
+        vector<string> an; an.push_back("Cystbearer"); an.push_back("Hand of the Praetors");
+        an.push_back("Ichorclaw Myr");
+        vector<vector<int> > legal(1); legal[0].push_back(0); legal[0].push_back(1); legal[0].push_back(2);
+        vector<int> out;
+        int dropped = 0;
+        // deck139 vs105 s24: ONE blocker named against FOUR attackers. First
+        // wins is correct; the three discarded intents were invisible, and
+        // 7 poison connected through them.
+        int pairs = parseBlockAssignments(
+            "BLOCKS: Illuna blocks Cystbearer, Illuna blocks Hand of the Praetors,"
+            " Illuna blocks Ichorclaw Myr", 1, 3, out, &bn, &an, &legal, &dropped);
+        cout << "     gang-of-one: pairs=" << pairs << " dropped=" << dropped << "\n";
+        CHECK(pairs == 1 && out[0] == 1 && dropped == 2,
+              "W34-1b-B the two blocks first-wins discarded are COUNTED, not silent");
+        // Coded form: a duplicate and an out-of-range blocker label.
+        vector<int> out2;
+        int dropped2 = 0;
+        int pairs2 = parseBlockAssignments("BLOCKS: B1:A1, B1:A2, B5:A1", 2, 2, out2,
+                                           NULL, NULL, NULL, &dropped2);
+        CHECK(pairs2 == 1 && out2[0] == 1 && dropped2 == 2,
+              "W34-1b-B a duplicate B# and an out-of-range B# each count as a dropped assignment");
+        // NEGATIVE: a clean multi-blocker declaration drops nothing.
+        vector<int> out3;
+        int dropped3 = 0;
+        int pairs3 = parseBlockAssignments("BLOCKS: B1:A2, B2:A1", 2, 2, out3, NULL, NULL, NULL, &dropped3);
+        CHECK(pairs3 == 2 && dropped3 == 0,
+              "W34-1b-B NEGATIVE a fully executable declaration drops nothing");
+        // NEGATIVE: an explicit "none" is a decision, not a drop.
+        vector<int> out4;
+        int dropped4 = 0;
+        parseBlockAssignments("BLOCKS: B1:none, B2:none", 2, 2, out4, NULL, NULL, NULL, &dropped4);
+        CHECK(dropped4 == 0,
+              "W34-1b-B NEGATIVE declining with B#:none is not a dropped assignment");
+    }
+
+    // ---- #3 / N-36e: the plan CONSUMER anchors LAST, like every other consumer
+    cout << "\n[W34-N36e] a revised plan supersedes the abandoned one\n";
+    {
+        // deck36 vs105 s35: two PLAN: lines, the first abandoned mid-reply.
+        string two = "CHOICE: 1 (Cast Ichor Rats)\n"
+                     "PLAN: race on poison and hold removal.\n"
+                     "Actually the board says otherwise.\n"
+                     "PLAN: stabilise first, then race.";
+        size_t first = string::npos;
+        size_t pos = findPlanMarker(two, string::npos, &first);
+        cout << "     markers: first=" << (long) first << " current=" << (long) pos << "\n";
+        CHECK(pos == two.rfind("PLAN:") && first == two.find("PLAN:") && pos != first,
+              "W34-N36e the CURRENT plan is the LAST PLAN: line, not the abandoned first");
+        CHECK(postPlanOverrun(two) > 0,
+              "W34-N36e the tail meter still measures from the FIRST plan (deliberately unmoved)");
+        // NEGATIVE: one plan line - first and last are the same marker.
+        string one = "CHOICE: 2 (Cast Mordor Muster)\nPLAN: build the army.";
+        size_t f1 = string::npos;
+        CHECK(findPlanMarker(one, string::npos, &f1) == one.find("PLAN:") && f1 == one.find("PLAN:"),
+              "W34-N36e NEGATIVE a single-plan reply is unaffected");
+        // NEGATIVE: no plan at all -> npos, and the omission semantics
+        // (f46dd58ee: the previous plan carries forward) are untouched.
+        size_t f2 = string::npos;
+        CHECK(findPlanMarker("CHOICE: 0 (pass)", string::npos, &f2) == string::npos && f2 == string::npos,
+              "W34-N36e NEGATIVE an omitted PLAN is still an omission, never a marker");
+        // A "PLAN:" that sits AFTER the trailing answer label belongs to that
+        // line's tail, not to the plan - the earlier real plan stays current.
+        string tail = "PLAN: hold up mana and counter the bomb.\nCHOICE: 1 (Hold) PLAN: nonsense";
+        size_t labelLine = tail.find("CHOICE:");
+        size_t f3 = string::npos;
+        CHECK(findPlanMarker(tail, labelLine, &f3) == tail.find("PLAN:"),
+              "W34-N36e a PLAN: inside the answer line's tail does not supersede the real plan");
+    }
+
+    // ---- #3 / N-146m: an index whose NAME names no option is NOT an answer
+    cout << "\n[W34-N146m] a stale echo cannot commit a real choice by index\n";
+    {
+        // deck146 vs116 seq34, exactly: a DUNGEON menu answered with seq33's
+        // answer, carried in as YOUR PLAN. The name anchors to nothing here.
+        vector<string> dungeons;
+        dungeons.push_back("Tomb of Annihilation {room effect: enter the trapped room on your battlefield}");
+        dungeons.push_back("Lost Mine of Phandelver {room effect: cave in - a creature you control gets +1/+1}");
+        dungeons.push_back("Dungeon of the Mad Mage {room effect: secret door on the battlefield}");
+        bool stale = false;
+        int c = parseChoice("1 (Nadaar, Selfless Paladin #1 (5/5) [vigilance] [your battlefield])",
+                            3, &dungeons, &stale, NULL);
+        cout << "     stale dungeon answer -> " << c << " (must be -1) stale=" << (int) stale << "\n";
+        CHECK(c == -1 && stale,
+              "W34-N146m a parenthetical naming NO offered option is a rejection, not option 1");
+        // The two halves of that fix, each on its own:
+        // (a) the nested parenthetical must not cut the card NAME off the echo.
+        vector<string> creatures;
+        creatures.push_back("Grizzly Bears (2/2) [your battlefield]");
+        creatures.push_back("Nadaar, Selfless Paladin (5/5) [vigilance] [your battlefield]");
+        bool st2 = false;
+        int c2 = parseChoice("1 (Nadaar, Selfless Paladin #1 (5/5) [vigilance] [your battlefield])",
+                             2, &creatures, &st2, NULL);
+        cout << "     nested-paren echo against the real option -> " << c2 << " (must be 2)\n";
+        CHECK(c2 == 2 && !st2,
+              "W34-N146m the repaired echo still REMAPS to the option it actually names");
+        // (b) render vocabulary shared with an option is not agreement.
+        CHECK(isRenderVocabWord("battlefield") && isRenderVocabWord("your")
+              && !isRenderVocabWord("nadaar") && !isRenderVocabWord("annihilation"),
+              "W34-N146m zone/state words are render furniture; card words are identity");
+        // NEGATIVE, the guard that must stay green: an ordinary correct answer
+        // whose echo names its own option still binds, annotations and all.
+        bool st3 = false;
+        int c3 = parseChoice("1 (Tomb of Annihilation)", 3, &dungeons, &st3, NULL);
+        CHECK(c3 == 1 && !st3,
+              "W34-N146m NEGATIVE a correct in-context answer binds unchanged");
+        // NEGATIVE: a deliberate pass carries no name and is never stale.
+        bool st4 = false;
+        CHECK(parseChoice("0 (pass)", 3, &dungeons, &st4, NULL) == 0 && !st4,
+              "W34-N146m NEGATIVE CHOICE: 0 (pass) is a decision, not a stale echo");
+    }
+
+    // ---- owner docket 3: the NARRATED copy of a decision drops the offer's furniture
+    cout << "\n[W34-docket3] a consumed decision narrates the choice, not the offer\n";
+    {
+        string offer = "Cast Gray Merchant of Asphodel {3}{b}{b} (2/4) "
+                       "{card text: \"When Gray Merchant enters, each opponent loses X life...\"} "
+                       "{right now: drains 5}";
+        string narrated = stripNarrationDecoration(offer);
+        cout << "     narrated: \"" << narrated << "\"\n";
+        CHECK(narrated == "Cast Gray Merchant of Asphodel {3}{b}{b} (2/4)",
+              "W34-docket3 card text and the live magnitude leave the narrated copy");
+        // The cost bracket goes too, and the mana COST - which identifies the
+        // card - stays. A card text containing "{T}" must not cut the strip
+        // short and strand its tail in the log.
+        string act = "Put in Play with Windswept Heath [cost: {1}, Sacrifice] "
+                     "{card text: \"{T}, Pay 1 life, Sacrifice: Search your library.\"} done";
+        CHECK(stripNarrationDecoration(act) == "Put in Play with Windswept Heath done",
+              "W34-docket3 a [cost: ...] goes, and a nested {T} inside card text does not truncate the strip");
+        // NEGATIVE: a line with no furniture is byte-identical - and the
+        // OPTION lines the model decides from are never passed through here.
+        string plain = "Attack with Yawgmoth, Thran Physician (2/3)";
+        CHECK(stripNarrationDecoration(plain) == plain,
+              "W34-docket3 NEGATIVE an undecorated decision is untouched");
+        // NEGATIVE: identity is not furniture - P/T, pump deltas, targets and
+        // the (printed X/Y) tag all survive.
+        string keep = "+2/+2 until EOT (2/2 -> 4/4) targeting Grizzly Bears (printed 2/2)";
+        CHECK(stripNarrationDecoration(keep) == keep,
+              "W34-docket3 NEGATIVE stats, deltas and targets are identity and stay");
+    }
+
+    // ---- live-probe conformance: the answer can arrive in the REASONING field
+    cout << "\n[W34-probe] a coded answer at the END of the reasoning field is the answer\n";
+    {
+        // The verified phase-2 shape: prefill "<think>...</think>\n" + continue
+        // -> reasoning = "\n\nCHOICE: 1", content = null. The parser classifies
+        // by GENERATED tokens, so our injected close is invisible to it - but
+        // the model answered immediately, which is the point.
+        CHECK(answerTailFromReasoning("\n\nCHOICE: 1") == "CHOICE: 1",
+              "W34-probe the forced close's answer is recovered from the reasoning field");
+        // Answered inside the thinking window, then stopped: the trailing coded
+        // line is the answer.
+        string ended = "Option 2 trades badly.\nSo I take the Muster.\nCHOICE: 1 (Cast Mordor Muster)";
+        CHECK(answerTailFromReasoning(ended) == "CHOICE: 1 (Cast Mordor Muster)",
+              "W34-probe thinking that ENDS on a coded line yields that line");
+        // NEGATIVE, the one that matters: a mid-thinking candidate the model
+        // was still weighing is NOT an answer. This is the shape a phase-1
+        // budget hit produces, and parsing it would commit a choice the model
+        // explicitly talked itself out of.
+        string midThought = "Maybe CHOICE: 3 (Cast Emrakul)?\nNo wait, that is 15 mana and I have 4.";
+        CHECK(answerTailFromReasoning(midThought).empty(),
+              "W34-probe NEGATIVE a candidate followed by more thinking is never an answer");
+        // NEGATIVE: thinking with no coded line at all yields nothing.
+        CHECK(answerTailFromReasoning("I count four lands and a Bowmasters in hand.").empty(),
+              "W34-probe NEGATIVE reasoning with no coded line yields no answer");
+        // Two coded lines with nothing after: last wins, as everywhere else.
+        string two = "CHOICE: 2 (Yotian Soldier)\nCHOICE: 1 (Akroma's Memorial)";
+        CHECK(answerTailFromReasoning(two) == "CHOICE: 1 (Akroma's Memorial)",
+              "W34-probe the LAST coded line wins here too");
+    }
+
+    // ---- hidden reasoning: the provider reasoned and kept the trace ----
+    cout << "\n[W34-hidden] a withheld thinking trace is a NORMAL reply, not a failure\n";
+    {
+        // OpenAI/Anthropic withhold raw chain-of-thought as policy; OpenRouter
+        // can hide it depending on the upstream (this project's own 40s mystery
+        // latency behind a 140-token answer, 71f4f615c). The answer is right
+        // there in content and must parse exactly as the thinking-off path does.
+        string content = "CHOICE: 2 (Cast Ichor Rats)\nPLAN: race on poison.";
+        CHECK(reasoningHiddenShape(true, content, ""),
+              "W34-hidden thinking requested + content + no trace = the hidden shape");
+        // It is the INVERSE of reasoning_only and must never be read as it:
+        // that shape is EMPTY content with reasoning present.
+        CHECK(!reasoningHiddenShape(true, "", "still deliberating about the fetchland"),
+              "W34-hidden NEGATIVE content-empty-with-reasoning is reasoning_only, not hidden");
+        // Thinking OFF: an ordinary terse reply is not a withheld trace.
+        CHECK(!reasoningHiddenShape(false, content, ""),
+              "W34-hidden NEGATIVE with thinking off there is no trace to withhold");
+        // A provider that DID return the trace is not hiding it.
+        CHECK(!reasoningHiddenShape(true, content, "Option 1 is worse on board."),
+              "W34-hidden NEGATIVE a returned trace is not a hidden one");
+        // The reply itself parses with nothing special about it - no reasoning
+        // block to split, an answer where an answer belongs, plan carried.
+        string c = content;
+        string r;
+        CHECK(splitReasoningBlock(c, r) && c == content && r.empty(),
+              "W34-hidden a content-only reply passes through the splitter untouched");
+        vector<string> opts;
+        opts.push_back("Cast Mordor Muster {1}{b}");
+        opts.push_back("Cast Ichor Rats {2}{b}");
+        bool stale = false;
+        CHECK(parseChoice("2 (Cast Ichor Rats)", 2, &opts, &stale, NULL) == 2 && !stale,
+              "W34-hidden the answer in a hidden-trace reply binds like any other");
+        // And no answer-recovery machinery engages: there is no reasoning field
+        // to mine, and content was never empty.
+        CHECK(answerTailFromReasoning("").empty(),
+              "W34-hidden NEGATIVE no reasoning field means nothing to recover from");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
