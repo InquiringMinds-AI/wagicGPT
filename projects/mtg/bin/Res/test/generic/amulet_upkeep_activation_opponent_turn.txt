@@ -1,0 +1,36 @@
+#Wave-33 ledger #2 (N-116g), OPPONENT-TURN PARITY of
+#generic/amulet_upkeep_activation.txt -- same defect, the other side of the
+#turn. The corpus split the failures 5-of-6 arriving on the activator's own
+#upkeep against 0-of-2 on the opponent's, so the fix has to be validated at
+#BOTH settings of the parity, not just the one that happened to be sampled.
+#
+#The game starts in the CLEANUP step of the AI's own turn: no player has
+#priority there, so the first window the AI sees is the OPPONENT's upkeep.
+#Board and defect are identical to the own-turn fixture: a shared, never-cleared
+#payment plan built for Bonesplitter's Equip {1} is inherited by the Amulet's
+#{4} payment, which then silently refuses.
+#
+#WITNESS: PRE-FIX Craw Wurm stays in hand. POST-FIX Craw Wurm is on the
+#battlefield during the opponent's turn.
+FORCEABILITY
+AICALLS 120
+[INIT]
+CLEANUP
+[PLAYER1]
+inplay:Quicksilver Amulet,Snow-Covered Forest,Snow-Covered Plains,Snow-Covered Island,Snow-Covered Swamp,Bonesplitter
+hand:Craw Wurm
+life:20
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+[ASSERT]
+draw
+[PLAYER1]
+inplay:Quicksilver Amulet,Snow-Covered Forest,Snow-Covered Plains,Snow-Covered Island,Snow-Covered Swamp,Bonesplitter,Craw Wurm
+life:20
+[PLAYER2]
+life:20
+[END]

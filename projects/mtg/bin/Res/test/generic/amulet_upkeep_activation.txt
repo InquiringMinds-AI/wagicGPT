@@ -1,0 +1,43 @@
+#Wave-33 ledger #2 (N-116g) -- a cheat-into-play activation is offered, chosen,
+#narrated and PAID FOR, and then never reaches the stack.
+#
+#ROOT CAUSE: AIPlayerBaka::selectAbility scans every (ability, card) pair and,
+#for every pair the pooled potential mana cannot cover, overwrites a SHARED
+#abilityPayment vector with a specific-mana plan for THAT pair's cost. It is
+#never cleared, so the plan handed to payTheManaCost for the CHOSEN action was
+#in general a plan for some other ability's cost. A plan that cannot afford the
+#chosen cost makes payTheManaCost return false after printing "Ai had a payment
+#in mind": no AIAction is queued, nothing is tapped, nothing is paid, and the
+#activation vanishes with no fallback, no defer and no counter.
+#
+#THE FIXTURE RIDES THE BROKEN BRANCH deliberately. Two ingredients:
+#  1. UPKEEP, not a main phase -- corpus arrival was 8/8 in main phases and
+#     3-of-11 broken at upkeep windows, so a main-phase fixture proves nothing.
+#  2. A SECOND, CHEAPER activated ability on the battlefield (Bonesplitter's
+#     Equip {1}), listed AFTER the Amulet so its one-mana plan is
+#     the leftover the Amulet's {4} payment inherits.
+#
+#WITNESS: PRE-FIX Craw Wurm stays in hand, the Amulet is untapped and no mana is
+#spent. POST-FIX Craw Wurm is on the battlefield.
+FORCEABILITY
+AICALLS 120
+[INIT]
+UPKEEP
+[PLAYER1]
+inplay:Quicksilver Amulet,Snow-Covered Forest,Snow-Covered Plains,Snow-Covered Island,Snow-Covered Swamp,Bonesplitter
+hand:Craw Wurm
+life:20
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Quicksilver Amulet,Snow-Covered Forest,Snow-Covered Plains,Snow-Covered Island,Snow-Covered Swamp,Bonesplitter,Craw Wurm
+life:20
+[PLAYER2]
+life:20
+[END]

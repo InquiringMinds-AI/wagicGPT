@@ -1929,6 +1929,24 @@ vector<MTGAbility*> AIPlayerBaka::canPayMana(MTGCardInstance * target, ManaCost 
     return ManaEngine::planPayment(this, policy, target, _cost, anytypeofmana, used, searchingAgain);
 }
 
+//N-116g: the specific-mana plan for ONE (ability, source) pair, by the same
+//rule the ability scans use - only probe for a specific plan when the pooled
+//potential mana cannot already cover the cost. The scans compute this into a
+//shared variable that is never cleared between pairs, so the plan that reached
+//payment belonged to an arbitrary other ability; callers ask for the plan of
+//the action they are about to take instead.
+vector<MTGAbility*> AIPlayerBaka::planPaymentForAction(MTGAbility * ability, MTGCardInstance * click,
+                                                       ManaCost * totalPotentialMana)
+{
+    vector<MTGAbility*> plan;
+    if (!ability || !click || !ability->getCost())
+        return plan;
+    int anyType = click->has(Constants::ANYTYPEOFMANAABILITY);
+    if (!ability->isReactingToClick(click, totalPotentialMana))
+        plan = canPayMana(click, ability->getCost(), anyType);
+    return plan;
+}
+
 vector<MTGAbility*> AIPlayerBaka::canPaySunBurst(ManaCost * cost)
 {
     //in canPaySunburst we try to fill the cost with one of each color we can produce, 
@@ -2420,22 +2438,42 @@ int AIPlayerBaka::selectAbility()
             }
         }
     }
-    delete totalPotentialMana;
     const OrderedAIAction * chosenAction = chooseOrderedAction(ranking);
     if (chosenAction)
     {
         const OrderedAIAction & action = *chosenAction;
         if (!clickstream.size())
         {
-            if (abilityPayment.size())
+            //N-116g: the payment plan must belong to the action being taken.
+            //abilityPayment above is assigned inside the scan for WHATEVER
+            //(ability, card) pair last failed the potential-mana probe - which
+            //is nearly every pair, since the probe runs for every ability
+            //against every card and only the ability's own source can react -
+            //and it is never cleared between pairs. So the plan handed to
+            //payTheManaCost was, in general, a plan for a DIFFERENT ability's
+            //cost. When that foreign plan cannot afford the chosen cost,
+            //payTheManaCost prints "Ai had a payment in mind" and returns
+            //false: no AIAction is queued, nothing is tapped, nothing is paid,
+            //and the whole activation disappears with no fallback, no defer
+            //and no counter recording it (wave-33 N-116g: 3 of 11 cheat-into-
+            //play activations silently no-op'd, one of them the game). The
+            //complementary failure - an empty leftover plan forcing the strict
+            //one-ability-per-card potential-mana path, which cannot see a dual
+            //land's second colour - dropped the {g},Tap Elvish Piper
+            //activation off a Tropical Island the same corpus.
+            //Recompute here, for THIS action, by the same rule the scan uses.
+            vector<MTGAbility*> chosenPayment = planPaymentForAction(action.ability, action.click,
+                                                                    totalPotentialMana);
+            if (chosenPayment.size())
             {
                 DebugTrace(" Ai knows exactly what mana to use for this ability.");
             }
             DebugTrace("AIPlayer:Using Activated ability");
-            if (payTheManaCost(action.ability->getCost(),action.click->has(Constants::ANYTYPEOFMANAABILITY),action.click,abilityPayment))
+            if (payTheManaCost(action.ability->getCost(),action.click->has(Constants::ANYTYPEOFMANAABILITY),action.click,chosenPayment))
                 clickstream.push(NEW AIAction(action));
         }
     }
+    delete totalPotentialMana;
 
     abilityPayment.clear();
     return 1;
@@ -2547,7 +2585,6 @@ int AIPlayerBaka::doAbility(MTGAbility * Specific, MTGCardInstance * withCard)
             }
         }
     }
-    delete totalPotentialMana;
     if (ranking.size())
     {
         OrderedAIAction action = ranking.begin()->first;
@@ -2561,7 +2598,15 @@ int AIPlayerBaka::doAbility(MTGAbility * Specific, MTGCardInstance * withCard)
         {
             if (!clickstream.size())
             {
-                if (abilityPayment.size())
+                //N-116g, same leak as in selectAbility(): the scan's
+                //abilityPayment belongs to whichever pair last failed the
+                //potential-mana probe, not to the action being taken. The
+                //attack/block-cost branches below carry a plan the scan built
+                //for THIS card's specific cost, so they keep it; the ordinary
+                //cost path recomputes for the chosen action.
+                vector<MTGAbility*> chosenPayment = planPaymentForAction(action.ability, action.click,
+                                                                        totalPotentialMana);
+                if (abilityPayment.size() || chosenPayment.size())
                 {
                     DebugTrace(" Ai knows exactly what mana to use for this ability.");
                 }
@@ -2589,12 +2634,13 @@ int AIPlayerBaka::doAbility(MTGAbility * Specific, MTGCardInstance * withCard)
                 }
                 else
                 {
-                    if (payTheManaCost(action.ability->getCost(), action.click->has(Constants::ANYTYPEOFMANAABILITY), action.click, abilityPayment))
+                    if (payTheManaCost(action.ability->getCost(), action.click->has(Constants::ANYTYPEOFMANAABILITY), action.click, chosenPayment))
                         clickstream.push(NEW AIAction(action));
                 }
             }
         }
     }
+    delete totalPotentialMana;
     abilityPayment.clear();
     return 1;
 }

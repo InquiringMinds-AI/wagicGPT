@@ -102,6 +102,9 @@ class AIPlayerBaka: public AIPlayer{
     virtual vector<MTGAbility*> canPayMana(MTGCardInstance * card, ManaCost * mCost, int anytypeofmana);
     virtual vector<MTGAbility*> canPayMana(MTGCardInstance * card, ManaCost * mCost, int anytypeofmana, map<MTGCardInstance*, bool> &usedCards, bool searchingAgain = false);
     virtual vector<MTGAbility*> canPaySunBurst(ManaCost * mCost = NULL);
+    //N-116g: the specific-mana plan for ONE (ability, source) pair - see the definition.
+    vector<MTGAbility*> planPaymentForAction(MTGAbility * ability, MTGCardInstance * click,
+                                             ManaCost * totalPotentialMana);
 
     virtual MTGCardInstance * chooseCard(TargetChooser * tc, MTGCardInstance * source, int random = 0);
     //The COMMIT choice for an extra-cost target (what to sacrifice/tap/
