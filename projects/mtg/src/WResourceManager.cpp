@@ -248,10 +248,18 @@ bool ResourceManagerImpl::IsThreaded()
     return CacheEngine::IsThreaded();
 }
 
+#ifdef WAGIC_AUTODEMO
+//Autodemo telemetry counters (consumed by the GameStateDuel heartbeat probe).
+unsigned wagicArtCalls = 0, wagicArtMiss = 0;
+#endif
+
 JQuadPtr ResourceManagerImpl::RetrieveCard(MTGCard * card, int style, int submode)
 {
     //Cards are never, ever resource managed, so just check cache.
     if (!card || options[Options::DISABLECARDS].number) return JQuadPtr();
+#ifdef WAGIC_AUTODEMO
+    ++wagicArtCalls;
+#endif
 
     submode = submode | TEXTURE_SUB_CARD;
 
@@ -301,6 +309,9 @@ JQuadPtr ResourceManagerImpl::RetrieveCard(MTGCard * card, int style, int submod
         return jq;
     }
 
+#ifdef WAGIC_AUTODEMO
+    ++wagicArtMiss;
+#endif
     return JQuadPtr();
 }
 

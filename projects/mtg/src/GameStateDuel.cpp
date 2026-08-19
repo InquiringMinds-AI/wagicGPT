@@ -73,6 +73,23 @@ static void wagicProbe(const char* fmt, ...)
     fprintf(f, " used=%u arena=%u\n", (unsigned)mi.uordblks, (unsigned)mi.arena);
     fclose(f);
 }
+#ifdef WAGIC_AUTODEMO
+//Autodemo frame telemetry: splits frame cost between Update and Render and
+//counts card-art retrievals, so an unattended run distinguishes a genuine
+//engine stall from slow pacing (2026-08-18: a 3h headless soak read as a
+//turn-2 hang; this telemetry proved the game healthy and the emulator slow).
+extern unsigned wagicArtCalls, wagicArtMiss;
+namespace
+{
+unsigned gUpdMs = 0, gRndMs = 0;
+struct WagicScopeMs
+{
+    unsigned & acc; int t0;
+    WagicScopeMs(unsigned & a) : acc(a), t0(JGEGetTime()) {}
+    ~WagicScopeMs() { acc += (unsigned) (JGEGetTime() - t0); }
+};
+}
+#endif
 #else
 #define WAGIC_SELFPLAY_ACTIVE (getenv("WAGIC_SELFPLAY") != NULL)
 #endif
@@ -704,6 +721,33 @@ void GameStateDuel::ThreadProc(void* inParam)
 void GameStateDuel::Update(float dt)
 {
 #if defined(WAGIC_AUTODEMO) || defined(WAGIC_HWPROBE)
+#ifdef WAGIC_AUTODEMO
+    WagicScopeMs _updTimer(gUpdMs);
+#endif
+    {
+        //Heartbeat: proves Update is still being called (vs. a spin inside one call).
+        static unsigned hbCalls = 0;
+        static float hbDt = 0;
+        ++hbCalls;
+        hbDt += dt;
+        if (hbCalls == 1 || (hbCalls % 200u) == 0)
+        {
+            //GameObserver::turn is uninitialized until the game starts; the phase
+            //ring (getCurrentGamePhase() >= 0) marks when it is safe to read.
+            int goPhase = (mGamePhase == DUEL_STATE_PLAY && game) ? game->getCurrentGamePhase() : -1;
+            int goTurn = (goPhase >= 0) ? game->turn : -1;
+#ifdef WAGIC_AUTODEMO
+            wagicProbe("hb calls=%u dt=%.5f dtsum=%.3f now=%d updms=%u rndms=%u art=%u miss=%u phase=%d turn=%d gophase=%d",
+                hbCalls, dt, hbDt, JGEGetTime(), gUpdMs, gRndMs, wagicArtCalls, wagicArtMiss,
+                (int) mGamePhase, goTurn, goPhase);
+            gUpdMs = gRndMs = 0;
+            wagicArtCalls = wagicArtMiss = 0;
+#else
+            wagicProbe("hb calls=%u dt=%.5f dtsum=%.3f phase=%d turn=%d gophase=%d", hbCalls, dt, hbDt,
+                (int) mGamePhase, goTurn, goPhase);
+#endif
+        }
+    }
     if (mGamePhase == DUEL_STATE_PLAY)
     {
 #ifdef WAGIC_AUTODEMO
@@ -1440,6 +1484,9 @@ void GameStateDuel::Update(float dt)
 
 void GameStateDuel::Render()
 {
+#ifdef WAGIC_AUTODEMO
+    WagicScopeMs _rndTimer(gRndMs);
+#endif
     WFont * mFont = WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
     JRenderer * r = JRenderer::GetInstance();
     r->ClearScreen(ARGB(0,0,0,0));
