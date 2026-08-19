@@ -1554,6 +1554,72 @@ bool ciStartsWith(const string& s, const string& name)
     return true;
 }
 
+//---- N-146n (wave-33 deck146, HIGH, the corpus's largest latency driver) -------
+//The room-branch menu rendered two room names and their effects and NOTHING
+//about where in the dungeon the pilot stood: not which dungeon, not the step,
+//not where the offered rooms sit in the dungeon's own room list. Three of the
+//corpus's four worst reasoning spirals are that reconstruction - 200-214s each,
+//9k-15k characters, one of them concluding an option name must be "a typo in
+//the prompt's options list", another hand-counting Explore counters turn by
+//turn to locate itself. The venture state is engine-side and knowable (the
+//active dungeon lives in the command zone and carries its Explore counters), so
+//this is a surface defect: under the trust doctrine the model owes the surface
+//belief and the surface owes it the truth, and an underspecified menu that
+//forces re-derivation of engine state is the same failure family as a
+//wrong-scope statement.
+//  WORDING DISCIPLINE: state only what the engine knows. A dungeon's rooms
+//BRANCH, so "room 2 of 5" as a claim about the PATH would be false (Tomb of
+//Annihilation prints five rooms and a run visits four); the position is
+//therefore always scoped to the printed room LIST, and the branching is said
+//out loud so the model does not read the list as a route. Pure over their
+//inputs, so PARSETEST proves the emitted shapes without a game.
+string dungeonRoomPositionTag(const string& dungeonName, size_t index, size_t total)
+{
+    if (!total || index >= total)
+        return "";
+    std::ostringstream o;
+    o << " (room " << (index + 1) << " of " << total << " in " << dungeonName
+      << "'s printed room list)";
+    return o.str();
+}
+
+string dungeonRoomBranchHeader(const string& dungeonName, int exploreCount,
+                               const std::vector<std::pair<string, string> >& rooms)
+{
+    std::ostringstream o;
+    o << "DUNGEON ROOM CHOICE - you are venturing in " << dungeonName << ".";
+    if (exploreCount > 0)
+        o << " This is venture step " << exploreCount << " of your current run"
+             " through it (" << dungeonName << " carries " << exploreCount
+          << " Explore counter" << (exploreCount == 1 ? "" : "s") << ").";
+    o << " You are choosing which ROOM you enter now - this is not a target and"
+         " not a card to cast.";
+    if (!rooms.empty())
+    {
+        o << " " << dungeonName << "'s rooms, in printed order:";
+        for (size_t i = 0; i < rooms.size(); i++)
+            o << " " << (i + 1) << ". " << rooms[i].first << (i + 1 == rooms.size() ? "." : ";");
+        o << " Dungeon paths BRANCH, so a run does not enter every room and the"
+             " printed order is not a route.";
+    }
+    o << " The options below are the only rooms you may enter at this step, and"
+         " each one's effect is stated on its own line.";
+    return o.str();
+}
+
+//The narration line for one Explore counter landing on a dungeon. The generic
+//counter line ("Counter added to Tomb of Annihilation: Explore") gave the pilot
+//nothing to count with except its own bookkeeping - which is exactly what the
+//spirals above were doing. `step` is the dungeon's Explore count after this one.
+string ventureStepLine(bool mine, const string& dungeonName, int step)
+{
+    std::ostringstream o;
+    o << (mine ? "You venture into " : "Opponent ventures into ") << dungeonName;
+    if (step > 0)
+        o << ": venture step " << step << " of that run";
+    return o.str();
+}
+
 //One targetable thing, described for the model's target menu.
 //---- N-105a / N-105b (wave-32; SEVEN seats; corpus-integrity) ------------------
 //Poison counters were rendered NOWHERE to this seat. The engine tracks
@@ -3165,6 +3231,15 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //engine sends this event AFTER applying the counter (Counters::addCounter
         //increments, then fires), so the permanent's CURRENT P/T is the settled
         //result: print it and there is no arithmetic left to do.
+        //N-146n: an Explore counter landing on a dungeon IS the venture. The
+        //generic counter line ("Counter added to Tomb of Annihilation: Explore")
+        //made the step number something the model had to count for itself, turn
+        //by turn, and it did - at 200s a time. Name the act and the step.
+        if (e->added && e->targetCard->hasType(Subtypes::TYPE_DUNGEON)
+            && ciStartsWith(e->name, "explore"))
+            return ventureStepLine(e->targetCard->controller() == this,
+                                   e->targetCard->getDisplayName(),
+                                   e->stateCaptured ? e->settledNb : 0);
         out << (e->added ? "Counter added to " : "Counter removed from ")
             << e->targetCard->getDisplayName() << instanceHandle(e->targetCard);
         if (!e->name.empty() && e->name != " ")
@@ -6185,17 +6260,35 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //room effect. Self-gating: only options whose text matches a room name of the
     //active dungeon are touched, so every other bare-name menu is untouched.
     //Append-only - the answer index and req.optionTexts (staleness key) are unchanged.
+    //N-146n: the effect text alone still left the model unable to say WHERE it
+    //was. Add the position of each offered room in the dungeon's printed room
+    //list, and (below) replace the generic header with one that names the
+    //dungeon, the venture step, and the branching. Still append-only per option:
+    //the answer index and req.optionTexts (the staleness key) are unchanged.
+    string dungeonRoomHeader;
     if (MTGCardInstance * dng = activeDungeon(game))
     {
         std::vector<std::pair<string, string> > rooms;
         parseDungeonRooms(dng->text, rooms);
+        string dngName = dng->getDisplayName();
+        bool anyRoomOption = false;
         for (size_t i = 0; i < opts.size(); i++)
             for (size_t r = 0; r < rooms.size(); r++)
                 if (ciStartsWith(opts[i], rooms[r].first))
                 {
+                    opts[i] += dungeonRoomPositionTag(dngName, r, rooms.size());
                     opts[i] += " {room effect: " + rooms[r].second + "}";
+                    anyRoomOption = true;
                     break;
                 }
+        if (anyRoomOption)
+        {
+            int explores = 0;
+            if (dng->counters)
+                if (Counter * ec = dng->counters->hasCounter("Explore", 0, 0))
+                    explores = ec->nb;
+            dungeonRoomHeader = dungeonRoomBranchHeader(dngName, explores, rooms);
+        }
     }
     //N-139a (wave-29 deck139): the mutate OVER/UNDER placement menu ("Mutate Over"/
     //"Mutate Under") and the cast-mode sub-menu's "mutate" option reached the model
@@ -6262,6 +6355,12 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //N-139a: a mutate placement menu overrides the generic header with a role header.
     if (mutatePlaceMenu)
         decision = mutateOverUnderHeader(ctxName);
+    //N-146n: a room-branch menu says which dungeon and which venture step it is.
+    //The generic header ("Choose an option for Tomb of Annihilation:") named the
+    //dungeon but nothing else, and the position is the fact the spirals were
+    //re-deriving.
+    if (!dungeonRoomHeader.empty())
+        decision = dungeonRoomHeader;
     //Thread the source card as the pending source (as ANNOUNCE_X does): the model
     //often echoes "<verb> <source card>" against a bare option ("Tap Temple
     //Garden" vs "tap"), and INDEX-WINS treats a source-naming echo as a
@@ -10813,6 +10912,74 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(c == 1 && !stale, "W34-N152k a bare-name echo binds the cost-less back face option");
         int c2 = parseChoice("2 (Mox Jet {0})", 2, &opts, &stale, NULL);
         CHECK(c2 == 2 && !stale, "W34-N152k the {0} Mox option still binds by its cost token");
+    }
+
+    // ---- N-146n: the room-branch menu states where in the dungeon you are ----
+    cout << "\n[W34-N146n] the dungeon room-branch ask names the dungeon, the step and the position\n";
+    {
+        // Tomb of Annihilation's text=, verbatim from borderline.txt.
+        string tomb = "Trapped Entry - Each player loses 1 life. -- Veils of Fear - Each"
+                      " player loses 2 life unless they discard a card. -- Sandfall Cell -"
+                      " Each player loses 2 life unless they sacrifice an artifact, a"
+                      " creature, or a land. -- Oubliette - Discard a card and sacrifice an"
+                      " artifact, a creature, and a land. -- Cradle of the Death God -"
+                      " Create The Atropal, a legendary 4/4 black God Horror creature token"
+                      " with deathtouch.";
+        std::vector<std::pair<string, string> > rooms;
+        parseDungeonRooms(tomb, rooms);
+        CHECK(rooms.size() == 5, "W34-N146n the 5 Tomb rooms parse for the position tag");
+        // The vs116 seq35 specimen: options were "veils of fear" / "oubliette",
+        // bare, and the reply spent 9,091 characters deciding whether "Oubliette"
+        // was a typo. Both now carry their place in the printed list.
+        string t1 = dungeonRoomPositionTag("Tomb of Annihilation", 1, rooms.size());
+        string t2 = dungeonRoomPositionTag("Tomb of Annihilation", 3, rooms.size());
+        cout << "     " << t1 << " /" << t2 << "\n";
+        CHECK(t1 == " (room 2 of 5 in Tomb of Annihilation's printed room list)",
+              "W34-N146n a room option carries its printed-list position");
+        CHECK(t2 == " (room 4 of 5 in Tomb of Annihilation's printed room list)",
+              "W34-N146n the second branch option carries its own position");
+        // NEGATIVE: an out-of-range or empty room list annotates nothing.
+        CHECK(dungeonRoomPositionTag("Tomb of Annihilation", 7, rooms.size()).empty()
+              && dungeonRoomPositionTag("Tomb of Annihilation", 0, 0).empty(),
+              "W34-N146n no position is invented when the room list cannot place it");
+        string hdr = dungeonRoomBranchHeader("Tomb of Annihilation", 2, rooms);
+        cout << "     " << hdr << "\n";
+        CHECK(hdr.find("Tomb of Annihilation") != string::npos
+              && hdr.find("venture step 2") != string::npos,
+              "W34-N146n the header names the dungeon AND the venture step");
+        CHECK(hdr.find("BRANCH") != string::npos
+              && hdr.find("printed order is not a route") != string::npos,
+              "W34-N146n the header says the printed order is not the path");
+        CHECK(hdr.find("Sandfall Cell") != string::npos,
+              "W34-N146n the header lists every room, including ones not offered"
+              " (the vs116 spiral asked where Sandfall Cell had gone)");
+        // NEGATIVE: with the explore count unknown, no step is asserted.
+        string hdr0 = dungeonRoomBranchHeader("Tomb of Annihilation", 0, rooms);
+        CHECK(hdr0.find("venture step") == string::npos,
+              "W34-N146n an unknown explore count asserts no step number");
+        // The narration half: the venture itself, with its step.
+        CHECK(ventureStepLine(true, "Tomb of Annihilation", 2)
+              == "You venture into Tomb of Annihilation: venture step 2 of that run",
+              "W34-N146n venturing narrates as a venture, with the step");
+        CHECK(ventureStepLine(false, "Lost Mine of Phandelver", 1)
+              == "Opponent ventures into Lost Mine of Phandelver: venture step 1 of that run",
+              "W34-N146n the opponent's venture is narrated from the same helper");
+        CHECK(ventureStepLine(true, "Tomb of Annihilation", 0)
+              == "You venture into Tomb of Annihilation",
+              "W34-N146n an uncaptured step number is omitted, never guessed");
+        // Echo shape: the option now carries a position tag AND a room effect;
+        // a bare room-name echo must still bind, and the wrong room must not.
+        vector<string> opts;
+        opts.push_back("Veils of Fear" + t1
+                       + " {room effect: Each player loses 2 life unless they discard a card.}");
+        opts.push_back("Oubliette" + t2
+                       + " {room effect: Discard a card and sacrifice an artifact, a creature, and a land.}");
+        bool stale = false;
+        int c = parseChoice("2 (Oubliette)", 2, &opts, &stale, NULL);
+        CHECK(c == 2 && !stale, "W34-N146n a bare room-name echo binds through the position tag");
+        int c2 = parseChoice("1 (Veils of Fear (room 2 of 5 in Tomb of Annihilation's"
+                             " printed room list))", 2, &opts, &stale, NULL);
+        CHECK(c2 == 1 && !stale, "W34-N146n an echo that repeats the position tag binds too");
     }
 
     // ---- N-105f: a batched counter run narrates its own step, not the batch's end ----
