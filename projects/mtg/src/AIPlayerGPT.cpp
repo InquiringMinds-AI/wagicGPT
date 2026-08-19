@@ -3762,6 +3762,63 @@ static bool ptPumpModifierDelta(MTGAbility * a, int& dp, int& dt, bool& ueot,
     return true;
 }
 
+//NARRATED DECISIONS CARRY THE CHOICE, NOT THE OFFER (owner docket 3, wave-34).
+//An option line is a live decision surface: {card text: "..."}, [cost: ...]
+//and the evaluated {right now: ...} magnitude are there to be decided ON. The
+//narrated COPY of a decision already taken is history - "what did I do" - and
+//every one of those annotations is re-served, per consumed decision, for the
+//rest of the game, on a prompt that is already the largest thing in the
+//request. Wrong by architecture, and measured small (deck36: 72/201 prompts,
+//mean 81 chars; deck105 ~320 chars/line), so this is a hygiene fix, not a
+//latency one - the estimate is stated honestly rather than sold.
+//
+//Only the annotation FURNITURE goes. Anything that identifies WHAT was chosen
+//- the name, the P/T, the pump delta, the target - is untouched, and the
+//OPTION lines the model chooses from are not touched at all: they still carry
+//everything. Brace/bracket depth is counted because a card's text legitimately
+//contains "{T}" and "{2}", so a naive scan to the first '}' would cut a
+//snippet in half and leave its tail in the log.
+static string stripNarrationDecoration(const string& in)
+{
+    string out;
+    for (size_t i = 0; i < in.size(); )
+    {
+        bool drop = false;
+        char openCh = in[i];
+        if (openCh == '{')
+            drop = (in.compare(i, 12, "{card text: ") == 0) || (in.compare(i, 12, "{right now: ") == 0);
+        else if (openCh == '[')
+            drop = (in.compare(i, 7, "[cost: ") == 0);
+        if (!drop)
+        {
+            out += in[i++];
+            continue;
+        }
+        char closeCh = (openCh == '{') ? '}' : ']';
+        int depth = 0;
+        size_t j = i;
+        for (; j < in.size(); j++)
+        {
+            if (in[j] == openCh)
+                depth++;
+            else if (in[j] == closeCh && --depth == 0)
+            {
+                j++;
+                break;
+            }
+        }
+        i = j;
+        //Leave no double space where the annotation stood.
+        while (!out.empty() && out[out.size() - 1] == ' ' && i < in.size() && in[i] == ' ')
+            i++;
+    }
+    //A trailing space left by an annotation at the end of the line.
+    size_t last = out.find_last_not_of(' ');
+    if (last != string::npos)
+        out.erase(last + 1);
+    return out;
+}
+
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 {
     std::ostringstream out;
@@ -5235,7 +5292,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
         {
-            narrateDecision("You: " + describeAction(*shown[choice - 1]));
+            narrateDecision("You: " + stripNarrationDecoration(describeAction(*shown[choice - 1])));
             //Consume-on-choose: a taken land fetch is done for the turn -
             //an identical line (a second copy of the same fetch, or the
             //same crack re-proposed at a different land) re-asking at the
@@ -5371,7 +5428,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
         //first line of the question only: multi-line asks (damage order)
         //would bloat a narration that persists all game
-        narrateDecision(decision.substr(0, decision.find('\n')) + " -> " + options[choice - 1]);
+        narrateDecision(decision.substr(0, decision.find('\n')) + " -> "
+                        + stripNarrationDecoration(options[choice - 1]));
 
     mAskCache[askKey] = choice;
     {
@@ -11644,6 +11702,35 @@ void AIPlayerGPT::runParseSelfTest()
         bool st4 = false;
         CHECK(parseChoice("0 (pass)", 3, &dungeons, &st4, NULL) == 0 && !st4,
               "W34-N146m NEGATIVE CHOICE: 0 (pass) is a decision, not a stale echo");
+    }
+
+    // ---- owner docket 3: the NARRATED copy of a decision drops the offer's furniture
+    cout << "\n[W34-docket3] a consumed decision narrates the choice, not the offer\n";
+    {
+        string offer = "Cast Gray Merchant of Asphodel {3}{b}{b} (2/4) "
+                       "{card text: \"When Gray Merchant enters, each opponent loses X life...\"} "
+                       "{right now: drains 5}";
+        string narrated = stripNarrationDecoration(offer);
+        cout << "     narrated: \"" << narrated << "\"\n";
+        CHECK(narrated == "Cast Gray Merchant of Asphodel {3}{b}{b} (2/4)",
+              "W34-docket3 card text and the live magnitude leave the narrated copy");
+        // The cost bracket goes too, and the mana COST - which identifies the
+        // card - stays. A card text containing "{T}" must not cut the strip
+        // short and strand its tail in the log.
+        string act = "Put in Play with Windswept Heath [cost: {1}, Sacrifice] "
+                     "{card text: \"{T}, Pay 1 life, Sacrifice: Search your library.\"} done";
+        CHECK(stripNarrationDecoration(act) == "Put in Play with Windswept Heath done",
+              "W34-docket3 a [cost: ...] goes, and a nested {T} inside card text does not truncate the strip");
+        // NEGATIVE: a line with no furniture is byte-identical - and the
+        // OPTION lines the model decides from are never passed through here.
+        string plain = "Attack with Yawgmoth, Thran Physician (2/3)";
+        CHECK(stripNarrationDecoration(plain) == plain,
+              "W34-docket3 NEGATIVE an undecorated decision is untouched");
+        // NEGATIVE: identity is not furniture - P/T, pump deltas, targets and
+        // the (printed X/Y) tag all survive.
+        string keep = "+2/+2 until EOT (2/2 -> 4/4) targeting Grizzly Bears (printed 2/2)";
+        CHECK(stripNarrationDecoration(keep) == keep,
+              "W34-docket3 NEGATIVE stats, deltas and targets are identity and stay");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
