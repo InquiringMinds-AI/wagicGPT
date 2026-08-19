@@ -349,5 +349,10 @@ LOAD-BEARING zone records, not flavor — completeness of those emitters is a zo
 integrity requirement; (b) the 24k narration trim drops early zone events — when the
 trim fires, the trim marker must carry a compact zone digest of what fell off. PARKED
 (owner's road-not-taken, cache-motivated): per-card draw-chance/held-chance rendering;
-note if ever revisited that CURRENT SITUATION is already the uncached tail, so a
-compact remaining-copies form costs tail tokens, not cache.
+note if ever revisited: CURRENT SITUATION is already the uncached tail (no cache
+cost), BUT an always-rendered remaining-copies line is ~150-250 tokens/ask x ~60
+asks/game = 9-15k tokens/game (owner: "potentially quite alot of tokens") — fails the
+value-per-token criterion at the always-on position. The surviving shape is
+CONDITIONAL: render draw math only on asks where it IS the decision (mulligan, scry/
+surveil order, tutor picks, draw-spell pricing), possibly scoped to guide-named engine
+cards.
