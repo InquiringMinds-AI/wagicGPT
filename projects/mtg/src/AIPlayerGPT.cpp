@@ -1070,6 +1070,27 @@ static string copyOfTag(int rank, int total, const char * where)
     return o.str();
 }
 
+//The same rank/total pair for a card list that is not a zone (a reveal set, the
+//pregame bottoming hand). N-166a applies to every hand-shaped list the model
+//reads, not only the zone renders.
+static int listCopyRank(const std::vector<MTGCardInstance*>& cards, size_t index, int & outTotal)
+{
+    outTotal = 0;
+    int rank = 0;
+    if (index >= cards.size() || !cards[index])
+        return 0;
+    const string& want = cards[index]->name;
+    for (size_t k = 0; k < cards.size(); k++)
+    {
+        if (!cards[k] || cards[k]->name != want)
+            continue;
+        outTotal++;
+        if (k == index)
+            rank = outTotal;
+    }
+    return rank;
+}
+
 //Rank of zone->cards[index] among same-NAMED cards in the same zone, 1-based,
 //with the total written to outTotal. Zone order is a deterministic function of
 //the instance, so every emitter of a zone list prints the same pair.
@@ -9719,7 +9740,10 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
     }
     for (size_t j = 0; j < revealed.size(); j++)
     {
-        tail << (j + 1) << ". " << revealed[j]->name;
+        int rcopies = 0;
+        int rrank = listCopyRank(revealed, j, rcopies);
+        tail << (j + 1) << ". " << revealed[j]->name
+             << copyOfTag(rrank, rcopies, "this list");
         if (revealed[j]->isCreature())
             tail << " (" << revealed[j]->power << "/" << revealed[j]->toughness
                  << " creature)";
@@ -9978,7 +10002,10 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
              << keep << " and bottom your worst " << remaining << ".\n";
     for (size_t j = 0; j < hand.size(); j++)
     {
-        tail << (j + 1) << ". " << hand[j]->name << changelingAnnotation(hand[j]);
+        int copies = 0;
+        int rank = listCopyRank(hand, j, copies);
+        tail << (j + 1) << ". " << hand[j]->name << copyOfTag(rank, copies, "your hand")
+             << changelingAnnotation(hand[j]);
         if (hand[j]->isLand())
             tail << landTag(hand[j]); //land + colors it taps for (deck93 wave-27), not a bare "(land)"
         else
@@ -13137,6 +13164,20 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(hand.find("You revealed your hand") != string::npos
               && hand.find("Search:") == string::npos,
               "W35-N166p NEGATIVE the hand-reveal branch is untouched");
+    }
+
+    // ---- N-166a, second sweep: the non-zone hand-shaped lists ----
+    cout << "\n[W35-N166a-lists] copy ranking over a card LIST (reveal / bottoming hand)\n";
+    {
+        vector<MTGCardInstance*> empty;
+        int total = 0;
+        CHECK(listCopyRank(empty, 0, total) == 0 && total == 0,
+              "W35-N166a-lists NEGATIVE an out-of-range index yields no rank and no total");
+        // The ranking contract itself (a zone and a list must agree in shape):
+        // rank is 1-based, total counts every same-named entry, and the pair
+        // feeds the SAME tag builder the zone renders use.
+        CHECK(copyOfTag(1, 3, "this list") == " (copy 1 of 3 in this list)",
+              "W35-N166a-lists the reveal/bottom lists use the same tag with their own noun");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
