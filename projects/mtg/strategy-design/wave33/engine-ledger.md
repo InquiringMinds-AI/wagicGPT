@@ -360,3 +360,35 @@ trying to measure it." His Magic judgment: "you can play at a very high level of
 without a firm grasp of the probabilities of your deck mid game... during play it's
 just a sliver of the pie." No counting question in any reviewer brief, no seat routing,
 no proposals. Revisit only if HE raises it.
+
+## Wave-35 step 1 — SHIPPED (2026-08-20)
+
+Four worktree lanes off the wave-34 trace audit (spec: wave34-trace-audit/00-consolidated.md),
+merged sequentially to master, gated, pushed. Merge chain: 41216cc4c (lane A protocol surgery:
+three-case PLAN rule, stale-plan gate rebuilt in GptPlanCaveat.h, template sync — the stale
+"two or three sentences" text lived in deck139_strategy.txt, echo contract = number + short
+name, MP2/instants facts, budget default 6000), 18a9eab20 (lane B narration register: all
+emitters past-tense declarative, WEventSpellCountered for countered-vs-resolved, graveyard/
+exile digests on the trim marker, composed-log golden, WEventLife::settledLife), 5b09cdaea
+(lane C render truth: hand "(copy R of N)" tags, honest battlefield header, per-source mana
+line + foreach-unwrap in potentialColorReach, land-drop statement, alt-cost divergence note,
+amass plus(N), stackAbilityName, poison zero-state when poison live), 20e9db397 (lane D:
+selfAsCostPayment fix — Scarecrone's self-sacrifice cost was silently unpayable, general
+chooseCard source-exclusion defect; budget_hit gated on finish_reason=="length" with
+reasoning_forced_close split out; reasoning_degenerate shingle metric; 01-engine-verdicts.md —
+Fateful Absence / Vanishing Verse / Glaze Fiend / Master of Etherium all ENGINE-RIGHT, the
+traces' rules claims were hallucinated). Post-merge addition 9833cf39e: cast log lines carry
+targets ("You cast X targeting Y" — owner register verbatim; only historical record of a
+countered spell's target).
+
+GATES at 9833cf39e: suite 1046/0 + 28 AI/0 single-threaded; PARSETEST 552/0 (404 → 548 via
+lanes +34/+45/+65, +4 targeting). Binary /tmp/wagic-9833cf39e. Smoke (146v139, -j1,
+--thinking, budget 6000): register verified live — all six negative greps clean, 0 fallbacks
+through 34 decisions, latency p50 91s solo, reasoning p50 ~3.3k tok, budget-hit rate ~7% at
+the tighter cap (real hits, post-gating).
+
+WAVE-35 CORPUS CONFIG (guard method per owner directive): -j 8, WAGIC_GPT_TIMEOUT=1100
+(guard(8) = 6,860 worst-case tok / ~9.5 p10 tok/s × 1.5, extrapolated generously from the
+-j3 measurement), -T 14400, budget 6000 default, --thinking, REPPENALTY 1.05, seats
+146,139,152,158,105,36,116. Validation gate: fallback rate audited on first completions;
+>~1% ⇒ stop, drop to -j 6.
