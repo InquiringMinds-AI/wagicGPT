@@ -1,0 +1,43 @@
+#Wave-35 trace audit b2 R5 -- pins the ruling that the artifact count and the CDA AGREE.
+#
+#CLAIM AUDITED: "`Artifacts in play: you 7` disagrees with the rendered CDA P/T by exactly
+#1" -- the prompt said 7 while the board rendered `Master of Etherium #1 {2}{u} (8/8)`.
+#
+#ORACLE (scryfall, verified 2026-08-20): "Master of Etherium's power and toughness are each
+#equal to the number of artifacts you control." / "Other artifact creatures you control get
+#+1/+1." Master IS an artifact, so it counts ITSELF; and the +1/+1 lord is "other", so it
+#never pumps itself -- but a SECOND Master does pump the first.
+#
+#THE TELL: that render says `#1`. instanceHandle() emits a `#N` suffix ONLY when the
+#controller's battlefield holds two or more permanents of that name (total < 2 -> ""), so
+#that board had at least TWO Masters. With 7 artifacts and two Masters, each is 7/7 from
+#its own CDA and 8/8 after the other Master's lord -- exactly what was rendered. Both
+#surfaces were TRUE; the missing term was the other Master's +1/+1, which neither the model
+#nor the deck guide applied. NO engine or script change; do not "fix" the count line.
+#
+#(The single-Master case is already pinned by master_of_etherium.txt: Master + 2 other
+#artifacts attacks for exactly 3, i.e. the CDA counts itself and does not self-lord.)
+#
+#WITNESS: two Masters + Mind Stone = 3 artifacts. Each Master is 3/3 from its CDA plus
+#1/+1 from the other = 4/4. One Master attacks unblocked: 20 -> 16, NOT 20 -> 17.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Master of Etherium,Master of Etherium,Mind Stone
+[PLAYER2]
+[DO]
+Master of Etherium
+next
+#blockers
+next
+#damage
+next
+#end
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Master of Etherium,Master of Etherium,Mind Stone
+manapool:{0}
+[PLAYER2]
+life:16
+[END]
