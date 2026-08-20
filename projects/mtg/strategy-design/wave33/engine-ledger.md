@@ -408,3 +408,9 @@ MemoryMax deliberately. WAVE-36 ADOPTION GATE: pin the aggregate curve first —
 -j 8 measured point + one measured point at 16; convert with measured guards, not
 extrapolations (a mis-set guard at batch 16 = a fallback storm discovered hours in).
 Wave-35 corpus deliberately left at -j 8 mid-flight (no config changes mid-corpus).
+
+OWNER RULING (2026-08-20): finish wave-35 on the current -j 8 run as-is. THE OWNER does the
+serve-configuration work between waves — Claude does not touch or re-examine the Spark serving
+config; the measured batch-8 findings above (aggregate 68 vs 110 at -j3, step time 84→357ms,
+MTP acceptance healthy at 69%) are the handoff data for that work. Next-wave corpus config
+waits on his serve changes.
