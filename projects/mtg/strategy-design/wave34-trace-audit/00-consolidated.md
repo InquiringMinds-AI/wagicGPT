@@ -105,3 +105,7 @@ below, re-measure on the wave-35 corpus, cut again on evidence.
 - Priority asks are the worst value-per-token (18 near-identical × 14.7k chars in one
   game, b6) — a per-kind budget or cheaper priority ask shape is a candidate, on
   evidence, after the wording fixes.
+
+**OWNER RULING (2026-08-20): wave-35 reasoning_budget = 6,000.** "let's fix stuff, then
+maybe next round will propose a smaller budget." The wave-35 corpus re-measures depth
+post-surgery; any further cut is proposed from that data.
