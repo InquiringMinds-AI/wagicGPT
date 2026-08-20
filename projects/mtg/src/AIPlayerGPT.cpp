@@ -540,6 +540,36 @@ string legibleKeywordName(const string& engineName)
 {
     if (engineName == "poisondamager")
         return "deals its damage to players as poison counters";
+    //N-166g (wave-34 audit b6 F11): the same argument as the poison family, for
+    //the keywords whose ENGINE token is not an Oracle word. Emrakul rendered
+    //"[flying, nofizzle, protectionfromcoloredspells]" and the seat spent ~2k
+    //chars re-deriving protection semantics from memory because neither token
+    //is a phrase it has ever read on a card. One table, every surface that
+    //lists keywords goes through this function.
+    if (engineName == "nofizzle")
+        return "can't be countered";
+    if (engineName == "nofizzle alternative")
+        return "can't be countered when cast for its alternative cost";
+    if (engineName == "protectionfromcoloredspells")
+        return "protection from colored spells";
+    if (engineName == "cantblock")
+        return "can't block";
+    if (engineName == "cantattack")
+        return "can't attack";
+    if (engineName == "mustattack")
+        return "attacks each combat if able";
+    if (engineName == "mustblock")
+        return "blocks each combat if able";
+    if (engineName == "doesnotuntap")
+        return "doesn't untap during its controller's untap step";
+    if (engineName == "cantregen")
+        return "can't be regenerated";
+    if (engineName == "unblockable")
+        return "can't be blocked";
+    if (engineName == "oneblocker")
+        return "can't be blocked by more than one creature";
+    if (engineName == "canblocktapped")
+        return "can block even while tapped";
     //poisontoxic .. poisontentoxic -> "toxic N"
     if (engineName.size() > 10 && engineName.compare(0, 6, "poison") == 0
         && engineName.compare(engineName.size() - 5, 5, "toxic") == 0)
@@ -949,6 +979,84 @@ string instanceHandle(MTGCardInstance * card)
     return h.str();
 }
 
+//N-166a (wave-34 audit, THE dominant render churn driver: 45/146 traces in 5 of
+//7 games argue about it, and four of those acted on the false belief). The
+//battlefield numbers same-named permanents (instanceHandle's "#N"); the HAND
+//did not, so every duplicate in hand read as a render fault: "The prompt text
+//lists 'Glimmerpost (land)' twice. Likely a typo in the prompt generation. I
+//will ignore the duplicate" - a REAL second land dropped from the model's hand,
+//which then reasoned over 7 cards the render said were 8. Deliberately a
+//DIFFERENT notation from the battlefield's "#N": a hand "Swamp #2" printed
+//beside a battlefield "Swamp #2" would assert an identity that does not exist,
+//and one of the four observed failures was exactly that shape ("If Glimmerpost
+//is on the battlefield, why is it in the hand?"). State the fact instead - this
+//is copy R of N in this zone. Pure, so the shape is provable in PARSETEST.
+static string copyOfTag(int rank, int total, const char * where)
+{
+    if (total < 2 || rank < 1 || rank > total)
+        return "";
+    std::ostringstream o;
+    o << " (copy " << rank << " of " << total << " in " << (where ? where : "this list") << ")";
+    return o.str();
+}
+
+//Rank of zone->cards[index] among same-NAMED cards in the same zone, 1-based,
+//with the total written to outTotal. Zone order is a deterministic function of
+//the instance, so every emitter of a zone list prints the same pair.
+static int zoneCopyRank(MTGGameZone * zone, int index, int & outTotal)
+{
+    outTotal = 0;
+    int rank = 0;
+    if (!zone || index < 0 || index >= zone->nb_cards || !zone->cards[index])
+        return 0;
+    const string& want = zone->cards[index]->name;
+    for (int k = 0; k < zone->nb_cards; k++)
+    {
+        if (!zone->cards[k] || zone->cards[k]->name != want)
+            continue;
+        outTotal++;
+        if (k == index)
+            rank = outTotal;
+    }
+    return rank;
+}
+
+//N-166h (wave-34 audit b6 F11): Annihilator is scripted as a triggered ability
+//(`_ATTACKING_name(Annihilate) ... notaTarget(<N>*|mybattlefield) sacrifice`),
+//NOT as a basic keyword, so the keyword tag list structurally could not carry
+//it - Emrakul rendered with flying and two opaque tokens and its
+//game-deciding Annihilator 6 nowhere on the surface, and the pilot supplied the
+//number from memory ("not listed in text summary but standard for Emrakul").
+//Read N off the card's own script so the render is the engine's fact, not a
+//card-name table. Pure: takes the raw magicText, returns "" when absent.
+static string annihilatorTag(const string& magicText)
+{
+    string t = magicText;
+    for (size_t i = 0; i < t.size(); i++)
+        t[i] = (char) tolower((unsigned char) t[i]);
+    size_t at = t.find("name(annihilate)");
+    if (at == string::npos)
+        return "";
+    size_t nt = t.find("notatarget(<", at);
+    if (nt == string::npos)
+        return "";
+    size_t d = nt + 12;
+    int n = 0;
+    bool any = false;
+    while (d < t.size() && isdigit((unsigned char) t[d]))
+    {
+        n = n * 10 + (t[d] - '0');
+        d++;
+        any = true;
+    }
+    if (!any || n <= 0)
+        return "";
+    std::ostringstream o;
+    o << " [annihilator " << n << " - whenever it attacks, the defending player"
+         " sacrifices " << n << " permanent" << (n == 1 ? "" : "s") << "]";
+    return o.str();
+}
+
 //Read the alnum/hyphen token at 'start' and, if it is a creature subtype, add
 //its proper-cased form to 'out'. Helper for collectTribalTypes.
 void addTribeToken(const string& mt, size_t start,
@@ -1081,9 +1189,47 @@ static string tappedCreatureTag(bool canBlockTapped, bool attacking, const strin
 //restriction and, beside the tapped tag that spells BOTH out, read as "cannot
 //block either"; a seat declared lethal on that belief and lost. Pure helper so
 //the exact clause is provable.
-static string summoningSickTag()
+//N-166e (wave-34 audit b1 F-06 / b2): the "but CAN block" clause was
+//UNCONDITIONAL, so a summoning-sick creature that also carries can't-block
+//rendered "[cantblock] [summoning sick - cannot attack this turn, but CAN
+//block]" - the pilot named it "contradictory" verbatim (Bloodghast, and any
+//walled/decayed body with the flag). The RESTRICTION wins: when the creature
+//cannot block, the permission clause is simply false and must not print. The
+//affirmative substring is still REQUIRED in the can-block branch - that is the
+//N-139k finding, and it is what this branch keeps intact.
+static string summoningSickTag(bool canBlock)
 {
-    return " [summoning sick - cannot attack this turn, but CAN block]";
+    return canBlock
+        ? " [summoning sick - cannot attack this turn, but CAN block]"
+        : " [summoning sick - cannot attack this turn, and it cannot block either]";
+}
+
+//N-166b (wave-34 audit, b1 F-09 / b4 F7 - an 84/84 mismatch at one batch, 5/125
+//traces re-parsing the board at another): "Your battlefield (creatures: 3):"
+//sits over a list of ALL permanents, so the header's only integer describes a
+//SUBSET of the lines under it and the pilot read lands as creatures ("It lists
+//Mountains as 'creatures'? This looks like a parsing error in the prompt's
+//representation of the board"). Both numbers, both named. `permanents` is the
+//count of lines actually RENDERED (mutate piles fold to one line), so the
+//header and the list can never disagree.
+//N-166d: the stack line's label for a triggered/activated ability. See the
+//emitter for the defect; pure so all three branches are provable.
+static string stackAbilityName(const string& sourceName, const string& menuText)
+{
+    if (!sourceName.empty())
+        return "ability from " + sourceName;
+    if (!menuText.empty())
+        return "ability: " + menuText;
+    return "an ability whose source the engine can no longer name";
+}
+
+static string battlefieldHeaderText(bool mine, int permanents, int creatures)
+{
+    std::ostringstream o;
+    o << (mine ? "Your" : "Opponent") << " battlefield (" << permanents
+      << " permanent" << (permanents == 1 ? "" : "s") << " listed, of which "
+      << creatures << (creatures == 1 ? " is a creature" : " are creatures") << "): ";
+    return o.str();
 }
 
 //N-139j: the blockers menu annotates a 0-power creature and the attackers menu
@@ -1250,7 +1396,8 @@ static string mutatedPileTag(const std::vector<string>& underNames)
     return o.str();
 }
 
-void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus)
+void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus,
+                       const char * copyScope = "your hand")
 {
     bool first = true;
     for (int i = 0; i < zone->nb_cards; i++)
@@ -1272,6 +1419,14 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         //A#/B#/target line that offers it (battlefield lines only; "" otherwise).
         if (withStatus)
             out << instanceHandle(card);
+        else
+        {
+            //N-166a: the hand's duplicates get their own, deliberately distinct
+            //notation - see copyOfTag.
+            int copies = 0;
+            int rank = zoneCopyRank(zone, i, copies);
+            out << copyOfTag(rank, copies, copyScope);
+        }
         out << manaCostToken(card); //N-36b: {0} is a cost, not an absence
         if (card->isCreature())
         {
@@ -1440,8 +1595,20 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             //this is the one place an affirmative substring is REQUIRED, because
             //the omission is what the model was completing wrongly, and "CAN
             //block" cannot be misread as a present-turn ATTACK licence.
-            if (card->hasSummoningSickness())
-                out << summoningSickTag();
+            //N-166f (wave-34 audit b2 R4): the tag also printed on the
+            //OPPONENT's permanents during YOUR turn, where "cannot attack this
+            //turn" is trivially true of every creature they control and the
+            //clause reads as a restriction on the coming combat that it is not.
+            //Scope it to the board whose controller is the ACTIVE player - the
+            //only seat for whom "this turn" carries an attack decision. On the
+            //defender's board the decision is blocking, and the block
+            //permission/restriction is already carried by the tapped and
+            //can't-block tags.
+            if (card->hasSummoningSickness()
+                && card->getObserver() && card->controller() == card->getObserver()->currentPlayer)
+                out << summoningSickTag(!card->has(Constants::CANTBLOCK));
+            //Annihilator is a triggered ability, invisible to the keyword list.
+            out << annihilatorTag(card->magicText);
             //Combat status. When the creature is tapped the tapped tag above
             //already named the cause (N-122c), so do not print it twice.
             if (!card->isTapped())
@@ -1653,14 +1820,52 @@ static string poisonCountPhrase(bool mine, int count)
 
 //The CURRENT SITUATION status line for both players. Empty when neither player
 //is poisoned, so a game with no infect/toxic card in it is untouched.
-static string poisonStatusLine(int mine, int opp)
+//N-166j (wave-34 audit b3's 41-trace litigation + b6 F7, 9 decisions blind):
+//poisonStatusLine prints nothing while BOTH counts are zero, so an Infect deck
+//saw no poison line at all until its first connect - "there is NO poison
+//counter line shown. This is unusual given the strategy guide instructions".
+//A zero IS the state, and for an infect seat it is the state its whole plan is
+//measured against. But rendering "0 of 10" in every game would tax ~all games
+//for the benefit of the few, so gate on poison being LIVE: either count
+//nonzero, or some permanent on either battlefield can actually produce poison
+//(infect, toxic N, or damage-becomes-poison). Cheap scan, battlefields only.
+static bool poisonIsLiveInGame(GameObserver * obs, int mineCount, int oppCount)
 {
-    if (mine <= 0 && opp <= 0)
+    if (mineCount > 0 || oppCount > 0)
+        return true;
+    if (!obs)
+        return false;
+    for (int p = 0; p < 2; p++)
+    {
+        Player * pl = obs->players[p];
+        if (!pl || !pl->game || !pl->game->inPlay)
+            continue;
+        MTGGameZone * bf = pl->game->inPlay;
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            if (!c)
+                continue;
+            if (c->has(Constants::INFECT) || c->has(Constants::POISONDAMAGER)
+                || c->getToxicity() > 0)
+                return true;
+        }
+    }
+    return false;
+}
+
+//N-166j: `poisonLive` is the gate - when poison can actually decide this game,
+//BOTH players' counters print, zero included (a zero is the state, and the
+//infect seat's whole plan is measured against it). When it cannot, the whole
+//block stays absent exactly as before.
+static string poisonStatusLine(int mine, int opp, bool poisonLive)
+{
+    if (!poisonLive && mine <= 0 && opp <= 0)
         return "";
     std::ostringstream o;
-    if (mine > 0)
+    if (poisonLive || mine > 0)
         o << poisonCountPhrase(true, mine) << "\n";
-    if (opp > 0)
+    if (poisonLive || opp > 0)
         o << poisonCountPhrase(false, opp) << "\n";
     return o.str();
 }
@@ -3848,7 +4053,9 @@ string AIPlayerGPT::serializeGameState()
     //infect game presented its entire win/loss condition as invisible - and the
     //pilot filled the gap with invented numbers in 100% of windows across six
     //games. The engine has the number and shows it to the human.
-    out << poisonStatusLine(this->poisonCount, opp ? opp->poisonCount : 0);
+    out << poisonStatusLine(this->poisonCount, opp ? opp->poisonCount : 0,
+                            poisonIsLiveInGame(observer, this->poisonCount,
+                                               opp ? opp->poisonCount : 0));
     //Re-baseline the narration's delta tracker off the live totals. A poison
     //DECREASE fires no event at all (AllAbilities.cpp carries the engine's own
     //"todo loses poison event"), so without this a later gain would report a
@@ -3887,9 +4094,23 @@ string AIPlayerGPT::serializeGameState()
                 continue; //phase steps / damage plumbing, not respondable objects
             std::ostringstream line;
             Player * ctrl = it->source ? it->source->controller() : NULL;
-            line << (ctrl == this ? "your " : (ctrl ? "opponent's " : ""))
-                 << it->getDisplayName()
-                 << (it->type == ACTION_SPELL ? " [spell]" : " [triggered/activated ability]");
+            line << (ctrl == this ? "your " : (ctrl ? "opponent's " : ""));
+            if (it->type == ACTION_ABILITY)
+            {
+                //N-166d (wave-34 audit b2 R6): StackAbility::getDisplayName()
+                //renders "StackAbility.  (Source: <name>)" and the name is EMPTY
+                //whenever the source instance carries none (an engine-internal
+                //or token-backed source) - "1 (top): StackAbility. (Source: )"
+                //is not a game object the model can reason about, and it spent
+                //a whole window deciding whether the stack entry was real.
+                //Build the label from what we know here instead.
+                StackAbility * sa = dynamic_cast<StackAbility *>(it);
+                string srcName = it->source ? it->source->getDisplayName() : string("");
+                string menu = (sa && sa->ability) ? sa->ability->getMenuText() : string("");
+                line << stackAbilityName(srcName, menu) << " [triggered/activated ability]";
+            }
+            else
+                line << it->getDisplayName() << " [spell]";
             if (it->type == ACTION_SPELL)
             {
                 Spell * sp = (Spell *) it;
@@ -3971,19 +4192,34 @@ string AIPlayerGPT::serializeGameState()
     //artifacts and [tapped] flags gets miscounted (wave-7 deck140: every
     //sweeper mistiming stood on a wrong creature tally). An integer at the
     //header is the representation the per-deck workarounds stood in for.
-    int myCreatures = 0, oppCreatures = 0;
+    //N-166b: the permanent count is the number of LINES the render emits, so
+    //the header cannot contradict the list underneath it (a mutated-down card
+    //folds into its pile's single line and must not be counted twice).
+    int myCreatures = 0, oppCreatures = 0, myPermanents = 0, oppPermanents = 0;
     for (int i = 0; i < game->inPlay->nb_cards; i++)
-        if (game->inPlay->cards[i]->isCreature())
+    {
+        MTGCardInstance * c = game->inPlay->cards[i];
+        if (c->mutation && !c->parentCards.empty())
+            continue;
+        myPermanents++;
+        if (c->isCreature())
             myCreatures++;
+    }
     if (opp)
         for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
-            if (opp->game->inPlay->cards[i]->isCreature())
+        {
+            MTGCardInstance * c = opp->game->inPlay->cards[i];
+            if (c->mutation && !c->parentCards.empty())
+                continue;
+            oppPermanents++;
+            if (c->isCreature())
                 oppCreatures++;
-    out << "\nYour battlefield (creatures: " << myCreatures << "): ";
+        }
+    out << "\n" << battlefieldHeaderText(true, myPermanents, myCreatures);
     describeZoneCards(out, game->inPlay, true);
     if (opp)
     {
-        out << "\nOpponent battlefield (creatures: " << oppCreatures << "): ";
+        out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures);
         describeZoneCards(out, opp->game->inPlay, true);
         out << "\nOpponent hand size: " << opp->game->hand->nb_cards
             << " | Opponent library: " << opp->game->library->nb_cards << " cards";
@@ -4013,7 +4249,21 @@ string AIPlayerGPT::serializeGameState()
             }
         }
     }
-    out << "\nYour library: " << game->library->nb_cards << " cards\n";
+    //N-166i (wave-34 audit b1/b5): a tutor/dig MOVES the looked-at cards into
+    //the reveal zone, so mid-search the library zone is transiently EMPTY and
+    //this line printed "Your library: 0 cards" three lines above a 47-card
+    //reveal. The pilot read it as a loss condition ("if library is 0, you lose
+    //the game on draw step") and as a render fault, twice in one game. The
+    //revealed cards ARE still library cards until the search resolves; count
+    //them, and say where they are so the two numbers reconcile.
+    {
+        int inReveal = (game->reveal ? game->reveal->nb_cards : 0);
+        out << "\nYour library: " << (game->library->nb_cards + inReveal) << " cards";
+        if (inReveal > 0)
+            out << " (" << inReveal << " of them are the cards listed in the search/reveal"
+                   " below - they are still in your library until this decision resolves)";
+        out << "\n";
+    }
     return out.str();
 }
 
@@ -11090,13 +11340,13 @@ void AIPlayerGPT::runParseSelfTest()
         }
 
         // ---- N-139k: summoning sickness restricts attacking only.
-        CHECK(summoningSickTag() == " [summoning sick - cannot attack this turn, but CAN block]",
+        CHECK(summoningSickTag(true) == " [summoning sick - cannot attack this turn, but CAN block]",
               "W32-R N-139k: the summoning-sick tag states the BLOCK permission explicitly");
-        CHECK(summoningSickTag().find("but CAN block") != string::npos,
+        CHECK(summoningSickTag(true).find("but CAN block") != string::npos,
               "W32-R N-139k: the permission clause is present (the omission is what was mis-completed)");
-        CHECK(summoningSickTag().find("cannot attack this turn") != string::npos,
+        CHECK(summoningSickTag(true).find("cannot attack this turn") != string::npos,
               "W32-R N-139k NEGATIVE: the attack restriction is NOT weakened by adding the permission");
-        CHECK(summoningSickTag().find("can attack") == string::npos,
+        CHECK(summoningSickTag(true).find("can attack") == string::npos,
               "W32-R N-139k NEGATIVE: still no affirmative 'can attack' substring");
 
         // ---- N-139j: the attackers menu gains the blockers menu's 0-power tag.
@@ -11479,10 +11729,10 @@ void AIPlayerGPT::runParseSelfTest()
     cout << "\n[W33-N105a] poison counters render, with the 10-counter threshold explicit\n";
     {
         // NEGATIVE: a game with no poison in it must be byte-untouched.
-        CHECK(poisonStatusLine(0, 0).empty(),
+        CHECK(poisonStatusLine(0, 0, false).empty(),
               "W33-N105a no poison anywhere -> no status line at all");
         // POSITIVE: this seat's own counters, threshold and remainder explicit.
-        string mine = poisonStatusLine(6, 0);
+        string mine = poisonStatusLine(6, 0, false);
         cout << "     " << mine;
         CHECK(mine.find("Poison counters (you): 6 of 10") != string::npos,
               "W33-N105a the seat's own poison total renders against the 10 threshold");
@@ -11491,12 +11741,12 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(mine.find("(opponent)") == string::npos,
               "W33-N105a an unpoisoned opponent contributes no line");
         // Both players, and the opponent's line names the OPPONENT as the loser.
-        string both = poisonStatusLine(6, 3);
+        string both = poisonStatusLine(6, 3, false);
         CHECK(both.find("Poison counters (opponent): 3 of 10") != string::npos
               && both.find("the opponent LOSES the game at 10") != string::npos,
               "W33-N105a both players' totals render, each against its own loss clause");
         // The threshold-reached case must not print a negative remainder.
-        string over = poisonStatusLine(10, 0);
+        string over = poisonStatusLine(10, 0, false);
         CHECK(over.find("-") == string::npos || over.find(" -1 more") == string::npos,
               "W33-N105a at/over the threshold no negative remainder is emitted");
         CHECK(over.find("already reached") != string::npos,
@@ -12373,6 +12623,150 @@ void AIPlayerGPT::runParseSelfTest()
         // to mine, and content was never empty.
         CHECK(answerTailFromReasoning("").empty(),
               "W34-hidden NEGATIVE no reasoning field means nothing to recover from");
+    }
+
+    // ==== WAVE-35 step-1 (render lane) cases ====
+
+    // ---- N-166a: hand duplicate copy-numbering ----
+    cout << "\n[W35-N166a] hand duplicates carry a copy tag; singletons carry nothing\n";
+    {
+        CHECK(copyOfTag(1, 2, "your hand") == " (copy 1 of 2 in your hand)",
+              "W35-N166a a duplicated hand card names which copy it is and how many exist");
+        CHECK(copyOfTag(2, 2, "your hand") == " (copy 2 of 2 in your hand)",
+              "W35-N166a the second copy is distinguishable from the first");
+        // NEGATIVE: a singleton must stay byte-identical to the old render.
+        CHECK(copyOfTag(1, 1, "your hand").empty(),
+              "W35-N166a NEGATIVE a singleton name gets no tag (no noise)");
+        CHECK(copyOfTag(0, 3, "your hand").empty() && copyOfTag(4, 3, "your hand").empty(),
+              "W35-N166a NEGATIVE an out-of-range rank emits nothing rather than a lie");
+        // NEGATIVE: the notation must NOT collide with the battlefield's "#N"
+        // handle - a hand "Swamp #2" beside a board "Swamp #2" asserted an
+        // identity that does not exist, which is one of the four observed
+        // failures.
+        CHECK(copyOfTag(2, 2, "your hand").find('#') == string::npos,
+              "W35-N166a NEGATIVE the hand tag never borrows the battlefield's #N notation");
+        // ECHO SHAPE: the tag is a parenthesised tail, so an answer that echoes
+        // the card name with it still binds by name.
+        {
+            vector<string> opts;
+            opts.push_back("Discard Glimmerpost");
+            opts.push_back("Discard Ancient Den");
+            bool stale = false;
+            int c = parseChoice("1 (Discard Glimmerpost (copy 2 of 2 in your hand))", 2, &opts, &stale, NULL);
+            cout << "     N-166a echo with a copy tag -> " << c << " (must be 1)\n";
+            CHECK(c == 1 && !stale, "W35-N166a an echo carrying the copy tag still binds");
+        }
+    }
+
+    // ---- N-166b: the battlefield header names BOTH numbers ----
+    cout << "\n[W35-N166b] battlefield header: permanents listed AND creatures among them\n";
+    {
+        string h = battlefieldHeaderText(true, 12, 3);
+        cout << "     " << h << "\n";
+        CHECK(h == "Your battlefield (12 permanents listed, of which 3 are creatures): ",
+              "W35-N166b the header states the count of LINES and the creature subset");
+        CHECK(battlefieldHeaderText(false, 1, 1)
+              == "Opponent battlefield (1 permanent listed, of which 1 is a creature): ",
+              "W35-N166b singular grammar on both numbers");
+        CHECK(battlefieldHeaderText(true, 5, 0)
+              == "Your battlefield (5 permanents listed, of which 0 are creatures): ",
+              "W35-N166b a creatureless board says zero rather than omitting the number");
+        // NEGATIVE: the old shape asserted the list WAS the creatures.
+        CHECK(h.find("(creatures: ") == string::npos,
+              "W35-N166b NEGATIVE the old creatures-only header shape is gone");
+    }
+
+    // ---- N-166d: the stack line never renders an empty source ----
+    cout << "\n[W35-N166d] stack ability label\n";
+    {
+        CHECK(stackAbilityName("Orcish Bowmasters", "whatever") == "ability from Orcish Bowmasters",
+              "W35-N166d a named source is used verbatim");
+        CHECK(stackAbilityName("", "Draw a card") == "ability: Draw a card",
+              "W35-N166d with no source name the ability's own menu text names it");
+        CHECK(stackAbilityName("", "") == "an ability whose source the engine can no longer name",
+              "W35-N166d with neither, the render says so instead of printing an empty paren");
+        // NEGATIVE: none of the three branches can emit the old "(Source: )".
+        CHECK(stackAbilityName("", "").find("(Source: )") == string::npos
+              && stackAbilityName("", "").find("StackAbility") == string::npos,
+              "W35-N166d NEGATIVE no branch emits StackAbility or an empty Source paren");
+    }
+
+    // ---- N-166e: cant-block beats the summoning-sick block permission ----
+    cout << "\n[W35-N166e] summoning sickness vs a can't-block flag\n";
+    {
+        CHECK(summoningSickTag(false)
+              == " [summoning sick - cannot attack this turn, and it cannot block either]",
+              "W35-N166e a can't-block creature gets the restriction, not the permission");
+        CHECK(summoningSickTag(false).find("CAN block") == string::npos,
+              "W35-N166e NEGATIVE the permission clause cannot co-render with [cantblock]");
+        // NEGATIVE: the N-139k finding must survive - the can-block branch keeps
+        // its affirmative clause, which is the one place it is required.
+        CHECK(summoningSickTag(true).find("but CAN block") != string::npos,
+              "W35-N166e NEGATIVE the N-139k permission clause is untouched in the normal case");
+        CHECK(summoningSickTag(false).find("cannot attack this turn") != string::npos,
+              "W35-N166e the attack restriction is stated in both branches");
+    }
+
+    // ---- N-166g: opaque engine keywords get Oracle wording ----
+    cout << "\n[W35-N166g] legible keyword names for non-Oracle engine tokens\n";
+    {
+        CHECK(legibleKeywordName("nofizzle") == "can't be countered",
+              "W35-N166g nofizzle reads as the Oracle ability it is");
+        CHECK(legibleKeywordName("protectionfromcoloredspells") == "protection from colored spells",
+              "W35-N166g the unspaced protection token is spelled out");
+        CHECK(legibleKeywordName("cantblock") == "can't block"
+              && legibleKeywordName("doesnotuntap") == "doesn't untap during its controller's untap step",
+              "W35-N166g the rest of the opaque set is translated too");
+        // NEGATIVE: every other keyword still passes through byte-identical.
+        CHECK(legibleKeywordName("flying") == "flying"
+              && legibleKeywordName("first strike") == "first strike"
+              && legibleKeywordName("trample") == "trample",
+              "W35-N166g NEGATIVE ordinary keywords are returned unchanged");
+        // NEGATIVE: the poison family's existing translation is not disturbed.
+        CHECK(legibleKeywordName("poisontwotoxic") == "toxic 2",
+              "W35-N166g NEGATIVE the N-105a poison translation still fires");
+    }
+
+    // ---- N-166h: Annihilator N read off the card's own script ----
+    cout << "\n[W35-N166h] annihilator tag\n";
+    {
+        string emrakul = "_ATTACKING_name(Annihilate) ability$!name(sacrifice 6 permanents)"
+                         " notaTarget(<6>*|mybattlefield) sacrifice!$ opponent";
+        string tag = annihilatorTag(emrakul);
+        cout << "     " << tag << "\n";
+        CHECK(tag == " [annihilator 6 - whenever it attacks, the defending player"
+                     " sacrifices 6 permanents]",
+              "W35-N166h the magnitude comes from the script, not from a card-name table");
+        string one = "_ATTACKING_name(Annihilate) ability$!name(sacrifice a permanent)"
+                     " notaTarget(<1>*|mybattlefield) sacrifice!$ opponent";
+        CHECK(annihilatorTag(one).find("sacrifices 1 permanent]") != string::npos,
+              "W35-N166h annihilator 1 is singular");
+        // NEGATIVE: a card with no annihilator emits nothing.
+        CHECK(annihilatorTag("").empty()
+              && annihilatorTag("_ATTACKING_ ability$!life:-2!$ opponent").empty(),
+              "W35-N166h NEGATIVE a non-annihilator script emits no tag");
+        // NEGATIVE: a lookalike without the amount must not invent one.
+        CHECK(annihilatorTag("_ATTACKING_name(Annihilate) sacrifice").empty(),
+              "W35-N166h NEGATIVE no amount in the script means no tag, not a guessed N");
+    }
+
+    // ---- N-166j: the poison line at zero, but only when poison is live ----
+    cout << "\n[W35-N166j] poison zero-state\n";
+    {
+        string zero = poisonStatusLine(0, 0, true);
+        cout << "     " << zero;
+        CHECK(zero.find("Poison counters (you): 0 of 10") != string::npos
+              && zero.find("Poison counters (opponent): 0 of 10") != string::npos,
+              "W35-N166j with poison live in the game BOTH zero counts render");
+        CHECK(zero.find("10 more end it") != string::npos,
+              "W35-N166j the distance to the threshold is stated at zero too");
+        // NEGATIVE: a game with no poison in it stays byte-untouched.
+        CHECK(poisonStatusLine(0, 0, false).empty(),
+              "W35-N166j NEGATIVE no infect/toxic anywhere -> no poison line at all");
+        // NEGATIVE: the nonzero rendering is unchanged by the new gate.
+        CHECK(poisonStatusLine(6, 0, false).find("Poison counters (you): 6 of 10") != string::npos
+              && poisonStatusLine(6, 0, false).find("(opponent)") == string::npos,
+              "W35-N166j NEGATIVE an ungated nonzero count renders exactly as before");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
