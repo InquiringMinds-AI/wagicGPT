@@ -56,10 +56,19 @@ inline bool windowNegated(const std::string& win)
 
 // Does an action VERB governing this card sit in the pre-window? "play " and
 // "playing"/"played" carry a trailing letter/space so "player" does not match.
+// WAVE-35 (churn driver #2): "attack" is NOT a cast/activation verb, and it was
+// the single largest false-fire source. A plan that says "attack with Grishnakh
+// next turn" is a perfectly live intent, and the ask that shows it - a declare-
+// attackers ask, or a pay-life sub-ask - never lists a "Cast Grishnakh" option,
+// so anyOffered was false by construction and the caveat fired on a plan that
+// was entirely on track. The caveat exists for ONE failure (a plan naming a cast
+// or activation that has already happened), so only cast/activation-shaped verbs
+// arm it now. See also optionsAreActionMenu() below, which requires the ask to
+// be the kind of ask those verbs could be answered from.
 inline bool windowHasVerb(const std::string& win)
 {
     static const char * verbs[] = {
-        "cast", "activat", "attack", "equip", "play ", "playing", "played"
+        "cast", "activat", "equip", "play ", "playing", "played"
     };
     for (size_t i = 0; i < sizeof(verbs) / sizeof(verbs[0]); i++)
         if (win.find(verbs[i]) != std::string::npos)
@@ -90,6 +99,42 @@ inline std::string stripTargetEnumerations(const std::string& optsLower)
     return out;
 }
 
+// WAVE-35 (churn driver #2): the shortest form of a card name a plan will use.
+// Plans say "cast Sigarda in main phase 2"; the display name is "Sigarda,
+// Champion of Light". The old full-name-only scan therefore FAILED to see the
+// plan's own affirmation on comma-named cards - and, worse, failed to see the
+// SAME card sitting in the option list as "Cast Sigarda, Champion of Light", so
+// a plan that was being executed literally that decision could still be told its
+// actions were gone (batch5 finding 1, verbatim: "Option 4 IS available... I
+// will ignore the implication"). Matching on the pre-comma head fixes both
+// directions at once, and it is used symmetrically (plan side AND option side)
+// so it can never make the caveat fire MORE often than the full name would.
+inline std::string shortName(const std::string& lowerName)
+{
+    size_t comma = lowerName.find(',');
+    if (comma == std::string::npos || comma < 4)
+        return lowerName;
+    return lowerName.substr(0, comma);
+}
+
+// WAVE-35 (churn driver #2): is this ask one whose options are cast/activation
+// actions at all? The caveat's whole claim - "the actions your plan names are no
+// longer among the options" - is only meaningful when the options COULD have
+// carried such an action. On a pay-life sub-ask ("1. Pay 3 life / 2. Don't"), a
+// declare-attackers ask (A1/A2 lines) or a blocker ask, they never can, so the
+// claim was false ~100% of the time it was made there. Measured: the note fired
+// on 24% of all prompts (15/102 at batch5, 30/146 at batch6) and was read as a
+// LEGALITY RULING - "This confirms I cannot activate Amulet" - which is the
+// opposite of the truth the surface owes the model.
+inline bool optionsAreActionMenu(const std::string& optsLower)
+{
+    static const char * marks[] = { "cast ", "activate ", "play land", "play ", "equip " };
+    for (size_t i = 0; i < sizeof(marks) / sizeof(marks[0]); i++)
+        if (optsLower.find(marks[i]) != std::string::npos)
+            return true;
+    return false;
+}
+
 // planRaw / optsRaw as assembled; myCardNames = display names from the
 // caster's own zones (the vocabulary the plan can name). True when the plan
 // affirmatively commits to acting on >=1 named card and NONE of those cards
@@ -102,14 +147,19 @@ inline bool planActionsStale(const std::string& planRaw, const std::string& opts
         return false;
     std::string plan = toLower(planRaw);
     std::string opts = stripTargetEnumerations(toLower(optsRaw));
+    if (!optionsAreActionMenu(opts))
+        return false; //not a cast/activation menu: the caveat has nothing to claim
     bool anyAffirmative = false;
     bool anyOffered = false;
     std::set<std::string> seen;
     for (size_t n = 0; n < myCardNames.size(); n++)
     {
-        std::string nm = toLower(myCardNames[n]);
-        if (nm.size() < 4)
+        std::string full = toLower(myCardNames[n]);
+        if (full.size() < 4)
             continue; //skip tiny names: too much substring noise
+        std::string nm = shortName(full); //wave-35: match the head, both sides
+        if (nm.size() < 4)
+            continue;
         if (!seen.insert(nm).second)
             continue;
         size_t pos = 0;
@@ -128,7 +178,7 @@ inline bool planActionsStale(const std::string& planRaw, const std::string& opts
         if (cardAffirmed)
         {
             anyAffirmative = true;
-            if (opts.find(nm) != std::string::npos)
+            if (opts.find(nm) != std::string::npos || opts.find(full) != std::string::npos)
                 anyOffered = true;
         }
     }

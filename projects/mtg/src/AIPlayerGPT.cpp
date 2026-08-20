@@ -149,19 +149,67 @@ const char * kExampleFakeCardLc = "example card";
 //The reply protocol is appended in code AFTER the (user-editable) system
 //prompt template, so a stale or hand-edited template cannot silently drop
 //the contract the parsers and the plan carry-forward depend on.
+//
+//WAVE-35 PROTOCOL SURGERY (churn drivers #1 and #4 of the wave-34 trace audit).
+//Two clauses here were the two largest measured consumers of reasoning tokens
+//across ~740 traces, and BOTH were undecidable rather than merely wordy:
+//  #1 "ONLY IF your plan has changed" (7-15% of ALL reasoning chars, present in
+//     ~100% of traces). It has no answer at the FIRST decision of a game (there
+//     is no prior plan to compare against - one trace spent 57% of itself on
+//     exactly that), and no answer while EXECUTING a multi-step plan ("does
+//     advancing a step count as changing it?"). The rewrite states the three
+//     cases as a closed, mechanical set - first decision / something in the plan
+//     is now done-or-false / otherwise - so the question is answerable in every
+//     state a decision can occur in, and says outright that executing is not
+//     changing. It also states that the PLAN is NOT checked against the option
+//     list, which is the other half of the same defect: "write your plan FROM
+//     the list" (system_prompt.txt) was read as "the plan line is validated
+//     against the current options", costing 52% of one 26.8k trace.
+//  #4 "<action name exactly as listed>" is UNSATISFIABLE against real option
+//     labels: they carry {mana}, {right now: ...} and a {card text: "..."} blob
+//     that is itself truncated mid-sentence with an ellipsis. The model either
+//     litigated the scope (~6k chars a time) or complied literally and echoed
+//     the whole blob - the mechanism behind every post_answer_overrun event
+//     measured (42/90 at batch2, 53/146 at batch6). The contract is now NUMBER +
+//     SHORT NAME, which is what the parser already wants: parseChoice matches
+//     the echo's significant words as a SUBSET of the option text (and, in the
+//     reverse pass, the option's words as a subset of the echo), so a short name
+//     binds exactly and a copied blob only adds noise. The instruction is moved
+//     to parser reality, not the parser to the instruction.
+//  Also folded in (batch5 #10 / batch6 P6): the parenthesised-name mandate and
+//  the ATTACK:/BLOCKS: worked examples contradicted each other, and 70/102
+//  traces reasoned about the format. The label form ("ATTACK: A1, A3") is what
+//  every combat example and every per-decision line already shows and what the
+//  parsers prefer, so the mandate is scoped to CHOICE: and combat is exempted.
 const char * kReplyProtocol =
     "\nHOW TO REPLY (every decision):\n"
-    "Your reply is ONE line, or TWO when your plan changed. Nothing else.\n"
+    "Your reply is ONE line, or TWO when you write a plan. Nothing else.\n"
     "LINE 1 is your ANSWER, using exactly the label the decision asks for (CHOICE: for numbered "
-    "choices, ATTACK: for attack declarations, BLOCKS: for block assignments). Format: the label, "
-    "then the NUMBER of your choice FROM THE LIST, then that option's name in parentheses - "
-    "CHOICE: <number> (<action name exactly as listed>). For example, \"CHOICE: 3 (Cast Example "
-    "Card)\" (Example Card is a placeholder - always copy the real number and name from the options "
-    "in front of you, never this example's).\n"
-    "LINE 2, ONLY IF your plan has changed: a line starting with PLAN:, holding your complete game "
-    "plan from here on - CONCISE, a few sentences of intent, not an analysis. If your plan is "
-    "unchanged, OMIT the PLAN line entirely - your last stated plan carries forward automatically "
-    "and will be shown to you again.\n"
+    "choices, ATTACK: for attack declarations, BLOCKS: for block assignments). For CHOICE: write "
+    "the label, then the NUMBER of your choice FROM THE LIST, then that option's SHORT NAME in "
+    "parentheses - CHOICE: <number> (<short name>). The SHORT NAME is the action and card name "
+    "only, i.e. the option text up to the first \"{\": never copy the {mana cost}, the {right now: "
+    "...} note or the {card text: \"...\"} blob - they are annotations for your reading, not part "
+    "of the name, and the card text is often cut off mid-sentence. So an option that renders as "
+    "\"3. Cast Example Card {1}{b} {right now: drains 2} {card text: \\\"You draw a card and...\\\"}\" "
+    "is answered in full by \"CHOICE: 3 (Cast Example Card)\" - nothing more is wanted or matched "
+    "(Example Card is a placeholder - always copy the real number and short name from the options "
+    "in front of you, never this example's). On a TARGET menu the "
+    "short name is the target's name. ATTACK: and BLOCKS: are different: they take the A#/B# "
+    "LABELS only, with no names and no parentheses (\"ATTACK: A1, A3\", \"BLOCKS: B1:A2, B3:A1\").\n"
+    "LINE 2 is a PLAN: line - your complete game plan from this point on, CONCISE, a few sentences "
+    "of intent, not an analysis. Whether to write one is a mechanical test with exactly three "
+    "cases; take the first that applies and do not re-open it:\n"
+    "  (a) No plan is shown to you above (the first decision of a game): ALWAYS write a PLAN line.\n"
+    "  (b) A plan is shown and any part of it is now done, impossible, or no longer what you "
+    "intend: write a PLAN line stating the whole plan as it now stands.\n"
+    "  (c) Otherwise - you are simply carrying on with the plan shown, at whatever step of it you "
+    "have reached: OMIT the PLAN line. Executing a plan is NOT changing it. Your last stated plan "
+    "carries forward automatically and will be shown to you again.\n"
+    "Your PLAN is a private note to your future self. It is not an instruction to the game, it is "
+    "not a second answer, and it is NOT checked against this decision's option list: it may name "
+    "any card in your deck or hand and any future turn, whether or not that card is among today's "
+    "choices. Only LINE 1 has to come from the list.\n"
     "Write no reasoning, no commentary, no restatement of the board and no working in the reply "
     "itself: think the decision through BEFORE you answer, then give only the answer. (If you do "
     "write more than one answer line, the LAST well-formed answer line is the one taken.)\n"
@@ -170,6 +218,33 @@ const char * kReplyProtocol =
     "your earlier plans will have dropped out of context. So every PLAN you do write must be "
     "complete and self-contained: state your full current plan, or your full revised plan if the "
     "situation changed. Never write a fragment like \"continue as before\".\n";
+
+//WAVE-35 churn driver #5 and #2: the per-ask FACT lines and the stale-plan
+//note, hoisted to file scope so PARSETEST can assert their exact wording
+//without a game. They are single-use in the emitters below; the point of the
+//constants is that the regression corpus can hold them to their contract (what
+//they claim, and what they must NOT claim).
+const char * kAttackersTurnFacts =
+    "This is not your last chance to act this turn: your SECOND MAIN PHASE follows combat, so "
+    "creatures, sorceries and other main-phase cards you do not cast now can still be cast after "
+    "combat on this same turn, and you get priority again during combat, so instants and activated "
+    "abilities you hold stay castable this turn. Declaring attackers taps only the attacking "
+    "creatures - never your lands.\n";
+const char * kBlockersTurnFacts =
+    "You keep priority through the rest of this combat: instants and activated abilities you hold "
+    "stay castable after blockers are declared.\n";
+const char * kSecondMainAheadFact =
+    "Still ahead of you this turn: your SECOND MAIN PHASE, after combat. Creatures, sorceries and "
+    "other main-phase cards you do not cast now can still be cast then, on this same turn.\n";
+const char * kPriorityAgainFact =
+    "You will have priority again later this turn, so instants and activated abilities you hold "
+    "stay castable this turn.\n";
+//The caveat is a nudge about THIS menu, never a ruling about legality - see the
+//emitter in assemblePrompt for the measured failure it replaces.
+const char * kStalePlanNote =
+    "(note: this decision's list does not contain the actions your plan names. That is about this "
+    "menu, not about what is legal for you - pick the best option below, and re-state your plan if "
+    "it has gone out of date.)\n";
 
 //The card's rules text, single-line and bounded, for option/target lines:
 //the deciding fact belongs ON the choice, not in a distant deck blob (the
@@ -1992,7 +2067,18 @@ static const long kAnswerReserveTokens = 400;
 //gives 10450. The owner set the shipped starting value at a flat 8000
 //("oof. thats a lot. lets make it 8000"). Config/env override it; 0 or less
 //means unbounded (the pre-budget behaviour).
-static const long kDefaultReasoningBudget = 8000;
+//WAVE-35 (OWNER RULING 2026-08-20, "let's fix stuff, then maybe next round will
+//propose a smaller budget"): 8000 -> 6000, measured off the wave-34 trace audit
+//(~740 traces, 6 batches): last-novel-diagnostic depth pooled to p50 ~3k / p90
+//~4.8k tokens, with the per-batch max at or under 6.2k in 5 of 6 batches, so
+//6000 clears every batch's p90 with margin and satisfies batch-3's floor
+//warning (below ~6k truncates ~10% mid-diagnostic). The audit's unanimous
+//caveat is why this cut is paired with the protocol surgery above rather than
+//taken alone: the churn is CAUSED and INTERLEAVED, not trailing, so a cap
+//cannot recover it - only removing the undecidable instructions can. Wave-35's
+//corpus re-measures depth post-surgery and any further cut is proposed from
+//that data.
+static const long kDefaultReasoningBudget = 6000;
 
 //Which endpoints accept an assistant prefill (vLLM's continue_final_message /
 //llama.cpp's equivalent). The subscription (Codex) and OpenRouter paths keep
@@ -2646,9 +2732,10 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     //otherwise the budget machinery gets cut off rescuing exactly the
     //decisions it exists for. Worst case, budgeted end to end at this stack's
     //~30 tok/s: phase 1 = prompt prefill (~10-20s at corpus prompt sizes) +
-    //(8000 thinking + ~230 reply) tokens ~= 295s; a budget hit then adds
-    //phase 2 = re-prefill of prompt + the 8k of thinking (~15-25s) + ~400
-    //tokens ~= 40s. Total ~= 335-360s, and each phase is its own request. 420s
+    //(6000 thinking + ~230 reply) tokens ~= 210s (wave-35 budget cut; it was
+    //295s at 8000); a budget hit then adds phase 2 = re-prefill of prompt + the
+    //6k of thinking (~15-25s) + ~400 tokens ~= 40s. Total ~= 250-275s, and each
+    //phase is its own request. The floor is deliberately NOT retuned down: 420s
     //keeps a real margin over that rather than shaving it. An explicit timeout
     //(env or config) is the user's call and is never raised over their head;
     //the built-in default (600s) already clears this floor, so the guard is
@@ -2912,7 +2999,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (!mLastReasoning.empty())
     {
         rec["reasoning"] = mLastReasoning;
-        //The LENGTH, separately, because the 8000-token budget is a
+        //The LENGTH, separately, because the 6000-token budget is a
         //calibration value the owner expects to tune DOWN: the next budget is
         //read off this distribution (p95/p99 by decision kind) against the
         //reasoning_budget_hit rate, and doing that from the text field alone
@@ -3259,9 +3346,15 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
         //this branch - the whole board frame has to go, including the sentences
         //that only MENTION one.
         if (!pregame && gptcaveat::planActionsStale(mCurrentPlan, tail, myNames))
-            u << "(note: the actions your plan names are no longer among the options available "
-                 "right now - the game state has advanced past that plan; re-derive your choice "
-                 "from the current board and the options below.)\n";
+            //Wave-35 churn driver #2, the WORDING half. The old text asserted
+            //that the plan's actions were "no longer available", which the model
+            //read as a LEGALITY RULING about its own cards ("This confirms I
+            //cannot activate Amulet") and then reasoned from as fact. It is not
+            //a ruling - it is a nudge about THIS decision's menu, which never
+            //offers the whole game's actions. Restriction-scoped, self-authored,
+            //explicitly non-binding, and it names the only action it wants:
+            //choose from this list, and refresh the plan if it is out of date.
+            u << kStalePlanNote;
     }
     u << "\n" << tail;
     return u.str();
@@ -5595,7 +5688,21 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         DebugTrace("AIPlayerGPT[ph" << phase << "]: only display-toggle (Flip Side) options; auto-passing without a model call");
         return NULL;
     }
-    tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and the chosen action's name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list) or \"CHOICE: 0 (pass)\"; then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
+    //Wave-35 churn driver #5 (batch5 #12, batch6 P5): a priority ask named the
+    //phase and nothing about what was still AHEAD, so the model re-derived the
+    //turn structure from scratch at nearly every window - "did I miss the
+    //chance to cast Sigarda?", "usually there is a Main Phase 1 before combat",
+    //"perhaps the system filtered options out". Both statements below are
+    //scoped so they are only made where they are TRUE (a true statement in the
+    //wrong scope is a lie): the second main phase is only still ahead on YOUR
+    //turn before it, and a later priority window only exists before the turn
+    //has run out.
+    if (observer->currentPlayer == this && phase < MTG_PHASE_SECONDMAIN)
+        tail << "\n" << kSecondMainAheadFact;
+    if (phase < MTG_PHASE_ENDOFTURN)
+        tail << (observer->currentPlayer == this && phase < MTG_PHASE_SECONDMAIN ? "" : "\n")
+             << kPriorityAgainFact;
+    tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and short name from the list) or \"CHOICE: 0 (pass)\"; then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
@@ -5760,7 +5867,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
         tail << (i + 1) << ". " << options[i] << "\n";
-    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its name in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and name from the list); then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
+    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and short name from the list); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -8504,10 +8611,22 @@ int AIPlayerGPT::chooseAttackers()
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
+    //Wave-35 churn driver #5 (batch5 #12): the attackers ask stated neither of
+    //the two facts that decide it, so the model derived them from scratch - one
+    //26,457-char trace on a ONE-legal-attacker decision spent ~20,000 chars
+    //asking whether it had already missed its chance to cast a creature, and
+    //found "I could cast Sigarda today after combat" as the LAST novel element
+    //at char 23,100. Both facts are unconditionally true at this ask: a declare-
+    //attackers decision only exists on your own turn, so your second main phase
+    //is always still ahead of you, and you always receive priority again during
+    //combat. Stating them is cheaper than the model re-deriving them, and the
+    //trust doctrine says the surface owes the model the truth rather than a gap
+    //to confabulate into.
+    tail << kAttackersTurnFacts;
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
-            " attack with nobody this turn; then, ONLY if your plan changed, a"
-            " final PLAN: line. Write nothing else.";
+            " attack with nobody this turn; then a PLAN: line only if the reply"
+            " rules call for one. Write nothing else.";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -8897,13 +9016,17 @@ int AIPlayerGPT::chooseBlockers()
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
+    //Wave-35 churn driver #5, defender side. Main phase 2 is NOT true here (it
+    //is the opponent's turn), so only the priority fact is stated - a true
+    //statement in the wrong scope is a lie (trust doctrine).
+    tail << kBlockersTurnFacts;
     tail << "Assign each blocker to AT MOST ONE attacker (a creature cannot block"
             " two attackers), but several DIFFERENT blockers may gang-block the same"
             " attacker. Blockers you do not mention stay out of combat.\nOn the"
             " FIRST line write BLOCKS: followed by the assignments, comma-separated,"
             " e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\", or exactly \"BLOCKS: none\" to"
-            " block with nobody this turn; then, ONLY if your plan changed, a final"
-            " PLAN: line. Write nothing else.";
+            " block with nobody this turn; then a PLAN: line only if the reply rules"
+            " call for one. Write nothing else.";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -9271,12 +9394,12 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
         tail << "On the FIRST line write PUT: followed by the ONE card number you"
                 " choose (e.g. \"PUT: 2\")"
              << (eligCount == 0 ? ", or \"PUT: none\" if none qualify" : "")
-             << "; then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
+             << "; then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
     else
         tail << "On the FIRST line write PUT: followed by the card numbers you send to \""
              << optOneLabel << "\", comma-separated (e.g. \"PUT: 1, 3\"), or exactly"
                 " \"PUT: none\" to send none there (every revealed card then goes to \""
-             << optTwoLabel << "\"); then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
+             << optTwoLabel << "\"); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
     return tail.str();
 }
 
@@ -9513,7 +9636,7 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
     }
     tail << "On the FIRST line write PUT: followed by the " << remaining << " card number"
          << (remaining == 1 ? "" : "s") << " you send to the bottom, comma-separated (e.g. \"PUT: "
-         << (remaining == 1 ? "3" : "3, 5") << "\"); then, ONLY if your plan changed, a final PLAN: line. Write nothing else.";
+         << (remaining == 1 ? "3" : "3, 5") << "\"); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
     return tail.str();
 }
 
@@ -12373,6 +12496,207 @@ void AIPlayerGPT::runParseSelfTest()
         // to mine, and content was never empty.
         CHECK(answerTailFromReasoning("").empty(),
               "W34-hidden NEGATIVE no reasoning field means nothing to recover from");
+    }
+
+    // ================= WAVE-35 PROTOCOL SURGERY =================
+    // Regression cover for every instruction/annotation string the wave-35
+    // churn-driver surgery changed. Each driver gets a positive (the new
+    // contract is present / the new gate fires where it should), a negative
+    // (the removed wording is GONE / the gate does not fire where it false-
+    // fired), and, where the model echoes the string back, the echo shape.
+
+    // ---- driver #1: the PLAN-line rule is decidable in every state ----
+    cout << "\n[W35-plan] the PLAN rule states all three cases and never asks 'did it change?'\n";
+    {
+        string proto = kReplyProtocol;
+        // POSITIVE: the closed three-case set, including the null case that had
+        // no answer at all (first decision of a game: no prior plan exists).
+        CHECK(proto.find("(a) No plan is shown to you above (the first decision of a game): ALWAYS "
+                         "write a PLAN line.") != string::npos,
+              "W35-plan case (a) the null case is stated: first decision ALWAYS writes a PLAN");
+        CHECK(proto.find("(b) A plan is shown and any part of it is now done, impossible, or no "
+                         "longer what you intend") != string::npos,
+              "W35-plan case (b) stale/half-consumed plans are named explicitly");
+        CHECK(proto.find("(c) Otherwise") != string::npos
+              && proto.find("OMIT the PLAN line. Executing a plan is NOT changing it.") != string::npos,
+              "W35-plan case (c) executing-unchanged omits, and executing is declared not-changing");
+        // NEGATIVE: the undecidable gate that cost 7-15% of ALL reasoning chars
+        // is gone from the protocol AND from every per-decision tail that
+        // repeated it.
+        CHECK(proto.find("ONLY IF your plan has changed") == string::npos
+              && proto.find("ONLY if your plan changed") == string::npos,
+              "W35-plan NEGATIVE the undecidable 'ONLY IF your plan has changed' gate is gone");
+        // POSITIVE: the plan is explicitly NOT validated against the options -
+        // the "write your plan FROM the list" misreading that ate 52% of one
+        // 26.8k trace. Only LINE 1 comes from the list.
+        CHECK(proto.find("NOT checked against this decision's option list") != string::npos
+              && proto.find("Only LINE 1 has to come from the list.") != string::npos,
+              "W35-plan the plan line is declared free of the option list; only the answer is bound");
+    }
+
+    // ---- driver #4: the echo contract is number + SHORT NAME ----
+    cout << "\n[W35-echo] 'exactly as listed' is gone; the contract is number + short name\n";
+    {
+        string proto = kReplyProtocol;
+        // NEGATIVE: the unsatisfiable clause. Option labels carry {mana},
+        // {right now: ...} and a {card text: "..."} blob truncated mid-sentence,
+        // so "exactly as listed" could not be obeyed - it produced every
+        // post_answer_overrun event measured in the wave-34 corpus.
+        CHECK(proto.find("exactly as listed") == string::npos,
+              "W35-echo NEGATIVE the unsatisfiable 'action name exactly as listed' clause is gone");
+        CHECK(proto.find("CHOICE: <number> (<short name>)") != string::npos,
+              "W35-echo the contract is stated as number + short name");
+        CHECK(proto.find("never copy the {mana cost}, the {right now: ") != string::npos
+              && proto.find("{card text: ") != string::npos,
+              "W35-echo the annotation braces are named as the thing NOT to copy");
+        // The combat exemption (batch5 #10): the parenthesised-name mandate and
+        // the ATTACK:/BLOCKS: worked examples contradicted each other in 70/102
+        // traces. The example format wins - it is what the parsers prefer.
+        CHECK(proto.find("ATTACK: and BLOCKS: are different: they take the A#/B# "
+                         "LABELS only, with no names and no parentheses") != string::npos,
+              "W35-echo combat answers are exempted from the parenthesised-name mandate");
+        // NEGATIVE: the de-fanged worked example is still the only card named in
+        // the protocol - a REAL card name here poisons the retraction detector.
+        CHECK(proto.find("Cast Example Card") != string::npos,
+              "W35-echo NEGATIVE the worked example still uses the fake card name");
+    }
+
+    // ---- driver #4, echo SHAPES: what the model now sends must still bind ----
+    cout << "\n[W35-echo-shape] short-name echo binds; the old blob echo still binds\n";
+    {
+        vector<string> opts;
+        opts.push_back("Cast Mordor Muster {1}{b} {right now: Army 1/1 -> 2/2} "
+                       "{card text: \"You draw a card and you lose 1 life. -- Amass Orcs 1...\"}");
+        opts.push_back("Cast Ichor Rats {2}{b} {card text: \"Whenever Ichor Rats deals damage...\"}");
+        opts.push_back("Cast nothing right now");
+        bool stale = false;
+        // The NEW contract's answer: number + short name, nothing from the braces.
+        CHECK(parseChoice("CHOICE: 1 (Cast Mordor Muster)", 3, &opts, &stale, NULL) == 1 && !stale,
+              "W35-echo-shape the short-name echo binds to its option");
+        // Backward compatibility: a model that still copies the whole label must
+        // not be downgraded to the heuristic.
+        stale = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Mordor Muster {1}{b} {right now: Army 1/1 -> 2/2})",
+                          3, &opts, &stale, NULL) == 1 && !stale,
+              "W35-echo-shape a full-label echo still binds (no regression for old replies)");
+        // The short name still DISAMBIGUATES: it must pick its own option, not
+        // the neighbouring cast.
+        stale = false;
+        CHECK(parseChoice("CHOICE: 2 (Cast Ichor Rats)", 3, &opts, &stale, NULL) == 2 && !stale,
+              "W35-echo-shape short names remain unique across a multi-cast menu");
+        // NEGATIVE: a short name matching NOTHING is still a stale echo that
+        // routes to the heuristic - the safety property is untouched.
+        stale = false;
+        parseChoice("CHOICE: 1 (Cast Emrakul, the Aeons Torn)", 3, &opts, &stale, NULL);
+        CHECK(stale, "W35-echo-shape NEGATIVE an off-menu short name is still flagged stale");
+        // The declines still parse with no card name at all.
+        stale = false;
+        CHECK(parseChoice("CHOICE: 3 (Cast nothing)", 3, &opts, &stale, NULL) == 3,
+              "W35-echo-shape a decline echo needs no card name");
+    }
+
+    // ---- driver #2: the stale-plan note stops false-firing ----
+    cout << "\n[W35-caveat] the stale-plan note fires only on a cast menu that lost the plan\n";
+    {
+        vector<string> mine;
+        mine.push_back("Sigarda, Champion of Light");
+        mine.push_back("Steel Overseer");
+        mine.push_back("Fateful Absence");
+        mine.push_back("Grishnakh, Brash Instigator");
+        // POSITIVE (the defect this note exists for, deck110-vs-deck21): the
+        // plan commits to casting a card that has already been cast, and the
+        // cast menu on offer does not contain it.
+        string castMenu = "1. Cast Fateful Absence {1}{w}\n2. Cast nothing right now\n";
+        CHECK(gptcaveat::planActionsStale("Cast Steel Overseer, then activate it each turn.",
+                                          castMenu, mine),
+              "W35-caveat POSITIVE a cast the menu no longer offers still arms the note");
+        // NEGATIVE (batch5 finding 1, the 15/102 false-fire): the plan names the
+        // card by its SHORT name and the option carries the full display name.
+        // The old full-name-only scan saw neither side and fired anyway.
+        string sigardaMenu = "1. Cast Sigarda, Champion of Light {2}{w}{w}\n2. Cast nothing right now\n";
+        CHECK(!gptcaveat::planActionsStale("Cast Sigarda in Main Phase 2, then attack.",
+                                           sigardaMenu, mine),
+              "W35-caveat NEGATIVE a plan naming 'Sigarda' sees 'Sigarda, Champion of Light'");
+        // NEGATIVE: a pay-life sub-ask is not an action menu at all, so the note
+        // has nothing to claim (near-100% false there in the wave-34 corpus).
+        string payLife = "1. Pay 3 life\n2. Do not pay\n";
+        CHECK(!gptcaveat::planActionsStale("Cast Steel Overseer, then activate it each turn.",
+                                           payLife, mine),
+              "W35-caveat NEGATIVE a pay-life sub-ask never arms the note");
+        // NEGATIVE: an attackers ask - A-labels, no cast lines.
+        string attackers = "A1. Grishnakh, Brash Instigator (3/3) [haste]\nA2. Orc Army (2/2)\n";
+        CHECK(!gptcaveat::planActionsStale("Cast Steel Overseer, then activate it each turn.",
+                                           attackers, mine),
+              "W35-caveat NEGATIVE a declare-attackers ask never arms the note");
+        // NEGATIVE: a blockers ask, same reason.
+        string blockers = "B1. Orc Army (2/2) - may block A1 (kills it, survives)\n";
+        CHECK(!gptcaveat::planActionsStale("Cast Steel Overseer, then activate it each turn.",
+                                           blockers, mine),
+              "W35-caveat NEGATIVE a declare-blockers ask never arms the note");
+        // NEGATIVE: "attack with X" is a live intent, not a cast/activation, so
+        // it can never arm the note on its own (the largest false-fire source).
+        CHECK(!gptcaveat::planActionsStale("Attack with Grishnakh every turn while they are open.",
+                                           castMenu, mine),
+              "W35-caveat NEGATIVE an attack-only plan does not arm a cast-menu note");
+        // The pre-existing guards are intact: a negated plan mention and an
+        // empty plan both stay silent.
+        CHECK(!gptcaveat::planActionsStale("Do not cast Steel Overseer into open mana.",
+                                           castMenu, mine),
+              "W35-caveat NEGATIVE a negated plan mention is not an affirmation (guard intact)");
+        CHECK(!gptcaveat::planActionsStale("", castMenu, mine),
+              "W35-caveat NEGATIVE an empty plan never arms the note (guard intact)");
+    }
+
+    // ---- driver #2, the WORDING: a nudge, never a legality ruling ----
+    cout << "\n[W35-caveat-text] the note cannot be read as a ruling about legality\n";
+    {
+        string note = kStalePlanNote;
+        CHECK(note.find("not about what is legal for you") != string::npos,
+              "W35-caveat-text the note denies the legality reading in its own words");
+        CHECK(note.find("no longer among the options available") == string::npos,
+              "W35-caveat-text NEGATIVE the old availability assertion is gone");
+        CHECK(note.find("pick the best option below") != string::npos
+              && note.find("re-state your plan if it has gone out of date") != string::npos,
+              "W35-caveat-text the note names the two actions it wants and nothing else");
+        // ECHO SHAPE: an answer given while the note is on the prompt binds
+        // normally - the note is parenthesised prose carrying no option's words,
+        // so it can never resolve as a candidate.
+        vector<string> opts;
+        opts.push_back("Cast Fateful Absence {1}{w}");
+        opts.push_back("Cast nothing right now");
+        bool stale = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Fateful Absence)", 2, &opts, &stale, NULL) == 1 && !stale,
+              "W35-caveat-text an answer given under the note binds normally");
+    }
+
+    // ---- driver #5: the combat/priority asks state what is still ahead ----
+    cout << "\n[W35-combat] attacker/blocker/priority asks carry their turn-structure facts\n";
+    {
+        string atk = kAttackersTurnFacts;
+        CHECK(atk.find("SECOND MAIN PHASE follows combat") != string::npos,
+              "W35-combat the attackers ask states that main phase 2 follows combat");
+        CHECK(atk.find("instants and activated abilities you hold stay castable this turn") != string::npos,
+              "W35-combat the attackers ask states that instants remain castable this turn");
+        CHECK(atk.find("taps only the attacking creatures - never your lands") != string::npos,
+              "W35-combat the attackers ask states what declaring actually taps");
+        // NEGATIVE / scope: the BLOCKERS ask happens on the OPPONENT's turn, so
+        // it must NOT claim a second main phase of your own. A true statement in
+        // the wrong scope is a lie.
+        string blk = kBlockersTurnFacts;
+        CHECK(blk.find("SECOND MAIN PHASE") == string::npos
+              && blk.find("second main") == string::npos,
+              "W35-combat NEGATIVE the blockers ask never claims a main phase 2 of your own");
+        CHECK(blk.find("stay castable after blockers are declared") != string::npos,
+              "W35-combat the blockers ask states that instants survive the declaration");
+        // The two priority-ask facts are separate strings precisely because they
+        // are scoped separately (own turn before MP2 / any turn before end step).
+        string mp2 = kSecondMainAheadFact;
+        string pri = kPriorityAgainFact;
+        CHECK(mp2.find("Still ahead of you this turn: your SECOND MAIN PHASE, after combat") != string::npos,
+              "W35-combat the priority ask names the second main phase as still ahead");
+        CHECK(pri.find("priority again later this turn") != string::npos
+              && pri.find("SECOND MAIN") == string::npos,
+              "W35-combat NEGATIVE the priority-again fact makes no main-phase claim of its own");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

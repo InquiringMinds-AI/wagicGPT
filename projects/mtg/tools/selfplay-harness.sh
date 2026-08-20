@@ -120,8 +120,9 @@ echo "  pool   : $POOL"
 echo "  games  : $NGAMES ($(( ${#DECKS[@]} * (${#DECKS[@]} - 1) / 2 )) pairings x $REPS reps), $JOBS concurrent"
 # The HTTP timeout is the only watchdog that falls back to the heuristic, so it
 # must clear the worst case a decision can take. With --thinking that is the
-# two-phase budget path (8000-token thinking window + the forced-answer close,
-# ~335-360s at ~30 tok/s); without it, the terse-reply default stands.
+# two-phase budget path (6000-token thinking window since wave-35 + the
+# forced-answer close, ~250-275s at ~30 tok/s); without it, the terse-reply
+# default stands. 420s keeps margin over that rather than shaving it.
 if [ "$THINKING" = "1" ]; then DEFAULT_GPT_TIMEOUT=420; else DEFAULT_GPT_TIMEOUT=240; fi
 echo "  model  : $MODEL @ $URL (thinking=$THINKING, gpt timeout=${WAGIC_GPT_TIMEOUT:-$DEFAULT_GPT_TIMEOUT}s)"
 echo "  caps   : ${TOTAL_CAP_S}s total, ${GAME_TIMEOUT_S}s/game (fastclock=$FASTCLOCK)"
