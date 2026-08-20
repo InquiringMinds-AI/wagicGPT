@@ -103,7 +103,28 @@ struct WEventLife : public WEvent {
     Player * player;
     int amount;
     MTGCardInstance * source;
+    //W35-narration: GameObserver::receiveEvent QUEUES events raised while one is
+    //dispatching, so the N life changes of one batch (a multi-source damage
+    //step, a drain-per-creature trigger) are all narrated AFTER the whole batch
+    //has landed - a reader of player->life sees the POST-batch total on every
+    //partial line (wave-34 b6 F5). The total this change settled at is captured
+    //at fire time, so each line prints the step it actually is. Same mechanism
+    //as WEventCounters::captureTargetState (N-105f).
+    int settledLife;
     WEventLife(Player * player, int amount, MTGCardInstance * source);
+    virtual Targetable * getTarget(int target);
+};
+
+//W35-narration: a spell LEAVING THE STACK is one zone event for two opposite
+//outcomes - "stack -> graveyard" is emitted both when a spell RESOLVES and when
+//it is COUNTERED, and the log could not tell them apart (owner ruling addendum
+//(4): informational, not stylistic). ActionStack::Fizzle raises this
+//immediately BEFORE it moves the countered card, and the event queue is FIFO,
+//so the very next zone event for that card is the countering move.
+struct WEventSpellCountered : public WEvent {
+    MTGCardInstance * card;      //the spell that was countered
+    MTGCardInstance * counteredBy; //the countering source, when there is one
+    WEventSpellCountered(MTGCardInstance * card, MTGCardInstance * counteredBy);
     virtual Targetable * getTarget(int target);
 };
 

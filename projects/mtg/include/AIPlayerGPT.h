@@ -260,6 +260,8 @@ private:
     void narrateDecision(const string& line);
     //Bound-checked narration append; flushes the pending phase marker first.
     void appendNarration(const string& line);
+    //Zone-duty digest for the trim marker (see trimMarkerLine).
+    string zoneNameDigest(MTGGameZone * z);
     //Split a reply at its "PLAN:" marker: stores the (complete, per the
     //protocol) plan into mCurrentPlan and returns the decision part, which
     //is the ONLY text the choice parsers may see - plan prose is full of
@@ -485,6 +487,21 @@ private:
     //human would remember. Tracked by name (instances are recreated on zone
     //moves), decremented when a card of that name leaves the hand.
     std::map<string, int> mKnownOppHand;
+    //W35 narration register, owner addendum (4): "stack -> graveyard" is the
+    //SAME move for a spell that resolved and a spell that was countered.
+    //ActionStack::Fizzle raises WEventSpellCountered immediately before it
+    //moves the countered card and the observer's event queue is FIFO, so this
+    //marker names the card whose NEXT zone event is the countering move. It is
+    //consumed by that line and can never colour an unrelated later move.
+    MTGCardInstance * mCounteredSpell;
+    string mCounteredBy;
+    //W35: per-option register lines for the NEXT askModel call, set by a caller
+    //that can state the CONSEQUENCE of each option ("You mulliganed to 6",
+    //"You targeted X with Y"). Consumed (and cleared) by askModel, which
+    //otherwise falls back to a generic "You chose <option>" - never the
+    //question header, never the decorated option text.
+    vector<string> mNextAskNarration;
+    void setAskNarration(const vector<string>& lines) { mNextAskNarration = lines; }
     //N-105a: last-narrated poison total per player ([0] this seat, [1] the
     //opponent), so a poison-gain line can state the real DELTA. The engine's
     //own WEventplayerPoisoned payload cannot be trusted for it - the toxic

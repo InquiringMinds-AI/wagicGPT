@@ -23,8 +23,24 @@ WEventDamage::WEventDamage(Damage *damage) :
 }
 
 WEventLife::WEventLife(Player * player, int amount, MTGCardInstance* source) :
-    WEvent(), player(player), amount(amount), source(source)
+    WEvent(), player(player), amount(amount), source(source), settledLife(0)
 {
+    //The caller applies the change BEFORE raising the event (Player::
+    //gainOrLoseLife), so the live total here is the one THIS change settled at.
+    if (player)
+        settledLife = player->life;
+}
+
+WEventSpellCountered::WEventSpellCountered(MTGCardInstance * card, MTGCardInstance * counteredBy) :
+    WEvent(), card(card), counteredBy(counteredBy)
+{
+}
+
+Targetable * WEventSpellCountered::getTarget(int target)
+{
+    if (target == TARGET_FROM)
+        return counteredBy;
+    return card;
 }
 
 WEventDamageStackResolved::WEventDamageStackResolved() :
