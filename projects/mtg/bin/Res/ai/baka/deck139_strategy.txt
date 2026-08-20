@@ -173,8 +173,8 @@ of 10 poison". Ten poison counters lose you the game at any life total, and they
   An attacker tagged [infect] does NOT reduce your life at all - blocking is the only thing that
   stops it. Do not price these blocks against your life total; price them against M.
 
-DECIDE FAST - ON EVERY DECISION. Write your CHOICE / ATTACK / BLOCKS / PUT line, two or three
-sentences of reason, and STOP. Re-reading the board a second and third time inside one answer does
+DECIDE FAST - ON EVERY DECISION. Settle the decision, then answer in exactly the shape the HOW TO
+REPLY block gives you, and STOP. Re-reading the board a second and third time inside one answer does
 not change the answer and it burns the clock. Double strike (Snapdax) and trample
 (Gemrazer/Illuna/Nethroi/Brokkos) mean a blocked trampler assigns lethal to the blocker and the
 rest to the player; a blocked creature WITHOUT trample deals nothing to the player.
