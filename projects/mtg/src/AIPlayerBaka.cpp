@@ -1585,6 +1585,30 @@ MTGCardInstance * AIPlayerBaka::chooseCard(TargetChooser * tc, MTGCardInstance *
     return NULL;
 }
 
+//See the header. The source is offered ONLY as a last resort (a cost payable
+//from another permanent is preferred, which is also the better play), only
+//from the battlefield, and only if the cost's own TargetChooser accepts it -
+//so an "another"/"other" filter still excludes it, exactly as the rules do.
+MTGCardInstance * AIPlayerBaka::selfAsCostPayment(TargetChooser * tc, MTGCardInstance * source)
+{
+    if (!tc || !source)
+        return NULL;
+    if (!source->isInPlay(observer))
+        return NULL;
+    if (tc->alreadyHasTarget(source))
+        return NULL;
+    if (!tc->canTarget(source))
+        return NULL;
+    return source;
+}
+
+MTGCardInstance * AIPlayerBaka::chooseCostTarget(TargetChooser * tc, MTGCardInstance * source)
+{
+    if (MTGCardInstance * other = chooseCard(tc, source))
+        return other;
+    return selfAsCostPayment(tc, source);
+}
+
 bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardInstance * target,vector<MTGAbility*>gotPayments)
 {
     DebugTrace("AIPlayerBaka: AI attempting to pay a mana cost." << endl
@@ -2042,7 +2066,12 @@ int AIPlayerBaka::CanHandleCost(ManaCost * cost, MTGCardInstance * card)
             ec->costs[i]->setSource(card);
             if(!ec->costs[i]->tc->countValidTargets())
                 return 0;
-            if(!chooseCard(ec->costs[i]->tc,card))
+            //Same blind spot as chooseCostTarget's (see selfAsCostPayment): a
+            //cost whose only legal payment is the ability's own source read as
+            //UNPAYABLE here, so AIAction::getEfficiency() scored the ability 0
+            //and Baka would never activate it at all (Scarecrone as the lone
+            //Scarecrow). Probe with the same rule the payment uses.
+            if(!chooseCard(ec->costs[i]->tc,card) && !selfAsCostPayment(ec->costs[i]->tc,card))
                 return 0;
         }
     }

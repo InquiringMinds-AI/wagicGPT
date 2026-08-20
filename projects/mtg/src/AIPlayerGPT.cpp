@@ -7101,13 +7101,21 @@ MTGCardInstance * AIPlayerGPT::chooseCostTarget(TargetChooser * tc, MTGCardInsta
         return AIPlayerBaka::chooseCostTarget(tc, source);
 
     //cost targets are cards; mirror chooseCard's exclusions (never the
-    //spell being paid for, never the chooser's own source)
+    //spell being paid for, never the chooser's own source) - EXCEPT for a
+    //source already on the battlefield, which an activated ability's cost may
+    //legally consume ("{1}, Sacrifice a Scarecrow" on a Scarecrow). Excluding
+    //it unconditionally left an activation whose only payment is itself with
+    //no legal answer, so the payment was never made and the engine re-offered
+    //the ability every priority window (wave-34 b6 F1). Legality stays the
+    //TargetChooser's call - it is what put the card in targetCandidates.
     vector<MTGCardInstance *> cands;
     vector<string> opts;
     for (size_t i = 0; i < req.targetCandidates.size(); i++)
     {
         MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(req.targetCandidates[i]);
-        if (!c || c == source || c == tc->source)
+        if (!c)
+            continue;
+        if ((c == source || c == tc->source) && !c->isInPlay(observer))
             continue;
         cands.push_back(c);
         opts.push_back(describeTarget(this, c));
