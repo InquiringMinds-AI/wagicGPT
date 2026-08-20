@@ -11,6 +11,7 @@
 #include "GameObserver.h"
 #include "MTGDefinitions.h"
 #include "WEvent.h"
+#include "Token.h" //W35: a token's creator (Token::tokenSource) for the log
 #include "Damage.h"
 #include "PhaseRing.h"
 #include "JFileSystem.h"
@@ -1572,6 +1573,300 @@ string zoneDesc(MTGGameZone * z)
     return z->getName();
 }
 
+//=== W35: the GAME LOG's NARRATION REGISTER ==================================
+//OWNER RULING (2026-08-19): the historical log is PAST-TENSE DECLARATIVE GAME
+//EVENTS - "You drew X" / "You cast X targeting Y" / "X resolved" /
+//"Opponent's X died". What the log recorded before was engine plumbing: raw
+//zone arrows ("Your Arboreal Grazer: hand -> stack"), consumed-ask ECHOES (the
+//generic question header plus the fully decorated option text) and target-
+//question echoes. The information content of a consumed decision is KEPT (what
+//was decided AND its consequence); only the register changes.
+//OWNER DOCTRINE (same day): graveyard and exile are NOT rendered in CURRENT
+//SITUATION - "the historical log is the optimal method to present graveyard and
+//exile state". Deaths, discards, exiles, sacrifices and countered spells are
+//therefore LOAD-BEARING zone records on this surface, not flavor.
+//Every shape below is a PURE function so the whole register - including a
+//composed multi-event log - is provable in PARSETEST without a game (see the
+//[W35-register] and [W35-composed] blocks in runParseSelfTest).
+
+static string regLower(const string& s)
+{
+    string o = s;
+    for (size_t i = 0; i < o.size(); i++)
+        o[i] = (char) tolower((unsigned char) o[i]);
+    return o;
+}
+
+//"Your Bear" / "Opponent's Bear" - the possessive that opens a card line.
+static string ownerTag(bool mine)
+{
+    return mine ? "Your " : "Opponent's ";
+}
+
+//"your graveyard" / "the opponent's graveyard" - a zone in the possessive.
+static string ownedZone(bool mine, const string& zone)
+{
+    return (mine ? "your " : "the opponent's ") + zone;
+}
+
+//The destination clause of a spell leaving the stack. Zone duty: the log is the
+//authoritative graveyard/exile surface, so where a countered or resolved spell
+//WENT is part of the record, never dropped for brevity.
+static string leftStackClause(bool mine, const string& to)
+{
+    if (to == "graveyard")
+        return " and went to " + ownedZone(mine, "graveyard");
+    if (to == "exile")
+        return " and was exiled";
+    if (to == "hand")
+        return " and returned to " + ownedZone(mine, "hand");
+    if (to == "library")
+        return " and went into " + ownedZone(mine, "library");
+    if (to == "battlefield")
+        return " and entered the battlefield";
+    return " and went to " + ownedZone(mine, to);
+}
+
+//The register form of one zone change. `mine` is the destination zone's owner
+//(this seat's own view); `countered` marks a spell that left the stack because
+//it was COUNTERED rather than because it resolved - the two produce the SAME
+//"stack -> graveyard" move and the old log could not tell them apart (owner
+//addendum (4): an informational defect, not a stylistic one).
+string zoneChangeNarration(bool mine, const string& cardName, const string& from,
+                           const string& to, bool isCreature, bool isLand,
+                           bool countered, const string& counterSource)
+{
+    string who = mine ? "You " : "Opponent ";
+    if (to == "stack")
+    {
+        string cast = (mine ? "You cast " : "Opponent cast ") + cardName;
+        if (from == "hand")
+            return cast;
+        return cast + " from " + ownedZone(mine, from);
+    }
+    if (from == "stack")
+    {
+        if (countered)
+        {
+            string line = ownerTag(mine) + cardName + " was countered";
+            if (!counterSource.empty())
+                line += " by " + counterSource;
+            return line + leftStackClause(mine, to);
+        }
+        if (to == "battlefield")
+            return ownerTag(mine) + cardName + " resolved and entered the battlefield";
+        return ownerTag(mine) + cardName + " resolved" + leftStackClause(mine, to);
+    }
+    if (from == "library" && to == "hand")
+        return mine ? ("You drew " + cardName) : string("Opponent drew a card");
+    if (from == "library" && to == "graveyard")
+        return who + "milled " + cardName;
+    if (from == "hand" && to == "battlefield")
+        return isLand ? (who + "played " + cardName)
+                      : (who + "put " + cardName + " onto the battlefield from "
+                         + ownedZone(mine, "hand"));
+    if (from == "hand" && to == "graveyard")
+        return who + "discarded " + cardName;
+    if (from == "hand" && to == "exile")
+        return ownerTag(mine) + cardName + " was exiled from " + ownedZone(mine, "hand");
+    if (from == "battlefield" && to == "graveyard")
+        return isCreature ? (ownerTag(mine) + cardName + " died")
+                          : (ownerTag(mine) + cardName + " was put into "
+                             + ownedZone(mine, "graveyard"));
+    if (from == "battlefield" && to == "exile")
+        return ownerTag(mine) + cardName + " was exiled from the battlefield";
+    if (from == "battlefield" && to == "hand")
+        return ownerTag(mine) + cardName + " was returned to " + ownedZone(mine, "hand");
+    if (from == "battlefield" && to == "library")
+        return ownerTag(mine) + cardName + " was put into " + ownedZone(mine, "library");
+    if (to == "battlefield")
+        return ownerTag(mine) + cardName + " entered the battlefield from "
+               + (from == "exile" ? string("exile") : ownedZone(mine, from));
+    if (to == "exile")
+        return ownerTag(mine) + cardName + " was exiled from "
+               + (from == "exile" ? string("exile") : ownedZone(mine, from));
+    if (to == "graveyard")
+        return ownerTag(mine) + cardName + " was put into " + ownedZone(mine, "graveyard")
+               + " from " + ownedZone(mine, from);
+    //Anything the map above does not name still reads as a past-tense sentence:
+    //a zone ARROW never reaches this surface again.
+    return ownerTag(mine) + cardName + " moved from " + ownedZone(mine, from)
+           + " to " + ownedZone(mine, to);
+}
+
+//Token creation attributes its CREATOR (owner addendum (7)): "March from the
+//Black Gate created a 0/0 Orc Army token", never a bare "created -> battlefield".
+string tokenCreatedNarration(bool mine, const string& tokenName, const string& creator,
+                             bool isCreature, int power, int toughness, const string& to)
+{
+    std::ostringstream o;
+    if (!creator.empty())
+        o << ownerTag(mine) << creator << " created a ";
+    else
+        o << (mine ? "You created a " : "Opponent created a ");
+    if (isCreature)
+        o << power << "/" << toughness << " ";
+    o << tokenName << " token";
+    if (!to.empty() && to != "battlefield")
+        o << " in " << ownedZone(mine, to);
+    return o.str();
+}
+
+//A counter event, subject first. `appliedTag` is counterAppliedTag's settled
+//"(now X/Y)" (N-105f). `sourceName` is the counter's SOURCE - the owner's
+//addendum (5) makes naming it a requirement on EVERY path, so the engine-side
+//sweep passes a source wherever one exists and this prints it whenever it does.
+string counterEventNarration(bool mine, const string& cardName, const string& handle,
+                             bool added, const string& counterName,
+                             int power, int toughness, const string& appliedTag,
+                             const string& sourceName)
+{
+    std::ostringstream o;
+    o << ownerTag(mine) << cardName << handle << (added ? " got " : " lost ");
+    string label;
+    if (!counterName.empty() && counterName != " ")
+        label = counterName;
+    else if (power || toughness)
+    {
+        std::ostringstream p;
+        p << (power >= 0 ? "+" : "") << power << "/" << (toughness >= 0 ? "+" : "") << toughness;
+        label = p.str();
+    }
+    if (label.empty())
+        o << "a counter";
+    else
+        o << "a " << label << " counter";
+    if (!sourceName.empty())
+        o << (added ? " from " : " removed by ") << sourceName;
+    o << appliedTag;
+    return o.str();
+}
+
+//A life change. `settled` is the total THIS change settled at (captured at fire
+//time): a batch of life changes is dispatched only after the whole batch has
+//landed, so the LIVE total is the post-batch one on every partial line
+//(wave-34 b6 F5). Same mechanism as N-105f for counters.
+string lifeChangeNarration(bool mine, int amount, int settled)
+{
+    std::ostringstream o;
+    o << (mine ? "You " : "Opponent ") << (amount >= 0 ? "gained " : "lost ")
+      << (amount >= 0 ? amount : -amount) << " life (now " << settled << ")";
+    return o.str();
+}
+
+//Damage, subject first: "<source> dealt N damage to you".
+string damageNarration(const string& sourceName, int amount, const string& targetName)
+{
+    std::ostringstream o;
+    if (sourceName.empty())
+        o << amount << " damage was dealt to " << targetName;
+    else
+        o << sourceName << " dealt " << amount << " damage to " << targetName;
+    return o.str();
+}
+
+//The mulligan Q->A echo becomes its OUTCOME (owner addendum (6)).
+string mulliganNarration(bool kept, int handSize)
+{
+    std::ostringstream o;
+    if (kept)
+        o << "You kept your opening hand (" << handSize << " cards)";
+    else
+        o << "You mulliganed to " << handSize;
+    return o.str();
+}
+
+//A target pick: "You targeted <X> with <source>'s <ability>" (owner class (3)).
+string targetChoiceNarration(const string& target, const string& source,
+                             const string& ability)
+{
+    string src = source.empty() ? string("a spell on the stack") : source;
+    if (!ability.empty() && ability != source)
+        return "You targeted " + target + " with " + src + "'s " + ability + " ability";
+    return "You targeted " + target + " with " + src;
+}
+
+//OWNER DOCTRINE (2026-08-19), the log's ZONE DUTY: graveyard and exile are
+//never rendered in CURRENT SITUATION - "the historical log is the optimal
+//method to present graveyard and exile state". So the 24k trim, which drops the
+//OLDEST events, is exactly what deletes a player's early graveyard: the trim
+//marker carries a compact digest of both graveyards and both exiles as they
+//stand at the moment of the trim, so nothing that fell off the log is lost as
+//zone state. Pure, so the shape is provable in PARSETEST.
+string trimMarkerLine(const string& myGrave, const string& oppGrave,
+                      const string& myExile, const string& oppExile)
+{
+    std::ostringstream o;
+    o << "(...earlier events trimmed";
+    if (!myGrave.empty() || !oppGrave.empty())
+    {
+        o << " - graveyards at trim: you - " << (myGrave.empty() ? "empty" : myGrave)
+          << "; opponent - " << (oppGrave.empty() ? "empty" : oppGrave);
+    }
+    if (!myExile.empty() || !oppExile.empty())
+    {
+        o << "; exiled at trim: you - " << (myExile.empty() ? "none" : myExile)
+          << "; opponent - " << (oppExile.empty() ? "none" : oppExile);
+    }
+    o << ")";
+    return o.str();
+}
+
+//A taken priority action ("Cast X", "Attack with X", "Put in Play with X").
+//The option labels are IMPERATIVES - the log is past tense, so the head verb is
+//conjugated. A CAST returns "": the cast is already recorded by its own zone
+//event ("You cast X"), and the resolution by the next one ("X resolved"), which
+//is exactly the fold the owner asked for ("you cast _ targeting _" / "_
+//resolved"). Everything else keeps its full label, verb conjugated where the
+//head is one the seam actually emits.
+string actionTakenNarration(const string& action)
+{
+    static const char * kVerbs[][2] = {
+        { "Attack", "You attacked" },      { "Block", "You blocked" },
+        { "Activate", "You activated" },   { "Play", "You played" },
+        { "Tap", "You tapped" },           { "Untap", "You untapped" },
+        { "Put", "You put" },              { "Sacrifice", "You sacrificed" },
+        { "Discard", "You discarded" },    { "Draw", "You drew" },
+        { "Equip", "You equipped" },       { "Return", "You returned" },
+        { "Search", "You searched" },      { "Cycle", "You cycled" },
+        { "Transform", "You transformed" },{ "Move", "You moved" },
+        { "Choose", "You chose" },         { "Exile", "You exiled" },
+        { "Destroy", "You destroyed" },    { "Regenerate", "You regenerated" },
+    };
+    if (action.empty())
+        return "";
+    if (regLower(action).find("cast ") == 0)
+        return "";
+    for (size_t i = 0; i < sizeof(kVerbs) / sizeof(kVerbs[0]); i++)
+    {
+        string head = kVerbs[i][0];
+        if (action.size() >= head.size() && regLower(action).compare(0, head.size(), regLower(head)) == 0
+            && (action.size() == head.size() || action[head.size()] == ' '))
+            return string(kVerbs[i][1]) + action.substr(head.size());
+    }
+    //An unrecognised label still reads as something the player DID, and the
+    //label itself is preserved verbatim (it is the only record of the action).
+    return "You used: " + action;
+}
+
+//A consumed MENU ask: record the CONSEQUENCE naming the subject, never the
+//question header or the decorated option (owner class (2)). `option` arrives
+//already stripped of decision-time decoration (stripNarrationDecoration), so
+//the bracketed guidance annotations never reach history. The shockland
+//pay-or-tap menu is the owner's own worked example.
+string menuConsequenceNarration(const string& subject, const string& option)
+{
+    string lower = regLower(option);
+    string subj = subject.empty() ? string("It") : subject;
+    if (lower.find("pay ") == 0 && lower.find("life") != string::npos)
+        return subj + " entered untapped (you paid " + option.substr(4) + ")";
+    if (lower == "tap")
+        return subj + " entered tapped (you declined to pay life)";
+    if (subject.empty())
+        return "You chose " + option;
+    return "You chose " + option + " for " + subject;
+}
+
 //Dungeon rooms: a dungeon card's text= lists every room as
 //"<Room Name> - <effect>. -- <Room Name> - <effect>. -- ...". The engine
 //surfaces room CHOICES - the first-venture dungeon SELECTION and the in-dungeon
@@ -1687,7 +1982,7 @@ string dungeonRoomBranchHeader(const string& dungeonName, int exploreCount,
 string ventureStepLine(bool mine, const string& dungeonName, int step)
 {
     std::ostringstream o;
-    o << (mine ? "You venture into " : "Opponent ventures into ") << dungeonName;
+    o << (mine ? "You ventured into " : "Opponent ventured into ") << dungeonName;
     if (step > 0)
         o << ": venture step " << step << " of that run";
     return o.str();
@@ -1752,7 +2047,7 @@ static string poisonGainLine(bool mine, int delta, int total)
     std::ostringstream o;
     o << "Poison: " << (mine ? "you" : "the opponent");
     if (delta > 0)
-        o << (mine ? " take " : " takes ") << delta << " poison counter"
+        o << (mine ? " took " : " took ") << delta << " poison counter"
           << (delta == 1 ? "" : "s") << " - now ";
     else
         o << (mine ? " now have " : " now has ");
@@ -2682,7 +2977,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false), mReasoningBudget(0),
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
@@ -3360,26 +3655,80 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
     return u.str();
 }
 
+//The zone-duty digest's card list: names in zone order, same-named cards
+//collapsed to "Name xN" so a mill-heavy graveyard stays compact. Empty for an
+//empty (or absent) zone - the caller renders "empty"/"none" itself.
+string AIPlayerGPT::zoneNameDigest(MTGGameZone * z)
+{
+    if (!z || !z->nb_cards)
+        return "";
+    vector<string> names;
+    vector<int> counts;
+    for (int i = 0; i < z->nb_cards; i++)
+    {
+        string n = z->cards[i]->getDisplayName();
+        if (n.empty())
+            n = z->cards[i]->name;
+        if (n.empty())
+            continue;
+        bool seen = false;
+        for (size_t k = 0; k < names.size(); k++)
+            if (names[k] == n) { counts[k]++; seen = true; break; }
+        if (!seen) { names.push_back(n); counts.push_back(1); }
+    }
+    std::ostringstream o;
+    for (size_t k = 0; k < names.size(); k++)
+    {
+        o << (k ? ", " : "") << names[k];
+        if (counts[k] > 1)
+            o << " x" << counts[k];
+    }
+    return o.str();
+}
+
+//The log's assembly rule, extracted PURE so a whole composed log can be pinned
+//in PARSETEST through the same code the game runs: the pending phase marker
+//joins the log ahead of the first real line in that phase, the line is written
+//as a bullet, and a narration past 24k is trimmed on a line boundary behind a
+//trim marker (whose zone digest the caller supplies - see trimMarkerLine).
+void narrationAppend(string& narration, string& pendingPhase, const string& line,
+                     const string& trimMarker)
+{
+    if (line.empty())
+        return;
+    if (!pendingPhase.empty())
+    {
+        narration += "- " + pendingPhase + "\n";
+        pendingPhase.clear();
+    }
+    narration += "- " + line + "\n";
+    //Bound a runaway narrative (very long games, degenerate combos); keep
+    //the tail, cut on a line boundary. The narration is otherwise
+    //append-only, which is what keeps the prompt prefix cacheable.
+    if (narration.size() > 24000)
+    {
+        size_t nl = narration.find('\n', narration.size() - 20000);
+        if (nl != string::npos)
+            narration = trimMarker + "\n" + narration.substr(nl + 1);
+    }
+}
+
 void AIPlayerGPT::appendNarration(const string& line)
 {
     if (line.empty())
         return;
     flushOpeningHand(); //the deal precedes whatever is being narrated
-    if (!mPendingPhase.empty())
-    {
-        mNarration += "- " + mPendingPhase + "\n";
-        mPendingPhase.clear();
-    }
-    mNarration += "- " + line + "\n";
-    //Bound a runaway narrative (very long games, degenerate combos); keep
-    //the tail, cut on a line boundary. The narration is otherwise
-    //append-only, which is what keeps the prompt prefix cacheable.
-    if (mNarration.size() > 24000)
-    {
-        size_t nl = mNarration.find('\n', mNarration.size() - 20000);
-        if (nl != string::npos)
-            mNarration = "(...earlier events trimmed...)\n" + mNarration.substr(nl + 1);
-    }
+    //Zone duty (owner doctrine): the trim drops the OLDEST events, which is
+    //exactly where a player's early graveyard lives - so the marker carries
+    //both graveyards and both exiles as they stand at the moment of the trim.
+    //(built only when a trim is actually near - it walks four zones)
+    string marker;
+    if (mNarration.size() + line.size() > 24000)
+        marker = trimMarkerLine(zoneNameDigest(game ? game->graveyard : NULL),
+                                zoneNameDigest(opponent() ? opponent()->game->graveyard : NULL),
+                                zoneNameDigest(game ? game->removedFromGame : NULL),
+                                zoneNameDigest(opponent() ? opponent()->game->removedFromGame : NULL));
+    narrationAppend(mNarration, mPendingPhase, line, marker);
 }
 
 void AIPlayerGPT::narrateDecision(const string& line)
@@ -3678,12 +4027,22 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //narration (Krenko's Command resolved and Goblins just appeared).
         if (!e->from)
         {
-            out << (e->to->owner == this ? "Your " : "Opponent's ")
-                << e->card->getDisplayName();
-            if (e->card->isCreature())
-                out << " (" << e->card->power << "/" << e->card->toughness << ")";
-            out << ": created -> " << zoneDesc(e->to);
-            return out.str();
+            //W35 addendum (7): attribute the creator. A token instance carries
+            //the card that made it (Token::tokenSource), so "created ->
+            //battlefield" becomes "Your March from the Black Gate created a 0/0
+            //Orc Army token" - the trigger and its product read as one event.
+            string creator;
+            Token * tok = dynamic_cast<Token *>(e->card);
+            if (tok && tok->getTokenSource())
+            {
+                creator = tok->getTokenSource()->getDisplayName();
+                if (creator.empty())
+                    creator = tok->getTokenSource()->name;
+            }
+            return tokenCreatedNarration(e->to->owner == this, e->card->getDisplayName(),
+                                         creator, e->card->isCreature() != 0,
+                                         e->card->power, e->card->toughness,
+                                         zoneDesc(e->to));
         }
         Player * owner = e->to->owner;
         bool mine = (owner == this);
@@ -3702,8 +4061,8 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //Reveals are public information, whoever's card it is.
         if (isRevealZone(e->to))
         {
-            out << (mine ? "Your " : "Opponent's ") << cardName
-                << " is revealed (from " << zoneDesc(e->from) << ")";
+            out << (mine ? "You revealed your " : "Opponent revealed their ") << cardName
+                << " from " << (mine ? "your " : "their ") << zoneDesc(e->from);
             return out.str();
         }
         if (isRevealZone(e->from))
@@ -3714,19 +4073,22 @@ string AIPlayerGPT::describeEvent(WEvent * event)
                 //the ones a human player would remember.
                 if (toName == "hand")
                     mKnownOppHand[cardName]++;
-                out << "Opponent puts the revealed " << cardName << " into their " << toName;
+                out << "Opponent put the revealed " << cardName << " into their " << toName;
                 return out.str();
             }
             out << (mine ? "Your revealed " : "Opponent's revealed ") << cardName
-                << " goes to " << toName;
+                << " went to " << (mine ? "your " : "their ") << toName;
             return out.str();
         }
 
         //Hidden information: never name cards entering the opponent's
-        //(the human's) hand or library unrevealed.
+        //(the human's) hand or library unrevealed. A draw is still a draw -
+        //count-only, per the owner's ruling ("Opponent drew a card").
         if (!mine && (toName == "hand" || toName == "library"))
         {
-            out << "Opponent puts a card into their " << toName;
+            if (toName == "hand" && e->from->owner && e->from == e->from->owner->game->library)
+                return "Opponent drew a card";
+            out << "Opponent put a card into their " << toName;
             return out.str();
         }
         //Persist / undying return: the just-dead creature re-enters as a fresh
@@ -3747,19 +4109,53 @@ string AIPlayerGPT::describeEvent(WEvent * event)
             if (e->card->basicAbilities[Constants::PERSIST])
             {
                 out << (mine ? "Your " : "Opponent's ") << cardName
-                    << " returns to the battlefield with a -1/-1 counter (persist)";
+                    << " returned to the battlefield with a -1/-1 counter (persist)";
                 return out.str();
             }
             if (e->card->basicAbilities[Constants::UNDYING])
             {
                 out << (mine ? "Your " : "Opponent's ") << cardName
-                    << " returns to the battlefield with a +1/+1 counter (undying)";
+                    << " returned to the battlefield with a +1/+1 counter (undying)";
                 return out.str();
             }
         }
-        out << (mine ? "Your " : "Opponent's ") << cardName
-            << ": " << zoneDesc(e->from) << " -> " << toName;
-        return out.str();
+        //W35: the register. A pending counter marker (WEventSpellCountered,
+        //raised by ActionStack::Fizzle immediately before it moves the card)
+        //turns this stack departure into "was countered" instead of "resolved";
+        //it is consumed here so it can never colour a later, unrelated move.
+        //Only a departure FROM THE STACK can be a counter: if the marked card
+        //moves again later (a graveyard recursion of the same instance), a
+        //stale marker must never relabel it.
+        bool countered = (mCounteredSpell == e->card && zoneDesc(e->from) == "stack");
+        string counterSource;
+        if (countered)
+        {
+            counterSource = mCounteredBy;
+            mCounteredSpell = NULL;
+            mCounteredBy.clear();
+        }
+        return zoneChangeNarration(mine, cardName, zoneDesc(e->from), toName,
+                                   e->card->isCreature() != 0,
+                                   e->card->hasType(Subtypes::TYPE_LAND) != 0,
+                                   countered, counterSource);
+    }
+
+    //W35 addendum (4): the countering itself. The marker is stashed and the
+    //NEXT zone event for that card (the countering move, FIFO-queued behind
+    //this one) renders the whole outcome as one line, destination included.
+    if (WEventSpellCountered * e = dynamic_cast<WEventSpellCountered *>(event))
+    {
+        if (!e->card)
+            return "";
+        mCounteredSpell = e->card;
+        mCounteredBy.clear();
+        if (e->counteredBy)
+        {
+            mCounteredBy = e->counteredBy->getDisplayName();
+            if (mCounteredBy.empty())
+                mCounteredBy = e->counteredBy->name;
+        }
+        return ""; //the zone line carries it
     }
 
     if (WEventDamage * e = dynamic_cast<WEventDamage *>(event))
@@ -3777,9 +4173,9 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //life line - an absent line is not a rendered fact.
         if (dp && sourceDealsPoisonInsteadOfDamage(dsrc))
         {
-            out << "Infect damage: " << e->damage->damage;
             if (dsrc)
-                out << " from " << dsrc->getDisplayName();
+                out << dsrc->getDisplayName() << " dealt ";
+            out << e->damage->damage << " infect damage";
             out << " to " << (dp == this ? "you" : "the opponent")
                 << " - dealt as POISON COUNTERS, not life loss: no life was lost"
                    " (see the Poison line)";
@@ -3787,20 +4183,17 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         }
         if (dc && dsrc && (dsrc->has(Constants::WITHER) || dsrc->has(Constants::INFECT)))
         {
-            out << (dsrc->has(Constants::WITHER) ? "Wither damage: " : "Infect damage: ")
-                << e->damage->damage << " from " << dsrc->getDisplayName()
+            out << dsrc->getDisplayName() << " dealt " << e->damage->damage
+                << (dsrc->has(Constants::WITHER) ? " wither damage" : " infect damage")
                 << " to " << dc->getDisplayName() << " - dealt as " << e->damage->damage
                 << " -1/-1 counter" << (e->damage->damage == 1 ? "" : "s")
                 << ", a permanent shrink that does NOT wear off at end of turn";
             return out.str();
         }
-        out << "Damage: " << e->damage->damage << " dealt";
-        if (dsrc)
-            out << " by " << dsrc->getDisplayName();
-        if (dp)
-            out << " to " << (dp == this ? "you" : "the opponent");
-        else if (dc)
-            out << " to " << dc->getDisplayName();
+        string dtarget = dp ? string(dp == this ? "you" : "the opponent")
+                            : (dc ? dc->getDisplayName() : string("nothing"));
+        out << damageNarration(dsrc ? dsrc->getDisplayName() : string(),
+                               e->damage->damage, dtarget);
         if (dp && dsrc && dsrc->getToxicity() > 0)
             out << " - and toxic " << dsrc->getToxicity() << ": it ALSO puts "
                 << dsrc->getToxicity() << " poison counter"
@@ -3828,9 +4221,10 @@ string AIPlayerGPT::describeEvent(WEvent * event)
     {
         if (!e->player)
             return "";
-        out << (e->player == this ? "Your" : "Opponent's") << " life "
-            << (e->amount >= 0 ? "+" : "") << e->amount << " (now " << e->player->life << ")";
-        return out.str();
+        //The total THIS change settled at, not the post-batch one: a batch of
+        //life changes narrates after the whole batch has landed, so every
+        //partial line printed the same final total (wave-34 b6 F5).
+        return lifeChangeNarration(e->player == this, e->amount, e->settledLife);
     }
 
     //(phase changes are handled in receiveEvent: lazy marker + turn header)
@@ -3863,33 +4257,34 @@ string AIPlayerGPT::describeEvent(WEvent * event)
                                    e->targetCard->getDisplayName(),
                                    e->stateCaptured ? e->settledNb : 0);
         }
-        out << (e->added ? "Counter added to " : "Counter removed from ")
-            << e->targetCard->getDisplayName() << instanceHandle(e->targetCard);
-        if (!e->name.empty() && e->name != " ")
-            out << ": " << e->name;
-        else if (e->power || e->toughness)
-            out << ": " << (e->power >= 0 ? "+" : "") << e->power << "/"
-                << (e->toughness >= 0 ? "+" : "") << e->toughness;
-        //N-105f: the state THIS counter settled at, not the post-batch pair.
-        out << counterAppliedTag(e->targetCard->isCreature(), e->stateCaptured,
-                                 e->settledPower, e->settledToughness,
-                                 e->targetCard->power, e->targetCard->toughness);
         //N-158l: the source attribution rendered an EMPTY "[from ]" in 38 distinct
         //prompts - always right after "- Your Mordor Muster: stack -> graveyard".
         //A sorcery that has already finished resolving is in the graveyard by the
         //time its counter event lands, and getDisplayName() comes back empty for
-        //it. An empty bracket is a rendered non-fact on this surface's own new
-        //annotation: emit the bracket only when a name actually resolves, and
+        //it. An empty name is a rendered non-fact on this surface's own new
+        //annotation: name the source only when a name actually resolves, and
         //fall back to the instance's raw name field before giving up.
+        //W35 addendum (5): the OTHER half of that class was paths that carried
+        //no source AT ALL (the bare Counters::addCounter(p,t) overload). Those
+        //call sites now pass their source (engine sweep), so this renders it.
+        string sn;
         if (e->source && e->source != e->targetCard)
         {
-            string sn = e->source->getDisplayName();
+            sn = e->source->getDisplayName();
             if (sn.empty())
                 sn = e->source->name;
-            if (!sn.empty())
-                out << " [from " << sn << "]";
         }
-        return out.str();
+        Player * ctrl = e->targetCard->controller();
+        //N-105f: the state THIS counter settled at, not the post-batch pair.
+        return counterEventNarration(ctrl == this, e->targetCard->getDisplayName(),
+                                     instanceHandle(e->targetCard), e->added,
+                                     e->name, e->power, e->toughness,
+                                     counterAppliedTag(e->targetCard->isCreature(),
+                                                       e->stateCaptured,
+                                                       e->settledPower, e->settledToughness,
+                                                       e->targetCard->power,
+                                                       e->targetCard->toughness),
+                                     sn);
     }
 
     return ""; //everything else (mana plumbing, taps, micro-steps) is noise
@@ -4260,7 +4655,15 @@ static string stripNarrationDecoration(const string& in)
         if (openCh == '{')
             drop = (in.compare(i, 12, "{card text: ") == 0) || (in.compare(i, 12, "{right now: ") == 0);
         else if (openCh == '[')
-            drop = (in.compare(i, 7, "[cost: ") == 0);
+            //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
+            //appends "[this permanent then enters the battlefield UNTAPPED -
+            //usable ... this turn]" and the may-object and DFC annotations
+            //append their own - all of them decision-time guidance the owner's
+            //ruling keeps OUT of history ("the bracketed guidance annotations
+            //are decision-time surfaces and NEVER enter history"). Nothing that
+            //identifies WHAT was chosen lives in a bracket: the name, the cost
+            //in braces, the P/T and the target are all outside one.
+            drop = true;
         if (!drop)
         {
             out += in[i++];
@@ -4284,6 +4687,11 @@ static string stripNarrationDecoration(const string& in)
         while (!out.empty() && out[out.size() - 1] == ' ' && i < in.size() && in[i] == ' ')
             i++;
     }
+    //W35: a " -> DISPLAY TOGGLE only ..." tail is the same species of
+    //decision-time guidance, written as a trailing clause instead of a bracket.
+    size_t tog = out.find(" -> DISPLAY TOGGLE");
+    if (tog != string::npos)
+        out.erase(tog);
     //A trailing space left by an annotation at the end of the line.
     size_t last = out.find_last_not_of(' ');
     if (last != string::npos)
@@ -5785,7 +6193,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
         {
-            narrateDecision("You: " + stripNarrationDecoration(describeAction(*shown[choice - 1])));
+            narrateDecision(actionTakenNarration(
+                stripNarrationDecoration(describeAction(*shown[choice - 1]))));
             //Consume-on-choose: a taken land fetch is done for the turn -
             //an identical line (a second copy of the same fetch, or the
             //same crack re-proposed at a different land) re-asking at the
@@ -5852,6 +6261,10 @@ int AIPlayerGPT::selectHintAbility()
 int AIPlayerGPT::askModel(const string& decision, const vector<string>& options, bool narrateChoice,
                           const string& pendingSourceName)
 {
+    //W35: consume the caller's per-option register lines FIRST, on every exit
+    //path, so a set of lines can never leak onto a later, unrelated ask.
+    vector<string> askNarration;
+    askNarration.swap(mNextAskNarration);
     //"Only one valid action": no decision to make, no model call.
     if (options.empty())
         return -1;
@@ -5919,10 +6332,20 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     if (content.empty())
         noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
-        //first line of the question only: multi-line asks (damage order)
-        //would bloat a narration that persists all game
-        narrateDecision(decision.substr(0, decision.find('\n')) + " -> "
-                        + stripNarrationDecoration(options[choice - 1]));
+    {
+        //W35 owner ruling class (2): the consumed ask records its CONSEQUENCE,
+        //never the question header plus the decorated option ("A choice is
+        //required - choose an option: -> pay 2 life [this permanent then
+        //enters ... UNTAPPED - usable ... this turn]"). A caller that knows the
+        //consequence supplies a register line per option; otherwise the generic
+        //form names the decision without the interrogative furniture. The
+        //bracketed decision-time guidance never enters history either way.
+        if ((size_t) choice <= askNarration.size() && !askNarration[choice - 1].empty())
+            narrateDecision(askNarration[choice - 1]);
+        else
+            narrateDecision(menuConsequenceNarration(pendingSourceName,
+                                stripNarrationDecoration(options[choice - 1])));
+    }
 
     mAskCache[askKey] = choice;
     {
@@ -6603,6 +7026,17 @@ int AIPlayerGPT::orderBlockers()
                     o << " [" << kw << "]";
                 opts.push_back(o.str());
             }
+            {
+                vector<string> narr;
+                for (size_t b = 0; b < opts.size(); b++)
+                {
+                    std::ostringstream n;
+                    n << "You assigned " << atk->card->getDisplayName() << "'s combat damage to "
+                      << stripNarrationDecoration(opts[b]) << " in position " << (ordered.size() + 1);
+                    narr.push_back(n.str());
+                }
+                setAskNarration(narr);
+            }
             int pick = askModel(q.str(), opts);
             if (pick == kChoicePending)
                 return 1; //stay in the ORDER step; re-poll next tick
@@ -6926,6 +7360,15 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //"Cast <spell> with X=N" against the bare "X = N" option, and INDEX-WINS
         //treats an echo that names the source spell as a self-reference rather
         //than a stale answer (wave-23 ITEM A shape 1, deck140 Black Sun's Zenith).
+        {
+            //Register: the announcement, not the menu question.
+            string xName = ctx ? ctx->getDisplayName() : string("the spell");
+            vector<string> narr;
+            for (size_t xi = 0; xi < shown.size(); xi++)
+                narr.push_back("You announced " + stripNarrationDecoration(shown[xi])
+                               + " for " + xName);
+            setAskNarration(narr);
+        }
         int pick = askModel(announceXHeader(ctx ? ctx->getDisplayName() : string("this spell"), capX),
                             shown, true, ctx ? ctx->getDisplayName() : string());
         if (pick == kChoicePending)
@@ -6942,6 +7385,14 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
 
     if (req.kind == DecisionRequest::CHOOSE_MODE)
     {
+        {
+            string mName = ctx ? ctx->getDisplayName() : string("the spell");
+            vector<string> narr;
+            for (size_t mi = 0; mi < req.optionTexts.size(); mi++)
+                narr.push_back("You chose " + mName + "'s mode \""
+                               + stripNarrationDecoration(req.optionTexts[mi]) + "\"");
+            setAskNarration(narr);
+        }
         int pick = askModel("Choose one mode for "
                             + (ctx ? ctx->getDisplayName() : string("this spell")) + ":", req.optionTexts,
                             true, ctx ? ctx->getDisplayName() : string());
@@ -7226,6 +7677,13 @@ MTGCardInstance * AIPlayerGPT::chooseCostTarget(TargetChooser * tc, MTGCardInsta
 
     string what = source ? source->getDisplayName()
                          : (tc->source ? tc->source->getDisplayName() : string("this spell"));
+    {
+        vector<string> narr;
+        for (size_t ci = 0; ci < opts.size(); ci++)
+            narr.push_back("You paid " + stripNarrationDecoration(opts[ci])
+                           + " as " + what + "'s additional cost");
+        setAskNarration(narr);
+    }
     int pick = askModel("Choose what to pay for " + what
                         + "'s additional cost (it will be consumed):", opts);
     if (pick == kChoicePending)
@@ -7607,6 +8065,18 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
           << effectName << "\")";
         }
 
+        //W35 owner ruling class (3): the target ask's own instructional text
+        //(and its rules-text tails) never enter the log - the RECORD is the
+        //pick: "You targeted <X> with <source>'s <ability>".
+        {
+            vector<string> narr;
+            for (size_t ti = 0; ti < opts.size(); ti++)
+                narr.push_back(mayStop && ti + 1 == opts.size()
+                               ? ("You chose no further target for " + effectName)
+                               : targetChoiceNarration(stripNarrationDecoration(opts[ti]),
+                                                       effectName, abilityName));
+            setAskNarration(narr);
+        }
         //Pass the pending source name so parseChoice can strip a "<spell>
         //targeting <target>" echo prefix down to the target name (stale-echo
         //family A). effectName is the exact spell/ability named in the prompt.
@@ -9556,6 +10026,15 @@ int AIPlayerGPT::pregameMulliganDecision(int mullsTaken)
     vector<string> opts;
     opts.push_back("Keep this hand");
     opts.push_back("Mulligan");
+    //W35 addendum (6): the mulligan was the last full question-and-answer echo
+    //in the log ("Pre-game mulligan decision (London mulligan). ... ? -> Keep
+    //this hand"). It records its OUTCOME: a keep states the hand it kept, a
+    //mulligan states the size it went to (this hand's size, minus the one more
+    //card it will bottom on the next keep).
+    vector<string> narr;
+    narr.push_back(mulliganNarration(true, keepSize));
+    narr.push_back(mulliganNarration(false, startingHandSize() - mullsTaken - 1));
+    setAskNarration(narr);
     int pick = askModel(q.str(), opts, true);
     if (pick == kChoicePending)
         return PREGAME_PENDING;
@@ -9576,6 +10055,10 @@ int AIPlayerGPT::pregameLeylineDecision(MTGCardInstance * card)
     vector<string> opts;
     opts.push_back("Yes, begin the game with " + card->name + " on the battlefield");
     opts.push_back("No, keep it in hand");
+    vector<string> narr;
+    narr.push_back("You began the game with " + card->name + " on the battlefield");
+    narr.push_back("You kept " + card->name + " in hand instead of starting it on the battlefield");
+    setAskNarration(narr);
     int pick = askModel(q.str(), opts, true);
     if (pick == kChoicePending)
         return PREGAME_PENDING;
@@ -11665,12 +12148,12 @@ void AIPlayerGPT::runParseSelfTest()
     {
         string g = poisonGainLine(true, 3, 6);
         cout << "     " << g << "\n";
-        CHECK(g.find("you take 3 poison counters - now 6 of 10") != string::npos,
+        CHECK(g.find("you took 3 poison counters - now 6 of 10") != string::npos,
               "W33-N105a a poison gain states delta AND settled total");
         CHECK(g.find("4 more end it") != string::npos,
               "W33-N105a the gain line carries the distance to the threshold");
         string one = poisonGainLine(false, 1, 1);
-        CHECK(one.find("the opponent takes 1 poison counter - now 1 of 10") != string::npos,
+        CHECK(one.find("the opponent took 1 poison counter - now 1 of 10") != string::npos,
               "W33-N105a singular/plural and the opponent's side both render");
         // A gain the seat cannot attribute a delta to still states the total.
         string nod = poisonGainLine(true, 0, 2);
@@ -11817,13 +12300,13 @@ void AIPlayerGPT::runParseSelfTest()
               "W34-N146n an unknown explore count asserts no step number");
         // The narration half: the venture itself, with its step.
         CHECK(ventureStepLine(true, "Tomb of Annihilation", 2)
-              == "You venture into Tomb of Annihilation: venture step 2 of that run",
+              == "You ventured into Tomb of Annihilation: venture step 2 of that run",
               "W34-N146n venturing narrates as a venture, with the step");
         CHECK(ventureStepLine(false, "Lost Mine of Phandelver", 1)
-              == "Opponent ventures into Lost Mine of Phandelver: venture step 1 of that run",
+              == "Opponent ventured into Lost Mine of Phandelver: venture step 1 of that run",
               "W34-N146n the opponent's venture is narrated from the same helper");
         CHECK(ventureStepLine(true, "Tomb of Annihilation", 0)
-              == "You venture into Tomb of Annihilation",
+              == "You ventured into Tomb of Annihilation",
               "W34-N146n an uncaptured step number is omitted, never guessed");
         // Echo shape: the option now carries a position tag AND a room effect;
         // a bare room-name echo must still bind, and the wrong room must not.
@@ -12697,6 +13180,211 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(pri.find("priority again later this turn") != string::npos
               && pri.find("SECOND MAIN") == string::npos,
               "W35-combat NEGATIVE the priority-again fact makes no main-phase claim of its own");
+    }
+
+    // ---- W35 OWNER RULING: the GAME LOG's narration register ----
+    cout << "\n[W35-register] the log is past-tense declarative game events\n";
+    {
+        // (1) raw zone mechanics are gone. A draw is a draw, a land drop is a
+        // play, a cast is a cast - and the opponent's hidden draw stays
+        // count-only ("Opponent drew a card"), never a card name.
+        CHECK(zoneChangeNarration(true, "Forest", "library", "hand", false, true, false, "")
+              == "You drew Forest", "W35 library->hand is 'You drew <X>'");
+        CHECK(zoneChangeNarration(false, "Forest", "library", "hand", false, true, false, "")
+              == "Opponent drew a card",
+              "W35 the opponent's draw is count-only - the card is NEVER named");
+        CHECK(zoneChangeNarration(true, "Stomping Ground", "hand", "battlefield", false, true, false, "")
+              == "You played Stomping Ground", "W35 a land drop is 'You played <X>'");
+        CHECK(zoneChangeNarration(true, "Arboreal Grazer", "hand", "stack", false, false, false, "")
+              == "You cast Arboreal Grazer",
+              "W35 hand->stack is 'You cast <X>' (the owner's own offending line)");
+        CHECK(zoneChangeNarration(true, "Snapcaster Mage", "graveyard", "stack", true, false, false, "")
+              == "You cast Snapcaster Mage from your graveyard",
+              "W35 a cast from another zone names the zone, still as a cast");
+        // (4) THE informational fix: stack->graveyard is the SAME move for a
+        // resolution and a counter. They no longer read alike.
+        CHECK(zoneChangeNarration(true, "Mordor Muster", "stack", "graveyard", false, false, false, "")
+              == "Your Mordor Muster resolved and went to your graveyard",
+              "W35 a resolved spell RESOLVED - and the log still records the graveyard");
+        CHECK(zoneChangeNarration(true, "Mordor Muster", "stack", "graveyard", false, false, true, "Counterspell")
+              == "Your Mordor Muster was countered by Counterspell and went to your graveyard",
+              "W35 a countered spell is DISTINGUISHED from a resolved one, source named");
+        CHECK(zoneChangeNarration(true, "Dread Return", "stack", "exile", false, false, true, "")
+              == "Your Dread Return was countered and was exiled",
+              "W35 a countered flashback spell records its EXILE, not a graveyard");
+        CHECK(zoneChangeNarration(true, "Grizzly Bears", "stack", "battlefield", true, false, false, "")
+              == "Your Grizzly Bears resolved and entered the battlefield",
+              "W35 a resolving permanent resolves AND enters");
+        // Zone duty: deaths, discards, exiles are load-bearing zone records.
+        CHECK(zoneChangeNarration(false, "Grizzly Bears", "battlefield", "graveyard", true, false, false, "")
+              == "Opponent's Grizzly Bears died",
+              "W35 a creature leaving the battlefield DIED (the owner's own example)");
+        CHECK(zoneChangeNarration(true, "Sol Ring", "battlefield", "graveyard", false, false, false, "")
+              == "Your Sol Ring was put into your graveyard",
+              "W35 a non-creature is put into the graveyard, not 'died'");
+        CHECK(zoneChangeNarration(true, "Thoughtseize", "hand", "graveyard", false, false, false, "")
+              == "You discarded Thoughtseize", "W35 hand->graveyard is a DISCARD");
+        CHECK(zoneChangeNarration(false, "Snapcaster Mage", "graveyard", "exile", true, false, false, "")
+              == "Opponent's Snapcaster Mage was exiled from the opponent's graveyard",
+              "W35 an exile from a graveyard names both zones, declaratively");
+        CHECK(zoneChangeNarration(true, "Uro", "battlefield", "hand", true, false, false, "")
+              == "Your Uro was returned to your hand", "W35 a bounce is a return, not an arrow");
+        // NEGATIVE, the acceptance criterion: no zone ARROW survives, not even
+        // on a pair the map above does not name.
+        CHECK(zoneChangeNarration(true, "Oddity", "sideboard", "command", false, false, false, "")
+                  .find(" -> ") == string::npos,
+              "W35 NEGATIVE an unmapped zone pair still carries NO ' -> ' arrow");
+        // (7) token creation attributes its creator.
+        CHECK(tokenCreatedNarration(true, "Orc Army", "March from the Black Gate", true, 0, 0, "battlefield")
+              == "Your March from the Black Gate created a 0/0 Orc Army token",
+              "W35 a token names its CREATOR and its P/T (the owner's own example)");
+        CHECK(tokenCreatedNarration(true, "Treasure", "", false, 0, 0, "battlefield")
+              == "You created a Treasure token",
+              "W35 NEGATIVE an unattributable token still reads as an event, not a zone arrow");
+        // (5) counter lines name their source on every path.
+        CHECK(counterEventNarration(true, "Orc Army", "", true, "", 1, 1, " (now 2/2)",
+                                    "March from the Black Gate")
+              == "Your Orc Army got a +1/+1 counter from March from the Black Gate (now 2/2)",
+              "W35 a counter names its source and the state it settled at");
+        CHECK(counterEventNarration(true, "Tomb of Annihilation", "", true, "Explore", 0, 0, "", "")
+              == "Your Tomb of Annihilation got a Explore counter",
+              "W35 NEGATIVE a sourceless counter renders no empty attribution");
+        CHECK(counterEventNarration(false, "Slippery Bogle", "", false, "", -1, -1, " (now 1/1)", "")
+              == "Opponent's Slippery Bogle lost a -1/-1 counter (now 1/1)",
+              "W35 a REMOVED counter reads as a loss");
+        // Per-partial life totals (wave-34 b6 F5): each line prints the total
+        // ITS OWN change settled at, so a batch is a strictly readable run.
+        CHECK(lifeChangeNarration(true, -2, 18) == "You lost 2 life (now 18)",
+              "W35 a life loss states the total that change settled at");
+        CHECK(lifeChangeNarration(false, 3, 23) == "Opponent gained 3 life (now 23)",
+              "W35 a life gain reads as a gain");
+        CHECK(damageNarration("Lightning Bolt", 3, "you") == "Lightning Bolt dealt 3 damage to you",
+              "W35 damage is subject-first and past tense");
+        // (6) the mulligan Q->A echo becomes its outcome.
+        CHECK(mulliganNarration(true, 7) == "You kept your opening hand (7 cards)",
+              "W35 the mulligan echo becomes 'You kept your opening hand'");
+        CHECK(mulliganNarration(false, 6) == "You mulliganed to 6",
+              "W35 a taken mulligan states the size it went to");
+        // (3) target-question echoes become the pick.
+        CHECK(targetChoiceNarration("Grizzly Bears", "Lightning Bolt", "")
+              == "You targeted Grizzly Bears with Lightning Bolt",
+              "W35 a target pick is 'You targeted <X> with <source>'");
+        CHECK(targetChoiceNarration("Llanowar Elves", "Skullclamp", "Equip")
+              == "You targeted Llanowar Elves with Skullclamp's Equip ability",
+              "W35 a named ability rides the target line");
+        // (2) consumed-ask echoes become the consequence, naming the subject.
+        CHECK(menuConsequenceNarration("Stomping Ground", "pay 2 life")
+              == "Stomping Ground entered untapped (you paid 2 life)",
+              "W35 the shockland menu records its CONSEQUENCE (the owner's example)");
+        CHECK(menuConsequenceNarration("Stomping Ground", "tap")
+              == "Stomping Ground entered tapped (you declined to pay life)",
+              "W35 the declined branch records the tapped entry");
+        CHECK(menuConsequenceNarration("Sensei's Divining Top", "Draw a card")
+              == "You chose Draw a card for Sensei's Divining Top",
+              "W35 a generic menu still names its subject and drops the question");
+        // The priority-action echo: imperatives become past tense, and a CAST
+        // yields to its own zone events (the owner's cast/resolve fold).
+        CHECK(actionTakenNarration("Cast Gray Merchant of Asphodel {3}{b}{b} (2/4)").empty(),
+              "W35 a cast is narrated by its zone events, not twice");
+        CHECK(actionTakenNarration("Attack with Yawgmoth, Thran Physician (2/3)")
+              == "You attacked with Yawgmoth, Thran Physician (2/3)",
+              "W35 an imperative option label is conjugated into the past");
+        CHECK(actionTakenNarration("Put in Play with Windswept Heath")
+              == "You put in Play with Windswept Heath",
+              "W35 the fetch action keeps its full label, past tense");
+        CHECK(actionTakenNarration("Nibble the moon").find("Nibble the moon") != string::npos,
+              "W35 NEGATIVE an unrecognised label is preserved verbatim, never dropped");
+        // The owner's own offending line, end to end: the decorated shockland
+        // option becomes a consequence naming its subject, with not one
+        // character of decision-time guidance carried into history.
+        {
+            string offer = "pay 2 life [this permanent then enters the battlefield UNTAPPED"
+                           " - usable (tap for mana / attack) this turn]";
+            CHECK(menuConsequenceNarration("Stomping Ground", stripNarrationDecoration(offer))
+                  == "Stomping Ground entered untapped (you paid 2 life)",
+                  "W35 the FULL decorated shockland offer narrates as the owner wrote it");
+            string toggle = "Toggle display of Delver of Secrets -> DISPLAY TOGGLE only"
+                            " (this is a TRANSFORMING double-faced card): it does not flip";
+            CHECK(stripNarrationDecoration(toggle) == "Toggle display of Delver of Secrets",
+                  "W35 a ' -> DISPLAY TOGGLE only ...' guidance tail never enters history");
+            CHECK(stripNarrationDecoration("Block A1 [flying, deathtouch]") == "Block A1",
+                  "W35 every bracket is guidance, not identity - all of them go");
+        }
+        // Zone duty at the trim: what fell off the log survives as zone state.
+        CHECK(trimMarkerLine("Mordor Muster, Bolt x2", "Grizzly Bears", "", "")
+              == "(...earlier events trimmed - graveyards at trim: you - Mordor Muster,"
+                 " Bolt x2; opponent - Grizzly Bears)",
+              "W35 the trim marker carries a compact graveyard digest");
+        CHECK(trimMarkerLine("", "", "Dread Return", "")
+                  .find("exiled at trim: you - Dread Return; opponent - none") != string::npos,
+              "W35 the trim digest covers exile too - the other unrendered zone");
+    }
+
+    // ---- W35 COMPOSED-LOG GOLDEN: a whole rendered log, through the real
+    // emitters and the real assembler, pinned against the owner's register.
+    cout << "\n[W35-composed] a representative log, assembled by the real emitter path\n";
+    {
+        string log = "=== Turn 1 - YOUR turn ===\n";
+        string phase = "Phase: First Main";
+        const string kNoTrim = "(...earlier events trimmed...)"; //never reached here
+        #define NARRATE(x) narrationAppend(log, phase, (x), kNoTrim)
+        NARRATE(mulliganNarration(true, 7));
+        NARRATE(zoneChangeNarration(true, "Forest", "library", "hand", false, true, false, ""));
+        NARRATE(zoneChangeNarration(true, "Stomping Ground", "hand", "battlefield", false, true, false, ""));
+        NARRATE(menuConsequenceNarration("Stomping Ground", "pay 2 life"));
+        NARRATE(zoneChangeNarration(true, "Lightning Bolt", "hand", "stack", false, false, false, ""));
+        NARRATE(targetChoiceNarration("Grizzly Bears", "Lightning Bolt", ""));
+        NARRATE(zoneChangeNarration(true, "Lightning Bolt", "stack", "graveyard", false, false, false, ""));
+        NARRATE(damageNarration("Lightning Bolt", 3, "Grizzly Bears"));
+        NARRATE(zoneChangeNarration(false, "Grizzly Bears", "battlefield", "graveyard", true, false, false, ""));
+        NARRATE(zoneChangeNarration(true, "Mordor Muster", "hand", "stack", false, false, false, ""));
+        NARRATE(zoneChangeNarration(true, "Mordor Muster", "stack", "graveyard", false, false, true, "Counterspell"));
+        NARRATE(tokenCreatedNarration(true, "Orc Army", "March from the Black Gate", true, 0, 0, "battlefield"));
+        NARRATE(counterEventNarration(true, "Orc Army", "", true, "", 1, 1, " (now 1/1)",
+                                      "March from the Black Gate"));
+        NARRATE(lifeChangeNarration(true, -2, 18));
+        NARRATE(zoneChangeNarration(false, "Duress", "library", "hand", false, false, false, ""));
+        NARRATE(actionTakenNarration("Attack with Orc Army (1/1)"));
+        #undef NARRATE
+        cout << log;
+        string expected =
+            "=== Turn 1 - YOUR turn ===\n"
+            "- Phase: First Main\n"
+            "- You kept your opening hand (7 cards)\n"
+            "- You drew Forest\n"
+            "- You played Stomping Ground\n"
+            "- Stomping Ground entered untapped (you paid 2 life)\n"
+            "- You cast Lightning Bolt\n"
+            "- You targeted Grizzly Bears with Lightning Bolt\n"
+            "- Your Lightning Bolt resolved and went to your graveyard\n"
+            "- Lightning Bolt dealt 3 damage to Grizzly Bears\n"
+            "- Opponent's Grizzly Bears died\n"
+            "- You cast Mordor Muster\n"
+            "- Your Mordor Muster was countered by Counterspell and went to your graveyard\n"
+            "- Your March from the Black Gate created a 0/0 Orc Army token\n"
+            "- Your Orc Army got a +1/+1 counter from March from the Black Gate (now 1/1)\n"
+            "- You lost 2 life (now 18)\n"
+            "- Opponent drew a card\n"
+            "- You attacked with Orc Army (1/1)\n";
+        CHECK(log == expected, "W35-composed the whole rendered log matches the register");
+        // The owner's own acceptance criteria, on the composed artifact.
+        CHECK(log.find("A choice is required") == string::npos,
+              "W35-composed ACCEPTANCE zero 'A choice is required' in the log");
+        CHECK(log.find("TARGET CHOICE") == string::npos,
+              "W35-composed ACCEPTANCE zero 'TARGET CHOICE' in the log");
+        CHECK(log.find(" -> ") == string::npos,
+              "W35-composed ACCEPTANCE zero ' -> ' zone arrows in the log");
+        // And the trim's zone duty on a log long enough to trim: the marker
+        // replaces the head, the tail survives, the digest rides the marker.
+        string big, ph;
+        for (int i = 0; i < 900; i++)
+            narrationAppend(big, ph, "You drew a card, and then some more text to pad the line out",
+                            trimMarkerLine("Mordor Muster", "Grizzly Bears", "", ""));
+        CHECK(big.size() <= 24000 && big.find("(...earlier events trimmed") == 0,
+              "W35-composed the trim fires and leads with its marker");
+        CHECK(big.find("graveyards at trim: you - Mordor Muster; opponent - Grizzly Bears")
+              != string::npos,
+              "W35-composed the trimmed log still carries both graveyards (zone duty)");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

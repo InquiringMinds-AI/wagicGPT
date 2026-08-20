@@ -2993,7 +2993,10 @@ int AATrain::resolve()
             _target = _target->next;
 
         if(_target->counters)
-            _target->counters->addCounter(1,1);
+            //W35 addendum (5): name the counter's SOURCE on every path - the
+            //bare addCounter(p,t) overload passed none, so a whole class of
+            //counter lines reached the game log unattributed.
+            _target->counters->addCounter("", 1, 1, false, false, source);
 
         WEvent * e = NEW WEventCardTrained(_target);
         game->receiveEvent(e);
@@ -6107,7 +6110,8 @@ int AADynamic::resolve()
                 if(!dynamic_cast<MTGCardInstance *>(_target))
                     _target = OriginalSrc;
                 for(int j = 0;j < sourceamount;j++)
-                    ((MTGCardInstance*)_target)->counters->addCounter(1,1);
+                    //W35 addendum (5): attribute the counter to its source.
+                    ((MTGCardInstance*)_target)->counters->addCounter("", 1, 1, false, false, source);
                 break;
             }
         default:

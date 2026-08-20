@@ -11,6 +11,10 @@ public:
     Token(int id);
     Token(const Token& source);
     virtual MTGCardInstance* clone();
+    //W35 narration: the card that CREATED this token, so the game log can
+    //attribute it ("March from the Black Gate created a 0/0 Orc Army token")
+    //instead of narrating a token that simply appeared.
+    MTGCardInstance * getTokenSource() const { return tokenSource; }
 };
 
 #endif

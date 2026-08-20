@@ -1546,6 +1546,14 @@ void ActionStack::Fizzle(Interruptible * action, MTGCardInstance * fizzler, Fizz
         Spell * spell = (Spell *) action;
         MTGCardInstance * _target = NULL;
         unsigned int position = 0;
+        //W35-narration: announce the COUNTER before the card moves. Every
+        //fizzle mode below leaves the stack with an ordinary zone change that is
+        //indistinguishable from a resolution ("stack -> graveyard" for both), so
+        //an observer needs this marker to record the outcome. Raised first and
+        //the observer's queue is FIFO, so it always precedes the move it
+        //describes.
+        if (spell->source && spell->source->getObserver())
+            spell->source->getObserver()->receiveEvent(NEW WEventSpellCountered(spell->source, fizzler));
         switch (fizzleMode) {
         case PUT_IN_GRAVEARD:
             //Flashback-cast spells are exiled wherever they would leave

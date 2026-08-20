@@ -5646,7 +5646,8 @@ public:
         {
             if (_target->controller()->opponent()->damaged() > 0)
             {
-                _target->counters->addCounter(1, 1);
+                //W35 addendum (5): attribute the counter to its source.
+                _target->counters->addCounter("", 1, 1, false, false, source);
             }
         }
         return MTGAbility::addToGame();
