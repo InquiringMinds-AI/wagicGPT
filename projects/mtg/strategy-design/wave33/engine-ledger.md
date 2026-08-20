@@ -392,3 +392,19 @@ WAVE-35 CORPUS CONFIG (guard method per owner directive): -j 8, WAGIC_GPT_TIMEOU
 -j3 measurement), -T 14400, budget 6000 default, --thinking, REPPENALTY 1.05, seats
 146,139,152,158,105,36,116. Validation gate: fallback rate audited on first completions;
 >~1% ⇒ stop, drop to -j 6.
+
+## Concurrency conversion (owner directive, 2026-08-20): saturate the server
+
+Owner: "we definitely want to convert our testing design to maximize concurrency gains" —
+run corpora at/above the batch ceiling. Design: wall clock = total generated tokens /
+AGGREGATE server tok/s; aggregate rises with batch (weight-read amortization on the MoE), so
+the saturated batch is the fastest corpus. Slight OVERSUBSCRIPTION (more games than
+max-num-seqs 16) beats exact-16: queued requests backfill batch slots the moment a game is
+between decisions, so the server never decodes under-batch. Harness -j cap raised 16 → 64
+(runaway guard only). Knobs that scale with j: WAGIC_GPT_TIMEOUT via guard(j) (at j≥16,
+p10 per-stream ~5-7 tok/s → guard ~1,700-1,900s), and -T becomes corpus-length (all games
+finish together at queue pace). Voyager side: N wagic processes × ~300MB — raise the scope
+MemoryMax deliberately. WAVE-36 ADOPTION GATE: pin the aggregate curve first — this wave's
+-j 8 measured point + one measured point at 16; convert with measured guards, not
+extrapolations (a mis-set guard at batch 16 = a fallback storm discovered hours in).
+Wave-35 corpus deliberately left at -j 8 mid-flight (no config changes mid-corpus).

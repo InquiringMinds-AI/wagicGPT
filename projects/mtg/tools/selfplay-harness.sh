@@ -68,9 +68,16 @@ while [ $# -gt 0 ]; do
     esac
 done
 # Spark serves max-num-seqs 16 and its memory is flat under request load (KV is
-# pre-allocated), and Magic is turn-based (~1 in-flight request per game), so up
-# to ~16 concurrent games fit the batch. Cap at 16.
-[ "$JOBS" -gt 16 ] && { echo "capping -j to 16 (Spark max-num-seqs 16)"; JOBS=16; }
+# pre-allocated), and Magic is turn-based (~1 in-flight request per game), so 16
+# concurrent games fill the batch. OVERSUBSCRIPTION (-j above 16) is allowed and
+# deliberate: streams beyond 16 queue server-side, and the queue backfills batch
+# slots the instant a game goes between-decisions - the server holds full batch
+# with no bubbles. Aggregate tok/s is what wall clock divides by, so a saturated
+# batch is the fastest corpus. Scale WAGIC_GPT_TIMEOUT with j (guard(j) =
+# worst_case_tokens / p10_per_stream_tok_s(j) * 1.5) and set -T to corpus-length
+# at high j: ALL games run at queue pace and finish together. Hard cap 64 is a
+# runaway guard, not a tuning point.
+[ "$JOBS" -gt 64 ] && { echo "capping -j to 64 (runaway guard)"; JOBS=64; }
 [ "$JOBS" -lt 1 ] && JOBS=1
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"   # projects/mtg
