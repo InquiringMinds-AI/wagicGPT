@@ -1956,15 +1956,22 @@ static string leftStackClause(bool mine, const string& to)
 //addendum (4): an informational defect, not a stylistic one).
 string zoneChangeNarration(bool mine, const string& cardName, const string& from,
                            const string& to, bool isCreature, bool isLand,
-                           bool countered, const string& counterSource)
+                           bool countered, const string& counterSource,
+                           const string& targets = "")
 {
     string who = mine ? "You " : "Opponent ";
     if (to == "stack")
     {
+        //"You cast X targeting Y" is the owner's register verbatim; the target
+        //belongs to the CAST line because it is the only historical record of
+        //what the spell was aimed at - a countered spell's target otherwise
+        //vanishes from the log entirely.
         string cast = (mine ? "You cast " : "Opponent cast ") + cardName;
-        if (from == "hand")
-            return cast;
-        return cast + " from " + ownedZone(mine, from);
+        if (from != "hand")
+            cast += " from " + ownedZone(mine, from);
+        if (!targets.empty())
+            cast += " targeting " + targets;
+        return cast;
     }
     if (from == "stack")
     {
@@ -4553,10 +4560,42 @@ string AIPlayerGPT::describeEvent(WEvent * event)
             mCounteredSpell = NULL;
             mCounteredBy.clear();
         }
+        //W35 register: "You cast X targeting Y". The zone event fires as the
+        //spell arrives on the stack with its targets already chosen; the cast
+        //line is the only HISTORICAL record of what it was aimed at (the
+        //situation block's stack render disappears once the spell leaves).
+        string castTargets;
+        if (toName == "stack" && observer && observer->mLayers)
+        {
+            ActionStack * stk = observer->mLayers->stackLayer();
+            for (size_t i = 0; stk && i < stk->mObjects.size(); i++)
+            {
+                Interruptible * it = (Interruptible *) stk->mObjects[i];
+                if (!it || it->type != ACTION_SPELL || it->source != e->card
+                    || it->state != NOT_RESOLVED)
+                    continue;
+                Spell * sp = (Spell *) it;
+                bool first = true;
+                std::ostringstream tgt;
+                for (Targetable * t = sp->getNextTarget(); t; t = sp->getNextTarget(t))
+                {
+                    tgt << (first ? "" : ", ");
+                    first = false;
+                    if (MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(t))
+                        tgt << c->getDisplayName();
+                    else if (Player * pl = dynamic_cast<Player *>(t))
+                        tgt << (pl == this ? "you" : "the opponent");
+                    else
+                        tgt << "something";
+                }
+                castTargets = tgt.str();
+                break;
+            }
+        }
         return zoneChangeNarration(mine, cardName, zoneDesc(e->from), toName,
                                    e->card->isCreature() != 0,
                                    e->card->hasType(Subtypes::TYPE_LAND) != 0,
-                                   countered, counterSource);
+                                   countered, counterSource, castTargets);
     }
 
     //W35 addendum (4): the countering itself. The marker is stashed and the
@@ -13782,6 +13821,25 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(zoneChangeNarration(true, "Snapcaster Mage", "graveyard", "stack", true, false, false, "")
               == "You cast Snapcaster Mage from your graveyard",
               "W35 a cast from another zone names the zone, still as a cast");
+        // (1b) "You cast X targeting Y" - the owner's register verbatim. The
+        // cast line is the only historical record of the target (the stack
+        // render vanishes once the spell leaves; a countered spell's target
+        // would otherwise never be in the log at all).
+        CHECK(zoneChangeNarration(true, "Vanishing Verse", "hand", "stack", false, false, false, "",
+                                  "Arboreal Grazer")
+              == "You cast Vanishing Verse targeting Arboreal Grazer",
+              "W35 a targeted cast is 'You cast <X> targeting <Y>'");
+        CHECK(zoneChangeNarration(false, "Lightning Bolt", "hand", "stack", false, false, false, "",
+                                  "you")
+              == "Opponent cast Lightning Bolt targeting you",
+              "W35 a player target reads as 'you' from this seat");
+        CHECK(zoneChangeNarration(true, "Snapcaster Mage", "graveyard", "stack", true, false, false, "",
+                                  "Counterspell")
+              == "You cast Snapcaster Mage from your graveyard targeting Counterspell",
+              "W35 the from-zone clause and the target clause compose in that order");
+        CHECK(zoneChangeNarration(true, "Arboreal Grazer", "hand", "stack", false, false, false, "", "")
+              .find("targeting") == string::npos,
+              "W35 NEGATIVE an untargeted cast gains no targeting clause");
         // (4) THE informational fix: stack->graveyard is the SAME move for a
         // resolution and a counter. They no longer read alike.
         CHECK(zoneChangeNarration(true, "Mordor Muster", "stack", "graveyard", false, false, false, "")
