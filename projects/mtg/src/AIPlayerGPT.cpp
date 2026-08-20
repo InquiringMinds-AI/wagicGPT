@@ -4030,7 +4030,10 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //raised by ActionStack::Fizzle immediately before it moves the card)
         //turns this stack departure into "was countered" instead of "resolved";
         //it is consumed here so it can never colour a later, unrelated move.
-        bool countered = (mCounteredSpell == e->card);
+        //Only a departure FROM THE STACK can be a counter: if the marked card
+        //moves again later (a graveyard recursion of the same instance), a
+        //stale marker must never relabel it.
+        bool countered = (mCounteredSpell == e->card && zoneDesc(e->from) == "stack");
         string counterSource;
         if (countered)
         {
