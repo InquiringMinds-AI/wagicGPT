@@ -334,6 +334,8 @@ static MTGCardInstance * findMyArmy(MTGCardInstance * card)
 //Pure core over the script text, so the parse is provable in PARSETEST.
 static int counterAddPlusFromScript(const string& magicText)
 {
+    if (magicText.find("otalcounteradded") == string::npos)
+        return 0; //pre-filter; runs per permanent whenever an amass is previewed
     string t = magicText;
     for (size_t i = 0; i < t.size(); i++)
         t[i] = (char) tolower((unsigned char) t[i]);
@@ -1122,6 +1124,11 @@ static int zoneCopyRank(MTGGameZone * zone, int index, int & outTotal)
 //card-name table. Pure: takes the raw magicText, returns "" when absent.
 static string annihilatorTag(const string& magicText)
 {
+    //Cheap pre-filter: this runs per permanent per render, and the lowercase
+    //copy below is the only expensive part. "nnihilat" is case-stable whatever
+    //the script's leading capital.
+    if (magicText.find("nnihilat") == string::npos)
+        return "";
     string t = magicText;
     for (size_t i = 0; i < t.size(); i++)
         t[i] = (char) tolower((unsigned char) t[i]);
