@@ -544,9 +544,26 @@ private:
     int mLastDroppedAssignments; //blocker seam: B:A pairs the reply asked for
                              //that never reached the battlefield (parser drops
                              //+ apply-site prunes). -1 = not a blocker record
-    bool mLastBudgetHit;     //a forced close fired for this decision (translog
-                             //reasoning_budget_hit) - the A/B's count of how
-                             //often the budget actually bound
+    bool mLastBudgetHit;     //the forced close fired AND the decode had actually
+                             //stopped at the cap (finish_reason == "length") -
+                             //translog reasoning_budget_hit, the A/B's count of
+                             //how often the BUDGET bound. Split from the line
+                             //below in wave-35: the marker used to be set for
+                             //every forced close, so a reply that merely stopped
+                             //reasoning without answering (natural stop, no
+                             //truncation) was logged as a budget hit - which is
+                             //how a 12,058-char trace "hit" an 8,000-TOKEN budget
+                             //that 29,027-char traces did not (wave-34 b6).
+    bool mLastForcedClose;   //a forced close fired for this decision, whatever
+                             //the reason (translog reasoning_forced_close). The
+                             //rescue-rate metric; superset of mLastBudgetHit.
+    //Repetition ratio of the last reply's reasoning trace: the share of its
+    //40-char shingles that are copies of the single most-repeated one. A
+    //healthy trace sits near 0; a decode collapse (415-repeat mojibake, a
+    //13.8k-char "No. Okay." loop - both wave-34, both invisible to every answer
+    //metric because the reply itself parsed fine) sits near 1. -1 = no
+    //reasoning to measure.
+    double mLastReasoningDegenerate;
     //The truncated thinking handed back to the model on the forced close, with
     //its "</think>" injected by the request builder.
     string mForceClosePrefill;
