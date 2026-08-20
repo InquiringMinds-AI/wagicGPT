@@ -414,3 +414,15 @@ serve-configuration work between waves — Claude does not touch or re-examine t
 config; the measured batch-8 findings above (aggregate 68 vs 110 at -j3, step time 84→357ms,
 MTP acceptance healthy at 69%) are the handoff data for that work. Next-wave corpus config
 waits on his serve changes.
+
+OWNER RULING (2026-08-20, supersedes "finish the wave as-is" above — INVARIANT): a selfplay
+corpus COMPLETES A FULL GAME FOR EVERY DECK MATCHUP or the test has FAILED. Verbatim: "if the
+test is not completing games, then it is a failure... this test requires a full game for every
+deck matchup. if its not getting that, then the test is wrong." Cap adjudication is a backstop
+for rare stragglers, never an accepted outcome class; truncated runs are not "calibration
+corpora." The -j 8 run was killed on his order (matchups-20260820-115109, marked
+FAILED-NOT-A-CORPUS). ENFORCEMENT: selfplay-harness.sh now runs a feasibility watchdog —
+at ≥15 measured decisions it projects median latency × expected decisions/game
+(WAGIC_CORPUS_DECISIONS, default 130) against -T and kills the whole corpus with a loud
+INFEASIBLE verdict if a full game cannot fit (verified: today's 419s median → INFEASIBLE;
+90s → OK). Wave-35 corpus reruns after the owner's serve work, when the arithmetic passes.

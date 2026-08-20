@@ -214,7 +214,60 @@ PYEOF
     printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$d0" "$d2" "$winner" "${life0:--}" "${life1:--}" "${turn:--}" "$gstart" >> "$RESULTS"
 }
 
-trap 'echo "stopping..."; kill $(jobs -p) 2>/dev/null' INT TERM
+trap 'echo "stopping..."; for p in $(jobs -p); do kill $(pgrep -P "$p") "$p" 2>/dev/null; done' INT TERM
+
+# FEASIBILITY WATCHDOG (owner ruling 2026-08-20): a corpus completes a FULL game for
+# every matchup or the test has FAILED - truncated games are a wrong test, not a
+# partial result. Once 15 real decisions exist in this run's translogs, project
+# median-decision-latency x expected-decisions-per-game; if that exceeds -T, a full
+# game cannot fit: kill the whole corpus NOW and exit loudly, instead of burning
+# hours producing 21 cap-adjudications. Override the per-game decision estimate with
+# WAGIC_CORPUS_DECISIONS (default 130, from smoke/corpus history).
+EXPECTED_DECISIONS="${WAGIC_CORPUS_DECISIONS:-130}"
+HARNESS_PID=$$
+feasibility_watchdog() {
+    while sleep 45; do
+        local verdict
+        verdict=$(python3 - "$LOGDIR" "$START" "$EXPECTED_DECISIONS" "$GAME_TIMEOUT_S" <<'WPY'
+import json, glob, os, sys
+logdir, start, dec, cap = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+lat = []
+for f in glob.glob(os.path.join(logdir, "*.jsonl")):
+    try:
+        ep = int(os.path.basename(f).split("-")[0])
+    except ValueError:
+        continue
+    if ep < start - 5:
+        continue
+    for line in open(f):
+        try: r = json.loads(line)
+        except Exception: continue
+        if r.get("latency_ms"):
+            lat.append(r["latency_ms"] / 1000.0)
+if len(lat) < 15:
+    print("WAIT"); sys.exit()
+lat.sort()
+med = lat[len(lat)//2]
+proj = med * dec
+print(f"INFEASIBLE {med:.0f} {proj:.0f}" if proj > cap else f"OK {med:.0f} {proj:.0f}")
+WPY
+)
+        case "$verdict" in
+            INFEASIBLE*)
+                set -- $verdict
+                echo ""
+                echo "!! CORPUS INFEASIBLE: median decision latency ${2}s -> projected full game ~${3}s > -T ${GAME_TIMEOUT_S}s."
+                echo "!! Games CANNOT complete. A corpus that cannot finish full games is a FAILED test (owner ruling 2026-08-20)."
+                echo "!! Killing all games. Fix throughput (serve config / lower -j) or raise -T before relaunching."
+                touch "$OUTDIR/INFEASIBLE"
+                kill -TERM "$HARNESS_PID" 2>/dev/null
+                return 1;;
+            OK*) : ;;
+        esac
+    done
+}
+feasibility_watchdog &
+WATCHDOG_PID=$!
 
 while read -r d0 d1; do
     # Overall time cap.
@@ -222,16 +275,21 @@ while read -r d0 d1; do
         echo "hit total time cap with $done_ct/$NGAMES games done"; break
     fi
     # Throttle to JOBS concurrent.
-    while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n 2>/dev/null || sleep 2; done
+    while [ "$(jobs -rp | /usr/bin/grep -cv "^$WATCHDOG_PID\$")" -ge "$JOBS" ]; do wait -n 2>/dev/null || sleep 2; done
     run_one_game "$d0" "$d1" &
     sleep 2   # stagger startup so the card-DB loads don't thundering-herd
     done_ct=$((done_ct+1))
-    echo "  launched $done_ct/$NGAMES: deck$d0 vs deck$d1  ($(jobs -rp | wc -l) running, $(( $(date +%s)-START ))s elapsed)"
+    echo "  launched $done_ct/$NGAMES: deck$d0 vs deck$d1  ($(jobs -rp | /usr/bin/grep -cv "^$WATCHDOG_PID\$") running, $(( $(date +%s)-START ))s elapsed)"
 done < "$JOBFILE"
 
 echo "waiting for in-flight games to finish..."
-wait 2>/dev/null
+wait $(jobs -p | /usr/bin/grep -v "^$WATCHDOG_PID$") 2>/dev/null
+kill "$WATCHDOG_PID" 2>/dev/null
 trap - INT TERM
+if [ -f "$OUTDIR/INFEASIBLE" ]; then
+    echo "== CORPUS FAILED: infeasible (see above). Partial logs in $OUTDIR are NOT a corpus. =="
+    exit 1
+fi
 
 # Harvest this run's translogs.
 comm -13 "$BEFORE_LIST" <(ls "$LOGDIR"/*.jsonl 2>/dev/null | sort) | while read -r f; do
