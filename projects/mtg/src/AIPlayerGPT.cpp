@@ -2067,7 +2067,18 @@ static const long kAnswerReserveTokens = 400;
 //gives 10450. The owner set the shipped starting value at a flat 8000
 //("oof. thats a lot. lets make it 8000"). Config/env override it; 0 or less
 //means unbounded (the pre-budget behaviour).
-static const long kDefaultReasoningBudget = 8000;
+//WAVE-35 (OWNER RULING 2026-08-20, "let's fix stuff, then maybe next round will
+//propose a smaller budget"): 8000 -> 6000, measured off the wave-34 trace audit
+//(~740 traces, 6 batches): last-novel-diagnostic depth pooled to p50 ~3k / p90
+//~4.8k tokens, with the per-batch max at or under 6.2k in 5 of 6 batches, so
+//6000 clears every batch's p90 with margin and satisfies batch-3's floor
+//warning (below ~6k truncates ~10% mid-diagnostic). The audit's unanimous
+//caveat is why this cut is paired with the protocol surgery above rather than
+//taken alone: the churn is CAUSED and INTERLEAVED, not trailing, so a cap
+//cannot recover it - only removing the undecidable instructions can. Wave-35's
+//corpus re-measures depth post-surgery and any further cut is proposed from
+//that data.
+static const long kDefaultReasoningBudget = 6000;
 
 //Which endpoints accept an assistant prefill (vLLM's continue_final_message /
 //llama.cpp's equivalent). The subscription (Codex) and OpenRouter paths keep
@@ -2721,9 +2732,10 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     //otherwise the budget machinery gets cut off rescuing exactly the
     //decisions it exists for. Worst case, budgeted end to end at this stack's
     //~30 tok/s: phase 1 = prompt prefill (~10-20s at corpus prompt sizes) +
-    //(8000 thinking + ~230 reply) tokens ~= 295s; a budget hit then adds
-    //phase 2 = re-prefill of prompt + the 8k of thinking (~15-25s) + ~400
-    //tokens ~= 40s. Total ~= 335-360s, and each phase is its own request. 420s
+    //(6000 thinking + ~230 reply) tokens ~= 210s (wave-35 budget cut; it was
+    //295s at 8000); a budget hit then adds phase 2 = re-prefill of prompt + the
+    //6k of thinking (~15-25s) + ~400 tokens ~= 40s. Total ~= 250-275s, and each
+    //phase is its own request. The floor is deliberately NOT retuned down: 420s
     //keeps a real margin over that rather than shaving it. An explicit timeout
     //(env or config) is the user's call and is never raised over their head;
     //the built-in default (600s) already clears this floor, so the guard is
@@ -2987,7 +2999,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (!mLastReasoning.empty())
     {
         rec["reasoning"] = mLastReasoning;
-        //The LENGTH, separately, because the 8000-token budget is a
+        //The LENGTH, separately, because the 6000-token budget is a
         //calibration value the owner expects to tune DOWN: the next budget is
         //read off this distribution (p95/p99 by decision kind) against the
         //reasoning_budget_hit rate, and doing that from the text field alone

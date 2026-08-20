@@ -48,7 +48,7 @@ public:
                               //flag covers every other provider family.
     long reasoningBudget;     //thinking-window budget in TOKENS (config key
                               //reasoning_budget, env WAGIC_GPT_REASONING_BUDGET).
-                              //-1 unset = the built-in default (8000); 0 or
+                              //-1 unset = the built-in default (6000); 0 or
                               //less = unbounded. Only meaningful with thinking
                               //ON: it caps the model's NATIVE reasoning window
                               //and, when the cap binds, the client forces the
