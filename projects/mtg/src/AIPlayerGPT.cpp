@@ -12498,6 +12498,207 @@ void AIPlayerGPT::runParseSelfTest()
               "W34-hidden NEGATIVE no reasoning field means nothing to recover from");
     }
 
+    // ================= WAVE-35 PROTOCOL SURGERY =================
+    // Regression cover for every instruction/annotation string the wave-35
+    // churn-driver surgery changed. Each driver gets a positive (the new
+    // contract is present / the new gate fires where it should), a negative
+    // (the removed wording is GONE / the gate does not fire where it false-
+    // fired), and, where the model echoes the string back, the echo shape.
+
+    // ---- driver #1: the PLAN-line rule is decidable in every state ----
+    cout << "\n[W35-plan] the PLAN rule states all three cases and never asks 'did it change?'\n";
+    {
+        string proto = kReplyProtocol;
+        // POSITIVE: the closed three-case set, including the null case that had
+        // no answer at all (first decision of a game: no prior plan exists).
+        CHECK(proto.find("(a) No plan is shown to you above (the first decision of a game): ALWAYS "
+                         "write a PLAN line.") != string::npos,
+              "W35-plan case (a) the null case is stated: first decision ALWAYS writes a PLAN");
+        CHECK(proto.find("(b) A plan is shown and any part of it is now done, impossible, or no "
+                         "longer what you intend") != string::npos,
+              "W35-plan case (b) stale/half-consumed plans are named explicitly");
+        CHECK(proto.find("(c) Otherwise") != string::npos
+              && proto.find("OMIT the PLAN line. Executing a plan is NOT changing it.") != string::npos,
+              "W35-plan case (c) executing-unchanged omits, and executing is declared not-changing");
+        // NEGATIVE: the undecidable gate that cost 7-15% of ALL reasoning chars
+        // is gone from the protocol AND from every per-decision tail that
+        // repeated it.
+        CHECK(proto.find("ONLY IF your plan has changed") == string::npos
+              && proto.find("ONLY if your plan changed") == string::npos,
+              "W35-plan NEGATIVE the undecidable 'ONLY IF your plan has changed' gate is gone");
+        // POSITIVE: the plan is explicitly NOT validated against the options -
+        // the "write your plan FROM the list" misreading that ate 52% of one
+        // 26.8k trace. Only LINE 1 comes from the list.
+        CHECK(proto.find("NOT checked against this decision's option list") != string::npos
+              && proto.find("Only LINE 1 has to come from the list.") != string::npos,
+              "W35-plan the plan line is declared free of the option list; only the answer is bound");
+    }
+
+    // ---- driver #4: the echo contract is number + SHORT NAME ----
+    cout << "\n[W35-echo] 'exactly as listed' is gone; the contract is number + short name\n";
+    {
+        string proto = kReplyProtocol;
+        // NEGATIVE: the unsatisfiable clause. Option labels carry {mana},
+        // {right now: ...} and a {card text: "..."} blob truncated mid-sentence,
+        // so "exactly as listed" could not be obeyed - it produced every
+        // post_answer_overrun event measured in the wave-34 corpus.
+        CHECK(proto.find("exactly as listed") == string::npos,
+              "W35-echo NEGATIVE the unsatisfiable 'action name exactly as listed' clause is gone");
+        CHECK(proto.find("CHOICE: <number> (<short name>)") != string::npos,
+              "W35-echo the contract is stated as number + short name");
+        CHECK(proto.find("never copy the {mana cost}, the {right now: ") != string::npos
+              && proto.find("{card text: ") != string::npos,
+              "W35-echo the annotation braces are named as the thing NOT to copy");
+        // The combat exemption (batch5 #10): the parenthesised-name mandate and
+        // the ATTACK:/BLOCKS: worked examples contradicted each other in 70/102
+        // traces. The example format wins - it is what the parsers prefer.
+        CHECK(proto.find("ATTACK: and BLOCKS: are different: they take the A#/B# "
+                         "LABELS only, with no names and no parentheses") != string::npos,
+              "W35-echo combat answers are exempted from the parenthesised-name mandate");
+        // NEGATIVE: the de-fanged worked example is still the only card named in
+        // the protocol - a REAL card name here poisons the retraction detector.
+        CHECK(proto.find("Cast Example Card") != string::npos,
+              "W35-echo NEGATIVE the worked example still uses the fake card name");
+    }
+
+    // ---- driver #4, echo SHAPES: what the model now sends must still bind ----
+    cout << "\n[W35-echo-shape] short-name echo binds; the old blob echo still binds\n";
+    {
+        vector<string> opts;
+        opts.push_back("Cast Mordor Muster {1}{b} {right now: Army 1/1 -> 2/2} "
+                       "{card text: \"You draw a card and you lose 1 life. -- Amass Orcs 1...\"}");
+        opts.push_back("Cast Ichor Rats {2}{b} {card text: \"Whenever Ichor Rats deals damage...\"}");
+        opts.push_back("Cast nothing right now");
+        bool stale = false;
+        // The NEW contract's answer: number + short name, nothing from the braces.
+        CHECK(parseChoice("CHOICE: 1 (Cast Mordor Muster)", 3, &opts, &stale, NULL) == 1 && !stale,
+              "W35-echo-shape the short-name echo binds to its option");
+        // Backward compatibility: a model that still copies the whole label must
+        // not be downgraded to the heuristic.
+        stale = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Mordor Muster {1}{b} {right now: Army 1/1 -> 2/2})",
+                          3, &opts, &stale, NULL) == 1 && !stale,
+              "W35-echo-shape a full-label echo still binds (no regression for old replies)");
+        // The short name still DISAMBIGUATES: it must pick its own option, not
+        // the neighbouring cast.
+        stale = false;
+        CHECK(parseChoice("CHOICE: 2 (Cast Ichor Rats)", 3, &opts, &stale, NULL) == 2 && !stale,
+              "W35-echo-shape short names remain unique across a multi-cast menu");
+        // NEGATIVE: a short name matching NOTHING is still a stale echo that
+        // routes to the heuristic - the safety property is untouched.
+        stale = false;
+        parseChoice("CHOICE: 1 (Cast Emrakul, the Aeons Torn)", 3, &opts, &stale, NULL);
+        CHECK(stale, "W35-echo-shape NEGATIVE an off-menu short name is still flagged stale");
+        // The declines still parse with no card name at all.
+        stale = false;
+        CHECK(parseChoice("CHOICE: 3 (Cast nothing)", 3, &opts, &stale, NULL) == 3,
+              "W35-echo-shape a decline echo needs no card name");
+    }
+
+    // ---- driver #2: the stale-plan note stops false-firing ----
+    cout << "\n[W35-caveat] the stale-plan note fires only on a cast menu that lost the plan\n";
+    {
+        vector<string> mine;
+        mine.push_back("Sigarda, Champion of Light");
+        mine.push_back("Steel Overseer");
+        mine.push_back("Fateful Absence");
+        mine.push_back("Grishnakh, Brash Instigator");
+        // POSITIVE (the defect this note exists for, deck110-vs-deck21): the
+        // plan commits to casting a card that has already been cast, and the
+        // cast menu on offer does not contain it.
+        string castMenu = "1. Cast Fateful Absence {1}{w}\n2. Cast nothing right now\n";
+        CHECK(gptcaveat::planActionsStale("Cast Steel Overseer, then activate it each turn.",
+                                          castMenu, mine),
+              "W35-caveat POSITIVE a cast the menu no longer offers still arms the note");
+        // NEGATIVE (batch5 finding 1, the 15/102 false-fire): the plan names the
+        // card by its SHORT name and the option carries the full display name.
+        // The old full-name-only scan saw neither side and fired anyway.
+        string sigardaMenu = "1. Cast Sigarda, Champion of Light {2}{w}{w}\n2. Cast nothing right now\n";
+        CHECK(!gptcaveat::planActionsStale("Cast Sigarda in Main Phase 2, then attack.",
+                                           sigardaMenu, mine),
+              "W35-caveat NEGATIVE a plan naming 'Sigarda' sees 'Sigarda, Champion of Light'");
+        // NEGATIVE: a pay-life sub-ask is not an action menu at all, so the note
+        // has nothing to claim (near-100% false there in the wave-34 corpus).
+        string payLife = "1. Pay 3 life\n2. Do not pay\n";
+        CHECK(!gptcaveat::planActionsStale("Cast Steel Overseer, then activate it each turn.",
+                                           payLife, mine),
+              "W35-caveat NEGATIVE a pay-life sub-ask never arms the note");
+        // NEGATIVE: an attackers ask - A-labels, no cast lines.
+        string attackers = "A1. Grishnakh, Brash Instigator (3/3) [haste]\nA2. Orc Army (2/2)\n";
+        CHECK(!gptcaveat::planActionsStale("Cast Steel Overseer, then activate it each turn.",
+                                           attackers, mine),
+              "W35-caveat NEGATIVE a declare-attackers ask never arms the note");
+        // NEGATIVE: a blockers ask, same reason.
+        string blockers = "B1. Orc Army (2/2) - may block A1 (kills it, survives)\n";
+        CHECK(!gptcaveat::planActionsStale("Cast Steel Overseer, then activate it each turn.",
+                                           blockers, mine),
+              "W35-caveat NEGATIVE a declare-blockers ask never arms the note");
+        // NEGATIVE: "attack with X" is a live intent, not a cast/activation, so
+        // it can never arm the note on its own (the largest false-fire source).
+        CHECK(!gptcaveat::planActionsStale("Attack with Grishnakh every turn while they are open.",
+                                           castMenu, mine),
+              "W35-caveat NEGATIVE an attack-only plan does not arm a cast-menu note");
+        // The pre-existing guards are intact: a negated plan mention and an
+        // empty plan both stay silent.
+        CHECK(!gptcaveat::planActionsStale("Do not cast Steel Overseer into open mana.",
+                                           castMenu, mine),
+              "W35-caveat NEGATIVE a negated plan mention is not an affirmation (guard intact)");
+        CHECK(!gptcaveat::planActionsStale("", castMenu, mine),
+              "W35-caveat NEGATIVE an empty plan never arms the note (guard intact)");
+    }
+
+    // ---- driver #2, the WORDING: a nudge, never a legality ruling ----
+    cout << "\n[W35-caveat-text] the note cannot be read as a ruling about legality\n";
+    {
+        string note = kStalePlanNote;
+        CHECK(note.find("not about what is legal for you") != string::npos,
+              "W35-caveat-text the note denies the legality reading in its own words");
+        CHECK(note.find("no longer among the options available") == string::npos,
+              "W35-caveat-text NEGATIVE the old availability assertion is gone");
+        CHECK(note.find("pick the best option below") != string::npos
+              && note.find("re-state your plan if it has gone out of date") != string::npos,
+              "W35-caveat-text the note names the two actions it wants and nothing else");
+        // ECHO SHAPE: an answer given while the note is on the prompt binds
+        // normally - the note is parenthesised prose carrying no option's words,
+        // so it can never resolve as a candidate.
+        vector<string> opts;
+        opts.push_back("Cast Fateful Absence {1}{w}");
+        opts.push_back("Cast nothing right now");
+        bool stale = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Fateful Absence)", 2, &opts, &stale, NULL) == 1 && !stale,
+              "W35-caveat-text an answer given under the note binds normally");
+    }
+
+    // ---- driver #5: the combat/priority asks state what is still ahead ----
+    cout << "\n[W35-combat] attacker/blocker/priority asks carry their turn-structure facts\n";
+    {
+        string atk = kAttackersTurnFacts;
+        CHECK(atk.find("SECOND MAIN PHASE follows combat") != string::npos,
+              "W35-combat the attackers ask states that main phase 2 follows combat");
+        CHECK(atk.find("instants and activated abilities you hold stay castable this turn") != string::npos,
+              "W35-combat the attackers ask states that instants remain castable this turn");
+        CHECK(atk.find("taps only the attacking creatures - never your lands") != string::npos,
+              "W35-combat the attackers ask states what declaring actually taps");
+        // NEGATIVE / scope: the BLOCKERS ask happens on the OPPONENT's turn, so
+        // it must NOT claim a second main phase of your own. A true statement in
+        // the wrong scope is a lie.
+        string blk = kBlockersTurnFacts;
+        CHECK(blk.find("SECOND MAIN PHASE") == string::npos
+              && blk.find("second main") == string::npos,
+              "W35-combat NEGATIVE the blockers ask never claims a main phase 2 of your own");
+        CHECK(blk.find("stay castable after blockers are declared") != string::npos,
+              "W35-combat the blockers ask states that instants survive the declaration");
+        // The two priority-ask facts are separate strings precisely because they
+        // are scoped separately (own turn before MP2 / any turn before end step).
+        string mp2 = kSecondMainAheadFact;
+        string pri = kPriorityAgainFact;
+        CHECK(mp2.find("Still ahead of you this turn: your SECOND MAIN PHASE, after combat") != string::npos,
+              "W35-combat the priority ask names the second main phase as still ahead");
+        CHECK(pri.find("priority again later this turn") != string::npos
+              && pri.find("SECOND MAIN") == string::npos,
+              "W35-combat NEGATIVE the priority-again fact makes no main-phase claim of its own");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
