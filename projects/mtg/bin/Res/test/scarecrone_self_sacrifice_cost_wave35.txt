@@ -1,0 +1,62 @@
+#Wave-35 trace audit b6 F1 -- an extra-cost payment whose ONLY legal payment is the
+#ability's own source is never made, so the activation silently no-ops forever.
+#
+#SYMPTOM (corpus 20260820, trace 1787200425): the engine offered
+#"Draw 1 with Scarecrone [cost: {1}, Sacrifice]" 12+ TIMES across turns 3-7. The model
+#took it every time, the narration recorded it every time, and Scarecrone never left the
+#battlefield (it even attacked). Free repeatable draw from the model's point of view, and
+#18 of that file's 30 decisions were spent litigating the contradiction.
+#
+#ORACLE (scryfall, verified 2026-08-20): Scarecrone {3} Artifact Creature - Scarecrow 1/2,
+#"{1}, Sacrifice a Scarecrow: Draw a card." / "{4}, {T}: Return target artifact creature
+#card from your graveyard to the battlefield." The card SCRIPT is FAITHFUL -- the audit's
+#companion claim (b2 C1 / b6 F1b: "real Oracle says an artifact creature") is WRONG, and
+#no card-script change is warranted. Sacrificing Scarecrone ITSELF to its own ability is
+#rules-legal: it is a Scarecrow, and the cost carries no "another".
+#
+#ROOT CAUSE: AIPlayerBaka::chooseCard -- the scan that AIPlayerBaka::chooseCostTarget and
+#CanHandleCost both use -- skips `card == source` and `card == tc->source`. That exclusion
+#is right for chooseCard's normal job (never target the spell being cast with its own
+#effect) but wrong for a COST payment: when the ability's source is the only permanent the
+#cost's TargetChooser accepts, the scan returns NULL, payTheManaCost returns false, no
+#AIAction is queued, and the whole activation disappears with no fallback and no defer --
+#while SacrificeCost::canPay() (which does NOT exclude the source) keeps reporting the
+#activation as payable, so it is re-offered every priority window. AIPlayerGPT::
+#chooseCostTarget mirrored the same exclusion, so both seats fizzled.
+#
+#FIX: cost payment legality is the TargetChooser's call. If the ordinary scan finds no
+#payment, offer the source itself when it is on the battlefield (i.e. an activated ability
+#of a permanent, never a spell paying with itself from hand) and the chooser accepts it.
+#Applied at chooseCostTarget AND at the CanHandleCost probe, so Baka's efficiency gate
+#stops zeroing these abilities out.
+#
+#WITNESS: Scarecrone is the only Scarecrow on the battlefield. PRE-FIX nothing happens --
+#Scarecrone stays in play, no card is drawn, library stays at 5. POST-FIX Scarecrone is
+#sacrificed (-> graveyard) and one card is drawn.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Scarecrone,Darksteel Citadel
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Darksteel Citadel
+hand:Mind Stone
+library:Mind Stone,Mind Stone,Mind Stone,Mind Stone
+graveyard:Scarecrone
+life:20
+[PLAYER2]
+[END]

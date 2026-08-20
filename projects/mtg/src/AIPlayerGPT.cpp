@@ -2709,6 +2709,35 @@ void AIPlayerGPT::WorkerMain(void * p)
 //message with the assistant prefill appended.
 static const char * kForceCloseTag = "\x01wagic-force-close\x01";
 
+//Wave-35 instrumentation: how repetitive is a reasoning trace? Degenerate
+//decodes exist in this corpus and are INVISIBLE to every answer-side metric -
+//the 415-repeat mojibake trace returned a well-formed reply, and the 13.8k-char
+//"No. Okay." loop parsed fine - so nothing counts them today and no budget
+//number can be read against them. Measured as the share of the trace's 40-char
+//shingles (stride 8, so the scan is linear and cheap even on a 30k-char trace)
+//that are copies of the single most common one: normal prose repeats a shingle
+//a handful of times out of thousands; a collapse repeats one shingle for most
+//of its length. Deliberately NOT a threshold or a behaviour change - it is a
+//number to cut on later, once a corpus has produced a distribution.
+static double reasoningRepetitionRatio(const string& s)
+{
+    const size_t kWindow = 40, kStride = 8, kFloor = 400;
+    if (s.size() < kFloor)
+        return 0.0; //too short for the shape to mean anything
+    std::map<string, int> counts;
+    int total = 0, best = 0;
+    for (size_t i = 0; i + kWindow <= s.size(); i += kStride)
+    {
+        int c = ++counts[s.substr(i, kWindow)];
+        if (c > best)
+            best = c;
+        total++;
+    }
+    if (!total)
+        return 0.0;
+    return (double) best / (double) total;
+}
+
 //The answer reserve, in tokens: everything the reply itself needs once the
 //thinking window is spent. Derived from this corpus, not guessed - p95 PLAN
 //line 592 chars (~200 tokens) + p95 coded choice line 74 chars (~30 tokens),
@@ -2997,7 +3026,12 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                     }
                 }
                 if (!fieldReasoning.empty())
+                {
                     mLastReasoning = fieldReasoning;
+                    //Measured HERE, on the trace as it arrived, because the
+                    //record path consumes (and clears) mLastReasoning.
+                    mLastReasoningDegenerate = reasoningRepetitionRatio(fieldReasoning);
+                }
                 //Reasoning was asked for and the provider kept it. Recorded,
                 //never treated as a failure: the answer is right there in
                 //content and is parsed exactly as the thinking-off path parses
@@ -3187,6 +3221,7 @@ static bool hasCodedAnswerLine(const string& content)
     return scanCodedAnswerLines(content, NULL, NULL, NULL) > 0;
 }
 
+
 bool AIPlayerGPT::isDecodeGarbage(const string& content)
 {
     //Conservative floor: a decode collapse is always long (the 80-120s spirals
@@ -3311,7 +3346,14 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         mRetryBase = userMsg;
         mForceClosePrefill = mLastReasoning;
         mRetryActivePrompt = string(kForceCloseTag) + userMsg;
-        mLastBudgetHit = true;
+        mLastForcedClose = true;
+        //Only a decode that STOPPED AT THE CAP is a budget hit. The other way
+        //into this branch is a reply that ended its thinking naturally and
+        //simply never wrote an answer line - the rescue is identical, the
+        //diagnosis is not, and conflating them made the budget-hit rate
+        //unreadable (a 12,058-char trace marked as hitting an 8,000-token
+        //budget, wave-34 b6). Both are still counted, under their own names.
+        mLastBudgetHit = mLastFinishLength;
         setNotice("thinking hit its budget - asking for the answer", 3.0f);
         DebugTrace("AIPlayerGPT: unclosed <think> (budget/truncation); forcing the answer");
         return kChoicePending; //next tick polls the forced-close request
@@ -3339,7 +3381,8 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
     : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
-      mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false), mReasoningBudget(0),
+      mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
+      mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
       mInPregameAsk(false)
 
@@ -3686,6 +3729,22 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     {
         rec["reasoning_budget_hit"] = true;
         mLastBudgetHit = false;
+    }
+    //The rescue itself, budget-driven or not. reasoning_forced_close without
+    //reasoning_budget_hit is the shape that used to be misreported as a budget
+    //hit: the model stopped thinking and never answered, with room to spare.
+    if (mLastForcedClose)
+    {
+        rec["reasoning_forced_close"] = true;
+        mLastForcedClose = false;
+    }
+    //Both markers are PRESENT-ONLY-WHEN-TRUE, like retry/reasoning_hidden:
+    //absence means false, not "unimplemented". An analysis that needs a
+    //denominator counts records, not fields.
+    if (mLastReasoningDegenerate >= 0.0)
+    {
+        rec["reasoning_degenerate"] = mLastReasoningDegenerate;
+        mLastReasoningDegenerate = -1.0;
     }
     //Narration delta: the game events that landed since the previous
     //record. A consumed cast's outcome (resolved/countered/died) shows up
@@ -8150,13 +8209,21 @@ MTGCardInstance * AIPlayerGPT::chooseCostTarget(TargetChooser * tc, MTGCardInsta
         return AIPlayerBaka::chooseCostTarget(tc, source);
 
     //cost targets are cards; mirror chooseCard's exclusions (never the
-    //spell being paid for, never the chooser's own source)
+    //spell being paid for, never the chooser's own source) - EXCEPT for a
+    //source already on the battlefield, which an activated ability's cost may
+    //legally consume ("{1}, Sacrifice a Scarecrow" on a Scarecrow). Excluding
+    //it unconditionally left an activation whose only payment is itself with
+    //no legal answer, so the payment was never made and the engine re-offered
+    //the ability every priority window (wave-34 b6 F1). Legality stays the
+    //TargetChooser's call - it is what put the card in targetCandidates.
     vector<MTGCardInstance *> cands;
     vector<string> opts;
     for (size_t i = 0; i < req.targetCandidates.size(); i++)
     {
         MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(req.targetCandidates[i]);
-        if (!c || c == source || c == tc->source)
+        if (!c)
+            continue;
+        if ((c == source || c == tc->source) && !c->isInPlay(observer))
             continue;
         cands.push_back(c);
         opts.push_back(describeTarget(this, c));

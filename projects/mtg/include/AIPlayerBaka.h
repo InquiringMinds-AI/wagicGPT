@@ -113,10 +113,16 @@ class AIPlayerBaka: public AIPlayer{
     //mana enumeration) that a decision-making override must never turn
     //into a model call. Returning NULL means "no choice yet"; the payment
     //attempt aborts for this tick (the async decision pattern).
-    virtual MTGCardInstance * chooseCostTarget(TargetChooser * tc, MTGCardInstance * source)
-    {
-        return chooseCard(tc, source);
-    }
+    virtual MTGCardInstance * chooseCostTarget(TargetChooser * tc, MTGCardInstance * source);
+    //A cost payment may legally BE the ability's own source ("{1}, Sacrifice a
+    //Scarecrow" on a Scarecrow). chooseCard refuses the source outright - right
+    //for its normal job (an effect must not target the spell producing it),
+    //fatal for a cost whose only payment is the permanent itself: the payment
+    //never gets made, the activation is silently dropped, and canPay() keeps
+    //re-offering it forever (wave-34 b6 F1, Scarecrone). Legality here is the
+    //TargetChooser's call. Restricted to a source ON THE BATTLEFIELD so a spell
+    //being cast from hand can still never pay with itself.
+    MTGCardInstance * selfAsCostPayment(TargetChooser * tc, MTGCardInstance * source);
     virtual int selectMenuOption();
 
     virtual AIStats * getStats();
