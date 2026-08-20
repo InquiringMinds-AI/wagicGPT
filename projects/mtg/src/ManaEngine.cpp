@@ -618,22 +618,79 @@ ManaCost * ManaEngine::potentialManaPermissive(Player * p, ManaPolicy & policy)
 
 int ManaEngine::potentialColorReach(Player * p, ManaPolicy & policy, ManaCost * outColors)
 {
-    map<MTGCardInstance *, bool> seen;
+    return potentialColorReach(p, policy, outColors, NULL);
+}
+
+int ManaEngine::potentialColorReach(Player * p, ManaPolicy & policy, ManaCost * outColors,
+                                    std::vector<ManaSourceView> * outSources)
+{
+    map<MTGCardInstance *, size_t> seen; //source card -> index in outSources
+    vector<ManaSourceView> sources;
     ActionLayer * al = p->getObserver()->mLayers->actionLayer();
     for (size_t i = 0; i < al->manaObjects.size(); i++)
     {
-        AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility*) al->manaObjects[i]);
-        if (!amp || !policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true))
+        MTGAbility * a = (MTGAbility *) al->manaObjects[i];
+        AManaProducer * amp = dynamic_cast<AManaProducer*>(a);
+        bool variable = false;
+        //N-166k: a foreach-wrapped producer (Tolarian Academy: `{T}: foreach
+        //(artifact|myBattlefield) add{U}`) is a GenericActivatedAbility holding
+        //an AForeach holding the AManaProducer, so the plain cast above returns
+        //NULL and the source was counted NOWHERE - "Mana available: 3 total" on
+        //a board with three lands AND an untapped Academy. potentialMana already
+        //unwraps this shape; do the same here, and mark the source variable so
+        //the render can say the one source is not one mana.
+        if (!amp)
+        {
+            GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(a);
+            if (gmp)
+                if (AForeach * fmp = dynamic_cast<AForeach*>(gmp->ability))
+                {
+                    amp = dynamic_cast<AManaProducer*>(fmp->ability);
+                    variable = (amp != NULL);
+                }
+        }
+        if (!amp || !policy.canHandle(a) || !amp->source)
+            continue;
+        //The foreach wrapper carries the tap cost, so amp->tap can be 0 on a
+        //producer whose source is spent - refuse a tapped source outright
+        //rather than trusting the inner ability's flag.
+        if (variable && (amp->source->isTapped() || amp->source->hasSummoningSickness()))
+            continue;
+        if (!producerUsable(p, amp, amp->source, true))
             continue;
         if (amp->output->getConvertedCost() < 1)
             continue;
-        seen[amp->source] = true;
-        if (outColors)
-            for (int c = 0; c < Constants::NB_Colors; c++)
-                if (amp->output->hasColor(c) && outColors->getCost(c) < 1)
+        std::ostringstream mine;
+        for (int c = 0; c < Constants::NB_Colors; c++)
+            if (amp->output->hasColor(c))
+            {
+                if (outColors && outColors->getCost(c) < 1)
                     outColors->add(c, 1);
+                mine << "{" << Constants::MTGColorChars[c] << "}";
+            }
+        map<MTGCardInstance *, size_t>::iterator at = seen.find(amp->source);
+        if (at == seen.end())
+        {
+            ManaSourceView v;
+            v.card = amp->source;
+            v.colors = mine.str();
+            v.variable = variable;
+            seen[amp->source] = sources.size();
+            sources.push_back(v);
+        }
+        else
+        {
+            //A dual scripted as two single-colour abilities: ONE source, both
+            //colours (the N-146d collapse, at the per-source line this time).
+            ManaSourceView & v = sources[at->second];
+            if (v.colors.find(mine.str()) == string::npos)
+                v.colors += " or " + mine.str();
+            v.variable = v.variable || variable;
+        }
     }
-    return (int) seen.size();
+    if (outSources)
+        *outSources = sources;
+    return (int) sources.size();
 }
 
 vector<MTGAbility*> ManaEngine::selectAutoTapProducers(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana)

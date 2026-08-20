@@ -121,6 +121,31 @@ public:
     //   rider is never evaluated - it would draw the game RNG).
     static int selfDamageOnTap(MTGCardInstance * card);
     static std::vector<std::string> selfDamageManaSources(Player * p);
+
+    //N-166k (wave-34 audit, b1 F-10 / b2 R1 / b3 F1 / b4 F5): one usable mana
+    //SOURCE, as the render needs to name it. potentialColorReach returns a bare
+    //count and a colour set, and an unexplained colour is a colour the model
+    //INVENTS a mechanism for ("why {B}? Ah, the opponent has Urborg") - while a
+    //creature mana source it cannot see sent one trace on a 33k-char hunt for a
+    //fourth land. `variable` marks a producer whose output is a per-something
+    //count (Tolarian Academy's "add {U} for each artifact you control"): it is
+    //ONE source but not one mana, and the flat count silently understated it.
+    class ManaSourceView
+    {
+    public:
+        MTGCardInstance * card;
+        std::string colors;  //what this source alone can add, e.g. "{u}"
+        bool variable;       //output scales with a count; more than one mana
+        ManaSourceView() : card(0), variable(false) {}
+    };
+
+    //potentialColorReach, plus the per-source breakdown. `outSources` (may be
+    //NULL) receives one entry per distinct usable source card, in action-layer
+    //order. Variable (foreach-wrapped) producers are counted here - the plain
+    //dynamic_cast in the 3-argument form misses them entirely, so an untapped
+    //Academy was invisible to the count as well as unnamed.
+    static int potentialColorReach(Player * p, ManaPolicy & policy, ManaCost * outColors,
+                                   std::vector<ManaSourceView> * outSources);
 };
 
 #endif

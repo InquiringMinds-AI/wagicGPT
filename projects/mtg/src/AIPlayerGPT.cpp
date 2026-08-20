@@ -319,6 +319,68 @@ static MTGCardInstance * findMyArmy(MTGCardInstance * card)
     return NULL;
 }
 
+//N-166o (wave-34 audit b6 F6, ~40% of a 19.9k trace and ~35% of a 21.5k one):
+//the amass preview computed base + N and IGNORED the live "that many plus one"
+//replacement (Mauhur, Uruk-hai Captain: `@totalcounteradded(1/1)
+//from(*[army;orc;goblin]|mybattlefield) plus(1)`), while deck158's guide
+//asserts in so many words that "the cast line prints the exact result ... and
+//that number is CORRECT, Mauhur's doubling and the new-token case included".
+//A guide promise and a render that contradict each other is the worst of the
+//three possible states - the model litigated which to believe instead of
+//deciding anything. Make the RENDER authoritative: sum the plus(N) of every
+//live counter-adding replacement on this player's battlefield whose filter
+//covers an Army. Read off the scripts, so a second such card stacks correctly
+//and a card-name table is never involved.
+//Pure core over the script text, so the parse is provable in PARSETEST.
+static int counterAddPlusFromScript(const string& magicText)
+{
+    string t = magicText;
+    for (size_t i = 0; i < t.size(); i++)
+        t[i] = (char) tolower((unsigned char) t[i]);
+    size_t at = t.find("totalcounteradded(1/1)");
+    if (at == string::npos)
+        return 0;
+    //The replacement must actually cover an Army. `from(...)` carries the
+    //filter; require "army" inside it (a `from(*|...)` wildcard covers it too).
+    size_t f = t.find("from(", at);
+    if (f != string::npos)
+    {
+        size_t fe = t.find(')', f);
+        string filter = (fe == string::npos) ? t.substr(f) : t.substr(f + 5, fe - f - 5);
+        if (filter.find("army") == string::npos && filter.find('*') == string::npos)
+            return 0;
+    }
+    size_t p = t.find("plus(", at);
+    if (p == string::npos)
+        return 0;
+    size_t d = p + 5;
+    int n = 0;
+    bool any = false;
+    while (d < t.size() && isdigit((unsigned char) t[d]))
+    {
+        n = n * 10 + (t[d] - '0');
+        d++;
+        any = true;
+    }
+    return (any && n > 0) ? n : 0;
+}
+
+//The total extra +1/+1 counters this player's live replacements add to one
+//amass event.
+static int amassCounterBonus(MTGCardInstance * card)
+{
+    if (!card || !card->controller() || !card->controller()->game)
+        return 0;
+    MTGGameZone * bf = card->controller()->game->battlefield;
+    if (!bf)
+        return 0;
+    int bonus = 0;
+    for (int i = 0; i < bf->nb_cards; i++)
+        if (bf->cards[i])
+            bonus += counterAddPlusFromScript(bf->cards[i]->magicText);
+    return bonus;
+}
+
 //N-158s: read the `target(...)` spec that immediately follows a magnitude
 //clause in the card script, if there is one. `pos` is the offset just past the
 //magnitude expression in `script`. Returns "" when the next token is not a
@@ -418,9 +480,17 @@ string dynamicMagnitudes(MTGCardInstance * card)
         MTGCardInstance * army = findMyArmy(card);
         int curP = army ? army->power : 0;
         int curT = army ? army->toughness : 0;
+        //N-166o: fold in the live "that many plus N" counter replacements, so
+        //the preview is the number the amass will actually settle at and the
+        //guide's promise about this line becomes true.
+        int bonus = amassCounterBonus(card);
+        amassN += bonus;
         amassResultP = curP + amassN;
         out << "Army " << curP << "/" << curT << " -> " << amassResultP << "/"
             << (curT + amassN);
+        if (bonus > 0)
+            out << " (includes +" << bonus << " from your counter-adding replacement"
+                   " effect" << (bonus == 1 ? "" : "s") << " already in play)";
         //Creature type stays UNSPOKEN: the macro creates an Orc Army on Foray of
         //Orcs and a ZOMBIE Army on Widespread Brutality (both detected here), so
         //naming one would be wrong half the time. The card text on the same line
@@ -1293,7 +1363,7 @@ static int cardShowsOtherFace(MTGCardInstance * card)
 //{3}{B} ... I cannot afford it") and lost a game at 1 life. The count is the
 //number the arithmetic needs; spell it in words too so a digit cannot be
 //misbound to a colour, and demote the colours to a named sub-clause.
-static string manaAvailableLine(int sources, const string& colors)
+static string manaAvailableLine(int sources, const string& colors, const string& sourceList)
 {
     static const char * kNumWord[] = { "zero", "one", "two", "three", "four", "five",
                                        "six", "seven", "eight", "nine", "ten" };
@@ -1305,6 +1375,63 @@ static string manaAvailableLine(int sources, const string& colors)
         o << kNumWord[sources] << " ";
     o << "untapped source" << (sources > 1 ? "s" : "")
       << ", tapped automatically when you cast; colours you can make: " << colors << ")";
+    //N-166k: the sources themselves, so no colour in the set above is
+    //unattributed. Omitted when the engine could not name them (never observed,
+    //but a silent gap is preferable to a wrong list).
+    if (!sourceList.empty())
+        o << "\n  Those sources, one per untapped card: " << sourceList;
+    return o.str();
+}
+
+//N-166m (wave-34 audit: b4 F3 39/91, b6 P2 34/146, b3 11 traces - 34-39% of a
+//corpus). The land drop is asked as its OWN decision (FindCardToPlay's "land"
+//branch), so no cast or ability menu ever lists it - and nothing said so. The
+//pilot therefore SIMULATED a land drop it had not made and did mana math on a
+//board it never had ("I should play Tolarian Academy. But I can't select 'Play
+//Tolarian Academy' from the numbered list. So I will cast Mox Sapphire. Then I
+//can play a land afterwards if the system allows"), or concluded the drop was
+//spent when it was not. State the fact, and name WHERE the drop is asked so the
+//absence from this menu stops being evidence of anything. Only on YOUR turn -
+//there is no land drop to reason about on the opponent's. Three truthful cases,
+//no fourth: `playable` is the oracle's own legal-land-play set, and `haveLand`
+//separates "the drop is spent" from "there is nothing to play".
+//Pure so each branch is provable without a game.
+static string landDropStatusLine(bool myTurn, bool playable, bool haveLand)
+{
+    if (!myTurn)
+        return "";
+    if (playable)
+        return "Land drop: NOT yet used this turn - you can still play a land. The land"
+               " drop is its OWN decision (a \"Land drop:\" question with its own Play"
+               " options); it is never listed in a casting, ability or target menu, so"
+               " its absence from the choices below does not mean it is gone.\n";
+    if (haveLand)
+        return "Land drop: ALREADY USED this turn - you cannot play another land until"
+               " your next turn. Do not plan mana that depends on a land entering now.\n";
+    return "Land drop: you have no land you could play right now (none playable from"
+           " your hand or any other zone).\n";
+}
+
+//N-166l (wave-34 audit b2 R2 / b3 D4 / b4 F4 / b5 #7 - 2/2 deeply confusing at
+//one batch): `| Already in pool: {g}{g}{w}` was appended to a line reading
+//"Mana available: 2 total", and the two numbers were read as competing claims
+//about the SAME quantity ("This is contradictory. If I have 3 mana in the pool,
+//I can cast {2}{W}. If I only have 2 total available, I cannot"). It also fired
+//on TARGET CHOICE asks, where no cast is being priced at all, and once beside
+//"0 total (no untapped sources)", which reads as phantom mana. Two fixes: the
+//clause renders only when the pool actually HOLDS mana (a pool whose string is
+//non-empty but whose amount is zero can no longer print), and it states the
+//relationship between the two numbers instead of leaving the reader to guess
+//it. Pure so both branches are provable.
+static string manaPoolClause(const string& pool, int poolAmount, int sources)
+{
+    if (poolAmount <= 0 || pool.empty())
+        return "";
+    std::ostringstream o;
+    o << " | Already in pool: " << pool << " (" << poolAmount << " mana ALREADY produced"
+         " and floating right now - this is SEPARATE from the " << sources
+      << " untapped source" << (sources == 1 ? "" : "s") << " counted above, not a"
+         " different count of it; spend the floating mana first)";
     return o.str();
 }
 
@@ -4153,9 +4280,34 @@ string AIPlayerGPT::serializeGameState()
     //color per dual (the planPayment fix).
     ManaEngine::FreeProducerPolicy manaReachPolicy;
     ManaCost * potential = NEW ManaCost();
-    int sources = ManaEngine::potentialColorReach(this, manaReachPolicy, potential);
+    vector<ManaEngine::ManaSourceView> manaSources;
+    int sources = ManaEngine::potentialColorReach(this, manaReachPolicy, potential, &manaSources);
     string colors = potential->toString();
     SAFE_DELETE(potential);
+    //N-166k (wave-34 audit b1 F-10 / b3 F1 / b4 F5): the colour set had NO
+    //source attribution, and an unattributed fact is one the model supplies a
+    //mechanism for - "why {r}{b}? I have 4 Mountains. Where does {B} come from?
+    //Ah, the opponent has Urborg" (a card that was not on the board), a
+    //confabulation that then fed later reasoning as fact. The mirror failure is
+    //a source it cannot see at all: one trace spent 33k chars hunting a fourth
+    //land and found Katilda, a CREATURE mana source, in its last 320 chars.
+    //Name every source the count counts.
+    string sourceList;
+    {
+        std::ostringstream s;
+        for (size_t i = 0; i < manaSources.size(); i++)
+        {
+            s << (i ? "; " : "") << manaSources[i].card->getDisplayName()
+              << instanceHandle(manaSources[i].card);
+            if (!manaSources[i].colors.empty())
+                s << " " << manaSources[i].colors;
+            if (manaSources[i].variable)
+                s << " (VARIABLE output: this ONE source adds more than one mana - its"
+                     " amount is a count, read its own rules text; the total above counts"
+                     " it as one source, not as its mana)";
+        }
+        sourceList = s.str();
+    }
     //N-158g (wave-31 deck158, HIGH, cost a game at 1 life): this line USED to
     //read "Mana available: {r}{b} from 5 untapped sources" - colour set FIRST -
     //and the pilot bound the leading symbols to the POOL SIZE, concluding "I have
@@ -4166,9 +4318,8 @@ string AIPlayerGPT::serializeGameState()
     //places and loses at distance, so this is a REPRESENTATION fix: lead with the
     //COUNT (the number the arithmetic needs), spell it in words so a digit cannot
     //be misbound to a colour, and demote the colours to a named sub-clause.
-    out << "Mana available: " << manaAvailableLine(sources, colors);
-    if (!pool.empty())
-        out << " | Already in pool: " << pool;
+    out << "Mana available: " << manaAvailableLine(sources, colors, sourceList);
+    out << manaPoolClause(pool, this->getManaPool()->getConvertedCost(), sources);
     out << "\n";
     //R-PAINLAND (wave-21 deck102): the count above hides that some of your
     //usable sources DAMAGE you when tapped for mana (Ancient Tomb: 2 damage;
@@ -4184,6 +4335,22 @@ string AIPlayerGPT::serializeGameState()
         for (size_t i = 0; i < harmSources.size(); i++)
             out << (i ? "; " : "") << harmSources[i];
         out << "\n";
+    }
+    //N-166m: the land-drop fact, on YOUR turn, on every ask that carries the
+    //situation block (cast, priority, ability, target) - the re-derivation this
+    //replaces happened at all of them.
+    {
+        bool myTurn = (observer->currentPlayer == this);
+        bool playable = false;
+        bool haveLand = false;
+        if (myTurn)
+        {
+            playable = !LegalActionsOracle::legalLandPlays(this).empty();
+            for (int i = 0; i < game->hand->nb_cards && !haveLand; i++)
+                if (game->hand->cards[i] && game->hand->cards[i]->isLand())
+                    haveLand = true;
+        }
+        out << landDropStatusLine(myTurn, playable, haveLand);
     }
 
     out << "Your hand: ";
@@ -6102,6 +6269,27 @@ namespace
 //that each pip pays with EITHER of its colors and how small the real total is.
 //Non-hybrid costs get nothing (annotating every cost is noise, per the wave-15
 //synthesis ruling).
+//N-166n: the emitted tail of the hybrid gloss, split out as a PURE function of
+//(the pip descriptions, the cost's converted total) so the "total N mana" claim
+//has a provable shape. The total is the WHOLE cost's converted value - generic
+//component included - which is what made the observed
+//"{w}{w}{b/r} ... total 3 mana" beside a decklist {2}{BR}{W}{W} a contradiction
+//worth chasing; see altCostPrintedNote for the divergence half of the fix.
+static string hybridPipNoteText(const vector<string>& pips, int totalMana)
+{
+    if (pips.empty())
+        return "";
+    std::ostringstream note;
+    note << " [hybrid: ";
+    if (pips.size() == 1)
+        note << "each " << pips[0];
+    else
+        for (size_t k = 0; k < pips.size(); k++)
+            note << (k ? "; " : "") << pips[k];
+    note << " - total " << totalMana << " mana]";
+    return note.str();
+}
+
 static string hybridPipNote(ManaCost * c)
 {
     if (!c)
@@ -6125,17 +6313,38 @@ static string hybridPipNote(ManaCost * c)
         if (!seen)
             pips.push_back(desc);
     }
-    if (pips.empty())
+    return hybridPipNoteText(pips, c->getConvertedCost());
+}
+
+//N-166n (wave-34 audit b1 F-07, the batch's highest-severity render bug and one
+//of its two budget-hit traces): the mutate option printed
+//`mutate cost {w}{w}{b/r} ... [hybrid: ... - total 3 mana]` for Snapdax, whose
+//printed mutate cost is {2}{BR}{W}{W} - five mana. The model litigated it
+//verbatim ("This is contradictory") and was rescued only by having 5 mana
+//anyway. This is the class the core prompt's own rail ("trust the numbers the
+//game prints") makes most dangerous: a WRONG NUMBER stated as engine ground
+//truth. The live alternative-cost object is what the engine will actually
+//charge - cost reduction mutates it in place - so the label must keep printing
+//the live cost, and the fix is to stop the SILENT divergence from the decklist:
+//when live != printed, say both and say which one is binding. Pure over the two
+//strings so the branches are provable.
+static string altCostPrintedNote(const string& liveCost, const string& printedCost)
+{
+    if (printedCost.empty() || liveCost == printedCost)
         return "";
-    std::ostringstream note;
-    note << " [hybrid: ";
-    if (pips.size() == 1)
-        note << "each " << pips[0];
-    else
-        for (size_t k = 0; k < pips.size(); k++)
-            note << (k ? "; " : "") << pips[k];
-    note << " - total " << c->getConvertedCost() << " mana]";
-    return note.str();
+    return " (the decklist prints this cost as " + printedCost + "; the cost shown"
+           " here is the LIVE one after any cost changes, and it is what you actually pay)";
+}
+
+//The card's PRINTED alternative cost as a string ("" when unavailable).
+static string printedAlternativeCostString(MTGCardInstance * card)
+{
+    if (!card || !card->model || !card->model->data)
+        return "";
+    ManaCost * printed = card->model->data->getManaCost();
+    if (!printed || !printed->getAlternative())
+        return "";
+    return printed->getAlternative()->toString();
 }
 
 //Name the card(s) an EXTRA cost on an alternative cast will consume from
@@ -6336,6 +6545,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             o << mutateAltCostLabel(card->has(Constants::MUTATE),
                                     cost->getAlternative()->alternativeName);
             o << " " << cost->getAlternative()->toString();
+            //N-166n: never let the label's cost silently disagree with the
+            //decklist's printed cost.
+            o << altCostPrintedNote(cost->getAlternative()->toString(),
+                                    printedAlternativeCostString(card));
             //Adventure alternative casts put an INSTANT/SORCERY spell onto the
             //stack, not the creature - the card's power/toughness belongs to the
             //creature face you may cast LATER from exile, so printing "(5/5)"
@@ -9438,7 +9651,8 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
                                  const string& optTwoLabel,
                                  const string& optOneEffect,
                                  const vector<bool>& eligibleForOptionOne,
-                                 int revealSource, bool pickExactlyOne)
+                                 int revealSource, bool pickExactlyOne,
+                                 bool wholeLibrary)
 {
     bool haveElig = (eligibleForOptionOne.size() == revealed.size());
     int eligCount = 0;
@@ -9470,8 +9684,20 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
     }
     else
     {
-        tail << "Reveal: you looked at the top " << revealed.size()
-             << " card" << (revealed.size() == 1 ? "" : "s") << " of your library.";
+        //N-166p (wave-34 audit b5): a TUTOR moves the WHOLE library into the
+        //reveal zone, and this line registered it as "you looked at the top 48
+        //cards of your library" - a top-of-library look, which is a different
+        //game action with different information and a different cost. Name the
+        //action for what it is when the library has nothing left behind it.
+        if (wholeLibrary)
+            tail << "Search: you are searching your ENTIRE library - all "
+                 << revealed.size() << " card"
+                 << (revealed.size() == 1 ? "" : "s") << " of it are listed below."
+                    " This is a search, not a look at the top of your library:"
+                    " every card you own that is still in the library is here.";
+        else
+            tail << "Reveal: you looked at the top " << revealed.size()
+                 << " card" << (revealed.size() == 1 ? "" : "s") << " of your library.";
         if (pickExactlyOne)
             tail << " Choose the ONE card that goes to \"" << optOneLabel
                  << "\"; every other card goes to \"" << optTwoLabel << "\".\n";
@@ -9586,7 +9812,11 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
 
     string userMsg = assemblePrompt(
         buildRevealAskText(revealed, optOneLabel, optTwoLabel, optOneEffect,
-                           eligibleForOptionOne, revealSource, pickExactlyOne));
+                           eligibleForOptionOne, revealSource, pickExactlyOne,
+                           //N-166p: a search empties the library zone into the
+                           //reveal zone; a top-of-library look does not.
+                           revealSource == 0 && game->library->nb_cards == 0
+                               && revealed.size() > 1));
 
     string content;
     if (pollCompletionRetry(userMsg, content) == kChoicePending)
@@ -11403,7 +11633,7 @@ void AIPlayerGPT::runParseSelfTest()
 
         // ---- N-158g: the mana line leads with the COUNT, not the colour set.
         {
-            string ml = manaAvailableLine(5, "{r}{b}");
+            string ml = manaAvailableLine(5, "{r}{b}", "");
             cout << "     N-158g mana line -> " << ml << "\n";
             CHECK(ml.compare(0, 8, "5 total ") == 0,
                   "W32-R N-158g: the mana line LEADS with the source count");
@@ -11413,11 +11643,11 @@ void AIPlayerGPT::runParseSelfTest()
                   "W32-R N-158g: the colours survive, demoted to a named sub-clause");
             CHECK(ml[0] != '{',
                   "W32-R N-158g NEGATIVE: the line no longer OPENS with a mana symbol (the misbinding)");
-            CHECK(manaAvailableLine(1, "{w}").find("one untapped source,") != string::npos,
+            CHECK(manaAvailableLine(1, "{w}", "").find("one untapped source,") != string::npos,
                   "W32-R N-158g: a single source is singular");
-            CHECK(manaAvailableLine(0, "") == "0 total (no untapped sources)",
+            CHECK(manaAvailableLine(0, "", "") == "0 total (no untapped sources)",
                   "W32-R N-158g: the empty case still leads with a count");
-            CHECK(manaAvailableLine(12, "{g}").find("12 total (untapped sources,") != string::npos,
+            CHECK(manaAvailableLine(12, "{g}", "").find("12 total (untapped sources,") != string::npos,
                   "W32-R N-158g: past the word table the digit stands alone (no out-of-range read)");
         }
 
@@ -12767,6 +12997,146 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(poisonStatusLine(6, 0, false).find("Poison counters (you): 6 of 10") != string::npos
               && poisonStatusLine(6, 0, false).find("(opponent)") == string::npos,
               "W35-N166j NEGATIVE an ungated nonzero count renders exactly as before");
+    }
+
+    // ---- N-166k: the mana line names its sources ----
+    cout << "\n[W35-N166k] mana source attribution\n";
+    {
+        string ml = manaAvailableLine(4, "{g}{w}",
+                                      "Forest #1 {g}; Forest #2 {g}; Deserted Beach {g} or {w};"
+                                      " Katilda, Dawnhart Prime {g} or {w}");
+        cout << "     " << ml << "\n";
+        CHECK(ml.compare(0, 8, "4 total ") == 0,
+              "W35-N166k NEGATIVE the N-158g count-first shape is untouched");
+        CHECK(ml.find("Those sources, one per untapped card: Forest #1 {g}") != string::npos,
+              "W35-N166k every counted source is named, so no colour is unattributed");
+        CHECK(ml.find("Katilda, Dawnhart Prime") != string::npos,
+              "W35-N166k a CREATURE mana source appears in the enumeration");
+        // NEGATIVE: with no list the line is byte-identical to the old shape.
+        CHECK(manaAvailableLine(4, "{g}{w}", "").find("Those sources") == string::npos,
+              "W35-N166k NEGATIVE an empty list adds nothing rather than an empty clause");
+        CHECK(manaAvailableLine(0, "", "any").find("Those sources") == string::npos,
+              "W35-N166k NEGATIVE the zero-source line takes no source clause");
+    }
+
+    // ---- N-166l: the pool clause cannot contradict the count ----
+    cout << "\n[W35-N166l] Already-in-pool clause\n";
+    {
+        string pc = manaPoolClause("{g}{g}{w}", 3, 2);
+        cout << "     " << pc << "\n";
+        CHECK(pc.find("Already in pool: {g}{g}{w}") != string::npos,
+              "W35-N166l the pool contents still render when the pool is real");
+        CHECK(pc.find("SEPARATE from the 2 untapped sources") != string::npos,
+              "W35-N166l the relationship between the two numbers is stated, not implied");
+        // NEGATIVE: an empty pool - the phantom-floating-mana case, incl. the
+        // TARGET CHOICE asks with zero untapped sources.
+        CHECK(manaPoolClause("", 0, 0).empty(),
+              "W35-N166l NEGATIVE an empty pool emits no clause");
+        CHECK(manaPoolClause("{b}", 0, 0).empty(),
+              "W35-N166l NEGATIVE a non-empty string with a zero amount is phantom mana, suppressed");
+        CHECK(manaPoolClause("{b}", 1, 1).find("1 untapped source,") != string::npos
+              || manaPoolClause("{b}", 1, 1).find("1 untapped source ") != string::npos,
+              "W35-N166l a single source is singular in the clause");
+    }
+
+    // ---- N-166m: the land drop states its own status ----
+    cout << "\n[W35-N166m] land-drop status line\n";
+    {
+        string avail = landDropStatusLine(true, true, true);
+        cout << "     " << avail;
+        CHECK(avail.find("NOT yet used this turn") != string::npos,
+              "W35-N166m an unused, playable land drop says so");
+        CHECK(avail.find("its OWN decision") != string::npos,
+              "W35-N166m the line says WHERE the drop is asked, so its absence here proves nothing");
+        CHECK(landDropStatusLine(true, false, true).find("ALREADY USED this turn") != string::npos,
+              "W35-N166m a spent drop is stated as spent");
+        CHECK(landDropStatusLine(true, false, false).find("no land you could play") != string::npos,
+              "W35-N166m with nothing playable the line says that, not that the drop is spent");
+        // NEGATIVE: nothing at all on the opponent's turn.
+        CHECK(landDropStatusLine(false, true, true).empty()
+              && landDropStatusLine(false, false, false).empty(),
+              "W35-N166m NEGATIVE no land-drop line on the opponent's turn");
+        // NEGATIVE: the available branch must not read as an offered option.
+        CHECK(avail.compare(0, 11, "Land drop: ") == 0 && avail.find("\n1.") == string::npos
+              && avail.find("1. Play") == string::npos,
+              "W35-N166m NEGATIVE the status line is a statement, never a numbered choice");
+    }
+
+    // ---- N-166n: an alt cost that diverges from the decklist says so ----
+    cout << "\n[W35-N166n] alternative-cost divergence note\n";
+    {
+        string n = altCostPrintedNote("{w}{w}{b/r}", "{2}{w}{w}{b/r}");
+        cout << "     " << n << "\n";
+        CHECK(n.find("decklist prints this cost as {2}{w}{w}{b/r}") != string::npos,
+              "W35-N166n the printed cost is named when the live cost differs");
+        CHECK(n.find("what you actually pay") != string::npos,
+              "W35-N166n the line says which of the two is binding");
+        // NEGATIVE: agreement is silence.
+        CHECK(altCostPrintedNote("{2}{w}", "{2}{w}").empty(),
+              "W35-N166n NEGATIVE matching costs add no note");
+        CHECK(altCostPrintedNote("{2}{w}", "").empty(),
+              "W35-N166n NEGATIVE an unavailable printed cost adds no note rather than a wrong one");
+        // The hybrid gloss states the WHOLE cost's total, generic included.
+        // (A live ManaCost cannot be built here - Constants::NB_Colors is not
+        // populated in a PARSETEST process - so the arithmetic is pinned at the
+        // pure text builder the emitter now routes through.)
+        {
+            vector<string> pips;
+            pips.push_back("{b/r} pays with B or R");
+            string g = hybridPipNoteText(pips, 5);
+            cout << "     hybrid gloss -> " << g << "\n";
+            CHECK(g == " [hybrid: each {b/r} pays with B or R - total 5 mana]",
+                  "W35-N166n the gloss reports the converted total it is handed, not a pip count");
+            CHECK(hybridPipNoteText(pips, 3).find("total 3 mana") != string::npos,
+                  "W35-N166n the total is the cost's number, never a constant");
+            vector<string> nopips;
+            CHECK(hybridPipNoteText(nopips, 5).empty(),
+                  "W35-N166n NEGATIVE a cost with no hybrid pips emits no gloss at all");
+        }
+    }
+
+    // ---- N-166o: the amass preview folds in counter replacements ----
+    cout << "\n[W35-N166o] amass preview includes live counter-adding replacements\n";
+    {
+        string mauhur = "@totalcounteradded(1/1) from(*[army;orc;goblin]|mybattlefield)"
+                        " plus(1):ability$!name(That many plus 1) donothing!$ controller";
+        CHECK(counterAddPlusFromScript(mauhur) == 1,
+              "W35-N166o the plus(N) of an Army-covering replacement is read off the script");
+        // NEGATIVE: a replacement that cannot cover an Army contributes nothing.
+        CHECK(counterAddPlusFromScript(
+                  "@totalcounteradded(1/1) from(creature[elf]|mybattlefield) plus(2):"
+                  "ability$!name(x)donothing!$ controller") == 0,
+              "W35-N166o NEGATIVE a non-Army filter is not folded into the amass preview");
+        CHECK(counterAddPlusFromScript("") == 0,
+              "W35-N166o NEGATIVE an empty script contributes nothing");
+        CHECK(counterAddPlusFromScript("_ATTACKING_ ability$!life:-2!$ opponent") == 0,
+              "W35-N166o NEGATIVE an unrelated script contributes nothing");
+        CHECK(counterAddPlusFromScript(
+                  "@totalcounteradded(1/1) from(*[army]|mybattlefield) plus(0):x") == 0,
+              "W35-N166o NEGATIVE plus(0) is not a bonus");
+    }
+
+    // ---- N-166p: a full-library tutor is named a search ----
+    cout << "\n[W35-N166p] tutor reveal is registered as a search\n";
+    {
+        vector<bool> noElig;
+        vector<MTGCardInstance*> none;
+        string search = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, true);
+        cout << "     " << search.substr(0, 120) << "\n";
+        CHECK(search.find("Search: you are searching your ENTIRE library") != string::npos,
+              "W35-N166p a whole-library reveal is called a search");
+        CHECK(search.find("not a look at the top of your library") != string::npos,
+              "W35-N166p the line rules out the top-of-library reading it used to assert");
+        // NEGATIVE: a genuine top-of-library look keeps its wording exactly.
+        string look = buildRevealAskText(none, "Hand", "Library", "", noElig, 0, true, false);
+        CHECK(look.find("Reveal: you looked at the top") != string::npos
+              && look.find("Search:") == string::npos,
+              "W35-N166p NEGATIVE a real top-of-library look is byte-unchanged");
+        // NEGATIVE: a HAND reveal is neither.
+        string hand = buildRevealAskText(none, "Discard", "Hand", "", noElig, 2, true, false);
+        CHECK(hand.find("You revealed your hand") != string::npos
+              && hand.find("Search:") == string::npos,
+              "W35-N166p NEGATIVE the hand-reveal branch is untouched");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
