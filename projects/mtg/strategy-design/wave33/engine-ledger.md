@@ -426,3 +426,26 @@ at ≥15 measured decisions it projects median latency × expected decisions/gam
 (WAGIC_CORPUS_DECISIONS, default 130) against -T and kills the whole corpus with a loud
 INFEASIBLE verdict if a full game cannot fit (verified: today's 419s median → INFEASIBLE;
 90s → OK). Wave-35 corpus reruns after the owner's serve work, when the arithmetic passes.
+
+## Wave-35 tier A/B — 35B arm COMPLETE, livelock fixed (2026-08-21)
+
+**35B-A3B wave (matchups-20260820-192210 + rerun matchups-20260821-022400): 21/21 matchups,
+ALL full natural games** (serve-bench-35b.sh mtp:4 :8084, -j 21, budget 6000, timeout 900,
+~2.5h wall + rerun). Health: ~0.3% fallbacks, ~2 budget hits, 0 degenerate, latency p50 90s
+at C=21. Wins: 152 6/6, 146 4/6 (incl. rerun), 158 3/6, 105 3/6, 116 2/6, 36 2/6, 139 1/6.
+Measured decisions/game (both seats): ~60.
+
+**LIVELOCK found+fixed (f0689f56f)**: game 146v36 spent 4.6h / 341 stale drops on one Kaya
+priority menu. Root cause (gdb live prompt-diff, divergence at the -3 target order): Baka
+seeds ability efficiencies with random() -> equal candidates reorder each window rebuild ->
+prompt text unstable for identical state -> every answer stale. Fix: GPT priority menu
+renders in its own text order (byte-stable; Baka untouched) + kStaleLivelockLimit=6 drop
+streak hands that one decision to Baka (translog class stale_livelock). Gates: suite 1046/0
++ 28/0 ST, PARSETEST 552/0. Rerun of 146v36 on the fix: natural completion, no loop.
+Diagnostics: strategy-design/wave35-diag/.
+
+**122B wave LAUNCHED** (matchups-20260821-033000, serve-bench.sh SPEC=off SEQS=24 UTIL=0.80
+:8081, -j 21, -T 70000, timeout 2400, WAGIC_CORPUS_DECISIONS=65): overnight, projected
+~10-20h (per-decision ~660s at C=21). First launch was restarted once pre-data: the watchdog
+default 130 decisions/game (wave-34 cap-truncated estimate) would have false-aborted a
+feasible run - 60 is the measured whole-game number for these seven decks.
