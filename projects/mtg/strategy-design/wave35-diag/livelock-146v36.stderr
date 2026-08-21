@@ -1,0 +1,1487 @@
+I R in da native
+Init ResourceManagerImpl : 0x5568cbc5ec50
+21hgeParticleSystemInfo cache resized to 500000 bytes
+7JSample cache resized to 1500000 bytes
+8JTexture cache resized to 2000000 bytes
+Threaded Version
+8JTexture cache resized to 60000000 bytes
+Texture graphics/background/backdrop1.jpg failed to load
+AttemptNew failed to load (404): background/backdrop1.jpg
+Destroying WCachedResource: background/backdrop1.jpg
+Can't locate 
+background/backdrop1.jpg
+Texture graphics/background/backdrop2.jpg failed to load
+AttemptNew failed to load (404): background/backdrop2.jpg
+Destroying WCachedResource: background/backdrop2.jpg
+Can't locate 
+background/backdrop2.jpg
+Texture graphics/background/backdrop3.jpg failed to load
+AttemptNew failed to load (404): background/backdrop3.jpg
+Destroying WCachedResource: background/backdrop3.jpg
+Can't locate 
+background/backdrop3.jpg
+Texture graphics/background/backdrop4.jpg failed to load
+AttemptNew failed to load (404): background/backdrop4.jpg
+Destroying WCachedResource: background/backdrop4.jpg
+Can't locate 
+background/backdrop4.jpg
+Texture graphics/background/backdrop5.jpg failed to load
+AttemptNew failed to load (404): background/backdrop5.jpg
+Destroying WCachedResource: background/backdrop5.jpg
+Can't locate 
+background/backdrop5.jpg
+Texture graphics/background/backdrop6.jpg failed to load
+AttemptNew failed to load (404): background/backdrop6.jpg
+Destroying WCachedResource: background/backdrop6.jpg
+Can't locate 
+background/backdrop6.jpg
+size of MTGCardInstance: 2464
+size of MTGCard: 32
+size of CardPrimitive: 640
+size of ExtraCost: 72
+size of ManaCost: 176
+entergamestate:menu
+Selected soundtrack is: Track0.mp3
+sound/Track0.mp3
+inserted item ptr 0x5568cbc02b00 at index 2000000016
+Time elapsed while loading sets/primitives/. : 0 ms
+Time elapsed while loading sets/primitives/.. : 1 ms
+Time elapsed while loading sets/primitives/_macros.txt : 0 ms
+Time elapsed while loading sets/primitives/borderline.txt : 360 ms
+Time elapsed while loading sets/primitives/mtg.txt : 329 ms
+Time elapsed while loading sets/primitives/planeswalkers.txt : 10 ms
+Time elapsed while loading sets/primitives/unsupported.txt : 1 ms
+warning, card id collision! : 446807 -> Nighteyes the Desecrator(Commander Anthology Volume II)
+
+==
+Total MTGCards: 68020
+Total CardPrimitives: 26078
+==
+8JTexture cache resized to 60000000 bytes
+WAGIC_SELFPLAY: auto-launching AI-vs-AI demo
+leavegamestate:menuentergamestate:transitioninserted item ptr 0x5568cebad560 at index 2000000017
+inserted item ptr 0x5568cebaf6a0 at index 2000000018
+inserted item ptr 0x5568cebaf7d0 at index 2000000019
+inserted item ptr 0x5568cebaf970 at index 2000000020
+inserted item ptr 0x5568cebafc90 at index 2000000021
+inserted item ptr 0x5568cbc3bd00 at index 2000000022
+inserted item ptr 0x5568cebaea50 at index 2000000023
+leavegamestate:transitionentergamestate:duelDeleting cache item 0x5568cbc02b00, cache reduced by 1048576 bytes
+Destroying WCachedResource: menutitle.png
+enterduelphase:choose_deck1WAGIC_SELFPLAY: matchup deck146 vs deck36
+inserted item ptr 0x5568cfe8bfb0 at index 2000000024
+AIPlayerGPT: using http://100.116.136.74:8084 (model qwen36-35b-a3b)
+inserted item ptr 0x5568cff18ab0 at index 2000000025
+AIPlayerGPT: using http://100.116.136.74:8084 (model qwen36-35b-a3b)
+leaveduelphase:choose_deck1enterduelphase:playinserted item ptr 0x5568cff1b470 at index 2000000027
+RULES Init Game
+
+PhasingRing: goToPhase called, current phase is ---
+sound/sfx/
+AttemptNew failed to load (404): 
+Destroying WCachedResource: 
+Can't locate 
+
+ZONE SHUFFLE obs=0x5568ce9d8930 isLibrary=1 nb=60
+ZONE SHUFFLE obs=0x5568ce9d8930 isLibrary=1 nb=60
+sound/sfx/
+AttemptNew failed to load (404): 
+Destroying WCachedResource: 
+Can't locate 
+
+ZONE SHUFFLE obs=0x5568ce9d8930 isLibrary=1 nb=60
+ZONE SHUFFLE obs=0x5568ce9d8930 isLibrary=1 nb=60
+RULES Init Game Done !
+
+PREGAME: starting pre-game phase; starting player = seat 0, opponent = seat 1
+
+Selected soundtrack is: ai_baka_music.mp3
+sound/ai_baka_music.mp3
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+in GetCost Seems ManaCost was not properly initialized
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand. Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 2 of 2
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand. Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 1 of 2
+ZONE SHUFFLE obs=0x5568ce9d8930 isLibrary=1 nb=60
+PREGAME: player 0 (seat 0) takes mulligan #1, redrew 7 cards
+PREGAME: player 1 (seat 1) KEEPS after 0 mulligan(s); will bottom 0 card(s)
+AIPlayerGPT: Pre-game mulligan decision (London mulligan). You have a fresh 7-card opening hand, and having already taken 1 mulligan you will bottom 1 card on a keep (keeping 6). Keep this hand, or mulligan (shuffle back and draw 7 again, bottoming one more at the next keep)? -> chose 1 of 2
+PREGAME: player 0 (seat 0) KEEPS after 1 mulligan(s); will bottom 1 card(s)
+AIPlayerGPT: bottom prose-reconciled to the final stated set
+PREGAME: player 0 (seat 0) bottoms 'Hive of the Eye Tyrant' (1 of 1); library bottom card now 'Hive of the Eye Tyrant'
+PREGAME: pre-game phase complete; turn 1 begins (game opens at the untap step; the starting player skips only its first draw)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Shineshadow Snarl
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 3 of 4
+Should I play Shineshadow Snarl?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Shineshadow Snarl
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Shineshadow Snarl
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+sound/sfx/
+AttemptNew failed to load (404): 
+Destroying WCachedResource: 
+Can't locate 
+
+Untap Phase -------------   Turn 1
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 1 of 4
+Should I play Great Furnace?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Great Furnace
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Great Furnace
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+sound/sfx/artifact.wav
+AttemptNew failed to load (404): artifact.wav
+Destroying WCachedResource: 
+Can't locate 
+artifact.wav
+sound/sfx/
+AttemptNew failed to load (404): 
+Destroying WCachedResource: 
+Can't locate 
+
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Mox Sapphire
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 3
+Should I play Mox Sapphire?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Mox Sapphire
+
+AIPlayerGPT: casting Mox Sapphire (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Mox Sapphire
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+ACTIONSTACK Add spell
+Action added to stack: Mox Sapphire
+Resolving Action on stack: Mox Sapphire
+sound/sfx/artifact.wav
+AttemptNew failed to load (404): artifact.wav
+Destroying WCachedResource: 
+Can't locate 
+artifact.wav
+sound/sfx/
+AttemptNew failed to load (404): 
+Destroying WCachedResource: 
+Can't locate 
+
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Mox Jet
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Mox Jet?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Mox Jet
+
+AIPlayerGPT: casting Mox Jet (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Mox Jet
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+ACTIONSTACK Add spell
+Action added to stack: Mox Jet
+Resolving Action on stack: Mox Jet
+sound/sfx/artifact.wav
+AttemptNew failed to load (404): artifact.wav
+Destroying WCachedResource: 
+Can't locate 
+artifact.wav
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 4
+Should I play Glaze Fiend?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Glaze Fiend
+
+AIPlayerGPT: casting Glaze Fiend (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Glaze Fiend
+-  Cost: {1}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+inserted item ptr 0x5568cffc5350 at index 2000000032
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+inserted item ptr 0x5568cffb7010 at index 2000000033
+ACTIONSTACK Add spell
+Action added to stack: Glaze Fiend
+Resolving Action on stack: Glaze Fiend
+
+AttemptNew failed to load (404): illusion.wav
+Destroying WCachedResource: 
+Can't locate 
+illusion.wav
+sound/sfx/creature.wav
+AttemptNew failed to load (404): creature.wav
+Destroying WCachedResource: 
+Can't locate 
+creature.wav
+sound/sfx/flying.wav
+AttemptNew failed to load (404): flying.wav
+Destroying WCachedResource: 
+Can't locate 
+flying.wav
+sound/sfx/artifact.wav
+AttemptNew failed to load (404): artifact.wav
+Destroying WCachedResource: 
+Can't locate 
+artifact.wav
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 2
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 1 of 3
+Should I play Plains?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Plains
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Plains
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): plains.wav
+Destroying WCachedResource: 
+Can't locate 
+plains.wav
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Triumphant Adventurer?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Triumphant Adventurer
+
+AIPlayerGPT: casting Triumphant Adventurer (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Triumphant Adventurer
+-  Cost: {b}{w}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+inserted item ptr 0x5568cff98420 at index 2000000039
+ACTIONSTACK Add spell
+Action added to stack: Triumphant Adventurer
+Resolving Action on stack: Triumphant Adventurer
+sound/sfx/knight.wav
+AttemptNew failed to load (404): knight.wav
+Destroying WCachedResource: 
+Can't locate 
+knight.wav
+sound/sfx/human.wav
+AttemptNew failed to load (404): human.wav
+Destroying WCachedResource: 
+Can't locate 
+human.wav
+
+AttemptNew failed to load (404): deathtouch.wav
+Destroying WCachedResource: 
+Can't locate 
+deathtouch.wav
+sound/sfx/creature.wav
+AttemptNew failed to load (404): creature.wav
+Destroying WCachedResource: 
+Can't locate 
+creature.wav
+Untap Phase -------------   Turn 3
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 1 of 3
+Should I play Ancient Den?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Ancient Den
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Ancient Den
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+Action added to stack: StackAbility.  (Source: Glaze Fiend)
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+sound/sfx/artifact.wav
+AttemptNew failed to load (404): artifact.wav
+Destroying WCachedResource: 
+Can't locate 
+artifact.wav
+Resolving Action on stack: StackAbility.  (Source: Glaze Fiend)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Ornithopter
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 3 of 4
+Should I play Ornithopter?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Ornithopter
+
+AIPlayerGPT: casting Ornithopter (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Ornithopter
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+ACTIONSTACK Add spell
+Action added to stack: Ornithopter
+Resolving Action on stack: Ornithopter
+Action added to stack: StackAbility.  (Source: Glaze Fiend)
+
+AttemptNew failed to load (404): thopter.wav
+Destroying WCachedResource: 
+Can't locate 
+thopter.wav
+sound/sfx/creature.wav
+AttemptNew failed to load (404): creature.wav
+Destroying WCachedResource: 
+Can't locate 
+creature.wav
+sound/sfx/flying.wav
+AttemptNew failed to load (404): flying.wav
+Destroying WCachedResource: 
+Can't locate 
+flying.wav
+Resolving Action on stack: StackAbility.  (Source: Glaze Fiend)
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 2 of 3
+Should I play Salvage Slasher?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Salvage Slasher
+
+AIPlayerGPT: casting Salvage Slasher (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Salvage Slasher
+-  Cost: {1}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+sound/sfx/mana.wav
+AttemptNew failed to load (404): mana.wav
+Destroying WCachedResource: 
+Can't locate 
+mana.wav
+ACTIONSTACK Add spell
+Action added to stack: Salvage Slasher
+Resolving Action on stack: Salvage Slasher
+Action added to stack: StackAbility.  (Source: Glaze Fiend)
+
+AttemptNew failed to load (404): rogue.wav
+Destroying WCachedResource: 
+Can't locate 
+rogue.wav
+sound/sfx/human.wav
+AttemptNew failed to load (404): human.wav
+Destroying WCachedResource: 
+Can't locate 
+human.wav
+sound/sfx/creature.wav
+AttemptNew failed to load (404): creature.wav
+Destroying WCachedResource: 
+Can't locate 
+creature.wav
+Resolving Action on stack: StackAbility.  (Source: Glaze Fiend)
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT: declared attack (1 of 1) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Triumphant Adventurer
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 4
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 1 of 3
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): swamp.wav
+Destroying WCachedResource: 
+Can't locate 
+swamp.wav
+
+AttemptNew failed to load (404): land.wav
+Destroying WCachedResource: 
+Can't locate 
+land.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Triumphant Adventurer?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Triumphant Adventurer
+
+AIPlayerGPT: casting Triumphant Adventurer (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Triumphant Adventurer
+-  Cost: {b}{w}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Triumphant Adventurer
+Resolving Action on stack: Triumphant Adventurer
+sound/sfx/knight.wav
+AttemptNew failed to load (404): knight.wav
+Destroying WCachedResource: 
+Can't locate 
+knight.wav
+sound/sfx/human.wav
+AttemptNew failed to load (404): human.wav
+Destroying WCachedResource: 
+Can't locate 
+human.wav
+
+AttemptNew failed to load (404): deathtouch.wav
+Destroying WCachedResource: 
+Can't locate 
+deathtouch.wav
+sound/sfx/creature.wav
+AttemptNew failed to load (404): creature.wav
+Destroying WCachedResource: 
+Can't locate 
+creature.wav
+AIPlayerGPT: declared attack (1 of 1) in one reply
+Action added to stack: StackAbility.  (Source: Triumphant Adventurer)
+Resolving Action on stack: StackAbility.  (Source: Triumphant Adventurer)
+inserted item ptr 0x5568cffa6480 at index 2000000049
+ActionLayer::doReactTo 134
+CHECKING Spell
+
+AIPlayerGPT: VENTURE - CHOOSE A DUNGEON to enter (you are picking WHICH dungeon to venture into, NOT targeting a permanent). Each option below is a dungeon; its tag shows the room count and the completion reward, and its full room path follows. Weigh how many rooms to completion and whether the completion payoff and the rooms en route fit your plan (a dungeon whose completion turns on your payoffs is usually worth the shorter path). Pick the ONE dungeon to venture into, and answer with its name. -> chose 2 of 3
+AIPlayerGPT: targeting with Triumphant Adventurer -> 1 target(s), first: Lost Mine of Phandelver [your zone] [dungeon: 7 rooms; completion reward ("Temple of Dumathoin"): Draw a card.] - full room path: "Cave Entrance - Scry 1. -- Goblin Lair - Create a 1/1 red Goblin creature token. -- Mine Tunnels - Create a Treasure token. -- Storeroom - Put a +1/+1 counter on target creature. -- Dark Pool - Each opponent loses 1 life and you gain 1 life. -- Fungi Cavern - Target creature gets -4/-0 until your next turn. -- Temple of Dumathoin - Draw a card."
+Action added to stack: StackAbility.  (Source: Triumphant Adventurer)
+Resolving Action on stack: StackAbility.  (Source: Triumphant Adventurer)
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Salvage Slasher
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: explicit all-decline (no blockers) in one reply
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Ornithopter
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Ornithopter
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 5
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Tree of Tales
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 3 of 3
+AIPlayerGPT: held the land drop
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: held the land drop
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Nuisance Engine?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Nuisance Engine
+
+AIPlayerGPT: casting Nuisance Engine (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Nuisance Engine
+-  Cost: {3}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+inserted item ptr 0x5568cffc97b0 at index 2000000050
+ACTIONSTACK Add spell
+Action added to stack: Nuisance Engine
+Resolving Action on stack: Nuisance Engine
+Action added to stack: StackAbility.  (Source: Glaze Fiend)
+Resolving Action on stack: StackAbility.  (Source: Glaze Fiend)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Tree of Tales
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 1 of 3
+Should I play Swamp?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Swamp
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Swamp
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): swamp.wav
+Destroying WCachedResource: 
+Can't locate 
+swamp.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+AIPlayerGPT: model chose 1 of 1
+AIPlayerGPT[ph4]: take action 1/1 (cached=0)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Nuisance Engine
+-  Cost: {2}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+Action added to stack: StackAbility.  (Source: Nuisance Engine)
+Resolving Action on stack: StackAbility.  (Source: Nuisance Engine)
+Action added to stack: StackAbility.  (Source: Glaze Fiend)
+
+AttemptNew failed to load (404): pest.wav
+Destroying WCachedResource: 
+Can't locate 
+pest.wav
+Resolving Action on stack: StackAbility.  (Source: Glaze Fiend)
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT: declared attack (2 of 3) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Triumphant Adventurer
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 6
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Shineshadow Snarl
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 1 of 3
+Should I play Plains?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Plains
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Plains
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): plains.wav
+Destroying WCachedResource: 
+Can't locate 
+plains.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Barrowin of Clan Undurr?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Barrowin of Clan Undurr
+
+AIPlayerGPT: casting Barrowin of Clan Undurr (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Barrowin of Clan Undurr
+-  Cost: {2}{b}{w}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Barrowin of Clan Undurr
+Resolving Action on stack: Barrowin of Clan Undurr
+
+AttemptNew failed to load (404): cleric.wav
+Destroying WCachedResource: 
+Can't locate 
+cleric.wav
+
+AttemptNew failed to load (404): dwarf.wav
+Destroying WCachedResource: 
+Can't locate 
+dwarf.wav
+
+AttemptNew failed to load (404): legendary.wav
+Destroying WCachedResource: 
+Can't locate 
+legendary.wav
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+AIPlayerGPT: DUNGEON ROOM CHOICE - you are venturing in Lost Mine of Phandelver. You are choosing which ROOM you enter now - this is not a target and not a card to cast. Lost Mine of Phandelver's rooms, in printed order: 1. Cave Entrance; 2. Goblin Lair; 3. Mine Tunnels; 4. Storeroom; 5. Dark Pool; 6. Fungi Cavern; 7. Temple of Dumathoin. Dungeon paths BRANCH, so a run does not enter every room and the printed order is not a route. The options below are the only rooms you may enter at this step, and each one's effect is stated on its own line. -> chose 1 of 2
+ActionLayer::doReactTo 149
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+sound/sfx/goblin.wav
+AttemptNew failed to load (404): goblin.wav
+Destroying WCachedResource: 
+Can't locate 
+goblin.wav
+AIPlayerGPT: declared attack (2 of 2) in one reply
+Action added to stack: StackAbility.  (Source: Triumphant Adventurer)
+Action added to stack: StackAbility.  (Source: Triumphant Adventurer)
+Resolving Action on stack: StackAbility.  (Source: Triumphant Adventurer)
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+AIPlayerGPT: DUNGEON ROOM CHOICE - you are venturing in Lost Mine of Phandelver. You are choosing which ROOM you enter now - this is not a target and not a card to cast. Lost Mine of Phandelver's rooms, in printed order: 1. Cave Entrance; 2. Goblin Lair; 3. Mine Tunnels; 4. Storeroom; 5. Dark Pool; 6. Fungi Cavern; 7. Temple of Dumathoin. Dungeon paths BRANCH, so a run does not enter every room and the printed order is not a route. The options below are the only rooms you may enter at this step, and each one's effect is stated on its own line. -> chose 2 of 2
+ActionLayer::doReactTo 157
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Triumphant Adventurer)
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+ActionLayer::doReactTo 161
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Pest
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: explicit all-decline (no blockers) in one reply
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Ornithopter
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Pest
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 7
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT: model chose 1 of 1
+AIPlayerGPT[ph2]: take action 1/1 (cached=0)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Nuisance Engine
+-  Cost: {2}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+Action added to stack: StackAbility.  (Source: Nuisance Engine)
+Resolving Action on stack: StackAbility.  (Source: Nuisance Engine)
+Action added to stack: StackAbility.  (Source: Glaze Fiend)
+
+AttemptNew failed to load (404): pest.wav
+Destroying WCachedResource: 
+Can't locate 
+pest.wav
+Resolving Action on stack: StackAbility.  (Source: Glaze Fiend)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Island
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 1 of 3
+Should I play Tree of Tales?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Tree of Tales
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Tree of Tales
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+Action added to stack: StackAbility.  (Source: Glaze Fiend)
+Resolving Action on stack: StackAbility.  (Source: Glaze Fiend)
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT: declared attack (2 of 4) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Goblin
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 8
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Shineshadow Snarl
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: which land do you play now, if any? -> chose 1 of 3
+Should I play Shineshadow Snarl?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Shineshadow Snarl
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Shineshadow Snarl
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Soul Shatter?
+shouldPlayPercentage = 60
+ AI wants to play card.
+- Next card to play: Soul Shatter
+
+AIPlayerGPT: casting Soul Shatter (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Soul Shatter
+-  Cost: {2}{b}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Soul Shatter
+Resolving Action on stack: Soul Shatter
+sound/sfx/instant.wav
+AttemptNew failed to load (404): instant.wav
+Destroying WCachedResource: 
+Can't locate 
+instant.wav
+AIPlayerGPT: declared attack (4 of 4) in one reply
+Action added to stack: StackAbility.  (Source: Triumphant Adventurer)
+Action added to stack: StackAbility.  (Source: Triumphant Adventurer)
+Action added to stack: StackAbility.  (Source: Barrowin of Clan Undurr)
+Resolving Action on stack: StackAbility.  (Source: Barrowin of Clan Undurr)
+Resolving Action on stack: StackAbility.  (Source: Triumphant Adventurer)
+ActionLayer::doReactTo 141
+CHECKING Spell
+
+AIPlayerGPT: VENTURE - CHOOSE A DUNGEON to enter (you are picking WHICH dungeon to venture into, NOT targeting a permanent). Each option below is a dungeon; its tag shows the room count and the completion reward, and its full room path follows. Weigh how many rooms to completion and whether the completion payoff and the rooms en route fit your plan (a dungeon whose completion turns on your payoffs is usually worth the shorter path). Pick the ONE dungeon to venture into, and answer with its name. -> chose 3 of 3
+AIPlayerGPT: targeting with Triumphant Adventurer -> 1 target(s), first: Lost Mine of Phandelver [your zone] [dungeon: 7 rooms; completion reward ("Temple of Dumathoin"): Draw a card.] - full room path: "Cave Entrance - Scry 1. -- Goblin Lair - Create a 1/1 red Goblin creature token. -- Mine Tunnels - Create a Treasure token. -- Storeroom - Put a +1/+1 counter on target creature. -- Dark Pool - Each opponent loses 1 life and you gain 1 life. -- Fungi Cavern - Target creature gets -4/-0 until your next turn. -- Temple of Dumathoin - Draw a card."
+Action added to stack: StackAbility.  (Source: Triumphant Adventurer)
+Resolving Action on stack: StackAbility.  (Source: Triumphant Adventurer)
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Triumphant Adventurer)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Ornithopter
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+AIPlayerGPT: DUNGEON ROOM CHOICE - you are venturing in Lost Mine of Phandelver. You are choosing which ROOM you enter now - this is not a target and not a card to cast. Lost Mine of Phandelver's rooms, in printed order: 1. Cave Entrance; 2. Goblin Lair; 3. Mine Tunnels; 4. Storeroom; 5. Dark Pool; 6. Fungi Cavern; 7. Temple of Dumathoin. Dungeon paths BRANCH, so a run does not enter every room and the printed order is not a route. The options below are the only rooms you may enter at this step, and each one's effect is stated on its own line. -> chose 1 of 2
+ActionLayer::doReactTo 158
+Action added to stack: StackAbility.  (Source: Lost Mine of Phandelver)
+Resolving Action on stack: StackAbility.  (Source: Lost Mine of Phandelver)
+sound/sfx/goblin.wav
+AttemptNew failed to load (404): goblin.wav
+Destroying WCachedResource: 
+Can't locate 
+goblin.wav
+AIPlayerGPT: dropping stale async answer
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Ornithopter
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: explicit all-decline (no blockers) in one reply
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Ornithopter
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Pest
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Untap Phase -------------   Turn 9
+Action added to stack: NextGamePhase.  (Current phase is: Untap)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Untap)
+AIPlayerGPT: model chose 1 of 1
+AIPlayerGPT[ph2]: take action 1/1 (cached=0)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Nuisance Engine
+-  Cost: {2}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+inserted item ptr 0x5568d00106c0 at index 2000000057
+Action added to stack: StackAbility.  (Source: Nuisance Engine)
+Resolving Action on stack: StackAbility.  (Source: Nuisance Engine)
+Action added to stack: StackAbility.  (Source: Glaze Fiend)
+
+AttemptNew failed to load (404): pest.wav
+Destroying WCachedResource: 
+Can't locate 
+pest.wav
+Resolving Action on stack: StackAbility.  (Source: Glaze Fiend)
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+Action added to stack: NextGamePhase.  (Current phase is: Draw)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Draw)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Island
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+AIPlayerGPT: Land drop: play Island now? -> chose 1 of 2
+Should I play Island?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Island
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Island
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+
+AttemptNew failed to load (404): island.wav
+Destroying WCachedResource: 
+Can't locate 
+island.wav
+
+AttemptNew failed to load (404): basic.wav
+Destroying WCachedResource: 
+Can't locate 
+basic.wav
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 1)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 1)
+Action added to stack: NextGamePhase.  (Current phase is: Combat begins)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat begins)
+AIPlayerGPT: declared attack (2 of 5) in one reply
+Action added to stack: NextGamePhase.  (Current phase is: Attackers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Attackers)
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Goblin
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+Action added to stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Blockers)
+Resolving Action on stack: 11DamageStack
+Action added to stack: NextGamePhase.  (Current phase is: Combat damage)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat damage)
+Action added to stack: NextGamePhase.  (Current phase is: Combat ends)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Combat ends)
+Action added to stack: NextGamePhase.  (Current phase is: Main phase 2)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Main phase 2)
+Action added to stack: NextGamePhase.  (Current phase is: End)
+Resolving Action on stack: NextGamePhase.  (Current phase is: End)
+Action added to stack: NextGamePhase.  (Current phase is: Cleanup)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Cleanup)
+Untap Phase -------------   Turn 10
+Action added to stack: NextGamePhase.  (Current phase is: Upkeep)
+Resolving Action on stack: NextGamePhase.  (Current phase is: Upkeep)
+Action added to stack: 10DrawAction
+Resolving Action on stack: 10DrawAction
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: Land drop: play Hive of the Eye Tyrant now? -> chose 2 of 2
+AIPlayerGPT: held the land drop
+AIPlayerGPT[ph4]: only display-toggle (Flip Side) options; auto-passing without a model call
+AIPlayerGPT: held the land drop
+AIPlayerGPT: Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any? -> chose 1 of 2
+Should I play Kaya the Inexorable?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Kaya the Inexorable
+
+AIPlayerGPT: casting Kaya the Inexorable (model's pick)
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Kaya the Inexorable
+-  Cost: {3}{b}{w}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+ACTIONSTACK Add spell
+Action added to stack: Kaya the Inexorable
+Resolving Action on stack: Kaya the Inexorable
+
+AttemptNew failed to load (404): kaya.wav
+Destroying WCachedResource: 
+Can't locate 
+kaya.wav
+
+AttemptNew failed to load (404): planeswalker.wav
+Destroying WCachedResource: 
+Can't locate 
+planeswalker.wav
+
+AttemptNew failed to load (404): legendary.wav
+Destroying WCachedResource: 
+Can't locate 
+legendary.wav
+AIPlayerGPT: Land drop: play Hive of the Eye Tyrant now? -> chose 1 of 2
+Should I play Hive of the Eye Tyrant?
+shouldPlayPercentage = 90
+ AI wants to play card.
+- Next card to play: Hive of the Eye Tyrant
+
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Hive of the Eye Tyrant
+-  Cost: 
+AIPlayerBaka: Card or Ability was free to play.  
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer
+AIPlayerGPT: dropping stale async answer

@@ -554,6 +554,14 @@ private:
     //budget (or max_tokens) cut the reply before any answer. Never parsed as
     //an answer; it triggers the forced close instead.
     bool mLastReasoningOnly;
+    //LIVELOCK BREAKER (2026-08-21, 146v36): consecutive stale-answer drops
+    //with no consume in between. A drop is legitimately rare (~2%, state
+    //moved mid-flight); a RUN of them means the prompt text is not stable
+    //for an unchanged state (the Kaya-menu random-rank reorder livelocked a
+    //seat for 4.6h). At kStaleLivelockLimit the ask gives up to the bounded
+    //heuristic fallback for THIS decision instead of looping forever.
+    int mStaleDropStreak;
+    bool mLastStaleLivelock; //the last no-answer was the breaker firing
     bool mLastFinishLength;  //the last reply stopped at the token cap
     long mLastReasoningTokens; //the server's own reasoning-token count when it
                              //reports one (-1 = it did not); the budget is in

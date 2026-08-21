@@ -2715,6 +2715,10 @@ void AIPlayerGPT::WorkerMain(void * p)
 //buildRequestBody recognises it, strips it, and rebuilds the SAME user
 //message with the assistant prefill appended.
 static const char * kForceCloseTag = "\x01wagic-force-close\x01";
+//Consecutive stale-answer drops (no consume between) before an ask gives its
+//decision to the heuristic fallback. Legitimate drops are isolated (~2%); a
+//run of them is a prompt-stability bug looping at one round trip per cycle.
+static const int kStaleLivelockLimit = 6;
 
 //Wave-35 instrumentation: how repetitive is a reasoning trace? Degenerate
 //decodes exist in this corpus and are INVISIBLE to every answer-side metric -
@@ -2910,6 +2914,8 @@ bool AIPlayerGPT::reasoningRequested() const
 
 const char * AIPlayerGPT::noAnswerClass() const
 {
+    if (mLastStaleLivelock)
+        return "stale_livelock";
     return mLastReasoning.empty() ? "empty_reply" : "reasoning_only";
 }
 
@@ -2931,6 +2937,10 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 content.clear();
                 mLastReasoningOnly = false;
                 mLastFinishLength = false;
+                //A consumed answer is forward progress: the livelock streak
+                //resets here and ONLY here.
+                mStaleDropStreak = 0;
+                mLastStaleLivelock = false;
                 //Is this the forced close (phase 2)? Its slot key carries the
                 //tag, and the answer-recovery rule below is scoped by it.
                 const bool forceClosePoll =
@@ -3072,6 +3082,22 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             GPTASYNCLOG("gpt stale drop (prompt moved) resp=%zu\n", mAsyncState->response.size());
             mAsyncState->status = 0;
             mAsyncState->response.clear();
+            //LIVELOCK BREAKER (146v36, 2026-08-21): a RUN of drops with no
+            //consume between them means the rebuilt prompt is not stable for
+            //an unchanged state - left alone this loops at one model round
+            //trip per cycle for hours (341 drops / 4.6h on the Kaya menu
+            //before the deterministic-order fix). Give this ONE decision to
+            //the bounded heuristic fallback instead; the game moves on and
+            //the translog records the give-up as its own class.
+            if (++mStaleDropStreak >= kStaleLivelockLimit)
+            {
+                DebugTrace("AIPlayerGPT: " << mStaleDropStreak
+                           << " consecutive stale drops - giving this decision to the heuristic");
+                mStaleDropStreak = 0;
+                mLastStaleLivelock = true;
+                content.clear();
+                return 0; //no answer: the caller's parse fails -> Baka fallback
+            }
         }
     }
 
@@ -3391,6 +3417,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
+      mStaleDropStreak(0), mLastStaleLivelock(false),
       mInPregameAsk(false)
 
 {
@@ -6574,21 +6601,39 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         mFlipDoneCount.clear();
         mPassDeclineTurn = observer->turn;
     }
+    //LIVELOCK ROOT FIX (146v36, 2026-08-21): the ranking order is NOT stable
+    //across priority windows - Baka seeds several ability efficiencies with
+    //random() (deliberate heuristic exploration), so equal candidates of one
+    //ability reorder on every rebuild. The staleness key is the full prompt
+    //text, so a reordered menu made every in-flight answer stale: a permanent
+    //drop/respawn loop (341 drops / 4.6h on a 15-option Kaya menu). The model
+    //does not consume Baka's rank order - it needs a BYTE-STABLE prompt for an
+    //unchanged state. Render the menu in its own text order: deterministic for
+    //identical state, and ties (byte-identical lines) are de-duped below
+    //anyway. stable_sort keeps this-build ranking order among equal texts.
+    vector<std::pair<string, const OrderedAIAction *> > renderOrder;
     for (size_t c = 0; c < candidates.size(); c++)
+        renderOrder.push_back(std::make_pair(describeAction(*candidates[c]), candidates[c]));
+    std::stable_sort(renderOrder.begin(), renderOrder.end(),
+                     [](const std::pair<string, const OrderedAIAction *>& a,
+                        const std::pair<string, const OrderedAIAction *>& b)
+                     { return a.first < b.first; });
+    for (size_t c = 0; c < renderOrder.size(); c++)
     {
+        const OrderedAIAction * cand = renderOrder[c].second;
         //Modal-DFC flip-thrash cap (see header): an in-hand "Flip Side"
         //toggle already taken 2x this turn stops being offered - it is a
         //no-op that mutates the presented face, so the no-progress deadlock
         //breaker below never catches it (deck102 flipped Tergrid 11x). Two
         //flips reach the wanted face and allow one flip back; the cast itself
         //rides the Cast menu on the showing face.
-        if (AATurnSide * fats = asTurnSide(candidates[c]->ability))
+        if (AATurnSide * fats = asTurnSide(cand->ability))
         {
-            MTGCardInstance * fcard = candidates[c]->click ? candidates[c]->click : fats->source;
+            MTGCardInstance * fcard = cand->click ? cand->click : fats->source;
             if (fcard && mFlipDoneCount[fcard] >= 2)
                 continue;
         }
-        string line = describeAction(*candidates[c]);
+        const string& line = renderOrder[c].first;
         if (!seenLines.insert(line).second)
             continue;
         //Pass-declined this turn: the model has said "hold" enough - stop
@@ -6602,7 +6647,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         std::map<string, int>::iterator dc = mPassDeclineCount.find(fetchLine ? fetchLineKey(line) : line);
         if (dc != mPassDeclineCount.end() && dc->second >= (fetchLine ? 1 : 2))
             continue;
-        shown.push_back(candidates[c]);
+        shown.push_back(cand);
         shownLines.push_back(line);
         index++;
         tail << index << ". " << line << "\n";
