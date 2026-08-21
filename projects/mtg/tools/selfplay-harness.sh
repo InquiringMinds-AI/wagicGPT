@@ -43,7 +43,12 @@ POOL="44,135,140,131,110,109,133"
 REPS=1
 JOBS=8
 TOTAL_CAP_S=86400        # 24h overall wall cap
-GAME_TIMEOUT_S=2400      # 40 min per game (games run ~28 min; margin for stalls)
+# NO per-game cap by default (owner ruling 2026-08-21: "no cap" - a corpus game
+# runs to its NATURAL end, full stop; a killed game is a failed test, and the
+# 122B wave nearly lost games to a cap sized from an estimate). GNU timeout
+# treats a 0 duration as disabled, so -T 0 = uncapped; pass -T SECONDS only for
+# short probe runs where a runaway matters more than completeness.
+GAME_TIMEOUT_S=0
 OUTDIR=""
 URL="http://100.116.136.74:8081"   # Spark production port (8011 = serve.sh dev default)
 MODEL="qwen35"
@@ -132,7 +137,7 @@ echo "  games  : $NGAMES ($(( ${#DECKS[@]} * (${#DECKS[@]} - 1) / 2 )) pairings 
 # default stands. 420s keeps margin over that rather than shaving it.
 if [ "$THINKING" = "1" ]; then DEFAULT_GPT_TIMEOUT=420; else DEFAULT_GPT_TIMEOUT=240; fi
 echo "  model  : $MODEL @ $URL (thinking=$THINKING, gpt timeout=${WAGIC_GPT_TIMEOUT:-$DEFAULT_GPT_TIMEOUT}s)"
-echo "  caps   : ${TOTAL_CAP_S}s total, ${GAME_TIMEOUT_S}s/game (fastclock=$FASTCLOCK)"
+echo "  caps   : ${TOTAL_CAP_S}s total, $([ "$GAME_TIMEOUT_S" = "0" ] && echo 'NO per-game cap' || echo "${GAME_TIMEOUT_S}s/game") (fastclock=$FASTCLOCK)"
 echo "  outdir : $OUTDIR"
 
 cd "$HERE/bin"
@@ -226,6 +231,9 @@ trap 'echo "stopping..."; for p in $(jobs -p); do kill $(pgrep -P "$p") "$p" 2>/
 EXPECTED_DECISIONS="${WAGIC_CORPUS_DECISIONS:-130}"
 HARNESS_PID=$$
 feasibility_watchdog() {
+    #Uncapped run: a full game can always fit, the projection has nothing to
+    #violate - the watchdog stands down.
+    [ "$GAME_TIMEOUT_S" = "0" ] && return 0
     while sleep 45; do
         local verdict
         verdict=$(python3 - "$LOGDIR" "$START" "$EXPECTED_DECISIONS" "$GAME_TIMEOUT_S" <<'WPY'

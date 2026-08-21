@@ -449,3 +449,12 @@ Diagnostics: strategy-design/wave35-diag/.
 ~10-20h (per-decision ~660s at C=21). First launch was restarted once pre-data: the watchdog
 default 130 decisions/game (wave-34 cap-truncated estimate) would have false-aborted a
 feasible run - 60 is the measured whole-game number for these seven decks.
+
+OWNER RULING (2026-08-21, "no cap"): corpus games run to their NATURAL end - no per-game
+wall cap, ever. The 122B wave's -T 70000 (sized from an estimate) projected to kill the
+slowest games; the owner ordered the cap removed outright. LIVE UNCAP executed on the
+running wave without touching a game: all 21 `timeout` wrappers SIGSTOPped (a stopped
+wrapper's expiry can never deliver its kill), reaper monitor SIGCONTs each wrapper only
+after its game exits naturally so the harness reaps and harvests normally. Harness now
+defaults GAME_TIMEOUT_S=0 (= GNU timeout disabled); the feasibility watchdog stands down
+when uncapped. -T is for short probe runs only.
