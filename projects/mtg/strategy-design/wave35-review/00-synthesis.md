@@ -81,3 +81,34 @@ PROTOCOL/INSTRUMENTATION: budget-overrun salvage when phase-2 also comes back em
 GUIDES: deck158 "deaths feed the Army" is FALSE (engine-verified; caused two misplays);
 deck139 "ALWAYS mutate over" wrong when cast card smaller than host + Dryad-vs-mutate
 curve conflict; deck152 generic blockers hint contradicts deck105's numeric block rule.
+
+---
+
+# ADDENDUM: FP8 quant arm (2026-08-22, matchups-20260822-111102)
+
+Owner ordered a third arm: official Qwen/Qwen3.6-35B-A3B-FP8 (replacing the PrismaQuant
+4.75-bit), same harness/budget/seats, 21/21 natural games, ~3.5h wave, latency p50 120s.
+Question: were the 35B's failures quant damage or tier-intrinsic? FP8 reviews on the four
+held seats (deckN-fp8-review.md):
+
+| seat | 4.75-bit failures | FP8 result | verdict |
+|---|---|---|---|
+| 105 | 2 | **0** (recount class gone; Ichorclaw prior recurred, neutral) | CLEARED — FP8 ≈ 122B |
+| 36 | 8 | **2** (adherence 86%→97%; answer-flip class EXTINCT, 0/174 scanned) | predominantly QUANT DAMAGE |
+| 158 | 3 (2 guide-bug) | 0 recurrence; FP8 REFUTED the guide's false amass line from card text (ideal audible); 4 NEW one-off number-misreads (~3-5%) | TIER-INTRINSIC slip rate, non-overlapping sets |
+| 116 | 2 (1 game-losing) | both signature failures GONE (Rule 4 quoted verbatim; deathtouch row answered right); 1 NEW game-losing illegal triple-block — trace QUOTED the at-most-one constraint then dismissed it | NOT cleared — fragility persists in changed form |
+
+## Conclusion
+
+1. **FP8 replaces the 4.75-bit unconditionally.** The failure mass collapsed on every
+   seat; three failure classes are extinct; the guide-bug refutation shows card-text
+   reasoning the 4.75-bit never produced. The PrismaQuant's aggressive compression was
+   causing real damage.
+2. **vs the 122B, a tier-intrinsic residue remains**: a ~2-5%-of-decisions rate of one-off
+   rules/arithmetic slips and occasional overrides of PRINTED constraints (116's triple-
+   block), against the 122B's zero-failure bar across all seats. FP8 is at parity on
+   105/36, within noise on 158, and still loses 116.
+3. Sharpened wave-36 docket (added by the FP8 reviews): harness RE-ASKS on illegal
+   multi-block replies (would have saved 116's game); the one-answer-per-ask overrun now
+   demonstrably corrupts engine picks (docket #1); print toughness in damage-target lists;
+   "at 0 life you LOSE" in blockers step 2; guide G1 amass fix still required.
