@@ -458,3 +458,12 @@ wrapper's expiry can never deliver its kill), reaper monitor SIGCONTs each wrapp
 after its game exits naturally so the harness reaps and harvests normally. Harness now
 defaults GAME_TIMEOUT_S=0 (= GNU timeout disabled); the feasibility watchdog stands down
 when uncapped. -T is for short probe runs only.
+
+OWNER RULING (2026-08-22) — the wave-35 tier A/B criterion, verbatim: "mtg has alot of
+random chance to it. win rate is irrelevant. the question is, how well do the models follow
+the provided strategies, and if they diverge from the provided strategies, is it a good
+choice to do so at that time." The seat review therefore scores, per decision against the
+deck's strategy guide: (a) ADHERENCE — did the choice execute the guide's line for this
+board; (b) DIVERGENCE QUALITY — where the choice departs from the guide, was departing
+correct AT THAT MOMENT (a justified audible vs a comprehension failure). Same rubric applied
+to both arms on the SAME seven seats; win tables are context only, never the verdict.
