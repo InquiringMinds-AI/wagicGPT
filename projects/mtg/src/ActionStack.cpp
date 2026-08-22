@@ -4,6 +4,7 @@ The Action Stack contains all information for Game Events that can be interrupte
 #include "PrecompiledHeader.h"
 
 #include "ActionStack.h"
+#include "AIPlayer.h"
 #include "LegalActions.h"
 #include "CardGui.h"
 #include "Damage.h"
@@ -106,6 +107,41 @@ NextGamePhase requested by user
 */
 int NextGamePhase::resolve()
 {
+    //W36 lane-B item 6 (B-vs-105 t15): a phase-advance queued while the
+    //defender's blockers decision was MASKED by an ability resolving on the
+    //stack used to ride past the blockers step when it resolved - the
+    //deferred, engine-issued declaration never got another settled tick, and
+    //a real, lethal-preventing block window vanished with no ask and no
+    //translog record. pendingCombatDecision's stack gate promises "deferred,
+    //not dropped"; honoring that promise here means a queued pass yields to a
+    //still-owed AI declaration (the declaring seat re-drives the flow and
+    //advances the phase itself once committed). Scoped to AI defenders whose
+    //declaration is genuinely outstanding (blockersDeclarationDue - the async
+    //GPT seat; heuristic seats declare synchronously and never report due),
+    //so a HUMAN defender's deliberate decline-by-advance is untouched.
+    //The gates mirror pendingCombatDecision's, EXCEPT the stack gate: while
+    //resolve() runs, THIS pass is itself still NOT_RESOLVED on the stack
+    //(ActionStack::resolve sets the state after the call), so the oracle's
+    //stack check would read the pass as unfinished business and never let the
+    //hold fire. "Settled" here means nothing is pending BUT this pass.
+    if (observer->getCurrentGamePhase() == MTG_PHASE_COMBATBLOCKERS
+        && observer->combatStep == BLOCKERS && observer->currentPlayer)
+    {
+        Player * defender = observer->currentPlayer->opponent();
+        AIPlayer * aiDefender = (defender && defender->isAI()) ? dynamic_cast<AIPlayer *>(defender) : NULL;
+        ActionStack * stack = observer->mLayers->stackLayer();
+        if (aiDefender && aiDefender->blockersDeclarationDue()
+            && stack->count(0, NOT_RESOLVED) <= 1 //only this pass itself
+            && !observer->mLayers->actionLayer()->menuObject
+            && !observer->getCurrentTargetChooser()
+            && !observer->mExtraPayment
+            && observer->currentPlayer->game->inPlay->getNextAttacker(NULL)
+            && LegalActionsOracle::hasLegalBlock(defender))
+        {
+            DebugTrace("NextGamePhase: held - defender's blockers declaration still due");
+            return 1;
+        }
+    }
     observer->userRequestNextGamePhase(false, false);
     return 1;
 }

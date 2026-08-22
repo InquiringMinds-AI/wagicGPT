@@ -3455,7 +3455,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -3739,7 +3739,10 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
                                 const char * choiceSource)
 {
     if (mTransLogPath.empty())
+    {
+        mLastParseNote.clear(); //consumed even when logging is off
         return;
+    }
     ensureGameStartRecord();
     json rec = {
         {"seq", mTransSeq++},
@@ -3835,6 +3838,16 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["chosen_text"] = chosenText;
     if (fallback)
         rec["fallback"] = fallback;
+    //Parse-shape signature (W36 items 1-4): multi-answer overruns, echo/index
+    //conflicts and blocker re-ask provenance - divergences between what the
+    //reply said and what executed, none of which is a heuristic fallback.
+    //Present only when something diverged; consumed here so a note can never
+    //leak onto a later record.
+    if (!mLastParseNote.empty())
+    {
+        rec["parse_note"] = mLastParseNote;
+        mLastParseNote.clear();
+    }
     //Commit-failure counters (see postPlanOverrun / commitRetracted above).
     //Written on EVERY record, present or zero, so a seat review can divide by
     //the record count without inferring absence.
@@ -4252,13 +4265,29 @@ static bool isExampleEchoLine(const string& line);
 //whose trailing 2/2 parsed to option 2, which then matched no echoed option and
 //was dropped as stale_echo - discarding a valid, in-range CHOICE. A CHOICE ask
 //can only be answered by a CHOICE: line; combat labels in its body are CoT.
+//W36 lane-B item 3 (deck36 F2 s39): last-wins is the SELF-CORRECTION rule (a
+//later answer after intervening reasoning supersedes), but a CONSECUTIVE block
+//of CHOICE: lines is the other disease entirely - the model listing SEVERAL
+//picks line-by-line for a single-pick ask ("CHOICE: 9 (Pest #3)\nCHOICE: 7
+//(Island)\nCHOICE: 6 (Seat)"). There the FIRST line is the committed intent
+//(rung 1 of its own ladder) and taking the last executed a pick the model
+//ranked third. So: within an unbroken run of adjacent CHOICE lines the run's
+//FIRST line is the answer; a CHOICE line separated by any non-blank content
+//still supersedes (self-correction keeps line precedence). Scoped to CHOICE:
+//only - combat labels keep pure line precedence (W32-N122d relies on it).
+//choiceRunLen (out, optional) reports the winning run's length so the caller
+//can stamp the multi-answer shape into the translog.
 static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
-                                size_t& segStart, size_t& segEnd, size_t& labelLineStart)
+                                size_t& segStart, size_t& segEnd, size_t& labelLineStart,
+                                int * choiceRunLen = NULL)
 {
     static const char * kAnswerLabels[] = { "CHOICE:", "ATTACK:", "BLOCKS:", "PUT:" };
     const int kNumAnswerLabels = (int) (sizeof(kAnswerLabels) / sizeof(kAnswerLabels[0]));
     bool found = false;
     size_t lineStart = 0;
+    int runLen = 0;                      //length of the run the current answer heads
+    bool lastMatchWasChoice = false;     //previous MATCHED line carried CHOICE:
+    size_t lastMatchLineEnd = string::npos; //its end offset (the '\n' position)
     while (lineStart <= text.size())
     {
         size_t lineEnd = text.find('\n', lineStart);
@@ -4279,10 +4308,30 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
                 if (match && !isTemplatePlaceholderLine(text.substr(s, end - s))
                     && !isExampleEchoLine(text.substr(s, end - s)))
                 {
-                    segStart = s + len;
-                    segEnd = end;
-                    labelLineStart = lineStart;
+                    bool isChoice = (strcmp(kAnswerLabels[li], "CHOICE:") == 0);
+                    //Adjacent when only whitespace separates this line from
+                    //the previous matched line (blank lines don't break a
+                    //list; any prose or other content does).
+                    bool adjacent = false;
+                    if (found && isChoice && lastMatchWasChoice
+                        && lastMatchLineEnd != string::npos && lastMatchLineEnd <= lineStart)
+                    {
+                        adjacent = true;
+                        for (size_t g = lastMatchLineEnd; g < lineStart && adjacent; g++)
+                            adjacent = isspace((unsigned char) text[g]) != 0;
+                    }
+                    if (adjacent)
+                        runLen++; //extend the run; the run HEAD stays the answer
+                    else
+                    {
+                        segStart = s + len;
+                        segEnd = end;
+                        labelLineStart = lineStart;
+                        runLen = 1;
+                    }
                     found = true;
+                    lastMatchWasChoice = isChoice;
+                    lastMatchLineEnd = end;
                 }
             }
         }
@@ -4290,6 +4339,8 @@ static bool findAnswerLabelLine(const string& text, const char * expectedLabel,
             break;
         lineStart = lineEnd + 1;
     }
+    if (choiceRunLen)
+        *choiceRunLen = (found && lastMatchWasChoice) ? runLen : 0;
     return found;
 }
 
@@ -4328,8 +4379,11 @@ static size_t findPlanMarker(const string& text, size_t labelLineStart, size_t *
     return pos;
 }
 
-string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabel)
+string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabel,
+                                int * choiceRunLen)
 {
+    if (choiceRunLen)
+        *choiceRunLen = 0;
     //Drop any inline think block first (same as parseChoice).
     string text = content;
     size_t thinkEnd = text.rfind("</think>");
@@ -4352,7 +4406,7 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
     size_t answerStart = string::npos, answerEnd = 0, labelLineStart = string::npos;
     {
         size_t ss = 0, se = 0, ls = 0;
-        if (findAnswerLabelLine(text, expectedLabel, ss, se, ls))
+        if (findAnswerLabelLine(text, expectedLabel, ss, se, ls, choiceRunLen))
         {
             answerStart = ss;
             answerEnd = se;
@@ -5790,10 +5844,175 @@ static bool isRenderVocabWord(const string& w)
     return false;
 }
 
+//---- W36 lane-B items 2/4 helpers (pure; PARSETEST-provable) ----
+
+static int nameOrdinal(const string& seg);            //defined with the combat name parsers below
+static string stripAnswerLabelPrefix(const string& seg); //ditto
+
+//The echo word filter (lowercase alnum tokens, length >= 4, minus verb /
+//decline filler and render vocabulary) as a reusable function - the same
+//split parseChoice's echo pass performs inline.
+static void echoSignificantWords(const string& seg, vector<string>& out)
+{
+    string w;
+    for (size_t i = 0; i <= seg.size(); i++)
+    {
+        char c = (i < seg.size()) ? (char) tolower((unsigned char) seg[i]) : ' ';
+        if (isalnum((unsigned char) c))
+            w += c;
+        else
+        {
+            if (w.size() >= 4 && w != "cast" && w != "with" && w != "play"
+                && w != "pass" && w != "none" && w != "hold" && w != "done"
+                && w != "skip" && w != "decline" && w != "nobody"
+                && !isRenderVocabWord(w))
+                out.push_back(w);
+            w.clear();
+        }
+    }
+}
+
+//All-digit tokens of a string ("add 5 counters" -> {"5"}). The alpha filter
+//above drops them; the number is often the ONLY discriminator between
+//near-identical options ("add 5 counters" vs "add 10 counters" share every
+//alpha word - the deck152 vs139 s19 echo/index conflict).
+static void numericTokens(const string& seg, vector<string>& out)
+{
+    string w;
+    bool digitsOnly = true;
+    for (size_t i = 0; i <= seg.size(); i++)
+    {
+        char c = (i < seg.size()) ? seg[i] : ' ';
+        if (isalnum((unsigned char) c))
+        {
+            if (!isdigit((unsigned char) c))
+                digitsOnly = false;
+            w += c;
+        }
+        else
+        {
+            if (!w.empty() && digitsOnly)
+                out.push_back(w);
+            w.clear();
+            digitsOnly = true;
+        }
+    }
+}
+
+//Does this option text contain numTok as an EXACT numeric token? A substring
+//find would let "5" match the "15" in another option.
+static bool optionHasNumericToken(const string& optionText, const string& numTok)
+{
+    vector<string> toks;
+    numericTokens(optionText, toks);
+    for (size_t i = 0; i < toks.size(); i++)
+        if (toks[i] == numTok)
+            return true;
+    return false;
+}
+
+//Split at top-level commas only (commas inside (...)/[...]/{...} belong to
+//names and annotations, not to a pick list).
+static void topLevelCommaSegments(const string& text, vector<string>& out)
+{
+    int depth = 0;
+    string cur;
+    for (size_t i = 0; i <= text.size(); i++)
+    {
+        char c = (i < text.size()) ? text[i] : ',';
+        if (c == '(' || c == '[' || c == '{')
+            depth++;
+        else if (c == ')' || c == ']' || c == '}')
+        {
+            if (depth > 0)
+                depth--;
+        }
+        if ((c == ',' && depth == 0) || i == text.size())
+        {
+            size_t s = cur.find_first_not_of(" \t\r\n");
+            size_t e = cur.find_last_not_of(" \t\r\n");
+            out.push_back(s == string::npos ? string() : cur.substr(s, e - s + 1));
+            cur.clear();
+        }
+        else
+            cur += c;
+    }
+    if (!out.empty() && out.back().empty())
+        out.pop_back();
+}
+
+//Resolve one name phrase ("Pest #1") to the UNIQUE option it names, or -1.
+//All significant words must appear in the option; among several same-worded
+//matches a "#N" handle in the phrase picks the option whose own text carries
+//that exact handle (the render prints "#N" on duplicate names, so the
+//round-trip is faithful - this is NOT uniqueNameMatch's Nth-match rule,
+//which a non-duplicate incidental match would derail: "Pest" also matches
+//the Nuisance Engine line that mints Pest tokens).
+static int resolveNamedOption(const string& phrase, const vector<string>& optionTexts)
+{
+    vector<string> words;
+    echoSignificantWords(phrase, words);
+    if (words.empty())
+        return -1;
+    vector<int> matches;
+    for (size_t o = 0; o < optionTexts.size(); o++)
+    {
+        string low = optionTexts[o];
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        bool all = true;
+        for (size_t k = 0; k < words.size() && all; k++)
+            all = low.find(words[k]) != string::npos;
+        if (all)
+            matches.push_back((int) o);
+    }
+    if (matches.size() == 1)
+        return matches[0];
+    if (matches.size() > 1)
+    {
+        int ord = nameOrdinal(phrase);
+        if (ord >= 1)
+        {
+            std::ostringstream h;
+            h << "#" << ord;
+            string handle = h.str();
+            int hit = -1;
+            for (size_t m = 0; m < matches.size(); m++)
+            {
+                const string& t = optionTexts[matches[m]];
+                size_t p = t.find(handle);
+                //exact handle: the char after "#N" must not extend the number
+                if (p != string::npos
+                    && (p + handle.size() >= t.size() || !isdigit((unsigned char) t[p + handle.size()])))
+                {
+                    if (hit >= 0)
+                        return -1; //two options carry the same handle: ambiguous
+                    hit = matches[m];
+                }
+            }
+            return hit;
+        }
+    }
+    return -1;
+}
+
+//Append a parse-shape signature, semicolon-joined, no duplicates.
+static void appendParseNote(std::string * noteOut, const char * sig)
+{
+    if (!noteOut || !sig)
+        return;
+    if (noteOut->find(sig) != string::npos)
+        return;
+    if (!noteOut->empty())
+        *noteOut += ";";
+    *noteOut += sig;
+}
+
 int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                              const std::vector<string> * optionTexts,
                              bool * staleEcho,
-                             const std::string * pendingSource)
+                             const std::string * pendingSource,
+                             std::string * noteOut)
 {
     if (staleEcho) *staleEcho = false;
     //Drop any inline think block first.
@@ -5831,6 +6050,9 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     bool echoNoMatch = false;
     vector<string> words; //echo's significant words (hoisted for INDEX-WINS)
     string echoLc;        //lowercased echo string (hoisted for INDEX-WINS (a2))
+    vector<int> echoMatches; //every option the echo's alpha words match
+                             //(hoisted so a conflict note can test whether the
+                             //index's own option is among them)
     if (optionTexts && !optionTexts->empty())
     {
         //the LAST "(...)" following a digit on the answer-ish tail
@@ -5940,9 +6162,45 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                     for (size_t k = 0; k < words.size() && all; k++)
                         all = low.find(words[k]) != string::npos;
                     if (all)
+                        echoMatches.push_back((int) o);
+                }
+                if (echoMatches.size() == 1)
+                    match = echoMatches[0];
+                else if (echoMatches.size() > 1)
+                    echoConflict = true; //not unique on alpha words alone
+                //Numeric disambiguation (W36 item 4, deck152 vs139 s19): the
+                //alpha words of "add 5 counters" match every "add N counters"
+                //option - the NUMBER is the discriminator the >=4-length
+                //filter drops. Strictly narrowing: it only runs where pass 1
+                //already conflicted (where index-wins used to stand silently),
+                //and only an exact numeric-token match on a UNIQUE survivor
+                //converts the conflict into a remap.
+                if (echoConflict)
+                {
+                    vector<string> nums;
+                    numericTokens(echoLc, nums);
+                    if (!nums.empty())
                     {
-                        if (match >= 0) { match = -1; echoConflict = true; break; } //not unique
-                        match = (int) o;
+                        int survivor = -1;
+                        bool multiple = false;
+                        for (size_t m = 0; m < echoMatches.size() && !multiple; m++)
+                        {
+                            bool allNums = true;
+                            for (size_t k = 0; k < nums.size() && allNums; k++)
+                                allNums = optionHasNumericToken((*optionTexts)[echoMatches[m]], nums[k]);
+                            if (allNums)
+                            {
+                                if (survivor >= 0)
+                                    multiple = true;
+                                else
+                                    survivor = echoMatches[m];
+                            }
+                        }
+                        if (survivor >= 0 && !multiple)
+                        {
+                            match = survivor;
+                            echoConflict = false;
+                        }
                     }
                 }
                 //Fallback (option-subset-of-echo): the all-echo-words-in-
@@ -6019,6 +6277,73 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                     echoRemap = match + 1; //1-based option number
                 else if (!echoConflict)
                     echoNoMatch = true; //named words matched NO offered option
+            }
+            else if (!echoLc.empty())
+            {
+                //AMOUNT-MENU echo (W36 item 4, deck152 vs139 s19: "CHOICE: 11
+                //(add 5 counters)" executed option 11 = "add 10 counters").
+                //Every alpha word of such an echo is render vocabulary
+                //("counters") or under the 4-length floor ("add"), so the
+                //significant-words pass above sees NOTHING and the whole
+                //reconciliation is skipped - the NUMBER, the one
+                //discriminator, was being dropped with the furniture.
+                //Relaxed pass: length>=3 alpha tokens (vocabulary allowed,
+                //substring match) plus numeric tokens (exact-token match,
+                //so "5" cannot ride the "15" in a sibling option). Requires
+                //at least one of EACH, so a bare stat echo "(3/3)" can never
+                //remap, and only a UNIQUE full match does anything - this
+                //pass is widen-only and sets no staleness signals.
+                vector<string> nums;
+                numericTokens(echoLc, nums);
+                vector<string> alphaToks;
+                {
+                    string t;
+                    bool hasAlpha = false;
+                    for (size_t k = 0; k <= echoLc.size(); k++)
+                    {
+                        char c = (k < echoLc.size()) ? echoLc[k] : ' ';
+                        if (isalnum((unsigned char) c))
+                        {
+                            if (!isdigit((unsigned char) c))
+                                hasAlpha = true;
+                            t += c;
+                        }
+                        else
+                        {
+                            if (t.size() >= 3 && hasAlpha)
+                                alphaToks.push_back(t);
+                            t.clear();
+                            hasAlpha = false;
+                        }
+                    }
+                }
+                if (!nums.empty() && !alphaToks.empty())
+                {
+                    vector<int> relaxed;
+                    for (size_t o = 0; o < optionTexts->size(); o++)
+                    {
+                        string low = (*optionTexts)[o];
+                        for (size_t i2 = 0; i2 < low.size(); i2++)
+                            low[i2] = (char) tolower((unsigned char) low[i2]);
+                        bool all = true;
+                        for (size_t k = 0; k < alphaToks.size() && all; k++)
+                            all = low.find(alphaToks[k]) != string::npos;
+                        for (size_t k = 0; k < nums.size() && all; k++)
+                            all = optionHasNumericToken(low, nums[k]);
+                        if (all)
+                            relaxed.push_back((int) o);
+                    }
+                    if (relaxed.size() == 1)
+                        echoRemap = relaxed[0] + 1;
+                    else if (relaxed.size() > 1)
+                    {
+                        //several full matches: no remap, but the conflict is
+                        //REAL - export it so an index foreign to every match
+                        //gets the ambiguous-conflict signature downstream.
+                        echoConflict = true;
+                        echoMatches = relaxed;
+                    }
+                }
             }
         }
     }
@@ -6163,9 +6488,48 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             //A disagreeing unique name-echo outranks the index (the index
             //is the observed failure mode; the name is the intent). A
             //deliberate 0 (pass priority) is never remapped - it carries
-            //no option name of its own.
+            //no option name of its own. The divergence is SIGNED into the
+            //translog (W36 item 4) - it used to resolve invisibly.
             if (echoRemap > 0 && !echoConflict && n != 0 && echoRemap != n)
+            {
+                appendParseNote(noteOut, "echo_index_conflict");
                 return echoRemap;
+            }
+            //Ambiguous conflict: the echo matched SEVERAL options and none of
+            //them is the index's own - number and name genuinely disagree but
+            //no unique name target exists, so the index stands (a re-ask has
+            //no channel at this depth); the signature keeps it auditable.
+            if (echoConflict && n >= 1 && n <= optionCount && !echoMatches.empty())
+            {
+                bool indexAmongMatches = false;
+                for (size_t m = 0; m < echoMatches.size(); m++)
+                    if (echoMatches[m] == n - 1)
+                        indexAmongMatches = true;
+                if (!indexAmongMatches)
+                    appendParseNote(noteOut, "echo_index_conflict_ambiguous");
+            }
+            //Multi-pick comma list on a coded head ("CHOICE: 8 (Pest #3), 6
+            //(Island), ..." - deck36 F2 s40): the FIRST pick already wins by
+            //the head parse; stamp the overrun so it is visible (W36 item 2b).
+            if (noteOut && n >= 1)
+            {
+                vector<string> segs;
+                topLevelCommaSegments(text, segs);
+                for (size_t sg = 1; sg < segs.size(); sg++)
+                {
+                    const string& t2 = segs[sg];
+                    size_t d = t2.find_first_not_of(" \t");
+                    if (d != string::npos && isdigit((unsigned char) t2[d]))
+                    {
+                        int n2 = atoi(t2.c_str() + d);
+                        if (n2 >= 1 && n2 <= optionCount && n2 != n)
+                        {
+                            appendParseNote(noteOut, "multi_answer_first_taken");
+                            break;
+                        }
+                    }
+                }
+            }
             //Absent-echo staleness: the echo named significant words that
             //match NO offered option (a parent-action echo at a target
             //sub-menu, or a card cast earlier this turn after the option
@@ -6191,6 +6555,52 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     }
     else if (echoRemap > 0 && !echoConflict)
         return echoRemap; //non-numeric head, but the echo names the intent
+
+    //NAME-LIST multi-pick reply on a single-pick ask (W36 item 2, deck36 F2
+    //s29): "CHOICE: Pest #1, Pest #2, Pest #3, Pest #4" carries no coded
+    //index and no parenthetical echo, so the trailing digit scan below used
+    //to grab the "1" inside "#1" and execute OPTION 1 - a card the model
+    //never named, with no fallback flag (the HL11 instrument gap). Resolve
+    //the FIRST comma segment by name (honoring the model's own ladder order);
+    //a single name that merely CONTAINS a comma ("Sigarda, Champion of
+    //Light") resolves both halves to the same option and is not a list. When
+    //the first segment cannot be resolved but at least two LATER segments
+    //name two distinct options, the reply is provably a pick list whose head
+    //is unreadable - fail it loudly (multi_answer_unresolved -> heuristic)
+    //rather than let the digit scan execute an unintended option. Anything
+    //else (prose with commas) falls through to the shipped scan unchanged.
+    if (optionTexts && !optionTexts->empty())
+    {
+        vector<string> segs;
+        topLevelCommaSegments(text, segs);
+        if (segs.size() >= 2)
+        {
+            //the first segment may still carry the answer label when a raw
+            //line (salvage path) rather than a consumePlan segment arrives
+            int m0 = resolveNamedOption(stripAnswerLabelPrefix(segs[0]), *optionTexts);
+            if (m0 >= 0)
+            {
+                int m1 = resolveNamedOption(segs[1], *optionTexts);
+                if (m1 != m0) //a distinct/unresolved tail = a real list
+                    appendParseNote(noteOut, "multi_answer_first_taken");
+                return m0 + 1;
+            }
+            int firstHit = -1;
+            for (size_t sg = 1; sg < segs.size(); sg++)
+            {
+                int mx = resolveNamedOption(segs[sg], *optionTexts);
+                if (mx < 0)
+                    continue;
+                if (firstHit < 0)
+                    firstHit = mx;
+                else if (mx != firstHit)
+                {
+                    appendParseNote(noteOut, "multi_answer_unresolved");
+                    return -1;
+                }
+            }
+        }
+    }
     //Real replies begin "CHOICE: N ...", so the head is non-numeric and the
     //index is resolved by the trailing scan below. Staleness is applied to
     //that resolved index (a positive index only - a resolved 0 is a
@@ -6226,6 +6636,23 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     {
         if (staleEcho) *staleEcho = true;
         return -1;
+    }
+    //Name-over-index on the trailing-scan path too (W36 item 4): a unique
+    //echo naming a DIFFERENT option than the scanned index is the intent,
+    //same rule as the head branch - and the divergence is signed.
+    if (echoRemap > 0 && !echoConflict && choice > 0 && echoRemap != choice)
+    {
+        appendParseNote(noteOut, "echo_index_conflict");
+        return echoRemap;
+    }
+    if (echoConflict && choice > 0 && !echoMatches.empty())
+    {
+        bool indexAmongMatches = false;
+        for (size_t m = 0; m < echoMatches.size(); m++)
+            if (echoMatches[m] == choice - 1)
+                indexAmongMatches = true;
+        if (!indexAmongMatches)
+            appendParseNote(noteOut, "echo_index_conflict_ambiguous");
     }
     return choice;
 }
@@ -6795,9 +7222,17 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //numbers that would otherwise misparse as the chosen action. Restrict
         //the answer line to CHOICE: so a CoT "Attack:"/"Blocks:" line in the
         //reasoning body is not taken as the answer (stale-echo family B).
-        string decisionPart = consumePlan(content, "CHOICE:");
+        int choiceRunLen = 0;
+        string decisionPart = consumePlan(content, "CHOICE:", &choiceRunLen);
         bool staleEcho = false;
-        choice = parseChoice(decisionPart, index, &shownLines, &staleEcho);
+        string parseNote;
+        choice = parseChoice(decisionPart, index, &shownLines, &staleEcho, NULL, &parseNote);
+        //A consecutive block of CHOICE lines answered a single-pick ask: the
+        //run head was taken (findAnswerLabelLine) - stamp the overrun.
+        if (choiceRunLen >= 2)
+            appendParseNote(&parseNote, "multi_answer_first_taken");
+        if (!parseNote.empty())
+            mLastParseNote = parseNote;
         //Repeat-loop AND absent-card-bookend salvage (wave-23 ITEM A part 2).
         //salvageLoopedChoice walks EVERY CHOICE: line through the full validator
         //(echo + INDEX-WINS staleness still apply), keeping the last that
@@ -6941,10 +7376,18 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     //Plan split BEFORE choice parsing: plan prose is full of numbers. Restrict
     //the answer line to CHOICE: so a CoT combat line ("Attack: ...") in the
     //reasoning body is not mistaken for the answer (stale-echo family B).
-    string decisionPart = consumePlan(content, "CHOICE:");
+    int choiceRunLen = 0;
+    string decisionPart = consumePlan(content, "CHOICE:", &choiceRunLen);
     bool staleEcho = false;
+    string parseNote;
     int choice = parseChoice(decisionPart, (int) options.size(), &options, &staleEcho,
-                             pendingSourceName.empty() ? NULL : &pendingSourceName);
+                             pendingSourceName.empty() ? NULL : &pendingSourceName, &parseNote);
+    //A consecutive block of CHOICE lines answered a single-pick ask: the run
+    //head was taken (findAnswerLabelLine) - stamp the overrun (W36 item 2/3).
+    if (choiceRunLen >= 2)
+        appendParseNote(&parseNote, "multi_answer_first_taken");
+    if (!parseNote.empty())
+        mLastParseNote = parseNote;
     //Repeat-loop AND absent-card-bookend salvage (see chooseOrderedAction):
     //walk every CHOICE: line through the validator, recovering a clean sibling
     //when the primary line was a decode spiral OR a stale absent-card echo. A
@@ -9193,7 +9636,8 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                                  const vector<string> * blockerNames = NULL,
                                  const vector<string> * attackerNames = NULL,
                                  const vector<vector<int> > * legalPerBlocker = NULL,
-                                 int * dropped = NULL);
+                                 int * dropped = NULL,
+                                 bool * gangConflict = NULL);
 
 //Every line of a reply whose FIRST token (after markdown decoration) is the
 //given answer label, as the text AFTER the label to end of line, in reply
@@ -10034,11 +10478,17 @@ int AIPlayerGPT::chooseAttackers()
 //UNIQUE matching name (attacker restricted to that blocker's legal set when
 //given). Ambiguous/no-match drops THAT assignment only; already-coded
 //assignments and the first-wins rule are respected.
+//gangConflict (out, optional; W36 item 1): set true when ONE blocker is
+//assigned to SEVERAL DIFFERENT attackers - the illegal shape whose first pair
+//used to be taken silently (116-fp8 vs105 seq25: "B1:A1, B1:A2, B1:A3" left
+//A2+A3 unblocked for lethal poison). A repeated IDENTICAL pair, or a legal
+//gang-block (several blockers on one attacker), is NOT a conflict.
 static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
                                  const vector<string> * blockerNames,
                                  const vector<string> * attackerNames,
                                  const vector<vector<int> > * legalPerBlocker,
-                                 int * dropped)
+                                 int * dropped,
+                                 bool * gangConflict)
 {
     out.assign(nBlockers, 0); //0 = no block; else attacker number
     int pairs = 0;
@@ -10078,6 +10528,9 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
         {
             if (dropped)
                 (*dropped)++;
+            if (gangConflict && a >= 1 && out[b - 1] != a)
+                *gangConflict = true; //same blocker, DIFFERENT attacker: the
+                                      //illegal one-blocker-many-attackers shape
             continue; //first assignment wins: a creature blocks at most one
                       //attacker, so ignore a later "B1:A3" after "B1:A1"
                       //(the model occasionally double-assigns one blocker).
@@ -10128,16 +10581,8 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                     continue;
                 }
                 int bMatch = uniqueNameMatch(leftWords, *blockerNames, nBlockers, NULL, nameOrdinal(leftSeg));
-                if (bMatch < 0 || out[bMatch] != 0)
-                {
-                    //A named pair that resolves to a blocker already spoken
-                    //for is the gang-of-one shape: "Illuna blocks A, Illuna
-                    //blocks B, ..." - first-wins is correct, and the three
-                    //discarded intents were previously invisible.
-                    if (dropped && bMatch >= 0)
-                        (*dropped)++;
-                    break; //no unique blocker, or already assigned by a code
-                }
+                if (bMatch < 0)
+                    break; //no unique blocker for this segment
                 const vector<int> * allowed = (legalPerBlocker && (size_t) bMatch < legalPerBlocker->size())
                                               ? &(*legalPerBlocker)[bMatch] : NULL;
                 //"#N" on the attacker half ("Saproling (1/1) #1") disambiguates
@@ -10154,6 +10599,20 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                 //unparseable reply (deck139 s21, deck158 s35).
                 if (aMatch < 0 && allowed)
                     aMatch = uniqueNameMatch(rightWords, *attackerNames, nAttackers, NULL, nameOrdinal(rightSeg));
+                if (out[bMatch] != 0)
+                {
+                    //A named pair that resolves to a blocker already spoken
+                    //for is the gang-of-one shape: "Illuna blocks A, Illuna
+                    //blocks B, ..." - first-wins is correct, and the three
+                    //discarded intents were previously invisible. When the
+                    //discarded intent names a DIFFERENT attacker, flag the
+                    //illegal multi-block so the seam can re-ask (W36 item 1).
+                    if (dropped)
+                        (*dropped)++;
+                    if (gangConflict && aMatch >= 0 && out[bMatch] != aMatch + 1)
+                        *gangConflict = true;
+                    break;
+                }
                 if (aMatch < 0)
                 {
                     if (dropped)
@@ -10183,7 +10642,14 @@ int AIPlayerGPT::chooseBlockers()
     //blocker's legal set (contract c1).
     DecisionRequest req;
     if (!DecisionManager::buildDeclareBlockers(this, req))
+    {
+        //Nothing to declare (the builder found no answerable shape): the
+        //declaration is vacuously satisfied. Marking it done keeps
+        //blockersDeclarationDue honest - a due-forever verdict here would
+        //hold every queued phase-advance (NextGamePhase's item-6 guard).
+        mBlocksDoneTurn = observer->turn;
         return 1;
+    }
     vector<MTGCardInstance *> & attackers = req.attackers;
     vector<MTGCardInstance *> & blockers = req.blockers;
     vector<vector<MTGCardInstance *> > & legal = req.legalPerBlocker;
@@ -10306,6 +10772,19 @@ int AIPlayerGPT::chooseBlockers()
             " e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\", or exactly \"BLOCKS: none\" to"
             " block with nobody this turn; then a PLAN: line only if the reply rules"
             " call for one. Write nothing else.";
+    //W36 item 1, the one-per-combat RE-ASK: the previous reply assigned one
+    //blocker to several different attackers, so the question is re-put with a
+    //terse correction naming the violated constraint. The changed text makes
+    //this a DIFFERENT prompt, so the async machinery issues a fresh call
+    //rather than replaying the conflicted answer. Deliberately free of
+    //B<digit>/A<digit> codes and of the word "blocks" so a model echoing the
+    //correction cannot feed the assignment parser a phantom pair.
+    bool reasking = (mBlockReaskTurn == observer->turn && mBlocksDoneTurn != observer->turn);
+    if (reasking)
+        tail << "\n[RE-ASK] Your previous reply assigned ONE creature to SEVERAL"
+                " different attackers, which is illegal - each creature can"
+                " block only ONE attacker. Re-answer the whole assignment now,"
+                " naming each of your creatures at most once.";
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -10338,9 +10817,28 @@ int AIPlayerGPT::chooseBlockers()
     //parser's own silent drops - the half pruned_pairs never saw.
     mLastPrunedPairs.clear();
     mLastDroppedAssignments = 0;
+    bool gangConflict = false;
     int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick,
                                                              &blockerNames, &attackerNames, &legalIdx,
-                                                             &mLastDroppedAssignments);
+                                                             &mLastDroppedAssignments, &gangConflict);
+
+    //W36 item 1: an illegal one-blocker-many-attackers reply is RE-ASKED once
+    //(with the correction appended - see the tail above) instead of silently
+    //keeping its first pair; the conflicted attempt is logged as its own
+    //record so the corpus can count every re-ask. A second conflicted reply
+    //falls through to the shipped first-wins behavior, marked in the note.
+    if (gangConflict && mBlockReaskTurn != observer->turn)
+    {
+        mBlockReaskTurn = observer->turn;
+        writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
+                      "", "multiblock_reask", &shownLines);
+        setNotice("a creature was assigned to several attackers - asking again", 5.0f);
+        DebugTrace("AIPlayerGPT: one-blocker-many-attackers reply -> re-asking once");
+        return 1; //next tick rebuilds the prompt WITH the correction line
+    }
+    if (reasking)
+        mLastParseNote = gangConflict ? "multiblock_reask_exhausted"
+                       : (pairs > 0 ? "multiblock_reask_recovered" : "multiblock_reask_unanswered");
 
     //WAVE-29 N-18e: the reply committed a block in an early coded line, then
     //reasoned itself OUT of blocking but was cut off by the token ceiling before
@@ -10504,6 +11002,17 @@ int AIPlayerGPT::chooseBlockers()
     mBlocksDoneTurn = observer->turn;
     DebugTrace("AIPlayerGPT: declared blocks from " << pairs << " assignment(s) in one reply");
     return 1;
+}
+
+//The async blockers declaration is still owed for this combat (W36 item 6).
+//True only while this seat DEFENDS with a live endpoint and this turn's
+//bundled declaration has not committed - every chooseBlockers exit
+//(declared, declined, heuristic fallback, vacuous builder) stamps
+//mBlocksDoneTurn, so "due" can never outlive the decision itself.
+bool AIPlayerGPT::blockersDeclarationDue()
+{
+    return !mEndpoint.empty() && observer && observer->currentPlayer != this
+           && mBlocksDoneTurn != observer->turn;
 }
 
 //A human-readable name for option one's eligibility filter, parsed from the
@@ -14611,6 +15120,198 @@ void AIPlayerGPT::runParseSelfTest()
         vector<string> one; one.push_back("Add 1 counter"); one.push_back("Draw a card");
         CHECK(payRepeatModeNote(one).empty(),
               "W36-N152h NEGATIVE a lone Add option draws no pay-repeat note");
+    }
+
+    // ---- W36 lane-B item 1: illegal one-blocker-many-attackers (re-ask trigger) ----
+    cout << "\n[W36-B1] one-blocker-many-attackers conflict detection\n";
+    {
+        vector<int> out;
+        bool gc = false;
+        int dropped = 0;
+        int pairs = parseBlockAssignments("B1:A1, B1:A2, B1:A3", 2, 3, out, NULL, NULL, NULL, &dropped, &gc);
+        cout << "     'B1:A1, B1:A2, B1:A3': pairs=" << pairs << " conflict=" << gc << "\n";
+        CHECK(pairs == 1 && out[0] == 1 && gc,
+              "W36-B1 POSITIVE coded gang-of-one keeps the first pair AND flags the conflict");
+        out.clear(); gc = false; dropped = 0;
+        pairs = parseBlockAssignments("B1:A1, B2:A1", 2, 2, out, NULL, NULL, NULL, &dropped, &gc);
+        CHECK(pairs == 2 && out[0] == 1 && out[1] == 1 && !gc,
+              "W36-B1 NEGATIVE several DIFFERENT blockers on one attacker is a legal gang-block, no flag");
+        out.clear(); gc = false; dropped = 0;
+        pairs = parseBlockAssignments("B1:A2, B1:A2", 1, 2, out, NULL, NULL, NULL, &dropped, &gc);
+        CHECK(pairs == 1 && out[0] == 2 && !gc,
+              "W36-B1 NEGATIVE a repeated IDENTICAL pair is a stutter, not a conflict");
+        //name-form gang-of-one ("Illuna blocks X, Illuna blocks Y")
+        vector<string> bn; bn.push_back("Illuna, Apex of Wishes");
+        vector<string> an; an.push_back("Serra Angel"); an.push_back("Shivan Dragon");
+        vector<vector<int> > legal(1); legal[0].push_back(0); legal[0].push_back(1);
+        out.clear(); gc = false; dropped = 0;
+        pairs = parseBlockAssignments("Illuna blocks Serra Angel, Illuna blocks Shivan Dragon",
+                                      1, 2, out, &bn, &an, &legal, &dropped, &gc);
+        cout << "     name-form gang-of-one: pairs=" << pairs << " conflict=" << gc << "\n";
+        CHECK(pairs == 1 && out[0] == 1 && gc,
+              "W36-B1 POSITIVE name-form gang-of-one flags the conflict too");
+        //ECHO-SHAPE: the re-ask correction line echoed back around a real
+        //answer must neither mint a pair nor re-flag a conflict.
+        out.clear(); gc = false; dropped = 0;
+        pairs = parseBlockAssignments(
+            "[RE-ASK] Your previous reply assigned ONE creature to SEVERAL different attackers,"
+            " which is illegal - each creature can block only ONE attacker. Re-answer the whole"
+            " assignment now, naming each of your creatures at most once.\nBLOCKS: B1:A2",
+            1, 2, out, &bn, &an, &legal, &dropped, &gc);
+        cout << "     echoed correction + real answer: pairs=" << pairs << " B1->A" << out[0] << " conflict=" << gc << "\n";
+        CHECK(pairs == 1 && out[0] == 2 && !gc,
+              "W36-B1 ECHO-SHAPE an echoed correction line parses clean around the real BLOCKS line");
+    }
+
+    // ---- W36 lane-B item 2: multi-answer reply to a single-pick ask ----
+    cout << "\n[W36-B2] comma-list / name-list replies on a single-pick ask\n";
+    {
+        vector<string> opts;
+        opts.push_back("Vault of Whispers [land] [your battlefield]");                        //1
+        opts.push_back("Nuisance Engine [artifact] - \"{2}, {T}: Put a 0/1 colorless Pest"
+                       " artifact creature token onto the battlefield.\"");                    //2
+        opts.push_back("Pest #1 (0/1) [your battlefield]");                                    //3
+        opts.push_back("Pest #2 (0/1) [your battlefield]");                                    //4
+        opts.push_back("Pest #3 (0/1) [your battlefield]");                                    //5
+        opts.push_back("Steel Wall (0/4) [defender] [your battlefield]");                      //6
+        bool st = false;
+        string note;
+        //the s29 shape: names, no number - the trailing scan used to grab the
+        //"1" inside "#1" and execute OPTION 1 (Vault), silently
+        int c = parseChoice("Pest #1, Pest #2, Pest #3", 6, &opts, &st, NULL, &note);
+        cout << "     'Pest #1, Pest #2, Pest #3' -> " << c << " note=" << note << "\n";
+        CHECK(c == 3 && note.find("multi_answer_first_taken") != string::npos,
+              "W36-B2 POSITIVE s29 name-list takes the FIRST named pick (its #1 handle disambiguates)");
+        //unreadable head of a provable pick list -> loud fail, never the digit scan
+        st = false; note.clear();
+        int cu = parseChoice("Mox Jet, Pest #2, Pest #3", 6, &opts, &st, NULL, &note);
+        cout << "     'Mox Jet, Pest #2, Pest #3' -> " << cu << " note=" << note << "\n";
+        CHECK(cu == -1 && note.find("multi_answer_unresolved") != string::npos,
+              "W36-B2 an unresolvable head of a proven pick list fails LOUD (no digit-scan misfire)");
+        //a single name that merely contains a comma is not a list
+        vector<string> o2;
+        o2.push_back("Cast Sigarda, Champion of Light {2}{g}{w}");
+        o2.push_back("Cast nothing right now");
+        st = false; note.clear();
+        int cn = parseChoice("Sigarda, Champion of Light", 2, &o2, &st, NULL, &note);
+        cout << "     'Sigarda, Champion of Light' -> " << cn << " note=" << note << "\n";
+        CHECK(cn == 1 && note.empty(),
+              "W36-B2 NEGATIVE a comma inside ONE name is not a list (both halves = same option)");
+        //prose with a comma still falls through to the shipped integer scan
+        vector<string> o3;
+        o3.push_back("Cast Icehide Golem");
+        o3.push_back("Attack for 3");
+        o3.push_back("Hold up mana");
+        st = false; note.clear();
+        int cp = parseChoice("I'll take option 2, it seems strongest", 3, &o3, &st, NULL, &note);
+        cout << "     prose-with-comma -> " << cp << " note=" << note << "\n";
+        CHECK(cp == 2 && note.empty(),
+              "W36-B2 NEGATIVE prose with commas keeps the shipped in-range scan");
+        //the s40 shape: coded head + trailing extra picks = first taken, stamped
+        st = false; note.clear();
+        int cs = parseChoice("8 (Pest #3), 6 (Island), 3 (Ancient Den #1)", 9, NULL, &st, NULL, &note);
+        cout << "     '8 (...), 6 (...), 3 (...)' -> " << cs << " note=" << note << "\n";
+        CHECK(cs == 8 && note.find("multi_answer_first_taken") != string::npos,
+              "W36-B2 s40 coded comma-list keeps the first pick and stamps the overrun");
+        //ECHO-SHAPE: a single coded answer whose parenthetical carries commas
+        //inside annotations stays silent
+        st = false; note.clear();
+        int ce = parseChoice("CHOICE: 1 (Cast Icehide Golem)", 3, &o3, &st, NULL, &note);
+        CHECK(ce == 1 && note.empty(),
+              "W36-B2 NEGATIVE a plain single coded answer is untouched, no note");
+    }
+
+    // ---- W36 lane-B item 3: consecutive CHOICE-line block -> FIRST wins ----
+    cout << "\n[W36-B3] multi-CHOICE-line replies: run-first vs correction-last\n";
+    {
+        string multi = "CHOICE: 9 (Pest #3)\nCHOICE: 7 (Island)\nCHOICE: 6 (Seat of the Synod)\nPLAN: Survive combat.";
+        size_t ss = 0, se = 0, ls = 0;
+        int run = 0;
+        bool f = findAnswerLabelLine(multi, "CHOICE:", ss, se, ls, &run);
+        cout << "     s39 3-line block: seg='" << (f ? multi.substr(ss, se - ss) : string("<none>"))
+             << "' run=" << run << "\n";
+        CHECK(f && run == 3 && multi.substr(ss, se - ss) == " 9 (Pest #3)",
+              "W36-B3 POSITIVE a consecutive CHOICE block answers with its FIRST line (run reported)");
+        bool st2 = false;
+        int c9 = parseChoice(multi.substr(ss, se - ss), 10, NULL, &st2);
+        CHECK(c9 == 9, "W36-B3 the run-head segment parses to the model's first-committed pick");
+        //prose-separated correction keeps last-wins (the shipped self-correction rule)
+        string corr = "CHOICE: 4 (Cast nothing right now)\nWait, the golem is better.\nCHOICE: 1 (Cast Icehide Golem)";
+        run = 0;
+        f = findAnswerLabelLine(corr, "CHOICE:", ss, se, ls, &run);
+        cout << "     correction: seg='" << (f ? corr.substr(ss, se - ss) : string("<none>")) << "' run=" << run << "\n";
+        CHECK(f && run == 1 && corr.substr(ss, se - ss) == " 1 (Cast Icehide Golem)",
+              "W36-B3 NEGATIVE a prose-separated correction still supersedes (last-wins kept)");
+        //adjacent BLOCKS lines keep pure line precedence (rule is CHOICE-scoped)
+        string blk = "BLOCKS: B1:A1\nBLOCKS: B1:none";
+        run = 0;
+        f = findAnswerLabelLine(blk, "BLOCKS:", ss, se, ls, &run);
+        CHECK(f && run == 0 && blk.substr(ss, se - ss) == " B1:none",
+              "W36-B3 NEGATIVE adjacent BLOCKS lines keep line precedence (W32-N122d intact)");
+        //a blank line inside the block does not break the run
+        string blanky = "CHOICE: 2 (Attack for 3)\n\nCHOICE: 1 (Cast Icehide Golem)";
+        run = 0;
+        f = findAnswerLabelLine(blanky, "CHOICE:", ss, se, ls, &run);
+        CHECK(f && run == 2 && blanky.substr(ss, se - ss) == " 2 (Attack for 3)",
+              "W36-B3 a blank line does not break a pick-list block");
+    }
+
+    // ---- W36 lane-B item 4: echo/index conflict resolves to the NAME, signed ----
+    cout << "\n[W36-B4] echo/index conflicts (deck152 vs139 s19 family)\n";
+    {
+        vector<string> vo;
+        vo.push_back("don't add any counter"); //1
+        vo.push_back("add 5 counters");        //2
+        vo.push_back("add 10 counters");       //3
+        vo.push_back("add 15 counters");       //4
+        bool st = false;
+        string note;
+        //the incident shape as the seam sees it (consumePlan strips the
+        //label, so the head IS the number): number and name disagree; every
+        //alpha word of the echo is render vocabulary, so only the NUMBER can
+        //discriminate
+        int c = parseChoice(" 3 (add 5 counters)", 4, &vo, &st, NULL, &note);
+        cout << "     ' 3 (add 5 counters)' -> " << c << " note=" << note << "\n";
+        CHECK(c == 2 && note.find("echo_index_conflict") != string::npos,
+              "W36-B4 POSITIVE the unique NAME match wins over the index, and the conflict is signed");
+        //the raw labeled line (salvage path): non-numeric head, the unique
+        //echo still names the intent - remapped there before the index is
+        //even known, so no conflict note is possible or needed
+        st = false; note.clear();
+        int cr = parseChoice("CHOICE: 3 (add 5 counters)", 4, &vo, &st, NULL, &note);
+        CHECK(cr == 2, "W36-B4 the raw labeled line resolves to the named option on the salvage path too");
+        //agreement stays silent
+        st = false; note.clear();
+        int ca = parseChoice("CHOICE: 2 (add 5 counters)", 4, &vo, &st, NULL, &note);
+        CHECK(ca == 2 && note.empty(),
+              "W36-B4 NEGATIVE index and echo naming the SAME option: no remap, no note");
+        //a bare stat echo has no alpha token: the relaxed pass must not fire
+        st = false; note.clear();
+        vector<string> vs;
+        vs.push_back("Cast Grizzly Bears");
+        vs.push_back("Cast Hill Giant");
+        int cb = parseChoice("CHOICE: 2 (3/3)", 2, &vs, &st, NULL, &note);
+        CHECK(cb == 2 && note.empty(),
+              "W36-B4 NEGATIVE a bare stat echo '(3/3)' never remaps (numeric-only echoes are inert)");
+        //ambiguous conflict, index's own option among the matches: trusted, silent
+        vector<string> va;
+        va.push_back("add 5 counters");
+        va.push_back("add 5 counters and draw a card");
+        st = false; note.clear();
+        int cm = parseChoice("CHOICE: 2 (add 5 counters)", 2, &va, &st, NULL, &note);
+        CHECK(cm == 2 && note.empty(),
+              "W36-B4 NEGATIVE ambiguous echo that INCLUDES the index's option keeps the index, silent");
+        //genuinely ambiguous conflict, index foreign to every match: index
+        //stands (no re-ask channel at this depth) but the divergence is signed
+        vector<string> vg;
+        vg.push_back("add 5 counters");
+        vg.push_back("add 5 counters and draw a card");
+        vg.push_back("discard a card");
+        st = false; note.clear();
+        int cg = parseChoice("CHOICE: 3 (add 5 counters)", 3, &vg, &st, NULL, &note);
+        cout << "     ambiguous foreign-index -> " << cg << " note=" << note << "\n";
+        CHECK(cg == 3 && note.find("echo_index_conflict_ambiguous") != string::npos,
+              "W36-B4 ambiguous conflict with a foreign index executes the index but is signed");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
