@@ -342,6 +342,75 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                 used[attackerProd[k]->source] = true;
         }
     }
+    //HYBRID PIPS FIRST (N-116h, wave-36). Hybrid pips are COLOURED requirements,
+    //and the old post-walk hybrid pass had two compounding defects: (a) it ran
+    //AFTER the generic fill had already swallowed sources in layer order, so a
+    //dual whose either colour a pip needed was often burned on its FIRST-listed
+    //colour for generic; (b) its per-producer gate compared the accumulated
+    //colour against a SINGLE pip's value (`result->getCost(c1) < value1`, i.e.
+    //"< 1"), so a cost with TWO identical hybrid pips ({1}{g/w}{g/w}, Kitchen
+    //Finks) could never receive a second source of the same colour - the first
+    //{g} payment made the comparison false for the second pip forever. Because
+    //LegalActionsOracle::payable's last resort IS this walk (potentialMana is
+    //one-ability-per-card and under-reports duals), the cast was then never
+    //offered at all - silently (deck116 vs105 s17, corpus 20260820: Forest +
+    //Tropical Island + 2 Glimmerpost on the table, "Mana available: 4", Kitchen
+    //Finks {1}{g/w}{g/w} absent from the cast list). Pay each pip UP FRONT, one
+    //unused producer per pip, either colour side, preferring a source that pays
+    //none of the cost's PLAIN coloured pips (hold those for the coloured walk
+    //below); the final result->canAfford(cost) validation still arbitrates
+    //global correctness, so a shape this walk cannot complete stays unpayable
+    //exactly as before.
+    {
+        ManaCostHybrid * hc;
+        int hyb = 0;
+        while ((hc = cost->getHybridCost(hyb++)) != NULL)
+        {
+            if (result->canAfford(cost, 0))
+                break; //everything, this pip included, is already covered
+            bool paid = false;
+            for (int pref = 0; pref < 2 && !paid; pref++)
+            {
+                for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size() && !paid; i++)
+                {
+                    MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
+                    AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
+                    if (!amp || !policy.canHandle(amp))
+                        continue;
+                    if (amp->getCost() && amp->getCost()->extraCosts && !amp->getCost()->extraCosts->canPay())
+                        continue;
+                    MTGCardInstance * src = amp->source;
+                    if (src == target)
+                        used[src] = true; //http://code.google.com/p/wagic/issues/detail?id=76
+                    if (used[src] || !producerUsable(p, amp, src, true) || amp->output->getConvertedCost() < 1)
+                        continue;
+                    //only true colour sides; a {2/w}-style generic side is out of
+                    //this walk's scope (unchanged from the old pass's reach).
+                    bool c1 = hc->color1 > 0 && hc->value1 && amp->output->hasColor(hc->color1);
+                    bool c2 = hc->color2 > 0 && hc->value2 && amp->output->hasColor(hc->color2);
+                    if (!c1 && !c2)
+                        continue;
+                    if (pref == 0)
+                    {
+                        //don't burn a source a PLAIN coloured pip of this cost
+                        //also needs - hold it for the coloured walk below.
+                        bool onPlainPip = false;
+                        for (int k = 1; k < Constants::NB_Colors && !onPlainPip; k++)
+                            if (k != Constants::MTG_COLOR_ARTIFACT && cost->getCost(k) && amp->output->hasColor(k))
+                                onPlainPip = true;
+                        if (onPlainPip)
+                            continue;
+                    }
+                    int col = c1 ? hc->color1 : hc->color2;
+                    payments.push_back(amp);
+                    result->add(col, amp->output->getCost(col));
+                    used[src] = true;
+                    fullColor++;
+                    paid = true;
+                }
+            }
+        }
+    }
     for (int pass = 0; pass < 2; pass++)
     {
     for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
@@ -488,48 +557,9 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
     hybridCost = cost->getHybridCost(0);
     if(hybridCost)
     {
-        int hyb = 0;
-        while ((hybridCost = cost->getHybridCost(hyb)) != NULL)
-        {
-            //here we try to find one of the colors in the hybrid cost, it is done 1 at a time unfortunately
-            //{rw}{ub} would be 2 runs of this.90% of the time ai finds it's hybrid in pMana check.
-            bool foundColor1 = false;
-            bool foundColor2 = false;
-            for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
-            {
-                MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
-                AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
-                if (amp && policy.canHandle(amp))
-                {
-                    foundColor1 = amp->output->hasColor(hybridCost->color1)?true:false;
-                    foundColor2 = amp->output->hasColor(hybridCost->color2)?true:false;
-                    if ((foundColor1 && result->getCost(hybridCost->color1) < hybridCost->value1)||
-                        (foundColor2 && result->getCost(hybridCost->color2) < hybridCost->value2))
-                    {
-                        MTGCardInstance * card = amp->source;
-                        if (card == target)
-                            used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
-                        if (!used[card] && producerUsable(p, amp, card, true) && amp->output->getConvertedCost() >= 1)
-                        {
-                            ManaCost * check = NEW ManaCost();
-                            check->add(foundColor1?hybridCost->color1:hybridCost->color2,foundColor1?hybridCost->value1:hybridCost->value2);
-                            ManaCost * checkResult = NEW ManaCost();
-                            checkResult->add(foundColor1?hybridCost->color1:hybridCost->color2,result->getCost(foundColor1?hybridCost->color1:hybridCost->color2));
-                            if(((foundColor1 && !foundColor2)||(!foundColor1 && foundColor2)) &&!(checkResult->canAfford(check,0)))
-                            {
-                                payments.push_back(amp);
-                                result->add(foundColor1?hybridCost->color1:hybridCost->color2,amp->output->getCost(foundColor1?hybridCost->color1:hybridCost->color2));
-                                used[card] = true;
-                                fullColor++;
-                            }
-                            SAFE_DELETE(check);
-                            SAFE_DELETE(checkResult);
-                        }
-                    }
-                }
-            }
-            hyb++;
-        }
+        //hybrid pips are paid by the HYBRID-PIPS-FIRST walk above (N-116h),
+        //before the generic fill can swallow their sources; nothing left to do
+        //here. The final result->canAfford(cost) validation below arbitrates.
     }
     else if(!hybridCost && result->getConvertedCost())
     {

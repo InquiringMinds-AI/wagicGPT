@@ -377,20 +377,57 @@ GameObserver::CombatDecision GameObserver::pendingCombatDecision(Player * p)
     //declared), an open menu, a live target chooser, or a pending extra
     //payment. The stack gate is what kills the historical silent
     //blocker-skip: the decision is deferred, not dropped.
+    //N-146s (wave-36 diagnostic, dev builds only): in the B3 122B game the
+    //caster of a fused Silverquill Command received NO attacker asks for nine
+    //consecutive turns while holding legal attackers; the opponent-granted
+    //sacrifice chooser surfaced ~9 turns late. A scripted probe proved the
+    //grant resolves promptly once the receiver clicks, so the fault is in
+    //WHICH of these gates stays raised on live AI seats. This tracer names
+    //the suppressing gate once per (turn, phase, seat) at combat phases, to
+    //stderr (harvested per game by the selfplay harness), so the next corpus
+    //occurrence carries its own diagnosis. Compiled out of release builds.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+#define WAGIC_COMBATTRACE_SUPPRESS(reason) \
+    do { if ((mCurrentGamePhase == MTG_PHASE_COMBATATTACKERS && p == currentPlayer) \
+          || (mCurrentGamePhase == MTG_PHASE_COMBATBLOCKERS && p != currentPlayer)) { \
+        static int lastTurn = -1; static int lastPhase = -1; static void * lastSeat = NULL; \
+        if (lastTurn != turn || lastPhase != (int) mCurrentGamePhase || lastSeat != (void *) p) { \
+            lastTurn = turn; lastPhase = (int) mCurrentGamePhase; lastSeat = (void *) p; \
+            fprintf(stderr, "[combattrace] t%d ph%d seat=%p combat decision suppressed by %s\n", \
+                    turn, (int) mCurrentGamePhase, (void *) p, reason); \
+        } } } while (0)
+#else
+#define WAGIC_COMBATTRACE_SUPPRESS(reason) do { } while (0)
+#endif
     if (mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED))
+    {
+        WAGIC_COMBATTRACE_SUPPRESS("unresolved-stack");
         return COMBAT_DECISION_NONE;
+    }
     if (mLayers->actionLayer()->menuObject)
+    {
+        WAGIC_COMBATTRACE_SUPPRESS("open-menu");
         return COMBAT_DECISION_NONE;
+    }
     if (getCurrentTargetChooser())
+    {
+        WAGIC_COMBATTRACE_SUPPRESS("live-target-chooser");
         return COMBAT_DECISION_NONE;
+    }
     if (mExtraPayment)
+    {
+        WAGIC_COMBATTRACE_SUPPRESS("extra-payment");
         return COMBAT_DECISION_NONE;
+    }
     if (mCurrentGamePhase == MTG_PHASE_COMBATATTACKERS)
     {
         if (p != currentPlayer)
             return COMBAT_DECISION_NONE;
         if (!LegalActionsOracle::hasLegalAttacker(p))
+        {
+            WAGIC_COMBATTRACE_SUPPRESS("no-legal-attacker");
             return COMBAT_DECISION_NONE;
+        }
         return COMBAT_DECISION_ATTACKERS;
     }
     if (mCurrentGamePhase == MTG_PHASE_COMBATBLOCKERS && combatStep == BLOCKERS)

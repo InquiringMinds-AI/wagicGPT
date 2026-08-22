@@ -1,0 +1,73 @@
+# Wave-36 N-116h: a cost with TWO IDENTICAL HYBRID pips must be castable off
+# two sources that can each pay one pip.  Live witness (deck116 vs105 s17,
+# corpus 20260820-192210): Kitchen Finks {1}{g/w}{g/w} in hand over untapped
+# Forest + Tropical Island + Glimmerpost x2 ("Mana available: 4"), and "Cast
+# Kitchen Finks" absent from the cast list - the seat cast Farseek instead and
+# the Finks never hit play.
+#
+# Board here mirrors the shape comma-free and basic-free: Tropical Island
+# (Forest Island -> add{G} THEN add{U}) + Bayou (Swamp Forest -> add{B} THEN
+# add{G}) + Darksteel Citadel ({T}:add{1}).  Only legal assignment: Tropical
+# -> {G} for one {g/w} pip, Bayou -> {G} for the other, Citadel -> the generic
+# {1}.  No white source exists at all - both pips must ride green.
+#
+# PRE-FIX this FAILS SILENTLY (no defer record, no ask - the cast never
+# reaches the decision surface).  Two stacked defects in ManaEngine:
+# (a) potentialMana is one-ability-per-card, so the pool reads g+b+1 (each
+#     dual contributes only its FIRST colour) and pMana->canAfford finds one
+#     G where two G/W are needed;
+# (b) planPayment's old hybrid pass ran AFTER the generic fill had swallowed
+#     sources in layer order, and its gate compared the accumulated colour
+#     against a SINGLE pip's value (result->getCost(G) < 1), so the second
+#     identical {g/w} pip could never receive a second green source - the
+#     first payment made the comparison false forever.
+# payable() therefore returned false on both routes and legalCasts dropped
+# the card.
+#
+# POST-FIX the HYBRID-PIPS-FIRST walk in planPayment pays each pip up front
+# (one unused producer per pip, either colour side) before the generic fill
+# runs; the final result->canAfford(cost) validation is unchanged, so shapes
+# the walk cannot complete stay unpayable exactly as before.
+#
+# Kitchen Finks' ETB gains its controller 2 life, so life 22 in the ASSERT is
+# the proof the cast actually RESOLVED (not merely left hand).
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Tropical Island,Bayou,Darksteel Citadel
+hand:Kitchen Finks
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+life:22
+inplay:Tropical Island,Bayou,Darksteel Citadel,Kitchen Finks
+hand:
+[PLAYER2]
+life:20
+[END]
