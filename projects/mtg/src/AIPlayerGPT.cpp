@@ -234,6 +234,16 @@ const char * kAttackersTurnFacts =
 const char * kBlockersTurnFacts =
     "You keep priority through the rest of this combat: instants and activated abilities you hold "
     "stay castable after blockers are declared.\n";
+//W36 #1 (four seats independently authored this teach in wave-35 - 152 rule-4,
+//116 rule-9, 36 blocking amendment, 105 printed-outcome): the pilots re-derive
+//the trade parentheticals and stochastically override them ("likely a template
+//error"). Stated ONCE at the ask tail, where the answer is composed; the four
+//per-guide crutches retire against this line (2-corpora bar).
+const char * kBlockTradeTrustNote =
+    "Each parenthetical trade above is the ENGINE'S computed fight result for that exact 1-on-1 "
+    "block - deathtouch, first strike, wither and every printed ability are already included. "
+    "Trust it over your own arithmetic; never re-derive it. Only gang-blocks, pumps or combat "
+    "tricks can change it.\n";
 const char * kSecondMainAheadFact =
     "Still ahead of you this turn: your SECOND MAIN PHASE, after combat. Creatures, sorceries and "
     "other main-phase cards you do not cast now can still be cast then, on this same turn.\n";
@@ -1477,8 +1487,11 @@ static string manaAvailableLine(int sources, const string& colors, const string&
     o << sources << " total (";
     if (sources <= 10)
         o << kNumWord[sources] << " ";
+    //W36 #9 (105/158, the generic-cost misread class): a pilot read {3} in a
+    //cost as needing specific colours. State the payment rule where the count is.
     o << "untapped source" << (sources > 1 ? "s" : "")
-      << ", tapped automatically when you cast; colours you can make: " << colors << ")";
+      << ", tapped automatically when you cast; colours you can make: " << colors
+      << "; mana of ANY colour pays a generic cost like {2})";
     //N-166k: the sources themselves, so no colour in the set above is
     //unattributed. Omitted when the engine could not name them (never observed,
     //but a silent gap is preferable to a wrong list).
@@ -2454,11 +2467,15 @@ static string combatDamageForecast(int life, int poison, int lifeIncoming, int p
     if (poisonIncoming <= 0)
     {
         //Non-poison swing: byte-identical to the validated wording.
+        //W36 #5 (158 R1): a trace computed "4 - 4 = 0 life. I survive!" - state
+        //the boundary: reaching EXACTLY 0 is death. W36 #3 (105/152/36 collision):
+        //the take-the-damage hint licensed overriding deck guides and read
+        //"ahead" off the wrong resource; scope it to LIFE and make it yield.
         o << " Unblocked, these attackers deal up to " << lifeIncoming
           << " - you would be at " << (life - lifeIncoming)
           << (life - lifeIncoming <= 0
-              ? " - LETHAL if it all connects: block enough to survive."
-              : " - NOT lethal: block only where the trade favors you; taking damage while ahead is often correct.")
+              ? " - LETHAL if it all connects (at 0 life you LOSE - 0 is not survival): block enough to survive."
+              : " - NOT lethal: block only where the trade favors you; taking damage while ahead on LIFE is often correct (your strategy guide's blocking rules override this general hint).")
           << "\n";
         return o.str();
     }
@@ -2521,6 +2538,31 @@ string perTargetLifeCostNote(Targetable * t)
     ManaCost * mc = c->getManaCost();
     std::ostringstream o;
     o << " (costs you " << (mc ? mc->getConvertedCost() : 0) << " life)";
+    return o.str();
+}
+
+//W36 #4 (158 P6): the engine's kill verdict for a knowable damage amount
+//against one creature target - the pilot transposed (3/1) into "toughness 3"
+//twice and read 6 damage as killing an 8/8; a printed verdict outranks its
+//arithmetic (trust doctrine). `remaining` is the creature's current remaining
+//toughness (Damageable::life - damage already marked counts); deathtouch makes
+//any amount lethal; indestructible survives damage outright. Pure, so the
+//verdict table is provable in PARSETEST.
+string damageTargetVerdict(int dmg, int toughness, int remaining, bool indestructible, bool deathtouch)
+{
+    std::ostringstream o;
+    o << " {right now: takes " << dmg << " damage - ";
+    if (indestructible)
+        o << "INDESTRUCTIBLE, survives}";
+    else if (deathtouch || dmg >= remaining)
+        o << "DIES" << (deathtouch && dmg < remaining ? " (deathtouch)" : "") << "}";
+    else
+    {
+        o << "SURVIVES (toughness " << toughness;
+        if (remaining != toughness)
+            o << ", " << remaining << " more kills it";
+        o << ")}";
+    }
     return o.str();
 }
 
@@ -7902,7 +7944,7 @@ static bool isTapOption(const string & opt)
     //longer option that merely starts with "tap ..."
     return toLowerCopy(opt) == "tap";
 }
-static bool annotateEtbPayOrTapMenu(vector<string>& opts)
+static bool annotateEtbPayOrTapMenu(vector<string>& opts, const string& landName)
 {
     bool hasPayLife = false, hasTap = false;
     for (size_t i = 0; i < opts.size(); i++)
@@ -7914,16 +7956,51 @@ static bool annotateEtbPayOrTapMenu(vector<string>& opts)
     }
     if (!(hasPayLife && hasTap))
         return false;
+    //W36 #7 (139 N2: all three arm-C deck139 fallbacks landed on this one ask):
+    //the bare "pay 2 life"/"tap" labels gave the echo no anchor - the pilot
+    //reasons about the LAND's name. Put the land into the option SHORT NAME
+    //(outside the [] tail, which answer matching strips), so its natural echo
+    //matches. landName may be empty (recovery failed): generic wording then.
+    string who = landName.empty() ? string("this permanent") : landName;
     for (size_t i = 0; i < opts.size(); i++)
     {
         if (isPayLifeOption(opts[i]))
-            opts[i] += " [this permanent then enters the battlefield UNTAPPED -"
-                       " usable (tap for mana / attack) this turn]";
+            opts[i] += " - " + who + " enters UNTAPPED [usable (tap for"
+                       " mana / attack) this turn]";
         else if (isTapOption(opts[i]))
-            opts[i] += " [decline the payment; this permanent instead enters the"
-                       " battlefield TAPPED - unusable until your next untap step]";
+            opts[i] += " - " + who + " enters TAPPED [decline the payment;"
+                       " unusable until your next untap step]";
     }
     return true;
+}
+
+//W36 #7, the name recovery: the menu's own instance is nameless (w26a probe -
+//name cleared, model NULL), but by the time the pay-or-tap ask arms the land
+//HAS entered the battlefield (the narration shows "You played X" before this
+//ask). The newest fresh land in the chooser's own battlefield is the one that
+//armed it; prefer the shock text shape as a discriminator, fall back to the
+//newest fresh land, and return "" when there is none (the caller then keeps
+//the generic wording - a wrong name would be worse than no name).
+static string etbPayOrTapLandName(Player * p)
+{
+    if (!p || !p->game || !p->game->inPlay)
+        return "";
+    MTGGameZone * bf = p->game->inPlay;
+    string fallback;
+    for (int zi = bf->nb_cards - 1; zi >= 0; zi--)
+    {
+        MTGCardInstance * lc = bf->cards[zi];
+        if (!lc || !lc->isLand() || !lc->fresh)
+            continue;
+        if (fallback.empty())
+            fallback = lc->getDisplayName();
+        string lt = lc->text;
+        for (size_t i = 0; i < lt.size(); i++)
+            lt[i] = (char) tolower((unsigned char) lt[i]);
+        if (lt.find("enters tapped") != string::npos && lt.find("pay") != string::npos)
+            return lc->getDisplayName();
+    }
+    return fallback;
 }
 
 //Triggered/activated "may"-ability ask assembly (Tergrid's steal class). The
@@ -8212,18 +8289,23 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                        " casting a fresh separate body]";
     }
     //ETB "pay life or enter tapped" menu (shocklands - Temple Garden class, and
-    //the fixed painland sibling): append the consequence each bare label omits.
-    //Annotation only, mechanism-matched (see annotateEtbPayOrTapMenu). deck137
-    //wave-24.
-    annotateEtbPayOrTapMenu(opts);
+    //the fixed painland sibling): append the consequence each bare label omits,
+    //and name the entering land in the option short-names (W36 #7 - the name is
+    //recovered from the battlefield, see etbPayOrTapLandName; the menu's own
+    //instance is nameless, w26a probe). deck137 wave-24 + deck139 wave-35.
+    string etbLandName;
+    {
+        vector<string> probeOpts = opts;
+        if (annotateEtbPayOrTapMenu(probeOpts, string()))
+            etbLandName = etbPayOrTapLandName(this);
+    }
+    bool etbPayOrTap = annotateEtbPayOrTapMenu(opts, etbLandName);
     //Recover the subject name for the header. Some ETB menus arm on an instance
     //whose own name is cleared (getDisplayName() empty) but whose card TEMPLATE
     //(model->data) still carries the printed name - recover it there. The
-    //shockland pay-or-tap menu is the WORST case: its entering instance is a
-    //stripped copy with name cleared AND model == NULL (verified w26a probe -
-    //currentActionCard/menuObject/option-source all point to the same nameless,
-    //model-less instance), so no name is recoverable at this seam. Naming it
-    //would need an engine-level change to the ETB menu-arming flow.
+    //shockland pay-or-tap menu arms on a stripped copy with name cleared AND
+    //model == NULL (verified w26a probe), so its name comes from the
+    //battlefield recovery above instead.
     string ctxName;
     if (ctx)
     {
@@ -8231,6 +8313,8 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         if (ctxName.empty() && ctx->model && ctx->model->data)
             ctxName = ctx->model->data->getName();
     }
+    if (ctxName.empty() && etbPayOrTap)
+        ctxName = etbLandName;
     string decision;
     if (!req.mayObjectName.empty())
         //Triggered "may"-ability ask (Tergrid's steal class): name the object
@@ -8501,6 +8585,21 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             mtl[li] = (char) tolower((unsigned char) mtl[li]);
         lifeCostPerTarget = mtl.find("life:-manacost") != string::npos;
     }
+    //W36 #4 (158 P6): when the ability waiting for this target deals a knowable
+    //damage amount, each creature line below carries the engine's kill verdict.
+    //"rand" expressions draw the game RNG - never evaluated (standing rule);
+    //0 or negative amounts render nothing (an authoritative 0 is worse than
+    //silence - the sorcery-power lesson).
+    int dmgAmount = 0;
+    bool dmgDeathtouch = false;
+    {
+        AADamager * ad = dynamic_cast<AADamager *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+        if (ad && ad->d.find("rand") == string::npos)
+        {
+            dmgAmount = ad->getDamage();
+            dmgDeathtouch = ad->source && ad->source->has(Constants::DEATHTOUCH);
+        }
+    }
     for (;;)
     {
         vector<Targetable *> targets;
@@ -8520,8 +8619,17 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 if (std::find(picks.begin(), picks.end(), t) != picks.end())
                     continue;
                 targets.push_back(t);
-                opts.push_back(describeTarget(this, t)
-                               + (lifeCostPerTarget ? perTargetLifeCostNote(t) : string()));
+                string tdesc = describeTarget(this, t)
+                               + (lifeCostPerTarget ? perTargetLifeCostNote(t) : string());
+                //W36 #4: the kill verdict rides the creature target line.
+                if (dmgAmount > 0)
+                    if (MTGCardInstance * dtc = dynamic_cast<MTGCardInstance *>(t))
+                        if (dtc->isCreature() && dtc->controller() && dtc->controller()->game
+                            && dtc->currentZone == dtc->controller()->game->inPlay)
+                            tdesc += damageTargetVerdict(dmgAmount, dtc->toughness, dtc->life,
+                                                         dtc->basicAbilities[Constants::INDESTRUCTIBLE],
+                                                         dmgDeathtouch);
+                opts.push_back(tdesc);
             }
             req = round;
         }
@@ -9016,6 +9124,52 @@ static CombatTradeStat combatStatOf(MTGCardInstance * c)
 static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * attacker)
 {
     return combatTradePreviewStats(combatStatOf(blocker), combatStatOf(attacker));
+}
+
+//W36 #2 (139-tier P1 / 158 P3, engine-verified game-affecting): a "whenever ~
+//becomes blocked" trigger changes the fight BEFORE damage, so a trade computed
+//from printed stats lies about the block - Ichorclaw Myr (1/1, +2/+2 when
+//blocked) rendered "you kill it, your blocker lives" for a 2/2 blocker the
+//pumped 3/3 actually kills, and the trust doctrine makes that printed lie an
+//instruction. Parse the attacker's oracle text for the simple SELF-pump form;
+//the caller folds it into the computed trade and says so. Anything else a
+//becomes-blocked trigger does (blocker debuffs, untaps, damage riders) is
+//uncomputable in a 1-on-1 preview and gets an explicit not-included flag
+//instead - silent omission is the failure mode this fixes. Pure, on the text
+//line, so PARSETEST proves the classification without an engine card.
+//Returns 0 = no becomes-blocked trigger; 1 = simple self-pump (dp/dt set);
+//2 = a trigger this preview cannot compute.
+static int becomesBlockedSelfPump(const string& text, int& dp, int& dt)
+{
+    dp = dt = 0;
+    string low = text;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    size_t pos = low.find("becomes blocked");
+    if (pos == string::npos)
+        return 0;
+    size_t end = low.find('.', pos); //classify from the trigger's own sentence
+    string sent = low.substr(pos, end == string::npos ? string::npos : end - pos);
+    size_t g = sent.find("gets +");
+    if (g == string::npos)
+        return 2;
+    //"each creature blocking it gets +N/+N" pumps the BLOCKER side - not a
+    //self-pump; anything naming a creature/blocking before the verb bails.
+    string pre = sent.substr(0, g);
+    if (pre.find("creature") != string::npos || pre.find("blocking") != string::npos)
+        return 2;
+    size_t p = g + 6;
+    int n = 0; bool anyN = false;
+    while (p < sent.size() && isdigit((unsigned char) sent[p])) { n = n * 10 + (sent[p] - '0'); p++; anyN = true; }
+    if (!anyN || p + 1 >= sent.size() || sent[p] != '/' || sent[p + 1] != '+')
+        return 2;
+    p += 2;
+    int m = 0; bool anyM = false;
+    while (p < sent.size() && isdigit((unsigned char) sent[p])) { m = m * 10 + (sent[p] - '0'); p++; anyM = true; }
+    if (!anyM)
+        return 2;
+    dp = n; dt = m;
+    return 1;
 }
 
 //Forward declarations: the salvage helpers below re-parse a labeled line
@@ -10097,6 +10251,12 @@ int AIPlayerGPT::chooseBlockers()
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
+    //W36 #2: classify each attacker's becomes-blocked trigger once; the B-line
+    //trades below fold a simple self-pump into the computed result and flag
+    //anything else as not-included.
+    vector<int> bbKind(attackers.size(), 0), bbP(attackers.size(), 0), bbT(attackers.size(), 0);
+    for (size_t j = 0; j < attackers.size(); j++)
+        bbKind[j] = becomesBlockedSelfPump(attackers[j]->text, bbP[j], bbT[j]);
     tail << "Your available blockers (with, for each attacker it may block, the"
             " naive 1-on-1 trade - before other blockers, pump or combat tricks):\n";
     for (size_t i = 0; i < blockers.size(); i++)
@@ -10121,13 +10281,38 @@ int AIPlayerGPT::chooseBlockers()
                     ln << (j ? "," : "") << " A" << (k + 1);
                     //The computed trade rides the B#:A# pairing so there is
                     //nothing left to re-derive (block-outcome annotation).
-                    string trade = combatBlockOutcome(blockers[i], attackers[k]);
+                    //W36 #2: a simple when-blocked self-pump is folded IN and
+                    //said; an uncomputable trigger is flagged as not included.
+                    string trade;
+                    if (bbKind[k] == 1)
+                    {
+                        CombatTradeStat as = combatStatOf(attackers[k]);
+                        as.power += bbP[k];
+                        as.toughness += bbT[k];
+                        trade = combatTradePreviewStats(combatStatOf(blockers[i]), as);
+                        if (!trade.empty())
+                        {
+                            std::ostringstream bb;
+                            bb << trade << " - includes its +" << bbP[k] << "/+"
+                               << bbT[k] << " when-blocked trigger";
+                            trade = bb.str();
+                        }
+                    }
+                    else
+                    {
+                        trade = combatBlockOutcome(blockers[i], attackers[k]);
+                        if (bbKind[k] == 2 && !trade.empty())
+                            trade += " - PLUS its becomes-blocked trigger, NOT"
+                                     " included here: read its text";
+                    }
                     if (!trade.empty())
                         ln << " (" << trade << ")";
                 }
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
+    //W36 #1: the trade-trust rule, at the tail for salience (see the constant).
+    tail << kBlockTradeTrustNote;
     //Wave-35 churn driver #5, defender side. Main phase 2 is NOT true here (it
     //is the opponent's turn), so only the priority fact is stated - a true
     //statement in the wrong scope is a lie (trust doctrine).
@@ -11129,27 +11314,49 @@ void AIPlayerGPT::runParseSelfTest()
     cout << "\n[A-shockland] ETB pay-life-or-tapped menu annotation (deck137 wave-24)\n";
     {
         // The shockland menu the engine builds: bare "Pay N life" / "Tap".
+        // Nameless fallback (recovery failed): generic wording, name outside [].
         vector<string> shock; shock.push_back("Pay 2 life"); shock.push_back("Tap");
-        bool fired = annotateEtbPayOrTapMenu(shock);
+        bool fired = annotateEtbPayOrTapMenu(shock, "");
         cout << "     opt1: \"" << shock[0] << "\"\n     opt2: \"" << shock[1] << "\"\n";
         CHECK(fired, "A shockland shape (Pay N life + Tap) is recognized");
         CHECK(shock[0].compare(0, 10, "Pay 2 life") == 0 && shock[0].find("UNTAPPED") != string::npos,
               "A the pay-life option keeps its label and gains the UNTAPPED consequence");
+        CHECK(shock[0].find("this permanent enters UNTAPPED") != string::npos
+              && shock[0].find("this permanent enters UNTAPPED") < shock[0].find('['),
+              "W36-7 nameless fallback: the consequence sits in the SHORT NAME, before the [] tail");
         CHECK(shock[1].compare(0, 3, "Tap") == 0 && shock[1].find("TAPPED") != string::npos
               && shock[1].find("untap step") != string::npos,
               "A the Tap option keeps its label and gains the enters-TAPPED consequence");
         // A larger life cost (Pay 3 life) is the same shape.
         vector<string> shock3; shock3.push_back("Pay 3 life"); shock3.push_back("Tap");
-        CHECK(annotateEtbPayOrTapMenu(shock3), "A 'Pay 3 life' + Tap also recognized");
+        CHECK(annotateEtbPayOrTapMenu(shock3, ""), "A 'Pay 3 life' + Tap also recognized");
         // A "Pay N life" menu WITHOUT a "Tap" sibling (e.g. a damage/drain menu)
         // must NOT be touched - only the pay-or-tapped ETB shape.
         vector<string> other; other.push_back("Pay 2 Life"); other.push_back("Deal 2 damage");
         string before = other[0];
-        CHECK(!annotateEtbPayOrTapMenu(other) && other[0] == before,
+        CHECK(!annotateEtbPayOrTapMenu(other, "Steam Vents") && other[0] == before,
               "A a Pay-life option with no Tap sibling is left untouched");
         // A lone "Tap" (no pay-life sibling) is untouched.
         vector<string> tapOnly; tapOnly.push_back("Tap"); tapOnly.push_back("Do nothing");
-        CHECK(!annotateEtbPayOrTapMenu(tapOnly), "A a Tap option with no pay-life sibling is untouched");
+        CHECK(!annotateEtbPayOrTapMenu(tapOnly, ""), "A a Tap option with no pay-life sibling is untouched");
+        // W36 #7 (139 N2): the recovered land name rides the SHORT NAME so the
+        // pilot's natural echo ("pay 2 life (Temple Garden)") has an anchor.
+        vector<string> named; named.push_back("pay 2 life"); named.push_back("tap");
+        CHECK(annotateEtbPayOrTapMenu(named, "Sacred Foundry"), "W36-7 lowercase engine labels recognized");
+        cout << "     named opt1: \"" << named[0] << "\"\n";
+        CHECK(named[0].find("pay 2 life - Sacred Foundry enters UNTAPPED") == 0,
+              "W36-7 pay short-name carries the land + UNTAPPED before the [] tail");
+        CHECK(named[1].find("tap - Sacred Foundry enters TAPPED") == 0,
+              "W36-7 tap short-name carries the land + TAPPED before the [] tail");
+        // Echo shape: an echo that names the land now matches its option.
+        {
+            int c = parseChoice("CHOICE: 1 (pay 2 life - Sacred Foundry enters UNTAPPED)",
+                                (int) named.size(), &named, NULL, NULL);
+            CHECK(c == 1, "W36-7 an echo carrying the land name parses to the pay option");
+            c = parseChoice("CHOICE: 2 (tap - Sacred Foundry enters TAPPED)",
+                            (int) named.size(), &named, NULL, NULL);
+            CHECK(c == 2, "W36-7 the tap echo parses to the tap option");
+        }
     }
 
     cout << "\n[A-mayobject] triggered may-ability ask names the object + origin (deck199 wave-26)\n";
@@ -12440,6 +12647,11 @@ void AIPlayerGPT::runParseSelfTest()
                   "W32-R N-158g: the empty case still leads with a count");
             CHECK(manaAvailableLine(12, "{g}", "").find("12 total (untapped sources,") != string::npos,
                   "W32-R N-158g: past the word table the digit stands alone (no out-of-range read)");
+            // W36 #9 (105/158): the payment rule for generic costs rides the line.
+            CHECK(ml.find("mana of ANY colour pays a generic cost like {2}") != string::npos,
+                  "W36-9 the mana line states that any colour pays generic costs");
+            CHECK(manaAvailableLine(0, "", "").find("ANY colour") == string::npos,
+                  "W36-9 NEGATIVE: the zero-source line carries no payment clause");
         }
 
         // ---- N-152e: the transform-DFC Flip-Side text is truthful, and the two
@@ -12829,15 +13041,30 @@ void AIPlayerGPT::runParseSelfTest()
     // ---- N-105b: the blocker-seam forecast is infect-aware ----
     cout << "\n[W33-N105b] the block forecast prices poison against 10, not life against 20\n";
     {
-        // CONTROL: a non-poison swing keeps the validated wording byte-for-byte.
+        // CONTROL: the non-poison swing (wording re-pinned by W36 #3/#5 below).
         string plain = combatDamageForecast(20, 0, 5, 0);
         cout << "     " << plain;
         CHECK(plain == "Your life: 20. Unblocked, these attackers deal up to 5 - you would be at 15"
                        " - NOT lethal: block only where the trade favors you; taking damage while"
-                       " ahead is often correct.\n",
-              "W33-N105b a swing with no poison in it is unchanged");
+                       " ahead on LIFE is often correct (your strategy guide's blocking rules"
+                       " override this general hint).\n",
+              "W33-N105b a swing with no poison in it keeps the count arithmetic");
         CHECK(combatDamageForecast(4, 0, 5, 0).find("LETHAL if it all connects") != string::npos,
               "W33-N105b the lethal branch of the non-poison forecast is unchanged");
+        // W36 #3 (105/152/36 three-seat collision): the hint names LIFE as the
+        // resource and yields to deck-guide blocking rules.
+        CHECK(plain.find("ahead on LIFE") != string::npos
+              && plain.find("strategy guide's blocking rules override") != string::npos,
+              "W36-3 the general hint is LIFE-scoped and yields to the deck guide");
+        // W36 #5 (158 R1: "4 - 4 = 0 life. I survive!"): the boundary is EQUAL.
+        string zero = combatDamageForecast(4, 0, 4, 0);
+        cout << "     " << zero;
+        CHECK(zero.find("you would be at 0") != string::npos
+              && zero.find("at 0 life you LOSE") != string::npos
+              && zero.find("0 is not survival") != string::npos,
+              "W36-5 reaching EXACTLY 0 is stated as LETHAL, not survival");
+        CHECK(combatDamageForecast(5, 0, 4, 0).find("at 0 life you LOSE") == string::npos,
+              "W36-5 NEGATIVE: a survivable swing carries no 0-life boundary clause");
 
         // The deck36 s25 t12 GAME-LOSING window: 5 infect power onto 6 poison.
         // The old line said "you would be at 15 - NOT lethal" and the seat took it.
@@ -14367,6 +14594,77 @@ void AIPlayerGPT::runParseSelfTest()
         // feeds the SAME tag builder the zone renders use.
         CHECK(copyOfTag(1, 3, "this list") == " (copy 1 of 3 in this list)",
               "W35-N166a-lists the reveal/bottom lists use the same tag with their own noun");
+    }
+
+    // ---- W36 #2: becomes-blocked triggers reach the printed trade ----
+    cout << "\n[W36-2] becomes-blocked classification + the Ichorclaw trade truth\n";
+    {
+        int dp = 0, dt = 0;
+        // The Ichorclaw Myr class: a simple self-pump is parsed out.
+        CHECK(becomesBlockedSelfPump("Whenever Ichorclaw Myr becomes blocked,"
+                                     " it gets +2/+2 until end of turn.", dp, dt) == 1
+              && dp == 2 && dt == 2,
+              "W36-2 Ichorclaw's when-blocked +2/+2 classifies as a self-pump");
+        // NEGATIVE: no trigger, no classification.
+        CHECK(becomesBlockedSelfPump("Infect (This creature deals damage in the"
+                                     " form of -1/-1 counters.)", dp, dt) == 0,
+              "W36-2 NEGATIVE: a card without the trigger classifies 0");
+        // A trigger that is NOT a self-pump is flagged uncomputable, never
+        // silently folded (an untap, a debuff, a damage rider).
+        CHECK(becomesBlockedSelfPump("Whenever this creature becomes blocked,"
+                                     " untap it and it phases out.", dp, dt) == 2,
+              "W36-2 a non-pump becomes-blocked trigger classifies uncomputable");
+        // A pump aimed at the BLOCKING side is not a self-pump.
+        CHECK(becomesBlockedSelfPump("Whenever it becomes blocked, each creature"
+                                     " blocking it gets +1/+1.", dp, dt) == 2,
+              "W36-2 a blocker-side pump is not folded into the attacker");
+        // The composed truth (139-tier P1's exact shape): 2/2 blocker vs the
+        // 1/1 attacker whose pump makes it 3/3 - pre-fix the render said
+        // "you kill it, your blocker lives"; the pumped fight kills the 2/2.
+        CombatTradeStat army22 = { 2, 2, false, false, false, false, false, false, false };
+        CombatTradeStat ichor  = { 1, 1, false, true, true, false, false, false, false };
+        int k = becomesBlockedSelfPump("Whenever Ichorclaw Myr becomes blocked,"
+                                       " it gets +2/+2 until end of turn.", dp, dt);
+        ichor.power += dp; ichor.toughness += dt;
+        string trade = combatTradePreviewStats(army22, ichor);
+        cout << "     2/2 vs pumped Ichorclaw -> \"" << trade << "\"\n";
+        CHECK(k == 1 && trade.find("your blocker dies, attacker lives") == 0,
+              "W36-2 the pumped trade tells the truth: the 2/2 blocker dies");
+    }
+
+    // ---- W36 #4: damage-target lines carry the engine's kill verdict ----
+    cout << "\n[W36-4] damage-target verdicts (158 P6: the number-slip class)\n";
+    {
+        CHECK(damageTargetVerdict(2, 1, 1, false, false)
+              == " {right now: takes 2 damage - DIES}",
+              "W36-4 damage >= toughness prints DIES (the 3/1 Spellbinder shape)");
+        CHECK(damageTargetVerdict(6, 8, 8, false, false)
+              == " {right now: takes 6 damage - SURVIVES (toughness 8)}",
+              "W36-4 the 6-into-8/8 Foray shape prints SURVIVES with the toughness");
+        CHECK(damageTargetVerdict(1, 5, 5, false, true)
+              == " {right now: takes 1 damage - DIES (deathtouch)}",
+              "W36-4 a deathtouch source makes any amount lethal, and says why");
+        CHECK(damageTargetVerdict(9, 4, 4, true, false)
+              == " {right now: takes 9 damage - INDESTRUCTIBLE, survives}",
+              "W36-4 indestructible survives damage outright");
+        CHECK(damageTargetVerdict(2, 8, 3, false, false)
+              == " {right now: takes 2 damage - SURVIVES (toughness 8, 3 more kills it)}",
+              "W36-4 marked damage shows the remaining margin, not just printed toughness");
+        CHECK(damageTargetVerdict(3, 8, 3, false, false)
+              == " {right now: takes 3 damage - DIES}",
+              "W36-4 the verdict prices REMAINING toughness (marked damage counts)");
+    }
+
+    // ---- W36 #1: the trade-trust rule ships at the blockers ask tail ----
+    cout << "\n[W36-1] the block-trade trust note (four-seat wave-35 promotion)\n";
+    {
+        string note = kBlockTradeTrustNote;
+        CHECK(note.find("ENGINE'S computed fight result") != string::npos
+              && note.find("deathtouch") != string::npos
+              && note.find("never re-derive") != string::npos,
+              "W36-1 the note claims engine authority, names deathtouch, forbids re-derivation");
+        CHECK(note.find("gang-blocks, pumps or combat tricks") != string::npos,
+              "W36-1 the note keeps the honest scope (what CAN change the result)");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
