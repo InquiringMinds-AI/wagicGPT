@@ -237,6 +237,16 @@ const char * kBlockersTurnFacts =
 const char * kSecondMainAheadFact =
     "Still ahead of you this turn: your SECOND MAIN PHASE, after combat. Creatures, sorceries and "
     "other main-phase cards you do not cast now can still be cast then, on this same turn.\n";
+//N-152i (wave-36, deck152 vs105 upkeep window): a pre-main priority window on
+//the model's own turn told it only about the SECOND main - so a pilot holding
+//its planned creature answered the upkeep ask with "CHOICE: Cast Tovolar's
+//Huntmaster" (numberless, not offered -> unparsed_reply, 97s burned). The fact
+//it needed is that BOTH main phases are still ahead and that main-phase cards
+//are NOT castable in this window - they get their own Cast menu later.
+const char * kMainPhasesAheadFact =
+    "Still ahead of you this turn: BOTH your main phases. Creatures, sorceries and other "
+    "main-phase cards are NOT castable in this window - your main phase's own Casting decision "
+    "is where you cast them, later this same turn.\n";
 const char * kPriorityAgainFact =
     "You will have priority again later this turn, so instants and activated abilities you hold "
     "stay castable this turn.\n";
@@ -669,6 +679,39 @@ string dynamicMagnitudes(MTGCardInstance * card)
                 }
             }
             out << (count ? ", " : "") << kVerbs[v].label << " " << n;
+            count++;
+        }
+    }
+    //N-146r (wave-36, Agadeem's Awakening B3 s74): a battlefield-return spell
+    //offered over a graveyard with NO creature cards resolves to nothing - the
+    //122B burned 10 mana and a turn casting Agadeem "returning" a planeswalker
+    //the effect cannot touch, against a named guide do-not, and the surface
+    //never said the return was empty. Casting stays LEGAL (Oracle: "any
+    //number of target creature cards" includes zero), so the offer is kept
+    //and the deciding fact rides the option (P1/P4): when the controller's
+    //graveyard holds no creature card, every X returns nothing, and the tag
+    //says so. Scoped to battlefield returns from the caster's own graveyard;
+    //any creature card present suppresses the tag (per-X legality is not
+    //cheaply provable, and a false "returns nothing" would be the worse lie).
+    if (count < 3
+        && text.find("moveto(mybattlefield)") != string::npos
+        && text.find("|mygraveyard)") != string::npos
+        && text.find("target(creature") != string::npos)
+    {
+        MTGGameZone * gy = card->controller() ? card->controller()->game->graveyard : NULL;
+        bool anyCreature = false;
+        if (gy)
+            for (int gi = 0; gi < gy->nb_cards; gi++)
+                if (gy->cards[gi] && gy->cards[gi]->isCreature())
+                {
+                    anyCreature = true;
+                    break;
+                }
+        if (!anyCreature)
+        {
+            out << (count ? ", " : "")
+                << "returns NOTHING - your graveyard has no creature cards, so"
+                   " the return part cannot happen at any X";
             count++;
         }
     }
@@ -6693,7 +6736,15 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //wrong scope is a lie): the second main phase is only still ahead on YOUR
     //turn before it, and a later priority window only exists before the turn
     //has run out.
-    if (observer->currentPlayer == this && phase < MTG_PHASE_SECONDMAIN)
+    //N-152i: BEFORE the first main (upkeep/draw windows on your own turn) the
+    //relevant fact is that BOTH mains are ahead and main-phase cards are not
+    //castable HERE - the second-main-only fact invited a hallucinated cast of
+    //the pilot's planned creature (deck152 vs105, unparsed_reply). Between the
+    //mains, the second-main fact stands as before. Each statement only where
+    //it is true.
+    if (observer->currentPlayer == this && phase < MTG_PHASE_FIRSTMAIN)
+        tail << "\n" << kMainPhasesAheadFact;
+    else if (observer->currentPlayer == this && phase < MTG_PHASE_SECONDMAIN)
         tail << "\n" << kSecondMainAheadFact;
     if (phase < MTG_PHASE_ENDOFTURN)
         tail << (observer->currentPlayer == this && phase < MTG_PHASE_SECONDMAIN ? "" : "\n")
@@ -7902,7 +7953,15 @@ static bool isTapOption(const string & opt)
     //longer option that merely starts with "tap ..."
     return toLowerCopy(opt) == "tap";
 }
-static bool annotateEtbPayOrTapMenu(vector<string>& opts)
+//N-139q (wave-36): the pay-life consequence is CONDITIONAL. When the land was
+//PUT onto the battlefield tapped by another effect (Arboreal Grazer's "put a
+//land ... tapped"), the shock replacement still asks, but paying does NOT
+//untap it - the engine keeps it tapped (verified in the 139v116 s8 board
+//snapshot: "Steam Vents [tapped]" AT the ask, still tapped after the payment,
+//life 20->18). The old unconditional "enters UNTAPPED - usable this turn"
+//text was therefore a LIE in exactly that context, and the arm-C pilot paid
+//2 life for nothing on its word. alreadyTapped selects the truthful text.
+static bool annotateEtbPayOrTapMenu(vector<string>& opts, bool alreadyTapped = false)
 {
     bool hasPayLife = false, hasTap = false;
     for (size_t i = 0; i < opts.size(); i++)
@@ -7917,11 +7976,25 @@ static bool annotateEtbPayOrTapMenu(vector<string>& opts)
     for (size_t i = 0; i < opts.size(); i++)
     {
         if (isPayLifeOption(opts[i]))
-            opts[i] += " [this permanent then enters the battlefield UNTAPPED -"
-                       " usable (tap for mana / attack) this turn]";
+        {
+            if (alreadyTapped)
+                opts[i] += " [NO-OP: this permanent was put onto the battlefield"
+                           " TAPPED by the effect that moved it, and it is already"
+                           " tapped - paying life will NOT untap it. The payment"
+                           " buys nothing; decline it]";
+            else
+                opts[i] += " [this permanent then enters the battlefield UNTAPPED -"
+                           " usable (tap for mana / attack) this turn]";
+        }
         else if (isTapOption(opts[i]))
-            opts[i] += " [decline the payment; this permanent instead enters the"
-                       " battlefield TAPPED - unusable until your next untap step]";
+        {
+            if (alreadyTapped)
+                opts[i] += " [decline the payment - this permanent is already"
+                           " tapped and stays tapped either way]";
+            else
+                opts[i] += " [decline the payment; this permanent instead enters the"
+                           " battlefield TAPPED - unusable until your next untap step]";
+        }
     }
     return true;
 }
@@ -7950,6 +8023,72 @@ static string buildMayObjectAsk(const string & srcName, const string & objName,
         opts[0] += " [" + objName + origin + " is the card this acts on, NOT " + srcRef + "]";
     return src + " - you MAY act on " + objName + origin + ". " + srcRef
          + " is the trigger SOURCE, not the object being moved. Choose:";
+}
+
+//N-152h (wave-36, deck152 vs139 s19): the Intrepid Adversary-class ETB menu
+//("Don't add any counter" / "Add 1 counter" ... "Add 20 counters") offers the
+//full printed range with no affordability information, and the engine then
+//PARTIAL-PAYS whatever the chosen count's per-counter payments can cover
+//(verified live: "add 10" chosen on ~3 spendable mana resolved exactly 2 valor
+//counters). 21 options where ~2 are real is a mis-echo trap, and the
+//partial-pay semantics were undocumented on the surface. The counts CANNOT be
+//filtered (option indices are the contract's answer space and the staleness
+//key), so state the true semantics in the ask header: payments are
+//per-counter, an over-ask never fails - it stops at what the mana covers.
+//Pure over the option texts; fires only on the pay-repeat shape (two or more
+//"Add N counter(s)" modes).
+static bool isAddNCountersOption(const string & opt)
+{
+    if (opt.compare(0, 4, "Add ") != 0)
+        return false;
+    size_t i = 4;
+    if (i >= opt.size() || !isdigit((unsigned char) opt[i]))
+        return false;
+    while (i < opt.size() && isdigit((unsigned char) opt[i]))
+        i++;
+    return opt.find(" counter", i) == i;
+}
+static string payRepeatModeNote(const vector<string>& opts)
+{
+    int addModes = 0;
+    for (size_t i = 0; i < opts.size(); i++)
+        if (isAddNCountersOption(opts[i]))
+            addModes++;
+    if (addModes < 2)
+        return "";
+    return " NOTE: the counters are paid for ONE AT A TIME (the card text names"
+           " the per-counter cost), from mana you still have available now."
+           " Choosing a number does NOT require that you can pay for all of"
+           " them: the engine charges as many per-counter payments as your mana"
+           " actually covers, adds exactly that many counters, and stops - an"
+           " over-ask never fails and never loses the spell. With no spendable"
+           " mana left, every option adds 0 counters.";
+}
+
+//N-146q (wave-36, ESCALATED - recurred with a harmful pick): a fused/compound
+//mode's target ask carried NO mode attribution. Silverquill Command's
+//"creature gains 3/3 and sacrifice creature" mode targets ONLY the pump half
+//(the sacrifice half is `notaTarget ... opponent` - the OPPONENT chooses it),
+//but the ask read as one target for the whole spell, and the arm-C pilot
+//flagged the ambiguity in-trace ("It implies one target for the whole spell")
+//then picked the opponent's Plague Stinger - +3/+3-and-flying'ing the
+//opponent's creature (146 vs105 s31-32; arm B B3 s35 same shape). Pure over
+//the mode name so the emitted claim is provable: fires only on a compound
+//(" and " in the acting ability's name), and states the engine truth - each
+//targeted part asks separately, this pick lands ONLY on the part it belongs
+//to, and parts assigned to the opponent are the opponent's choice.
+static string compoundModeTargetNote(const string& modeName)
+{
+    if (modeName.find(" and ") == string::npos)
+        return "";
+    return " NOTE: \"" + modeName + "\" is a COMPOUND effect. Each part that"
+           " targets asks for its target SEPARATELY - THIS pick aims only the"
+           " part this ask belongs to, and the chosen target is what that part"
+           " ACTS ON (a gain/pump lands ON the creature you pick, so picking an"
+           " enemy creature HELPS the enemy). Any part the effect assigns to the"
+           " opponent (such as \"sacrifice creature\" demanded of the opponent)"
+           " is chosen BY THE OPPONENT from their own cards - it is never chosen"
+           " by this pick.";
 }
 
 //N-139a: role header for the mutate OVER/UNDER placement menu. Pure helper.
@@ -8027,8 +8166,12 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                                + stripNarrationDecoration(req.optionTexts[mi]) + "\"");
             setAskNarration(narr);
         }
+        //N-152h: a pay-repeat menu (Add N counters) states its partial-pay
+        //semantics in the header - the counts themselves are the answer space
+        //and stay untouched.
         int pick = askModel("Choose one mode for "
-                            + (ctx ? ctx->getDisplayName() : string("this spell")) + ":", req.optionTexts,
+                            + (ctx ? ctx->getDisplayName() : string("this spell")) + ":"
+                            + payRepeatModeNote(req.optionTexts), req.optionTexts,
                             true, ctx ? ctx->getDisplayName() : string());
         if (pick == kChoicePending)
             return kChoicePending;
@@ -8215,7 +8358,29 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //the fixed painland sibling): append the consequence each bare label omits.
     //Annotation only, mechanism-matched (see annotateEtbPayOrTapMenu). deck137
     //wave-24.
-    annotateEtbPayOrTapMenu(opts);
+    //N-139q (wave-36): when the entering permanent is ALREADY tapped (put onto
+    //the battlefield tapped by another effect - the Arboreal Grazer shape),
+    //paying is a strictly-dominated no-op: the engine keeps the land tapped
+    //(verified 139v116 s8) and the 2 life buys nothing. With only one outcome
+    //that matters, decline WITHOUT a model call - this also retires the ask
+    //class that owned all three arm-C fallbacks at the 139 seat (the pilot
+    //derailing on a pay/tap menu whose stakes were imaginary). When ctx is
+    //unrecoverable or reads untapped, the ask proceeds exactly as before,
+    //annotated with whichever consequence text is true.
+    {
+        bool etbAlreadyTapped = ctx && ctx->isTapped();
+        bool etbPayTapMenu = annotateEtbPayOrTapMenu(opts, etbAlreadyTapped);
+        if (etbPayTapMenu && etbAlreadyTapped)
+            for (size_t i = 0; i < req.optionTexts.size(); i++)
+                if (isTapOption(req.optionTexts[i]))
+                {
+                    narrateDecision("It entered tapped (the effect that put it onto"
+                                    " the battlefield entered it tapped; paying life"
+                                    " could not untap it, so the payment was declined)");
+                    act.choice = (int) i;
+                    return 0;
+                }
+    }
     //Recover the subject name for the header. Some ETB menus arm on an instance
     //whose own name is cleared (getDisplayName() empty) but whose card TEMPLATE
     //(model->data) still carries the printed name - recover it there. The
@@ -8705,6 +8870,8 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         }
         q << " from the list below, and answer with the chosen TARGET's name (not \""
           << effectName << "\")";
+        //N-146q: a compound mode's target ask names which part this pick feeds.
+        q << compoundModeTargetNote(abilityName);
         }
 
         //W35 owner ruling class (3): the target ask's own instructional text
@@ -11150,6 +11317,26 @@ void AIPlayerGPT::runParseSelfTest()
         // A lone "Tap" (no pay-life sibling) is untouched.
         vector<string> tapOnly; tapOnly.push_back("Tap"); tapOnly.push_back("Do nothing");
         CHECK(!annotateEtbPayOrTapMenu(tapOnly), "A a Tap option with no pay-life sibling is untouched");
+        // N-139q: the ALREADY-TAPPED variant (Arboreal Grazer put a shockland
+        // in tapped; the pay ask still arms). The pay option must state the
+        // payment is a NO-OP - never promise an UNTAPPED entry - and the tap
+        // option must say the permanent stays tapped either way.
+        vector<string> put; put.push_back("pay 2 life"); put.push_back("tap");
+        bool putFired = annotateEtbPayOrTapMenu(put, true);
+        cout << "     opt1: \"" << put[0] << "\"\n     opt2: \"" << put[1] << "\"\n";
+        CHECK(putFired, "A-tapped the lowercase live menu shape is still recognized");
+        CHECK(put[0].find("NO-OP") != string::npos && put[0].find("will NOT untap") != string::npos,
+              "A-tapped the pay option states the payment is a no-op on an already-tapped permanent");
+        CHECK(put[0].find("UNTAPPED - usable") == string::npos,
+              "A-tapped NEGATIVE the pay option never promises an UNTAPPED entry");
+        CHECK(put[1].find("stays tapped either way") != string::npos,
+              "A-tapped the tap option states the permanent stays tapped either way");
+        // The untapped default is byte-stable: alreadyTapped=false keeps the
+        // wave-24 texts exactly (the two CHECKs above already pin them).
+        vector<string> norm; norm.push_back("pay 2 life"); norm.push_back("tap");
+        annotateEtbPayOrTapMenu(norm, false);
+        CHECK(norm[0].find("UNTAPPED") != string::npos && norm[0].find("NO-OP") == string::npos,
+              "A-tapped NEGATIVE an untapped entering permanent keeps the true UNTAPPED consequence");
     }
 
     cout << "\n[A-mayobject] triggered may-ability ask names the object + origin (deck199 wave-26)\n";
@@ -13845,6 +14032,17 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(pri.find("priority again later this turn") != string::npos
               && pri.find("SECOND MAIN") == string::npos,
               "W35-combat NEGATIVE the priority-again fact makes no main-phase claim of its own");
+        // N-152i: the PRE-MAIN window (upkeep/draw, own turn) states that BOTH
+        // mains are ahead and that main-phase cards are NOT castable here -
+        // the fact whose absence drew "CHOICE: Cast Tovolar's Huntmaster" into
+        // an upkeep window (deck152 vs105, unparsed_reply).
+        string pre = kMainPhasesAheadFact;
+        CHECK(pre.find("BOTH your main phases") != string::npos,
+              "N-152i the pre-main fact names both main phases as still ahead");
+        CHECK(pre.find("NOT castable in this window") != string::npos,
+              "N-152i the pre-main fact states main-phase cards are not castable here");
+        CHECK(pre.find("SECOND MAIN PHASE, after combat") == string::npos,
+              "N-152i NEGATIVE the pre-main fact is not the second-main-only wording");
     }
 
     // ---- W35 OWNER RULING: the GAME LOG's narration register ----
@@ -14367,6 +14565,52 @@ void AIPlayerGPT::runParseSelfTest()
         // feeds the SAME tag builder the zone renders use.
         CHECK(copyOfTag(1, 3, "this list") == " (copy 1 of 3 in this list)",
               "W35-N166a-lists the reveal/bottom lists use the same tag with their own noun");
+    }
+
+    // ---- N-146q (wave-36): compound-mode target attribution ----
+    cout << "\n[W36-N146q] a compound mode's target ask names which part the pick feeds\n";
+    {
+        // The escalated live shape: Silverquill Command's fused pump+sacrifice
+        // mode. The note must attribute the pick to ONE part and state that an
+        // opponent-assigned part is the opponent's own choice.
+        string note = compoundModeTargetNote("creature gains 3/3 and sacrifice creature");
+        CHECK(note.find("COMPOUND effect") != string::npos
+              && note.find("asks for its target SEPARATELY") != string::npos,
+              "W36-N146q a compound mode name draws the per-part attribution note");
+        CHECK(note.find("chosen BY THE OPPONENT") != string::npos,
+              "W36-N146q the note states opponent-assigned parts are the opponent's choice");
+        CHECK(note.find("picking an enemy creature HELPS the enemy") != string::npos,
+              "W36-N146q the note states a pump on an enemy pick helps the enemy");
+        // Simple (single-part) effects draw nothing - the generic ask stands.
+        CHECK(compoundModeTargetNote("Destroy target creature").empty(),
+              "W36-N146q NEGATIVE a single-part effect name draws no compound note");
+        CHECK(compoundModeTargetNote("").empty(),
+              "W36-N146q NEGATIVE an empty ability name draws no compound note");
+    }
+
+    // ---- N-152h (wave-36): pay-repeat mode menus state partial-pay semantics ----
+    cout << "\n[W36-N152h] the Add-N-counters menu header states per-counter partial pay\n";
+    {
+        vector<string> valor;
+        valor.push_back("Don't add any counter");
+        valor.push_back("Add 1 counter");
+        valor.push_back("Add 2 counters");
+        valor.push_back("Add 10 counters");
+        string note = payRepeatModeNote(valor);
+        CHECK(note.find("ONE AT A TIME") != string::npos
+              && note.find("adds exactly that many counters") != string::npos,
+              "W36-N152h the pay-repeat menu draws the per-counter partial-pay note");
+        CHECK(note.find("over-ask never fails") != string::npos,
+              "W36-N152h the note states an over-ask stops at what the mana covers");
+        // The option matcher: real shapes in, near-misses out.
+        CHECK(isAddNCountersOption("Add 1 counter") && isAddNCountersOption("Add 20 counters"),
+              "W36-N152h 'Add N counter(s)' options are recognized");
+        CHECK(!isAddNCountersOption("Add a counter") && !isAddNCountersOption("Don't add any counter"),
+              "W36-N152h NEGATIVE non-numeric and decline options are not counted");
+        // A menu with a single Add option (or none) is not the repeat shape.
+        vector<string> one; one.push_back("Add 1 counter"); one.push_back("Draw a card");
+        CHECK(payRepeatModeNote(one).empty(),
+              "W36-N152h NEGATIVE a lone Add option draws no pay-repeat note");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

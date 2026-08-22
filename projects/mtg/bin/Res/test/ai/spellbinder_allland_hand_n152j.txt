@@ -1,0 +1,51 @@
+# Wave-36 N-152j: Elite Spellbinder's ETB against an ALL-LAND opponent hand.
+# Oracle: "look at target opponent's hand. You may exile a nonland card from
+# it." With no nonland card there is nothing to exile - the script's fallback
+# line reveals the hand instead. The fallback must resolve without stranding
+# any opponent card outside the hand and without exiling anything (152
+# tier-review B-vs105 s24: the old fallback asked the caster to pick ONE card
+# of the revealed hand as if it were a target - a pointless model ask; the
+# reveal now covers the whole hand with no pick).
+# Darksteel Citadel is an artifact LAND, so a 2x Citadel hand is the all-land
+# shape without basic-land printing-id trouble.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ancient Den,Ancient Den,Ancient Den
+hand:Elite Spellbinder
+[PLAYER2]
+hand:Darksteel Citadel,Darksteel Citadel
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Ancient Den,Ancient Den,Ancient Den,Elite Spellbinder
+hand:
+[PLAYER2]
+hand:Darksteel Citadel,Darksteel Citadel
+life:20
+[END]
