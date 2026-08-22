@@ -98,6 +98,17 @@ public:
     
     int isAI(){return 1;};
 
+    //True while this seat, as the DEFENDER, still owes the current combat its
+    //blockers declaration (an engine-issued decision that may be answered
+    //asynchronously). NextGamePhase::resolve consults it so a phase-advance
+    //queued while the declaration was masked (an ability resolving on the
+    //stack during the blockers window) cannot ride past the step and skip a
+    //real decision - the W36 lane-B item-6 skip (B-vs-105 t15: three legal
+    //blockers vs a lethal poison swing, no blockers ask ever surfaced).
+    //Default false: heuristic AIs declare synchronously the tick their window
+    //opens, so only the async GPT seat overrides this.
+    virtual bool blockersDeclarationDue() { return false; }
+
     void setFastTimerMode(bool mode = true) { mFastTimerMode = mode; };
     RandomGenerator* getRandomGenerator(){return &randomGenerator;};
 

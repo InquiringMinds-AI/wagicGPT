@@ -99,6 +99,11 @@ public:
     //the "gameend" record.
     virtual void gameEnded();
 
+    //The async blockers declaration is still owed for this combat (see
+    //AIPlayer::blockersDeclarationDue) - true while this seat defends with
+    //a live endpoint and this turn's bundled declaration has not committed.
+    virtual bool blockersDeclarationDue();
+
 protected:
     virtual const OrderedAIAction * chooseOrderedAction(RankingContainer& ranking);
     //Deck hint scripts must not pre-empt the model's ranked decision.
@@ -270,7 +275,12 @@ private:
     //decision's own label, so a chain-of-thought line beginning with a
     //DIFFERENT answer label ("Attack: Regent 6/6 vs...") in the reasoning body
     //is not mistaken for the answer. NULL keeps the legacy any-label behavior.
-    string consumePlan(const string& content, const char * expectedLabel = NULL);
+    //choiceRunLen (out, optional): the length of the CONSECUTIVE run of
+    //CHOICE: lines the answer line heads (>=2 = the model listed several
+    //picks line-by-line for a single-pick ask; the FIRST of the run is the
+    //answer taken - see findAnswerLabelLine).
+    string consumePlan(const string& content, const char * expectedLabel = NULL,
+                       int * choiceRunLen = NULL);
 
     //Decision seams return this while the model call for their prompt is
     //still in flight. Callers unwind for the current tick and re-poll on the
@@ -320,6 +330,18 @@ private:
     //more may be asked this turn (leftover no-block creatures would
     //otherwise re-prompt against the changed board).
     int mBlocksDoneTurn;
+
+    //Turn on which the illegal one-blocker-many-attackers RE-ASK already
+    //fired (W36 lane-B item 1, 116-fp8 vs105 seq25: "BLOCKS: B1:A1, B1:A2,
+    //B1:A3" had its first pair taken and lost the game). One re-ask per
+    //combat, with a terse correction appended to the prompt; a second
+    //conflicted reply falls back to the shipped first-wins behavior.
+    int mBlockReaskTurn;
+
+    //Parse-shape signature for the NEXT translog record (parseChoice noteOut,
+    //blocker re-ask provenance). Consumed and cleared by writeTransLog so a
+    //note can never leak onto a later, unrelated record.
+    string mLastParseNote;
 
     //Same for the bundled attacker declaration: the whole attack is decided
     //in ONE reply, so the seam commits once per turn's combat and does not
@@ -420,10 +442,19 @@ private:
     //staleEcho (out, optional) is set true when the name-echo parses to
     //significant words that match NO offered option - a staleness signal
     //that routes the answer to the heuristic instead of the raw index.
+    //noteOut (out, optional) receives a parse-shape signature for the
+    //translog when the reply expressed more than one pick for a single-pick
+    //ask ("multi_answer_first_taken" / "multi_answer_unresolved") or when the
+    //echoed name and the coded index named DIFFERENT options
+    //("echo_index_conflict" - the unique name wins; "_ambiguous" - the index
+    //stood because the echo matched several options, none of them the
+    //index's own). Silent divergence between what the model said and what
+    //executed was the W36 lane-B items 2-4 instrument gap.
     static int parseChoice(const string& content, int optionCount,
                            const std::vector<string> * optionTexts = NULL,
                            bool * staleEcho = NULL,
-                           const std::string * pendingSource = NULL);
+                           const std::string * pendingSource = NULL,
+                           std::string * noteOut = NULL);
 
     //Salvage a decode-time repeat-loop reply: when the normal parse fails,
     //scan the raw reply for the LAST well-formed "CHOICE: N (name)" line
