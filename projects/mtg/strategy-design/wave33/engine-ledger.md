@@ -467,3 +467,13 @@ deck's strategy guide: (a) ADHERENCE — did the choice execute the guide's line
 board; (b) DIVERGENCE QUALITY — where the choice departs from the guide, was departing
 correct AT THAT MOMENT (a justified audible vs a comprehension failure). Same rubric applied
 to both arms on the SAME seven seats; win tables are context only, never the verdict.
+
+OWNER RULING (2026-08-22): **the dev-loop opponent is now Qwen3.6-35B-A3B-FP8** (official
+quant, spark:~/models/Qwen3.6-35B-A3B-FP8, serve-bench-35b.sh MODEL_DIR override, :8084,
+SPEC=mtp:4 TRITON_ATTN-pinned, seqs 24). The PrismaQuant 4.75-bit is retired as the
+opponent (proven quant damage, see wave35-review addendum). Corpus recipe accordingly:
+-u http://100.116.136.74:8084 -m qwen36-35b-a3b, -j 21, NO per-game cap, budget 6000,
+timeout 900. The 122B remains available as a validator arm on demand. Wave-35 guide
+review (the usual dev-loop routine) runs with ALL THREE wave-35 corpora reviewable
+(owner directive): 4.75-bit matchups-20260820-192210 (+022400 rerun), 122B
+matchups-20260821-033000, FP8 matchups-20260822-111102.
