@@ -1090,3 +1090,4 @@ generic/amulet_upkeep_activation_opponent_turn.txt
 generic/legend_second_copy_castable.txt
 scarecrone_self_sacrifice_cost_wave35.txt
 master_of_etherium_two_copies_wave35.txt
+elite_spellbinder_empty_hand.txt

@@ -1,0 +1,16 @@
+[INIT]
+firstmain
+[PLAYER1]
+hand:Elite Spellbinder
+manapool:{2}{W}
+[PLAYER2]
+hand:Darksteel Citadel
+[DO]
+Elite Spellbinder
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Elite Spellbinder
+[PLAYER2]
+hand:Darksteel Citadel
+[END]
