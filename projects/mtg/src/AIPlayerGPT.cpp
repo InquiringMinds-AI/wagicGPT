@@ -2005,6 +2005,36 @@ static string leftStackClause(bool mine, const string& to)
     return " and went to " + ownedZone(mine, to);
 }
 
+} //end of the anonymous namespace: the two functions below have EXTERNAL
+  //linkage (declared in AIPlayerGPT.h) because the TESTSUITE seat runs them
+  //too - a narration fixture must exercise the shipped code, not a copy of it
+  //(W40 #3). Everything they call stays file-local; the namespace reopens
+  //immediately after them.
+
+//W40 #3 - THE COUNTER GATE. The marker stashed from WEventSpellCountered is
+//the card instance that was ON THE STACK (ActionStack::Fizzle passes
+//`spell->source`), but MTGGameZone::removeCard CLONES the card on every zone
+//move (`copy->previous = card`, MTGGameZones.cpp:939) and
+//MTGPlayerCards::putInZone raises WEventZoneChange with the NEW COPY
+//(MTGGameZones.cpp:796). The W35 gate compared the stack instance against its
+//graveyard clone, so it could not fire ONCE - measured 0 hits in 21 corpus
+//games while every countered spell narrated as "resolved". The countered
+//instance is exactly one clone link back; walk a short chain so an engine path
+//that adds a temp hop still matches, and stop far short of a card's whole zone
+//history (a marker must never relabel a later, unrelated move - the caller
+//also gates on the departure being FROM THE STACK and consumes the marker on
+//the first match).
+bool counterMarkerMatches(const MTGCardInstance * moved, const MTGCardInstance * marker)
+{
+    if (!moved || !marker)
+        return false;
+    const MTGCardInstance * c = moved;
+    for (int hops = 0; c && hops < 3; hops++, c = c->previous)
+        if (c == marker)
+            return true;
+    return false;
+}
+
 //The register form of one zone change. `mine` is the destination zone's owner
 //(this seat's own view); `countered` marks a spell that left the stack because
 //it was COUNTERED rather than because it resolved - the two produce the SAME
@@ -2013,7 +2043,7 @@ static string leftStackClause(bool mine, const string& to)
 string zoneChangeNarration(bool mine, const string& cardName, const string& from,
                            const string& to, bool isCreature, bool isLand,
                            bool countered, const string& counterSource,
-                           const string& targets = "")
+                           const string& targets) //default "" declared in AIPlayerGPT.h
 {
     string who = mine ? "You " : "Opponent ";
     if (to == "stack")
@@ -2033,7 +2063,10 @@ string zoneChangeNarration(bool mine, const string& cardName, const string& from
     {
         if (countered)
         {
-            string line = ownerTag(mine) + cardName + " was countered";
+            //W40 #3: the fact is CAPPED because "resolved" and "was countered"
+            //are one word apart in an append-only log the pilot skims, and the
+            //whole decision (did my spell happen?) turns on which one it is.
+            string line = ownerTag(mine) + cardName + " was COUNTERED";
             if (!counterSource.empty())
                 line += " by " + counterSource;
             return line + leftStackClause(mine, to);
@@ -2078,6 +2111,9 @@ string zoneChangeNarration(bool mine, const string& cardName, const string& from
     return ownerTag(mine) + cardName + " moved from " + ownedZone(mine, from)
            + " to " + ownedZone(mine, to);
 }
+
+namespace //back to file-local linkage for the rest of the register
+{
 
 //Token creation attributes its CREATOR (owner addendum (7)): "March from the
 //Black Gate created a 0/0 Orc Army token", never a bare "created -> battlefield".
@@ -4713,12 +4749,16 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         }
         //W35: the register. A pending counter marker (WEventSpellCountered,
         //raised by ActionStack::Fizzle immediately before it moves the card)
-        //turns this stack departure into "was countered" instead of "resolved";
+        //turns this stack departure into "was COUNTERED" instead of "resolved";
         //it is consumed here so it can never colour a later, unrelated move.
         //Only a departure FROM THE STACK can be a counter: if the marked card
         //moves again later (a graveyard recursion of the same instance), a
         //stale marker must never relabel it.
-        bool countered = (mCounteredSpell == e->card && zoneDesc(e->from) == "stack");
+        //W40 #3: the match goes through counterMarkerMatches, NOT `==` - the
+        //event delivers the clone putInZone made, never the stack instance the
+        //marker holds. The plain identity test never fired once.
+        bool countered = (zoneDesc(e->from) == "stack"
+                          && counterMarkerMatches(e->card, mCounteredSpell));
         string counterSource;
         if (countered)
         {
@@ -15095,11 +15135,48 @@ void AIPlayerGPT::runParseSelfTest()
               == "Your Mordor Muster resolved and went to your graveyard",
               "W35 a resolved spell RESOLVED - and the log still records the graveyard");
         CHECK(zoneChangeNarration(true, "Mordor Muster", "stack", "graveyard", false, false, true, "Counterspell")
-              == "Your Mordor Muster was countered by Counterspell and went to your graveyard",
+              == "Your Mordor Muster was COUNTERED by Counterspell and went to your graveyard",
               "W35 a countered spell is DISTINGUISHED from a resolved one, source named");
         CHECK(zoneChangeNarration(true, "Dread Return", "stack", "exile", false, false, true, "")
-              == "Your Dread Return was countered and was exiled",
+              == "Your Dread Return was COUNTERED and was exiled",
               "W35 a countered flashback spell records its EXILE, not a graveyard");
+        // === W40 #3: the counter register, after the gate was repaired. ====
+        // A countered spell must never carry the resolution wording - three
+        // wave-39 seats read "resolved and went to ... graveyard" on spells
+        // that were countered and believed it (the pilot is instructed to).
+        CHECK(zoneChangeNarration(false, "Overgrown Battlement", "stack", "graveyard", true, false, true,
+                                  "Essence Scatter")
+              == "Opponent's Overgrown Battlement was COUNTERED by Essence Scatter and went to the opponent's graveyard",
+              "W40#3 the opponent-side twin names the countering spell");
+        CHECK(zoneChangeNarration(false, "Overgrown Battlement", "stack", "graveyard", true, false, true,
+                                  "Essence Scatter")
+              .find("resolved and went") == string::npos,
+              "W40#3 NEGATIVE a countered spell carries NO 'resolved and went' clause");
+        CHECK(zoneChangeNarration(true, "Ob Nixilis, the Hate-Twisted", "stack", "graveyard", false, false,
+                                  false, "")
+              .find("was COUNTERED") == string::npos,
+              "W40#3 NEGATIVE a genuinely resolved spell is never labelled COUNTERED");
+        // The no-fizzler path (Blue/Red Elemental Blast, MTGAbility 1191/1312
+        // call Fizzle with a NULL fizzler): the counter is still stated, the
+        // "by <spell>" clause is simply absent.
+        CHECK(zoneChangeNarration(true, "Grizzly Bears", "stack", "graveyard", true, false, true, "")
+              == "Your Grizzly Bears was COUNTERED and went to your graveyard",
+              "W40#3 an unattributed counter still reads as a counter");
+        // fizzleto(hand)/spellmover destinations (Remand-shaped): the counter
+        // wording and the destination clause compose, both are load-bearing.
+        CHECK(zoneChangeNarration(true, "Craw Wurm", "stack", "hand", true, false, true, "Remand")
+              == "Your Craw Wurm was COUNTERED by Remand and returned to your hand",
+              "W40#3 a countered spell put into HAND records the hand, not a graveyard");
+        CHECK(zoneChangeNarration(false, "Craw Wurm", "stack", "library", true, false, true, "Condescend")
+              == "Opponent's Craw Wurm was COUNTERED by Condescend and went into the opponent's library",
+              "W40#3 a countered spell put into the LIBRARY records the library");
+        // ECHO SHAPE: the model echoes narration fragments back into answers.
+        // The counter line must not look like an option/answer candidate -
+        // it carries no leading index, no bracketed annotation tail, and its
+        // capped token is not a substring of any card name in the pool.
+        CHECK(zoneChangeNarration(true, "Mordor Muster", "stack", "graveyard", false, false, true, "Counterspell")
+              .find("[") == string::npos,
+              "W40#3 ECHO the counter line carries no bracketed tail to be stripped");
         CHECK(zoneChangeNarration(true, "Grizzly Bears", "stack", "battlefield", true, false, false, "")
               == "Your Grizzly Bears resolved and entered the battlefield",
               "W35 a resolving permanent resolves AND enters");
@@ -15248,7 +15325,7 @@ void AIPlayerGPT::runParseSelfTest()
             "- Lightning Bolt dealt 3 damage to Grizzly Bears\n"
             "- Opponent's Grizzly Bears died\n"
             "- You cast Mordor Muster\n"
-            "- Your Mordor Muster was countered by Counterspell and went to your graveyard\n"
+            "- Your Mordor Muster was COUNTERED by Counterspell and went to your graveyard\n"
             "- Your March from the Black Gate created a 0/0 Orc Army token\n"
             "- Your Orc Army got a +1/+1 counter from March from the Black Gate (now 1/1)\n"
             "- You lost 2 life (now 18)\n"

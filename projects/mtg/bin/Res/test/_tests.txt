@@ -507,6 +507,8 @@ counterspell2.txt
 counterspell3.txt
 counterspell4.txt
 counter_unless_pay_x.txt
+countered_spell_narration.txt
+countered_spell_narration_tolibrary.txt
 Covetous_Dragon_ASLONGAS_3.txt
 Covetous_Dragon_ASLONGAS_4.txt
 cranial_plating.txt

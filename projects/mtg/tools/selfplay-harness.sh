@@ -158,6 +158,8 @@ run_one_game() {
         WAGIC_GPT_THINKING="$THINKING" WAGIC_GPT_TRANSLOG=1 \
         WAGIC_GPT_TIMEOUT="${WAGIC_GPT_TIMEOUT:-$DEFAULT_GPT_TIMEOUT}" \
         ./wagic > "$elog" 2>&1
+    # W40 #16: the game's exit status is EVIDENCE and used to be thrown away.
+    local rc=$?
     local resline; resline=$(grep -E 'WAGIC_SELFPLAY_RESULT winner=' "$elog" | tail -1)
     local winner life0 life1 turn
     winner=$(echo "$resline" | grep -oE 'winner=-?[0-9]+' | cut -d= -f2)
@@ -165,6 +167,16 @@ run_one_game() {
     life1=$(echo "$resline"  | grep -oE 'life1=-?[0-9]+'  | cut -d= -f2)
     turn=$(echo "$resline"   | grep -oE 'turn=-?[0-9]+'   | cut -d= -f2)
     [ -z "$winner" ] && winner="timeout"
+    # W40 #16 (wave-39 ledger). A game that DIED - SIGSEGV/SIGABRT, core dumped -
+    # emits no WAGIC_SELFPLAY_RESULT line either, so it used to fall straight
+    # into the cap adjudicator below and be handed a "winner": the wave-39 row
+    # `139 125 adj1 16 28 14` credited deck139 with a game deck125 was AHEAD in
+    # 28-16 when the engine crashed. A crash is its own verdict. Life and turn
+    # are still filled in (real evidence of where the game died) but NO seat may
+    # be credited, and the matchup owes a rerun. GNU timeout reports 124 when
+    # IT ended the game; anything else nonzero is the game dying on its own.
+    local crashed=0
+    if [ "$winner" = "timeout" ] && [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then crashed=1; fi
     if [ "$winner" = "timeout" ]; then
         # Adjudicate from the seat translogs' final records (wave-7 ledger 7a):
         # fill life/turn so control-mirror timeouts don't need manual
@@ -210,11 +222,12 @@ PYEOF
         # was a latency-starved control mirror that was AHEAD or even at the
         # cap - "timeout" as an undifferentiated loss made the win table lie.
         # The ahead seat takes an adjudicated win; ties stay timeout/draw.
-        if [ -n "$life0" ] && [ -n "$life1" ] && [ "$life0" != "-" ] && [ "$life1" != "-" ]; then
+        if [ "$crashed" = "0" ] && [ -n "$life0" ] && [ -n "$life1" ] && [ "$life0" != "-" ] && [ "$life1" != "-" ]; then
             if [ "$life0" -gt "$life1" ] 2>/dev/null; then winner="adj0"
             elif [ "$life1" -gt "$life0" ] 2>/dev/null; then winner="adj1"
             fi
         fi
+        [ "$crashed" = "1" ] && winner="crash(rc=$rc)"
     fi
     printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$d0" "$d2" "$winner" "${life0:--}" "${life1:--}" "${turn:--}" "$gstart" >> "$RESULTS"
 }
@@ -320,7 +333,7 @@ for f in files:
 print(f"\n== harvested {len(files)} player-game logs, {n} decisions ==")
 for k, c in kinds.most_common(): print(f"  {k:10s} {c}")
 # win tally per deck
-wins = Counter(); games = Counter(); to = 0; adj = 0
+wins = Counter(); games = Counter(); to = 0; adj = 0; crash = 0
 for i, line in enumerate(open(res)):
     if i == 0: continue
     p = line.rstrip("\n").split("\t")
@@ -331,8 +344,11 @@ for i, line in enumerate(open(res)):
     elif w == "1": wins[d1]+=1
     elif w == "adj0": wins[d0]+=1; adj += 1
     elif w == "adj1": wins[d1]+=1; adj += 1
+    # W40 #16: a crashed game credits NOBODY and is not a timeout either - it is
+    # a missing result the wave owes a rerun for (completeness invariant).
+    elif w.startswith("crash"): crash += 1
     else: to += 1
-print(f"\n== results ({sum(games.values())//2} games, {to} timeouts/draws, {adj} life-adjudicated at cap) ==")
+print(f"\n== results ({sum(games.values())//2} games, {to} timeouts/draws, {adj} life-adjudicated at cap, {crash} CRASHED - no winner, rerun owed) ==")
 for d in sorted(games, key=lambda x:-(wins[x]/games[x] if games[x] else 0)):
     print(f"  deck{d:<4s} {wins[d]}/{games[d]} wins  ({100*wins[d]/games[d]:.0f}%)")
 print(f"\nlogs + results.tsv in: {out}")

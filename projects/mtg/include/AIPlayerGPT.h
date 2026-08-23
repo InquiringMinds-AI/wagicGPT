@@ -52,6 +52,25 @@
 class WEvent;
 class DecisionRequest;
 class DecisionAction;
+class MTGCardInstance;
+
+//=== W35/W40 narration register - shared surface ============================
+//Both are defined in AIPlayerGPT.cpp. They are exposed so the TESTSUITE seat
+//can drive the SAME production code the live GPT seat does: a fixture that
+//re-implemented the counter gate would test a copy of the defect's neighbour
+//instead of the defect (see Res/test/countered_spell_narration.txt).
+
+//Does this zone-departure card descend from the marked (countered) stack
+//instance? putInZone raises its event with a CLONE, so identity comparison
+//against the stack instance can never match - the rationale, and the 0-hits
+//measurement that exposed it, are on the definition.
+bool counterMarkerMatches(const MTGCardInstance * moved, const MTGCardInstance * marker);
+
+//The register form of one zone change (pure; PARSETEST-covered).
+string zoneChangeNarration(bool mine, const string& cardName, const string& from,
+                           const string& to, bool isCreature, bool isLand,
+                           bool countered, const string& counterSource,
+                           const string& targets = "");
 
 class AIPlayerGPT : public AIPlayerBaka
 {
