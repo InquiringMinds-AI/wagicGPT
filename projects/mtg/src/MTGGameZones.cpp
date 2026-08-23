@@ -649,6 +649,28 @@ MTGCardInstance * MTGPlayerCards::putInZone(MTGCardInstance * card, MTGGameZone 
             card->kicked = 0;
             copy->kicked = 0;//kicked reset everflowing chalice...
         }
+    //107.3a: the announced X belongs to the SPELL/ABILITY on the stack (and to
+    //the permanent it becomes). A card that leaves for any other zone is a new
+    //object, and its next cast announces X afresh. The zone-move copy ctor
+    //propagates setX unconditionally (issue #1085 - a resolving spell must keep
+    //the X it announced), and nothing ever cleared it again, so a spent
+    //announcement rode graveyard -> library -> hand. MTGPutInPlayRule::
+    //reactToClick guards the WHOLE announce block on `card->setX == -1`, so the
+    //next cast of that same physical card skipped the announcement entirely and
+    //folded the OLD X into the new cost in silence - the pilot was never asked,
+    //and X landed far below what the mana afforded (wave-41 #W41-1: seat deck125,
+    //4x Sphinx's Revelation recycled by Elixir of Immortality, 14 casts / 10
+    //ANNOUNCE_X windows; the un-asked 125v123 s71 drew 3 off a one-card library
+    //and decked a 70-vs-7 game away). Clear it on entry to every zone a fresh
+    //cast can begin from; keep it on the stack and the battlefield, where the
+    //#1085 readers (prex choosers, Rats' Feast, WParsedInt's "X") live.
+    //Only the DESTINATION instance is cleared: the outgoing `card` is the object
+    //a still-resolving spell's abilities point at (an instant's own effects
+    //resolve off the stack instance AFTER this move), so its announcement must
+    //stand until it is destroyed.
+    if (to != g->players[0]->game->stack && to != g->players[1]->game->stack
+        && to != g->players[0]->game->battlefield && to != g->players[1]->game->battlefield)
+        copy->setX = -1;
     if (card->discarded)
     {//set discarded for madness...
         if(from == g->players[0]->game->hand || from == g->players[1]->game->hand)

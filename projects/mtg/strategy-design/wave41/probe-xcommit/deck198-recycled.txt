@@ -1,0 +1,9 @@
+#NAME:W41 Recycled X Probe
+#DESC:Wave-41 #W41-1 probe B: the corpus shape that produced the defect - an {X}
+#spell recycled by Elixir of Immortality (graveyard -> library -> hand). Every
+#RECAST of a physical Sphinx's Revelation must raise its own announce window.
+#Delete after the probe run.
+Sphinx's Revelation * 4
+Elixir of Immortality * 4
+Seat of the Synod * 16
+Ancient Den * 16

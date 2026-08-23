@@ -1,0 +1,7 @@
+#NAME:W41 Zero Slack X Probe
+#DESC:Wave-41 #W41-2 probe: an {X} spell with exactly its coloured pips and no slack.
+#Three artifact lands are the ENTIRE mana base, so Sphinx's Revelation {X}{W}{U}{U}
+#is only ever castable at X = 0. Delete after the probe run.
+Sphinx's Revelation * 37
+Ancient Den * 1
+Seat of the Synod * 2

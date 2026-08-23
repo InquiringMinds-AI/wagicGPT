@@ -243,8 +243,17 @@ private:
     //events (land drop, casting - the zone changes narrate themselves) or
     //whose "no" answer is a non-action; true for choices that leave no
     //event trace (targets, modes, X values, damage order).
+    //askEvenIfSingle: normally an ask with exactly ONE option is answered
+    //without a model call - there is no decision to make. The X announcement
+    //is the one seam where that optimisation is WRONG (owner ruling, wave-41
+    //#W41-1: "the pilot must be ASKED for X on every {X} cast it commits.
+    //Removing the question is the same wrong as removing the option"). A
+    //zero-slack {X} cast has exactly one announceable value, and answering it
+    //silently committed X with no stderr line and no translog record - the
+    //same silent-discard shape the ruling forbids. Scoped to ANNOUNCE_X; every
+    //other seam keeps the no-call shortcut.
     int askModel(const string& decision, const vector<string>& options, bool narrateChoice = true,
-                 const string& pendingSourceName = string());
+                 const string& pendingSourceName = string(), bool askEvenIfSingle = false);
     std::map<string, int> mAskCache;
 
     //Answer a menu-family DecisionRequest (CHOOSE_MENU / CHOOSE_MODE /
