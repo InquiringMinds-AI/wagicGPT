@@ -8940,31 +8940,48 @@ int AManaProducer::reactToClick(MTGCardInstance * _card)
     return ActivatedAbility::activateAbility();
 }
 
-const string AManaProducer::getMenuText()
+//W39-BATTLEMENT (#9): the mana-producer label formatter, as a pure core over a
+//ManaCost so PARSETEST can prove the scaled shape without a game or a card.
+string scaledManaMenuText(ManaCost * output, int multiplier)
 {
-    if (menutext.size())
-        return menutext.c_str();
-    menutext = _("Add ");
+    string out = _("Add ");
     char buffer[128];
     int alreadyHasOne = 0;
+    if (!output)
+        return out + _(" mana");
     for (int i = 0; i < 8; i++)
     {
         int value = output->getCost(i);
         if (value)
         {
             if (alreadyHasOne)
-                menutext.append(",");
-            sprintf(buffer, "%i ", value);
-            menutext.append(buffer);
+                out.append(",");
+            //Scale AFTER the nonzero test: a multiplier of 0 must still render
+            //the colour ("Add 0 green mana"), never vanish into "Add  mana".
+            sprintf(buffer, "%i ", value * multiplier);
+            out.append(buffer);
             if (i == Constants::MTG_COLOR_WASTE)
-                menutext.append(_(" colorless"));
+                out.append(_(" colorless"));
             else if (i >= Constants::MTG_COLOR_GREEN && i <= Constants::MTG_COLOR_WASTE)
-                menutext.append(_(Constants::MTGColorStrings[i]));
-            
+                out.append(_(Constants::MTGColorStrings[i]));
+
             alreadyHasOne = 1;
         }
     }
-    menutext.append(_(" mana"));
+    out.append(_(" mana"));
+    return out;
+}
+
+const string AManaProducer::getScaledMenuText(int multiplier)
+{
+    return scaledManaMenuText(output, multiplier);
+}
+
+const string AManaProducer::getMenuText()
+{
+    if (menutext.size())
+        return menutext.c_str();
+    menutext = getScaledMenuText(1);
     return menutext.c_str();
 }
 

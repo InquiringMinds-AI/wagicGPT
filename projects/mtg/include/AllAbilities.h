@@ -4633,8 +4633,44 @@ public:
         return 0;
     }
 
+    //W39-BATTLEMENT (#9): how many permanents this foreach currently matches.
+    //`cards` is only populated while the ability is a live observer, and an
+    //ACTIVATED foreach clears the list at resolve(), so a label emitted from
+    //`cards.size()` would read 0 - count the zones the way updateTargets does.
+    int foreachMatchCount()
+    {
+        int n = 0;
+        if (!game || !tc)
+            return 0;
+        for (int i = 0; i < 2; i++)
+        {
+            Player * p = game->players[i];
+            if (!p)
+                continue;
+            MTGGameZone * zones[] = { p->game->inPlay, p->game->graveyard, p->game->hand, p->game->library, p->game->stack, p->game->exile, p->game->commandzone, p->game->sideboard, p->game->reveal };
+            for (int k = 0; k < 9; k++)
+            {
+                MTGGameZone * zone = zones[k];
+                if (!zone || !canTarget(zone))
+                    continue;
+                for (int j = 0; j < zone->nb_cards; j++)
+                    if (canBeInList(zone->cards[j]))
+                        n++;
+            }
+        }
+        return n;
+    }
+
+    //W39-BATTLEMENT (#9): a foreach-wrapped MANA producer adds its output ONCE
+    //PER MATCHING PERMANENT, but the inner AManaProducer only knows its
+    //per-iteration output - so every activation line for Overgrown Battlement
+    //(`{T}:foreach(creature[defender]|myBattlefield) add{G}`) read "Add 1 green
+    //mana" while the activation floated four. An emitted magnitude ASSERTS;
+    //scale it by the live match count so the number is true at emission.
     const string getMenuText()
     {
+        if (AManaProducer * amp = dynamic_cast<AManaProducer *>(ability))
+            return amp->getScaledMenuText(foreachMatchCount());
         return ability->getMenuText();
     }
 
