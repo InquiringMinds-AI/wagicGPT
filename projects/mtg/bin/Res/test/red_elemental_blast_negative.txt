@@ -1,0 +1,27 @@
+#NEGATIVE: Red Elemental Blast may not be cast when no blue spell is on the
+#stack and no blue permanent is on the battlefield (CR 601.2b).
+#The opponent's spell here is RED, so neither mode has a legal target.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+manapool:{R}
+[PLAYER2]
+hand:Red Elemental Blast
+manapool:{R}
+[DO]
+Raging Goblin
+yes
+Red Elemental Blast
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Raging Goblin
+manapool:{0}
+life:20
+[PLAYER2]
+hand:Red Elemental Blast
+manapool:{R}
+life:20
+[END]

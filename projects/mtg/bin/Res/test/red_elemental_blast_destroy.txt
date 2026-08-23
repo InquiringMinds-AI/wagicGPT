@@ -1,0 +1,23 @@
+#Red Elemental Blast, destroy mode: destroy target blue permanent.
+#Nothing on the stack, so the merged choose-one menu holds only the destroy leg.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Red Elemental Blast
+manapool:{R}
+[PLAYER2]
+inplay:Merfolk of the Pearl Trident
+[DO]
+Red Elemental Blast
+choice 0
+Merfolk of the Pearl Trident
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Red Elemental Blast
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Merfolk of the Pearl Trident
+life:20
+[END]

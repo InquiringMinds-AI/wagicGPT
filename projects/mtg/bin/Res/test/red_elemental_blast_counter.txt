@@ -1,0 +1,30 @@
+#Red Elemental Blast, counter mode: counter target blue spell.
+#Oracle: "Choose one - Counter target blue spell; or destroy target blue permanent."
+#Mirror of blue_elemental_blast_counter.txt; same wave-40 fix (alias=1312 hardcode
+#replaced by script, so the card is reachable in the response window).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Merfolk of the Pearl Trident
+manapool:{U}
+[PLAYER2]
+hand:Red Elemental Blast
+manapool:{R}
+[DO]
+Merfolk of the Pearl Trident
+yes
+Red Elemental Blast
+choice 0
+Merfolk of the Pearl Trident
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Merfolk of the Pearl Trident
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Red Elemental Blast
+manapool:{0}
+life:20
+[END]

@@ -1,0 +1,33 @@
+#Blue Elemental Blast, counter mode: counter target red spell.
+#Oracle: "Choose one - Counter target red spell; or destroy target red permanent."
+#Rides the wave-40 fix: before it, the card carried alias=1191 and NO script, so
+#its hardcoded SpellOrPermanentTargetChooser was gated by validTargetsExist(),
+#which only scans battlefield zones - a spell on the stack is a Spell object, not
+#a card in a scanned zone, so GameObserver::targetListIsSet() rejected the cast
+#outright and the card could never be played as a response.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+manapool:{R}
+[PLAYER2]
+hand:Blue Elemental Blast
+manapool:{U}
+[DO]
+Raging Goblin
+yes
+Blue Elemental Blast
+choice 0
+Raging Goblin
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Raging Goblin
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Blue Elemental Blast
+manapool:{0}
+life:20
+[END]

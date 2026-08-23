@@ -12861,7 +12861,9 @@ type=Enchantment
 [/card]
 [card]
 name=Blue Elemental Blast
-alias=1191
+restriction=type(*[red]|stack^battlefield)~morethan~0
+auto=choice fizzle target(*[red]|stack)
+auto=choice destroy target(*[red])
 text=Choose one - Counter target red spell; or destroy target red permanent.
 mana={U}
 type=Instant
@@ -93308,7 +93310,9 @@ toughness=4
 [/card]
 [card]
 name=Red Elemental Blast
-alias=1312
+restriction=type(*[blue]|stack^battlefield)~morethan~0
+auto=choice fizzle target(*[blue]|stack)
+auto=choice destroy target(*[blue])
 text=Choose one - Counter target blue spell; or destroy target blue permanent.
 mana={R}
 type=Instant

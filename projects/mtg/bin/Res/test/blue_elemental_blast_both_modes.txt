@@ -1,0 +1,33 @@
+#Blue Elemental Blast with BOTH modes legal: a red spell on the stack AND a red
+#permanent on the battlefield. Pins the menu order - the script lists the counter
+#leg first, so index 0 is "counter target red spell" and index 1 is
+#"destroy target red permanent". Here mode 0 is taken: Raging Goblin is
+#countered and Goblin Piker survives untouched.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+inplay:Goblin Piker
+manapool:{R}
+[PLAYER2]
+hand:Blue Elemental Blast
+manapool:{U}
+[DO]
+Raging Goblin
+yes
+Blue Elemental Blast
+choice 0
+Raging Goblin
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Goblin Piker
+graveyard:Raging Goblin
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Blue Elemental Blast
+manapool:{0}
+life:20
+[END]
