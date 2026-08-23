@@ -1,0 +1,36 @@
+#NAME: Pyroblast counters a BLUE spell (W41 #W41-9)
+#Oracle (Scryfall, verified 2026-08-23): "Choose one - Counter target spell if
+#it's blue; or destroy target permanent if it's blue."  Same shape as
+#Hydroblast with the colours swapped; alias=1312 removed.
+#narration: asserts the wave-39 #3 countered-vs-resolved register fires for a
+#counter that is NOT a plain fizzle-with-a-colour-restricted-chooser but a
+#teach()-gated conditional counter - the register keys on the fizzle, so it
+#must survive the indirection.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Merfolk of the Pearl Trident
+manapool:{U}
+[PLAYER2]
+hand:Pyroblast
+manapool:{R}
+[DO]
+Merfolk of the Pearl Trident
+yes
+Pyroblast
+Merfolk of the Pearl Trident
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Merfolk of the Pearl Trident
+manapool:{0}
+life:20
+narration:Your Merfolk of the Pearl Trident was COUNTERED by Pyroblast
+nonarration:Merfolk of the Pearl Trident resolved
+[PLAYER2]
+graveyard:Pyroblast
+manapool:{0}
+life:20
+narration:Opponent's Merfolk of the Pearl Trident was COUNTERED by Pyroblast
+[END]

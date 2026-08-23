@@ -1,0 +1,38 @@
+#NAME: Hydroblast counters a RED spell (W41 #W41-9)
+#Oracle (Scryfall, verified 2026-08-23): "Choose one - Counter target spell if
+#it's red; or destroy target permanent if it's red."  The target is ANY spell /
+#ANY permanent; the colour is checked at RESOLUTION, not at targeting - so the
+#colour-restricted SpellOrPermanentTargetChooser the alias=1191 hardcode built
+#was doubly wrong: it over-restricted targeting legality AND, because
+#SpellOrPermanentTargetChooser only declares the two battlefield zones,
+#TargetChooser::validTargetsExist() could never see a spell on the stack, so
+#GameObserver::targetListIsSet() refused the cast and the card was never
+#offered as a response.
+#The script replaces the alias entirely: one spell-or-permanent chooser plus
+#two teach() lines, which are the DSL's target-scoped conditional (the granted
+#effect fires only when the chosen target matches the descriptor).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+manapool:{R}
+[PLAYER2]
+hand:Hydroblast
+manapool:{U}
+[DO]
+Raging Goblin
+yes
+Hydroblast
+Raging Goblin
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Raging Goblin
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Hydroblast
+manapool:{0}
+life:20
+[END]

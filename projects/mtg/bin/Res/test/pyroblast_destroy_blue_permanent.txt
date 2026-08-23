@@ -1,0 +1,25 @@
+#NAME: Pyroblast destroys a BLUE permanent, and leaves a non-blue one alone
+#Oracle mode 2: "Destroy target permanent if it's blue."
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Pyroblast,Pyroblast
+manapool:{R}{R}
+[PLAYER2]
+inplay:Merfolk of the Pearl Trident,Raging Goblin
+[DO]
+Pyroblast
+Merfolk of the Pearl Trident
+Pyroblast
+Raging Goblin
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Pyroblast,Pyroblast
+manapool:{0}
+life:20
+[PLAYER2]
+inplay:Raging Goblin
+graveyard:Merfolk of the Pearl Trident
+life:20
+[END]
