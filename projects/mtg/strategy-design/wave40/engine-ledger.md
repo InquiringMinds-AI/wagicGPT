@@ -614,3 +614,12 @@ exact SUM of the lanes' added cases.**
    force an ARMED SOLE-ATTACKER window; and a small-attacker board at low life to force a blocker
    window at forecast ≤ 9. Discharges seat 152's two un-adjudicated edits without a third
    corpus null.
+
+## #W41-19 — [HIGH, OWNER LIVE-PLAY REPORT 2026-08-23, Vita session] Upkeep triggers: Delver no first-upkeep trigger; Black Vise damage not applying
+- Owner verbatim: "delver of secrets doesn't trigger on the first upkeep after playing
+  it. there's a problem with black vise, doesn't seem to be applying damage when its
+  supposed to. possibly same upkeep bug."
+- Owner observation = ground truth; the same-bug hypothesis is HIS, unverified — test it.
+- Investigation lane running (Oracle-first, repro fixtures, class sweep over other
+  @each-upkeep cards, fix at the right layer). If it's an engine ETB-registration/
+  phase-ring ordering defect, the class is far wider than two cards.
