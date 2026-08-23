@@ -1,0 +1,36 @@
+#NAME: Countered spell narration, non-graveyard destination (W40 #3)
+#DESC: Per-path companion to countered_spell_narration.txt. Counterspells do
+#DESC: not all end in a graveyard: Lapse of Certainty is an auto=fizzleto(...)
+#DESC: card, so it reaches ActionStack::Fizzle with PUT_IN_LIBRARY_TOP instead
+#DESC: of PUT_IN_GRAVEARD and the countered spell leaves the stack for its
+#DESC: owner's LIBRARY. The counter marker must survive that path too, and the
+#DESC: destination clause must record the library rather than a graveyard.
+#DESC: narration:/nonarration: match case-insensitively (see the sibling file).
+[INIT]
+firstmain
+[PLAYER1]
+hand:Grizzly Bears
+library:Forest
+manapool:{G}{G}
+[PLAYER2]
+hand:Lapse of Certainty
+library:Swamp
+manapool:{W}{W}{W}
+[DO]
+Grizzly Bears
+yes
+Lapse of Certainty
+Grizzly Bears
+endinterruption
+[ASSERT]
+firstmain
+[PLAYER1]
+library:Forest,Grizzly Bears
+narration:Your Grizzly Bears was COUNTERED by Lapse of Certainty and went into your library
+nonarration:Grizzly Bears resolved
+[PLAYER2]
+library:Swamp
+graveyard:Lapse of Certainty
+narration:Opponent's Grizzly Bears was COUNTERED by Lapse of Certainty and went into the opponent's library
+nonarration:Grizzly Bears resolved
+[END]

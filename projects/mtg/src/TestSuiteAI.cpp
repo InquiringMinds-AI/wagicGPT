@@ -13,6 +13,9 @@
 #include "GameStateShop.h"
 #include "MTGDeck.h"
 #include "AIPlayerBaka.h"
+#include "AIPlayerGPT.h" //W40 #3: counterMarkerMatches + zoneChangeNarration
+#include "WEvent.h"
+#include "Subtypes.h"
 #ifdef QT_CONFIG
 #include <QThread>
 #endif
@@ -42,6 +45,7 @@ TestSuiteAI::TestSuiteAI(TestSuiteGame *tsGame, int playerId) :
     aiActCounter = 1.0f;
     mAssertPhaseArmed = false;
     expectedTappedInPlay = -1;
+    mCounteredMark = NULL;
     playMode = MODE_TEST_SUITE;
     this->deckName = "Test Suite AI";
     this->comboHint = NULL;
@@ -82,7 +86,65 @@ bool TestSuiteAI::parseLine(const string& s)
         expectedCardText.push_back(s.substr(kCardText.size()));
         return true;
     }
+    //W40 #3: word-level assertions on this seat's GAME NARRATION. The zone
+    //assertions cannot see a narration defect - a countered spell and a
+    //resolved one end in the SAME graveyard.
+    static const string kNarration = "narration:";
+    if (s.compare(0, kNarration.size(), kNarration) == 0)
+    {
+        expectedNarration.push_back(s.substr(kNarration.size()));
+        return true;
+    }
+    static const string kNoNarration = "nonarration:";
+    if (s.compare(0, kNoNarration.size(), kNoNarration) == 0)
+    {
+        forbiddenNarration.push_back(s.substr(kNoNarration.size()));
+        return true;
+    }
     return AIPlayerBaka::parseLine(s);
+}
+
+//W40 #3 - the fixture surface for the narration register.
+//The register itself belongs to the live AIPlayerGPT seat, and a scripted seat
+//can ask a model nothing; but it CAN run the SAME two production functions
+//over the SAME real events, and that is precisely the chain the countered-spell
+//defect lived in: ActionStack::Fizzle raises WEventSpellCountered -> the marker
+//holds the STACK instance -> putInZone delivers the CLONE -> the gate decides
+//"countered" or "resolved" -> zoneChangeNarration renders the words. Only stack
+//departures are recorded, so the other ~1050 tests pay almost nothing.
+int TestSuiteAI::receiveEvent(WEvent * event)
+{
+    int result = AIPlayerBaka::receiveEvent(event);
+#ifdef WITH_GPT_AI
+    if (WEventSpellCountered * ce = dynamic_cast<WEventSpellCountered *>(event))
+    {
+        mCounteredMark = ce->card;
+        mCounteredMarkBy = ce->counteredBy ? ce->counteredBy->getDisplayName() : "";
+        return result;
+    }
+    if (WEventZoneChange * ze = dynamic_cast<WEventZoneChange *>(event))
+    {
+        if (!ze->card || !ze->from || !ze->to || !ze->to->owner)
+            return result;
+        if (string(ze->from->getName()) != "stack")
+            return result;
+        bool countered = counterMarkerMatches(ze->card, mCounteredMark);
+        string by;
+        if (countered)
+        {
+            by = mCounteredMarkBy;
+            mCounteredMark = NULL;
+            mCounteredMarkBy.clear();
+        }
+        mNarrationLog.push_back(zoneChangeNarration(ze->to->owner == this,
+                                                    ze->card->getDisplayName(),
+                                                    "stack", ze->to->getName(),
+                                                    ze->card->isCreature() != 0,
+                                                    ze->card->hasType(Subtypes::TYPE_LAND) != 0,
+                                                    countered, by, ""));
+    }
+#endif
+    return result;
 }
 
 MTGCardInstance * TestSuiteAI::getCard(string action)
@@ -1041,6 +1103,43 @@ void TestSuiteGame::assertGame()
             {
                 sprintf(result, "<span class=\"error\">==card text assertion failed for %s in player %i==</span><br />",
                         expectedP->expectedCardText[n].c_str(), i);
+                Log(result);
+                error++;
+            }
+        }
+        //W40 #3: narration (word-level) assertions. The whole recorded log is
+        //one blob - the assertion is about what the seat was TOLD, and a
+        //fixture states the fragment, not the line number.
+        //The fixture parser lowercases every line it reads, so the comparison
+        //is case-INSENSITIVE here; the capitalisation of "was COUNTERED" is
+        //pinned exactly in PARSETEST instead (runParseSelfTest, W40#3 block).
+        string narration;
+        for (size_t n = 0; n < p->mNarrationLog.size(); n++)
+            narration += p->mNarrationLog[n] + " | ";
+        std::transform(narration.begin(), narration.end(), narration.begin(), ::tolower);
+        //`result` is a fixed 4096-byte sprintf buffer; keep the echoed log
+        //well inside it however long the game ran.
+        string shown = narration.size() > 1500 ? narration.substr(0, 1500) + "...(truncated)" : narration;
+        for (size_t n = 0; n < expectedP->expectedNarration.size(); n++)
+        {
+            string want = expectedP->expectedNarration[n];
+            std::transform(want.begin(), want.end(), want.begin(), ::tolower);
+            if (narration.find(want) == string::npos)
+            {
+                sprintf(result, "<span class=\"error\">==narration assertion failed for player %i: expected \"%s\", log was \"%s\"==</span><br />",
+                        i, expectedP->expectedNarration[n].c_str(), shown.c_str());
+                Log(result);
+                error++;
+            }
+        }
+        for (size_t n = 0; n < expectedP->forbiddenNarration.size(); n++)
+        {
+            string banned = expectedP->forbiddenNarration[n];
+            std::transform(banned.begin(), banned.end(), banned.begin(), ::tolower);
+            if (narration.find(banned) != string::npos)
+            {
+                sprintf(result, "<span class=\"error\">==forbidden narration present for player %i: \"%s\", log was \"%s\"==</span><br />",
+                        i, expectedP->forbiddenNarration[n].c_str(), shown.c_str());
                 Log(result);
                 error++;
             }

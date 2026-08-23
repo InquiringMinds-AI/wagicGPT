@@ -1,0 +1,47 @@
+#NAME: Countered spell narration (W40 #3)
+#DESC: A countered spell and a resolved one make the SAME stack->graveyard
+#DESC: move, so no zone assertion can tell them apart - the whole defect lived
+#DESC: in the words. Three wave-39 seats independently read
+#DESC: "<card> resolved and went to ... graveyard" on spells that were
+#DESC: COUNTERED, and the pilot is instructed to believe the narration.
+#DESC: Root cause: MTGGameZone::removeCard clones the card on every zone move
+#DESC: and putInZone raises WEventZoneChange with the NEW COPY, so the W35 gate
+#DESC: mCounteredSpell == e->card compared a stack instance with its graveyard
+#DESC: clone and never fired once in 21 corpus games.
+#DESC: This fixture asserts the WORDS on both seats, and keeps a positive
+#DESC: control in frame: the counterspell's OWN resolution must still read
+#DESC: "resolved", so the fix cannot pass by labelling everything countered.
+#DESC: narration:/nonarration: match case-INSENSITIVELY (the fixture parser
+#DESC: lowercases every line it reads); the capitals in "was COUNTERED" are
+#DESC: pinned exactly by the W40#3 PARSETEST block instead.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Grizzly Bears
+library:Forest
+manapool:{G}{G}
+[PLAYER2]
+hand:Cancel
+library:Swamp
+manapool:{U}{U}{U}
+[DO]
+Grizzly Bears
+yes
+Cancel
+Grizzly Bears
+endinterruption
+[ASSERT]
+firstmain
+[PLAYER1]
+library:Forest
+graveyard:Grizzly Bears
+narration:Your Grizzly Bears was COUNTERED by Cancel and went to your graveyard
+narration:Opponent's Cancel resolved and went to the opponent's graveyard
+nonarration:Grizzly Bears resolved
+[PLAYER2]
+library:Swamp
+graveyard:Cancel
+narration:Opponent's Grizzly Bears was COUNTERED by Cancel and went to the opponent's graveyard
+narration:Your Cancel resolved and went to your graveyard
+nonarration:Grizzly Bears resolved
+[END]

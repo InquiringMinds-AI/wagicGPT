@@ -157,6 +157,20 @@ public:
     vector<string> expectedBasicAbilities;
     //[ASSERT]-only: card|display-text pairs expected on the live card.
     vector<string> expectedCardText;
+    //[ASSERT]-only: substrings the seat's GAME NARRATION must / must not carry.
+    //W40 #3: the countered-spell register was invisible to every existing
+    //assertion because the suite asserts ZONES, and a countered spell and a
+    //resolved one land in the SAME zone - the whole defect lived in the words.
+    vector<string> expectedNarration;
+    vector<string> forbiddenNarration;
+    //LIVE-seat recording of the narration register for stack departures and
+    //counter events. It runs the PRODUCTION functions (counterMarkerMatches +
+    //zoneChangeNarration from AIPlayerGPT.cpp) rather than a copy, so a
+    //fixture failure points at the shipped gate.
+    vector<string> mNarrationLog;
+    MTGCardInstance * mCounteredMark;
+    string mCounteredMarkBy;
+    virtual int receiveEvent(WEvent * event);
 
     TestSuiteAI(TestSuiteGame *tsGame, int playerId);
     virtual int Act(float dt);
