@@ -60,7 +60,8 @@ second one makes the first bigger.
 The option reads "add blue mana for each artifact with Tolarian Academy [cost: Tap]" - one blue per
 artifact, a huge number late. Before taking it, ask ONE question: is this YOUR Main Phase 1, AND am
 I casting something this turn? Unless BOTH answers are yes, answer 0 (pass) - the offer comes back
-at every window, you lose nothing by passing.
+at every window, you lose nothing by passing. Playing a LAND is NOT a cast - lands cost no mana, so
+Academy mana can never help a land drop; if your only play this turn is a land, the answer is 0.
 Why: mana disappears at the end of the step it was made in. "Tap it now for later this turn or next
 turn" is ALWAYS wrong - mana made at an upkeep, in combat, or on the opponent's turn is thrown away.
 When both answers are yes: create any Nuisance Engine Pest FIRST, so the Pest counts toward the
