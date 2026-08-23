@@ -1,0 +1,62 @@
+#W41-6 arrival trace - the repeat-activation countable across CONSECUTIVE priority windows.
+Probe: deck198 (12x Thraben Doomsayer / 12x Intruder Alarm / 24x Tundra) vs deck199 (lands only),
+WAGIC_AI=gpt against the stub server in stub.py (takes the maker; passes once the PRINTED count reaches 8).
+601 priority windows offered the maker in one game; every option line below is verbatim from the assembled prompt.
+
+window #54  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, other creatures you..."}
+
+window #55  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, other creatures you..."}
+
+window #56  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, other creatures you..."}
+
+window #57  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 2 times already; you control 10 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #58  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 2 times already; you control 11 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #59  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 3 times already; you control 12 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #60  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 3 times already; you control 13 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #61  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 4 times already; you control 14 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #62  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 4 times already; you control 15 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #63  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 5 times already; you control 16 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #64  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 5 times already; you control 17 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #65  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 6 times already; you control 18 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #66  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 6 times already; you control 19 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #67  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 7 times already; you control 20 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #68  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 7 times already; you control 21 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #69  (stop-on-countable N=8 -> CHOICE: 0 (pass))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 8 times already; you control 22 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #70  (stop-on-countable N=8 -> CHOICE: 0 (pass))
+    1. Create human with Thraben Doomsayer [cost: Tap] [repeat: activated this turn 8 times already; you control 22 creatures] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful
+
+window #72  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, other creatures you..."}
+
+window #73  (take -> CHOICE: 1 (Create human with Thraben Doomsayer))
+    1. Create human with Thraben Doomsayer [cost: Tap] {card text: "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful hour - As long as you have 5 or less life, other creatures you..."}
+

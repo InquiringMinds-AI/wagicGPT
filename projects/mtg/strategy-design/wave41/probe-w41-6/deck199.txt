@@ -1,0 +1,4 @@
+#NAME:W41G Inert Opponent
+#DESC:probe - lands only
+
+Tundra (ME4) * 48

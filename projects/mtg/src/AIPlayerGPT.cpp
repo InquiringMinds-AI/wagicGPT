@@ -5668,6 +5668,147 @@ static string stripNarrationDecoration(const string& in)
     return out;
 }
 
+//#W41-6 (L-123a) - THE REPEAT-ACTIVATION COUNTABLE. A BOUND, NOT A FILTER.
+//
+//With Intruder Alarm plus any {T}-token-maker (deck123: Thraben Doomsayer),
+//every token that enters untaps the maker, so the engine legally re-offers
+//"Create a Human token with Thraben Doomsayer [cost: Tap]" forever (vs125
+//seq25-33: eight consecutive activations, still offered at seq34). Nothing in
+//the engine bounds it, and a pilot that correctly obeys "a printed option is
+//takeable now" never passes priority - the game cannot finish (invariant 00).
+//
+//The owner's ruling is binding: NEVER hard-suppress a legal play on a strategy
+//judgment. So the option stays on the menu forever and nothing here removes,
+//reorders or caps anything. What ships is a COUNTABLE: the loop state the
+//pilot could not see, printed on the option line, so a guide can key a
+//stopping rule to a number instead of to prose. The guide's registered stopgap
+//("until your own battlefield line shows 12 or more creatures, then pass")
+//keys on the creature count, so both numbers are printed.
+//
+//TRUTH: both numbers are read out of engine state, never estimated.
+// * the activation count is `ActivatedAbility::counters` - the engine's OWN
+//   per-turn counter, incremented inside activateAbility() on every activation
+//   (whether or not the ability resolves) and reset to 0 by
+//   ActivatedAbility::Update at MTG_PHASE_AFTER_EOT. "this turn" is the
+//   engine's own meaning of the phrase, not a re-derivation.
+// * the creature count is a live count of the controller's battlefield.
+//
+//GENERALITY + EMIT CONDITION: the count rides EVERY activated ability, not
+//token-makers - any ability re-offered in a loop gets the same bound. It is
+//emitted only from the THIRD offer onward (counters >= 2, i.e. two activations
+//already banked this turn). Why 2: one or two activations of the same ability
+//in a turn is ordinary Magic (an equip, a pump, a second pump) and annotating
+//those spends tokens on every option line to say nothing; a THIRD offer of the
+//same ability in the same turn is the earliest point at which repetition is
+//the salient fact. It also arrives with a wide margin - any plausible
+//stopping rule (12 creatures is 8+ activations) is many windows away, so the
+//pilot has the countable long before it needs it.
+//
+//The creature-count clause is added only when the ability actually makes a
+//CREATURE token, because that is the resource this loop grows and the number
+//the stopping rule counts; on a Treasure-maker or a pump loop it would be a
+//true number in the wrong scope, which the trust doctrine calls a lie.
+//
+//WORDING is restriction-first by construction: the annotation states only what
+//has ALREADY happened and what is ALREADY on the board. It contains no
+//affirmative-action substring ("you may", "again", "you can activate") for the
+//model to latch onto as permission, and no advice - the stopping rule is the
+//guide's job, the number is the engine's.
+//
+//SHAPE is a square bracket, deliberately: stripNarrationDecoration drops every
+//[...] so this decision-time state never enters the narration history, and
+//stripRenderAnnotationsLc drops every [...] so an echoed annotation can never
+//collide with answer matching. A {...} form would do neither.
+static const int kRepeatActivationFloor = 2;
+
+//The ability whose counters the engine actually increments. A GenericActivated
+//wrapper is BOTH a NestedAbility and an ActivatedAbility, and it is the OUTER
+//object that runs activateAbility() - so a direct cast must win before the
+//unwrap (the same shape as asTurnSide, opposite priority).
+static ActivatedAbility * asActivatedForCount(MTGAbility * a)
+{
+    if (!a)
+        return NULL;
+    if (ActivatedAbility * direct = dynamic_cast<ActivatedAbility *>(a))
+        return direct;
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        return dynamic_cast<ActivatedAbility *>(na->ability);
+    return NULL;
+}
+
+//Does this activation put a CREATURE token onto the battlefield? Both of
+//ATokenCreator's identity routes are checked: a token declared by id/name
+//resolves through the card db, a token declared by construction carries its
+//types list (token(Human,Creature Human,1/1,white) -> TYPE_CREATURE).
+static bool makesCreatureToken(MTGAbility * a)
+{
+    ATokenCreator * tc = dynamic_cast<ATokenCreator *>(a);
+    if (!tc)
+    {
+        if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+            tc = dynamic_cast<ATokenCreator *>(na->ability);
+    }
+    if (!tc)
+        return false;
+    if (tc->tokenId)
+    {
+        MTGCard * c = MTGCollection()->getCardById(tc->tokenId);
+        return c && c->data && c->data->isCreature();
+    }
+    for (list<int>::iterator it = tc->types.begin(); it != tc->types.end(); ++it)
+        if (*it == Subtypes::TYPE_CREATURE)
+            return true;
+    return false;
+}
+
+static int creatureCountOnBattlefield(Player * p)
+{
+    if (!p || !p->game || !p->game->battlefield)
+        return 0;
+    int n = 0;
+    MTGGameZone * bf = p->game->battlefield;
+    for (int i = 0; i < bf->nb_cards; i++)
+        if (bf->cards[i] && bf->cards[i]->isCreature())
+            n++;
+    return n;
+}
+
+//"" for everything below the floor: no annotation, no token cost, no change to
+//any line the pilot sees today.
+static string repeatActivationNote(const OrderedAIAction& action)
+{
+    ActivatedAbility * aa = asActivatedForCount(action.ability);
+    if (!aa || aa->counters < kRepeatActivationFloor)
+        return "";
+    std::ostringstream o;
+    o << " [repeat: activated this turn " << aa->counters << " times already";
+    if (makesCreatureToken(action.ability))
+    {
+        MTGCardInstance * src = action.click ? action.click : aa->source;
+        Player * ctrl = src ? src->controller() : NULL;
+        if (ctrl)
+            o << "; you control " << creatureCountOnBattlefield(ctrl) << " creatures";
+    }
+    o << "]";
+    return o.str();
+}
+
+//The repeat annotation is VOLATILE by design - its numbers move as the loop
+//runs - and two of the priority seam's per-turn memories are keyed by the
+//rendered line text (mPassDeclineCount's two-decline allowance, and the fetch
+//key). Keying those on a line whose digits change would silently retire them.
+//Strip the annotation for KEY purposes only; the pilot still sees it.
+static string stripRepeatAnnotation(const string& line)
+{
+    size_t p = line.find(" [repeat: ");
+    if (p == string::npos)
+        return line;
+    size_t c = line.find(']', p);
+    if (c == string::npos)
+        return line.substr(0, p);
+    return line.substr(0, p) + line.substr(c + 1);
+}
+
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 {
     std::ostringstream out;
@@ -5866,6 +6007,11 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         if (any)
             out << " [cost: " << cost.str() << "]";
     }
+
+    //#W41-6: the repeat-activation countable, next to the cost it is paid with
+    //and ahead of the static card text, so the loop state reads as part of the
+    //price of this activation rather than as a footnote to the rules blurb.
+    out << repeatActivationNote(action);
 
     //The BENEFIT, not just the cost: menu texts like "Put in Play" (a
     //fetchland crack) read as pure downside next to their [cost: ...] -
@@ -7416,7 +7562,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //keep the two-decline allowance since their value genuinely moves
         //within a turn.
         bool fetchLine = isFetchCrackLine(line);
-        std::map<string, int>::iterator dc = mPassDeclineCount.find(fetchLine ? fetchLineKey(line) : line);
+        //#W41-6: key on the line WITHOUT its volatile [repeat: ...] state, or
+        //a loop's moving digits would mint a fresh key at every activation and
+        //silently retire the two-decline allowance for exactly the option
+        //class the allowance matters most for.
+        std::map<string, int>::iterator dc = mPassDeclineCount.find(fetchLine ? fetchLineKey(line)
+                                                                              : stripRepeatAnnotation(line));
         if (dc != mPassDeclineCount.end() && dc->second >= (fetchLine ? 1 : 2))
             continue;
         shown.push_back(cand);
@@ -7595,7 +7746,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         if (choice == 0)
             for (size_t s = 0; s < shownLines.size(); s++)
                 mPassDeclineCount[isFetchCrackLine(shownLines[s])
-                                  ? fetchLineKey(shownLines[s]) : shownLines[s]]++;
+                                  ? fetchLineKey(shownLines[s])
+                                  : stripRepeatAnnotation(shownLines[s])]++;
         {
             const char * fb = (choice >= 0) ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
@@ -16474,6 +16626,62 @@ void AIPlayerGPT::runParseSelfTest()
                              2, &btwo, &bst, NULL, &bnote);
         CHECK(bd == 2 && bnote.empty(),
               "W39-9 duplicate scaled labels keep the index and stay silent");
+    }
+
+    cout << "\n[W41-6] the repeat-activation countable: history, matching, echo, keys\n";
+    // The NUMBERS are engine state (ActivatedAbility::counters + a live
+    // battlefield count) and are arrival-traced in a live probe, not here.
+    // What belongs HERE is the parse-relevant half: the annotation must be
+    // invisible to history, invisible to answer matching, harmless to echo,
+    // and removable for the per-turn line keys.
+    {
+        const string annot = " [repeat: activated this turn 5 times already; you control 12 creatures]";
+        string opt = "Create a Human token with Thraben Doomsayer [cost: Tap]" + annot
+                     + " {card text: \"{T}: Put a 1/1 white Human creature token onto the battlefield.\"}";
+        // HISTORY: a decision-time surface never enters the narration.
+        CHECK(stripNarrationDecoration(opt) == "Create a Human token with Thraben Doomsayer",
+              "W41-6 the repeat annotation leaves the narrated copy with the cost bracket");
+        // MATCHING: every [...] is stripped before an option core is compared,
+        // so the moving digits can never make an echo miss its option.
+        string core = stripRenderAnnotationsLc(opt);
+        CHECK(core.find("repeat") == string::npos && core.find("12 creatures") == string::npos,
+              "W41-6 the repeat annotation is stripped out of the matching core");
+        CHECK(core.find("thraben doomsayer") != string::npos,
+              "W41-6 NEGATIVE the identity survives the strip - only the annotation goes");
+        // ECHO SHAPE: the prompt tells the model to copy the SHORT NAME and
+        // nothing from the annotations, so the bare name must bind; a model
+        // that echoes the annotation anyway must bind to the same option.
+        vector<string> ropts;
+        ropts.push_back("Create a Human token with Thraben Doomsayer [cost: Tap]" + annot); // 1
+        ropts.push_back("Cast Tragic Slip {b}");                                            // 2
+        bool rst = false;
+        CHECK(parseChoice("CHOICE: 1 (Create a Human token with Thraben Doomsayer)",
+                          2, &ropts, &rst, NULL, NULL) == 1,
+              "W41-6 the bare short name binds to the annotated option");
+        rst = false;
+        CHECK(parseChoice("CHOICE: 1 (Create a Human token with Thraben Doomsayer" + annot + ")",
+                          2, &ropts, &rst, NULL, NULL) == 1,
+              "W41-6 echoing the annotation back still binds to the same option");
+        // NEGATIVE: the annotation's own digits are not an answer. An echo
+        // naming the OTHER option routes there even though a "5" and a "12"
+        // sit inside option 1's tail.
+        rst = false;
+        CHECK(parseChoice("CHOICE: 2 (Cast Tragic Slip)", 2, &ropts, &rst, NULL, NULL) == 2,
+              "W41-6 NEGATIVE the counts inside the annotation are not a choice index");
+        // KEYS: the per-turn decline memory keys on the line without the
+        // volatile state, so two windows of the same loop share one key.
+        string l5 = "Create a Human token with Thraben Doomsayer [cost: Tap]" + annot + " {card text: \"x\"}";
+        string l6 = "Create a Human token with Thraben Doomsayer [cost: Tap]"
+                    " [repeat: activated this turn 6 times already; you control 13 creatures] {card text: \"x\"}";
+        CHECK(stripRepeatAnnotation(l5) == stripRepeatAnnotation(l6),
+              "W41-6 two activation counts of the same loop collapse to ONE decline key");
+        CHECK(stripRepeatAnnotation(l5) == "Create a Human token with Thraben Doomsayer [cost: Tap] {card text: \"x\"}",
+              "W41-6 the strip removes only the annotation and leaves no double space");
+        // NEGATIVE: a line that never carried the annotation is byte-identical
+        // - no option below the emit floor changes at all.
+        string plain = "Equip with Lightning Greaves [cost: {0}] targeting Thraben Doomsayer";
+        CHECK(stripRepeatAnnotation(plain) == plain,
+              "W41-6 NEGATIVE an unannotated option line is untouched by the key strip");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
