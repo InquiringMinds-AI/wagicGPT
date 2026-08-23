@@ -8499,26 +8499,31 @@ static bool annotateEtbPayOrTapMenu(vector<string>& opts, const string& landName
 //HAS entered the battlefield (the narration shows "You played X" before this
 //ask). The newest fresh land in the chooser's own battlefield is the one that
 //armed it; prefer the shock text shape as a discriminator, fall back to the
-//newest fresh land, and return "" when there is none (the caller then keeps
+//newest fresh land, and return NULL when there is none (the caller then keeps
 //the generic wording - a wrong name would be worse than no name).
-static string etbPayOrTapLandName(Player * p)
+//W37 #1: return the INSTANCE, not just the name - the wave-36 tapped-truth fix
+//read ctx->isTapped() on the menu's STRIPPED COPY (always untapped), so every
+//Grazer-put shockland ask still promised "enters UNTAPPED" live (validation
+//139 N1, >=7 asks, 2 no-op pays). The tapped state must be read off the SAME
+//recovered battlefield land the name comes from.
+static MTGCardInstance * etbPayOrTapLand(Player * p)
 {
     if (!p || !p->game || !p->game->inPlay)
-        return "";
+        return NULL;
     MTGGameZone * bf = p->game->inPlay;
-    string fallback;
+    MTGCardInstance * fallback = NULL;
     for (int zi = bf->nb_cards - 1; zi >= 0; zi--)
     {
         MTGCardInstance * lc = bf->cards[zi];
         if (!lc || !lc->isLand() || !lc->fresh)
             continue;
-        if (fallback.empty())
-            fallback = lc->getDisplayName();
+        if (!fallback)
+            fallback = lc;
         string lt = lc->text;
         for (size_t i = 0; i < lt.size(); i++)
             lt[i] = (char) tolower((unsigned char) lt[i]);
         if (lt.find("enters tapped") != string::npos && lt.find("pay") != string::npos)
-            return lc->getDisplayName();
+            return lc;
     }
     return fallback;
 }
@@ -8561,9 +8566,16 @@ static string buildMayObjectAsk(const string & srcName, const string & objName,
 //per-counter, an over-ask never fails - it stops at what the mana covers.
 //Pure over the option texts; fires only on the pay-repeat shape (two or more
 //"Add N counter(s)" modes).
-static bool isAddNCountersOption(const string & opt)
+//W37 #3: the LIVE menu renders lowercase "add N counters" (grep-confirmed in
+//the wave-36 corpus - "Choose an option for Intrepid Adversary: 1. don't add
+//any counter ... 3. add 2 counters"), while the auto-script name() reads
+//"Add N counters". The original capital-only matcher never fired live (and its
+//PARSETEST fixture tested the capitalized form only - the fixture-lies class).
+//Match case-insensitively, like the shockland pay/tap matcher above.
+static bool isAddNCountersOption(const string & optRaw)
 {
-    if (opt.compare(0, 4, "Add ") != 0)
+    string opt = toLowerCopy(optRaw);
+    if (opt.compare(0, 4, "add ") != 0)
         return false;
     size_t i = 4;
     if (i >= opt.size() || !isdigit((unsigned char) opt[i]))
@@ -8894,17 +8906,31 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     bool etbPayOrTap = false;
     {
         vector<string> probeOpts = opts;
+        bool etbAlreadyTapped = false;
         if (annotateEtbPayOrTapMenu(probeOpts, string()))
-            etbLandName = etbPayOrTapLandName(this);
-        bool etbAlreadyTapped = ctx && ctx->isTapped();
+        {
+            //W37 #1: name AND tapped state come from the recovered battlefield
+            //land - the menu's own ctx is a stripped copy whose isTapped() is
+            //always false (that read left the wave-36 truth fix inert live).
+            MTGCardInstance * entered = etbPayOrTapLand(this);
+            if (entered)
+            {
+                etbLandName = entered->getDisplayName();
+                etbAlreadyTapped = entered->isTapped();
+            }
+            else
+                etbAlreadyTapped = ctx && ctx->isTapped();
+        }
         etbPayOrTap = annotateEtbPayOrTapMenu(opts, etbLandName, etbAlreadyTapped);
         if (etbPayOrTap && etbAlreadyTapped)
             for (size_t i = 0; i < req.optionTexts.size(); i++)
                 if (isTapOption(req.optionTexts[i]))
                 {
-                    narrateDecision("It entered tapped (the effect that put it onto"
-                                    " the battlefield entered it tapped; paying life"
-                                    " could not untap it, so the payment was declined)");
+                    string who = etbLandName.empty() ? string("It") : etbLandName;
+                    narrateDecision(who + " entered tapped (the effect that put it"
+                                    " onto the battlefield entered it tapped; paying"
+                                    " life could not untap it, so the payment was"
+                                    " declined)");
                     act.choice = (int) i;
                     return 0;
                 }
@@ -8947,6 +8973,13 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //re-deriving.
     if (!dungeonRoomHeader.empty())
         decision = dungeonRoomHeader;
+    //N-152h + W37 #3: the live Add-N-counters pay-repeat menu (Intrepid
+    //Adversary class) arms as CHOOSE_MENU, not CHOOSE_MODE - the wave-36
+    //corpus ask reads "Choose an option for Intrepid Adversary: 1. don't add
+    //any counter ...". State the per-counter partial-pay semantics here too;
+    //detection runs on the clean engine labels (req.optionTexts), and the
+    //note is header-only (options and the staleness key untouched).
+    decision += payRepeatModeNote(req.optionTexts);
     //Thread the source card as the pending source (as ANNOUNCE_X does): the model
     //often echoes "<verb> <source card>" against a bare option ("Tap Temple
     //Garden" vs "tap"), and INDEX-WINS treats a source-naming echo as a
@@ -9117,6 +9150,35 @@ static string mutateHostAsk(const string& effectName, int placement)
     return q.str();
 }
 
+//W37 #2: the waiting-for-answer element for a triggered/activated damage
+//target ask is a WRAPPER, not the AADamager itself - the inline
+//"damage:N target(...)" script builds a TargetAbility (NestedAbility) holding
+//the damager, and may/multi shells nest further. Walk the nesting; a
+//MultiAbility with two damage riders is ambiguous and yields nothing (a wrong
+//number would be worse than none). Depth-capped against cyclic clones.
+static AADamager * unwrapDamagerAbility(MTGAbility * a, int depth)
+{
+    if (!a || depth > 5)
+        return NULL;
+    if (AADamager * ad = dynamic_cast<AADamager *>(a))
+        return ad;
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        return unwrapDamagerAbility(na->ability, depth + 1);
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+    {
+        AADamager * found = NULL;
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            if (AADamager * ad = unwrapDamagerAbility(ma->abilities[i], depth + 1))
+            {
+                if (found)
+                    return NULL; //two damage riders: attribution ambiguous
+                found = ad;
+            }
+        return found;
+    }
+    return NULL;
+}
+
 int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCardInstance * chosenCard, bool checkOnly)
 {
     //checkOnly is a castability probe (no clicks, no decision) and
@@ -9199,14 +9261,54 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     //"rand" expressions draw the game RNG - never evaluated (standing rule);
     //0 or negative amounts render nothing (an authoritative 0 is worse than
     //silence - the sorcery-power lesson).
+    //W37 #2 (wave-36 validation: 0 renders corpus-wide - the hook never fired):
+    //the waiting element for a triggered/activated damage ask is the target
+    //WRAPPER (TargetAbility/GenericTargetAbility around the AADamager -
+    //Bowmasters' "damage:1 target(anytarget)" trigger, Foray's granted "Damage
+    //creature"), so the direct dynamic_cast always failed - unwrap the nesting.
+    //And a burn SPELL's target menu arms at CAST time with nothing waiting at
+    //all: derive the amount from the spell's own single damage: rider instead.
     int dmgAmount = 0;
     bool dmgDeathtouch = false;
     {
-        AADamager * ad = dynamic_cast<AADamager *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+        AADamager * ad = unwrapDamagerAbility(
+            dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer()), 0);
         if (ad && ad->d.find("rand") == string::npos)
         {
             dmgAmount = ad->getDamage();
             dmgDeathtouch = ad->source && ad->source->has(Constants::DEATHTOUCH);
+        }
+        else if (!ad && tc->source
+                 && (tc->source->hasType(Subtypes::TYPE_INSTANT)
+                     || tc->source->hasType(Subtypes::TYPE_SORCERY)))
+        {
+            //Spell path, conservatively scoped so the number cannot be
+            //mis-attributed: exactly ONE damage: rider in the spell's script,
+            //and no inline target(...) (an inline rider aims its own chooser,
+            //not this cast-time one - Lightning Bolt's separate target= line is
+            //the covered shape). x is unknown at target time; rand draws the
+            //game RNG - both skipped (render nothing rather than a guess).
+            string mt = toLowerCopy(tc->source->magicText);
+            size_t dp = mt.find("damage:");
+            if (dp != string::npos && mt.find("damage:", dp + 7) == string::npos
+                && mt.find("target(") == string::npos)
+            {
+                size_t start = dp + 7;
+                size_t end = mt.find_first_of(" \t\r\n", start);
+                string expr = mt.substr(start, end == string::npos ? string::npos : end - start);
+                if (!expr.empty() && expr != "x" && expr != "-x"
+                    && expr.find("rand") == string::npos
+                    //the sorcery-power lesson: a non-creature source's own
+                    //power/toughness evaluates to 0 with false authority
+                    && !((expr.find("power") != string::npos
+                          || expr.find("toughness") != string::npos)
+                         && !tc->source->isCreature()))
+                {
+                    WParsedInt val(expr, NULL, tc->source);
+                    dmgAmount = abs(val.getValue());
+                    dmgDeathtouch = tc->source->has(Constants::DEATHTOUCH);
+                }
+            }
         }
     }
     for (;;)
@@ -11265,6 +11367,14 @@ static string describeRevealFilter(const string& effect)
     return out;
 }
 
+//W37 #4: the ONE builder for the per-card eligibility tag, used by BOTH the
+//ELIGIBILITY header's promise and the per-card option lines, so the header
+//can never again instruct a match against a marker that does not render.
+static string revealEligMarker(const string & optOneLabel)
+{
+    return " [eligible for \"" + optOneLabel + "\"]";
+}
+
 //Pure builder for the reveal ask text (no game/observer/endpoint state).
 //revealSource: 0 = top of library (surveil/dig), 1 = the opponent's hand, 2 =
 //the decider's own hand. pickExactlyOne: option one is a fixed <1> chooser.
@@ -11342,11 +11452,18 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
     }
     if (restricted)
     {
+        //W37 #4 (validation-158-36-116 defect 1, 10/10): the header promised a
+        //bare "[eligible]" marker while the per-card tag renders as
+        //[eligible for "<option one>"] - a match instruction against a marker
+        //that does not exist (trust doctrine). Promise the EXACT tag that
+        //renders below (revealEligMarker builds both). Grammar: a/an by vowel.
+        bool vowel = !filterPhrase.empty()
+                     && string("aeiouAEIOU").find(filterPhrase[0]) != string::npos;
         tail << "ELIGIBILITY: only " << (filterPhrase.empty() ? "certain cards"
-                                                              : ("a " + filterPhrase))
+                                                              : ((vowel ? "an " : "a ") + filterPhrase))
              << " may go to \"" << optOneLabel << "\" - the rest do not qualify and go"
                 " to \"" << optTwoLabel << "\" regardless. Pick ONLY from the cards"
-                " marked [eligible] below";
+                " marked" << revealEligMarker(optOneLabel) << " below";
         if (eligCount == 0)
             tail << " (none of these qualify - answer \"PUT: none\")";
         tail << ".\n";
@@ -11376,7 +11493,7 @@ static string buildRevealAskText(const vector<MTGCardInstance*>& revealed,
         //missed (the same "deciding fact rides the option" principle as combat).
         if (restricted)
             tail << (eligibleForOptionOne[j]
-                     ? " [eligible for \"" + optOneLabel + "\"]"
+                     ? revealEligMarker(optOneLabel)
                      : " [does NOT qualify - goes to \"" + optTwoLabel + "\"]");
         tail << "\n";
     }
@@ -15324,29 +15441,50 @@ void AIPlayerGPT::runParseSelfTest()
               "W36-N146q NEGATIVE an empty ability name draws no compound note");
     }
 
-    // ---- N-152h (wave-36): pay-repeat mode menus state partial-pay semantics ----
+    // ---- N-152h (wave-36) + W37 #3: pay-repeat menus state partial-pay semantics ----
     cout << "\n[W36-N152h] the Add-N-counters menu header states per-counter partial pay\n";
     {
+        // W37 #3 (fixture-lies class): the LIVE menu labels are LOWERCASE -
+        // "don't add any counter" / "add 2 counters" (grep-confirmed in the
+        // wave-36 corpus translogs, Intrepid Adversary asks). The old fixture
+        // tested only the capitalized auto-script name() form, so the matcher's
+        // never-fires-live defect passed green. The live casing is primary now.
         vector<string> valor;
-        valor.push_back("Don't add any counter");
-        valor.push_back("Add 1 counter");
-        valor.push_back("Add 2 counters");
-        valor.push_back("Add 10 counters");
+        valor.push_back("don't add any counter");
+        valor.push_back("add 1 counter");
+        valor.push_back("add 2 counters");
+        valor.push_back("add 10 counters");
         string note = payRepeatModeNote(valor);
         CHECK(note.find("ONE AT A TIME") != string::npos
               && note.find("adds exactly that many counters") != string::npos,
-              "W36-N152h the pay-repeat menu draws the per-counter partial-pay note");
+              "W37-3 the LIVE lowercase pay-repeat menu draws the partial-pay note");
         CHECK(note.find("over-ask never fails") != string::npos,
               "W36-N152h the note states an over-ask stops at what the mana covers");
-        // The option matcher: real shapes in, near-misses out.
+        // The option matcher: both casings in, near-misses out.
+        CHECK(isAddNCountersOption("add 1 counter") && isAddNCountersOption("add 20 counters"),
+              "W37-3 the LIVE lowercase 'add N counter(s)' options are recognized");
         CHECK(isAddNCountersOption("Add 1 counter") && isAddNCountersOption("Add 20 counters"),
-              "W36-N152h 'Add N counter(s)' options are recognized");
-        CHECK(!isAddNCountersOption("Add a counter") && !isAddNCountersOption("Don't add any counter"),
+              "W36-N152h the capitalized auto-script form is still recognized");
+        CHECK(!isAddNCountersOption("add a counter") && !isAddNCountersOption("don't add any counter"),
               "W36-N152h NEGATIVE non-numeric and decline options are not counted");
         // A menu with a single Add option (or none) is not the repeat shape.
-        vector<string> one; one.push_back("Add 1 counter"); one.push_back("Draw a card");
+        vector<string> one; one.push_back("add 1 counter"); one.push_back("Draw a card");
         CHECK(payRepeatModeNote(one).empty(),
               "W36-N152h NEGATIVE a lone Add option draws no pay-repeat note");
+    }
+
+    // ---- W37 #4: the reveal ELIGIBILITY header promises the tag that renders ----
+    cout << "\n[W37-4] the eligibility header's promised marker IS the per-card tag\n";
+    {
+        string marker = revealEligMarker("choose card");
+        cout << "     marker: \"" << marker << "\"\n";
+        CHECK(marker == " [eligible for \"choose card\"]",
+              "W37-4 the per-card eligibility tag names option one");
+        // The header and the per-card lines both render through revealEligMarker,
+        // so a bare-"[eligible]" promise (the wave-36 10/10 defect) cannot recur:
+        // the helper's output always carries the option-one label.
+        CHECK(marker.find("[eligible]") == string::npos,
+              "W37-4 NEGATIVE the bare [eligible] marker (which never rendered) is gone");
     }
 
     // ---- W36 lane-B item 1: illegal one-blocker-many-attackers (re-ask trigger) ----
