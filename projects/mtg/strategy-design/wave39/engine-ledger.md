@@ -459,3 +459,67 @@ merged-tree gate on master is the only gate that counts).
 Lanes B, C and D all touch `AIPlayerGPT.cpp` in different regions — that merges fine (proven), but
 apply in the order **B → C → D** and expect `patch -p1 --fuzz=3` on the third. PARSETEST count on
 the merged tree must equal the exact SUM of the lanes' added cases.
+
+## #19 — [MEDIUM-HIGH, TRUST DOCTRINE, added 2026-08-23 post-lane-launch] Zone-change narration masks PUBLIC cards and omits the activating source
+
+- **id**: W39-LIBMASK (owner-spotted in the wave-39 lategame specimen, 146v125 t4).
+- **Symptom**: `- Opponent put a card into their library` — 93 occurrences in the 146v125 game
+  alone. At t4 the "card" was **Elixir of Immortality itself moving from the BATTLEFIELD**
+  (public); later occurrences are **graveyard→library shuffles** (also public). The preceding
+  `Opponent gained 5 life` is the only clue to the cause; the ACTIVATION of Elixir is never
+  narrated.
+- **Three defects**: (a) activated-ability activations don't narrate (effects appear with no
+  cause line); (b) the zone-change narrator masks card identity regardless of ORIGIN zone —
+  masking is correct ONLY for hidden origins (hand→library); battlefield/graveyard origins
+  must name the card; (c) bulk shuffles emit one line per card — a late Elixir shuffle
+  produces dozens of identical anonymous lines; collapse to one line
+  (`Opponent shuffled their graveyard (N cards) into their library with Elixir of Immortality`).
+- **Lane**: narration region (lane C's territory). NOT briefed into the running wave-40 lane C
+  (launched before this was found) — schedule wave-41 step-1 unless lane C's merge window
+  makes it cheap.
+- **Validated next by**: seat 125 (Elixir is its loop). Metric: zero masked lines for
+  public-origin moves; activation lines present; shuffle collapsed with count + source named.
+
+## #20 — [DESIGN, owner-floated 2026-08-23] Batch answer for repeated identical may-prompts in one window
+- **Context**: #12 resolved Oracle-faithful by owner ruling ("may should be rules faithful.
+  7 blockers are quite rare anyways") — Perimeter Captain's auto= now carries `may`, text=
+  keeps "may". Consequence: N blocking defenders = N sequential identical may-prompts.
+- **Owner's tentative ask (his words)**: "maybe some sort of mass accept / deny option?"
+  — when the SAME may-ability from the SAME source class triggers N>1 times in one
+  resolution window with identical effect text, offer a bundled ask: accept all / decline
+  all / decide individually. Fits the campaign's bundle-a-whole-decision-into-one-ask
+  doctrine (blockers/attackers precedent); benefits both the GPT seat (one model call
+  instead of N) and human UX. Generalizes past the Captain (Soul Warden-class storms of
+  identical triggers).
+- **Status**: design item, NOT committed — scope a wave-41 lane: where identical pending
+  may-triggers can be detected (ActionStack / MTGAbility trigger queue), whether
+  "identical" is safely decidable (same ability id + same controller + no per-instance
+  targets), and the contract shape (CHOOSE_MENU with 3 options). Fixture: 3+ defenders
+  block in one combat.
+
+## #21 — [MEDIUM, added post-lane-F 2026-08-23] Remaining alias-hardcode counter cards unreachable as responses
+- Lane F fixed BEB/REB by full script replacement (modal choice + stack target; alias blocks
+  bypassed). STILL BROKEN on the same mechanism: **Hydroblast/Pyroblast** (alias 1191/1312,
+  unchanged), **Spell Blast (1224)**, and **the five Lace cards** — SpellTargetChooser /
+  SpellOrPermanentTargetChooser are invisible to TargetChooser::validTargetsExist()
+  (TargetChooser.cpp:1658 walks zone-gated MTGCardInstance entries only; spells on the stack
+  match neither), so GameObserver::targetListIsSet() refuses the cast and LegalActions drops
+  the offer whenever no matching PERMANENT exists.
+- ⚠ Hydroblast/Pyroblast are NOT a straight BEB port: Oracle is "Counter target spell IF
+  it's red" — targets ANY spell, colour-checked at RESOLUTION; the current colour-restricted
+  chooser over-restricts targeting legality. Needs a conditional resolution, not a colour-
+  restricted target.
+- Two fix shapes for a wave-41 lane: (a) script the remaining cards where the DSL allows
+  (Spell Blast: X-cost counter; Laces: colour-change on stack), (b) or fix
+  validTargetsExist() to see stack spells for spell-choosers (engine, benefits all).
+
+## #22 — [LOW, SUITE HARNESS, added 2026-08-23] Suite driver wedges on a may-menu raised at the blockers step
+- Found while fixturing the Perimeter Captain Oracle-faithful may change (#12): a scoped
+  suite test (attacker declared, Captain blocks, may-prompt raised) hangs the suite driver
+  right after duel entry — no DO step executes; the "yes" keyword and the unanswered-menu
+  default (TestSuiteAI.cpp:313-363) never engage. LIVE games are unaffected: a merged-binary
+  Baka selfplay 126v36 ended naturally turn 19 with the may-Captain in deck.
+- Consequence: the #12 behavior change ships with live-game validation + primitives-load
+  gates but NO suite fixture; seat-126's wave-40 review owes the arrival trace (a rendered
+  may ask for the GPT seat + accepted gains landing). Fix the driver interaction in a
+  wave-41 lane if a combat-step may fixture is wanted durably.
