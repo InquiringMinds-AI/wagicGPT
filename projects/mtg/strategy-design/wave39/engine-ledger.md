@@ -523,3 +523,36 @@ the merged tree must equal the exact SUM of the lanes' added cases.
   gates but NO suite fixture; seat-126's wave-40 review owes the arrival trace (a rendered
   may ask for the GPT seat + accepted gains landing). Fix the driver interaction in a
   wave-41 lane if a combat-step may fixture is wanted durably.
+
+## #23 — [MEDIUM, TRUST/ATTRIBUTION, owner-spotted 2026-08-23 in the wave-40 specimen] Target-pick narration attributes to the EFFECT, not the SOURCE
+- Symptom (wave-40 specimen, 125v126 t48): `You targeted Swamp - "B" with Put in Play`.
+  Owner ruling: "'put in play' is not good. this should be the effect source, not the
+  effect."
+- Mechanism pointer: the emitter (AIPlayerGPT.cpp:2418-2425) renders
+  `You targeted <X> with <src>` / `with <src>'s <ability> ability` — on this path the
+  src slot received the ABILITY's display name ("Put in Play", AllAbilities.cpp:6958/7015,
+  the AAMover/put-in-play effect) instead of the owning card's name. Find which target-pick
+  path passes ability text as src (likely an ability whose source lookup falls back to
+  getMenuText()) and attribute to source->name, with the effect in the ability slot:
+  `You targeted <X> with <Card>'s Put in Play ability`.
+- Sweep the class: audit every caller of the 2418 narration for what they pass as src —
+  any other effect-name-as-source instances die in the same fix. PARSETEST: existing W35
+  cases pin the correct shapes; add a regression for this path.
+- Lane: narration (with #19). Validated by: any seat using put-in-play effects (126 Sorin/
+  tokens? 125?); metric: zero narration lines whose src slot names an effect.
+
+## #19-AMENDED (owner ruling 2026-08-23 + fix-validation F2) — binding fix shape
+- Owner, on `- Opponent put a card into their library`: "this should indicate where from,
+  and also, I believe it's a revealed card(from the graveyard) so it should name the card."
+  BINDING: every zone-change narration names the ORIGIN zone; and when the origin is a
+  PUBLIC zone (battlefield, graveyard, stack, exile — revealed information), the card is
+  NAMED. Masking is legitimate ONLY for hidden origins (hand/library), and even then the
+  origin is stated ("from their hand").
+- Scope per fix-validation F2: the mask is OBSERVER-scoped, not origin-scoped — the acting
+  seat narrates fully, the opposing seat is blind to the whole activated/loyalty channel
+  (`You used:` 165 / `Opponent used:` 0 corpus-wide; 107 Kaya/Lolth effect lines with no
+  cause). The wave-41 lane fixes the CHANNEL: opponent-side activation/loyalty narration
+  (`Opponent used: <ability> with <Card>`), public-origin naming, origin zones, and the
+  bulk-shuffle collapse (one line, count + source). #23 (effect-as-source) rides the same
+  lane. Baselines: 165/0 used-lines; 47 masked library lines; metric = zero cause-less
+  effect lines on the observing seat, zero anonymous public-origin moves.

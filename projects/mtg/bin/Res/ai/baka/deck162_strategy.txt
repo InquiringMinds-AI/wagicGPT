@@ -30,7 +30,11 @@ only while a punisher is on the battlefield to convert those cards into damage.
 Look at YOUR battlefield line and count the names Underworld Dreams, Fate Unraveler and Ob Nixilis.
 - ONE OR MORE of them on your battlefield: cast every draw engine you are offered, every turn, as
   fast as you can - each one multiplies the damage. This is where the deck wins. Stack Mines,
-  Dictates and Puzzle Boxes without limit.
+  Dictates and Puzzle Boxes without limit, with ONE ordering rule that never lapses: if a second
+  punisher (Underworld Dreams, Fate Unraveler, Ob Nixilis) is ALSO in this ask's list, cast the
+  punisher FIRST and the engines with whatever mana is left. Rule 1 outranks this rule at every
+  life total and on every board, whether or not a punisher is already out. A punisher you priced
+  out of your own turn is a punisher that never resolves.
 - ZERO of them on your battlefield: one Howling Mine is enough. With a Howling Mine already on your
   battlefield line, take a wall, a punisher, a Liliana's Caress, or "Cast nothing right now" instead
   of a second draw engine; Master of the Feast, Dictate of Kruphix, Teferi's Puzzle Box and Forced
@@ -71,8 +75,7 @@ never increases the damage you take.
 Run this over the offered block lines, every combat:
 1. A line ending "(you kill it, your blocker lives)" - take that block. Free kill, every time.
 2. A line ending "(neither dies)" - take that block. Your wall survives and the damage is gone.
-   Shield Sphere is tagged "[deals 0 - this block kills nothing, but it STOPS all N damage from
-   reaching you]": that STOPS clause is the whole job, and N is the damage the block erases.
+   The wall line's "STOPS all ..." clause is the whole job - it names the damage the block erases.
    Assign one wall per attacker, biggest attacker first.
 3. A line ending "your blocker dies, attacker lives" - take it only when the header says the attack
    IS lethal, or your life is 8 or less.
@@ -126,10 +129,13 @@ FOG BANK {1}{u} - 0/2 flying defender that prevents all combat damage to and fro
 === ATTACKING ===
 Keep declaring every creature the attacker list offers you - the list has already dropped everything
 that cannot attack. One exception, and it is about ORDER:
-FATE UNRAVELER stays home unless the lethal check below clears. Its damage comes from the opponent's draw step, not from
-combat, and attacking taps it out of blocking on their turn. Send Fate Unraveler ONLY when its power
-plus your other unblocked attackers is at or above the opponent's printed life total - then swing
-with everything and end it. Master of the Feast attacks freely; it is a 5/5 flier and it is your
+FATE UNRAVELER stays home. Before you write "ATTACK:", read the names your attacker list offers:
+if it holds ANY name other than Fate Unraveler, declare those names and LEAVE FATE UNRAVELER OUT.
+Its damage comes from the opponent's draw step, not from combat, and attacking taps it out of
+blocking on their turn. The one time it goes: the printed opponent life is at or below the total
+power of every attacker you are sending including it - then run the lethal check below, swing with
+everything and end it. A list with two names in it is where this rule gets forgotten; it applies
+there most of all. Master of the Feast attacks freely; it is a 5/5 flier and it is your
 clock.
 
 === LETHAL CHECK - RUN IT EVERY TURN ===

@@ -121,16 +121,23 @@ creature, ask what happens on the crack-back with that creature unavailable.
   tapped through that next-turn swing and blocks nothing. "I will draw removal next turn" is not
   a survival plan; the blockers are. At low life, chip damage is worth nothing and a body that
   survives to block is worth the game.
-- ONE BLOCKER STOPS ALL OF A NON-TRAMPLING ATTACKER'S DAMAGE, however big the attacker is. If
-  the attacker's text does not say trample, one blocker in front of it prevents the WHOLE hit: a
-  2/1 Spider blocking a 12/12 saves you all 12. The blockers ask prints your no-block price: the
-  number after "you would be at" is YOUR LIFE AFTER if you block with NOBODY. Blocking CHANGES
-  that number - each non-trampler you block deals you ZERO, so you keep that attacker's full
-  power in life. NEVER write "I take the damage either way": against a non-trampler that is
-  false, and it is the exact reasoning that loses these games. "My blocker dies anyway" is never
-  a reason to take the damage - a 2/1 for 12 life is the best trade this deck is ever offered.
-  When the ask's forecast says "you would be at" 10 or less, block the biggest non-trample
-  attacker with your cheapest creature.
+BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
+this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ 1. "(you kill it, your blocker lives)" - TAKE THAT BLOCK, always, at every life total and every
+    forecast number. It costs you nothing: their creature dies, yours does not, and the damage is
+    gone. No number on this screen can make this block wrong.
+ 2. "(both die)" - TAKE THAT BLOCK unless the attacker it kills is worth less than your blocker.
+    A body for a body is a trade you want, and the damage is gone as well.
+ 3. "(your blocker dies, attacker lives)" - THIS is the chump line, and it is the ONLY line the
+    forecast number decides. Read "you would be at N". Take this block when N is 10 or less,
+    or when the header says the attack IS lethal. When N is above 10, leave that attacker
+    unblocked and keep your creature.
+ONE BLOCKER STOPS ALL OF A NON-TRAMPLING ATTACKER'S DAMAGE, however big the attacker is. Blocking
+CHANGES the forecast number: each non-trampler you block deals you ZERO. "I take the damage either
+way" is FALSE against a non-trampler, and so is "I will preserve this creature for future blocks"
+and "let the attackers through" - a creature you preserved at N of 10 or less is a creature
+you kept for a turn you will not get.
+"BLOCKS: none" is correct only when every offered block is rung 3 above your floor.
 - Triumphant Adventurer is your best defensive body: 1/1 DEATHTOUCH (and first strike on your turn)
   blocks or trades with anything they have. Keep it untapped when you are the one under pressure.
 - THE BOARD RENDER ALREADY DID YOUR COMBAT MATH. A creature is printed with its CURRENT power and
@@ -228,9 +235,11 @@ DECIDING SITUATIONS (recognize -> do):
 - The opponent's creatures' total power is your life total or more (count EVERY creature - the
   tapped ones untap for their turn) -> ATTACK: none (Nadaar may still go - vigilance); every
   other body stays home to block. Their creatures being tapped never makes attacking safe.
-- The forecast's "you would be at" number is 10 or less -> chump-block the biggest non-trample
-  attacker with your cheapest creature; a blocked non-trampler deals you ZERO - you never "take
-  it either way".
+- A block line reads "(you kill it, your blocker lives)" -> take it, whatever the forecast says.
+- A block line reads "(both die)" -> take it unless their creature is worth less than yours.
+- Only "(your blocker dies, attacker lives)" is decided by the forecast: take it at 10 or less,
+  leave it above 10. A blocked non-trampler deals you ZERO - you never "take it either way", and
+  "preserve it for future blocks" is not a reason at 10 or less.
 - The three-dungeon list is offered (first venture OR after completing one) -> answer LOST MINE OF
   PHANDELVER by name, unless you are ahead and racing.
 - A room branch is offered -> read the {room effect} text; take the room that makes a body or

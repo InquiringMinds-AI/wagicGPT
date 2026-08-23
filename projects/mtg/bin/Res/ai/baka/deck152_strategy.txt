@@ -39,9 +39,14 @@ swings: one body, then two, then the whole team. Keep swinging.
         battlefield line). A creature whose line shows +1/+1 counters is GROWING (the Orc army
         class): count it at its power PLUS ONE, because it will be bigger by the time it swings
         back.
-    (2) COUNT THE ATTACKERS THE LIST OFFERS YOU. When (1) armed and the list offers exactly ONE
-        attacker, your answer is "ATTACK: none" - that one creature is your blocker. The thought
-        "it is free damage" is ALWAYS FALSE here: that damage costs you the block.
+    (2) ONLY IF (1) ARMED: count the attackers the list offers you. When (1) armed and the list
+        offers exactly ONE attacker, your answer is "ATTACK: none" - that one creature is your
+        blocker. The thought "it is free damage" is ALWAYS FALSE here: that damage costs you the
+        block.
+        IF (1) DID NOT ARM, this whole check is over and you skip step (2) entirely: attack with
+        every creature the list offers, including a sole attacker, per rule #2 above. A creature
+        that kills its blocker and survives always attacks; holding it back at a healthy life
+        total is a turn of damage thrown away.
   Their creatures being tapped this turn does NOT protect you - they untap and swing back next
   turn, a creature you sent attacking cannot block, and a line reading "[tapped - cannot attack
   or block this turn]" says nothing about next turn. When the check arms and the list offers TWO
@@ -90,12 +95,23 @@ error" is ALWAYS FALSE - it is never an error.
 - TRIUMPHANT ADVENTURER (their white-black 1/1): deathtouch, plus first strike on its own turn -
   ANY blocker you assign dies before it deals a point of damage, exactly as its trade line says.
   Take the 1 damage every time.
-Answer "BLOCKS: none" and take the damage unless a listed block trades up, saves your life this
-combat, or stops poison counters (see the infect line below). THE CHUMP TEST - use the number the
-window already prints for you, "you would be at N": when N is 10 or more, a block whose
-parenthesis reads "(your blocker dies, attacker lives)" is a chump - leave that attacker unblocked
-and keep your creature, however big the attacker is. Take a blocker-dies block only when N is 9 or
-less, when the header says the attack IS lethal, or when the attackers are tagged [infect].
+BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
+this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ 1. "(you kill it, your blocker lives)" - TAKE THAT BLOCK, always, at every life total and every
+    forecast number. It costs you nothing: their creature dies, yours does not, and the damage is
+    gone. No number on this screen can make this block wrong.
+ 2. "(both die)" - TAKE THAT BLOCK unless the attacker it kills is worth less than your blocker.
+    A body for a body is a trade you want, and the damage is gone as well.
+ 3. "(your blocker dies, attacker lives)" - THIS is the chump line, and it is the ONLY line the
+    forecast number decides. Read "you would be at N". Take this block when N is 9 or less,
+    or when the header says the attack IS lethal. When N is above 9, leave that attacker
+    unblocked and keep your creature.
+ONE BLOCKER STOPS ALL OF A NON-TRAMPLING ATTACKER'S DAMAGE, however big the attacker is. Blocking
+CHANGES the forecast number: each non-trampler you block deals you ZERO. "I take the damage either
+way" is FALSE against a non-trampler, and so is "I will preserve this creature for future blocks"
+and "let the attackers through" - a creature you preserved at N of 9 or less is a creature
+you kept for a turn you will not get.
+"BLOCKS: none" is correct only when every offered block is rung 3 above your floor.
 Katilda is a mana source, not a
 trading piece: she blocks to save your life, never to swap with a 1/1 mana creature - and she
 joins INFECT blocks only from "8 of 10" poison upward (see the infect rule for the exact test).
@@ -198,8 +214,10 @@ cards on a keep, bottom the most expensive spell you cannot reach and never bott
 early play.
 
 MATCHUP POSTURE:
-- vs REMOVAL/GRIND: keep deploying anyway - an empty board loses these far more often than
-  walking into removal does. Keep attacking so the clock forces trades.
+- vs REMOVAL/GRIND: keep deploying anyway. Their removal answers one creature at a time and your
+  board is what wins the game; a creature you held in hand blocks nothing and deals nothing. Cast
+  the best creature offered on every one of your main phases, and keep attacking so the clock
+  forces trades.
 - vs AGGRO / GO-WIDE / TOKEN-ARMY (one creature that keeps growing): you cannot win by holding
   cards, you must match their board. Deploy every turn, block early with your bigger bodies,
   spend Fateful Absence or Brutal Cathar on their best attacker, gain life off Intrepid

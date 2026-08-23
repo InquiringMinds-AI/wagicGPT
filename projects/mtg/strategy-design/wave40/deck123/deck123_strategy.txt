@@ -1,0 +1,163 @@
+INTRUDERS OF THRABEN - WBU TOKEN COMBO
+
+You win by putting Intruder Alarm onto the battlefield next to Thraben Doomsayer or Bloodline
+Keeper, then tapping that creature for a token over and over: every token that enters untaps
+all creatures, so the tap ability comes straight back. Your removal buys the turns; the tokens
+end the game. Every turn is the same three actions: play a land, deploy a token-maker or
+Intruder Alarm, then tap every token-maker you own until your board is an army.
+
+=== RULE 1 - WHEN A LINE ENDS IN "[cost: Tap]", TAKE IT ===
+These are the three lines, exactly as you will see them:
+  "Create human with Thraben Doomsayer [cost: Tap]"
+  "Create vampire with Bloodline Keeper [cost: Tap]"
+  "Create vampire with Lord of Lineage [cost: Tap]"
+Take it. Then take it again the next time it appears, and again, until either the line stops
+being offered or your own battlefield line shows 12 or more creatures - then answer 0 (pass).
+"[cost: Tap]" is the WHOLE cost. It needs no mana, no land drop, and no untapped land, and it
+works on the opponent's turn as well as your own.
+The thought "I have 0 mana, so I can't do anything" is ALWAYS FALSE while one of those lines is
+in your list - the printed cost is the only cost there is, and it is not mana.
+The thought "I already tapped it this turn" is ALWAYS FALSE while the line is in your list -
+the game only prints an ability you can use right now. That is Intruder Alarm working: the
+token you just made untapped the maker again. When the line comes back, take it again.
+Take it on the opponent's turn too - a token made there blocks this turn and attacks next turn.
+Each token is a free body. There is no cost to weigh.
+
+=== RULE 2 - MARSH FLATS TAKES A DUAL, NOT A BASIC ===
+When lines beginning "Put in Play with Marsh Flats targeting" appear, answer in this order and
+stop at the first one that is listed:
+  1. "targeting Underground Sea"  - makes {U} and {B}
+  2. "targeting Tundra"           - makes {W} and {U}
+  3. "targeting Scrubland"        - makes {W} and {B}
+  4. any basic
+Underground Sea does everything a Swamp does AND makes blue; Tundra does everything a Plains
+does AND makes blue. Both come in untapped. There is nothing a basic gives you that they do not.
+Why this decides games: Intruder Alarm costs {2}{u} and Vision Skeins costs {1}{u}, and only
+10 of your 24 lands make blue. Fetch a basic and your combo piece sits in your hand for the
+rest of the game.
+
+=== RULE 3 - COUNT BOTH BOARDS BEFORE DAMNATION ===
+Damnation destroys ALL creatures, yours included. Both battlefield lines print a creature count
+right after the words "of which" - read YOUR number and THEIR number, and compare them.
+Cast Damnation when THEIR number is bigger than yours. That is the whole test.
+Equal numbers are not a reason to cast it: keep the Damnation and take another action.
+When YOUR number is the bigger one, spend the window on a creature, a token activation or a
+removal spell instead, and keep the Damnation - your creatures are how you win, and a wipe that
+kills two of yours to kill one of theirs has handed them the game.
+Your number is 0 and theirs is 2 or more: that is the best Damnation there is. Take it.
+
+=== RULE 4 - TRAGIC SLIP KILLS TOUGHNESS 1 ===
+Tragic Slip gives -1/-1. That kills a creature whose battlefield line shows toughness 1 - a
+(2/1), a (1/1), a (0/1). Against anything with toughness 2 or more it shrinks the creature and
+it lives.
+Pick the target with toughness 1. If several are listed, take the one with the biggest power.
+The one upgrade: under the CURRENT turn header in the GAME LOG, a line ending in "died" means
+Tragic Slip gives -13/-13 instead and kills anything on the list -
+then take the target with the biggest printed power on the battlefield line.
+No toughness-1 target on the list and no "died" line under this turn: answer "Cast nothing
+right now" and keep the Slip. It costs {B} and it will kill something on a later turn.
+
+=== RULE 5 - THE TWO EDICTS ARE DIFFERENT CARDS ===
+"Cast Tribute to Hunger {2}{b}" - the opponent sacrifices a creature and YOU gain life equal to
+its toughness. This is the one you want.
+Cast it at the opponent whenever it is listed and their battlefield line shows exactly ONE
+creature. With two or more of their creatures listed, they hand over their worst one and keep the
+good one - take Tragic Slip, Damnation or a token activation instead.
+"Cast Devour Flesh {1}{b}" - the player you name sacrifices a creature AND THAT SAME PLAYER
+gains the life. Naming "The opponent (player, life" gives them the life, so use Devour Flesh
+on the opponent when Tribute to Hunger is not on the list and they have exactly ONE creature -
+then the sacrifice takes their only body and the life they gain is worth it.
+Both cards let the SACRIFICING player pick, so against two or more creatures they hand over
+their worst one and keep the good one. With two or more of their creatures on the board, take
+Tragic Slip, Damnation or a token activation instead.
+"Yourself (player, life" is the right answer only when the creature you give up is a Human
+or Vampire TOKEN you can remake next turn. Your Bloodline Keeper, your Thraben Doomsayer and
+your flying Vampires stay on the battlefield.
+
+=== RULE 6 - EQUIP LIGHTNING GREAVES ONCE PER GREAVES ===
+An equip line for Lightning Greaves costs {0}, so the game re-offers it at every window.
+Take it ONE time per Greaves, on Bloodline Keeper if
+it is on the battlefield, otherwise on Thraben Doomsayer.
+The done-signal is on the battlefield line: a creature reading "{attached: Lightning Greaves
+#1}" already has it, and that Greaves is finished. Count your Greaves: one equip each, no more.
+At every later re-offer, take a "[cost: Tap]" line if one is listed, otherwise
+answer 0 (pass) and let combat happen - your remaining windows belong to tokens and removal.
+Equip again only when the equipped creature has DIED, or a token-maker that has never been
+equipped has just arrived.
+Greaves gives haste, so a token-maker can tap for a token the turn it lands, and shroud, which
+means that creature can no longer be targeted by anything - including your own spells.
+
+=== WHAT TO CAST WHEN SEVERAL THINGS ARE LISTED ===
+Take the highest entry on this list that appears in your casting menu:
+ 1. "Cast Intruder Alarm {2}{u}" - when no Intruder Alarm is on your battlefield.
+ 2. "Cast Bloodline Keeper {2}{b}{b}".
+ 3. "Cast Thraben Doomsayer {1}{w}{w}".
+ 4. "Cast Idyllic Tutor {2}{w}" - when no Intruder Alarm is on your battlefield or in your hand.
+ 5. A removal spell, by Rules 3, 4 and 5.
+ 6. "Cast Vision Skeins {1}{u}".
+
+=== INTRUDER ALARM AND IDYLLIC TUTOR ===
+"Cast Intruder Alarm {2}{u}": it is the engine, and it is entry 1 on the cast list above.
+One copy does the whole job. With an Intruder Alarm already on your battlefield, spend the
+window on a creature or a removal spell instead.
+It is symmetric: no creature untaps in its controller's untap step, theirs or yours, and ANY
+creature entering - theirs or yours - untaps everything. With a token-maker in play that is
+pure profit. With no token-maker in play, a creature of yours that attacks stays tapped, so get
+Thraben Doomsayer or Bloodline Keeper down before you rely on attacking.
+"Cast Idyllic Tutor {2}{w}" searches for an enchantment. The answer on the reveal list is
+Intruder Alarm, every time. Cast the Alarm the next window it appears in your list.
+
+=== KEY CARDS ===
+Thraben Doomsayer {1}{w}{w} (2/2) - "{T}: Put a 1/1 white Human creature token onto the
+  battlefield". Cast it by the cast list above. Fateful hour: while YOUR life is 5 or less,
+  every OTHER creature you control gets +2/+2, so your 1/1 Humans arrive as 3/3s and your
+  battlefield line shows "(3/3) (printed 1/1)". Low life makes your tokens bigger, not smaller.
+Bloodline Keeper {2}{b}{b} (3/3) flying - "{T}: Put a 2/2 black Vampire creature token with
+  flying". Your best creature. Cast it by the cast list above.
+  When "Transform:backside with Bloodline Keeper [cost: {b}]" appears in your list, take it:
+  it becomes Lord of Lineage, a 5/5 that gives every other Vampire +2/+2 - your 2/2 tokens
+  become 4/4s - and it still makes a token every turn with the same tap. If that line is not
+  listed, nothing changes; keep tapping the Keeper.
+Vision Skeins {1}{u} - EACH player draws two cards, you and them. Cast it when you want cards.
+  When the opponent's battlefield holds a permanent that damages or drains a player for drawing
+  cards, take a different action - that permanent turns your own draw spell against you.
+Lightning Greaves {2} - see Rule 6.
+
+=== COMBAT ===
+"Your creatures that can attack:" already excludes every creature that cannot attack. Send all
+of them.
+One exception, read off THEIR battlefield: if a permanent there damages each attacker by the
+number of attackers - Lightmine Field on deck125's board says so in its text - then attacking
+with N creatures deals N damage to each of your attackers before any combat damage happens.
+Count it off the battlefield line: find the SMALLEST toughness among the creatures you would send,
+and send that many minus one, biggest power first. Leave the rest home.
+With no such permanent on their board, send everything.
+Blocking: block with your Human and Vampire TOKENS first - they are free and you make more every
+turn.
+
+=== MULLIGAN ===
+KEEP any 7-card hand with two or more lands. The prompt counts them for you on the line that
+begins "Your hand (7 cards), counted by the engine:". Read that land number, do not recount.
+Never keep fewer than 5 cards.
+Your cheapest card costs ONE mana, so "no early play" is never a reason to ship a two-land hand.
+
+=== DECIDING SITUATIONS ===
+- A line ending in "[cost: Tap]" is in your list: take it, this window, whatever your mana
+  says, on either player's turn.
+- You just took that line and it appears again: take it again. Keep going until it stops being
+  offered or your battlefield line shows 12 or more creatures.
+- "Put in Play with Marsh Flats targeting Underground Sea" is listed: take it. Otherwise
+  "targeting Tundra". Otherwise "targeting Scrubland".
+- Several casts are listed at once: answer with the highest entry on the cast list above that
+  appears in your menu.
+- "Cast Idyllic Tutor {2}{w}" is taken: choose Intruder Alarm on the reveal list.
+- "Transform:backside with Bloodline Keeper [cost: {b}]" is listed: take it.
+- "Cast Damnation {2}{b}{b}" is listed: compare the two creature counts printed after "of which".
+  Theirs bigger - cast it. Yours bigger - take another action and keep it.
+- "Cast Tragic Slip {b}" is listed: take a target whose line shows toughness 1, or any target if
+  a "died" line sits under this turn's header. Otherwise "Cast nothing right now".
+- An edict is listed and they have exactly one creature: Tribute to Hunger at the opponent
+  first, Devour Flesh at "The opponent" only if Tribute is not listed. Naming "Yourself" is for
+  giving up a token, nothing else.
+- "Equip with Lightning Greaves targeting" is listed and no creature reads "{attached: Lightning
+  Greaves}": equip your best token-maker. Every re-offer after that: 0 (pass).

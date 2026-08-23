@@ -305,7 +305,7 @@ Peer into the Abyss; any sentence hedging against a render.
 
 | guide line | defect it patches | removal condition |
 |---|---|---|
-| "A block by Shield Sphere or Fog Bank STOPS that attacker's damage completely..." | E-162c, the wall-block annotation buries its load-bearing clause (146v162 s7, s10) | Delete when `/usr/bin/grep -c 'STOPS all' <corpus>/*.jsonl` is non-empty, i.e. when the render states the stopped damage itself. |
+| "A block by Shield Sphere or Fog Bank STOPS that attacker's damage completely..." | E-162c, the wall-block annotation buries its load-bearing clause (146v162 s7, s10) | **AMENDED at wave-40 synthesis (162-R1) — the original condition FIRED and executing it would have been wrong: this is a BELIEF-CORRECTING crutch, not an information-supplying one.** Delete only when BOTH hold: (a) `/usr/bin/grep -c 'STOPS all' <corpus>/*.jsonl` is non-empty, and (b) `no blockers` chosen with a `(neither dies)` line offered under a NOT-lethal header stays at 0 across TWO corpora that both contain a wall-block window (2-corpora bar; corpus 1 = matchups-20260823-110407, PASSED 0/5 windows). The information-supplying half (deck162_strategy.txt L74-75) is DEMOTED at wave 40; the falsity fact at L81-82 stays until the bar is met. |
 | (none written for E-162a) | Per doctrine a guide never teaches doubt about a render. No line is written about countered spells; the fix is engine-lane only. | n/a |
 
 ## 11. FALSIFIABLE PREDICTIONS for the next corpus (the real gate on this guide)

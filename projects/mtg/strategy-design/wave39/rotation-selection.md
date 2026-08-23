@@ -53,3 +53,15 @@ pending), 36 (crash-fix live validation pending). ENTER (Step 0, FIRST PASS GUID
 - deck126 construction: owner ordered the Forest*16 -> *1 fix (75/39 -> 60/24) 2026-08-23;
   committed with this wave. Seat-126 wave-40 deltas must be attributed across BOTH the new
   guide and the construction change (wave-35 attribute-deltas-correctly rule).
+
+## Wave-40 adjudication (synthesis, 2026-08-23)
+
+- EXIT -> canary: deck139 (crash + rerun discharged, host-carry closed W39; #7 mutate
+  render re-keyed to a probe deck, not a held seat). Guide stays deployed as canary.
+- HOLD: 152 (edits un-adjudicated - probe-deck discharge runs IN wave-41 alongside the
+  corpus), 146 (gate kept, chump-anchor regression -> guide mods), 125/126/162 (Step-0
+  validation done, guide mods shipped this wave; 162 at corpus 1 of the 2-corpus crutch
+  bar), 123 (Step-0, owes validation corpus).
+- ENTER: deck130 "Budde's Ponza" (guideless first pass). 121 = wave-42 front-runner;
+  56 deferred while 162 holds the engine-management lane.
+- Wave-41 pool: 146, 152, 125, 126, 162, 123, 130.

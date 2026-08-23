@@ -16,6 +16,10 @@ before your main phase ever starts, and a tapped Battlement is a 0/4 wall that c
 opponent's next turn - a wall you needed.
 The thought "I should ramp first so I can afford Sanguine Bond" is ALWAYS FALSE in the upkeep
 window: mana made there does not survive to the main phase where the enchantment is cast.
+The same is true in EVERY window, your main phase included: tapping the Battlement by hand is
+right only when the very next thing you do in that same decision is cast a spell with that mana.
+If your answer to the following ask would be "Cast nothing right now", the tap was wasted and the
+wall is now a 0/4 that cannot block on their turn.
 The ONE time you take it: you are casting Tribute to Hunger in that same window and need the mana
 to pay for it right now.
 
@@ -74,8 +78,10 @@ Assign EVERY blocker the list offers you, in every combat:
  - The life arrives when blockers are DECLARED, before damage. A wall that dies in combat has
    already gained you the life.
 The one blocker you leave out: neither enchantment is on your battlefield AND that blocker's line
-reads "your blocker dies, attacker lives". Every other line - "neither dies", or any line at all
-once an enchantment is down - blocks.
+reads "your blocker dies, attacker lives" on EVERY attacker it is offered. A line reading "both
+die" is not that line - take it; a body of theirs for a body of yours is a trade you want, and a
+lifelink blocker gains you life on the way. Once either enchantment is on your battlefield, every
+blocker blocks, on any line at all.
 "BLOCKS: none" is right only when every blocker the list offers you falls under the line above.
 
 === RULE #6 - ATTACKING ===
@@ -93,9 +99,11 @@ Take the highest entry on this list that appears in your casting menu:
  4. Any other wall: Wall of Omens (it replaces itself), Overgrown Battlement, Pride Guardian.
  5. Staff of Nin.
  6. Sorin, Lord of Innistrad.
- 7. Chromatic Lantern - only when the "colours you can make:" line does NOT include {b}. Your
-    Bayous, Scrublands, Savannahs and Urborg already make black; when {b} is on that line the
-    Lantern does nothing for 3 mana, so take a wall or a combo piece instead.
+ 7. Chromatic Lantern - only when BOTH are true: the "colours you can make:" line does NOT include
+    {b}, AND no Chromatic Lantern is already on your battlefield line. Your Bayous, Scrublands,
+    Savannahs and Urborg already make black; when {b} is on that line the Lantern does nothing for
+    3 mana. A SECOND Lantern does nothing at any time - once one is on your battlefield this entry
+    is finished for the rest of the game, so take a wall or a combo piece instead.
 Keep casting while the list keeps offering. "Cast nothing right now" is correct only when it is the
 ONLY option left.
 

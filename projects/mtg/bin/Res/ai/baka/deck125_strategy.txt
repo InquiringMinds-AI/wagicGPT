@@ -19,13 +19,20 @@ were given, replace the plan with the line above.
 If "Cast Emrakul, the Aeons Torn" is ever actually printed in your numbered list, take it - the game
 only prints a cast you can already pay for. Until that line appears, Emrakul is a blank card and
 changes nothing you do this turn.
+Once an Emrakul of yours IS on the battlefield, the two sentences above about having no creature
+stop applying to it: declare it as an attacker in every attackers window that offers it, and
+assign it as a blocker whenever the block line does not read "your blocker dies". Nothing else in
+this guide changes.
 
 === STAFF OF NIN - THE CLOCK ===
 Staff of Nin {6} artifact, two copies. Its line reads: "At the beginning of your upkeep, draw a card.
 -- {T}: Staff of Nin deals 1 damage to any target." It is the only damage and the only extra card
 this deck has.
-- Cast it the first turn "Cast Staff of Nin" appears in your list, ahead of anything except an answer
-  you need this same turn.
+- Cast it the first turn "Cast Staff of Nin" appears in your list - but only when doing so leaves
+  {1}{U} still untapped. If casting the Staff would take your "Mana available:" line below {1}{U},
+  pass this turn and cast it next turn with a land to spare: a Staff you cast one turn later still
+  wins, and a turn spent tapped out is the turn their engine lands uncountered. This rule outranks
+  "cast it the first turn it appears"; nothing else does.
 - Keep taking the "Deal 1 Damage with Staff of Nin ... targeting a player" option in every window it
   is offered, including upkeep, and with EVERY Staff you control. That damage is how the game ends.
 - Point it at a creature or a planeswalker only when 1 damage finishes it: printed toughness 1, or a
@@ -36,34 +43,34 @@ You hold 13 counterspells - 4 Essence Scatter {1}{U} (creature spells only), 3 D
 {1}{U}{U} (counters anything, you both draw), 3 Cancel {1}{U}{U}, 3 Fall of the Gavel {3}{W}{U}
 (counters anything and gains you 5 life). You can afford to spend them freely; each one is still only
 worth whatever it stopped.
-COUNTER ON SIGHT, whatever else is going on:
-  - the big creatures in this pool: Master of Etherium, Illuna Apex of Wishes, Everquill Phoenix,
-    Tovolar's Huntmaster, Brutal Cathar, Augur of Autumn, Acererak the Archlich, Nadaar Selfless
-    Paladin, Beanstalk Giant;
-  - every planeswalker: Kaya the Inexorable, Lolth Spider Queen, Ob Nixilis the Hate-Twisted;
+The stack line and the counter option both print the target's TYPE, MANA COST and (P/T):
+"1 (top): opponent's Overgrown Battlement {1}{g} (creature 0/4) [spell]". Read them and decide
+from the numbers, not from the name:
+  - (creature P/T) with printed POWER 2 or more: COUNTER IT.
+  - (creature P/T) with printed power 0 or 1: LET IT RESOLVE. It cannot kill you, and Path to
+    Exile or a sweeper answers it later for less mana. This holds however expensive it was and
+    however much the reasoning wants the counter spent.
+  - anything printed (land), (artifact) with no P/T, or (instant)/(sorcery) that only draws or
+    searches: LET IT RESOLVE.
+COUNTER ON SIGHT regardless of the numbers - these are the names whose danger is not visible in a
+P/T, and this list is short on purpose:
+  - every planeswalker;
   - every permanent that hits you or grows them EVERY turn: Underworld Dreams, Fate Unraveler,
     Sanguine Bond, Exquisite Blood, Howling Mine, Staff of Nin, Nuisance Engine;
-  - and Idyllic Tutor: it is not a permanent, but it fetches the enchantment half of their combo.
-LET IT RESOLVE and keep the counter for the list above:
-  - mana makers: Silver Myr, Chromatic Lantern, Mox Sapphire, Mox Jet, Arboreal Grazer, Overgrown
-    Battlement, Dryad of the Ilysian Grove;
-  - walls and 0-power bodies: Steel Wall, Shield Sphere, Pride Guardian, Perimeter Captain, Fog Bank,
-    Ornithopter, Glaze Fiend.
-  None of these can kill you, and Path to Exile or a sweeper answers them later for less mana.
-A name you do not recognise: counter it when their battlefield line already shows a creature, or when
-your life is 12 or less; otherwise, let it resolve and answer the permanent afterwards.
-The stack prints only a name - "1 (top): opponent's Silver Myr [spell]". The card's rules text is in
-the OPPONENT DECK list at the top of this prompt; that is where you read what it does.
+  - Idyllic Tutor: it is not a permanent, but it fetches the enchantment half of their combo.
 
 === PATH TO EXILE - YOUR ONLY ANSWER TO A CREATURE THAT ALREADY LANDED ===
 Path to Exile {W} instant, four copies: "Exile target creature." These are the ONLY cards in your
 deck that remove one creature that is already on the battlefield. Essence Scatter and every other
 counter you own can only stop a spell on the stack; once a creature has resolved they do nothing to
 it.
-So: cast Path to Exile at the creature with the HIGHEST printed power on their battlefield line. When
-every target it offers you is tagged [defender] or has printed power 1 or 0, answer "Cast nothing
-right now" and keep the Path for the real threat - unless your life is 12 or less, and then exile the
-biggest creature they have right now.
+The "legal targets right now:" clause on the Path option gives you NAMES ONLY. Before you answer,
+find each of those names on the opponent battlefield line and read its (P/T) and its tags there.
+Then: cast Path to Exile at the creature with the HIGHEST printed power. If EVERY name on that
+clause reads printed power 0 or 1 on the battlefield line, or is tagged [defender], answer "Cast
+nothing right now" and keep the Path - at any life total above 12, whatever else is on the board
+and however many turns you have been holding it. A 0/4 wall is never a Path target.
+Your life is 12 or less: that floor is off - exile the biggest creature they have right now.
 Path lets its controller fetch a basic land. That cost is the point of the card; always pay it.
 
 === SWEEPERS - THE HEADER COUNTS THE CREATURES FOR YOU ===
@@ -73,7 +80,13 @@ creatures)". Read that number and act on it:
 - 2 or more creatures: cast Supreme Verdict {1}{W}{W}{U} - its own line says "can't be countered", and
   it means it, so it resolves through their counterspells. With six mana, Final Judgment {4}{W}{W}
   EXILES instead of destroying; use Final Judgment against anything that returns from a graveyard.
-- exactly 1 creature: Path to Exile it and keep the sweeper.
+- exactly 1 creature, and Path to Exile is in your list: take the Path and keep the sweeper. A
+  {W} instant is the right price for one creature; a sweeper is not.
+- exactly 1 creature, and Path to Exile is NOT in your list: cast the sweeper when that creature's
+  printed power is 4 or more, otherwise answer "Cast nothing right now" and keep it.
+- 3 or more creatures, and Lightmine Field is in your list: cast Lightmine Field. At 0, 1 or 2
+  creatures on that header it kills nothing at any size, so keep it and spend the mana on a Path
+  or a sweeper instead.
 - 0 creatures: answer "Cast nothing right now" and keep the sweeper. A wipe with nothing to kill is a
   card you have thrown away.
 
@@ -83,13 +96,19 @@ Sphinx's Revelation {X}{W}{U}{U} instant: "You gain X life and draw X cards." X 
 Cast Sphinx's Revelation when your "Mana available:" line reads SIX or more - that is X = 3 or better.
 Below six, answer "Cast nothing right now" and hold it; it is an instant and it will still be there
 next turn with one more land behind it.
+BEFORE you take Sphinx's Revelation, or any other optional draw, read the line "Your library: N
+cards". If N is 5 or less, answer "Cast nothing right now" and keep the card: drawing your last
+card loses the game outright, and Sphinx's Revelation draws X on top of your normal draw step.
+At N of 6 or more, cast it as above and pick the largest X the menu offers, EXCEPT that you never
+announce an X larger than N minus 2.
+Once the opponent's printed life is 10 or less and you control a Staff of Nin, stop drawing
+entirely: the Staff clock finishes the game on its own and every extra card is a turn of library
+you are spending for nothing.
 Cast it at whatever size the game allows, whatever that number says, when your hand holds no counter
 and no Path to Exile - then you need the cards more than you need the size.
 When the X menu appears, pick the line showing the LARGEST X. The sentence above the menu names the
 largest X you can afford, and every value listed is affordable. Reply with the OPTION number, not the
 X value - the line you pick must literally read "X = " followed by the biggest number in the menu.
-If you choose Sphinx's Revelation and your very next prompt still shows Sphinx's Revelation in your
-hand with your mana unspent, cast something else this turn and take it again next turn.
 
 === ELIXIR OF IMMORTALITY - THE RECYCLER ===
 Elixir of Immortality {1} artifact, two copies: "{2},{T}: You gain 5 life. Shuffle Elixir of
@@ -103,8 +122,7 @@ whatever mana is left after the spell you wanted this turn, or at any point your
 Lightmine Field {2}{W}{W}: "Whenever one or more creatures attack, Lightmine Field deals damage to
 each of those creatures equal to the number of attacking creatures." Three attackers take 3 each and
 die; ONE attacker takes 1 damage, which kills nothing however large it is.
-Cast Lightmine Field when the opponent battlefield header counts 3 or more creatures. Against one or
-two big creatures, spend that mana on Path to Exile or a sweeper instead.
+Its gate is the same header count you already read for your sweepers - see that list.
 
 === YOUR MANA AND YOUR WINDOWS ===
 You get a window on the opponent's turn only when they cast a spell, and the prompt shows it to you
@@ -138,10 +156,10 @@ When a keep makes you bottom cards, bottom Emrakul first, then your lands beyond
 - "Deal 1 Damage with Staff of Nin ... targeting a player" is in your list: take it, every window,
   with every Staff.
 - "Cast Staff of Nin" is in your list and no answer is needed this turn: take it.
-- Their spell on the stack is a mana maker, a wall or a 0-power body: let it resolve and keep the
-  counter.
-- Their spell on the stack is a planeswalker, a big creature, or a permanent that hits you every
-  turn: counter it now.
+- Their spell on the stack prints (creature P/T) with printed power 0 or 1, or prints no P/T at
+  all: let it resolve and keep the counter.
+- Their spell on the stack prints (creature P/T) with printed power 2 or more, or is a
+  planeswalker, or is one of the named permanents above: counter it now.
 - The header says 2 or more creatures: cast Supreme Verdict, or Final Judgment against anything that
   comes back from a graveyard.
 - The header says exactly 1 creature: Path to Exile it and keep the sweeper.
