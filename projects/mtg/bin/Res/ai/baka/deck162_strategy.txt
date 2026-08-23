@@ -71,8 +71,9 @@ never increases the damage you take.
 Run this over the offered block lines, every combat:
 1. A line ending "(you kill it, your blocker lives)" - take that block. Free kill, every time.
 2. A line ending "(neither dies)" - take that block. Your wall survives and the damage is gone.
-   Shield Sphere is tagged "[deals 0 - this block kills nothing, it only absorbs damage]": absorbing
-   is the whole job. Assign one wall per attacker, biggest attacker first.
+   Shield Sphere is tagged "[deals 0 - this block kills nothing, but it STOPS all N damage from
+   reaching you]": that STOPS clause is the whole job, and N is the damage the block erases.
+   Assign one wall per attacker, biggest attacker first.
 3. A line ending "your blocker dies, attacker lives" - take it only when the header says the attack
    IS lethal, or your life is 8 or less.
 "BLOCKS: none" is correct only when every wall you control is already assigned or the only offered

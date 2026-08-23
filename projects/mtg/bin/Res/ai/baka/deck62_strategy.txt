@@ -93,7 +93,7 @@ SURVIVING AGGRO AND FLIERS WHILE THE ENGINE SETS UP:
 - Protect the engine on DEFENSE too. The block prompt tells you the total incoming damage and
   whether it is lethal. If it says NOT lethal and you are ahead or comfortable, TAKE the damage -
   do NOT chump-block with Argothian Enchantress or an un-pumped Birds (your 0/1 engine/dorks) just
-  to absorb a few points. The prompt marks them "deals 0 - only absorbs damage": a 0/1 that keeps
+  to absorb a few points. The prompt marks them "deals 0 - this block kills nothing": a 0/1 that keeps
   drawing you cards is worth far more than soaking 1-2 life you can afford. Chump the engine ONLY to
   stop ACTUAL lethal.
 - This "do not chump" caution is ONLY about your 0/1 Argothian/Birds. Blocking with a REAL creature
