@@ -48,6 +48,12 @@ public:
     vector<MTGCardInstance*>parentCards;
     vector<MTGCardInstance*>childrenCards;
     vector<MTGAbility *>cardsAbilities;
+    //cardsAbilities is an index, not an owner.  Always go through these:
+    //registerAbility records the back-link the ability needs to remove itself
+    //when it dies, and unregister/clear tear that link down again.
+    void registerAbility(MTGAbility * a);
+    void unregisterAbility(MTGAbility * a);
+    void clearAbilityRegistry();
 
     int setAttacker(int value);
     int setDefenser(MTGCardInstance * c);

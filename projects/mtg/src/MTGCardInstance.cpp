@@ -234,8 +234,42 @@ void MTGCardInstance::copy(MTGCardInstance * card, bool nolegend)
     getObserver()->receiveEvent(e);
 }
 
+void MTGCardInstance::registerAbility(MTGAbility * a)
+{
+    if (!a)
+        return;
+    //one ability, one index slot: re-registering elsewhere must not leave the
+    //previous card holding a pointer only the new card can clean up
+    if (a->mRegistryCard && a->mRegistryCard != this)
+        a->mRegistryCard->unregisterAbility(a);
+    cardsAbilities.push_back(a);
+    a->mRegistryCard = this;
+}
+
+void MTGCardInstance::unregisterAbility(MTGAbility * a)
+{
+    if (!a)
+        return;
+    for (size_t i = cardsAbilities.size(); i > 0; i--)
+        if (cardsAbilities[i - 1] == a)
+            cardsAbilities.erase(cardsAbilities.begin() + (i - 1));
+    if (a->mRegistryCard == this)
+        a->mRegistryCard = NULL;
+}
+
+void MTGCardInstance::clearAbilityRegistry()
+{
+    for (size_t i = 0; i < cardsAbilities.size(); i++)
+        if (cardsAbilities[i] && cardsAbilities[i]->mRegistryCard == this)
+            cardsAbilities[i]->mRegistryCard = NULL;
+    cardsAbilities.clear();
+}
+
 MTGCardInstance::~MTGCardInstance()
 {
+    //drop the back-links before the vector dies, or an ability outliving this
+    //card would later try to erase itself from freed storage
+    clearAbilityRegistry();
     SAFE_DELETE(counters);
     if (previous != NULL)
     {
@@ -388,7 +422,7 @@ void MTGCardInstance::initMTGCI()
     exileEffects = false;
     commandZoneEffects = false;
     currentZone = NULL;
-    cardsAbilities = vector<MTGAbility *>();
+    clearAbilityRegistry(); //drop any back-links before the index is reset
     //cardsAbilitiesFilter = vector<MTGAbility *>();
     data = this; //an MTGCardInstance point to itself for data, allows to update it without killing the underlying database item
 

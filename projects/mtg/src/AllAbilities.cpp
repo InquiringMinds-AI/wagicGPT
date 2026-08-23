@@ -2727,13 +2727,16 @@ int AACopier::resolve()
         {
             source->GrantedAndAbility = andAbility;
             AbilityFactory af(game);
-            for(unsigned int i = 0;i < source->cardsAbilities.size();i++)
+            //snapshot: removeObserver can free the ability, and ~MTGAbility
+            //now erases its own slot from this very vector
+            vector<MTGAbility *> registered = source->cardsAbilities;
+            source->clearAbilityRegistry();
+            for(unsigned int i = 0;i < registered.size();i++)
             {
-                MTGAbility * a = dynamic_cast<MTGAbility *>(source->cardsAbilities[i]);
+                MTGAbility * a = dynamic_cast<MTGAbility *>(registered[i]);
 
                 if(a) game->removeObserver(a);
             }
-            source->cardsAbilities.clear();
             source->magicText = _target->magicText;
 
             af.getAbilities(&currentAbilities, NULL, source);
@@ -2755,7 +2758,7 @@ int AACopier::resolve()
                         MayAbility * dontAdd = dynamic_cast<MayAbility*>(a);
                         if(!dontAdd)
                         {
-                            source->cardsAbilities.push_back(a);
+                            source->registerAbility(a);
                         }
                     }
                 }
@@ -3905,12 +3908,8 @@ int AASetColorChosen::resolve()
             MayAbility * dontAdd = dynamic_cast<MayAbility*>(abilityAltered);
             if (!dontAdd)
             {
-                _target->cardsAbilities.push_back(abilityAltered);
-                for(unsigned int j = 0;j < _target->cardsAbilities.size();++j)
-                {
-                    if(_target->cardsAbilities[j] == this)
-                        _target->cardsAbilities.erase(_target->cardsAbilities.begin() + j);
-                }
+                _target->registerAbility(abilityAltered);
+                _target->unregisterAbility(this);
             }
             abilityAltered->addToGame();
         }
@@ -3961,12 +3960,8 @@ int AASetTypeChosen::resolve()
             MayAbility * dontAdd = dynamic_cast<MayAbility*>(abilityAltered);
             if (!dontAdd)
             {
-                _target->cardsAbilities.push_back(abilityAltered);
-                for(unsigned int j = 0;j < _target->cardsAbilities.size();++j)
-                {
-                    if(_target->cardsAbilities[j] == this)
-                        _target->cardsAbilities.erase(_target->cardsAbilities.begin() + j);
-                }
+                _target->registerAbility(abilityAltered);
+                _target->unregisterAbility(this);
             }
 
             abilityAltered->addToGame();
@@ -4019,12 +4014,8 @@ int AASetNameChosen::resolve()
             MayAbility * dontAdd = dynamic_cast<MayAbility*>(abilityAltered);
             if (!dontAdd)
             {
-                _target->cardsAbilities.push_back(abilityAltered);
-                for(unsigned int j = 0;j < _target->cardsAbilities.size();++j)
-                {
-                    if(_target->cardsAbilities[j] == this)
-                        _target->cardsAbilities.erase(_target->cardsAbilities.begin() + j);
-                }
+                _target->registerAbility(abilityAltered);
+                _target->unregisterAbility(this);
             }
 
             abilityAltered->addToGame();
@@ -5333,7 +5324,7 @@ int AAMorph::resolve()
                     MayAbility * dontAdd = dynamic_cast<MayAbility*>(a);
                     if(!dontAdd)
                     {
-                        _target->cardsAbilities.push_back(a);
+                        _target->registerAbility(a);
                     }
                 }
             }
@@ -5682,13 +5673,15 @@ int AAFlip::resolve()
                 }
             }
             //
-            for(unsigned int i = 0;i < _target->cardsAbilities.size();i++)
+            //snapshot: see the matching comment in AACopier::resolve
+            vector<MTGAbility *> registered = _target->cardsAbilities;
+            _target->clearAbilityRegistry();
+            for(unsigned int i = 0;i < registered.size();i++)
             {
-                MTGAbility * a = dynamic_cast<MTGAbility *>(_target->cardsAbilities[i]);
+                MTGAbility * a = dynamic_cast<MTGAbility *>(registered[i]);
 
                 if(a) game->removeObserver(a);
             }
-            _target->cardsAbilities.clear();
             _target->magicText = myFlip->magicText;
             af.getAbilities(&currentAbilities, NULL, _target);
             for (size_t i = 0; i < currentAbilities.size(); ++i)
@@ -5715,7 +5708,7 @@ int AAFlip::resolve()
                         MayAbility * dontAdd = dynamic_cast<MayAbility*>(a);
                         if(!dontAdd){
                             a->addToGame();
-                            _target->cardsAbilities.push_back(a);
+                            _target->registerAbility(a);
                         } else if(!backfromcopy) // Fix to avoid triggering of may abilities when flip is used to return from a copy (e.g. Mirror of the Forebears).
                             a->addToGame();
                     }
