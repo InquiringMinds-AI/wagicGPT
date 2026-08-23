@@ -542,67 +542,82 @@ static bool riderHasLegalTarget(MTGCardInstance * card, const string& spec)
     return found;
 }
 
-string dynamicMagnitudes(MTGCardInstance * card)
+//N-162b (wave-39 ledger #10): a magnitude that lives inside an "@each <phase>"
+//trigger fires on a FUTURE step, so "right now" is false for it - and the
+//trigger HEADER itself carries the phase word, which the "draw:" key matches
+//("@each my draw:" -> expr "draw:1" -> WParsedInt 0). Dictate of Kruphix
+//rendered "{right now: draws 0}" and Teferi's Puzzle Box "{right now: draws 0,
+//draws 0}" on two cards whose whole function is drawing. Both halves are the
+//same scope error, so one guard closes them: find the '@' that opens the
+//ability containing this match (magicText is the auto= lines joined by '\n',
+//so an ability cannot span a newline) and skip the match when that trigger is
+//an "@each" recurrence. ON-RESOLUTION triggers are untouched - "@movedTo(this|
+//mybattlefield):lifeleech:..." (Gray Merchant's "drains N") fires when the
+//spell resolves, which IS now. Suppressing beats naming a branch here: the
+//payload of a recurring draw is a count evaluated at that future step
+//("draw:countedamount"), unknowable at cast time, and a wrong magnitude is
+//strictly worse than an absent one (the card's own text= snippet, rendered on
+//the same option line, states the recurrence in full).
+//Pure over the lowercased script text, so PARSETEST can prove both halves.
+static bool insideRecurringTrigger(const string& lowText, size_t pos)
 {
-    //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
-    //loyalty ability plus the emblem/transforms payload in one string, so this
-    //card-level scan cannot attribute a magnitude to the specific loyalty (or
-    //cast) option being offered - it grabbed Lolth's -8 emblem expression
-    //(damage:8minusoplifelostminusend) and stamped "{right now: damage 8}"
-    //(later "damage 4") onto her CAST and her +0/-3 loyalty options, none of
-    //which deal that damage. A walker's loyalty effects are plain-numeric
-    //loyalty costs already visible in the {card text} snippet, so an unscopable
-    //number this pass evaluates from a NON-offered sub-ability is worse than
-    //none (same spirit as skipping "rand"). Skip walkers.
-    if (card && card->hasType(Subtypes::TYPE_PLANESWALKER))
+    size_t lineStart = lowText.rfind('\n', pos);
+    lineStart = (lineStart == string::npos) ? 0 : lineStart + 1;
+    size_t at = lowText.rfind('@', pos);
+    if (at == string::npos || at < lineStart)
+        return false;
+    return lowText.compare(at, 6, "@each ") == 0;
+}
+
+//The modal-branch label of one auto= line ("choice name(Target opponent) ...")
+//- empty when the line is not a choice branch. Pure; PARSETEST-provable.
+static string choiceBranchLabel(const string& rawLine)
+{
+    size_t s = 0;
+    while (s < rawLine.size() && (rawLine[s] == ' ' || rawLine[s] == '\t'))
+        s++;
+    string head = rawLine.substr(s, 12);
+    for (size_t i = 0; i < head.size(); i++)
+        head[i] = (char) tolower((unsigned char) head[i]);
+    if (head != "choice name(")
         return "";
-    static const struct { const char * key; const char * label; bool absValue; } kVerbs[] = {
-        { "lifeleech:", "drains", true },
-        { "damage:", "damage", true },
-        { "life:", "life", false },
-        { "draw:", "draws", true },
-        { "prevent:", "prevents", true },
-    };
-    string text = card->magicText;
-    for (size_t i = 0; i < text.size(); i++)
-        text[i] = (char) tolower((unsigned char) text[i]);
-    std::ostringstream out;
-    std::set<string> seen;
-    int count = 0;
-    //Amass preview FIRST (it is also the baseline every other magnitude on this
-    //card keys off). "Army 7/7 -> 9/9" is the whole arithmetic, done.
-    int amassN = amassCounters(card);
-    int amassResultP = 0;
-    if (amassN > 0)
-    {
-        MTGCardInstance * army = findMyArmy(card);
-        int curP = army ? army->power : 0;
-        int curT = army ? army->toughness : 0;
-        //N-166o: fold in the live "that many plus N" counter replacements, so
-        //the preview is the number the amass will actually settle at and the
-        //guide's promise about this line becomes true.
-        int bonus = amassCounterBonus(card);
-        amassN += bonus;
-        amassResultP = curP + amassN;
-        out << "Army " << curP << "/" << curT << " -> " << amassResultP << "/"
-            << (curT + amassN);
-        if (bonus > 0)
-            out << " (includes +" << bonus << " from your counter-adding replacement"
-                   " effect" << (bonus == 1 ? "" : "s") << " already in play)";
-        //Creature type stays UNSPOKEN: the macro creates an Orc Army on Foray of
-        //Orcs and a ZOMBIE Army on Widespread Brutality (both detected here), so
-        //naming one would be wrong half the time. The card text on the same line
-        //says which; the size is what the pilot could not compute.
-        if (!army)
-            out << " (a new 0/0 Army token is created first)";
-        count++;
-    }
-    for (size_t v = 0; v < sizeof(kVerbs) / sizeof(kVerbs[0]) && count < 3; v++)
+    size_t open = s + 11;
+    size_t close = rawLine.find(')', open);
+    if (close == string::npos || close <= open + 1)
+        return "";
+    return rawLine.substr(open + 1, close - open - 1);
+}
+
+static const struct { const char * key; const char * label; bool absValue; } kVerbs[] = {
+    { "lifeleech:", "drains", true },
+    { "damage:", "damage", true },
+    { "life:", "life", false },
+    { "draw:", "draws", true },
+    { "prevent:", "prevents", true },
+};
+
+//The verb scan, factored out of dynamicMagnitudes so the SAME evaluation can be
+//run over one modal branch's line as over a whole card's script (wave-39 #13).
+//`text` is already lowercased. Returns the new magnitude count.
+static int appendVerbMagnitudes(MTGCardInstance * card, const string& text,
+                                const string& rawText,
+                                std::ostringstream& out, std::set<string>& seen,
+                                int count, int maxCount,
+                                int amassN, int amassResultP)
+{
+    for (size_t v = 0; v < sizeof(kVerbs) / sizeof(kVerbs[0]) && count < maxCount; v++)
     {
         size_t pos = 0;
-        while (count < 3 && (pos = text.find(kVerbs[v].key, pos)) != string::npos)
+        while (count < maxCount && (pos = text.find(kVerbs[v].key, pos)) != string::npos)
         {
             size_t start = pos + strlen(kVerbs[v].key);
+            //N-162b: a future-step recurrence is not a "right now" magnitude,
+            //and its trigger header is itself a false match for "draw:".
+            if (insideRecurringTrigger(text, pos))
+            {
+                pos = start;
+                continue;
+            }
             pos = start;
             size_t end = text.find_first_of(" \t\r\n", start); //the parser slices amounts at whitespace too
             string expr = text.substr(start, end == string::npos ? string::npos : end - start);
@@ -639,7 +654,10 @@ string dynamicMagnitudes(MTGCardInstance * card)
             //invented rules (the trust doctrine's own lesson from N-36b), and
             //the qualifier carries no magnitude for it to reuse.
             {
-                string tspec = riderTargetSpec(card->magicText, start + expr.size());
+                //rawText is the UNlowercased twin of `text` (same length, so the
+                //offset carries) - the modal path scans ONE branch line, so
+                //reading the whole card's script here would mis-locate the rider.
+                string tspec = riderTargetSpec(rawText, start + expr.size());
                 if (!tspec.empty() && !riderHasLegalTarget(card, tspec))
                 {
                     out << (count ? ", " : "") << kVerbs[v].label
@@ -692,6 +710,99 @@ string dynamicMagnitudes(MTGCardInstance * card)
             count++;
         }
     }
+    return count;
+}
+
+string dynamicMagnitudes(MTGCardInstance * card)
+{
+    //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
+    //loyalty ability plus the emblem/transforms payload in one string, so this
+    //card-level scan cannot attribute a magnitude to the specific loyalty (or
+    //cast) option being offered - it grabbed Lolth's -8 emblem expression
+    //(damage:8minusoplifelostminusend) and stamped "{right now: damage 8}"
+    //(later "damage 4") onto her CAST and her +0/-3 loyalty options, none of
+    //which deal that damage. A walker's loyalty effects are plain-numeric
+    //loyalty costs already visible in the {card text} snippet, so an unscopable
+    //number this pass evaluates from a NON-offered sub-ability is worse than
+    //none (same spirit as skipping "rand"). Skip walkers.
+    if (card && card->hasType(Subtypes::TYPE_PLANESWALKER))
+        return "";
+    string rawText = card->magicText;
+    string text = card->magicText;
+    for (size_t i = 0; i < text.size(); i++)
+        text[i] = (char) tolower((unsigned char) text[i]);
+    std::ostringstream out;
+    std::set<string> seen;
+    int count = 0;
+    //Amass preview FIRST (it is also the baseline every other magnitude on this
+    //card keys off). "Army 7/7 -> 9/9" is the whole arithmetic, done.
+    int amassN = amassCounters(card);
+    int amassResultP = 0;
+    if (amassN > 0)
+    {
+        MTGCardInstance * army = findMyArmy(card);
+        int curP = army ? army->power : 0;
+        int curT = army ? army->toughness : 0;
+        //N-166o: fold in the live "that many plus N" counter replacements, so
+        //the preview is the number the amass will actually settle at and the
+        //guide's promise about this line becomes true.
+        int bonus = amassCounterBonus(card);
+        amassN += bonus;
+        amassResultP = curP + amassN;
+        out << "Army " << curP << "/" << curT << " -> " << amassResultP << "/"
+            << (curT + amassN);
+        if (bonus > 0)
+            out << " (includes +" << bonus << " from your counter-adding replacement"
+                   " effect" << (bonus == 1 ? "" : "s") << " already in play)";
+        //Creature type stays UNSPOKEN: the macro creates an Orc Army on Foray of
+        //Orcs and a ZOMBIE Army on Widespread Brutality (both detected here), so
+        //naming one would be wrong half the time. The card text on the same line
+        //says which; the size is what the pilot could not compute.
+        if (!army)
+            out << " (a new 0/0 Army token is created first)";
+        count++;
+    }
+    //N-162d (wave-39 ledger #13): a MODAL spell writes one auto= line per
+    //branch ("choice name(Target opponent) ... " / "choice name(Target
+    //controller) ... ") and the flat card-wide scan concatenated their
+    //magnitudes into one anonymous list - Peer into the Abyss rendered
+    //"{right now: life -4, life -8, draws 25}" at life 16 vs opponent 8, where
+    //"life -8" is the CONTROLLER branch's self-loss and nothing said so. A
+    //pilot reading "life -8" as its own cost declines a lethal spell. Scan each
+    //branch SEPARATELY and label it with the engine's own choice name, so the
+    //cast option and the choose-a-mode menu that follows cannot disagree.
+    //Gated on two branches actually producing magnitudes: a single-branch card
+    //falls through to the card-wide path below, byte-identical to before.
+    if (count == 0)
+    {
+        std::ostringstream mo;
+        int shown = 0, branches = 0;
+        size_t lp = 0;
+        while (lp <= rawText.size())
+        {
+            size_t nl = rawText.find('\n', lp);
+            string rawLine = rawText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+            lp = (nl == string::npos) ? rawText.size() + 1 : nl + 1;
+            string label = choiceBranchLabel(rawLine);
+            if (label.empty())
+                continue;
+            branches++;
+            string lowLine = rawLine;
+            for (size_t i = 0; i < lowLine.size(); i++)
+                lowLine[i] = (char) tolower((unsigned char) lowLine[i]);
+            std::ostringstream bo;
+            std::set<string> bseen;
+            if (appendVerbMagnitudes(card, lowLine, rawLine, bo, bseen, 0, 3, 0, 0) > 0)
+            {
+                mo << (shown++ ? "; " : "") << "if you choose \"" << label
+                   << "\": " << bo.str();
+            }
+        }
+        if (branches >= 2 && shown >= 2)
+            return " {right now: " + mo.str() + "}";
+    }
+    count = appendVerbMagnitudes(card, text, rawText, out, seen, count, 3,
+                                 amassN, amassResultP);
     //N-146r (wave-36, Agadeem's Awakening B3 s74): a battlefield-return spell
     //offered over a graveyard with NO creature cards resolves to nothing - the
     //122B burned 10 mana and a turn casting Agadeem "returning" a planeswalker
@@ -899,6 +1010,48 @@ string typeTag(MTGCardInstance * card)
     if (card->hasType(Subtypes::TYPE_SORCERY))
         return "sorcery";
     return "";
+}
+
+//W39-STACKFACTS (wave-39 ledger #4, deck125 §5.2): the stack line and the
+//counter option's "can target on the stack:" clause both printed a BARE NAME -
+//30 distinct stack lines in the wave-39 corpus, 0 carrying the spell's type,
+//its mana cost or its P/T. A counter decision is exactly a decision about
+//those three numbers, and with none of them on the screen the pilot had to
+//recall the card from the decklist block at the top of a very long prompt; it
+//did so badly (deck125 spent 9 of 25 counters on mana producers, walls and
+//0-power bodies, the decisive one a 5-mana Fall of the Gavel on a Silver Myr
+//while a Master of Etherium hit for 8 a turn). The deciding fact rides the
+//object: name what the spell IS. Reads the engine's LIVE power/toughness -
+//Master of Etherium's characteristic-defining ability is "cdaactive", so the
+//instance already carries the real 8/8 on the stack - and the PRINTED mana
+//cost from the card data, which is the identity the pilot is matching.
+//Returns "" for anything with neither a cost nor a type worth naming.
+//Pure core, so PARSETEST proves every shape (creature / artifact creature /
+//non-creature / costless token) without a game.
+static string stackFactsCore(const string& cost, bool isCreature, bool isArtifact,
+                             const string& typeName, int power, int toughness)
+{
+    std::ostringstream o;
+    if (!cost.empty())
+        o << " " << cost;
+    if (isCreature)
+        o << " (" << (isArtifact ? "artifact creature " : "creature ")
+          << power << "/" << toughness << ")";
+    else if (!typeName.empty())
+        o << " (" << typeName << ")";
+    return o.str();
+}
+
+string stackCardFacts(MTGCardInstance * card)
+{
+    if (!card)
+        return "";
+    string cost;
+    if (card->data && card->data->getManaCost())
+        cost = card->data->getManaCost()->toString();
+    return stackFactsCore(cost, card->isCreature(),
+                          card->hasType(Subtypes::TYPE_ARTIFACT),
+                          typeTag(card), card->power, card->toughness);
 }
 
 //The colours a LAND can produce, as a W/U/B/R/G flag array. Basic land types -
@@ -1465,6 +1618,71 @@ static string battlefieldHeaderText(bool mine, int permanents, int creatures)
 static string zeroPowerAttackerTag(int power)
 {
     return power <= 0 ? " [deals 0 - this attack deals no damage to the opponent]" : "";
+}
+
+//W39-WALLBLOCK / E-162c (wave-39 ledger #5). The blocker-side twin, rewritten
+//on the wave-29 annotation-wording rung: the STOP is the load-bearing clause,
+//so it goes FIRST and it carries the NUMBER. The pre-fix text ended on the
+//vague, unquantified "it only absorbs damage" and the deck162 pilot twice read
+//straight past it ("blocking with a defender doesn't prevent damage to me"),
+//declining 9 free life in a game it won at 4. TRUST DOCTRINE: the number is
+//claimed only where it is exactly computable - one shared power across the
+//blocker's whole legal set and no trampler in it. A trampler pushes damage
+//past a 0-power body, and a wrong N is strictly worse than no N, so that path
+//takes an honest qualifier and points at the A-lines that DO carry the number.
+//`maxP`/`minP` are the clamped powers of the attackers this blocker may block
+//(minP < 0 when the legal set is empty). Pure, so PARSETEST proves all four rungs.
+static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample)
+{
+    if (maxP > 0 && !anyTrample && minP == maxP)
+    {
+        std::ostringstream o;
+        o << " [deals 0 - this block kills nothing, but it STOPS all " << maxP
+          << " damage from reaching you]";
+        return o.str();
+    }
+    if (maxP > 0 && !anyTrample)
+        return " [deals 0 - this block kills nothing, but it STOPS all of the"
+               " damage from whichever attacker it blocks - each A-line above"
+               " says how much]";
+    if (maxP > 0)
+        return " [deals 0 - this block kills nothing; it stops the blocked"
+               " attacker's damage except what a trampler pushes through -"
+               " each A-line above says how much]";
+    return " [deals 0 - this block kills nothing, and every attacker it can"
+           " block already deals 0 damage]";
+}
+
+//W39-UNREACHABLE (wave-39 ledger #6). The B-lines carry a POSITIVE "may block
+//A2, A3" list and the attacker line a POSITIVE "[flying]" tag; nothing on
+//either negated the pairing the model actually wrote (146v36 s22: "BLOCKS:
+//B1:A1" with B1 groundbound and A1 an Ornithopter with flying - the corpus's
+//one all_assignments_illegal). Restriction-first, on the attacker line, and
+//counted from the ENGINE's own per-blocker legal sets so it cannot over-claim.
+//`flyingExplains` is only ever true when the caller has PROVEN the partition
+//(every blocker that may block has flying or reach, every blocker that may not
+//has neither) - an unproven reason is omitted, never guessed. Returns "" when
+//every available blocker may block this attacker (no restriction to state).
+//Pure, so PARSETEST proves both rungs and the silent case.
+static string unreachableAttackerTag(int canBlockCount, int totalBlockers, bool flyingExplains)
+{
+    if (totalBlockers <= 0 || canBlockCount >= totalBlockers)
+        return "";
+    std::ostringstream o;
+    if (canBlockCount == 0)
+    {
+        o << " [NONE of your available blockers can block this attacker";
+        if (flyingExplains)
+            o << " - it has flying and none of your available blockers has flying or reach";
+        o << "]";
+        return o.str();
+    }
+    o << " [only " << canBlockCount << " of your " << totalBlockers
+      << " available blockers can block this attacker";
+    if (flyingExplains)
+        o << " - it has flying, so only blockers with flying or reach can block it";
+    o << " - the may-block lists below say which]";
+    return o.str();
 }
 
 //N-152d: the printed-P/T delta tag. "printed" must mean the DISPLAYED face's
@@ -5017,7 +5235,9 @@ string AIPlayerGPT::serializeGameState()
                 line << stackAbilityName(srcName, menu) << " [triggered/activated ability]";
             }
             else
-                line << it->getDisplayName() << " [spell]";
+                //W39-STACKFACTS: type, mana cost and P/T at the object the
+                //response window is ABOUT (see stackCardFacts).
+                line << it->getDisplayName() << stackCardFacts(it->source) << " [spell]";
             if (it->type == ACTION_SPELL)
             {
                 Spell * sp = (Spell *) it;
@@ -7846,7 +8066,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     for (int zi = 0; zi < sz->nb_cards; zi++)
                         if (tc->canTarget(sz->cards[zi]))
                         {
-                            hits << (firstHit ? "" : ", ") << sz->cards[zi]->getDisplayName();
+                            //W39-STACKFACTS: the counter option's own clause is
+                            //the OFFER side of the same absent-field audit -
+                            //annotate the hit with what it is worth countering
+                            //for (type, cost, P/T).
+                            hits << (firstHit ? "" : ", ") << sz->cards[zi]->getDisplayName()
+                                 << stackCardFacts(sz->cards[zi]);
                             firstHit = false;
                         }
                 }
@@ -11047,6 +11272,19 @@ int AIPlayerGPT::chooseBlockers()
     //trade-outcome annotations. Pure observability - the prompt text below is
     //byte-identical to before, just also accumulated per line.
     vector<string> shownLines;
+    //W39-UNREACHABLE (wave-39 ledger #6, validator §D): the B-lines say which
+    //attackers each blocker MAY block and NOTHING says why the others are
+    //absent - the attacker line carried a POSITIVE "[flying]" tag on a
+    //different line and the model read past it, answering "BLOCKS: B1:A1" with
+    //B1 (no reach) legal only on A2/A3 and A1 an Ornithopter with flying (the
+    //corpus's one all_assignments_illegal). Put the NEGATION on the attacker
+    //line, derived from the ENGINE's own legal sets so it cannot over-claim.
+    vector<int> canBlockCount(attackers.size(), 0);
+    for (size_t i = 0; i < blockers.size(); i++)
+        for (size_t j = 0; j < legal[i].size(); j++)
+            for (size_t k = 0; k < attackers.size(); k++)
+                if (attackers[k] == legal[i][j])
+                    canBlockCount[k]++;
     tail << "Attackers:\n";
     for (size_t j = 0; j < attackers.size(); j++)
     {
@@ -11079,6 +11317,26 @@ int AIPlayerGPT::chooseBlockers()
             || txt.find("dealt damage") != string::npos
             || txt.find("deals combat damage") != string::npos)
             ln << " {text: " << cardTextSnippet(attackers[j], 160) << "}";
+        //W39-UNREACHABLE: the restriction, first and negative. The REASON is
+        //only stated when it is PROVABLE from the data on hand - flying
+        //explains the pattern exactly when every blocker that may block this
+        //attacker has flying or reach and every blocker that may not, has
+        //neither. Anything else gets the bare (and still true) negation.
+        if (!blockers.empty() && canBlockCount[j] < (int) blockers.size())
+        {
+            bool flyingExplains = attackers[j]->has(Constants::FLYING);
+            for (size_t i = 0; flyingExplains && i < blockers.size(); i++)
+            {
+                bool canB = false;
+                for (size_t g = 0; g < legal[i].size() && !canB; g++)
+                    canB = (legal[i][g] == attackers[j]);
+                bool air = blockers[i]->has(Constants::FLYING)
+                           || blockers[i]->has(Constants::REACH);
+                if (canB != air)
+                    flyingExplains = false;
+            }
+            ln << unreachableAttackerTag(canBlockCount[j], (int) blockers.size(), flyingExplains);
+        }
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
@@ -11102,8 +11360,34 @@ int AIPlayerGPT::chooseBlockers()
         //a 0-power blocker was thrown in front of a 0/2 Ornithopter, a
         //block that neither killed nor saved anything (the [deals 0] gap
         //in the blocker-seam lethal family).
+        //W39-WALLBLOCK / E-162c (wave-39 ledger #5): the two salient tokens
+        //here were "deals 0" and "kills nothing", and the clause that actually
+        //decides the question - that the block STOPS the damage - was the
+        //trailing, unquantified "it only absorbs damage". The wave-29
+        //annotation-wording rung (restriction/verb FIRST, no vague affirmative
+        //tail) violated in its own register: at 146v162 s7/s10 the pilot wrote
+        //"I take 3 damage (if one blocks) or 6 (if both)" and "blocking with a
+        //defender doesn't prevent damage to me", declined both blocks, and
+        //gave away 9 life in a game it won at 4. Put the STOP first and put the
+        //NUMBER in it. TRUST DOCTRINE: N is only claimed where it is exactly
+        //computable - a trampling attacker pushes damage past a 0-power body,
+        //so that path gets the honest qualifier instead of a wrong N.
         if (blockers[i]->power <= 0)
-            ln << " [deals 0 - this block kills nothing, it only absorbs damage]";
+        {
+            int minP = -1, maxP = 0;
+            bool anyTrample = false;
+            for (size_t j = 0; j < legal[i].size(); j++)
+            {
+                int p = legal[i][j]->power > 0 ? legal[i][j]->power : 0;
+                if (minP < 0 || p < minP)
+                    minP = p;
+                if (p > maxP)
+                    maxP = p;
+                if (legal[i][j]->basicAbilities[Constants::TRAMPLE])
+                    anyTrample = true;
+            }
+            ln << zeroPowerBlockerTag(minP, maxP, anyTrample);
+        }
         ln << " - may block";
         for (size_t j = 0; j < legal[i].size(); j++)
             for (size_t k = 0; k < attackers.size(); k++)
@@ -15886,6 +16170,178 @@ void AIPlayerGPT::runParseSelfTest()
               "W36-1 the note claims engine authority, names deathtouch, forbids re-derivation");
         CHECK(note.find("gang-blocks, pumps or combat tricks") != string::npos,
               "W36-1 the note keeps the honest scope (what CAN change the result)");
+    }
+
+
+    // ---- W39 #4: stack entries and counter targets carry type/cost/(P/T) ----
+    cout << "\n[W39-4] W39-STACKFACTS: the counter seam names what the spell IS\n";
+    {
+        CHECK(stackFactsCore("{2}{u}", true, true, "", 8, 8)
+              == " {2}{u} (artifact creature 8/8)",
+              "W39-4 the Master of Etherium shape: cost + artifact creature + live P/T");
+        CHECK(stackFactsCore("{1}{g}", true, false, "", 2, 2)
+              == " {1}{g} (creature 2/2)",
+              "W39-4 a plain creature spell prints cost and P/T");
+        CHECK(stackFactsCore("{u}{u}", false, false, "instant", 0, 0)
+              == " {u}{u} (instant)",
+              "W39-4 a non-creature spell prints its cost and its type, never a 0/0");
+        // NEGATIVE: nothing is invented for an object with neither cost nor
+        // nameable type (a token-backed stack object) - silence beats a "0/0".
+        CHECK(stackFactsCore("", false, false, "", 0, 0).empty(),
+              "W39-4 no cost and no type -> no facts fabricated");
+        // ECHO SHAPE: the facts are IDENTITY, not annotation. Answer matching
+        // strips "[...]" and LAND parentheticals; a "(creature 2/2)" must
+        // survive both, or the option core stops matching its own echo.
+        string opt4 = "Cast Counterspell {u}{u} - can target on the stack:"
+                      " Master of Etherium {2}{u} (artifact creature 8/8)";
+        string core4 = stripRenderAnnotationsLc(opt4);
+        CHECK(core4.find("master of etherium {2}{u} (artifact creature 8/8)") != string::npos,
+              "W39-4 echo: the stack facts survive stripRenderAnnotationsLc (not a land parenthetical)");
+        CHECK(stripRenderAnnotationsLc("Mountain (land: taps for {r})").find("land") == string::npos,
+              "W39-4 echo negative: a LAND parenthetical is still stripped (guard intact)");
+        // The cost braces must not be mistaken for a "{right now: ...}" or
+        // "{card text: ...}" annotation by the narration stripper.
+        CHECK(stripNarrationDecoration("Grizzly Bears {1}{g} (creature 2/2)")
+              == "Grizzly Bears {1}{g} (creature 2/2)",
+              "W39-4 echo: stripNarrationDecoration leaves cost braces and P/T alone");
+    }
+
+    // ---- W39 #5: the wall-block annotation leads with the STOP and its N ----
+    cout << "\n[W39-5] W39-WALLBLOCK: 9 free life declined behind a vague tail\n";
+    {
+        CHECK(zeroPowerBlockerTag(2, 2, false)
+              == " [deals 0 - this block kills nothing, but it STOPS all 2 damage"
+                 " from reaching you]",
+              "W39-5 one shared attacker power -> the STOP leads and carries N");
+        string mixed5 = zeroPowerBlockerTag(2, 5, false);
+        CHECK(mixed5.find("STOPS all of the damage from whichever attacker") != string::npos,
+              "W39-5 mixed powers -> the STOP still leads, pointing at the A-lines");
+        // NEGATIVE (trust doctrine): no N is claimed where N is not computable.
+        CHECK(mixed5.find("STOPS all 2") == string::npos
+              && mixed5.find("STOPS all 5") == string::npos,
+              "W39-5 mixed powers never claim a single N");
+        string tramp5 = zeroPowerBlockerTag(5, 5, true);
+        CHECK(tramp5.find("trampler pushes through") != string::npos
+              && tramp5.find("STOPS all") == string::npos,
+              "W39-5 a trampler in the legal set drops the STOPS-all claim (it is false there)");
+        string zero5 = zeroPowerBlockerTag(0, 0, false);
+        CHECK(zero5.find("already deals 0 damage") != string::npos
+              && zero5.find("STOPS") == string::npos,
+              "W39-5 an all-0-power legal set says so instead of promising a stop");
+        // The defect string itself is gone from every rung.
+        CHECK(zeroPowerBlockerTag(2, 2, false).find("only absorbs damage") == string::npos
+              && mixed5.find("only absorbs damage") == string::npos
+              && tramp5.find("only absorbs damage") == string::npos
+              && zero5.find("only absorbs damage") == string::npos,
+              "W39-5 the vague 'it only absorbs damage' tail is gone from all four rungs");
+        // ECHO SHAPE: the tag is a bracket, so narration drops it whole, and a
+        // reply that echoes it still parses to exactly the one pairing.
+        string bline5 = "B1. Shield Sphere (0/6) [defender]"
+                        + zeroPowerBlockerTag(2, 2, false) + " - may block A3 (neither dies)";
+        CHECK(stripNarrationDecoration(bline5).find("STOPS all") == string::npos,
+              "W39-5 echo: the bracket never reaches the narration");
+        vector<int> out5;
+        int pairs5 = parseBlockAssignments("BLOCKS: B1:A3" + zeroPowerBlockerTag(2, 2, false),
+                                           1, 3, out5);
+        cout << "     echoed tag: pairs=" << pairs5 << " B1->A" << out5[0] << "\n";
+        CHECK(pairs5 == 1 && out5[0] == 3,
+              "W39-5 echo: a reply carrying the STOPS-all tail still declares B1:A3 only");
+    }
+
+    // ---- W39 #6: the attacker line states which blockers CANNOT reach it ----
+    cout << "\n[W39-6] W39-UNREACHABLE: the corpus's one all_assignments_illegal\n";
+    {
+        CHECK(unreachableAttackerTag(0, 2, true)
+              == " [NONE of your available blockers can block this attacker - it has"
+                 " flying and none of your available blockers has flying or reach]",
+              "W39-6 nothing can block it -> the negation leads, with the proven reason");
+        string part6 = unreachableAttackerTag(1, 2, true);
+        CHECK(part6.find(" [only 1 of your 2 available blockers can block this attacker") == 0
+              && part6.find("flying or reach") != string::npos,
+              "W39-6 a partial legal set is counted from the engine's own sets");
+        // NEGATIVES: silence when there is no restriction to state, and no
+        // reason when the reason is not proven.
+        CHECK(unreachableAttackerTag(2, 2, true).empty(),
+              "W39-6 every blocker may block it -> no annotation at all");
+        CHECK(unreachableAttackerTag(0, 0, true).empty(),
+              "W39-6 no available blockers -> nothing to negate, stay silent");
+        CHECK(unreachableAttackerTag(0, 3, false).find("flying") == string::npos,
+              "W39-6 an unproven reason is omitted, never guessed");
+        // ECHO SHAPE: the tag lives on an A-line inside a bracket, and it
+        // contains bare digits - prove they cannot forge a block pairing.
+        vector<int> out6;
+        int pairs6 = parseBlockAssignments("BLOCKS: none" + unreachableAttackerTag(1, 2, true),
+                                           2, 3, out6);
+        cout << "     echoed A-tag with 'BLOCKS: none': pairs=" << pairs6 << "\n";
+        CHECK(pairs6 == 0 && out6[0] == 0 && out6[1] == 0,
+              "W39-6 echo: the tag's digits never forge a pairing");
+        CHECK(stripNarrationDecoration("A1. Wind Drake (2/2) deals 2 [flying]"
+                                       + unreachableAttackerTag(1, 2, true))
+              == "A1. Wind Drake (2/2) deals 2",
+              "W39-6 echo: the bracket never reaches the narration");
+    }
+
+    // ---- W39 #10: no "{right now: draws 0}" on a future-step draw ----
+    cout << "\n[W39-10] W39-DRAWS0: Dictate of Kruphix / Teferi's Puzzle Box\n";
+    {
+        // Dictate of Kruphix, verbatim from the primitive. The "draw:" key
+        // matches the TRIGGER HEADER ("@each my draw:") first, which is where
+        // the bogus "draws 0" came from; both that match and the payload after
+        // it belong to a future step.
+        string dictate = "@each my draw:draw:1 controller";
+        CHECK(insideRecurringTrigger(dictate, dictate.find("draw:")),
+              "W39-10 the '@each my draw:' header match is suppressed (the 'draws 0' source)");
+        CHECK(insideRecurringTrigger(dictate, dictate.find("draw:", dictate.find("draw:") + 1)),
+              "W39-10 the payload of a recurring ability is suppressed too (not 'right now')");
+        // Teferi's Puzzle Box: the second bogus magnitude was the unevaluable
+        // "draw:countedamount" payload.
+        string box = "@each my draw:name(recycle draw) count(type:*:myhand) &&"
+                     " bottomoflibrary all(*|myhand) && draw:countedamount controller";
+        CHECK(insideRecurringTrigger(box, box.rfind("draw:")),
+              "W39-10 'draw:countedamount' on a draw-step trigger is suppressed");
+        // NEGATIVE: an ON-RESOLUTION trigger still renders. Gray Merchant's
+        // "drains N" is the flagship magnitude and must be untouched.
+        string gary = "@movedto(this|mybattlefield):lifeleech:type:mana{b}:mybattlefield opponent";
+        CHECK(!insideRecurringTrigger(gary, gary.find("lifeleech:")),
+              "W39-10 an ETB (@movedTo) trigger is NOT suppressed - Gray Merchant still drains N");
+        // NEGATIVE: an untriggered script line is untouched.
+        string plain = "draw:2 controller";
+        CHECK(!insideRecurringTrigger(plain, 0),
+              "W39-10 a plain on-resolution effect is not a recurrence");
+        // NEGATIVE: the '@' must be on the SAME auto= line (magicText joins
+        // them with a newline), or one card's trigger would mute another's effect.
+        string twoLines = dictate + "\nlifeleech:type:mana{b}:mybattlefield opponent";
+        CHECK(!insideRecurringTrigger(twoLines, twoLines.find("lifeleech:")),
+              "W39-10 a trigger on the previous auto= line does not reach the next one");
+    }
+
+    // ---- W39 #13: modal branches are labelled, not flattened ----
+    cout << "\n[W39-13] W39-PEER: which magnitude belongs to which branch\n";
+    {
+        CHECK(choiceBranchLabel("choice name(Target opponent) draw:halfuptype:*:opponentlibrary"
+                                " opponent && life:-halfupopponentlifetotal opponent")
+              == "Target opponent",
+              "W39-13 the branch label is the engine's own choice name");
+        CHECK(choiceBranchLabel("choice name(Target controller) draw:halfuptype:*:mylibrary"
+                                " controller && life:-halfuplifetotal controller")
+              == "Target controller",
+              "W39-13 the second branch is read the same way");
+        // NEGATIVES: a non-modal line claims no branch, and an empty label is
+        // not a branch either (it would render as an unnamed 'if you choose ""').
+        CHECK(choiceBranchLabel("lord(other creature[artifact]|mybattlefield) 1/1").empty(),
+              "W39-13 a non-choice auto= line is not a modal branch");
+        CHECK(choiceBranchLabel("choice name() draw:1").empty(),
+              "W39-13 an empty choice name is not a usable branch label");
+        // ECHO SHAPE: the labelled clause is still one "{right now: ...}"
+        // annotation, so narration drops it whole - the quotes inside must not
+        // break the brace-depth scan.
+        string opt13 = "Cast Peer into the Abyss {4}{b}{b}{b} {right now: if you choose"
+                       " \"target opponent\": life -10, draws 12; if you choose"
+                       " \"target controller\": life -7, draws 16}";
+        CHECK(stripNarrationDecoration(opt13) == "Cast Peer into the Abyss {4}{b}{b}{b}",
+              "W39-13 echo: the labelled magnitude clause is dropped whole from narration");
+        CHECK(stripRenderAnnotationsLc(opt13).find("if you choose") != string::npos,
+              "W39-13 the labels stay on the OPTION line the model chooses from");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
