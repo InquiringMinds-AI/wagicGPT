@@ -270,9 +270,12 @@ const char * kStalePlanNote =
 //The card's rules text, single-line and bounded, for option/target lines:
 //the deciding fact belongs ON the choice, not in a distant deck blob (the
 //model picked discard/removal targets near-arbitrarily from bare names).
-string cardTextSnippet(MTGCardInstance * card, size_t maxLen)
+//Pure core (W41-4 factored it out so the mutate-pile concatenation below builds
+//from the SAME one-line/truncate rule the single-card snippet uses, and PARSETEST
+//can prove it without a board).
+string textSnippetCore(const string& raw, size_t maxLen)
 {
-    string text = card->text;
+    string text = raw;
     for (size_t i = 0; i < text.size(); i++)
         if (text[i] == '\n')
             text[i] = ' ';
@@ -282,6 +285,11 @@ string cardTextSnippet(MTGCardInstance * card, size_t maxLen)
         text = text.substr(0, (cut == string::npos || cut < maxLen / 2) ? maxLen : cut) + "...";
     }
     return text;
+}
+
+string cardTextSnippet(MTGCardInstance * card, size_t maxLen)
+{
+    return textSnippetCore(card->text, maxLen);
 }
 
 //State-computed payoff magnitudes: cards like Gray Merchant carry their
@@ -588,6 +596,81 @@ static string choiceBranchLabel(const string& rawLine)
     return rawLine.substr(open + 1, close - open - 1);
 }
 
+//W41-10: an amount that does not EXIST until the ability resolves. "thatmuch" is
+//the engine's trigger-event variable (the size of the event that fired the
+//ability, written at resolution by Player::gainOrLoseLife) and evaluates to 0 at
+//cast time; "rand" would draw the game RNG just by being rendered and is already
+//dropped upstream - named here so the whole class has one home. Pure, so
+//PARSETEST proves both halves.
+static bool magnitudeExprIsResolutionTimeOnly(const string& expr)
+{
+    return expr.find("thatmuch") != string::npos || expr.find("rand") != string::npos;
+}
+
+//W41-11 (wave-40 L-123c): Tragic Slip's option line printed only the STATIC text
+//("-1/-1 ... Morbid - -13/-13 instead if a creature died this turn") and never the
+//value that applies RIGHT NOW, while the engine already renders live magnitudes
+//for other cards. 9 casts, 4 killed the target and 5 did nothing - the sharpest
+//repro put a 2/1 and a 4/4 on the same target list with no morbid. Adjudicating
+//morbid otherwise means reading the GAME LOG tail, the weak-tell shape this
+//campaign warns about. Pull the two branch modifiers out of the script; the
+//caller evaluates which one is live and renders THAT one.
+//Pure over the lowercased script text, so PARSETEST proves both halves.
+static bool morbidPTBranches(const string& lowText, string& ifMorbid, string& ifNotMorbid)
+{
+    ifMorbid.clear();
+    ifNotMorbid.clear();
+    static const char * kHeads[2] = { "ifnot morbid then ", "if morbid then " };
+    for (int h = 0; h < 2; h++)
+    {
+        size_t pos = lowText.find(kHeads[h]);
+        if (pos == string::npos)
+            continue;
+        size_t start = pos + strlen(kHeads[h]);
+        size_t end = lowText.find_first_of(" \t\r\n", start);
+        string mod = lowText.substr(start, end == string::npos ? string::npos : end - start);
+        //A P/T modifier and nothing else: "-13/-13", "+2/+2", "1/1". Anything
+        //else (a named sub-ability, a moveto, a macro) is left to the card text -
+        //never guess a magnitude out of a construct this cannot read.
+        size_t slash = mod.find('/');
+        if (slash == string::npos || slash == 0 || slash + 1 >= mod.size())
+            continue;
+        bool shaped = true;
+        for (size_t i = 0; i < mod.size(); i++)
+            if (!(isdigit((unsigned char) mod[i]) || mod[i] == '/' || mod[i] == '+' || mod[i] == '-'))
+            {
+                shaped = false;
+                break;
+            }
+        if (!shaped)
+            continue;
+        //An unsigned script modifier is a BONUS - sign BOTH halves, or "2/2"
+        //renders as the half-signed "+2/2" and reads as a set-to value.
+        {
+            string p = mod.substr(0, slash), t = mod.substr(slash + 1);
+            if (!p.empty() && isdigit((unsigned char) p[0]))
+                p = "+" + p;
+            if (!t.empty() && isdigit((unsigned char) t[0]))
+                t = "+" + t;
+            mod = p + "/" + t;
+        }
+        (h == 0 ? ifNotMorbid : ifMorbid) = mod;
+    }
+    return !ifMorbid.empty() || !ifNotMorbid.empty();
+}
+
+//The rendered clause for whichever morbid branch is live. Pure; the caller
+//supplies the engine's own morbid verdict.
+static string morbidMagnitudeClause(const string& ifMorbid, const string& ifNotMorbid,
+                                    bool morbidLive)
+{
+    const string& mod = morbidLive ? ifMorbid : ifNotMorbid;
+    if (mod.empty())
+        return "";
+    return mod + (morbidLive ? " (a creature died this turn, so Morbid applies)"
+                             : " (no creature has died this turn, so Morbid does NOT apply)");
+}
+
 static const struct { const char * key; const char * label; bool absValue; } kVerbs[] = {
     { "lifeleech:", "drains", true },
     { "damage:", "damage", true },
@@ -642,6 +725,20 @@ static int appendVerbMagnitudes(MTGCardInstance * card, const string& text,
             //cast option's "legal targets right now:" list instead, where the
             //target IS known.
             if (expr.find("manacost") != string::npos && !card->spellTargetType.empty())
+                continue;
+            //W41-10 (wave-40 N1, 27 emissions in one corpus): "thatmuch" is the
+            //engine's TRIGGER-EVENT variable - the amount of the event that fired
+            //the ability, set at resolution (Player::gainOrLoseLife writes it) and
+            //0 at cast time. Sanguine Bond (@lifeof(player)...:life:-thatmuch) and
+            //Exquisite Blood (@lifelostfoeof(player):life:thatmuch) therefore
+            //rendered "{right now: life 0}" on the only two cards that WIN their
+            //deck the game. Three waves of magnitude work trained the pilot to
+            //prefer the annotation to the card text, so a wrong magnitude is
+            //strictly worse than an absent one - take the same SUPPRESS branch
+            //ledger-#10 took. No gap is opened: the card's printed text rides the
+            //SAME option line ({card text: "Whenever you gain life, target
+            //opponent loses that much life."}) and states the effect in full.
+            if (magnitudeExprIsResolutionTimeOnly(expr))
                 continue;
             if (!seen.insert(string(kVerbs[v].key) + expr).second)
                 continue;
@@ -800,6 +897,28 @@ string dynamicMagnitudes(MTGCardInstance * card)
         }
         if (branches >= 2 && shown >= 2)
             return " {right now: " + mo.str() + "}";
+    }
+    //W41-11: the live Morbid branch, evaluated through the ENGINE's own morbid
+    //check (AbilityFactory::parseCastRestrictions - the same code the ability
+    //resolution consults), so the annotation and the resolution cannot drift.
+    //After the modal gate so a modal card's per-branch render is untouched.
+    {
+        string ifM, ifN;
+        if (morbidPTBranches(text, ifM, ifN))
+        {
+            bool morbidLive = false;
+            if (card->getObserver() && card->controller())
+            {
+                AbilityFactory af(card->getObserver());
+                morbidLive = af.parseCastRestrictions(card, card->controller(), "morbid") != 0;
+            }
+            string clause = morbidMagnitudeClause(ifM, ifN, morbidLive);
+            if (!clause.empty())
+            {
+                out << (count ? ", " : "") << clause;
+                count++;
+            }
+        }
     }
     count = appendVerbMagnitudes(card, text, rawText, out, seen, count, 3,
                                  amassN, amassResultP);
@@ -1901,6 +2020,182 @@ static string mutatedPileTag(const std::vector<string>& underNames)
     return o.str();
 }
 
+//W41-4 (wave-40 fix-validation F5: 14 of 20 mutate-pile option lines quoted the
+//WRONG card's rules text = 70% wrong, and by wave 40 the defect had crossed onto
+//the OPPONENT's targeting surface). Root cause is in the engine's mutate
+//resolution (AANewTarget::resolve): it SWAPS the two instances' names
+//(source->setName(_target->getName()) / _target->setName(oldname)) and leaves
+//each instance's `text` untouched - so a pile instance renders name(A) beside
+//text(B). Every card's text IS present across the pile; only the name/text
+//pairing is broken, which is why the [mutated pile] tag's promise ("the combined
+//abilities of every card in the pile") was true while the quote beneath it was a
+//lie in scope.
+//
+//The display name is therefore NOT a safe attribution key (nor is nameOrig -
+//mutate never records it, and `data` on an MTGCardInstance points at ITSELF).
+//The printing id is: mutate does not touch mtgid, so the collection lookup
+//recovers the true printed name of the card whose `text` this instance holds.
+//When that lookup fails the member is rendered UNATTRIBUTED rather than guessed
+//(trust doctrine: omit rather than assert a pairing we cannot prove).
+static string mutatePileMemberName(MTGCardInstance * c)
+{
+    if (!c)
+        return "";
+    if (MTGCard * printed = MTGCollection()->getCardById(c->getMTGId()))
+        if (printed->data && !printed->data->getName().empty())
+            return printed->data->getName();
+    return "";
+}
+
+//Every card of the pile `card` belongs to, TOP first. Empty when `card` is not
+//part of a mutate pile (bounded walk; the engine models a pile as a parent/child
+//chain of battlefield instances).
+static void collectMutatePile(MTGCardInstance * card, std::vector<MTGCardInstance *>& out)
+{
+    out.clear();
+    if (!card || !card->mutation)
+        return;
+    MTGCardInstance * top = card;
+    for (int guard = 0; top && !top->parentCards.empty() && guard < 8; guard++)
+        top = top->parentCards[0];
+    if (!top)
+        return;
+    out.push_back(top);
+    std::vector<MTGCardInstance *> stack(top->childrenCards.begin(), top->childrenCards.end());
+    while (!stack.empty() && out.size() < 8)
+    {
+        MTGCardInstance * u = stack.back();
+        stack.pop_back();
+        if (!u)
+            continue;
+        out.push_back(u);
+        for (size_t k = 0; k < u->childrenCards.size(); k++)
+            stack.push_back(u->childrenCards[k]);
+    }
+    if (out.size() < 2)
+        out.clear(); //a lone card is not a pile
+}
+
+//Pure composition core: (printed name, rules text) per pile member -> the one
+//quoted blob an option/target line carries for the pile. Returns "" for fewer
+//than two members, so every non-pile card falls through to the single-card
+//snippet byte-identically. A member with no recoverable printed name is named
+//"one card in the pile" - never another member's name.
+string mutatedPileTextCore(const std::vector<std::pair<string, string> >& members,
+                           size_t maxLenPerCard)
+{
+    if (members.size() < 2)
+        return "";
+    std::ostringstream o;
+    o << "mutate pile - combined abilities of " << members.size() << " cards";
+    for (size_t i = 0; i < members.size(); i++)
+    {
+        string t = textSnippetCore(members[i].second, maxLenPerCard);
+        if (t.empty())
+            continue;
+        o << " || " << (members[i].first.empty() ? string("one card in the pile")
+                                                 : members[i].first)
+          << ": " << t;
+    }
+    return o.str();
+}
+
+//The pile-aware replacement for cardTextSnippet at the OPTION/TARGET emitters
+//(the only surfaces the defect lives on - battlefield summary lines quote no
+//text). Non-pile cards are unaffected.
+string pileAwareCardText(MTGCardInstance * c, size_t maxLen)
+{
+    std::vector<MTGCardInstance *> pile;
+    collectMutatePile(c, pile);
+    if (pile.size() >= 2)
+    {
+        std::vector<std::pair<string, string> > members;
+        for (size_t i = 0; i < pile.size(); i++)
+            members.push_back(std::make_pair(mutatePileMemberName(pile[i]), pile[i]->text));
+        string combined = mutatedPileTextCore(members, maxLen);
+        if (!combined.empty())
+            return combined;
+    }
+    return c ? cardTextSnippet(c, maxLen) : string();
+}
+
+//W41-8 (wave-40 seat125 §5.2): when exactly ONE target is legal the engine
+//correctly makes no model call for the target, so the cast option's
+//"legal targets right now:" clause is the ONLY surface carrying the deciding
+//facts - and it named bare names. 6 of 13 Path to Exile casts were spent below
+//the guide's decline floor, 4 of them on printed 0/4 walls at 25-50 life. This
+//is W39-STACKFACTS' fix applied to the adjacent emitter: the SAME cost/type/(P/T)
+//core, plus the live keyword set, so the preview and the battlefield line for the
+//same permanent cannot disagree.
+string targetPreviewFacts(MTGCardInstance * c)
+{
+    if (!c)
+        return "";
+    string s = stackCardFacts(c);
+    string kw = keywordList(c);
+    if (!kw.empty())
+        s += " [" + kw + "]";
+    return s;
+}
+
+//W41-12 (wave-40 L-123d): Lightning Greaves is auto={0}:equip, so the engine
+//re-offers "Equip ... targeting X" at EVERY priority window at no cost. One seat
+//spent 190,348 reasoning chars on 30 such windows in a single game, ping-ponging
+//the Greaves between two creatures eleven times in one turn. The BATTLEFIELD line
+//carries {attached: ...}; the OPTION line said nothing about the current holder.
+//Restriction-first, and the cost of the move is stated where the move is offered.
+//Pure, so PARSETEST proves both branches.
+static string equipHolderNote(const string& equipName, const string& hostName,
+                              const string& targetName, bool hostIsTheTarget)
+{
+    if (hostName.empty())
+        return "";
+    if (hostIsTheTarget)
+        return " (ALREADY attached to it - this would change NOTHING; no equip step"
+               " is left to take with " + equipName + ")";
+    //The DESTINATION is named too: the option's own "targeting <name>" prefix
+    //carries no instance handle, so at two same-named creatures "already
+    //attached to Wall of Omens #1 - this MOVES it" cannot be bound to a
+    //destination. The note states both ends and is therefore self-binding.
+    return " (" + equipName + " is ALREADY attached to " + hostName
+         + " - this MOVES it to " + (targetName.empty() ? string("the chosen creature")
+                                                        : targetName)
+         + ", and " + hostName + " loses what it grants)";
+}
+
+//W41-14 (wave-40 N3): a "may"-menu option rendered as the bare label "Life" -
+//no amount, no source, and the identical label would render for ANY life-granting
+//may. 22/22 answered correctly but at a median 5,702 reasoning chars re-deriving
+//the magnitude off the battlefield line. Append-only bracket tail: the answer
+//index and req.optionTexts (the staleness key) are untouched.
+static string lifeMenuLabelTag(int amount, bool gain, const string& sourceName,
+                               const string& sourceText)
+{
+    if (amount <= 0 || sourceName.empty())
+        return "";
+    std::ostringstream o;
+    o << " [" << (gain ? "gain " : "lose ") << amount << " life - " << sourceName;
+    if (!sourceText.empty())
+        o << ": \"" << sourceText << "\"";
+    o << "]";
+    return o.str();
+}
+
+//W41-16 (wave-40 F1): the day/night designation marker was pushed onto the stack
+//and typed "[spell]" - "1 (top): your Day [spell]" - telling the pilot it could
+//respond to a spell that is not a game object at all, and it was the single miss
+//in W39-STACKFACTS' 108/109. Designation/state markers (CR 730 day/night, the
+//monarch, the initiative, the ring, city's blessing) are modelled as type=Emblem
+//marker cards; the suite's zone accounting already excludes them by exactly this
+//predicate (TestSuiteAI.cpp isDesignationMarker). Pure core so PARSETEST can
+//prove the exclusion and its negative guard.
+bool stackObjectIsRespondable(bool hasSource, bool sourceIsEmblemMarker)
+{
+    if (!hasSource)
+        return true; //an engine-internal object still gets its line (never a silent gap)
+    return !sourceIsEmblemMarker;
+}
+
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus,
                        const char * copyScope = "your hand")
 {
@@ -2915,7 +3210,10 @@ string describeTarget(Player * me, Targetable * t)
     }
     //The deciding fact rides on the option: a discard or removal pick from
     //bare names is a coin flip for the model.
-    string txt = cardTextSnippet(c, 110);
+    //W41-4: a mutate pile's quote is the pile's COMBINED, per-card-attributed
+    //text - the annotation's own promise - not one member's text under another
+    //member's name.
+    string txt = pileAwareCardText(c, 110);
     if (!txt.empty())
         o << " - \"" << txt << "\"";
     return o.str();
@@ -5257,6 +5555,13 @@ string AIPlayerGPT::serializeGameState()
                 continue;
             if (it->type != ACTION_SPELL && it->type != ACTION_ABILITY)
                 continue; //phase steps / damage plumbing, not respondable objects
+            //W41-16: a day/night designation marker is not a card and not a
+            //spell - it renders "your Day [spell]" with no cost, type or P/T and
+            //tells the pilot it may respond to something that is not a game
+            //object. Same exclusion the suite's zone accounting already applies.
+            if (!stackObjectIsRespondable(it->source != NULL,
+                                          it->source && it->source->hasType(Subtypes::TYPE_EMBLEM)))
+                continue;
             std::ostringstream line;
             Player * ctrl = it->source ? it->source->controller() : NULL;
             line << (ctrl == this ? "your " : (ctrl ? "opponent's " : ""));
@@ -5820,8 +6125,18 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 host = moved->target;
             else if (moved->hasSubtype(Subtypes::TYPE_AURA))
                 host = moved->auraParent ? moved->auraParent : moved->target;
-            if (host && host == action.target)
-                out << " (ALREADY attached to it - this would change NOTHING)";
+            //W41-12: the same fact, both ways round. Re-attaching to the current
+            //host is the pure no-op the old note already caught; MOVING it off
+            //the current host was silent, and a {0} equip re-offered at every
+            //priority window turned that silence into a ping-pong (11 re-equips
+            //in one turn, 190k reasoning chars in one game). Name the holder and
+            //state the cost of moving it.
+            if (host)
+                out << equipHolderNote(moved->getDisplayName(),
+                                       host->getDisplayName() + instanceHandle(host),
+                                       action.target->getDisplayName()
+                                           + instanceHandle(action.target),
+                                       host == action.target);
         }
     }
     else if (action.playerAbilityTarget || action.player)
@@ -5875,7 +6190,9 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                                          : (action.ability ? action.ability->source : NULL);
     if (src)
     {
-        string txt = cardTextSnippet(src, 140);
+        //W41-4: pile-aware (this emitter serves battlefield activations, where a
+        //mutate pile is a legal source).
+        string txt = pileAwareCardText(src, 140);
         if (!txt.empty())
             out << " {card text: \"" << txt << "\"}";
         out << dynamicMagnitudes(src);
@@ -7390,6 +7707,22 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                      [](const std::pair<string, const OrderedAIAction *>& a,
                         const std::pair<string, const OrderedAIAction *>& b)
                      { return a.first < b.first; });
+    //W41-18 (wave-40 L-123b): "Flip Side with Bloodline Keeper -> DISPLAY TOGGLE
+    //only" was offered at nearly every priority window a Bloodline Keeper was in
+    //play - 38 of 285 prompts - changing nothing about the game state, and by
+    //alphabetical text order it sat DIRECTLY ABOVE the real, once-offered
+    //"Transform:backside with Bloodline Keeper [cost: {b}]": two near-identical
+    //lines, the inert one first, at the seam that decides this deck's best card.
+    //The option is not suppressed (it is a real face-data mutation, and the
+    //never-hide-a-legal-play ruling stands) - it is ordered LAST, the same place
+    //the declines go, so option-1 bias cannot land on the no-op and the two lines
+    //no longer read as neighbours. stable_sort keeps the byte-stable text order
+    //WITHIN each group, so an unchanged state still renders an unchanged prompt.
+    std::stable_sort(renderOrder.begin(), renderOrder.end(),
+                     [](const std::pair<string, const OrderedAIAction *>& a,
+                        const std::pair<string, const OrderedAIAction *>& b)
+                     { return (asTurnSide(a.second->ability) != NULL)
+                              < (asTurnSide(b.second->ability) != NULL); });
     for (size_t c = 0; c < renderOrder.size(); c++)
     {
         const OrderedAIAction * cand = renderOrder[c].second;
@@ -8173,7 +8506,14 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                         MTGCardInstance * tgt = zz[zi]->cards[cj];
                                         (tgt->controller() == this ? ownT : oppT)++;
                                         tNames << (tShown++ ? ", " : "") << tgt->getDisplayName()
-                                               << instanceHandle(tgt);
+                                               << instanceHandle(tgt)
+                                        //W41-8: cost + type + (P/T) + live
+                                        //keywords, the SAME facts W39-STACKFACTS
+                                        //put on the stack clause. At exactly one
+                                        //legal target the engine makes no model
+                                        //call for the target, so this preview is
+                                        //the ONLY surface carrying them.
+                                               << targetPreviewFacts(tgt);
                                         //N-158k: the SAME helper the target menu
                                         //now uses, so the cast preview and the
                                         //commit seat cannot drift apart.
@@ -9076,6 +9416,54 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         if (opts[i].compare(0, 10, "Transform:") == 0)
             opts[i] += " [available NOW - this transform is only offered because its"
                        " condition is already met; do not recount, it is legal this instant]";
+    //W41-14: AALifer::getMenuText renders EVERY life-granting "may" as the bare
+    //label "Life" (or "Life Loss") - no amount, no source. The deciding fact was
+    //not on the option, and the pilot re-derived the magnitude off the
+    //battlefield line at a median 5,702 reasoning chars per ask. Recover it from
+    //the ability's own life: expression, evaluated on the live board with the
+    //same WParsedInt the resolution uses, and name the card that raised the ask.
+    //Omit rather than guess: a script carrying more than one life: clause cannot
+    //be attributed to THIS option, a "rand" expression is never evaluated (it
+    //would draw the game RNG), and a trigger-event amount ("thatmuch") is 0 here
+    //(W41-10) - each of those keeps the bare label plus the card text the option
+    //already sits beside.
+    if (ctx)
+    {
+        string low = ctx->magicText;
+        for (size_t li = 0; li < low.size(); li++)
+            low[li] = (char) tolower((unsigned char) low[li]);
+        size_t first = low.find("life:");
+        bool unique = (first != string::npos && low.find("life:", first + 5) == string::npos);
+        for (size_t i = 0; unique && i < opts.size(); i++)
+        {
+            bool loss = (opts[i] == "Life Loss");
+            if (!loss && opts[i] != "Life")
+                continue;
+            size_t s = first + 5;
+            size_t e = low.find_first_of(" \t\r\n", s);
+            string expr = low.substr(s, e == string::npos ? string::npos : e - s);
+            if (expr.empty() || expr.find("rand") != string::npos
+                || expr.find("thatmuch") != string::npos)
+                continue;
+            bool numeric = true;
+            for (size_t k = (expr[0] == '-' || expr[0] == '+') ? 1 : 0; k < expr.size(); k++)
+                if (!isdigit((unsigned char) expr[k]))
+                {
+                    numeric = false;
+                    break;
+                }
+            int amount;
+            if (numeric)
+                amount = atoi(expr.c_str());
+            else
+            {
+                WParsedInt v(expr, NULL, ctx);
+                amount = v.getValue();
+            }
+            opts[i] += lifeMenuLabelTag(abs(amount), !loss, ctx->getDisplayName(),
+                                        cardTextSnippet(ctx, 140));
+        }
+    }
     //Modal-DFC "Flip Side" in the CLICK menu (deck199 Tergrid, observed live at
     //g1 seq21: "1. Cast Card Normally / 2. Flip Side / 3. Decline"). AATurnSide::
     //getMenuText renders it as a bare "Flip Side"; AATurnSide::resolve swaps the
@@ -11365,13 +11753,24 @@ int AIPlayerGPT::chooseBlockers()
         //Phyrexian Obliterator's "deals damage to" rider stayed hidden and
         //deck109 blocked into it (wave-8).
         string txt = attackers[j]->text;
+        //W41-4: an attacking mutate pile is ONE creature with every pile card's
+        //abilities, so the rider that decides the block may sit on an UNDER card.
+        //Gate on the whole pile's text and render the pile's combined, per-card
+        //attributed text.
+        {
+            std::vector<MTGCardInstance *> pile;
+            collectMutatePile(attackers[j], pile);
+            for (size_t pj = 0; pj < pile.size(); pj++)
+                if (pile[pj] && pile[pj] != attackers[j])
+                    txt += " " + pile[pj]->text;
+        }
         for (size_t ti = 0; ti < txt.size(); ti++)
             txt[ti] = (char) tolower((unsigned char) txt[ti]);
         if (txt.find("block") != string::npos
             || txt.find("deals damage") != string::npos
             || txt.find("dealt damage") != string::npos
             || txt.find("deals combat damage") != string::npos)
-            ln << " {text: " << cardTextSnippet(attackers[j], 160) << "}";
+            ln << " {text: " << pileAwareCardText(attackers[j], 160) << "}";
         //W39-UNREACHABLE: the restriction, first and negative. The REASON is
         //only stated when it is PROVABLE from the data on hand - flying
         //explains the pattern exactly when every blocker that may block this
@@ -16474,6 +16873,254 @@ void AIPlayerGPT::runParseSelfTest()
                              2, &btwo, &bst, NULL, &bnote);
         CHECK(bd == 2 && bnote.empty(),
               "W39-9 duplicate scaled labels keep the index and stay silent");
+    }
+
+    // ---- W41-4: a mutate pile quotes the PILE's text, per-card attributed ----
+    cout << "\n[W41-4] a mutate pile's option/target quote names every card in the pile\n";
+    {
+        std::vector<std::pair<string, string> > pile;
+        pile.push_back(std::make_pair(string("Everquill Phoenix"),
+                                      string("Flying -- Whenever this creature mutates, create a"
+                                             " 1/1 white Bird creature token with flying.")));
+        pile.push_back(std::make_pair(string("Dryad of the Ilysian Grove"),
+                                      string("You may play an additional land on each of your"
+                                             " turns. -- Lands you control are every basic land"
+                                             " type in addition to their other types.")));
+        string blob = mutatedPileTextCore(pile, 220);
+        // POSITIVE: the promise the [mutated pile] tag already makes is now kept -
+        // the concatenation names BOTH cards and carries BOTH texts.
+        CHECK(blob.find("mutate pile - combined abilities of 2 cards") == 0,
+              "W41-4 the pile blob opens with the combined-abilities marker");
+        CHECK(blob.find("Everquill Phoenix: Flying") != string::npos,
+              "W41-4 the top card's text is attributed to the top card");
+        CHECK(blob.find("Dryad of the Ilysian Grove: You may play an additional land") != string::npos,
+              "W41-4 the under card's text is attributed to the under card");
+        CHECK(blob.find(" || ") != string::npos,
+              "W41-4 pile members are separated by the || delimiter");
+        // NEGATIVE: a lone card is NOT a pile - the single-card snippet path is
+        // untouched, byte-for-byte (this is what keeps every non-mutate render
+        // identical to before).
+        std::vector<std::pair<string, string> > lone;
+        lone.push_back(std::make_pair(string("Perimeter Captain"), string("Defender")));
+        CHECK(mutatedPileTextCore(lone, 220).empty(),
+              "W41-4 NEGATIVE a single card produces no pile blob");
+        // NEGATIVE (the attribution rule): a member whose printed name could not
+        // be recovered is named "one card in the pile" - NEVER the other member's
+        // name, which is the exact swap that made 70% of these lines wrong.
+        std::vector<std::pair<string, string> > unknown;
+        unknown.push_back(std::make_pair(string("Gemrazer"), string("Trample, reach")));
+        unknown.push_back(std::make_pair(string(""),
+                                         string("Each creature spell you cast costs {1} less to cast.")));
+        string ublob = mutatedPileTextCore(unknown, 220);
+        CHECK(ublob.find("one card in the pile: Each creature spell") != string::npos,
+              "W41-4 an unattributable member is named generically, not guessed");
+        CHECK(ublob.find("Gemrazer: Each creature spell") == string::npos,
+              "W41-4 NEGATIVE the unattributable text is never given another member's name");
+        // ECHO SHAPE: the blob rides inside the same quoted tail every target line
+        // uses, so an echo of the option's SHORT NAME must still bind, and the
+        // "||" inside the quote must not be read as a second answer.
+        vector<string> popts;
+        popts.push_back("Everquill Phoenix #1 (4/4) [flying] [opponent's battlefield] - \""
+                        + blob + "\"");                      // 1
+        popts.push_back("Arboreal Grazer #1 (0/3) [opponent's battlefield]"); // 2
+        bool pstale = false;
+        string pnote;
+        int pc = parseChoice("CHOICE: 1 (Everquill Phoenix #1)", 2, &popts, &pstale, NULL, &pnote);
+        CHECK(pc == 1 && !pstale,
+              "W41-4 an echo of a pile target's short name still binds to its option");
+        pstale = false;
+        int pn = parseChoice("CHOICE: 2 (Arboreal Grazer #1)", 2, &popts, &pstale, NULL, NULL);
+        CHECK(pn == 2 && !pstale,
+              "W41-4 NEGATIVE a sibling target beside a pile blob is unaffected");
+        // The truncation rule is shared with the single-card snippet.
+        CHECK(textSnippetCore("one two three four five", 9) == "one two...",
+              "W41-4 the shared snippet core truncates on a word boundary");
+        CHECK(textSnippetCore("a\nb", 40) == "a b",
+              "W41-4 the shared snippet core flattens newlines");
+    }
+
+    // ---- W41-8: the legal-targets preview carries the deciding facts ----
+    cout << "\n[W41-8] the one-legal-target preview carries cost + type + P/T + keywords\n";
+    {
+        // The facts themselves come from stackCardFacts + keywordList (both already
+        // proven above); what is parse-relevant is that the enriched clause still
+        // echoes cleanly - the cast option's SHORT NAME is what the model copies.
+        vector<string> topts;
+        topts.push_back("Cast Path to Exile {w} - legal targets right now:"
+                        " Perimeter Captain #1 {w} (creature 0/4) [defender]"); // 1
+        topts.push_back("Cast nothing right now");                              // 2
+        bool tstale = false;
+        int tc = parseChoice("CHOICE: 1 (Cast Path to Exile)", 2, &topts, &tstale, NULL, NULL);
+        CHECK(tc == 1 && !tstale,
+              "W41-8 an echo of the cast's short name binds through the enriched target clause");
+        tstale = false;
+        int tn = parseChoice("CHOICE: 2 (Cast nothing right now)", 2, &topts, &tstale, NULL, NULL);
+        CHECK(tn == 2 && !tstale,
+              "W41-8 NEGATIVE the decline beside an enriched target clause is unaffected");
+        // NEGATIVE: the P/T inside the clause is not an answer the parser may
+        // invent - a reply naming a number that is only in the annotation is not
+        // a second option.
+        tstale = false;
+        int tb = parseChoice("CHOICE: 1 (Cast Path to Exile targeting Perimeter Captain #1)",
+                             2, &topts, &tstale, NULL, NULL);
+        CHECK(tb == 1, "W41-8 an echo that also names the previewed target still binds to the cast");
+    }
+
+    // ---- W41-10: a resolution-time amount is never rendered as a magnitude ----
+    cout << "\n[W41-10] trigger-event amounts are suppressed, not evaluated to 0\n";
+    {
+        // POSITIVE (the branch that was broken): Sanguine Bond's "-thatmuch" and
+        // Exquisite Blood's "thatmuch" produced "{right now: life 0}" on the only
+        // two cards that win that deck the game.
+        CHECK(magnitudeExprIsResolutionTimeOnly("thatmuch"),
+              "W41-10 a bare thatmuch amount is resolution-time only");
+        CHECK(magnitudeExprIsResolutionTimeOnly("-thatmuch"),
+              "W41-10 a negated thatmuch amount is resolution-time only");
+        CHECK(magnitudeExprIsResolutionTimeOnly("rand2"),
+              "W41-10 a rand amount is never evaluated (it would draw the game RNG)");
+        // NEGATIVE GUARD: the live magnitudes this campaign shipped must keep
+        // rendering - a devotion count and a plain number are both computable now.
+        CHECK(!magnitudeExprIsResolutionTimeOnly("type:manab:mybattlefield"),
+              "W41-10 NEGATIVE a devotion count still renders (Gray Merchant)");
+        CHECK(!magnitudeExprIsResolutionTimeOnly("2"),
+              "W41-10 NEGATIVE a plain amount is untouched");
+    }
+
+    // ---- W41-11: Tragic Slip's live Morbid branch ----
+    cout << "\n[W41-11] the live Morbid branch is rendered, not the static both-branch text\n";
+    {
+        string ifM, ifN;
+        // Tragic Slip: "auto=ifnot morbid then -1/-1" + "auto=if morbid then -13/-13"
+        CHECK(morbidPTBranches("ifnot morbid then -1/-1\nif morbid then -13/-13", ifM, ifN),
+              "W41-11 both morbid branches are found");
+        CHECK(ifM == "-13/-13" && ifN == "-1/-1",
+              "W41-11 each branch keeps its own modifier");
+        CHECK(morbidMagnitudeClause(ifM, ifN, true)
+              == "-13/-13 (a creature died this turn, so Morbid applies)",
+              "W41-11 the morbid-live clause names the magnitude and why");
+        CHECK(morbidMagnitudeClause(ifM, ifN, false)
+              == "-1/-1 (no creature has died this turn, so Morbid does NOT apply)",
+              "W41-11 the morbid-dead clause names the magnitude and why");
+        // An unsigned script modifier is a BONUS, and must render as one.
+        string bM, bN;
+        morbidPTBranches("if morbid then 2/2", bM, bN);
+        CHECK(bM == "+2/+2" && bN.empty(),
+              "W41-11 an unsigned modifier renders signed, and a missing branch stays empty");
+        // NEGATIVE: no morbid at all, and a morbid branch whose payload is NOT a
+        // P/T modifier - omit rather than guess a magnitude out of a construct
+        // this cannot read.
+        string nM, nN;
+        CHECK(!morbidPTBranches("target(creature) -1/-1", nM, nN),
+              "W41-11 NEGATIVE a card with no morbid branch produces nothing");
+        CHECK(!morbidPTBranches("if morbid then name(Destroy it) destroy", nM, nN),
+              "W41-11 NEGATIVE a non-P/T morbid payload is left to the card text");
+        CHECK(morbidMagnitudeClause("", "", true).empty(),
+              "W41-11 NEGATIVE an empty branch renders no clause");
+        // ECHO SHAPE: the clause rides in the {right now: ...} annotation the
+        // reply protocol tells the model NOT to copy - an echo that copies it
+        // anyway must still bind.
+        vector<string> mopts;
+        mopts.push_back("Cast Tragic Slip {b} {right now: -13/-13 (a creature died this turn,"
+                        " so Morbid applies)}");   // 1
+        mopts.push_back("Cast nothing right now"); // 2
+        bool mstale = false;
+        int mc = parseChoice("CHOICE: 1 (Cast Tragic Slip {right now: -13/-13 (a creature died"
+                             " this turn, so Morbid applies)})", 2, &mopts, &mstale, NULL, NULL);
+        CHECK(mc == 1, "W41-11 an echo carrying the morbid annotation still binds");
+        mstale = false;
+        int mn = parseChoice("CHOICE: 2 (Cast nothing right now)", 2, &mopts, &mstale, NULL, NULL);
+        CHECK(mn == 2, "W41-11 NEGATIVE the decline beside a morbid annotation is unaffected");
+    }
+
+    // ---- W41-12: a {0} equip names its current holder ----
+    cout << "\n[W41-12] the equip option states where the Equipment already is\n";
+    {
+        // POSITIVE (the silent branch): moving it OFF its current holder. Both
+        // ends are named - the option's "targeting <name>" prefix carries no
+        // instance handle, so at two same-named creatures the note is the only
+        // bindable statement of where the Equipment ends up.
+        string mv = equipHolderNote("Lightning Greaves", "Wall of Omens #1",
+                                    "Wall of Omens #2", false);
+        CHECK(mv == " (Lightning Greaves is ALREADY attached to Wall of Omens #1"
+                    " - this MOVES it to Wall of Omens #2, and Wall of Omens #1"
+                    " loses what it grants)",
+              "W41-12 a move names the holder, the destination and the cost");
+        CHECK(equipHolderNote("Lightning Greaves", "Bloodline Keeper #1", "", false)
+                  .find("MOVES it to the chosen creature") != string::npos,
+              "W41-12 an unnamed destination is described, never guessed");
+        // POSITIVE (the no-op branch): the done-signal the option line lacked.
+        string sm = equipHolderNote("Lightning Greaves", "Bloodline Keeper #1",
+                                    "Bloodline Keeper #1", true);
+        CHECK(sm.find("ALREADY attached to it - this would change NOTHING") != string::npos,
+              "W41-12 a re-attach to the same creature is still called a no-op");
+        CHECK(sm.find("no equip step is left to take with Lightning Greaves") != string::npos,
+              "W41-12 the no-op carries a done-signal naming the Equipment");
+        // NEGATIVE: an unattached Equipment says nothing - the first equip is a
+        // real play and must not be discouraged.
+        CHECK(equipHolderNote("Lightning Greaves", "", "Vampire #1", false).empty(),
+              "W41-12 NEGATIVE an unattached Equipment gets no holder note");
+        // ECHO SHAPE: the note is bare parenthetical text on the option line.
+        vector<string> eopts;
+        eopts.push_back("Equip with Lightning Greaves targeting Vampire #1" + mv); // 1
+        eopts.push_back("Equip with Lightning Greaves targeting Bloodline Keeper #1" + sm); // 2
+        bool estale = false;
+        int ec = parseChoice("CHOICE: 1 (Equip with Lightning Greaves targeting Vampire #1)",
+                             2, &eopts, &estale, NULL, NULL);
+        CHECK(ec == 1, "W41-12 an echo of the equip's short name binds through the holder note");
+        estale = false;
+        int en = parseChoice("CHOICE: 2 (Equip with Lightning Greaves targeting Bloodline Keeper #1)",
+                             2, &eopts, &estale, NULL, NULL);
+        CHECK(en == 2, "W41-12 NEGATIVE the sibling equip option is still distinguishable");
+    }
+
+    // ---- W41-14: the bare "Life" may-menu label ----
+    cout << "\n[W41-14] a life may-menu option carries its magnitude and its source\n";
+    {
+        string tag = lifeMenuLabelTag(2, true, "Perimeter Captain",
+                                      "Defender -- Whenever a creature you control with defender"
+                                      " blocks, you may gain 2 life.");
+        CHECK(tag.find("[gain 2 life - Perimeter Captain:") == 0
+              || tag == " [gain 2 life - Perimeter Captain: \"Defender -- Whenever a creature you"
+                        " control with defender blocks, you may gain 2 life.\"]",
+              "W41-14 the label states the amount, the direction and the source");
+        CHECK(lifeMenuLabelTag(3, false, "Some Card", "").find("[lose 3 life - Some Card]")
+              != string::npos,
+              "W41-14 a life-LOSS label states the direction and works without card text");
+        // NEGATIVE: no magnitude and no source means no claim - the bare label
+        // stands rather than a fabricated one (a wrong magnitude is worse than
+        // an absent one, W41-10's own lesson).
+        CHECK(lifeMenuLabelTag(0, true, "Perimeter Captain", "x").empty(),
+              "W41-14 NEGATIVE a zero/unknown amount renders no tag");
+        CHECK(lifeMenuLabelTag(2, true, "", "x").empty(),
+              "W41-14 NEGATIVE an unnamed source renders no tag");
+        // ECHO SHAPE: the model echoes the bare engine label, the annotated label,
+        // or the decline; all three must land on the right index.
+        vector<string> lopts;
+        lopts.push_back("Life" + lifeMenuLabelTag(2, true, "Perimeter Captain",
+                                                  "Defender -- ... you may gain 2 life.")); // 1
+        lopts.push_back("Decline - do nothing");                                            // 2
+        bool lstale = false;
+        int lc = parseChoice("CHOICE: 1 (Life)", 2, &lopts, &lstale, NULL, NULL);
+        CHECK(lc == 1 && !lstale, "W41-14 an echo of the bare engine label still binds");
+        lstale = false;
+        int la = parseChoice("CHOICE: 1 (Life [gain 2 life - Perimeter Captain: \"Defender -- ..."
+                             " you may gain 2 life.\"])", 2, &lopts, &lstale, NULL, NULL);
+        CHECK(la == 1, "W41-14 an echo carrying the whole annotated label still binds");
+        lstale = false;
+        int ld = parseChoice("CHOICE: 2 (Decline - do nothing)", 2, &lopts, &lstale, NULL, NULL);
+        CHECK(ld == 2 && !lstale,
+              "W41-14 NEGATIVE the decline beside an annotated Life option is unaffected");
+    }
+
+    // ---- W41-16: designation markers are not stack objects ----
+    cout << "\n[W41-16] a day/night designation marker is not rendered as a stack spell\n";
+    {
+        CHECK(!stackObjectIsRespondable(true, true),
+              "W41-16 an Emblem-typed designation marker is excluded from the stack render");
+        CHECK(stackObjectIsRespondable(true, false),
+              "W41-16 NEGATIVE a real spell on the stack still renders");
+        CHECK(stackObjectIsRespondable(false, false),
+              "W41-16 NEGATIVE a sourceless engine object still renders (never a silent gap)");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
