@@ -1,0 +1,24 @@
+                Stack trace of thread 528628:
+                #0  0x00007f14b86b3f55 __dynamic_cast (libstdc++.so.6 + 0xb3f55)
+                #1  0x000055ab27178dc6 _ZN12GameObserver8AffinityEv (wagic + 0x2c3dc6)
+                #2  0x000055ab271778ca _ZN12GameObserver21gameStateBasedEffectsEv (wagic + 0x2c28ca)
+                #3  0x000055ab271744d2 _ZN12GameObserver6UpdateEf (wagic + 0x2bf4d2)
+                #4  0x000055ab271be193 _ZN13GameStateDuel6UpdateEf (wagic + 0x309193)
+                #5  0x000055ab2716dfbb _ZN7GameApp6UpdateEv (wagic + 0x2b8fbb)
+                #6  0x000055ab273f64cc _ZN3JGE6UpdateEf (wagic + 0x5414cc)
+                #7  0x000055ab274315e4 _ZN6SdlApp8OnUpdateEv (wagic + 0x57c5e4)
+                #8  0x000055ab27432ed9 _ZN6SdlApp9OnExecuteEv (wagic + 0x57ded9)
+                #9  0x000055ab27432bf7 main (wagic + 0x57dbf7)
+                #10 0x00007f14b8227781 n/a (libc.so.6 + 0x27781)
+                #11 0x00007f14b82278b9 __libc_start_main (libc.so.6 + 0x278b9)
+                #12 0x000055ab26f24595 _start (wagic + 0x6f595)
+                
+                Stack trace of thread 528630:
+                Stack trace of thread 528629:
+                #0  0x00007f14b82a0952 n/a (libc.so.6 + 0xa0952)
+                #1  0x00007f14b8311365 __poll (libc.so.6 + 0x111365)
+                #2  0x00007f14b4df4c2b n/a (libusb-1.0.so.0 + 0x14c2b)
+                #3  0x00007f14b82980a2 n/a (libc.so.6 + 0x980a2)
+                #4  0x00007f14b832080c n/a (libc.so.6 + 0x12080c)
+                
+                Stack trace of thread 528631:
