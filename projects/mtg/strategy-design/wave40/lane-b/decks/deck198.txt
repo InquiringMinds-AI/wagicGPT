@@ -1,0 +1,8 @@
+#NAME:Zero-Slack Blaze Probe
+#DESC:wave-40 lane-B regression fixture: a mono-red {X} spell over exactly its coloured pip
+
+#20 spells
+Blaze * 20
+
+#40 lands
+Mountain (M13) * 40

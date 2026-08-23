@@ -3419,9 +3419,30 @@ MTGCardInstance * AIPlayerBaka::FindCardToPlay(ManaCost * pMana, const char * ty
             //FORCEABILITY tests: any card worth playing at all is played,
             //so scripted AI tests don't depend on the (process-global,
             //thread-shared) rand() stream. Deliberate zeros still skip.
-            if ((forceBestAbilityUse || aiForcedCandidate) && shouldPlayPercentage > 0)
+            if (forceBestAbilityUse && shouldPlayPercentage > 0)
                 chance = 0;
-            if (chance > shouldPlayPercentage)
+            //W39-D1: an EXPLICIT MODEL PICK is not subject to a desirability
+            //roll AT ALL. shouldPlayPercentage is a preference heuristic and
+            //preference is the model's job; legality is LegalActionsOracle's,
+            //and it already approved this cast before the option was ever
+            //rendered. The old form gated the forced-candidate override on
+            //`shouldPlayPercentage > 0`, so a NEGATIVE score silently vetoed
+            //the pilot's own choice - `chance > shouldPlayPercentage` is true
+            //for every roll at a negative score, so the candidate was
+            //`continue`d with no click, no clickstream entry and no reason
+            //given. The X-slack penalty reaches negative scores routinely:
+            //at zero announceable slack it is `P - (P*1.9)/1`, i.e. -0.9P
+            //(corpus 20260823 deck125 vs139 t5: Sphinx's Revelation over
+            //exactly {u}{u}{w}, shouldPlayPercentage = -9, vetoed five
+            //priority windows running; the same card at one mana of slack
+            //scored 1 and was honoured). Casting an {X} spell for X = 0 is
+            //legal and is sometimes right (owner ruling 2026-08-23) - the
+            //heuristic's opinion of it is not a veto over the pilot.
+            //Baka's own behaviour is untouched: this branch needs
+            //aiForcedCandidate, which only the GPT seam sets.
+            //The random draw itself stays unconditional so the shared rand()
+            //stream advances identically either way.
+            if (card != aiForcedCandidate && chance > shouldPlayPercentage)
                 continue;
             if(shouldPlayPercentage <= 10)
             {

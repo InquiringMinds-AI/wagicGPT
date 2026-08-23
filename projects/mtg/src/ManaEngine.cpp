@@ -610,8 +610,26 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
     {
         //if we decided to play an "x" ability/card, lets go all out, these effects tend to be game winners.
         //add the rest of the mana.
+        //
+        //ONE ABILITY PER SOURCE (W39-DOUBLEASK). This tail is the only walk in
+        //the planner that did not mark `used[amp->source]` after taking a
+        //producer, so a card carrying more than one mana ability - every DUAL
+        //land (Seachrome Coast add{W} + add{U}, Tundra, Volcanic Island) -
+        //entered the plan TWICE. The plan is executed as one click per entry
+        //and the first click taps the card, so the second click on the same
+        //(now tapped) card is refused; AIPlayerBaka::Act treats a refused
+        //payment click as a broken plan and DISCARDS THE WHOLE REMAINDER,
+        //including the cast click. The seat is then left with partial mana
+        //floating and the spell still in hand - which is what the GPT seat
+        //re-asked over: the identical cast question a second time, now
+        //rendering the POST-TAP `Mana available:` figure (corpus 20260823
+        //deck125 vs126 seq16 "Mana available: 6" -> seq17 "Mana available: 1,
+        //Already in pool: 5"; the second ask is a full extra model call).
+        //Every other walk above already enforces one-ability-per-card through
+        //this same `used` map, and so does ManaEngine::selectAutoTapProducers
+        //on the human side; this is the outlier, not a deliberate exception.
         for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
-        { 
+        {
             MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
             AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
             if (amp && policy.canHandle(amp))
@@ -619,6 +637,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                 if (!used[amp->source] && producerUsable(p, amp, amp->source, true) && amp->output->getConvertedCost() >= 1)
                 {
                     payments.push_back(amp);
+                    used[amp->source] = true;
                 }
             }
         }

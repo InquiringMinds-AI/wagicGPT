@@ -8075,8 +8075,21 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     //breaker. It is also deterministic on re-poll: the full menu is rebuilt
     //identically each tick, replays its cached answer, rejects again, and the
     //reduced menu replays its own. (The rejected line is deliberately NOT put
-    //into mStuckCastLines: that would change the next tick's FULL menu and so
-    //the re-ask's question text, turning a cache hit into a fresh HTTP call.)
+    //into mStuckCastLines WHILE re-asks remain: that would change the next
+    //tick's FULL menu and so the re-ask's question text, turning a cache hit
+    //into a fresh HTTP call.)
+    //
+    //W39-D1(b): that cache objection covers the INTERMEDIATE re-ask only. Once
+    //lastChance fires the window has already been conceded to the heuristic and
+    //there is no live answer left to protect, so the rejected line IS retired
+    //into mStuckCastLines (turn-scoped - it clears on the next turn header
+    //above). Without that, the next priority poll rebuilt the identical full
+    //menu, askModel replayed the same cached answer (latency_ms -1, no HTTP
+    //call), validation rejected it again, and another
+    //`validation_reject_reask_exhausted` record was written - once per poll
+    //until the phase advanced. Corpus 20260823 deck125 vs139 t5 seq11-15: five
+    //exhaustion records, five burned priority windows, zero model calls. One
+    //rejected line now costs exactly ONE record.
     const int kMaxCastReasks = 2; //3 asks per window, worst case
     string rejectedSoFar;
     for (int attempt = 0; ; attempt++)
@@ -8140,6 +8153,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         writeTransLog("defer", "", "", -1, (int) menu.size(), chosen->name,
                       lastChance ? "validation_reject_reask_exhausted"
                                  : "validation_reject_reask");
+        if (lastChance)
+            mStuckCastLines.insert(opts[pick]); //no replay of a conceded window
         candidates.erase(candidates.begin() + pick);
         candidateUsesAlt.erase(candidateUsesAlt.begin() + pick);
         opts.erase(opts.begin() + pick);
