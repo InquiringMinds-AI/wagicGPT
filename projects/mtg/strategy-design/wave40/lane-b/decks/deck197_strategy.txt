@@ -1,0 +1,11 @@
+This deck exists to exercise ONE engine seam: casting an {X} spell for X = 0.
+
+Blaze {X}{R} is the only spell in the deck. Mountains are the only lands.
+
+How to pilot it, every turn, without exception:
+- Play a land when one is offered.
+- When a casting decision offers Blaze, CAST BLAZE. Choose it even when the only
+  announceable value of X is 0. An X = 0 Blaze is a legal cast and casting it is
+  what this seat is here to do.
+- When the X menu appears, take the LARGEST offered value.
+- Do not hold Blaze back for a bigger X. There is nothing else to spend mana on.

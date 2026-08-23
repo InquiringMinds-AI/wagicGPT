@@ -1,0 +1,8 @@
+#NAME:Blaze Probe Sparring Partner
+#DESC:wave-40 lane-B regression fixture opponent: slow, harmless, ends the game eventually
+
+#4 creatures
+Grizzly Bears * 4
+
+#56 lands
+Forest (M13) * 56

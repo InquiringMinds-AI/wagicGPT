@@ -1,0 +1,8 @@
+#NAME:Dual-Land Blaze Probe
+#DESC:wave-40 lane-B: {X} spell over DUAL lands (two mana abilities per source)
+
+#20 spells
+Blaze * 20
+
+#40 lands
+Volcanic Island * 40
