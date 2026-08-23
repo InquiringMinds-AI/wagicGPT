@@ -1,0 +1,29 @@
+#W41-5, the FROM() side of the prevention query. Armored Transport (2/1)
+#prevents all combat damage dealt to it BY CREATURES BLOCKING IT - a prevention
+#whose target chooser matches on the damage SOURCE, not the damage target, and
+#one that is scoped to a filtered set rather than to `this`. Grizzly Bears
+#(2/2) would kill the 2/1 outright on raw stats; instead the Bears die and the
+#Transport survives. This is the attacker-side shape of the same annotation
+#defect: the block-outcome parenthetical predicted "both die" here.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Armored Transport
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+Armored Transport
+next
+#blockers
+grizzly bears
+next
+#damage
+next
+#combat end
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Armored Transport
+[PLAYER2]
+graveyard:grizzly bears
+[END]

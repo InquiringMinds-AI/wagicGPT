@@ -1,0 +1,27 @@
+#W41-5: the plain-lethal path. A 2/2 attacker would kill a 0/2 wall outright on
+#raw stats - which is precisely what the block-outcome annotation used to
+#predict. Fog Bank's prevention makes it survive, and the attacker takes
+#nothing back (Fog Bank's damage is prevented too). Both creatures must still
+#be on the battlefield at combat end.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:grizzly bears
+[PLAYER2]
+inplay:Fog Bank
+[DO]
+grizzly bears
+next
+#blockers
+Fog Bank
+next
+#damage
+next
+#combat end
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:grizzly bears
+[PLAYER2]
+inplay:Fog Bank
+[END]
