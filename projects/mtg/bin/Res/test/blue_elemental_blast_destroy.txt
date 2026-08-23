@@ -1,0 +1,24 @@
+#Blue Elemental Blast, destroy mode: destroy target red permanent.
+#Only one mode has a legal target here (nothing on the stack), so the merged
+#choose-one menu holds a single entry - index 0 is the destroy leg.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Blue Elemental Blast
+manapool:{U}
+[PLAYER2]
+inplay:Raging Goblin
+[DO]
+Blue Elemental Blast
+choice 0
+Raging Goblin
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Blue Elemental Blast
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Raging Goblin
+life:20
+[END]

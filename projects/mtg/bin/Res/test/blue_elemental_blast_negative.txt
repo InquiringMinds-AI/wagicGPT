@@ -1,0 +1,30 @@
+#NEGATIVE: Blue Elemental Blast may not be cast when no red spell is on the
+#stack and no red permanent is on the battlefield (CR 601.2b - a modal spell
+#needs at least one legal mode). The opponent's spell here is BLUE, so the
+#counter mode has no legal target and the destroy mode has none either.
+#Expected: the click on Blue Elemental Blast is refused - it stays in hand with
+#its mana unspent, and the blue spell resolves.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Merfolk of the Pearl Trident
+manapool:{U}
+[PLAYER2]
+hand:Blue Elemental Blast
+manapool:{U}
+[DO]
+Merfolk of the Pearl Trident
+yes
+Blue Elemental Blast
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Merfolk of the Pearl Trident
+manapool:{0}
+life:20
+[PLAYER2]
+hand:Blue Elemental Blast
+manapool:{U}
+life:20
+[END]

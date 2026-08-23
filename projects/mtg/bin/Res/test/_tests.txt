@@ -1091,3 +1091,11 @@ generic/legend_second_copy_castable.txt
 scarecrone_self_sacrifice_cost_wave35.txt
 master_of_etherium_two_copies_wave35.txt
 elite_spellbinder_empty_hand.txt
+blue_elemental_blast_counter.txt
+blue_elemental_blast_destroy.txt
+blue_elemental_blast_negative.txt
+blue_elemental_blast_wrongcolor_spell.txt
+red_elemental_blast_counter.txt
+red_elemental_blast_destroy.txt
+red_elemental_blast_negative.txt
+blue_elemental_blast_both_modes.txt

@@ -1,0 +1,33 @@
+#Per-mode target legality: Blue Elemental Blast's counter mode is restricted to
+#RED spells, so a BLUE spell on the stack is not a legal target for it even
+#though a red permanent makes the card castable.
+#Expected: only the destroy mode joins the choose-one menu (index 0); the blue
+#spell resolves untouched and the red permanent dies.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Merfolk of the Pearl Trident
+inplay:Raging Goblin
+manapool:{U}
+[PLAYER2]
+hand:Blue Elemental Blast
+manapool:{U}
+[DO]
+Merfolk of the Pearl Trident
+yes
+Blue Elemental Blast
+choice 0
+Raging Goblin
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Merfolk of the Pearl Trident
+graveyard:Raging Goblin
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Blue Elemental Blast
+manapool:{0}
+life:20
+[END]
