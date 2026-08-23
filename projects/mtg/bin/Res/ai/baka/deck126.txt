@@ -34,4 +34,4 @@ Isolated Chapel * 2
 Urborg, Tomb of Yawgmoth * 1
 Swamp (SOM) * 1
 Plains (M12) * 1
-Forest (SHM) * 16
+Forest (SHM) * 1

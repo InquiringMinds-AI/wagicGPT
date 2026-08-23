@@ -37,3 +37,19 @@ grows to 26. HOLD: 152, 146 (guides modified wave-37), 139 (host-carry validatio
 pending), 36 (crash-fix live validation pending). ENTER (Step 0, FIRST PASS GUIDELESS):
 125 Revelation Fracture, 126 Sanguine Blood, 162 Draw and Die!. Wave-39 pool:
 146, 139, 152, 36, 125, 126, 162.
+
+## Wave-39 adjudication (synthesis, 2026-08-23)
+
+- EXIT -> canary: deck36 (guide unmodified two waves; crash-fix validated with positive
+  control; zero seat-scoped ledger items). Guide stays deployed as canary.
+- HOLD: 139 (party to the Affinity crash + owed 139v125 rerun + mutated-pile render item),
+  152 (two surgical guide edits shipped this wave, validation owed), 146 (hold-back gate
+  NULL on n=1 — named arming requirement: report arming counts from 146v139 and 146v152
+  specifically, or retire the line), 125/126/162 (Step-0, initial guides deployed,
+  one validation corpus owed).
+- ENTER: deck123 "Intruders Of Thraben" (60 cards verified, no guide file — first pass
+  GUIDELESS per Step-0).
+- Wave-40 pool: 146, 139, 152, 125, 126, 162, 123.
+- deck126 construction: owner ordered the Forest*16 -> *1 fix (75/39 -> 60/24) 2026-08-23;
+  committed with this wave. Seat-126 wave-40 deltas must be attributed across BOTH the new
+  guide and the construction change (wave-35 attribute-deltas-correctly rule).

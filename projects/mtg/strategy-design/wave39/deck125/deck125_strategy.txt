@@ -1,0 +1,155 @@
+REVELATION FRACTURE - UW DRAW-GO CONTROL
+
+You never have a creature on the battlefield and nothing in this deck attacks. You win by answering
+every threat the opponent makes and then killing them one damage at a time with Staff of Nin, while
+Elixir of Immortality shuffles your spent answers back into your deck. Every turn is the same three
+actions: play a land, answer the most dangerous thing on their side, and tap every Staff of Nin you
+control at their face. You are the control player in every matchup and you have all the time in the
+world - but you take one of those three actions EVERY turn, never none.
+
+=== #1 - STAFF OF NIN IS YOUR WIN CONDITION. EMRAKUL IS NOT YOUR PLAN. ===
+Emrakul, the Aeons Torn costs {15} - fifteen mana. Your mana is 26 lands and nothing else: this deck
+has no ramp, no mana rock and no cost reduction, so one land per turn is all the mana you will ever
+have. Your plan is therefore this, and you can write it as your PLAN line word for word:
+   "Answer their threats, resolve Staff of Nin, ping their face every turn."
+The thought "ramp to 15 mana and cast Emrakul", the thought "I just need to survive until I can cast
+Emrakul", and the thought "attack when board presence allows" are ALWAYS FALSE in this deck. There is
+no ramp to do, and you have no creature to attack with. When one of them shows up in the plan you
+were given, replace the plan with the line above.
+If "Cast Emrakul, the Aeons Torn" is ever actually printed in your numbered list, take it - the game
+only prints a cast you can already pay for. Until that line appears, Emrakul is a blank card and
+changes nothing you do this turn.
+
+=== STAFF OF NIN - THE CLOCK ===
+Staff of Nin {6} artifact, two copies. Its line reads: "At the beginning of your upkeep, draw a card.
+-- {T}: Staff of Nin deals 1 damage to any target." It is the only damage and the only extra card
+this deck has.
+- Cast it the first turn "Cast Staff of Nin" appears in your list, ahead of anything except an answer
+  you need this same turn.
+- Keep taking the "Deal 1 Damage with Staff of Nin ... targeting a player" option in every window it
+  is offered, including upkeep, and with EVERY Staff you control. That damage is how the game ends.
+- Point it at a creature or a planeswalker only when 1 damage finishes it: printed toughness 1, or a
+  planeswalker showing exactly 1 loyalty counter. Otherwise it goes at the player.
+
+=== SPEND YOUR ANSWERS ON WHAT ACTUALLY KILLS YOU ===
+You hold 13 counterspells - 4 Essence Scatter {1}{U} (creature spells only), 3 Dream Fracture
+{1}{U}{U} (counters anything, you both draw), 3 Cancel {1}{U}{U}, 3 Fall of the Gavel {3}{W}{U}
+(counters anything and gains you 5 life). You can afford to spend them freely; each one is still only
+worth whatever it stopped.
+COUNTER ON SIGHT, whatever else is going on:
+  - the big creatures in this pool: Master of Etherium, Illuna Apex of Wishes, Everquill Phoenix,
+    Tovolar's Huntmaster, Brutal Cathar, Augur of Autumn, Acererak the Archlich, Nadaar Selfless
+    Paladin, Beanstalk Giant;
+  - every planeswalker: Kaya the Inexorable, Lolth Spider Queen, Ob Nixilis the Hate-Twisted;
+  - every permanent that hits you or grows them EVERY turn: Underworld Dreams, Fate Unraveler,
+    Sanguine Bond, Exquisite Blood, Howling Mine, Staff of Nin, Nuisance Engine;
+  - and Idyllic Tutor: it is not a permanent, but it fetches the enchantment half of their combo.
+LET IT RESOLVE and keep the counter for the list above:
+  - mana makers: Silver Myr, Chromatic Lantern, Mox Sapphire, Mox Jet, Arboreal Grazer, Overgrown
+    Battlement, Dryad of the Ilysian Grove;
+  - walls and 0-power bodies: Steel Wall, Shield Sphere, Pride Guardian, Perimeter Captain, Fog Bank,
+    Ornithopter, Glaze Fiend.
+  None of these can kill you, and Path to Exile or a sweeper answers them later for less mana.
+A name you do not recognise: counter it when their battlefield line already shows a creature, or when
+your life is 12 or less; otherwise, let it resolve and answer the permanent afterwards.
+The stack prints only a name - "1 (top): opponent's Silver Myr [spell]". The card's rules text is in
+the OPPONENT DECK list at the top of this prompt; that is where you read what it does.
+
+=== PATH TO EXILE - YOUR ONLY ANSWER TO A CREATURE THAT ALREADY LANDED ===
+Path to Exile {W} instant, four copies: "Exile target creature." These are the ONLY cards in your
+deck that remove one creature that is already on the battlefield. Essence Scatter and every other
+counter you own can only stop a spell on the stack; once a creature has resolved they do nothing to
+it.
+So: cast Path to Exile at the creature with the HIGHEST printed power on their battlefield line. When
+every target it offers you is tagged [defender] or has printed power 1 or 0, answer "Cast nothing
+right now" and keep the Path for the real threat - unless your life is 12 or less, and then exile the
+biggest creature they have right now.
+Path lets its controller fetch a basic land. That cost is the point of the card; always pay it.
+
+=== SWEEPERS - THE HEADER COUNTS THE CREATURES FOR YOU ===
+Your battlefield has no creatures, so a board wipe only ever costs the opponent. The opponent
+battlefield header gives you the number: "Opponent battlefield (11 permanents listed, of which 3 are
+creatures)". Read that number and act on it:
+- 2 or more creatures: cast Supreme Verdict {1}{W}{W}{U} - its own line says "can't be countered", and
+  it means it, so it resolves through their counterspells. With six mana, Final Judgment {4}{W}{W}
+  EXILES instead of destroying; use Final Judgment against anything that returns from a graveyard.
+- exactly 1 creature: Path to Exile it and keep the sweeper.
+- 0 creatures: answer "Cast nothing right now" and keep the sweeper. A wipe with nothing to kill is a
+  card you have thrown away.
+
+=== SPHINX'S REVELATION - X IS YOUR MANA MINUS 3 ===
+Sphinx's Revelation {X}{W}{U}{U} instant: "You gain X life and draw X cards." X is the number on your
+"Mana available: N total" line, minus 3. At X = 0 it gains nothing and draws nothing.
+Cast Sphinx's Revelation when your "Mana available:" line reads SIX or more - that is X = 3 or better.
+Below six, answer "Cast nothing right now" and hold it; it is an instant and it will still be there
+next turn with one more land behind it.
+Cast it at whatever size the game allows, whatever that number says, when your hand holds no counter
+and no Path to Exile - then you need the cards more than you need the size.
+When the X menu appears, pick the line showing the LARGEST X. The sentence above the menu names the
+largest X you can afford, and every value listed is affordable. Reply with the OPTION number, not the
+X value - the line you pick must literally read "X = " followed by the biggest number in the menu.
+If you choose Sphinx's Revelation and your very next prompt still shows Sphinx's Revelation in your
+hand with your mana unspent, cast something else this turn and take it again next turn.
+
+=== ELIXIR OF IMMORTALITY - THE RECYCLER ===
+Elixir of Immortality {1} artifact, two copies: "{2},{T}: You gain 5 life. Shuffle Elixir of
+Immortality and your graveyard into library." Every counterspell and every Path you have already
+spent goes back into your deck, and the Elixir goes back with them, so you can draw it and cast it
+again. That is why this deck never runs out of answers.
+Cast it the turn it is listed when you have a spare {1}. Activate it in your OWN main phase with
+whatever mana is left after the spell you wanted this turn, or at any point your life is 15 or less.
+
+=== LIGHTMINE FIELD - IT ONLY PUNISHES A CROWD ===
+Lightmine Field {2}{W}{W}: "Whenever one or more creatures attack, Lightmine Field deals damage to
+each of those creatures equal to the number of attacking creatures." Three attackers take 3 each and
+die; ONE attacker takes 1 damage, which kills nothing however large it is.
+Cast Lightmine Field when the opponent battlefield header counts 3 or more creatures. Against one or
+two big creatures, spend that mana on Path to Exile or a sweeper instead.
+
+=== YOUR MANA AND YOUR WINDOWS ===
+You get a window on the opponent's turn only when they cast a spell, and the prompt shows it to you
+under "ON THE STACK". You are never offered an end-of-their-turn window, so mana you hold open
+through a turn where they cast nothing is mana you threw away.
+So keep {1}{U} open for Essence Scatter, or {1}{U}{U} for Cancel or Dream Fracture, and spend
+everything ABOVE that on your own turn - a Staff of Nin, an Elixir activation, a Sphinx's Revelation,
+a Lightmine Field. Ending your turn with all your mana unspent is right only when your hand is
+nothing but counterspells.
+
+=== MULLIGAN ===
+KEEP any 7-card opening hand with 2, 3, 4 or 5 lands. The prompt counts them for you - "Your hand (7
+cards), counted by the engine: 3 lands, 4 spells" - so read that number and do not count the hand
+yourself.
+Your cheapest cards cost ONE mana (Path to Exile {W}, Elixir of Immortality {1}), so "no early play"
+is never a reason to ship a hand, and the prompt's "Playing every land in this hand would cover the
+cost of:" line names exactly what this hand can already cast - if it names even one card, this hand
+can act.
+Tiebreakers between keepable hands only, never a reason to mulligan on their own: prefer the hand
+with a land that makes both colours (Tundra, Glacial Fortress, Seachrome Coast), and prefer the hand
+with at least one counterspell. Colour is only a tiebreaker: 18 of your lands make {W} and 20 make
+{U}, so a one-colour opener still casts spells.
+If the mulligan question ever contains the words "having already taken", this is your LAST look:
+answer 1, Keep this hand. The thought "I will keep whatever I draw next" is how you end up with a
+4-card hand - keep THIS one instead.
+When a keep makes you bottom cards, bottom Emrakul first, then your lands beyond the fifth.
+
+=== DECIDING SITUATIONS ===
+- The plan you were given talks about ramping to Emrakul or about attacking: write the plan "answer
+  their threats, resolve Staff of Nin, ping their face every turn" instead.
+- "Deal 1 Damage with Staff of Nin ... targeting a player" is in your list: take it, every window,
+  with every Staff.
+- "Cast Staff of Nin" is in your list and no answer is needed this turn: take it.
+- Their spell on the stack is a mana maker, a wall or a 0-power body: let it resolve and keep the
+  counter.
+- Their spell on the stack is a planeswalker, a big creature, or a permanent that hits you every
+  turn: counter it now.
+- The header says 2 or more creatures: cast Supreme Verdict, or Final Judgment against anything that
+  comes back from a graveyard.
+- The header says exactly 1 creature: Path to Exile it and keep the sweeper.
+- The header says 3 or more creatures and Lightmine Field is in your list: cast it.
+- The only Path targets offered are defenders or 1-power creatures and your life is above 12: cast
+  nothing and keep the Path.
+- "Mana available:" reads 6 or more and Sphinx's Revelation is listed: cast it, then pick the line
+  with the largest X on the menu that follows.
+- Your life is 15 or less and Elixir of Immortality is on your battlefield untapped: activate it.
+- Nothing in your list answers anything and you have mana above your counterspell's cost: spend it on
+  Staff of Nin, on Elixir, or on Sphinx's Revelation rather than passing the turn with it unused.

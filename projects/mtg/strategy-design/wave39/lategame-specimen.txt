@@ -1,0 +1,462 @@
+WAVE-39 LATEGAME SPECIMEN — 1787476100-ai_baka_deck146-0x55a01ffdff30-vs-ai_baka_deck125.jsonl
+turn 42 seq 96 kind ask phase Blockers my_life 16 opp_life 4
+
+=== PROMPT (user message) ===
+GAME LOG (everything that has happened so far):
+=== Turn 1 - YOUR turn ===
+- Your opening hand (7 cards): Triumphant Adventurer; Swamp; Vanishing Verse; Swamp; Plains; Vanishing Verse; Vanishing Verse
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- You played Swamp
+=== Turn 2 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+=== Turn 3 - YOUR turn ===
+- Phase: Draw
+- You drew Brightclimb Pathway
+- Phase: Main phase 1
+- You played Plains
+- You cast Triumphant Adventurer
+- Your Triumphant Adventurer resolved and entered the battlefield
+=== Turn 4 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent gained 5 life (now 25)
+- Opponent put a card into their library
+=== Turn 5 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Swamp
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer
+- Phase: Blockers
+- You targeted Lost Mine of Phandelver - full room path: "Cave Entrance - Scry 1. -- Goblin Lair - Create a 1/1 red Goblin creature token. -- Mine Tunnels - Create a Treasure token. -- Storeroom - Put a +1/+1 counter on target creature. -- Dark Pool - Each opponent loses 1 life and you gain 1 life. -- Fungi Cavern - Target creature gets -4/-0 until your next turn. -- Temple of Dumathoin - Draw a card." with Triumphant Adventurer's choose a new dungeon ability
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You ventured into Lost Mine of Phandelver: venture step 1 of that run
+- You revealed your Kaya the Inexorable from your library
+- Your revealed Kaya the Inexorable went to your library
+- Phase: Combat damage
+- Opponent lost 1 life (now 24)
+- Triumphant Adventurer dealt 1 damage to the opponent
+=== Turn 6 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Seachrome Coast
+- Opponent cast Path to Exile
+- Your Triumphant Adventurer was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- You targeted Plains - "W" with Put in Play
+- Your Plains entered the battlefield from your library
+=== Turn 7 - YOUR turn ===
+- Phase: Draw
+- You drew Swamp
+- Phase: Main phase 1
+- You chose Play Land for Brightclimb Pathway
+- You played Brightclimb Pathway
+=== Turn 8 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+- Opponent cast Supreme Verdict
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+=== Turn 9 - YOUR turn ===
+- Phase: Draw
+- You drew Shineshadow Snarl
+- Phase: Main phase 1
+- You played Shineshadow Snarl
+=== Turn 10 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Lightmine Field
+- Opponent's Lightmine Field resolved and entered the battlefield
+=== Turn 11 - YOUR turn ===
+- Phase: Draw
+- You drew Shineshadow Snarl
+- Phase: Main phase 1
+- You played Plains
+- You cast Vanishing Verse
+- Opponent's Lightmine Field was exiled from the battlefield
+- Your Vanishing Verse resolved and went to your graveyard
+=== Turn 12 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 13 - YOUR turn ===
+- Phase: Draw
+- You drew Kaya the Inexorable
+- Phase: Main phase 1
+- You cast Kaya the Inexorable
+- Opponent cast Dream Fracture
+- Your Kaya the Inexorable resolved and went to your graveyard
+- Opponent drew a card
+- You drew Nadaar, Selfless Paladin
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+- You played Shineshadow Snarl
+- You cast Nadaar, Selfless Paladin
+- Your Nadaar, Selfless Paladin resolved and entered the battlefield
+- You ventured into Lost Mine of Phandelver: venture step 2 of that run
+- You chose goblin lair (room 2 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a 1/1 red Goblin creature token.} for Lost Mine of Phandelver
+- Your Lost Mine of Phandelver created a 1/1 Goblin token
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Supreme Verdict
+- Your Goblin died
+- Your Goblin moved from your graveyard to your zone
+- Your Nadaar, Selfless Paladin died
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+=== Turn 15 - YOUR turn ===
+- Phase: Draw
+- You drew Vanishing Verse
+- Phase: Main phase 1
+- You played Swamp
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Triumphant Adventurer
+- Phase: Main phase 1
+- You cast Triumphant Adventurer
+- Opponent cast Essence Scatter
+- Your Triumphant Adventurer resolved and went to your graveyard
+- Opponent's Essence Scatter resolved and went to the opponent's graveyard
+=== Turn 18 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+=== Turn 19 - YOUR turn ===
+- Phase: Draw
+- You drew Soul Shatter
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 21 - YOUR turn ===
+- Phase: Draw
+- You drew Silverquill Command
+- Phase: Main phase 2
+- You cast Silverquill Command
+- Opponent cast Fall of the Gavel
+- Your Silverquill Command resolved and went to your graveyard
+- Opponent gained 5 life (now 29)
+- Opponent's Fall of the Gavel resolved and went to the opponent's graveyard
+=== Turn 22 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 23 - YOUR turn ===
+- Phase: Draw
+- You drew Brightclimb Pathway
+- Phase: Main phase 1
+- You chose Play Land for Brightclimb Pathway
+- You played Brightclimb Pathway
+=== Turn 24 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 25 - YOUR turn ===
+- Phase: Draw
+- You drew Silverquill Silencer
+- Phase: Main phase 1
+- You cast Silverquill Silencer
+- Opponent cast Essence Scatter
+- Your Silverquill Silencer resolved and went to your graveyard
+- Opponent's Essence Scatter resolved and went to the opponent's graveyard
+=== Turn 26 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Lightmine Field
+- Opponent's Lightmine Field resolved and entered the battlefield
+=== Turn 27 - YOUR turn ===
+- Phase: Draw
+- You drew Emeria's Call
+- Phase: Main phase 1
+- You cast Vanishing Verse
+- Opponent's Lightmine Field was exiled from the battlefield
+- Your Vanishing Verse resolved and went to your graveyard
+- You chose Cast Card Normally for Emeria's Call
+- You cast Emeria's Call
+- Your Emeria's Call created a 4/4 Angel token
+- Your Emeria's Call created a 4/4 Angel token
+- Your Emeria's Call resolved and went to your graveyard
+=== Turn 28 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Final Judgment
+- Your Angel was exiled from the battlefield
+- Your Angel moved from your exile to your zone
+- Your Angel was exiled from the battlefield
+- Your Angel moved from your exile to your zone
+- Opponent's Final Judgment resolved and went to the opponent's graveyard
+=== Turn 29 - YOUR turn ===
+- Phase: Draw
+- You drew Acererak the Archlich
+- Phase: Main phase 1
+- You cast Acererak the Archlich
+- Your Acererak the Archlich resolved and entered the battlefield
+- Your Acererak the Archlich was returned to your hand
+- You ventured into Lost Mine of Phandelver: venture step 3 of that run
+- You gained 1 life (now 21)
+- Opponent lost 1 life (now 28)
+- You cast Acererak the Archlich
+- Your Acererak the Archlich resolved and entered the battlefield
+- Your Acererak the Archlich was returned to your hand
+- You ventured into Lost Mine of Phandelver: venture step 4 of that run
+- You drew Shineshadow Snarl
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You played Shineshadow Snarl
+=== Turn 30 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+=== Turn 31 - YOUR turn ===
+- Phase: Draw
+- You drew Silverquill Silencer
+- Phase: Main phase 1
+- You cast Acererak the Archlich
+- Opponent cast Dream Fracture
+- Your Acererak the Archlich resolved and went to your graveyard
+- Opponent drew a card
+- You drew Lolth, Spider Queen
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+- You cast Lolth, Spider Queen
+- Your Lolth, Spider Queen resolved and entered the battlefield
+- Your Lolth, Spider Queen got a loyalty counter
+- Your Lolth, Spider Queen got a loyalty counter
+- Your Lolth, Spider Queen got a loyalty counter
+- Your Lolth, Spider Queen got a loyalty counter
+- You used: -3: create spiders with Lolth, Spider Queen
+- Your Lolth, Spider Queen lost a loyalty counter
+- Your Lolth, Spider Queen lost a loyalty counter
+- Your Lolth, Spider Queen lost a loyalty counter
+- Your Lolth, Spider Queen created a 2/1 Spider token
+- Your Lolth, Spider Queen created a 2/1 Spider token
+=== Turn 32 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Final Judgment
+- Your Spider was exiled from the battlefield
+- Your Spider moved from your exile to your zone
+- Your Spider was exiled from the battlefield
+- Your Spider moved from your exile to your zone
+- Opponent's Final Judgment resolved and went to the opponent's graveyard
+=== Turn 33 - YOUR turn ===
+- Phase: Draw
+- You drew Brightclimb Pathway
+- Phase: Main phase 1
+- You chose Play Land for Brightclimb Pathway
+- You played Brightclimb Pathway
+- Phase: Main phase 2
+- You cast Silverquill Silencer
+- Your Silverquill Silencer resolved and entered the battlefield
+- You chose Silverquill Silencer's mode "Cancel"
+=== Turn 34 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Supreme Verdict
+- Your Silverquill Silencer died
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+- Your Lolth, Spider Queen got a loyalty counter
+=== Turn 35 - YOUR turn ===
+- Phase: Draw
+- You drew Nadaar, Selfless Paladin
+- Phase: Main phase 1
+- You cast Nadaar, Selfless Paladin
+- Your Nadaar, Selfless Paladin resolved and entered the battlefield
+- You targeted Lost Mine of Phandelver - full room path: "Cave Entrance - Scry 1. -- Goblin Lair - Create a 1/1 red Goblin creature token. -- Mine Tunnels - Create a Treasure token. -- Storeroom - Put a +1/+1 counter on target creature. -- Dark Pool - Each opponent loses 1 life and you gain 1 life. -- Fungi Cavern - Target creature gets -4/-0 until your next turn. -- Temple of Dumathoin - Draw a card." with Nadaar, Selfless Paladin's choose a new dungeon ability
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You ventured into Lost Mine of Phandelver: venture step 1 of that run
+- You used: +0: draw card and lose life with Lolth, Spider Queen
+- You drew Silverquill Command
+- You lost 1 life (now 20)
+- You revealed your Silverquill Silencer from your library
+- Your revealed Silverquill Silencer went to your library
+- You cast Silverquill Command
+- Your Silverquill Command resolved and went to your graveyard
+- You chose creature gains 3/3 and return creature
+- You targeted Triumphant Adventurer (1/1) - "Deathtouch -- As long as it's your turn, Triumphant Adventurer has first strike. -- Whenever Triumphant..." with return creature
+- Your Triumphant Adventurer entered the battlefield from your graveyard
+=== Turn 36 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Phase: Main phase 2
+- Opponent cast Path to Exile
+- Your Nadaar, Selfless Paladin was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- You targeted Plains - "W" with Put in Play
+- Your Plains entered the battlefield from your library
+- Opponent cast Path to Exile
+- Your Triumphant Adventurer was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- You targeted Plains - "W" with Put in Play
+- Your Plains entered the battlefield from your library
+=== Turn 37 - YOUR turn ===
+- Phase: Draw
+- You drew Soul Shatter
+- Phase: Main phase 1
+- You used: +0: draw card and lose life with Lolth, Spider Queen
+- You drew Barrowin of Clan Undurr
+- You lost 1 life (now 19)
+- You cast Barrowin of Clan Undurr
+- Your Barrowin of Clan Undurr resolved and entered the battlefield
+- You ventured into Lost Mine of Phandelver: venture step 2 of that run
+- You chose goblin lair (room 2 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a 1/1 red Goblin creature token.} for Lost Mine of Phandelver
+- Your Lost Mine of Phandelver created a 1/1 Goblin token
+=== Turn 38 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Staff of Nin
+- Opponent's Staff of Nin resolved and entered the battlefield
+- You lost 1 life (now 18)
+- Staff of Nin dealt 1 damage to you
+=== Turn 39 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+- You used: +0: draw card and lose life with Lolth, Spider Queen
+- You drew Silverquill Command
+- You lost 1 life (now 17)
+- You cast Silverquill Command
+- Your Silverquill Command resolved and went to your graveyard
+- You chose creature gains 3/3 and return creature
+- You targeted Barrowin of Clan Undurr (3/3) - "When Barrowin of Clan Undurr enters, venture into the dungeon. (Enter the first room or advance to the next..." with Silverquill Command's creature gains 3/3 and return creature ability
+- You targeted Silverquill Silencer (3/2) - "As Silverquill Silencer enters, choose a nonland card name. -- Whenever an opponent casts a spell with the..." with return creature
+- Your Silverquill Silencer entered the battlefield from your graveyard
+- You chose Silverquill Silencer's mode "Supreme Verdict"
+- Phase: Attackers
+- You declared attackers: Barrowin of Clan Undurr, Goblin
+- Phase: Blockers
+- You targeted Nadaar, Selfless Paladin (3/3) - "Vigilance -- Whenever Nadaar, Selfless Paladin enters or attacks, venture into the dungeon. (Enter the first..." with Barrowin of Clan Undurr's return creature ability
+- Your Nadaar, Selfless Paladin entered the battlefield from your graveyard
+- You ventured into Lost Mine of Phandelver: venture step 3 of that run
+- You chose dark pool (room 5 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Each opponent loses 1 life and you gain 1 life.} for Lost Mine of Phandelver
+- You gained 1 life (now 18)
+- Opponent lost 1 life (now 27)
+- Phase: Combat damage
+- Opponent lost 2 life (now 25)
+- Goblin dealt 2 damage to the opponent
+- Opponent lost 7 life (now 18)
+- Barrowin of Clan Undurr dealt 7 damage to the opponent
+=== Turn 40 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- You lost 1 life (now 17)
+- Staff of Nin dealt 1 damage to you
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Phase: Main phase 2
+- Opponent cast Staff of Nin
+- Opponent's Staff of Nin resolved and entered the battlefield
+- You lost 1 life (now 16)
+- Staff of Nin dealt 1 damage to you
+=== Turn 41 - YOUR turn ===
+- Phase: Draw
+- You drew Emeria's Call
+- Phase: Main phase 1
+- You chose Cast Card Normally for Emeria's Call
+- You cast Emeria's Call
+- Your Emeria's Call created a 4/4 Angel token
+- Your Emeria's Call created a 4/4 Angel token
+- Your Emeria's Call resolved and went to your graveyard
+- Phase: Attackers
+- You declared attackers: Barrowin of Clan Undurr, Goblin, Silverquill Silencer, Nadaar, Selfless Paladin
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 4 of that run
+- You drew Soul Shatter
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You targeted Silverquill Silencer (3/2) - "As Silverquill Silencer enters, choose a nonland card name. -- Whenever an opponent casts a spell with the..." with Barrowin of Clan Undurr's return creature ability
+- Your Silverquill Silencer entered the battlefield from your graveyard
+- You chose Silverquill Silencer's mode "Staff of Nin"
+- Phase: Combat damage
+- Opponent lost 4 life (now 14)
+- Nadaar, Selfless Paladin dealt 4 damage to the opponent
+- Opponent lost 4 life (now 10)
+- Silverquill Silencer dealt 4 damage to the opponent
+- Opponent lost 2 life (now 8)
+- Goblin dealt 2 damage to the opponent
+- Opponent lost 4 life (now 4)
+- Barrowin of Clan Undurr dealt 4 damage to the opponent
+=== Turn 42 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Staff of Nin dealt 1 damage to Lolth, Spider Queen
+- Your Lolth, Spider Queen lost a loyalty counter
+- Staff of Nin dealt 1 damage to Lolth, Spider Queen
+- Your Lolth, Spider Queen lost a loyalty counter
+- Your Lolth, Spider Queen was put into your graveyard
+- Opponent drew a card
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+=== Turn 43 - YOUR turn ===
+- Phase: Draw
+- You drew Hive of the Eye Tyrant
+- Phase: Attackers
+- You declared attackers: Barrowin of Clan Undurr, Goblin, Silverquill Silencer, Nadaar, Selfless Paladin, Angel, Angel, Silverquill Silencer
+- Phase: Blockers
+- You targeted Lost Mine of Phandelver - full room path: "Cave Entrance - Scry 1. -- Goblin Lair - Create a 1/1 red Goblin creature token. -- Mine Tunnels - Create a Treasure token. -- Storeroom - Put a +1/+1 counter on target creature. -- Dark Pool - Each opponent loses 1 life and you gain 1 life. -- Fungi Cavern - Target creature gets -4/-0 until your next turn. -- Temple of Dumathoin - Draw a card." with Nadaar, Selfless Paladin's choose a new dungeon ability
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You ventured into Lost Mine of Phandelver: venture step 1 of that run
+- You revealed your Hive of the Eye Tyrant from your library
+- Your revealed Hive of the Eye Tyrant went to your library
+- You chose return creature for Barrowin of Clan Undurr
+- Your Acererak the Archlich entered the battlefield from your graveyard
+- Your Acererak the Archlich was returned to your hand
+- You ventured into Lost Mine of Phandelver: venture step 2 of that run
+
+--- CURRENT SITUATION ---
+Phase: Blockers | It is your turn.
+Your life: 16 | Opponent life: 4
+Dungeons completed (you): 2 - effects that check "completed a dungeon" (e.g. a completed-dungeon anthem) are ACTIVE for you.
+Mana available: 15 total (untapped sources, tapped automatically when you cast; colours you can make: {b}{w}; mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Swamp #1 {b}; Plains #1 {w}; Swamp #2 {b}; Plains #2 {w}; Brightclimb Pathway #1 {w}; Shineshadow Snarl #1 {b} or {w}; Plains #3 {w}; Shineshadow Snarl #2 {b} or {w}; Swamp #3 {b}; Brightclimb Pathway #2 {w}; Shineshadow Snarl #3 {b} or {w}; Brightclimb Pathway #3 {w}; Plains #4 {w}; Plains #5 {w}; Plains #6 {w}
+Land drop: NOT yet used this turn - you can still play a land. The land drop is its OWN decision (a "Land drop:" question with its own Play options); it is never listed in a casting, ability or target menu, so its absence from the choices below does not mean it is gone.
+Your hand: Vanishing Verse (copy 1 of 2 in your hand) {b}{w} [instant]; Vanishing Verse (copy 2 of 2 in your hand) {b}{w} [instant]; Soul Shatter (copy 1 of 3 in your hand) {2}{b} [instant]; Soul Shatter (copy 2 of 3 in your hand) {2}{b} [instant]; Soul Shatter (copy 3 of 3 in your hand) {2}{b} [instant]; Hive of the Eye Tyrant (land: taps for {B}); Acererak the Archlich {2}{b} (5/5) [creature]
+Your battlefield (22 permanents listed, of which 7 are creatures): Swamp #1; Plains #1; Swamp #2; Plains #2; Brightclimb Pathway #1; Shineshadow Snarl #1; Plains #3; Shineshadow Snarl #2; Swamp #3; Brightclimb Pathway #2; Shineshadow Snarl #3; Brightclimb Pathway #3; Plains #4; Plains #5; Barrowin of Clan Undurr {2}{b}{w} (4/4) (printed 3/3) [tapped - attacking]; Goblin (2/2) (printed 1/1) [tapped - attacking]; Plains #6; Silverquill Silencer #1 {b}{w} (4/3) (printed 3/2) [tapped - attacking]; Nadaar, Selfless Paladin {2}{w} (4/4) (printed 3/3) [vigilance] [attacking]; Angel #1 (5/5) (printed 4/4) [flying] [tapped - attacking]; Angel #2 (5/5) (printed 4/4) [flying] [tapped - attacking]; Silverquill Silencer #2 {b}{w} (4/3) (printed 3/2) [tapped - attacking]
+Opponent battlefield (14 permanents listed, of which 0 are creatures): Island #1; Island #2; Seachrome Coast; Tundra #1; Plains #1; Island #3; Plains #2; Glacial Fortress; Plains #3; Plains #4; Staff of Nin #1 {6} [artifact] [tapped]; Island #4; Staff of Nin #2 {6} [artifact] [tapped]; Tundra #2
+Opponent hand size: 3 | Opponent library: 28 cards
+Artifacts in play: you 0 | opponent 2
+Your library: 22 cards
+
+YOUR PLAN (as you last stated it): Attack with all creatures to deal lethal damage and win the game.
+
+DUNGEON ROOM CHOICE - you are venturing in Lost Mine of Phandelver. You are choosing which ROOM you enter now - this is not a target and not a card to cast. Lost Mine of Phandelver's rooms, in printed order: 1. Cave Entrance; 2. Goblin Lair; 3. Mine Tunnels; 4. Storeroom; 5. Dark Pool; 6. Fungi Cavern; 7. Temple of Dumathoin. Dungeon paths BRANCH, so a run does not enter every room and the printed order is not a route. The options below are the only rooms you may enter at this step, and each one's effect is stated on its own line.
+1. goblin lair (room 2 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a 1/1 red Goblin creature token.}
+2. mine tunnels (room 3 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a Treasure token.}
+
+On the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 3 (Cast Example Card)" (a placeholder - copy a real number and short name from the list); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+
+=== MODEL REPLY ===
+
+
+CHOICE: 1 (goblin lair)
+PLAN: Attack with all creatures to deal lethal damage and win the game.
+
+=== CHOSEN ===
+goblin lair (room 2 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a 1/1 red Goblin creature token.}

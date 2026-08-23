@@ -1,0 +1,133 @@
+SANGUINE BLOOD - WGB WALL PRISON WITH A TWO-CARD KILL
+
+You win by getting Exquisite Blood AND Sanguine Bond onto the battlefield at the same time. The
+moment both are there, the very next life you gain - or the very next life the opponent loses -
+loops between them and drains the opponent from whatever they are at down to 0. That is the whole
+game. Sixteen walls buy the turns. Every turn you do the same three things: play a land if one is
+offered, put a wall or a combo piece onto the battlefield, and pass with your Battlement UNTAPPED.
+
+=== RULE #1 - AT YOUR UPKEEP, PASS. THIS IS THE MOST IMPORTANT LINE IN THIS GUIDE ===
+At your Upkeep the engine will offer you a single action: tapping Overgrown Battlement for green
+mana. Answer CHOICE: 0 (pass). Every time. Upkeep, Draw, the opponent's turn - pass all of them.
+You never have to tap the Battlement by hand. When you cast a spell in your MAIN PHASE the engine
+taps your sources for you, and the "Mana available:" line already counts the Battlement in with
+your lands. Taking that upkeep option instead does two bad things at once: the green mana is gone
+before your main phase ever starts, and a tapped Battlement is a 0/4 wall that cannot block on the
+opponent's next turn - a wall you needed.
+The thought "I should ramp first so I can afford Sanguine Bond" is ALWAYS FALSE in the upkeep
+window: mana made there does not survive to the main phase where the enchantment is cast.
+The ONE time you take it: you are casting Tribute to Hunger in that same window and need the mana
+to pay for it right now.
+
+=== RULE #2 - THE WIN BUTTON ===
+Check your battlefield line at every decision. If it lists BOTH "Exquisite Blood" and "Sanguine
+Bond", you are one life-gain away from winning outright. Take the first of these the list offers,
+immediately, and the game ends:
+ - Declare a block with ANY wall, if Perimeter Captain is on your battlefield (2 life).
+ - Declare a block with Pride Guardian (3 life, Captain or no Captain).
+ - Deal 1 Damage with Staff of Nin targeting a player - pick the OPPONENT.
+ - Cast Tribute to Hunger while the opponent has a creature (you gain its toughness).
+ - Attack with a lifelink Vampire and connect.
+Any one of these wins from any life total, yours or theirs. You do not need a big number - 1 life is
+enough, because the loop runs itself until the opponent is at 0. Do not wait for a better turn and
+do not build a bigger board first.
+
+=== RULE #3 - ASSEMBLING THE PAIR (your only win condition) ===
+Exquisite Blood {4}{B}: whenever an opponent loses life, you gain that much life.
+Sanguine Bond {3}{B}{B}: whenever you gain life, the opponent loses that much life.
+Neither does anything useful alone. Both together end the game.
+ 1. The turn either one appears in your casting list, CAST IT. Not later, not after a wall, not
+    once you can afford both.
+ 2. If one is already on your battlefield and the other is not in your hand, "Cast Idyllic Tutor
+    {2}{w}" is your best play in that list - ahead of every wall and every other card.
+ 3. Idyllic Tutor puts the enchantment into your HAND, not onto the battlefield. You still have to
+    cast it for 5, and Tutor plus enchantment in one turn costs 8 mana. So cast the Tutor the FIRST
+    turn it is listed - the turn you spend tutoring is a turn you are not casting the enchantment.
+ 4. The Tutor then shows you your whole library as a long numbered list. Pick the one of the two you
+    do NOT already have; if you have neither, pick either.
+ 5. You run four Idyllic Tutors and two copies of each enchantment. If a piece is countered or
+    exiled, tutor for the next copy and cast it again. There is no other way to win this game.
+
+=== RULE #4 - TRIBUTE TO HUNGER IS AN EDICT, NOT A KILL SPELL ===
+"Cast Tribute to Hunger {2}{b}" - the OPPONENT picks which of their creatures dies, and they will
+pick their worst one. You gain life equal to THAT creature's toughness.
+The thought "cast Tribute to Hunger on their best creature" is ALWAYS FALSE - you never choose the
+victim, and naming one in your plan makes you expect a kill and a life total you will not get.
+Cast it when any of these is true:
+ - Both enchantments are on your battlefield and the opponent has a creature. This WINS the game.
+ - The opponent controls exactly ONE creature - then their choice is your choice.
+ - You need the life right now to survive the turn.
+Otherwise hold it. It is an instant, it stays castable on their turn, and it will be offered again.
+The engine also lists it when the opponent has no creature at all; with an empty opponent board,
+take a different option.
+
+=== RULE #5 - BLOCKING IS HOW THIS DECK DEALS DAMAGE ===
+The combat prompt's general hint says "block only where the trade favors you". Your strategy guide
+overrides that hint, and the prompt says so itself. Ignore it here. Your walls have 0 power, so no
+block of yours ever wins a trade - blocks are how you gain life, and life is how you win.
+Assign EVERY blocker the list offers you, in every combat:
+ - Give each attacker one blocker first, then put the leftovers on the biggest attacker. Several of
+   your blockers may gang up on one attacker; each triggers its own life gain.
+ - Perimeter Captain gains you 2 life for EACH defender you control that blocks. Three walls
+   blocking with the Captain out is 6 life on top of what those walls gain themselves.
+ - Pride Guardian gains you 3 life whenever it blocks.
+ - The life arrives when blockers are DECLARED, before damage. A wall that dies in combat has
+   already gained you the life.
+The one blocker you leave out: neither enchantment is on your battlefield AND that blocker's line
+reads "your blocker dies, attacker lives". Every other line - "neither dies", or any line at all
+once an enchantment is down - blocks.
+"BLOCKS: none" is right only when every blocker the list offers you falls under the line above.
+
+=== RULE #6 - ATTACKING ===
+All sixteen of your creatures are Defenders and can never attack; the attacker list already leaves
+them out, so never re-derive who is eligible. An empty attacker list means ATTACK: none, and that
+costs you nothing.
+When the list DOES offer a Vampire token, it has lifelink: attack with every Vampire offered, every
+turn. Each point that connects is life gained, and with Sanguine Bond out that is the win.
+
+=== RULE #7 - WHAT TO CAST WHEN SEVERAL THINGS ARE LISTED ===
+Take the highest entry on this list that appears in your casting menu:
+ 1. Exquisite Blood or Sanguine Bond - whichever is missing from your battlefield.
+ 2. Idyllic Tutor, when either enchantment is missing from both your hand and your battlefield.
+ 3. Perimeter Captain - it turns every future block by every wall into 2 more life.
+ 4. Any other wall: Wall of Omens (it replaces itself), Overgrown Battlement, Pride Guardian.
+ 5. Staff of Nin.
+ 6. Sorin, Lord of Innistrad.
+ 7. Chromatic Lantern - only when the "colours you can make:" line does NOT include {b}. Your
+    Bayous, Scrublands, Savannahs and Urborg already make black; when {b} is on that line the
+    Lantern does nothing for 3 mana, so take a wall or a combo piece instead.
+Keep casting while the list keeps offering. "Cast nothing right now" is correct only when it is the
+ONLY option left.
+
+=== STAFF OF NIN AND SORIN ===
+Staff of Nin {6}: draws you an extra card at each of your upkeeps, and offers "Deal 1 Damage with
+Staff of Nin targeting a player" every turn. Always aim it at the OPPONENT, every upkeep - this is
+the one upkeep option you always TAKE. With Exquisite Blood down that damage is life for you; with
+both enchantments down it wins the game on the spot.
+Sorin, Lord of Innistrad {2}{W}{B}: cast him when offered, then take "+1: create a 1/1 vampire with
+Sorin, Lord of Innistrad" every turn. The Vampires have lifelink, so they block for life, attack for
+life, and win the game once both enchantments are out.
+If neither is in your hand, nothing above changes.
+
+=== MULLIGAN ===
+Keep almost everything. The pregame prompt prints "Your hand (7 cards), counted by the engine: N
+lands, M spells." KEEP whenever N is 2 or more. Also KEEP whenever the line "Playing every land in
+this hand would cover the cost of:" names even one card - that line already checked your mana
+against your hand and it is right.
+Never mulligan more than once. If the prompt contains the words "having already taken", this is your
+last look: answer 1 (Keep this hand).
+The thought "I will keep whatever I draw next" is how you end up with a four-card hand - keep THIS
+one instead.
+Your cheapest spell costs ONE mana, so "no early play" is never a reason to mulligan, and a hand
+with no combo piece is not one either: your lands and walls buy the turns you need to draw one.
+
+=== SITUATIONS THAT DECIDE YOUR GAMES ===
+ - Both Exquisite Blood and Sanguine Bond on your battlefield: take the first block, Staff ping,
+   Tribute or lifelink attack the list offers. You win this turn.
+ - Your Upkeep, and the only offered action taps Overgrown Battlement for mana: answer CHOICE: 0 (pass)
+   and keep the wall untapped for their turn.
+ - One enchantment down, the other not in hand, "Cast Idyllic Tutor {2}{w}" listed: cast the Tutor
+   and take the missing one.
+ - An enchantment in hand and castable: cast it this turn, at any life total, ahead of anything else.
+ - The opponent attacks: assign every blocker on the list.
+ - The opponent has exactly one creature and you need life: cast Tribute to Hunger.

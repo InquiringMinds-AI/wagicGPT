@@ -1,0 +1,175 @@
+DRAW AND DIE - UB FORCED-DRAW PUNISH
+
+The opponent's own draw step is your kill. Underworld Dreams, Fate Unraveler and Ob Nixilis each
+deal the opponent 1 damage EVERY time that opponent draws a card - and they stack, so three of them
+out means 3 damage per card. Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box and Forced
+Fruition make the opponent draw MORE cards. Put the damage on the battlefield FIRST, then hand them
+cards. Every turn you do one of three things: land a punisher, put a wall in front of their
+creatures, or - once a punisher is out - stack another draw engine on top. You are never idle and
+you never wait to stabilize.
+
+=== RULE 1 - THE PUNISHER GOES FIRST. ALWAYS. READ YOUR CAST LIST TOP TO BOTTOM ===
+Your three punishers are UNDERWORLD DREAMS {b}{b}{b}, FATE UNRAVELER {3}{b}, OB NIXILIS, THE
+HATE-TWISTED {3}{b}{b}. Every time you are asked "which card do you cast now", scan the numbered
+options for those three names FIRST.
+If ANY of the three is in the list, CAST IT THIS ASK. Not after the Howling Mine, not after the
+Master of the Feast, not in a moment - THIS ask, this reply. It goes ahead of every other card in
+your deck, at every life total, on every board.
+An option that is printed is an option you can pay for; the game has already checked.
+Mana runs out mid-turn: cast the punisher while you can still afford it, then spend what is left.
+The thought "it doesn't strictly matter which order I cast these in" is ALWAYS FALSE for this deck.
+The order is the single most important thing you decide.
+ONE named exception: when your life is 8 or less AND the opponent's battlefield shows a creature,
+"Cast Fog Bank {1}{u}" goes ahead of the punisher for that one ask - then cast the punisher with
+what is left, or on your next turn.
+
+=== RULE 2 - HOW MANY DRAW ENGINES YOU MAY HAVE OUT ===
+Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box, Forced Fruition and Master of the Feast all
+give the OPPONENT cards - their card text says "each player" or "each opponent". They are damage
+only while a punisher is on the battlefield to convert those cards into damage.
+Look at YOUR battlefield line and count the names Underworld Dreams, Fate Unraveler and Ob Nixilis.
+- ONE OR MORE of them on your battlefield: cast every draw engine you are offered, every turn, as
+  fast as you can - each one multiplies the damage. This is where the deck wins. Stack Mines,
+  Dictates and Puzzle Boxes without limit.
+- ZERO of them on your battlefield: one Howling Mine is enough. With a Howling Mine already on your
+  battlefield line, take a wall, a punisher, a Liliana's Caress, or "Cast nothing right now" instead
+  of a second draw engine; Master of the Feast, Dictate of Kruphix, Teferi's Puzzle Box and Forced
+  Fruition all wait for the punisher.
+The thought "drawing more cards is the priority, I need to find my win condition" is ALWAYS FALSE
+for this deck - a card you hand the opponent with no punisher out is a card that kills you.
+
+=== RULE 3 - THE WALLS. PUT THEM DOWN THE TURN THEY APPEAR ===
+Shield Sphere and Fog Bank are your entire defence - this deck has no removal except Ob Nixilis's
+-2 and it gains no life. Both walls are cheap permanents with no downside.
+- "Cast Shield Sphere {0}" costs ZERO mana. Take it every single time it is listed, whatever else
+  you are doing, including with a full board and no other play. A 0/6 that blocks anything.
+- "Cast Fog Bank {1}{u}": if the opponent's battlefield line shows ANY creature, cast Fog Bank the
+  first ask it is offered. Fog Bank prevents ALL combat damage dealt to it and by it, so it blocks
+  the same attacker every combat and takes no damage from it. It is your answer to a big ground
+  creature. Removal still answers it, so a Fog Bank in your hand blocks nothing - put it on the
+  battlefield.
+
+THE WHOLE CAST ORDER, ONE LIST. At every "which card do you cast now" ask, read your numbered
+options top to bottom and take the FIRST line that matches:
+1. Underworld Dreams, Fate Unraveler or Ob Nixilis.
+2. Peer into the Abyss, when a punisher is already on your battlefield.
+3. Shield Sphere (it is free).
+4. Fog Bank, when the opponent controls a creature.
+5. Any Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box, Forced Fruition or Master of the
+   Feast - if rule 2 says the brake is OFF, or it is your first Howling Mine.
+6. Liliana's Caress, when a Howling Mine, Dictate or Puzzle Box is on your battlefield.
+7. "Cast nothing right now".
+Then take the ask again if the game offers it - you can cast more than one spell in a turn.
+
+=== RULE 4 - BLOCKING. YOUR WALLS BLOCK; THAT IS WHAT THEY ARE FOR ===
+The general blockers hint says "block only where the trade favors you; taking damage while ahead on
+LIFE is often correct". It also says your strategy guide overrides it. THIS SECTION OVERRIDES IT.
+A block by Shield Sphere or Fog Bank STOPS that attacker's damage completely - none of it reaches
+your life total. Whether your wall survives is printed in that block's own parenthesis - read it
+there. Two blockers on two attackers stop BOTH attackers; blocking
+never increases the damage you take.
+Run this over the offered block lines, every combat:
+1. A line ending "(you kill it, your blocker lives)" - take that block. Free kill, every time.
+2. A line ending "(neither dies)" - take that block. Your wall survives and the damage is gone.
+   Shield Sphere is tagged "[deals 0 - this block kills nothing, it only absorbs damage]": absorbing
+   is the whole job. Assign one wall per attacker, biggest attacker first.
+3. A line ending "your blocker dies, attacker lives" - take it only when the header says the attack
+   IS lethal, or your life is 8 or less.
+"BLOCKS: none" is correct only when every wall you control is already assigned or the only offered
+blocks are option 3 above at a healthy life total.
+The thought "blocking with a defender doesn't prevent damage to me" is ALWAYS FALSE - the block is
+exactly what stops the damage.
+Fate Unraveler (3/4) and Master of the Feast (5/5) block well - use them when a line says "you kill
+it, your blocker lives" and Fate Unraveler is not needed untapped for a lethal swing.
+
+=== HOW THE KILL ACTUALLY HAPPENS ===
+1. Punisher on the battlefield.
+2. Draw engines on top of it. Howling Mine and Dictate of Kruphix each add ONE opponent card per
+   draw step, so each adds 1 damage per punisher per turn. Two punishers plus two Mines is 4 damage
+   a turn before you attack.
+3. TEFERI'S PUZZLE BOX {4} is your best multiplier: each draw step the opponent bottoms their whole
+   hand and redraws that many cards, so their hand size becomes damage every single turn. Read the
+   number on the "Opponent hand size:" line - with one punisher out, Puzzle Box turns that number
+   into that much damage every turn.
+4. FORCED FRUITION {4}{u}{u}: whenever the opponent casts a spell, they draw SEVEN cards. With one
+   punisher out that is 7 damage per spell they cast; with two it is 14. Cast it the turn you can,
+   once a punisher is out. If it is not in your hand, nothing above changes.
+5. PEER INTO THE ABYSS {4}{b}{b}{b} finishes. It makes the target draw half their library and lose
+   half their life. Cast it when a punisher is on your battlefield - the draws convert into damage
+   at 1 per punisher per card, and it draws them more than half their library. It then asks a SECOND
+   question with
+   two options: "target opponent" and "target controller". Answer "target opponent". NEVER answer
+   "target controller" - that one points the spell at YOU; the opponent is always the answer.
+
+=== KEY CARDS ===
+UNDERWORLD DREAMS {b}{b}{b} - enchantment, 1 damage to the opponent per card they draw. Three black
+  pips; when it is listed you can pay it. Rule 1 card.
+FATE UNRAVELER {3}{b} - 3/4 creature with the same trigger. It is a punisher that also blocks.
+OB NIXILIS, THE HATE-TWISTED {3}{b}{b} - planeswalker, enters with 5 loyalty, same trigger, and
+  "-2: Destroy target creature. Its controller draws two cards." The -2 is removal AND two more
+  draws to punish. Use it on the opponent's biggest creature. When the ONLY name offered after
+  "targeting" is one of your own creatures, pass - the offer comes back.
+HOWLING MINE {2} - EACH player draws an extra card each draw step while it is untapped. Gated by
+  rule 2.
+DICTATE OF KRUPHIX {1}{u}{u} - EACH player draws an extra card each draw step. Same gate.
+MASTER OF THE FEAST {1}{b}{b} - 5/5 flier, and at the beginning of YOUR upkeep each opponent draws
+  a card. It is your fastest clock and a free draw trigger, but the free card is a gift until a
+  punisher is out, so it sits behind rule 1 and inside rule 2's gate.
+LILIANA'S CARESS {1}{b} - the opponent loses 2 life for each card THEY discard. Your Howling Mines
+  and Puzzle Box make them overdraw and discard at cleanup, so cast Caress once a Mine, Dictate or
+  Puzzle Box is on your battlefield. Before that it does nothing; take a wall instead.
+SHIELD SPHERE {0} - 0/6 defender, free. Gets a -0/-1 counter each time it blocks, so a fresh one
+  blocks six times. It never attacks.
+FOG BANK {1}{u} - 0/2 flying defender that prevents all combat damage to and from itself. Rule 3.
+
+=== ATTACKING ===
+Keep declaring every creature the attacker list offers you - the list has already dropped everything
+that cannot attack. One exception, and it is about ORDER:
+FATE UNRAVELER stays home unless the lethal check below clears. Its damage comes from the opponent's draw step, not from
+combat, and attacking taps it out of blocking on their turn. Send Fate Unraveler ONLY when its power
+plus your other unblocked attackers is at or above the opponent's printed life total - then swing
+with everything and end it. Master of the Feast attacks freely; it is a 5/5 flier and it is your
+clock.
+
+=== LETHAL CHECK - RUN IT EVERY TURN ===
+Count the punisher names on your battlefield (Underworld Dreams, Fate Unraveler, Ob Nixilis) - call
+that P. Count your Howling Mines, Dictates and Puzzle Boxes - each Mine or Dictate is 1 extra
+opponent card per turn, a Puzzle Box is their hand size. Multiply the extra cards by P, add 1 x P
+for their normal draw, and add the power of your unblocked attackers. If that total is at or above
+the number printed as the opponent's life, attack with everything including Fate Unraveler and cast
+every draw engine in your list this turn. You do not need to survive another turn - they take the
+damage on their own draw step.
+Worked example: P = 2 (Underworld Dreams and one Fate Unraveler). You control two Howling Mines and
+a Dictate of Kruphix, so 3 extra cards. 3 extra + 1 normal = 4 cards; 4 x P = 8 damage on their
+draw step. An unblocked Master of the Feast adds 5, for 13. If the opponent's printed life is 13 or
+less, swing with everything and hold nothing back.
+
+=== MULLIGAN ===
+KEEP any 7-card hand with two or more lands. The prompt counts them for you on its own line - "Your
+hand (7 cards), counted by the engine: 3 lands, 4 spells" - read that number, do not count the hand
+yourself. Never keep fewer than 5 cards.
+Tiebreakers between keepable hands, only once the two-land floor is met: prefer a hand holding a
+punisher or a Fog Bank; prefer a hand whose "Playing every land in this hand would cover the cost
+of:" line names at least one card.
+Your cheapest card costs ZERO ("Cheapest spell in this hand: Shield Sphere {0}") and this deck
+contains NO one-mana card, so a hand with no cheap play is never a reason to mulligan - you will
+never find a one-drop. Colour is a tiebreaker and never a gate: 18 of your 26 lands make black,
+18 make blue, and ten of them make both.
+If the prompt says "having already taken 1 mulligan", this is your LAST look: answer "Keep this
+hand". "I will keep whatever I draw next" is how you end up with a 4-card hand - keep THIS one.
+
+=== DECIDING SITUATIONS ===
+- Underworld Dreams, Fate Unraveler or Ob Nixilis is anywhere in your cast list: cast it this ask,
+  ahead of everything else.
+- Two spells are both payable and one is a punisher: the punisher goes first, then spend the rest.
+- No Underworld Dreams, no Fate Unraveler and no Ob Nixilis on your battlefield, and a Howling Mine
+  is already out: cast a wall or a Liliana's Caress - or "Cast nothing right now".
+- A punisher IS on your battlefield: cast every Howling Mine, Dictate, Puzzle Box and Forced
+  Fruition you are offered, every turn.
+- "Cast Shield Sphere {0}" is in the list: take it.
+- The opponent controls any creature and "Cast Fog Bank" is in the list: take it.
+- A block line reads "(you kill it, your blocker lives)" or "(neither dies)": take that block.
+- Peer into the Abyss resolves and asks target opponent or target controller: answer "target
+  opponent".
+- Ob Nixilis's -2 offers only your own creature as a target: pass.
+- The lethal check clears: attack with everything, Fate Unraveler included.
