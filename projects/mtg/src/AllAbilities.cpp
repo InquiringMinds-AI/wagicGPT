@@ -6825,8 +6825,10 @@ MTGGameZone * AAMover::destinationZone(Targetable * target)
 
 int AAMover::resolve()
 {
-    MTGCardInstance * _target = (MTGCardInstance *) target;
-    if (target)
+    //movers move CARDS: a lord/foreach matching players can hand us a Player*
+    //as target - blind-casting it segfaulted (w37 152v36 core); skip non-cards.
+    MTGCardInstance * _target = dynamic_cast<MTGCardInstance *>(target);
+    if (_target)
     {
         if(_target->mutation && _target->parentCards.size() > 0) return 0; // Mutated down cards cannot be moved to any zone, they will follow the fate of top-card
         if(necro)
@@ -7066,8 +7068,9 @@ MTGGameZone * AARandomMover::destinationZone(Targetable * target,string zone)
 
 int AARandomMover::resolve()
 {
-    MTGCardInstance * _target = (MTGCardInstance *) target;
-    if (target)
+    //same Player*/card type-confusion guard as AAMover::resolve
+    MTGCardInstance * _target = dynamic_cast<MTGCardInstance *>(target);
+    if (_target)
     {
         if(_target->mutation && _target->parentCards.size() > 0) return 0; // Mutated down cards cannot be randomly moved to any zone, they will follow the fate of top-card
         Player* p = _target->controller();

@@ -90,8 +90,11 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
     };
 
     found = s.find("opponent");
-    if (found == 0)
+    if (found == 0 && (s.size() == 8 || !isalpha((unsigned char) s[8])))
     {
+        //exact token only: zone names like "opponenthand"/"opponentgraveyard" must
+        //NOT parse as a player target (a lord over the opponent PLAYER wired to a
+        //card-only effect like moveto() type-confuses Player*/MTGCardInstance*)
         int maxtargets = 1;
         Player * opponent = card->controller()->opponent();
         return NEW PlayerTargetChooser(observer, card, maxtargets, opponent);
