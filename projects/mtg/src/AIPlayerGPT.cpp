@@ -8628,6 +8628,11 @@ static string compoundModeTargetNote(const string& modeName)
 }
 
 //N-139a: role header for the mutate OVER/UNDER placement menu. Pure helper.
+//W38: the header also asks for the intended HOST on the PLAN line - the host
+//is a SEPARATE later ask, and the wave-37 corpus showed the intent dying at
+//that boundary (139v152 s30-31: "over" chosen intending Dryad, then Gemrazer
+//picked as host). A plan that names the host rides the existing plan carry
+//into the host ask, where the carry line renders it back.
 static string mutateOverUnderHeader(const string& ctxName)
 {
     string who = ctxName.empty() ? string("this creature") : ctxName;
@@ -8636,7 +8641,54 @@ static string mutateOverUnderHeader(const string& ctxName)
            " cast - you pick WHICH of your non-Human creatures to mutate onto NEXT."
            " OVER keeps " + who + "'s name and P/T on the merged creature; UNDER keeps"
            " the host's. Either way the merged creature gains BOTH cards' abilities"
-           " (CR 725). Choose:";
+           " (CR 725). Choose, and state in a PLAN: line which creature you intend"
+           " as the HOST - the host is picked at the NEXT ask, and your plan is"
+           " shown there.";
+}
+
+//W38 (wave-37 validation #3): placement from a rendered label or ability name,
+//case-insensitive. Card scripts pass through the parser LOWERCASED, so live
+//menus and waiting-ability names read "mutate over"/"mutate under" while the
+//primitives (and the old checks here) spell "Mutate Over" - the capitalized-
+//only detection missed the live labels and dropped BOTH mutate role headers
+//in the wave-37 corpus (139v152 s30 got the generic "Choose an option", s31
+//the generic TARGET CHOICE). Returns 1 = over, 2 = under, 0 = not a mutate
+//placement label.
+static int mutatePlacementFromLabel(const string& s)
+{
+    string lc = s;
+    for (size_t i = 0; i < lc.size(); i++)
+        lc[i] = (char) tolower((unsigned char) lc[i]);
+    if (lc.compare(0, 11, "mutate over") == 0)
+        return 1;
+    if (lc.compare(0, 12, "mutate under") == 0)
+        return 2;
+    return 0;
+}
+
+//W38 host-intent carry: the single candidate name that `text` mentions
+//(case-insensitive substring). Exactly ONE distinct name must match - a plan
+//that names several candidates (or none) is not a commitment to render.
+static string uniqueNamedIn(const string& text, const vector<string>& names)
+{
+    string lct = text;
+    for (size_t i = 0; i < lct.size(); i++)
+        lct[i] = (char) tolower((unsigned char) lct[i]);
+    string found;
+    for (size_t i = 0; i < names.size(); i++)
+    {
+        if (names[i].empty() || names[i] == found)
+            continue;
+        string lcn = names[i];
+        for (size_t j = 0; j < lcn.size(); j++)
+            lcn[j] = (char) tolower((unsigned char) lcn[j]);
+        if (lct.find(lcn) == string::npos)
+            continue;
+        if (!found.empty())
+            return string(); //two distinct names named: ambiguous, no carry
+        found = names[i];
+    }
+    return found;
 }
 
 int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & act)
@@ -8873,13 +8925,17 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     bool mutatePlaceMenu = false;
     for (size_t i = 0; i < opts.size(); i++)
     {
-        if (opts[i].compare(0, 11, "Mutate Over") == 0)
+        //W38: detection is case-insensitive - the parser lowercases card
+        //scripts, so live labels read "mutate over"/"mutate under" and the
+        //old capitalized-only compare missed them (wave-37 139v152 s30).
+        int mpl = mutatePlacementFromLabel(opts[i]);
+        if (mpl == 1)
         {
             mutatePlaceMenu = true;
             opts[i] += " [this card goes ON TOP: the merged creature keeps THIS card's"
                        " name and P/T, and ALSO gains the host's abilities]";
         }
-        else if (opts[i].compare(0, 12, "Mutate Under") == 0)
+        else if (mpl == 2)
         {
             mutatePlaceMenu = true;
             opts[i] += " [this card goes UNDERNEATH: the creature on top keeps its name"
@@ -8988,6 +9044,15 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     int pick = askModel(decision, opts, true, ctxName);
     if (pick == kChoicePending)
         return kChoicePending;
+    //W38 host-intent carry: the host is a SEPARATE later model call. Record
+    //whose over/under menu was just answered and the plan stated with that
+    //answer (consumePlan already folded a reply PLAN into mCurrentPlan), so
+    //the host ask can render the pilot's own commitment back to it.
+    if (mutatePlaceMenu && pick >= 0)
+    {
+        mMutateIntentCard = ctxName;
+        mMutateIntentPlan = mCurrentPlan;
+    }
     if (pick < 0)
     {
         //heuristic fallback: base selectMenuOption picks in SimpleMenu item
@@ -9468,6 +9533,13 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             if (AANewTarget * nt = dynamic_cast<AANewTarget *>(waiting))
                 mutatePlacement = nt->mutation;
         }
+        //W38: in the live corpus the waiting element is a WRAPPER whose menu
+        //text is the parser-lowercased label ("mutate over"), not the
+        //AANewTarget itself - the cast yielded nothing and the host ask fell
+        //to the generic TARGET CHOICE header (wave-37 139v152 s31). The
+        //rendered ability name states the same fact; read placement from it.
+        if (!mutatePlacement)
+            mutatePlacement = mutatePlacementFromLabel(abilityName);
 
         //Target sub-menus reached the model as a bare "Choose ... for X" line
         //that read like a phase or cast decision, owning most of the corpus's
@@ -9489,6 +9561,22 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         else if (mutatePlacement)
         {
             q << mutateHostAsk(effectName, mutatePlacement);
+            //W38 host-intent carry: if the plan stated WITH the over/under
+            //answer names exactly ONE of the host candidates, render that
+            //commitment back (annotation, never automation - the model sees
+            //its own stated intent and may still override it).
+            if (effectName == mMutateIntentCard && !mMutateIntentPlan.empty())
+            {
+                vector<string> candNames;
+                for (size_t ci = 0; ci < targets.size(); ci++)
+                    if (MTGCardInstance * cc = dynamic_cast<MTGCardInstance *>(targets[ci]))
+                        candNames.push_back(cc->getDisplayName());
+                string named = uniqueNamedIn(mMutateIntentPlan, candNames);
+                if (!named.empty())
+                    q << " At the over/under step your PLAN named " << named
+                      << " as the host - you may still pick differently, but that"
+                         " was your stated intent.";
+            }
         }
         else if (dungeonSelect)
         {
@@ -9546,6 +9634,13 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         int pick = askModel(q.str(), opts, true, effectName);
         if (pick == kChoicePending)
             return 1; //chooser stays open; earlier picks re-derive from cache next tick
+        //W38: the host ask is decided (model or heuristic) - the carried
+        //intent is consumed; never let it leak onto a later mutate.
+        if (mutatePlacement)
+        {
+            mMutateIntentCard.clear();
+            mMutateIntentPlan.clear();
+        }
         if (pick < 0)
         {
             //Model deferred (or transport failed). With nothing selected the
@@ -12749,6 +12844,49 @@ void AIPlayerGPT::runParseSelfTest()
               "W30-R N-139a: over/under menu carries a role header, not the generic 'Choose an option'");
         CHECK(mutateOverUnderHeader("").find("MUTATE PLACEMENT for this creature:") == 0,
               "W30-R N-139a: over/under header degrades cleanly when the source name is unrecoverable");
+    }
+
+    // ---- WAVE-38: mutate host-intent carry (wave-37 validation #3, 139v152
+    // s30-31). The parser lowercases card scripts, so live labels read
+    // "mutate over"/"mutate under" - detection must be case-insensitive; the
+    // over/under header asks for the intended host on the PLAN line; and the
+    // carry line renders only when the plan names exactly ONE host candidate.
+    cout << "\n[W38] mutate host-intent carry: label detection + unique-name carry\n";
+    {
+        CHECK(mutatePlacementFromLabel("mutate over") == 1
+              && mutatePlacementFromLabel("Mutate Over") == 1
+              && mutatePlacementFromLabel("mutate under") == 2
+              && mutatePlacementFromLabel("Mutate Under") == 2,
+              "W38: placement label detection matches both parser-lowercased and primitive casings");
+        CHECK(mutatePlacementFromLabel("mutate") == 0
+              && mutatePlacementFromLabel("New Target") == 0
+              && mutatePlacementFromLabel("") == 0,
+              "W38: non-placement labels (cast-mode 'mutate', 'New Target', empty) do not match");
+        CHECK(mutateOverUnderHeader("Migratory Greathorn").find("state in a PLAN: line which creature you intend"
+              " as the HOST") != string::npos,
+              "W38: over/under header asks for the intended host on the PLAN line");
+        vector<string> hosts;
+        hosts.push_back("Gemrazer");
+        hosts.push_back("Dryad of the Ilysian Grove");
+        CHECK(uniqueNamedIn("Mutate over onto Dryad of the Ilysian Grove, then attack.", hosts)
+              == "Dryad of the Ilysian Grove",
+              "W38: a plan naming ONE candidate carries that host (case preserved from the option)");
+        CHECK(uniqueNamedIn("over if dryad of the ilysian grove host, under if gemrazer host", hosts).empty(),
+              "W38: a plan naming BOTH candidates is ambiguous - no carry line");
+        CHECK(uniqueNamedIn("Build board presence and apply pressure.", hosts).empty(),
+              "W38: a plan naming NO candidate carries nothing");
+        //echo shape: the lowercase live labels now ride annotated option
+        //lines - a bare lowercase echo must still match its option.
+        vector<string> lcou;
+        lcou.push_back("mutate over [this card goes ON TOP: the merged creature keeps THIS card's name and P/T, and ALSO gains the host's abilities]");
+        lcou.push_back("mutate under [this card goes UNDERNEATH: the creature on top keeps its name and P/T, and gains THIS card's abilities]");
+        bool slo = false;
+        int clo = parseChoice("1 (mutate over)", 2, &lcou, &slo, NULL);
+        cout << "     lowercase 'mutate over' echo vs annotated option -> " << clo << " (must be 1)\n";
+        CHECK(clo == 1 && !slo, "W38: lowercase 'mutate over' echo matches its annotated option");
+        bool slu = false;
+        int clu = parseChoice("2 (mutate under)", 2, &lcou, &slu, NULL);
+        CHECK(clu == 2 && !slu, "W38: lowercase 'mutate under' echo matches its annotated option");
     }
 
     // ---- WAVE-30: the new render annotations that ride OPTION lines (mutate
