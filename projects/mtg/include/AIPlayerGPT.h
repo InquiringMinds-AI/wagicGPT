@@ -514,6 +514,16 @@ private:
     //the model's last stated PLAN line - the ONLY reply text carried
     //forward (the protocol tells it so, and to restate the plan in full)
     string mCurrentPlan;
+    //W38 mutate host-intent carry (wave-37 validation #3, 139v152 s30-31):
+    //the over/under placement and the host pick are SEPARATE model calls,
+    //and the pilot's host intent did not survive the boundary (chose "over"
+    //intending Dryad, then picked Gemrazer as host). Record which card's
+    //over/under menu was just answered and the PLAN stated with that answer,
+    //so the host ask can render the pilot's own commitment back to it
+    //(annotation, never automation - the model may still override). Cleared
+    //when the host ask consumes an answer.
+    string mMutateIntentCard;
+    string mMutateIntentPlan;
     //Cards the opponent revealed that are now in their hand: public info a
     //human would remember. Tracked by name (instances are recreated on zone
     //moves), decremented when a card of that name leaves the hand.
