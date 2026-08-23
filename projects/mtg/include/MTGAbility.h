@@ -138,6 +138,15 @@ public:
     bool oneShot;
     int forceDestroy;
     int forcedAlive;
+    //The card whose MTGCardInstance::cardsAbilities index currently lists this
+    //ability, or NULL.  That index is a raw-pointer cache read back by
+    //GameObserver::Affinity, MTGCardInstance::canproduceMana and WParsedInt's
+    //land-colour count, every one of which dynamic_casts what it finds - so an
+    //entry that outlives its ability is a use-after-free waiting for the next
+    //frame (the wave-39 139v125 SEGV inside __dynamic_cast).  The link is weak
+    //in both directions: ~MTGAbility drops the entry, and ~MTGCardInstance
+    //drops the back-pointers, so neither side can be left holding the other.
+    MTGCardInstance * mRegistryCard;
     bool canBeInterrupted;
     //a trigger-granted interaction (e.g. the phasedoutbonus discard chooser)
     //may be answered while its source is phased out - it is not an activation

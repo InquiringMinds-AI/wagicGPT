@@ -6881,9 +6881,9 @@ int AbilityFactory::magicText(int id, Spell * spell, MTGCardInstance * card, int
                 if(!dontAdd)
                 {
                 if (a->source)
-                    a->source->cardsAbilities.push_back(a);
+                    a->source->registerAbility(a);
                 else if(spell && spell->source)
-                    spell->source->cardsAbilities.push_back(a);
+                    spell->source->registerAbility(a);
                 }
                 //keep track of abilities being added to the game on each card it belongs to, this ignores p/t bonuses given
                 //from other cards, or ability bonuses, making it generally easier to strip a card of it's abilities.
@@ -7501,6 +7501,7 @@ thread_local vector<void*> MTGAbility::deletedpointers;
 
 MTGAbility::MTGAbility(const MTGAbility& a): ActionElement(a)
 {
+    mRegistryCard = NULL; //a clone is not the registered ability
     //Todo get rid of menuText, it is only used as a placeholder in getMenuText, for something that could be a string
     for (int i = 0; i < 50; ++i)
     {
@@ -7540,6 +7541,7 @@ MTGAbility::MTGAbility(const MTGAbility& a): ActionElement(a)
 MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * card) :
     ActionElement(id)
 {
+    mRegistryCard = NULL;
     game = observer;
     source = card;
     target = card;
@@ -7555,6 +7557,7 @@ MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * card) :
 MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * _source, Targetable * _target) :
     ActionElement(id)
 {
+    mRegistryCard = NULL;
     game = observer;
     source = _source;
     target = _target;
@@ -7586,6 +7589,10 @@ int MTGAbility::stillInUse(MTGCardInstance * card)
 
 MTGAbility::~MTGAbility()
 {
+    //leave the per-card ability index before the object goes away - see
+    //MTGAbility::mRegistryCard
+    if (mRegistryCard)
+        mRegistryCard->unregisterAbility(this);
     SAFE_DELETE(mCost);
 }
 
