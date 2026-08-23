@@ -576,6 +576,13 @@ public:
     }
 };
 
+//W39-BATTLEMENT (#9): the formatter behind AManaProducer::getScaledMenuText -
+//"Add <value*multiplier> <colour> mana". Free function so the label can be
+//built from any ManaCost without a card. NOT usable from PARSETEST: the colour
+//table it reads (Constants::MTGColorStrings / NB_Colors) is populated from the
+//mod rules at game load, so a bare ManaCost outside a game has no colour slots.
+string scaledManaMenuText(ManaCost * output, int multiplier);
+
 class AManaProducer : public ActivatedAbilityTP
 {
 protected:
@@ -594,6 +601,11 @@ public:
     int resolve();
     int reactToClick(MTGCardInstance* _card);
     const string getMenuText();
+    //W39-BATTLEMENT: the same formatter with every amount multiplied. A
+    //foreach-wrapped producer resolves this ability once per matching
+    //permanent, so its label has to state the TOTAL, not the per-iteration
+    //output. Uncached on purpose - the multiplier is a live count.
+    const string getScaledMenuText(int multiplier);
     ~AManaProducer();
     virtual AManaProducer * clone() const;
 };

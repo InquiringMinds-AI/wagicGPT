@@ -16436,6 +16436,46 @@ void AIPlayerGPT::runParseSelfTest()
               "W39-13 the labels stay on the OPTION line the model chooses from");
     }
 
+    // ---- W39 #9: the foreach mana-producer label states the TOTAL ----
+    // Overgrown Battlement (`{T}:foreach(creature[defender]|myBattlefield)
+    // add{G}`) emitted "Add 1 green mana" on all 22 of its activation lines
+    // while the activation floated four. The label is now the per-iteration
+    // output scaled by the live match count.
+    cout << "\n[W39-9] foreach mana-producer labels carry the scaled total\n";
+    // (The formatter itself is NOT provable here: Constants::NB_Colors and
+    // Constants::MTGColorStrings are populated from the mod rules at game
+    // load, so a bare ManaCost in PARSETEST has a 1-element cost vector.
+    // The number is arrival-traced in a live fixture instead; what belongs
+    // HERE is the parse-relevant half - the echo of the new label.)
+    {
+        // ECHO SHAPE: the scaled label is what an option line carries, so the
+        // model's echo of it must still resolve to that option by name.
+        vector<string> bopts;
+        bopts.push_back("Add 4 green mana with Overgrown Battlement");  // 1
+        bopts.push_back("Cast Wall of Omens");                          // 2
+        bool bst = false;
+        int bc = parseChoice("CHOICE: 1 (Add 4 green mana with Overgrown Battlement)",
+                             2, &bopts, &bst, NULL, NULL);
+        CHECK(bc == 1, "W39-9 the scaled label echoes back cleanly as an option name");
+        // NEGATIVE: the amount is not a discriminator the parser may invent an
+        // option from - an echo naming the OTHER option still routes there, and
+        // the mana label does not swallow it.
+        bst = false;
+        int bn = parseChoice("CHOICE: 2 (Cast Wall of Omens)", 2, &bopts, &bst, NULL, NULL);
+        CHECK(bn == 2, "W39-9 NEGATIVE a non-mana echo beside a scaled mana label is unaffected");
+        // Two Battlements now carry the SAME scaled amount, so the label alone
+        // no longer discriminates them: the index must still decide, silently.
+        vector<string> btwo;
+        btwo.push_back("Add 4 green mana with Overgrown Battlement");   // 1
+        btwo.push_back("Add 4 green mana with Overgrown Battlement");   // 2
+        bst = false;
+        string bnote;
+        int bd = parseChoice("CHOICE: 2 (Add 4 green mana with Overgrown Battlement)",
+                             2, &btwo, &bst, NULL, &bnote);
+        CHECK(bd == 2 && bnote.empty(),
+              "W39-9 duplicate scaled labels keep the index and stay silent");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

@@ -85435,7 +85435,7 @@ type=Artifact
 [card]
 name=Perimeter Captain
 abilities=defender
-auto=@combat(blocking) source(creature[defender]|mybattlefield):life:2 controller
+auto=@combat(blocking) source(creature[defender]|mybattlefield):may life:2 controller
 text=Defender -- Whenever a creature you control with defender blocks, you may gain 2 life.
 mana={W}
 type=Creature
@@ -124113,7 +124113,7 @@ type=Instant
 name=Tribute to Hunger
 target=opponent
 auto=ability$!name(sacrifice) notaTarget(creature|mybattlefield) dynamicability<!mytgt toughnesslifegain targetopponent!> sacrifice!$ targetedplayer
-text=Target opponent sacrifices a creature. You gain life equal to that creature's toughness.
+text=Target opponent sacrifices a creature of their choice. You gain life equal to that creature's toughness.
 mana={2}{B}
 type=Instant
 [/card]
