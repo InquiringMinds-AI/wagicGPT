@@ -1,0 +1,39 @@
+#NAME: Chaoslace makes a SPELL ON THE STACK red, and the change sticks
+#The half of "Target spell or permanent becomes red" that the alias hardcode
+#could never reach: with only a spell on the stack to point at,
+#SpellOrPermanentTargetChooser's battlefield-only zone list made
+#validTargetsExist() false and the cast was refused.
+#Proof that the colour actually changed on the STACK object (no zone assertion
+#can see a colour): Blue Elemental Blast's counter mode only takes RED spells,
+#so a Grizzly Bears spell it could not have touched a moment earlier becomes a
+#legal target once Chaoslace resolves - and is countered.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Grizzly Bears
+manapool:{1}{G}
+[PLAYER2]
+hand:Chaoslace,Blue Elemental Blast
+manapool:{R}{U}
+[DO]
+Grizzly Bears
+yes
+Chaoslace
+Grizzly Bears
+yes
+Blue Elemental Blast
+choice 0
+Grizzly Bears
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Grizzly Bears
+manapool:{0}
+life:20
+narration:Your Grizzly Bears was COUNTERED by Blue Elemental Blast
+[PLAYER2]
+graveyard:Chaoslace,Blue Elemental Blast
+manapool:{0}
+life:20
+[END]

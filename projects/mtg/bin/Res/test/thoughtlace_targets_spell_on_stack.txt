@@ -1,0 +1,35 @@
+#NAME: Thoughtlace can be CAST at a spell on the stack (W41 #W41-9)
+#This is the root defect the whole item is about.  With alias=1227 the card
+#built a SpellOrPermanentTargetChooser, which declares only the two battlefield
+#zones, so TargetChooser::validTargetsExist() (TargetChooser.cpp:1658 - it
+#walks the zones the chooser declares and matches MTGCardInstance entries)
+#could never see a spell on the stack.  With nothing else on the battlefield
+#the cast was REFUSED outright: the card stayed in hand with its mana unspent
+#and the AI was never offered the response.
+#Here the stack spell is the ONLY thing on the board, so the fixture rides
+#exactly that branch: the pre-fix behaviour is Thoughtlace still in hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+manapool:{R}
+[PLAYER2]
+hand:Thoughtlace
+manapool:{U}
+[DO]
+Raging Goblin
+yes
+Thoughtlace
+Raging Goblin
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Raging Goblin
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Thoughtlace
+manapool:{0}
+life:20
+[END]

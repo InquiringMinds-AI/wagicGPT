@@ -18908,7 +18908,8 @@ type=Instant
 [/card]
 [card]
 name=Chaoslace
-alias=1282
+target=*|battlefield,stack
+auto=becomes(,red) forever
 text=Target spell or permanent becomes red. (Its mana symbols remain unchanged.)
 mana={R}
 type=Instant
@@ -27348,7 +27349,8 @@ toughness=1
 [/card]
 [card]
 name=Deathlace
-alias=1152
+target=*|battlefield,stack
+auto=becomes(,black) forever
 text=Target spell or permanent becomes black. (Mana symbols on that permanent remain unchanged.)
 mana={B}
 type=Instant
@@ -56578,7 +56580,9 @@ toughness=8
 [/card]
 [card]
 name=Hydroblast
-alias=1191
+target=*|battlefield,stack
+auto=teach(*[red]|stack) fizzle
+auto=teach(*[red]|battlefield) destroy
 text=Choose one - Counter target spell if it's red; or destroy target permanent if it's red.
 mana={U}
 type=Instant
@@ -66958,7 +66962,8 @@ type=Enchantment
 [/card]
 [card]
 name=Lifelace
-alias=1257
+target=*|battlefield,stack
+auto=becomes(,green) forever
 text=Target spell or permanent becomes green. (Mana symbols on that permanent remain unchanged.)
 mana={G}
 type=Instant
@@ -89854,7 +89859,8 @@ type=Enchantment
 [/card]
 [card]
 name=Purelace
-alias=1358
+target=*|battlefield,stack
+auto=becomes(,white) forever
 text=Target spell or permanent becomes white. (Mana symbols on that permanent remain unchanged.)
 mana={W}
 type=Instant
@@ -90214,7 +90220,9 @@ type=Artifact
 [/card]
 [card]
 name=Pyroblast
-alias=1312
+target=*|battlefield,stack
+auto=teach(*[blue]|stack) fizzle
+auto=teach(*[blue]|battlefield) destroy
 text=Choose one - Counter target spell if it's blue; or destroy target permanent if it's blue.
 mana={R}
 type=Instant
@@ -120538,7 +120546,8 @@ type=Instant
 [/card]
 [card]
 name=Thoughtlace
-alias=1227
+target=*|battlefield,stack
+auto=becomes(,blue) forever
 text=Target spell or permanent becomes blue. (Mana symbols on that permanent remain unchanged.)
 mana={U}
 type=Instant

@@ -1,0 +1,32 @@
+#NAME: Hydroblast may TARGET a non-red spell, and then counters nothing
+#Oracle: "Counter target spell IF IT'S RED" - the colour is a resolution
+#condition, not a targeting restriction (CR 601.2c / the intervening-if is on
+#the effect).  So a BLUE spell is a legal target and Hydroblast still resolves
+#(and is still paid for and still goes to the graveyard) while the blue spell
+#lives.  This is the half the old colour-restricted chooser got backwards: it
+#made the blue spell untargetable instead of unaffected.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Merfolk of the Pearl Trident
+manapool:{U}
+[PLAYER2]
+hand:Hydroblast
+manapool:{U}
+[DO]
+Merfolk of the Pearl Trident
+yes
+Hydroblast
+Merfolk of the Pearl Trident
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Merfolk of the Pearl Trident
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Hydroblast
+manapool:{0}
+life:20
+[END]

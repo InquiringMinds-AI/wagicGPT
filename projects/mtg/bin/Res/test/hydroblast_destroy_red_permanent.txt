@@ -1,0 +1,28 @@
+#NAME: Hydroblast destroys a RED permanent, and leaves a non-red one alone
+#Oracle mode 2: "Destroy target permanent if it's red."  Both permanents are
+#legal targets; only the red one dies.  The two casts in one fixture keep the
+#positive and the control on the same board, so a fix that simply destroys
+#everything it touches cannot pass.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Hydroblast,Hydroblast
+manapool:{U}{U}
+[PLAYER2]
+inplay:Raging Goblin,Merfolk of the Pearl Trident
+[DO]
+Hydroblast
+Raging Goblin
+Hydroblast
+Merfolk of the Pearl Trident
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Hydroblast,Hydroblast
+manapool:{0}
+life:20
+[PLAYER2]
+inplay:Merfolk of the Pearl Trident
+graveyard:Raging Goblin
+life:20
+[END]

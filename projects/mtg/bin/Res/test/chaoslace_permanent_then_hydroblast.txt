@@ -1,0 +1,33 @@
+#NAME: Chaoslace makes a permanent RED, end to end (W41 #W41-9)
+#Oracle (Scryfall, verified 2026-08-23): "Target spell or permanent becomes
+#red."  becomes(,red) with no newcolors[] subkeyword clears the old colours
+#first (ATransformer calls setColor(0,1)), which is what "becomes red" means -
+#the Grizzly Bears stops being green.
+#The colour change is otherwise invisible to any zone assertion, so the proof
+#is a second card that only answers RED things: Hydroblast's destroy mode kills
+#the laced Bears and (control, same board) cannot touch the untouched Merfolk.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Chaoslace,Hydroblast,Hydroblast
+manapool:{R}{U}{U}
+[PLAYER2]
+inplay:Grizzly Bears,Merfolk of the Pearl Trident
+[DO]
+Chaoslace
+Grizzly Bears
+Hydroblast
+Grizzly Bears
+Hydroblast
+Merfolk of the Pearl Trident
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Chaoslace,Hydroblast,Hydroblast
+manapool:{0}
+life:20
+[PLAYER2]
+inplay:Merfolk of the Pearl Trident
+graveyard:Grizzly Bears
+life:20
+[END]

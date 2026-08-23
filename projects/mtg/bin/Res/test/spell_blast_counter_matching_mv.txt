@@ -1,0 +1,38 @@
+#NAME: Spell Blast counters a spell whose mana value equals X (W41 #W41-9)
+#Oracle (Scryfall, verified 2026-08-23): "Counter target spell with mana value
+#X."  Spell Blast is already scripted (target=*[manacost=prex]|stack +
+#auto=fizzle), so the alias=1224 branch in TargetChooserFactory is dead for it
+#- createTargetChooser(spellTargetType) wins before the switch is reached.
+#What was never proven is that the X-announcement and the prex-parameterised
+#stack chooser survive the same validTargetsExist() gate the other cards died
+#on: at the moment the cast is offered X is still 0, so a chooser that reports
+#"no valid targets" at X=0 would refuse the cast before the player ever gets
+#to announce X.
+#Grizzly Bears is {1}{G}, mana value 2; Spell Blast is cast for X=2.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Grizzly Bears
+manapool:{1}{G}
+[PLAYER2]
+hand:Spell Blast
+manapool:{2}{U}
+[DO]
+Grizzly Bears
+yes
+Spell Blast
+choice 2
+Grizzly Bears
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Grizzly Bears
+manapool:{0}
+life:20
+narration:was COUNTERED by Spell Blast
+[PLAYER2]
+graveyard:Spell Blast
+manapool:{0}
+life:20
+[END]

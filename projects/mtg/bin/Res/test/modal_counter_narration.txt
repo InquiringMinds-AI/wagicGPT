@@ -1,0 +1,42 @@
+#NAME: A MODAL spell's counter mode raises the countered register (W41 #W41-9)
+#The wave-40 ledger left #3 (the "was COUNTERED by <spell>" narration register)
+#unvalidated against a MODAL counter, and nominated Silverquill Command as the
+#untested case.  That nomination is WRONG: Silverquill Command has no counter
+#mode at all - its Oracle (Scryfall, verified 2026-08-23) is choose two of
+#{+3/+3 and flying, reanimate mv<=2, target player draws and loses 1, target
+#opponent sacrifices}, and the primitive in borderline.txt matches.  So the gap
+#is closed here with a card that really is a modal counter: Blue Elemental
+#Blast, whose choose-one menu was built in wave 40 (choice fizzle | choice
+#destroy).  Mode index 0 is the counter leg.
+#The control is in frame on purpose: the counterspell's OWN resolution must
+#still read "resolved", so a fix that labels everything countered cannot pass.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Raging Goblin
+manapool:{R}
+[PLAYER2]
+hand:Blue Elemental Blast
+manapool:{U}
+[DO]
+Raging Goblin
+yes
+Blue Elemental Blast
+choice 0
+Raging Goblin
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Raging Goblin
+life:20
+narration:Your Raging Goblin was COUNTERED by Blue Elemental Blast
+narration:Opponent's Blue Elemental Blast resolved
+nonarration:Raging Goblin resolved
+[PLAYER2]
+graveyard:Blue Elemental Blast
+life:20
+narration:Opponent's Raging Goblin was COUNTERED by Blue Elemental Blast
+narration:Your Blue Elemental Blast resolved
+nonarration:Raging Goblin resolved
+[END]
