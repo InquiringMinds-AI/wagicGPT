@@ -1106,3 +1106,6 @@ red_elemental_blast_negative.txt
 blue_elemental_blast_both_modes.txt
 x_announce_recast_wave41.txt
 ai_x_announce_untapped_wave41.txt
+perimeter_captain_may_scripted_w41.txt
+ai/perimeter_captain_may_w41.txt
+ai/perimeter_captain_may_batch_w41.txt

@@ -1,0 +1,49 @@
+# Wave-41 #W41-15 / #W41-7 fixture: a `may` prompt raised at the BLOCKERS step.
+# P1 (AI) attacks with Grizzly Bears; P2 (AI) blocks with Perimeter Captain
+# (0/4 defender, `auto=@combat(blocking) source(creature[defender]|mybattlefield)
+# :may life:2 controller`). The block raises P2's may-prompt; accepting it gains 2.
+#
+# EXPECTED: P2 20 -> 22, nothing dies (2 damage into a 0/4, 0 damage back).
+# This is the fixture wave-40 could not write: the suite driver wedged on a
+# may-menu armed at the blockers step (#W41-15).
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Perimeter Captain
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Perimeter Captain
+life:22
+[END]

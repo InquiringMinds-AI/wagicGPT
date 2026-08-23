@@ -4197,7 +4197,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
       mStaleDropStreak(0), mLastStaleLivelock(false),
-      mInPregameAsk(false)
+      mInPregameAsk(false),
+      mMayBatchVerdict(kMayBatchNone), mMayBatchRemaining(0)
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
@@ -9671,6 +9672,130 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     {
         act.choice = 0;
         return 0;
+    }
+
+    //#W41-14 LABEL TRUTH. A may-gain-life option arrives from the engine as the
+    //bare verb "Life": no magnitude, no source, and the identical string for
+    //ANY life-granting may. The deciding fact must ride the option (P1/P2/P4),
+    //and the pilot was spending a median 5,702 reasoning characters per ask
+    //re-deriving "2" off the battlefield line. The magnitude is evaluated at
+    //build time (DecisionRequest::mayEffectLabel); name the source with it.
+    //Presentation only - req.optionTexts is the staleness key and is untouched,
+    //and the option COUNT and ORDER are unchanged, so the answer index still
+    //means what applyMenuChoice thinks it means.
+    string mayBatchSourceName;
+    if (ctx)
+    {
+        mayBatchSourceName = ctx->getDisplayName();
+        if (mayBatchSourceName.empty() && ctx->model && ctx->model->data)
+            mayBatchSourceName = ctx->model->data->getName();
+    }
+    if (!req.mayEffectLabel.empty() && !opts.empty())
+        opts[0] = mayBatchSourceName.empty()
+                      ? req.mayEffectLabel
+                      : (req.mayEffectLabel + " with " + mayBatchSourceName);
+
+    //#W41-7 MASS ACCEPT / DENY. See AIPlayerGPT.h for the measured bill. The
+    //engine pushes every sibling trigger onto the stack before resolving the
+    //first, so the size of the window is known at the FIRST ask; the contract's
+    //inspector counts only siblings it can positively verify identical (same
+    //source, same controller, same rendered effect, no per-instance targets,
+    //no per-instance condition). Anything it cannot verify never joins a batch
+    //and keeps its own ask.
+    DecisionManager::MayBatch batch;
+    bool batchOffered = DecisionManager::inspectMayBatch(this, req, batch);
+    bool inGroup = !batch.groupKey.empty();
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //dev-only probe (WAGIC_MAYPROBE=1): the batch verdict bookkeeping. This is
+    //what caught the instance-vs-class keying bug during wave-41 validation.
+    //Compiled out of release builds, per the project's diagnostics convention.
+    if (getenv("WAGIC_MAYPROBE"))
+        fprintf(stderr, "MAYPROBE seat offered=%d key='%s' held='%s' verdict=%d rem=%d total=%d\n",
+                (int) batchOffered, batch.groupKey.c_str(), mMayBatchKey.c_str(),
+                mMayBatchVerdict, mMayBatchRemaining, batch.totalInWindow);
+#endif //_DEBUG || WAGIC_DEVLOGS
+    //A verdict from earlier in this same window answers without a model call.
+    if (inGroup && mMayBatchVerdict != kMayBatchNone && mMayBatchKey == batch.groupKey
+        && mMayBatchRemaining > 0)
+    {
+        int verdict = mMayBatchVerdict;
+        if (--mMayBatchRemaining <= 0)
+        {
+            mMayBatchVerdict = kMayBatchNone;
+            mMayBatchKey.clear();
+        }
+        if (verdict == kMayBatchAcceptAll)
+        {
+            act.choice = 0;
+            return 0;
+        }
+        if (verdict == kMayBatchDeclineAll)
+        {
+            act.choice = req.canDecline ? -1 : 0;
+            return 0;
+        }
+        //kMayBatchIndividual: fall through to the normal single ask below.
+    }
+    else if (batchOffered)
+    {
+        //Ask once for the whole window. "Decide individually" is ALWAYS the
+        //third answer, so the batched question can never make an answer
+        //impossible - it falls back to exactly today's per-instance flow.
+        std::ostringstream head;
+        head << (mayBatchSourceName.empty() ? string("This trigger") : mayBatchSourceName)
+             << " has triggered " << batch.totalInWindow << " times in this window, and every"
+             << " one of them is the SAME choice with no targets to pick. Answer all "
+             << batch.totalInWindow << " at once, or take them one at a time:";
+        string effect = req.mayEffectLabel.empty() ? opts[0] : req.mayEffectLabel;
+        std::ostringstream acceptAll, declineAll, individually;
+        acceptAll << effect << " - accept ALL " << batch.totalInWindow << " triggers";
+        declineAll << "Decline ALL " << batch.totalInWindow << " triggers - do nothing";
+        individually << "Decide each of the " << batch.totalInWindow
+                     << " triggers separately (you will be asked once per trigger)";
+        vector<string> batchOpts;
+        batchOpts.push_back(acceptAll.str());
+        batchOpts.push_back(declineAll.str());
+        batchOpts.push_back(individually.str());
+        {
+            //One narration line for the whole window - not N identical echoes.
+            vector<string> narr;
+            std::ostringstream a, d, s;
+            a << "You accepted " << effect << " for all " << batch.totalInWindow
+              << " triggers of " << (mayBatchSourceName.empty() ? string("that ability") : mayBatchSourceName);
+            d << "You declined all " << batch.totalInWindow << " triggers of "
+              << (mayBatchSourceName.empty() ? string("that ability") : mayBatchSourceName);
+            s << "You chose to answer each of the " << batch.totalInWindow << " triggers separately";
+            narr.push_back(a.str());
+            narr.push_back(d.str());
+            narr.push_back(s.str());
+            setAskNarration(narr);
+        }
+        int bpick = askModel(head.str(), batchOpts, true, mayBatchSourceName);
+        if (bpick == kChoicePending)
+            return kChoicePending;
+        if (bpick >= 0 && bpick <= 2)
+        {
+            mMayBatchKey = batch.groupKey;
+            mMayBatchRemaining = batch.totalInWindow;
+            if (bpick == 0)
+            {
+                mMayBatchVerdict = kMayBatchAcceptAll;
+                mMayBatchRemaining--;
+                act.choice = 0;
+                return 0;
+            }
+            if (bpick == 1)
+            {
+                mMayBatchVerdict = kMayBatchDeclineAll;
+                mMayBatchRemaining--;
+                act.choice = req.canDecline ? -1 : 0;
+                return 0;
+            }
+            mMayBatchVerdict = kMayBatchIndividual;
+            mMayBatchRemaining--;
+            //fall through: this instance gets the normal single ask
+        }
+        //model failure: no verdict recorded, normal per-instance flow below
     }
     //ENGINE-R6 (wave-21 deck135): a Transform/flip menu option is only ever
     //offered when its gating condition is already satisfied - the engine arms
@@ -17932,6 +18057,63 @@ void AIPlayerGPT::runParseSelfTest()
               "W41-16 NEGATIVE a real spell on the stack still renders");
         CHECK(stackObjectIsRespondable(false, false),
               "W41-16 NEGATIVE a sourceless engine object still renders (never a silent gap)");
+    }
+
+    // ---- W41-14 + W41-7: truthful may labels and the batched may ask ----
+    // The engine's own label for Perimeter Captain's may is the bare verb
+    // "Life" - no magnitude, no source, and the identical string for any
+    // life-granting may. The seat now renders "Gain 2 life with <source>", and
+    // when the same trigger is pending N>1 times in one window it asks ONCE
+    // with accept-all / decline-all / decide-individually.
+    cout << "\n[W41-14] the may option carries its magnitude and its source\n";
+    {
+        vector<string> mopts;
+        mopts.push_back("Gain 2 life with Perimeter Captain"); // 1
+        mopts.push_back("Decline - do nothing");               // 2
+        bool st = false;
+        int c = parseChoice("CHOICE: 1 (Gain 2 life with Perimeter Captain)",
+                            2, &mopts, &st, NULL, NULL);
+        CHECK(c == 1, "W41-14 the magnitude+source label echoes back as option 1");
+        // NEGATIVE: the decline still routes to the decline, and the life
+        // label does not swallow an echo that names the other option.
+        st = false;
+        int d = parseChoice("CHOICE: 2 (Decline - do nothing)", 2, &mopts, &st, NULL, NULL);
+        CHECK(d == 2, "W41-14 NEGATIVE the decline echo is unaffected by the new label");
+        // The label is plain text, so narration keeps it whole (no bracket tail
+        // to strip) - the game log line stays readable.
+        CHECK(stripNarrationDecoration("Gain 2 life with Perimeter Captain")
+              == "Gain 2 life with Perimeter Captain",
+              "W41-14 echo: the may label survives narration stripping intact");
+    }
+    cout << "\n[W41-7] the batched may ask: accept all / decline all / individually\n";
+    {
+        vector<string> bopts;
+        bopts.push_back("Gain 2 life - accept ALL 3 triggers");                       // 1
+        bopts.push_back("Decline ALL 3 triggers - do nothing");                       // 2
+        bopts.push_back("Decide each of the 3 triggers separately (you will be asked" // 3
+                        " once per trigger)");
+        bool st = false;
+        int a = parseChoice("CHOICE: 1 (Gain 2 life - accept ALL 3 triggers)",
+                            3, &bopts, &st, NULL, NULL);
+        CHECK(a == 1, "W41-7 accept-all echoes back as option 1");
+        // NEGATIVE and the important one: decline-all SHARES the "3 triggers"
+        // substring with accept-all and must not be pulled onto it.
+        st = false;
+        int dn = parseChoice("CHOICE: 2 (Decline ALL 3 triggers - do nothing)",
+                             3, &bopts, &st, NULL, NULL);
+        CHECK(dn == 2, "W41-7 NEGATIVE decline-all does not resolve to accept-all");
+        st = false;
+        int iv = parseChoice("CHOICE: 3 (Decide each of the 3 triggers separately)",
+                             3, &bopts, &st, NULL, NULL);
+        CHECK(iv == 3, "W41-7 decide-individually echoes back as option 3");
+        // The escape hatch must be reachable by NAME too - a reply that states
+        // the fallback without an index still has to land on it, because that
+        // answer is what guarantees the batched ask can never make an answer
+        // impossible.
+        st = false;
+        int iv2 = parseChoice("Decide each of the 3 triggers separately (you will be"
+                              " asked once per trigger)", 3, &bopts, &st, NULL, NULL);
+        CHECK(iv2 == 3, "W41-7 the individually fallback resolves by name alone");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

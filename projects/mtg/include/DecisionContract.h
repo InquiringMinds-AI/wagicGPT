@@ -71,6 +71,14 @@ public:
     //current text. Snapshotted strings, never a live pointer.
     std::string mayObjectName;    //e.g. "Bog Wraith"
     std::string mayObjectOrigin;  //e.g. "opponent's graveyard"
+    //CHOOSE_MENU, single-option "may" ask (#W41-14 label truth): the engine's
+    //own option label for a may-gain-life trigger is the bare verb "Life" - no
+    //magnitude, no source, and the SAME string for any life-granting may. The
+    //deciding fact must ride the option (P1/P2/P4), so the magnitude is
+    //evaluated here at build time ("Gain 2 life") and the seat renders it.
+    //Empty whenever the effect's magnitude is not safely derivable - then the
+    //seat keeps the engine label untouched.
+    std::string mayEffectLabel;   //e.g. "Gain 2 life"
     //CHOOSE_TARGET: the chooser's currently-legal candidates (players and
     //cards across all zones, capped), the source card, and the selection
     //bounds (targetMin: a minimum must be met before stopping; maxTargets
@@ -131,6 +139,42 @@ public:
     //real option (the engine's own convention for that key).
     static bool buildMenuChoice(Player * p, DecisionRequest & req);
     static void applyMenuChoice(const DecisionRequest & req, const DecisionAction & act);
+
+    //Mass accept/deny for repeated identical "may" triggers (#W41-7).
+    //
+    //One `may` ability can fire N times inside a single resolution window -
+    //Perimeter Captain's "whenever a creature you control with defender
+    //blocks, you may gain 2 life" raised EIGHT identical asks in one combat
+    //(wave-40 seat126: 22 asks, 22 accepts, 1,377s of inference, 132k
+    //reasoning characters for 22 identical answers). The engine pushes every
+    //sibling trigger onto the stack BEFORE the first one resolves, so at the
+    //FIRST ask the size of the whole group is already knowable: this
+    //inspector counts the still-unresolved siblings so a seat can ask once
+    //instead of N times.
+    //
+    //"Identical" is deliberately narrow, and every condition must be
+    //POSITIVELY verified or the group is not offered as batchable:
+    //  - the live menu is a single-option may with a legal decline;
+    //  - the option's ability is a MayAbility with no target chooser (no
+    //    per-instance targets to choose) and no cast-restriction condition
+    //    (which could evaluate differently per instance);
+    //  - each counted sibling is an unresolved StackAbility whose nested
+    //    ability is a MayAbility with the SAME source card, the SAME
+    //    controller, the SAME rendered menu text, and likewise no targets.
+    //Anything unverifiable simply does not join the batch and keeps its own
+    //ask. The batch is an AFFORDANCE, never a replacement for the `may`:
+    //a consumer offering it must always keep a "decide individually" answer,
+    //so the batched question can never make an answer impossible.
+    struct MayBatch
+    {
+        bool batchable;        //true only when totalInWindow >= 2 and all checks passed
+        int pendingSiblings;   //unresolved identical triggers still on the stack
+        int totalInWindow;     //pendingSiblings + this ask
+        std::string groupKey;  //stable within one window; changes with source/effect/turn
+        std::string sourceName;
+        MayBatch() : batchable(false), pendingSiblings(0), totalInWindow(1) {}
+    };
+    static bool inspectMayBatch(Player * p, const DecisionRequest & req, MayBatch & out);
 
     //Targets (c4). buildChooseTarget enumerates the chooser's live legal
     //candidates (false when none exist); applyChooseTarget re-validates

@@ -1,0 +1,6 @@
+#NAME:W41 Captain Wall
+#DESC:Wave-41 #W41-7 probe deck: mass may-trigger defender wall
+Perimeter Captain (*) * 12
+Fortified Rampart (*) * 12
+Wall of Wood (*) * 4
+Plains (*) * 20

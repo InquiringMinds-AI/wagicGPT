@@ -175,6 +175,60 @@ namespace
         std::string possessive = (z->owner == decider) ? "your " : "opponent's ";
         return possessive + z->getName();
     }
+
+    //#W41-14: a may-gain-life option renders as the bare verb "Life" (or
+    //"Life Loss"). Evaluate the magnitude the same way the engine will when it
+    //resolves (AALifer::getLife runs the WParsedInt against the source), so the
+    //label states the amount instead of leaving the pilot to re-derive it off
+    //the battlefield line. Empty for every effect whose magnitude is not
+    //derivable here - the seat then keeps the engine's own label.
+    std::string mayEffectLabelFor(MTGAbility * may)
+    {
+        MTGAbility * core = AbilityFactory::getCoreAbility(may);
+        if (AALifer * lifer = dynamic_cast<AALifer *>(core))
+        {
+            int n = lifer->getLife();
+            if (!n)
+                return std::string();
+            std::ostringstream o;
+            if (n > 0)
+                o << "Gain " << n << " life";
+            else
+                o << "Lose " << -n << " life";
+            return o.str();
+        }
+        return std::string();
+    }
+
+    //What the SEAT actually renders for this may - the evaluated effect label
+    //when one exists, else the engine's own menu label. Batch identity is
+    //decided on this string, so two triggers only group when the pilot would
+    //read them as the same question.
+    std::string renderedMayEffect(MTGAbility * may, const std::string & menuLabel)
+    {
+        std::string label = mayEffectLabelFor(may);
+        return label.empty() ? menuLabel : label;
+    }
+
+    //The MayAbility behind a single-option may menu, or NULL. Batch identity
+    //(#W41-7) requires the ability to be a `may` with NO per-instance target
+    //choice and NO cast-restriction condition: a chooser makes each instance a
+    //different question, and a condition can evaluate differently per instance.
+    MayAbility * batchableMay(MTGAbility * a)
+    {
+        MayAbility * may = dynamic_cast<MayAbility *>(a);
+        if (!may || !may->source || !may->ability)
+            return NULL;
+        if (dynamic_cast<MenuAbility *>(may))
+            return NULL; //a custom multi-option menu is not an accept/decline may
+        if (!may->Cond.empty())
+            return NULL;
+        if (dynamic_cast<TargetAbility *>(may->ability))
+            return NULL;
+        if (may->ability->getActionTc())
+            return NULL;
+        return may;
+    }
 }
 
 bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
@@ -191,6 +245,10 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     req.optionTexts.clear();
     req.menuIndices.clear();
     req.canDecline = false;
+    //a reused request must not carry a previous menu's may annotations
+    req.mayObjectName.clear();
+    req.mayObjectOrigin.clear();
+    req.mayEffectLabel.clear();
 
     if (object->abilitiesMenu->isMultipleChoice && object->currentActionCard)
     {
@@ -261,11 +319,17 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     //renders them and leaves req.optionTexts (the staleness key) untouched.
     if (req.optionTexts.size() == 1)
         if (MayAbility * may = dynamic_cast<MayAbility *>(soleOptionAbility))
+        {
             if (MTGCardInstance * obj = resolveTriggerObject(may))
             {
                 req.mayObjectName = obj->getName();
                 req.mayObjectOrigin = objectOrigin(obj, p);
             }
+            //#W41-14: state the magnitude on the option. Representation only -
+            //req.optionTexts (the staleness key) is untouched, so the answer
+            //index and the apply path are unchanged.
+            req.mayEffectLabel = mayEffectLabelFor(may);
+        }
     req.canDecline = !object->checkCantCancel();
     req.kind = DecisionRequest::CHOOSE_MENU;
     return true;
@@ -303,6 +367,94 @@ void DecisionManager::applyMenuChoice(const DecisionRequest & req, const Decisio
     //can't-cancel menu the same key clicks the last real option (the
     //engine's own convention - an answer must always land)
     object->doReactTo((int) object->abilitiesMenu->mObjects.size() - 1);
+}
+
+bool DecisionManager::inspectMayBatch(Player * p, const DecisionRequest & req, MayBatch & out)
+{
+    out = MayBatch();
+    if (!p || req.kind != DecisionRequest::CHOOSE_MENU)
+        return false;
+    //accept-or-decline shape only: one real option plus a legal decline. A
+    //multi-option menu is not a mass yes/no question.
+    if (req.optionTexts.size() != 1 || !req.canDecline)
+        return false;
+
+    GameObserver * g = p->getObserver();
+    ActionLayer * object = g->mLayers->actionLayer();
+    if (!object->menuObject || !object->abilitiesMenu || req.menuIndices.size() != 1)
+        return false;
+    int item = req.menuIndices[0];
+    if (item < 0 || (size_t) item >= object->abilitiesMenu->mObjects.size())
+        return false;
+    int slot = object->abilitiesMenu->mObjects[item]->GetId();
+    if (slot <= 0 || (size_t) slot >= object->mObjects.size())
+        return false;
+    MayAbility * may = batchableMay((MTGAbility *) object->mObjects[slot]);
+    if (!may)
+        return false;
+    MTGCardInstance * src = may->source;
+    Player * controller = src->controller();
+    if (controller != p)
+        return false; //only the deciding seat's own repeated trigger
+    //The group is the SOURCE CLASS, not the source instance: the measured
+    //case (wave-40 126v139 t24) was TWO Perimeter Captains x FOUR blocking
+    //defenders = eight asks, so keying on the instance pointer would split
+    //the window into per-Captain groups and re-ask for each. Identity is
+    //therefore: same printed card, and the same text the SEAT RENDERS - the
+    //evaluated effect label when one exists (so two copies whose magnitudes
+    //differ render differently and do NOT group), else the engine's own menu
+    //label. Both halves must match; an unverifiable pair simply does not join.
+    const std::string sourceClass = src->getName();
+    const std::string effect = renderedMayEffect(may, req.optionTexts[0]);
+    if (sourceClass.empty() || effect.empty())
+        return false;
+
+    //Every sibling still waiting on the stack. The engine pushes the whole
+    //batch of triggers before resolving the first, so this count is the rest
+    //of the window - not a guess about the future.
+    ActionStack * stack = g->mLayers->stackLayer();
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        StackAbility * sa = dynamic_cast<StackAbility *>((Interruptible *) stack->mObjects[i]);
+        if (!sa || sa->state != NOT_RESOLVED || !sa->ability)
+            continue;
+        //the trigger on the stack wraps the may (GenericTriggeredAbility ->
+        //MayAbility); an unwrapped may on the stack counts too.
+        MayAbility * sib = batchableMay(sa->ability);
+        if (!sib)
+        {
+            NestedAbility * na = dynamic_cast<NestedAbility *>(sa->ability);
+            sib = na ? batchableMay(na->ability) : NULL;
+        }
+        if (!sib || sib == may)
+            continue;
+        if (!sib->source || sib->source->getName() != sourceClass
+            || sib->source->controller() != controller)
+            continue;
+        if (renderedMayEffect(sib, sib->getMenuText()) != effect)
+            continue;
+        out.pendingSiblings++;
+    }
+
+    out.totalInWindow = out.pendingSiblings + 1;
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //dev-only counting probe (WAGIC_MAYPROBE=1): what the batch inspector saw.
+    //Compiled out of release builds, per the project's diagnostics convention.
+    if (getenv("WAGIC_MAYPROBE"))
+        fprintf(stderr, "MAYPROBE batch src=%s effect='%s' pending=%d stack=%d\n",
+                sourceClass.c_str(), effect.c_str(), out.pendingSiblings,
+                (int) stack->mObjects.size());
+#endif //_DEBUG || WAGIC_DEVLOGS
+    out.sourceName = sourceClass;
+    //Key the group by source, effect and turn. Two separate windows on the
+    //same turn merge only if the first is fully answered before the second
+    //arms - and a verdict is consumed exactly totalInWindow times, so a
+    //later window re-asks rather than inheriting a spent verdict.
+    std::ostringstream k;
+    k << sourceClass << "|" << effect << "|" << g->turn;
+    out.groupKey = k.str();
+    out.batchable = out.totalInWindow >= 2;
+    return out.batchable;
 }
 
 bool DecisionManager::buildChooseTarget(Player * p, TargetChooser * tc, DecisionRequest & req)
