@@ -1,0 +1,6 @@
+#NAME:W41G Doomsayer Loop Probe
+#DESC:probe - token maker + Intruder Alarm
+
+Thraben Doomsayer * 12
+Intruder Alarm (8ED) * 12
+Tundra (ME4) * 24
