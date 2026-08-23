@@ -12,7 +12,8 @@ These are the three lines, exactly as you will see them:
   "Create vampire with Bloodline Keeper [cost: Tap]"
   "Create vampire with Lord of Lineage [cost: Tap]"
 Take it. Then take it again the next time it appears, and again, until either the line stops
-being offered or your own battlefield line shows 12 or more creatures - then answer 0 (pass).
+being offered or the option line's own "[repeat: ... you control M creatures]" note shows 12
+or more creatures - then answer 0 (pass).
 "[cost: Tap]" is the WHOLE cost. It needs no mana, no land drop, and no untapped land, and it
 works on the opponent's turn as well as your own.
 The thought "I have 0 mana, so I can't do anything" is ALWAYS FALSE while one of those lines is
@@ -145,7 +146,7 @@ Your cheapest card costs ONE mana, so "no early play" is never a reason to ship 
 - A line ending in "[cost: Tap]" is in your list: take it, this window, whatever your mana
   says, on either player's turn.
 - You just took that line and it appears again: take it again. Keep going until it stops being
-  offered or your battlefield line shows 12 or more creatures.
+  offered or the option's "[repeat: ...]" note shows you control 12 or more creatures.
 - "Put in Play with Marsh Flats targeting Underground Sea" is listed: take it. Otherwise
   "targeting Tundra". Otherwise "targeting Scrubland".
 - Several casts are listed at once: answer with the highest entry on the cast list above that
