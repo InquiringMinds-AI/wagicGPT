@@ -1,0 +1,12 @@
+#NAME:Narration Channel Probe
+#DESC:W41-3 probe: activations, fetch targets, bulk graveyard shuffle, venturing
+Elixir of Immortality (*) * 4
+Cloister Gargoyle (*) * 8
+Windswept Heath (*) * 10
+Grizzly Bears (*) * 6
+Giant Growth (*) * 4
+Forest (*) * 14
+Plains (*) * 14
+#DNG:Lost Mine of Phandelver (*) *1
+#DNG:Tomb of Annihilation (*) *1
+#DNG:Dungeon of the Mad Mage (*) *1

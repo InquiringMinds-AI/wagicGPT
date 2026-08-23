@@ -8002,6 +8002,19 @@ int ActivatedAbility::activateAbility()
         return 1;
     }
     counters++;
+    //W41-3(a): announce the activation itself. Mana producers returned above
+    //(a tap-for-mana is plumbing, narrated nowhere), so everything reaching
+    //here is a real activated or loyalty ability - the cause line an OBSERVING
+    //seat previously never got. The event is informational only: no engine
+    //behaviour reads it.
+    if (game && source)
+    {
+        Player * activator = game->currentlyActing();
+        if (!activator)
+            activator = source->controller();
+        WEvent * act = NEW WEventAbilityActivated(source, activator, getMenuText());
+        game->receiveEvent(act);
+    }
     if(sideEffect && usesBeforeSideEffects.size())
     {
         activateSideEffect();

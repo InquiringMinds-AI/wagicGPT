@@ -295,6 +295,13 @@ private:
     void appendNarration(const string& line);
     //Zone-duty digest for the trim marker (see trimMarkerLine).
     string zoneNameDigest(MTGGameZone * z);
+    //W41-3(c): write (and clear) the pending collapsed bulk move, if any. Must
+    //run before ANY other narration line and before the prompt is assembled,
+    //so the collapsed line lands in the log at the point the moves happened.
+    void flushBulkMove();
+    //W41-3(c): the card whose spell/ability is resolving right now (the latest
+    //NOT_RESOLVED stack object's source), used to attribute a bulk move.
+    MTGCardInstance * resolvingStackSource();
     //Split a reply at its "PLAN:" marker: stores the (complete, per the
     //protocol) plan into mCurrentPlan and returns the decision part, which
     //is the ONLY text the choice parsers may see - plan prose is full of
@@ -578,6 +585,13 @@ private:
     //toxicity granted - while Player::poisonCount is settled by the time the
     //event lands, so the delta is derived from the settled totals instead.
     int mLastPoison[2];
+    //W41-3(c): the pending bulk graveyard->library run. `mBulkMoveFirstLine` is
+    //the ordinary named line for the FIRST move, kept so a run of length one
+    //flushes as itself rather than as a "1 card" count.
+    int mBulkMoveCount;
+    bool mBulkMoveMine;
+    string mBulkMoveFirstLine;
+    string mBulkMoveSource;
     //Avoid re-querying the model every AI tick while nothing changed. Keyed
     //by board state + question (not the full prompt) for the same reason as
     //mAskCache: taking an action narrates it, and a full-prompt key would
