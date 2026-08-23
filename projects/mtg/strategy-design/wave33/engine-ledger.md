@@ -477,3 +477,11 @@ timeout 900. The 122B remains available as a validator arm on demand. Wave-35 gu
 review (the usual dev-loop routine) runs with ALL THREE wave-35 corpora reviewable
 (owner directive): 4.75-bit matchups-20260820-192210 (+022400 rerun), 122B
 matchups-20260821-033000, FP8 matchups-20260822-111102.
+
+OWNER RULING (2026-08-23, binding, verbatim core: "never have I ever told you to cycle
+the fucking serve back and forth between what we are using for development and ANYTHING
+ELSE"): the dev-loop serve does NOT get cycled. The FP8-35B (:8084) is THE standing
+Spark serve for this project — it stays up between waves; no autonomous swap-back to the
+122B/embedder or anything else, ever. Other serves come up only when the owner says so.
+The "restore production posture" swaps I performed between waves 36-38 were my own
+invention from the bench notes' restore recipe, not an owner instruction — wrong.
