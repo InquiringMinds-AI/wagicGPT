@@ -556,6 +556,23 @@ struct WEventCardMutated : public WEventCardUpdate {
     virtual Targetable * getTarget(int target);
 };
 
+//W41-3(a): an ACTIVATED ability was activated (loyalty abilities included).
+//The engine had no event for this at all, so an observing seat saw an
+//activation's EFFECTS with no cause line while the acting seat recorded
+//"You used: ...". Raised at ActivatedAbility::activateAbility's non-mana
+//path (mana taps are plumbing, not decisions, and are narrated nowhere).
+//`abilityText` is the ability's own menu text, captured at activation time
+//because the ability object may be cloned/destroyed before anyone reads it.
+struct WEventAbilityActivated : public WEvent {
+    MTGCardInstance * source;
+    Player * controller;
+    string abilityText;
+    WEventAbilityActivated(MTGCardInstance * _source, Player * _controller,
+                           string _abilityText)
+        : WEvent(), source(_source), controller(_controller), abilityText(_abilityText) {}
+    virtual ~WEventAbilityActivated() {};
+};
+
 //token creation event
 struct WEventTokenCreated : public WEventCardUpdate {
     WEventTokenCreated(MTGCardInstance * card);

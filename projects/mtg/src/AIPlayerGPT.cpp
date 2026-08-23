@@ -2305,16 +2305,29 @@ string zoneChangeNarration(bool mine, const string& cardName, const string& from
         return who + "discarded " + cardName;
     if (from == "hand" && to == "exile")
         return ownerTag(mine) + cardName + " was exiled from " + ownedZone(mine, "hand");
+    //W41-3(b), OWNER RULING: every zone change STATES ITS ORIGIN. The verbs
+    //that already encode it ("drew", "milled", "played", "discarded", "died")
+    //keep the owner's W35 register verbatim; the ones that did not name where
+    //the card came from now do - a permanent bounced to hand and a graveyard
+    //card recurred to hand were the same sentence.
     if (from == "battlefield" && to == "graveyard")
         return isCreature ? (ownerTag(mine) + cardName + " died")
                           : (ownerTag(mine) + cardName + " was put into "
-                             + ownedZone(mine, "graveyard"));
+                             + ownedZone(mine, "graveyard") + " from the battlefield");
     if (from == "battlefield" && to == "exile")
         return ownerTag(mine) + cardName + " was exiled from the battlefield";
     if (from == "battlefield" && to == "hand")
-        return ownerTag(mine) + cardName + " was returned to " + ownedZone(mine, "hand");
+        return ownerTag(mine) + cardName + " was returned to " + ownedZone(mine, "hand")
+               + " from the battlefield";
     if (from == "battlefield" && to == "library")
-        return ownerTag(mine) + cardName + " was put into " + ownedZone(mine, "library");
+        return ownerTag(mine) + cardName + " was put into " + ownedZone(mine, "library")
+               + " from the battlefield";
+    if (from == "graveyard" && to == "hand")
+        return ownerTag(mine) + cardName + " was returned to " + ownedZone(mine, "hand")
+               + " from " + ownedZone(mine, "graveyard");
+    if (from == "graveyard" && to == "library")
+        return ownerTag(mine) + cardName + " was put into " + ownedZone(mine, "library")
+               + " from " + ownedZone(mine, "graveyard");
     if (to == "battlefield")
         return ownerTag(mine) + cardName + " entered the battlefield from "
                + (from == "exile" ? string("exile") : ownedZone(mine, from));
@@ -2332,6 +2345,66 @@ string zoneChangeNarration(bool mine, const string& cardName, const string& from
 
 namespace //back to file-local linkage for the rest of the register
 {
+
+//W41-3: the possessive the OWNER wrote his fix shapes in ("their library"),
+//used by the masked and collapsed lines below. The named-card register keeps
+//ownedZone's "the opponent's X"; both forms already shipped side by side.
+string ownZone(bool mine, const string& zone)
+{
+    return (mine ? "your " : "their ") + zone;
+}
+
+//W41-3(b): a zone is PUBLIC when every card leaving it was visible to both
+//players on the way out. OWNER RULING: mask by ORIGIN, never by observer seat
+//- the old mask hid a graveyard recursion (public) exactly as hard as a draw
+//(hidden), which is how 47 anonymous "put a card into their library" lines
+//stood in for a named Elixir shuffle the opponent had watched happen.
+bool isPublicOriginZone(const string& zone)
+{
+    return zone == "battlefield" || zone == "graveyard" || zone == "stack"
+        || zone == "exile" || zone == "reveal";
+}
+
+//W41-3(b): a move out of a HIDDEN origin. The card stays unnamed - hidden
+//information stays hidden - but the ORIGIN is stated on every such line: a
+//silent origin is a gap, and the model confabulates rules into gaps.
+string hiddenOriginMoveNarration(bool mine, const string& from, const string& to)
+{
+    return (mine ? string("You put a card from ") : string("Opponent put a card from "))
+           + ownZone(mine, from) + " into " + ownZone(mine, to);
+}
+
+//W41-3(c): N moves of the same shape inside one resolution collapse into ONE
+//counted line naming the effect that caused them. Elixir of Immortality
+//shuffling back a seven-card graveyard produced seven identical lines, none of
+//which said what had happened.
+string bulkZoneMoveNarration(bool mine, int count, const string& from,
+                             const string& to, const string& sourceName)
+{
+    std::ostringstream o;
+    o << (mine ? "You " : "Opponent ")
+      << ((from == "graveyard" && to == "library") ? "shuffled " : "moved ")
+      << ownZone(mine, from) << " (" << count << " card" << (count == 1 ? "" : "s")
+      << ") into " << ownZone(mine, to);
+    if (!sourceName.empty())
+        o << " with " << sourceName;
+    return o.str();
+}
+
+//W41-3(a): the OBSERVER's half of an activation. The acting seat writes its own
+//activations as consumed decisions ("You used: <label> with <Card>"); this is
+//that same sentence from the other chair. Without it every activated and
+//loyalty ability was INVISIBLE across the table - the observing seat saw the
+//effect (a loyalty counter, a drain) with no cause line above it.
+string abilityActivationNarration(bool mine, const string& abilityText,
+                                  const string& cardName)
+{
+    string label = abilityText.empty() ? string("an ability") : abilityText;
+    string line = (mine ? "You used: " : "Opponent used: ") + label;
+    if (!cardName.empty())
+        line += " with " + cardName;
+    return line;
+}
 
 //Token creation attributes its CREATOR (owner addendum (7)): "March from the
 //Black Gate created a 0/0 Orc Army token", never a bare "created -> battlefield".
@@ -3761,6 +3834,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
 
 {
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
+    mBulkMoveCount = 0;                  //W41-3(c): no bulk move pending
+    mBulkMoveMine = false;
 #ifndef WAGIC_NO_CURL
     curl_global_init(CURL_GLOBAL_DEFAULT);
 #endif
@@ -4390,6 +4465,9 @@ void AIPlayerGPT::flushOpeningHand()
 string AIPlayerGPT::assemblePrompt(const string& tail)
 {
     std::ostringstream u;
+    //W41-3(c): a bulk move that ran right up to the decision point must be in
+    //the log the model reads, not stranded in the accumulator.
+    flushBulkMove();
     flushOpeningHand(); //always: preserves the opening-hand log line for turn 1+
     //N-93b de-dup: at pregame (turn 0 - mulligan/leyline/bottom asks) the only
     //narration is the just-flushed opening-hand line, and the live "Your hand:"
@@ -4522,6 +4600,10 @@ void AIPlayerGPT::appendNarration(const string& line)
 {
     if (line.empty())
         return;
+    //W41-3(c): a pending bulk run precedes whatever is being narrated now.
+    //flushBulkMove clears its count BEFORE it appends, so this re-entry is a
+    //single no-op recursion, never a loop.
+    flushBulkMove();
     flushOpeningHand(); //the deal precedes whatever is being narrated
     //Zone duty (owner doctrine): the trim drops the OLDEST events, which is
     //exactly where a player's early graveyard lives - so the marker carries
@@ -4853,10 +4935,79 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
         return result;
     }
 
+    //W41-3(c): collapse a BULK move. One resolution that walks N cards between
+    //the same pair of zones (Elixir of Immortality shuffling a graveyard back
+    //into its library) fired N identical lines, none of which said what had
+    //happened. Consecutive same-shape moves accumulate; ANY other event flushes
+    //the accumulator first, so the log's ordering is untouched. A run of ONE
+    //flushes as the ordinary named line, so nothing is ever counted at "1 card".
+    if (WEventZoneChange * z = dynamic_cast<WEventZoneChange *>(event))
+    {
+        if (z->card && z->from && z->to && z->from != z->to && z->to->owner
+            && zoneDesc(z->from) == "graveyard" && string(z->to->getName()) == "library")
+        {
+            bool bmine = (z->to->owner == this);
+            if (mBulkMoveCount > 0 && mBulkMoveMine != bmine)
+                flushBulkMove();
+            if (mBulkMoveCount == 0)
+            {
+                mBulkMoveMine = bmine;
+                mBulkMoveFirstLine = describeEvent(event);
+                MTGCardInstance * rs = resolvingStackSource();
+                mBulkMoveSource = rs ? rs->getDisplayName() : string();
+            }
+            mBulkMoveCount++;
+            return result;
+        }
+    }
+    flushBulkMove();
+
     string line = describeEvent(event);
     if (!line.empty())
         appendNarration(line);
     return result;
+}
+
+//W41-3(c): write the pending bulk move, then clear. The count is reset BEFORE
+//the append so a re-entrant event can never double-flush the same run.
+void AIPlayerGPT::flushBulkMove()
+{
+    if (mBulkMoveCount <= 0)
+        return;
+    int n = mBulkMoveCount;
+    mBulkMoveCount = 0;
+    string line = (n == 1) ? mBulkMoveFirstLine
+                           : bulkZoneMoveNarration(mBulkMoveMine, n, "graveyard",
+                                                   "library", mBulkMoveSource);
+    mBulkMoveFirstLine.clear();
+    mBulkMoveSource.clear();
+    if (!line.empty())
+        appendNarration(line);
+}
+
+//The card whose spell or ability is resolving RIGHT NOW: ActionStack marks the
+//resolving object RESOLVED_OK only after resolve() returns, so during the zone
+//events an effect raises it is still the latest NOT_RESOLVED entry. Used to
+//attribute a collapsed bulk move to the effect that caused it.
+MTGCardInstance * AIPlayerGPT::resolvingStackSource()
+{
+    if (!observer || !observer->mLayers)
+        return NULL;
+    ActionStack * stk = observer->mLayers->stackLayer();
+    if (!stk)
+        return NULL;
+    Interruptible * it = stk->getLatest(NOT_RESOLVED);
+    if (!it)
+        return NULL;
+    //StackAbility never fills Interruptible::source (its ctor sets only the
+    //type) - the owning card hangs off the ability instead. Reading it->source
+    //alone left every collapsed bulk move unattributed (observed live on the
+    //W41-3 probe: "Opponent shuffled their graveyard (7 cards) into their
+    //library" with no "with Elixir of Immortality").
+    if (StackAbility * sa = dynamic_cast<StackAbility *>(it))
+        if (sa->ability && sa->ability->source)
+            return sa->ability->source;
+    return it->source;
 }
 
 string AIPlayerGPT::describeEvent(WEvent * event)
@@ -4890,6 +5041,14 @@ string AIPlayerGPT::describeEvent(WEvent * event)
                                          e->card->power, e->card->toughness,
                                          zoneDesc(e->to));
         }
+        //W41-3(e): a zone change that begins and ends in the SAME zone is not a
+        //move. Lost Mine of Phandelver's dungeon venturing fires one per venture
+        //and rendered "moved from the opponent's zone to the opponent's zone"
+        //(25x in the wave-40 corpus), sitting next to the correct venture line
+        //that already states what actually happened.
+        if (e->from == e->to
+            || (e->from->owner == e->to->owner && zoneDesc(e->from) == zoneDesc(e->to)))
+            return "";
         Player * owner = e->to->owner;
         bool mine = (owner == this);
         string toName = e->to->getName();
@@ -4927,15 +5086,21 @@ string AIPlayerGPT::describeEvent(WEvent * event)
             return out.str();
         }
 
-        //Hidden information: never name cards entering the opponent's
-        //(the human's) hand or library unrevealed. A draw is still a draw -
-        //count-only, per the owner's ruling ("Opponent drew a card").
-        if (!mine && (toName == "hand" || toName == "library"))
+        //W41-3(b) OWNER RULING: the mask is ORIGIN-scoped, not OBSERVER-scoped.
+        //A card whose ORIGIN is public (battlefield/graveyard/stack/exile) was
+        //revealed information on the way out, so it is NAMED even when it lands
+        //in a hidden zone; only a HIDDEN origin (hand/library) masks the card,
+        //and the origin is stated either way. Observer-scoping is what made the
+        //two seats of one game disagree about the same event: the actor logged
+        //"Your Dream Fracture moved from your graveyard to your library" while
+        //the observer logged "Opponent put a card into their library".
+        //A draw stays the owner's own count-only ruling ("Opponent drew a card").
+        if (!mine && (toName == "hand" || toName == "library")
+            && !isPublicOriginZone(zoneDesc(e->from)))
         {
             if (toName == "hand" && e->from->owner && e->from == e->from->owner->game->library)
                 return "Opponent drew a card";
-            out << "Opponent put a card into their " << toName;
-            return out.str();
+            return hiddenOriginMoveNarration(false, zoneDesc(e->from), toName);
         }
         //Persist / undying return: the just-dead creature re-enters as a fresh
         //copy carrying its signature counter (persist: -1/-1, undying: +1/+1).
@@ -5082,6 +5247,21 @@ string AIPlayerGPT::describeEvent(WEvent * event)
                 << (dsrc->getToxicity() == 1 ? "" : "s") << " on that player"
                    " (see the Poison line)";
         return out.str();
+    }
+
+    //W41-3(a): an activated (or planeswalker loyalty) ability was activated.
+    //THE ACTING SEAT already records its own activations as consumed decisions
+    //("You used: <label> with <Card>", actionTakenNarration), so emitting here
+    //for the actor would double every line; this fills the OBSERVER's side,
+    //which had no channel at all - 165 "You used:" lines corpus-wide against
+    //ZERO "Opponent used:", so every loyalty tick and every activation on the
+    //other side of the table arrived as an effect with no cause.
+    if (WEventAbilityActivated * e = dynamic_cast<WEventAbilityActivated *>(event))
+    {
+        if (!e->source || e->controller == this)
+            return "";
+        return abilityActivationNarration(false, e->abilityText,
+                                          e->source->getDisplayName());
     }
 
     //N-105a part (c): every poison GAIN. The engine fires this event on all
@@ -9707,15 +9887,31 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         //("Damage creature"); when it differs from the permanent, say both, so
         //the header names what is happening rather than who is holding it.
         string abilityName;
-        {
-            MTGAbility * waiting = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
-            if (waiting)
-                abilityName = waiting->getMenuText();
-        }
+        MTGAbility * waiting = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+        if (waiting)
+            abilityName = waiting->getMenuText();
         if (effectName.empty())
         {
-            //Granted/inner abilities ride a nameless fake card.
-            effectName = abilityName;
+            //W41-3(d), OWNER RULING (verbatim: "'put in play' is not good. this
+            //should be the effect source, not the effect"): a granted/inner
+            //ability rides a NAMELESS fake card, and the old fallback promoted
+            //the ability's own display name into the SOURCE slot - "You targeted
+            //Swamp with Put in Play" names an EFFECT as though it were a card,
+            //on the one surface whose whole job is to say what is doing this.
+            //The ability knows the card that owns it; take the name from there
+            //and leave the effect in the ability slot, where the header and the
+            //narration both already render it: "You targeted Swamp with
+            //Windswept Heath's Put in Play ability".
+            if (waiting && waiting->source)
+            {
+                effectName = waiting->source->getDisplayName();
+                if (effectName.empty())
+                    effectName = waiting->source->name;
+            }
+            if (effectName.empty())
+                effectName = tc->source->name;
+            //Never the ability's own name: an unnamed source is honestly
+            //unnamed, and the ability is still named beside it.
             if (effectName.empty())
                 effectName = "this effect";
         }
@@ -15469,15 +15665,16 @@ void AIPlayerGPT::runParseSelfTest()
               == "Opponent's Grizzly Bears died",
               "W35 a creature leaving the battlefield DIED (the owner's own example)");
         CHECK(zoneChangeNarration(true, "Sol Ring", "battlefield", "graveyard", false, false, false, "")
-              == "Your Sol Ring was put into your graveyard",
-              "W35 a non-creature is put into the graveyard, not 'died'");
+              == "Your Sol Ring was put into your graveyard from the battlefield",
+              "W35/W41-3b a non-creature is put into the graveyard, not 'died' - origin stated");
         CHECK(zoneChangeNarration(true, "Thoughtseize", "hand", "graveyard", false, false, false, "")
               == "You discarded Thoughtseize", "W35 hand->graveyard is a DISCARD");
         CHECK(zoneChangeNarration(false, "Snapcaster Mage", "graveyard", "exile", true, false, false, "")
               == "Opponent's Snapcaster Mage was exiled from the opponent's graveyard",
               "W35 an exile from a graveyard names both zones, declaratively");
         CHECK(zoneChangeNarration(true, "Uro", "battlefield", "hand", true, false, false, "")
-              == "Your Uro was returned to your hand", "W35 a bounce is a return, not an arrow");
+              == "Your Uro was returned to your hand from the battlefield",
+              "W35/W41-3b a bounce is a return, not an arrow - and it names the battlefield");
         // NEGATIVE, the acceptance criterion: no zone ARROW survives, not even
         // on a pair the map above does not name.
         CHECK(zoneChangeNarration(true, "Oddity", "sideboard", "command", false, false, false, "")
@@ -15567,6 +15764,97 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(trimMarkerLine("", "", "Dread Return", "")
                   .find("exiled at trim: you - Dread Return; opponent - none") != string::npos,
               "W35 the trim digest covers exile too - the other unrendered zone");
+    }
+
+    // ---- W41-3 OWNER-RULED: the narration CHANNEL (a-e) ----
+    cout << "\n[W41-3] the narration channel: both seats, public origins, bulk, sources\n";
+    {
+        // (a) the missing half. The acting seat's own line comes from
+        // actionTakenNarration's verbatim-label fallback; the observing seat's
+        // comes from the activation event. Pin them as the SAME sentence with
+        // the subject swapped - that identity IS the 165/0 symmetry metric.
+        CHECK(abilityActivationNarration(false, "+1: don't target any creature",
+                                         "Kaya the Inexorable")
+              == "Opponent used: +1: don't target any creature with Kaya the Inexorable",
+              "W41-3a an opponent activation names the ability AND the card");
+        CHECK(abilityActivationNarration(true, "+1: don't target any creature",
+                                         "Kaya the Inexorable")
+              == actionTakenNarration("+1: don't target any creature with Kaya the Inexorable"),
+              "W41-3a SYMMETRY the two seats render one activation as the same sentence");
+        CHECK(abilityActivationNarration(false, "Life", "Elixir of Immortality")
+              == "Opponent used: Life with Elixir of Immortality",
+              "W41-3a the wave-40 specimen line, from the observing chair");
+        CHECK(abilityActivationNarration(false, "", "Elixir of Immortality")
+              == "Opponent used: an ability with Elixir of Immortality",
+              "W41-3a NEGATIVE a nameless ability never renders an empty label");
+        CHECK(abilityActivationNarration(false, "Life", "").find(" with ") == string::npos,
+              "W41-3a NEGATIVE an unnamed source leaves no dangling 'with' clause");
+        // Echo shape: the activation line carries no bracketed guidance, so an
+        // echoed copy survives decoration-stripping byte-identically.
+        CHECK(stripNarrationDecoration(abilityActivationNarration(false, "Life",
+                                                                  "Elixir of Immortality"))
+              == "Opponent used: Life with Elixir of Immortality",
+              "W41-3a the activation line carries no decoration to strip");
+        // (b) OWNER RULING: the mask is ORIGIN-scoped, not observer-scoped.
+        CHECK(isPublicOriginZone("battlefield") && isPublicOriginZone("graveyard")
+              && isPublicOriginZone("stack") && isPublicOriginZone("exile"),
+              "W41-3b battlefield/graveyard/stack/exile are PUBLIC origins");
+        CHECK(!isPublicOriginZone("hand") && !isPublicOriginZone("library")
+              && !isPublicOriginZone("zone"),
+              "W41-3b NEGATIVE hand, library and an unnamed zone stay hidden origins");
+        CHECK(hiddenOriginMoveNarration(false, "hand", "library")
+              == "Opponent put a card from their hand into their library",
+              "W41-3b a HIDDEN origin masks the card but still states the origin");
+        CHECK(hiddenOriginMoveNarration(false, "hand", "library").find("Dream Fracture")
+              == string::npos,
+              "W41-3b NEGATIVE a hidden-origin move never has a card name to leak");
+        // The measured defect, both seats of one game, now agreeing.
+        CHECK(zoneChangeNarration(false, "Dream Fracture", "graveyard", "library", false, false, false, "")
+              == "Opponent's Dream Fracture was put into the opponent's library"
+                 " from the opponent's graveyard",
+              "W41-3b a PUBLIC-origin move into a hidden zone NAMES the card");
+        CHECK(zoneChangeNarration(true, "Dream Fracture", "graveyard", "library", false, false, false, "")
+              == "Your Dream Fracture was put into your library from your graveyard",
+              "W41-3b the acting seat's twin of the same move");
+        CHECK(zoneChangeNarration(false, "Eternal Witness", "graveyard", "hand", true, false, false, "")
+              == "Opponent's Eternal Witness was returned to the opponent's hand"
+                 " from the opponent's graveyard",
+              "W41-3b a graveyard recursion to hand is named, origin first-class");
+        CHECK(zoneChangeNarration(false, "Sol Ring", "battlefield", "library", false, false, false, "")
+              == "Opponent's Sol Ring was put into the opponent's library from the battlefield",
+              "W41-3b a battlefield->library move states the battlefield");
+        // (c) the bulk collapse, in the owner's own shape.
+        CHECK(bulkZoneMoveNarration(false, 7, "graveyard", "library", "Elixir of Immortality")
+              == "Opponent shuffled their graveyard (7 cards) into their library"
+                 " with Elixir of Immortality",
+              "W41-3c the bulk shuffle collapses to ONE counted, attributed line");
+        CHECK(bulkZoneMoveNarration(true, 1, "graveyard", "library", "Elixir of Immortality")
+              == "You shuffled your graveyard (1 card) into your library"
+                 " with Elixir of Immortality",
+              "W41-3c the count is grammatical at one (the run-of-one path never uses it)");
+        CHECK(bulkZoneMoveNarration(false, 4, "graveyard", "library", "").find(" with ")
+              == string::npos,
+              "W41-3c NEGATIVE an unattributable bulk move invents no source");
+        // (d) OWNER RULING: the SOURCE slot holds the effect's SOURCE, never the
+        // effect. The offending wave-40 line was "You targeted Swamp with Put in
+        // Play"; the fix moves the effect into the ability slot it already has.
+        CHECK(targetChoiceNarration("Swamp", "Windswept Heath", "Put in Play")
+              == "You targeted Swamp with Windswept Heath's Put in Play ability",
+              "W41-3d the target line attributes the CARD, with the effect as its ability");
+        CHECK(targetChoiceNarration("Swamp", "Windswept Heath", "Put in Play")
+              .find("with Put in Play") == string::npos,
+              "W41-3d NEGATIVE an effect name never occupies the source slot");
+        // (e) the no-op the same-zone guard suppresses before it is ever built.
+        CHECK(zoneChangeNarration(false, "Lost Mine of Phandelver", "zone", "zone",
+                                  false, false, false, "")
+              == "Opponent's Lost Mine of Phandelver moved from the opponent's zone"
+                 " to the opponent's zone",
+              "W41-3e this is the exact same-zone no-op line describeEvent now suppresses");
+        CHECK(zoneChangeNarration(false, "Lost Mine of Phandelver", "zone", "graveyard",
+                                  false, false, false, "")
+              != zoneChangeNarration(false, "Lost Mine of Phandelver", "zone", "zone",
+                                     false, false, false, ""),
+              "W41-3e NEGATIVE a genuine cross-zone move is a different line and survives");
     }
 
     // ---- W35 COMPOSED-LOG GOLDEN: a whole rendered log, through the real
