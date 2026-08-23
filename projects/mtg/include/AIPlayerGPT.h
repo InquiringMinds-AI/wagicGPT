@@ -543,6 +543,21 @@ private:
     //when the host ask consumes an answer.
     string mMutateIntentCard;
     string mMutateIntentPlan;
+    //#W41-7 mass accept/deny. When ONE `may` ability fires N>1 times in a
+    //single window with an identical, target-free effect (Perimeter Captain's
+    //"a defender you control blocked -> you may gain 2 life" raised EIGHT
+    //identical asks in one combat; 22 asks cost 1,377s of inference and 132k
+    //reasoning characters for 22 identical answers), the seat asks ONCE:
+    //accept all / decline all / decide individually. The verdict below then
+    //answers the remaining siblings locally, with NO model call.
+    //Structurally safe by construction: "decide individually" restores the
+    //per-instance flow exactly, so the batched ask can never make an answer
+    //impossible, and the engine still resolves every trigger separately - this
+    //batches the ASKING, never the effect. AI seat only; no human UI changes.
+    enum MayBatchVerdict { kMayBatchNone = 0, kMayBatchAcceptAll, kMayBatchDeclineAll, kMayBatchIndividual };
+    string mMayBatchKey;        //DecisionManager::MayBatch::groupKey it applies to
+    int mMayBatchVerdict;       //MayBatchVerdict
+    int mMayBatchRemaining;     //asks still covered; the verdict expires at 0
     //Cards the opponent revealed that are now in their hand: public info a
     //human would remember. Tracked by name (instances are recreated on zone
     //moves), decremented when a card of that name leaves the hand.

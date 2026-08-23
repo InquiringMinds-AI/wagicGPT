@@ -1,0 +1,45 @@
+# Wave-41 #W41-15: SCRIPTED may-menu raised at the BLOCKERS step - the shape
+# wave-39 reported as wedging the suite driver. It does NOT wedge on the current
+# binary; what it needs is fixture craft, pinned here so the next attempt does
+# not re-derive it:
+#   1. the trigger only reaches the stack on the tick AFTER the block click, so
+#      the answer sits one `next` later - `Perimeter Captain / next / choice N`;
+#   2. `choice N` is a 0-BASED MENU INDEX, so accepting a two-item may menu
+#      ("Life" / "Cancel") is `choice 0`. `choice 1` clicks Cancel;
+#   3. a `choice` that arrives before its menu arms is CONSUMED AND DROPPED, and
+#      the driver's unanswered-menu default then takes Cancel - i.e. a
+#      mis-timed answer silently DECLINES rather than failing loudly.
+# P1 attacks with Grizzly Bears; P2 blocks with Perimeter Captain; the block
+# raises the `may gain 2 life` menu for P2, accepted with `choice 0` -> 20 -> 22.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Perimeter Captain
+life:20
+[DO]
+next
+#combatbegins
+next
+#attackers
+Grizzly Bears
+next
+#blockers
+Perimeter Captain
+next
+choice 0
+next
+#combatdamage
+next
+#combatend
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Perimeter Captain
+life:22
+[END]

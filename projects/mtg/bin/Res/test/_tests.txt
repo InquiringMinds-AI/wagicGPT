@@ -1101,3 +1101,6 @@ red_elemental_blast_counter.txt
 red_elemental_blast_destroy.txt
 red_elemental_blast_negative.txt
 blue_elemental_blast_both_modes.txt
+perimeter_captain_may_scripted_w41.txt
+ai/perimeter_captain_may_w41.txt
+ai/perimeter_captain_may_batch_w41.txt

@@ -1,0 +1,5 @@
+#NAME:W41 Goblin Rush
+#DESC:Wave-41 #W41-7 probe deck: cheap attackers to force gang-blocks
+Raging Goblin (*) * 16
+Goblin Piker (*) * 12
+Mountain (*) * 20

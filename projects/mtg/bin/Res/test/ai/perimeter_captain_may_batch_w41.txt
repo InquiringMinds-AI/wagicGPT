@@ -1,0 +1,54 @@
+# Wave-41 #W41-7 fixture: THREE identical `may` triggers in ONE combat window.
+# P1 (AI) attacks with three 1/1 Raging Goblins; P2 (AI) gang-blocks ONE of them
+# with all three defenders - Perimeter Captain + two vanilla 0/6 Fortified
+# Ramparts. Each defender that blocks fires the Captain's
+# `@combat(blocking) source(creature[defender]|mybattlefield):may life:2
+# controller` trigger: THREE identical may-asks in one window, all accepted.
+#
+# EXPECTED: +2 x3 = 20 -> 26, then the two unblocked 1/1s deal 2 -> 24.
+# The arithmetic DISCRIMINATES: one accepted trigger would land 20, two 22.
+# Nothing dies (1 damage into 0/4 and 0/6 bodies, 0 damage back).
+# This is the batch case for #W41-7's mass accept/deny affordance; the three
+# trigger StackAbilities are all pushed BEFORE the first resolves (verified with
+# WAGIC_MAYPROBE=1), which is what makes a batched ask decidable at ask #1.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Raging Goblin,Raging Goblin,Raging Goblin
+life:20
+[PLAYER2]
+inplay:Perimeter Captain,Fortified Rampart,Fortified Rampart
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Raging Goblin,Raging Goblin,Raging Goblin
+life:20
+[PLAYER2]
+inplay:Perimeter Captain,Fortified Rampart,Fortified Rampart
+life:24
+[END]
