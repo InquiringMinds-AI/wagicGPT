@@ -1,0 +1,57 @@
+#Wave-41 engine item #W41-1 -- an {X} cast must ANNOUNCE X over the whole
+#affordable range, not over whatever the payment happened to float.
+#
+#SYMPTOM (corpus 20260823, deck123 Sphinx's Revelation, 14 casts / 10 announces):
+#four {X} casts committed with NO ANNOUNCE_X window at all and resolved far below
+#the affordable X; the pilot was never asked. Side-by-side in ONE stderr file
+#(game-125v123-1787501085): the same spell, the same seat, one cast raising
+#"Announce the value of X ... 1 of 14" and one going straight to "ACTIONSTACK Add
+#spell".
+#
+#WITNESS (player-agnostic -- this is the engine's cast path, not the GPT seat's):
+#seven untapped artifact lands (6 blue + 1 white, no ETB drawback, no damage) and
+#Sphinx's Revelation {X}{W}{U}{U} in hand. The affordable X is 7 - 3 = 4, so the
+#AI must gain 4 life: 20 -> 24. PRE-FIX the AI's payment floats only the base
+#cost, the announce menu is built from that short pool, and X collapses to 0 (life
+#stays 20) or to whatever the float happened to leave.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Seat of the Synod,Seat of the Synod,Seat of the Synod,Seat of the Synod,Seat of the Synod,Seat of the Synod,Ancient Den
+hand:Sphinx's Revelation
+life:20
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Seat of the Synod,Seat of the Synod,Seat of the Synod,Seat of the Synod,Seat of the Synod,Seat of the Synod,Ancient Den
+graveyard:Sphinx's Revelation
+life:24
+[PLAYER2]
+life:20
+[END]

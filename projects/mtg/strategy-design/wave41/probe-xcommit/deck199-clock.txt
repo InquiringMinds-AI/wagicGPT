@@ -1,0 +1,5 @@
+#NAME:W41 Probe Clock
+#DESC:Wave-41 #W41-2 probe opponent: a plain beatdown clock so the probe game
+#ends on its own. Delete after the probe run.
+Grizzly Bears * 20
+Forest * 20

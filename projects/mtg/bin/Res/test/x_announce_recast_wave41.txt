@@ -1,0 +1,50 @@
+# Wave-41 engine item #W41-1 -- the SECOND cast of the same physical {X} card
+# must raise its OWN announce window.
+#
+# SYMPTOM (corpus 20260823, seat deck125 = 4x Sphinx's Revelation + 2x Elixir of
+# Immortality): 14 Revelation casts, only 10 "Announce the value of X" windows.
+# The four silent casts are the ones made AFTER the Elixir loop shuffled a spent
+# Revelation back into the library - each resolved at the X announced by that
+# card's PREVIOUS cast, far below what the mana afforded, with no ANNOUNCE_X
+# record in the translog. One of them (125v123 s71) drew 3 off a one-card
+# library and decked the seat out of a 70-vs-7 game.
+#
+# ROOT CAUSE: MTGCardInstance::setX is propagated by the zone-move copy
+# constructor (issue #1085 - a resolving spell must keep the X it announced) and
+# was never cleared again, so it rode graveyard -> library -> hand. The announce
+# block in MTGPutInPlayRule::reactToClick is guarded by `card->setX == -1`, so a
+# card carrying a stale announcement skips the whole window and the old X is
+# folded silently into the new cost.
+#
+# WITNESS (scripted, no AI, no model): pool {4}{W}{W}{U}{U}{U}{U}{U} (11).
+#   1. Cast Sphinx's Revelation, announce X = 0 (a LEGAL and deliberate choice -
+#      the owner's X ruling; it is also what makes the stale value observable).
+#      Pays {W}{U}{U}; life stays 20.
+#   2. Call to Mind {2}{U} returns it from the graveyard to hand.
+#   3. Recast it with {2}{W}{U}{U} left: the window must arm again and offer
+#      X = 0..2. Announce X = 2 -> life 20 -> 22.
+# PRE-FIX step 3 raises NO window, reuses the stale X = 0, and life stays 20.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Sphinx's Revelation,Call to Mind
+manapool:{4}{W}{W}{U}{U}{U}{U}{U}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Sphinx's Revelation
+choice 0
+Call to Mind
+Sphinx's Revelation
+Sphinx's Revelation
+choice 2
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Sphinx's Revelation,Call to Mind
+life:22
+manapool:{0}
+[PLAYER2]
+life:20
+[END]

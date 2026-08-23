@@ -7635,7 +7635,7 @@ int AIPlayerGPT::selectHintAbility()
 }
 
 int AIPlayerGPT::askModel(const string& decision, const vector<string>& options, bool narrateChoice,
-                          const string& pendingSourceName)
+                          const string& pendingSourceName, bool askEvenIfSingle)
 {
     //W35: consume the caller's per-option register lines FIRST, on every exit
     //path, so a set of lines can never leak onto a later, unrelated ask.
@@ -7644,7 +7644,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     //"Only one valid action": no decision to make, no model call.
     if (options.empty())
         return -1;
-    if (options.size() == 1)
+    //One option = no decision, so no model call - EXCEPT where the caller says
+    //the question itself is owed (see askEvenIfSingle in the header: the X
+    //announcement). A zero-slack {X} cast has exactly one announceable value,
+    //and taking it silently is the very silence #W41-1 forbids.
+    if (options.size() == 1 && !askEvenIfSingle)
         return 0;
     if (mEndpoint.empty())
         return -1; //no endpoint: caller falls back to the heuristic
@@ -8541,8 +8545,18 @@ int AIPlayerGPT::computeActions()
                 return 1;
             }
             //no answerable shape (e.g. X no longer affordable): the
-            //heuristic click path, exactly as before the contract
+            //heuristic click path, exactly as before the contract.
+            //#W41-1's standing requirement is that this path is never SILENT -
+            //if the pilot structurally cannot be asked, the engine says which
+            //option it took for it and on which menu, so a reviewer reading
+            //the stderr can tell "not asked" from "asked and answered".
             int doThis = AIPlayerBaka::selectMenuOption();
+            fprintf(stderr, "AIPlayerGPT: menu on %s could not be put to the model"
+                            " (no answerable shape - e.g. the announced X is no longer"
+                            " affordable); the heuristic took option %d\n",
+                    object->currentActionCard ? object->currentActionCard->getDisplayName().c_str()
+                                              : "(unnamed)",
+                    doThis);
             if (doThis >= 0)
             {
                 if (object->abilitiesMenu->isMultipleChoice)
@@ -9010,8 +9024,16 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                                + " for " + xName);
             setAskNarration(narr);
         }
+        //askEvenIfSingle: a zero-slack {X} cast offers exactly one value, and
+        //the generic one-option shortcut answered it with no model call, no
+        //stderr line and no translog record - X was committed for the pilot in
+        //silence (wave-41 #W41-1/#W41-2; the deck198 zero-slack probe cast
+        //Sphinx's Revelation ten times with ZERO ANNOUNCE_X records). X = 0 is
+        //a legal and sometimes correct choice, so the question is real even
+        //when the answer is forced: it is what puts the commitment in the log
+        //and in front of the pilot.
         int pick = askModel(announceXHeader(ctx ? ctx->getDisplayName() : string("this spell"), capX),
-                            shown, true, ctx ? ctx->getDisplayName() : string());
+                            shown, true, ctx ? ctx->getDisplayName() : string(), true);
         if (pick == kChoicePending)
             return kChoicePending;
         if (pick >= 0 && pick < (int) shown.size())

@@ -1101,3 +1101,5 @@ red_elemental_blast_counter.txt
 red_elemental_blast_destroy.txt
 red_elemental_blast_negative.txt
 blue_elemental_blast_both_modes.txt
+x_announce_recast_wave41.txt
+ai_x_announce_untapped_wave41.txt
