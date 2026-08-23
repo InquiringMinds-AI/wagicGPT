@@ -43,6 +43,41 @@ WEvent * REDamagePrevention::replace(WEvent *event)
     }
     return event;
 }
+//W41-5: the read-only twin of replace() above. Every gate below is the SAME
+//gate replace() applies, in the same order, with nothing mutated and nothing
+//deleted - so a "yes" here is the engine's own answer, not a re-derivation of
+//the rules. A spent shield (damage == 0) prevents nothing, exactly as
+//replace()'s first line says. damage == -1 is the blanket form
+//(preventAllCombatDamage and friends) and is the only case reported as a FULL
+//prevention; a finite shield reports 2, because how much of it survives to
+//this particular damage event depends on what else it absorbs first.
+int REDamagePrevention::preventionKindFor(Targetable * src, Targetable * tgt, int damageType)
+{
+    if (!damage)
+        return 0;
+    if ((int) typeOfDamage != damageType && typeOfDamage != Damage::DAMAGE_ALL_TYPES)
+        return 0;
+    if (tcSource && !tcSource->canTarget(src))
+        return 0;
+    if (tcTarget && !tcTarget->canTarget(tgt))
+        return 0;
+    return (damage == -1) ? 1 : 2;
+}
+
+int ReplacementEffects::preventionKindFor(Targetable * src, Targetable * tgt, int damageType)
+{
+    int best = 0;
+    for (list<ReplacementEffect *>::iterator it = modifiers.begin(); it != modifiers.end(); ++it)
+    {
+        int k = (*it) ? (*it)->preventionKindFor(src, tgt, damageType) : 0;
+        if (k == 1)
+            return 1;
+        if (k == 2)
+            best = 2;
+    }
+    return best;
+}
+
 REDamagePrevention::~REDamagePrevention()
 {
     SAFE_DELETE(tcSource);

@@ -1,0 +1,29 @@
+#W41-5: prevention beats deathtouch. Fog Bank prevents all combat damage dealt
+#TO and BY it, and deathtouch only destroys on damage DEALT (702.2b), so a
+#deathtouch attacker it blocks kills nothing. This is the ground truth the
+#block-outcome annotation now leans on: before the fix it printed "your blocker
+#dies, attacker lives" for exactly this pairing, and the engine refuted it in a
+#live game. Toxic Iguanar has deathtouch only while its controller has a green
+#permanent - grizzly bears supplies it, as in generic/deathtouch.txt.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:Toxic Iguanar,grizzly bears
+[PLAYER2]
+inplay:Fog Bank
+[DO]
+Toxic Iguanar
+next
+#blockers
+Fog Bank
+next
+#damage
+next
+#combat end
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Toxic Iguanar,grizzly bears
+[PLAYER2]
+inplay:Fog Bank
+[END]

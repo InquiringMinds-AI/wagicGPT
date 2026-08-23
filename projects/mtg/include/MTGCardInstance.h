@@ -207,6 +207,10 @@ public:
     MTGCardInstance * banding; // If belongs to a band when attacking
     int canBlock();
     int canBlock(MTGCardInstance * opponent);
+    //W41-13: the pair-only half of canBlock(), and the hold-back question the
+    //attackers window asks with it (nothing is an attacker yet at that step).
+    int canBlockPairwise(MTGCardInstance * opponent);
+    int couldBlockIfItAttacked(MTGCardInstance * opponent);
     int canAttack( bool pwcheck = false );
     int isAttacker();
     Targetable * isAttacking;

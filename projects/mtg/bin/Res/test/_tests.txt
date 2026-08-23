@@ -105,6 +105,9 @@ generic/cycling.txt
 generic/cycling2.txt
 generic/deathtouch.txt
 generic/deathtouch_taught_i1142.txt
+generic/fog_bank_prevents_deathtouch.txt
+generic/fog_bank_prevents_lethal.txt
+generic/armored_transport_blocker_prevention.txt
 generic/adarkar_unicorn_upkeep_i1085.txt
 generic/adarkar_unicorn_mainphase_i1085.txt
 generic/westvale_abbey_five_sacrifices.txt

@@ -18,6 +18,19 @@ public:
         return e;
     }
     ;
+    //NON-DESTRUCTIVE PROBE (W41-5). replace() is the live path: it mutates the
+    //Damage and deletes the event, so it can never be used to ASK "would this
+    //damage be prevented?" - which is exactly what the block-outcome
+    //annotation needs before combat happens. This mirrors the same predicate
+    //without touching state. Return 0 = this effect does not apply; 1 = it
+    //prevents the damage ENTIRELY (a claim the annotation may lean on);
+    //2 = it applies but the residue is not exactly computable here (a finite
+    //shield), which the caller must render as an honest not-included flag
+    //rather than a guess.
+    virtual int preventionKindFor(Targetable * /*src*/, Targetable * /*tgt*/, int /*damageType*/)
+    {
+        return 0;
+    }
     virtual ~ReplacementEffect() {}
 };
 
@@ -34,6 +47,7 @@ public:
     REDamagePrevention(MTGAbility * _source, TargetChooser *_tcSource = NULL, TargetChooser *_tcTarget = NULL,
                        int _damage = -1, bool _oneShot = true, Damage::DamageType typeOfDamage = Damage::DAMAGE_ALL_TYPES);
     WEvent * replace(WEvent *e);
+    int preventionKindFor(Targetable * src, Targetable * tgt, int damageType);
     ~REDamagePrevention();
 };
 
@@ -70,6 +84,9 @@ public:
     list<ReplacementEffect *> modifiers;
     ReplacementEffects();
     WEvent * replace(WEvent *e);
+    //W41-5: the strongest verdict across every registered effect - 1 (fully
+    //prevented) dominates 2 (applies, not exactly computable) dominates 0.
+    int preventionKindFor(Targetable * src, Targetable * tgt, int damageType);
     int add(ReplacementEffect * re);
     int remove(ReplacementEffect * re);
     ~ReplacementEffects();

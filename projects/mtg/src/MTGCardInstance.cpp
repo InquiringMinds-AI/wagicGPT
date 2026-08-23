@@ -1239,6 +1239,36 @@ int MTGCardInstance::canBlock(MTGCardInstance * opponent)
         return 1;
     if (!opponent->isAttacker())
         return 0;
+    return canBlockPairwise(opponent);
+}
+
+//W41-13: could this creature block that one if THAT one were attacking? The
+//attackers window has to answer a hold-back question about NEXT turn's combat,
+//where nothing is an attacker yet - so the two gates that ask about the combat
+//in progress (isAttacker, and tapped, which a held-back creature will not be)
+//are the only ones dropped. Everything about the PAIR is unchanged, because it
+//is literally the same code: canBlockPairwise below is the body canBlock()
+//already ran, extracted rather than copied, so no evasion rule can drift
+//between the prediction and the block the engine will later allow or refuse.
+int MTGCardInstance::couldBlockIfItAttacked(MTGCardInstance * opponent)
+{
+    if (basicAbilities[(int)Constants::CANTBLOCK])
+        return 0;
+    if (!isCreature())
+        return 0;
+    if (hasType(Subtypes::TYPE_BATTLE))
+        return 0;
+    if (!isInPlay(observer))
+        return 0;
+    if (!opponent)
+        return 1;
+    return canBlockPairwise(opponent);
+}
+
+//Every blocking restriction that is a property of the PAIR. Extracted from
+//canBlock(MTGCardInstance*) unchanged (W41-13).
+int MTGCardInstance::canBlockPairwise(MTGCardInstance * opponent)
+{
     // Comprehensive rule 502.7f : If a creature with protection attacks, it can't be blocked by creatures that have the stated quality.
     if (opponent->protectedAgainst(this))
         return 0;

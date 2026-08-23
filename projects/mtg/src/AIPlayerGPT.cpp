@@ -1685,6 +1685,75 @@ static string unreachableAttackerTag(int canBlockCount, int totalBlockers, bool 
     return o.str();
 }
 
+//W41-13 (wave-40 ledger). The BLOCKERS window states block legality outright
+//("[NONE of your available blockers can block this attacker...]", above); the
+//ATTACKERS window stated nothing, so a seat deciding whether to hold a body
+//home had to PREDICT next turn's block legality itself - and got it wrong:
+//146v152 seq34 kept Silverquill Silencer (3/2, ground) back explicitly "to
+//block Elite Spellbinder next turn". Spellbinder flies. The hold was correct
+//by the guide's gate and worthless in fact.
+//This is the pure builder for the tag; the caller supplies the already-proven
+//entries. SCOPE HONESTY: the claim is about THIS board as it stands - it does
+//not promise the creature will attack, stay untapped, or keep its abilities -
+//so the tag states only the pairwise restriction, which is the half that is
+//knowable now. Wording follows the wave-29 rung: restriction first, and NO
+//affirmative "can block" substring anywhere for the model to latch onto.
+static string heldBackBlockTag(const vector<string>& cannotBlock, int totalOpposing)
+{
+    if (totalOpposing <= 0 || cannotBlock.empty())
+        return ""; //nothing is restricted -> nothing to state
+    std::ostringstream o;
+    o << " [held back, it CANNOT block";
+    if ((int) cannotBlock.size() >= totalOpposing)
+        o << " ANY of their " << totalOpposing << " creatures";
+    o << ": ";
+    size_t shown = cannotBlock.size() < 3 ? cannotBlock.size() : 3;
+    for (size_t i = 0; i < shown; i++)
+        o << (i ? ", " : "") << cannotBlock[i];
+    if (cannotBlock.size() > shown)
+        o << ", +" << (cannotBlock.size() - shown) << " more";
+    o << "]";
+    return o.str();
+}
+
+//W41-13: WHICH gate refused the block. Not a re-derivation of the rules - each
+//line reads the same flag MTGCardInstance::canBlockPairwise reads, in its
+//order, and names the first one that fires. A cause this list does not cover
+//is left unnamed rather than guessed (the restriction itself is still stated,
+//because the ENGINE decided it; only the explanation is optional).
+//⚠ REGISTER SCOPE, stated plainly per the ledger's scope check: the blockers
+//window's shipped tag only ever explained FLYING in the wave-40 corpus. This
+//one covers flying plus protection, unblockable, fear, intimidate, skulk,
+//shadow, horsemanship and can't-block - more than one evasion class, though
+//only flying and can't-block have been seen live so far.
+static const char * blockRestrictionReason(MTGCardInstance * mine, MTGCardInstance * theirs)
+{
+    if (!mine || !theirs)
+        return NULL;
+    if (mine->basicAbilities[(int) Constants::CANTBLOCK])
+        return "it cannot block at all";
+    if (theirs->protectedAgainst(mine))
+        return "protection";
+    if (theirs->basicAbilities[(int) Constants::UNBLOCKABLE])
+        return "unblockable";
+    if (theirs->basicAbilities[(int) Constants::FEAR])
+        return "fear";
+    if (theirs->basicAbilities[(int) Constants::INTIMIDATE])
+        return "intimidate";
+    if (theirs->basicAbilities[(int) Constants::SKULK]
+        || theirs->basicAbilities[(int) Constants::EVADEBIGGER])
+        return "skulk";
+    if (theirs->basicAbilities[(int) Constants::SHADOW])
+        return "shadow";
+    if (theirs->basicAbilities[(int) Constants::HORSEMANSHIP])
+        return "horsemanship";
+    if (theirs->basicAbilities[(int) Constants::FLYING]
+        && !(mine->basicAbilities[(int) Constants::FLYING]
+             || mine->basicAbilities[(int) Constants::REACH]))
+        return "flying";
+    return NULL;
+}
+
 //N-152d: the printed-P/T delta tag. "printed" must mean the DISPLAYED face's
 //printed stats - AAFlip::resolve resyncs origpower/origtoughness on transform
 //and leaves basepower on the FRONT face, so a transformed DFC read as a pumped
@@ -10322,14 +10391,51 @@ struct CombatTradeStat
     bool persist;      //has persist AND no -1/-1 counter yet -> returns once if it dies
 };
 
+//W41-5 PREVENTION KINDS. Damage-prevention replacement effects (Fog Bank's
+//`preventAllCombatDamage to(this)` + `from(this)`, Guard Gomazoa, protection,
+//Circle-of-Protection shields) sit BETWEEN power and death, and the trade
+//preview computed straight through them: Fog Bank read "(your blocker dies,
+//attacker lives)" against attackers that cannot damage it at all, and the
+//engine refuted its own annotation inside one game (146v162 s5 - the Bank
+//blocked a deathtouch first-striker and SURVIVED). The trust doctrine makes
+//that printed lie an instruction, so the predictor now asks the engine.
+//  kPreventNone - nothing prevents this damage.
+//  kPreventFull - the damage is prevented ENTIRELY: none is dealt, so nothing
+//                 dies from it and NOTHING THAT RIDES DEALT DAMAGE happens.
+//                 Verified against the engine, not assumed: Damage::resolve
+//                 returns before emitting WEventDamage when a replacement
+//                 zeroes the damage, and MTGDeathtouchRule fires only on that
+//                 event with damage > 0 - so prevention beats deathtouch here
+//                 exactly as 702.2b says it should. Wither/infect counters ride
+//                 dealt damage too and are likewise not applied.
+//  kPreventPartial - a prevention effect applies but its residue is not
+//                 exactly computable in a 1-on-1 preview (a finite "prevent the
+//                 next N" shield, absorb, phantom, wilting/vigor conversions).
+//                 The preview must NOT guess in either direction: it states the
+//                 naive outcome and flags the omission explicitly, the same
+//                 shape as the uncomputable becomes-blocked trigger below.
+//                 Silent omission is the worse failure - the model confabulates
+//                 rules into gaps.
+static const int kPreventNone = 0;
+static const int kPreventFull = 1;
+static const int kPreventPartial = 2;
+
 //The pure trade-outcome logic. Perspective: 'b' = the blocking side ('you'),
 //'a' = the attacker. Empty-ish returns handled by the caller.
-static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a)
+//'preventAtoB' / 'preventBtoA' are the prevention kinds for each DIRECTION of
+//combat damage between these two creatures; 'preventAtoFace' is the kind for
+//the attacker's damage to YOU, which is what the trample-through claim rides.
+static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a,
+                                      int preventAtoB = kPreventNone,
+                                      int preventBtoA = kPreventNone,
+                                      int preventAtoFace = kPreventNone)
 {
     int bp = b.power > 0 ? b.power : 0;
     int ap = a.power > 0 ? a.power : 0;
     int bt = b.toughness;
     int at = a.toughness;
+    const bool aStopped = (preventAtoB == kPreventFull);
+    const bool bStopped = (preventBtoA == kPreventFull);
 
     //Base lethality (before first-strike ordering): does X's damage kill Y?
     //Deathtouch makes ANY damage lethal; normal damage is lethal at
@@ -10341,8 +10447,10 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     //deathtouch made a wither blocker read as auto-lethal ("both die") even
     //when its power could not kill (deck27 wave-20 item 1: Oona's Gatewarden
     //2/1 wither vs a 3/4 -> the attacker survives as a 1/2, it does NOT trade).
-    bool aKillsB = (ap > 0) && ((a.wither && ap >= bt) || (!b.indestructible && (a.deathtouch || ap >= bt)));
-    bool bKillsA = (bp > 0) && ((b.wither && bp >= at) || (!a.indestructible && (b.deathtouch || bp >= at)));
+    //Fully prevented damage is never dealt, so it kills nothing - deathtouch,
+    //wither counters and lethal-toughness math all ride damage that lands.
+    bool aKillsB = !aStopped && (ap > 0) && ((a.wither && ap >= bt) || (!b.indestructible && (a.deathtouch || ap >= bt)));
+    bool bKillsA = !bStopped && (bp > 0) && ((b.wither && bp >= at) || (!a.indestructible && (b.deathtouch || bp >= at)));
     //First strike / double strike ordering: a one-sided first striker that
     //kills its foe removes that foe before it can deal (the survivor's later
     //normal-step damage lands on a dead creature). A creature killed in the
@@ -10364,16 +10472,39 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         o << "your blocker dies, attacker lives";
     else
         o << "neither dies";
+    //W41-5: say WHY, immediately after the verdict it justifies. A "neither
+    //dies" with no cause reads as a stats coincidence the model may re-derive
+    //and disbelieve; naming the prevention makes the verdict self-supporting,
+    //and the restriction ("no combat damage is dealt") leads, per the
+    //annotation-wording rung.
+    if (aStopped && bStopped)
+        o << " (no combat damage is dealt either way - prevented)";
+    else if (aStopped)
+        o << " (the attacker deals NO damage to your blocker - prevented)";
+    else if (bStopped)
+        o << " (your blocker deals NO damage to the attacker - prevented)";
     //Trample-through to your face (attacker assigns lethal to the blocker,
     //rest carries over) - only when the attacker actually deals (not killed
     //first by a one-sided first-strike blocker). Wither trample still assigns
     //full toughness as lethal (only deathtouch reduces the lethal cut to 1).
+    //W41-5: the assignment is made BEFORE prevention applies, so a prevented
+    //blocker still soaks its full lethal cut - what changes is whether the
+    //carried-over damage reaches YOU, which is a separate prevention question
+    //(preventAtoFace) and the only one this clause may lean on.
     if (a.trample && !(b.firststrike && !a.firststrike && bKillsA))
     {
         int lethalToB = a.deathtouch ? 1 : (bt > 0 ? bt : 0);
         int through = ap - lethalToB;
         if (through > 0)
-            o << ", " << through << " tramples to your face";
+        {
+            if (preventAtoFace == kPreventFull)
+                o << ", but its trample damage to you is prevented";
+            else if (preventAtoFace == kPreventPartial)
+                o << ", up to " << through << " tramples to your face"
+                     " (damage to you is partly prevented - not computed here)";
+            else
+                o << ", " << through << " tramples to your face";
+        }
     }
     //Wither/infect that does NOT kill still SHRINKS the survivor by its damage
     //(-1/-1 counters), so the model does not read the survivor as untouched -
@@ -10383,14 +10514,15 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     //applies its -1/-1 counters, so the shrink must not be claimed (deck27
     //wave-24: the shrink was printed for a wither blocker already dead to first
     //strike). bDiesToFirstStrike / aDiesToFirstStrike mark that no-damage case.
-    if (b.wither && bp > 0 && !bKillsA && !bDiesToFirstStrike)
+    //W41-5: prevented damage deals no -1/-1 counters either, so no shrink.
+    if (b.wither && bp > 0 && !bKillsA && !bDiesToFirstStrike && !bStopped)
     {
         int np = ap - bp; if (np < 0) np = 0;
         int nt = at - bp; //survives => bp < at, so nt >= 1
         o << " (" << (b.infectLabel ? "infect" : "wither")
           << " shrinks it to " << np << "/" << nt << ")";
     }
-    if (a.wither && ap > 0 && !aKillsB && !aDiesToFirstStrike)
+    if (a.wither && ap > 0 && !aKillsB && !aDiesToFirstStrike && !aStopped)
     {
         int np = bp - ap; if (np < 0) np = 0;
         int nt = bt - ap; //survives => ap < bt, so nt >= 1
@@ -10406,6 +10538,20 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         o << " (yours returns with a -1/-1 counter (persist))";
     if (bKillsA && a.persist)
         o << " (theirs returns with a -1/-1 counter (persist))";
+    //W41-5, the honest-weaker-claim path. A prevention effect applies but its
+    //residue is not exactly computable here, so the verdict above is the NAIVE
+    //one and says so - the omit-when-unprovable precedent, stated rather than
+    //silent, and worded so no affirmative substring can be latched as a
+    //prediction.
+    if (preventAtoB == kPreventPartial && preventBtoA == kPreventPartial)
+        o << " - damage prevention applies to BOTH creatures and is NOT included"
+             " here: read their text";
+    else if (preventAtoB == kPreventPartial)
+        o << " - damage prevention protecting your blocker is NOT included here:"
+             " read its text";
+    else if (preventBtoA == kPreventPartial)
+        o << " - damage prevention protecting the attacker is NOT included here:"
+             " read its text";
     return o.str();
 }
 
@@ -10427,9 +10573,66 @@ static CombatTradeStat combatStatOf(MTGCardInstance * c)
     return s;
 }
 
+//W41-5: what would happen to COMBAT damage dealt by 'src' to 'tgt', asked of
+//the engine's own machinery rather than re-derived from card text. Two
+//sources, in the order Damage::resolve consults them:
+//  (1) the registered replacement effects (every preventAllCombatDamage /
+//      preventAllDamage / fog form compiles to a REDamagePrevention, so ONE
+//      probe covers all 42 primitive occurrences of the keyword and every
+//      to()/from() shape they use, including the ones that name a filtered
+//      set rather than `this`);
+//  (2) the per-card checks Damage::resolve applies after replacement -
+//      protection (damage = 0, a full stop), and then the family that zeroes
+//      damage while doing something ELSE with it (phantom eats a +1/+1
+//      counter, wilting/vigor convert it to counters, absorb reduces it by N,
+//      a finite `preventable` shield spends itself). That second family is
+//      reported PARTIAL, never FULL: each one changes the body in a way this
+//      1-on-1 preview does not model, and claiming "nothing happens" would be
+//      its own lie.
+static int combatPreventionKind(MTGCardInstance * src, MTGCardInstance * tgt)
+{
+    if (!src || !tgt)
+        return kPreventNone;
+    int k = kPreventNone;
+    GameObserver * g = tgt->getObserver();
+    if (g && g->replacementEffects)
+        k = g->replacementEffects->preventionKindFor(src, tgt, (int) Damage::DAMAGE_COMBAT);
+    if (k == kPreventFull)
+        return kPreventFull;
+    if (tgt->protectedAgainst(src))
+        return kPreventFull;
+    if (tgt->preventable > 0
+        || tgt->has(Constants::PHANTOM)
+        || tgt->has(Constants::ABSORB)
+        || tgt->has(Constants::WILTING)
+        || tgt->has(Constants::VIGOR))
+        return kPreventPartial;
+    return k;
+}
+
+//The same question for the attacker's damage to YOU (the defending player) -
+//what the trample-through claim rides. Only the replacement layer and the
+//player's own finite shield apply here; a player has no protection or counter
+//conversions.
+static int combatPreventionKindToPlayer(MTGCardInstance * src, Player * p)
+{
+    if (!src || !p)
+        return kPreventNone;
+    int k = kPreventNone;
+    GameObserver * g = src->getObserver();
+    if (g && g->replacementEffects)
+        k = g->replacementEffects->preventionKindFor(src, p, (int) Damage::DAMAGE_COMBAT);
+    if (k == kPreventNone && p->preventable > 0)
+        return kPreventPartial;
+    return k;
+}
+
 static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * attacker)
 {
-    return combatTradePreviewStats(combatStatOf(blocker), combatStatOf(attacker));
+    return combatTradePreviewStats(combatStatOf(blocker), combatStatOf(attacker),
+                                   combatPreventionKind(attacker, blocker),
+                                   combatPreventionKind(blocker, attacker),
+                                   combatPreventionKindToPlayer(attacker, blocker->controller()));
 }
 
 //W36 #2 (139-tier P1 / 158 P3, engine-verified game-affecting): a "whenever ~
@@ -11038,6 +11241,53 @@ static int salvageProsePutList(const string& content, size_t n, int need, vector
     return -1;
 }
 
+//W41-13: an echoed A-line drags its ANNOTATIONS with it, and an annotation is
+//prose - it carries digits ("+2 more", "#1") and, now that the hold-back tag
+//names the opposing creatures a held body could not block, NAMES that can
+//collide with the model's own attack candidates in a mirror. Neither may vote
+//on the declaration. Bracketed spans are where every annotation on these lines
+//lives, so a span is dropped when its interior reads as PROSE - it contains an
+//alphabetic word of 4+ characters. A label echo ("[A1, A3]", "[A2]") has no
+//such word and survives untouched, which is the case that must not break: the
+//model does write its answer in brackets sometimes.
+static string stripAnnotationBrackets(const string& s)
+{
+    string out;
+    size_t i = 0;
+    while (i < s.size())
+    {
+        if (s[i] != '[')
+        {
+            out += s[i++];
+            continue;
+        }
+        size_t close = s.find(']', i);
+        if (close == string::npos)
+        {
+            out += s[i++]; //unclosed - not an annotation, leave it alone
+            continue;
+        }
+        bool prose = false;
+        size_t runLen = 0;
+        for (size_t k = i + 1; k < close && !prose; k++)
+        {
+            if (isalpha((unsigned char) s[k]))
+            {
+                if (++runLen >= 4)
+                    prose = true;
+            }
+            else
+                runLen = 0;
+        }
+        if (prose)
+            out += ' '; //the whole annotation goes, replaced by a separator
+        else
+            out += s.substr(i, close - i + 1);
+        i = close + 1;
+    }
+    return out;
+}
+
 //Scan a bundled-attacker reply for the set of attackers to send: "A<n>"
 //tokens (or bare numbers) in [1..nAttackers]. Returns >0 = that many named,
 //0 = an explicit decline (a "none/hold/pass" keyword with no numbers) OR a
@@ -11052,22 +11302,29 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
     out.assign(nAttackers, false);
     int named = 0;
     bool sawNamedContent = false; //the reply named creature(s), eligible or not
-    for (size_t i = 0; i < content.size(); i++)
+    //W41-13: the INDEX and NAME passes read the de-annotated reply; the
+    //decline detection below still reads the ORIGINAL, so a bracketed
+    //"[none]" is still an explicit decline rather than an unusable reply.
+    const string scan = stripAnnotationBrackets(content);
+    for (size_t i = 0; i < scan.size(); i++)
     {
         //Accept "A3" or a bare "3"; skip digits that are part of a P/T echo
         //like "2/2" by ignoring a number immediately preceded/followed by '/'.
-        char prev = (i > 0) ? content[i - 1] : ' ';
-        bool aPrefixed = (content[i] == 'A' || content[i] == 'a')
-                         && i + 1 < content.size() && isdigit(content[i + 1]);
+        //W41-13: '#' and '+' are likewise never A-index prefixes - "#2" is an
+        //instance ordinal on a named creature and "+2" is a quantity.
+        char prev = (i > 0) ? scan[i - 1] : ' ';
+        bool aPrefixed = (scan[i] == 'A' || scan[i] == 'a')
+                         && i + 1 < scan.size() && isdigit(scan[i + 1]);
         //A bare number, but not one glued to a letter or the tail of a "2/2".
-        bool bareStart = isdigit(content[i]) && !isalnum(prev) && prev != '/';
+        bool bareStart = isdigit(scan[i]) && !isalnum(prev) && prev != '/'
+                         && prev != '#' && prev != '+';
         if (!aPrefixed && !bareStart)
             continue;
         size_t j = aPrefixed ? i + 1 : i;
         int n = 0;
-        while (j < content.size() && isdigit(content[j]))
-            n = n * 10 + (content[j++] - '0');
-        if (j < content.size() && content[j] == '/')
+        while (j < scan.size() && isdigit(scan[j]))
+            n = n * 10 + (scan[j++] - '0');
+        if (j < scan.size() && scan[j] == '/')
             continue; //a "3/3" power echo, not an attacker index
         if (n >= 1 && n <= (int) nAttackers && !out[n - 1])
         {
@@ -11089,7 +11346,7 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
     if (optionNames)
     {
         size_t start = 0;
-        for (size_t s = 0; s <= content.size(); s++)
+        for (size_t s = 0; s <= scan.size(); s++)
         {
             //';' is a separator here too (wave-33 N-158n symmetry): the ATTACK
             //name pass already tolerates names, but a ';'-joined list arrived
@@ -11097,9 +11354,9 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
             //otherwise-compliant "ATTACK: Hellrider; Rakdos Cackler" declared
             //NOBODY. The A#-index scan above is separator-independent and
             //unaffected.
-            if (s != content.size() && content[s] != ',' && content[s] != ';' && content[s] != '\n')
+            if (s != scan.size() && scan[s] != ',' && scan[s] != ';' && scan[s] != '\n')
                 continue;
-            string seg = content.substr(start, s - start);
+            string seg = scan.substr(start, s - start);
             start = s + 1;
             vector<string> words;
             significantWords(seg, words);
@@ -11165,6 +11422,7 @@ int AIPlayerGPT::chooseAttackers()
     //Capture each presented option line for the translog (item: combat
     //options_text was EMPTY, which blocked wave-19's combat-decision review).
     vector<string> shownLines;
+    bool anyHeldBack = false; //W41-13: at least one hold-back restriction shown
     for (size_t j = 0; j < attackers.size(); j++)
     {
         std::ostringstream ln;
@@ -11181,6 +11439,37 @@ int AIPlayerGPT::chooseAttackers()
         //for the "(P/T)" above; name the consequence at the line that decides,
         //mirroring the validated blocker text.
         ln << zeroPowerAttackerTag(attackers[j]->power);
+        //W41-13: the hold-back half of the decision. Which of THEIR creatures
+        //this body could not block if kept home, asked of the engine's own
+        //pairwise gate rather than predicted from keywords.
+        {
+            vector<string> cannot;
+            int totalOpposing = 0;
+            Player * opp = opponent();
+            if (opp && opp->game && opp->game->inPlay)
+            {
+                MTGGameZone * bf = opp->game->inPlay;
+                for (int i = 0; i < bf->nb_cards; i++)
+                {
+                    MTGCardInstance * c = bf->cards[i];
+                    if (!c || !c->isCreature())
+                        continue;
+                    totalOpposing++;
+                    if (attackers[j]->couldBlockIfItAttacked(c))
+                        continue;
+                    std::ostringstream e;
+                    e << c->name << instanceHandle(c);
+                    const char * why = blockRestrictionReason(attackers[j], c);
+                    if (why)
+                        e << " (" << why << ")";
+                    cannot.push_back(e.str());
+                }
+            }
+            string hb = heldBackBlockTag(cannot, totalOpposing);
+            if (!hb.empty())
+                anyHeldBack = true;
+            ln << hb;
+        }
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
@@ -11195,6 +11484,14 @@ int AIPlayerGPT::chooseAttackers()
     //combat. Stating them is cheaper than the model re-deriving them, and the
     //trust doctrine says the surface owes the model the truth rather than a gap
     //to confabulate into.
+    //W41-13 SCOPE, stated once rather than on every line: the hold-back tag is
+    //a legality fact about the board AS IT STANDS, not a forecast. Saying so
+    //costs one line and keeps the tag from being read as a promise about what
+    //the opponent will do - a true statement in the wrong scope is a lie.
+    if (anyHeldBack)
+        tail << "A \"held back\" tag lists their CURRENT creatures that body could"
+                " not legally block if you keep it home. It says nothing about"
+                " whether they will attack with those creatures.\n";
     tail << kAttackersTurnFacts;
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
@@ -11677,7 +11974,14 @@ int AIPlayerGPT::chooseBlockers()
                         CombatTradeStat as = combatStatOf(attackers[k]);
                         as.power += bbP[k];
                         as.toughness += bbT[k];
-                        trade = combatTradePreviewStats(combatStatOf(blockers[i]), as);
+                        //W41-5: the pumped branch is the same fight, so it asks
+                        //the same prevention questions - a self-pump that beats
+                        //the blocker's toughness is still irrelevant when the
+                        //damage is prevented.
+                        trade = combatTradePreviewStats(combatStatOf(blockers[i]), as,
+                                                        combatPreventionKind(attackers[k], blockers[i]),
+                                                        combatPreventionKind(blockers[i], attackers[k]),
+                                                        combatPreventionKindToPlayer(attackers[k], blockers[i]->controller()));
                         if (!trade.empty())
                         {
                             std::ostringstream bb;
@@ -12755,6 +13059,109 @@ void AIPlayerGPT::runParseSelfTest()
         CombatTradeStat noPersistBlk = { 2, 2, false, false, false, false, false, false, false };
         string snone = combatTradePreviewStats(noPersistBlk, plainAtk22);
         CHECK(snone == "both die", "C non-persist both-die is unchanged");
+    }
+
+    // ---- W41-5: damage-prevention replacement effects in the block outcome ----
+    // The live repro: Fog Bank (0/2, `preventAllCombatDamage to(this)` AND
+    // `from(this)`) read "(your blocker dies, attacker lives)" against
+    // attackers that cannot damage it, and the engine refuted the annotation
+    // in the same game. The engine supplies the prevention KIND per direction;
+    // these cases pin what each kind must render.
+    cout << "\n[A3-prevent] damage prevention in the block-outcome parenthetical (W41-5)\n";
+    {
+        // fields: power, toughness, deathtouch, wither, infectLabel, firststrike, indestructible, trample, persist
+        CombatTradeStat fogBank  = { 0, 2, false, false, false, false, false, false, false };
+        CombatTradeStat a33      = { 3, 3, false, false, false, false, false, false, false };
+        // 1. THE REGRESSION: Fog Bank blocks a vanilla attacker. Both
+        // directions fully prevented -> nobody dies, and the annotation must
+        // not contain the old false claim anywhere.
+        string sfog = combatTradePreviewStats(fogBank, a33, kPreventFull, kPreventFull);
+        cout << "     Fog Bank 0/2 (prevents both ways) vs 3/3: \"" << sfog << "\"  (pre-fix: \"your blocker dies, attacker lives\")\n";
+        CHECK(sfog == "neither dies (no combat damage is dealt either way - prevented)",
+              "A3 Fog Bank vs a vanilla attacker: neither dies, and the cause is stated");
+        CHECK(sfog.find("your blocker dies") == string::npos,
+              "A3 the pre-fix false claim is gone from the Fog Bank line");
+        // 2. Prevention beats DEATHTOUCH + FIRST STRIKE. Triumphant Adventurer
+        // (1/1 first strike, deathtouch) is the exact attacker from repro 1;
+        // the engine dealt it no damage and the Bank survived. Verified in the
+        // engine, not assumed: a replacement that zeroes the damage makes
+        // Damage::resolve return before WEventDamage is emitted, and
+        // MTGDeathtouchRule only fires on that event.
+        CombatTradeStat adventurer = { 1, 1, true, false, false, true, false, false, false };
+        string sdtp = combatTradePreviewStats(fogBank, adventurer, kPreventFull, kPreventFull);
+        cout << "     Fog Bank vs 1/1 first-strike DEATHTOUCH: \"" << sdtp << "\"\n";
+        CHECK(sdtp == "neither dies (no combat damage is dealt either way - prevented)",
+              "A3 prevention beats deathtouch (702.2b: deathtouch needs damage DEALT)");
+        // Negative control on the SAME attacker: with no prevention the
+        // deathtouch first-striker does kill an 0/2 wall. The prevention flag
+        // is what changes the verdict, not the stat line.
+        string sdtn = combatTradePreviewStats(fogBank, adventurer);
+        CHECK(sdtn == "your blocker dies, attacker lives",
+              "A3 control: without prevention the deathtouch attacker still kills the wall");
+        // 3. ONE-SIDED, blocker protected (a `to(this)` wall, or protection
+        // from the attacker): your damage lands, theirs does not.
+        CombatTradeStat b33 = { 3, 3, false, false, false, false, false, false, false };
+        string sprot = combatTradePreviewStats(b33, a33, kPreventFull, kPreventNone);
+        cout << "     3/3 protected blocker vs 3/3: \"" << sprot << "\"\n";
+        CHECK(sprot == "you kill it, your blocker lives (the attacker deals NO damage to your blocker - prevented)",
+              "A3 blocker-protects-self: you kill it and survive");
+        // 4. ONE-SIDED the other way - the blocker's own damage is prevented
+        // (`from(this)` with no `to(this)`), or the ATTACKER carries the
+        // prevention. Same field, either origin.
+        string sself = combatTradePreviewStats(b33, a33, kPreventNone, kPreventFull);
+        cout << "     3/3 blocker whose damage is prevented vs 3/3: \"" << sself << "\"\n";
+        CHECK(sself == "your blocker dies, attacker lives (your blocker deals NO damage to the attacker - prevented)",
+              "A3 blocker-prevents-its-own-damage: it dies for nothing, and is told so");
+        // 5. A prevented WITHER blocker deals no -1/-1 counters, so no shrink
+        // may be claimed (the wave-24 shrink rule, under prevention).
+        CombatTradeStat oonaP = { 2, 1, false, true, false, false, false, false, false };
+        CombatTradeStat a34P  = { 3, 4, false, false, false, false, false, false, false };
+        string swp = combatTradePreviewStats(oonaP, a34P, kPreventNone, kPreventFull);
+        cout << "     2/1 wither blocker, its damage prevented, vs 3/4: \"" << swp << "\"\n";
+        CHECK(swp.find("shrinks") == string::npos,
+              "A3 prevented wither damage applies no counters - no shrink claimed");
+        CHECK(swp == "your blocker dies, attacker lives (your blocker deals NO damage to the attacker - prevented)",
+              "A3 the prevented-wither line states the prevention, not a shrink");
+        // 6. INDESTRUCTIBLE is not prevention and must be untouched: damage is
+        // still dealt (deathtouch/wither still work through it), the body just
+        // is not destroyed.
+        CombatTradeStat indBlk = { 2, 2, false, false, false, false, true, false, false };
+        CombatTradeStat a55    = { 5, 5, false, false, false, false, false, false, false };
+        string sind2 = combatTradePreviewStats(indBlk, a55);
+        cout << "     2/2 INDESTRUCTIBLE blocker vs 5/5: \"" << sind2 << "\"\n";
+        CHECK(sind2 == "neither dies", "A3 indestructible verdict is unchanged (no prevention clause)");
+        // 7. TRAMPLE past a prevention wall. The attacker still ASSIGNS lethal
+        // to the blocker before prevention applies, so the carry-over is
+        // unchanged - Fog Bank does NOT fog your face.
+        CombatTradeStat tramp55 = { 5, 5, false, false, false, false, false, true, false };
+        string strFog = combatTradePreviewStats(fogBank, tramp55, kPreventFull, kPreventFull, kPreventNone);
+        cout << "     Fog Bank vs 5/5 TRAMPLE: \"" << strFog << "\"\n";
+        CHECK(strFog == "neither dies (no combat damage is dealt either way - prevented), 3 tramples to your face",
+              "A3 prevention on the blocker does not stop trample damage to YOU");
+        // ...but a prevention that covers YOU does, and then no number is owed.
+        string strFace = combatTradePreviewStats(fogBank, tramp55, kPreventFull, kPreventFull, kPreventFull);
+        cout << "     Fog Bank vs 5/5 TRAMPLE, damage to you prevented: \"" << strFace << "\"\n";
+        CHECK(strFace.find("tramples to your face") == string::npos
+              && strFace.find("its trample damage to you is prevented") != string::npos,
+              "A3 a fog over YOU replaces the trample number, it does not keep it");
+        // 8. NOT-COMPUTABLE prevention (a finite shield, absorb, phantom,
+        // wilting/vigor): the naive verdict stands and the omission is STATED.
+        // The honest weaker claim, never a guess in either direction.
+        string spb = combatTradePreviewStats(b33, a33, kPreventPartial, kPreventNone);
+        cout << "     3/3 blocker with a finite shield vs 3/3: \"" << spb << "\"\n";
+        CHECK(spb == "both die - damage prevention protecting your blocker is NOT included here: read its text",
+              "A3 partial prevention on the blocker is flagged, not guessed");
+        string spa = combatTradePreviewStats(b33, a33, kPreventNone, kPreventPartial);
+        CHECK(spa == "both die - damage prevention protecting the attacker is NOT included here: read its text",
+              "A3 partial prevention on the attacker is flagged, not guessed");
+        string spboth = combatTradePreviewStats(b33, a33, kPreventPartial, kPreventPartial);
+        CHECK(spboth == "both die - damage prevention applies to BOTH creatures and is NOT included here: read their text",
+              "A3 partial prevention on both sides collapses to one flag");
+        // 9. NEGATIVE CONTROL: the default (no prevention) call is byte-identical
+        // to the pre-fix behaviour - no clause may appear uninvited.
+        string sclean = combatTradePreviewStats(b33, a33);
+        CHECK(sclean == "both die" && sclean.find("prevent") == string::npos,
+              "A3 with no prevention the annotation is unchanged");
     }
 
     cout << "\n[A-shockland] ETB pay-life-or-tapped menu annotation (deck137 wave-24)\n";
@@ -16681,6 +17088,100 @@ void AIPlayerGPT::runParseSelfTest()
                                        + unreachableAttackerTag(1, 2, true))
               == "A1. Wind Drake (2/2) deals 2",
               "W39-6 echo: the bracket never reaches the narration");
+    }
+
+    // ---- W41-13: the hold-back block-legality tag on the ATTACKERS window ----
+    cout << "\n[W41-13] held-back block legality on the attackers window\n";
+    {
+        vector<string> one;
+        one.push_back("Elite Spellbinder #1 (flying)");
+        // The repro: a 3/2 ground body held home "to block Elite Spellbinder
+        // next turn" - which flies. The restriction leads and names the cause.
+        string t1 = heldBackBlockTag(one, 3);
+        cout << "     1 of 3 unblockable-by-it: \"" << t1 << "\"\n";
+        CHECK(t1 == " [held back, it CANNOT block: Elite Spellbinder #1 (flying)]",
+              "W41-13 the restriction leads and carries the proven cause");
+        // ALL of their creatures -> the count is stated, so the hold has no
+        // defensive value at all and the model is told so in one clause.
+        vector<string> all3;
+        all3.push_back("Elite Spellbinder #1 (flying)");
+        all3.push_back("Faerie Vandal #1 (flying)");
+        all3.push_back("Shadow Rat #1 (shadow)");
+        string t2 = heldBackBlockTag(all3, 3);
+        cout << "     all 3: \"" << t2 << "\"\n";
+        CHECK(t2 == " [held back, it CANNOT block ANY of their 3 creatures:"
+                    " Elite Spellbinder #1 (flying), Faerie Vandal #1 (flying),"
+                    " Shadow Rat #1 (shadow)]",
+              "W41-13 a total restriction says so and names them");
+        // Wave-29 wording rung: no affirmative "can block" substring exists for
+        // the model to latch as permission (the "can attack next turn" misread).
+        CHECK(t1.find("can block") == string::npos && t2.find("can block") == string::npos,
+              "W41-13 no affirmative can-block substring anywhere in the tag");
+        // A long list is capped, and the overflow is COUNTED rather than dropped
+        // silently (a silent omission is the worse failure).
+        vector<string> five;
+        for (int i = 1; i <= 5; i++)
+        {
+            std::ostringstream n; n << "Flier #" << i << " (flying)";
+            five.push_back(n.str());
+        }
+        string t3 = heldBackBlockTag(five, 7);
+        cout << "     5 of 7, capped: \"" << t3 << "\"\n";
+        CHECK(t3.find("Flier #3 (flying), +2 more]") != string::npos
+              && t3.find("Flier #4") == string::npos,
+              "W41-13 the list caps at 3 and counts the rest");
+        // NEGATIVES: silence when there is nothing to restrict, and when the
+        // opponent has no creatures at all (nothing knowable to state).
+        vector<string> none;
+        CHECK(heldBackBlockTag(none, 4).empty(),
+              "W41-13 it could block everything -> no annotation at all");
+        CHECK(heldBackBlockTag(one, 0).empty(),
+              "W41-13 no opposing creatures -> stay silent");
+        // ECHO SHAPE: the tag sits in a bracket on an A-line and contains bare
+        // digits and '#N' handles - prove they cannot forge an attacker set or
+        // reach the narration.
+        vector<bool> outA;
+        int nA = parseAttackerSet("ATTACK: none" + t3, 3, outA, NULL);
+        cout << "     echoed A-tag with 'ATTACK: none': declared=" << nA << "\n";
+        CHECK(nA == 0 && !outA[0] && !outA[1] && !outA[2],
+              "W41-13 echo: the tag's digits never forge an attacker");
+        CHECK(stripNarrationDecoration("A1. Silverquill Silencer (3/2)" + t1)
+              == "A1. Silverquill Silencer (3/2)",
+              "W41-13 echo: the bracket never reaches the narration");
+        // The MECHANISM that makes the echo safe, tested directly: a prose
+        // annotation goes, a LABEL echo stays. The second half is the one that
+        // must not break - models do answer "ATTACK: [A1, A3]".
+        CHECK(stripAnnotationBrackets("ATTACK: A1 [held back, it CANNOT block: Foo #2 (flying)]")
+              == "ATTACK: A1  ", //the span becomes one separating space
+              "W41-13 a prose annotation is dropped whole");
+        CHECK(stripAnnotationBrackets("ATTACK: [A1, A3]") == "ATTACK: [A1, A3]",
+              "W41-13 a bracketed LABEL answer survives untouched");
+        CHECK(stripAnnotationBrackets("ATTACK: [A2]") == "ATTACK: [A2]",
+              "W41-13 a single bracketed label survives untouched");
+        CHECK(stripAnnotationBrackets("ATTACK: A1 [unclosed") == "ATTACK: A1 [unclosed",
+              "W41-13 an unclosed bracket is left alone");
+        // A bracketed "[none]" is prose by the rule above, so it is stripped
+        // from the SCAN - the decline detection reads the original, so it is
+        // still an explicit decline (0), never an unusable reply (-1).
+        vector<bool> outN;
+        CHECK(parseAttackerSet("ATTACK: [none]", 3, outN, NULL) == 0,
+              "W41-13 a bracketed decline is still a decline, not a garbled reply");
+        // The pre-existing attacker-line annotations ride the same protection:
+        // the zero-power tag's digits cannot forge a declaration either.
+        vector<bool> outZ;
+        CHECK(parseAttackerSet("ATTACK: none" + zeroPowerAttackerTag(0), 3, outZ, NULL) == 0,
+              "W41-13 the zero-power attacker tag cannot forge a declaration");
+        // '#' and '+' are never A-index prefixes (defence in depth, outside
+        // brackets too): a named reply with an instance ordinal declares by
+        // NAME, and must not also forge the ordinal as an index.
+        vector<bool> outH;
+        vector<string> names; names.push_back("Hellrider"); names.push_back("Rakdos Cackler");
+        names.push_back("Bloodrock Cyclops");
+        int nH = parseAttackerSet("ATTACK: Hellrider #3", 3, outH, &names);
+        cout << "     'ATTACK: Hellrider #3' -> declared=" << nH
+             << " [" << outH[0] << outH[1] << outH[2] << "]\n";
+        CHECK(nH == 1 && outH[0] && !outH[2],
+              "W41-13 '#3' is an instance ordinal, not an A-index");
     }
 
     // ---- W39 #10: no "{right now: draws 0}" on a future-step draw ----
