@@ -12,6 +12,10 @@ investigation (in flight), carried items. Ranked.
    filter applies FLYING legality but not MENACE (11 semantically-wrong 1-on-1 tags;
    menace attacker must list "[cannot be blocked by fewer than two creatures]" and drop
    the tag when <2 untapped bodies). PARSETEST cases named in both seat reports.
+   OWNER FIELD REPORT (2026-08-24): BAKA is hit too — "it frequently tries to block
+   illegally, only to be made to not block." Confirms seat-agnostic: fix at the
+   LEGALITY layer (exclude menace attackers from single-blocker legal sets BEFORE
+   declaration), which repairs human UI + Baka + GPT in one mechanism.
 2. **#W43-2 (HIGH) Vita victory-screen crash** — heap corruption at MTGLibrary teardown
    (core-dump analysis + ASAN lane in flight; whatever it finds lands here).
 3. **#W43-3 (HIGH) Hand-reveal attribution inverted** — reveal events bind to the
