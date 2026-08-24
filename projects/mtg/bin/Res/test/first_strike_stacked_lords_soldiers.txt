@@ -1,0 +1,47 @@
+#CLASS WIDTH for the stacked-keyword-grant defect: nothing about it is sliver-
+#specific.  Any two continuous effects granting the same keyword to the same
+#creature hit it - 850 lord() lines in primitives, plus every until-end-of-turn
+#grant.  Here the lords are two Rhox Pikemasters ("Other Soldier creatures you
+#control have first strike") and the creature is a vanilla 2/2 Glory Seeker.
+#
+#Both Pikemasters are bolted (3 damage exactly kills a 3/3), a turn cycle
+#passes, and a 2/2 Grizzly Bears attacks into Glory Seeker.  With both grantors
+#dead the two 2/2s must TRADE; the snapshot-and-restore bug left Glory Seeker
+#with permanent first strike instead.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt,Lightning Bolt
+inplay:Grizzly Bears
+manapool:{R}{R}
+[PLAYER2]
+inplay:Rhox Pikemaster,Rhox Pikemaster,Glory Seeker
+[DO]
+Lightning Bolt
+Rhox Pikemaster
+Lightning Bolt
+Rhox Pikemaster
+goto end
+goto firstmain
+goto end
+goto firstmain
+next
+#combat begins
+next
+#attackers
+Grizzly Bears
+next
+#blockers
+Glory Seeker
+next
+#damage
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+graveyard:Grizzly Bears,Lightning Bolt,Lightning Bolt
+life:20
+[PLAYER2]
+graveyard:Rhox Pikemaster,Rhox Pikemaster,Glory Seeker
+life:20
+[END]

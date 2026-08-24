@@ -1,0 +1,45 @@
+#The OTHER direction of the same defect (found while reproducing the owner's
+#2026-08-23 report).  Two first-strike lords, only the FIRST-granting one dies:
+#its snapshot said "first strike was OFF before me", so restoring that snapshot
+#stripped the keyword off creatures the STILL-LIVE second lord was granting it
+#to.  Counting modifiers on the card keeps the survivor's grant standing.
+#
+#Talon Sliver is bolted; Striking Sliver stays on the battlefield.  Spinneret
+#Sliver must therefore still have first strike, so it kills the attacking 2/2
+#Grizzly Bears without taking a scratch.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+inplay:Grizzly Bears
+manapool:{R}
+[PLAYER2]
+inplay:Talon Sliver,Striking Sliver,Spinneret Sliver
+[DO]
+Lightning Bolt
+Talon Sliver
+goto end
+goto firstmain
+goto end
+goto firstmain
+next
+#combat begins
+next
+#attackers
+Grizzly Bears
+next
+#blockers
+Spinneret Sliver
+next
+#damage
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+graveyard:Grizzly Bears,Lightning Bolt
+life:20
+[PLAYER2]
+inplay:Striking Sliver,Spinneret Sliver
+graveyard:Talon Sliver
+life:20
+[END]

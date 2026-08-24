@@ -1,0 +1,31 @@
+#CONTROL: Striking Sliver ("Sliver creatures you control have first strike.")
+#is on the battlefield, so Spinneret Sliver (2/2) HAS first strike.  A 2/2
+#Grizzly Bears attacks into it: the blocker strikes first, kills the Bears,
+#and takes no damage back.  Expected: Bears dead, Spinneret alive.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+[PLAYER2]
+inplay:Striking Sliver,Spinneret Sliver
+[DO]
+next
+#combat begins
+next
+#attackers
+Grizzly Bears
+next
+#blockers
+Spinneret Sliver
+next
+#damage
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+graveyard:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Striking Sliver,Spinneret Sliver
+life:20
+[END]

@@ -1125,3 +1125,8 @@ delver_of_secrets_no_instant.txt
 black_vise_seven_cards.txt
 black_vise_four_cards.txt
 black_vise_own_upkeep.txt
+striking_sliver_grant_alive.txt
+striking_sliver_grant_revoked.txt
+first_strike_two_lords_both_die.txt
+first_strike_two_lords_one_dies.txt
+first_strike_stacked_lords_soldiers.txt
