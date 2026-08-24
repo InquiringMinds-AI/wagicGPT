@@ -515,6 +515,15 @@ private:
     string storedString;
     string storedAbilityString;
     string storedAndAbility;
+    //SPEND-RESTRICTED MANA: the `manarestriction{<tc spec>}` clause, stripped
+    //from the line the moment it is seen and consumed where the AManaProducer
+    //is CONSTRUCTED. It cannot be a local: a wrapped mana ability
+    //(`this(...) {T}:add{G} manarestriction{creature}` - Beastcaller Savant's
+    //shape, and the shape of most restricted producers in the corpus) is
+    //parsed by an OUTER call that never sees the producer, and an inner
+    //recursive call that never sees the clause. Same carrier idiom as
+    //storedAndAbility above.
+    string storedSpendRestriction;
     int countCards(TargetChooser * tc, Player * player = NULL, int option = 0);
     TriggeredAbility * parseTrigger(string s, string magicText, int id, Spell * spell, MTGCardInstance *card, Targetable * target);
     MTGAbility * getAlternateCost( string s, int id, Spell *spell, MTGCardInstance *card );
@@ -596,6 +605,17 @@ public:
     int tap;
     string Producing;
     bool DoesntEmpty;
+    //SPEND-RESTRICTED MANA (CR 106.6b): "Spend this mana only to cast <X>".
+    //A TargetChooser spec (e.g. "creature", "creature[elemental]",
+    //"*[devoid]", "chosentype") describing the SPELLS this producer's mana
+    //may pay for; empty = unrestricted. Scripted as `manarestriction{...}`
+    //on the mana ability. Honored by ManaEngine::spendAllowed at every
+    //producer-SELECTION point, which is what makes the restriction real:
+    //the card-script idiom that existed before this
+    //(`this(variable{type:creature:myrestrictedcastingzone}>0)`) only gated
+    //ACTIVATION - once the mana was in the pool it paid for anything, so
+    //Beastcaller Savant financed a Captain's Claws in live play.
+    string spendRestriction;
     AManaProducer(GameObserver* observer, int id, MTGCardInstance * card, Targetable * t, ManaCost * _output, ManaCost * _cost = NULL, int who = TargetChooser::UNSET,string producing = "",bool doesntEmpty = false);
     int isReactingToClick(MTGCardInstance *  _card, ManaCost * mana = NULL);
     int resolve();

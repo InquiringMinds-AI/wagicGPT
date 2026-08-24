@@ -652,6 +652,31 @@ int TestSuiteAI::Act(float)
             }
         }
     }
+    else if (action.find("autotap ") == 0)
+    {
+        //HUMAN auto-tap, driven directly. MTGPutInPlayRule::reactToClick gates
+        //its ManaEngine::autoTapForCost call on `!player->isAI()`, and BOTH
+        //suite seats are AIPlayer-derived - so a scripted card click can NEVER
+        //reach the human casting-payment path, and a fixture that "verifies" it
+        //by clicking a card in hand proves nothing (the first cut of the
+        //spend-restriction fixtures went falsely green exactly this way: the
+        //restricted case and its unrestricted control BOTH failed to cast).
+        //This calls the same entry point the rule calls, with the same
+        //arguments, so the fixture can assert the taps and the resulting pool.
+        string cname = action.substr(8);
+        MTGCardInstance * autoTapCard = getCard(cname);
+        if (!autoTapCard || !autoTapCard->getManaCost())
+        {
+            std::cerr << "TESTSUITE autotap: no card '" << cname << "' with a mana cost"
+                         " (state unchanged) [" << suite->filename << "]" << std::endl;
+            return 1;
+        }
+        Player * autoTapPayer = autoTapCard->controller();
+        int autoTapAny = autoTapCard->has(Constants::ANYTYPEOFMANA);
+        if (autoTapPayer
+            && !autoTapPayer->getManaPool()->canAfford(autoTapCard->getManaCost(), autoTapAny))
+            ManaEngine::autoTapForCost(autoTapPayer, autoTapCard, autoTapCard->getManaCost(), autoTapAny);
+    }
     else if (action.find(" -momir- ") != string::npos)
     {
         int start = action.find(" -momir- ");

@@ -6,6 +6,7 @@
 #include "AllAbilities.h"
 #include "ManaCostHybrid.h"
 #include "ExtraCost.h"
+#include "TargetChooser.h"
 #include <sstream>
 
 int ManaEngine::FreeProducerPolicy::canHandle(MTGAbility * producer)
@@ -28,6 +29,48 @@ int ManaEngine::FreeProducerPolicy::canHandle(MTGAbility * producer)
     return 1;
 }
 
+//SPEND-RESTRICTED MANA (CR 106.6b), the honor point for the card-script
+//`manarestriction{<tc spec>}` clause: "Spend this mana only to cast <spec>
+//spells". `payee` is the card the mana is about to pay for.
+//
+//Before this existed the restriction had NO engine representation - the card
+//scripts approximated it with an ACTIVATION gate
+//(`this(variable{type:creature:myrestrictedcastingzone}>0)`, "only tap me if a
+//creature is castable"), which is a different claim: once the mana reached the
+//pool it was ordinary mana and paid for anything. Live play, 2026-08-24:
+//Beastcaller Savant's mana paid for Captain's Claws, an Equipment.
+//
+//"Only to cast a SPELL" is decided here by where the payee lives: a spell is a
+//card that is not (yet) a permanent, so a payee already on the battlefield is
+//an ABILITY ACTIVATION and never a legal use of this mana. A NULL payee (the
+//context-free "what could I make" estimate) is likewise refused - understating
+//an unrestricted pool is safe, because every payment path re-asks with the
+//actual payee and gets the restricted producer back if it qualifies.
+bool ManaEngine::spendAllowed(MTGAbility * producer, MTGCardInstance * payee)
+{
+    AManaProducer * amp = dynamic_cast<AManaProducer*>(producer);
+    if (!amp || amp->spendRestriction.empty())
+        return true;
+    if (!payee)
+        return false;
+    Player * pc = payee->controller();
+    if (pc && pc->game && pc->game->inPlay->hasCard(payee))
+        return false;
+    GameObserver * g = payee->getObserver();
+    if (!g)
+        return false;
+    TargetChooserFactory tcf(g);
+    TargetChooser * tc = tcf.createTargetChooser(amp->spendRestriction, amp->source);
+    if (!tc)
+        return false;
+    //The payee is in hand / graveyard / exile / command zone / on the stack,
+    //never the battlefield the spec would default to.
+    tc->setAllZones();
+    bool ok = tc->canTarget(payee, true);
+    delete tc;
+    return ok;
+}
+
 
 namespace
 {
@@ -36,10 +79,18 @@ namespace
     //subject when the engine probes a non-acting responder (priority
     //windows) or renders castability. checkCost=false mirrors the one
     //legacy call site that passed the producer's own cost as the pool.
-    bool producerUsable(Player * p, AManaProducer * amp, MTGCardInstance * card, bool checkCost)
+    //`payee` + `enforceSpend`: the SPEND-RESTRICTION honor point. Every
+    //producer-SELECTION walk (potentialMana, planPayment) passes the card the
+    //mana would pay for and enforces; the display/reach walks
+    //(potentialManaPermissive, potentialColorReach, selfDamage*) do not - they
+    //report what the board can make, not what a given cost may spend.
+    bool producerUsable(Player * p, AManaProducer * amp, MTGCardInstance * card, bool checkCost,
+                        MTGCardInstance * payee = NULL, bool enforceSpend = false)
     {
         MTGCardInstance * source = amp->source;
         if (card != source)
+            return false;
+        if (enforceSpend && !ManaEngine::spendAllowed(amp, payee))
             return false;
         if (amp->castRestriction.size())
         {
@@ -115,7 +166,8 @@ namespace
     //to one color when the card is nothing of the kind.
     bool cardCoversOtherNeededColor(Player * p, ManaEngine::ManaPolicy & policy,
                                     ManaCost * cost, ManaCost * result,
-                                    MTGCardInstance * sourceCard, int k)
+                                    MTGCardInstance * sourceCard, int k,
+                                    MTGCardInstance * payee)
     {
         ActionLayer * al = p->getObserver()->mLayers->actionLayer();
         for (size_t i = 0; i < al->manaObjects.size(); i++)
@@ -123,7 +175,7 @@ namespace
             AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility*) al->manaObjects[i]);
             if (!amp || amp->source != sourceCard)
                 continue;
-            if (!policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true))
+            if (!policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true, payee, true))
                 continue;
             if (amp->output->getConvertedCost() < 1)
                 continue;
@@ -150,19 +202,20 @@ namespace
     bool deferFlexibleSource(Player * p, ManaEngine::ManaPolicy & policy,
                              ManaCost * cost, ManaCost * result,
                              map<MTGCardInstance*, bool> & used,
-                             MTGCardInstance * card, int k)
+                             MTGCardInstance * card, int k,
+                             MTGCardInstance * payee)
     {
         ActionLayer * al = p->getObserver()->mLayers->actionLayer();
         //SELF test: this source can also pay a different still-needed color, so
         //spending it on k might be the wrong use of it.
-        bool sourceHasOtherNeeded = cardCoversOtherNeededColor(p, policy, cost, result, card, k);
+        bool sourceHasOtherNeeded = cardCoversOtherNeededColor(p, policy, cost, result, card, k, payee);
         if (!sourceHasOtherNeeded)
             return false;
         bool otherUnusedCoversK = false;
         for (size_t i = 0; i < al->manaObjects.size(); i++)
         {
             AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility*) al->manaObjects[i]);
-            if (!amp || !policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true))
+            if (!amp || !policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true, payee, true))
                 continue;
             if (amp->output->getConvertedCost() < 1)
                 continue;
@@ -191,7 +244,7 @@ namespace
                 //shape, and it leaves the N-146a case that motivated deferral
                 //untouched - a genuine mono source has one ability, and
                 //aggregating over one ability changes nothing.
-                if (!cardCoversOtherNeededColor(p, policy, cost, result, amp->source, k))
+                if (!cardCoversOtherNeededColor(p, policy, cost, result, amp->source, k, payee))
                     otherUnusedCoversK = true;
             }
         }
@@ -229,7 +282,7 @@ ManaCost * ManaEngine::potentialMana(Player * p, ManaPolicy & policy, MTGCardIns
             MTGCardInstance * card = amp->source;
             if (card == target)
                 used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
-            if (!used[card] && producerUsable(p, amp, card, true) && amp->output->getConvertedCost() == 1)
+            if (!used[card] && producerUsable(p, amp, card, true, target, true) && amp->output->getConvertedCost() == 1)
             {//ai can't use cards which produce more than 1 converted while using the old pMana method.
                 result->add(amp->output);
                 used[card] = true;
@@ -311,7 +364,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
         {
             MTGAbility * za = (MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[z];
             AManaProducer * zamp = dynamic_cast<AManaProducer*>(za);
-            if (!zamp || !policy.canHandle(zamp) || !producerUsable(p, zamp, zamp->source, true))
+            if (!zamp || !policy.canHandle(zamp) || !producerUsable(p, zamp, zamp->source, true, target, true))
                 continue;
             MTGCardInstance * zsrc = zamp->source;
             if (zsrc == target || counted[zsrc])
@@ -382,7 +435,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                     MTGCardInstance * src = amp->source;
                     if (src == target)
                         used[src] = true; //http://code.google.com/p/wagic/issues/detail?id=76
-                    if (used[src] || !producerUsable(p, amp, src, true) || amp->output->getConvertedCost() < 1)
+                    if (used[src] || !producerUsable(p, amp, src, true, target, true) || amp->output->getConvertedCost() < 1)
                         continue;
                     //only true colour sides; a {2/w}-style generic side is out of
                     //this walk's scope (unchanged from the old pass's reach).
@@ -469,7 +522,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                     MTGCardInstance * card = amp->source;
                     if (card == target)
                         used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
-                    if (!used[card] && producerUsable(p, amp, card, true) && amp->output->getConvertedCost() >= 1)
+                    if (!used[card] && producerUsable(p, amp, card, true, target, true) && amp->output->getConvertedCost() >= 1)
                     {
                         if(!(result->canAfford(cost,0)))//if we got to this point we should be filling colorless mana requirements.
                         {
@@ -513,7 +566,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                 }
             }
         }
-        else if (amp && policy.canHandle(amp) && producerUsable(p, amp, amp->source, false))
+        else if (amp && policy.canHandle(amp) && producerUsable(p, amp, amp->source, false, target, true))
         {
             for (int k = Constants::NB_Colors-1; k > 0 ; k--)//go backwards.
             {
@@ -522,14 +575,14 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                     MTGCardInstance * card = amp->source;
                     if (card == target)
                         used[card] = true; //http://code.google.com/p/wagic/issues/detail?id=76
-                    if (!used[card] && producerUsable(p, amp, card, true) && amp->output->getConvertedCost() >= 1)
+                    if (!used[card] && producerUsable(p, amp, card, true, target, true) && amp->output->getConvertedCost() >= 1)
                     {
                         //Don't burn a dual/flexible source on a color a dedicated
                         //source can pay - hold it for the color only it supplies.
                         //Only a single-color ability is deferrable; an add-both
                         //producer ({W}{B} at once) pays both pips in one tap.
                         if (amp->output->getConvertedCost() == 1
-                            && deferFlexibleSource(p, policy, cost, result, used, card, k))
+                            && deferFlexibleSource(p, policy, cost, result, used, card, k, target))
                             continue;
                         ManaCost * check = NEW ManaCost();
                         check->add(k,cost->getCost(k));
@@ -634,7 +687,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
             AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
             if (amp && policy.canHandle(amp))
             {
-                if (!used[amp->source] && producerUsable(p, amp, amp->source, true) && amp->output->getConvertedCost() >= 1)
+                if (!used[amp->source] && producerUsable(p, amp, amp->source, true, target, true) && amp->output->getConvertedCost() >= 1)
                 {
                     payments.push_back(amp);
                     used[amp->source] = true;

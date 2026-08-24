@@ -1,0 +1,48 @@
+# SPEND-RESTRICTED MANA - the LEGAL half of the Beastcaller Savant class
+# (companion to manarestriction_savant_no_artifact.txt). A restriction the
+# engine over-enforces is as wrong as one it ignores: the Savant's mana MUST
+# still pay for a creature spell.
+#
+# WITNESS: Beastcaller Savant + Darksteel Citadel ({T}: Add {1}) and Grizzly
+# Bears {1}{G} in hand. The Citadel can only pay the generic {1}; the {G} pip
+# exists ONLY on the Savant, so the cast is impossible unless the restricted
+# mana is admitted for a creature spell.
+#
+# EXPECTED: Grizzly Bears resolves onto the battlefield.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Beastcaller Savant,Darksteel Citadel
+hand:Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Beastcaller Savant,Darksteel Citadel,Grizzly Bears
+[PLAYER2]
+[END]
