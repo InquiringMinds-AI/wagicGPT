@@ -1,0 +1,31 @@
+# W43-1 (CR 509.1c). A menace attacker is not a legal assignment for a lone
+# blocker, so the declaration must never be OFFERED to one - the defender's only
+# creature has to end up on the attacker it can actually block.
+# Two attackers, one blocker, and the menace body is FIRST in play order, which
+# is the order the block rule cycles. Before the fix the lone Hill Giant was
+# assigned to Alley Strangler (accepted, narrated), the rules layer deleted the
+# blocker after the fact at WEventBlockersChosen, and BOTH attackers connected:
+# life 16 with Grizzly Bears still alive. The blocker was spent on nothing.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:alley strangler,grizzly bears
+[PLAYER2]
+inplay:hill giant
+life:20
+[DO]
+alley strangler
+grizzly bears
+next
+hill giant
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:alley strangler
+graveyard:grizzly bears
+[PLAYER2]
+inplay:hill giant
+life:18
+[END]

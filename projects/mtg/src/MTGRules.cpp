@@ -2745,12 +2745,28 @@ int MTGBlockRule::receiveEvent(WEvent *e)
     if (dynamic_cast<WEventBlockersChosen*>(e))
     {
         //if a card with menace is not blocked by 2 or more, remove any known blockers and attacking as normal.
+        //W43-1 SAFETY NET, no longer a fixer. Block legality is now decided
+        //BEFORE the declaration is accepted (MTGCardInstance::canBlock refuses
+        //an assignment that could never be completed; the human's phase advance
+        //and both AI seats refuse an under-filled set), so reaching this loop
+        //means some consumer built a declaration the legality layer should have
+        //rejected. It still repairs the board - a silently-wrong combat is worse
+        //than a silently-repaired one - but it says so loudly in a dev build
+        //instead of pretending the block happened. It should never fire.
         MTGGameZone * z = p->game->inPlay;
         for (int i = 0; i < z->nb_cards; i++)
         {
             MTGCardInstance * card = z->cards[i];
-            if (card->isAttacker() && card->has(Constants::MENACE) && card->blockers.size() < 2)
+            //W43-1: blockers.size() == 0 is the ordinary "nobody blocked it"
+            //case, not an illegal declaration - blockDeclarationIllegal draws
+            //that line so the assertion below only speaks when it is true.
+            if (card->isAttacker() && card->has(Constants::MENACE) && card->blockDeclarationIllegal())
             {
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+                fprintf(stderr, "WAGIC W43-1 ASSERT: illegal block declaration accepted -"
+                        " %s (MENACE) left with %d blocker(s), needs 2\n",
+                        card->getName().c_str(), (int) card->blockers.size());
+#endif
                 while (card->blockers.size())
                 {
                     MTGCardInstance * blockingCard = card->blockers.front();
@@ -2767,8 +2783,16 @@ int MTGBlockRule::receiveEvent(WEvent *e)
         for (int i = 0; i < z->nb_cards; i++)
         {
             MTGCardInstance * card = z->cards[i];
-            if (card->isAttacker() && card->has(Constants::THREEBLOCKERS) && card->blockers.size() < 3)
+            //W43-1: blockers.size() == 0 is the ordinary "nobody blocked it"
+            //case, not an illegal declaration - blockDeclarationIllegal draws
+            //that line so the assertion below only speaks when it is true.
+            if (card->isAttacker() && card->has(Constants::THREEBLOCKERS) && card->blockDeclarationIllegal())
             {
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+                fprintf(stderr, "WAGIC W43-1 ASSERT: illegal block declaration accepted -"
+                        " %s (THREEBLOCKERS) left with %d blocker(s), needs 3\n",
+                        card->getName().c_str(), (int) card->blockers.size());
+#endif
                 while (card->blockers.size())
                 {
                     MTGCardInstance * blockingCard = card->blockers.front();

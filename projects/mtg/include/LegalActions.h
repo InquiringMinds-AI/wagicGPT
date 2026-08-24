@@ -83,6 +83,16 @@ public:
     //meaningful during the blockers step (attackers already declared).
     static bool hasLegalBlock(Player * defender);
 
+    //W43-1 (CR 509.1c): the SET-level half of block legality. Returns the first
+    //attacker whose current declaration is under-filled (menace blocked by one,
+    //"three or more" blocked by two), or NULL when the declaration as a whole is
+    //legal. This is the predicate the declare-blockers step is ACCEPTED against
+    //- pairwise canBlock() cannot express it, because the first blocker of a
+    //legal pair is individually legal. Consumers: the human's refused phase
+    //advance, AIPlayerBaka's end-of-declaration sweep, AIPlayerGPT's reply
+    //validator, and the rules-layer safety net that must now never fire.
+    static MTGCardInstance * illegalBlockDeclaration(Player * defender);
+
     //hasAnyLegalAction: can p do ANYTHING at all in the current phase? This
     //is the predicate behind "a window where nothing is possible is not a
     //window" - the engine skips such a stop regardless of the player's

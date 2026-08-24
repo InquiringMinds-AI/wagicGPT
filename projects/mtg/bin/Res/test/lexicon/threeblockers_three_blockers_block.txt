@@ -1,0 +1,33 @@
+# W43-1 CONTROL: three creatures ARE a legal block of a "can't be blocked except
+# by three or more" attacker, and the new feasibility gate must not touch it.
+# Three DISTINCT bodies (the harness clicks by name, so three copies of one card
+# would all resolve to the same instance). Combined power 5 kills the 6/5 Troll;
+# its 6 damage is ordered cheapest-kill-first by the attacker's heuristic, which
+# spends 2 on the Bears and 3 on the Giant and cannot reach the 0/8 Wall.
+# Nothing reaches the defender: life stays 20.
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:troll of khazad-dum
+[PLAYER2]
+inplay:grizzly bears,hill giant,wall of stone
+life:20
+[DO]
+troll of khazad-dum
+next
+grizzly bears
+hill giant
+wall of stone
+next
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+graveyard:troll of khazad-dum
+[PLAYER2]
+inplay:wall of stone
+graveyard:grizzly bears,hill giant
+life:20
+[END]

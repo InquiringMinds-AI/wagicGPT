@@ -4485,6 +4485,50 @@ int AIPlayerBaka::chooseBlockers()
         }
     }
 
+    //W43-1 (CR 509.1c), the heuristic's end-of-declaration sweep. Pass 3 already
+    //understood menace, but passes 1 and 2 did not: pass 1 cycles a blocker onto
+    //the first attacker its kill test likes, and pass 2 can unassign one half of
+    //a legal pair - either way the seat handed the engine an under-filled
+    //declaration, which the rules layer then silently deleted after the fact.
+    //(Owner field report 2026-08-24: "it frequently tries to block illegally,
+    //only to be made to not block.") Repair the SET before the declaration is
+    //accepted: top the attacker up from a free untapped body when one exists,
+    //since the blocks the earlier passes wanted are usually still worth making,
+    //and otherwise take the whole doomed assignment back so the creature stays
+    //home instead of being deleted out of combat with nothing to show for it.
+    {
+        MTGCardInstance * atk = NULL;
+        while ((atk = opponent()->game->inPlay->getNextAttacker(atk)))
+        {
+            if (!atk->blockDeclarationIllegal())
+                continue;
+            const int need = atk->minBlockersRequired();
+            CardDescriptor cdFree;
+            cdFree.init();
+            cdFree.setType("Creature");
+            cdFree.unsecureSetTapped(-1);
+            MTGCardInstance * extra = NULL;
+            while ((int) atk->blockers.size() < need
+                   && (extra = cdFree.nextmatch(game->inPlay, extra)))
+            {
+                if (extra->defenser || extra->blockCost)
+                    continue;
+                if (hints && hints->HintSaysDontBlock(observer, extra))
+                    continue;
+                extra->toggleDefenser(atk);
+            }
+            if ((int) atk->blockers.size() >= need)
+                continue;
+            while (atk->blockers.size())
+            {
+                MTGCardInstance * b = atk->blockers.front();
+                if (b->getNextOpponent() != atk)
+                    break; //not ours to take back; the rules-layer net has it
+                b->toggleDefenser(NULL);
+            }
+        }
+    }
+
     return 1;
 }
 

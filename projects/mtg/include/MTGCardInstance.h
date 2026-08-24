@@ -242,6 +242,27 @@ public:
     //attackers window asks with it (nothing is an attacker yet at that step).
     int canBlockPairwise(MTGCardInstance * opponent);
     int couldBlockIfItAttacked(MTGCardInstance * opponent);
+    //W43-1, CR 509.1c: menace / "can't be blocked except by three or more" are
+    //DECLARATION-SET constraints, not pairwise ones - they are properties of
+    //the whole block declaration, so no per-pair gate can express them alone.
+    //These three are the attacker-side half of the legality layer every
+    //declare-blockers consumer (human UI, Baka, GPT) now shares.
+    //minBlockersRequired: how many creatures a legal block of THIS attacker
+    //needs (3 threeblockers, 2 menace, else 1).
+    int minBlockersRequired();
+    //potentialBlockerCount: how many of the defending player's creatures could
+    //pairwise-legally block this attacker right now. Uses canBlock() +
+    //canBlockPairwise() - deliberately NOT canBlock(attacker), which consults
+    //the set constraint and would recurse.
+    int potentialBlockerCount();
+    //blockRequirementSatisfiable: TRUE when the defender owns enough bodies for
+    //a legal block to EXIST. False means no single creature may be assigned at
+    //all - the declaration could never be completed, so offering it is a lie.
+    bool blockRequirementSatisfiable();
+    //blockDeclarationIllegal: TRUE when this attacker's CURRENT declaration is
+    //under-filled (blocked by at least one, but fewer than the minimum). The
+    //predicate behind the human's refused confirm and the AI seats' sweeps.
+    bool blockDeclarationIllegal();
     int canAttack( bool pwcheck = false );
     int isAttacker();
     Targetable * isAttacking;
