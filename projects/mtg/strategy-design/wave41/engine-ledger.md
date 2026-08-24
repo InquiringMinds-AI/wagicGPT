@@ -59,3 +59,35 @@ prior seeds carried from wave40/engine-ledger.md appends. Ranked.
 misplays -> E2/E7 carve-outs); armed-sole-attacker (3-corpus null -> retired, E1);
 deck162 Rule-4 crutch (register condition met -> retired); wave-41 lane predictions per
 fix-validation verdict table (narration/may/X/morbid/flip/prevention CONFIRMED).
+
+## WAVE-42 STEP-1 OUTCOME (2026-08-24, merged at 6788e6171, gate 1093/0 + 33/0, PARSETEST 928/0)
+All 7 lanes landed: A #W42-D1+D9 (search collapse+mask; probe 58/58 <=3 lines, 0 leaks);
+B #W42-3 (attack-side forecasts, one math source re-voiced; 539/539 coverage, 10/10
+hand-checked); C #W42-D2+D3 (unified narration, storedSourceCard ladder, verb seam for
+the owner question; 0 observer-only/0 sourceless in probe); D #W42-D4+D5 (getMenuText
+render boundary, derive-not-table; your-own-targets now named); E #W42-1 (loud-fail
+mandatory chooser, 500-tick grace, empirically forced) — AND FALSIFIED #W42-D6:
+ActivatedAbility::counters was CORRECT; the real defect was missing instance handles on
+same-named permanents' option lines (de-dupe collapsed two Hives) — #N handles shipped;
+F DFC sweep (59/59 fixed by deleting the illegal anyzone hand-flip line — every card
+already carried its faithful mechanism; 4 'may' restorations Group D) + Burnout (zone
+AND missing 'controller' rider) + 5 fixtures; G #W42-4+D7+D8 (token-run collapse 100%
+on 5,100+ boards; ceased-to-exist narration; delta re-based on structural pending-lines
+— the old byte-offset was broken by the 24K front-trim, worse than the 1-record cite).
+
+NEW ITEMS from step-1 (wave-43 docket seeds):
+- CS-023 candidate: Ludevic's Test Subject transforms at ONE hatchling counter, not 5
+  (bare this(...)-gate + && andAbility bypass; Grizzled Angler's if-then idiom is the
+  fix shape; lane F evidence, empirical). Expect a 13/13 for 2 mana in corpora until fixed.
+- Docent of Perfection: transform is scripted as a state trigger, Oracle is cast-then-if
+  (lane F, expressible via the Grizzled Angler idiom).
+- borderline.txt carries 7 doubleside(backside) lines needing the same per-card Oracle
+  sweep (modal-DFC doubleside(<name>) forms are LEGITIMATE — do not sweep those).
+- #W42-D2r: mana-tap narration asymmetry (actor-only by design; owner/seat call).
+- Tutored library->hand renders as "You drew X" (search is not a draw; D4-style pass).
+- Observer never learns a mulligan happened (public info in real MTG; deliberate no-widen).
+- Single-candidate mandatory NON-player chooser still has no auto-resolve (lane E scope
+  note) — would wedge as timeout, not loud-fail.
+- Suite instrument warning (lane F): a truncated-but-exit-0 suite run reports 0 failures
+  and LOOKS GREEN — always compare the COUNT, not just failures.
+- Method: WAGIC_FASTCLOCK=0.1 on suite runs ~10x faster (SDL_WaitEventTimeout throttle).
