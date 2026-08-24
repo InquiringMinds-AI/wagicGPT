@@ -22,8 +22,9 @@ WEventDamage::WEventDamage(Damage *damage) :
 {
 }
 
-WEventLife::WEventLife(Player * player, int amount, MTGCardInstance* source) :
-    WEvent(), player(player), amount(amount), source(source), settledLife(0)
+WEventLife::WEventLife(Player * player, int amount, MTGCardInstance* source, bool fromDamage) :
+    WEvent(), player(player), amount(amount), source(source), settledLife(0),
+    fromDamage(fromDamage)
 {
     //The caller applies the change BEFORE raising the event (Player::
     //gainOrLoseLife), so the live total here is the one THIS change settled at.

@@ -292,7 +292,10 @@ int Damage::resolve()
                         source->controller()->prowledTypes.push_back(values[i]);
                 }
             }
-            WEvent * lifed = NEW WEventLife((Player*)target,-damage, source);
+            //W43-R2: flagged fromDamage - the WEventDamage for this very same
+            //delta is raised a few lines below (observer->receiveEvent(e)), so a
+            //narrator that prints both writes the same event twice.
+            WEvent * lifed = NEW WEventLife((Player*)target,-damage, source, true);
             observer->receiveEvent(lifed);
             if(((MTGCardInstance*)source)->damageInflictedAsCommander > 20) // If a player has been dealt 21 points of combat damage by a particular Commander during the game, that player loses a game.
                 observer->setLoser(((MTGCardInstance*)source)->controller()->opponent());
