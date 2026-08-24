@@ -1711,6 +1711,217 @@ static string summoningSickTag(bool canBlock)
 //representation of the board"). Both numbers, both named. `permanents` is the
 //count of lines actually RENDERED (mutate piles fold to one line), so the
 //header and the list can never disagree.
+//W42-D4: RENDER-NAME MAPPING for engine ability labels.
+//`MTGAbility::getMenuText()` returns the INTERNAL menu tokens the 480x272 d-pad
+//UI was built around, and every one of them reached the pilot VERBATIM in the
+//wave-41 corpus: "ToughLife" (137 lines), "Put in Play"/"Put in Hand"/"Put in
+//Library" (2,416), " 1/1 Counter" (821 - with the engine's own leading space,
+//rendered as the literal double space in "used:  1/1 Counter"), "level Counter"
+//(502), "Deal 1 Damage" (6,216). The engine strings belong to the HUMAN UI and
+//are NOT touched; this is the render boundary for the model's surface only.
+//
+//Everything below is DERIVED from the label the engine itself composed - the
+//counter's own name/P-T/count, the damage magnitude, the destination zone, the
+//dynamic type+effect pair - so a new card needs no new entry. The only
+//enumerated vocabularies are the engine's OWN closed switch statements
+//(AAMover::overrideNamed, AADynamic::getMenuText); anything unrecognised falls
+//through to the RAW label. Trust doctrine: never delete the token - a
+//funny-looking name is recoverable, a silent gap the model confabulates into is not.
+static string w42Collapse(const string& s)
+{
+    string out;
+    bool sp = true; //a leading run of blanks is dropped outright
+    for (size_t i = 0; i < s.size(); i++)
+    {
+        char c = s[i];
+        if (c == ' ' || c == '\t') { sp = true; continue; }
+        if (sp && !out.empty()) out += ' ';
+        sp = false;
+        out += c;
+    }
+    return out;
+}
+
+static string w42Lower(const string& s)
+{
+    string o = s;
+    for (size_t i = 0; i < o.size(); i++) o[i] = (char) tolower((unsigned char) o[i]);
+    return o;
+}
+
+static bool w42Int(const string& s, int& out)
+{
+    if (s.empty()) return false;
+    size_t i = (s[0] == '+' || s[0] == '-') ? 1 : 0;
+    if (i >= s.size()) return false;
+    for (size_t j = i; j < s.size(); j++)
+        if (!isdigit((unsigned char) s[j])) return false;
+    out = atoi(s.c_str());
+    return true;
+}
+
+static string w42Signed(int v)
+{
+    std::ostringstream o;
+    o << (v >= 0 ? "+" : "") << v;
+    return o.str();
+}
+
+//AACounter::getMenuText composes "[name][ P/T] Counter[: N]" (AllAbilities.cpp
+//AACounter::getMenuText) - so name, size and count are all recoverable from the
+//label, and the plain-English line is derived, not tabled.
+static bool w42CounterLabel(const string& s, string& out)
+{
+    string low = w42Lower(s);
+    size_t cpos = low.rfind("counter");
+    if (cpos == string::npos) return false;
+    string after = s.substr(cpos + 7);
+    int nb = 1;
+    if (!after.empty())
+    {
+        if (after[0] != ':') return false; //"Counters!"/"CounterStrike" are AADynamic, handled below
+        if (!w42Int(w42Collapse(after.substr(1)), nb)) return false;
+    }
+    string head = w42Collapse(s.substr(0, cpos));
+    string ptWord, name = head;
+    size_t sp = head.rfind(' ');
+    string lastTok = (sp == string::npos) ? head : head.substr(sp + 1);
+    size_t slash = lastTok.find('/');
+    if (slash != string::npos && slash > 0)
+    {
+        int p = 0, t = 0;
+        if (w42Int(lastTok.substr(0, slash), p) && w42Int(lastTok.substr(slash + 1), t))
+        {
+            ptWord = w42Signed(p) + "/" + w42Signed(t);
+            name = (sp == string::npos) ? string("") : w42Collapse(head.substr(0, sp));
+        }
+    }
+    string kind = ptWord;
+    if (!name.empty())
+        kind += (kind.empty() ? "" : " ") + w42Lower(name);
+    if (kind.empty()) return false; //a bare "Counter" tells the pilot nothing the raw label did not
+    int count = nb < 0 ? -nb : nb;
+    std::ostringstream o;
+    o << (nb < 0 ? "remove " : "put ");
+    if (count == 1) o << "a " << kind << " counter";
+    else o << count << " " << kind << " counters";
+    out = o.str();
+    return true;
+}
+
+//AADamager::getMenuText composes "Deal <amount> Damage[ to Player]".
+static bool w42DamageLabel(const string& s, string& out)
+{
+    string low = w42Lower(s);
+    if (low.size() < 12 || low.compare(0, 5, "deal ") != 0) return false;
+    bool toPlayer = false;
+    size_t end;
+    const string plr = " damage to player";
+    if (low.size() > plr.size() && low.compare(low.size() - plr.size(), plr.size(), plr) == 0)
+    { toPlayer = true; end = low.size() - plr.size(); }
+    else if (low.compare(low.size() - 7, 7, " damage") == 0)
+        end = low.size() - 7;
+    else
+        return false;
+    string amt = w42Collapse(s.substr(5, end - 5));
+    if (amt.empty()) return false;
+    out = "deal " + amt + " damage" + (toPlayer ? " to a player" : "");
+    return true;
+}
+
+//The stack/ability label the model should read. Unmapped labels come back
+//space-collapsed but otherwise VERBATIM, and `mapped` reports which happened:
+//callers must NOT re-case a label they did not map. Card scripts name their own
+//abilities in lower case ("search basic land"), the rendered option line is what
+//isFetchCrackLine and the de-dup/decline keys match on, and capitalising an
+//untouched label would silently un-key them.
+static string renderAbilityLabel(const string& raw, bool * mapped = NULL)
+{
+    if (mapped) *mapped = true;
+    string s = w42Collapse(raw);
+    if (s.empty()) { if (mapped) *mapped = false; return s; }
+    string out;
+    if (w42CounterLabel(s, out)) return out;
+    if (w42DamageLabel(s, out)) return out;
+    string low = w42Lower(s);
+
+    //AAMover::overrideNamed's closed set of destination names. These read as
+    //bare imperatives with no object ("Put in Play"), which is what made them
+    //unreadable beside a [cost: ...] clause.
+    static const char * kZone[][2] = {
+        { "put in play",     "put a card onto the battlefield" },
+        { "put in hand",     "put a card into hand" },
+        { "put in library",  "put a card into the library" },
+        { "put in graveyard","put a card into the graveyard" },
+        { "put in exile",    "exile a card" },
+        { "previous zone",   "return a card to the zone it came from" },
+    };
+    for (size_t i = 0; i < sizeof(kZone) / sizeof(kZone[0]); i++)
+        if (low == kZone[i][0]) return kZone[i][1];
+
+    //AADynamic::getMenuText concatenates an AMOUNT-SOURCE token and an EFFECT
+    //token with no separator ("Tough" + "Life"). Both vocabularies are the
+    //engine's own switch statements; the phrasing below is read off
+    //AADynamic::resolve, so "Drain" (DYNAMIC_ABILITY_EFFECT_LIFELOSS) says lose
+    //life and "Buff" (PUMPBOTH) says power/toughness - never the token's look.
+    static const char * kAmount[][2] = {
+        { "power",     "its power" },
+        { "tough",     "its toughness" },
+        { "mana",      "its mana value" },
+        { "color",     "its number of colors" },
+        { "elder",     "its age counters" },
+        { "charged",   "its charge counters" },
+        { "counter",   "its +1/+1 counters" },
+        { "that many", "that amount" },
+    };
+    static const char * kEffect[][2] = {
+        { "strike",    "deal damage equal to " },
+        { "draw",      "draw cards equal to " },
+        { "life",      "gain life equal to " },
+        { "pump",      "boost power by " },
+        { "fortify",   "boost toughness by " },
+        { "buff",      "boost power/toughness by " },
+        { "drain",     "lose life equal to " },
+        { "deplete!",  "mill cards equal to " },
+        { "counters!", "put +1/+1 counters equal to " },
+    };
+    for (size_t a = 0; a < sizeof(kAmount) / sizeof(kAmount[0]); a++)
+    {
+        string tok = kAmount[a][0];
+        if (low.size() <= tok.size() || low.compare(0, tok.size(), tok) != 0)
+            continue;
+        string rest = w42Collapse(low.substr(tok.size()));
+        for (size_t e = 0; e < sizeof(kEffect) / sizeof(kEffect[0]); e++)
+            if (rest == kEffect[e][0])
+                return string(kEffect[e][1]) + kAmount[a][1];
+    }
+    if (mapped) *mapped = false;
+    return s;
+}
+
+//W42-D5 (trust doctrine): the own-targets-only clause. It used to assert a
+//restriction and name NOTHING - 59 corpus option lines telling the pilot that
+//its only legal targets were its own without saying WHICH, which is the silent
+//omission the model confabulates into. `names` is the SAME enumeration the
+//opponent-side branch renders (targetPreviewFacts: cost, type, P/T, keywords),
+//so the two branches cannot disagree about what is legal. Pure, so the exact
+//clause - and the impossibility of the nameless form - is provable in PARSETEST.
+static string ownTargetsOnlyClause(const string& names)
+{
+    string head = " - the only legal targets are YOUR OWN right now";
+    if (names.empty())
+        return head; //unreachable at the call site (the branch needs ownT >= 1)
+    return head + ": " + names;
+}
+
+//Option lines are sentence-initial; the mapped phrases are not.
+static string w42Capitalize(const string& s)
+{
+    string o = s;
+    if (!o.empty()) o[0] = (char) toupper((unsigned char) o[0]);
+    return o;
+}
+
 //N-166d: the stack line's label for a triggered/activated ability. See the
 //emitter for the defect; pure so all three branches are provable.
 static string stackAbilityName(const string& sourceName, const string& menuText)
@@ -1718,7 +1929,7 @@ static string stackAbilityName(const string& sourceName, const string& menuText)
     if (!sourceName.empty())
         return "ability from " + sourceName;
     if (!menuText.empty())
-        return "ability: " + menuText;
+        return "ability: " + renderAbilityLabel(menuText); //W42-D4
     return "an ability whose source the engine can no longer name";
 }
 
@@ -2893,7 +3104,10 @@ string abilityActivationNarration(bool mine, const string& abilityText,
 {
     if (cardName.empty())
         return "";
-    string label = abilityText.empty() ? string("an ability") : abilityText;
+    //W42-D4: the observer's copy of the label goes through the same render map
+    //as the actor's option line, so both chairs read the same plain English.
+    string label = abilityText.empty() ? string("an ability")
+                                       : renderAbilityLabel(abilityText);
     return activationVerbPhrase(mine) + label + " with " + cardName;
 }
 
@@ -2984,9 +3198,32 @@ string targetChoiceNarration(const string& target, const string& source,
                              const string& ability)
 {
     string src = source.empty() ? string("a spell on the stack") : source;
+    //W42-D4: the ability slot now carries a plain-English VERB PHRASE
+    //("put a +1/+1 counter"), which the old possessive-noun template mangled
+    //("with Luminarch Aspirant's put a +1/+1 counter ability"). Parenthesised,
+    //both a name ("Equip") and a phrase read as English.
     if (!ability.empty() && ability != source)
-        return "You targeted " + target + " with " + src + "'s " + ability + " ability";
+        return "You targeted " + target + " with " + src + "'s ability (" + ability + ")";
     return "You targeted " + target + " with " + src;
+}
+
+//W42-D4: the reveal/tutor decision's own summary line. `optionLabel` is the
+//ENGINE's menu label for the branch taken ("choose card", "get a human") - it
+//is data, so it rides in parentheses and never carries the sentence's syntax.
+//Pure, so the exact shape is provable in PARSETEST.
+string revealSummaryNarration(size_t revealedCount, const string& chosen,
+                              const string& optionLabel)
+{
+    std::ostringstream o;
+    o << "You revealed " << revealedCount << " card"
+      << (revealedCount == 1 ? "" : "s") << " and ";
+    if (chosen.empty())
+        o << "took none";
+    else
+        o << "took " << chosen;
+    if (!optionLabel.empty())
+        o << " (" << optionLabel << ")";
+    return o.str();
 }
 
 //OWNER DOCTRINE (2026-08-19), the log's ZONE DUTY: graveyard and exile are
@@ -3043,6 +3280,11 @@ string actionTakenNarration(const string& action, bool activationVerb = false)
         { "Transform", "You transformed" },{ "Move", "You moved" },
         { "Choose", "You chose" },         { "Exile", "You exiled" },
         { "Destroy", "You destroyed" },    { "Regenerate", "You regenerated" },
+        //W42-D4: heads the render map now produces ("Deal 1 damage with ...",
+        //"Boost power by its toughness", "Mill cards equal to ...").
+        { "Deal", "You dealt" },           { "Gain", "You gained" },
+        { "Lose", "You lost" },            { "Mill", "You milled" },
+        { "Remove", "You removed" },       { "Boost", "You boosted" },
     };
     if (action.empty())
         return "";
@@ -6773,7 +7015,15 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     << (pumped->power + dp) << "/" << (pumped->toughness + dt) << ")";
         }
         else
-            out << action.ability->getMenuText();
+        {
+            //W42-D4: plain rules-English at the render boundary. A MAPPED phrase
+            //is capitalised (it is the head of the option line and the mapping
+            //emits lower case); an UNMAPPED label is passed through untouched -
+            //see renderAbilityLabel on why re-casing it would be a live bug.
+            bool mapped = false;
+            string lbl = renderAbilityLabel(action.ability->getMenuText(), &mapped);
+            out << (mapped ? w42Capitalize(lbl) : lbl);
+        }
     }
     if (action.click)
         out << " with " << action.click->getDisplayName();
@@ -8369,7 +8619,12 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
 //top decision-count driver on control decks.
 static bool isFetchCrackLine(const string& line)
 {
-    return line.find("Put in Play with") != string::npos
+    //W42-D4 renamed the rendered head ("Put in Play" -> "Put a card onto the
+    //battlefield"); BOTH spellings stay live here - this detector keys on the
+    //rendered option line, and a missed fetch line silently un-keys the
+    //de-dup/decline maps that stop a fetch re-asking three times.
+    return line.find("Put a card onto the battlefield with") != string::npos
+        || line.find("Put in Play with") != string::npos
         || line.find("search basic land with") != string::npos;
 }
 
@@ -9332,7 +9587,17 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     }
                     if (ownT && !oppT && firstHit)
                     {
-                        o << " - the only legal targets are YOUR OWN right now";
+                        //W42-D5 (trust doctrine): this branch used to name
+                        //NOTHING - 59 corpus option lines asserted a
+                        //restriction and then withheld the set it restricted
+                        //to, which is exactly the silent omission the model
+                        //confabulates into (it cannot weigh "my own" without
+                        //knowing WHICH of its own). `tNames` is already built
+                        //with the same facts the opponent-side branch below
+                        //carries (name, instance handle, cost/type/P-T/keywords
+                        //via targetPreviewFacts), so name them here too and the
+                        //two branches cannot drift apart.
+                        o << ownTargetsOnlyClause(tNames.str());
                         //Owner ruling (2026-07-16): a legal play is never
                         //hidden on a strategy judgment - strange cards make
                         //normally-nonsensical lines correct (heroic, cast
@@ -11043,7 +11308,7 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         string abilityName;
         MTGAbility * waiting = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
         if (waiting)
-            abilityName = waiting->getMenuText();
+            abilityName = renderAbilityLabel(waiting->getMenuText()); //W42-D4
         if (effectName.empty())
         {
             //W41-3(d), OWNER RULING (verbatim: "'put in play' is not good. this
@@ -13816,12 +14081,14 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
     //the second would be a lie about a card the very next line puts in hand.
     //Both branches are suppressed on a search: the collapsed search line above
     //and the found card's own move line below carry the whole event, truthfully.
+    //W42-D4 (grammar half): when the echo DOES print (not a search), the old
+    //template spliced a bare count and an engine menu label straight into a
+    //sentence ("You revealed 51 and put Exquisite Blood to choose card", 282
+    //corpus lines). revealSummaryNarration pluralises the count, states the
+    //noun, and demotes the engine's option label to a parenthetical.
     if (mSearchMaskOwner != this)
-        narrateDecision(chosen.empty()
-                        ? ("You revealed " + std::to_string(revealed.size())
-                           + " and kept them all (" + optTwoLabel + ")")
-                        : ("You revealed " + std::to_string(revealed.size()) + " and put "
-                           + chosen + " to " + optOneLabel));
+        narrateDecision(revealSummaryNarration(revealed.size(), chosen,
+                                               chosen.empty() ? optTwoLabel : optOneLabel));
     DebugTrace("AIPlayerGPT: reveal put " << selForOptionOne.size() << " of "
                << revealed.size() << " to option one in one reply");
     return 1;
@@ -17387,8 +17654,8 @@ void AIPlayerGPT::runParseSelfTest()
               == "You targeted Grizzly Bears with Lightning Bolt",
               "W35 a target pick is 'You targeted <X> with <source>'");
         CHECK(targetChoiceNarration("Llanowar Elves", "Skullclamp", "Equip")
-              == "You targeted Llanowar Elves with Skullclamp's Equip ability",
-              "W35 a named ability rides the target line");
+              == "You targeted Llanowar Elves with Skullclamp's ability (Equip)",
+              "W35/W42-D4 a named ability rides the target line, parenthesised");
         // (2) consumed-ask echoes become the consequence, naming the subject.
         CHECK(menuConsequenceNarration("Stomping Ground", "pay 2 life")
               == "Stomping Ground entered untapped (you paid 2 life)",
@@ -17514,9 +17781,12 @@ void AIPlayerGPT::runParseSelfTest()
         // (d) OWNER RULING: the SOURCE slot holds the effect's SOURCE, never the
         // effect. The offending wave-40 line was "You targeted Swamp with Put in
         // Play"; the fix moves the effect into the ability slot it already has.
-        CHECK(targetChoiceNarration("Swamp", "Windswept Heath", "Put in Play")
-              == "You targeted Swamp with Windswept Heath's Put in Play ability",
-              "W41-3d the target line attributes the CARD, with the effect as its ability");
+        CHECK(targetChoiceNarration("Swamp", "Windswept Heath",
+                                    renderAbilityLabel("Put in Play"))
+              == "You targeted Swamp with Windswept Heath's ability"
+                 " (put a card onto the battlefield)",
+              "W41-3d/W42-D4 the target line attributes the CARD, with the effect"
+              " as its ability - rendered in plain English");
         CHECK(targetChoiceNarration("Swamp", "Windswept Heath", "Put in Play")
               .find("with Put in Play") == string::npos,
               "W41-3d NEGATIVE an effect name never occupies the source slot");
@@ -19280,6 +19550,133 @@ void AIPlayerGPT::runParseSelfTest()
         // by its own zone events, from either chair.
         CHECK(actionTakenNarration("Cast Tragic Slip {b}", true).empty(),
               "W42-D2 NEGATIVE a cast still narrates nothing, activation flag or not");
+    }
+
+    cout << "\n[W42-D4] engine ability labels render as plain rules-English\n";
+    {
+        // (a) AACounter's composed label - name, size and count all derived.
+        // The corpus form carries the engine's LEADING SPACE, which rendered as
+        // the literal double space in "Opponent used:  1/1 Counter" (342 lines).
+        CHECK(renderAbilityLabel(" 1/1 Counter") == "put a +1/+1 counter",
+              "W42-D4 a bare P/T counter label becomes its rules sentence");
+        CHECK(renderAbilityLabel(" 1/1 Counter").find("  ") == string::npos,
+              "W42-D4 NEGATIVE the engine's leading space never survives to the surface");
+        CHECK(renderAbilityLabel("level Counter") == "put a level counter",
+              "W42-D4 a NAMED counter keeps its name and gains its verb");
+        CHECK(renderAbilityLabel("-1/-1 Counter: 3") == "put 3 -1/-1 counters",
+              "W42-D4 the count and the sign both come off the label");
+        CHECK(renderAbilityLabel("Charge Counter: -2") == "remove 2 charge counters",
+              "W42-D4 a negative count is a REMOVAL, not a put");
+        // (b) damage magnitude, and the to-player variant AADamager emits.
+        CHECK(renderAbilityLabel("Deal 1 Damage") == "deal 1 damage",
+              "W42-D4 the 6,216-line damage label reads as rules English");
+        CHECK(renderAbilityLabel("Deal 2 Damage to Player") == "deal 2 damage to a player",
+              "W42-D4 the to-Player variant names a player, not the token");
+        // (c) AAMover's destination names.
+        CHECK(renderAbilityLabel("Put in Play") == "put a card onto the battlefield",
+              "W42-D4 a zone label states the zone in rules terms");
+        CHECK(renderAbilityLabel("Put in Hand") == "put a card into hand",
+              "W42-D4 the Hammer of Bogardan recursion label (858 lines)");
+        CHECK(renderAbilityLabel("Put in Library") == "put a card into the library",
+              "W42-D4 the Emrakul shuffle label (403 lines)");
+        // (d) AADynamic's amount+effect concatenation, phrased off resolve()
+        // (LIFELOSS is "Drain", PUMPBOTH is "Buff" - the token's LOOK lies).
+        CHECK(renderAbilityLabel("ToughLife") == "gain life equal to its toughness",
+              "W42-D4 the ToughLife concatenation decomposes into its two halves");
+        CHECK(renderAbilityLabel("PowerStrike") == "deal damage equal to its power",
+              "W42-D4 the same decomposition covers every dynamic pair");
+        CHECK(renderAbilityLabel("ManaDrain") == "lose life equal to its mana value",
+              "W42-D4 Drain is LIFELOSS per AADynamic::resolve, not a drain-and-gain");
+        CHECK(renderAbilityLabel("PowerBuff").find(" and ") == string::npos,
+              "W42-D4 NEGATIVE no mapped phrase contains ' and ' (it would fake a COMPOUND mode note)");
+        // (e) the floor: anything unrecognised keeps its RAW label. A dropped
+        // line is a gap the model confabulates into; a raw one is merely ugly.
+        CHECK(renderAbilityLabel("Equip") == "Equip",
+              "W42-D4 NEGATIVE an already-English label is untouched");
+        CHECK(renderAbilityLabel("+1: don't target any creature") == "+1: don't target any creature",
+              "W42-D4 NEGATIVE a loyalty label is untouched");
+        CHECK(renderAbilityLabel("Counter") == "Counter",
+              "W42-D4 NEGATIVE a bare Counter says nothing new, so the raw label stands");
+        CHECK(renderAbilityLabel("Flip Side") == "Flip Side",
+              "W42-D4 NEGATIVE an unknown label is preserved, never dropped");
+        // The `mapped` flag is what stops an unmapped label being re-cased: card
+        // scripts name abilities in lower case and isFetchCrackLine keys on the
+        // rendered line ("search basic land with Prismatic Vista").
+        {
+            bool m = true;
+            string lower_kept = renderAbilityLabel("search basic land", &m);
+            CHECK(!m && lower_kept == "search basic land",
+                  "W42-D4 NEGATIVE an unmapped script-named ability reports unmapped and keeps its case");
+            CHECK(isFetchCrackLine(lower_kept + " with Prismatic Vista"),
+                  "W42-D4 the lower-case script fetch line is still detected");
+            m = false;
+            renderAbilityLabel(" 1/1 Counter", &m);
+            CHECK(m, "W42-D4 a mapped label reports mapped (so the option head may be capitalised)");
+        }
+        // (f) the ECHO shapes: the same mapped phrase at all three seats.
+        CHECK(stackAbilityName("", renderAbilityLabel("Deal 1 Damage"))
+              == "ability: deal 1 damage",
+              "W42-D4 echo the stack line carries the mapped phrase");
+        CHECK(abilityActivationNarration(false, " 1/1 Counter", "Luminarch Aspirant")
+              == "Opponent used: put a +1/+1 counter with Luminarch Aspirant",
+              "W42-D4 echo the observer activation line is mapped and single-spaced");
+        CHECK(actionTakenNarration(w42Capitalize(renderAbilityLabel("Deal 1 Damage"))
+                                   + " with Staff of Nin targeting a player")
+              == "You dealt 1 damage with Staff of Nin targeting a player",
+              "W42-D4 echo the consumed-decision line conjugates the mapped head");
+        CHECK(actionTakenNarration(w42Capitalize(renderAbilityLabel("Put in Play"))
+                                   + " with Marsh Flats targeting Scrubland")
+              == "You put a card onto the battlefield with Marsh Flats targeting Scrubland",
+              "W42-D4 echo the fetch crack reads as a sentence");
+        // (g) the fetch detector keys on the RENDERED line - both spellings.
+        CHECK(isFetchCrackLine(w42Capitalize(renderAbilityLabel("Put in Play"))
+                               + " with Misty Rainforest targeting Island"),
+              "W42-D4 the renamed fetch line is still detected as a fetch crack");
+        CHECK(isFetchCrackLine("Put in Play with Misty Rainforest targeting Island"),
+              "W42-D4 the legacy fetch spelling still matches (no de-dup key is lost)");
+        CHECK(!isFetchCrackLine("Equip with Lightning Greaves [cost: {0}]"),
+              "W42-D4 NEGATIVE a non-fetch activation is not a fetch crack");
+        // (h) the reveal summary's grammar (282 corpus lines of "You revealed 51
+        // and put Exquisite Blood to choose card").
+        CHECK(revealSummaryNarration(51, "Exquisite Blood", "choose card")
+              == "You revealed 51 cards and took Exquisite Blood (choose card)",
+              "W42-D4 the reveal summary is a sentence, with the engine label as a label");
+        CHECK(revealSummaryNarration(1, "Elite Spellbinder", "get a human")
+              == "You revealed 1 card and took Elite Spellbinder (get a human)",
+              "W42-D4 the count is grammatical at one");
+        CHECK(revealSummaryNarration(5, "", "shuffle")
+              == "You revealed 5 cards and took none (shuffle)",
+              "W42-D4 the declined branch names the branch it took");
+        CHECK(revealSummaryNarration(5, "Brutal Cathar", "").find("(") == string::npos,
+              "W42-D4 NEGATIVE an unlabelled branch appends no empty parenthesis");
+        CHECK(revealSummaryNarration(51, "Exquisite Blood", "choose card")
+              .find(" and put ") == string::npos,
+              "W42-D4 NEGATIVE the malformed 'and put X to <label>' shape is gone");
+    }
+
+    cout << "\n[W42-D5] the own-targets-only cast clause NAMES the owned targets\n";
+    {
+        // The wave-41 shape (all 59 cites are Tragic Slip / Fateful Absence /
+        // Vanishing Verse): a restriction with no set behind it.
+        string names = "Champion of the Parish#1 [{W}, Creature - Human Soldier, 3/3]";
+        CHECK(ownTargetsOnlyClause(names)
+              == " - the only legal targets are YOUR OWN right now: "
+                 "Champion of the Parish#1 [{W}, Creature - Human Soldier, 3/3]",
+              "W42-D5 the clause carries the owned target with its facts");
+        CHECK(ownTargetsOnlyClause(names).find("3/3") != string::npos,
+              "W42-D5 the P/T the pilot needs to price the trade is present");
+        CHECK(ownTargetsOnlyClause("A, B").find("A, B") != string::npos,
+              "W42-D5 more than one owned target is listed, not summarised away");
+        // NEGATIVE: the nameless form is no longer reachable with a populated set.
+        CHECK(ownTargetsOnlyClause(names)
+              != " - the only legal targets are YOUR OWN right now",
+              "W42-D5 NEGATIVE the bare restriction-only clause never renders when a target exists");
+        // ECHO: the warning tail still appends AFTER the named set, so the
+        // classifier's verdict reads as a comment on a stated fact.
+        CHECK((ownTargetsOnlyClause(names) + " (warning: this would harm your own side"
+               " - only correct if you are deliberately triggering something)")
+              .find("3/3] (warning:") != string::npos,
+              "W42-D5 echo the harm warning follows the named set");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
