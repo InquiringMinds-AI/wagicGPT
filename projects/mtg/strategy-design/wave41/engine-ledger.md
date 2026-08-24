@@ -1,0 +1,61 @@
+# Wave-41 engine ledger — THE WAVE-42 DOCKET (assembled 2026-08-24)
+
+Sources: wave-41 seat reports (seats/), fix-validation verdict table, probe-results.md,
+prior seeds carried from wave40/engine-ledger.md appends. Ranked.
+
+## Open items (ranked)
+1. **#W42-D1 (HIGH) Tutor-reveal collapse + hidden-info leak.** Search/reveal narrates
+   the whole library card-by-card to BOTH seats: 1,546 event lines (12%), 2.53M chars =
+   15.2% of ALL assembled prompt text this corpus; observer names opponent library
+   contents (377 lines) that MTG rules never grant (shuffled search reveals only the
+   found card). Fix shape: lane-B bulk-collapse applied to the search/reveal path +
+   observer masking of unfound cards. Cites: ...891-deck126 seq 9 (162-line delta),
+   ...863-deck130 seq 12, ...898-deck162 seq 6. Also fold D9's mulligan shuffle-back
+   (7-line spam, bottoming never narrated) into the same collapse.
+2. **#W42-3 Attack-side combat-outcome annotation** (perception layer). Blockers windows
+   get computed parentheses; attackers windows get bare "A1. Name (P/T)". Observed cost:
+   hallucinated outcomes both directions (deck146 vs126 s9 "Silencer dies to Battlement"
+   — false; the s51 hallucinated-deathtouch attack). Proposal: "- their untapped
+   blockers: <name> (P/T) (<outcome>)" mirroring the ladder. Guide prose cannot fix a
+   number the model must derive.
+3. **#W42-D2 Observer/actor narration unification.** The 165/0 asymmetry INVERTED
+   (236/419); 17 of 20 game pairs disagree on the same activations — actor writes only
+   consumed decisions, WEventAbilityActivated fires for everything. Unify so the actor
+   also narrates heuristic/auto-resolved/trigger-internal activations. TIES TO the open
+   OWNER QUESTION: "Opponent chose ..." vs "used" for choice-bearing triggers.
+4. **#W42-D3 Sourceless/anonymous activation lines** (13 no-source + 29 "with this
+   effect's X ability") — the new observer event needs lane B's waiting->source ladder.
+   **#W42-D4 Engine lexicon leak**: ToughLife(9), Put in Play/Hand/Library(43),
+   "1/1 Counter"(57, double-space), level Counter(12), Deal 1 Damage(168); malformed
+   reveal grammar ("You revealed 51 and put Exquisite Blood to choose card"). One
+   render-name mapping pass covers both.
+5. **#W42-D5 "the only legal targets are YOUR OWN right now" names nothing** (59 lines;
+   trust doctrine — silent omission invites confabulation). Render owned targets + facts.
+6. **#W42-1 (carried) Unanswered multi-candidate mandatory chooser -> loud red, never
+   guess.** Suite-driver default still undefined for multi-candidate.
+7. **(carried) DFC flip-line sweep**: 59 transform-DFC fronts carry Delver's illegal
+   anyzone doubleside line.
+8. **(carried) Burnout zoneless-teach** primitive bug.
+9. **#W42-4 Token battlefield-render collapse**: byte-identical token entries -> one
+   ranged line (measured 8% of a 19.7KB prompt; seats 123+126 independently).
+10. LOW batch: **#W42-D6** [repeat:] counter not advancing on land-animation abilities
+    (Hive of the Eye Tyrant, both misses); **#W42-D7** ceases-to-exist moves render
+    "your zone" destination (84 lines); **#W42-D8** events delta sliced mid-line
+    (1/1808, char-offset not line boundary).
+11. **(carried) Baka-cannot-X=0 residual** (slack penalty + >0 force-gate on Baka's own
+    seat).
+12. **INFO/economy**: PLAN-line emission 76% despite plan-on-change rule; adjacent
+    identical no-op pairs scale with game length (~10 in one long game); decision
+    latency medians 81-135s at -j 21. Prompt-economy review candidates, not defects.
+13. **#W42-2 false arm on restricted bodies** — PARTIALLY DISCHARGED guide-side this
+    wave (deck152 E1 / deck146 gate exclude [defender]/can't-attack). OPEN residual:
+    sweep OTHER guides using power-floor patterns for the same blindness.
+14. **Watch items**: may-batch turn-scoped verdict edge (0/0 two corpora); deck125 E5
+    sweeper split (0 windows in 543 — cut or probe-force next wave); equip done-signal
+    no-op form never offered (0/0); deck162-dependent R4 prediction (162 held in pool).
+
+## Discharged this wave (cites in seats/ + probe-results.md)
+#W41-4 mutate render (probe 35/35); rung-3 adjudication (2 offers taken = rule-obedient
+misplays -> E2/E7 carve-outs); armed-sole-attacker (3-corpus null -> retired, E1);
+deck162 Rule-4 crutch (register condition met -> retired); wave-41 lane predictions per
+fix-validation verdict table (narration/may/X/morbid/flip/prevention CONFIRMED).
