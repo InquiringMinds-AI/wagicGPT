@@ -1835,6 +1835,43 @@ static string heldBackBlockTag(const vector<string>& cannotBlock, int totalOppos
     return o.str();
 }
 
+//W42-3 (wave-41 ledger item 2, perception layer). The BLOCKERS window hands the
+//model a computed outcome for every pairing; the ATTACKERS window printed a bare
+//"A1. Name (P/T)" and left the fight to be derived - which it was, wrongly, in
+//BOTH directions: deck146 vs126 s9 reasoned "Silencer dies to Battlement" about
+//a 3/2 attacking a 0/4 wall that kills nothing, and the s51 attack was justified
+//by a deathtouch its blocker did not have. Guide prose cannot fix a number the
+//model must derive; the surface owes it the truth.
+//This is the pure builder. The caller supplies entries already computed by the
+//SHARED forecast (combatAttackOutcome -> combatTradePreviewStats), so the two
+//windows cannot disagree about who dies, and re-voices them for this seat.
+//`entries` are "Name (P/T) (outcome)" in board order, for the defender's
+//untapped creatures that could block THIS attacker; `biggest` is the same string
+//for the highest-power one, printed when the list is capped (>4 would cost more
+//tokens than the decision is worth). BRACKETED like every other attacker-line
+//tag: the reply scanner drops [prose] annotations whole, so an echoed line still
+//parses as a declaration. Returns "" when nothing of theirs could block it -
+//silence, not "no blockers" spam on every line of every empty-board attack.
+static string potentialBlockersTag(const vector<string>& entries, const string& biggest,
+                                   const string& extraNote = string())
+{
+    if (entries.empty())
+        return "";
+    std::ostringstream o;
+    o << " [their untapped blockers: ";
+    if (entries.size() > 4)
+        o << "they have " << entries.size()
+          << " untapped creatures that could block this one, biggest "
+          << (biggest.empty() ? entries[0] : biggest);
+    else
+        for (size_t i = 0; i < entries.size(); i++)
+            o << (i ? "; " : "") << entries[i];
+    if (!extraNote.empty())
+        o << " - " << extraNote;
+    o << "]";
+    return o.str();
+}
+
 //W41-13: WHICH gate refused the block. Not a re-derivation of the rules - each
 //line reads the same flag MTGCardInstance::canBlockPairwise reads, in its
 //order, and names the first one that fires. A cause this list does not cover
@@ -11307,15 +11344,23 @@ static const int kPreventNone = 0;
 static const int kPreventFull = 1;
 static const int kPreventPartial = 2;
 
-//The pure trade-outcome logic. Perspective: 'b' = the blocking side ('you'),
-//'a' = the attacker. Empty-ish returns handled by the caller.
+//The pure trade-outcome logic. Perspective: 'b' = the blocking side, 'a' = the
+//attacking side. Empty-ish returns handled by the caller.
 //'preventAtoB' / 'preventBtoA' are the prevention kinds for each DIRECTION of
 //combat damage between these two creatures; 'preventAtoFace' is the kind for
-//the attacker's damage to YOU, which is what the trample-through claim rides.
+//the attacker's damage to the DEFENDING PLAYER, which is what the
+//trample-through claim rides.
+//W42-3: the MATH is seat-independent; only the PRONOUNS are not. 'attackerSeat'
+//re-voices the same verdict for the attackers window, where 'a' is the reader's
+//creature and 'b' is the opponent's - a true statement in the wrong scope is a
+//lie, and the attackers window had no statement at all (the model derived its
+//own and got "Silencer dies to Battlement" and a hallucinated deathtouch). One
+//source of truth for the outcome; two voicings of it.
 static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a,
                                       int preventAtoB = kPreventNone,
                                       int preventBtoA = kPreventNone,
-                                      int preventAtoFace = kPreventNone)
+                                      int preventAtoFace = kPreventNone,
+                                      bool attackerSeat = false)
 {
     int bp = b.power > 0 ? b.power : 0;
     int ap = a.power > 0 ? a.power : 0;
@@ -11354,9 +11399,11 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     if (aKillsB && bKillsA)
         o << "both die";
     else if (bKillsA && !aKillsB)
-        o << "you kill it, your blocker lives";
+        o << (attackerSeat ? "your attacker dies, their blocker lives"
+                           : "you kill it, your blocker lives");
     else if (aKillsB && !bKillsA)
-        o << "your blocker dies, attacker lives";
+        o << (attackerSeat ? "you kill it, your attacker lives"
+                           : "your blocker dies, attacker lives");
     else
         o << "neither dies";
     //W41-5: say WHY, immediately after the verdict it justifies. A "neither
@@ -11367,9 +11414,11 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     if (aStopped && bStopped)
         o << " (no combat damage is dealt either way - prevented)";
     else if (aStopped)
-        o << " (the attacker deals NO damage to your blocker - prevented)";
+        o << (attackerSeat ? " (your attacker deals NO damage to it - prevented)"
+                           : " (the attacker deals NO damage to your blocker - prevented)");
     else if (bStopped)
-        o << " (your blocker deals NO damage to the attacker - prevented)";
+        o << (attackerSeat ? " (their blocker deals NO damage to your attacker - prevented)"
+                           : " (your blocker deals NO damage to the attacker - prevented)");
     //Trample-through to your face (attacker assigns lethal to the blocker,
     //rest carries over) - only when the attacker actually deals (not killed
     //first by a one-sided first-strike blocker). Wither trample still assigns
@@ -11385,10 +11434,16 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         if (through > 0)
         {
             if (preventAtoFace == kPreventFull)
-                o << ", but its trample damage to you is prevented";
+                o << (attackerSeat ? ", but its trample damage to them is prevented"
+                                   : ", but its trample damage to you is prevented");
+            else if (attackerSeat && preventAtoFace == kPreventPartial)
+                o << ", up to " << through << " tramples through to them"
+                     " (damage to them is partly prevented - not computed here)";
             else if (preventAtoFace == kPreventPartial)
                 o << ", up to " << through << " tramples to your face"
                      " (damage to you is partly prevented - not computed here)";
+            else if (attackerSeat)
+                o << ", " << through << " tramples through to them";
             else
                 o << ", " << through << " tramples to your face";
         }
@@ -11407,14 +11462,16 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         int np = ap - bp; if (np < 0) np = 0;
         int nt = at - bp; //survives => bp < at, so nt >= 1
         o << " (" << (b.infectLabel ? "infect" : "wither")
-          << " shrinks it to " << np << "/" << nt << ")";
+          << (attackerSeat ? " shrinks your attacker to " : " shrinks it to ")
+          << np << "/" << nt << ")";
     }
     if (a.wither && ap > 0 && !aKillsB && !aDiesToFirstStrike && !aStopped)
     {
         int np = bp - ap; if (np < 0) np = 0;
         int nt = bt - ap; //survives => ap < bt, so nt >= 1
         o << " (" << (a.infectLabel ? "infect" : "wither")
-          << " shrinks your blocker to " << np << "/" << nt << ")";
+          << (attackerSeat ? " shrinks their blocker to " : " shrinks your blocker to ")
+          << np << "/" << nt << ")";
     }
     //Persist: a creature that DIES here but has persist (and no -1/-1 counter
     //yet) comes straight back with a -1/-1 counter, so "both die" / "dies"
@@ -11422,9 +11479,11 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     //on whichever side dies. Keyed on the FINAL kill flags, so a persist blocker
     //that dies to first strike still returns (death is death, order aside).
     if (aKillsB && b.persist)
-        o << " (yours returns with a -1/-1 counter (persist))";
+        o << (attackerSeat ? " (theirs returns with a -1/-1 counter (persist))"
+                           : " (yours returns with a -1/-1 counter (persist))");
     if (bKillsA && a.persist)
-        o << " (theirs returns with a -1/-1 counter (persist))";
+        o << (attackerSeat ? " (yours returns with a -1/-1 counter (persist))"
+                           : " (theirs returns with a -1/-1 counter (persist))");
     //W41-5, the honest-weaker-claim path. A prevention effect applies but its
     //residue is not exactly computable here, so the verdict above is the NAIVE
     //one and says so - the omit-when-unprovable precedent, stated rather than
@@ -11434,11 +11493,15 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         o << " - damage prevention applies to BOTH creatures and is NOT included"
              " here: read their text";
     else if (preventAtoB == kPreventPartial)
-        o << " - damage prevention protecting your blocker is NOT included here:"
-             " read its text";
+        o << (attackerSeat ? " - damage prevention protecting their blocker is NOT"
+                             " included here: read its text"
+                           : " - damage prevention protecting your blocker is NOT"
+                             " included here: read its text");
     else if (preventBtoA == kPreventPartial)
-        o << " - damage prevention protecting the attacker is NOT included here:"
-             " read its text";
+        o << (attackerSeat ? " - damage prevention protecting your attacker is NOT"
+                             " included here: read its text"
+                           : " - damage prevention protecting the attacker is NOT"
+                             " included here: read its text");
     return o.str();
 }
 
@@ -11520,6 +11583,19 @@ static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * at
                                    combatPreventionKind(attacker, blocker),
                                    combatPreventionKind(blocker, attacker),
                                    combatPreventionKindToPlayer(attacker, blocker->controller()));
+}
+
+//W42-3: the SAME fight, asked from the attacking seat. Identical arguments in
+//the identical order - only the voicing flips - so the attackers window can
+//never disagree with the blockers window about who dies. 'attacker' is the
+//reader's creature; 'blocker' is one of the defender's untapped bodies.
+static string combatAttackOutcome(MTGCardInstance * attacker, MTGCardInstance * blocker)
+{
+    return combatTradePreviewStats(combatStatOf(blocker), combatStatOf(attacker),
+                                   combatPreventionKind(attacker, blocker),
+                                   combatPreventionKind(blocker, attacker),
+                                   combatPreventionKindToPlayer(attacker, blocker->controller()),
+                                   true);
 }
 
 //W36 #2 (139-tier P1 / 158 P3, engine-verified game-affecting): a "whenever ~
@@ -12310,6 +12386,7 @@ int AIPlayerGPT::chooseAttackers()
     //options_text was EMPTY, which blocked wave-19's combat-decision review).
     vector<string> shownLines;
     bool anyHeldBack = false; //W41-13: at least one hold-back restriction shown
+    bool anyPotentialBlockers = false; //W42-3: at least one trade forecast shown
     for (size_t j = 0; j < attackers.size(); j++)
     {
         std::ostringstream ln;
@@ -12357,6 +12434,88 @@ int AIPlayerGPT::chooseAttackers()
                 anyHeldBack = true;
             ln << hb;
         }
+        //W42-3: the attack half of the same fight. For every UNTAPPED creature
+        //of theirs that could block this attacker, the computed 1-on-1 outcome
+        //from the shared forecast - the machinery the blockers window already
+        //uses, re-voiced for this seat. UNTAPPED-NOW is the honest scope: their
+        //creatures do not untap before this combat's block step, so a tapped
+        //body cannot block THIS attack (the hold-back tag above is the one that
+        //speaks about next turn, and says so).
+        {
+            vector<string> entries;
+            string biggest;
+            int biggestPower = -1, biggestToughness = -1;
+            int bbP = 0, bbT = 0;
+            int bbKind = becomesBlockedSelfPump(attackers[j]->text, bbP, bbT);
+            Player * opp = opponent();
+            if (opp && opp->game && opp->game->inPlay)
+            {
+                MTGGameZone * bf = opp->game->inPlay;
+                for (int i = 0; i < bf->nb_cards; i++)
+                {
+                    MTGCardInstance * c = bf->cards[i];
+                    if (!c || !c->isCreature())
+                        continue;
+                    //canBlock() is the engine's own solo gate (tapped without
+                    //CANBLOCKTAPPED, can't-block, not in play); the pairwise
+                    //half comes from couldBlockIfItAttacked, because at declare-
+                    //attackers nothing is an attacker yet and canBlock(card)
+                    //would refuse every pairing on isAttacker alone.
+                    if (!c->canBlock())
+                        continue;
+                    if (!c->couldBlockIfItAttacked(attackers[j]))
+                        continue;
+                    string outcome;
+                    if (bbKind == 1)
+                    {
+                        //A when-blocked self-pump changes the fight before
+                        //damage; fold it in exactly as the blockers window does.
+                        CombatTradeStat as = combatStatOf(attackers[j]);
+                        as.power += bbP;
+                        as.toughness += bbT;
+                        outcome = combatTradePreviewStats(combatStatOf(c), as,
+                                                          combatPreventionKind(attackers[j], c),
+                                                          combatPreventionKind(c, attackers[j]),
+                                                          combatPreventionKindToPlayer(attackers[j], c->controller()),
+                                                          true);
+                    }
+                    else
+                        outcome = combatAttackOutcome(attackers[j], c);
+                    std::ostringstream e;
+                    e << c->name << instanceHandle(c)
+                      << " (" << c->power << "/" << c->toughness << ")";
+                    if (!outcome.empty())
+                        e << " (" << outcome << ")";
+                    entries.push_back(e.str());
+                    //"biggest" is decided by POWER first and toughness as the
+                    //tie-break: a board of 0-power walls is exactly the case the
+                    //cap fires on, and naming a 0/2 Fog Bank as the biggest body
+                    //over a 0/4 wall would be a false superlative.
+                    if (c->power > biggestPower
+                        || (c->power == biggestPower && c->toughness > biggestToughness))
+                    {
+                        biggestPower = c->power;
+                        biggestToughness = c->toughness;
+                        biggest = e.str();
+                    }
+                }
+            }
+            string bbNote;
+            if (!entries.empty() && bbKind == 1)
+            {
+                std::ostringstream n;
+                n << "each outcome above INCLUDES its +" << bbP << "/+" << bbT
+                  << " when-blocked trigger";
+                bbNote = n.str();
+            }
+            else if (!entries.empty() && bbKind == 2)
+                bbNote = "each outcome above OMITS its becomes-blocked trigger:"
+                         " read its text";
+            string pb = potentialBlockersTag(entries, biggest, bbNote);
+            if (!pb.empty())
+                anyPotentialBlockers = true;
+            ln << pb;
+        }
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
@@ -12379,6 +12538,17 @@ int AIPlayerGPT::chooseAttackers()
         tail << "A \"held back\" tag lists their CURRENT creatures that body could"
                 " not legally block if you keep it home. It says nothing about"
                 " whether they will attack with those creatures.\n";
+    //W42-3 SCOPE, stated once rather than on every line - the same trade-trust
+    //register the blockers window uses for its parentheses. The forecast is the
+    //naive 1-on-1 fight and the defender chooses whether to block at all, so say
+    //so; and say the outcome is computed, because the failure being fixed here
+    //is the model deriving it itself and getting it wrong.
+    if (anyPotentialBlockers)
+        tail << "A \"their untapped blockers\" tag lists each of their currently"
+                " untapped creatures that could legally block that attacker, with"
+                " the computed 1-on-1 result if it does - before gang-blocks, pump"
+                " or combat tricks. They choose whether to block. Do not re-derive"
+                " these outcomes; use them.\n";
     tail << kAttackersTurnFacts;
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
@@ -18703,6 +18873,176 @@ void AIPlayerGPT::runParseSelfTest()
         string plain = "Equip with Lightning Greaves [cost: {0}] targeting Thraben Doomsayer";
         CHECK(stripRepeatAnnotation(plain) == plain,
               "W41-6 NEGATIVE an unannotated option line is untouched by the key strip");
+    }
+
+    // ---- W42-3: attack-side combat-outcome annotation ----
+    // The blockers window hands the model a computed outcome per pairing; the
+    // attackers window printed "A1. Name (P/T)" and the model derived the fight
+    // itself, wrongly in BOTH directions (deck146 vs126 s9 "Silencer dies to
+    // Battlement"; the s51 attack justified by a deathtouch that was not there).
+    // Same math, re-voiced for the attacking seat: 'b' is THEIR blocker, 'a' is
+    // MY attacker.
+    cout << "\n[W42-3] attack-side trade forecast: one source of truth, two voicings\n";
+    {
+        // fields: power, toughness, deathtouch, wither, infectLabel, firststrike, indestructible, trample, persist
+        CombatTradeStat wall04 = { 0, 4, false, false, false, false, false, false, false };
+        CombatTradeStat sil32  = { 3, 2, false, false, false, false, false, false, false };
+        CombatTradeStat b22    = { 2, 2, false, false, false, false, false, false, false };
+        CombatTradeStat a55    = { 5, 5, false, false, false, false, false, false, false };
+        CombatTradeStat dt11   = { 1, 1, true,  false, false, false, false, false, false };
+        CombatTradeStat p11    = { 1, 1, false, false, false, false, false, false, false };
+        CombatTradeStat fs22   = { 2, 2, false, false, false, true,  false, false, false };
+        CombatTradeStat tr55   = { 5, 5, false, false, false, false, false, true,  false };
+        CombatTradeStat wit21  = { 2, 1, false, true,  false, false, false, false, false };
+        CombatTradeStat a34    = { 3, 4, false, false, false, false, false, false, false };
+        CombatTradeStat per22  = { 2, 2, false, false, false, false, false, false, true  };
+
+        // THE SPECIMEN. A 3/2 attacking into a 0/4 wall kills nothing and dies
+        // to nothing - the exact fight the pilot read as "Silencer dies to
+        // Battlement" with no surface to correct it.
+        string spec = combatTradePreviewStats(wall04, sil32, kPreventNone, kPreventNone,
+                                              kPreventNone, true);
+        cout << "     3/2 attacker vs their 0/4 wall: \"" << spec << "\"\n";
+        CHECK(spec == "neither dies",
+              "W42-3 the s9 specimen: a 3/2 does NOT die to a 0/4 wall");
+        // The two seats never disagree about the FACT, only the pronouns.
+        CHECK(combatTradePreviewStats(wall04, sil32) == spec,
+              "W42-3 the blocker seat computes the same verdict for the same pairing");
+        CHECK(combatTradePreviewStats(b22, b22, kPreventNone, kPreventNone, kPreventNone, true)
+              == "both die",
+              "W42-3 a mutual kill needs no re-voicing");
+        // The two one-sided verdicts, re-voiced. A true statement in the wrong
+        // scope is a lie, so BOTH halves of each string change seats.
+        string mine = combatTradePreviewStats(p11, a55, kPreventNone, kPreventNone, kPreventNone, true);
+        string theirs = combatTradePreviewStats(a55, p11, kPreventNone, kPreventNone, kPreventNone, true);
+        cout << "     my 5/5 into their 1/1: \"" << mine << "\"   my 1/1 into their 5/5: \"" << theirs << "\"\n";
+        CHECK(mine == "you kill it, your attacker lives",
+              "W42-3 my attacker killing their blocker is voiced from my seat");
+        CHECK(theirs == "your attacker dies, their blocker lives",
+              "W42-3 my attacker dying to their blocker names WHOSE creature dies");
+        // NEGATIVE: the blocker-seat wordings must never appear on an A-line.
+        CHECK(mine.find("your blocker") == string::npos
+              && theirs.find("your blocker") == string::npos,
+              "W42-3 NEGATIVE no 'your blocker' text survives into the attacking seat");
+        // Deathtouch, the s51 hallucination, both ways: a REAL deathtouch
+        // blocker trades with anything; a plain 1/1 does not.
+        CHECK(combatTradePreviewStats(dt11, a55, kPreventNone, kPreventNone, kPreventNone, true)
+              == "both die",
+              "W42-3 their 1/1 deathtouch blocker trades with my 5/5");
+        CHECK(combatTradePreviewStats(p11, a55, kPreventNone, kPreventNone, kPreventNone, true)
+              == "you kill it, your attacker lives",
+              "W42-3 NEGATIVE a plain 1/1 blocker is not deathtouch - no invented trade");
+        // First strike, both sides.
+        CHECK(combatTradePreviewStats(b22, fs22, kPreventNone, kPreventNone, kPreventNone, true)
+              == "you kill it, your attacker lives",
+              "W42-3 my first-striker kills their 2/2 before it swings back");
+        CHECK(combatTradePreviewStats(fs22, b22, kPreventNone, kPreventNone, kPreventNone, true)
+              == "your attacker dies, their blocker lives",
+              "W42-3 their first-strike blocker kills my 2/2 before it swings back");
+        // Trample: the carry-over goes to THEM, never to "your face".
+        string tramp = combatTradePreviewStats(wall04, tr55, kPreventNone, kPreventNone,
+                                               kPreventNone, true);
+        cout << "     my 5/5 trampler vs their 0/4 wall: \"" << tramp << "\"\n";
+        CHECK(tramp == "you kill it, your attacker lives, 1 tramples through to them",
+              "W42-3 trample-through is voiced toward the DEFENDING player");
+        CHECK(tramp.find("your face") == string::npos,
+              "W42-3 NEGATIVE the blocker seat's 'to your face' never reaches an A-line");
+        CHECK(combatTradePreviewStats(wall04, tr55, kPreventNone, kPreventNone, kPreventFull, true)
+                  .find("but its trample damage to them is prevented") != string::npos,
+              "W42-3 a fully prevented trample-through says so, in this seat's voice");
+        CHECK(combatTradePreviewStats(wall04, tr55, kPreventNone, kPreventNone, kPreventPartial, true)
+                  .find("up to 1 tramples through to them (damage to them is partly prevented") != string::npos,
+              "W42-3 a partial prevention states the naive number and flags the omission");
+        // Prevention (Fog Bank class), the wave-41 branch, from this seat.
+        CHECK(combatTradePreviewStats(b22, sil32, kPreventFull, kPreventFull, kPreventNone, true)
+              == "neither dies (no combat damage is dealt either way - prevented)",
+              "W42-3 mutual full prevention is seat-neutral and still states the cause");
+        CHECK(combatTradePreviewStats(b22, sil32, kPreventFull, kPreventNone, kPreventNone, true)
+              == "your attacker dies, their blocker lives (your attacker deals NO damage to it - prevented)",
+              "W42-3 prevention against MY attacker's damage names it as mine");
+        CHECK(combatTradePreviewStats(b22, sil32, kPreventNone, kPreventFull, kPreventNone, true)
+              == "you kill it, your attacker lives (their blocker deals NO damage to your attacker - prevented)",
+              "W42-3 prevention against THEIR blocker's damage names it as theirs");
+        CHECK(combatTradePreviewStats(b22, b22, kPreventPartial, kPreventNone, kPreventNone, true)
+                  .find("prevention protecting their blocker") != string::npos
+              && combatTradePreviewStats(b22, b22, kPreventNone, kPreventPartial, kPreventNone, true)
+                  .find("prevention protecting your attacker") != string::npos,
+              "W42-3 the not-computed prevention flags name the right owner");
+        // Wither and persist riders, re-voiced.
+        CHECK(combatTradePreviewStats(wit21, a34, kPreventNone, kPreventNone, kPreventNone, true)
+              == "you kill it, your attacker lives (wither shrinks your attacker to 1/2)",
+              "W42-3 their wither blocker shrinks MY attacker, and says whose it is");
+        CHECK(combatTradePreviewStats(per22, b22, kPreventNone, kPreventNone, kPreventNone, true)
+              == "both die (theirs returns with a -1/-1 counter (persist))",
+              "W42-3 a persist BLOCKER returns to THEIR side from this seat");
+        CHECK(combatTradePreviewStats(b22, per22, kPreventNone, kPreventNone, kPreventNone, true)
+              == "both die (yours returns with a -1/-1 counter (persist))",
+              "W42-3 a persist ATTACKER returns to MINE from this seat");
+    }
+
+    // ---- W42-3 the tag builder: cap, silence, and echo shape ----
+    cout << "\n[W42-3] the attacker-line tag: capped, silent when empty, echo-safe\n";
+    {
+        vector<string> none;
+        CHECK(potentialBlockersTag(none, "").empty(),
+              "W42-3 nothing of theirs can block it -> no annotation at all (no spam)");
+        vector<string> one;
+        one.push_back("Overgrown Battlement (0/4) (neither dies)");
+        CHECK(potentialBlockersTag(one, one[0])
+              == " [their untapped blockers: Overgrown Battlement (0/4) (neither dies)]",
+              "W42-3 a single potential blocker rides the A-line with its forecast");
+        vector<string> four;
+        for (int i = 0; i < 4; i++)
+        {
+            std::ostringstream e;
+            e << "Wall #" << (i + 1) << " (0/4) (neither dies)";
+            four.push_back(e.str());
+        }
+        string t4 = potentialBlockersTag(four, four[0]);
+        CHECK(t4.find("Wall #4") != string::npos && t4.find("untapped creatures that could block") == string::npos,
+              "W42-3 four blockers are listed in full");
+        vector<string> five = four;
+        five.push_back("Colossal Dreadmaw (6/6) (both die)");
+        string t5 = potentialBlockersTag(five, five[4]);
+        cout << "     capped:" << t5 << "\n";
+        CHECK(t5 == " [their untapped blockers: they have 5 untapped creatures that could"
+                    " block this one, biggest Colossal Dreadmaw (6/6) (both die)]",
+              "W42-3 above four, the list collapses to a count plus the biggest body");
+        CHECK(potentialBlockersTag(one, one[0], "each outcome above OMITS its becomes-blocked"
+                                                " trigger: read its text")
+                  .find("OMITS its becomes-blocked trigger") != string::npos,
+              "W42-3 an uncomputable becomes-blocked trigger is flagged once, not per entry");
+        // ECHO SHAPE. The tag is a BRACKET (like every other A-line tag), so a
+        // reply that copies the whole line still declares exactly what it named:
+        // the reply scanner drops [prose] annotations whole, and the tag's bare
+        // digits ("0/4", "5", "6/6") never reach the index scan.
+        vector<string> names;
+        names.push_back("Silverquill Silencer");
+        names.push_back("Colossal Dreadmaw");
+        vector<bool> sel;
+        int r1 = parseAttackerSet("ATTACK: A1" + potentialBlockersTag(one, one[0]), 2, sel, &names);
+        cout << "     echoed tag: named=" << r1 << " A1=" << sel[0] << " A2=" << sel[1] << "\n";
+        CHECK(r1 == 1 && sel[0] && !sel[1],
+              "W42-3 echo: an echoed forecast still declares A1 only");
+        int r2 = parseAttackerSet("ATTACK: A2" + t5, 2, sel, &names);
+        CHECK(r2 == 1 && !sel[0] && sel[1],
+              "W42-3 echo: the capped form's count digit never forges an attacker");
+        int r3 = parseAttackerSet("ATTACK: none" + t5, 2, sel, &names);
+        CHECK(r3 == 0 && !sel[0] && !sel[1],
+              "W42-3 echo NEGATIVE: a decline carrying the tag stays a decline");
+        // NEGATIVE: the blocker names inside the tag are not attacker names -
+        // "Colossal Dreadmaw" appears in the annotation of A1's line and must
+        // not add A2 to the declaration.
+        vector<string> big;
+        big.push_back("Colossal Dreadmaw (6/6) (both die)");
+        int r4 = parseAttackerSet("ATTACK: A1" + potentialBlockersTag(big, big[0]), 2, sel, &names);
+        CHECK(r4 == 1 && sel[0] && !sel[1],
+              "W42-3 echo NEGATIVE: a blocker named inside the tag is not declared as an attacker");
+        // And the tag never reaches the narration.
+        CHECK(stripNarrationDecoration("A1. Silverquill Silencer (3/2)"
+                                       + potentialBlockersTag(one, one[0]))
+              == "A1. Silverquill Silencer (3/2)",
+              "W42-3 echo: the bracket never reaches the narration");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
