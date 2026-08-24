@@ -84,6 +84,10 @@ class GameObserver{
   //even after the `ai` command flips both players to MODE_AI (the old
   //playMode==MODE_TEST_SUITE check stops seeing them at that point).
   bool mSuiteGame;
+  //`realgame` fixture directive only: names the seat the engine should treat
+  //as the human one for the no-legal-action phase automation, so a fixture
+  //can exercise the real-play skip path. NULL in every ordinary game.
+  Player * mSuiteHumanSeat;
   //Memo for the "a window with no legal action is not a window" phase skip.
   //hasAnyLegalAction walks the hand, every mana producer and the whole action
   //layer; the skip is evaluated on EVERY state-based check, which is far too

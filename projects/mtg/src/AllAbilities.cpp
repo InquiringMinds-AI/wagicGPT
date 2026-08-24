@@ -108,6 +108,34 @@ GenericRevealAbility::~GenericRevealAbility()
     //SAFE_DELETE(ability);
 }
 
+//A reveal/scry/surveil display seizes the screen mid-phase, and the player has
+//not seen it yet at the instant it opens. Everything already in JGE's key
+//buffer was aimed at the PREVIOUS game state, so none of it can be an answer
+//to this display.
+//
+//That is not a theoretical hazard - it is the reported defect (owner live
+//report, Vita 2026-08-24, "turn 1 island, delver of secrets. turn 2 ... delver
+//never triggered"). The phase-advance trigger is JGE_BTN_PREV (JGE_BTN_NEXT
+//under REVERSETRIGGERS), which is ALSO this display's decline key, and JGE
+//auto-repeats a HELD button every REPEAT_PERIOD (0.07s) after REPEAT_DELAY.
+//A player holding the trigger to step through phases therefore declined the
+//Delver upkeep reveal in the frame it opened, every time, without ever seeing
+//it. The suite never saw this because it drives reveals with scripted
+//revealok/revealnext clicks and never feeds ReadButton.
+//
+//Flushing at open drops the queued presses AND clears the auto-repeat holds,
+//so a still-held trigger produces nothing until the player releases and
+//presses again - a deliberate answer to a display they have now seen. The
+//idiom is the codebase's own (SimpleMenu::CheckUserInput does the same after
+//it acts). Class-level: every reveal/look/scry/surveil card benefits, not
+//just Delver.
+static void flushInputForNewDisplay(GameObserver * game)
+{
+    JGE * jge = game ? game->getInput() : NULL;
+    if (jge)
+        jge->ResetInput();
+}
+
 //carddisplay created for use in abilities.
 RevealDisplay::RevealDisplay(int id, GameObserver* game, int x, int y, JGuiListener * listener, TargetChooser * tc,
     int nb_displayed_items) :
@@ -146,6 +174,7 @@ MTGRevealingCards::MTGRevealingCards(GameObserver* observer, int _id, MTGCardIns
     mAIZoneAtFinalize = 0;
     mAIDriveDone = false;
     mAITestTicks = 0;
+    mInputArmed = false;
 
     afterReveal = "";
     afterEffectActivated = false;
@@ -322,6 +351,8 @@ void MTGRevealingCards::Update(float dt)
         revealDisplay->init(RevealZone);
         revealDisplay->zone = RevealZone;
         game->OpenedDisplay = revealDisplay;
+        flushInputForNewDisplay(game);
+        mInputArmed = false;
         toResolve();
         initCD = true;
     }
@@ -475,11 +506,15 @@ void MTGRevealingCards::Render()
     //heuristic's auto-key lives in CheckUserInput and is what completes THEIR
     //reveals).
     bool asyncDrive = source->controller()->isInteractiveAI() || revealTestAsyncActive();
-    if (!asyncDrive)
+    //One-frame arming (see flushInputForNewDisplay): the display refuses input
+    //until it has been through a full pass, so a press cannot answer a display
+    //that had not been drawn when the press was made.
+    if (!asyncDrive && mInputArmed)
     {
         CheckUserInput(mEngine->ReadButton());
         revealDisplay->CheckUserInput(mEngine->ReadButton());
     }
+    mInputArmed = true;
     //Headless suite workers must not touch the GPU resource manager: two
     //concurrent reveal tests crashed in CardGui::Render (fonts) from a
     //ThreadProc worker. The input routing above still runs - it is what
@@ -961,6 +996,7 @@ MTGScryCards::MTGScryCards(GameObserver* observer, int _id, MTGCardInstance * ca
     revealTopAmount = 1;//scry, then reveal the top card and do effect.
 
     initCD = false;
+    mInputArmed = false;
     RevealZone = source->controller()->game->reveal;
     zone =RevealZone;
     RevealFromZone = source->controller()->game->library;
@@ -1078,6 +1114,8 @@ void MTGScryCards::initDisplay(int value)
     revealDisplay->init(RevealZone);
     revealDisplay->zone = RevealZone;
     game->OpenedDisplay = revealDisplay;
+    flushInputForNewDisplay(game);
+    mInputArmed = false;
 }
 
 int MTGScryCards::testDestroy()
@@ -1121,6 +1159,12 @@ void MTGScryCards::Render()
 {
     if (!revealDisplay)
         return;
+    //One-frame arming, same rule as MTGRevealingCards::Render.
+    if (!mInputArmed)
+    {
+        mInputArmed = true;
+        return;
+    }
     CheckUserInput(mEngine->ReadButton());
     if (revealDisplay)
     {

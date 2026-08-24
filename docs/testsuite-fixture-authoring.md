@@ -205,6 +205,32 @@ top). Driving one from a fixture:
   multi-select) and `macro_surveil3_grim_flayer.txt` (combat-damage trigger, aicode,
   select three) for worked examples.
 
+### Real INPUT, not scripted clicks: `holdkey` / `releasekey`
+
+Every command above answers a display by calling into it directly. That is the *wrong*
+road for one class of defect: a bug where a display eats input the player aimed at the
+**previous** game state. `holdkey <prev|next|sec|ok>` holds the physical button through
+JGE, so JGE's own auto-repeat machinery (`REPEAT_DELAY` 0.5s, then `REPEAT_PERIOD`
+0.07s) keeps feeding the key buffer exactly as it does when a player holds a button on
+a handheld; `releasekey <btn>` lets go. Note the interaction that makes this worth
+having: the phase-advance button is `JGE_BTN_PREV` (or `JGE_BTN_NEXT` under
+`REVERSETRIGGERS`) and it is ALSO the reveal/scry display's decline key, so
+hold-to-fast-step and dismiss-the-reveal are the same gesture. Under
+`WAGIC_FASTCLOCK=0.1` the repeat arms after ~5 driver ticks. Worked example:
+`delver_of_secrets_held_trigger.txt`.
+
+### Real-play automation: `realgame`
+
+Suite games are pinned skip-free (`GameObserver::mSuiteGame`) and the no-legal-action
+phase skip is off for them, so no ordinary fixture can reach a defect that lives in the
+human-seat automation. `realgame` (first `[DO]` line) drops the pin and names this seat
+as the engine's human seat (`GameObserver::mSuiteHumanSeat`), so the real-play skips run
+as they do in a live duel. `isAI()` and `playMode` deliberately do NOT change —
+MODE_HUMAN hands control away and stops the script pump, and DuelLayers only calls
+`Act()` (the pump) for an AI seat. Expect the automation to race the script: phases with
+no legal action advance on their own, so `goto` can overshoot; read the trace rather
+than leaning on a tight `[ASSERT]` phase. `mSuiteHumanSeat` is NULL in every real game.
+
 ### Pay-or-decline prompts (extra costs / ward): `paycost` and `cancelcost`
 
 Some cards arm a **pay-or-decline extra payment** (`GameObserver::mExtraPayment`) — a

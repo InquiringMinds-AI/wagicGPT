@@ -94,6 +94,10 @@ public:
     vector<MTGCardInstance*> mAIGraveSel;  //model's option-one picks (pointers)
     vector<MTGCardInstance*> mAIRemainder; //option-two cards (captured at arm)
     void driveInteractiveReveal();
+    //Input arming. False from the moment the display opens until it has been
+    //through one full Render, so no button can answer a display the player has
+    //not been shown yet. See flushInputForNewDisplay() in AllAbilities.cpp.
+    bool mInputArmed;
 
     void Update(float dt);
     int testDestroy();
@@ -155,6 +159,8 @@ public:
     MTGAbility * abilitySecond;
     vector<MTGAbility*>abilities;
     bool initCD;
+    //See MTGRevealingCards::mInputArmed - same rule, same reason.
+    bool mInputArmed;
     void Update(float dt);
     int testDestroy();
     void initDisplay(int value = 0);
