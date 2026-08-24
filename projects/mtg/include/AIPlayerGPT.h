@@ -442,10 +442,17 @@ private:
     //adjudication both need it in the same file.
     bool mGameEndLogged;
     bool mGameStartLogged; //header record emitted (lazily, first write)
-    size_t mNarrationLogged; //narration length already emitted to the translog
-                             //(each record carries the delta = the events that
-                             //landed since the previous record, so a consumed
-                             //cast's OUTCOME is machine-readable - wave-7 7b)
+    //Each record carries the narration DELTA - the events that landed since the
+    //previous record - so a consumed cast's OUTCOME is machine-readable
+    //(wave-7 7b). W42-D8: this used to be a byte OFFSET into mNarration
+    //(`substr(mNarrationLogged)`), but mNarration is NOT append-only - a game
+    //past 24k chars is trimmed FROM THE FRONT - so a stale absolute offset
+    //indexed into a shifted buffer and sliced a line mid-word (wave-41
+    //1787543863-deck130 seq 62 began "f Nin into their library"). The delta is
+    //now its own accumulator, written line-at-a-time alongside the log and
+    //consumed/cleared by each record: line boundaries are structural, so no
+    //record can begin mid-line and the trim cannot lose or duplicate a line.
+    string mNarrationPending;
     void logGameEnd();
 
     //True while a request is in flight whose answer has not been consumed.
