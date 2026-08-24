@@ -44,6 +44,7 @@ TestSuiteAI::TestSuiteAI(TestSuiteGame *tsGame, int playerId) :
     timer = 0;
     aiActCounter = 1.0f;
     mAssertPhaseArmed = false;
+    mMandatoryChooserStrikes = 0;
     expectedTappedInPlay = -1;
     mCounteredMark = NULL;
     playMode = MODE_TEST_SUITE;
@@ -309,6 +310,67 @@ int TestSuiteAI::Act(float)
     //The [filename] tag makes one test's commands extractable from the
     //braided multi-worker suite log (grep "\[<testfile>\]").
     DebugTrace("TESTSUITE command: " << action << " [" << suite->filename << "]");
+
+    //#W42-1: an unanswered MANDATORY chooser is a LOUD RED, never a guess.
+    //The driver has a default for an unanswered MENU (decline when cancelable,
+    //first option when not, see the block below) and wave-41 gave the mandatory
+    //SINGLE-candidate player chooser an engine-side auto-resolve (no decision
+    //content: exactly one legal answer). Neither covers a mandatory chooser with
+    //TWO OR MORE legal candidates - answering that one would mean GUESSING, and
+    //a guessed pick is precisely the false-green shape these disciplines exist
+    //to prevent: the fixture would "pass" on an answer it never stated. So name
+    //it and fail the test instead. Without this the fixture WEDGES (the chooser
+    //holds the phase ring) and reports only as a 1,000,000-update timeout.
+    //Scope: the suite driver only - a real game's mandatory chooser belongs to
+    //its human or AI controller and is untouched by this file.
+    {
+        ActionLayer * al = observer->mLayers->actionLayer();
+        TargetChooser * mtc = al->getCurrentTargetChooser();
+        //Commands that can NEVER answer a chooser. A card name / mtg id (the
+        //ordinary target click) and p1/p2 (the player click) CAN, so they fall
+        //through to the normal path and clear the strike count below.
+        bool cannotAnswer = (action == "" || action == "next" || action == "eot"
+                             || action == "yes" || action == "no" || action == "human"
+                             || action == "ai" || action == "endinterruption"
+                             || action.find("goto") != string::npos);
+        //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
+        //it when a must-menu arms and clears it when the waiting action ends.
+        int candidates = mtc ? mtc->countValidTargets() : 0;
+        if (observer->mSuiteGame && mtc && al->checkCantCancel() && candidates >= 2
+            && cannotAnswer && !suite->mForcedFailure.size()
+            //A GRACE PERIOD, not a single tick, and the ticks below run
+            //NORMALLY while it burns - nothing about a striking tick differs
+            //from an unguarded one. It has to be that way: 18 green fixtures
+            //arm a mandatory multi-candidate chooser that RESOLVES ITSELF a
+            //few driver ticks later (ActionLayer::Update's cantCancel block
+            //auto-fills a chooser whose legal candidates are already all
+            //selected, and the trigger/stack machinery finishes others), and
+            //a one-strike guard (which re-queued the command and returned
+            //early, starving the very ticks that resolve them) turned every
+            //one of those 18 red. Measured across the whole suite, the widest
+            //self-resolve took EIGHT driver ticks; 500 is ~60x that and still
+            //costs ~3,000 game updates against the runaway cap of 1,000,000 -
+            //so a genuine wedge is named in a blink instead of surfacing, six
+            //figures of updates later, as an anonymous timeout.
+            && ++mMandatoryChooserStrikes >= 500)
+        {
+            std::ostringstream why;
+            why << candidates << " candidates, source "
+                << (mtc->source ? mtc->source->getName() : string("?"))
+                << ", pending command '" << action << "'";
+            std::cerr << "==Suite: unanswered mandatory chooser (" << candidates
+                      << " candidates) - failing loud== [" << suite->filename << "] "
+                      << why.str() << std::endl;
+            DebugTrace("==Suite: unanswered mandatory chooser (" << candidates
+                       << " candidates) - failing loud== [" << suite->filename << "]");
+            suite->mForcedFailure = why.str();
+            suite->assertGame();
+            observer->setLoser(observer->players[0]);
+            return 1;
+        }
+        if (!mtc)
+            mMandatoryChooserStrikes = 0;
+    }
 
     //A pending decision menu whose answer the script does not provide:
     //under engine-owned priority a pending menu HOLDS the game (correctly -
@@ -813,6 +875,16 @@ void TestSuiteGame::assertGame()
     int error = 0;
     bool wasAI = false;
 
+    //#W42-1: a driver-detected fatal outranks every board assertion - the
+    //board after a guessed-or-wedged decision means nothing.
+    if (mForcedFailure.size())
+    {
+        sprintf(result, "<span class=\"error\">==Suite: unanswered mandatory chooser (%s) - failing loud==</span><br />",
+                mForcedFailure.size() < 3000 ? mForcedFailure.c_str() : "...");
+        Log(result);
+        error++;
+    }
+
     if (endState.expectedGameOver >= 0 && observedGameOver != endState.expectedGameOver)
     {
         sprintf(result, "<span class=\"error\">==game-over problem. Expected %i, got %i==</span><br />",
@@ -1286,6 +1358,10 @@ TestSuite::TestSuite(const char * filename)
 int TestSuite::loadNext()
 {
     mAsserted = false; //fresh test: its assert has not run yet
+    //#W42-1: the main-thread path reuses THIS object for every test in the
+    //list, so a driver-detected fatal must be cleared here or one red test
+    //would fail every test after it.
+    mForcedFailure.clear();
     endTime = JGEGetTime();
     summoningSickness = 0;
     seed = 0;

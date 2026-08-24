@@ -6394,7 +6394,20 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             out << action.ability->getMenuText();
     }
     if (action.click)
-        out << " with " << action.click->getDisplayName();
+    {
+        //#W42-D6: name WHICH copy. Two same-named permanents offer two
+        //byte-identical activation lines, the de-dupe collapses them to one,
+        //and every per-instance fact attached to that line - above all the
+        //[repeat: activated this turn N times already] countable, which is
+        //per-permanent state - then reads as if it described the other copy.
+        //That collision is what made a wave-41 corpus look like the repeat
+        //counter had stopped advancing on Hive of the Eye Tyrant: the annotated
+        //Hive was not the Hive being offered. instanceHandle is the same "#N"
+        //the board snapshot and the A#/B#/target lines already print (and ""
+        //for a singleton name), so the option line now binds to one physical
+        //card on every surface.
+        out << " with " << action.click->getDisplayName() << instanceHandle(action.click);
+    }
 
     //Kaldheim-style modal DFC in hand (R-DFC-FLIP, deck102 wave-22): the
     //engine surfaces a double-faced card ONLY as a repeatable "Flip Side"
@@ -18322,6 +18335,45 @@ void AIPlayerGPT::runParseSelfTest()
         string plain = "Equip with Lightning Greaves [cost: {0}] targeting Thraben Doomsayer";
         CHECK(stripRepeatAnnotation(plain) == plain,
               "W41-6 NEGATIVE an unannotated option line is untouched by the key strip");
+    }
+
+    cout << "\n[W42-D6] the activation option names WHICH copy (instance handle)\n";
+    // The repeat countable is PER PERMANENT. Two same-named copies used to
+    // render byte-identical activation lines, so the de-dupe kept one and the
+    // annotation (or its absence) read as if it described the other copy -
+    // exactly how a wave-41 corpus looked like the counter had stopped
+    // advancing on Hive of the Eye Tyrant. describeAction now appends the same
+    // "#N" the board snapshot prints; these cases pin what that does to the
+    // strings around it.
+    {
+        string h1 = "becomes beholder with Hive of the Eye Tyrant #1 [cost: {3}{b}]"
+                    " [repeat: activated this turn 2 times already]";
+        string h2 = "becomes beholder with Hive of the Eye Tyrant #2 [cost: {3}{b}]";
+        vector<string> hopts;
+        hopts.push_back(h1); // 1
+        hopts.push_back(h2); // 2
+        // The two copies are DISTINGUISHABLE - the de-dupe cannot collapse them.
+        CHECK(h1 != h2, "W42-D6 two copies of one name render two distinct option lines");
+        // The handle survives the annotation strips (it is identity, not decoration).
+        CHECK(stripRenderAnnotationsLc(h1).find("#1") != string::npos,
+              "W42-D6 the instance handle survives the matching strip");
+        CHECK(stripNarrationDecoration(h1) == "becomes beholder with Hive of the Eye Tyrant #1",
+              "W42-D6 the narrated copy keeps the handle and drops the annotations");
+        // ECHO: a reply naming a copy binds to THAT copy, not to its twin.
+        bool hst = false;
+        CHECK(parseChoice("CHOICE: 2 (becomes beholder with Hive of the Eye Tyrant #2)",
+                          2, &hopts, &hst, NULL, NULL) == 2,
+              "W42-D6 an echo naming copy #2 binds to copy #2");
+        hst = false;
+        CHECK(parseChoice("CHOICE: 1 (becomes beholder with Hive of the Eye Tyrant #1)",
+                          2, &hopts, &hst, NULL, NULL) == 1,
+              "W42-D6 NEGATIVE an echo naming copy #1 does not slide onto copy #2");
+        // The per-turn decline key still collapses the same copy's own windows.
+        CHECK(stripRepeatAnnotation(h1)
+                  == "becomes beholder with Hive of the Eye Tyrant #1 [cost: {3}{b}]",
+              "W42-D6 the repeat strip leaves the handle in the decline key");
+        CHECK(stripRepeatAnnotation(h1) != stripRepeatAnnotation(h2),
+              "W42-D6 NEGATIVE two copies do NOT share one decline key");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

@@ -79,6 +79,10 @@ public:
     //game ends by itself (lethal trigger loop) before the script's
     //end-of-actions assert is reached
     bool mAsserted;
+    //#W42-1: a driver-detected fatal the ordinary zone/phase assertions
+    //cannot express (an unanswered MANDATORY chooser). Non-empty means the
+    //test FAILS, whatever the board looks like, with this text as the reason.
+    string mForcedFailure;
     MTGPlayerCards * buildDeck(Player* player, int playerId);
     GameType getGameType() { return gameType; };
     string getNextAction();
@@ -146,6 +150,11 @@ private:
     float timer;
     float aiActCounter; //dt fed to AIPlayerBaka::Act in [AI] tests (was a thread-shared function static)
     bool mAssertPhaseArmed; //[AI] tests: game has left the [ASSERT] phase at least once
+    //#W42-1: consecutive driver ticks that found a MANDATORY, multi-candidate
+    //target chooser armed with a pending command that cannot possibly answer
+    //it. Past the grace period in TestSuiteAI::Act (choosers of this shape do
+    //self-resolve, in <=8 ticks measured) the fixture never answers -> loud red.
+    int mMandatoryChooserStrikes;
     TestSuiteGame * suite;
 
 public:
