@@ -332,7 +332,9 @@ int TestSuiteAI::Act(float)
         bool cannotAnswer = (action == "" || action == "next" || action == "eot"
                              || action == "yes" || action == "no" || action == "human"
                              || action == "ai" || action == "endinterruption"
-                             || action.find("goto") != string::npos);
+                             || action.find("goto") != string::npos
+                             || action.compare(0, 8, "holdkey ") == 0
+                             || action.compare(0, 11, "releasekey ") == 0);
         //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
         //it when a must-menu arms and clears it when the waiting action ends.
         int candidates = mtc ? mtc->countValidTargets() : 0;
@@ -399,7 +401,8 @@ int TestSuiteAI::Act(float)
             //lookup (its miss path dumps the whole board to the log).
             bool keyword = action == "" || action == "next" || action == "eot" || action == "yes"
                 || action == "no" || action == "human" || action == "ai" || action == "endinterruption"
-                || action == "interactivereveal"
+                || action == "interactivereveal" || action == "realgame"
+                || action.compare(0, 8, "holdkey ") == 0 || action.compare(0, 11, "releasekey ") == 0
                 || action.find("goto") != string::npos || action.find("reveal") != string::npos
                 || action.find("p1") != string::npos || action.find("p2") != string::npos;
             MTGCardInstance * manaCard = keyword ? NULL : getCard(action);
@@ -460,6 +463,49 @@ int TestSuiteAI::Act(float)
     {
         DebugTrace("TESTSUITE You have control");
         playMode = MODE_HUMAN;
+        return 1;
+    }
+    else if (action.compare(0, 8, "holdkey ") == 0 || action.compare(0, 11, "releasekey ") == 0)
+    {
+        //Real INPUT, not a scripted click: hold (or release) a physical
+        //button through JGE, so JGE's own auto-repeat machinery
+        //(REPEAT_DELAY/REPEAT_PERIOD) keeps feeding the key buffer exactly as
+        //it does when a player holds the phase-advance trigger on a handheld.
+        //That is the only way a fixture can reproduce a defect where a modal
+        //display eats input the player aimed at the PREVIOUS game state.
+        bool release = (action.compare(0, 11, "releasekey ") == 0);
+        string which = action.substr(release ? 11 : 8);
+        JButton btn = JGE_BTN_NONE;
+        if (which.find("prev") != string::npos) btn = JGE_BTN_PREV;
+        else if (which.find("next") != string::npos) btn = JGE_BTN_NEXT;
+        else if (which.find("sec") != string::npos) btn = JGE_BTN_SEC;
+        else if (which.find("ok") != string::npos) btn = JGE_BTN_OK;
+        JGE * jge = observer->getInput();
+        if (jge && btn != JGE_BTN_NONE)
+        {
+            if (release) jge->ReleaseKey(btn);
+            else jge->HoldKey(btn);
+        }
+        DebugTrace("TESTSUITE " << (release ? "releasekey" : "holdkey") << " " << which
+                   << " -> " << (int) btn << " [" << suite->filename << "]");
+        return 1;
+    }
+    else if (action.compare("realgame") == 0)
+    {
+        //Opt this fixture into REAL-PLAY automation: drop the suite's
+        //skip-free pin and present this seat to the engine as the human one.
+        //Everything an ordinary fixture is deliberately insulated from - the
+        //ASPHASES skips and GameObserver's no-legal-action phase skip - now
+        //runs. Issue it as the first [DO] line. See docs/testsuite-fixture-
+        //authoring.md.
+        DebugTrace("TESTSUITE realgame: suite pin dropped, seat "
+                   << ((this == observer->players[0]) ? 0 : 1) << " poses as human");
+        //playMode stays MODE_TEST_SUITE: MODE_HUMAN hands control away and
+        //stops the script pump, and isAI() stays 1 so DuelLayers keeps calling
+        //Act. mSuiteHumanSeat alone re-enables the automation (see
+        //GameObserver::gameStateBasedEffects).
+        observer->mSuiteGame = false;
+        observer->mSuiteHumanSeat = this;
         return 1;
     }
     else if (action.compare("ai") == 0)

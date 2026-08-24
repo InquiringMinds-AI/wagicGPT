@@ -42,6 +42,7 @@ void GameObserver::cleanup()
     }
     players.clear();
 
+    mSuiteHumanSeat = NULL;
     currentPlayer = NULL;
     currentActionPlayer = NULL;
     isInterrupting = NULL;
@@ -116,6 +117,7 @@ GameObserver::GameObserver(WResourceManager *output, JGE* input)
     LPWeffect = false;
     mLoading = false;
     mSuiteGame = false;
+    mSuiteHumanSeat = NULL;
     mLayers = NULL;
     mTrash = new Trash();
     mDeckManager = new DeckManager();
@@ -1388,9 +1390,14 @@ void GameObserver::gameStateBasedEffects()
     //skipLevel is forced to ASKIP_NONE for them above.
     //Settled-stack guard as in the empty-blockers skip: a trigger still
     //resolving has to keep the window open.
-    const bool automationAllowed = !(currentPlayer->playMode == Player::MODE_TEST_SUITE
-                                     || mSuiteGame || mLoading);
-    Player * humanSeat = !players[0]->isAI() ? players[0] : (!players[1]->isAI() ? players[1] : NULL);
+    //mSuiteHumanSeat (the `realgame` fixture directive) deliberately
+    //re-enables the automation for a scripted seat - that is the whole
+    //point of the directive; it is NULL in every ordinary game.
+    const bool automationAllowed = mSuiteHumanSeat
+        || !(currentPlayer->playMode == Player::MODE_TEST_SUITE
+             || mSuiteGame || mLoading);
+    Player * humanSeat = mSuiteHumanSeat ? mSuiteHumanSeat
+        : (!players[0]->isAI() ? players[0] : (!players[1]->isAI() ? players[1] : NULL));
     //Only the human's OWN turn. userRequestNextGamePhase advances the phase
     //globally, so firing this on the opponent's turn would rip the phase out
     //from under the AI before its throttled Act got to play - every other skip

@@ -1123,6 +1123,7 @@ modal_counter_narration.txt
 chaoslace_on_stack_spell_then_blast.txt
 chaoslace_colour_lasts_across_turns.txt
 delver_of_secrets_cast_upkeep.txt
+delver_of_secrets_held_trigger.txt
 delver_of_secrets_no_instant.txt
 black_vise_seven_cards.txt
 black_vise_four_cards.txt
