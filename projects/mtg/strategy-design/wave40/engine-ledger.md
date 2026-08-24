@@ -658,3 +658,11 @@ exact SUM of the lanes' added cases.**
   test with "unanswered chooser: <shape>" instead of hanging, and NEVER answers with a
   guessed default (a guessed pick is the false-green shape the suite disciplines exist to
   avoid). Wave-42 step-1 candidate; TestSuiteAI.cpp, small.
+
+## #W42-2 — guide-rule false arm on attack-restricted bodies (probe-2 finding, 2026-08-24)
+deck152 probe G1 s32: the creature arming the "biggest opposing power" return-swing check
+was Goblin Goon, rendered `[can't attack, can't block, cantpwattack]` — a swing that cannot
+happen. Guide step (1) reads POWER only. Fix candidate is a GUIDE-side rewording ("biggest
+opposing power among creatures that can attack"), possibly generalized across all guides
+using the power-floor pattern; render already carries the restriction tags, so no engine
+work owed. Full context: wave41/probe-results.md.
