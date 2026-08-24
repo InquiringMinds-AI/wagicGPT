@@ -1,5 +1,7 @@
 #Black Vise, X floor: the opponent holds 4 at their upkeep -> 4 minus 4 = 0
 #damage. Life must stay 20 (no negative-X life gain either).
+#As in black_vise_seven_cards.txt, no command here answers the as-enters
+#"choose an opponent" chooser - it auto-resolves (one legal candidate).
 [INIT]
 SECONDMAIN
 [PLAYER1]

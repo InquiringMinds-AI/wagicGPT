@@ -7837,8 +7837,42 @@ void MayAbility::Update(float dt)
 #endif
         if (TargetAbility * ta = dynamic_cast<TargetAbility *>(ability))
         {
-            if (!ta->getActionTc()->validTargetsExist() || ta->getActionTc()->maxtargets == 0)
+            TargetChooser * atc = ta->getActionTc();
+            if (!atc->validTargetsExist() || atc->maxtargets == 0)
                 return;
+            //No decision when only one outcome exists - the engine's standing
+            //principle, applied here to the as-enters PLAYER chooser. A
+            //MANDATORY choice among players with exactly one legal candidate
+            //(the only opponent, in this two-seat engine) carries no decision
+            //content: its controller cannot answer it any other way. Asking
+            //anyway is not merely ceremony, it is fragile - the ask arms a
+            //modal menu and then a target chooser, and BOTH hold the phase
+            //ring, so a seat with no path to the chooser (the suite driver
+            //has none) WEDGES the game outright; and an ask that never lands
+            //leaves source->playerTarget NULL forever, which makes every
+            //"@each targetedplayer" trigger on the permanent silently inert
+            //for the rest of the game (Black Vise, The Rack).
+            //Resolve it here instead, through exactly the two calls a human's
+            //click pair makes (arm the cloned chooser, then answer it), so
+            //nothing downstream can tell an auto-resolve from a click.
+            //Deliberately narrow: optional ("may") asks are untouched -
+            //declining is a real decision - and so is any chooser that has
+            //two or more legal candidates.
+            if (must && atc->maxtargets == 1 && dynamic_cast<PlayerTargetChooser *>(atc)
+                && atc->countValidTargets() == 1)
+            {
+                Player * only = NULL;
+                for (size_t i = 0; i < game->players.size(); ++i)
+                    if (atc->canTarget(game->players[i]))
+                        only = game->players[i];
+                if (only)
+                {
+                    reactToTargetClick(source);
+                    if (mClone)
+                        mClone->reactToTargetClick(only);
+                    return;
+                }
+            }
         }
         game->mLayers->actionLayer()->setMenuObject(source, must);
         previousInterrupter = game->isInterrupting;

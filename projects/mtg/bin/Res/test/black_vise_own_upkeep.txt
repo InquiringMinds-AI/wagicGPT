@@ -1,4 +1,5 @@
-#Black Vise timing: it fires on the OPPONENT'S upkeep, never its controller's.
+#Black Vise timing: it fires on the CHOSEN player's upkeep - in a 2-seat game
+#the opponent's - never its controller's.
 #The opponent holds 3 (no damage to them); one turn cycle later the CONTROLLER
 #is at his own upkeep holding 6 - he must still be at 20.
 [INIT]

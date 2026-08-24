@@ -1,0 +1,32 @@
+#The Rack - the second card in the as-enters-player-chooser class (the first
+#is Black Vise): "As The Rack enters, choose an opponent. At the beginning of
+#the chosen player's upkeep, The Rack deals X damage to that player, where X
+#is 3 minus the number of cards in their hand."
+#Script: name(choose opponent) notaTarget(opponent) deplete:0
+#      + @each targetedplayer upkeep:damage:3minustype:*:targetedpersonshandminusend
+#Nothing in this script answers the ETB chooser, and nothing needs to: with
+#exactly one legal player candidate the mandatory choice auto-resolves
+#(MayAbility::Update), setting playerTarget so the upkeep trigger is live.
+#Before that mechanism fix this fixture WEDGED - the armed menu and the target
+#chooser both hold the phase ring and no seat here answers either.
+#Opponent holds 1 card at their upkeep -> 3 - 1 = 2 damage, 20 -> 18.
+[INIT]
+SECONDMAIN
+[PLAYER1]
+hand:the rack
+inplay:mountain
+[PLAYER2]
+hand:act of treason
+[DO]
+mountain
+the rack
+eot
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:mountain,the rack
+[PLAYER2]
+hand:act of treason
+life:18
+[END]

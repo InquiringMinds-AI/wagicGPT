@@ -1,7 +1,8 @@
 #Test ">" symbol in foreach
-#(Black Vise no longer takes an ETB "choose an opponent" click - the primitive
-#now uses the same target-free "@each opponent upkeep" idiom as Iron Maiden and
-#Viseling, so the choice/p2 pair that answered that chooser is gone.)
+#(Black Vise keeps its Oracle-faithful "As Black Vise enters, choose an
+#opponent" script. The choice/p2 pair that used to answer that chooser is
+#gone because the chooser no longer asks: with exactly one legal player
+#candidate the mandatory choice auto-resolves in MayAbility::Update.)
 [INIT]
 SECONDMAIN
 [PLAYER1]

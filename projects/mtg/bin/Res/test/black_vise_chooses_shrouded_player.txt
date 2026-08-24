@@ -1,0 +1,37 @@
+#Black Vise is a CHOOSE, not a TARGET. Oracle: "As Black Vise enters, choose
+#an opponent." (The printed 1993 face says "target opponent" - pre-errata.)
+#The script encodes that with notaTarget(opponent), which the ability factory
+#treats as a choice: it sets bypassTC and NULLS the chooser's targetter, so
+#PlayerTargetChooser::canTarget skips the whole protection/shroud/hexproof
+#block. A plain target(opponent) would keep those checks.
+#This fixture DISCRIMINATES the two. The opponent controls True Believer
+#("You have shroud", abilities=playershroud, the engine's player-level
+#untargetability). Under target() semantics the opponent would be an illegal
+#candidate, MayAbility::Update would bail on validTargetsExist(), playerTarget
+#would stay NULL and the Vise would be inert forever. Under choose semantics
+#- which is what Oracle says and what the script says - the choice resolves
+#onto the shrouded player anyway and the upkeep damage lands.
+#Opponent holds 7 at their upkeep -> 7 - 4 = 3 damage, 20 -> 17.
+#(Nothing here answers the chooser; it auto-resolves, one legal candidate.)
+[INIT]
+SECONDMAIN
+[PLAYER1]
+hand:black vise
+inplay:mountain
+[PLAYER2]
+hand:act of treason,raging goblin,plains,swamp,forest,island,mind stone
+inplay:true believer
+[DO]
+mountain
+black vise
+eot
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:mountain,black vise
+[PLAYER2]
+hand:act of treason,raging goblin,plains,swamp,forest,island,mind stone
+inplay:true believer
+life:17
+[END]
