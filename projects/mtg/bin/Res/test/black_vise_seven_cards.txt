@@ -1,0 +1,31 @@
+#Black Vise: "At the beginning of each opponent's upkeep, Black Vise deals X
+#damage to that player, where X is the number of cards in their hand minus 4."
+#Cast in the controller's second main; at the OPPONENT'S next upkeep (before
+#their draw) they hold 7 -> 3 damage, 20 -> 17.
+#Owner live report (2026-08-23): Vise "doesn't seem to be applying damage".
+#The primitive used to require an ETB "choose an opponent" click
+#(notaTarget(opponent) + @each targetedplayer upkeep); left unanswered that
+#chooser WEDGES the game, and a Vise whose playerTarget never got set is inert
+#for the rest of the game. It now uses the same target-free idiom as its two
+#functional identicals, Iron Maiden and Viseling - correct in a 2-player engine,
+#where the chosen opponent is necessarily the only opponent.
+[INIT]
+SECONDMAIN
+[PLAYER1]
+hand:black vise
+inplay:mountain
+[PLAYER2]
+hand:act of treason,raging goblin,plains,swamp,forest,island,mind stone
+[DO]
+mountain
+black vise
+eot
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:mountain,black vise
+[PLAYER2]
+hand:act of treason,raging goblin,plains,swamp,forest,island,mind stone
+life:17
+[END]

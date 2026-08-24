@@ -11044,9 +11044,8 @@ type=Sorcery
 [/card]
 [card]
 name=Black Vise
-auto=name(choose opponent) notaTarget(opponent) doNothing
-auto=@each targetedplayer upkeep:damage:type:*:targetedpersonshandminus4minusend targetedplayer
-text=As Black Vise enters, choose an opponent. -- At the beginning of the chosen player's upkeep, Black Vise deals X damage to that player, where X is the number of cards in their hand minus 4.
+auto=@each opponent upkeep:damage:type:*:opponenthandminus4minusend opponent
+text=At the beginning of each opponent's upkeep, Black Vise deals X damage to that player, where X is the number of cards in their hand minus 4.
 mana={1}
 type=Artifact
 [/card]
@@ -28251,7 +28250,6 @@ type=Enchantment
 name=Delver of Secrets
 backside=Insectile Aberration
 restriction=compare(isflipped)~equalto~0
-anyzone={0}:doubleside(backside)
 aicode=activate target(*[instant;sorcery;zpos=1]|mylibrary) moveto(mylibrary) and!(moveto(mylibrary) and!(if cantargetcard(*[instant;sorcery]|*) then all(this) flip(backside) oneshot ) !)!
 auto=@each my upkeep:name(look) reveal:1 optionone name(transform) target(*[instant;sorcery]|reveal) moveto(mylibrary) and!( all(this) transforms((,newability[flip(backside)])) forever )! optiononeend optiontwo name(put back) target(<1>*|reveal) moveto(mylibrary) optiontwoend revealend
 text=At the beginning of your upkeep, look at the top card of your library. You may reveal that card. If an instant or sorcery card is revealed this way, transform Delver of Secrets. // Insectile Aberration

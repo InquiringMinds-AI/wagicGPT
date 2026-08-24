@@ -1,0 +1,27 @@
+#Black Vise timing: it fires on the OPPONENT'S upkeep, never its controller's.
+#The opponent holds 3 (no damage to them); one turn cycle later the CONTROLLER
+#is at his own upkeep holding 6 - he must still be at 20.
+[INIT]
+SECONDMAIN
+[PLAYER1]
+hand:black vise,act of treason,raging goblin,plains,swamp,forest,island
+inplay:mountain
+[PLAYER2]
+hand:act of treason,raging goblin,plains
+[DO]
+mountain
+black vise
+eot
+next
+eot
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:mountain,black vise
+hand:act of treason,raging goblin,plains,swamp,forest,island
+life:20
+[PLAYER2]
+hand:act of treason,raging goblin,plains
+life:20
+[END]

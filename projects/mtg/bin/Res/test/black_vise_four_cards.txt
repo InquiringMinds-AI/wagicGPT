@@ -1,0 +1,22 @@
+#Black Vise, X floor: the opponent holds 4 at their upkeep -> 4 minus 4 = 0
+#damage. Life must stay 20 (no negative-X life gain either).
+[INIT]
+SECONDMAIN
+[PLAYER1]
+hand:black vise
+inplay:mountain
+[PLAYER2]
+hand:act of treason,raging goblin,plains,swamp
+[DO]
+mountain
+black vise
+eot
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:mountain,black vise
+[PLAYER2]
+hand:act of treason,raging goblin,plains,swamp
+life:20
+[END]

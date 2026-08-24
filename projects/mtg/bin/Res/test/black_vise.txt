@@ -1,4 +1,7 @@
 #Test ">" symbol in foreach
+#(Black Vise no longer takes an ETB "choose an opponent" click - the primitive
+#now uses the same target-free "@each opponent upkeep" idiom as Iron Maiden and
+#Viseling, so the choice/p2 pair that answered that chooser is gone.)
 [INIT]
 SECONDMAIN
 [PLAYER1]
@@ -9,8 +12,6 @@ hand:act of treason,raging goblin,plains,swamp,forest,island
 [DO]
 mountain
 black vise
-choice 0
-p2
 eot
 next
 #upkeep
