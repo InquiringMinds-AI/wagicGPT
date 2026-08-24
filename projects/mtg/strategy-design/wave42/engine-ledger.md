@@ -16,8 +16,20 @@ investigation (in flight), carried items. Ranked.
    illegally, only to be made to not block." Confirms seat-agnostic: fix at the
    LEGALITY layer (exclude menace attackers from single-blocker legal sets BEFORE
    declaration), which repairs human UI + Baka + GPT in one mechanism.
-2. **#W43-2 (HIGH) Vita victory-screen crash** — heap corruption at MTGLibrary teardown
-   (core-dump analysis + ASAN lane in flight; whatever it finds lands here).
+2. **#W43-2 DISCHARGED (2026-08-24): Vita victory-screen crash FIXED.** ASAN
+   deterministic repro (lifeline.txt x2): InstantAbility::testDestroy ignored
+   forcedAlive -> ALord's granted-ability clone culled at first AFTER_EOT while
+   ALord::abilities[card] kept the raw pointer -> teardown UAF write (~ActionLayer ->
+   ALord::removed) corrupting heap that aborts one step later in ~MTGLibrary (the
+   owner's exact frames; glibc silent, newlib aborts). 18-line fix: testDestroy
+   honours forcedAlive. ASAN suite 1098/0 clean + 380 teardowns clean; normal gates
+   held. Evidence: psp-work/vita-crash-20260824/asan-repro{,-fixed}.log. RESIDUAL
+   WATCH: (a) Condemn no-op NOT explained (mid-game UAF writes from this bug were
+   possible but unproven); (b) other testDestroy overrides bypassing forcedAlive —
+   ACounterTracker (AllAbilities.cpp:3466) clearest, none fired under ASAN; (c)
+   incidental: WSrcUnlockedCards setId==-1 1-byte overflow read (WDataSrc.cpp:404,
+   benign, wants a bounds guard). Prediction: no more victory dumps in matches with a
+   surviving lord(...)transforms(...) grant; a recurring crash now discriminates.
 3. **#W43-3 (HIGH) Hand-reveal attribution inverted** — reveal events bind to the
    EFFECT'S CONTROLLER, not the card owner (24 lines, both seats mirrored wrong).
 4. **#W43-4 (HIGH) Transform-DFC hand-flips residual** — Brutal Cathar x5 + Tovolar's
