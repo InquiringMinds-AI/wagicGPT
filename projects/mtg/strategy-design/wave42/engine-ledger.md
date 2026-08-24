@@ -77,3 +77,29 @@ guide-edit predictions adjudicated across five seats (P6 construction prediction
 RETIRED as mis-specified; E5 resolved KEEP; sole-attacker gate deleted from 152 after
 third null); rung-3/hallucinated-keyword classes did not recur; serve-transient
 hypothesis for wave-41 fallbacks CONFIRMED (0 empty replies).
+
+## WAVE-43 STEP-1 OUTCOME (2026-08-24, merged chain through afdd40215)
+All 6 lanes landed; gate **1113/0 + 36 AI/0, PARSETEST 1076/0** (exact sums), menace
+assert 0. Highlights: #W43-1 menace fixed at canBlock/legality (all four consumers, strip
+now loud assert); #W43-3/#W43-5 reveal owner-authority + transform narration (emblem
+carve-out); #W43-4 DFC sweep was actually 198+2 deletions (ledger's "7" was occurrence
+count) + Docent + Ludevic's via the if-then idiom — NEW ENGINE RULE: a prefix gate does
+not survive a && split on the same line (CS-023 class); #W43-6 silent cast drop =
+ActionLayer unconditional menu retirement + phase-advance pool wipe (menuArmedSerial fix;
+second latent stale-setX path also closed); #W43-12 was a LEGALITY gap (legalLandPlays
+never applied cast restrictions — "zero-option" was a defer-record-shape misread);
+#W43-7/8 X pricing (maxAnnounceableX authority) + counter target text; #W43-9/10/11 +
+LOW batch (owner tags, observer parity, run collapse, Day/Night filter, 5 lexicon fixes).
+CS-024a (Boggart Trawler missing backside=) reported not fixed; counter-clause keyword
+set noted as follow-up.
+
+## INCIDENT (orchestrator error, recorded per silent-instrument discipline)
+Lane D's engine hunks were LOST at commit: the orchestrator's `git add <engine files>
+2>/dev/null` failed silently (bad path aborted the whole add) so the lane's commit
+carried only its fixture+scripts — the merged tree shipped the TEST without the FIX.
+Caught ONLY because the fixture tested its own fix (1 AI red); recovered verbatim from
+the still-live worktree, one gated-fprintf deviation applied, gate green. LESSONS:
+(1) never 2>/dev/null a load-bearing git add; (2) verify each lane commit's --stat
+against the lane's reported file list BEFORE merging; (3) a green gate cannot catch a
+lost contribution unless a test rides with it — fixtures-with-fix is load-bearing, keep
+demanding them.
