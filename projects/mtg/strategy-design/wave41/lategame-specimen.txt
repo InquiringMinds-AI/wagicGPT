@@ -1,0 +1,435 @@
+# wave-41 lategame prompt specimen
+# file: 1787543893-ai_baka_deck130-0x56029214a9a0-vs-ai_baka_deck125.jsonl
+# seq 79 turn 41 phase Main phase 1 kind ask options 2 latency_ms 55960 chars 17010
+
+GAME LOG (everything that has happened so far):
+=== Turn 1 - opponent's turn ===
+- Your opening hand (7 cards): Dwarven Blastminer; Forgotten Cave; Mountain; Pyrite Spellbomb; Spark Spray; Talisman of Impulse; Mountain
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+=== Turn 2 - YOUR turn ===
+- Phase: Draw
+- You drew Talisman of Impulse
+- Phase: Main phase 1
+- You played Mountain
+- You cast Pyrite Spellbomb
+- Your Pyrite Spellbomb resolved and entered the battlefield
+=== Turn 3 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 25)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+=== Turn 4 - YOUR turn ===
+- Phase: Upkeep
+- You drew 1 with Pyrite Spellbomb
+- Your Pyrite Spellbomb was put into your graveyard from the battlefield
+- You drew Talisman of Impulse
+- Phase: Draw
+- You drew Starstorm
+- Phase: Main phase 1
+- You played Mountain
+- You used: cycling with Forgotten Cave
+- You discarded Forgotten Cave
+- You drew Mountain
+=== Turn 5 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 30)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+=== Turn 6 - YOUR turn ===
+- Phase: Upkeep
+- You used: cycling with Spark Spray
+- You discarded Spark Spray
+- You drew Stone Rain
+- Phase: Draw
+- You drew Stone Rain
+- Phase: Main phase 1
+- You played Mountain
+- You cast Dwarven Blastminer
+- Your Dwarven Blastminer resolved and entered the battlefield
+=== Turn 7 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Seachrome Coast
+=== Turn 8 - YOUR turn ===
+- Phase: Upkeep
+- You destroyed with Dwarven Blastminer targeting Tundra
+- Opponent's Tundra was put into the opponent's graveyard from the battlefield
+- Phase: Draw
+- You drew Starstorm
+=== Turn 9 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 35)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent's Tundra was put into the opponent's library from the opponent's graveyard
+=== Turn 10 - YOUR turn ===
+- Phase: Draw
+- You drew Mountain
+- Phase: Main phase 1
+- You played Mountain
+- You targeted Seachrome Coast - "Seachrome Coast enters tapped unless you control two or fewer other lands. -- {T}: Add {W} or {U}." with Stone Rain
+- You cast Stone Rain
+- Opponent's Seachrome Coast was put into the opponent's graveyard from the battlefield
+- Your Stone Rain resolved and went to your graveyard
+- Phase: Attackers
+- You declared attackers: Dwarven Blastminer
+- Phase: Combat damage
+- Opponent lost 1 life (now 34)
+- Dwarven Blastminer dealt 1 damage to the opponent
+=== Turn 11 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 12 - YOUR turn ===
+- Phase: Upkeep
+- You used: cycling with Starstorm
+- You discarded Starstorm
+- You drew Forgotten Cave
+- You used: cycling with Forgotten Cave
+- You discarded Forgotten Cave
+- You drew Lay Waste
+- Phase: Draw
+- You drew Dwarven Blastminer
+- Phase: Attackers
+- You declared attackers: Dwarven Blastminer
+- Phase: Combat damage
+- Opponent lost 1 life (now 33)
+- Dwarven Blastminer dealt 1 damage to the opponent
+=== Turn 13 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+=== Turn 14 - YOUR turn ===
+- Phase: Draw
+- You drew Mountain
+- Phase: Main phase 1
+- You played Mountain
+- You cast Dwarven Blastminer
+- Your Dwarven Blastminer resolved and entered the battlefield
+- You targeted Plains #1 - "W" with Stone Rain
+- You cast Stone Rain
+- Opponent's Plains was put into the opponent's graveyard from the battlefield
+- Your Stone Rain resolved and went to your graveyard
+- Phase: Attackers
+- You declared attackers: Dwarven Blastminer
+- Phase: Combat damage
+- Opponent lost 1 life (now 32)
+- Dwarven Blastminer dealt 1 damage to the opponent
+=== Turn 15 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Path to Exile
+- Your Dwarven Blastminer was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- You targeted Mountain - "R" with this effect's Put in Play ability
+- Your Mountain entered the battlefield from your library
+=== Turn 16 - YOUR turn ===
+- Phase: Upkeep
+- You used: cycling with Lay Waste
+- You discarded Lay Waste
+- You drew Mountain
+- Phase: Draw
+- You drew Mountain
+- Phase: Main phase 1
+- You played Mountain
+- You used: cycling with Starstorm
+- You discarded Starstorm
+- You drew Forgotten Cave
+- You used: cycling with Forgotten Cave
+- You discarded Forgotten Cave
+- You drew Rorix Bladewing
+- Phase: Attackers
+- You declared attackers: Dwarven Blastminer
+- Phase: Combat damage
+- Opponent lost 1 life (now 31)
+- Dwarven Blastminer dealt 1 damage to the opponent
+=== Turn 17 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 18 - YOUR turn ===
+- Phase: Draw
+- You drew Mountain
+- Phase: Main phase 1
+- You played Mountain
+- You cast Rorix Bladewing
+- Opponent cast Essence Scatter
+- Your Rorix Bladewing was COUNTERED by Essence Scatter and went to your graveyard
+- Opponent's Essence Scatter resolved and went to the opponent's graveyard
+- You cast Talisman of Impulse
+- Your Talisman of Impulse resolved and entered the battlefield
+- Phase: Attackers
+- You declared attackers: Dwarven Blastminer
+- Phase: Combat damage
+- Opponent lost 1 life (now 30)
+- Dwarven Blastminer dealt 1 damage to the opponent
+=== Turn 19 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+- Opponent cast Path to Exile
+- Your Dwarven Blastminer was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- You targeted Mountain - "R" with this effect's Put in Play ability
+- Your Mountain entered the battlefield from your library
+=== Turn 20 - YOUR turn ===
+- Phase: Draw
+- You drew Starstorm
+- Phase: Main phase 1
+- You played Mountain
+- You cast Talisman of Impulse
+- Your Talisman of Impulse resolved and entered the battlefield
+- You cast Talisman of Impulse
+- Your Talisman of Impulse resolved and entered the battlefield
+- You used: cycling with Starstorm
+- You discarded Starstorm
+- You drew Mountain
+=== Turn 21 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 22 - YOUR turn ===
+- Phase: Draw
+- You drew Pyrite Spellbomb
+- Phase: Main phase 1
+- You played Mountain
+- You cast Pyrite Spellbomb
+- Your Pyrite Spellbomb resolved and entered the battlefield
+- You drew 1 with Pyrite Spellbomb
+- Your Pyrite Spellbomb was put into your graveyard from the battlefield
+- You drew Mountain
+=== Turn 23 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 24 - YOUR turn ===
+- Phase: Draw
+- You drew Mountain
+- Phase: Main phase 1
+- You played Mountain
+=== Turn 25 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 26 - YOUR turn ===
+- Phase: Draw
+- You drew Mountain
+- Phase: Main phase 1
+- You played Mountain
+=== Turn 27 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 28 - YOUR turn ===
+- Phase: Draw
+- You drew Forgotten Cave
+- Phase: Main phase 1
+- You played Mountain
+- You used: cycling with Forgotten Cave
+- You discarded Forgotten Cave
+- You drew Mountain
+=== Turn 29 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+=== Turn 30 - YOUR turn ===
+- Phase: Draw
+- You drew Siege-Gang Commander
+- Phase: Main phase 1
+- You played Mountain
+- You cast Siege-Gang Commander
+- Opponent cast Essence Scatter
+- Your Siege-Gang Commander was COUNTERED by Essence Scatter and went to your graveyard
+- Opponent's Essence Scatter resolved and went to the opponent's graveyard
+=== Turn 31 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Staff of Nin
+- Opponent's Staff of Nin resolved and entered the battlefield
+- Opponent used: Deal 1 Damage with Staff of Nin
+- You lost 1 life (now 19)
+- Staff of Nin dealt 1 damage to you
+=== Turn 32 - YOUR turn ===
+- Phase: Draw
+- You drew Hammer of Bogardan
+- Phase: Main phase 1
+- You targeted The opponent (player, life 30) with Hammer of Bogardan
+- You cast Hammer of Bogardan
+- Opponent lost 3 life (now 27)
+- Hammer of Bogardan dealt 3 damage to the opponent
+- Your Hammer of Bogardan resolved and went to your graveyard
+=== Turn 33 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 Damage with Staff of Nin
+- You lost 1 life (now 18)
+- Staff of Nin dealt 1 damage to you
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+=== Turn 34 - YOUR turn ===
+- Phase: Upkeep
+- You put in Hand with Hammer of Bogardan
+- Your Hammer of Bogardan was returned to your hand from your graveyard
+- Phase: Draw
+- You drew Mountain
+- Phase: Main phase 1
+- You played Mountain
+- You targeted The opponent (player, life 27) with Hammer of Bogardan
+- You cast Hammer of Bogardan
+- Opponent lost 3 life (now 24)
+- Hammer of Bogardan dealt 3 damage to the opponent
+- Your Hammer of Bogardan resolved and went to your graveyard
+=== Turn 35 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 Damage with Staff of Nin
+- You lost 1 life (now 17)
+- Staff of Nin dealt 1 damage to you
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+=== Turn 36 - YOUR turn ===
+- Phase: Upkeep
+- You put in Hand with Hammer of Bogardan
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 29)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent shuffled their graveyard (6 cards) into their library with Elixir of Immortality
+- Your Hammer of Bogardan was returned to your hand from your graveyard
+- Phase: Draw
+- You drew Starstorm
+- Phase: Main phase 1
+- You targeted The opponent (player, life 29) with Hammer of Bogardan
+- You cast Hammer of Bogardan
+- Opponent lost 3 life (now 26)
+- Hammer of Bogardan dealt 3 damage to the opponent
+- Your Hammer of Bogardan resolved and went to your graveyard
+- You used: cycling with Starstorm
+- You discarded Starstorm
+- You drew Mountain
+- You played Mountain
+=== Turn 37 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 Damage with Staff of Nin
+- You lost 1 life (now 16)
+- Staff of Nin dealt 1 damage to you
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 31)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+=== Turn 38 - YOUR turn ===
+- Phase: Upkeep
+- You put in Hand with Hammer of Bogardan
+- Your Hammer of Bogardan was returned to your hand from your graveyard
+- Phase: Draw
+- You drew Mountain
+- Phase: Main phase 1
+- You played Mountain
+- You targeted The opponent (player, life 31) with Hammer of Bogardan
+- You cast Hammer of Bogardan
+- Opponent cast Cancel
+- Your Hammer of Bogardan was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+=== Turn 39 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 Damage with Staff of Nin
+- You lost 1 life (now 15)
+- Staff of Nin dealt 1 damage to you
+- Phase: Draw
+- Opponent drew a card
+- Phase: ---
+- Opponent discarded Emrakul, the Aeons Torn
+=== Turn 40 - YOUR turn ===
+- Phase: Untap
+- Opponent used: Put in Library with Emrakul, the Aeons Torn
+- Opponent shuffled their graveyard (2 cards) into their library with Emrakul, the Aeons Torn
+- Phase: Upkeep
+- You put in Hand with Hammer of Bogardan
+- Your Hammer of Bogardan was returned to your hand from your graveyard
+- Phase: Draw
+- You drew Spark Spray
+- Phase: Main phase 1
+- You targeted The opponent (player, life 31) with Hammer of Bogardan
+- You cast Hammer of Bogardan
+- Opponent lost 3 life (now 28)
+- Hammer of Bogardan dealt 3 damage to the opponent
+- Your Hammer of Bogardan resolved and went to your graveyard
+- You chose Cast Card Normally for Spark Spray
+- You targeted The opponent (player, life 28) with Spark Spray
+- You cast Spark Spray
+- Opponent lost 1 life (now 27)
+- Spark Spray dealt 1 damage to the opponent
+- Your Spark Spray resolved and went to your graveyard
+=== Turn 41 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 Damage with Staff of Nin
+- You lost 1 life (now 14)
+- Staff of Nin dealt 1 damage to you
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Phase: ---
+- Opponent discarded Dream Fracture
+=== Turn 42 - YOUR turn ===
+- Phase: Upkeep
+- You put in Hand with Hammer of Bogardan
+- Your Hammer of Bogardan was returned to your hand from your graveyard
+- Phase: Draw
+- You drew Mountain
+- Phase: Main phase 1
+- You played Mountain
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 14 | Opponent life: 27
+Mana available: 14 total (untapped sources, tapped automatically when you cast; colours you can make: {g}{r}{c}; mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Mountain #1 {r}; Mountain #2 {r}; Mountain #3 {r}; Mountain #4 {r}; Mountain #5 {r}; Mountain #6 {r}; Mountain #7 {r}; Mountain #8 {r}; Talisman of Impulse #1 {c} or {r} or {g}; Mountain #9 {r}; Mountain #10 {r}; Talisman of Impulse #2 {c} or {r} or {g}; Talisman of Impulse #3 {c} or {r} or {g}; Mountain #11 {r} | Already in pool: {r}{r}{r} (3 mana ALREADY produced and floating right now - this is SEPARATE from the 14 untapped sources counted above, not a different count of it; spend the floating mana first)
+CAUTION - some usable mana sources DAMAGE YOU when tapped for mana (auto-tap when you cast may spend them - count this life loss first): Talisman of Impulse: 1 damage; Talisman of Impulse: 1 damage; Talisman of Impulse: 1 damage
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand: Hammer of Bogardan {1}{r}{r} [sorcery]
+Your battlefield (22 permanents listed, of which 0 are creatures): Mountain #1; Mountain #2; Mountain #3; Mountain #4; Mountain #5; Mountain #6; Mountain #7; Mountain #8; Talisman of Impulse #1 {2} [artifact] [tapping for mana deals 1 damage to its controller]; Mountain #9; Mountain #10; Talisman of Impulse #2 {2} [artifact] [tapping for mana deals 1 damage to its controller]; Talisman of Impulse #3 {2} [artifact] [tapping for mana deals 1 damage to its controller]; Mountain #11; Mountain #12 [tapped]; Mountain #13 [tapped]; Mountain #14 [tapped]; Mountain #15 [tapped]; Mountain #16 [tapped]; Mountain #17 [tapped]; Mountain #18 [tapped]; Mountain #19 [tapped]
+Opponent battlefield (10 permanents listed, of which 0 are creatures): Island #1; Plains #1; Tundra #1; Island #2; Plains #2; Island #3; Staff of Nin {6} [artifact] [tapped]; Tundra #2; Island #4; Plains #3
+Opponent hand size: 7 | Opponent library: 42 cards
+Artifacts in play: you 3 | opponent 1
+Your library: 18 cards
+
+YOUR PLAN (as you last stated it): Burn opponent with Hammer of Bogardan. Continue cycling and burning each turn until the opponent reaches 0 life. Manage life total against Staff of Nin's upkeep trigger.
+
+TARGET CHOICE for Hammer of Bogardan (this spell/ability is already on the stack and needs a target - it is NOT a cast or phase step). Pick the ONE target it will affect from the list below, and answer with the chosen TARGET's name (not "Hammer of Bogardan")
+1. The opponent (player, life 27)
+2. Yourself (player, life 14)
+
+On the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 3 (Cast Example Card)" (a placeholder - copy a real number and short name from the list); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
