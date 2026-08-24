@@ -2,7 +2,10 @@
 #define _WEVENT_H_
 
 #include <iostream>
+#include <vector>
 #include "PhaseRing.h"
+
+using std::vector;
 
 class MTGCardInstance;
 class MTGGameZone;
@@ -571,13 +574,22 @@ struct WEventCardMutated : public WEventCardUpdate {
 //path (mana taps are plumbing, not decisions, and are narrated nowhere).
 //`abilityText` is the ability's own menu text, captured at activation time
 //because the ability object may be cloned/destroyed before anyone reads it.
+//#W43-10: the chosen TARGETS, captured at activation time from the ability's own
+//target chooser. Targets are public information and the ACTING seat's line has
+//always named them ("...targeting Forgotten Cave"); the observing seat's line
+//dropped them on every one of 302 activations, so the two chairs' records of the
+//same act disagreed about what it was aimed at. Consumed synchronously inside
+//GameObserver::receiveEvent's drain, exactly like `source` above.
 struct WEventAbilityActivated : public WEvent {
     MTGCardInstance * source;
     Player * controller;
     string abilityText;
+    vector<Targetable *> targets;
     WEventAbilityActivated(MTGCardInstance * _source, Player * _controller,
-                           string _abilityText)
-        : WEvent(), source(_source), controller(_controller), abilityText(_abilityText) {}
+                           string _abilityText,
+                           vector<Targetable *> _targets = vector<Targetable *>())
+        : WEvent(), source(_source), controller(_controller), abilityText(_abilityText),
+          targets(_targets) {}
     virtual ~WEventAbilityActivated() {};
 };
 

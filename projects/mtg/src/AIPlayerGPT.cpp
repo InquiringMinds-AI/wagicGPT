@@ -287,8 +287,31 @@ string textSnippetCore(const string& raw, size_t maxLen)
     return text;
 }
 
+//W43-LOW (wave-42 seat 130 N4 - read live as a "phantom Clue option with empty
+//card text sourced to Dwarven Blastminer"): a TOKEN's `text` field is not rules
+//text. The engine writes its own bookkeeping into it at creation -
+//"(<colors,keywords>) source: <the card whose ability made it>" (the token
+//branch in AllAbilities.h) - so a Clue token rendered {card text: "() source:
+//Dwarven Blastminer"}: nothing about what the token DOES, plus an attribution
+//the pilot read as a link between two unrelated cards. The colours and keywords
+//that string lists are already rendered from the instance's own live state
+//(keywordList/typeTag), so the whole field is engine internals. Recognise the
+//shape exactly - a leading parenthetical immediately followed by " source: " -
+//and render nothing at all rather than a non-fact.
+bool isEngineTokenText(const string& t)
+{
+    if (t.empty() || t[0] != '(')
+        return false;
+    size_t close = t.find(')');
+    if (close == string::npos)
+        return false;
+    return t.size() > close + 10 && t.compare(close, 10, ") source: ") == 0;
+}
+
 string cardTextSnippet(MTGCardInstance * card, size_t maxLen)
 {
+    if (isEngineTokenText(card->text))
+        return "";
     return textSnippetCore(card->text, maxLen);
 }
 
@@ -1021,6 +1044,23 @@ string legibleKeywordName(const string& engineName)
             return t.str();
         }
     }
+    return engineName;
+}
+
+//W43-LOW (wave-42 engine-validation defect 9, 37 corpus lines): "TeferiEffect"
+//is a BOOKKEEPING counter - Teferi, Who Slows the Sunset's +1 puts one on
+//itself purely so its own @counteradded(...) triggers fire, and the card script
+//removes it in the same breath. Rendered by its engine token it read as a game
+//fact the pilot had to account for beside real loyalty counters ("[counters: 5x
+//loyalty 1x teferieffect]"). Name what it IS. A table, because the next
+//engine-named counter will want the same treatment.
+string legibleCounterName(const string& engineName)
+{
+    string low = engineName;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    if (low == "teferieffect")
+        return "bookkeeping (Teferi's +1)";
     return engineName;
 }
 
@@ -1783,6 +1823,38 @@ static bool w42CounterLabel(const string& s, string& out)
         if (!w42Int(w42Collapse(after.substr(1)), nb)) return false;
     }
     string head = w42Collapse(s.substr(0, cpos));
+    //W43-LOW (wave-42 engine-validation defect 11): the ENGINE's composed label
+    //(AACounter::getMenuText) is "<name> <P/T> Counter[: N]" and never carries a
+    //verb - THIS composer supplies the put/remove. A CARD SCRIPT's name(...) is
+    //often already a whole English phrase ("Put 1/1 counter", "Don't add any
+    //counter", "Remove 1 loyalty counter"), and recomposing one folded the
+    //author's verb into the counter's KIND: "put a +1/+1 put counter" (316
+    //corpus lines) and "put a don't add any counter" (45). Two rules. A leading
+    //put/add/place is this composer's own verb, duplicated: drop it and compose
+    //normally. Any OTHER leading verb or negation is a phrase this composer
+    //cannot model - it would relabel a move/remove/conditional as a plain "put"
+    //- so hand the author's words back untouched (unmapped, hence never
+    //re-cased, per renderAbilityLabel's contract).
+    {
+        string hl = w42Lower(head);
+        static const char * kOwnVerb[] = { "put ", "add ", "place " };
+        for (size_t v = 0; v < 3; v++)
+        {
+            size_t n = strlen(kOwnVerb[v]);
+            if (hl.size() > n && hl.compare(0, n, kOwnVerb[v]) == 0)
+            {
+                head = w42Collapse(head.substr(n));
+                hl = w42Lower(head);
+                break;
+            }
+        }
+        static const char * kForeignHead[] = { "don't", "do not", "remove", "move",
+                                               "assign", "gain", "check", "pay",
+                                               "get", "creatures", "put", "add", "place" };
+        for (size_t v = 0; v < sizeof(kForeignHead) / sizeof(kForeignHead[0]); v++)
+            if (hl.compare(0, strlen(kForeignHead[v]), kForeignHead[v]) == 0)
+                return false;
+    }
     string ptWord, name = head;
     size_t sp = head.rfind(' ');
     string lastTok = (sp == string::npos) ? head : head.substr(sp + 1);
@@ -2513,6 +2585,41 @@ bool stackObjectIsRespondable(bool hasSource, bool sourceIsEmblemMarker)
     return !sourceIsEmblemMarker;
 }
 
+//#W43-11 (wave-42 engine-validation defect 4; 66 board entries and 211 "Your
+//Day resolved and entered the battlefield" log lines in one corpus): the SAME
+//designation markers W41-16 removed from the stack were still being rendered as
+//a player's battlefield PERMANENTS. CR 730 day/night is a game-wide designation
+//that belongs to neither player and is not an object at all; the engine models
+//it (with the monarch, the initiative, the ring and city's blessing) as a
+//type=Emblem marker card parked on a battlefield so the daybound/ascend/monarch
+//machinery can locate it, and it MOVES between the two battlefields every end
+//step - which is where the repeated "entered the battlefield" lines came from.
+//The engine hack is left alone; the RENDER stops counting a non-object as a
+//permanent and states the designation as its own neutral fact. Same predicate
+//the suite's zone accounting (TestSuiteAI isDesignationMarker) already uses.
+bool boardEntryIsPermanent(bool isDesignationMarker)
+{
+    return !isDesignationMarker;
+}
+
+//The neutral one-liner a day/night transition earns in place of a permanent's
+//zone-change sentence. GAME-WIDE, so no owner tag: "Your Day" was itself the
+//false half of the old line.
+string dayNightChangeNarration(const string& designation)
+{
+    if (designation.empty())
+        return "";
+    return "It became " + designation;
+}
+
+//Is this marker the day/night designation (as opposed to a player-held one like
+//the monarch)? Case-folded because the marker's name is card data.
+bool isDayNightMarkerName(const string& name)
+{
+    string low = w42Lower(name);
+    return low == "day" || low == "night";
+}
+
 //W42-4 (wave-41 seats 123 AND 126, independently; measured 1,619 of 19,750
 //prompt chars = 8% on deck126 seq 28): a token swarm renders one entry per
 //body, and eleven byte-identical "Vampire #n (2/2) [summoning sick ...]"
@@ -2598,6 +2705,11 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         //as its own battlefield entry. Battlefield renders only (withStatus); an
         //under card never appears off the battlefield.
         if (withStatus && card->mutation && !card->parentCards.empty())
+            continue;
+        //#W43-11: a designation marker is not a permanent - see
+        //boardEntryIsPermanent. Battlefield renders only; the marker never
+        //appears in a hand.
+        if (withStatus && !boardEntryIsPermanent(card->hasType(Subtypes::TYPE_EMBLEM)))
             continue;
         entNames.push_back(card->getDisplayName());
         //Disambiguate same-named permanents so a board entry binds to the
@@ -2724,7 +2836,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                         continue;
                     out << " " << ct->nb << "x ";
                     if (!ct->name.empty() && ct->name != " ")
-                        out << ct->name;
+                        out << legibleCounterName(ct->name); //W43-LOW defect 9
                     else
                         out << (ct->power >= 0 ? "+" : "") << ct->power << "/"
                             << (ct->toughness >= 0 ? "+" : "") << ct->toughness;
@@ -2848,11 +2960,83 @@ bool isRevealZone(MTGGameZone * z)
     return z && z->owner && z == z->owner->game->reveal;
 }
 
+//W43-LOW (wave-42 engine-validation defect 13): a dungeon lives in its owner's
+//COMMAND ZONE, which is a plain MTGGameZone - getName() answers the base
+//class's placeholder "zone", so all 36 corpus dungeon rows read "[your zone]".
+//Same identity test isRevealZone uses, for the same reason (no subclass to key
+//on).
+bool isCommandZone(MTGGameZone * z)
+{
+    return z && z->owner && z->owner->game && z == z->owner->game->commandzone;
+}
+
 string zoneDesc(MTGGameZone * z)
 {
     if (isRevealZone(z))
         return "reveal";
+    if (isCommandZone(z))
+        return "command zone";
     return z->getName();
+}
+
+//#W43-9 (wave-42 seat 130 N3, one self-inflicted land destruction): SPELL
+//target rows carried "[your battlefield]" / "[opponent's battlefield]" while
+//ability-ACTIVATION rows named the target bare ("Destroy with Dwarven
+//Blastminer targeting Forgotten Cave"), and the pilot blew up its own cycling
+//land. WHICH BOARD the target sits on is the one fact that separates the two
+//decisions, so both builders take the tag from here and cannot drift apart
+//again. DECISION SURFACES ONLY: it is a bracket, and the owner's ruling keeps
+//bracketed guidance out of the append-only log (stripNarrationDecoration drops
+//every bracket) - see targetLogName for the history-side twin.
+string targetZoneTag(Player * me, MTGCardInstance * c)
+{
+    if (!c || !c->currentZone)
+        return "";
+    return string(" [") + (c->controller() == me ? "your " : "opponent's ")
+           + zoneDesc(c->currentZone) + "]";
+}
+
+//#W43-10: how a target is NAMED in the append-only log - identity only (name
+//plus the "#N" instance handle that binds it to one physical card), no
+//bracketed decoration. The acting seat's line reaches history through
+//stripNarrationDecoration, which drops every bracket; the observing seat writes
+//its line directly, so it must build the already-stripped shape itself or the
+//two chairs' records of one act differ.
+string targetLogName(Player * me, Targetable * t)
+{
+    if (Player * p = dynamic_cast<Player *>(t))
+        return (p == me) ? "you" : "the opponent";
+    MTGCardInstance * c = dynamic_cast<MTGCardInstance *>(t);
+    if (!c)
+        return "";
+    return c->getDisplayName() + instanceHandle(c);
+}
+
+//The DECISION-surface twin: the log name plus the owner/zone tag (#W43-9).
+string targetReference(Player * me, Targetable * t)
+{
+    string base = targetLogName(me, t);
+    if (base.empty())
+        return base;
+    return base + targetZoneTag(me, dynamic_cast<MTGCardInstance *>(t));
+}
+
+//A comma-joined list of target references, skipping anything that cannot be
+//named (never a bare comma, never an empty "targeting").
+string targetListPhrase(Player * me, const vector<Targetable *>& targets, bool decisionSurface)
+{
+    string out;
+    for (size_t i = 0; i < targets.size(); i++)
+    {
+        string one = decisionSurface ? targetReference(me, targets[i])
+                                     : targetLogName(me, targets[i]);
+        if (one.empty())
+            continue;
+        if (!out.empty())
+            out += ", ";
+        out += one;
+    }
+    return out;
 }
 
 //=== W35: the GAME LOG's NARRATION REGISTER ==================================
@@ -3193,15 +3377,38 @@ string activationVerbPhrase(bool mine)
 //resolveOwningCardName ladder first; a line that still cannot name a real card
 //is dropped rather than printed nameless.
 string abilityActivationNarration(bool mine, const string& abilityText,
-                                  const string& cardName)
+                                  const string& cardName, const string& targets = string())
 {
     if (cardName.empty())
         return "";
     //W42-D4: the observer's copy of the label goes through the same render map
     //as the actor's option line, so both chairs read the same plain English.
+    bool mapped = false;
     string label = abilityText.empty() ? string("an ability")
-                                       : renderAbilityLabel(abilityText);
-    return activationVerbPhrase(mine) + label + " with " + cardName;
+                                       : renderAbilityLabel(abilityText, &mapped);
+    //#W43-10(c): the actor capitalises a MAPPED label (it is sentence-initial on
+    //its option line, describeAction) and this chair did not - two render paths
+    //where W42-D4 intended one, so one act read "You used: Put a level counter"
+    //against "Opponent used: put a level counter". Same rule, both chairs. An
+    //UNMAPPED label is still passed through untouched: card scripts name their
+    //own abilities and re-casing one would un-key the de-dup/decline maps that
+    //match on the rendered line (see renderAbilityLabel).
+    if (mapped)
+        label = w42Capitalize(label);
+    //W43-LOW (wave-42 defect 10): an ability whose script carries no name= falls
+    //back to the CARD's own name, lower-cased - "used: mistgate pathway with
+    //Mistgate Pathway" (22 corpus lines). The label then states nothing the
+    //"with <Card>" clause does not, and its different casing reads as a second,
+    //unknown object. Say what is true and no more.
+    if (!label.empty() && regLower(label) == regLower(cardName))
+        label = "an ability";
+    string out = activationVerbPhrase(mine) + label + " with " + cardName;
+    //#W43-10(a): the targeting clause. Identity only - the acting seat's copy
+    //reaches history through stripNarrationDecoration, which drops every
+    //bracket, so a zone tag here would put the two chairs back out of step.
+    if (!targets.empty())
+        out += " targeting " + targets;
+    return out;
 }
 
 //Token creation attributes its CREATOR (owner addendum (7)): "March from the
@@ -3235,7 +3442,7 @@ string counterEventNarration(bool mine, const string& cardName, const string& ha
     o << ownerTag(mine) << cardName << handle << (added ? " got " : " lost ");
     string label;
     if (!counterName.empty() && counterName != " ")
-        label = counterName;
+        label = legibleCounterName(counterName); //W43-LOW defect 9
     else if (power || toughness)
     {
         std::ostringstream p;
@@ -3353,6 +3560,82 @@ string trimMarkerLine(const string& myGrave, const string& oppGrave,
           << "; opponent - " << (oppExile.empty() ? "none" : oppExile);
     }
     o << ")";
+    return o.str();
+}
+
+//#W43-11 (wave-42 engine-validation defect 7: 52 runs of >= 3 byte-identical
+//event lines in one corpus, planeswalker loyalty ticks the worst class - a
+//five-counter arrival wrote the same sentence five times). N identical lines
+//carry exactly the information of one plus a COUNT, and the count is the fact
+//the log was hiding. Fold the run into one sentence that states it.
+//
+//Truthfulness rules (the collapsed line is a rendered statement, so it is an
+//instruction): the COUNT is always exact - it is the length of the run this
+//function was handed. The RESULTING TOTAL is stated only when the emitter
+//supplied one (`total` >= 0, a counter event's own settledNb captured at fire
+//time); it is never derived from the count, because a run that began above zero
+//would then read as a lie. A shape this function cannot re-conjugate keeps its
+//sentence verbatim and takes an explicit "(xN)" - never a silent drop, never an
+//invented plural.
+//
+//Pure over the line text, so every shape (and every non-shape) is provable in
+//PARSETEST without a game.
+const int kEventRunCollapseFloor = 3;
+
+string collapsedRunNarration(const string& line, int count, int total)
+{
+    if (line.empty() || count < 2)
+        return line;
+    std::ostringstream tail;
+    if (total >= 0)
+        tail << " (now " << total << ")";
+    //"<subject> got a loyalty counter" x5 -> "<subject> got 5 loyalty counters"
+    //(the counter register: counterEventNarration writes " got a "/" lost a ").
+    static const char * kCounterVerb[] = { " got a ", " lost a " };
+    for (size_t v = 0; v < 2; v++)
+    {
+        size_t p = line.find(kCounterVerb[v]);
+        if (p == string::npos)
+            continue;
+        size_t noun = p + strlen(kCounterVerb[v]);
+        //Only the plain "<kind> counter" tail pluralises cleanly; a line that
+        //already carries a settled "(now X/Y)" or any other tail is left to the
+        //verbatim branch below rather than pluralised through it.
+        if (line.size() < noun + 9
+            || line.compare(line.size() - 8, 8, " counter") != 0)
+            break;
+        std::ostringstream o;
+        o << line.substr(0, p) << (v == 0 ? " got " : " lost ") << count << " "
+          << line.substr(noun, line.size() - noun - 8) << " counters" << tail.str();
+        return o.str();
+    }
+    //"You drew a card" x3 -> "You drew 3 cards".
+    {
+        size_t p = line.find(" drew a card");
+        if (p != string::npos && p + 12 == line.size())
+        {
+            std::ostringstream o;
+            o << line.substr(0, p) << " drew " << count << " cards";
+            return o.str();
+        }
+    }
+    //"<creator> created a 1/1 Soldier token" x3 -> "... created 3 1/1 Soldier
+    //tokens" (tokenCreatedNarration's shape).
+    {
+        size_t p = line.find(" created a ");
+        size_t noun = (p == string::npos) ? 0 : p + 11;
+        if (p != string::npos && line.size() >= noun + 6
+            && line.compare(line.size() - 6, 6, " token") == 0)
+        {
+            std::ostringstream o;
+            o << line.substr(0, p) << " created " << count << " "
+              << line.substr(noun, line.size() - noun - 6) << " tokens";
+            return o.str();
+        }
+    }
+    //Anything else keeps the author's sentence and states the count outright.
+    std::ostringstream o;
+    o << line << " (x" << count << ")" << tail.str();
     return o.str();
 }
 
@@ -3829,8 +4112,7 @@ string describeTarget(Player * me, Targetable * t, bool decisionSurface = true)
         if (!tag.empty())
             o << " [" << tag << "]";
     }
-    if (c->currentZone)
-        o << " [" << (c->controller() == me ? "your " : "opponent's ") << zoneDesc(c->currentZone) << "]";
+    o << targetZoneTag(me, c); //#W43-9: the shared owner/zone tag
     if (c->isTapped())
         o << " [tapped]";
     //Dungeon SELECTION target (N-146c): the generic 110-char snippet TRUNCATED
@@ -4710,6 +4992,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
     mBulkMoveCount = 0;                  //W41-3(c): no bulk move pending
     mBulkMoveMine = false;
+    mRunCount = 0;                       //#W43-11: no identical-line run held
+    mRunTotal = -1;
     mSearchRevealMine = false;           //#W42-D1: no search run pending
     mSearchIsFullDump = false;
     mSearchIsWholeZone = false;
@@ -5161,6 +5445,9 @@ void AIPlayerGPT::logGameEnd()
     //machine moves on, and only ONE gameend record may close the file.
     if (mGameEndLogged || mTransLogPath.empty())
         return;
+    //#W43-11: the last events of the game may still be held in the run buffer;
+    //the closing record's delta is the only place they can still land.
+    flushEventRun();
     ensureGameStartRecord();
     mGameEndLogged = true;
     bool iWon = observer->didWin(this);
@@ -5339,6 +5626,9 @@ void AIPlayerGPT::flushOpeningHand()
         return;
     if (!mOpeningHand.empty())
     {
+        //#W43-11: this writer goes STRAIGHT into mNarration, so a held run must
+        //be written out first or its lines would jump the queue behind this one.
+        flushEventRun();
         std::ostringstream o;
         o << "- Your opening hand (" << mOpeningHand.size() << " cards): ";
         for (size_t i = 0; i < mOpeningHand.size(); i++)
@@ -5359,6 +5649,9 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
     flushSearchReveal();  //#W42-D1: the search must be in the log the model reads
     flushPregameBottom(); //#W42-D9
     flushOpeningHand(); //always: preserves the opening-hand log line for turn 1+
+    //#W43-11: LAST - every flush above appends, and an append can start or
+    //extend the identical-line run this one writes out.
+    flushEventRun();
     //N-93b de-dup: at pregame (turn 0 - mulligan/leyline/bottom asks) the only
     //narration is the just-flushed opening-hand line, and the live "Your hand:"
     //render below shows the SAME cards tagged (strictly more info). Rendering
@@ -5498,7 +5791,7 @@ void narrationAppend(string& narration, string& pendingPhase, const string& line
     }
 }
 
-void AIPlayerGPT::appendNarration(const string& line)
+void AIPlayerGPT::appendNarration(const string& line, int runTotal)
 {
     if (line.empty())
         return;
@@ -5509,6 +5802,47 @@ void AIPlayerGPT::appendNarration(const string& line)
     flushSearchReveal();  //#W42-D1: same reason, same re-entry discipline
     flushPregameBottom(); //#W42-D9: the bottoming precedes turn 1's first line
     flushOpeningHand(); //the deal precedes whatever is being narrated
+    //#W43-11: hold a run of BYTE-IDENTICAL lines instead of writing each one.
+    //Same flush-buffer discipline as the four above: the run is written by
+    //flushEventRun, which clears its count BEFORE it writes, so the recursion
+    //through writeNarration is a single hop and never a loop.
+    if (mRunCount > 0 && line == mRunLine)
+    {
+        mRunCount++;
+        mRunTotal = runTotal; //the total the LAST line of the run settled at
+        return;
+    }
+    flushEventRun();
+    mRunLine = line;
+    mRunCount = 1;
+    mRunTotal = runTotal;
+}
+
+void AIPlayerGPT::flushEventRun()
+{
+    if (mRunCount <= 0)
+        return;
+    int n = mRunCount;
+    int total = mRunTotal;
+    string line = mRunLine;
+    mRunCount = 0;             //cleared BEFORE the write, per the flush idiom
+    mRunTotal = -1;
+    mRunLine.clear();
+    if (n < kEventRunCollapseFloor)
+    {
+        //A run of one or two stays verbatim: two lines are not the noise class
+        //this collapse exists for, and their per-line detail is still cheap.
+        for (int i = 0; i < n; i++)
+            writeNarration(line);
+        return;
+    }
+    writeNarration(collapsedRunNarration(line, n, total));
+}
+
+void AIPlayerGPT::writeNarration(const string& line)
+{
+    if (line.empty())
+        return;
     //Zone duty (owner doctrine): the trim drops the OLDEST events, which is
     //exactly where a player's early graveyard lives - so the marker carries
     //both graveyards and both exiles as they stand at the moment of the trim.
@@ -5892,6 +6226,10 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
             {
                 if (mNarratedTurnOwner) //not before the game's first turn header
                     flushOpeningHand(); //the deal belongs to turn 1, before this header
+                //#W43-11: the header is written STRAIGHT into mNarration, so a
+                //held run must land ahead of it or the run's own lines would be
+                //filed under the next turn.
+                flushEventRun();
                 mNarratedTurnOwner = observer->currentPlayer;
                 mNarratedTurnNumber = observer->turn;
                 mPendingPhase.clear();
@@ -5908,6 +6246,11 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
                 mNarration += t.str() + "\n";
                 mNarrationPending += t.str() + "\n"; //W42-D8: delta gets the header too
             }
+            //#W43-11: a held run belongs to the phase it happened in. The
+            //pending marker is consumed by the NEXT line written, so arming a
+            //new phase while a run is still buffered would file that run's
+            //collapsed line under the phase after it. Write it out first.
+            flushEventRun();
             //the turn header carries the owner; the marker only needs the phase
             mPendingPhase = string("Phase: ") + Constants::MTGPhaseNames[pe->to->id];
         }
@@ -6023,9 +6366,55 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
     //A held life change the damage line did not consume (damage to the OTHER
     //player, or a damage line describeEvent suppressed) still gets its own line.
     flushDamageLife();
+    //#W43-11: the resulting family total a collapsed run of identical counter
+    //lines may state. Only for a NON-creature target: a creature's counter line
+    //already carries counterAppliedTag's settled "(now X/Y)", which makes each
+    //line of the run distinct (N-105f) and therefore no run at all. The
+    //planeswalker/dungeon/level case has no such tail, which is exactly why its
+    //ticks came out byte-identical.
+    int runTotal = -1;
+    if (WEventCounters * ce = dynamic_cast<WEventCounters *>(event))
+        if (ce->stateCaptured && ce->added && ce->targetCard && !ce->targetCard->isCreature())
+            runTotal = ce->settledNb;
     if (!line.empty())
-        appendNarration(line);
+        appendNarration(line, runTotal);
+    //#W43-11: a day/night transition is narrated once, on the tick it changes -
+    //the marker card's own zone events are filtered out (see describeEvent).
+    noteDesignationChange();
     return result;
+}
+
+//#W43-11: the game-wide designation, read off the board. The engine parks the
+//marker on whichever battlefield it last moved to, so BOTH are scanned and the
+//owner is deliberately ignored: day/night belongs to neither player.
+void AIPlayerGPT::noteDesignationChange()
+{
+    string now;
+    for (int p = 0; p < 2 && now.empty(); p++)
+    {
+        Player * pl = (p == 0) ? (Player *) this : opponent();
+        if (!pl || !pl->game || !pl->game->inPlay)
+            continue;
+        MTGGameZone * bf = pl->game->inPlay;
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            if (!c || !c->hasType(Subtypes::TYPE_EMBLEM))
+                continue;
+            if (isDayNightMarkerName(c->getDisplayName()))
+            {
+                now = c->getDisplayName();
+                break;
+            }
+        }
+    }
+    if (now == mDayNight)
+        return;
+    mDayNight = now;
+    //The marker leaving play is the designation ENDING, which CR 730 has no
+    //event for and no card cares about: say nothing rather than invent one.
+    if (!now.empty())
+        appendNarration(dayNightChangeNarration(now));
 }
 
 //W43-R2: the held damage-caused life change, written as an ordinary standalone
@@ -6174,6 +6563,13 @@ string AIPlayerGPT::describeEvent(WEvent * event)
     if (WEventZoneChange * e = dynamic_cast<WEventZoneChange *>(event))
     {
         if (!e->card || !e->to)
+            return "";
+        //#W43-11: a designation marker's travels are engine bookkeeping, not
+        //game events - the day/night marker alone moves between the two
+        //battlefields every end step and produced 211 "Your Day resolved and
+        //entered the battlefield" lines in one corpus. The DESIGNATION itself is
+        //narrated by noteDesignationChange, which fires only when it changes.
+        if (!boardEntryIsPermanent(e->card->hasType(Subtypes::TYPE_EMBLEM)))
             return "";
         //No origin zone = the card was CREATED (a token, a conjured copy):
         //putInZone rewrites from = previousZone, which is NULL for a card
@@ -6454,8 +6850,17 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //W42-D3: name the owning CARD, walking the granted-ability dummy back to
         //its granter; an unresolvable source omits the line (see
         //abilityActivationNarration) rather than printing a bare engine label.
-        return abilityActivationNarration(mine, e->abilityText,
-                                          resolveOwningCardName(e->source));
+        string owningName = resolveOwningCardName(e->source);
+        //#W43-10(b): the "#N" handle the ACTOR's line carries (describeAction's
+        //"with <Card> #2"). Attached only when the resolved name IS this
+        //instance's own - a granted-ability dummy resolves to the GRANTER's
+        //name, and that name with this instance's rank would assert an identity
+        //that does not exist.
+        string handle;
+        if (!owningName.empty() && owningName == e->source->getDisplayName())
+            handle = instanceHandle(e->source);
+        return abilityActivationNarration(mine, e->abilityText, owningName + handle,
+                                          targetListPhrase(this, e->targets, false));
     }
 
     //N-105a part (c): every poison GAIN. The engine fires this event on all
@@ -6789,6 +7194,11 @@ string AIPlayerGPT::serializeGameState()
         MTGCardInstance * c = game->inPlay->cards[i];
         if (c->mutation && !c->parentCards.empty())
             continue;
+        //#W43-11: the header counts LINES the render emits, and the marker no
+        //longer gets one (describeZoneCards); counting it here would put the
+        //header back at odds with its own list.
+        if (!boardEntryIsPermanent(c->hasType(Subtypes::TYPE_EMBLEM)))
+            continue;
         myPermanents++;
         if (c->isCreature())
             myCreatures++;
@@ -6798,6 +7208,8 @@ string AIPlayerGPT::serializeGameState()
         {
             MTGCardInstance * c = opp->game->inPlay->cards[i];
             if (c->mutation && !c->parentCards.empty())
+                continue;
+            if (!boardEntryIsPermanent(c->hasType(Subtypes::TYPE_EMBLEM))) //#W43-11
                 continue;
             oppPermanents++;
             if (c->isCreature())
@@ -7346,7 +7758,10 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
     }
     if (action.target)
     {
-        out << " targeting " << action.target->getDisplayName();
+        //#W43-9: name, instance handle AND the owner/zone tag - the same
+        //reference the spell-target rows already carried. A bare name here read
+        //as "some Forgotten Cave" and the pilot destroyed its own.
+        out << " targeting " << targetReference(this, action.target);
         //Re-attaching to the current host is rules-legal but changes nothing.
         //The board line's cue (two power numbers / {attached:}) proved
         //insufficient at range - the pilot read it and re-equipped anyway
@@ -7377,8 +7792,25 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                                        host == action.target);
         }
     }
+    else if (!action.mAbilityTargets.empty())
+    {
+        //#W43-9: a MULTI-target activation named none of its targets at all -
+        //the same owner-blindness as the single-target row, one degree worse.
+        string many = targetListPhrase(this, action.mAbilityTargets, true);
+        if (!many.empty())
+            out << " targeting " << many;
+    }
     else if (action.playerAbilityTarget || action.player)
-        out << " targeting a player";
+    {
+        //#W43-9/#W43-10: WHICH player. "a player" is the owner-tag defect in
+        //its purest form on a face-damage/drain activation, and the observing
+        //seat's line names the player, so this one had to as well.
+        Player * pt = action.player;
+        if (!pt)
+            pt = dynamic_cast<Player *>(action.playerAbilityTarget);
+        out << " targeting " << (pt ? (pt == this ? "you" : "the opponent")
+                                    : string("a player"));
+    }
 
     //Localize the cost onto the action itself. The menu text describes the
     //EFFECT ("Destroy target enchantment") but never the price, so a sacrifice
@@ -19840,8 +20272,10 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(stackAbilityName("", renderAbilityLabel("Deal 1 Damage"))
               == "ability: deal 1 damage",
               "W42-D4 echo the stack line carries the mapped phrase");
+        //#W43-10(c) revised this expectation: the observer capitalises a MAPPED
+        //label exactly as describeAction does for the actor's option line.
         CHECK(abilityActivationNarration(false, " 1/1 Counter", "Luminarch Aspirant")
-              == "Opponent used: put a +1/+1 counter with Luminarch Aspirant",
+              == "Opponent used: Put a +1/+1 counter with Luminarch Aspirant",
               "W42-D4 echo the observer activation line is mapped and single-spaced");
         CHECK(actionTakenNarration(w42Capitalize(renderAbilityLabel("Deal 1 Damage"))
                                    + " with Staff of Nin targeting a player")
@@ -20222,6 +20656,172 @@ void AIPlayerGPT::runParseSelfTest()
                                                        true, 34))
               == "Dwarven Blastminer dealt 1 damage to the opponent (now 34)",
               "W43-R2 echo: the life result is content, not decoration - it is never stripped");
+    }
+
+    // ---- #W43-9: the owner tag on ability-target rows ----
+    cout << "\n[#W43-9] every target reference names WHICH board it is on\n";
+    {
+        // The shipped shape is a bracket after the name (and after the "#N"
+        // handle when the name collides), exactly as the spell-target rows
+        // already carried - the pure half of that is targetZoneTag, whose
+        // whole job is that both builders read one function.
+        CHECK(targetZoneTag(NULL, NULL).empty(),
+              "#W43-9 no card, no tag (never a bare '[ ]')");
+        // The observed defect, as a string: the seat-130 line had no bracket at
+        // all, so a bare Forgotten Cave read as the OPPONENT's.
+        CHECK(string("Destroy with Dwarven Blastminer targeting Forgotten Cave")
+                  .find('[') == string::npos,
+              "#W43-9 NEGATIVE the pre-fix ability-target row carried no owner tag");
+        // The log-side twin carries identity ONLY: a bracket here would be
+        // stripped out of the actor's copy (stripNarrationDecoration) and would
+        // put the two chairs' records of one act out of step.
+        CHECK(stripNarrationDecoration("You used: Destroy with Dwarven Blastminer"
+                                       " targeting Forgotten Cave [your battlefield]")
+              == "You used: Destroy with Dwarven Blastminer targeting Forgotten Cave",
+              "#W43-9 echo: the owner tag is decision-time decoration and never enters history");
+    }
+
+    // ---- #W43-10: actor and observer describe one activation identically ----
+    cout << "\n[#W43-10] observer activation lines reach parity with the actor's\n";
+    {
+        // (a) the targeting clause. Same sentence, subject swapped.
+        CHECK(abilityActivationNarration(false, "Destroy", "Dwarven Blastminer",
+                                         "Forgotten Cave")
+              == "Opponent used: Destroy with Dwarven Blastminer targeting Forgotten Cave",
+              "#W43-10(a) the observer line names the target (targets are public)");
+        CHECK(actionTakenNarration(stripNarrationDecoration(
+                  "Destroy with Dwarven Blastminer targeting Forgotten Cave"
+                  " [opponent's battlefield] [cost: {1}{r}, Tap]"), true)
+              == "You used: Destroy with Dwarven Blastminer targeting Forgotten Cave",
+              "#W43-10(a) the ACTOR's copy of the same act is byte-identical after 'used: '");
+        // NEGATIVE: no targets, no clause - never a dangling "targeting".
+        CHECK(abilityActivationNarration(false, "Draw 1", "Pyrite Spellbomb")
+              == "Opponent used: Draw 1 with Pyrite Spellbomb",
+              "#W43-10(a) NEGATIVE an untargeted activation grows no targeting clause");
+        // Multi-target reads as one comma list, in the order the chooser holds.
+        CHECK(abilityActivationNarration(true, "Tap or untap permanents",
+                                         "Teferi, Who Slows the Sunset",
+                                         "Mountain #2, the opponent")
+              == "You used: Tap or untap permanents with Teferi, Who Slows the Sunset"
+                 " targeting Mountain #2, the opponent",
+              "#W43-10(a) a multi-target activation lists every target");
+        // (b) the "#N" handle rides the source name, as it does on the actor's
+        // option line ("with <Card> #2").
+        CHECK(abilityActivationNarration(false, "becomes Beholder", "Hive of the Eye Tyrant #2")
+              == "Opponent used: becomes Beholder with Hive of the Eye Tyrant #2",
+              "#W43-10(b) the observer line binds to ONE physical card");
+        // (c) verb case: a MAPPED label is capitalised at both chairs, an
+        // UNMAPPED one is passed through untouched at both (re-casing an
+        // author's label would un-key the de-dup/decline maps).
+        {
+            bool m = false;
+            string lbl = renderAbilityLabel("level Counter", &m);
+            CHECK(m && abilityActivationNarration(false, "level Counter", "Ranger Class")
+                  == "Opponent used: " + w42Capitalize(lbl) + " with Ranger Class",
+                  "#W43-10(c) a mapped label is capitalised on the observer path too");
+            CHECK(abilityActivationNarration(false, "search basic land", "Marsh Flats")
+                  == "Opponent used: search basic land with Marsh Flats",
+                  "#W43-10(c) NEGATIVE an unmapped label is NOT re-cased");
+        }
+        // W43-LOW defect 10: a label that is just the card's own name, lowercased.
+        CHECK(abilityActivationNarration(true, "mistgate pathway", "Mistgate Pathway")
+              == "You used: an ability with Mistgate Pathway",
+              "W43-LOW a self-named label states nothing the 'with <Card>' clause does not");
+        CHECK(abilityActivationNarration(true, "Cycling", "Forgotten Cave")
+              == "You used: Cycling with Forgotten Cave",
+              "W43-LOW NEGATIVE a real label beside its card is untouched");
+    }
+
+    // ---- #W43-11: run collapse, and day/night as a designation ----
+    cout << "\n[#W43-11] identical event runs collapse; day/night is not a permanent\n";
+    {
+        // The worst class: a planeswalker arriving with its starting loyalty.
+        CHECK(collapsedRunNarration("Your Teferi, Who Slows the Sunset got a loyalty counter",
+                                    5, 5)
+              == "Your Teferi, Who Slows the Sunset got 5 loyalty counters (now 5)",
+              "#W43-11 a loyalty run folds into one line with the resulting total");
+        // TRUTHFULNESS: the total is the emitter's, never derived from the count.
+        CHECK(collapsedRunNarration("Your Ranger Class got a level counter", 2, 5)
+              == "Your Ranger Class got 2 level counters (now 5)",
+              "#W43-11 count and total are independent facts");
+        CHECK(collapsedRunNarration("Your Ranger Class got a level counter", 3, -1)
+              == "Your Ranger Class got 3 level counters",
+              "#W43-11 NEGATIVE no total is invented when the emitter supplied none");
+        CHECK(collapsedRunNarration("Opponent drew a card", 3, -1)
+              == "Opponent drew 3 cards",
+              "#W43-11 the draw run reads as one draw of N");
+        CHECK(collapsedRunNarration("Opponent created a 1/1 Goblin token", 3, -1)
+              == "Opponent created 3 1/1 Goblin tokens",
+              "#W43-11 a token-creation run reads as one creation of N");
+        // A shape this cannot re-conjugate keeps its sentence and states the
+        // count outright - never a silent drop, never an invented plural.
+        CHECK(collapsedRunNarration("Untap step", 4, -1) == "Untap step (x4)",
+              "#W43-11 an unmodelled shape is counted verbatim");
+        CHECK(collapsedRunNarration("Your Slippery Bogle lost a -1/-1 counter (now 1/1)", 3, -1)
+              == "Your Slippery Bogle lost a -1/-1 counter (now 1/1) (x3)",
+              "#W43-11 a line already carrying a settled tail is not pluralised through it");
+        // NEGATIVE: a run of one is itself - the collapse never rewrites a
+        // single event.
+        CHECK(collapsedRunNarration("Opponent drew a card", 1, -1) == "Opponent drew a card",
+              "#W43-11 NEGATIVE a lone line is never collapsed");
+        CHECK(kEventRunCollapseFloor == 3,
+              "#W43-11 the floor is three (two identical lines are not the noise class)");
+        // Day/night: a designation, not a permanent.
+        CHECK(!boardEntryIsPermanent(true) && boardEntryIsPermanent(false),
+              "#W43-11 a type=Emblem designation marker is never a board permanent");
+        CHECK(dayNightChangeNarration("Night") == "It became Night"
+              && dayNightChangeNarration("Day") == "It became Day",
+              "#W43-11 the transition is a neutral, game-wide one-liner");
+        CHECK(dayNightChangeNarration("").empty(),
+              "#W43-11 NEGATIVE no designation, no line");
+        CHECK(dayNightChangeNarration("Night").find("Your") == string::npos
+              && dayNightChangeNarration("Night").find("Opponent") == string::npos,
+              "#W43-11 NEGATIVE the line takes NO owner tag - 'Your Day' was the false half");
+        CHECK(isDayNightMarkerName("Day") && isDayNightMarkerName("night")
+              && !isDayNightMarkerName("The Monarch"),
+              "#W43-11 only day/night is the game-wide designation");
+        // ECHO: the collapsed line is history, so it must survive the strip.
+        CHECK(stripNarrationDecoration("It became Night") == "It became Night",
+              "#W43-11 echo: the designation line carries no decoration to strip");
+    }
+
+    // ---- W43-LOW batch ----
+    cout << "\n[W43-LOW] counter labels, dungeon zone, engine token text\n";
+    {
+        // defect 11: the composer's verb, duplicated by the script's own.
+        CHECK(renderAbilityLabel("Put 1/1 Counter") == "put a +1/+1 counter",
+              "W43-LOW the script's leading 'Put' is this composer's own verb - dropped");
+        CHECK(renderAbilityLabel("Put 1/1 Counter").find("put counter") == string::npos,
+              "W43-LOW NEGATIVE the doubled verb is gone");
+        CHECK(renderAbilityLabel("Don't add any Counter") == "Don't add any Counter",
+              "W43-LOW a negation is a phrase this composer cannot model - verbatim");
+        CHECK(renderAbilityLabel("Remove 1 loyalty Counter") == "Remove 1 loyalty Counter",
+              "W43-LOW a foreign verb is handed back untouched, never relabelled 'put'");
+        CHECK(renderAbilityLabel("Move 1/1 Counter") == "Move 1/1 Counter",
+              "W43-LOW NEGATIVE a MOVE is never recomposed as a put");
+        CHECK(renderAbilityLabel(" 1/1 Counter") == "put a +1/+1 counter",
+              "W43-LOW REGRESSION the engine's own composed label is unaffected");
+        CHECK(renderAbilityLabel("Charge Counter: -2") == "remove 2 charge counters",
+              "W43-LOW REGRESSION the removal shape is unaffected");
+        // defect 9: the bookkeeping counter.
+        CHECK(legibleCounterName("TeferiEffect") == "bookkeeping (Teferi's +1)",
+              "W43-LOW the engine-named bookkeeping counter is render-named");
+        CHECK(legibleCounterName("loyalty") == "loyalty"
+              && legibleCounterName("level") == "level",
+              "W43-LOW NEGATIVE real counters keep their names");
+        CHECK(counterEventNarration(true, "Teferi, Who Slows the Sunset", "", true,
+                                    "TeferiEffect", 0, 0, "", "")
+              == "Your Teferi, Who Slows the Sunset got a bookkeeping (Teferi's +1) counter",
+              "W43-LOW the narration reads the same table as the board line");
+        // seat-130 N4: a token's engine bookkeeping is not card text.
+        CHECK(isEngineTokenText("() source: Dwarven Blastminer"),
+              "W43-LOW the empty-ability token text is recognised");
+        CHECK(isEngineTokenText("(black,reach,menace) source: Lolth, Spider Queen"),
+              "W43-LOW the same shape with an ability list is recognised");
+        CHECK(!isEngineTokenText("Sacrifice this artifact: Draw a card.")
+              && !isEngineTokenText("({T}: Add {G}.) It enters tapped.")
+              && !isEngineTokenText(""),
+              "W43-LOW NEGATIVE real rules text - parenthesised or not - is never dropped");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

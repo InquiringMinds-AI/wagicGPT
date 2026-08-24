@@ -8173,7 +8173,18 @@ int ActivatedAbility::activateAbility()
         Player * activator = game->currentlyActing();
         if (!activator)
             activator = source->controller();
-        WEvent * act = NEW WEventAbilityActivated(source, activator, getMenuText());
+        //#W43-10: carry the chosen targets so the OBSERVING seat's line can name
+        //them too (they are public). A TargetAbility holds them in its own
+        //chooser at this point (TargetAbility::reactToClick only reaches
+        //activateAbility once targetsReadyCheck is OK); a plain ActivatedAbility
+        //has no chooser and the list stays empty. The ability's own `target`
+        //member is deliberately NOT used as a fallback: for most abilities the
+        //MTGAbility ctor sets it to the SOURCE card, which would render every
+        //untargeted activation as "targeting itself".
+        vector<Targetable *> actTargets;
+        if (tc)
+            actTargets = tc->getTargetsFrom();
+        WEvent * act = NEW WEventAbilityActivated(source, activator, getMenuText(), actTargets);
         game->receiveEvent(act);
     }
     if(sideEffect && usesBeforeSideEffects.size())
