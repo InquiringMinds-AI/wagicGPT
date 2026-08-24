@@ -306,7 +306,19 @@ private:
     //wrote the line and the event must stay silent.
     bool consumeSelfActivationStamp(MTGCardInstance * source, const string& abilityText);
     //Bound-checked narration append; flushes the pending phase marker first.
-    void appendNarration(const string& line);
+    //#W43-11: `runTotal`, when >= 0, is the family total this line settled at
+    //(a counter event's settledNb) - the resulting number a collapsed run of
+    //identical lines is allowed to state.
+    void appendNarration(const string& line, int runTotal = -1);
+    //#W43-11: write (and clear) the pending run of identical lines - as the one
+    //line itself when it never repeated, as both when it ran to two, and as ONE
+    //collapsed line from three up. Runs wherever flushBulkMove runs.
+    void flushEventRun();
+    //#W43-11: the raw (pre-collapse) narration write. Everything appendNarration
+    //did before the run buffer was put in front of it.
+    void writeNarration(const string& line);
+    //#W43-11: narrate a day/night transition, once, when it actually changes.
+    void noteDesignationChange();
     //Zone-duty digest for the trim marker (see trimMarkerLine).
     string zoneNameDigest(MTGGameZone * z);
     //W41-3(c): write (and clear) the pending collapsed bulk move, if any. Must
@@ -672,6 +684,20 @@ private:
     Player * mDamageLifePlayer;
     int mDamageLifeAmount;
     int mDamageLifeSettled;
+    //#W43-11: the pending run of BYTE-IDENTICAL narration lines. `mRunLine` is
+    //held, not written, until a different line arrives or the prompt is
+    //assembled - the same flush-buffer discipline W41-3(c) and #W42-D1 use, so
+    //the collapsed line lands in the log exactly where its run happened.
+    //`mRunTotal` is the family total the LAST line of the run settled at (the
+    //counter event's own settledNb), or -1 when the emitter has no such total;
+    //it is the only number the collapsed line may claim.
+    string mRunLine;
+    int mRunCount;
+    int mRunTotal;
+    //#W43-11: the game-wide day/night designation as this seat last narrated it
+    //("Day", "Night", or empty for neither). The marker card itself is filtered
+    //off every object surface, so this is the only place the fact lives.
+    string mDayNight;
     //W41-3(c): the pending bulk graveyard->library run. `mBulkMoveFirstLine` is
     //the ordinary named line for the FIRST move, kept so a run of length one
     //flushes as itself rather than as a "1 card" count.
