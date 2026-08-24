@@ -1101,3 +1101,8 @@ red_elemental_blast_counter.txt
 red_elemental_blast_destroy.txt
 red_elemental_blast_negative.txt
 blue_elemental_blast_both_modes.txt
+delver_of_secrets_cast_upkeep.txt
+delver_of_secrets_no_instant.txt
+black_vise_seven_cards.txt
+black_vise_four_cards.txt
+black_vise_own_upkeep.txt
