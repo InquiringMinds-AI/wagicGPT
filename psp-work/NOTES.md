@@ -5550,3 +5550,13 @@ byte-for-byte. deploy-vita.sh's pre-check curl false-negatived once (single-thre
 server) while the port was provably open — direct curl -T worked; script check may
 want a retry. Install remains MANUAL per policy: VitaShell -> ux0:/vpk/wagic.vpk ->
 Cross. Old wagicGPT-alpha.vpk (08-19) still alongside in ux0:/vpk/.
+
+## 2026-08-24 (later) — second VPK of the day: owner-fix build uploaded
+psp-port ff'd to e1ade0171; hermetic vitasdk build (logs ~/.gatelogs/vita_vpk2.log);
+VPK 32,516,320 bytes uploaded to ux0:/vpk/wagic.vpk, size-verified. Carries: reveal/scry
+input-flush (held-trigger self-decline fix — hold-stepping now HALTS at a reveal),
+manarestriction{} spend-restricted mana, Condemn fizzle logger (ALPHA-only WAGIC_DEVLOGS
+on MTGAbility.cpp via CMake set_source_files_properties; log at ux0:data/Wagic/
+fizzlelog.txt — owner plays to repro, FTP the file off after a session). One unverified
+link flagged by the lane: if fizzlelog.txt never appears despite targeted spells, the
+per-file define didn't apply — fall back to add_definitions or a dedicated flag.
