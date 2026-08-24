@@ -22,6 +22,7 @@ class Counters;
 struct Pos;
 
 #include <list>
+#include <map>
 using namespace std;
 
 class MTGCardInstance: public CardPrimitive, public MTGCard, public Damageable
@@ -54,6 +55,36 @@ public:
     void registerAbility(MTGAbility * a);
     void unregisterAbility(MTGAbility * a);
     void clearAbilityRegistry();
+
+    //Keyword grants STACK.  Two continuous effects granting the same keyword
+    //(three Striking Slivers, a Talon Sliver alongside one, an anthem plus an
+    //aura) are independent - the keyword survives until the LAST of them is
+    //gone, and it must not survive one tick longer.  A per-ability-object
+    //snapshot ("what was the bit before I set it?") cannot express that: the
+    //second grant snapshots TRUE, so whichever teardown runs last writes back
+    //whatever its own snapshot happened to be.  Live-play consequence, both
+    //directions, owner-reported 2026-08-23: kill the first-granting lord and
+    //its restore-to-false strips first strike off creatures a SECOND live lord
+    //is still granting it to; kill it first and the second teardown restores
+    //TRUE, leaving a DEAD lord's first strike on the board forever (two 2/2
+    //slivers ate a 2/2 attacker untouched).
+    //
+    //So the card, not the ability object, owns the arithmetic: count the
+    //effects forcing the keyword ON and the effects forcing it OFF, remember
+    //the intrinsic value from before the first modifier attached, and
+    //recompute the bit from those three facts every time a modifier arrives or
+    //leaves.  OFF wins over ON while both are live (that is what a single
+    //remover such as Earthbind already did).  A modifier that leaves without a
+    //matching apply - a card whose basicAbilities were rebuilt from data
+    //underneath it - clamps at zero instead of going negative.
+    void applyBasicAbilityModifier(int ability, bool value);
+    void removeBasicAbilityModifier(int ability, bool value);
+private:
+    map<int, int> mAbilityGrantCount;
+    map<int, int> mAbilityDenyCount;
+    map<int, bool> mAbilityBaseValue;
+    void recomputeBasicAbility(int ability);
+public:
 
     int setAttacker(int value);
     int setDefenser(MTGCardInstance * c);

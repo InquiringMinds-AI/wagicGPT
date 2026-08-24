@@ -2482,19 +2482,30 @@ public:
     int modifier;
     int ability;
     bool value_before_modification;
+    //the card counts modifiers, so this object must contribute EXACTLY once no
+    //matter how many times addToGame/destroy are driven over its lifetime
+    bool mModifierApplied;
     ABasicAbilityModifier(GameObserver* observer, int _id, MTGCardInstance * _source, MTGCardInstance * _target, int _ability, int _modifier = 1) :
         MTGAbility(observer, _id, _source, _target), modifier(_modifier), ability(_ability)
     {
         aType = MTGAbility::STANDARDABILITYGRANT;
         abilitygranted = ability;
+        mModifierApplied = false;
+        //AEarthbind's constructor reads this before addToGame() has run
+        value_before_modification = _target ? _target->basicAbilities.test(ability) : false;
     }
 
     int addToGame()
     {
-        value_before_modification = ((MTGCardInstance *) target)->basicAbilities.test(ability);
-
         assert(modifier < 2);
-        ((MTGCardInstance *) target)->basicAbilities.set(ability, modifier > 0);
+        //grants stack - the card counts them; see MTGCardInstance.h
+        MTGCardInstance * _target = (MTGCardInstance *) target;
+        if (_target && !mModifierApplied)
+        {
+            value_before_modification = _target->basicAbilities.test(ability);
+            _target->applyBasicAbilityModifier(ability, modifier > 0);
+            mModifierApplied = true;
+        }
 
         return MTGAbility::addToGame();
     }
@@ -2502,7 +2513,12 @@ public:
     int destroy()
     {
          assert(modifier < 2);
-        ((MTGCardInstance *) target)->basicAbilities.set(ability, value_before_modification);
+        MTGCardInstance * _target = (MTGCardInstance *) target;
+        if (_target && mModifierApplied)
+        {
+            _target->removeBasicAbilityModifier(ability, modifier > 0);
+            mModifierApplied = false;
+        }
 
         return 1;
     }
@@ -2521,7 +2537,10 @@ public:
 
     ABasicAbilityModifier * clone() const
     {
-        return NEW ABasicAbilityModifier(*this);
+        ABasicAbilityModifier * copy = NEW ABasicAbilityModifier(*this);
+        //a fresh object has not contributed to any card's modifier counts yet
+        copy->mModifierApplied = false;
+        return copy;
     }
 };
 
@@ -2532,20 +2551,29 @@ public:
     bool stateBeforeActivation;
     int ability;
     int value;
+    //same one-contribution-per-object rule as ABasicAbilityModifier
+    bool mModifierApplied;
     AInstantBasicAbilityModifierUntilEOT(GameObserver* observer, int _id, MTGCardInstance * _source, MTGCardInstance * _target, int _ability, int value)
         : InstantAbility(observer, _id, _source, _target), ability(_ability), value(value)
         {
             aType = MTGAbility::STANDARDABILITYGRANT;
             abilitygranted = ability;
+            mModifierApplied = false;
+            stateBeforeActivation = _target ? _target->basicAbilities.test(ability) : false;
         }
 
         int addToGame()
         {
             MTGCardInstance * _target = (MTGCardInstance *) target;
-            stateBeforeActivation = _target->basicAbilities.test(ability);
-
             assert(value < 2);
-            _target->basicAbilities.set(ability, value > 0);
+            //until-end-of-turn grants stack with continuous ones; the card
+            //counts them - see MTGCardInstance.h
+            if (_target && !mModifierApplied)
+            {
+                stateBeforeActivation = _target->basicAbilities.test(ability);
+                _target->applyBasicAbilityModifier(ability, value > 0);
+                mModifierApplied = true;
+            }
 
 #if defined(WAGIC_MEMPROBE) && defined(PSP)
             {
@@ -2636,8 +2664,11 @@ public:
                 wagicRuleProbe("ungrant indest %s restore=%d", _target->getName().c_str(), (int)stateBeforeActivation);
         }
 #endif
-        if (_target)
-            _target->basicAbilities.set(ability, stateBeforeActivation);
+        if (_target && mModifierApplied)
+        {
+            _target->removeBasicAbilityModifier(ability, value > 0);
+            mModifierApplied = false;
+        }
         return 1;
     }
 
@@ -2650,7 +2681,10 @@ public:
 
     AInstantBasicAbilityModifierUntilEOT * clone() const
     {
-        return NEW AInstantBasicAbilityModifierUntilEOT(*this);
+        AInstantBasicAbilityModifierUntilEOT * copy = NEW AInstantBasicAbilityModifierUntilEOT(*this);
+        //a fresh object has not contributed to any card's modifier counts yet
+        copy->mModifierApplied = false;
+        return copy;
     }
 };
 

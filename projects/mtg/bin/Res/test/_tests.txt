@@ -1120,3 +1120,8 @@ spell_blast_counter_matching_mv.txt
 modal_counter_narration.txt
 chaoslace_on_stack_spell_then_blast.txt
 chaoslace_colour_lasts_across_turns.txt
+striking_sliver_grant_alive.txt
+striking_sliver_grant_revoked.txt
+first_strike_two_lords_both_die.txt
+first_strike_two_lords_one_dies.txt
+first_strike_stacked_lords_soldiers.txt

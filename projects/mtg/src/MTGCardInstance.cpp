@@ -257,6 +257,60 @@ void MTGCardInstance::unregisterAbility(MTGAbility * a)
         a->mRegistryCard = NULL;
 }
 
+//see the comment on the declarations in MTGCardInstance.h for why the card owns
+//this arithmetic instead of each granting ability snapshotting the bit
+void MTGCardInstance::recomputeBasicAbility(int ability)
+{
+    int denies = mAbilityDenyCount[ability];
+    int grants = mAbilityGrantCount[ability];
+    if (denies > 0)
+        basicAbilities.set(ability, false);
+    else if (grants > 0)
+        basicAbilities.set(ability, true);
+    else
+    {
+        //no modifier left: fall back to what the card had before the first one
+        map<int, bool>::iterator base = mAbilityBaseValue.find(ability);
+        if (base != mAbilityBaseValue.end())
+        {
+            basicAbilities.set(ability, base->second);
+            mAbilityBaseValue.erase(base);
+        }
+        mAbilityGrantCount.erase(ability);
+        mAbilityDenyCount.erase(ability);
+    }
+}
+
+void MTGCardInstance::applyBasicAbilityModifier(int ability, bool value)
+{
+    if (!mAbilityGrantCount[ability] && !mAbilityDenyCount[ability]
+        && mAbilityBaseValue.find(ability) == mAbilityBaseValue.end())
+        mAbilityBaseValue[ability] = basicAbilities.test(ability);
+
+    if (value)
+        mAbilityGrantCount[ability]++;
+    else
+        mAbilityDenyCount[ability]++;
+
+    recomputeBasicAbility(ability);
+}
+
+void MTGCardInstance::removeBasicAbilityModifier(int ability, bool value)
+{
+    if (value)
+    {
+        if (mAbilityGrantCount[ability] > 0)
+            mAbilityGrantCount[ability]--;
+    }
+    else
+    {
+        if (mAbilityDenyCount[ability] > 0)
+            mAbilityDenyCount[ability]--;
+    }
+
+    recomputeBasicAbility(ability);
+}
+
 void MTGCardInstance::clearAbilityRegistry()
 {
     for (size_t i = 0; i < cardsAbilities.size(); i++)

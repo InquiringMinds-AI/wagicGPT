@@ -1,0 +1,55 @@
+#REGRESSION (owner live-play report, Vita build, 2026-08-23): two 2/2 slivers
+#gang-blocked his 2/2 Frost Lynx, BOTH lived, the Lynx died - the slivers still
+#carried first strike from a lord that had died on an earlier turn.
+#
+#ONE dead first-strike lord does not do it (see striking_sliver_grant_revoked).
+#TWO do.  Keyword grants used to be snapshot-and-restore per ability object:
+#the first lord's grant saved "first strike was OFF", the second saved
+#"first strike was ON", and whichever teardown ran LAST wrote its own snapshot
+#back.  Kill the first-granting lord first and the second lord's teardown
+#re-set the keyword ON with no lord left alive - permanently.  MTGCardInstance
+#now counts modifiers instead, so the keyword falls away with the last of them.
+#
+#Talon Sliver and Striking Sliver both read "All Sliver creatures (you control)
+#have first strike"; Mighty Slivers (deck35) runs 3 Striking Slivers, so two
+#live first-strike lords is an ordinary board there.  Both are bolted on turn 1,
+#Talon (the first grant) first; a full turn cycle passes; then a 2/2 Grizzly
+#Bears attacks into the surviving 2/2 Spinneret Sliver.  With no lord left they
+#must TRADE.  If a dead lord's first strike lingers, Spinneret walks away.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt,Lightning Bolt
+inplay:Grizzly Bears
+manapool:{R}{R}
+[PLAYER2]
+inplay:Talon Sliver,Striking Sliver,Spinneret Sliver
+[DO]
+Lightning Bolt
+Talon Sliver
+Lightning Bolt
+Striking Sliver
+goto end
+goto firstmain
+goto end
+goto firstmain
+next
+#combat begins
+next
+#attackers
+Grizzly Bears
+next
+#blockers
+Spinneret Sliver
+next
+#damage
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+graveyard:Grizzly Bears,Lightning Bolt,Lightning Bolt
+life:20
+[PLAYER2]
+graveyard:Talon Sliver,Striking Sliver,Spinneret Sliver
+life:20
+[END]

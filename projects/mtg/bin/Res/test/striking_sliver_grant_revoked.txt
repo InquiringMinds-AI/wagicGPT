@@ -1,0 +1,47 @@
+#REGRESSION (owner live-play report, Vita build, 2026-08-23): a Striking Sliver
+#that DIED on an earlier turn was still granting first strike to the surviving
+#slivers - two 2/2 slivers gang-blocked a 2/2 and BOTH lived.
+#
+#Striking Sliver reads "Sliver creatures you control have first strike."  Once
+#it is off the battlefield the grant must be gone.  Here it is Lightning Bolted
+#on turn 1, a full turn cycle passes, and only then does a 2/2 Grizzly Bears
+#attack into the surviving 2/2 Spinneret Sliver.  With the grant correctly
+#revoked the two 2/2s TRADE; if the dead lord's first strike lingers the
+#Spinneret survives and the fixture goes red.
+#Mox Ruby pays for the Bolt (basic lands cannot appear in INIT/ASSERT).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+inplay:Grizzly Bears,Mox Ruby
+[PLAYER2]
+inplay:Striking Sliver,Spinneret Sliver
+[DO]
+Mox Ruby
+Lightning Bolt
+Striking Sliver
+goto end
+goto firstmain
+goto end
+goto firstmain
+next
+#combat begins
+next
+#attackers
+Grizzly Bears
+next
+#blockers
+Spinneret Sliver
+next
+#damage
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+inplay:Mox Ruby
+graveyard:Grizzly Bears,Lightning Bolt
+life:20
+[PLAYER2]
+graveyard:Striking Sliver,Spinneret Sliver
+life:20
+[END]
