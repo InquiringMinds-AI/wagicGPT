@@ -1,0 +1,11 @@
+#NAME:Sole Attacker Probe
+#DESC:W41 probe deck - small red attackers to push the seat's life down (blocker windows at a low forecast), 20 cheap burn spells to strip its board toward ONE attacker, and eight large ground bodies with no attack restriction (7/7, 6/6, 10/10) to arm deck152's RETURN-SWING check honestly
+Jackal Pup (*) *4
+Goblin Piker (*) *4
+Shock (*) *8
+Lightning Bolt (*) *6
+Flame Slash (*) *6
+Scoria Wurm (*) *4
+Frenetic Raptor (*) *2
+Bearer of the Heavens (*) *2
+Mountain (*) *24

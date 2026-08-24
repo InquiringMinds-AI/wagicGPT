@@ -1,0 +1,12 @@
+#NAME:Mutate Probe
+#DESC:W41 probe deck - wide cheap host board + cheap mutate bodies, so every mutate cast raises a multi-host TARGET ask with a pile already on the battlefield
+Llanowar Elves (*) *6
+Birds of Paradise (*) *6
+Arboreal Grazer (*) *4
+Pollywog Symbiote (*) *2
+Gemrazer (*) *8
+Migratory Greathorn (*) *8
+Everquill Phoenix (*) *4
+Forest (*) *16
+Island (*) *2
+Mountain (*) *4

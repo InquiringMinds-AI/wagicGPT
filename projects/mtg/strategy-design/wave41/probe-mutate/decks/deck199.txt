@@ -1,0 +1,6 @@
+#NAME:Pinger Probe
+#DESC:W41 probe deck - walls to prolong the game + cheap targeted burn (each cast raises a TARGET ask that must render the mutate pile)
+Wall of Stone (*) *14
+Shock (*) *11
+Lightning Bolt (*) *11
+Mountain (*) *24

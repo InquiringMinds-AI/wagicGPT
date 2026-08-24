@@ -1,0 +1,18 @@
+records by kind: {'gamestart': 5, 'ask': 174, 'attackers': 17, 'priority': 34, 'blockers': 5, 'gameend': 4}
+
+=== (a) ARMED SOLE-ATTACKER windows: 0
+  armed MULTI-attacker windows (context): 2
+    G1 s32 t24 life=6 big=6 n=2 -> 'Elite Spellbinder, Brutal Cathar'
+    G2 s48 t16 life=5 big=7 n=2 -> 'Sigarda, Champion of Light, Katilda, Dawnhart Prime'
+  replies containing "free damage" (any kind): 0
+
+=== (b) BLOCKER windows: 5
+  forecast >= 10: 1  of which rung-3 offered: 0  rung-3 ASSIGNMENTS taken: 0
+  forecast <= 9 : 4  of which any block offered: 4  windows with a block taken: 4
+  G1 s18 t17 life=6 N=4 lethal=False offered3=False taken='Brutal Cathar blocks Jackal Pup' rung3taken=[]
+  G2 s16 t9 life=10 N=6 lethal=False offered3=False taken='Sigarda, Champion of Light blocks Goblin Piker' rung3taken=[]
+  G3 s9 t5 life=14 N=12 lethal=False offered3=False taken='Luminarch Aspirant blocks Goblin Piker' rung3taken=[]
+  G4 s16 t9 life=3 N=-1 lethal=False offered3=False taken='Luminarch Aspirant blocks Goblin Piker' rung3taken=[]
+  G5 s11 t7 life=6 N=4 lethal=False offered3=False taken='Luminarch Aspirant blocks Jackal Pup' rung3taken=[]
+
+=== (c) trade-drift hits: 0
