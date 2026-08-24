@@ -5560,3 +5560,12 @@ on MTGAbility.cpp via CMake set_source_files_properties; log at ux0:data/Wagic/
 fizzlelog.txt — owner plays to repro, FTP the file off after a session). One unverified
 link flagged by the lane: if fizzlelog.txt never appears despite targeted spells, the
 per-file define didn't apply — fall back to add_definitions or a dedicated flag.
+
+## 2026-08-24 (third VPK) — crash-fix build uploaded
+psp-port at 9f47ce024. Carries: lord-grant UAF fix (victory-screen crash root-caused via
+ASAN — InstantAbility::testDestroy now honours forcedAlive) + fizzlelog define repaired
+(global -DWAGIC_FIZZLELOG in CMakeLists; per-file property suspected inert). VPK
+32,519,221 bytes -> ux0:/vpk/wagic.vpk, size-verified. Watch: fizzlelog.txt must now
+appear after any game with targeted spells; if absent, escalate. First upload attempt
+timed out (single-threaded server busy) — direct retry worked; pre-check retry note
+stands.
