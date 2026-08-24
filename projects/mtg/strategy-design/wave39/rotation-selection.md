@@ -65,3 +65,11 @@ pending), 36 (crash-fix live validation pending). ENTER (Step 0, FIRST PASS GUID
 - ENTER: deck130 "Budde's Ponza" (guideless first pass). 121 = wave-42 front-runner;
   56 deferred while 162 holds the engine-management lane.
 - Wave-41 pool: 146, 152, 125, 126, 162, 123, 130.
+
+## Wave-41 rotation adjudication (2026-08-24)
+NO EXIT. Exit requires the exiting deck's guide to be settled; all seven pool decks ship
+new wave-41 edits with falsifiable predictions requiring the next corpus (deck130 first
+guided corpus; 123 EDITs1-7; 125 R1-R5; 126+162 rewrites, R4-prediction needs 162 held;
+152+146 ladder/mulligan rewrites). Wave-42 pool unchanged: 146,152,125,126,162,123,130.
+Canaries: deck123 construction question (if behaviors correct and rate flat at 1-2/6,
+next lever is deck construction, not the guide); deck130 passivity counter-risk vs 125.
