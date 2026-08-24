@@ -6919,15 +6919,151 @@ int AbilityFactory::magicText(int id, Spell * spell, MTGCardInstance * card, int
     return result;
 }
 
+//WAGIC_FIZZLELOG - compile-gated spell-resolution diagnostic (owner-directed
+//2026-08-24, the invisible-fizzle hunt). AbilityFactory::addAbilities below
+//sends a spell STRAIGHT to the graveyard when its single target is no longer
+//legal at resolution: no narration, no on-screen sign, nothing in the log. A
+//rules-correct fizzle and a broken card are indistinguishable to the player
+//("my Condemn went to the graveyard with no visible effect"). Every targeted
+//spell resolution appends one line here, fizzle or not, so a post-game read
+//closes the diagnosis from a SINGLE occurrence instead of needing a repro.
+//
+//Diagnostics do not belong in release builds: this entire block compiles out
+//unless _DEBUG (desktop debug build) or WAGIC_DEVLOGS is defined. WAGIC_DEVLOGS
+//is set globally by the ALPHA Android build (Android/jni/Android.mk) and, for
+//the Vita, per-source on THIS FILE ONLY in the top-level CMakeLists.txt - both
+//carry a REMOVE-for-release comment.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+namespace
+{
+    //Where the lines land. Resolved once, first call wins:
+    //  any platform  WAGIC_FIZZLELOG=1|stderr  -> stderr
+    //                WAGIC_FIZZLELOG=<path>    -> that file, appended
+    //  Vita          ux0:data/Wagic/fizzlelog.txt   (readable over FTP after
+    //                the session - same writable dir as debug.txt/fbdump)
+    //  Android       /sdcard/Wagic/User/fizzlelog.txt
+    //  desktop       nothing unless the env var is set, so suite runs stay
+    //                byte-identical and silent.
+    //No flag file on the console on purpose: the owner is reproducing by
+    //PLAYING, and a diagnostic that needs setup before the bug happens is a
+    //diagnostic that misses the bug. Volume is one short line per targeted
+    //spell resolution - a long session is tens of KB.
+    FILE * wagicFizzleLogFile()
+    {
+        static FILE * out = NULL;
+        static int state = 0;
+        if (state == 0)
+        {
+            state = -1;
+            const char * env = getenv("WAGIC_FIZZLELOG");
+            if (env && env[0])
+            {
+                string e(env);
+                if (e == "1" || e == "stderr") { out = stderr; state = 1; }
+                else { out = fopen(env, "a"); state = out ? 1 : -1; }
+            }
+#if defined(VITA)
+            else { out = fopen("ux0:data/Wagic/fizzlelog.txt", "a"); state = out ? 1 : -1; }
+#elif defined(ANDROID)
+            else { out = fopen("/sdcard/Wagic/User/fizzlelog.txt", "a"); state = out ? 1 : -1; }
+#endif
+        }
+        return (state == 1) ? out : NULL;
+    }
+
+    const char * wagicFizzleZone(MTGGameZone * z) { return z ? z->getName() : "(none)"; }
+
+    int wagicFizzleSeat(GameObserver * g, Player * p)
+    {
+        if (!g || !p) return -1;
+        for (size_t i = 0; i < g->players.size(); i++)
+            if (g->players[i] == p) return (int) i;
+        return -1;
+    }
+}
+#endif //_DEBUG || WAGIC_DEVLOGS
+
 void AbilityFactory::addAbilities(int _id, Spell * spell)
 {
     MTGCardInstance * card = spell->source;
+
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //One line per spell that reaches resolution, WHETHER OR NOT it fizzles.
+    //Without the non-fizzling half a reader cannot tell "the spell never
+    //resolved" from "it resolved and its effect did nothing" - which is the
+    //whole ambiguity the owner is trying to close. canTarget is sampled twice:
+    //once as the gate below will ask it, and once withoutProtections, because
+    //the two DISAGREEING is itself the answer (protection/shroud/hexproof
+    //gained while the spell sat on the stack); agreeing points at the zone.
+    //Only a TARGETED resolution can fizzle at the gate below, and every
+    //permanent entering play also passes through here - logging those too
+    //buried the interesting lines under anonymous nbTargets=0 noise (measured
+    //on the first probe run) and would bloat the console's log file for nothing.
+    if (spell->tc || spell->getNbTargets() > 0)
+    if (FILE * fzlog = wagicFizzleLogFile())
+    {
+        MTGCardInstance * dbgTgt = spell->getNextCardTarget();
+        Player * dbgPTgt = spell->getNextPlayerTarget();
+        int dbgCan       = (dbgTgt && spell->tc) ? (spell->tc->canTarget(dbgTgt) ? 1 : 0) : -1;
+        int dbgCanNoProt = (dbgTgt && spell->tc) ? (spell->tc->canTarget(dbgTgt, true) ? 1 : 0) : -1;
+        int dbgZoneOk    = (dbgTgt && spell->tc) ? (spell->tc->targetsZone(dbgTgt->currentZone) ? 1 : 0) : -1;
+        fprintf(fzlog,
+                "[resolve] turn=%d phase=%s caster=p%d card=\"%s\"(%p) from=%s"
+                " nbTargets=%d tc=%s target=\"%s\"(%p) targetZone=%s targetCtrl=p%d"
+                " phased=%d attacker=%d tapped=%d canTarget=%d canTargetNoProt=%d"
+                " tcAcceptsZone=%d playerTarget=p%d\n",
+                observer ? observer->turn : -1,
+                observer ? observer->getCurrentGamePhaseName().c_str() : "(nogame)",
+                wagicFizzleSeat(observer, card ? card->controller() : NULL),
+                card ? card->getDisplayName().c_str() : "(null)", (void *) card,
+                wagicFizzleZone(spell->from),
+                spell->getNbTargets(), spell->tc ? "yes" : "no",
+                dbgTgt ? dbgTgt->getDisplayName().c_str() : "(none)", (void *) dbgTgt,
+                dbgTgt ? wagicFizzleZone(dbgTgt->currentZone) : "(none)",
+                dbgTgt ? wagicFizzleSeat(observer, dbgTgt->controller()) : -1,
+                dbgTgt ? (int) dbgTgt->isPhased : -1,
+                dbgTgt ? (int) dbgTgt->isAttacker() : -1,
+                dbgTgt ? (int) (dbgTgt->isTapped() ? 1 : 0) : -1,
+                dbgCan, dbgCanNoProt, dbgZoneOk,
+                wagicFizzleSeat(observer, dbgPTgt));
+        fflush(fzlog);
+    }
+#endif //_DEBUG || WAGIC_DEVLOGS
 
     if (spell->getNbTargets() == 1)
     {
         card->target = spell->getNextCardTarget();
         if (card->target && (!spell->tc->canTarget(card->target) || card->target->isPhased))
         {
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+            //THE SILENT FIZZLE. Everything a post-game read needs to rule the
+            //occurrence rules-correct or not, captured BEFORE the card moves
+            //(currentZone is about to change).
+            if (FILE * fzlog = wagicFizzleLogFile())
+            {
+                fprintf(fzlog,
+                        "[FIZZLE] turn=%d phase=%s caster=p%d card=\"%s\"(%p) from=%s"
+                        " -> graveyard; target=\"%s\"(%p) targetZone=%s targetCtrl=p%d"
+                        " canTarget=%d canTargetNoProt=%d tcAcceptsZone=%d isPhased=%d"
+                        " attacker=%d tapped=%d"
+                        " [site MTGAbility.cpp AbilityFactory::addAbilities single-target gate]\n",
+                        observer ? observer->turn : -1,
+                        observer ? observer->getCurrentGamePhaseName().c_str() : "(nogame)",
+                        wagicFizzleSeat(observer, card->controller()),
+                        card->getDisplayName().c_str(), (void *) card,
+                        wagicFizzleZone(spell->from),
+                        card->target->getDisplayName().c_str(), (void *) card->target,
+                        wagicFizzleZone(card->target->currentZone),
+                        wagicFizzleSeat(observer, card->target->controller()),
+                        spell->tc->canTarget(card->target) ? 1 : 0,
+                        spell->tc->canTarget(card->target, true) ? 1 : 0,
+                        spell->tc->targetsZone(card->target->currentZone) ? 1 : 0,
+                        (int) card->target->isPhased,
+                        (int) card->target->isAttacker(),
+                        (int) (card->target->isTapped() ? 1 : 0));
+                fflush(fzlog);
+            }
+#endif //_DEBUG || WAGIC_DEVLOGS
             MTGPlayerCards * zones = card->controller()->game;
             zones->putInZone(card, spell->from, card->owner->game->graveyard);
             return; //fizzle

@@ -276,6 +276,20 @@ set(MTG_SOURCES
   projects/mtg/src/OptionGpt.cpp
 )
 
+# ALPHA ONLY: compile the WAGIC_FIZZLELOG spell-resolution diagnostic into the
+# Vita build so an invisible fizzle self-diagnoses on the owner's console -
+# lines land in ux0:data/Wagic/fizzlelog.txt, readable over FTP after the
+# session (Vitamain.cpp already creates ux0:data/Wagic at startup). Diagnostics
+# do not belong in release builds - REMOVE this block for any release VPK.
+#
+# Scoped to THIS ONE SOURCE on purpose. WAGIC_DEVLOGS is a wide gate: defining
+# it for the whole target would also switch on JGfx's thinlog, which adds a
+# per-draw-call function call plus a getenv() to every quad, rect and line the
+# console paints. The Android alpha can afford that; a 480x272 handheld chasing
+# 60fps should not pay it for a diagnostic that lives in one function.
+set_source_files_properties(projects/mtg/src/MTGAbility.cpp
+  PROPERTIES COMPILE_DEFINITIONS "WAGIC_DEVLOGS")
+
 add_executable(${PROJECT_NAME}
   ${JGE_SOURCES}
   ${MTG_SOURCES}
