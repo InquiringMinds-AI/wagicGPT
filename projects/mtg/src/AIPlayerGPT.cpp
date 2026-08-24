@@ -2513,6 +2513,39 @@ string targetPreviewFacts(MTGCardInstance * c)
     return s;
 }
 
+//W43-8 (wave-42 seat125 engine INFO 2): a counterspell's cast option renders
+//the COUNTERSPELL's own {card text: "..."} and, for the spell it would counter,
+//only a name/cost/type/P-T stub. So the line that asks "counter this?" could not
+//say what "this" DOES - the guide's rule 4 ("counter what draws them cards")
+//asks for a judgment the surface cannot support, and the pilot answered it from
+//the counterspell's text, which is the one text on the line that is irrelevant
+//to the question. This is W41-8 applied one emitter over: the deciding fact
+//rides the object the decision is ABOUT.
+//
+//Deliberately narrow, to stay off the STACK render's toes: that block already
+//prints the stack object's name, cost, type, P/T and its chosen targets a few
+//lines above in the SAME prompt, and duplicating those would be pure line
+//budget. The rules text is the one fact NEITHER surface carries, so it is the
+//only thing added - truncated at the same 140 the other target-side snippets
+//use (the card-text emitter on the option itself runs 220; a countered spell is
+//a supporting fact on someone else's option, not the option's own subject).
+//Pile-aware for the same reason the option/target emitters are.
+//Pure core, so PARSETEST proves the shape (and the textless negative) with no
+//board.
+static string stackTargetTextCore(const string& snippet)
+{
+    if (snippet.empty())
+        return "";
+    return " {target text: \"" + snippet + "\"}";
+}
+
+string stackTargetTextNote(MTGCardInstance * c)
+{
+    if (!c)
+        return "";
+    return stackTargetTextCore(pileAwareCardText(c, 140));
+}
+
 //W41-12 (wave-40 L-123d): Lightning Greaves is auto={0}:equip, so the engine
 //re-offers "Equip ... targeting X" at EVERY priority window at no cost. One seat
 //spent 190,348 reasoning chars on 30 such windows in a single game, ping-ponging
@@ -3891,6 +3924,457 @@ string damageTargetVerdict(int dmg, int toughness, int remaining, bool indestruc
         o << ")}";
     }
     return o.str();
+}
+
+//W43-7 (wave-42 seat130 N2 - the corpus's costliest misplay class): an {X}
+//spell renders with NO evaluated magnitude while every fixed-damage option
+//beside it carries "{right now: ...}". The pilot cast Hammer of Bogardan twice
+//into two Silverquill Silencers with a Starstorm in hand, because the Starstorm
+//line said only "Cast Starstorm {r}{r}{x}" - the two numbers that decide (what
+//does my mana buy, and what dies for it) were on no surface at all, while the
+//fixed-damage options beside it were fully priced. dynamicMagnitudes cannot
+//supply them BY CONSTRUCTION: it skips the amount "x" because X is announced
+//AFTER the cast is chosen, so the pricing has to come from the cost and the
+//board instead of from the script's amount.
+//
+//Both numbers come from machinery that already exists and is already the
+//engine's own answer: ManaEngine::maxAnnounceableX is the function that BUILDS
+//the ANNOUNCE_X menu (so the cast line and the announce menu that follows it
+//cannot disagree - the same failure mode wave-23's cap header closed), and the
+//kill arithmetic reads the same live remaining toughness (Damageable::life) the
+//board render and damageTargetVerdict already print.
+//
+//Truthfulness rails, all three load-bearing:
+//  * A SYMMETRIC sweep lists the caster's OWN dying creatures as loudly as the
+//    opponent's, and prints "YOURS: none" rather than omitting the clause - a
+//    silent omission is the gap the model confabulates into (trust doctrine).
+//  * Every number is recomputed from CURRENT state: this rides the option line,
+//    which is rebuilt per render window.
+//  * NOTHING here evaluates a script expression, so the "rand" rail cannot be
+//    crossed - the amount IS X. A script carrying "rand" anywhere is skipped
+//    outright as belt-and-braces.
+struct XDamVictim
+{
+    string name;     //display name WITH its instance handle ("Llanowar Elves #3")
+    string baseName; //the same name WITHOUT the handle, for run-grouping
+    int lethalX;     //smallest X that kills it; <=0 = damage cannot kill it
+    bool mine;
+    bool pluralVerb; //"you NEED X>=6", not "you needs" - the caster's own row
+    XDamVictim() : lethalX(0), mine(false), pluralVerb(false) {}
+};
+
+//Five identical 1/1 Elves are five rows saying the same thing. A board wipe's
+//kill list ran to seven handles in the probe and repeated the whole run at the
+//second X - pure prompt weight, and it pushed the row that actually decides
+//(the opponent's life total, on a burn spell) out past the display cap. Collapse
+//an identical (name, price) run into "Llanowar Elves x5". The instance HANDLE is
+//kept whenever the group is a single card, which is the only case where a handle
+//disambiguates anything the pilot must then pick between - and the downstream
+//target menu enumerates every instance in full regardless.
+static string xVictimGroupName(const XDamVictim& v, int count)
+{
+    if (count <= 1)
+        return v.name;
+    std::ostringstream o;
+    o << (v.baseName.empty() ? v.name : v.baseName) << " x" << count;
+    return o.str();
+}
+
+//The "rand" rail, as a named predicate so PARSETEST can prove it fires. Nothing
+//in this feature evaluates a script expression, but a card whose script draws
+//the game RNG is skipped outright rather than reasoned about: the rule the whole
+//magnitude family runs on is that RENDERING must never move the game's random
+//state, and a rail that is only implicit is a rail nobody can test.
+static bool xScriptDrawsRng(const string& magicText)
+{
+    string low = magicText;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    return low.find("rand") != string::npos;
+}
+
+//The names that die at exactly this X, on one side. "none" when the side loses
+//nothing - stated, never omitted.
+static string xVictimList(const std::vector<XDamVictim>& victims, int atX, bool mine)
+{
+    std::vector<XDamVictim> dying;
+    for (size_t i = 0; i < victims.size(); i++)
+        if (victims[i].mine == mine && victims[i].lethalX > 0 && victims[i].lethalX <= atX)
+            dying.push_back(victims[i]);
+    //Grouping is by NAME, not by adjacency: same-named permanents are not
+    //necessarily neighbours in a battlefield zone.
+    std::vector<bool> taken(dying.size(), false);
+    std::ostringstream o;
+    int shown = 0;
+    for (size_t i = 0; i < dying.size(); i++)
+    {
+        if (taken[i])
+            continue;
+        int count = 1;
+        if (!dying[i].baseName.empty())
+            for (size_t j = i + 1; j < dying.size(); j++)
+                if (!taken[j] && dying[j].baseName == dying[i].baseName)
+                {
+                    taken[j] = true;
+                    count++;
+                }
+        o << (shown++ ? ", " : "") << xVictimGroupName(dying[i], count);
+    }
+    return shown ? o.str() : string("none");
+}
+
+//Pure core, SWEEP class (Starstorm: "damage:X all(creature)"). Pure so PARSETEST
+//proves every shape - unaffordable, nothing-dies, empty board, own-risk - with
+//no board.
+static string xDamageSweepCore(int maxX, int baseCMC, const std::vector<XDamVictim>& victims,
+                               bool hitsMe, bool hitsOpp, int myLife, int oppLife)
+{
+    std::ostringstream o;
+    o << " {X pricing: ";
+    if (maxX <= 0)
+    {
+        o << "your mana affords only X=0 right now, which deals 0 damage and kills nothing}";
+        return o.str();
+    }
+    o << "max affordable X=" << maxX << " (" << (maxX + baseCMC) << " mana total)";
+    int k = 0;
+    for (size_t i = 0; i < victims.size(); i++)
+        if (victims[i].lethalX > 0 && victims[i].lethalX <= maxX
+            && (k == 0 || victims[i].lethalX < k))
+            k = victims[i].lethalX;
+    if (victims.empty())
+        o << "; there is no creature on the battlefield for it to damage";
+    else if (k == 0)
+        o << "; even at X=" << maxX << " NOTHING on the board dies";
+    else
+    {
+        o << "; smallest X that kills anything: X=" << k << " (" << (k + baseCMC)
+          << " mana total) - kills THEIRS: " << xVictimList(victims, k, false)
+          << "; YOURS: " << xVictimList(victims, k, true);
+        //The at-max clause earns its line only when spending up to the cap kills
+        //something the smallest lethal X does not: a byte-identical repeat is
+        //pure prompt weight (owner criterion: decision value per token).
+        bool moreAtMax = false;
+        for (size_t i = 0; i < victims.size() && !moreAtMax; i++)
+            if (victims[i].lethalX > k && victims[i].lethalX <= maxX)
+                moreAtMax = true;
+        if (moreAtMax)
+            o << ". At X=" << maxX << " - kills THEIRS: " << xVictimList(victims, maxX, false)
+              << "; YOURS: " << xVictimList(victims, maxX, true);
+    }
+    //The player half is rendered per SIDE, not as a blanket "each player": a
+    //spec that reaches only the opponent must not tell the caster its own life
+    //is on the line, and a symmetric one must (that is the same own-risk rail
+    //the creature lists run on).
+    if (hitsMe || hitsOpp)
+    {
+        o << ". It also deals X to ";
+        if (hitsMe && hitsOpp)
+            o << "EACH player: you are at " << myLife << " life (X>=" << myLife
+              << " kills YOU), the opponent at " << oppLife << " (X>=" << oppLife
+              << " kills them)";
+        else if (hitsMe)
+            o << "YOU: you are at " << myLife << " life (X>=" << myLife << " kills YOU)";
+        else
+            o << "the opponent, at " << oppLife << " life (X>=" << oppLife << " kills them)";
+    }
+    o << "}";
+    return o.str();
+}
+
+//Pure core, TARGETED class (Rolling Thunder: "damage:X target(anytarget)"). The
+//legal-target SET is already enumerated in full on the same option line by the
+//"legal targets right now:" clause, so this list prices what is there rather
+//than defining it - a cap here hides no legal play.
+static string xDamageTargetedCore(int maxX, int baseCMC, const std::vector<XDamVictim>& victims)
+{
+    std::ostringstream o;
+    o << " {X pricing: ";
+    if (maxX <= 0)
+    {
+        o << "your mana affords only X=0 right now, which deals 0 damage and kills nothing}";
+        return o.str();
+    }
+    o << "max affordable X=" << maxX << " (" << (maxX + baseCMC) << " mana total)";
+    if (victims.empty())
+        o << "; nothing it can hit right now can be killed by damage";
+    else
+    {
+        o << "; lethal X per legal target: ";
+        //Group identical (name, price) rows, so five Elves are one row and the
+        //row that decides a burn spell - the opponent's life total - is never
+        //crowded past the cap by a pile of interchangeable 1/1s.
+        std::vector<bool> taken(victims.size(), false);
+        size_t shown = 0;
+        for (size_t i = 0; i < victims.size() && shown < 12; i++)
+        {
+            if (taken[i])
+                continue;
+            int count = 1;
+            if (!victims[i].baseName.empty())
+                for (size_t j = i + 1; j < victims.size(); j++)
+                    if (!taken[j] && victims[j].baseName == victims[i].baseName
+                        && victims[j].lethalX == victims[i].lethalX)
+                    {
+                        taken[j] = true;
+                        count++;
+                    }
+            taken[i] = true;
+            o << (shown++ ? ", " : "") << (victims[i].mine ? "YOUR " : "")
+              << xVictimGroupName(victims[i], count);
+            if (victims[i].lethalX <= 0)
+                o << " cannot be killed by damage";
+            else
+            {
+                o << ((count > 1 || victims[i].pluralVerb) ? " need X>=" : " needs X>=")
+                  << victims[i].lethalX;
+                if (victims[i].lethalX > maxX)
+                    o << " (more than you can pay)";
+            }
+        }
+        int leftover = 0;
+        for (size_t i = 0; i < victims.size(); i++)
+            if (!taken[i])
+                leftover++;
+        if (leftover > 0)
+            o << " (+" << leftover << " more, priced the same way)";
+    }
+    o << "}";
+    return o.str();
+}
+
+//Pure core, every OTHER X class (draw X, X counters, X tokens): affordability
+//only. The card's own {card text: ...} on the same line states what X buys; the
+//number the pilot could not compute is what X can BE.
+static string xAffordabilityCore(int maxX, int baseCMC)
+{
+    std::ostringstream o;
+    o << " {X pricing: ";
+    if (maxX <= 0)
+        o << "your mana affords only X=0 right now";
+    else
+        o << "max affordable X=" << maxX << " (" << (maxX + baseCMC) << " mana total)";
+    o << "}";
+    return o.str();
+}
+
+//The auto= clause scan. A clause is priceable only when it is the SPELL's own
+//on-resolution effect, so the text before "damage:x" on its line must be EMPTY:
+//an activated ability ("{X}{G}{T}:damage:X target(...)"), a trigger ("@..."),
+//and an alternative/overload/paidmana/modal branch each price a DIFFERENT cast
+//than the one being offered, and pricing the offered cast off one of them is
+//exactly the mis-scoped magnitude ledger-#13 (planeswalkers) and W41-10
+//(thatmuch) both closed. The amount token must be exactly "x": "damage:XX"
+//(overload) and "damage:Xplus10plusend" are not X damage.
+//Pure over the script text, so PARSETEST replays the real primitives.
+static void collectXDamageClauses(const string& magicText,
+                                  std::vector<string>& sweepSpecs,
+                                  std::vector<string>& targetSpecs,
+                                  bool& implicitTarget)
+{
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        //Segments of one line joined by "&&" are each an independent effect.
+        size_t sp = 0;
+        while (sp <= line.size())
+        {
+            size_t amp = line.find("&&", sp);
+            string seg = line.substr(sp, amp == string::npos ? string::npos : amp - sp);
+            sp = (amp == string::npos) ? line.size() + 1 : amp + 2;
+            size_t b = seg.find_first_not_of(" \t\r");
+            if (b == string::npos)
+                continue;
+            seg = seg.substr(b);
+            string low = seg;
+            for (size_t i = 0; i < low.size(); i++)
+                low[i] = (char) tolower((unsigned char) low[i]);
+            if (low.compare(0, 7, "damage:") != 0)
+                continue; //prefixed clause: not this cast's own effect
+            size_t amtEnd = low.find_first_of(" \t\r", 7);
+            string amt = low.substr(7, amtEnd == string::npos ? string::npos : amtEnd - 7);
+            if (amt != "x")
+                continue;
+            string rest;
+            if (amtEnd != string::npos)
+            {
+                size_t r = low.find_first_not_of(" \t\r", amtEnd);
+                if (r != string::npos)
+                    rest = seg.substr(r);
+            }
+            if (rest.empty())
+            {
+                implicitTarget = true; //Fireball shape: the card's own target= line
+                continue;
+            }
+            string restLow = rest;
+            for (size_t i = 0; i < restLow.size(); i++)
+                restLow[i] = (char) tolower((unsigned char) restLow[i]);
+            size_t header = 0;
+            bool sweep = false;
+            if (restLow.compare(0, 4, "all(") == 0)
+            {
+                header = 4;
+                sweep = true;
+            }
+            else if (restLow.compare(0, 7, "target(") == 0)
+                header = 7;
+            else
+                continue; //an unrecognised shape prices nothing rather than guessing
+            //Balanced close: a spec legitimately nests ("creature[counter(-1/-1)]").
+            size_t open = header - 1, end = string::npos;
+            int depth = 0;
+            for (size_t p = open; p < rest.size(); p++)
+            {
+                if (rest[p] == '(')
+                    depth++;
+                else if (rest[p] == ')' && --depth == 0)
+                {
+                    end = p;
+                    break;
+                }
+            }
+            if (end == string::npos)
+                continue;
+            string spec = rest.substr(header, end - header);
+            if (spec.empty())
+                continue;
+            (sweep ? sweepSpecs : targetSpecs).push_back(spec);
+        }
+    }
+}
+
+//Board-facing wrapper: turns the clause scan + the engine's affordability answer
+//into the rendered annotation. Returns "" for a non-X spell (every other cast
+//line is byte-identical to before).
+string xSpellPricing(MTGCardInstance * card, Player * me)
+{
+    if (!card || !me)
+        return "";
+    ManaCost * cost = card->getManaCost();
+    if (!cost || !cost->hasX())
+        return "";
+    if (xScriptDrawsRng(card->magicText))
+        return ""; //rendering must never draw the game RNG
+    int maxX = ManaEngine::maxAnnounceableX(me, cost, card->has(Constants::ANYTYPEOFMANA));
+    int baseCMC = cost->getConvertedCost();
+    std::vector<string> sweepSpecs, targetSpecs;
+    bool implicitTarget = false;
+    collectXDamageClauses(card->magicText, sweepSpecs, targetSpecs, implicitTarget);
+    GameObserver * obs = card->getObserver();
+    if (!obs || !obs->players[0] || !obs->players[1]
+        || (sweepSpecs.empty() && targetSpecs.empty() && !implicitTarget))
+        return xAffordabilityCore(maxX, baseCMC);
+
+    TargetChooserFactory tcf(obs);
+    std::vector<XDamVictim> victims;
+    std::set<MTGCardInstance *> seen;
+    Player * ordered[2] = { me == obs->players[0] ? obs->players[1] : obs->players[0], me };
+
+    if (!sweepSpecs.empty())
+    {
+        bool hitsMe = false, hitsOpp = false;
+        for (size_t s = 0; s < sweepSpecs.size(); s++)
+        {
+            TargetChooser * tc = tcf.createTargetChooser(sweepSpecs[s], card);
+            if (!tc)
+                continue;
+            for (int oi = 0; oi < 2; oi++)
+            {
+                Player * pp = ordered[oi];
+                if (!pp || !pp->game)
+                    continue;
+                MTGGameZone * z = pp->game->inPlay;
+                if (z && tc->targetsZone(z))
+                    for (int ci = 0; ci < z->nb_cards; ci++)
+                    {
+                        MTGCardInstance * c = z->cards[ci];
+                        //withoutProtections: a sweep does not TARGET, so shroud
+                        //and hexproof do not save the creature - and a kill list
+                        //that quietly omitted them would be a false surface.
+                        if (!c || !c->isCreature() || !tc->canTarget(c, true))
+                            continue;
+                        if (!seen.insert(c).second)
+                            continue;
+                        XDamVictim v;
+                        v.baseName = c->getDisplayName();
+                        v.name = v.baseName + instanceHandle(c);
+                        v.mine = (c->controller() == me);
+                        v.lethalX = c->basicAbilities[Constants::INDESTRUCTIBLE]
+                                    ? 0 : (c->life > 0 ? c->life : 1);
+                        victims.push_back(v);
+                    }
+                if (tc->canTarget(pp, true))
+                    (pp == me ? hitsMe : hitsOpp) = true;
+            }
+            SAFE_DELETE(tc);
+        }
+        Player * opp = ordered[0];
+        return xDamageSweepCore(maxX, baseCMC, victims, hitsMe, hitsOpp,
+                                me->life, opp ? opp->life : 0);
+    }
+
+    //Targeted (explicit spec, or the card's own target= line for a bare
+    //"damage:X"): price each legal target, opponent side first.
+    for (size_t s = 0; s <= targetSpecs.size(); s++)
+    {
+        TargetChooser * tc = NULL;
+        if (s < targetSpecs.size())
+            tc = tcf.createTargetChooser(targetSpecs[s], card);
+        else if (implicitTarget)
+            tc = tcf.createTargetChooser(card);
+        if (!tc)
+            continue;
+        for (int oi = 0; oi < 2; oi++)
+        {
+            Player * pp = ordered[oi];
+            if (!pp || !pp->game)
+                continue;
+            //The PLAYER row goes first on its side: on a burn spell "the
+            //opponent needs X>=17" is the row the whole decision turns on, and
+            //it was being crowded past the display cap by a pile of
+            //interchangeable 1/1s (probe run 1).
+            if (tc->canTarget(pp))
+            {
+                XDamVictim v;
+                //"you" and "the opponent" are self-identifying, so they take no
+                //"YOUR " prefix - the first probe rendered "YOUR you needs X>=17".
+                v.name = (pp == me) ? "you" : "the opponent";
+                v.baseName = "";
+                v.mine = false;
+                v.pluralVerb = (pp == me); //"you need", not "you needs"
+                v.lethalX = pp->life > 0 ? pp->life : 1;
+                bool dup = false;
+                for (size_t vi = 0; vi < victims.size(); vi++)
+                    if (victims[vi].name == v.name)
+                        dup = true;
+                if (!dup)
+                    victims.push_back(v);
+            }
+            MTGGameZone * z = pp->game->inPlay;
+            if (z && tc->targetsZone(z))
+                for (int ci = 0; ci < z->nb_cards; ci++)
+                {
+                    MTGCardInstance * c = z->cards[ci];
+                    if (!c || !c->isCreature() || !tc->canTarget(c))
+                        continue;
+                    if (!seen.insert(c).second)
+                        continue;
+                    XDamVictim v;
+                    v.baseName = c->getDisplayName();
+                    v.name = v.baseName + instanceHandle(c);
+                    v.mine = (c->controller() == me);
+                    v.lethalX = c->basicAbilities[Constants::INDESTRUCTIBLE]
+                                ? 0 : (c->life > 0 ? c->life : 1);
+                    victims.push_back(v);
+                }
+        }
+        SAFE_DELETE(tc);
+    }
+    return xDamageTargetedCore(maxX, baseCMC, victims);
 }
 
 //W43-R1 (owner report, verbatim: "'Seachrome Coast enters tapped unless you
@@ -7153,7 +7637,12 @@ static string stripNarrationDecoration(const string& in)
         bool drop = false;
         char openCh = in[i];
         if (openCh == '{')
-            drop = (in.compare(i, 12, "{card text: ") == 0) || (in.compare(i, 12, "{right now: ") == 0);
+            //W43-7 / W43-8: the X-pricing block and the countered spell's rules
+            //text are the same species as {right now: ...} - decision-time
+            //surfaces, re-served on every prompt for the rest of the game if
+            //they enter history. Same gate, same reason.
+            drop = (in.compare(i, 12, "{card text: ") == 0) || (in.compare(i, 12, "{right now: ") == 0)
+                || (in.compare(i, 12, "{X pricing: ") == 0) || (in.compare(i, 14, "{target text: ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -9792,6 +10281,9 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             o << casts[ci].zoneLabel;
             o << hybridPipNote(cost);
             o << dynamicMagnitudes(card);
+            //W43-7: {X} spells are unpriceable by dynamicMagnitudes (it skips
+            //the amount "x" - X is announced AFTER this pick). Price them here.
+            o << xSpellPricing(card, this);
         }
         else
         {
@@ -9868,7 +10360,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             //annotate the hit with what it is worth countering
                             //for (type, cost, P/T).
                             hits << (firstHit ? "" : ", ") << sz->cards[zi]->getDisplayName()
-                                 << stackCardFacts(sz->cards[zi]);
+                                 << stackCardFacts(sz->cards[zi])
+                                 << stackTargetTextNote(sz->cards[zi]);
                             firstHit = false;
                         }
                 }
@@ -20685,6 +21178,351 @@ void AIPlayerGPT::runParseSelfTest()
             CHECK(obs == expectedObs,
                   "W43-5 the OBSERVER seat reads the same two transforms, mirrored");
         }
+    }
+
+    // ---- W43-7: X-spell pricing on the CAST option line (seat130 N2) ----
+    cout << "\n[W43-7] X spells render priced: max affordable X, smallest lethal X, kill list\n";
+    {
+        // The seat-130 window, exactly: Starstorm {X}{R}{R} (baseCMC 2) in hand,
+        // six mana up (max X = 4), two Silverquill Silencers (1/2 each) across
+        // the table and nothing of the pilot's own on the board. The line the
+        // pilot actually read said "Cast Starstorm {r}{r}{x}" and nothing else;
+        // it cast Hammer of Bogardan twice instead.
+        std::vector<XDamVictim> v;
+        XDamVictim a; a.name = "Silverquill Silencer #1"; a.lethalX = 2; a.mine = false; v.push_back(a);
+        XDamVictim b; b.name = "Silverquill Silencer #2"; b.lethalX = 2; b.mine = false; v.push_back(b);
+        XDamVictim c; c.name = "Thunderbreak Regent"; c.lethalX = 4; c.mine = false; v.push_back(c);
+        string s = xDamageSweepCore(4, 2, v, false, false, 0, 0);
+        cout << "     " << s << "\n";
+        CHECK(s == " {X pricing: max affordable X=4 (6 mana total); smallest X that kills"
+                   " anything: X=2 (4 mana total) - kills THEIRS: Silverquill Silencer #1,"
+                   " Silverquill Silencer #2; YOURS: none. At X=4 - kills THEIRS: Silverquill"
+                   " Silencer #1, Silverquill Silencer #2, Thunderbreak Regent; YOURS: none}",
+              "W43-7 sweep: max X, smallest lethal X, both kill lists, mana totals");
+        // The at-max clause is SUPPRESSED when it would repeat the smallest-X
+        // clause verbatim (nothing further dies between k and maxX).
+        std::vector<XDamVictim> v2;
+        v2.push_back(a); v2.push_back(b);
+        CHECK(xDamageSweepCore(2, 2, v2, false, false, 0, 0)
+              == " {X pricing: max affordable X=2 (4 mana total); smallest X that kills"
+                 " anything: X=2 (4 mana total) - kills THEIRS: Silverquill Silencer #1,"
+                 " Silverquill Silencer #2; YOURS: none}",
+              "W43-7 sweep: no second clause when max X IS the smallest lethal X");
+        // SYMMETRIC SWEEP, own-risk: the caster's own dying creatures are named
+        // as loudly as the opponent's. This is the rail the whole feature turns
+        // on - a sweep annotation that listed only the opponent's losses would
+        // sell the pilot a board wipe of its own team.
+        std::vector<XDamVictim> v3;
+        v3.push_back(a);
+        XDamVictim mine; mine.name = "Goblin Piledriver"; mine.lethalX = 2; mine.mine = true;
+        v3.push_back(mine);
+        string s3 = xDamageSweepCore(3, 2, v3, false, false, 0, 0);
+        cout << "     " << s3 << "\n";
+        CHECK(s3.find("YOURS: Goblin Piledriver") != string::npos,
+              "W43-7 symmetric sweep names the caster's OWN casualties");
+        CHECK(s3.find("YOURS: none") == string::npos,
+              "W43-7 NEGATIVE the own-risk clause is not 'none' when the caster loses a creature");
+        // UNAFFORDABLE X: no mana above the base cost. No kill list is offered
+        // because none is reachable, and the reason is stated rather than left
+        // as a gap.
+        string s0 = xDamageSweepCore(0, 2, v, false, false, 0, 0);
+        CHECK(s0 == " {X pricing: your mana affords only X=0 right now, which deals 0 damage"
+                    " and kills nothing}",
+              "W43-7 unaffordable: X=0 is stated with its consequence");
+        CHECK(s0.find("kills THEIRS") == string::npos && s0.find("max affordable") == string::npos,
+              "W43-7 NEGATIVE an unaffordable X advertises no kills and no cap");
+        // NOTHING DIES at the affordable maximum: say so, do not go silent.
+        std::vector<XDamVictim> big;
+        XDamVictim t8; t8.name = "Colossus"; t8.lethalX = 8; t8.mine = false; big.push_back(t8);
+        CHECK(xDamageSweepCore(4, 2, big, false, false, 0, 0)
+              == " {X pricing: max affordable X=4 (6 mana total); even at X=4 NOTHING on the"
+                 " board dies}",
+              "W43-7 nothing-dies: the ceiling is priced and the empty result stated");
+        // EMPTY BOARD is distinct from nothing-dies (the model confabulates into
+        // an unexplained absence).
+        std::vector<XDamVictim> none;
+        CHECK(xDamageSweepCore(4, 2, none, false, false, 0, 0)
+              == " {X pricing: max affordable X=4 (6 mana total); there is no creature on the"
+                 " battlefield for it to damage}",
+              "W43-7 empty board: the reason nothing dies is named");
+        // INDESTRUCTIBLE victims (lethalX 0) never enter a kill list.
+        std::vector<XDamVictim> ind;
+        XDamVictim k; k.name = "Darksteel Myr"; k.lethalX = 0; k.mine = false; ind.push_back(k);
+        CHECK(xDamageSweepCore(9, 2, ind, false, false, 0, 0).find("Darksteel Myr") == string::npos,
+              "W43-7 NEGATIVE an indestructible creature is never claimed as a kill");
+        // The player half of a Hurricane-class sweep, including the symmetric
+        // "this can kill YOU" arithmetic.
+        string hp = xDamageSweepCore(6, 1, none, true, true, 5, 12);
+        cout << "     " << hp << "\n";
+        CHECK(hp.find("you are at 5 life (X>=5 kills YOU)") != string::npos
+              && hp.find("the opponent at 12 (X>=12 kills them)") != string::npos,
+              "W43-7 player-sweep prices BOTH players, caster included");
+        CHECK(xDamageSweepCore(0, 1, none, true, true, 5, 12).find("kills YOU") == string::npos,
+              "W43-7 NEGATIVE an unaffordable player sweep makes no lethality claim");
+        // ASYMMETRIC player specs: an opponent-only sweep must NOT tell the
+        // caster its own life is on the line, and a caster-only one must not
+        // promise opponent damage. "EACH player" is a claim, not a template.
+        string oppOnly = xDamageSweepCore(6, 1, none, false, true, 5, 12);
+        CHECK(oppOnly.find("the opponent, at 12 life (X>=12 kills them)") != string::npos
+              && oppOnly.find("kills YOU") == string::npos
+              && oppOnly.find("EACH player") == string::npos,
+              "W43-7 an opponent-only player sweep claims nothing about the caster's life");
+        string meOnly = xDamageSweepCore(6, 1, none, true, false, 5, 12);
+        CHECK(meOnly.find("YOU: you are at 5 life (X>=5 kills YOU)") != string::npos
+              && meOnly.find("the opponent") == string::npos,
+              "W43-7 a caster-only player sweep claims nothing about the opponent");
+        CHECK(xDamageSweepCore(6, 1, none, false, false, 5, 12).find("deals X to") == string::npos,
+              "W43-7 NEGATIVE a creatures-only sweep prints no player clause at all");
+    }
+    cout << "\n[W43-7] X spells: the TARGETED class and the affordability-only fallback\n";
+    {
+        // Rolling Thunder shape: per-target lethal X, opponent side first, with
+        // the caster's own targets tagged and unreachable prices marked.
+        std::vector<XDamVictim> v;
+        XDamVictim a; a.name = "Thunderbreak Regent"; a.lethalX = 4; a.mine = false; v.push_back(a);
+        XDamVictim p; p.name = "the opponent"; p.lethalX = 17; p.mine = false; v.push_back(p);
+        XDamVictim m; m.name = "Mogg Fanatic"; m.lethalX = 1; m.mine = true; v.push_back(m);
+        string s = xDamageTargetedCore(4, 3, v);
+        cout << "     " << s << "\n";
+        CHECK(s == " {X pricing: max affordable X=4 (7 mana total); lethal X per legal target:"
+                   " Thunderbreak Regent needs X>=4, the opponent needs X>=17 (more than you"
+                   " can pay), YOUR Mogg Fanatic needs X>=1}",
+              "W43-7 targeted: per-target lethal X, ownership tag, unaffordable marker");
+        CHECK(xDamageTargetedCore(0, 3, v)
+              == " {X pricing: your mana affords only X=0 right now, which deals 0 damage"
+                 " and kills nothing}",
+              "W43-7 targeted unaffordable: same statement as the sweep class");
+        std::vector<XDamVictim> none;
+        CHECK(xDamageTargetedCore(4, 3, none)
+              == " {X pricing: max affordable X=4 (7 mana total); nothing it can hit right now"
+                 " can be killed by damage}",
+              "W43-7 targeted with no priceable target still states the cap");
+        std::vector<XDamVictim> ind;
+        XDamVictim k; k.name = "Darksteel Myr"; k.lethalX = 0; k.mine = false; ind.push_back(k);
+        CHECK(xDamageTargetedCore(4, 3, ind).find("Darksteel Myr cannot be killed by damage")
+              != string::npos,
+              "W43-7 targeted: an indestructible target is priced as unkillable, not omitted");
+        // Non-damage X classes (draw X, X counters) get the affordability half
+        // only - the card's own {card text: ...} on the same line says what X buys.
+        CHECK(xAffordabilityCore(5, 2) == " {X pricing: max affordable X=5 (7 mana total)}",
+              "W43-7 affordability-only shape for a non-damage X spell");
+        CHECK(xAffordabilityCore(0, 2) == " {X pricing: your mana affords only X=0 right now}",
+              "W43-7 affordability-only, unaffordable");
+    }
+    cout << "\n[W43-7] run-grouping: identical bodies collapse, the deciding row survives\n";
+    {
+        // Probe run 1 rendered five Llanowar Elves as five rows, TWICE (once per
+        // X), and the row the burn decision turns on - the opponent's life - fell
+        // off the end of the display cap.
+        std::vector<XDamVictim> v;
+        for (int i = 1; i <= 5; i++)
+        {
+            XDamVictim e;
+            std::ostringstream n; n << "Llanowar Elves #" << i;
+            e.name = n.str(); e.baseName = "Llanowar Elves"; e.lethalX = 1; e.mine = false;
+            v.push_back(e);
+        }
+        XDamVictim bear; bear.name = "Grizzly Bears"; bear.baseName = "Grizzly Bears";
+        bear.lethalX = 2; bear.mine = false; v.push_back(bear);
+        CHECK(xVictimList(v, 2, false) == "Llanowar Elves x5, Grizzly Bears",
+              "W43-7 grouping: a five-of run collapses; a singleton keeps its name");
+        CHECK(xVictimList(v, 1, false) == "Llanowar Elves x5",
+              "W43-7 grouping: only what actually dies at this X is grouped");
+        // Grouping is by NAME, not adjacency - a battlefield zone interleaves.
+        std::vector<XDamVictim> mixed;
+        mixed.push_back(v[0]); mixed.push_back(bear); mixed.push_back(v[1]);
+        CHECK(xVictimList(mixed, 2, false) == "Llanowar Elves x2, Grizzly Bears",
+              "W43-7 grouping: non-adjacent same-named permanents still group");
+        // An UNNAMED-base row (a player) never groups with anything.
+        std::vector<XDamVictim> t;
+        XDamVictim opp; opp.name = "the opponent"; opp.baseName = ""; opp.lethalX = 17;
+        opp.mine = false; t.push_back(opp);
+        for (size_t i = 0; i < 5; i++)
+            t.push_back(v[i]);
+        string s = xDamageTargetedCore(20, 1, t);
+        cout << "     " << s << "\n";
+        CHECK(s.find("the opponent needs X>=17, Llanowar Elves x5 need X>=1") != string::npos,
+              "W43-7 grouping: the player row leads and stays ungrouped; the run pluralises");
+        CHECK(s.find("YOUR you") == string::npos,
+              "W43-7 NEGATIVE a player row never takes the 'YOUR ' prefix");
+        // "you needs X>=6" was in the probe output; the caster's own row takes
+        // the plural verb.
+        std::vector<XDamVictim> self;
+        XDamVictim you; you.name = "you"; you.lethalX = 6; you.pluralVerb = true;
+        self.push_back(you);
+        CHECK(xDamageTargetedCore(9, 1, self).find("you need X>=6") != string::npos,
+              "W43-7 the caster's own life row reads 'you need', not 'you needs'");
+        // Same name, DIFFERENT price: two rows, because the price is the fact.
+        std::vector<XDamVictim> two;
+        XDamVictim h1 = v[0]; XDamVictim h2 = v[1]; h2.lethalX = 3;
+        two.push_back(h1); two.push_back(h2);
+        CHECK(xDamageTargetedCore(5, 1, two).find("Llanowar Elves #1 needs X>=1,"
+                                                  " Llanowar Elves #2 needs X>=3") != string::npos,
+              "W43-7 NEGATIVE same-named targets at different prices do NOT group");
+        // The display cap counts GROUPS and reports the remainder honestly.
+        std::vector<XDamVictim> many;
+        for (int i = 0; i < 15; i++)
+        {
+            XDamVictim d;
+            std::ostringstream n; n << "Body" << i;
+            d.name = n.str(); d.baseName = n.str(); d.lethalX = i + 1; d.mine = false;
+            many.push_back(d);
+        }
+        CHECK(xDamageTargetedCore(20, 1, many).find("(+3 more, priced the same way)") != string::npos,
+              "W43-7 cap: 12 groups shown, the remaining 3 counted");
+    }
+    cout << "\n[W43-7] the auto= clause scan: what is this cast's OWN X damage\n";
+    {
+        std::vector<string> sweeps, targets;
+        bool implicit = false;
+        // Starstorm (mtg.txt): "damage:X all(creature)".
+        collectXDamageClauses("damage:X all(creature)", sweeps, targets, implicit);
+        CHECK(sweeps.size() == 1 && sweeps[0] == "creature" && targets.empty() && !implicit,
+              "W43-7 scan: Starstorm is one creature sweep");
+        // Hurricane shape: two auto= lines, creatures and players.
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("damage:X all(creature[flying])\ndamage:X all(player)",
+                              sweeps, targets, implicit);
+        CHECK(sweeps.size() == 2 && sweeps[0] == "creature[flying]" && sweeps[1] == "player",
+              "W43-7 scan: a two-line sweep collects both specs");
+        // "&&"-joined segments on ONE line are independent effects too.
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("damage:X all(creature) && damage:X all(player)",
+                              sweeps, targets, implicit);
+        CHECK(sweeps.size() == 2 && sweeps[1] == "player",
+              "W43-7 scan: '&&' segments are scanned independently");
+        // Rolling Thunder: "damage:X target(anytarget)".
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("damage:X target(anytarget)", sweeps, targets, implicit);
+        CHECK(targets.size() == 1 && targets[0] == "anytarget" && sweeps.empty() && !implicit,
+              "W43-7 scan: an explicit target spec is the targeted class");
+        // Fireball shape: bare "damage:X", target comes from the card's target= line.
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("damage:X", sweeps, targets, implicit);
+        CHECK(implicit && sweeps.empty() && targets.empty(),
+              "W43-7 scan: a bare damage:X uses the card's own target= line");
+        // Nested parens in a spec survive (the lord parser's own hazard).
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("damage:X all(creature[counter(-1/-1)])", sweeps, targets, implicit);
+        CHECK(sweeps.size() == 1 && sweeps[0] == "creature[counter(-1/-1)]",
+              "W43-7 scan: a nested spec is closed on the BALANCED paren");
+        // NEGATIVES - each of these prices a DIFFERENT cast than the one offered.
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("{X}{G}{T}:damage:X target(creature[flying])", sweeps, targets, implicit);
+        CHECK(sweeps.empty() && targets.empty() && !implicit,
+              "W43-7 scan NEGATIVE an ACTIVATED ability's X is not the cast's X");
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("@each my upkeep:damage:X all(creature)", sweeps, targets, implicit);
+        CHECK(sweeps.empty() && targets.empty() && !implicit,
+              "W43-7 scan NEGATIVE a TRIGGERED X fires later, not on this cast");
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("overload damage:XX all(creature[-flying]|opponentbattlefield)",
+                              sweeps, targets, implicit);
+        CHECK(sweeps.empty() && targets.empty() && !implicit,
+              "W43-7 scan NEGATIVE 'damage:XX' (overload) is not X damage");
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("name(X>=10) damage:Xplus10plusend all(creature|battlefield)",
+                              sweeps, targets, implicit);
+        CHECK(sweeps.empty() && targets.empty() && !implicit,
+              "W43-7 scan NEGATIVE an X-derived expression is not a bare X");
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("choice name(Damage player) damage:X target(player)",
+                              sweeps, targets, implicit);
+        CHECK(sweeps.empty() && targets.empty() && !implicit,
+              "W43-7 scan NEGATIVE a MODAL branch is not priced as the whole cast");
+        sweeps.clear(); targets.clear(); implicit = false;
+        collectXDamageClauses("draw:X", sweeps, targets, implicit);
+        CHECK(sweeps.empty() && targets.empty() && !implicit,
+              "W43-7 scan NEGATIVE 'draw:X' collects no damage clause (affordability only)");
+        // THE RAND RAIL: a script that would draw the game RNG is refused before
+        // anything is computed from it.
+        CHECK(xScriptDrawsRng("damage:X all(creature) && genrandmana"),
+              "W43-7 rand-guard fires on a script that draws the game RNG");
+        CHECK(!xScriptDrawsRng("damage:X all(creature)"),
+              "W43-7 rand-guard NEGATIVE a plain sweep is not refused");
+        CHECK(!xScriptDrawsRng("damage:X target(anytarget)"),
+              "W43-7 rand-guard NEGATIVE a plain targeted burn is not refused");
+    }
+    cout << "\n[W43-7] echo shapes: the pricing block is decision-time only\n";
+    {
+        // The rendered option, as production composes it.
+        string opt = "Cast Starstorm {x}{r}{r}"
+                     + xDamageSweepCore(4, 2, std::vector<XDamVictim>(), false, false, 0, 0)
+                     + " {card text: \"Starstorm deals X damage to each creature.\"}";
+        vector<string> menu;
+        menu.push_back(opt);
+        menu.push_back("Cast nothing right now");
+        bool st = false;
+        int c = parseChoice("CHOICE: 1 (Cast Starstorm)", 2, &menu, &st);
+        cout << "     echo binds -> " << c << "\n";
+        CHECK(c == 1 && !st, "W43-7 echo: a SHORT-NAME answer still binds past the pricing block");
+        // History: the pricing block is a decision-time surface and never enters
+        // the append-only narration (it would be re-served on every later prompt,
+        // stating an affordability that has since changed - a stale surface is a
+        // false one).
+        CHECK(stripNarrationDecoration(opt) == "Cast Starstorm {x}{r}{r}",
+              "W43-7 echo: {X pricing: ...} is stripped from the narrated record");
+        CHECK(stripNarrationDecoration(opt).find("X pricing") == string::npos,
+              "W43-7 echo NEGATIVE no fragment of the pricing block survives into history");
+    }
+
+    // ---- W43-8: the counter option names what the TARGET spell does (seat125 INFO 2) ----
+    cout << "\n[W43-8] counter options carry the TARGET spell's rules text, not their own\n";
+    {
+        // The seat-125 window: "Cast Counterspell {u}{u} - can target on the
+        // stack: Sphinx's Revelation {x}{w}{u}{u}" and then the COUNTERSPELL's
+        // own card text. Guide rule 4 ("counter what draws them cards") asks a
+        // question that line cannot answer.
+        string facts = stackFactsCore("{x}{w}{u}{u}", false, false, "instant", 0, 0);
+        string note = stackTargetTextCore("You gain X life and draw X cards.");
+        string hit = "Sphinx's Revelation" + facts + note;
+        cout << "     " << hit << "\n";
+        CHECK(hit == "Sphinx's Revelation {x}{w}{u}{u} (instant) {target text: \"You gain X life"
+                     " and draw X cards.\"}",
+              "W43-8 the stack hit carries name, cost, type AND the target's rules text");
+        // A creature spell keeps its P/T from stackCardFacts and gains the text.
+        string cre = string("Master of Etherium") + stackFactsCore("{2}{u}", true, true, "", 8, 8)
+                   + stackTargetTextCore("Master of Etherium's power and toughness are each"
+                                         " equal to the number of artifacts you control.");
+        CHECK(cre.find("(artifact creature 8/8) {target text: \"Master of Etherium's power")
+              != string::npos,
+              "W43-8 a creature spell on the stack keeps its P/T and gains its text");
+        // NEGATIVE: a textless object (a token spell, an engine-internal) adds
+        // nothing - an empty quoted blob would be a gap dressed as a fact.
+        CHECK(stackTargetTextCore("") == "",
+              "W43-8 NEGATIVE a textless stack object adds no target-text clause");
+        CHECK((string("Ornithopter") + stackFactsCore("{0}", true, true, "", 0, 2)
+               + stackTargetTextCore(""))
+              == "Ornithopter {0} (artifact creature 0/2)",
+              "W43-8 NEGATIVE the composed hit is unchanged when there is no text to add");
+        // NO LEGAL TARGET window: with nothing counterable on the stack the
+        // emitter appends no hits clause at all, so no target-text can leak into
+        // a counter option that has nothing to counter.
+        string bare = "Cast Counterspell {u}{u} {card text: \"Counter target spell.\"}";
+        CHECK(bare.find("can target on the stack") == string::npos
+              && bare.find("{target text:") == string::npos,
+              "W43-8 NEGATIVE a counter option with no legal stack target carries no target facts");
+        // TRUNCATION follows the same one-line/ellipsis rule every other snippet
+        // uses, at the target-side length (140).
+        string longText(200, 'a');
+        string trunc = stackTargetTextCore(textSnippetCore(longText, 140));
+        CHECK(trunc.size() < 200 && trunc.find("...") != string::npos,
+              "W43-8 a long target text is truncated like every other card-text render");
+        // Echo/history: the target-text blob is decision-time only, and a
+        // short-name answer still binds past it.
+        string opt = "Cast Counterspell {u}{u} - can target on the stack: " + hit
+                   + " {card text: \"Counter target spell.\"}";
+        CHECK(stripNarrationDecoration(opt)
+              == "Cast Counterspell {u}{u} - can target on the stack: Sphinx's Revelation"
+                 " {x}{w}{u}{u} (instant)",
+              "W43-8 echo: {target text: ...} is stripped from the narrated record");
+        vector<string> menu;
+        menu.push_back(opt);
+        menu.push_back("Cast nothing right now");
+        bool st = false;
+        int c = parseChoice("CHOICE: 1 (Cast Counterspell)", 2, &menu, &st);
+        cout << "     echo binds -> " << c << "\n";
+        CHECK(c == 1 && !st, "W43-8 echo: a SHORT-NAME answer binds past the target-text block");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

@@ -1,0 +1,12 @@
+#NAME:W43 Probe Clock and Counter Bait
+#DESC:Wave-43 probe opponent: cheap creatures that all CARRY RULES TEXT, so a
+#counter option's stack clause has a target text to render. A vanilla Grizzly
+#Bears has no text= line and correctly renders none, which made the first two
+#versions of this deck a bad instrument for #W43-8 (it measured 0/2 and 1/3,
+#both of them the right answer to the wrong question - the textless branch is
+#proven in PARSETEST instead). Toughness 1 and 4 so the #W43-7 kill lists have
+#more than one lethal X to report. Delete after the probe run.
+Llanowar Elves * 14
+Elvish Visionary * 12
+Wall of Blossoms * 8
+Forest * 22

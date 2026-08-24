@@ -1,0 +1,10 @@
+#NAME:W43 X-Price and Counter Probe
+#DESC:Wave-43 #W43-7/#W43-8 probe: Starstorm (X sweep), Blaze (X targeted burn)
+#and Counterspell over a deliberately land-heavy base, so cast windows arrive
+#with real mana and the X pricing has an affordable range to report. Delete
+#after the probe run.
+Starstorm * 4
+Blaze * 4
+Counterspell * 4
+Mountain * 24
+Island * 24
