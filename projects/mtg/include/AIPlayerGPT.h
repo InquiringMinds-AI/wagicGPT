@@ -53,6 +53,7 @@ class WEvent;
 class DecisionRequest;
 class DecisionAction;
 class MTGCardInstance;
+class ActivatedAbility;
 
 //=== W35/W40 narration register - shared surface ============================
 //Both are defined in AIPlayerGPT.cpp. They are exposed so the TESTSUITE seat
@@ -291,6 +292,17 @@ private:
     //Append one line to the game narration (the model's own decisions join
     //the event narrative so the story stays complete without a transcript).
     void narrateDecision(const string& line);
+    //W42-D2: the ability this action will activate IF clicking it raises
+    //WEventAbilityActivated - NULL when nothing is announced (not an
+    //ActivatedAbility, or a mana producer, which activateAbility returns on
+    //before the announcement). Decides both the narration's verb and the stamp.
+    ActivatedAbility * eventRaisingActivation(const OrderedAIAction& action);
+    //Record that this seat has just narrated that activation as its own
+    //consumed decision, so the event the click raises does not repeat it.
+    void stampSelfActivation(ActivatedAbility * aa);
+    //Consume one stamp for (source, abilityText); true means this seat already
+    //wrote the line and the event must stay silent.
+    bool consumeSelfActivationStamp(MTGCardInstance * source, const string& abilityText);
     //Bound-checked narration append; flushes the pending phase marker first.
     void appendNarration(const string& line);
     //Zone-duty digest for the trim marker (see trimMarkerLine).
@@ -403,6 +415,18 @@ private:
     //pointer is stable across flips. Clears on turn change alongside
     //mPassDeclineCount.
     std::map<MTGCardInstance *, int> mFlipDoneCount;
+
+    //W42-D2 activation de-dup. WEventAbilityActivated is the ONE source of
+    //truth for activation lines and fires on both seats; where this seat has
+    //ALREADY written the same activation as a consumed decision, the event must
+    //not write a second line. Keyed by the two values the event itself carries -
+    //the ability's own source card and its menu text - so the match holds
+    //however the decision line was rendered (a pump activation narrates its
+    //delta, not its menu text). A COUNT, not a flag: the same ability activated
+    //twice in a window suppresses twice and no more. Cleared on turn change so
+    //a decision that never reached the click path cannot swallow a later
+    //genuine activation. Pointers are compared, never dereferenced.
+    std::map<std::pair<MTGCardInstance *, string>, int> mSelfActivationStamp;
 
     //Cast-seam livelock breaker (the priority seam's no-progress pass,
     //mirrored): a consumed cast pick that leaves the board byte-identical

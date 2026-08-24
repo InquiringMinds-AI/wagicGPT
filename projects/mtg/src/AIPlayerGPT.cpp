@@ -2755,19 +2755,65 @@ string bulkZoneMoveNarration(bool mine, int count, const string& from,
     return o.str();
 }
 
-//W41-3(a): the OBSERVER's half of an activation. The acting seat writes its own
-//activations as consumed decisions ("You used: <label> with <Card>"); this is
-//that same sentence from the other chair. Without it every activated and
-//loyalty ability was INVISIBLE across the table - the observing seat saw the
-//effect (a loyalty counter, a drain) with no cause line above it.
+//W42-D3: the waiting->source ladder, generalized to any card handle.
+//
+//A GRANTED/INNER ability - the engine's `ability$!...!$` keyword, which hands an
+//ability to a player or permanent (Tribute to Hunger's forced sacrifice, Path to
+//Exile's basic-land search, Soul Shatter's "sacrifice a creature or
+//planeswalker") - rides a NAMELESS dummy MTGCardInstance
+//(ATargetedAbilityCreator::resolve), so every surface that renders that
+//ability's source got an empty name and either printed nothing or promoted the
+//ability's own engine identifier into the card slot. The dummy carries
+//`storedSourceCard`, a link back to the real card that granted it; that link is
+//the ENGINE's own idiom for exactly this problem (parseMagicLine's token-creator
+//branch reads the same field with the same comment, "Fix for token creation
+//inside ability$!!$ keyword").
+//
+//Rungs: display name -> raw instance name -> the granting card, recursively.
+//Returns "" when no rung yields a real card - the caller then OMITS its line
+//rather than printing an engine identifier as though it were a card.
+static string resolveOwningCardName(const MTGCardInstance * c, int depth = 0)
+{
+    if (!c || depth > 4)
+        return "";
+    string n = c->getDisplayName();
+    if (!n.empty())
+        return n;
+    if (!c->name.empty())
+        return c->name;
+    return resolveOwningCardName(c->storedSourceCard, depth + 1);
+}
+
+//W42-D2, THE VERB SEAM. Every activation line - both seats, every decision path
+//- selects its verb HERE and nowhere else. There is an OPEN OWNER QUESTION on
+//the wording ("Opponent chose ..." reads better than "Opponent used ..." for a
+//choice-bearing trigger: an opponent forced to sacrifice by Tribute to Hunger
+//did not "use" anything). Until he rules, the shipped wording is unchanged
+//("used"); when he rules, this function is the whole change.
+string activationVerbPhrase(bool mine)
+{
+    return mine ? "You used: " : "Opponent used: ";
+}
+
+//W41-3(a) / W42-D2: THE ONE narration of an activation, rendered from whichever
+//chair is reading it. Both seats' logs describe the same activation - the actor
+//as "You used: X with <Card>", the peer as "Opponent used: X with <Card>" -
+//regardless of which decision path (model, heuristic, auto-resolve,
+//trigger-internal) performed it.
+//W42-D3: an EMPTY cardName returns "" so the caller OMITS the line. 13 corpus
+//lines read "- Opponent used: Put in Play" / "- Opponent used: ToughLife" with
+//no source at all: an engine ability identifier floating free of any card is a
+//rendered non-fact on the surface whose whole job is to say what did this, and
+//under the trust doctrine the model believes it. Callers run the
+//resolveOwningCardName ladder first; a line that still cannot name a real card
+//is dropped rather than printed nameless.
 string abilityActivationNarration(bool mine, const string& abilityText,
                                   const string& cardName)
 {
+    if (cardName.empty())
+        return "";
     string label = abilityText.empty() ? string("an ability") : abilityText;
-    string line = (mine ? "You used: " : "Opponent used: ") + label;
-    if (!cardName.empty())
-        line += " with " + cardName;
-    return line;
+    return activationVerbPhrase(mine) + label + " with " + cardName;
 }
 
 //Token creation attributes its CREATOR (owner addendum (7)): "March from the
@@ -2895,7 +2941,15 @@ string trimMarkerLine(const string& myGrave, const string& oppGrave,
 //is exactly the fold the owner asked for ("you cast _ targeting _" / "_
 //resolved"). Everything else keeps its full label, verb conjugated where the
 //head is one the seam actually emits.
-string actionTakenNarration(const string& action)
+//W42-D2: `activationVerb` forces the "You used: " head, skipping the
+//conjugation table. An ACTIVATION is narrated by both seats and the two lines
+//must be the same sentence with the subject swapped; conjugating the actor's
+//copy broke that ("- You drew 1 with Pyrite Spellbomb" against the peer's "-
+//Opponent used: Draw 1 with Pyrite Spellbomb", live probe t17/t31) and read as
+//a draw EVENT rather than an activation. Conjugation is still right for the
+//non-activation labels the seam emits - attacks, blocks, land drops - which no
+//event narrates from the other chair.
+string actionTakenNarration(const string& action, bool activationVerb = false)
 {
     static const char * kVerbs[][2] = {
         { "Attack", "You attacked" },      { "Block", "You blocked" },
@@ -2913,6 +2967,8 @@ string actionTakenNarration(const string& action)
         return "";
     if (regLower(action).find("cast ") == 0)
         return "";
+    if (activationVerb)
+        return activationVerbPhrase(true) + action;
     for (size_t i = 0; i < sizeof(kVerbs) / sizeof(kVerbs[0]); i++)
     {
         string head = kVerbs[i][0];
@@ -2922,7 +2978,9 @@ string actionTakenNarration(const string& action)
     }
     //An unrecognised label still reads as something the player DID, and the
     //label itself is preserved verbatim (it is the only record of the action).
-    return "You used: " + action;
+    //W42-D2: through the verb seam, so this fallback and every activation line
+    //change wording together.
+    return activationVerbPhrase(true) + action;
 }
 
 //A consumed MENU ask: record the CONSEQUENCE naming the subject, never the
@@ -4991,6 +5049,44 @@ void AIPlayerGPT::narrateDecision(const string& line)
     appendNarration(line);
 }
 
+//W42-D2: will clicking this action raise WEventAbilityActivated - i.e. is the
+//other seat about to narrate it? Two conditions, both taken from
+//ActivatedAbility::activateAbility itself: the ability is an ActivatedAbility,
+//and it is not a mana producer (activateAbility returns before the announcement
+//for those - "a tap-for-mana is plumbing, narrated nowhere"). Answering this
+//BEFORE narrating is what lets the actor's own line take the shared activation
+//wording and lets the de-dup stamp be recorded for exactly the acts that will
+//come back as events.
+ActivatedAbility * AIPlayerGPT::eventRaisingActivation(const OrderedAIAction& action)
+{
+    ActivatedAbility * aa = dynamic_cast<ActivatedAbility *>(action.ability);
+    if (!aa || !aa->source)
+        return NULL;
+    AbilityFactory af(observer);
+    MTGAbility * core = af.getCoreAbility(aa);
+    if (dynamic_cast<AManaProducer *>(aa) || dynamic_cast<AManaProducer *>(core))
+        return NULL;
+    return aa;
+}
+
+//W42-D2 de-dup, the actor's half. See mSelfActivationStamp.
+void AIPlayerGPT::stampSelfActivation(ActivatedAbility * aa)
+{
+    if (aa && aa->source)
+        mSelfActivationStamp[std::make_pair(aa->source, string(aa->getMenuText()))]++;
+}
+
+bool AIPlayerGPT::consumeSelfActivationStamp(MTGCardInstance * source, const string& abilityText)
+{
+    std::map<std::pair<MTGCardInstance *, string>, int>::iterator it =
+        mSelfActivationStamp.find(std::make_pair(source, abilityText));
+    if (it == mSelfActivationStamp.end() || it->second <= 0)
+        return false;
+    if (--(it->second) <= 0)
+        mSelfActivationStamp.erase(it);
+    return true;
+}
+
 //Defined below (near salvageLoopedChoice): drops verbatim reply-template lines.
 static bool isTemplatePlaceholderLine(const string& line);
 //Defined below: drops a coded line that merely echoes the protocol's worked
@@ -5292,6 +5388,13 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
                 mNarratedTurnOwner = observer->currentPlayer;
                 mNarratedTurnNumber = observer->turn;
                 mPendingPhase.clear();
+                //W42-D2: bound the de-dup stamps to the turn that raised them.
+                //A consumed decision whose click never reached activateAbility
+                //(a deferred or dropped action) would otherwise leave a stamp
+                //that silently swallows a later genuine activation of the same
+                //card+label. Within a turn the click follows the decision by a
+                //few ticks, so nothing legitimate is ever cleared early.
+                mSelfActivationStamp.clear();
                 std::ostringstream t;
                 t << "=== Turn " << (observer->turn + 1) << " - "
                   << (observer->currentPlayer == this ? "YOUR turn" : "opponent's turn") << " ===";
@@ -5617,19 +5720,39 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         return out.str();
     }
 
-    //W41-3(a): an activated (or planeswalker loyalty) ability was activated.
-    //THE ACTING SEAT already records its own activations as consumed decisions
-    //("You used: <label> with <Card>", actionTakenNarration), so emitting here
-    //for the actor would double every line; this fills the OBSERVER's side,
-    //which had no channel at all - 165 "You used:" lines corpus-wide against
-    //ZERO "Opponent used:", so every loyalty tick and every activation on the
-    //other side of the table arrived as an effect with no cause.
+    //W41-3(a) / W42-D2: an activated (or planeswalker loyalty) ability was
+    //activated. THIS EVENT IS THE ONE SOURCE OF TRUTH for activation lines, and
+    //it fires on BOTH seats.
+    //
+    //W41-3(a) shipped it observer-only, on the reasoning that the acting seat
+    //already writes its own activations as consumed decisions. That closed the
+    //165/0 gap by INVERTING it (236 "You used" / 419 "Opponent used"; 17 of 20
+    //game pairs disagreed about the same activations, worst 0 vs 19): the
+    //consumed-decision channel only fires when the MODEL answered a priority
+    //ask, so every heuristic-answered, auto-resolved and trigger-internal
+    //activation was visible to the opponent and invisible to the seat that
+    //performed it. The engine event has no such blind spot - everything
+    //reaching ActivatedAbility::activateAbility raises it - so the actor reads
+    //it too, and only the genuine consumed-decision duplicates are suppressed.
+    //
+    //DE-DUP: the actor stamps (source card, menu text) when it narrates a
+    //consumed decision (stampSelfActivation); the matching event consumes the
+    //stamp and prints nothing. Each activation is therefore exactly one line in
+    //each seat's log, whichever channel wrote it. The actor's own line is kept
+    //in preference to this one because it can be richer (a pump activation
+    //renders its signed delta and the resulting P/T).
     if (WEventAbilityActivated * e = dynamic_cast<WEventAbilityActivated *>(event))
     {
-        if (!e->source || e->controller == this)
+        if (!e->source)
             return "";
-        return abilityActivationNarration(false, e->abilityText,
-                                          e->source->getDisplayName());
+        bool mine = (e->controller == this);
+        if (mine && consumeSelfActivationStamp(e->source, e->abilityText))
+            return "";
+        //W42-D3: name the owning CARD, walking the granted-ability dummy back to
+        //its granter; an unresolvable source omits the line (see
+        //abilityActivationNarration) rather than printing a bare engine label.
+        return abilityActivationNarration(mine, e->abilityText,
+                                          resolveOwningCardName(e->source));
     }
 
     //N-105a part (c): every poison GAIN. The engine fires this event on all
@@ -8303,8 +8426,24 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
         {
-            narrateDecision(actionTakenNarration(
-                stripNarrationDecoration(describeAction(*shown[choice - 1]))));
+            //W42-D2: an ACTIVATION taken here is narrated in the SHARED
+            //activation wording ("You used: <label> with <Card>"), so this
+            //seat's line and the peer's event line are one sentence with the
+            //subject swapped; and the act is stamped so the event that follows
+            //the click does not write it a second time. Non-activations
+            //(attacks, blocks, land drops) keep their conjugated form - no
+            //other seat narrates those, so there is nothing to agree with.
+            ActivatedAbility * evAct = eventRaisingActivation(*shown[choice - 1]);
+            string takenLine = actionTakenNarration(
+                stripNarrationDecoration(describeAction(*shown[choice - 1])),
+                evAct != NULL);
+            narrateDecision(takenLine);
+            //Gated on a line having actually been written: a CAST narrates ""
+            //here (its zone events tell that story instead), and stamping one
+            //would suppress a line this seat never wrote - turning a de-dup
+            //into a new asymmetry.
+            if (!takenLine.empty())
+                stampSelfActivation(evAct);
             //Consume-on-choose: a taken land fetch is done for the turn -
             //an identical line (a second copy of the same fetch, or the
             //same crack re-proposed at a different land) re-asking at the
@@ -10658,14 +10797,18 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             //and leave the effect in the ability slot, where the header and the
             //narration both already render it: "You targeted Swamp with
             //Windswept Heath's Put in Play ability".
-            if (waiting && waiting->source)
-            {
-                effectName = waiting->source->getDisplayName();
-                if (effectName.empty())
-                    effectName = waiting->source->name;
-            }
+            //W42-D3: the ladder's rungs now run through resolveOwningCardName,
+            //which adds the storedSourceCard hop. 29 corpus lines fell all the
+            //way to the anonymous "this effect" - EVERY one of them a granted
+            //`ability$!!$` ability (Tribute to Hunger's ToughLife, Soul
+            //Shatter's Sacrifice, Path to Exile's Put in Play), whose dummy
+            //carrier knows the card that granted it. A nameless fake card
+            //carrying the ability is not an unnamed source; it is an unfollowed
+            //link.
+            if (waiting)
+                effectName = resolveOwningCardName(waiting->source);
             if (effectName.empty())
-                effectName = tc->source->name;
+                effectName = resolveOwningCardName(tc->source);
             //Never the ability's own name: an unnamed source is honestly
             //unnamed, and the ability is still named beside it.
             if (effectName.empty())
@@ -16892,8 +17035,13 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(abilityActivationNarration(false, "", "Elixir of Immortality")
               == "Opponent used: an ability with Elixir of Immortality",
               "W41-3a NEGATIVE a nameless ability never renders an empty label");
+        // W42-D3 revised this case's answer: an unnamed source used to render a
+        // line with no "with" clause at all ("- Opponent used: ToughLife"); it
+        // now renders nothing. The clause invariant is kept as the weaker half.
         CHECK(abilityActivationNarration(false, "Life", "").find(" with ") == string::npos,
               "W41-3a NEGATIVE an unnamed source leaves no dangling 'with' clause");
+        CHECK(abilityActivationNarration(false, "Life", "").empty(),
+              "W42-D3 an unnamed source omits the line entirely");
         // Echo shape: the activation line carries no bracketed guidance, so an
         // echoed copy survives decoration-stripping byte-identically.
         CHECK(stripNarrationDecoration(abilityActivationNarration(false, "Life",
@@ -18322,6 +18470,95 @@ void AIPlayerGPT::runParseSelfTest()
         string plain = "Equip with Lightning Greaves [cost: {0}] targeting Thraben Doomsayer";
         CHECK(stripRepeatAnnotation(plain) == plain,
               "W41-6 NEGATIVE an unannotated option line is untouched by the key strip");
+    }
+
+    cout << "\n[W42-D2/D3] one activation, one line per seat, always named\n";
+    // The engine half (who fires the event, when the stamp is consumed) is
+    // arrival-traced in a live probe. What is PROVABLE here is the rendering
+    // contract the probe then measures: the two seats' sentences are the same
+    // sentence with the subject swapped, the verb comes from ONE seam, and a
+    // line that cannot name a card is not printed.
+    {
+        // SYMMETRY: the D2 metric in its purest form. Same ability, same card,
+        // two chairs - and nothing but the subject differs.
+        const string abil = "-3: create spiders";
+        const string card = "Lolth, Spider Queen";
+        CHECK(abilityActivationNarration(true, abil, card)
+              == "You used: -3: create spiders with Lolth, Spider Queen",
+              "W42-D2 the ACTOR's line names the ability and the card");
+        CHECK(abilityActivationNarration(false, abil, card)
+              == "Opponent used: -3: create spiders with Lolth, Spider Queen",
+              "W42-D2 the PEER's line is the same sentence, subject swapped");
+        CHECK(abilityActivationNarration(true, abil, card).substr(activationVerbPhrase(true).size())
+              == abilityActivationNarration(false, abil, card).substr(activationVerbPhrase(false).size()),
+              "W42-D2 SYMMETRY the two seats differ in the subject phrase ONLY");
+        // THE VERB SEAM: the open owner question ("used" vs "chose") is one
+        // function away, and every activation line goes through it. If this
+        // pair ever disagrees with the rendered lines, a second verb has grown
+        // somewhere else - which is exactly what this case exists to catch.
+        CHECK(activationVerbPhrase(true) == "You used: "
+              && activationVerbPhrase(false) == "Opponent used: ",
+              "W42-D2 the verb seam still carries the shipped wording");
+        CHECK(abilityActivationNarration(true, abil, card).find(activationVerbPhrase(true)) == 0
+              && abilityActivationNarration(false, abil, card).find(activationVerbPhrase(false)) == 0,
+              "W42-D2 every activation line takes its verb from the seam");
+        // D3: an unnamed source is OMITTED, not printed bare. These are the two
+        // corpus shapes verbatim - "- Opponent used: Put in Play" (Path to
+        // Exile's granted search) and "- Opponent used: ToughLife" (Tribute to
+        // Hunger's granted sacrifice) - each an engine identifier floating free
+        // of any card on the one surface whose job is to say what did this.
+        CHECK(abilityActivationNarration(false, "Put in Play", "").empty(),
+              "W42-D3 a sourceless activation renders NOTHING, not a bare engine label");
+        CHECK(abilityActivationNarration(true, "ToughLife", "").empty(),
+              "W42-D3 the omission rule applies to the actor's chair too");
+        // NEGATIVE: omission is scoped to the SOURCE. A nameless ability with a
+        // real card still renders - the label falls back, the card does not.
+        CHECK(abilityActivationNarration(false, "", "Elixir of Immortality")
+              == "Opponent used: an ability with Elixir of Immortality",
+              "W42-D3 NEGATIVE a nameless ABILITY on a named card still renders");
+        // ECHO SHAPE: the line carries no bracketed annotation, so an echoed
+        // copy survives decoration-stripping byte-identically on both seats.
+        CHECK(stripNarrationDecoration(abilityActivationNarration(true, abil, card))
+              == "You used: -3: create spiders with Lolth, Spider Queen",
+              "W42-D2 the actor's activation line carries no decoration to strip");
+        // The wave-41 identity still holds: where the actor's own consumed
+        // decision writes the line, it is the SAME sentence the event would
+        // have written - so de-duping to either channel leaves one log shape.
+        CHECK(abilityActivationNarration(true, "Life", "Elixir of Immortality")
+              == actionTakenNarration("Life with Elixir of Immortality"),
+              "W42-D2 the consumed-decision channel and the event channel agree");
+        // THE CONJUGATION SPLIT, live-probe-driven. A label whose head IS one of
+        // the conjugated verbs used to render the actor's copy of an activation
+        // as a past-tense EVENT ("- You drew 1 with Pyrite Spellbomb") while the
+        // peer wrote "- Opponent used: Draw 1 with Pyrite Spellbomb" - one act,
+        // two incompatible sentences (probe t17/t31). An activation now takes
+        // the shared wording; everything else keeps its conjugation.
+        CHECK(actionTakenNarration("Draw 1 with Pyrite Spellbomb", true)
+              == "You used: Draw 1 with Pyrite Spellbomb",
+              "W42-D2 an ACTIVATION label is not conjugated - it takes the shared verb");
+        CHECK(actionTakenNarration("Draw 1 with Pyrite Spellbomb", true)
+              == abilityActivationNarration(true, "Draw 1", "Pyrite Spellbomb"),
+              "W42-D2 SYMMETRY the actor's activation line IS the event's actor line");
+        CHECK(actionTakenNarration("Sacrifice with Abyssal Gatekeeper", true)
+              == "You used: Sacrifice with Abyssal Gatekeeper"
+              && actionTakenNarration("Put in Play with Windswept Heath", true)
+              == "You used: Put in Play with Windswept Heath"
+              && actionTakenNarration("Equip with Lightning Greaves", true)
+              == "You used: Equip with Lightning Greaves",
+              "W42-D2 the other conjugation collisions take the shared verb too");
+        // NEGATIVE: a NON-activation keeps its conjugation. No other seat
+        // narrates an attack or a land drop, so there is nothing to agree with
+        // and the past tense is the better sentence.
+        CHECK(actionTakenNarration("Attack with Yawgmoth, Thran Physician (2/3)")
+              == "You attacked with Yawgmoth, Thran Physician (2/3)",
+              "W42-D2 NEGATIVE a non-activation label is still conjugated");
+        CHECK(actionTakenNarration("Put in Play with Windswept Heath")
+              == "You put in Play with Windswept Heath",
+              "W42-D2 NEGATIVE the conjugating path is unchanged when not an activation");
+        // NEGATIVE: the cast rule outranks the activation verb - a cast is told
+        // by its own zone events, from either chair.
+        CHECK(actionTakenNarration("Cast Tragic Slip {b}", true).empty(),
+              "W42-D2 NEGATIVE a cast still narrates nothing, activation flag or not");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
