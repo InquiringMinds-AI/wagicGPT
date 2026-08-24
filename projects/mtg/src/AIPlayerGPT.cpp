@@ -2755,6 +2755,50 @@ string bulkZoneMoveNarration(bool mine, int count, const string& from,
     return o.str();
 }
 
+//#W42-D1: ONE card leaving a hidden zone for the reveal zone. Kept as its own
+//emitter so a GENUINE reveal (reveal the top card, reveal your hand) still
+//names every card it shows - the collapse below must never reach those.
+string revealedCardNarration(bool mine, const string& cardName, const string& fromZone)
+{
+    return (mine ? "You revealed your " : "Opponent revealed their ") + cardName
+           + " from " + ownZone(mine, fromZone);
+}
+
+//#W42-D1: a library SEARCH is ONE event, not N reveals. The engine implements
+//"search your library" by dumping the WHOLE library into the reveal zone so the
+//chooser can walk it, and every examined card fired its own "revealed <name>"
+//line: 1,546 lines = 15.2% of ALL assembled prompt text in the wave-41 corpus.
+//Worse, on the OBSERVER seat those lines named the opponent's entire library -
+//information MTG rules never grant (a shuffled search reveals only the found
+//card). The examined run collapses to ONE line naming the SOURCE and no card;
+//the FOUND card keeps its own line, because it genuinely is revealed.
+//The gate is the MECHANISM (the whole origin library moved into the reveal
+//zone), never a line count - a real full reveal is a different event class and
+//must not be masked.
+string librarySearchNarration(bool mine, const string& sourceName)
+{
+    string line = mine ? string("You searched your library")
+                       : string("Opponent searched their library");
+    if (!sourceName.empty())
+        line += " with " + sourceName;
+    return line;
+}
+
+//#W42-D9: the London mulligan's bottoming, stated as the one thing that
+//happened. The shuffle-back narrated seven "moved from your hand to your
+//library" lines per mulligan and the BOTTOMING - the fact the model actually
+//needs - was never stated at all. Cards are named to their OWNER only: from
+//the other chair the identity and order of bottomed cards is hidden.
+string pregameBottomNarration(int count, const string& names)
+{
+    std::ostringstream o;
+    o << "You put " << count << " card" << (count == 1 ? "" : "s")
+      << " on the bottom of your library";
+    if (!names.empty())
+        o << ": " << names;
+    return o.str();
+}
+
 //W41-3(a): the OBSERVER's half of an activation. The acting seat writes its own
 //activations as consumed decisions ("You used: <label> with <Card>"); this is
 //that same sentence from the other chair. Without it every activated and
@@ -4204,6 +4248,14 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
     mBulkMoveCount = 0;                  //W41-3(c): no bulk move pending
     mBulkMoveMine = false;
+    mSearchRevealMine = false;           //#W42-D1: no search run pending
+    mSearchIsFullDump = false;
+    mSearchIsWholeZone = false;
+    mSearchRevealOwner = NULL;
+    mSearchMaskOwner = NULL;
+    mPregameBottomingNow = false;        //#W42-D9
+    mPregameShufflingBack = false;
+    mPregameBottomedCount = 0;
 #ifndef WAGIC_NO_CURL
     curl_global_init(CURL_GLOBAL_DEFAULT);
 #endif
@@ -4836,6 +4888,8 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
     //W41-3(c): a bulk move that ran right up to the decision point must be in
     //the log the model reads, not stranded in the accumulator.
     flushBulkMove();
+    flushSearchReveal();  //#W42-D1: the search must be in the log the model reads
+    flushPregameBottom(); //#W42-D9
     flushOpeningHand(); //always: preserves the opening-hand log line for turn 1+
     //N-93b de-dup: at pregame (turn 0 - mulligan/leyline/bottom asks) the only
     //narration is the just-flushed opening-hand line, and the live "Your hand:"
@@ -4972,6 +5026,8 @@ void AIPlayerGPT::appendNarration(const string& line)
     //flushBulkMove clears its count BEFORE it appends, so this re-entry is a
     //single no-op recursion, never a loop.
     flushBulkMove();
+    flushSearchReveal();  //#W42-D1: same reason, same re-entry discipline
+    flushPregameBottom(); //#W42-D9: the bottoming precedes turn 1's first line
     flushOpeningHand(); //the deal precedes whatever is being narrated
     //Zone duty (owner doctrine): the trim drops the OLDEST events, which is
     //exactly where a player's early graveyard lives - so the marker carries
@@ -5255,9 +5311,33 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
                 mOpeningHand.push_back(z->card->getDisplayName());
                 return result;
             }
-            if (!mDealDone && z->from == game->hand && z->to == game->library)
+            //#W42-D9: the pregame hand->library moves, collapsed. Both arms are
+            //ARMED BY THE DECISION that caused them (pregameChooseBottom hands
+            //back the card it is about to bottom; pregameMulliganDecision says
+            //it is mulliganing), never by a turn/phase window - a window wide
+            //enough to cover the London bottoming is also wide enough to
+            //swallow a real turn-1 hand->library move.
+            //The turn-0 term is a BELT on the decision arms, not the gate: an
+            //arm that somehow outlived its pregame (a mulligan the engine
+            //declined to perform) must never swallow a real in-game
+            //hand->library move, and no pregame act happens after turn 0.
+            if (z->from == game->hand && z->to == game->library && observer->turn == 0
+                && (!mDealDone || mPregameBottomingNow || mPregameShufflingBack))
             {
-                mOpeningHand.clear(); //mulligan shuffle-back
+                if (mPregameBottomingNow)
+                {
+                    mPregameBottomingNow = false;
+                    mPregameBottomedCount++;
+                    if (!mPregameBottomedNames.empty())
+                        mPregameBottomedNames += "; ";
+                    mPregameBottomedNames += z->card->getDisplayName();
+                }
+                else
+                {
+                    mOpeningHand.clear(); //mulligan shuffle-back
+                    if (game->hand->nb_cards == 0)
+                        mPregameShufflingBack = false;
+                }
                 return result;
             }
             bool mulliganWindow = (observer->turn == 0)
@@ -5275,6 +5355,11 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
     //narration is always contextually clear about whose turn it is.
     if (WEventPhaseChange * pe = dynamic_cast<WEventPhaseChange *>(event))
     {
+        //#W42-D9: the bottoming happened in the phase we are LEAVING. Flushing
+        //it here keeps it under its own phase marker - the probe's first pass
+        //filed "You put 1 card on the bottom of your library" under "Main
+        //phase 1", a pregame act reading as a main-phase one.
+        flushPregameBottom();
         if (pe->to)
         {
             //Turn ownership comes from observer->currentPlayer, NOT from
@@ -5328,7 +5413,64 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
             return result;
         }
     }
+    //#W42-D1: a library SEARCH's examined-cards run, and its return trip.
+    if (WEventZoneChange * z = dynamic_cast<WEventZoneChange *>(event))
+    {
+        //(a) library -> reveal. Buffer the named line for every card; the
+        //MECHANISM test below decides at flush time whether this was a search
+        //(the whole library went) or a genuine reveal-N (it did not).
+        if (z->card && z->from && z->to && z->from != z->to && isRevealZone(z->to)
+            && z->from->owner && z->from == z->from->owner->game->library)
+        {
+            Player * owner = z->from->owner;
+            if (!mSearchRevealLines.empty() && mSearchRevealOwner != owner)
+                flushSearchReveal();
+            if (mSearchRevealLines.empty())
+            {
+                mSearchRevealOwner = owner;
+                mSearchRevealMine = (owner == this);
+                mSearchIsFullDump = false;
+                //A Reveal ability does its zone work from ActionLayer::Update,
+                //NOT from a stack resolve, so resolvingStackSource() is empty
+                //here (the probe's first pass produced a sourceless "You
+                //searched your library"). Ask the live reveal ability instead,
+                //and keep the stack source as the fallback.
+                bool wholeZone = false;
+                MTGCardInstance * rs = revealingAbilitySource(owner, &wholeZone);
+                mSearchIsWholeZone = wholeZone;
+                if (!rs)
+                    rs = resolvingStackSource();
+                mSearchRevealSource = rs ? rs->getDisplayName() : string();
+            }
+            mSearchRevealLines.push_back(describeEvent(event));
+            //The whole library is now in the reveal zone: this is the engine
+            //walking a search, not an effect showing cards to both players.
+            if (z->from->nb_cards == 0)
+                mSearchIsFullDump = true;
+            return result;
+        }
+        //(b) reveal -> library, for a player whose search we already collapsed:
+        //the unfound cards going back where they came from. Nothing happened,
+        //and naming them is exactly the leak the collapse exists to close.
+        if (z->card && z->from && z->to && isRevealZone(z->from) && z->to->owner
+            && z->to == z->to->owner->game->library && mSearchMaskOwner == z->to->owner)
+        {
+            if (z->from->nb_cards == 0)
+                mSearchMaskOwner = NULL; //the search is over
+            return result;
+        }
+        //The mask lives exactly as long as the reveal zone it describes, and
+        //is cleared only HERE - after both branches have had their turn. The
+        //LAST card of a search leaves an EMPTY reveal zone behind (putInZone
+        //raises the event after the move), so a clear that ran first would
+        //disarm the mask on precisely the event it exists to suppress: the
+        //probe leaked exactly one named library card per search that way.
+        if (mSearchMaskOwner && mSearchMaskOwner->game->reveal
+            && mSearchMaskOwner->game->reveal->nb_cards == 0)
+            mSearchMaskOwner = NULL;
+    }
     flushBulkMove();
+    flushSearchReveal();
 
     string line = describeEvent(event);
     if (!line.empty())
@@ -5351,6 +5493,51 @@ void AIPlayerGPT::flushBulkMove()
     mBulkMoveSource.clear();
     if (!line.empty())
         appendNarration(line);
+}
+
+//#W42-D1: write the pending library->reveal run, then clear. The buffer is
+//emptied BEFORE anything is appended, so the re-entrant flush appendNarration
+//performs is a single no-op recursion rather than a loop.
+void AIPlayerGPT::flushSearchReveal()
+{
+    if (mSearchRevealLines.empty())
+        return;
+    vector<string> lines;
+    lines.swap(mSearchRevealLines);
+    bool fullDump = mSearchIsFullDump;
+    bool wholeZone = mSearchIsWholeZone;
+    bool mine = mSearchRevealMine;
+    string source = mSearchRevealSource;
+    Player * owner = mSearchRevealOwner;
+    mSearchIsFullDump = false;
+    mSearchIsWholeZone = false;
+    mSearchRevealSource.clear();
+    mSearchRevealOwner = NULL;
+    //The script says this ability walks the WHOLE zone (a search) - or, as a
+    //fallback for a path with no live ability object to ask, the run emptied
+    //the library and was longer than one card. Either way: ONE line, no card
+    //named, and the mask that follows keeps the return trip silent.
+    if (wholeZone || (fullDump && lines.size() > 1))
+    {
+        mSearchMaskOwner = owner;
+        appendNarration(librarySearchNarration(mine, source));
+        return;
+    }
+    for (size_t i = 0; i < lines.size(); i++)
+        if (!lines[i].empty())
+            appendNarration(lines[i]);
+}
+
+//#W42-D9: write the pending pregame bottoming, then clear.
+void AIPlayerGPT::flushPregameBottom()
+{
+    if (mPregameBottomedCount <= 0)
+        return;
+    int n = mPregameBottomedCount;
+    string names = mPregameBottomedNames;
+    mPregameBottomedCount = 0;
+    mPregameBottomedNames.clear();
+    appendNarration(pregameBottomNarration(n, names));
 }
 
 //The card whose spell or ability is resolving RIGHT NOW: ActionStack marks the
@@ -5376,6 +5563,45 @@ MTGCardInstance * AIPlayerGPT::resolvingStackSource()
         if (sa->ability && sa->ability->source)
             return sa->ability->source;
     return it->source;
+}
+
+//#W42-D1: the card whose Reveal/Scry ability is walking `p`'s library right
+//now. Unlike a spell resolution, MTGRevealingCards moves the cards from its
+//own Update() on the action layer, so there is no stack entry to attribute the
+//search to - the ability object itself is the only place the source lives.
+MTGCardInstance * AIPlayerGPT::revealingAbilitySource(Player * p, bool * wholeZone)
+{
+    if (wholeZone)
+        *wholeZone = false;
+    if (!p || !observer || !observer->mLayers)
+        return NULL;
+    ActionLayer * al = observer->mLayers->actionLayer();
+    if (!al)
+        return NULL;
+    for (size_t i = 0; i < al->mObjects.size(); i++)
+    {
+        if (MTGRevealingCards * rc = dynamic_cast<MTGRevealingCards *>(al->mObjects[i]))
+            if (rc->playerForZone == p)
+            {
+                //THE MECHANISM KEY, read off the script rather than off a line
+                //count: "Reveal:type:..." walks the WHOLE zone (a search),
+                //while "Reveal:3" shows a fixed N (a genuine reveal). Only the
+                //first is masked - and a search of a one-card library is still
+                //a search, which a count-based gate got wrong (the probe leaked
+                //one named library card at deck-out).
+                if (wholeZone)
+                    *wholeZone = (rc->number.find("type:") != string::npos)
+                              || (rc->abilityString.find("Reveal:type:") != string::npos)
+                              || (rc->abilityString.find("reveal:type:") != string::npos);
+                if (rc->source)
+                    return rc->source;
+                return NULL;
+            }
+        if (MTGScryCards * sc = dynamic_cast<MTGScryCards *>(al->mObjects[i]))
+            if (sc->source && sc->source->controller() == p)
+                return sc->source; //scry is a fixed N: never a whole-zone walk
+    }
+    return NULL;
 }
 
 string AIPlayerGPT::describeEvent(WEvent * event)
@@ -5433,11 +5659,7 @@ string AIPlayerGPT::describeEvent(WEvent * event)
 
         //Reveals are public information, whoever's card it is.
         if (isRevealZone(e->to))
-        {
-            out << (mine ? "You revealed your " : "Opponent revealed their ") << cardName
-                << " from " << (mine ? "your " : "their ") << zoneDesc(e->from);
-            return out.str();
-        }
+            return revealedCardNarration(mine, cardName, zoneDesc(e->from));
         if (isRevealZone(e->from))
         {
             if (!mine && (toName == "hand" || toName == "library"))
@@ -13267,11 +13489,26 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
         }
     writeTransLog("reveal", userMsg, content, result, (int) revealed.size(),
                   chosen.empty() ? string("none") : chosen, NULL, &names);
-    narrateDecision(chosen.empty()
-                    ? ("You revealed " + std::to_string(revealed.size())
-                       + " and kept them all (" + optTwoLabel + ")")
-                    : ("You revealed " + std::to_string(revealed.size()) + " and put "
-                       + chosen + " to " + optOneLabel));
+    //#W42-D1: on a SEARCH (this seat's whole library went to the reveal zone,
+    //so flushSearchReveal armed the mask) the echo would be a third line about
+    //an event the log already carries twice - the collapsed "You searched your
+    //library with <X>" above it, and the found card's own move line below it.
+    //Suppressing it is also the more TRUTHFUL choice: `chosen` is what we
+    //accepted, while the move line is what the engine actually did. A search
+    //that took nothing still says so - that outcome has no move line at all.
+    //PROBE CORRECTION (first pass): the empty-`chosen` branch is NOT "took
+    //nothing" on a search. The engine's own option-one chooser can take the
+    //card through chooseTarget instead of this reply, so `chosen` empty here
+    //means "this ask did not decide it", not "no card was found" - narrating
+    //the second would be a lie about a card the very next line puts in hand.
+    //Both branches are suppressed on a search: the collapsed search line above
+    //and the found card's own move line below carry the whole event, truthfully.
+    if (mSearchMaskOwner != this)
+        narrateDecision(chosen.empty()
+                        ? ("You revealed " + std::to_string(revealed.size())
+                           + " and kept them all (" + optTwoLabel + ")")
+                        : ("You revealed " + std::to_string(revealed.size()) + " and put "
+                           + chosen + " to " + optOneLabel));
     DebugTrace("AIPlayerGPT: reveal put " << selForOptionOne.size() << " of "
                << revealed.size() << " to option one in one reply");
     return 1;
@@ -13312,7 +13549,11 @@ int AIPlayerGPT::pregameMulliganDecision(int mullsTaken)
     if (pick == kChoicePending)
         return PREGAME_PENDING;
     if (pick < 0)
-        return AIPlayerBaka::pregameMulliganDecision(mullsTaken);
+        pick = AIPlayerBaka::pregameMulliganDecision(mullsTaken);
+    //#W42-D9: a mulligan is about to walk the whole hand back into the library
+    //one card at a time. Arm the collapse from the DECISION, not from a window.
+    if (pick == 1)
+        mPregameShufflingBack = true;
     return pick; //0 keep, 1 mulligan
 }
 
@@ -13399,7 +13640,19 @@ string AIPlayerGPT::buildPregameBottomAskText(const vector<MTGCardInstance*>& ha
     return tail.str();
 }
 
+//#W42-D9: every card this seam hands back is about to become a hand->library
+//move. Arming the flag HERE (rather than guessing from turn/phase) is what
+//lets receiveEvent collapse the bottoming without ever swallowing a real
+//hand->library move that happens to land in the same window.
 MTGCardInstance * AIPlayerGPT::pregameChooseBottom(int need, int chosenSoFar, int & status)
+{
+    MTGCardInstance * picked = pregameChooseBottomInner(need, chosenSoFar, status);
+    if (picked)
+        mPregameBottomingNow = true;
+    return picked;
+}
+
+MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFar, int & status)
 {
     status = 0;
     if (mEndpoint.empty())
@@ -16960,6 +17213,134 @@ void AIPlayerGPT::runParseSelfTest()
               != zoneChangeNarration(false, "Lost Mine of Phandelver", "zone", "zone",
                                      false, false, false, ""),
               "W41-3e NEGATIVE a genuine cross-zone move is a different line and survives");
+    }
+
+    // ---- #W42-D1 / #W42-D9: the search collapse and the mulligan collapse.
+    cout << "\n[W42-D1] library-search collapse + hidden-information mask\n";
+    {
+        // The collapsed line: ONE sentence, the SOURCE named, no card named.
+        CHECK(librarySearchNarration(true, "Idyllic Tutor")
+              == "You searched your library with Idyllic Tutor",
+              "W42-D1 the actor's search collapses to one sourced line");
+        CHECK(librarySearchNarration(false, "Idyllic Tutor")
+              == "Opponent searched their library with Idyllic Tutor",
+              "W42-D1 the observer's twin of the same search");
+        CHECK(librarySearchNarration(false, "").find(" with ") == string::npos,
+              "W42-D1 NEGATIVE an unattributable search invents no source");
+        // The LEAK, stated as a property: nothing about a search can name a
+        // card. The wave-41 observer seat read 377 lines of the opponent's
+        // library by name; the collapsed line has no card slot to put one in.
+        CHECK(librarySearchNarration(false, "Idyllic Tutor").find("Sanguine Bond")
+                  == string::npos
+              && librarySearchNarration(false, "Idyllic Tutor").find("revealed")
+                  == string::npos,
+              "W42-D1 NEGATIVE the observer's search line names no unfound card");
+        // POSITIVE CONTROL: a genuine reveal is a DIFFERENT event class and is
+        // NOT masked - reveal-the-top-card and reveal-your-hand still name the
+        // card on both seats. describeEvent still builds exactly this line;
+        // only a run that emptied the library ever reaches the collapse.
+        CHECK(revealedCardNarration(true, "Brainstorm", "library")
+              == "You revealed your Brainstorm from your library",
+              "W42-D1 POSITIVE CONTROL a genuine reveal still names the card");
+        CHECK(revealedCardNarration(false, "Thoughtseize", "hand")
+              == "Opponent revealed their Thoughtseize from their hand",
+              "W42-D1 POSITIVE CONTROL a hand reveal is public and stays named");
+        CHECK(revealedCardNarration(false, "Brainstorm", "library")
+              != librarySearchNarration(false, "Idyllic Tutor"),
+              "W42-D1 NEGATIVE the reveal line and the search line are not the same line");
+        // #W42-D9: the bottoming, stated once, named to its owner only.
+        CHECK(pregameBottomNarration(3, "Silverquill Silencer; Lolth, Spider Queen; Acererak the Archlich")
+              == "You put 3 cards on the bottom of your library: Silverquill Silencer;"
+                 " Lolth, Spider Queen; Acererak the Archlich",
+              "W42-D9 the London bottoming collapses to one counted, named line");
+        CHECK(pregameBottomNarration(1, "Plains")
+              == "You put 1 card on the bottom of your library: Plains",
+              "W42-D9 the count is grammatical at one");
+        CHECK(pregameBottomNarration(2, "") == "You put 2 cards on the bottom of your library",
+              "W42-D9 NEGATIVE with no names the line ends clean - no dangling colon");
+        CHECK(pregameBottomNarration(2, "").find(':') == string::npos,
+              "W42-D9 NEGATIVE the unnamed form leaks no card and no punctuation stub");
+        // The MECHANISM KEY itself, as revealingAbilitySource reads it off the
+        // live ability's script. A search is "Reveal:type:..."; a reveal-N is
+        // "Reveal:<n>". Keying on this (rather than on how many lines a run
+        // produced) is what keeps a one-card SEARCH masked and a genuine
+        // one-card REVEAL named - the probe leaked exactly that card at
+        // deck-out while the gate was still counting lines.
+        {
+            string tutor = "Reveal:type:*:mylibrary revealzone(mylibrary) optionone"
+                           " name(choose card) target(<1>enchantment|reveal)";
+            string revealN = "Reveal:3 optionone name(Put in graveyard)";
+            CHECK(tutor.find("type:") != string::npos,
+                  "W42-D1 a tutor's script is a WHOLE-ZONE walk (type:) - masked");
+            CHECK(revealN.find("type:") == string::npos,
+                  "W42-D1 NEGATIVE a fixed reveal-N carries no type: - never masked");
+            CHECK(string("Reveal:1").find("type:") == string::npos,
+                  "W42-D1 NEGATIVE reveal-the-top-card is a reveal, not a search");
+        }
+    }
+
+    // ---- #W42-D1 COMPOSED GOLDEN: a whole tutor, both seats, through the real
+    // emitters and the real assembler. The wave-41 corpus wrote 162 lines here.
+    cout << "\n[W42-D1-composed] a tutor as the two seats now read it\n";
+    {
+        const string kNoTrim = "(...earlier events trimmed...)";
+        string actor = "=== Turn 5 - YOUR turn ===\n";
+        string aphase = "Phase: Main phase 2";
+        narrationAppend(actor, aphase, zoneChangeNarration(true, "Idyllic Tutor", "hand", "stack",
+                                                           false, false, false, ""), kNoTrim);
+        narrationAppend(actor, aphase, zoneChangeNarration(true, "Idyllic Tutor", "stack", "graveyard",
+                                                           false, false, false, ""), kNoTrim);
+        narrationAppend(actor, aphase, librarySearchNarration(true, "Idyllic Tutor"), kNoTrim);
+        narrationAppend(actor, aphase, "Your revealed Exquisite Blood went to your hand", kNoTrim);
+        cout << actor;
+        string expectedActor =
+            "=== Turn 5 - YOUR turn ===\n"
+            "- Phase: Main phase 2\n"
+            "- You cast Idyllic Tutor\n"
+            "- Your Idyllic Tutor resolved and went to your graveyard\n"
+            "- You searched your library with Idyllic Tutor\n"
+            "- Your revealed Exquisite Blood went to your hand\n";
+        CHECK(actor == expectedActor,
+              "W42-D1 the ACTOR's whole tutor is 4 lines (was 166), unfound cards unnamed");
+
+        string obs = "=== Turn 5 - opponent's turn ===\n";
+        string ophase = "Phase: Main phase 2";
+        narrationAppend(obs, ophase, zoneChangeNarration(false, "Idyllic Tutor", "hand", "stack",
+                                                         false, false, false, ""), kNoTrim);
+        narrationAppend(obs, ophase, zoneChangeNarration(false, "Idyllic Tutor", "stack", "graveyard",
+                                                         false, false, false, ""), kNoTrim);
+        narrationAppend(obs, ophase, librarySearchNarration(false, "Idyllic Tutor"), kNoTrim);
+        narrationAppend(obs, ophase, "Opponent put the revealed Exquisite Blood into their hand", kNoTrim);
+        cout << obs;
+        string expectedObs =
+            "=== Turn 5 - opponent's turn ===\n"
+            "- Phase: Main phase 2\n"
+            "- Opponent cast Idyllic Tutor\n"
+            "- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard\n"
+            "- Opponent searched their library with Idyllic Tutor\n"
+            "- Opponent put the revealed Exquisite Blood into their hand\n";
+        CHECK(obs == expectedObs,
+              "W42-D1 the OBSERVER's twin: only the FOUND card is ever named");
+        CHECK(obs.find("Sanguine Bond") == string::npos
+              && obs.find("Underground Sea") == string::npos,
+              "W42-D1 NEGATIVE no unfound library card can appear in the observer's log");
+
+        string mull = "=== Turn 1 - YOUR turn ===\n";
+        string mphase = "Phase: Untap";
+        narrationAppend(mull, mphase, mulliganNarration(false, 6), kNoTrim);
+        narrationAppend(mull, mphase, mulliganNarration(true, 4), kNoTrim);
+        narrationAppend(mull, mphase, pregameBottomNarration(3, "Silverquill Silencer; Lolth, Spider Queen; Acererak the Archlich"), kNoTrim);
+        cout << mull;
+        CHECK(mull ==
+              "=== Turn 1 - YOUR turn ===\n"
+              "- Phase: Untap\n"
+              "- You mulliganed to 6\n"
+              "- You kept your opening hand (4 cards)\n"
+              "- You put 3 cards on the bottom of your library: Silverquill Silencer;"
+              " Lolth, Spider Queen; Acererak the Archlich\n",
+              "W42-D9 the mulligan sequence states the bottoming and spams nothing");
+        CHECK(mull.find("moved from your hand to your library") == string::npos,
+              "W42-D9 NEGATIVE the per-card shuffle-back line is gone");
     }
 
     // ---- W35 COMPOSED-LOG GOLDEN: a whole rendered log, through the real

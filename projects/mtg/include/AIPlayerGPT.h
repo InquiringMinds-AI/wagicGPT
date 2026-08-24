@@ -194,6 +194,8 @@ protected:
     //translog), whose picks are cached and popped one card per call.
     virtual int pregameMulliganDecision(int mullsTaken);
     virtual MTGCardInstance * pregameChooseBottom(int need, int chosenSoFar, int & status);
+    //#W42-D9: the real body; the override above only arms the bottoming flag.
+    MTGCardInstance * pregameChooseBottomInner(int need, int chosenSoFar, int & status);
     virtual int pregameLeylineDecision(MTGCardInstance * card);
     //State for the single bundled BOTTOM-N ask per keep.
     std::vector<MTGCardInstance*> mPregameBottomQueue;
@@ -299,9 +301,21 @@ private:
     //run before ANY other narration line and before the prompt is assembled,
     //so the collapsed line lands in the log at the point the moves happened.
     void flushBulkMove();
+    //#W42-D1: write (and clear) the pending library->reveal run - as ONE
+    //sourced "searched their library" line when the run emptied the library,
+    //otherwise as the named lines it buffered. Runs everywhere flushBulkMove
+    //does, for the same reason: the log's ordering must be untouched.
+    void flushSearchReveal();
+    //#W42-D9: write (and clear) the pending pregame bottoming as one counted
+    //line. Named to its owner only.
+    void flushPregameBottom();
     //W41-3(c): the card whose spell/ability is resolving right now (the latest
     //NOT_RESOLVED stack object's source), used to attribute a bulk move.
     MTGCardInstance * resolvingStackSource();
+    //#W42-D1: the card whose Reveal/Scry ability is walking `p`'s library now.
+    //`wholeZone` (optional out) is the mechanism key: true when the live
+    //ability walks the WHOLE zone (a search), false for a fixed reveal-N.
+    MTGCardInstance * revealingAbilitySource(Player * p, bool * wholeZone = NULL);
     //Split a reply at its "PLAN:" marker: stores the (complete, per the
     //protocol) plan into mCurrentPlan and returns the decision part, which
     //is the ONLY text the choice parsers may see - plan prose is full of
@@ -607,6 +621,30 @@ private:
     bool mBulkMoveMine;
     string mBulkMoveFirstLine;
     string mBulkMoveSource;
+    //#W42-D1: the pending library->reveal run. `mSearchRevealLines` holds the
+    //ordinary named line for EVERY card in the run, so a run that turns out to
+    //be a genuine reveal (not a whole-library search) replays unchanged.
+    //`mSearchIsWholeZone` is the MECHANISM key, read off the live ability's
+    //script ("Reveal:type:..." = a search); `mSearchIsFullDump` (the origin
+    //library hit zero) is only the fallback for a path with no ability to ask.
+    std::vector<string> mSearchRevealLines;
+    bool mSearchRevealMine;
+    bool mSearchIsFullDump;
+    bool mSearchIsWholeZone;
+    string mSearchRevealSource;
+    Player * mSearchRevealOwner;
+    //#W42-D1: while set, this player's reveal->library moves are the return
+    //trip of a search already narrated as one line - a no-op the model must
+    //never read as N events (and, on the observer seat, never read at all).
+    Player * mSearchMaskOwner;
+    //#W42-D9: the pregame bottoming, collapsed. `mPregameBottomingNow` is armed
+    //by pregameChooseBottom for exactly the one hand->library move the engine
+    //makes with the card it just handed back, so a real turn-1 hand->library
+    //move can never be swallowed by a window guess.
+    bool mPregameBottomingNow;
+    bool mPregameShufflingBack;
+    int mPregameBottomedCount;
+    string mPregameBottomedNames;
     //Avoid re-querying the model every AI tick while nothing changed. Keyed
     //by board state + question (not the full prompt) for the same reason as
     //mAskCache: taking an action narrates it, and a full-prompt key would
