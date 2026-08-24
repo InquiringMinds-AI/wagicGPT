@@ -113,3 +113,33 @@ Three narration reports, one lane, all mechanism-level:
    wave-41 #23 Swamp specimen shape.
 Predictions for the next corpus in the lane report (zero quoted narration tails; zero
 adjacent pairs; 100% damage lines carry (now N) except toxic/prevented).
+
+## OWNER LIVE REPORTS round 2 (2026-08-24, Vita play on the fresh VPK; merged at e4f4e0bec,
+## gate 1096/0 + 35 AI/0, PARSETEST 944/0)
+4. Delver never triggered (t1 Island+Delver, t2 drew Into the Roil): ROOT CAUSE was NOT
+   the card (script Oracle-faithful) and NOT auto-skip (hypothesis falsified with a
+   traced real-game repro) — the held phase-advance button's JGE auto-repeat (0.5s +
+   70ms) is ALSO the reveal display's decline key, and MTGRevealingCards read input
+   queued before it existed. CLASS FIX: input flush (ResetInput, clears holds) +
+   one-frame arming on MTGRevealingCards AND MTGScryCards (~500 reveal/scry cards).
+   New harness commands: holdkey/releasekey (real JGE input) + realgame (drops
+   mSuiteGame); fixture delver_of_secrets_held_trigger.txt RED-before/green-after,
+   20/20 stable. Residual: desktop OS-keyboard auto-repeat narrows but not fully closed
+   (JGE-owned repeat path — the Vita — is fully closed).
+5. Beastcaller Savant's mana paid for Captain's Claws (artifact): the engine had NO
+   spend-restriction concept — the corpus idiom is only an ACTIVATION gate. NEW
+   MECHANISM: manarestriction{<TC spec>} on mana abilities (parsed before the
+   restriction{ substring scan — ordering matters), stored on AManaProducer,
+   enforced at ManaEngine::spendAllowed inside producerUsable -> ALL of potentialMana
+   + planPayment; legality/castability/auto-tap/tap-preview inherit free (shared
+   substrate). Human seat had the identical hole. Fixtures 4 (incl. autotap harness
+   command — suite seats are all AIPlayer-derived, scripted clicks can't reach the
+   human payment path: a control failing exposed that false green).
+   BLAST RADIUS (wave-43 docket): 86 cards carry "Spend this mana only"; 85 still
+   mis-modeled. 48 activation-guarded are near-mechanical manarestriction adds BUT
+   many are "...or activate abilities of X" which the current predicate would
+   OVER-restrict (needs an alsoabilities flavour); 38 have no modelling; plus
+   activation-only, cost-shape ({X}, cumulative upkeep), and zone/mode (flashback,
+   foretell) classes the mechanism does not cover. Apply per-card with Oracle
+   verification, never blanket.
+Both fixes are ENGINE-level: Vita needs the new VPK (built + uploaded this session).
