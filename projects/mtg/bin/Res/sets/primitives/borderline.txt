@@ -9031,11 +9031,11 @@ toughness=3
 [card]
 name=Beastcaller Savant
 abilities=haste
-auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{B}
-auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{R}
-auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{G}
-auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{W}
-auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{U}
+auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{B} manarestriction{creature}
+auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{R} manarestriction{creature}
+auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{G} manarestriction{creature}
+auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{W} manarestriction{creature}
+auto=this(variable{type:creature:myrestrictedcastingzone}>0) {T}:add{U} manarestriction{creature}
 text=Haste -- {T}: Add one mana of any color. Spend this mana only to cast a creature spell.
 mana={1}{G}
 type=Creature

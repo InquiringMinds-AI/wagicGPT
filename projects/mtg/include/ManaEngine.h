@@ -46,6 +46,15 @@ public:
         int canHandle(MTGAbility * producer);
     };
 
+    //SPEND-RESTRICTED MANA (CR 106.6b). May `producer`'s mana pay for
+    //`payee`? True for every unrestricted producer. A producer carrying a
+    //`manarestriction{<tc spec>}` clause ("Spend this mana only to cast
+    //creature spells") answers true only when payee is a CARD BEING CAST
+    //(not a battlefield permanent, i.e. not an ability activation) that
+    //matches the spec. A NULL payee is refused: the restricted mana is real,
+    //but it is not spendable on an unknown cost.
+    static bool spendAllowed(MTGAbility * producer, MTGCardInstance * payee);
+
     //Sum of everything the player's untapped producers could add to the
     //pool right now (single-mana producers, matching the historical AI
     //behavior). Caller owns the returned ManaCost.

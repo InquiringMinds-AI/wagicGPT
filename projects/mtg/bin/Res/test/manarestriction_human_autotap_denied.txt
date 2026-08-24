@@ -1,0 +1,39 @@
+# SPEND-RESTRICTED MANA, HUMAN SEAT. ManaEngine is player-agnostic: the walk
+# that plans the AI's payment (planPayment) is the SAME one
+# ManaEngine::autoTapForCost uses to tap on a human's behalf from
+# MTGPutInPlayRule::reactToClick, so the Beastcaller Savant defect was never
+# AI-only.
+#
+# The suite cannot reach that path by clicking a card: the rule gates on
+# `!player->isAI()` and both suite seats are AIPlayer-derived. The `autotap`
+# harness command calls the identical entry point with the identical arguments.
+#
+# WITNESS: Beastcaller Savant + Darksteel Citadel untapped, Captain's Claws {2}
+# (Artifact - Equipment). Only the Citadel's mana may legally pay for it, so the
+# payment cannot be completed and auto-tap must tap NOTHING - a partial tap
+# would float mana for a cast that can never happen. Craw Wurm sits in hand only
+# to keep the Savant's own activation gate satisfied.
+#
+# EXPECTED: 0 tapped permanents, empty mana pool, nothing cast.
+# PRE-FIX: Citadel + Savant both tap and the pool covers {2}.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Beastcaller Savant,Darksteel Citadel
+hand:Captain's Claws,Craw Wurm
+[PLAYER2]
+life:20
+[DO]
+autotap captain's claws
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Beastcaller Savant,Darksteel Citadel
+hand:Captain's Claws,Craw Wurm
+tappedinplay:0
+[PLAYER2]
+[END]

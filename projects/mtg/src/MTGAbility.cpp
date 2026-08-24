@@ -2666,6 +2666,24 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         }
     }
 
+    //SPEND-RESTRICTED MANA (CR 106.6b): `manarestriction{<tc spec>}` on a mana
+    //ability - "Spend this mana only to cast <spec> spells". Stripped from the
+    //line HERE, before the `restriction{` scan below, because that scan is a
+    //substring find and "manarestriction{" contains "restriction{" - leaving it
+    //in would silently hijack the ability's cast restriction. The spec rides
+    //the producer (AManaProducer::spendRestriction) and is enforced at
+    //producer selection by ManaEngine::spendAllowed.
+    if (s.find("manarestriction{") != string::npos)
+    {
+        vector<string> splitSpend = parseBetween(s, "manarestriction{", "}");
+        if (splitSpend.size())
+        {
+            storedSpendRestriction = splitSpend[1];
+            s = splitSpend[0];
+            s.append(splitSpend[2]);
+        }
+    }
+
     int restrictions = parseRestriction(s);
     string castRestriction = "";
     if (s.find("restriction{") != string::npos)//using other/cast restrictions for abilities.
@@ -5743,6 +5761,13 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         Targetable * t = spell ? spell->getNextTarget() : NULL;
         MTGAbility * a = NEW AManaProducer(observer, id, card, t, output, NULL, who,s.substr(found),doesntEmptyTilueot);
         a->oneShot = 1;
+        //SPEND-RESTRICTED MANA: claim the pending manarestriction{} clause here,
+        //where every mana producer - wrapped or bare - is built exactly once.
+        if(storedSpendRestriction.size())
+        {
+            ((AManaProducer*)a)->spendRestriction = storedSpendRestriction;
+            storedSpendRestriction.clear();
+        }
         if(newName.size())
             ((AManaProducer*)a)->menutext = newName;
         if(storedAndAbility.size())

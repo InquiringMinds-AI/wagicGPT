@@ -1,0 +1,65 @@
+# SPEND-RESTRICTED MANA (CR 106.6b) - the owner's live-play report, 2026-08-24:
+# "opponent just used two islands, and a forest to cast beast caller savant,
+# followed by captains claws, 2 cmc each. beastcaller is tapped." Beastcaller
+# Savant's Oracle (Scryfall, BFZ #170) is "Haste -- {T}: Add one mana of any
+# color. Spend this mana only to cast a creature spell." Captain's Claws is an
+# Artifact - Equipment, so paying for it with the Savant's mana is illegal.
+#
+# The card script modelled the restriction as an ACTIVATION gate only
+# (`this(variable{type:creature:myrestrictedcastingzone}>0)` = "only tap me
+# while a creature is castable"); once the mana was in the pool it was ordinary
+# mana. The fix is the engine mechanism `manarestriction{<tc spec>}` on the mana
+# ability, honored by ManaEngine::spendAllowed at every producer-SELECTION point
+# (potentialMana / planPayment, and therefore castability, AI payment planning
+# and human auto-tap).
+#
+# WITNESS: Savant + Darksteel Citadel ({T}: Add {1}) is TWO mana, but only ONE
+# of them may pay for an artifact. Captain's Claws costs {2}, so it must not be
+# castable. Craw Wurm {4}{G}{G} sits in hand purely to keep the Savant's
+# activation gate satisfied (a creature IS castable-in-principle) - without it
+# the old gate alone would refuse the tap and the fixture would pass for the
+# wrong reason, proving nothing about the spend restriction.
+#
+# EXPECTED: nothing leaves hand; the board is unchanged.
+# PRE-FIX BEHAVIOUR: Captain's Claws is offered, paid with Citadel + Savant, and
+# arrives on the battlefield.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Beastcaller Savant,Darksteel Citadel
+hand:Captain's Claws,Craw Wurm
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Beastcaller Savant,Darksteel Citadel
+hand:Captain's Claws,Craw Wurm
+[PLAYER2]
+inplay:Grizzly Bears
+[END]

@@ -1142,3 +1142,9 @@ grizzled_angler_activated_transform.txt
 grizzled_angler_no_colorless.txt
 burnout_counters_blue_instant.txt
 burnout_spares_red_instant.txt
+#SPEND-RESTRICTED MANA (CR 106.6b): manarestriction{} on a mana ability
+#(Beastcaller Savant, owner live-play report 2026-08-24)
+manarestriction_human_autotap_denied.txt
+manarestriction_unrestricted_control.txt
+ai/manarestriction_savant_no_artifact.txt
+ai/manarestriction_savant_casts_creature.txt
