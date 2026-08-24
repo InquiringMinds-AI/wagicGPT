@@ -30,3 +30,10 @@ This ledger records suspicious behavior found during lexicon conformance testing
 | CS-022 | **FIXED — card script, 2026-08-23** | Black Vise ETB opponent-chooser | Owner live report (Vita): Vise "doesn't seem to be applying damage when its supposed to." Black Vise was the ONLY card of its family scripted as `auto=name(choose opponent) notaTarget(opponent) doNothing` + `@each targetedplayer upkeep:...targetedpersonshand...` — the trigger's `who=-3` branch fires ONLY when `source->playerTarget` is set, i.e. only if the player answers the as-enters chooser by clicking the opponent's avatar. Left unanswered the chooser WEDGES the game (reproduced: fixture never advances past the cast); answered wrongly/cancelled it leaves an inert Vise for the rest of the game. Its two functional identicals, Iron Maiden and Viseling, use the target-free `@each opponent upkeep:damage:type:*:opponenthandminus4minusend opponent` — rules-equivalent in this strictly 2-player engine, where the chosen opponent is necessarily the only opponent. Black Vise now matches them. | Witnesses green: `black_vise_seven_cards.txt` (7 cards —> 3 damage, no clicks — the same click-free script WEDGED before the fix), `black_vise_four_cards.txt` (4 —> 0), `black_vise_own_upkeep.txt` (never fires on the controller's own upkeep), plus the pre-existing `black_vise.txt` with its chooser answers removed. |
 
 Add new observations here even when unconfirmed. Preserve a deterministic failing fixture in `_known_failures.txt` only after the expected semantics and driver protocol are sufficiently established.
+
+- **CS-022a (scope note, 2026-08-23):** Black Vise's rescript to `@each opponent upkeep`
+  (Iron Maiden form) is exact in every shipping game mode (all modes load exactly 2 seats;
+  `Player::opponent()` is singular engine-wide). IF multiplayer ever lands, "each opponent"
+  cards (Iron Maiden, Viseling) stay correct but Black Vise must be re-scoped to its
+  chosen player - the old chooser script was equally 2-player-bound and encoded no real
+  multi-opponent choice.
