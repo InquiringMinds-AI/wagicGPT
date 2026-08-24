@@ -1,0 +1,36 @@
+#W42-1 (negative half) - THIS FIXTURE IS EXPECTED TO FAIL, LOUDLY.
+#It is deliberately NOT listed in _tests.txt: the behaviour under test IS a
+#test failure, and the harness has no "expected failure" inversion (a test's
+#verdict is computed inside assertGame from its own error count, and the
+#forced-failure path bypasses the board assertions entirely - by design,
+#because the board after a wedged decision means nothing). Inverting it would
+#have meant teaching the runner to expect a red, i.e. building the exact
+#false-green machinery #W42-1 exists to prevent.
+#Run it scoped instead, and read BOTH the stderr line and the verdict:
+#  cd projects/mtg/bin
+#  printf 'mandatory_chooser_unanswered.txt\n' > Res/test/_w42_1.txt
+#  systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 -- \
+#    env -u WAYLAND_DISPLAY -u DISPLAY WAGIC_HEADLESS=1 WAGIC_TESTSUITE=1 \
+#    WAGIC_TESTSUITE_THREADS=1 WAGIC_TESTSUITE_FILE=test/_w42_1.txt ./wagic
+#PASS for this fixture means the run prints
+#  ==Suite: unanswered mandatory chooser (3 candidates) - failing loud==
+#and reports 1 test, 1 failed - promptly, NOT as a 1,000,000-update timeout.
+#Board is identical to mandatory_chooser_answered.txt; the only difference is
+#that the script walks away from the chooser instead of answering it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:accursed centaur
+inplay:raging goblin,grizzly bears
+manapool:{B}
+[PLAYER2]
+[DO]
+accursed centaur
+eot
+eot
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:raging goblin,grizzly bears,accursed centaur
+[PLAYER2]
+[END]

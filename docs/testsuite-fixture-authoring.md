@@ -132,6 +132,26 @@ selection arms as a MENU, answer it with `choice N` (a menu index), not the targ
 card's name — a name click there yields "menu default: cancel". Player-targeted
 choosers (proliferate's poison selection) are driven with `p1`/`p2`.
 
+**A MANDATORY chooser is never guessed at (#W42-1).** The menu-default above applies
+to MENUS. A *target chooser* that is mandatory (no Cancel item — `ActionLayer::cantCancel`)
+and has **two or more legal candidates** has no defensible default: any pick the driver
+invented would let a fixture "pass" on an answer it never wrote. So the driver names it
+and fails the test:
+
+```
+==Suite: unanswered mandatory chooser (3 candidates) - failing loud== [<fixture>] 3 candidates, source Accursed Centaur, pending command 'eot'
+```
+
+It fires only after a 500-driver-tick grace period, and the ticks inside that period run
+normally — 18 green fixtures arm exactly this shape and let it self-resolve (widest
+measured: 8 ticks). If you see this line, your fixture walked away from a chooser: answer
+it (menu `choice N`, then the candidate click / `p1`/`p2`), don't work around it. A
+mandatory chooser with exactly ONE legal candidate needs no answer — `MayAbility::Update`
+auto-resolves that case engine-side (see `black_vise_chooses_shrouded_player.txt`).
+Worked pair: `mandatory_chooser_answered.txt` (registered, green) and
+`mandatory_chooser_unanswered.txt` (deliberately NOT registered — the behaviour under
+test IS a red; its header carries the scoped-run recipe).
+
 Known undrivable shapes (don't author fixtures that depend on them): menu/chooser
 based ALTERNATIVE-COST casts (subtype offering, suspend) never initiate from the
 scripted seat — it is a heuristic AI (`ishuman`=0, and several such cards are gated

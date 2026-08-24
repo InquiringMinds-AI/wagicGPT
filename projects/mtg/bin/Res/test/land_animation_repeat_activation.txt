@@ -1,0 +1,37 @@
+#W42-D6 regression. The [repeat: activated this turn N times already]
+#countable AIPlayerGPT renders on an activation option reads
+#ActivatedAbility::counters, and the emit floor is 2 - so the annotation only
+#exists if a repeatable ability's counters really advance, ON THE SAME
+#permanent, across a whole turn.
+#The wave-41 docket claimed counters does NOT advance for the land-animation
+#class (Hive of the Eye Tyrant's {3}{B}: transforms((...)) ueot). It does:
+#the layer object is a GenericActivatedAbility and ActivatedAbility::
+#activateAbility() increments it on every activation, resetting only at
+#MTG_PHASE_AFTER_EOT. This fixture pins that, and would go red if a future
+#change made the second or third activation land on a different ability
+#object, refuse outright, or reset the count mid-turn.
+#Three animations of the SAME Hive in one upkeep: exactly {9}{B}{B}{B} is
+#seeded, so a run that manages only two leaves mana behind and the manapool
+#assertion fails. `choice 1` picks the animation off the two-item menu
+#({T}: Add {B} is item 0).
+[INIT]
+UPKEEP
+[PLAYER1]
+inplay:hive of the eye tyrant
+manapool:{9}{B}{B}{B}
+[PLAYER2]
+[DO]
+hive of the eye tyrant
+choice 1
+hive of the eye tyrant
+choice 1
+hive of the eye tyrant
+choice 1
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:hive of the eye tyrant
+manapool:{0}
+ability:hive of the eye tyrant|menace
+[PLAYER2]
+[END]

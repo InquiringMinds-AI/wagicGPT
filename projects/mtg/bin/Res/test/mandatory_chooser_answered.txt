@@ -1,0 +1,30 @@
+#W42-1 (positive half). Accursed Centaur: "When Accursed Centaur enters,
+#sacrifice a creature." (auto=sacrifice notaTarget(creature|myBattlefield)).
+#The factory wraps a non-activated line that carries a target chooser in a
+#MayAbility with must=true, so this is a MANDATORY chooser - there is no
+#Cancel item and no legal decline. With the Centaur plus two other creatures
+#on the battlefield it has THREE legal candidates, which is the shape wave-41's
+#single-candidate auto-resolve deliberately does NOT cover.
+#This fixture ANSWERS it: `choice 0` takes the (uncancelable) menu's only
+#option, which arms the chooser, and the following card click answers the
+#chooser. Its twin, mandatory_chooser_unanswered.txt, leaves the same chooser
+#unanswered and must fail LOUD - see that file's header.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:accursed centaur
+inplay:raging goblin,grizzly bears
+manapool:{B}
+[PLAYER2]
+[DO]
+accursed centaur
+choice 0
+grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:raging goblin,accursed centaur
+graveyard:grizzly bears
+manapool:{0}
+[PLAYER2]
+[END]
