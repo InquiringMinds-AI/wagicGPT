@@ -1,0 +1,36 @@
+# Condemn vs a pumped attacker -- ONE Goblin War Paint (+2/+2), cast PRE-combat.
+# Oracle (verified 2026-08-24): Condemn "Put target attacking creature on the
+# bottom of its owner's library. Its controller gains life equal to its
+# toughness."  Goblin War Paint: "Enchanted creature gets +2/+2 and has haste."
+# Shivan Dragon 5/5 + War Paint = 7/7 on the battlefield.
+# CR 608.2h (last known information): the life gain uses the toughness the
+# creature had as it LAST EXISTED ON THE BATTLEFIELD = 7. P1 -> 27.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Shivan Dragon,Ancient Den
+hand:Condemn,Goblin War Paint
+manapool:{R}{R}
+[PLAYER2]
+[DO]
+Goblin War Paint
+Shivan Dragon
+no
+goto attackers
+Shivan Dragon
+Ancient Den
+Condemn
+Shivan Dragon
+no
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Ancient Den
+library:Shivan Dragon
+graveyard:Condemn,Goblin War Paint
+life:27
+[PLAYER2]
+life:20
+[END]

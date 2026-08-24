@@ -1,0 +1,38 @@
+# REAL-PLAY PARITY of condemn_defender.txt: the seat drops the suite's skip-free
+# pin and poses as the human one (realgame), so the ASPHASES auto-skips and the
+# no-legal-action phase skip that a live Vita game runs are ACTIVE here.
+# The owner's failing game was HUMAN vs BAKA with no GPT seat, so this is the
+# closest harness approximation of his conditions.
+# Same expectation as condemn_defender.txt: dragon to the bottom of P2's
+# library, P2 (its controller) gains 5 -> 25, P1 undamaged.
+[INIT]
+CLEANUP
+[PLAYER1]
+inplay:Ancient Den
+hand:Condemn
+life:20
+[PLAYER2]
+inplay:Shivan Dragon
+life:20
+[DO]
+realgame
+goto attackers
+Shivan Dragon
+next
+yes
+Ancient Den
+Condemn
+Shivan Dragon
+endinterruption
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Ancient Den
+graveyard:Condemn
+life:20
+[PLAYER2]
+library:Shivan Dragon
+life:25
+[END]

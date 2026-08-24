@@ -1,0 +1,51 @@
+# OWNER HYPOTHESIS B -- board history: a Thunderbreak Regent was exiled by Path
+# to Exile a turn earlier, THEN a Dragon is targeted by Condemn.
+# Thunderbreak Regent (Oracle, verified against the primitive 2026-08-24):
+# "Whenever a Dragon you control becomes the target of a spell or ability an
+# opponent controls, Thunderbreak Regent deals 3 damage to that player."
+# If the exiled Regent leaves a STALE registered listener, targeting Shivan
+# Dragon with Condemn would deal 3 to P1 (life 17) and/or interfere with the
+# resolution. Rules-correct: the Regent is gone, nothing triggers.
+# NOTE: the Regent is itself a Dragon, so Path targeting it legitimately fires
+# its own trigger once -> P1 takes 3 (life 17). That is CORRECT. The
+# discriminator is the SECOND targeting: Condemn on Shivan Dragon after the
+# Regent is gone must deal NO further damage. life 17 = correct; life 14 = a
+# stale listener survived the zone change (the owner's hypothesis confirmed).
+# Expected: Regent in P2's exile, dragon to the bottom of P2's library,
+# P2 gains 5 -> 25, P1 at 17.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ancient Den
+hand:Condemn,Path to Exile
+manapool:{W}
+life:20
+[PLAYER2]
+inplay:Shivan Dragon,Thunderbreak Regent
+life:20
+[DO]
+Path to Exile
+Thunderbreak Regent
+no
+goto end
+goto attackers
+Shivan Dragon
+next
+yes
+Ancient Den
+Condemn
+Shivan Dragon
+endinterruption
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Ancient Den
+graveyard:Condemn,Path to Exile
+life:17
+[PLAYER2]
+library:Shivan Dragon
+exile:Thunderbreak Regent
+life:25
+[END]

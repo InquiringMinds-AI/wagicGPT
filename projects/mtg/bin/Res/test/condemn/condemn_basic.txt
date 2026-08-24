@@ -1,0 +1,35 @@
+# Condemn (Oracle, verified Scryfall/MTGSalvation 2026-08-24):
+#   {W} Instant -- "Put target attacking creature on the bottom of its owner's
+#   library. Its controller gains life equal to its toughness."
+#
+# MINIMAL CASE, no pumps/auras, cast by the ATTACKER'S controller: P1 attacks
+# with Shivan Dragon (5/5) and casts Condemn on its own attacker inside the
+# attackers step.
+# Rules-correct: Shivan Dragon to the BOTTOM of P1's library, P1 (its
+# controller) gains 5 -> 25, Condemn to the graveyard, P2 takes no combat
+# damage because the attacker left combat.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Shivan Dragon,Ancient Den
+hand:Condemn
+[PLAYER2]
+[DO]
+goto attackers
+Shivan Dragon
+Ancient Den
+Condemn
+Shivan Dragon
+no
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Ancient Den
+library:Shivan Dragon
+graveyard:Condemn
+life:25
+[PLAYER2]
+life:20
+[END]

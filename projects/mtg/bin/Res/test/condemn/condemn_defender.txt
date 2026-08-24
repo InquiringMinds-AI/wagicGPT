@@ -1,0 +1,36 @@
+# THE OWNER'S SEAT: the DEFENDER casts Condemn on the OPPONENT's attacker.
+# (His live case: the AI attacked with Shivan Dragon; he cast Condemn on it.)
+# P2 is the active player and attacks with Shivan Dragon (5/5); P1 responds in
+# the attackers->blockers interrupt window with Condemn.
+# Rules-correct: dragon to the BOTTOM of P2's (its owner's) library; its
+# CONTROLLER (P2, the attacker) gains 5 life -> 25; P1 takes no combat damage.
+[INIT]
+CLEANUP
+[PLAYER1]
+inplay:Ancient Den
+hand:Condemn
+life:20
+[PLAYER2]
+inplay:Shivan Dragon
+life:20
+[DO]
+goto attackers
+Shivan Dragon
+next
+yes
+Ancient Den
+Condemn
+Shivan Dragon
+endinterruption
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Ancient Den
+graveyard:Condemn
+life:20
+[PLAYER2]
+library:Shivan Dragon
+life:25
+[END]

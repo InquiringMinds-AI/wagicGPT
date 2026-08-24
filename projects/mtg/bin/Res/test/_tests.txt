@@ -1149,3 +1149,14 @@ manarestriction_human_autotap_denied.txt
 manarestriction_unrestricted_control.txt
 ai/manarestriction_savant_no_artifact.txt
 ai/manarestriction_savant_casts_creature.txt
+########################
+#Condemn -- owner live-play report 2026-08-24 (bottom-of-library +
+#toughness-keyed lifegain, attacker seat / defender seat / pumped / history)
+########################
+condemn/condemn_basic.txt
+condemn/condemn_pumped.txt
+condemn/condemn_owner_shape.txt
+condemn/condemn_defender.txt
+condemn/condemn_defender_pumped.txt
+condemn/condemn_defender_realgame.txt
+condemn/condemn_after_regent_exiled.txt
