@@ -73,3 +73,9 @@ guided corpus; 123 EDITs1-7; 125 R1-R5; 126+162 rewrites, R4-prediction needs 16
 152+146 ladder/mulligan rewrites). Wave-42 pool unchanged: 146,152,125,126,162,123,130.
 Canaries: deck123 construction question (if behaviors correct and rate flat at 1-2/6,
 next lever is deck construction, not the guide); deck130 passivity counter-risk vs 125.
+
+## Wave-42 rotation adjudication (2026-08-24)
+NO EXIT. Every guide ships fresh wave-42 edits (25 across 7 decks); menace engine fix +
+owner narration fixes need their first corpus; E7 rework + deck123 obedience restructure
+unvalidated. Wave-43 pool unchanged: 146,152,125,126,162,123,130. Canaries: deck123
+obedience rate at M>=12 (was 72%); deck130 Starstorm release; deck125 W1/W2 vs punishers.
