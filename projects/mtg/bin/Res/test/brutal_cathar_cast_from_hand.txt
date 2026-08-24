@@ -1,0 +1,30 @@
+#NAME: Brutal Cathar - transform-DFC front casts from HAND in one click
+#Oracle (Scryfall, verified 2026-08-24): Brutal Cathar {2}{W} 2/2 Human Soldier
+#Werewolf - "Whenever this creature enters or transforms into Brutal Cathar,
+#exile target creature an opponent controls until this creature leaves the
+#battlefield." + Daybound. // Moonrage Brute 3/3 (first strike, ward-pay 3 life,
+#nightbound). Scryfall layout = "transform": there is NO rule by which either
+#face changes form outside the battlefield.
+#W43-4: borderline.txt still carried "anyzone={0}:doubleside(backside)" on 198
+#transform-DFC fronts (the residual of the wave-42 mtg.txt sweep), which made
+#"Flip Side" a free activated ability in EVERY zone. RED BEFORE the fix: the
+#single click on Brutal Cathar in hand opened a "Cast Card Normally / Flip Side
+#/ Cancel" menu instead of casting; the harness's unscripted-menu default
+#cancelled and the card stayed in hand (assert saw an empty battlefield).
+#The opponent controls no creature, so the enters trigger has no legal target
+#and adds nothing to answer - the ONE click is the whole test.
+#Daybound's Day marker is an Emblem designation and is invisible to zone asserts.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Brutal Cathar
+manapool:{2}{W}
+[PLAYER2]
+[DO]
+Brutal Cathar
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Brutal Cathar
+[PLAYER2]
+[END]

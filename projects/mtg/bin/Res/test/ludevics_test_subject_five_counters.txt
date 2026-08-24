@@ -1,0 +1,28 @@
+#NAME: CS-023 POSITIVE - Ludevic's Test Subject transforms on the FIFTH hatchling counter
+#Oracle (Scryfall, verified 2026-08-24): "{1}{U}: Put a hatchling counter on this
+#creature. Then if there are five or more hatchling counters on it, remove all of
+#them and transform it." // Ludevic's Abomination 13/13 trample.
+#Companion to ludevics_test_subject_four_counters: that one pins that four
+#activations do nothing but add counters, this one pins that the fifth one both
+#removes them and transforms. Five activations' worth of mana, pool asserted
+#empty, so an early transform (which would leave the later clicks unpayable)
+#cannot pass here either.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Ludevic's Test Subject
+manapool:{5}{U}{U}{U}{U}{U}
+[PLAYER2]
+[DO]
+Ludevic's Test Subject
+Ludevic's Test Subject
+Ludevic's Test Subject
+Ludevic's Test Subject
+Ludevic's Test Subject
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Ludevic's Abomination
+manapool:{0}
+[PLAYER2]
+[END]

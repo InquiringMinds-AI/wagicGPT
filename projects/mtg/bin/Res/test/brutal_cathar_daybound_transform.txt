@@ -1,0 +1,34 @@
+#NAME: Brutal Cathar - the REAL (daybound) transform still fires after the W43-4 sweep
+#Oracle (Scryfall, verified 2026-08-24): Brutal Cathar {2}{W} 2/2 // Moonrage
+#Brute 3/3. "Daybound (If a player casts no spells during their own turn, it
+#becomes night next turn.)" - the only lawful way this card changes face, and it
+#happens ON THE BATTLEFIELD.
+#Companion to brutal_cathar_cast_from_hand: that one pins that the illegal
+#in-hand "Flip Side" is gone; this one pins that dropping the
+#anyzone={0}:doubleside(backside) line did NOT cost the card its real transform.
+#Turn 1: P1 casts the Cathar (a spell during their own turn) -> stays day.
+#Turn 2 is P2's, who casts nothing -> it becomes night next turn.
+#P1's turn-3 untap: night arrives and every daybound permanent transforms.
+#Day/Night are Emblem designation markers and are invisible to zone asserts.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Brutal Cathar
+manapool:{2}{W}
+library:Hill Giant,Juggernaut
+[PLAYER2]
+[DO]
+Brutal Cathar
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto firstmain
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Moonrage Brute
+hand:Juggernaut
+library:Hill Giant
+[PLAYER2]
+[END]

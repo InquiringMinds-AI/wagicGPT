@@ -1,0 +1,28 @@
+#NAME: Docent of Perfection - casting an instant with two Wizards out transforms it
+#Oracle (Scryfall, verified 2026-08-24): "Whenever you cast an instant or sorcery
+#spell, create a 1/1 blue Human Wizard creature token. Then if you control three
+#or more Wizards, transform this creature." // Final Iteration 6/5.
+#Companion to docent_of_perfection_no_cast_no_transform: that one pins that
+#Wizards alone never transform it, this one pins that the cast trigger still
+#does. Two Wizards are already out; casting Shock makes the token (three) and the
+#rider fires in the same resolution. The Docent itself is an Insect Horror, so it
+#never counts toward its own three.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Docent of Perfection,Fugitive Wizard,Lumengrid Warden
+hand:Shock
+manapool:{R}
+[PLAYER2]
+life:20
+[DO]
+Shock
+p2
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Final Iteration,Fugitive Wizard,Lumengrid Warden,*
+graveyard:Shock
+[PLAYER2]
+life:18
+[END]

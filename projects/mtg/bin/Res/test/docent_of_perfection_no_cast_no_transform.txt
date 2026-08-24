@@ -1,0 +1,25 @@
+#NAME: Docent of Perfection - three Wizards ALONE do not transform it (state-trigger red)
+#Oracle (Scryfall, verified 2026-08-24): Docent of Perfection {3}{U}{U} 5/4
+#Insect Horror, Flying. "Whenever you cast an instant or sorcery spell, create a
+#1/1 blue Human Wizard creature token. Then if you control three or more Wizards,
+#transform this creature." // Final Iteration 6/5.
+#The "Then if..." check is a rider on the CAST trigger - it is only ever tested
+#at the moment a cast trigger resolves. The primitive instead carried a standing
+#state trigger, "aslongas(wizard|myBattlefield) flip(backside) while >2", which
+#transforms the Docent the instant a third Wizard is on the battlefield no matter
+#where it came from (an opponent's Turn to Frog, a second Docent's tokens, three
+#Wizards simply cast normally). RED BEFORE the fix: the Docent here transforms
+#into Final Iteration during the very first update with no spell cast at all.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Docent of Perfection,Fugitive Wizard,Fugitive Wizard,Fugitive Wizard
+[PLAYER2]
+[DO]
+goto end
+[ASSERT]
+end
+[PLAYER1]
+inplay:Docent of Perfection,Fugitive Wizard,Fugitive Wizard,Fugitive Wizard
+[PLAYER2]
+[END]

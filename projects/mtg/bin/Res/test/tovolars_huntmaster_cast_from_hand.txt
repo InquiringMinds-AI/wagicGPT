@@ -1,0 +1,26 @@
+#NAME: Tovolar's Huntmaster - second W43-4 witness, one-click cast from HAND
+#Oracle (Scryfall, verified 2026-08-24): Tovolar's Huntmaster {4}{G}{G} 6/6 Human
+#Werewolf. "When this creature enters, create two 2/2 green Wolf creature tokens."
+#+ Daybound. // Tovolar's Packleader 7/7 (nightbound). Scryfall layout =
+#"transform" - no face changes outside the battlefield.
+#The wave-42 corpus caught this card (x2) and Brutal Cathar (x5) still offering
+#"Flip Side" from hand; both live in borderline.txt, which the wave-42 sweep of
+#mtg.txt did not reach. RED BEFORE the fix: the single click opened
+#"Cast Card Normally / Flip Side / Cancel" and the harness's unscripted-menu
+#default cancelled, leaving an empty battlefield.
+#The two Wolf tokens are asserted as wildcard entries (tokens carry no
+#collection id); the Day designation marker is an Emblem and is not counted.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Tovolar's Huntmaster
+manapool:{4}{G}{G}
+[PLAYER2]
+[DO]
+Tovolar's Huntmaster
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Tovolar's Huntmaster,*,*
+[PLAYER2]
+[END]
