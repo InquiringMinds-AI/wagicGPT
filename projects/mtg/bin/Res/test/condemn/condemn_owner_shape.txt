@@ -1,0 +1,38 @@
+# OWNER LIVE-PLAY SHAPE (Vita, 2026-08-24): Shivan Dragon wearing TWO Goblin War
+# Paints (+2/+2 each) is declared as an attacker, then Condemn is cast on it.
+# Both auras resolved PRE-combat (owner correction), matching his t6o sequence.
+# Shivan Dragon 5/5 + 2x War Paint = 9/9 on the battlefield.
+# Rules-correct: dragon to the BOTTOM of its owner's library, its controller
+# gains 9 life (CR 608.2h last known information), both auras to the graveyard.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Shivan Dragon,Ancient Den
+hand:Condemn,Goblin War Paint,Goblin War Paint
+manapool:{R}{R}{R}{R}
+[PLAYER2]
+[DO]
+Goblin War Paint
+Shivan Dragon
+no
+Goblin War Paint
+Shivan Dragon
+no
+goto attackers
+Shivan Dragon
+Ancient Den
+Condemn
+Shivan Dragon
+no
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Ancient Den
+library:Shivan Dragon
+graveyard:Condemn,Goblin War Paint,Goblin War Paint
+life:29
+[PLAYER2]
+life:20
+[END]
