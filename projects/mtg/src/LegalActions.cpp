@@ -262,6 +262,27 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalLandPlays(Player * p)
             //Academy is a legal land drop; the SBA then bins one of them.
             if (p->game->playRestrictions->canPutIntoZone(card, p->game->inPlay) == PlayRestriction::CANT_PLAY)
                 continue;
+            //#W43-12. The card's OWN cast restrictions gate a land drop exactly
+            //as they gate a spell (MTGPutInPlayRule::isReactingToClick calls
+            //allowedToCast before anything else), and legalCasts above already
+            //applies them - this rung did not, so it offered lands the engine
+            //would never accept. The live case is the modal-DFC land: Hengegate
+            //Pathway carries restriction=compare(isflipped)~equalto~0, so once
+            //the pilot flips the display to Mistgate Pathway the card can no
+            //longer be PLAYED as a land at all - its back face reaches the
+            //battlefield through the autohand flip ABILITY instead. The seat
+            //nevertheless offered "Play Mistgate Pathway", the model (which is
+            //instructed to trust the legal list) took it, and the commit path
+            //refused: two deferred_to_heuristic records for one land drop and
+            //the drop still unused (corpus 20260824 deck152 vs146 s31-33).
+            //An option the engine cannot honour is a lie to the pilot; do not
+            //offer it.
+            if (card->getRestrictions().size())
+            {
+                AbilityFactory af(p->getObserver());
+                if (!af.parseCastRestrictions(card, p, card->getRestrictions()))
+                    continue;
+            }
             string key = card->getDisplayName() + scans[s].label;
             if (!seen.insert(key).second)
                 continue;

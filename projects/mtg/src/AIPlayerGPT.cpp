@@ -10608,8 +10608,24 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     if (!strcmp(type, "land"))
     {
         vector<LegalActionsOracle::Cast> lands = LegalActionsOracle::legalLandPlays(this);
+        //#W43-12. An ask with no options must never reach the model seam, and
+        //the skip must not be silent: a land in hand that the oracle declines
+        //to offer (its own cast restrictions forbid the play - the flipped
+        //modal-DFC case) reads to a reviewer exactly like "no land in hand"
+        //unless the engine says which it was. One line per window is cheap and
+        //it is the difference between "not offered" and "never had one".
         if (lands.empty())
+        {
+            int landsInHand = 0;
+            for (int hz = 0; hz < game->hand->nb_cards; hz++)
+                if (game->hand->cards[hz]->isLand())
+                    landsInHand++;
+            if (landsInHand)
+                DebugTrace("AIPlayerGPT: land-drop ask NOT issued - " << landsInHand
+                           << " land(s) in hand, none playable right now (restriction or"
+                           " play-restriction); the pilot is not asked a question with no answers");
             return NULL;
+        }
 
         //Play options FIRST (the model favors option 1, and playing a land
         //is nearly always right - decline goes LAST, house ordering rule).

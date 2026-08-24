@@ -433,7 +433,27 @@ static bool costHasConvoke(ManaCost * c)
 int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
 {
     if (!isReactingToClick(card))
+    {
+        //#W43-6. A card whose X was already ANNOUNCED (setX > -1) and which is
+        //now un-castable has had a committed cast die here - historically with
+        //no event, no re-ask and no record, leaving the spell in hand and the
+        //floated mana spent. Say so, and clear the announcement: a stale setX
+        //makes the NEXT attempt skip the announce menu entirely and cast at the
+        //old X without ever asking. (The commitment itself is kept alive by the
+        //same-tick arming below plus ActionLayer::ButtonPressed's chained-menu
+        //guard; this is the accounting for the cases those cannot save.)
+        if (card->setX > -1)
+        {
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+            fprintf(stderr, "MTGPutInPlayRule: cast of %s dropped after its X was announced"
+                            " (no longer castable - pool %s); announcement cleared, card stays in hand\n",
+                    card->name.c_str(),
+                    game->currentlyActing()->getManaPool()->toString().c_str());
+#endif
+            card->setX = -1;
+        }
         return 0;
+    }
     Player * player = game->currentlyActing();
     //Auto-tap for non-AI players: fill the pool from free untapped producers
     //before the payment machinery runs. Pool mana is consumed first, the plan
@@ -521,6 +541,17 @@ int MTGPutInPlayRule::reactToClick(MTGCardInstance * card)
             MTGAbility * a1 = NEW MenuAbility(game, this->GetId(), card, card, false, selection);
             game->mLayers->actionLayer()->currentActionCard = card;
             a1->resolve();
+            //#W43-6. ARM IT NOW, not on MenuAbility's next Update. The one-tick
+            //gap between "cast committed, announcement built" and "announcement
+            //visible on the action layer" is a window in which the game reads
+            //IDLE: the AI seats see no menuObject, find nothing to do and request
+            //the next game phase, and the end-of-phase rule empties the mana pool
+            //that was floated to pay for THIS cast. The announcement then offers
+            //no affordable X and the cast dies silently (deck130 s293-298).
+            //setCustomMenuObject is what MenuAbility::Update itself calls, every
+            //tick it is armed, with these same arguments - doing it once here is
+            //idempotent, and the Update that follows re-arms exactly as before.
+            game->mLayers->actionLayer()->setCustomMenuObject(card, false, selection);
         }
         return 0;
     }

@@ -26,6 +26,14 @@ public:
     SimpleMenu * abilitiesMenu;
     SimpleMenu * abilitiesTriggered;
     MTGCardInstance * currentActionCard;
+    //#W43-6. Bumped by every setMenuObject / setCustomMenuObject. A menu's
+    //IDENTITY cannot be read off menuObject (the alternative-cost menu and the
+    //{X} announcement it chains into are both armed on the SAME card) nor off
+    //the abilitiesMenu pointer (freed and re-allocated, so the address can
+    //repeat). ButtonPressed compares this serial across the rule callback to
+    //tell "the menu I answered is finished" from "the callback armed a NEW
+    //decision on the same card" - the second must not be thrown away.
+    unsigned int menuArmedSerial;
     int stuffHappened;
     //destroy()-in-progress stack: an element's destroy() can cascade into
     //more removals (a lord's destroy removes the abilities it granted -

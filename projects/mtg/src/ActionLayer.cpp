@@ -400,6 +400,7 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
         return;
     }
     menuObject = object;
+    menuArmedSerial++;
 
     SAFE_DELETE(abilitiesMenu);
     abilitiesTriggered = NULL;
@@ -453,6 +454,7 @@ void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGA
         return;
     }
     menuObject = object;
+    menuArmedSerial++;
     SAFE_DELETE(abilitiesMenu);
     abilitiesMenu = NEW SimpleMenu(observer->getInput(), observer->getResourceManager(), 10, this, Fonts::MAIN_FONT, 100, 100, customName.size()?customName.c_str():object->getDisplayName().c_str());
     currentActionCard = NULL;
@@ -516,9 +518,25 @@ void ActionLayer::ButtonPressed(int, int controlid)
     if (controlid >= 0 && controlid < static_cast<int>(mObjects.size()))
     {
         ActionElement * currentAction = (ActionElement *) mObjects[controlid];
+        //#W43-6. A rule callback may CHAIN a new decision instead of finishing:
+        //answering "Cast Card Normally" for an {X} spell runs
+        //MTGPutInPlayRule::reactToClick, which arms the X-ANNOUNCEMENT menu and
+        //returns 0. Clearing menuObject/currentActionCard unconditionally after
+        //the callback threw that fresh menu away for a tick, so the action layer
+        //read IDLE while a cast was mid-flight - whoever held priority advanced
+        //the phase, the end-of-phase rule emptied the mana pool, and the payment
+        //floated for THAT cast was gone. The announcement then arrived over an
+        //empty pool (no affordable X), was answered 0, and the cast died at
+        //isReactingToClick with no event and no record: the silent cast drop
+        //(corpus 20260824 deck130 s293-298; probe tools/silent-cast-probe.sh).
+        //Only retire the menu the callback actually consumed.
+        unsigned int armedBefore = menuArmedSerial;
         currentAction->reactToTargetClick(menuObject);
-        menuObject = 0;
-        currentActionCard = NULL;
+        if (menuArmedSerial == armedBefore)
+        {
+            menuObject = 0;
+            currentActionCard = NULL;
+        }
     }
     else if (controlid == kCancelMenuID)
     {
@@ -569,6 +587,7 @@ ActionLayer::ActionLayer(GameObserver *observer)
     menuObject = NULL;
     abilitiesMenu = NULL;
     abilitiesTriggered = NULL;
+    menuArmedSerial = 0;
     stuffHappened = 0;
     currentWaitingAction = NULL;
     cantCancel = 0;
