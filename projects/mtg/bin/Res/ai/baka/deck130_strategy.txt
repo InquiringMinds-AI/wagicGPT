@@ -14,13 +14,18 @@ Four of your cards can be discarded to draw one, and the game offers this consta
 a priority option beginning "cycling with " and ending "Cycle]", and a cast menu headed
 "Choose an option for" whose FIRST row is "1. cycling". Run this table over every one of them:
 
-  Forgotten Cave  -> CYCLE IT FREELY. It is a land that enters tapped and you own twenty-four lands.
+  Forgotten Cave  -> cycle it freely in your SECOND MAIN PHASE with mana you did not spend. Not in
+                     your own upkeep, and not while a second land sits in your hand - play the land
+                     first. It is a land, and you own twenty-four of them.
   Spark Spray     -> cycle it when its cast option's "legal targets right now:" list shows no
                      opponent creature. If it shows one, cast it instead (rule #2).
   Lay Waste       -> CAST IT at a land. Cycle Lay Waste only once you control 8 or more lands.
-  Starstorm       -> NEVER cycle Starstorm. It is the only card you own that kills more than one
-                     creature at a time, and you will want all four. When you want a card, cycle a
-                     Forgotten Cave instead.
+  Starstorm       -> do not cycle Starstorm while the "Opponent battlefield" line names ANY
+                     creature. That line's own count is the release: when it reads "of which 0 are
+                     creatures" and you hold no Forgotten Cave, CYCLE THE STARSTORM. Against a board
+                     with no creatures it is a blank card and you are the player who must find
+                     action; holding four blanks is how you deck yourself. With a Forgotten Cave in
+                     hand, cycle the Cave first.
 
 AND: when the line reads "Phase: Upkeep | It is your turn", answer CHOICE: 0 (pass) unless the option
 in front of you destroys a land or kills a creature. Cycling in your own upkeep spends the mana that
@@ -38,6 +43,11 @@ turns in which you did something.
 Pyrite Spellbomb, Spark Spray, Starstorm, Hammer of Bogardan and Siege-Gang's sacrifice ability all
 print their choices as a list - either after "legal targets right now:" or as one menu row per
 target, with the face row reading "targeting a player". Procedure, top down, every time:
+  0. FIRST count their creatures. If TWO OR MORE show a toughness that a single X would reach,
+     Starstorm at that X is the play and it OUTRANKS every single-target damage spell you hold -
+     Hammer of Bogardan, Pyrite Spellbomb and Spark Spray each kill exactly one. Price it before you
+     dismiss it: the cost is X plus {R}{R}, so two 3/2s both die to X=2 for four mana. Your own board
+     holding no creatures makes that sweep free.
   1. An opponent PLANESWALKER on the list -> aim there. A live planeswalker wins their game.
   2. An opponent CREATURE whose printed toughness this damage reaches -> aim there. Spark Spray
      kills 1 toughness; Pyrite Spellbomb kills 2; Hammer of Bogardan kills 3. The battlefield line
@@ -74,6 +84,9 @@ DWARVEN BLASTMINER (1/1) is a land-destruction machine, not a creature. His abil
 UNTAPPED - so leave him out of every ATTACK line. One point of chip damage costs you a land kill,
 and against creatures marked "[defender]" attacking him hands the opponent life for blocking.
 Activate him every turn you have three spare mana and their board shows a non-basic land.
+His ability's target row prints only a land NAME with no owner - "Destroy with Dwarven Blastminer
+targeting <land>". Before you take it, find that name on the "Opponent battlefield" line. If it is
+not there it is YOUR land and the activation is a self-inflicted loss: pass instead.
 STARSTORM ({X}{R}{R}, instant) deals X to EVERY creature, including yours. Cast it when the opponent
 battlefield line shows two or more creatures. Its X menu says "option 1 is the LARGEST X"; pick the
 smallest X that reaches the toughness you must kill. Because it kills your own Blastminers, goblins
@@ -100,11 +113,15 @@ FORGOTTEN CAVE enters tapped - play it on a turn you were not going to spend all
 =====================================================================
 COMBAT
 =====================================================================
-ATTACK FLOOR - at the "Your creatures that can attack:" ask, send EVERY creature listed except
-Dwarven Blastminer. That list has already dropped everything that cannot legally attack, so do not
-re-check summoning sickness or tapped status yourself. Answer "ATTACK: none" only when every listed
-attacker would die to a blocker and kill nothing - not to "hold blockers", and not because their
-creatures are marked "[tapped - cannot attack or block this turn]" (they untap for their turn).
+ATTACK FLOOR - read the "Your creatures that can attack:" list, then take the first case that
+applies. FIRST: if Dwarven Blastminer is the ONLY creature on that list, answer "ATTACK: none" -
+always, and stop reading. He is worth {2}{R} of land destruction every turn he stays untapped, and
+one point of chip damage is worth nothing to this deck. SECOND: with any other creature listed, send
+EVERY creature listed except Dwarven Blastminer. That list has already dropped everything that cannot
+legally attack, so do not re-check summoning sickness or tapped status yourself. Otherwise answer
+"ATTACK: none" only when every listed attacker would die to a blocker and kill nothing - not to
+"hold blockers", and not because their creatures are marked "[tapped - cannot attack or block this
+turn]" (they untap for their turn).
 ONE EXCEPTION INSIDE THE FLOOR: if their untapped creatures' printed power totals your life or more,
 send only Rorix this turn and keep the Goblins home.
 BLOCKING - take any block where your creature kills theirs and lives, and any block where both die.
@@ -124,7 +141,10 @@ own recount. Mulligan only a hand with zero lands, or a hand that is all lands.
 =====================================================================
 DECIDING SITUATIONS (recognise -> do)
 =====================================================================
-- "cycling with Starstorm" is offered -> pass, or cycle a Forgotten Cave instead.
+- "cycling with Starstorm" is offered and the opponent battlefield line names one or more creatures
+  -> pass, or cycle a Forgotten Cave instead.
+- "cycling with Starstorm" is offered, that line reads "of which 0 are creatures", and no Forgotten
+  Cave is in your hand -> cycle the Starstorm.
 - "cycling with Lay Waste" is offered and you control 7 or fewer lands -> pass, take your land drop,
   and cast Lay Waste at one of their lands this turn or next.
 - It is your Upkeep and your land drop is unused -> CHOICE: 0 (pass); act after the land drop.

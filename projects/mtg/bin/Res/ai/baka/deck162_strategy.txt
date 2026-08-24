@@ -42,10 +42,11 @@ Look at YOUR battlefield line and count the names Underworld Dreams, Fate Unrave
 The thought "drawing more cards is the priority, I need to find my win condition" is ALWAYS FALSE
 for this deck - a card you hand the opponent with no punisher out is a card that kills you.
 ONE exception to the brake, and only this one: MASTER OF THE FEAST is a 5/5 flying body as
-well as a gift. With NO punisher out, cast it anyway when you control no creature that can
-block and your printed life is below 20. A 5/5 blocker buys more turns than the one card it
-hands over costs you. Everything else - Dictate, Puzzle Box, Forced Fruition, extra Mines -
-still waits behind the brake.
+well as a gift, and it is the only card behind this brake that defends you. With NO punisher
+out, cast it whenever the opponent's battlefield line shows a creature - the body is worth the
+one card you hand over. It still sits behind Rule 1, behind Shield Sphere and behind Fog Bank.
+Everything else - Dictate, Puzzle Box, Forced Fruition, extra Mines - waits behind the brake at
+every life total, with a creature on their board or without one.
 
 === RULE 3 - THE WALLS. PUT THEM DOWN THE TURN THEY APPEAR ===
 Shield Sphere and Fog Bank are your entire defence - this deck has no removal except Ob Nixilis's
@@ -78,8 +79,10 @@ Every blocker line tells you what its block does: a "STOPS all ..." clause namin
 that block erases, and a parenthesis naming who dies. Both are true. Read both and act on them.
 Run this over the offered block lines, every combat, in this order:
 1. A line ending "(you kill it, your blocker lives)" - take that block. Free kill, every time.
-2. A line ending "(neither dies)" - take that block. Assign one wall per attacker, and when
-   several walls are free, gang the leftovers onto the biggest attacker.
+2. A line ending "(neither dies)" - take that block. One wall per attacker, spending your walls
+   on the attackers with the biggest "deals N" numbers first. A second wall added to an attacker
+   that is already blocked stops nothing extra and wears your walls out - never stack two walls
+   on one attacker while another attacker is going unblocked.
 3. When ONE blocker is offered several attackers, prefer an attacker whose parenthesis lets
    your blocker LIVE over one that kills it, even when the dying line stops a bigger number -
    a wall that survives erases damage again next combat. Take a dying line instead only when
@@ -142,8 +145,17 @@ Its damage comes from the opponent's draw step, not from combat, and attacking t
 blocking on their turn. The one time it goes: the printed opponent life is at or below the total
 power of every attacker you are sending including it - then run the lethal check below, swing with
 everything and end it. A list with two names in it is where this rule gets forgotten; it applies
-there most of all. Master of the Feast attacks freely; it is a 5/5 flier and it is your
-clock.
+there most of all.
+Never send Fate Unraveler into a "their untapped blockers" tag that reads "your attacker dies,
+their blocker lives". That tag is the engine's own computed result - do not argue with it. Fate
+Unraveler is a punisher first: dead, it stops the draw damage that wins you the game. If the
+lethal check has not cleared and that tag is on its line, the answer is ATTACK: none.
+MASTER OF THE FEAST attacks only when you can spare it. Before you send it, read the opponent's
+battlefield line: if they control any creature and your walls do not already cover every one of
+them, MASTER OF THE FEAST STAYS HOME - an attacking Master is tapped on their turn and blocks
+nothing, and a 5/5 blocker erases more damage than 5 unblocked damage buys you. Send it when
+their board shows no creature, when your walls already cover every attacker they have, or when
+the lethal check clears.
 
 === LETHAL CHECK - RUN IT EVERY TURN ===
 Count the punisher names on your battlefield (Underworld Dreams, Fate Unraveler, Ob Nixilis) - call

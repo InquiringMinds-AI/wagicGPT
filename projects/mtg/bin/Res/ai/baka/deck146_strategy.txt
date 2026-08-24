@@ -130,9 +130,21 @@ creature, ask what happens on the crack-back with that creature unavailable.
   and the list offers ONE attacker, the answer is ATTACK: none - no exception but lethal.
   AND: if the plan you were just shown says holding is right, your ATTACK: line must agree
   with it. A reply whose answer contradicts its own plan is wrong on the answer, not the plan.
-- Do not attack a creature into a blocker with MORE TOUGHNESS than your power (a 3/2 into an
-  untapped 0/4 wall): you deal no damage, kill nothing, and tap your blocker for their turn.
-  Send that creature only when the defender has no untapped body that outlasts it.
+  TWO THINGS THE COUNT MUST NOT GET WRONG:
+  - VIGILANCE. A creature with vigilance does NOT tap to attack. It attacks and
+    it still blocks. The gate never holds a vigilance creature home - send it.
+  - "[doesn't untap during its controller's untap step]". A creature carrying that
+    tag AND marked [tapped] stays tapped through their turn: it cannot attack you.
+    Count it ZERO. The "count tapped creatures too" rule assumes they untap; that
+    tag is the engine telling you they do not.
+- "(neither dies)" on the ATTACK side is the OPPOSITE of free damage. It means that
+  blocker stops every point you were sending and nothing dies - you spent a tapped
+  creature for nothing, and some walls (Perimeter Captain) GAIN THEM LIFE for blocking.
+- Before you send a creature, read its own "their untapped blockers" tag. If EVERY
+  outcome in it is "(neither dies)", that creature only gets through if they have
+  more attackers to block than blockers to spend. Count: send it only when the
+  attackers you are sending OUTNUMBER their untapped blockers, or when it has
+  flying or menace they cannot answer.
 BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
 this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
  0. "(neither dies)" - TAKE THAT BLOCK. Nothing of yours dies, nothing of theirs dies, and

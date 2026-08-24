@@ -82,8 +82,12 @@ Which attacker each blocker takes: your blocker's line lists several attackers w
 parenthesis each. Pick, for that blocker, an attacker whose parenthesis says your blocker
 LIVES ("neither dies" or "you kill it") ahead of one that says it dies. The life gain is
 identical either way - a wall that survives gains it again next combat, and a wall that
-dies gains it once. Two surviving lines are equal; take either. Only when every attacker
-offered to that blocker kills it do you put it on the biggest attacker. An attacker tagged
+dies gains it once. When two or more attackers all let that blocker live, take the one with the
+BIGGEST "deals N" number on its A-line. The life gain is the same either way, so the only thing
+left to decide is how much damage you stop - stop the bigger number.
+Only when every attacker offered to that blocker kills it do you put it on the attacker with the
+biggest "deals N" number on its A-line - read the number off the line, do not judge by name, by
+size in words, or by which one you blocked last turn. An attacker tagged
 [deathtouch] kills your wall whatever its toughness; its line will already say so.
 The one blocker you leave out: neither enchantment is on your battlefield AND that blocker's line
 reads "your blocker dies, attacker lives" on EVERY attacker it is offered. A line reading "both
@@ -98,6 +102,12 @@ them out, so never re-derive who is eligible. An empty attacker list means ATTAC
 costs you nothing.
 When the list DOES offer a Vampire token, it has lifelink: attack with every Vampire offered, every
 turn. Each point that connects is life gained, and with Sanguine Bond out that is the win.
+ONE stop, and read it off your own narration: if the last time you attacked it says your attacker
+took damage and died before combat damage - "<something> dealt N damage to Vampire" then "Your
+Vampire died" - the opponent controls a permanent that kills anything you send, and the next
+Vampire dies to it exactly the same way. Answer ATTACK: none and keep the Vampire on your
+battlefield instead: it is a lifelink blocker, and with both enchantments out one block wins the
+game outright. Attack again only once that permanent is gone from their battlefield line.
 
 === RULE #7 - WHAT TO CAST WHEN SEVERAL THINGS ARE LISTED ===
 Take the highest entry on this list that appears in your casting menu:

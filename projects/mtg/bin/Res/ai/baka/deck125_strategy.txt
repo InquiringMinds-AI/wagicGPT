@@ -32,6 +32,11 @@ this guide changes.
 Staff of Nin {6} artifact, two copies. Its line reads: "At the beginning of your upkeep, draw a card.
 -- {T}: Staff of Nin deals 1 damage to any target." It is the only damage and the only extra card
 this deck has.
+Before you spend mana on Sphinx's Revelation, Staff of Nin or Elixir of Immortality on your own
+turn, look at your hand for Cancel, Dream Fracture or Essence Scatter. If one is there, subtract
+3 from your "Mana available:" line (2 for Essence Scatter) and use the remainder as the number
+the rules below ask for. A resolved Sanguine Bond, Exquisite Blood or Underworld Dreams costs
+you the game; three extra cards do not win it.
 - Cast it the first turn "Cast Staff of Nin" appears in your list - but only when doing so leaves
   {1}{U} still untapped. If casting the Staff would take your "Mana available:" line below {1}{U},
   pass this turn and cast it next turn with a land to spare: a Staff you cast one turn later still
@@ -60,7 +65,8 @@ COUNTER ON SIGHT regardless of the numbers - these are the names whose danger is
 P/T, and this list is short on purpose:
   - every planeswalker;
   - every permanent that hits you or grows them EVERY turn: Underworld Dreams, Fate Unraveler,
-    Sanguine Bond, Exquisite Blood, Howling Mine, Staff of Nin, Nuisance Engine;
+    Sanguine Bond, Exquisite Blood, Howling Mine, Staff of Nin, Nuisance Engine,
+    Liliana's Caress;
   - Idyllic Tutor: it is not a permanent, but it fetches the enchantment half of their combo.
   - anything whose text makes a player DRAW extra cards, whatever its printed type: Howling Mine,
     Teferi's Puzzle Box, Dictate of Kruphix, Forced Fruition. This one outranks the "(artifact)
@@ -72,10 +78,10 @@ Path to Exile {W} instant, four copies: "Exile target creature." These are the O
 deck that remove one creature that is already on the battlefield. Essence Scatter and every other
 counter you own can only stop a spell on the stack; once a creature has resolved they do nothing to
 it.
-The "legal targets right now:" clause on the Path option gives you NAMES ONLY. Before you answer,
-find each of those names on the opponent battlefield line and read its (P/T) and its tags there.
-Then: cast Path to Exile at the creature with the HIGHEST printed power. If EVERY name on that
-clause reads printed power 0 or 1 on the battlefield line, or is tagged [defender], answer "Cast
+The "legal targets right now:" clause prints each candidate's (P/T) and its tags right there on
+the option line. Read them off that line.
+Then: cast Path to Exile at the creature with the HIGHEST printed power. If EVERY candidate on that
+clause reads printed power 0 or 1, or is tagged [defender], answer "Cast
 nothing right now" and keep the Path - at any life total above 12, whatever else is on the board
 and however many turns you have been holding it. A 0/4 wall is never a Path target.
 Your life is 12 or less: that floor is off for creatures that can attack - exile the one with
@@ -93,7 +99,9 @@ creatures)". Read that number and act on it:
 - exactly 1 creature, and Path to Exile is in your list: take the Path and keep the sweeper. A
   {W} instant is the right price for one creature; a sweeper is not.
 - exactly 1 creature, and Path to Exile is NOT in your list: cast the sweeper when that creature's
-  printed power is 4 or more, otherwise answer "Cast nothing right now" and keep it.
+  printed power is 4 or more, otherwise answer "Cast nothing right now" and keep it - unless your
+  life is 10 or less and nothing else in your list answers that creature: then cast the sweeper
+  whatever its printed power.
 - 3 or more creatures, and Lightmine Field is in your list: cast Lightmine Field. At 0, 1 or 2
   creatures on that header it kills nothing at any size, so keep it and spend the mana on a Path
   or a sweeper instead - unless it is your second main phase, nothing else in your list is worth
@@ -105,9 +113,15 @@ creatures)". Read that number and act on it:
 === SPHINX'S REVELATION - X IS YOUR MANA MINUS 3 ===
 Sphinx's Revelation {X}{W}{U}{U} instant: "You gain X life and draw X cards." X is the number on your
 "Mana available: N total" line, minus 3. At X = 0 it gains nothing and draws nothing.
+Before you spend mana on Sphinx's Revelation, Staff of Nin or Elixir of Immortality on your own
+turn, look at your hand for Cancel, Dream Fracture or Essence Scatter. If one is there, subtract
+3 from your "Mana available:" line (2 for Essence Scatter) and use the remainder as the number
+the rules below ask for. A resolved Sanguine Bond, Exquisite Blood or Underworld Dreams costs
+you the game; three extra cards do not win it.
 Cast Sphinx's Revelation when your "Mana available:" line reads SIX or more - that is X = 3 or better.
-Below six, answer "Cast nothing right now" and hold it; it is an instant and it will still be there
-next turn with one more land behind it.
+Below six, answer "Cast nothing right now" and hold it - it is an instant and it will still be
+there next turn with one more land behind it - unless your life is 10 or less and no other option
+in your list is worth casting: then cast it for whatever X the menu offers.
 BEFORE you take Sphinx's Revelation, or any other optional draw, read the line "Your library: N
 cards". If N is 5 or less, answer "Cast nothing right now" and keep the card: drawing your last
 card loses the game outright, and Sphinx's Revelation draws X on top of your normal draw step.
@@ -121,6 +135,11 @@ and no Path to Exile - then you need the cards more than you need the size.
 When the X menu appears, pick the line showing the LARGEST X. The sentence above the menu names the
 largest X you can afford, and every value listed is affordable. Reply with the OPTION number, not the
 X value - the line you pick must literally read "X = " followed by the biggest number in the menu.
+Before you announce X, count the cards on your own "Your hand:" line and add X to that number.
+Everything above 7 is discarded at end of turn. If the opponent battlefield line shows Liliana's
+Caress, Underworld Dreams or Fate Unraveler, each of those discarded cards also costs you life
+on the way to the graveyard - announce the largest X that keeps (cards in hand + X) at 7 or
+less, even when the menu offers more, and even when your library is deep.
 
 === ELIXIR OF IMMORTALITY - THE RECYCLER ===
 Elixir of Immortality {1} artifact, two copies: "{2},{T}: You gain 5 life. Shuffle Elixir of

@@ -33,20 +33,14 @@ Declare "no attackers" ONLY when every attacker would either die for nothing or 
 nothing at all (a 1/1 walking into an untapped 0/3 wall is the second case). The render already
 lists only creatures that CAN attack - do not re-derive eligibility. Your wins are escalating
 swings: one body, then two, then the whole team. Keep swinging.
-- BEFORE YOU WRITE "ATTACK:", RUN THE HOLD-BACK GATE - every attackers decision,
-  first, and it is a NUMBER, not a feeling. Add up the current power (the first
-  number in each "(P/T)") of every opposing creature that is not marked
-  [defender] or "can't attack" - INCLUDING every one marked "[tapped - cannot
-  attack or block this turn]", because that marker is about THIS turn and they
-  all untap for theirs. Call that THEIR TOTAL POWER.
-  If THEIR TOTAL POWER is BELOW your life total, the gate passes and this check
-  is over: attack with every creature the list offers, including a sole
-  attacker. A creature that kills its blocker and survives always attacks.
-  If THEIR TOTAL POWER is your life total or MORE, keep your biggest ground
-  creature HOME as a blocker and attack with the rest; if the list offers only
-  ONE attacker, answer "ATTACK: none" - that one creature is your blocker.
-  EXCEPTION, both directions: if the attack you can send RIGHT NOW is lethal
-  (unblockable damage at or above their life), send everyone.
+- "(neither dies)" on the ATTACK side is the OPPOSITE of free damage. It means that
+  blocker stops every point you were sending and nothing dies - you spent a tapped
+  creature for nothing, and some walls (Perimeter Captain) GAIN THEM LIFE for blocking.
+- Before you send a creature, read its own "their untapped blockers" tag. If EVERY
+  outcome in it is "(neither dies)", that creature only gets through if they have
+  more attackers to block than blockers to spend. Count: send it only when the
+  attackers you are sending OUTNUMBER their untapped blockers, or when it has
+  flying or menace they cannot answer.
 
 #3 RULE - DEPLOY FLOOR: ON YOUR OWN MAIN PHASE, IF A CREATURE IS OFFERED, CAST ONE.
 "Cast nothing right now" on YOUR main phase is correct in exactly TWO situations:

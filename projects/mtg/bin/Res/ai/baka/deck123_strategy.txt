@@ -6,33 +6,35 @@ all creatures, so the tap ability comes straight back. Your removal buys the tur
 end the game. Every turn is the same three actions: play a land, deploy a token-maker or
 Intruder Alarm, then tap every token-maker you own until your board is an army.
 
-=== RULE 1 - WHEN A LINE ENDS IN "[cost: Tap]", TAKE IT ===
-These are the three lines, exactly as you will see them:
+=== RULE 1 - THE TOKEN LINES, AND WHEN TO STOP TAKING THEM ===
+These are the three lines, exactly as you will see them. A second copy of the same card adds a
+handle - "Thraben Doomsayer #1", "Thraben Doomsayer #2" - same line, same rule:
   "Create human with Thraben Doomsayer [cost: Tap]"
   "Create vampire with Bloodline Keeper [cost: Tap]"
   "Create vampire with Lord of Lineage [cost: Tap]"
-Take it. Then take it again the next time it appears, and again, until you control 12 or more
-creatures - then answer 0 (pass).
-Read your creature count in this order and use the FIRST one that is on the screen:
+BEFORE you take one, read your creature count. Use the FIRST source that is on the screen:
   1. the option line's own note, "[repeat: ... you control M creatures]" - M is your count.
-  2. no such note on the line? Then read your battlefield line: "Your battlefield (K
-     permanents listed, of which M are creatures)" - that M is your count, always printed,
-     every window.
-The note is only printed from the third activation of a card onward, so the first two
-activations of every card, every turn, have no note - the battlefield line is your count there.
-"[cost: Tap]" is the WHOLE cost. It needs no mana, no land drop, and no untapped land, and it
-works on the opponent's turn as well as your own.
-The thought "I have 0 mana, so I can't do anything" is ALWAYS FALSE while one of those lines is
-in your list - the printed cost is the only cost there is, and it is not mana.
-The thought "I already tapped it this turn" is ALWAYS FALSE while the line is in your list -
-the game only prints an ability you can use right now. That is Intruder Alarm working: the
-token you just made untapped the maker again. When the line comes back, take it again.
-Take it on the opponent's turn too - a token made there blocks this turn and attacks next turn.
-Each token is a free body. There is no cost to weigh.
-One exception to "there is no cost": do not fire the whole chain in your own Main phase 2,
-after combat has already happened. Tokens made there cannot block until the opponent's turn and
-cannot attack until the turn after that - a board wipe in between costs you every one of them
-for zero damage. Fire the chain at the FIRST window of the turn you get it.
+  2. no such note on the line? Then your battlefield line: "Your battlefield (K permanents
+     listed, of which M are creatures)" - that M is your count, printed in every window.
+     When the count is one it reads "of which 1 is a creature".
+The note belongs to ONE COPY and ONE TURN: each copy's first two activations of a turn carry no
+note, so with two makers out four activations a turn have none. The battlefield line always does.
+Then, and only then:
+  - M is 11 or less: take the line. Take it again every time it comes back.
+  - M is 12 or more: answer 0 (pass). Take nothing from this list, this window.
+The 12 counts creatures ON YOUR BATTLEFIELD. It does not reset when a new turn starts, it does
+not reset when the "[repeat:]" note disappears, and "I have tapped it 0 times this turn" is not
+a reason to start again. Twelve creatures already standing is the whole of the reason to stop.
+ONE exception: if the opponent has attackers on the board whose damage would take you to 0 this
+turn, keep making tokens past 12 - each new one is another blocker, and a board you never get
+to use is worth nothing.
+Timing: the tokens you make CANNOT attack until your next turn, so making them early in your own
+turn buys you nothing this turn and leaves them standing through the opponent's whole turn. Fire
+the chain on the OPPONENT'S turn - the lines are offered there, in their upkeep, their main phase
+and their attack step. A token made then blocks that same turn and attacks on your very next turn,
+and a sweeper cast on their turn catches fewer of them.
+Fire on your OWN turn only when the creatures you are about to attack with are already on the
+board, or when the opponent has no untapped land left.
 A token you make this turn CANNOT ATTACK this turn. Its battlefield line says so:
 "[summoning sick - cannot attack this turn, but CAN block]". It can block right away, and it
 attacks on your NEXT turn.
@@ -85,6 +87,12 @@ good one - take Tragic Slip, Damnation or a token activation instead.
 gains the life. Naming "The opponent (player, life" gives them the life, so use Devour Flesh
 on the opponent when Tribute to Hunger is not on the list and they have exactly ONE creature -
 then the sacrifice takes their only body and the life they gain is worth it.
+Only a creature ON THE BATTLEFIELD can be sacrificed. A creature spell listed under "ON THE
+STACK, waiting to resolve" is not there yet - cast an edict at it and the opponent sacrifices
+nothing and you have thrown the card away. Read the opponent's battlefield line: if it says "of
+which 0 are creatures", no edict does anything, whatever is on the stack.
+Never cast an edict when the opponent's life is at or below the life it gives them. Killing
+their last creature and moving them from 1 life to 4 costs you a game you had already won.
 Do not spend an edict on a creature that is not hurting you. If their only creature is a
 defender, or has power 0 or 1, or its line says it cannot attack, keep the edict and take
 another action - you paid a card and handed them life equal to its toughness to remove
@@ -92,9 +100,11 @@ something that was never going to kill you.
 Both edicts give life to the player who sacrifices. If the OPPONENT'S deck list contains a card
 that rewards them for gaining life, "Cast nothing right now" beats either edict at the
 opponent.
-Both cards let the SACRIFICING player pick, so against two or more creatures they hand over
-their worst one and keep the good one. With two or more of their creatures on the board, take
-Tragic Slip, Damnation or a token activation instead.
+Both cards let the SACRIFICING player pick, so with TWO OR MORE of their creatures listed no
+edict is ever the play: they hand you their worst. A board of two Fate Unravelers (3/4) and a
+Fog Bank (0/2 defender) gives up the Fog Bank and gains 2 life, and both Unravelers stay. Count
+the number printed after "of which" on the OPPONENT'S battlefield line. If it is not exactly 1,
+take Tragic Slip, Damnation or a token activation instead.
 "Yourself (player, life" is the right answer only when the creature you give up is a Human
 or Vampire TOKEN you can remake next turn. Your Bloodline Keeper, your Thraben Doomsayer and
 your flying Vampires stay on the battlefield.
@@ -146,6 +156,11 @@ Bloodline Keeper {2}{b}{b} (3/3) flying - "{T}: Put a 2/2 black Vampire creature
   it becomes Lord of Lineage, a 5/5 that gives every other Vampire +2/+2 - your 2/2 tokens
   become 4/4s - and it still makes a token every turn with the same tap. If that line is not
   listed, nothing changes; keep tapping the Keeper.
+  Transforming needs {B} and five or more Vampires. Casting the Keeper off exactly four lands
+  taps you out, and Intruder Alarm untaps CREATURES, not lands - so the "Transform:backside with
+  Bloodline Keeper [cost: {b}]" line will not appear again that turn. When you can cast the
+  Keeper and still leave one black source untapped, do it: Lord of Lineage gives every OTHER
+  Vampire +2/+2, which turns eleven 2/2 tokens into eleven 4/4s.
 Vision Skeins {1}{u} - EACH player draws two cards, you and them.
   Cast it only when you have no token-maker and no Intruder Alarm you could cast this window -
   it is your dig, not your default. They draw two as well, so it is the last card you cast, never
@@ -166,12 +181,15 @@ with N creatures deals N damage to each of your attackers before any combat dama
 Count it off the battlefield line: find the SMALLEST toughness among the creatures you would send,
 and send that many minus one, biggest power first. Leave the rest home.
 With no such permanent on their board, send everything.
+One more hold-back: do not send a lone Thraben Doomsayer or Bloodline Keeper into a board that
+can block and kill it. The maker is the engine; your tokens are the attack. Send it once you
+have tokens attacking beside it.
 Blocking, in this order:
  - Block with your Human and Vampire TOKENS first - they are free and you make more every turn.
  - Add up the damage of every attacker with no blocker on it. If that total is your life total
-   minus 4 or more, block with EVERYTHING that can block, Thraben Doomsayer and Bloodline
-   Keeper included. A token-maker you keep alive at 1 life makes tokens for a game you already
-   lost.
+   minus 4 or more, put a blocker on EVERY attacker - biggest attacker first, Thraben Doomsayer
+   and Bloodline Keeper included - and keep assigning until no attacker is left unblocked. A
+   token-maker you keep alive at 1 life makes tokens for a game you already lost.
  - Otherwise your token-makers do NOT block. Take the damage. A blocker line reading "(both
    die)" on Thraben Doomsayer or Bloodline Keeper is a trade you decline while your life is
    comfortable - the maker is worth more than any one attacker.
@@ -183,12 +201,11 @@ Never keep fewer than 5 cards.
 Your cheapest card costs ONE mana, so "no early play" is never a reason to ship a two-land hand.
 
 === DECIDING SITUATIONS ===
-- A line ending in "[cost: Tap]" is in your list: take it, this window, whatever your mana
-  says, on either player's turn.
-- You just took that line and it appears again: take it again. Keep going until it stops being
-  offered or your creature count reaches 12 - read that count by Rule 1's order: the option's
-  "[repeat: ...]" note if the line carries one, otherwise your battlefield line's "of which M
-  are creatures".
+- A line ending in "[cost: Tap]" is in your list AND your creature count is 11 or less: take it,
+  this window, whatever your mana says, on either player's turn. Count 12 or more: answer 0.
+- You just took that line and it appears again: read the count again first. 11 or less, take it
+  again. 12 or more, stop - and it stays stopped on later turns and after the "[repeat:]" note
+  has gone.
 - "Put in Play with Marsh Flats targeting Underground Sea" is listed: take it. Otherwise
   "targeting Tundra". Otherwise "targeting Scrubland".
 - Several casts are listed at once: answer with the highest entry on the cast list above that
