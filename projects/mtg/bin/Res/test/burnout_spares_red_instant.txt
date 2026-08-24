@@ -1,0 +1,42 @@
+#NAME: Burnout may TARGET a non-blue instant, and then counters nothing (control)
+#Oracle (Scryfall, verified 2026-08-24): "Counter target instant spell IF IT'S
+#BLUE" - the colour is a RESOLUTION condition on the effect, not a targeting
+#restriction (CR 601.2c; the intervening-if rides the effect). So a red instant
+#is a legal target and Burnout still resolves, is still paid for, and still goes
+#to the graveyard, while the red instant resolves normally.
+#This is the negative half of burnout_counters_blue_instant: it pins that the
+#zone-explicit teach(instant[blue]|stack) did NOT become a colour-restricted
+#chooser, which would have made the red spell untargetable instead of unaffected.
+#Discriminator: Dangerous Wager is {1}{R} "Discard your hand, then draw two
+#cards" - player 1's hand is empty after casting it, so the discard is a no-op
+#and the two draws empty a two-card library into hand. Countered, neither happens.
+#Top of library = last listed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Dangerous Wager
+manapool:{1}{R}
+library:Hill Giant,Juggernaut
+[PLAYER2]
+hand:Burnout
+manapool:{1}{R}
+library:Mind Stone,Darksteel Citadel
+[DO]
+Dangerous Wager
+yes
+Burnout
+Dangerous Wager
+endinterruption
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+hand:Hill Giant,Juggernaut
+graveyard:Dangerous Wager
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Burnout
+library:Mind Stone,Darksteel Citadel
+manapool:{0}
+life:20
+[END]

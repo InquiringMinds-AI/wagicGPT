@@ -1,0 +1,31 @@
+#NAME: Grizzled Angler - COST-driven transform survives the W42 flip-line sweep
+#Oracle (Scryfall, verified 2026-08-24): "{T}: Mill two cards. Then if there is a
+#colorless creature card in your graveyard, transform this creature."
+#// Grisly Anglerfish 4/5.
+#Companion witness to reckless_waif_cast_transform: that one pins the TRIGGER
+#class of transform DFC, this one pins the COST/ACTIVATED class. Dropping the
+#illegal "anyzone={0}:doubleside(backside)" line (which made "Flip Side" a free
+#activated ability in HAND, library and graveyard - no MTG rule lets a
+#transforming DFC flip outside the battlefield) must not disturb the card's real,
+#PAID transform: the {T} activation still mills two and, with Juggernaut (a
+#colorless artifact creature) already in the graveyard, still flips it.
+#Zone asserts are per-id counts, so graveyard order is not significant.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzled angler
+graveyard:Juggernaut
+library:Hill Giant,Mind Stone
+[PLAYER2]
+life:20
+[DO]
+grizzled angler
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grisly anglerfish
+graveyard:Juggernaut,Hill Giant,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[END]

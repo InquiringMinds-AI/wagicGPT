@@ -1133,3 +1133,10 @@ striking_sliver_grant_revoked.txt
 first_strike_two_lords_both_die.txt
 first_strike_two_lords_one_dies.txt
 first_strike_stacked_lords_soldiers.txt
+#wave-42 DFC flip-line sweep (59 transform-DFC fronts lost Delver's illegal
+#anyzone={0}:doubleside(backside) hand-flip) + the Burnout zoneless-teach fix
+reckless_waif_cast_transform.txt
+grizzled_angler_activated_transform.txt
+grizzled_angler_no_colorless.txt
+burnout_counters_blue_instant.txt
+burnout_spares_red_instant.txt
