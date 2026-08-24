@@ -2513,10 +2513,81 @@ bool stackObjectIsRespondable(bool hasSource, bool sourceIsEmblemMarker)
     return !sourceIsEmblemMarker;
 }
 
+//W42-4 (wave-41 seats 123 AND 126, independently; measured 1,619 of 19,750
+//prompt chars = 8% on deck126 seq 28): a token swarm renders one entry per
+//body, and eleven byte-identical "Vampire #n (2/2) [summoning sick ...]"
+//entries carry exactly the information of one. Collapse a RUN of entries that
+//agree in EVERY rendered fact into one RANGED entry:
+//  Vampire #1-#11 (2/2) [summoning sick - cannot attack this turn, but CAN block] x11
+//The collapse compares the whole fact TAIL byte-for-byte, so any difference -
+//a counter, a tapped flag, an attachment, an attacking/blocking status, a
+//summoning-sickness split, a printed-P/T delta - SPLITS the run (a true
+//statement in the wrong scope is a lie). The id RANGE is printed, not dropped,
+//because option/target/combat lines name individual members ("Vampire #7") and
+//the model must still be able to locate one on the board; reply parsing reads
+//the OPTION list, never this line, so a collapsed range cannot affect it.
+const size_t kBattlefieldCollapseFloor = 3;
+
+//The numeric rank inside an instanceHandle (" #7" -> 7), or -1 when the handle
+//is absent or not of that shape (a singleton name, or the hand's copyOfTag).
+//Consecutive ranks are what license a range: "#1-#11" must name exactly its
+//eleven members, never a card the run skipped.
+int handleRank(const string& handle)
+{
+    if (handle.size() < 3 || handle[0] != ' ' || handle[1] != '#')
+        return -1;
+    for (size_t i = 2; i < handle.size(); i++)
+        if (!isdigit((unsigned char) handle[i]))
+            return -1;
+    return atoi(handle.c_str() + 2);
+}
+
+//PURE (so PARSETEST can prove both the positive and the must-NOT-merge
+//negatives without a game): the zone line assembled from per-entry
+//(name, handle, fact-tail) triples. `collapse` is the battlefield-only switch -
+//hand lines keep one entry per card, their copyOfTag notation is deliberately
+//NOT an identity handle, and a hand is never long enough to pay for a range.
+string joinZoneEntries(const vector<string>& names, const vector<string>& handles,
+                       const vector<string>& tails, bool collapse)
+{
+    if (names.empty())
+        return "(none)";
+    std::ostringstream o;
+    bool first = true;
+    size_t i = 0;
+    while (i < names.size())
+    {
+        size_t j = i + 1;
+        int rank = handleRank(handles[i]);
+        if (collapse && rank > 0)
+            while (j < names.size() && names[j] == names[i] && tails[j] == tails[i]
+                   && handleRank(handles[j]) == rank + (int) (j - i))
+                j++;
+        size_t run = j - i;
+        if (!first)
+            o << "; ";
+        first = false;
+        if (collapse && rank > 0 && run >= kBattlefieldCollapseFloor)
+        {
+            o << names[i] << " #" << rank << "-#" << (rank + (int) run - 1)
+              << tails[i] << " x" << run;
+            i = j;
+        }
+        else
+        {
+            //run too short (or handles not contiguous) - emit this one entry and
+            //re-scan from the next, so a gap never swallows the entries after it
+            o << names[i] << handles[i] << tails[i];
+            i++;
+        }
+    }
+    return o.str();
+}
+
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus,
                        const char * copyScope = "your hand")
 {
-    bool first = true;
+    vector<string> entNames, entHandles, entTails;
     for (int i = 0; i < zone->nb_cards; i++)
     {
         MTGCardInstance * card = zone->cards[i];
@@ -2528,22 +2599,25 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         //under card never appears off the battlefield.
         if (withStatus && card->mutation && !card->parentCards.empty())
             continue;
-        if (!first)
-            out << "; ";
-        first = false;
-        out << card->getDisplayName();
+        entNames.push_back(card->getDisplayName());
         //Disambiguate same-named permanents so a board entry binds to the
         //A#/B#/target line that offers it (battlefield lines only; "" otherwise).
         if (withStatus)
-            out << instanceHandle(card);
+            entHandles.push_back(instanceHandle(card));
         else
         {
             //N-166a: the hand's duplicates get their own, deliberately distinct
             //notation - see copyOfTag.
             int copies = 0;
             int rank = zoneCopyRank(zone, i, copies);
-            out << copyOfTag(rank, copies, copyScope);
+            entHandles.push_back(copyOfTag(rank, copies, copyScope));
         }
+        //W42-4: everything below is this entry's FACT TAIL - the string whose
+        //byte-identity is what licenses a collapse - so it is built into its own
+        //buffer. The local deliberately SHADOWS the caller's stream: the whole
+        //body below is unchanged by the collapse, and shadowing keeps it that way
+        //(a stray write to the outer stream would silently escape the grouping).
+        std::ostringstream out;
         out << manaCostToken(card); //N-36b: {0} is a cost, not an absence
         if (card->isCreature())
         {
@@ -2756,9 +2830,9 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 out << mutatedPileTag(underNames);
             }
         }
+        entTails.push_back(out.str());
     }
-    if (first)
-        out << "(none)";
+    out << joinZoneEntries(entNames, entHandles, entTails, withStatus);
 }
 
 bool envFlag(const char * name)
@@ -2833,6 +2907,25 @@ static string leftStackClause(bool mine, const string& to)
     if (to == "battlefield")
         return " and entered the battlefield";
     return " and went to " + ownedZone(mine, to);
+}
+
+//W42-D7 (84 lines in the wave-41 corpus): a token that leaves the battlefield
+//ceases to exist (CR 111.7). MTGTokensCleanup implements that by moving the
+//token into the player's `garbage` zone - a bare MTGGameZone whose getName()
+//is the placeholder "zone" - so the register's generic fallback rendered
+//"Your Vampire moved from your graveyard to your zone": an anonymous
+//DESTINATION that names no game concept at all, and which the model can only
+//fill by confabulating a zone that does not exist. Name the game event
+//instead, and state the origin the token actually left (the W41-3(b) owner
+//ruling: every zone change states its origin).
+string ceasedToExistNarration(bool mine, const string& cardName, bool isTokenCard,
+                              const string& from)
+{
+    string line = ownerTag(mine) + cardName + (isTokenCard ? " (token)" : "")
+                  + " ceased to exist";
+    if (!from.empty())
+        line += " and left " + ownedZone(mine, from);
+    return line;
 }
 
 } //end of the anonymous namespace: the two functions below have EXTERNAL
@@ -4572,7 +4665,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarrationLogged(0), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -4957,10 +5050,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //Narration delta: the game events that landed since the previous
     //record. A consumed cast's outcome (resolved/countered/died) shows up
     //here on the NEXT record - machine-readable without re-parsing prompts.
-    if (mNarration.size() > mNarrationLogged)
+    //W42-D8: consumed from the line-aligned accumulator, never sliced out of
+    //mNarration by a byte offset the 24k trim invalidates.
+    if (!mNarrationPending.empty())
     {
-        rec["events"] = mNarration.substr(mNarrationLogged);
-        mNarrationLogged = mNarration.size();
+        rec["events"] = mNarrationPending;
+        mNarrationPending.clear();
     }
     if (!chosenText.empty())
         rec["chosen_text"] = chosenText;
@@ -5214,6 +5309,7 @@ void AIPlayerGPT::flushOpeningHand()
         for (size_t i = 0; i < mOpeningHand.size(); i++)
             o << (i ? "; " : "") << mOpeningHand[i];
         mNarration += o.str() + "\n";
+        mNarrationPending += o.str() + "\n"; //W42-D8: direct writers feed the delta too
         mOpeningHand.clear();
     }
     mDealDone = true;
@@ -5333,20 +5429,32 @@ string AIPlayerGPT::zoneNameDigest(MTGGameZone * z)
 //joins the log ahead of the first real line in that phase, the line is written
 //as a bullet, and a narration past 24k is trimmed on a line boundary behind a
 //trim marker (whose zone digest the caller supplies - see trimMarkerLine).
+//W42-D8: `delta` (optional) receives EXACTLY the lines this call appends to the
+//log, and is never touched by the trim below - which is the whole point: the
+//translog's per-record events field is fed from it instead of from a byte
+//offset into a buffer the trim rewrites from the front.
 void narrationAppend(string& narration, string& pendingPhase, const string& line,
-                     const string& trimMarker)
+                     const string& trimMarker, string * delta = NULL)
 {
     if (line.empty())
         return;
     if (!pendingPhase.empty())
     {
         narration += "- " + pendingPhase + "\n";
+        if (delta)
+            *delta += "- " + pendingPhase + "\n";
         pendingPhase.clear();
     }
     narration += "- " + line + "\n";
+    if (delta)
+        *delta += "- " + line + "\n";
     //Bound a runaway narrative (very long games, degenerate combos); keep
     //the tail, cut on a line boundary. The narration is otherwise
     //append-only, which is what keeps the prompt prefix cacheable.
+    //W42-D8: `delta` is deliberately NOT touched here. The trim rewrites the
+    //LOG (dropping its oldest lines behind a marker) and is log maintenance,
+    //not a game event; the delta stream carries game-event lines only, and it
+    //has already handed its earlier lines to earlier records.
     if (narration.size() > 24000)
     {
         size_t nl = narration.find('\n', narration.size() - 20000);
@@ -5376,7 +5484,7 @@ void AIPlayerGPT::appendNarration(const string& line)
                                 zoneNameDigest(opponent() ? opponent()->game->graveyard : NULL),
                                 zoneNameDigest(game ? game->removedFromGame : NULL),
                                 zoneNameDigest(opponent() ? opponent()->game->removedFromGame : NULL));
-    narrationAppend(mNarration, mPendingPhase, line, marker);
+    narrationAppend(mNarration, mPendingPhase, line, marker, &mNarrationPending);
 }
 
 void AIPlayerGPT::narrateDecision(const string& line)
@@ -5763,6 +5871,7 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
                 t << "=== Turn " << (observer->turn + 1) << " - "
                   << (observer->currentPlayer == this ? "YOUR turn" : "opponent's turn") << " ===";
                 mNarration += t.str() + "\n";
+                mNarrationPending += t.str() + "\n"; //W42-D8: delta gets the header too
             }
             //the turn header carries the owner; the marker only needs the phase
             mPendingPhase = string("Phase: ") + Constants::MTGPhaseNames[pe->to->id];
@@ -6029,6 +6138,17 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         bool mine = (owner == this);
         string toName = e->to->getName();
         string cardName = e->card->getDisplayName();
+
+        //W42-D7: the token-cleanup destination. MTGTokensCleanup moves a token
+        //that left the battlefield into its controller's `garbage` zone, whose
+        //getName() is the placeholder "zone"; the generic fallback below then
+        //printed the anonymous "to your zone" (84 lines this corpus). This is
+        //the ceases-to-exist event - say so, with the origin.
+        if (e->to->owner && e->to->owner->game
+            && (e->to == e->to->owner->game->garbage
+                || e->to == e->to->owner->game->garbageLastTurn))
+            return ceasedToExistNarration(mine, cardName, e->card->isToken != 0,
+                                          zoneDesc(e->from));
 
         //A card of a known name leaving the opponent's hand consumes that
         //knowledge (it is now public anyway, or gone).
@@ -19729,6 +19849,199 @@ void AIPlayerGPT::runParseSelfTest()
               "W42-D6 the repeat strip leaves the handle in the decline key");
         CHECK(stripRepeatAnnotation(h1) != stripRepeatAnnotation(h2),
               "W42-D6 NEGATIVE two copies do NOT share one decline key");
+    }
+
+    // ==== WAVE-42 step-1 lane G (small render batch) ====
+
+    cout << "\n[W42-4] token battlefield-render collapse: ranges, splits, references\n";
+    {
+        const string sick = " (2/2) [summoning sick - cannot attack this turn, but CAN block]";
+        vector<string> n, h, t;
+        for (int i = 1; i <= 11; i++)
+        {
+            std::ostringstream hh;
+            hh << " #" << i;
+            n.push_back("Vampire"); h.push_back(hh.str()); t.push_back(sick);
+        }
+        string line = joinZoneEntries(n, h, t, true);
+        cout << "     collapsed: " << line << "\n";
+        CHECK(line == "Vampire #1-#11" + sick + " x11",
+              "W42-4 eleven byte-identical token entries collapse to ONE ranged line");
+        // The saving is the point: the measured specimen was 8% of a 19.7KB prompt.
+        CHECK(line.size() * 4 < joinZoneEntries(n, h, t, false).size(),
+              "W42-4 the collapsed line is a fraction of the eleven-entry render");
+        // NEGATIVE - the hard constraint: any differing FACT splits the run. A
+        // true statement in the wrong scope is a lie, so a tapped body, a
+        // counter, an attachment and a P/T difference each break the range.
+        {
+            vector<string> n2(n), h2(h), t2(t);
+            t2[5] = " (2/2) [tapped - it untaps and can attack again next turn]";
+            string l2 = joinZoneEntries(n2, h2, t2, true);
+            CHECK(l2.find("Vampire #1-#5" + sick + " x5") != string::npos,
+                  "W42-4 the run BEFORE the odd entry collapses on its own");
+            CHECK(l2.find("Vampire #6 (2/2) [tapped") != string::npos,
+                  "W42-4 the differing entry keeps its own line, verbatim");
+            CHECK(l2.find("Vampire #7-#11" + sick + " x5") != string::npos,
+                  "W42-4 the run AFTER the odd entry collapses on its own");
+            CHECK(l2.find("#1-#11") == string::npos,
+                  "W42-4 NEGATIVE a tapped body is never swallowed by a range around it");
+        }
+        {
+            vector<string> n3(n), h3(h), t3(t);
+            t3[3] = sick + " [counters: 1x +1/+1]";
+            CHECK(joinZoneEntries(n3, h3, t3, true).find("#1-#11") == string::npos,
+                  "W42-4 NEGATIVE a counter difference splits the run");
+            vector<string> n4(n), h4(h), t4(t);
+            t4[9] = " (2/2) [attached to: Lightning Greaves]";
+            CHECK(joinZoneEntries(n4, h4, t4, true).find("#1-#11") == string::npos,
+                  "W42-4 NEGATIVE an attachment difference splits the run");
+        }
+        // NEGATIVE: below the floor of 3, and a non-contiguous handle pair.
+        {
+            vector<string> n5, h5, t5;
+            n5.push_back("Vampire"); h5.push_back(" #1"); t5.push_back(sick);
+            n5.push_back("Vampire"); h5.push_back(" #2"); t5.push_back(sick);
+            CHECK(joinZoneEntries(n5, h5, t5, true) == "Vampire #1" + sick + "; Vampire #2" + sick,
+                  "W42-4 NEGATIVE two entries stay two entries (below the collapse floor)");
+            vector<string> n6, h6, t6;
+            n6.push_back("Vampire"); h6.push_back(" #1"); t6.push_back(sick);
+            n6.push_back("Vampire"); h6.push_back(" #3"); t6.push_back(sick);
+            n6.push_back("Vampire"); h6.push_back(" #4"); t6.push_back(sick);
+            CHECK(joinZoneEntries(n6, h6, t6, true).find("#1-#3") == string::npos,
+                  "W42-4 NEGATIVE a gap in the ids never produces a range that claims it");
+        }
+        // NEGATIVE: two DIFFERENT names never merge, and the hand surface
+        // (collapse off, copyOfTag notation) is byte-identical to before.
+        {
+            vector<string> n7, h7, t7;
+            n7.push_back("Vampire"); h7.push_back(" #1"); t7.push_back(sick);
+            n7.push_back("Human");   h7.push_back(" #1"); t7.push_back(sick);
+            n7.push_back("Human");   h7.push_back(" #2"); t7.push_back(sick);
+            CHECK(joinZoneEntries(n7, h7, t7, true).find("-#") == string::npos,
+                  "W42-4 NEGATIVE different names never share a range");
+            vector<string> n8, h8, t8;
+            for (int i = 1; i <= 4; i++)
+            {
+                n8.push_back("Plains");
+                h8.push_back(copyOfTag(i, 4, "your hand"));
+                t8.push_back(" (land: taps for {W})");
+            }
+            CHECK(joinZoneEntries(n8, h8, t8, false).find("-#") == string::npos,
+                  "W42-4 NEGATIVE the HAND surface never collapses (copyOfTag is not an id)");
+        }
+        CHECK(handleRank(" #7") == 7 && handleRank("") == -1
+              && handleRank(" (copy 2 of 3 in your hand)") == -1 && handleRank(" #x") == -1,
+              "W42-4 only a real ' #N' instance handle can anchor a range");
+        CHECK(joinZoneEntries(vector<string>(), vector<string>(), vector<string>(), true) == "(none)",
+              "W42-4 an empty zone still renders (none)");
+        // REFERENCE INTEGRITY: options/targets/combat lines name individual
+        // members ("Vampire #7"). The range must still LOCATE #7 on the board,
+        // and a reply that references that member must still parse - reply
+        // parsing reads the OPTION list, never the board line, so it does.
+        CHECK(line.find("#1-#11") != string::npos,
+              "W42-4 the collapsed line preserves the id RANGE, so #7 is locatable");
+        {
+            vector<string> vopts;
+            vopts.push_back("Attack with Vampire #7 (2/2)");   // 1
+            vopts.push_back("Attack with Vampire #11 (2/2)");  // 2
+            vopts.push_back("Attack with nothing");            // 3
+            bool vst = false;
+            CHECK(parseChoice("CHOICE: 1 (Attack with Vampire #7)", 3, &vopts, &vst, NULL, NULL) == 1,
+                  "W42-4 a reply referencing a MEMBER of a collapsed range still resolves");
+            vst = false;
+            CHECK(parseChoice("CHOICE: 2 (Attack with Vampire #11)", 3, &vopts, &vst, NULL, NULL) == 2,
+                  "W42-4 the LAST member of the range resolves to its own option, not the first");
+            // ECHO SHAPE: a model that echoes the collapsed board syntax back
+            // must NOT be silently routed to some member - it is not an option.
+            vst = false;
+            int echoed = parseChoice("CHOICE: 1 (Vampire #1-#11)", 3, &vopts, &vst, NULL, NULL);
+            CHECK(echoed == 1,
+                  "W42-4 an echo of the range text falls back to the stated index, never a guess");
+        }
+    }
+
+    cout << "\n[W42-D7] a token that leaves the battlefield CEASES TO EXIST, with its origin\n";
+    {
+        CHECK(ceasedToExistNarration(true, "Vampire", true, "graveyard")
+              == "Your Vampire (token) ceased to exist and left your graveyard",
+              "W42-D7 the ceases-to-exist line names the token and states its origin");
+        CHECK(ceasedToExistNarration(false, "Vampire", true, "battlefield")
+              == "Opponent's Vampire (token) ceased to exist and left the opponent's battlefield",
+              "W42-D7 the observing seat's twin of the same event");
+        // THE DEFECT: the anonymous destination the generic fallback produced.
+        CHECK(ceasedToExistNarration(true, "Vampire", true, "graveyard").find("your zone")
+              == string::npos,
+              "W42-D7 NEGATIVE the line never names the placeholder 'your zone' destination");
+        CHECK(ceasedToExistNarration(false, "Vampire", true, "graveyard").find("zone")
+              == string::npos,
+              "W42-D7 NEGATIVE nor the opponent's half of it");
+        // The shape the old fallback emitted, pinned so a regression is visible.
+        CHECK(zoneChangeNarration(true, "Vampire", "graveyard", "zone", true, false, false, "")
+              == "Your Vampire moved from your graveyard to your zone",
+              "W42-D7 (documenting the pre-fix line describeEvent no longer reaches)");
+        // NEGATIVE: a non-token never gets the token tag, and an unknown origin
+        // degrades to the bare fact rather than to a dangling clause.
+        CHECK(ceasedToExistNarration(true, "Clone", false, "graveyard").find("(token)")
+              == string::npos,
+              "W42-D7 NEGATIVE a non-token carries no (token) tag");
+        CHECK(ceasedToExistNarration(true, "Vampire", true, "")
+              == "Your Vampire (token) ceased to exist",
+              "W42-D7 an unknown origin leaves no dangling 'and left' clause");
+    }
+
+    cout << "\n[W42-D8] the translog events delta is LINE-aligned and trim-proof\n";
+    {
+        // The delta accumulator receives exactly the lines the log receives,
+        // and the 24k trim - which rewrites mNarration FROM THE FRONT, and is
+        // what invalidated the old byte offset - never touches it.
+        string log, phase, delta;
+        const string kMark = "(...earlier events trimmed...)";
+        narrationAppend(log, phase, "You drew Forest", kMark, &delta);
+        narrationAppend(log, phase, "You played Forest", kMark, &delta);
+        CHECK(delta == "- You drew Forest\n- You played Forest\n",
+              "W42-D8 the delta is exactly the lines appended since it was last consumed");
+        delta.clear(); //the record consumes it
+        narrationAppend(log, phase, "Opponent drew a card", kMark, &delta);
+        CHECK(delta == "- Opponent drew a card\n",
+              "W42-D8 NEGATIVE a consumed line is never re-emitted on the next record");
+        // A pending phase marker joins the log ahead of its first line - and
+        // must join the DELTA in the same place, or the record loses a line.
+        delta.clear();
+        phase = "Phase: Combat Damage";
+        narrationAppend(log, phase, "You attacked with Orc Army (1/1)", kMark, &delta);
+        CHECK(delta == "- Phase: Combat Damage\n- You attacked with Orc Army (1/1)\n",
+              "W42-D8 the phase marker rides the same record as the line it precedes");
+        // THE DEFECT: drive the log past the 24k trim. The old emitter was
+        // mNarration.substr(charOffset); after the trim that offset indexes a
+        // SHIFTED buffer and slices mid-word ("f Nin into their library").
+        // Here the delta must still be whole lines, every one of them.
+        string big, bph, bdelta;
+        for (int i = 0; i < 900; i++)
+            narrationAppend(big, bph, "Opponent put a card from their hand into their library,"
+                            " and then some more text to pad this line out",
+                            trimMarkerLine("Mordor Muster", "Grizzly Bears", "", ""), &bdelta);
+        CHECK(big.size() <= 24000 && big.find("(...earlier events trimmed") == 0,
+              "W42-D8 the trim did fire (the condition that broke the old offset)");
+        CHECK(bdelta.size() > big.size(),
+              "W42-D8 the delta survived the trim intact - it is not a view of the log");
+        bool aligned = !bdelta.empty() && bdelta[bdelta.size() - 1] == '\n';
+        size_t lines = 0;
+        for (size_t p = 0; aligned && p < bdelta.size(); )
+        {
+            size_t nl = bdelta.find('\n', p);
+            if (nl == string::npos) { aligned = false; break; }
+            string ln = bdelta.substr(p, nl - p);
+            //every delta line is a whole rendered line: a bullet event or a
+            //turn header, never a fragment of one
+            if (ln.compare(0, 2, "- ") != 0 && ln.compare(0, 4, "=== ") != 0)
+                aligned = false;
+            lines++;
+            p = nl + 1;
+        }
+        CHECK(aligned && lines == 900,
+              "W42-D8 every delta line is COMPLETE and none was lost across the trim");
+        CHECK(bdelta.compare(0, 2, "- ") == 0,
+              "W42-D8 NEGATIVE no record can begin mid-line (the seq-62 failure shape)");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
