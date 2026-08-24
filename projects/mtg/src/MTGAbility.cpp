@@ -8516,6 +8516,24 @@ InstantAbility::InstantAbility(GameObserver* observer, int _id, MTGCardInstance 
 //Instant abilities last generally until the end of the turn
     int InstantAbility::testDestroy()
     {
+        //...but forcedAlive means another object OWNS this one's lifetime and
+        //holds a raw pointer to it (ALord::_added sets forcedAlive=1 on every
+        //ability it grants and files it in ALord::abilities[card]; the
+        //`neverRemove` parse flag does the same for nested abilities). The base
+        //MTGAbility::testDestroy honours that flag; this override did not, so
+        //an ActionLayer sweep destroyed the grant at the first AFTER_EOT while
+        //its owner kept the pointer. The map entry then dangled until game
+        //teardown, where ~ActionLayer -> ListMaintainerAbility::destroy() ->
+        //ALord::removed() WROTE `abilities[card]->forcedAlive = 0` into freed
+        //heap and called removeObserver through a freed vtable. On glibc that
+        //silently corrupts; on the Vita's newlib dlmalloc it aborts inside
+        //_free_r at the very next free of the same teardown - the crash the
+        //owner hit at the victory screen (ASAN repro: Res/test/lifeline.txt
+        //run twice, heap-use-after-free at AllAbilities.h:3887).
+        //The owner's own removed() proves the intent: it clears forcedAlive
+        //FIRST precisely so the removal it then requests is permitted.
+        if (forcedAlive == 1)
+            return 0;
         GamePhase newPhase = game->getCurrentGamePhase();
         if (newPhase != currentPhase && newPhase == MTG_PHASE_AFTER_EOT)
             return 1;
