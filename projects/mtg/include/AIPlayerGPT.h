@@ -321,6 +321,10 @@ private:
     //#W42-D9: write (and clear) the pending pregame bottoming as one counted
     //line. Named to its owner only.
     void flushPregameBottom();
+    //W43-R2: write (and clear) the held damage-caused life change as its OWN
+    //standalone line. Only ever runs when the paired WEventDamage did not
+    //arrive to carry it (no line is ever silently dropped).
+    void flushDamageLife();
     //W41-3(c): the card whose spell/ability is resolving right now (the latest
     //NOT_RESOLVED stack object's source), used to attribute a bulk move.
     MTGCardInstance * resolvingStackSource();
@@ -645,6 +649,29 @@ private:
     //toxicity granted - while Player::poisonCount is settled by the time the
     //event lands, so the delta is derived from the settled totals instead.
     int mLastPoison[2];
+    //W43-R2 (owner report: "damage is receiving 2 entries, which may be
+    //confusing to the model, and is also unnecessarily verbose"). Damage::
+    //resolve raises WEventLife(fromDamage) and then the WEventDamage for the
+    //SAME delta, so the log printed the effect ("- You lost 1 life (now 34)")
+    //and its cause ("- Dwarven Blastminer dealt 1 damage to you") as two
+    //entries. The flagged life event is HELD here instead of printed, and the
+    //damage line that follows carries the result: "- Dwarven Blastminer dealt 1
+    //damage to you (now 34)". `mDamageLifePlayer` non-NULL = one is held.
+    //
+    //SIMULTANEOUS MULTI-SOURCE DAMAGE: each Damage::resolve raises its own
+    //life+damage pair in sequence, and settledLife is captured at fire time, so
+    //EVERY damage line carries the running total after ITS OWN damage - the
+    //last line therefore shows the final total, and the intermediate ones are
+    //true statements about the step they describe (the same shape wave-34 b6 F5
+    //established for batched life changes).
+    //
+    //PREVENTED / REPLACED damage never reaches the raise site (Damage::resolve
+    //returns at `if (!damage)`, and the infect/wither branches replace the
+    //damage with counters and raise no life event at all), so nothing is held
+    //and no life result is printed for damage that caused none.
+    Player * mDamageLifePlayer;
+    int mDamageLifeAmount;
+    int mDamageLifeSettled;
     //W41-3(c): the pending bulk graveyard->library run. `mBulkMoveFirstLine` is
     //the ordinary named line for the FIRST move, kept so a run of length one
     //flushes as itself rather than as a "1 card" count.

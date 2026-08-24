@@ -3265,13 +3265,24 @@ string lifeChangeNarration(bool mine, int amount, int settled)
 }
 
 //Damage, subject first: "<source> dealt N damage to you".
-string damageNarration(const string& sourceName, int amount, const string& targetName)
+//W43-R2: when the damage's own life change is known (`haveResult`), this ONE
+//attributed line carries the resulting total - "Dwarven Blastminer dealt 1
+//damage to you (now 34)" - and no separate "lost 1 life (now 34)" line is
+//written. Owner report: "damage is receiving 2 entries, which may be confusing
+//to the model, and is also unnecessarily verbose." The result is only ever
+//appended for damage that ACTUALLY changed a life total (see mDamageLifePlayer:
+//prevented, replaced and creature damage never reach it), so a damage line
+//without "(now N)" is an honest statement that no life result came with it.
+string damageNarration(const string& sourceName, int amount, const string& targetName,
+                       bool haveResult = false, int settledLife = 0)
 {
     std::ostringstream o;
     if (sourceName.empty())
         o << amount << " damage was dealt to " << targetName;
     else
         o << sourceName << " dealt " << amount << " damage to " << targetName;
+    if (haveResult)
+        o << " (now " << settledLife << ")";
     return o.str();
 }
 
@@ -3774,7 +3785,24 @@ string damageTargetVerdict(int dmg, int toughness, int remaining, bool indestruc
     return o.str();
 }
 
-string describeTarget(Player * me, Targetable * t)
+//W43-R1 (owner report, verbatim: "'Seachrome Coast enters tapped unless you
+//control two or fewer other lands. -- {T}: Add {W} or {U}.' doesn't need to be
+//in historic log").
+//
+//A target line is BOTH a decision surface and, once the pick is consumed, the
+//source string of the narrated record ("You targeted <X> with <Y>"). The
+//decision surface earns the rules-text tail - a removal pick from bare names is
+//a coin flip - but the append-only log records what HAPPENED, and every one of
+//those quotes is then re-served on every prompt for the rest of the game.
+//stripNarrationDecoration could not remove it: it drops brace/bracket
+//FURNITURE, and this tail is a bare ` - "..."` clause, deliberately (it is a
+//quote, not an annotation). So the gate is at the RENDER BOUNDARY, keyed on
+//WHICH surface is being built, not on string surgery after the fact.
+//
+//`decisionSurface` false => the identifying facts only (name, instance handle,
+//P/T, keyword/type tag, zone, tapped, price). Nothing that says WHICH card was
+//targeted is gated; only the quoted card text and the dungeon's full room path.
+string describeTarget(Player * me, Targetable * t, bool decisionSurface = true)
 {
     std::ostringstream o;
     if (Player * p = dynamic_cast<Player *>(t))
@@ -3820,7 +3848,8 @@ string describeTarget(Player * me, Targetable * t)
         {
             o << " [dungeon: " << rooms.size() << " rooms; completion reward (\""
               << rooms.back().first << "\"): " << rooms.back().second << "]";
-            o << " - full room path: \"" << c->text << "\"";
+            if (decisionSurface)
+                o << " - full room path: \"" << c->text << "\"";
             return o.str();
         }
     }
@@ -3829,9 +3858,12 @@ string describeTarget(Player * me, Targetable * t)
     //W41-4: a mutate pile's quote is the pile's COMBINED, per-card-attributed
     //text - the annotation's own promise - not one member's text under another
     //member's name.
-    string txt = pileAwareCardText(c, 110);
-    if (!txt.empty())
-        o << " - \"" << txt << "\"";
+    if (decisionSurface)
+    {
+        string txt = pileAwareCardText(c, 110);
+        if (!txt.empty())
+            o << " - \"" << txt << "\"";
+    }
     return o.str();
 }
 
@@ -4683,6 +4715,9 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     mSearchIsWholeZone = false;
     mSearchRevealOwner = NULL;
     mSearchMaskOwner = NULL;
+    mDamageLifePlayer = NULL;            //W43-R2: no damage life change held
+    mDamageLifeAmount = 0;
+    mDamageLifeSettled = 0;
     mPregameBottomingNow = false;        //#W42-D9
     mPregameShufflingBack = false;
     mPregameBottomedCount = 0;
@@ -5960,13 +5995,50 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
             && mSearchMaskOwner->game->reveal->nb_cards == 0)
             mSearchMaskOwner = NULL;
     }
+    //W43-R2: hold the life-loss half of a damage event; the WEventDamage that
+    //Damage::resolve raises immediately after carries the result instead. The
+    //key is the EVENT's own fromDamage flag - never adjacency, never matching
+    //numbers, never a timer.
+    if (WEventLife * le = dynamic_cast<WEventLife *>(event))
+    {
+        if (le->fromDamage && le->player)
+        {
+            flushBulkMove();
+            flushSearchReveal();
+            flushDamageLife(); //an earlier hold nothing consumed: print it, don't lose it
+            mDamageLifePlayer = le->player;
+            mDamageLifeAmount = le->amount;
+            mDamageLifeSettled = le->settledLife;
+            return result;
+        }
+    }
+    //Anything that is not the paired damage event ends the hold's window.
+    if (!dynamic_cast<WEventDamage *>(event))
+        flushDamageLife();
+
     flushBulkMove();
     flushSearchReveal();
 
     string line = describeEvent(event);
+    //A held life change the damage line did not consume (damage to the OTHER
+    //player, or a damage line describeEvent suppressed) still gets its own line.
+    flushDamageLife();
     if (!line.empty())
         appendNarration(line);
     return result;
+}
+
+//W43-R2: the held damage-caused life change, written as an ordinary standalone
+//life line. Cleared BEFORE the append so a re-entrant event cannot double-flush.
+void AIPlayerGPT::flushDamageLife()
+{
+    if (!mDamageLifePlayer)
+        return;
+    bool mine = (mDamageLifePlayer == this);
+    int amount = mDamageLifeAmount;
+    int settled = mDamageLifeSettled;
+    mDamageLifePlayer = NULL;
+    appendNarration(lifeChangeNarration(mine, amount, settled));
 }
 
 //W41-3(c): write the pending bulk move, then clear. The count is reset BEFORE
@@ -6331,8 +6403,18 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         }
         string dtarget = dp ? string(dp == this ? "you" : "the opponent")
                             : (dc ? dc->getDisplayName() : string("nothing"));
+        //W43-R2: ONE attributed entry per damage event. The life-loss half held
+        //by receiveEvent is consumed here and rendered as this line's RESULT, so
+        //the log reads "- Dwarven Blastminer dealt 1 damage to you (now 34)"
+        //instead of a bare life line plus an unquantified damage line. Consumed
+        //only for THIS damage's own player: a held change belonging to anyone
+        //else stays held and flushes as its own line.
+        bool haveResult = (dp && mDamageLifePlayer == dp);
+        int settled = mDamageLifeSettled;
+        if (haveResult)
+            mDamageLifePlayer = NULL;
         out << damageNarration(dsrc ? dsrc->getDisplayName() : string(),
-                               e->damage->damage, dtarget);
+                               e->damage->damage, dtarget, haveResult, settled);
         if (dp && dsrc && dsrc->getToxicity() > 0)
             out << " - and toxic " << dsrc->getToxicity() << ": it ALSO puts "
                 << dsrc->getToxicity() << " poison counter"
@@ -11124,8 +11206,11 @@ MTGCardInstance * AIPlayerGPT::chooseCostTarget(TargetChooser * tc, MTGCardInsta
                          : (tc->source ? tc->source->getDisplayName() : string("this spell"));
     {
         vector<string> narr;
-        for (size_t ci = 0; ci < opts.size(); ci++)
-            narr.push_back("You paid " + stripNarrationDecoration(opts[ci])
+        for (size_t ci = 0; ci < opts.size() && ci < cands.size(); ci++)
+            //W43-R1: same render boundary, log side - the paid card is named,
+            //its rules text is not.
+            narr.push_back("You paid "
+                           + stripNarrationDecoration(describeTarget(this, cands[ci], false))
                            + " as " + what + "'s additional cost");
         setAskNarration(narr);
     }
@@ -11392,6 +11477,10 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     {
         vector<Targetable *> targets;
         vector<string> opts;
+        //W43-R1: the LOG's copy of each candidate, built at the same render
+        //boundary from the same engine facts, minus the decision-time card-text
+        //quote. Index-parallel to `targets`/the real-target prefix of `opts`.
+        vector<string> narrOpts;
         //"Done" goes LAST (after the real targets): the model favors option
         //1, and an early-listed escape biased multi-target picks short.
         bool mayStop = multi && !picks.empty() && !tc->targetMin;
@@ -11407,8 +11496,9 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                 if (std::find(picks.begin(), picks.end(), t) != picks.end())
                     continue;
                 targets.push_back(t);
-                string tdesc = describeTarget(this, t)
-                               + (lifeCostPerTarget ? perTargetLifeCostNote(t) : string());
+                string priceNote = lifeCostPerTarget ? perTargetLifeCostNote(t) : string();
+                narrOpts.push_back(describeTarget(this, t, false) + priceNote);
+                string tdesc = describeTarget(this, t) + priceNote;
                 //W36 #4: the kill verdict rides the creature target line.
                 if (dmgAmount > 0)
                     if (MTGCardInstance * dtc = dynamic_cast<MTGCardInstance *>(t))
@@ -11654,9 +11744,9 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         {
             vector<string> narr;
             for (size_t ti = 0; ti < opts.size(); ti++)
-                narr.push_back(mayStop && ti + 1 == opts.size()
+                narr.push_back(ti >= narrOpts.size()
                                ? ("You chose no further target for " + effectName)
-                               : targetChoiceNarration(stripNarrationDecoration(opts[ti]),
+                               : targetChoiceNarration(stripNarrationDecoration(narrOpts[ti]),
                                                        effectName, abilityName));
             setAskNarration(narr);
         }
@@ -20042,6 +20132,96 @@ void AIPlayerGPT::runParseSelfTest()
               "W42-D8 every delta line is COMPLETE and none was lost across the trim");
         CHECK(bdelta.compare(0, 2, "- ") == 0,
               "W42-D8 NEGATIVE no record can begin mid-line (the seq-62 failure shape)");
+    }
+
+    // ---- W43-R1/R3: card RULES TEXT never enters the append-only log ----
+    cout << "\n[W43-R1] a target pick narrates the CARD, not its rules text\n";
+    {
+        // The owner's two specimens, verbatim in shape. LEFT of the gate is the
+        // OPTION line describeTarget builds for the decision surface (rules text
+        // included, deliberately); RIGHT is what describeTarget(..., false)
+        // builds for the log at the same render boundary.
+        string optLine = "Seachrome Coast [land] [opponent's battlefield]"
+                         " - \"Seachrome Coast enters tapped unless you control two or fewer"
+                         " other lands. -- {T}: Add {W} or {U}.\"";
+        string logLine = "Seachrome Coast [land] [opponent's battlefield]";
+        CHECK(targetChoiceNarration(stripNarrationDecoration(logLine), "Stone Rain", "")
+              == "You targeted Seachrome Coast with Stone Rain",
+              "W43-R1 the log records the pick: card name, no rules text");
+        CHECK(targetChoiceNarration(stripNarrationDecoration(logLine), "Stone Rain", "")
+                  .find(" - \"") == string::npos,
+              "W43-R1 NEGATIVE no quoted rules-text tail survives into the log line");
+        // R3: the owner's basic-land specimen. Mountain's primitive is text=R,
+        // so the SAME tail rendered as ` - \"R\"` on a bare land name.
+        CHECK(targetChoiceNarration(stripNarrationDecoration("Mountain [land] [your battlefield]"),
+                                    "this effect", "Put in Play")
+              == "You targeted Mountain with this effect's ability (Put in Play)",
+              "W43-R3 a basic land narrates as its bare name, not Mountain - \"R\"");
+        CHECK(targetChoiceNarration("Mountain", "Fireblast", "").find('"') == string::npos,
+              "W43-R3 NEGATIVE the mana-produce hint is not in the narration channel");
+        // WHERE THE HINT IS LEGITIMATELY KEPT: the option line is untouched -
+        // the decision surface still carries the rules text it is there to be
+        // decided on, and an echo of the bare name still binds against it.
+        CHECK(optLine.find("enters tapped unless") != string::npos,
+              "W43-R1 CONTROL the OPTION line still carries the full rules text");
+        {
+            vector<string> menu;
+            menu.push_back(optLine);
+            menu.push_back("Mountain [land] [your battlefield] - \"R\"");
+            bool stale = false;
+            int c = parseChoice("2 (Mountain)", 2, &menu, &stale, NULL);
+            cout << "     bare-name echo against quoted options -> " << c << " (must be 2)\n";
+            CHECK(c == 2 && !stale,
+                  "W43-R1 echo: a bare target name still binds against the quoted option line");
+        }
+        // WHY THE GATE IS AT THE RENDER BOUNDARY: stripNarrationDecoration's
+        // contract is brace/bracket FURNITURE only - a bare quoted clause is not
+        // furniture and it must not start eating them (a card's own text can
+        // contain quotes). This pins that contract.
+        CHECK(stripNarrationDecoration(optLine).find("enters tapped unless") != string::npos,
+              "W43-R1 stripNarrationDecoration does NOT remove a quoted clause "
+              "(hence the render-boundary gate)");
+    }
+
+    // ---- W43-R2: one damage event is ONE attributed line ----
+    cout << "\n[W43-R2] damage narrates once, carrying its life result\n";
+    {
+        CHECK(damageNarration("Dwarven Blastminer", 1, "the opponent", true, 34)
+              == "Dwarven Blastminer dealt 1 damage to the opponent (now 34)",
+              "W43-R2 the owner's specimen: one attributed line carrying the result");
+        CHECK(damageNarration("Dwarven Blastminer", 1, "the opponent", true, 34)
+                  .find("lost 1 life") == string::npos,
+              "W43-R2 NEGATIVE the separate life-loss entry is gone");
+        // NEGATIVE: damage with no life result (prevented/replaced, creature
+        // damage, the toxic path that raises no life event) prints no total.
+        CHECK(damageNarration("Wither Fang", 2, "Grizzly Bears")
+              == "Wither Fang dealt 2 damage to Grizzly Bears",
+              "W43-R2 NEGATIVE damage that caused no life change claims no life result");
+        CHECK(damageNarration("Wither Fang", 2, "Grizzly Bears").find("(now") == string::npos,
+              "W43-R2 NEGATIVE no '(now N)' is invented for a resultless damage line");
+        CHECK(damageNarration("", 3, "you", true, 17) == "3 damage was dealt to you (now 17)",
+              "W43-R2 a sourceless damage line carries its result too");
+        // SIMULTANEOUS MULTI-SOURCE: each damage line carries the running total
+        // after ITS OWN damage; the LAST line therefore shows the final total.
+        {
+            string a = damageNarration("Goblin Token", 1, "you", true, 19);
+            string b = damageNarration("Siege-Gang Commander", 2, "you", true, 17);
+            CHECK(a == "Goblin Token dealt 1 damage to you (now 19)"
+                  && b == "Siege-Gang Commander dealt 2 damage to you (now 17)",
+                  "W43-R2 each simultaneous damage line carries its own settled total");
+        }
+        // The standalone life line SURVIVES for every life change that is not
+        // damage: loss effects, payments, and the lifelink/lifegain half.
+        CHECK(lifeChangeNarration(true, -2, 18) == "You lost 2 life (now 18)",
+              "W43-R2 a non-damage life loss still narrates as its own line");
+        CHECK(lifeChangeNarration(false, 3, 23) == "Opponent gained 3 life (now 23)",
+              "W43-R2 the lifelink/lifegain half still narrates as its own line");
+        // ECHO SHAPE: the appended result is parenthesised, not bracketed, so
+        // stripNarrationDecoration leaves it alone (it identifies the outcome).
+        CHECK(stripNarrationDecoration(damageNarration("Dwarven Blastminer", 1, "the opponent",
+                                                       true, 34))
+              == "Dwarven Blastminer dealt 1 damage to the opponent (now 34)",
+              "W43-R2 echo: the life result is content, not decoration - it is never stripped");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

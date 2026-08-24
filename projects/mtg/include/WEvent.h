@@ -111,7 +111,15 @@ struct WEventLife : public WEvent {
     //at fire time, so each line prints the step it actually is. Same mechanism
     //as WEventCounters::captureTargetState (N-105f).
     int settledLife;
-    WEventLife(Player * player, int amount, MTGCardInstance * source);
+    //W43-R2: TRUE only when this life change IS the life-loss half of a damage
+    //event - i.e. it was raised from Damage::resolve, which raises this event
+    //and then, immediately after, the WEventDamage describing the same delta.
+    //Set at the ONE raise site that has that relationship; every other life
+    //change (loss effects, payments, lifelink/lifegain, drains) leaves it
+    //false. Consumers that merge the two lines key on this, never on adjacency
+    //or on matching numbers.
+    bool fromDamage;
+    WEventLife(Player * player, int amount, MTGCardInstance * source, bool fromDamage = false);
     virtual Targetable * getTarget(int target);
 };
 
