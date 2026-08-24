@@ -1,0 +1,32 @@
+#Shaman of the Pack - the ETB one-shot half of the as-enters-player-chooser
+#class (Black Vise / The Rack are the persistent half). Oracle: "When Shaman
+#of the Pack enters, target opponent loses life equal to the number of Elves
+#you control." Script: auto=life:-type:elf:mybattlefield target(opponent)
+#The parser gives that line the same catch-all wrap as Black Vise's chooser
+#(GenericTargetAbility inside MayAbility(must)), so it is the same mechanism:
+#a MANDATORY player choice with exactly one legal candidate. It auto-resolves
+#- no menu answer, no avatar click scripted below - and the effect still lands.
+#Shaman is itself an Elf, so X = 1: the opponent goes 20 -> 19.
+[INIT]
+SECONDMAIN
+[PLAYER1]
+hand:shaman of the pack
+inplay:swamp,forest,mountain
+[PLAYER2]
+hand:act of treason,raging goblin
+[DO]
+swamp
+forest
+mountain
+shaman of the pack
+eot
+next
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:swamp,forest,mountain,shaman of the pack
+life:20
+[PLAYER2]
+hand:act of treason,raging goblin
+life:19
+[END]

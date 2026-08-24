@@ -11044,8 +11044,9 @@ type=Sorcery
 [/card]
 [card]
 name=Black Vise
-auto=@each opponent upkeep:damage:type:*:opponenthandminus4minusend opponent
-text=At the beginning of each opponent's upkeep, Black Vise deals X damage to that player, where X is the number of cards in their hand minus 4.
+auto=name(choose opponent) notaTarget(opponent) doNothing
+auto=@each targetedplayer upkeep:damage:type:*:targetedpersonshandminus4minusend targetedplayer
+text=As Black Vise enters, choose an opponent. -- At the beginning of the chosen player's upkeep, Black Vise deals X damage to that player, where X is the number of cards in their hand minus 4.
 mana={1}
 type=Artifact
 [/card]

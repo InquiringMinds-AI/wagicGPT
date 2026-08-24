@@ -1,14 +1,18 @@
-#Black Vise: "At the beginning of each opponent's upkeep, Black Vise deals X
-#damage to that player, where X is the number of cards in their hand minus 4."
+#Black Vise (Oracle): "As Black Vise enters, choose an opponent. At the
+#beginning of the chosen player's upkeep, Black Vise deals X damage to that
+#player, where X is the number of cards in their hand minus 4."
 #Cast in the controller's second main; at the OPPONENT'S next upkeep (before
 #their draw) they hold 7 -> 3 damage, 20 -> 17.
 #Owner live report (2026-08-23): Vise "doesn't seem to be applying damage".
-#The primitive used to require an ETB "choose an opponent" click
-#(notaTarget(opponent) + @each targetedplayer upkeep); left unanswered that
-#chooser WEDGES the game, and a Vise whose playerTarget never got set is inert
-#for the rest of the game. It now uses the same target-free idiom as its two
-#functional identicals, Iron Maiden and Viseling - correct in a 2-player engine,
-#where the chosen opponent is necessarily the only opponent.
+#The card script is faithful and stays; the DEFECT was the engine mechanism
+#behind it. The as-enters chooser (notaTarget(opponent), wrapped as
+#MayAbility(must) + GenericTargetAbility) armed a modal menu and then a target
+#chooser, and both hold the phase ring - left unanswered they WEDGE the game,
+#and a Vise whose playerTarget never got set is inert for the rest of the game
+#(the @each targetedplayer trigger fires only when playerTarget is set).
+#MayAbility::Update now auto-resolves a mandatory player chooser that has
+#exactly one legal candidate, so no seat has to answer a question that has
+#only one answer. NOTHING BELOW ANSWERS THE CHOOSER - that is the point.
 [INIT]
 SECONDMAIN
 [PLAYER1]
