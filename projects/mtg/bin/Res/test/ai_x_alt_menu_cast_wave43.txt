@@ -1,0 +1,66 @@
+#Wave-43 engine item #W43-6 -- a cast COMMITTED through the alternative-cost
+#menu must reach its X announcement, not die in the arming gap.
+#
+#SYMPTOM (corpus 20260824, deck130 vs deck125 seq293-298, and reproduced live
+#with tools/silent-cast-probe.sh): the seat chose "Cast Starstorm", confirmed
+#"Cast Card Normally", and then NOTHING - no X announcement, no cast, no
+#resolution, no fallback record. The card was still in hand three records
+#later and was cycled away.
+#
+#MECHANISM: MTGPutInPlayRule::reactToClick builds the AAWhatsX announce menu
+#and returns 0, but ActionLayer::ButtonPressed then clears menuObject AND
+#currentActionCard unconditionally - so for one tick the action layer reads
+#IDLE even though a cast is mid-flight. Whoever holds priority advances the
+#phase in that tick, the end-of-phase rule empties the mana pool, and the
+#payment floated for THIS cast is gone. The announce menu then arms over an
+#empty pool: no affordable X exists, so the announcement is answered with 0
+#and MTGPutInPlayRule::reactToClick bails at isReactingToClick (the empty pool
+#cannot afford {R}{R}) - returning 0 with no event and no record.
+#
+#WITNESS (player-agnostic): Starstorm {X}{R}{R} (cycling {3}, so the
+#alternative-cost menu arms) over eight untapped Mountains and one creature to
+#kill. PRE-FIX the spell stays in HAND with the mana burned; POST-FIX it is
+#cast, the announced X kills the creature, and Starstorm reaches the graveyard.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain,Mountain,Mountain,Mountain,Mountain
+hand:Starstorm
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Mountain,Mountain,Mountain,Mountain,Mountain,Mountain,Mountain,Mountain
+graveyard:Starstorm
+life:20
+[PLAYER2]
+graveyard:Grizzly Bears
+life:20
+[END]

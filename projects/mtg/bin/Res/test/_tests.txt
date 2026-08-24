@@ -1175,3 +1175,7 @@ docent_of_perfection_no_cast_no_transform.txt
 docent_of_perfection_cast_transform.txt
 ludevics_test_subject_four_counters.txt
 ludevics_test_subject_five_counters.txt
+#wave-43 #W43-6: a cast committed through the alternative-cost menu must
+#reach its X announcement - the arming gap used to advance the phase, empty
+#the pool, and drop the cast with no event and no record.
+ai_x_alt_menu_cast_wave43.txt
