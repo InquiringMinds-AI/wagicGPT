@@ -3163,6 +3163,21 @@ string revealedCardNarration(bool mine, const string& cardName, const string& fr
            + " from " + ownZone(mine, fromZone);
 }
 
+//#W43-3: the reveal line's SUBJECT, as a stated contract rather than an
+//accident of which zone object the engine used. A reveal moves cards into the
+//EFFECT CONTROLLER's reveal zone whoever's cards they are, so binding the
+//narration to the destination zone's owner made the caster of a reveal-your-
+//hand effect claim the opponent's hand as its own ("You revealed your Teferi,
+//Who Slows the Sunset from your hand", 24 lines, both seats mirrored wrong).
+//The subject is the player the card came FROM - the one made to reveal. The
+//reveal zone's owner is passed in only to say, in code, that it is NOT the
+//authority here.
+bool revealSubjectIsMe(bool originOwnerIsMe, bool revealZoneOwnerIsMe)
+{
+    (void) revealZoneOwnerIsMe;
+    return originOwnerIsMe;
+}
+
 //#W42-D1: a library SEARCH is ONE event, not N reveals. The engine implements
 //"search your library" by dumping the WHOLE library into the reveal zone so the
 //chooser can walk it, and every examined card fired its own "revealed <name>"
@@ -3181,6 +3196,41 @@ string librarySearchNarration(bool mine, const string& sourceName)
     if (!sourceName.empty())
         line += " with " + sourceName;
     return line;
+}
+
+//#W43-5: a permanent's FACE SWAP, said out loud. AAFlip rewrites the instance
+//in place - name, P/T, types, text, abilities - and raises WEventCardTransforms;
+//no seat had a handler, so the wave-42 corpus carried ZERO transform lines while
+//boards silently traded "Brutal Cathar 2/2" for "Moonrage Brute 3/3" between two
+//consecutive records. From the seat that is indistinguishable from the creature
+//being replaced by another one: the model had no way to know its own blocker was
+//now a different card, or that the thing it was racing had grown.
+//The gate is the MECHANISM (the transform event), never a card name - werewolf
+//day/night flips, disturb backs and the flip back to the front face all read the
+//same way, ONE line per card. The resulting P/T and keyword set are stated
+//because they are what the swap CHANGED and what the next combat decision turns
+//on; nothing else about the new face is repeated here (the board snapshot in
+//CURRENT SITUATION carries it, and this is the historical-log register).
+string cardTransformNarration(bool mine, const string& fromName, const string& toName,
+                              bool isCreature, int power, int toughness,
+                              const string& keywords)
+{
+    //Nothing to state: an unnamed face, or a "transform" that changed no face
+    //(the modal-DFC path takes the zone-change branch instead and must not also
+    //produce a no-op arrow line here).
+    if (fromName.empty() || toName.empty() || fromName == toName)
+        return "";
+    std::ostringstream o;
+    o << (mine ? "Your " : "Opponent's ") << fromName
+      << " transformed into " << toName;
+    if (isCreature)
+    {
+        o << " (now " << power << "/" << toughness;
+        if (!keywords.empty())
+            o << " " << keywords;
+        o << ")";
+    }
+    return o.str();
 }
 
 //#W42-D9: the London mulligan's bottoming, stated as the one thing that
@@ -6289,9 +6339,27 @@ string AIPlayerGPT::describeEvent(WEvent * event)
                 mKnownOppHand.erase(known);
         }
 
-        //Reveals are public information, whoever's card it is.
+        //Reveals are public information, whoever's card it is - and #W43-3:
+        //WHOSE card it is is decided by where it CAME FROM, never by whose
+        //reveal zone the engine parked it in. A reveal-your-hand effect
+        //(Pelakka Predation) moves the TARGET player's hand cards into the
+        //EFFECT CONTROLLER's reveal zone, so the generic `mine` above
+        //(e->to->owner == this) made the CASTER read "You revealed your Teferi,
+        //Who Slows the Sunset from your hand" about a card that was the
+        //opponent's, out of the opponent's hand - 24 lines in the wave-42
+        //corpus, both seats mirrored wrong, while the same record's prompt
+        //header stated the ownership correctly one screen below.
+        //The origin zone's owner IS the player who was made to reveal (the hand
+        //or library the card left); the instance's own `owner` is the fallback
+        //for a card whose origin zone has none.
         if (isRevealZone(e->to))
-            return revealedCardNarration(mine, cardName, zoneDesc(e->from));
+        {
+            Player * revealer = (e->from && e->from->owner) ? e->from->owner
+                                                            : e->card->owner;
+            return revealedCardNarration(revealer ? revealSubjectIsMe(revealer == this, mine)
+                                                  : mine,
+                                         cardName, zoneDesc(e->from));
+        }
         if (isRevealZone(e->from))
         {
             if (!mine && (toName == "hand" || toName == "library"))
@@ -6514,6 +6582,30 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //abilityActivationNarration) rather than printing a bare engine label.
         return abilityActivationNarration(mine, e->abilityText,
                                           resolveOwningCardName(e->source));
+    }
+
+    //#W43-5: the face swap. AAFlip raises this AFTER rewriting the instance, so
+    //the card's CURRENT name and P/T are the face it became and the event
+    //carries the face it left. Attribute to the permanent's CONTROLLER (a
+    //stolen werewolf flips for whoever is currently playing it), which is also
+    //what every other battlefield line on this surface uses.
+    if (WEventCardTransforms * e = dynamic_cast<WEventCardTransforms *>(event))
+    {
+        MTGCardInstance * c = e->card;
+        if (!c)
+            return "";
+        //The Day/Night DESIGNATION is implemented as an emblem that transforms
+        //into its own other face and hops battlefields every end step. It is a
+        //game-wide state, not a permanent anyone owns, so "Your Day transformed
+        //into Night" would be both noise and a false possessive - and the
+        //designation change already narrates through its own named ability
+        //("It becomes night next turn"). Every mass werewolf flip the emblem
+        //drives still narrates, one line per creature.
+        if (c->hasType(Subtypes::TYPE_EMBLEM))
+            return "";
+        return cardTransformNarration(c->controller() == this, e->fromName,
+                                      c->getDisplayName(), c->isCreature() != 0,
+                                      c->power, c->toughness, keywordList(c));
     }
 
     //N-105a part (c): every poison GAIN. The engine fires this event on all
@@ -20443,6 +20535,156 @@ void AIPlayerGPT::runParseSelfTest()
                                                        true, 34))
               == "Dwarven Blastminer dealt 1 damage to the opponent (now 34)",
               "W43-R2 echo: the life result is content, not decoration - it is never stripped");
+    }
+
+    // ---- #W43-3: a reveal belongs to the card's OWNER, not the effect's caster
+    cout << "\n[W43-3] hand-reveal attribution follows the card, not the effect\n";
+    {
+        // THE CONTRACT. The reveal zone belongs to whoever's effect it is; the
+        // card belongs to whoever's hand it left. Only the second decides voice.
+        CHECK(revealSubjectIsMe(/*originOwnerIsMe*/ false, /*revealZoneOwnerIsMe*/ true)
+              == false,
+              "W43-3 I cast the reveal, the cards are the opponent's - the voice is theirs");
+        CHECK(revealSubjectIsMe(true, false) == true,
+              "W43-3 the mirror: my hand revealed into the opponent's reveal zone is MINE");
+        CHECK(revealSubjectIsMe(true, true) == true
+              && revealSubjectIsMe(false, false) == false,
+              "W43-3 a self-targeting reveal (both owners agree) is unchanged");
+        // THE CORPUS SPECIMEN, both seats. deck146 cast Pelakka Predation at
+        // deck152; the caster's seat printed the line below with "You"/"your".
+        {
+            bool casterIsMe = false;    //the caster's seat: not the card's owner
+            bool defenderIsMe = true;   //the revealer's seat: it is their hand
+            string casterSeat =
+                revealedCardNarration(revealSubjectIsMe(casterIsMe, true),
+                                      "Teferi, Who Slows the Sunset", "hand");
+            string defenderSeat =
+                revealedCardNarration(revealSubjectIsMe(defenderIsMe, false),
+                                      "Teferi, Who Slows the Sunset", "hand");
+            cout << "     caster seat   -> " << casterSeat << "\n";
+            cout << "     revealer seat -> " << defenderSeat << "\n";
+            CHECK(casterSeat
+                  == "Opponent revealed their Teferi, Who Slows the Sunset from their hand",
+                  "W43-3 the CASTER's seat names the card as the opponent's, from their hand");
+            CHECK(defenderSeat
+                  == "You revealed your Teferi, Who Slows the Sunset from your hand",
+                  "W43-3 the REVEALER's seat is the only one that says 'your hand'");
+            // NEGATIVE: the exact defective string the wave-42 corpus carried
+            // 24 times can no longer be produced by the caster's seat.
+            CHECK(casterSeat.find("You revealed your") == string::npos
+                  && casterSeat.find("from your hand") == string::npos,
+                  "W43-3 NEGATIVE the caster can no longer claim the opponent's hand");
+            // MIRROR INVARIANT: one event, two seats, exactly one 'You'.
+            CHECK((casterSeat.compare(0, 3, "You") == 0)
+                      != (defenderSeat.compare(0, 3, "You") == 0),
+                  "W43-3 the two seats of one reveal are mirrors - exactly one says 'You'");
+        }
+        // POSITIVE CONTROL: the ordinary own-library reveal (reveal the top
+        // card) is untouched - it was never mis-bound and must not move.
+        CHECK(revealedCardNarration(revealSubjectIsMe(true, true), "Brainstorm", "library")
+              == "You revealed your Brainstorm from your library",
+              "W43-3 POSITIVE CONTROL reveal-your-own-top-card is unchanged");
+        // The wave-42 search-collapse mask keys off the SEARCHING player (the
+        // origin library's owner), which is the same authority this fix adopts:
+        // the two never disagree, so a masked search stays masked.
+        CHECK(librarySearchNarration(revealSubjectIsMe(false, true), "Idyllic Tutor")
+              == "Opponent searched their library with Idyllic Tutor",
+              "W43-3 the search collapse still keys to the SEARCHING player");
+    }
+
+    // ---- #W43-5: a transform is an event, and it says so
+    cout << "\n[W43-5] transforms narrate as one arrow line per card\n";
+    {
+        CHECK(cardTransformNarration(true, "Brutal Cathar", "Moonrage Brute",
+                                     true, 3, 3, "first strike")
+              == "Your Brutal Cathar transformed into Moonrage Brute (now 3/3 first strike)",
+              "W43-5 the owner's specimen: name -> name, with what the swap changed");
+        CHECK(cardTransformNarration(false, "Brutal Cathar", "Moonrage Brute",
+                                     true, 3, 3, "first strike")
+              == "Opponent's Brutal Cathar transformed into Moonrage Brute"
+                 " (now 3/3 first strike)",
+              "W43-5 the observer's twin of the same transform");
+        // The flip BACK is the same mechanism read the other way round, which is
+        // why the event carries the face it LEFT rather than reading nameOrig.
+        CHECK(cardTransformNarration(true, "Moonrage Brute", "Brutal Cathar",
+                                     true, 2, 2, "vigilance")
+              == "Your Moonrage Brute transformed into Brutal Cathar (now 2/2 vigilance)",
+              "W43-5 the day-side flip back reads as its own transform");
+        // A non-creature face states no P/T (a transforming land, a Clue-side
+        // artifact): inventing 0/0 for it would be a rendered non-fact.
+        CHECK(cardTransformNarration(true, "Ancient Greenwarden", "Hidden Gardens",
+                                     false, 0, 0, "")
+              == "Your Ancient Greenwarden transformed into Hidden Gardens",
+              "W43-5 a non-creature face carries no P/T");
+        CHECK(cardTransformNarration(true, "Ancient Greenwarden", "Hidden Gardens",
+                                     false, 0, 0, "").find("(now") == string::npos,
+              "W43-5 NEGATIVE no '(now 0/0)' is invented for a noncreature");
+        CHECK(cardTransformNarration(true, "Werewolf Pack Leader", "Werewolf Pack Leader",
+                                     true, 3, 3, "trample").empty(),
+              "W43-5 NEGATIVE a swap that changed no face produces no line "
+              "(the modal-DFC path takes the zone-change branch)");
+        CHECK(cardTransformNarration(true, "", "Moonrage Brute", true, 3, 3, "").empty()
+              && cardTransformNarration(true, "Brutal Cathar", "", true, 3, 3, "").empty(),
+              "W43-5 NEGATIVE an unnamed face states nothing rather than half a line");
+        CHECK(cardTransformNarration(true, "Tovolar's Huntmaster", "Tovolar's Packleader",
+                                     true, 6, 6, "").find(" ()") == string::npos,
+              "W43-5 NEGATIVE a keywordless creature leaves no empty parenthetical stub");
+        // ECHO SHAPE: like the damage result, the parenthetical is CONTENT.
+        CHECK(stripNarrationDecoration(
+                  cardTransformNarration(true, "Brutal Cathar", "Moonrage Brute",
+                                         true, 3, 3, "first strike"))
+              == "Your Brutal Cathar transformed into Moonrage Brute (now 3/3 first strike)",
+              "W43-5 echo: the resulting face is content, never stripped as decoration");
+        // COMPOSED GOLDEN: a werewolf night flip of TWO permanents, both seats.
+        // ONE line per card, no per-fact spam, and the transform line does not
+        // duplicate any zone-change line (nothing changed zones).
+        {
+            const string kNoTrim = "(...earlier events trimmed...)";
+            string actor = "=== Turn 6 - opponent's turn ===\n";
+            string aphase = "Phase: Upkeep";
+            narrationAppend(actor, aphase, "It became night", kNoTrim);
+            narrationAppend(actor, aphase,
+                            cardTransformNarration(true, "Brutal Cathar", "Moonrage Brute",
+                                                   true, 3, 3, "first strike"), kNoTrim);
+            narrationAppend(actor, aphase,
+                            cardTransformNarration(true, "Tovolar's Huntmaster",
+                                                   "Tovolar's Packleader", true, 6, 6, ""),
+                            kNoTrim);
+            cout << actor;
+            string expectedActor =
+                "=== Turn 6 - opponent's turn ===\n"
+                "- Phase: Upkeep\n"
+                "- It became night\n"
+                "- Your Brutal Cathar transformed into Moonrage Brute (now 3/3 first strike)\n"
+                "- Your Tovolar's Huntmaster transformed into Tovolar's Packleader (now 6/6)\n";
+            CHECK(actor == expectedActor,
+                  "W43-5 a two-werewolf mass flip is exactly two lines, one per card");
+            size_t n = 0, at = 0;
+            while ((at = actor.find("transformed into", at)) != string::npos) { n++; at += 4; }
+            CHECK(n == 2, "W43-5 NEGATIVE no card's transform is stated twice");
+
+            string obs = "=== Turn 6 - YOUR turn ===\n";
+            string ophase = "Phase: Upkeep";
+            narrationAppend(obs, ophase, "It became night", kNoTrim);
+            narrationAppend(obs, ophase,
+                            cardTransformNarration(false, "Brutal Cathar", "Moonrage Brute",
+                                                   true, 3, 3, "first strike"), kNoTrim);
+            narrationAppend(obs, ophase,
+                            cardTransformNarration(false, "Tovolar's Huntmaster",
+                                                   "Tovolar's Packleader", true, 6, 6, ""),
+                            kNoTrim);
+            cout << obs;
+            string expectedObs =
+                "=== Turn 6 - YOUR turn ===\n"
+                "- Phase: Upkeep\n"
+                "- It became night\n"
+                "- Opponent's Brutal Cathar transformed into Moonrage Brute"
+                " (now 3/3 first strike)\n"
+                "- Opponent's Tovolar's Huntmaster transformed into Tovolar's Packleader"
+                " (now 6/6)\n";
+            CHECK(obs == expectedObs,
+                  "W43-5 the OBSERVER seat reads the same two transforms, mirrored");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

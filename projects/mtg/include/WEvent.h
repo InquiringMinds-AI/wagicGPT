@@ -402,8 +402,16 @@ struct WEventCardFaceUp : public WEventCardUpdate {
 };
 
 //event when card transforms
+//#W43-5: AAFlip rewrites the instance IN PLACE (name, P/T, types, text) and
+//then raises this event, so by the time anyone sees it the card can only say
+//what it became. `fromName` carries the face it LEFT - the one fact the swap
+//destroys - so a narrator can state the transform as "X transformed into Y"
+//instead of silently showing a different card. Defaulted, so the existing
+//raise sites and the MTGRules triggers that only care THAT it happened are
+//unaffected.
 struct WEventCardTransforms : public WEventCardUpdate {
-  WEventCardTransforms(MTGCardInstance * card);
+  string fromName;
+  WEventCardTransforms(MTGCardInstance * card, const string& fromName = "");
     virtual Targetable * getTarget(int target);
 };
 

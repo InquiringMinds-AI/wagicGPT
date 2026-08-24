@@ -331,8 +331,8 @@ WEventCardFaceUp::WEventCardFaceUp(MTGCardInstance * card) :
 {
 }
 
-WEventCardTransforms::WEventCardTransforms(MTGCardInstance * card) :
-    WEventCardUpdate(card)
+WEventCardTransforms::WEventCardTransforms(MTGCardInstance * card, const string& fromName) :
+    WEventCardUpdate(card), fromName(fromName)
 {
 }
 
