@@ -1293,7 +1293,67 @@ int MTGCardInstance::canBlock(MTGCardInstance * opponent)
         return 1;
     if (!opponent->isAttacker())
         return 0;
-    return canBlockPairwise(opponent);
+    if (!canBlockPairwise(opponent))
+        return 0;
+    //W43-1 (CR 509.1c), the FEASIBILITY half of the set constraint: when the
+    //defender does not own enough bodies for a legal block of this attacker to
+    //exist at all, no single creature may be assigned to it. Expressible
+    //pairwise because it does not depend on WHICH creature asks - the answer is
+    //the same for every one of them, so the incremental declaration the engine
+    //actually runs never opens with a move it would have to take back. The
+    //under-filled case where enough bodies DO exist is a property of the
+    //declaration as a whole and is enforced at declaration end instead
+    //(blockDeclarationIllegal + its three consumers).
+    if (opponent->minBlockersRequired() > 1 && !opponent->blockRequirementSatisfiable())
+        return 0;
+    return 1;
+}
+
+//W43-1: the attacker-side set-constraint predicates. See the header comment
+//for why these are not, and cannot be, pairwise gates.
+int MTGCardInstance::minBlockersRequired()
+{
+    if (basicAbilities[(int)Constants::THREEBLOCKERS])
+        return 3;
+    if (basicAbilities[(int)Constants::MENACE])
+        return 2;
+    return 1;
+}
+
+int MTGCardInstance::potentialBlockerCount()
+{
+    Player * defender = controller() ? controller()->opponent() : NULL;
+    if (!defender || !defender->game || !defender->game->inPlay)
+        return 0;
+    MTGGameZone * z = defender->game->inPlay;
+    int n = 0;
+    for (int i = 0; i < z->nb_cards; i++)
+    {
+        MTGCardInstance * c = z->cards[i];
+        //PERMISSIVE by design: a creature already assigned to another attacker
+        //still counts, because the defender may reassign it while the
+        //declaration is being built. A false "you may" costs one refused
+        //confirm; a false "you may not" silently deletes a legal block.
+        //A blockCost body is NOT excluded: it can block once the cost is paid,
+        //and under-counting here would delete a legal block outright.
+        if (!c || c->isPhased || !c->canBlock())
+            continue;
+        if (!c->canBlockPairwise(this))
+            continue;
+        n++;
+    }
+    return n;
+}
+
+bool MTGCardInstance::blockRequirementSatisfiable()
+{
+    return potentialBlockerCount() >= minBlockersRequired();
+}
+
+bool MTGCardInstance::blockDeclarationIllegal()
+{
+    const int n = (int) blockers.size();
+    return n > 0 && n < minBlockersRequired();
 }
 
 //W41-13: could this creature block that one if THAT one were attacking? The

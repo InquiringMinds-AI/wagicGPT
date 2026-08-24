@@ -1,0 +1,32 @@
+# W43-1, the "can't be blocked except by three or more" half of the same rule.
+# The defender owns TWO creatures, which is one short of a legal block of Troll
+# of Khazad-dum - so neither of them may be assigned to it at all, and both end
+# up on the attacker they can legally stop. Before the fix both were assigned to
+# the Troll, both were deleted at WEventBlockersChosen, and all 8 power connected
+# (life 12, Grizzly Bears alive, two blockers spent on nothing).
+[INIT]
+COMBATATTACKERS
+[PLAYER1]
+inplay:troll of khazad-dum,grizzly bears
+[PLAYER2]
+inplay:hill giant,wall of stone
+life:20
+[DO]
+troll of khazad-dum
+grizzly bears
+next
+hill giant
+wall of stone
+next
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:troll of khazad-dum
+graveyard:grizzly bears
+[PLAYER2]
+inplay:hill giant,wall of stone
+life:14
+[END]

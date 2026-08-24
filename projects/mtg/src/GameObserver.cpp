@@ -471,6 +471,24 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
     // Here's what I find weird - if the extra cost is something like a sacrifice, doesn't that imply a TargetChooser?
     if (WaitForExtraPayment(NULL)) 
         return;
+    //W43-1 (CR 509.1c): the declare-blockers step is not ACCEPTED while the
+    //declaration is illegal. A menace attacker blocked by exactly one creature
+    //(or a "three or more" attacker blocked by two) is not a legal set, and the
+    //engine used to accept it and then silently delete the blockers after the
+    //fact - the option was offered, the narration said it happened, and nothing
+    //ever told the player otherwise. Refusing the advance is this codebase's
+    //own idiom for an illegal act (the target-chooser and extra-payment gates
+    //directly above do exactly this); the human always has both repairs in
+    //hand, since clicking the assigned blocker removes it and clicking another
+    //creature adds the second one.
+    //HUMAN ONLY, deliberately: an AI seat that somehow still built an illegal
+    //set would spin here forever, so their declarations are made legal at the
+    //source (AIPlayerBaka's sweep, AIPlayerGPT's validator) and the rules-layer
+    //net stays behind them.
+    if (mCurrentGamePhase == MTG_PHASE_COMBATBLOCKERS && combatStep == BLOCKERS
+        && !isInterrupting && opponent() && !opponent()->isAI()
+        && LegalActionsOracle::illegalBlockDeclaration(opponent()))
+        return;
     /*if (OpenedDisplay)//dont let us fly through all the phases with grave and library box still open.
     {
         return;//I want this here, but it locks up on opponents turn, we need to come up with a clever way to close opened

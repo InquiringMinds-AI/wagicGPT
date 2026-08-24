@@ -999,6 +999,14 @@ string legibleKeywordName(const string& engineName)
         return "can't be blocked";
     if (engineName == "oneblocker")
         return "can't be blocked by more than one creature";
+    //W43-1: the two DECLARATION-SET restrictions. "threeblockers" is an engine
+    //token no card has ever printed, and "menace" names the keyword without
+    //saying what it forbids - and what it forbids is exactly the decision this
+    //surface is asked for. Same argument as oneblocker directly above.
+    if (engineName == "menace")
+        return "menace (can't be blocked except by two or more creatures)";
+    if (engineName == "threeblockers")
+        return "can't be blocked except by three or more creatures";
     if (engineName == "canblocktapped")
         return "can block even while tapped";
     //poisontoxic .. poisontentoxic -> "toxic N"
@@ -2080,6 +2088,56 @@ static string potentialBlockersTag(const vector<string>& entries, const string& 
     if (!extraNote.empty())
         o << " - " << extraNote;
     o << "]";
+    return o.str();
+}
+
+//W43-1 (wave-42 seat D1 + seat R4; CR 509.1c). Menace and "can't be blocked
+//except by three or more" are constraints on the block DECLARATION, not on any
+//one pairing, and both windows used to render as if they did not exist. The
+//defender's window offered the block, priced the 1-on-1 trade, and narrated it
+//as declared while the rules layer deleted it immediately afterwards (8/8
+//assignments dropped in the wave-42 corpus, ~24 life in one game); the
+//attacker's window computed 1-on-1 outcomes for attackers that cannot be
+//blocked 1-on-1 at all (11 semantically-wrong tags, two of them "(neither
+//dies)" on an unblockable-in-practice body).
+//RESTRICTION FIRST, no affirmative substring a reply scanner or a skimming
+//model can latch onto (the wave-29 annotation-wording rung), and the counts
+//come from the engine's own legal sets so neither tag can over-claim.
+//The DEFENDER's A-line: what a legal assignment has to look like.
+static string blockCountRequirementTag(int minBlockers)
+{
+    if (minBlockers < 2)
+        return "";
+    if (minBlockers >= 3)
+        return " [can't be blocked except by three or more - only a block by"
+               " THREE OR MORE of your creatures counts; fewer does not block"
+               " it at all]";
+    return " [menace - only a block by TWO OR MORE of your creatures counts;"
+           " one creature alone does not block it at all]";
+}
+
+//The ATTACKER's A-line: whether the defender can even field a legal block, and
+//the honest count of bodies that could join one. `eligibleUntapped` is the
+//number of their untapped creatures that could legally take part - the same
+//list the 1-on-1 forecast is built from, so the two can never disagree. Below
+//the minimum the forecast is SUPPRESSED by the caller rather than qualified:
+//a 1-on-1 result for a fight that cannot happen is not a hedged truth, it is a
+//false one.
+static string menaceAttackRestrictionTag(int minBlockers, int eligibleUntapped)
+{
+    if (minBlockers < 2)
+        return "";
+    const char * word = (minBlockers >= 3) ? "three" : "two";
+    std::ostringstream o;
+    o << " [" << (minBlockers >= 3 ? "can't be blocked except by three or more"
+                                   : "menace")
+      << " - cannot be blocked by fewer than " << word << " creatures; they have "
+      << eligibleUntapped << " untapped creature" << (eligibleUntapped == 1 ? "" : "s")
+      << " that could join such a block";
+    if (eligibleUntapped < minBlockers)
+        o << ", so it cannot be blocked at all this combat]";
+    else
+        o << ", and no one of them can block it alone]";
     return o.str();
 }
 
@@ -13018,6 +13076,7 @@ int AIPlayerGPT::chooseAttackers()
     vector<string> shownLines;
     bool anyHeldBack = false; //W41-13: at least one hold-back restriction shown
     bool anyPotentialBlockers = false; //W42-3: at least one trade forecast shown
+    bool anyMenaceRestricted = false; //W43-1: at least one set-restricted attacker
     for (size_t j = 0; j < attackers.size(); j++)
     {
         std::ostringstream ln;
@@ -13142,6 +13201,21 @@ int AIPlayerGPT::chooseAttackers()
             else if (!entries.empty() && bbKind == 2)
                 bbNote = "each outcome above OMITS its becomes-blocked trigger:"
                          " read its text";
+            //W43-1: the declaration-set restriction rides the attacker's own
+            //line, ahead of the forecast it governs, and BELOW the minimum the
+            //forecast is dropped entirely - lane B's filter applied flying
+            //legality but not menace, so a body nobody could legally block
+            //alone still carried "(neither dies)" 1-on-1 tags and was read as
+            //free damage in the wrong direction.
+            const int minB = attackers[j]->minBlockersRequired();
+            ln << menaceAttackRestrictionTag(minB, (int) entries.size());
+            if (minB > 1 && (int) entries.size() < minB)
+            {
+                anyMenaceRestricted = true;
+                entries.clear();
+            }
+            else if (minB > 1)
+                anyMenaceRestricted = true;
             string pb = potentialBlockersTag(entries, biggest, bbNote);
             if (!pb.empty())
                 anyPotentialBlockers = true;
@@ -13180,6 +13254,16 @@ int AIPlayerGPT::chooseAttackers()
                 " the computed 1-on-1 result if it does - before gang-blocks, pump"
                 " or combat tricks. They choose whether to block. Do not re-derive"
                 " these outcomes; use them.\n";
+    //W43-1 SCOPE, stated once. The listed 1-on-1 outcomes on a set-restricted
+    //attacker describe a fight that can only happen as part of a multi-creature
+    //block, so say which way the restriction cuts rather than leaving the model
+    //to reconcile two tags on the same line.
+    if (anyMenaceRestricted)
+        tail << "An attacker that cannot be blocked by fewer than two (or three)"
+                " creatures is blocked only when that many of theirs block it"
+                " TOGETHER. Any 1-on-1 result listed for it is what would happen"
+                " to that one creature inside such a group block, never on its"
+                " own.\n";
     tail << kAttackersTurnFacts;
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
@@ -13606,6 +13690,13 @@ int AIPlayerGPT::chooseBlockers()
             }
             ln << unreachableAttackerTag(canBlockCount[j], (int) blockers.size(), flyingExplains);
         }
+        //W43-1: the declaration-set restriction, on the line that decides it.
+        //A menace attacker only reaches the B-lines at all when the engine's
+        //legal sets say a legal block EXISTS (canBlock now refuses an
+        //assignment that could never be completed), so this tag never appears
+        //on a body the seat cannot block - it says what a legal answer for it
+        //has to look like.
+        ln << blockCountRequirementTag(attackers[j]->minBlockersRequired());
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
@@ -13918,6 +14009,47 @@ int AIPlayerGPT::chooseBlockers()
         act.blocks.push_back(std::make_pair(blockers[i], chosen));
         declared += (declared.empty() ? "" : "; ") + blockers[i]->name + " blocks " + chosen->name;
     }
+    //W43-1 (CR 509.1c): the SET-level legality pass. canBlock() above is
+    //pairwise and cannot see it - the first blocker of a legal menace pair is
+    //individually legal, so a reply naming only that one passed every gate and
+    //was declared, narrated, and then silently deleted by the rules layer. The
+    //assignment is under-filled or it is not made; and because it is dropped
+    //HERE it is dropped through the same accounting every other prune uses,
+    //never silently. (Under-filling is now the only way a menace block can
+    //fail: the render never offers one the seat could not complete.)
+    for (bool changed = true; changed; )
+    {
+        changed = false;
+        for (size_t a = 0; a < act.blocks.size() && !changed; a++)
+        {
+            MTGCardInstance * atk = act.blocks[a].second;
+            const int need = atk->minBlockersRequired();
+            if (need < 2)
+                continue;
+            int assigned = 0;
+            for (size_t b = 0; b < act.blocks.size(); b++)
+                if (act.blocks[b].second == atk)
+                    assigned++;
+            if (assigned >= need)
+                continue;
+            for (size_t b = act.blocks.size(); b-- > 0; )
+                if (act.blocks[b].second == atk)
+                {
+                    pruned += (pruned.empty() ? "" : "; ") + act.blocks[b].first->name
+                              + " -> " + atk->name + " (needs " + (need >= 3 ? "3" : "2")
+                              + " blockers, only " + (assigned == 1 ? "1" : "2") + " assigned)";
+                    mLastDroppedAssignments++;
+                    act.blocks.erase(act.blocks.begin() + b);
+                }
+            //`declared` is rebuilt from the surviving set below, so the
+            //narration can never claim a block this pass took back.
+            changed = true;
+        }
+    }
+    declared.clear();
+    for (size_t b = 0; b < act.blocks.size(); b++)
+        declared += (declared.empty() ? "" : "; ") + act.blocks[b].first->name
+                    + " blocks " + act.blocks[b].second->name;
     mLastPrunedPairs = pruned;
 
     //EVERY intended assignment was illegal (deck139 vs152 s21: a name-form
@@ -19684,6 +19816,95 @@ void AIPlayerGPT::runParseSelfTest()
                                        + potentialBlockersTag(one, one[0]))
               == "A1. Silverquill Silencer (3/2)",
               "W42-3 echo: the bracket never reaches the narration");
+    }
+
+    // ---- W43-1 the menace / three-or-more declaration-set tags ----
+    cout << "\n[W43-1] menace: the restriction on both A-lines, and the echo shape\n";
+    {
+        // THE DEFENDER'S A-LINE. Restriction first, and the consequence stated
+        // as a NEGATION - the wave-29 rung: no affirmative substring ("can be
+        // blocked by two") for a skimming model to latch onto.
+        string d2 = blockCountRequirementTag(2);
+        cout << "     defender, menace:" << d2 << "\n";
+        CHECK(d2 == " [menace - only a block by TWO OR MORE of your creatures counts;"
+                    " one creature alone does not block it at all]",
+              "W43-1 the defender's menace tag states the count and the consequence");
+        CHECK(blockCountRequirementTag(3)
+              == " [can't be blocked except by three or more - only a block by THREE OR MORE"
+                 " of your creatures counts; fewer does not block it at all]",
+              "W43-1 the three-or-more form is the same shape with the same restriction");
+        CHECK(blockCountRequirementTag(1).empty(),
+              "W43-1 NEGATIVE an ordinary attacker carries no count tag (no spam)");
+        CHECK(d2.find("can be blocked") == string::npos,
+              "W43-1 NEGATIVE no affirmative 'can be blocked' substring on the defender line");
+
+        // THE ATTACKER'S A-LINE. Below the minimum it says the block cannot
+        // happen at all (and the caller drops the 1-on-1 forecast entirely);
+        // at or above it, it says no single body can do the job alone.
+        string a0 = menaceAttackRestrictionTag(2, 1);
+        string a3 = menaceAttackRestrictionTag(2, 3);
+        cout << "     attacker, 1 untapped:" << a0 << "\n";
+        cout << "     attacker, 3 untapped:" << a3 << "\n";
+        CHECK(a0 == " [menace - cannot be blocked by fewer than two creatures; they have 1"
+                    " untapped creature that could join such a block, so it cannot be"
+                    " blocked at all this combat]",
+              "W43-1 below the minimum the attacker line says the block cannot happen");
+        CHECK(a3 == " [menace - cannot be blocked by fewer than two creatures; they have 3"
+                    " untapped creatures that could join such a block, and no one of them"
+                    " can block it alone]",
+              "W43-1 at or above the minimum it still forbids every 1-on-1 block");
+        CHECK(a3.find("cannot be blocked at all") == string::npos,
+              "W43-1 NEGATIVE a blockable menace attacker is never called unblockable");
+        CHECK(menaceAttackRestrictionTag(3, 2)
+                  .find("cannot be blocked by fewer than three creatures") != string::npos
+              && menaceAttackRestrictionTag(3, 2).find("cannot be blocked at all") != string::npos,
+              "W43-1 two bodies are one short of a three-or-more block, and it says so");
+        CHECK(menaceAttackRestrictionTag(1, 4).empty(),
+              "W43-1 NEGATIVE an ordinary attacker carries no restriction tag");
+        CHECK(menaceAttackRestrictionTag(2, 0).find("they have 0 untapped creatures") != string::npos,
+              "W43-1 an empty board is counted honestly, not silently omitted");
+
+        // The ENGINE keyword tokens both windows print. "threeblockers" is a
+        // token no printed card has ever carried, and bare "menace" names the
+        // keyword without saying what it forbids.
+        CHECK(legibleKeywordName("menace")
+              == "menace (can't be blocked except by two or more creatures)",
+              "W43-1 the menace keyword carries its own rule wherever it is listed");
+        CHECK(legibleKeywordName("threeblockers")
+              == "can't be blocked except by three or more creatures",
+              "W43-1 the opaque threeblockers token is translated to its Oracle wording");
+
+        // ECHO SHAPE, both windows. Both tags are brackets, and their digits
+        // ("2", "3", the untapped count) must never forge a declaration.
+        vector<string> anames;
+        anames.push_back("Alley Strangler");
+        anames.push_back("Grizzly Bears");
+        vector<bool> asel;
+        int e1 = parseAttackerSet("ATTACK: A1" + a3, 2, asel, &anames);
+        cout << "     echoed attacker tag: named=" << e1 << " A1=" << asel[0] << " A2=" << asel[1] << "\n";
+        CHECK(e1 == 1 && asel[0] && !asel[1],
+              "W43-1 echo: an echoed menace restriction still declares A1 only");
+        int e2 = parseAttackerSet("ATTACK: none" + a0, 2, asel, &anames);
+        CHECK(e2 == 0 && !asel[0] && !asel[1],
+              "W43-1 echo NEGATIVE: a decline carrying the tag stays a decline");
+        vector<string> bnames;
+        bnames.push_back("Hill Giant");
+        bnames.push_back("Wall of Stone");
+        vector<int> pick;
+        int dropped = 0;
+        bool gang = false;
+        int pairs = parseBlockAssignments("BLOCKS: B1:A1, B2:A1" + d2, 2, 2, pick,
+                                          &bnames, &anames, NULL, &dropped, &gang);
+        cout << "     echoed defender tag: pairs=" << pairs << " B1=" << pick[0]
+             << " B2=" << pick[1] << "\n";
+        CHECK(pairs == 2 && pick[0] == 1 && pick[1] == 1 && !gang,
+              "W43-1 echo: an echoed count tag leaves the two-creature block intact");
+        CHECK(stripNarrationDecoration("A1. Alley Strangler (2/3)" + d2)
+              == "A1. Alley Strangler (2/3)",
+              "W43-1 echo: neither bracket reaches the narration");
+        CHECK(stripNarrationDecoration("A1. Alley Strangler (2/3)" + a3)
+              == "A1. Alley Strangler (2/3)",
+              "W43-1 echo: the attacker-seat bracket does not reach the narration either");
     }
 
     cout << "\n[W42-D2/D3] one activation, one line per seat, always named\n";

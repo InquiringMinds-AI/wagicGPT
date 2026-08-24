@@ -66,6 +66,14 @@ jodahs_avenger.txt
 wall_of_diffusion2.txt
 lexicon/basic_menace_one_blocker.txt
 lexicon/basic_menace_two_blockers.txt
+#W43-1: menace / three-or-more are DECLARATION-SET constraints (CR 509.1c) -
+#an assignment that could never be completed is refused BEFORE it is declared,
+#not deleted afterwards. The two "takes_legal_attacker" fixtures discriminate:
+#pre-fix the lone blocker was spent on the unblockable body and every attacker
+#connected.
+lexicon/menace_lone_blocker_takes_legal_attacker.txt
+lexicon/threeblockers_two_blockers_take_legal_attacker.txt
+lexicon/threeblockers_three_blockers_block.txt
 lexicon/basic_intimidate_colored_blocker.txt
 lexicon/basic_intimidate_artifact_blocker.txt
 lexicon/basic_horsemanship_ordinary_blocker.txt

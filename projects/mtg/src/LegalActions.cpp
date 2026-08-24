@@ -467,6 +467,26 @@ bool LegalActionsOracle::hasLegalBlock(Player * defender)
     return false;
 }
 
+MTGCardInstance * LegalActionsOracle::illegalBlockDeclaration(Player * defender)
+{
+    if (!defender)
+        return NULL;
+    GameObserver * g = defender->getObserver();
+    if (!g)
+        return NULL;
+    Player * attackerP = g->currentPlayer;
+    if (!attackerP || attackerP == defender || !attackerP->game || !attackerP->game->inPlay)
+        return NULL;
+    MTGGameZone * z = attackerP->game->inPlay;
+    for (int i = 0; i < z->nb_cards; i++)
+    {
+        MTGCardInstance * c = z->cards[i];
+        if (c && c->isAttacker() && c->blockDeclarationIllegal())
+            return c;
+    }
+    return NULL;
+}
+
 bool LegalActionsOracle::canDeclareBlocker(MTGCardInstance * card)
 {
     //Mirrors MTGBlockRule::isReactingToClick (the click gate) plus the
