@@ -1160,3 +1160,7 @@ condemn/condemn_defender.txt
 condemn/condemn_defender_pumped.txt
 condemn/condemn_defender_realgame.txt
 condemn/condemn_after_regent_exiled.txt
+#wave-43 #W43-6: a cast committed through the alternative-cost menu must
+#reach its X announcement - the arming gap used to advance the phase, empty
+#the pool, and drop the cast with no event and no record.
+ai_x_alt_menu_cast_wave43.txt
