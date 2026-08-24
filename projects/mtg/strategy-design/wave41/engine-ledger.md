@@ -91,3 +91,25 @@ NEW ITEMS from step-1 (wave-43 docket seeds):
 - Suite instrument warning (lane F): a truncated-but-exit-0 suite run reports 0 failures
   and LOOKS GREEN — always compare the COUNT, not just failures.
 - Method: WAGIC_FASTCLOCK=0.1 on suite runs ~10x faster (SDL_WaitEventTimeout throttle).
+
+## OWNER LIVE REPORTS (2026-08-24, fixed same day, merged at ee63779b5, gate 1093/0+33/0, PARSETEST 944/0)
+Three narration reports, one lane, all mechanism-level:
+1. Rules text in historic log ("Seachrome Coast enters tapped unless..." — his words:
+   "doesn't need to be in historic log"): describeTarget's decision-surface card-text
+   tail was reused verbatim by the narration seams. Fixed with a decisionSurface render
+   gate — option lines/board render keep full text, the log states only the event.
+   Wave-41 corpus exposure: 2,036 lines.
+2. Damage double-entry ("- Opponent lost 1 life (now 34)" + "- Dwarven Blastminer dealt
+   1 damage..." — "may be confusing... unnecessarily verbose"): Damage::resolve raises
+   WEventLife + WEventDamage for the same delta. Fixed with WEventLife::fromDamage set
+   at that ONE raise site; damage renders as one attributed line with the result
+   ("dealt 1 damage to the opponent (now 34)"); non-damage life changes (payments,
+   drains, lifelink gains) keep their own lines; hold-and-flush so nothing drops.
+   Corpus exposure: 503 adjacent pairs. Toxicity branch raises no life event (pre-
+   existing, untouched).
+3. 'Mountain - "R"' in target narration ("- \"R\" not needed"): SAME emitter as (1) —
+   Mountain's primitive text= is literally "R", so the card-text tail rendered as a
+   mana hint. Covered by the same gate; bare names in narration, verified vs the
+   wave-41 #23 Swamp specimen shape.
+Predictions for the next corpus in the lane report (zero quoted narration tails; zero
+adjacent pairs; 100% damage lines carry (now N) except toxic/prevented).
