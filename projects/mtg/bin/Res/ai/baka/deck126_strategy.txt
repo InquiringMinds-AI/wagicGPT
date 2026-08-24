@@ -66,9 +66,10 @@ The engine also lists it when the opponent has no creature at all; with an empty
 take a different option.
 
 === RULE #5 - BLOCKING IS HOW THIS DECK DEALS DAMAGE ===
-The combat prompt's general hint says "block only where the trade favors you". Your strategy guide
-overrides that hint, and the prompt says so itself. Ignore it here. Your walls have 0 power, so no
-block of yours ever wins a trade - blocks are how you gain life, and life is how you win.
+The combat prompt prints a general hint about trades and about taking damage while ahead on
+life. It also says your strategy guide overrides it. THIS SECTION IS THAT OVERRIDE: run the
+rules below and nothing the hint says. Your walls have 0 power, so no block of yours ever wins
+a trade - blocks are how you gain life, and life is how you win.
 Assign EVERY blocker the list offers you, in every combat:
  - Give each attacker one blocker first, then put the leftovers on the biggest attacker. Several of
    your blockers may gang up on one attacker; each triggers its own life gain.
@@ -77,6 +78,13 @@ Assign EVERY blocker the list offers you, in every combat:
  - Pride Guardian gains you 3 life whenever it blocks.
  - The life arrives when blockers are DECLARED, before damage. A wall that dies in combat has
    already gained you the life.
+Which attacker each blocker takes: your blocker's line lists several attackers with a
+parenthesis each. Pick, for that blocker, an attacker whose parenthesis says your blocker
+LIVES ("neither dies" or "you kill it") ahead of one that says it dies. The life gain is
+identical either way - a wall that survives gains it again next combat, and a wall that
+dies gains it once. Two surviving lines are equal; take either. Only when every attacker
+offered to that blocker kills it do you put it on the biggest attacker. An attacker tagged
+[deathtouch] kills your wall whatever its toughness; its line will already say so.
 The one blocker you leave out: neither enchantment is on your battlefield AND that blocker's line
 reads "your blocker dies, attacker lives" on EVERY attacker it is offered. A line reading "both
 die" is not that line - take it; a body of theirs for a body of yours is a trade you want, and a
@@ -104,6 +112,12 @@ Take the highest entry on this list that appears in your casting menu:
     Savannahs and Urborg already make black; when {b} is on that line the Lantern does nothing for
     3 mana. A SECOND Lantern does nothing at any time - once one is on your battlefield this entry
     is finished for the rest of the game, so take a wall or a combo piece instead.
+7a. If BOTH enchantments are already on your battlefield, STAFF OF NIN and SORIN move to the
+    TOP of this list, above walls and above everything else. With both out the game ends the
+    moment any life changes, and Staff's ping and Sorin's lifelink Vampires are the only two
+    triggers you can make without help from the opponent - blocks need them to attack, Tribute
+    to Hunger needs them to have a creature. Against an opponent whose battlefield line shows
+    no creature, those two are your ONLY win.
 Keep casting while the list keeps offering. "Cast nothing right now" is correct only when it is the
 ONLY option left.
 

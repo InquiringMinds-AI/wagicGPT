@@ -41,6 +41,11 @@ Look at YOUR battlefield line and count the names Underworld Dreams, Fate Unrave
   Fruition all wait for the punisher.
 The thought "drawing more cards is the priority, I need to find my win condition" is ALWAYS FALSE
 for this deck - a card you hand the opponent with no punisher out is a card that kills you.
+ONE exception to the brake, and only this one: MASTER OF THE FEAST is a 5/5 flying body as
+well as a gift. With NO punisher out, cast it anyway when you control no creature that can
+block and your printed life is below 20. A 5/5 blocker buys more turns than the one card it
+hands over costs you. Everything else - Dictate, Puzzle Box, Forced Fruition, extra Mines -
+still waits behind the brake.
 
 === RULE 3 - THE WALLS. PUT THEM DOWN THE TURN THEY APPEAR ===
 Shield Sphere and Fog Bank are your entire defence - this deck has no removal except Ob Nixilis's
@@ -66,25 +71,27 @@ options top to bottom and take the FIRST line that matches:
 Then take the ask again if the game offers it - you can cast more than one spell in a turn.
 
 === RULE 4 - BLOCKING. YOUR WALLS BLOCK; THAT IS WHAT THEY ARE FOR ===
-The general blockers hint says "block only where the trade favors you; taking damage while ahead on
-LIFE is often correct". It also says your strategy guide overrides it. THIS SECTION OVERRIDES IT.
-A block by Shield Sphere or Fog Bank STOPS that attacker's damage completely - none of it reaches
-your life total. Whether your wall survives is printed in that block's own parenthesis - read it
-there. Two blockers on two attackers stop BOTH attackers; blocking
-never increases the damage you take.
-Run this over the offered block lines, every combat:
+The combat prompt prints a general hint about trades and about taking damage while ahead on
+life. It also says your strategy guide overrides it. THIS SECTION IS THAT OVERRIDE: run the
+numbered rules below and nothing the hint says.
+Every blocker line tells you what its block does: a "STOPS all ..." clause naming the damage
+that block erases, and a parenthesis naming who dies. Both are true. Read both and act on them.
+Run this over the offered block lines, every combat, in this order:
 1. A line ending "(you kill it, your blocker lives)" - take that block. Free kill, every time.
-2. A line ending "(neither dies)" - take that block. Your wall survives and the damage is gone.
-   The wall line's "STOPS all ..." clause is the whole job - it names the damage the block erases.
-   Assign one wall per attacker, biggest attacker first.
-3. A line ending "your blocker dies, attacker lives" - take it only when the header says the attack
-   IS lethal, or your life is 8 or less.
-"BLOCKS: none" is correct only when every wall you control is already assigned or the only offered
-blocks are option 3 above at a healthy life total.
-The thought "blocking with a defender doesn't prevent damage to me" is ALWAYS FALSE - the block is
-exactly what stops the damage.
-Fate Unraveler (3/4) and Master of the Feast (5/5) block well - use them when a line says "you kill
-it, your blocker lives" and Fate Unraveler is not needed untapped for a lethal swing.
+2. A line ending "(neither dies)" - take that block. Assign one wall per attacker, and when
+   several walls are free, gang the leftovers onto the biggest attacker.
+3. When ONE blocker is offered several attackers, prefer an attacker whose parenthesis lets
+   your blocker LIVE over one that kills it, even when the dying line stops a bigger number -
+   a wall that survives erases damage again next combat. Take a dying line instead only when
+   leaving that attacker unblocked would put your printed life at 8 or below; then block the
+   biggest "STOPS all" number you are offered.
+4. A line ending "your blocker dies, attacker lives" - take it when the header says the attack
+   IS lethal, when your life is 8 or less, or when it is the only line that blocker has.
+5. A wall you leave home erases nothing and is being saved for no one. "BLOCKS: none" is right
+   only when every blocker you control is already assigned, or every line offered is rule 4 at
+   a healthy life total.
+Fate Unraveler (3/4) and Master of the Feast (5/5) block well - use them on a "you kill it,
+your blocker lives" line when they are not needed untapped for a lethal swing.
 
 === HOW THE KILL ACTUALLY HAPPENS ===
 1. Punisher on the battlefield.

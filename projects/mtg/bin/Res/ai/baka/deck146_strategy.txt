@@ -5,7 +5,17 @@ against aggro (deploy blockers early, spend removal ON CURVE to survive, then ta
 opponent: if they are faster than you, your job is to trade and survive to the mid-game where your
 card quality wins. Do NOT sit on removal - a Vanishing Verse in hand while you die does nothing.
 
-MULLIGAN - READ THIS FIRST, IT IS THE MOST COMMON WAY THIS DECK LOSES.
+MULLIGAN - RUN THE FLOOR FIRST, BEFORE YOU LOOK AT THE CARDS.
+STEP 1. Read the ask's price line for the "(keeping N)" number. If it says (keeping 5) or ANY
+  lower number: KEEP, if the hand holds at least one land. The bar is ONE LAND and nothing
+  else - not a color, not a curve, not a spell you can cast. A 5-card hand with a land beats a
+  4-card hand every time, and there is no hand at 4 or fewer you can win from. If the floor
+  applies, you are DONE - do not read another rule in this section.
+STEP 2. Only at (keeping 6) or on your untouched opening 7 may you mulligan at all, and ONLY
+  for one of these three: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
+  your colors when the header shows every spell needs it. THIS LIST IS COMPLETE. A one-land
+  hand is NOT on it and is a KEEP. The "KEEP a 7 or a 6 with 2-5 lands" line below describes
+  hands that are obviously fine - it is NOT a test, and a hand failing it is not a mulligan.
 - THE ENGINE COUNTS YOUR HAND FOR YOU. Every mulligan ask opens with lines like "Your hand (7
   cards), counted by the engine: 3 lands, 4 spells", "Mana sources among those lands, counted by
   the engine: {W} 2, {B} 2", "Cheapest spell in this hand: Vanishing Verse {b}{w} (mana value 2)"
@@ -15,28 +25,21 @@ MULLIGAN - READ THIS FIRST, IT IS THE MOST COMMON WAY THIS DECK LOSES.
 - WHERE YOU ARE IN THE MULLIGAN IS THE "(keeping N)" NUMBER, NOTHING ELSE. Every mulligan hand
   you are shown is a fresh 7 cards, so never judge "I am still at 7" from the cards in front of
   you: read the ask's price line ("having already taken 2 mulligans you will bottom 2 cards on a
-  keep (keeping 5)") and let that N decide which rule below applies.
-- HARD FLOOR - NEVER GO BELOW 5 CARDS. When the ask says "(keeping 5)" or any lower number, KEEP
-  ANY HAND THAT CONTAINS AT LEAST ONE LAND. The bar is ONE LAND, nothing else, and it OVERRIDES
-  every other rule in this section - including the true-mulligans list below: at "(keeping 5)" a
-  one-land hand with no source of one of your colors is still a KEEP. A 5-card hand with a land
-  beats a 4-card hand every time, and a 3-, 2-, 1- or 0-card hand is an automatic loss - you
-  cannot win from there no matter what you draw.
+  keep (keeping 5)") and let that N decide which STEP above applies.
 - WHEN YOU KEEP AFTER MULLIGANS, THE GAME THEN ASKS WHICH CARDS TO PUT ON THE BOTTOM. The keep
   you just made was priced on the engine's land count - do not undo it at this ask. NEVER bottom
   a land (Hive of the Eye Tyrant IS a land - bottoming a Hive is bottoming a Swamp) unless the
-  hand you keep would still hold at least 4 lands. Bottom your most EXPENSIVE spells first:
-  Emeria's Call, Agadeem's Awakening, a second copy of a planeswalker, then the priciest spell
-  left. A kept hand of one land plus uncastable spells is a loss you chose at this ask.
+  hand you keep would still hold at least 4 lands - AND NEVER bottom your way to a hand with
+  zero spells. Keep AT LEAST ONE castable spell, always: a 4-card hand of four lands does
+  nothing at all and is worse than any hand with a two-drop in it. Bottom your most EXPENSIVE
+  spells first: Emeria's Call, Agadeem's Awakening, a second copy of a planeswalker, then the
+  priciest spell left - but the LAST cheap spell stays. A kept hand of one land plus uncastable
+  spells is a loss you chose at this ask.
 - KEEP a 7 or a 6 with 2-5 lands including a white source and a black source. Shineshadow Snarl
   alone counts as BOTH colors. Brightclimb Pathway is your white source, Hive and Swamp are black.
 - "Prefer a hand with an early play" is a TIEBREAKER between two keepable hands, NOT a requirement.
   A 5-land hand with two Lolths is a KEEP - you will draw spells. Never mulligan a hand for having
   too many lands or for lacking a one-drop.
-- Only these are true mulligans, and ONLY while the ask says "(keeping 6)" or you are on your
-  untouched opening 7: 0 lands; all-land (6-7); or a hand with NO source of one of your colors
-  when the header shows every spell needs it. At "(keeping 5)" or lower this list is DEAD - only
-  the one-land floor above applies.
 - EMERIA'S CALL AND AGADEEM'S AWAKENING ARE NOT LANDS FOR YOU. They are printed with a land on the
   back, but the game NEVER offers you their land face - it has not appeared on a single land-drop
   menu. Count them as SPELLS ONLY: a hand with two lands and an Emeria's Call is a TWO-land hand.
@@ -121,8 +124,19 @@ creature, ask what happens on the crack-back with that creature unavailable.
   tapped through that next-turn swing and blocks nothing. "I will draw removal next turn" is not
   a survival plan; the blockers are. At low life, chip damage is worth nothing and a body that
   survives to block is worth the game.
+  THE HOLE THIS RULE EXISTS TO PLUG: "it is my only attacker, so it is my only clock." That
+  is exactly when the gate matters most. A creature that attacks is TAPPED through the swing
+  that kills you; three points of chip damage does not beat being alive. When the gate fails
+  and the list offers ONE attacker, the answer is ATTACK: none - no exception but lethal.
+  AND: if the plan you were just shown says holding is right, your ATTACK: line must agree
+  with it. A reply whose answer contradicts its own plan is wrong on the answer, not the plan.
+- Do not attack a creature into a blocker with MORE TOUGHNESS than your power (a 3/2 into an
+  untapped 0/4 wall): you deal no damage, kill nothing, and tap your blocker for their turn.
+  Send that creature only when the defender has no untapped body that outlasts it.
 BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
 this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ 0. "(neither dies)" - TAKE THAT BLOCK. Nothing of yours dies, nothing of theirs dies, and
+    the damage is gone. It is strictly free; no number on this screen can make it wrong.
  1. "(you kill it, your blocker lives)" - TAKE THAT BLOCK, always, at every life total and every
     forecast number. It costs you nothing: their creature dies, yours does not, and the damage is
     gone. No number on this screen can make this block wrong.
@@ -132,6 +146,10 @@ this ladder, top down. The parenthesis is the answer; do not re-derive the comba
     forecast number decides. Read "you would be at N". Take this block when N is 10 or less,
     or when the header says the attack IS lethal. When N is above 10, leave that attacker
     unblocked and keep your creature.
+    ONE EXCEPTION, and the parenthesis itself tells you: when it ends "...N tramples to your
+    face", the block does NOT stop the damage - N still hits you. On a trampler, a chump block
+    buys only (attacker's power minus N) life. Do that ONLY when the header says the attack IS
+    lethal. Never spend two blockers on one trampler: the second one buys almost nothing.
 ONE BLOCKER STOPS ALL OF A NON-TRAMPLING ATTACKER'S DAMAGE, however big the attacker is. Blocking
 CHANGES the forecast number: each non-trampler you block deals you ZERO. "I take the damage either
 way" is FALSE against a non-trampler, and so is "I will preserve this creature for future blocks"
@@ -179,7 +197,8 @@ Triumphant Adventurer (on attack), Nadaar (on enter AND attack), Acererak (on en
 - ROOM BRANCHES: the venture asks you to pick between two rooms and SHOWS each one's effect (e.g.
   "goblin lair {room effect: Create a 1/1 red Goblin creature token}", "dark pool {room effect:
   each opponent loses 1 life and you gain 1}"). DECIDE ON THE EFFECT TEXT ALONE. Take the room
-  that MAKES A BODY (Goblin Lair) or DAMAGES the opponent (Dark Pool) over one that only scries.
+  that MAKES A BODY (Goblin Lair) or DAMAGES the opponent (Dark Pool) over one that only makes
+  a Treasure, only puts a +1/+1 counter on a creature, or only scries.
   You do not need to know which room number you are on or how many rooms are left to make this
   choice correctly - do not try to work it out, and do not question the two names you are shown:
   pick the better of the two effects in front of you and move on.
@@ -243,7 +262,8 @@ DECIDING SITUATIONS (recognize -> do):
 - The three-dungeon list is offered (first venture OR after completing one) -> answer LOST MINE OF
   PHANDELVER by name, unless you are ahead and racing.
 - A room branch is offered -> read the {room effect} text; take the room that makes a body or
-  drains the opponent over a scry, and do not try to work out which room number you are on.
+  drains the opponent over one that only makes a Treasure, adds a counter, or scries, and do
+  not try to work out which room number you are on.
 - You need combat math -> read the (P/T) already printed on each creature; do not rebuild it.
 - Triumphant Adventurer is castable and you are under pressure -> cast it; the deathtouch 1/1
   blocks or trades with anything.

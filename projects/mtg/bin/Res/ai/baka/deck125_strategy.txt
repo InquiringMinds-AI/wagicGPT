@@ -19,6 +19,10 @@ were given, replace the plan with the line above.
 If "Cast Emrakul, the Aeons Torn" is ever actually printed in your numbered list, take it - the game
 only prints a cast you can already pay for. Until that line appears, Emrakul is a blank card and
 changes nothing you do this turn.
+This line outranks the heading above it. "Emrakul is not your plan" describes what you do while
+Emrakul is uncastable; the moment "Cast Emrakul, the Aeons Torn" is printed in your numbered list
+it IS castable, so you take it - including on a turn when the opponent is nearly dead and your
+Staff would finish them anyway, because Emrakul finishes them sooner.
 Once an Emrakul of yours IS on the battlefield, the two sentences above about having no creature
 stop applying to it: declare it as an attacker in every attackers window that offers it, and
 assign it as a blocker whenever the block line does not read "your blocker dies". Nothing else in
@@ -58,6 +62,10 @@ P/T, and this list is short on purpose:
   - every permanent that hits you or grows them EVERY turn: Underworld Dreams, Fate Unraveler,
     Sanguine Bond, Exquisite Blood, Howling Mine, Staff of Nin, Nuisance Engine;
   - Idyllic Tutor: it is not a permanent, but it fetches the enchantment half of their combo.
+  - anything whose text makes a player DRAW extra cards, whatever its printed type: Howling Mine,
+    Teferi's Puzzle Box, Dictate of Kruphix, Forced Fruition. This one outranks the "(artifact)
+    with no P/T: let it resolve" line above. Extra cards cost you life whenever they have
+    Underworld Dreams or Fate Unraveler out, and cost you library either way.
 
 === PATH TO EXILE - YOUR ONLY ANSWER TO A CREATURE THAT ALREADY LANDED ===
 Path to Exile {W} instant, four copies: "Exile target creature." These are the ONLY cards in your
@@ -70,7 +78,9 @@ Then: cast Path to Exile at the creature with the HIGHEST printed power. If EVER
 clause reads printed power 0 or 1 on the battlefield line, or is tagged [defender], answer "Cast
 nothing right now" and keep the Path - at any life total above 12, whatever else is on the board
 and however many turns you have been holding it. A 0/4 wall is never a Path target.
-Your life is 12 or less: that floor is off - exile the biggest creature they have right now.
+Your life is 12 or less: that floor is off for creatures that can attack - exile the one with
+the highest printed power. A creature tagged [defender] still never gets the Path, at any life
+total: it cannot attack, so it is not what is killing you.
 Path lets its controller fetch a basic land. That cost is the point of the card; always pay it.
 
 === SWEEPERS - THE HEADER COUNTS THE CREATURES FOR YOU ===
@@ -86,7 +96,9 @@ creatures)". Read that number and act on it:
   printed power is 4 or more, otherwise answer "Cast nothing right now" and keep it.
 - 3 or more creatures, and Lightmine Field is in your list: cast Lightmine Field. At 0, 1 or 2
   creatures on that header it kills nothing at any size, so keep it and spend the mana on a Path
-  or a sweeper instead.
+  or a sweeper instead - unless it is your second main phase, nothing else in your list is worth
+  casting, and your "Mana available:" line still reads 4 or more: then cast it anyway, so it is
+  already there when the crowd arrives.
 - 0 creatures: answer "Cast nothing right now" and keep the sweeper. A wipe with nothing to kill is a
   card you have thrown away.
 
@@ -145,9 +157,6 @@ Tiebreakers between keepable hands only, never a reason to mulligan on their own
 with a land that makes both colours (Tundra, Glacial Fortress, Seachrome Coast), and prefer the hand
 with at least one counterspell. Colour is only a tiebreaker: 18 of your lands make {W} and 20 make
 {U}, so a one-colour opener still casts spells.
-If the mulligan question ever contains the words "having already taken", this is your LAST look:
-answer 1, Keep this hand. The thought "I will keep whatever I draw next" is how you end up with a
-4-card hand - keep THIS one instead.
 When a keep makes you bottom cards, bottom Emrakul first, then your lands beyond the fifth.
 
 === DECIDING SITUATIONS ===

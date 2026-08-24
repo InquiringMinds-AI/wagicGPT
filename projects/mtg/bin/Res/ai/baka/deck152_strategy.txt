@@ -33,28 +33,20 @@ Declare "no attackers" ONLY when every attacker would either die for nothing or 
 nothing at all (a 1/1 walking into an untapped 0/3 wall is the second case). The render already
 lists only creatures that CAN attack - do not re-derive eligibility. Your wins are escalating
 swings: one body, then two, then the whole team. Keep swinging.
-- BEFORE YOU WRITE "ATTACK:", RUN THE RETURN-SWING CHECK - every attackers decision, first.
-  Arming test, read straight off the prompt, in this order:
-    (1) YOUR LIFE is at or below the POWER of their biggest creature (the first number on its
-        battlefield line). A creature whose line shows +1/+1 counters is GROWING (the Orc army
-        class): count it at its power PLUS ONE, because it will be bigger by the time it swings
-        back.
-    (2) ONLY IF (1) ARMED: count the attackers the list offers you. When (1) armed and the list
-        offers exactly ONE attacker, your answer is "ATTACK: none" - that one creature is your
-        blocker. The thought "it is free damage" is ALWAYS FALSE here: that damage costs you the
-        block.
-        IF (1) DID NOT ARM, this whole check is over and you skip step (2) entirely: attack with
-        every creature the list offers, including a sole attacker, per rule #2 above. A creature
-        that kills its blocker and survives always attacks; holding it back at a healthy life
-        total is a turn of damage thrown away.
-  Their creatures being tapped this turn does NOT protect you - they untap and swing back next
-  turn, a creature you sent attacking cannot block, and a line reading "[tapped - cannot attack
-  or block this turn]" says nothing about next turn. When the check arms and the list offers TWO
-  OR MORE attackers, keep your biggest ground creature HOME as a blocker and attack with the
-  rest. EXCEPTION: if the attack you can send RIGHT NOW is lethal
-  (unblockable damage at or above their life), send everyone - a dead opponent never swings
-  back. When your life is above that number, this check changes nothing: attack per the rules
-  above.
+- BEFORE YOU WRITE "ATTACK:", RUN THE HOLD-BACK GATE - every attackers decision,
+  first, and it is a NUMBER, not a feeling. Add up the current power (the first
+  number in each "(P/T)") of every opposing creature that is not marked
+  [defender] or "can't attack" - INCLUDING every one marked "[tapped - cannot
+  attack or block this turn]", because that marker is about THIS turn and they
+  all untap for theirs. Call that THEIR TOTAL POWER.
+  If THEIR TOTAL POWER is BELOW your life total, the gate passes and this check
+  is over: attack with every creature the list offers, including a sole
+  attacker. A creature that kills its blocker and survives always attacks.
+  If THEIR TOTAL POWER is your life total or MORE, keep your biggest ground
+  creature HOME as a blocker and attack with the rest; if the list offers only
+  ONE attacker, answer "ATTACK: none" - that one creature is your blocker.
+  EXCEPTION, both directions: if the attack you can send RIGHT NOW is lethal
+  (unblockable damage at or above their life), send everyone.
 
 #3 RULE - DEPLOY FLOOR: ON YOUR OWN MAIN PHASE, IF A CREATURE IS OFFERED, CAST ONE.
 "Cast nothing right now" on YOUR main phase is correct in exactly TWO situations:
@@ -97,6 +89,8 @@ error" is ALWAYS FALSE - it is never an error.
   Take the 1 damage every time.
 BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
 this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ 0. "(neither dies)" - TAKE THAT BLOCK. Nothing of yours dies, nothing of theirs dies, and
+    the damage is gone. It is strictly free; no number on this screen can make it wrong.
  1. "(you kill it, your blocker lives)" - TAKE THAT BLOCK, always, at every life total and every
     forecast number. It costs you nothing: their creature dies, yours does not, and the damage is
     gone. No number on this screen can make this block wrong.
@@ -106,6 +100,10 @@ this ladder, top down. The parenthesis is the answer; do not re-derive the comba
     forecast number decides. Read "you would be at N". Take this block when N is 9 or less,
     or when the header says the attack IS lethal. When N is above 9, leave that attacker
     unblocked and keep your creature.
+    ONE EXCEPTION, and the parenthesis itself tells you: when it ends "...N tramples to your
+    face", the block does NOT stop the damage - N still hits you. On a trampler, a chump block
+    buys only (attacker's power minus N) life. Do that ONLY when the header says the attack IS
+    lethal. Never spend two blockers on one trampler: the second one buys almost nothing.
 ONE BLOCKER STOPS ALL OF A NON-TRAMPLING ATTACKER'S DAMAGE, however big the attacker is. Blocking
 CHANGES the forecast number: each non-trampler you block deals you ZERO. "I take the damage either
 way" is FALSE against a non-trampler, and so is "I will preserve this creature for future blocks"
@@ -131,7 +129,9 @@ YOUR LORDS AND GROWTH:
   one mana of their own color - Katilda is herself a Human, so once she is out she is an extra
   mana source and shows up in your "Mana available" total. Her {4}{G}{W},{T} puts a +1/+1
   counter on EACH of your creatures - worth a whole turn's mana only at three-plus creatures.
-- LUMINARCH ASPIRANT ({1}{W}, 1/1): free +1/+1 counter each of your combats. Keep it alive.
+- LUMINARCH ASPIRANT ({1}{W}, 1/1): free +1/+1 counter each of your combats. Keep it alive -
+  but "keep it alive" is about not ATTACKING it into death, never about declining a block the
+  ladder tells you to take. On the block ladder the ladder wins.
 - RANGER CLASS ({1}{G}): cast it for the 2/2 Wolf immediately. Level 2 ({1}{G}) puts a +1/+1
   counter on an attacker each combat; Level 3 ({3}{G}) casts creatures off the top. Level with
   SPARE mana only - never instead of casting a creature.

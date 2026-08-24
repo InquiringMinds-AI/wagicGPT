@@ -11,9 +11,15 @@ These are the three lines, exactly as you will see them:
   "Create human with Thraben Doomsayer [cost: Tap]"
   "Create vampire with Bloodline Keeper [cost: Tap]"
   "Create vampire with Lord of Lineage [cost: Tap]"
-Take it. Then take it again the next time it appears, and again, until either the line stops
-being offered or the option line's own "[repeat: ... you control M creatures]" note shows 12
-or more creatures - then answer 0 (pass).
+Take it. Then take it again the next time it appears, and again, until you control 12 or more
+creatures - then answer 0 (pass).
+Read your creature count in this order and use the FIRST one that is on the screen:
+  1. the option line's own note, "[repeat: ... you control M creatures]" - M is your count.
+  2. no such note on the line? Then read your battlefield line: "Your battlefield (K
+     permanents listed, of which M are creatures)" - that M is your count, always printed,
+     every window.
+The note is only printed from the third activation of a card onward, so the first two
+activations of every card, every turn, have no note - the battlefield line is your count there.
 "[cost: Tap]" is the WHOLE cost. It needs no mana, no land drop, and no untapped land, and it
 works on the opponent's turn as well as your own.
 The thought "I have 0 mana, so I can't do anything" is ALWAYS FALSE while one of those lines is
@@ -23,6 +29,17 @@ the game only prints an ability you can use right now. That is Intruder Alarm wo
 token you just made untapped the maker again. When the line comes back, take it again.
 Take it on the opponent's turn too - a token made there blocks this turn and attacks next turn.
 Each token is a free body. There is no cost to weigh.
+One exception to "there is no cost": do not fire the whole chain in your own Main phase 2,
+after combat has already happened. Tokens made there cannot block until the opponent's turn and
+cannot attack until the turn after that - a board wipe in between costs you every one of them
+for zero damage. Fire the chain at the FIRST window of the turn you get it.
+A token you make this turn CANNOT ATTACK this turn. Its battlefield line says so:
+"[summoning sick - cannot attack this turn, but CAN block]". It can block right away, and it
+attacks on your NEXT turn.
+So when you plan, count only the creatures whose lines do NOT say "summoning sick". A plan that
+says "attack with all 12 for lethal" is wrong on the turn you made those 12 - the attack list
+will offer you one creature. Make the tokens anyway; they block this turn and they swing next
+turn.
 
 === RULE 2 - MARSH FLATS TAKES A DUAL, NOT A BASIC ===
 When lines beginning "Put in Play with Marsh Flats targeting" appear, answer in this order and
@@ -68,6 +85,13 @@ good one - take Tragic Slip, Damnation or a token activation instead.
 gains the life. Naming "The opponent (player, life" gives them the life, so use Devour Flesh
 on the opponent when Tribute to Hunger is not on the list and they have exactly ONE creature -
 then the sacrifice takes their only body and the life they gain is worth it.
+Do not spend an edict on a creature that is not hurting you. If their only creature is a
+defender, or has power 0 or 1, or its line says it cannot attack, keep the edict and take
+another action - you paid a card and handed them life equal to its toughness to remove
+something that was never going to kill you.
+Both edicts give life to the player who sacrifices. If the OPPONENT'S deck list contains a card
+that rewards them for gaining life, "Cast nothing right now" beats either edict at the
+opponent.
 Both cards let the SACRIFICING player pick, so against two or more creatures they hand over
 their worst one and keep the good one. With two or more of their creatures on the board, take
 Tragic Slip, Damnation or a token activation instead.
@@ -90,15 +114,18 @@ means that creature can no longer be targeted by anything - including your own s
 
 === WHAT TO CAST WHEN SEVERAL THINGS ARE LISTED ===
 Take the highest entry on this list that appears in your casting menu:
- 1. "Cast Intruder Alarm {2}{u}" - when no Intruder Alarm is on your battlefield.
- 2. "Cast Bloodline Keeper {2}{b}{b}".
- 3. "Cast Thraben Doomsayer {1}{w}{w}".
+ 1. "Cast Bloodline Keeper {2}{b}{b}" - when no token-maker is on your battlefield.
+ 2. "Cast Thraben Doomsayer {1}{w}{w}" - when no token-maker is on your battlefield.
+ 3. "Cast Intruder Alarm {2}{u}" - when no Intruder Alarm is on your battlefield.
+    Intruder Alarm on an empty battlefield does NOTHING. A token-maker with no Alarm still
+    makes one token a turn. The maker goes first, every time.
  4. "Cast Idyllic Tutor {2}{w}" - when no Intruder Alarm is on your battlefield or in your hand.
  5. A removal spell, by Rules 3, 4 and 5.
  6. "Cast Vision Skeins {1}{u}".
 
 === INTRUDER ALARM AND IDYLLIC TUTOR ===
-"Cast Intruder Alarm {2}{u}": it is the engine, and it is entry 1 on the cast list above.
+"Cast Intruder Alarm {2}{u}": it is the engine, and it is entry 3 on the cast list above -
+behind both token-makers, because an Alarm with no maker out does nothing.
 One copy does the whole job. With an Intruder Alarm already on your battlefield, spend the
 window on a creature or a removal spell instead.
 It is symmetric: no creature untaps in its controller's untap step, theirs or yours, and ANY
@@ -119,7 +146,13 @@ Bloodline Keeper {2}{b}{b} (3/3) flying - "{T}: Put a 2/2 black Vampire creature
   it becomes Lord of Lineage, a 5/5 that gives every other Vampire +2/+2 - your 2/2 tokens
   become 4/4s - and it still makes a token every turn with the same tap. If that line is not
   listed, nothing changes; keep tapping the Keeper.
-Vision Skeins {1}{u} - EACH player draws two cards, you and them. Cast it when you want cards.
+Vision Skeins {1}{u} - EACH player draws two cards, you and them.
+  Cast it only when you have no token-maker and no Intruder Alarm you could cast this window -
+  it is your dig, not your default. They draw two as well, so it is the last card you cast, never
+  the first.
+  When the OPPONENT'S battlefield holds any card that draws them extra cards or punishes card
+  draw - Howling Mine and Liliana's Caress on deck162's board both count - do not cast Vision
+  Skeins at all.
   When the opponent's battlefield holds a permanent that damages or drains a player for drawing
   cards, take a different action - that permanent turns your own draw spell against you.
 Lightning Greaves {2} - see Rule 6.
@@ -133,8 +166,15 @@ with N creatures deals N damage to each of your attackers before any combat dama
 Count it off the battlefield line: find the SMALLEST toughness among the creatures you would send,
 and send that many minus one, biggest power first. Leave the rest home.
 With no such permanent on their board, send everything.
-Blocking: block with your Human and Vampire TOKENS first - they are free and you make more every
-turn.
+Blocking, in this order:
+ - Block with your Human and Vampire TOKENS first - they are free and you make more every turn.
+ - Add up the damage of every attacker with no blocker on it. If that total is your life total
+   minus 4 or more, block with EVERYTHING that can block, Thraben Doomsayer and Bloodline
+   Keeper included. A token-maker you keep alive at 1 life makes tokens for a game you already
+   lost.
+ - Otherwise your token-makers do NOT block. Take the damage. A blocker line reading "(both
+   die)" on Thraben Doomsayer or Bloodline Keeper is a trade you decline while your life is
+   comfortable - the maker is worth more than any one attacker.
 
 === MULLIGAN ===
 KEEP any 7-card hand with two or more lands. The prompt counts them for you on the line that
@@ -146,7 +186,9 @@ Your cheapest card costs ONE mana, so "no early play" is never a reason to ship 
 - A line ending in "[cost: Tap]" is in your list: take it, this window, whatever your mana
   says, on either player's turn.
 - You just took that line and it appears again: take it again. Keep going until it stops being
-  offered or the option's "[repeat: ...]" note shows you control 12 or more creatures.
+  offered or your creature count reaches 12 - read that count by Rule 1's order: the option's
+  "[repeat: ...]" note if the line carries one, otherwise your battlefield line's "of which M
+  are creatures".
 - "Put in Play with Marsh Flats targeting Underground Sea" is listed: take it. Otherwise
   "targeting Tundra". Otherwise "targeting Scrubland".
 - Several casts are listed at once: answer with the highest entry on the cast list above that
