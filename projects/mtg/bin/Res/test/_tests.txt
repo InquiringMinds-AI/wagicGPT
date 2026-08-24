@@ -1160,3 +1160,10 @@ condemn/condemn_defender.txt
 condemn/condemn_defender_pumped.txt
 condemn/condemn_defender_realgame.txt
 condemn/condemn_after_regent_exiled.txt
+brutal_cathar_cast_from_hand.txt
+brutal_cathar_daybound_transform.txt
+tovolars_huntmaster_cast_from_hand.txt
+docent_of_perfection_no_cast_no_transform.txt
+docent_of_perfection_cast_transform.txt
+ludevics_test_subject_four_counters.txt
+ludevics_test_subject_five_counters.txt
