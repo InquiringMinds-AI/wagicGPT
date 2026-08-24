@@ -1,29 +1,31 @@
-# Wave-42 status (step-1 complete, corpus launched 2026-08-24)
+# Wave-42/43 status (wave-42 CLOSED; wave-43 step-1 pending VPK; 2026-08-24)
 
-STEP-1 MERGED AND PUSHED (merge chain through e0269c53f; binary /tmp/wagic-6788e6171).
-Gate: **ST 1093/0 + 33 AI/0, PARSETEST 928/0** — exact sums verified (1086+5F+2E;
-784+19A+31B+17C+38D+7E+32G). Seven lanes: A search-collapse+mask (D1+D9), B attack-side
-outcome forecasts (#W42-3), C narration unification + source ladder (D2+D3, verb seam
-awaits owner ruling), D lexicon render boundary + your-own-targets (D4+D5), E loud-fail
-mandatory chooser (#W42-1) + instance handles (D6 FALSIFIED — counters was correct),
-F DFC sweep 59/59 + Burnout two fixes, G token collapse + ceased-to-exist + line-aligned
-delta (W42-4+D7+D8). Lane outcomes + wave-43 seeds recorded in wave41/engine-ledger.md
-("WAVE-42 STEP-1 OUTCOME" section).
+WAVE-42 COMPLETE: corpus 21/21 (3rd consecutive), six seats + engine validation filed
+(seats/), 26 guide edits deployed (be4801896), rotation NO EXIT, skill amendments 11-16,
+wave-43 docket = wave42/engine-ledger.md. Owner specimen delivered (X=7 into Caress).
 
-IN FLIGHT: w42-corpus unit — pool 146,152,125,126,162,123,130 (unchanged per the no-exit
-rotation), -j 21, no cap, serve FP8-35B :8084 (NEVER cycle), single done-file Monitor
-(/tmp/W42_CORPUS_DONE).
+SAME-DAY OWNER TRACK: 5 live reports handled — 3 narration fixes (ee63779b5), Delver
+reveal input-race + manarestriction (merged 400bcaba9-era), Condemn NON-REPRO (matrix
+committed; fizzle logger shipped, define repaired 0a061c415 -> WAGIC_FIZZLELOG global),
+victory-screen crash ROOT-CAUSED + FIXED (lord-grant UAF, 5e4eaa0b3, #W43-2 discharged).
+Gates at HEAD 9f47ce024: **ST 1103/0 + 35 AI/0, PARSETEST 944/0**; binary
+~/wagic-archives/wagic-9f47ce024.
 
-NEXT (the loop): harvest -> review seats carrying BOTH prediction sets:
-(a) the 24 wave-41 GUIDE-edit predictions (per seats/seat-*.md: deck162 crutch-free
-compliance, deck123 EDITs, deck125 R1-R5, deck146 E5/E6 mulligan+gate, deck152 hold-back
-gate reachability, deck130 initial-guide predictions 1-10);
-(b) the 7 wave-42 ENGINE-lane predictions (per lane reports, recorded in the ledger
-outcome section: reveal-leak zero + <=3 lines, attack-tag trust, used-symmetry
-convergence, lexicon zero-hits, chooser loud-fail, DFC hand-flip zero, token-collapse +
-delta-boundary). Known expected artifact: Ludevic's Test Subject 13/13-for-2 (CS-023,
-unfixed by design this wave). Then synthesis + rotation + deploy; owner lategame
-specimen due; wave-43 step-1 from the seeds.
+IN FLIGHT: vita-vpk3 unit (crash fix + fizzlelog; upload to owner's Vita when FTP up —
+sweep 10.0.0.x:1337, VitaShell single-threaded, upload-only policy).
 
-OPEN OWNER QUESTIONS: (1) "Opponent chose ..." vs "used" for choice-bearing triggers
-(one-function change at activationVerbPhrase); (2) mana-tap narration asymmetry #W42-D2r.
+NEXT — WAVE-43 STEP-1 fan-out (launch AFTER vpk3 lands; docket = wave42/engine-ledger.md):
+- Lane A: #W43-1 MENACE both sides (legality-layer: exclude menace from single-blocker
+  legal sets pre-declaration — fixes human+Baka+GPT per owner report; attack-tag menace
+  legality + "[cannot be blocked by fewer than two]"; THREEBLOCKERS same; Baka-defender
+  fixture required).
+- Lane B: #W43-3 hand-reveal owner attribution + #W43-5 transform narration.
+- Lane C: #W43-4 DFC hand-flip residuals (borderline.txt per-card Oracle sweep) +
+  Docent + CS-023 Ludevic's (the && gate idiom).
+- Lane D: #W43-6 silent cast drop (arrival-tracing the cast pipeline) + #W43-12 MDFC
+  zero-option re-ask.
+- Lane E: #W43-7 X-spell pricing + #W43-8 counter-option target text.
+- Lane F: #W43-9 ability-target owner tags + #W43-10 observer parity batch + #W43-11
+  event-log run collapse + LOW batch.
+Then corpus (pool unchanged) -> review (owner narration-fix predictions FIRST-TESTABLE
+there; deck edits' predictions per seats/) -> repeat.
