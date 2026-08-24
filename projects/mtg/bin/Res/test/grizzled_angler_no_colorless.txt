@@ -1,0 +1,28 @@
+#NAME: Grizzled Angler does NOT transform without a colorless creature in the graveyard
+#Oracle (Scryfall, verified 2026-08-24): "{T}: Mill two cards. Then IF there is a
+#colorless creature card in your graveyard, transform this creature."
+#Negative half of grizzled_angler_activated_transform. It also probes the
+#"&& andAbility ignores the preceding gate" suspicion raised in wave 42 by
+#Ludevic's Test Subject (which transformed after ONE hatchling counter instead
+#of five): here the gate is an explicit "if ... then" INSIDE the andAbility, so
+#it must hold. The two milled cards are coloured/non-creature (Hill Giant is
+#red; Mind Stone is a colourless ARTIFACT, not a creature), so nothing satisfies
+#the condition and the card stays Grizzled Angler.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzled angler
+library:Hill Giant,Mind Stone
+[PLAYER2]
+life:20
+[DO]
+grizzled angler
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzled angler
+graveyard:Hill Giant,Mind Stone
+life:20
+[PLAYER2]
+life:20
+[END]

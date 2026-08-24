@@ -1,0 +1,48 @@
+#NAME: Burnout counters a BLUE instant, and its cantrip rider draws for its own controller
+#Oracle (Scryfall, verified 2026-08-24): "Counter target instant spell if it's
+#blue. -- Draw a card at the beginning of the next turn's upkeep."
+#TWO wave-42 defects, both in the primitive:
+# (1) the teach clause was ZONELESS - "teach(instant[blue]) fizzle" defaults to
+#     the BATTLEFIELD, where an instant SPELL can never be, so the fizzle never
+#     attached and Burnout countered nothing. Fixed zone-explicitly, the same
+#     shape wave-41 gave Hydroblast/Pyroblast: "teach(instant[blue]|stack)".
+# (2) the rider was "@next upkeep:draw:1" with no "controller" - every other
+#     targeted cantrip-next-upkeep card in the corpus (Balduvian Rage, Clairvoyance,
+#     Enervate, Feral Instinct, ...) writes "draw:1 controller", and Burnout has a
+#     target= line, so the bare form is the outlier. The rider is UNCONDITIONAL in
+#     the Oracle - it draws whether or not anything was countered.
+#Discriminator: Obsessive Search is {U} "Draw a card". Countered, player 1 must NOT
+#draw; the Burnout caster (player 2) draws at ITS OWN upkeep, the next turn's.
+#Top of library = last listed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Obsessive Search
+manapool:{U}
+library:Hill Giant,Juggernaut
+[PLAYER2]
+hand:Burnout
+manapool:{1}{R}
+library:Mind Stone,Darksteel Citadel
+[DO]
+Obsessive Search
+yes
+Burnout
+Obsessive Search
+endinterruption
+goto end
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+graveyard:Obsessive Search
+library:Hill Giant,Juggernaut
+manapool:{0}
+life:20
+[PLAYER2]
+graveyard:Burnout
+hand:Darksteel Citadel
+library:Mind Stone
+manapool:{0}
+life:20
+[END]

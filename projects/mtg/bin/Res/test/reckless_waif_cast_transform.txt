@@ -1,0 +1,40 @@
+#NAME: Reckless Waif - cast from HAND, transforms only on its stated trigger (W42 DFC flip-line sweep)
+#Oracle (Scryfall, verified 2026-08-24): "At the beginning of each upkeep, if no
+#spells were cast last turn, transform this creature." // Merciless Predator 3/2.
+#CLASS WITNESS for the wave-42 sweep: 59 transform-DFC fronts besides Delver of
+#Secrets carried the illegal "anyzone={0}:doubleside(backside)" line, which makes
+#"Flip Side" an ACTIVATED ability in every zone but the battlefield - so clicking
+#the card in HAND opened Cast Card Normally / Flip Side / Cancel and Flip Side
+#turned the hand card into its back face. No MTG rule lets a transforming DFC
+#flip outside the battlefield. With the line dropped, ONE click on the hand card
+#casts it (the fixture's single "reckless waif" command must both target-free
+#cast AND resolve), and the transform happens ONLY on the trigger:
+#  - turn-2 upkeep: a spell WAS cast last turn (the Waif itself) -> no transform
+#  - turn-3 upkeep: no spells last turn -> transforms into Merciless Predator
+#Top of library = last listed, so the turn-3 draw takes Juggernaut.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:reckless waif
+manapool:{R}
+library:Hill Giant,Juggernaut
+[PLAYER2]
+life:20
+[DO]
+reckless waif
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto firstmain
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:merciless predator
+hand:Juggernaut
+library:Hill Giant
+manapool:{0}
+life:20
+[PLAYER2]
+life:20
+[END]
