@@ -287,8 +287,11 @@ set(MTG_SOURCES
 # per-draw-call function call plus a getenv() to every quad, rect and line the
 # console paints. The Android alpha can afford that; a 480x272 handheld chasing
 # 60fps should not pay it for a diagnostic that lives in one function.
-set_source_files_properties(projects/mtg/src/MTGAbility.cpp
-  PROPERTIES COMPILE_DEFINITIONS "WAGIC_DEVLOGS")
+# ALPHA-ONLY - REMOVE FOR RELEASE. Dedicated define (like WAGIC_VITA_FBDUMP): the
+# per-file WAGIC_DEVLOGS property produced no fizzlelog.txt on device (suspected
+# inert for this generator), and a GLOBAL WAGIC_DEVLOGS would switch on JGfx's
+# per-quad thinlog. WAGIC_FIZZLELOG is referenced only by MTGAbility.cpp's gates.
+add_definitions(-DWAGIC_FIZZLELOG)
 
 add_executable(${PROJECT_NAME}
   ${JGE_SOURCES}

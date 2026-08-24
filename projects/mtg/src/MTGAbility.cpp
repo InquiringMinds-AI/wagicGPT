@@ -6933,7 +6933,7 @@ int AbilityFactory::magicText(int id, Spell * spell, MTGCardInstance * card, int
 //is set globally by the ALPHA Android build (Android/jni/Android.mk) and, for
 //the Vita, per-source on THIS FILE ONLY in the top-level CMakeLists.txt - both
 //carry a REMOVE-for-release comment.
-#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) || defined(WAGIC_FIZZLELOG)
 namespace
 {
     //Where the lines land. Resolved once, first call wins:
@@ -6987,7 +6987,7 @@ void AbilityFactory::addAbilities(int _id, Spell * spell)
 {
     MTGCardInstance * card = spell->source;
 
-#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) || defined(WAGIC_FIZZLELOG)
     //One line per spell that reaches resolution, WHETHER OR NOT it fizzles.
     //Without the non-fizzling half a reader cannot tell "the spell never
     //resolved" from "it resolved and its effect did nothing" - which is the
@@ -7035,7 +7035,7 @@ void AbilityFactory::addAbilities(int _id, Spell * spell)
         card->target = spell->getNextCardTarget();
         if (card->target && (!spell->tc->canTarget(card->target) || card->target->isPhased))
         {
-#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) || defined(WAGIC_FIZZLELOG)
             //THE SILENT FIZZLE. Everything a post-game read needs to rule the
             //occurrence rules-correct or not, captured BEFORE the card moves
             //(currentZone is about to change).
