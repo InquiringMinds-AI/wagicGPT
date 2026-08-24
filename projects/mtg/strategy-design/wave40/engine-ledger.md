@@ -623,3 +623,38 @@ exact SUM of the lanes' added cases.**
 - Investigation lane running (Oracle-first, repro fixtures, class sweep over other
   @each-upkeep cards, fix at the right layer). If it's an engine ETB-registration/
   phase-ring ordering defect, the class is far wider than two cards.
+
+## #W41-20 — [HIGH, OWNER LIVE-PLAY REPORT 2026-08-23, Vita session] Lord-granted keyword persists after the lord dies (sliver first strike)
+- Owner verbatim: "playing against a sliver deck, a 2/2 spinnaret sliver and a 2/2
+  horned sliver blocked my 2/2 frost lynx, and lived while killing the lynx, no combat
+  trick. my hypothesis is they are somehow recieving first strike from one of the two
+  striking slivers that died in previous turns."
+- Combat math corroborates: 2x 2/2 blockers vs a 2/2 — without first strike one blocker
+  must die; with it, none do. Hypothesis (HIS, unverified): Striking Sliver's granted
+  first strike not removed when the grantor left the battlefield.
+- If confirmed, the CLASS is every "creatures you control have X" lord (ListMaintainer/
+  lord machinery grant-removal on leave) — sweep, don't fix one card.
+
+## #W41-19-REVISED (OWNER RULING 2026-08-23, binding) — Black Vise rescript REJECTED as a workaround
+- Owner verbatim: "the solution to this problem isn't to script the card wrong. that's
+  a workaround. we shouldn't be doing workarounds. we should be fixing problems."
+- The Iron-Maiden-form rescript is REVERTED. Black Vise keeps its Oracle-faithful script
+  (as-enters choose an opponent -> @each targetedplayer upkeep). The ENGINE mechanism is
+  the fix target: (a) an unanswered as-enters chooser must never wedge the game; (b) a
+  cancelled/mis-answered mandatory ETB choice must never leave a permanently inert
+  permanent — mandatory choices re-ask or auto-resolve; (c) with exactly ONE legal choice
+  (the only opponent in a 2-seat game) the choice may auto-resolve (no-decision-when-one-
+  outcome is an existing engine principle); (d) every seat must be able to answer it
+  (human click, Baka, GPT, suite driver).
+- Sweep the class: every card using the as-enters player-chooser / targetedplayer pattern
+  shares the fragility — fix the mechanism, validate on Black Vise + at least one other.
+- CS-022a in docs/card-script-potential-issues.md is OBSOLETE once reverted — revise it.
+
+## #W42-1 — [LOW, SUITE HARNESS] Unanswered multi-candidate chooser: fail loudly, never hang or guess
+- Residual from the chooser-mechanism lane (CS-022a): the suite driver has defaults for
+  unanswered MENUS but none for an unanswered CHOOSER with >=2 legal candidates — such a
+  fixture hangs its test. Single-candidate is covered by the auto-resolve.
+- Resolution chosen (2026-08-23, discussed with owner): a LOUD RED — the driver fails the
+  test with "unanswered chooser: <shape>" instead of hanging, and NEVER answers with a
+  guessed default (a guessed pick is the false-green shape the suite disciplines exist to
+  avoid). Wave-42 step-1 candidate; TestSuiteAI.cpp, small.
