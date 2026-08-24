@@ -5831,7 +5831,13 @@ int AAFlip::resolve()
                     WEvent * e = NEW WEventZoneChange(_target, currentZone, _target->controller()->game->battlefield);
                     game->receiveEvent(e);
                 } else {
-                    WEvent * e = NEW WEventCardTransforms(_target);
+                    //#W43-5: `nameOrig` is the instance's name as captured at the
+                    //top of this block, BEFORE the rename - the face this card is
+                    //leaving. It is the one fact the in-place swap destroys, and
+                    //_target->nameOrig cannot stand in for it: on the way BACK
+                    //(flipStats "myorigname") nameOrig is already set and is the
+                    //name being flipped TO, not FROM.
+                    WEvent * e = NEW WEventCardTransforms(_target, nameOrig);
                     game->receiveEvent(e);
                 }
             }
