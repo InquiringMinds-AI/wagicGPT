@@ -5569,3 +5569,7 @@ ASAN — InstantAbility::testDestroy now honours forcedAlive) + fizzlelog define
 appear after any game with targeted spells; if absent, escalate. First upload attempt
 timed out (single-threaded server busy) — direct retry worked; pre-check retry note
 stands.
+
+## 2026-08-24 — standing rule
+Owner: "don't make vpk I don't ask for." VPK builds are owner-initiated only; fixes
+accumulate on psp-port until he asks.
