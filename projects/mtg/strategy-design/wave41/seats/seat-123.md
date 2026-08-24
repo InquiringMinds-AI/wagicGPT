@@ -59,3 +59,67 @@ chars (8%) of deck126 seq 28 prompt; largest deck123 prompt 22.2KB.
 6. Win rate NOT predicted to move (1-2/6 expected); if behaviors correct and rate flat,
    next lever is DECK CONSTRUCTION (8 makers / 8 Alarms / 24 lands / 17 removal shell),
    not the guide.
+
+---
+## VERBATIM EDIT TEXTS (deploy-ready)
+
+EDIT 1 — RULE 1 stop rule, replace the "[repeat: ...]"-keyed sentence with:
+Take it. Then take it again the next time it appears, and again, until you control 12 or more
+creatures - then answer 0 (pass).
+Read your creature count in this order and use the FIRST one that is on the screen:
+  1. the option line's own note, "[repeat: ... you control M creatures]" - M is your count.
+  2. no such note on the line? Then read your battlefield line: "Your battlefield (K
+     permanents listed, of which M are creatures)" - that M is your count, always printed,
+     every window.
+The note is only printed from the third activation of a card onward, so the first two
+activations of every card, every turn, have no note - the battlefield line is your count there.
+
+EDIT 2 — cast list entries 1-3, replace with:
+ 1. "Cast Bloodline Keeper {2}{b}{b}" - when no token-maker is on your battlefield.
+ 2. "Cast Thraben Doomsayer {1}{w}{w}" - when no token-maker is on your battlefield.
+ 3. "Cast Intruder Alarm {2}{u}" - when no Intruder Alarm is on your battlefield.
+    Intruder Alarm on an empty battlefield does NOTHING. A token-maker with no Alarm still
+    makes one token a turn. The maker goes first, every time.
+
+EDIT 3 — COMBAT blocking, replace the single tokens-first clause with:
+Blocking, in this order:
+ - Block with your Human and Vampire TOKENS first - they are free and you make more every turn.
+ - Add up the damage of every attacker with no blocker on it. If that total is your life total
+   minus 4 or more, block with EVERYTHING that can block, Thraben Doomsayer and Bloodline
+   Keeper included. A token-maker you keep alive at 1 life makes tokens for a game you already
+   lost.
+ - Otherwise your token-makers do NOT block. Take the damage. A blocker line reading "(both
+   die)" on Thraben Doomsayer or Bloodline Keeper is a trade you decline while your life is
+   comfortable - the maker is worth more than any one attacker.
+
+EDIT 4 — new paragraph at end of RULE 1:
+A token you make this turn CANNOT ATTACK this turn. Its battlefield line says so:
+"[summoning sick - cannot attack this turn, but CAN block]". It can block right away, and it
+attacks on your NEXT turn.
+So when you plan, count only the creatures whose lines do NOT say "summoning sick". A plan that
+says "attack with all 12 for lethal" is wrong on the turn you made those 12 - the attack list
+will offer you one creature. Make the tokens anyway; they block this turn and they swing next
+turn.
+
+EDIT 5 — RULE 5, insert before "Both cards let the SACRIFICING player pick":
+Do not spend an edict on a creature that is not hurting you. If their only creature is a
+defender, or has power 0 or 1, or its line says it cannot attack, keep the edict and take
+another action - you paid a card and handed them life equal to its toughness to remove
+something that was never going to kill you.
+Both edicts give life to the player who sacrifices. If the OPPONENT'S deck list contains a card
+that rewards them for gaining life, "Cast nothing right now" beats either edict at the
+opponent.
+
+EDIT 6 — KEY CARDS, Vision Skeins, replace "Cast it when you want cards." with:
+Cast it only when you have no token-maker and no Intruder Alarm you could cast this window -
+it is your dig, not your default. They draw two as well, so it is the last card you cast, never
+the first.
+When the OPPONENT'S battlefield holds any card that draws them extra cards or punishes card
+draw - Howling Mine and Liliana's Caress on deck162's board both count - do not cast Vision
+Skeins at all.
+
+EDIT 7 — RULE 1, replace "Each token is a free body. There is no cost to weigh." with:
+One exception to "there is no cost": do not fire the whole chain in your own Main phase 2,
+after combat has already happened. Tokens made there cannot block until the opponent's turn and
+cannot attack until the turn after that - a board wipe in between costs you every one of them
+for zero damage. Fire the chain at the FIRST window of the turn you get it.
