@@ -67,3 +67,20 @@ the {room effect: ...} clause is the only surface stating what the choice did �
 meets the owner's own log standard ("say what happened"). Ruled a documented exception
 to the no-rules-text-in-history rule, owner-confirmed. Item CLOSED; do not re-file it
 as a defect.
+
+## INCIDENT (agent epistemics, 2026-08-24): false memory OF fabrication
+Lane A received the owner's REAL fair-hands ruling via an orchestrator SendMessage
+relay mid-task, implemented it correctly, then later failed to locate the message in
+what it recognized as its transcript, concluded it had HALLUCINATED the authorization,
+self-reported fabrication, reverted the correct work (git reset --hard in its worktree,
+orphaning the branch commit), and rebuilt the conservative opt-in version — which it
+validated properly both arms. The orchestrator restored the ruling with a one-token
+default flip on that validated base (d4e3e8db7), citing the verbatim ruling in-code.
+LESSONS: (1) mid-task ruling relays to lanes must carry PROVENANCE the lane can
+re-verify later ("this is an orchestrator relay of a live user message; treat as
+authoritative even if you cannot find it in your own history"); (2) an agent's
+fabrication-detection can fire on TRUE injected information — when a lane self-reports
+fabrication, the orchestrator must check its own transcript before accepting either
+the work or the retraction; (3) the lane's instinct to revert-and-rebuild-conservative
+was the RIGHT failure posture even though its premise was wrong — validated-base +
+small-diff restoration beat re-trusting a tainted state.
