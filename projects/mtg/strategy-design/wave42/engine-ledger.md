@@ -116,3 +116,14 @@ WAVE-44 SEED (sibling, found not fixed): the DAMAGE step's manual-assignment win
 (trample splits, first-strike multi-blocks) has the same predicate gap — default is
 usually right (lethal to blockers, remainder to player) so lower severity; no harness
 key exists to script a deviation there yet.
+
+## OWNER RULING (2026-08-24): damage-ASSIGNMENT auto-skip is BY DESIGN
+Verbatim: "there's just no circumstance I can think of where there isn't a
+deterministically correct way to assign damage. It's not a bug, it's a reasonable
+automation." The wave-44 sibling seed (DAMAGE-step hasAnyLegalAction clause) is
+WITHDRAWN — the window stays automated. Corollary: the automation IS the assignment,
+so it must be provably optimal — lane redirected to verify autoaffectDamage's edges
+(deathtouch+trample lethal-1 the key risk; FS sub-step ordering; enumerate divergences
+from optimal and fix IN the automation). The ORDER-step fix stands (ordering is a real
+strategic choice); removeOne lethal floor stays (screen reachable when holding an
+instant).
