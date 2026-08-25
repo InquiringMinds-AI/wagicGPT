@@ -1,0 +1,35 @@
+# COMBAT DAMAGE AUTO-ASSIGNMENT pins (wave 44). The damage ASSIGNMENT window is
+# auto-skipped by design - the owner's position is that the assignment has a
+# deterministically correct answer, so automating it is reasonable rather than a
+# bug. Because the player never sees that screen, GuiCombat::autoaffectDamage IS
+# the assignment, so these fixtures pin what it computes. Note the SAME function
+# is the AI's assignment too (AIPlayerBaka::affectCombatDamages calls it), so
+# there is one definition for both seats.
+#
+# CONTROL - ordinary combat, NO trample, one blocker. All 4 damage stays on the
+# blocker (the excess beyond lethal has nowhere else to go without trample) and
+# the defending player takes nothing. The second half of the "nothing changed
+# for normal combat" pin.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Stone Golem
+life:20
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+goto attackers
+Stone Golem
+next
+Hill Giant
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Stone Golem
+life:20
+[PLAYER2]
+graveyard:Hill Giant
+life:20
+[END]

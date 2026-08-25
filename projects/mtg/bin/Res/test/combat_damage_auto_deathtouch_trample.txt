@@ -1,0 +1,45 @@
+# COMBAT DAMAGE AUTO-ASSIGNMENT pins (wave 44). The damage ASSIGNMENT window is
+# auto-skipped by design - the owner's position is that the assignment has a
+# deterministically correct answer, so automating it is reasonable rather than a
+# bug. Because the player never sees that screen, GuiCombat::autoaffectDamage IS
+# the assignment, so these fixtures pin what it computes. Note the SAME function
+# is the AI's assignment too (AIPlayerBaka::affectCombatDamages calls it), so
+# there is one definition for both seats.
+#
+# DEATHTOUCH + TRAMPLE (the edge flagged as the known risk): VERIFIED CORRECT.
+# Thornweald Archer (2/1 deathtouch) + Rancor (+2/+0, trample) = 4/1 deathtouch
+# trample, blocked by two 2/2 bears. CR 702.2b makes 1 damage from a deathtouch
+# source lethal, so the optimal AND legal line is 1 per blocker with the
+# remaining 2 trampled through - which is what autoaffectDamage's deathtouch
+# clamp (GuiCombat.cpp:134-135) produces. Both bears die, the defender takes 2.
+# A regression that dropped the clamp would assign 2+2 and trample nothing,
+# leaving the defender on 20.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Thornweald Archer
+hand:Rancor
+manapool:{G}
+life:20
+[PLAYER2]
+inplay:Balduvian Bears,Bear Cub
+life:20
+[DO]
+Rancor
+Thornweald Archer
+goto attackers
+Thornweald Archer
+next
+Balduvian Bears
+Bear Cub
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+hand:Rancor
+graveyard:Thornweald Archer
+life:20
+[PLAYER2]
+graveyard:Balduvian Bears,Bear Cub
+life:18
+[END]
