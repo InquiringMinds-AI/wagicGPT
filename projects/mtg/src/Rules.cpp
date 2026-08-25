@@ -47,9 +47,14 @@ static bool rulesEnvFlag(const char * name, bool dflt)
 }
 
 //The hand gate: deal an AI-vs-AI seat a REAL opening hand instead of a stacked one.
+//DEFAULT ON by owner ruling (2026-08-24, verbatim): "I want legitimate hands. legit
+//mulligans. none of this fixing hands in advance." WAGIC_SELFPLAY_FAIRHAND=0 is a
+//legacy-forensics escape only (restores the pre-wave-44 OptimizedHand rig for A/B);
+//never set it in a corpus. Corpora from wave 44 on are not hand-comparable with
+//earlier waves - accepted with the ruling.
 static bool selfplayFairHand()
 {
-    return rulesEnvFlag("WAGIC_SELFPLAY_FAIRHAND", false);
+    return rulesEnvFlag("WAGIC_SELFPLAY_FAIRHAND", true);
 }
 
 //The seat gate: drop the agressivity/forceBestAbilityUse pins. Defaults to
