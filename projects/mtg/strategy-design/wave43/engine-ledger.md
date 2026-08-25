@@ -60,3 +60,10 @@ two pre-registered assert flips; three new pins from the derivation (shock_then_
 DS+protection composite, fs_kills_then_all_face — the last previously unverified);
 stop-and-revert on any unexpected suite movement. Construction case: OWNER RULED OUT
 OF SCOPE at this time. {room effect:} keep call still open.
+
+## OWNER RULING (2026-08-24): {room effect:} in history = DELIBERATE KEEP
+Dungeon room names are opaque without the dungeon card (true for model and human alike);
+the {room effect: ...} clause is the only surface stating what the choice did — which
+meets the owner's own log standard ("say what happened"). Ruled a documented exception
+to the no-rules-text-in-history rule, owner-confirmed. Item CLOSED; do not re-file it
+as a defect.
