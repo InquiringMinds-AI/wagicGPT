@@ -319,6 +319,10 @@ private:
     void writeNarration(const string& line);
     //#W43-11: narrate a day/night transition, once, when it actually changes.
     void noteDesignationChange();
+    //#W44-4: the game-wide day/night designation read LIVE off both
+    //battlefields ("Day", "Night", or empty). Shared by the narration's change
+    //line and the CURRENT SITUATION state line.
+    string scanDayNightDesignation();
     //Zone-duty digest for the trim marker (see trimMarkerLine).
     string zoneNameDigest(MTGGameZone * z);
     //W41-3(c): write (and clear) the pending collapsed bulk move, if any. Must

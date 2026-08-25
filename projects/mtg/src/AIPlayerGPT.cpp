@@ -4320,30 +4320,66 @@ static string xDamageSweepCore(int maxX, int baseCMC, const std::vector<XDamVict
         return o.str();
     }
     o << "max affordable X=" << maxX << " (" << (maxX + baseCMC) << " mana total)";
-    int k = 0;
+    //#W44-2 (wave-43 seat130 N1, measured): the headline used to be "smallest X
+    //that kills anything", computed over BOTH boards. With a single creature of
+    //the caster's OWN in play that headline read "X=1 ... kills THEIRS: none;
+    //YOURS: Blastminer" - a true statement in the wrong scope, which is the
+    //trust doctrine's own definition of a lie - and the four-wall kill that
+    //decided the game lived in the tail clause the pilot never reached.
+    //Starstorm was cast in 33% of the windows where an affordable X killed two
+    //or more OPPONENT creatures; two of the misses lost games. The question the
+    //pilot is answering is "what does X buy me against THEM", so that is the
+    //headline. The caster's own casualties are still stated at the headline X
+    //(the symmetric-sweep rail is untouched), and a cheaper self-only price is
+    //still stated - it just no longer LEADS.
+    int kOpp = 0, kMine = 0;
     for (size_t i = 0; i < victims.size(); i++)
-        if (victims[i].lethalX > 0 && victims[i].lethalX <= maxX
-            && (k == 0 || victims[i].lethalX < k))
-            k = victims[i].lethalX;
+    {
+        if (victims[i].lethalX <= 0 || victims[i].lethalX > maxX)
+            continue;
+        int & side = victims[i].mine ? kMine : kOpp;
+        if (side == 0 || victims[i].lethalX < side)
+            side = victims[i].lethalX;
+    }
     if (victims.empty())
         o << "; there is no creature on the battlefield for it to damage";
-    else if (k == 0)
+    else if (kOpp == 0 && kMine == 0)
         o << "; even at X=" << maxX << " NOTHING on the board dies";
     else
     {
-        o << "; smallest X that kills anything: X=" << k << " (" << (k + baseCMC)
-          << " mana total) - kills THEIRS: " << xVictimList(victims, k, false)
-          << "; YOURS: " << xVictimList(victims, k, true);
+        if (kOpp > 0)
+            o << "; smallest X that kills an OPPONENT creature: X=" << kOpp << " ("
+              << (kOpp + baseCMC) << " mana total) - kills THEIRS: "
+              << xVictimList(victims, kOpp, false)
+              << "; YOURS: " << xVictimList(victims, kOpp, true);
+        else
+            o << "; even at X=" << maxX << " NOTHING the OPPONENT controls dies";
+        //The self-only price, stated after the headline it used to displace. An
+        //X that kills nothing of theirs and something of yours is a real trap,
+        //and dropping it would be the silent omission the model confabulates
+        //into - so it is said, in the position its decision value earns.
+        if (kMine > 0 && kOpp == 0)
+            o << ". At X=" << kMine << " (" << (kMine + baseCMC)
+              << " mana total) it kills only YOURS: " << xVictimList(victims, kMine, true);
+        else if (kMine > 0 && kMine < kOpp)
+            o << ". A smaller X=" << kMine << " (" << (kMine + baseCMC)
+              << " mana total) kills only YOURS: " << xVictimList(victims, kMine, true);
         //The at-max clause earns its line only when spending up to the cap kills
-        //something the smallest lethal X does not: a byte-identical repeat is
-        //pure prompt weight (owner criterion: decision value per token).
+        //something the headline X does not: a byte-identical repeat is pure
+        //prompt weight (owner criterion: decision value per token).
+        int stated = (kOpp > 0) ? kOpp : kMine;
         bool moreAtMax = false;
         for (size_t i = 0; i < victims.size() && !moreAtMax; i++)
-            if (victims[i].lethalX > k && victims[i].lethalX <= maxX)
+            if (victims[i].lethalX > stated && victims[i].lethalX <= maxX)
                 moreAtMax = true;
-        if (moreAtMax)
+        if (moreAtMax && kOpp > 0)
             o << ". At X=" << maxX << " - kills THEIRS: " << xVictimList(victims, maxX, false)
               << "; YOURS: " << xVictimList(victims, maxX, true);
+        else if (moreAtMax)
+            //No opponent creature dies at ANY affordable X (said above), so the
+            //at-max clause claims nothing about their board: it prices only the
+            //caster's own further losses.
+            o << ". At X=" << maxX << " it kills YOURS: " << xVictimList(victims, maxX, true);
     }
     //The player half is rendered per SIDE, not as a blanket "each player": a
     //spec that reaches only the opponent must not tell the caster its own life
@@ -6979,7 +7015,7 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
 //#W43-11: the game-wide designation, read off the board. The engine parks the
 //marker on whichever battlefield it last moved to, so BOTH are scanned and the
 //owner is deliberately ignored: day/night belongs to neither player.
-void AIPlayerGPT::noteDesignationChange()
+string AIPlayerGPT::scanDayNightDesignation()
 {
     string now;
     for (int p = 0; p < 2 && now.empty(); p++)
@@ -7000,6 +7036,14 @@ void AIPlayerGPT::noteDesignationChange()
             }
         }
     }
+    return now;
+}
+
+void AIPlayerGPT::noteDesignationChange()
+{
+    //#W44-4: one scan, two consumers - the narration's change line and the
+    //snapshot's state line cannot disagree about what the designation IS.
+    string now = scanDayNightDesignation();
     if (now == mDayNight)
         return;
     mDayNight = now;
@@ -7602,6 +7646,23 @@ static string dungeonsCompletedLine(int mine, int opp)
     return o.str();
 }
 
+//#W44-4 (wave-43 engine-validation defect 3; 0 of 2190 CURRENT SITUATION blocks
+//carried it while 33 records rendered daybound creatures): CR 730's day/night is
+//a GAME-WIDE designation that changes what daybound/nightbound permanents are
+//and when they transform, and #W43-11 correctly stopped rendering its marker
+//card as a permanent - which left the fact stated NOWHERE except a one-shot
+//"It became Night" line in the append-only narration, scrolled away by the time
+//it decided anything. The snapshot is the ONLY board surface, so the state
+//belongs in it. Empty when no designation exists (a game with no daybound card
+//in it never sets one, and rendering "It is currently neither" would be a fact
+//about nothing). Pure helper so PARSETEST proves the shape and its absence.
+static string dayNightStateLine(const string& designation)
+{
+    if (designation.empty())
+        return "";
+    return "It is currently " + designation + ".\n";
+}
+
 //N-146k + N-139n: the ENTIRE situation block for a pregame ask. Hand only: the
 //engine-computed count header, then the tagged hand list. No phase, no life
 //totals, no stack, no mana line, no battlefield, no opponent counts, no library
@@ -7625,6 +7686,10 @@ string AIPlayerGPT::serializeGameState()
 
     out << "Phase: " << observer->getCurrentGamePhaseName();
     out << " | It is " << (observer->currentPlayer == this ? "your" : "the opponent's") << " turn.\n";
+    //#W44-4: the game-wide day/night designation, next to the other game-wide
+    //turn facts. Read live off the board, not off the narration tracker, so the
+    //line states the state at THIS render (see scanDayNightDesignation).
+    out << dayNightStateLine(scanDayNightDesignation());
     out << "Your life: " << this->life << " | Opponent life: " << (opp ? opp->life : 0) << "\n";
     //N-105a: poison counters, for BOTH players, whenever either is nonzero.
     //The life line above was the ONLY resource line this seat ever saw, so an
@@ -10856,6 +10921,24 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             mtl[li] = (char) tolower((unsigned char) mtl[li]);
                         lifeCostPerTarget = mtl.find("life:-manacost") != string::npos;
                     }
+                    //#W44-3 (wave-43 seat125/126 engine HIGH): the option line
+                    //carries the SPELL's own {card text: "..."} and, for each
+                    //legal target, name + cost + type + P/T + keywords - every
+                    //fact EXCEPT what the target actually DOES. Both of deck125's
+                    //HIGH losses lived in text nobody rendered: a 1-power
+                    //Blastminer eating the manabase (15 Path declines) and a
+                    //1-power Adventurer venturing four times (10 declines), each
+                    //protected by a printed-power floor because the line the pilot
+                    //read said "1/1" and nothing about the ability. This is the
+                    //counter lane's W43-8 fix one emitter over, same helper, same
+                    //140-char target-side length: the deciding fact rides the
+                    //object the decision is ABOUT.
+                    //Line budget: the battlefield summary quotes no text at all,
+                    //so nothing here is a duplicate of the board render; a
+                    //textless (vanilla) target adds nothing by construction; and
+                    //two instances of the same card quote their shared text ONCE
+                    //(the second is byte-identical prompt weight).
+                    std::vector<string> textedNames;
                     Player * ordered[2] = { this->opponent(), this };
                     for (int oi = 0; oi < 2; oi++)
                     {
@@ -10884,6 +10967,21 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                         //commit seat cannot drift apart.
                                         if (lifeCostPerTarget)
                                             tNames << perTargetLifeCostNote(tgt);
+                                        //#W44-3: what the target DOES, quoted
+                                        //once per distinct card (see above).
+                                        string ttxt = stackTargetTextNote(tgt);
+                                        if (!ttxt.empty())
+                                        {
+                                            string tkey = tgt->getDisplayName();
+                                            bool quoted = false;
+                                            for (size_t ti = 0; ti < textedNames.size() && !quoted; ti++)
+                                                quoted = (textedNames[ti] == tkey);
+                                            if (!quoted)
+                                            {
+                                                textedNames.push_back(tkey);
+                                                tNames << ttxt;
+                                            }
+                                        }
                                     }
                         if (tc->canTarget(pp))
                         {
@@ -21672,20 +21770,23 @@ void AIPlayerGPT::runParseSelfTest()
         XDamVictim c; c.name = "Thunderbreak Regent"; c.lethalX = 4; c.mine = false; v.push_back(c);
         string s = xDamageSweepCore(4, 2, v, false, false, 0, 0);
         cout << "     " << s << "\n";
-        CHECK(s == " {X pricing: max affordable X=4 (6 mana total); smallest X that kills"
-                   " anything: X=2 (4 mana total) - kills THEIRS: Silverquill Silencer #1,"
+        // #W44-2 REVISION: the headline is now scoped to the OPPONENT's board
+        // (see below for the defect it fixes); the rest of the shape is the
+        // wave-43 line unchanged.
+        CHECK(s == " {X pricing: max affordable X=4 (6 mana total); smallest X that kills an"
+                   " OPPONENT creature: X=2 (4 mana total) - kills THEIRS: Silverquill Silencer #1,"
                    " Silverquill Silencer #2; YOURS: none. At X=4 - kills THEIRS: Silverquill"
                    " Silencer #1, Silverquill Silencer #2, Thunderbreak Regent; YOURS: none}",
-              "W43-7 sweep: max X, smallest lethal X, both kill lists, mana totals");
-        // The at-max clause is SUPPRESSED when it would repeat the smallest-X
-        // clause verbatim (nothing further dies between k and maxX).
+              "W43-7/#W44-2 sweep: max X, smallest OPPONENT-lethal X, both kill lists, mana totals");
+        // The at-max clause is SUPPRESSED when it would repeat the headline
+        // clause verbatim (nothing further dies between it and maxX).
         std::vector<XDamVictim> v2;
         v2.push_back(a); v2.push_back(b);
         CHECK(xDamageSweepCore(2, 2, v2, false, false, 0, 0)
-              == " {X pricing: max affordable X=2 (4 mana total); smallest X that kills"
-                 " anything: X=2 (4 mana total) - kills THEIRS: Silverquill Silencer #1,"
+              == " {X pricing: max affordable X=2 (4 mana total); smallest X that kills an"
+                 " OPPONENT creature: X=2 (4 mana total) - kills THEIRS: Silverquill Silencer #1,"
                  " Silverquill Silencer #2; YOURS: none}",
-              "W43-7 sweep: no second clause when max X IS the smallest lethal X");
+              "W43-7/#W44-2 sweep: no second clause when max X IS the headline X");
         // SYMMETRIC SWEEP, own-risk: the caster's own dying creatures are named
         // as loudly as the opponent's. This is the rail the whole feature turns
         // on - a sweep annotation that listed only the opponent's losses would
@@ -21751,6 +21852,94 @@ void AIPlayerGPT::runParseSelfTest()
               "W43-7 a caster-only player sweep claims nothing about the opponent");
         CHECK(xDamageSweepCore(6, 1, none, false, false, 5, 12).find("deals X to") == string::npos,
               "W43-7 NEGATIVE a creatures-only sweep prints no player clause at all");
+    }
+    // ---- #W44-2: the sweep headline is scoped to the OPPONENT's board ----
+    cout << "\n[#W44-2] the X headline prices what it kills of THEIRS, not of anyone's\n";
+    {
+        // THE DEFECT WINDOW (wave-43 seat130, measured): Starstorm with six mana
+        // (X=4), four opponent walls that die at X=4, and ONE creature of the
+        // pilot's own - a 1/1 Blastminer - that dies at X=1. The old headline
+        // was "smallest X that kills anything: X=1 ... kills THEIRS: none;
+        // YOURS: Blastminer #1", and the four-wall kill lived in the tail. The
+        // pilot cast Starstorm in 33% of such windows; two misses lost games.
+        std::vector<XDamVictim> v;
+        XDamVictim mine; mine.name = "Blastminer #1"; mine.baseName = "Blastminer";
+        mine.lethalX = 1; mine.mine = true; v.push_back(mine);
+        for (int i = 1; i <= 4; i++)
+        {
+            XDamVictim w;
+            std::ostringstream n; n << "Wall of Stone #" << i;
+            w.name = n.str(); w.baseName = "Wall of Stone"; w.lethalX = 4; w.mine = false;
+            v.push_back(w);
+        }
+        string s = xDamageSweepCore(4, 2, v, false, false, 0, 0);
+        cout << "     " << s << "\n";
+        CHECK(s == " {X pricing: max affordable X=4 (6 mana total); smallest X that kills an"
+                   " OPPONENT creature: X=4 (6 mana total) - kills THEIRS: Wall of Stone x4;"
+                   " YOURS: Blastminer #1. A smaller X=1 (3 mana total) kills only YOURS:"
+                   " Blastminer #1}",
+              "#W44-2 the four-wall kill is the HEADLINE; the self-only price follows it");
+        CHECK(s.find("smallest X that kills anything") == string::npos,
+              "#W44-2 NEGATIVE the both-boards headline wording is gone");
+        CHECK(s.find("kills THEIRS: Wall of Stone x4") < s.find("kills only YOURS"),
+              "#W44-2 the opponent-side kill is stated BEFORE the own-side price");
+        CHECK(s.find("Blastminer") != string::npos,
+              "#W44-2 the caster's own casualty is still stated (truthfulness rail intact)");
+        // The self-only clause is NOT printed when the caster loses nothing
+        // below the headline X - a "smaller X" that buys nothing is noise.
+        std::vector<XDamVictim> clean;
+        XDamVictim opp; opp.name = "Thunderbreak Regent"; opp.lethalX = 4; opp.mine = false;
+        clean.push_back(opp);
+        CHECK(xDamageSweepCore(4, 2, clean, false, false, 0, 0).find("only YOURS") == string::npos,
+              "#W44-2 NEGATIVE no self-only clause when nothing of the caster's dies cheaper");
+        // A self-casualty at or ABOVE the headline X is carried by the headline
+        // list itself (and by the at-max clause), never by a "smaller X" line.
+        std::vector<XDamVictim> equal;
+        equal.push_back(opp);
+        XDamVictim m2; m2.name = "Goblin Piledriver"; m2.lethalX = 4; m2.mine = true;
+        equal.push_back(m2);
+        string se = xDamageSweepCore(4, 2, equal, false, false, 0, 0);
+        CHECK(se.find("YOURS: Goblin Piledriver") != string::npos
+              && se.find("A smaller X") == string::npos,
+              "#W44-2 a same-price own casualty rides the headline list, not a second clause");
+        // NOTHING OF THEIRS dies at any affordable X, but the caster's own would:
+        // the headline says exactly that, and the own-side price is stated after
+        // it. This is the case the old wording sold as a kill.
+        std::vector<XDamVictim> selfOnly;
+        selfOnly.push_back(mine);
+        XDamVictim tough; tough.name = "Colossus"; tough.lethalX = 9; tough.mine = false;
+        selfOnly.push_back(tough);
+        string so = xDamageSweepCore(4, 2, selfOnly, false, false, 0, 0);
+        cout << "     " << so << "\n";
+        CHECK(so == " {X pricing: max affordable X=4 (6 mana total); even at X=4 NOTHING the"
+                    " OPPONENT controls dies. At X=1 (3 mana total) it kills only YOURS:"
+                    " Blastminer #1}",
+              "#W44-2 an opponent-empty sweep says so FIRST, then prices the caster's loss");
+        CHECK(so.find("kills THEIRS") == string::npos,
+              "#W44-2 NEGATIVE an opponent-empty sweep claims no opponent kill anywhere");
+        // ... and its at-max clause prices only the caster's further losses.
+        std::vector<XDamVictim> selfTwo;
+        selfTwo.push_back(mine);
+        selfTwo.push_back(tough);
+        XDamVictim m3; m3.name = "Grizzly Bears"; m3.lethalX = 2; m3.mine = true;
+        selfTwo.push_back(m3);
+        string st = xDamageSweepCore(4, 2, selfTwo, false, false, 0, 0);
+        cout << "     " << st << "\n";
+        CHECK(st.find(". At X=4 it kills YOURS: Blastminer #1, Grizzly Bears") != string::npos
+              && st.find("At X=4 - kills THEIRS") == string::npos,
+              "#W44-2 the at-max clause of an opponent-empty sweep is own-side only");
+        // The board-is-empty and nothing-dies-at-all shapes are UNCHANGED: both
+        // sides are silent for the same reason, so the old wording still holds.
+        std::vector<XDamVictim> big;
+        big.push_back(tough);
+        CHECK(xDamageSweepCore(4, 2, big, false, false, 0, 0)
+              == " {X pricing: max affordable X=4 (6 mana total); even at X=4 NOTHING on the"
+                 " board dies}",
+              "#W44-2 nothing-dies-at-all keeps the both-boards wording (it is true of both)");
+        // ECHO: the restructured headline is still stripped from history whole.
+        string opt = "Cast Starstorm {x}{r}{r}" + s;
+        CHECK(stripNarrationDecoration(opt) == "Cast Starstorm {x}{r}{r}",
+              "#W44-2 echo: the rescoped {X pricing: ...} block leaves no history residue");
     }
     cout << "\n[W43-7] X spells: the TARGETED class and the affordability-only fallback\n";
     {
@@ -22001,6 +22190,108 @@ void AIPlayerGPT::runParseSelfTest()
         int c = parseChoice("CHOICE: 1 (Cast Counterspell)", 2, &menu, &st);
         cout << "     echo binds -> " << c << "\n";
         CHECK(c == 1 && !st, "W43-8 echo: a SHORT-NAME answer binds past the target-text block");
+    }
+
+    // ---- #W44-3: the REMOVAL option's target list carries the target's text ----
+    cout << "\n[#W44-3] 'legal targets right now:' names what each target DOES\n";
+    {
+        // The wave-43 seat125 losses, as strings. A printed-power floor declined
+        // Path to Exile 15 times on a 1/1 Dwarven Blastminer that was eating the
+        // manabase, and 10 times on a 1/1 that was venturing into a dungeon:
+        // both dangers lived entirely in text the option line never rendered.
+        // Same helper, same 140-char target-side length as the counter lane.
+        string bare = string("Dwarven Blastminer") + stackFactsCore("{1}{r}", true, false, "", 1, 1);
+        string withText = bare + stackTargetTextNote(NULL) // no card -> nothing
+                        + stackTargetTextCore("{1}{r}, {T}: Destroy target nonbasic land.");
+        cout << "     " << withText << "\n";
+        CHECK(withText == "Dwarven Blastminer {1}{r} (creature 1/1) {target text: \"{1}{r}, {T}:"
+                          " Destroy target nonbasic land.\"}",
+              "#W44-3 the target row carries cost, type, P/T AND what the creature does");
+        CHECK(bare.find("{target text:") == string::npos,
+              "#W44-3 NEGATIVE the pre-fix row named a 1/1 and nothing about its ability");
+        // A VANILLA target adds nothing at all - the line budget is spent only
+        // where there is a fact to spend it on.
+        CHECK((string("Grizzly Bears") + stackFactsCore("{1}{g}", true, false, "", 2, 2)
+               + stackTargetTextCore(""))
+              == "Grizzly Bears {1}{g} (creature 2/2)",
+              "#W44-3 NEGATIVE a textless (vanilla) target adds no clause");
+        // TRUNCATION is the shared snippet rule at the target-side length.
+        string longText(400, 'q');
+        string trunc = stackTargetTextCore(textSnippetCore(longText, 140));
+        CHECK(trunc.size() < 200 && trunc.find("...") != string::npos,
+              "#W44-3 a long target text truncates like every other card-text render");
+        // DEDUPE: two instances of the same card quote their shared text ONCE.
+        // This is the emitter's rule, replayed here over the same key it uses
+        // (the display name) so the saving is provable without a board.
+        {
+            std::vector<string> textedNames;
+            std::ostringstream tNames;
+            const char * names[3] = { "Wall of Stone", "Wall of Stone", "Dwarven Blastminer" };
+            const char * texts[3] = { "Defender", "Defender", "Destroy target nonbasic land." };
+            for (int i = 0; i < 3; i++)
+            {
+                tNames << (i ? ", " : "") << names[i];
+                string ttxt = stackTargetTextCore(texts[i]);
+                bool quoted = false;
+                for (size_t ti = 0; ti < textedNames.size() && !quoted; ti++)
+                    quoted = (textedNames[ti] == names[i]);
+                if (!quoted)
+                {
+                    textedNames.push_back(names[i]);
+                    tNames << ttxt;
+                }
+            }
+            cout << "     " << tNames.str() << "\n";
+            CHECK(tNames.str() == "Wall of Stone {target text: \"Defender\"}, Wall of Stone,"
+                                  " Dwarven Blastminer {target text: \"Destroy target nonbasic"
+                                  " land.\"}",
+                  "#W44-3 a repeated card name quotes its text once, and later names still do");
+        }
+        // ECHO: the target-text blob is decision-time only on THIS emitter too,
+        // and a short-name answer still binds past it.
+        string opt = "Cast Path to Exile {w} - legal targets right now: " + withText
+                   + " {card text: \"Exile target creature.\"}";
+        CHECK(stripNarrationDecoration(opt)
+              == "Cast Path to Exile {w} - legal targets right now: Dwarven Blastminer"
+                 " {1}{r} (creature 1/1)",
+              "#W44-3 echo: {target text: ...} is stripped from the narrated record");
+        vector<string> menu;
+        menu.push_back(opt);
+        menu.push_back("Cast nothing right now");
+        bool st = false;
+        int c = parseChoice("CHOICE: 1 (Cast Path to Exile)", 2, &menu, &st);
+        CHECK(c == 1 && !st, "#W44-3 echo: a SHORT-NAME answer binds past the target-text block");
+    }
+
+    // ---- #W44-4: the day/night designation is in the CURRENT SITUATION block ----
+    cout << "\n[#W44-4] the game-wide day/night state is rendered, not only logged\n";
+    {
+        // 0 of 2190 situation blocks carried it while 33 records rendered
+        // daybound creatures: #W43-11 stopped rendering the marker as a
+        // permanent (correctly) and the state then lived nowhere a snapshot
+        // could show it.
+        CHECK(dayNightStateLine("Day") == "It is currently Day.\n"
+              && dayNightStateLine("Night") == "It is currently Night.\n",
+              "#W44-4 the designation renders as its own game-wide line");
+        // NEGATIVE: a game with no daybound card in it never sets a designation,
+        // and "neither" is a fact about nothing - print no line at all.
+        CHECK(dayNightStateLine("").empty(),
+              "#W44-4 NEGATIVE no designation, no line");
+        // The line is OWNERLESS: day/night belongs to neither player, and "Your
+        // Day" was the false half of the render #W43-11 removed.
+        CHECK(dayNightStateLine("Night").find("Your") == string::npos
+              && dayNightStateLine("Night").find("Opponent") == string::npos,
+              "#W44-4 NEGATIVE the state line attributes the designation to no player");
+        // It agrees with the narration's change line about WHAT the state is -
+        // both read the same designation string.
+        CHECK(dayNightChangeNarration("Night") == "It became Night"
+              && dayNightStateLine("Night") == "It is currently Night.\n",
+              "#W44-4 the change line and the state line name the same designation");
+        // The state line is a SNAPSHOT line, not a bracketed decision-time
+        // annotation: nothing in it is stripped, because it never enters an
+        // option row or the history at all.
+        CHECK(stripNarrationDecoration("It is currently Night.") == "It is currently Night.",
+              "#W44-4 the state line carries no strippable decoration");
     }
 
     // ---- #W43-9: the owner tag on ability-target rows ----
