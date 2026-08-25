@@ -41,3 +41,12 @@ All owner narration-fix predictions (PASS across the board); wave-43 lane predic
 tags, parity, collapse); rung/edit adjudications per seat files; damage-order fix live
 (the ORDER window governed decisions this corpus); assignment automation VERIFIED
 correct incl. deathtouch+trample (5 pins, 0 code changes).
+
+## OWNER RULING on #W44-1 (2026-08-24, verbatim): "I want legitimate hands. legit
+## mulligans. none of this fixing hands in advance."
+Fair hands are the DEFAULT — OptimizedHand and the aggressivity/forceBestAbilityUse
+pins removed for AI-vs-AI, not gated. Comparability break accepted: wave-44+ corpora
+are not hand-comparable with waves <=43 (mulligan seams live for the first time; win
+rates and game-length distributions may shift for reasons unrelated to guides — the
+first fair-hand corpus is a NEW BASELINE, and its review must not attribute
+hand-variance effects to the wave's edits).
