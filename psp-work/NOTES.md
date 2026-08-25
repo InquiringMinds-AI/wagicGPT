@@ -5573,3 +5573,14 @@ stands.
 ## 2026-08-24 — standing rule
 Owner: "don't make vpk I don't ask for." VPK builds are owner-initiated only; fixes
 accumulate on psp-port until he asks.
+
+## 2026-08-25 — wave-44 close VPK uploaded (owner-requested)
+psp-port at 60dbf39b4 (= wave-44 step-1 final, gate 1130/0+37/0 + 1150/0). Hermetic
+build, VPK 32,608,180 -> ux0:/vpk/wagic.vpk, size-verified. Carries since last stick
+build (9f47ce024): menace legality all consumers (human blockers-step HOLDS on an
+under-filled menace block — add the 2nd blocker or remove), damage-order screen
+restored on multi-blocks (was skipped unless holding an instant), lethal-basis fix
+(trample through pre-damaged/first-struck blockers), fair hands incl. attract demo,
+manarestriction, reveal/transform narration, X pricing, removal target text, Day/Night
+line, fizzle logger (still watch for ux0:data/Wagic/fizzlelog.txt existing after games
+with targeted spells — if absent, the define needs another pass).
