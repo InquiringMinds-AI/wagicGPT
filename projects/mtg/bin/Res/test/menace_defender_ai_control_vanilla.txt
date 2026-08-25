@@ -1,0 +1,47 @@
+#NAME: Menace, defender side -- POSITIVE CONTROL: the AI blocks a VANILLA attacker
+#DESC: #W44-8. This fixture exists to make menace_defender_ai_gang_block.txt readable.
+#DESC: Identical board, identical script, identical tick budget - the ONLY difference
+#DESC: is that the attacker is Hill Giant (3/3, primitives: no abilities= line at all)
+#DESC: instead of Boggart Brute (3/2, abilities=menace and nothing else). Both seats go
+#DESC: AI; the defender holds Wall of Stone 0/8 and Wall of Granite 0/7, plain
+#DESC: defenders either of which eats the whole 3 damage and lives.
+#DESC:
+#DESC: Here the AI defender DOES block: it takes 0 over the pad and stays at 20. So the
+#DESC: heuristic block chooser is working, it can see these walls, and the walls can
+#DESC: legally block a 3-power ground creature. Any difference in the menace twin is
+#DESC: attributable to menace and to nothing else in the scenario.
+AICALLS 80
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Hill Giant
+[PLAYER2]
+inplay:Wall of Stone,Wall of Granite
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Hill Giant
+life:20
+[PLAYER2]
+inplay:Wall of Stone,Wall of Granite
+life:20
+[END]

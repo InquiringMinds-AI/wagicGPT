@@ -65,10 +65,19 @@ inline bool windowNegated(const std::string& win)
 // or activation that has already happened), so only cast/activation-shaped verbs
 // arm it now. See also optionsAreActionMenu() below, which requires the ask to
 // be the kind of ask those verbs could be answered from.
+// #W44-7 (wave-43 corpus, 4/2317 fallbacks): "resolve" is a CAST commitment in
+// the vocabulary plans actually use. Two of the four fallback decisions carried
+// the plan "Answer their threats, resolve Staff of Nin, ping their face every
+// turn" and then answered a narrow window with "CHOICE: 3 (Cast Supreme
+// Verdict)" / "Counter Idyllic Tutor with Dream Fracture" - a name that was
+// never on the menu. The old verb table had no word for it, so the note that
+// exists for exactly this failure was silent at both sites. "resolve" governs a
+// spell the plan intends to put on the stack, which is the same commitment
+// "cast" makes; it is NOT the attack-shaped verb class wave-35 removed.
 inline bool windowHasVerb(const std::string& win)
 {
     static const char * verbs[] = {
-        "cast", "activat", "equip", "play ", "playing", "played"
+        "cast", "activat", "equip", "play ", "playing", "played", "resolve"
     };
     for (size_t i = 0; i < sizeof(verbs) / sizeof(verbs[0]); i++)
         if (win.find(verbs[i]) != std::string::npos)
@@ -126,13 +135,64 @@ inline std::string shortName(const std::string& lowerName)
 // on 24% of all prompts (15/102 at batch5, 30/146 at batch6) and was read as a
 // LEGALITY RULING - "This confirms I cannot activate Amulet" - which is the
 // opposite of the truth the surface owes the model.
+// #W44-7: the assembled tail is not just the option list - it also carries the
+// reply-protocol boilerplate and the standing phase facts, and BOTH of those
+// say "cast". "e.g. \"CHOICE: 3 (Cast Example Card)\"" and "creatures,
+// sorceries and other main-phase cards you do not cast now can still be cast
+// then" match the marker table on windows that offer no cast at all, so the
+// wave-35 gate had been silently dead since those sentences were added: it
+// returned true on EVERY priority/attackers ask. Measured on the wave-43 corpus
+// (2232 prompts, note fired 762 = 34.1%): 43/43 declare-attackers fires were
+// this exact false positive, plus 58 target/mode/may-trigger asks - 101 fires,
+// 13% of all of them, on menus that could not have carried the plan's action.
+// So scan the NUMBERED OPTION LINES only, never the prose around them.
+inline std::string optionLinesOnly(const std::string& optsLower)
+{
+    std::string out;
+    size_t pos = 0;
+    while (pos <= optsLower.size())
+    {
+        size_t eol = optsLower.find('\n', pos);
+        size_t end = (eol == std::string::npos) ? optsLower.size() : eol;
+        std::string line = optsLower.substr(pos, end - pos);
+        size_t i = 0;
+        while (i < line.size() && (line[i] == ' ' || line[i] == '\t'))
+            i++;
+        size_t d = i;
+        while (d < line.size() && line[d] >= '0' && line[d] <= '9')
+            d++;
+        if (d > i && d < line.size() && line[d] == '.')
+            out += line + "\n";
+        if (eol == std::string::npos)
+            break;
+        pos = eol + 1;
+    }
+    return out;
+}
+
+// True when this ask's own option ROWS are card actions - the only shape on
+// which "your plan's actions are not in this list" is a meaningful claim.
+// Two families qualify. (1) The named verbs, as before. (2) #W44-7: an option
+// row carrying the engine's own action annotations ([cost: ...] / {card text:
+// ...}) - the NARROW windows the wave-43 fallbacks actually happened in, where
+// the only offers are mana taps, cycling, manland activations or a single
+// loyalty ability. A plan naming a cast is genuinely absent from those, and
+// they are where the pilot answered with a card that was never listed.
+// Everything else stays out by construction: declare-attackers/blockers rows
+// are "A1."/"B1." and produce NO numbered lines at all; pay-life sub-asks,
+// mode menus, dungeon-room choices and target lists carry neither a verb nor a
+// cost annotation.
 inline bool optionsAreActionMenu(const std::string& optsLower)
 {
+    std::string lines = optionLinesOnly(optsLower);
+    if (lines.empty())
+        return false;
     static const char * marks[] = { "cast ", "activate ", "play land", "play ", "equip " };
     for (size_t i = 0; i < sizeof(marks) / sizeof(marks[0]); i++)
-        if (optsLower.find(marks[i]) != std::string::npos)
+        if (lines.find(marks[i]) != std::string::npos)
             return true;
-    return false;
+    return lines.find("[cost:") != std::string::npos
+        || lines.find("{card text:") != std::string::npos;
 }
 
 // planRaw / optsRaw as assembled; myCardNames = display names from the

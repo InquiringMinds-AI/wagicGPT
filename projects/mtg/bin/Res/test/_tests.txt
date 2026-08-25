@@ -1197,3 +1197,13 @@ ai_x_alt_menu_cast_wave43.txt
 trample_vs_protection_blocker.txt
 trample_vs_ordinary_blocker.txt
 nontrample_vs_protection_blocker.txt
+
+#W44-8: the menace BLOCK side, which four selfplay corpora never once reached
+#(no menace attacker was ever offered to a defender). The scripted pair differs
+#only in how many walls are assigned to the same menace attacker - two holds
+#(life 20), one does not block at all (life 17). The AI fixture is the positive
+#control for its unregistered twin menace_defender_ai_gang_block.txt, which is a
+#known red: the heuristic defender cannot assemble a legal menace block.
+menace_defender_two_blockers.txt
+menace_defender_one_blocker.txt
+menace_defender_ai_control_vanilla.txt
