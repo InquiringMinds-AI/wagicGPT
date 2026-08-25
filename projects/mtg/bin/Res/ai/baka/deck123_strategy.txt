@@ -87,10 +87,12 @@ good one - take Tragic Slip, Damnation or a token activation instead.
 gains the life. Naming "The opponent (player, life" gives them the life, so use Devour Flesh
 on the opponent when Tribute to Hunger is not on the list and they have exactly ONE creature -
 then the sacrifice takes their only body and the life they gain is worth it.
-Only a creature ON THE BATTLEFIELD can be sacrificed. A creature spell listed under "ON THE
-STACK, waiting to resolve" is not there yet - cast an edict at it and the opponent sacrifices
-nothing and you have thrown the card away. Read the opponent's battlefield line: if it says "of
-which 0 are creatures", no edict does anything, whatever is on the stack.
+Before any edict, run this in order: (1) find "of which N are creatures" on the OPPONENT'S
+battlefield line. N is the only number that matters. (2) If N is not exactly 1, do not cast
+an edict - not at 0, not at 2 or more. (3) A creature listed under "ON THE STACK, waiting to
+resolve" is NOT on the battlefield and does not change N. Naming a creature spell on the
+stack in your PLAN is the mistake itself: at N=0 the opponent sacrifices nothing and you have
+thrown away the card.
 Never cast an edict when the opponent's life is at or below the life it gives them. Killing
 their last creature and moving them from 1 life to 4 costs you a game you had already won.
 Do not spend an edict on a creature that is not hurting you. If their only creature is a
@@ -130,8 +132,12 @@ Take the highest entry on this list that appears in your casting menu:
     Intruder Alarm on an empty battlefield does NOTHING. A token-maker with no Alarm still
     makes one token a turn. The maker goes first, every time.
  4. "Cast Idyllic Tutor {2}{w}" - when no Intruder Alarm is on your battlefield or in your hand.
- 5. A removal spell, by Rules 3, 4 and 5.
- 6. "Cast Vision Skeins {1}{u}".
+ 5. "Cast Lightning Greaves {2}" - ONLY when a token-maker is already on your battlefield.
+    Read your own battlefield line: "of which 0 are creatures" means the Greaves equips
+    nothing and does nothing. Cast a removal spell or answer "Cast nothing right now" and
+    keep the Greaves for the turn a maker lands.
+ 6. A removal spell, by Rules 3, 4 and 5.
+ 7. "Cast Vision Skeins {1}{u}".
 
 === INTRUDER ALARM AND IDYLLIC TUTOR ===
 "Cast Intruder Alarm {2}{u}": it is the engine, and it is entry 3 on the cast list above -
@@ -180,7 +186,19 @@ number of attackers - Lightmine Field on deck125's board says so in its text - t
 with N creatures deals N damage to each of your attackers before any combat damage happens.
 Count it off the battlefield line: find the SMALLEST toughness among the creatures you would send,
 and send that many minus one, biggest power first. Leave the rest home.
-With no such permanent on their board, send everything.
+Before you send anything, read the "[their untapped blockers: ...]" tag on your own attacker
+lines. If EVERY outcome in it reads "(neither dies)", you are not sending an attack - you are
+feeding blockers. Count their untapped creatures. If they have as many untapped creatures as
+you are sending, or more, answer ATTACK: none and keep building.
+Two walls make this actively lethal to you, and their names are on their battlefield line:
+PERIMETER CAPTAIN gains them 2 life for EVERY defender they block with, and PRIDE GUARDIAN
+gains them 3 more. With SANGUINE BOND or EXQUISITE BLOOD also on that line, each point they
+gain is a point you lose - a twelve-creature attack into six walls gained one opponent 26 life
+and took 19 off you in a single turn. When their battlefield line names Perimeter Captain,
+Pride Guardian, Sanguine Bond or Exquisite Blood, ATTACK: none is the answer until a token
+activation, a Tragic Slip or a Damnation has removed the wall that gains them the life.
+Send the army only when at least one attacker's tag says "you kill it, your blocker lives"
+or their untapped creature count is lower than the number you are sending.
 One more hold-back: do not send a lone Thraben Doomsayer or Bloodline Keeper into a board that
 can block and kill it. The maker is the engine; your tokens are the attack. Send it once you
 have tokens attacking beside it.
@@ -190,6 +208,10 @@ Blocking, in this order:
    minus 4 or more, put a blocker on EVERY attacker - biggest attacker first, Thraben Doomsayer
    and Bloodline Keeper included - and keep assigning until no attacker is left unblocked. A
    token-maker you keep alive at 1 life makes tokens for a game you already lost.
+   This rule spends EVERY blocker you have, including your last one. One blocker on one attacker
+   still stops that attacker's whole damage - "I only have one, so it does not matter" is how you
+   go from 10 life to 2 in one combat step. Assign blockers until you run out of blockers or run
+   out of unblocked attackers, whichever comes first.
  - Otherwise your token-makers do NOT block. Take the damage. A blocker line reading "(both
    die)" on Thraben Doomsayer or Bloodline Keeper is a trade you decline while your life is
    comfortable - the maker is worth more than any one attacker.

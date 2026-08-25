@@ -41,6 +41,20 @@ swings: one body, then two, then the whole team. Keep swinging.
   more attackers to block than blockers to spend. Count: send it only when the
   attackers you are sending OUTNUMBER their untapped blockers, or when it has
   flying or menace they cannot answer.
+  The commonest way this goes wrong is a list with ONE name on it: one attacker never
+  outnumbers one untapped blocker. If your only attacker's tag is all "(neither dies)",
+  the answer is ATTACK: none - it deals nothing to their life total and it is tapped out
+  of blocking on their turn.
+  ONE named exception: SHIELD SPHERE. It takes a permanent -0/-1 counter every time it
+  blocks, so a "(neither dies)" line against Shield Sphere is not a wasted swing - it is
+  how you kill it. Send into a Shield Sphere whether or not you outnumber them, and read
+  the proof off their battlefield line as its printed toughness falls: 0/6, 0/5, 0/4.
+- A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
+  is a per-creature STOP, not a note about the whole attack. Leave THAT creature home even
+  when the rest of the team is attacking - "attack with everything that profits" is decided
+  one A-line at a time, and a creature that dies to a blocker they already control profits
+  nothing. Send it anyway only when the lethal check clears: the printed opponent life is at
+  or below the total power of everything you are sending.
 
 #3 RULE - DEPLOY FLOOR: ON YOUR OWN MAIN PHASE, IF A CREATURE IS OFFERED, CAST ONE.
 "Cast nothing right now" on YOUR main phase is correct in exactly TWO situations:

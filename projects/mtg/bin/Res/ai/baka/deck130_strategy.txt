@@ -14,9 +14,11 @@ Four of your cards can be discarded to draw one, and the game offers this consta
 a priority option beginning "cycling with " and ending "Cycle]", and a cast menu headed
 "Choose an option for" whose FIRST row is "1. cycling". Run this table over every one of them:
 
-  Forgotten Cave  -> cycle it freely in your SECOND MAIN PHASE with mana you did not spend. Not in
-                     your own upkeep, and not while a second land sits in your hand - play the land
-                     first. It is a land, and you own twenty-four of them.
+  Forgotten Cave  -> the gate is your land drop, not the phase name. While the line reads
+                     "Land drop: NOT yet used this turn", or while a second land sits in your
+                     hand, PLAY THE LAND and do not cycle. Once the land drop is spent, cycle
+                     the Cave freely with mana you were not going to use. Never in your own
+                     upkeep. It is a land, and you own twenty-four of them.
   Spark Spray     -> cycle it when its cast option's "legal targets right now:" list shows no
                      opponent creature. If it shows one, cast it instead (rule #2).
   Lay Waste       -> CAST IT at a land. Cycle Lay Waste only once you control 8 or more lands.
@@ -43,11 +45,16 @@ turns in which you did something.
 Pyrite Spellbomb, Spark Spray, Starstorm, Hammer of Bogardan and Siege-Gang's sacrifice ability all
 print their choices as a list - either after "legal targets right now:" or as one menu row per
 target, with the face row reading "targeting a player". Procedure, top down, every time:
-  0. FIRST count their creatures. If TWO OR MORE show a toughness that a single X would reach,
-     Starstorm at that X is the play and it OUTRANKS every single-target damage spell you hold -
-     Hammer of Bogardan, Pyrite Spellbomb and Spark Spray each kill exactly one. Price it before you
-     dismiss it: the cost is X plus {R}{R}, so two 3/2s both die to X=2 for four mana. Your own board
-     holding no creatures makes that sweep free.
+  0. FIRST read the "{X pricing:" annotation on the Cast Starstorm line, and read the WHOLE of
+     it - the "At X=..." clause after the first sentence, not just the first number. Find the
+     largest X you can afford and the list of THEIRS it kills at that X. If that list names TWO
+     OR MORE creatures, casting Starstorm at that X is the play and it OUTRANKS every
+     single-target damage spell you hold and every land destruction spell in your hand - Hammer
+     of Bogardan, Pyrite Spellbomb and Spark Spray each kill exactly one. "smallest X that
+     kills anything: kills THEIRS: none" does NOT mean Starstorm is blank; it usually means the
+     smallest X only kills your own Dwarven Blastminer. Keep reading to the "At X=" clause
+     before you dismiss the card. Losing your own Blastminer to kill two of their creatures is
+     a trade you take.
   1. An opponent PLANESWALKER on the list -> aim there. A live planeswalker wins their game.
   2. An opponent CREATURE whose printed toughness this damage reaches -> aim there. Spark Spray
      kills 1 toughness; Pyrite Spellbomb kills 2; Hammer of Bogardan kills 3. The battlefield line
@@ -56,6 +63,13 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
      anyway rather than bank the card.
   4. Only then "The opponent (player, life" - and only when that number is 6 or less, so the damage
      you add actually finishes them.
+  ONE exception to the 6-or-less floor, and only this one: LETHAL THIS TURN. Add up every
+  point of damage you can produce in this window and the ones after it in this same turn -
+  each Goblin you can sacrifice is 2, each Pyrite Spellbomb is 2, Hammer of Bogardan is 3,
+  plus the damage of every attacker you have already declared that they cannot block. If that
+  total is at or above the "Opponent life:" number, start the chain now and spend every piece.
+  Nine life to a Siege-Gang Commander with three Goblins and a loaded Spellbomb is lethal, not
+  a face-burn mistake.
 CROSS-CHECK: "Opponent life:" is printed on every decision. If it is HIGHER than when you last
 looked, face damage is not a clock - they gain faster than you burn. Aim nothing at the face for the
 rest of that game; spend every point on their creatures and planeswalkers.
@@ -84,9 +98,9 @@ DWARVEN BLASTMINER (1/1) is a land-destruction machine, not a creature. His abil
 UNTAPPED - so leave him out of every ATTACK line. One point of chip damage costs you a land kill,
 and against creatures marked "[defender]" attacking him hands the opponent life for blocking.
 Activate him every turn you have three spare mana and their board shows a non-basic land.
-His ability's target row prints only a land NAME with no owner - "Destroy with Dwarven Blastminer
-targeting <land>". Before you take it, find that name on the "Opponent battlefield" line. If it is
-not there it is YOUR land and the activation is a self-inflicted loss: pass instead.
+His ability's target row now names the owner: "Destroy with Dwarven Blastminer targeting
+<land> [opponent's battlefield]". Take rows tagged [opponent's battlefield]; never a row
+tagged [your battlefield].
 STARSTORM ({X}{R}{R}, instant) deals X to EVERY creature, including yours. Cast it when the opponent
 battlefield line shows two or more creatures. Its X menu says "option 1 is the LARGEST X"; pick the
 smallest X that reaches the toughness you must kill. Because it kills your own Blastminers, goblins

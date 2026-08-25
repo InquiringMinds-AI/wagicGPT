@@ -112,31 +112,6 @@ BLOCK - the only exception is Nadaar, who has vigilance and attacks for free. Be
 creature, ask what happens on the crack-back with that creature unavailable.
 - NEVER plan to block with a creature you are attacking with in the same turn. If your plan says
   "attack with these, then block with these," the plan is impossible - rewrite it.
-- HOLD-BACK GATE - RUN THIS CHECK AT EVERY "declare ALL attackers" ASK, BEFORE PICKING
-  ATTACKERS. It is a hard gate, not advice, and it is a NUMBER, not a feeling: add up the
-  current power (the first number in each "(P/T)") of EVERY creature the opponent controls -
-  INCLUDING every one marked "[tapped - cannot attack or block this turn]". That marker is about
-  THIS turn only: they ALL untap at the start of the opponent's turn and can attack you. "Their
-  creatures are tapped" is NEVER a reason your attack is safe - the attack that kills you is
-  NEXT turn's, and nothing of theirs is tapped then. Call the sum THEIR TOTAL POWER. If THEIR
-  TOTAL POWER is your life total or more, the gate fails: declare ATTACK: none (Nadaar alone may
-  still attack - vigilance) and keep every body home to block - a creature that attacks now is
-  tapped through that next-turn swing and blocks nothing. "I will draw removal next turn" is not
-  a survival plan; the blockers are. At low life, chip damage is worth nothing and a body that
-  survives to block is worth the game.
-  THE HOLE THIS RULE EXISTS TO PLUG: "it is my only attacker, so it is my only clock." That
-  is exactly when the gate matters most. A creature that attacks is TAPPED through the swing
-  that kills you; three points of chip damage does not beat being alive. When the gate fails
-  and the list offers ONE attacker, the answer is ATTACK: none - no exception but lethal.
-  AND: if the plan you were just shown says holding is right, your ATTACK: line must agree
-  with it. A reply whose answer contradicts its own plan is wrong on the answer, not the plan.
-  TWO THINGS THE COUNT MUST NOT GET WRONG:
-  - VIGILANCE. A creature with vigilance does NOT tap to attack. It attacks and
-    it still blocks. The gate never holds a vigilance creature home - send it.
-  - "[doesn't untap during its controller's untap step]". A creature carrying that
-    tag AND marked [tapped] stays tapped through their turn: it cannot attack you.
-    Count it ZERO. The "count tapped creatures too" rule assumes they untap; that
-    tag is the engine telling you they do not.
 - "(neither dies)" on the ATTACK side is the OPPOSITE of free damage. It means that
   blocker stops every point you were sending and nothing dies - you spent a tapped
   creature for nothing, and some walls (Perimeter Captain) GAIN THEM LIFE for blocking.
@@ -145,6 +120,20 @@ creature, ask what happens on the crack-back with that creature unavailable.
   more attackers to block than blockers to spend. Count: send it only when the
   attackers you are sending OUTNUMBER their untapped blockers, or when it has
   flying or menace they cannot answer.
+  The commonest way this goes wrong is a list with ONE name on it: one attacker never
+  outnumbers one untapped blocker. If your only attacker's tag is all "(neither dies)",
+  the answer is ATTACK: none - it deals nothing to their life total and it is tapped out
+  of blocking on their turn.
+  ONE named exception: SHIELD SPHERE. It takes a permanent -0/-1 counter every time it
+  blocks, so a "(neither dies)" line against Shield Sphere is not a wasted swing - it is
+  how you kill it. Send into a Shield Sphere whether or not you outnumber them, and read
+  the proof off their battlefield line as its printed toughness falls: 0/6, 0/5, 0/4.
+- A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
+  is a per-creature STOP, not a note about the whole attack. Leave THAT creature home even
+  when the rest of the team is attacking - "attack with everything that profits" is decided
+  one A-line at a time, and a creature that dies to a blocker they already control profits
+  nothing. Send it anyway only when the lethal check clears: the printed opponent life is at
+  or below the total power of everything you are sending.
 BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
 this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
  0. "(neither dies)" - TAKE THAT BLOCK. Nothing of yours dies, nothing of theirs dies, and
@@ -263,9 +252,6 @@ DECIDING SITUATIONS (recognize -> do):
   A "pump now, attack next turn" plan is always wrong: the +3/+3 ends this turn.
 - Silverquill Command asks you to pick one creature on the battlefield -> pick YOUR OWN creature
   (it gets the +3/+3); never the opponent's, whatever the list shows.
-- The opponent's creatures' total power is your life total or more (count EVERY creature - the
-  tapped ones untap for their turn) -> ATTACK: none (Nadaar may still go - vigilance); every
-  other body stays home to block. Their creatures being tapped never makes attacking safe.
 - A block line reads "(you kill it, your blocker lives)" -> take it, whatever the forecast says.
 - A block line reads "(both die)" -> take it unless their creature is worth less than yours.
 - Only "(your blocker dies, attacker lives)" is decided by the forecast: take it at 10 or less,

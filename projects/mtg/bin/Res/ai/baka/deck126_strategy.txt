@@ -83,7 +83,9 @@ parenthesis each. Pick, for that blocker, an attacker whose parenthesis says you
 LIVES ("neither dies" or "you kill it") ahead of one that says it dies. The life gain is
 identical either way - a wall that survives gains it again next combat, and a wall that
 dies gains it once. When two or more attackers all let that blocker live, take the one with the
-BIGGEST "deals N" number on its A-line. The life gain is the same either way, so the only thing
+BIGGEST "deals N" number on its A-line that no other blocker of yours is already assigned to -
+one blocker per attacker first, as above; this tiebreak only chooses among attackers
+still unblocked. The life gain is the same either way, so the only thing
 left to decide is how much damage you stop - stop the bigger number.
 Only when every attacker offered to that blocker kills it do you put it on the attacker with the
 biggest "deals N" number on its A-line - read the number off the line, do not judge by name, by
@@ -94,7 +96,11 @@ reads "your blocker dies, attacker lives" on EVERY attacker it is offered. A lin
 die" is not that line - take it; a body of theirs for a body of yours is a trade you want, and a
 lifelink blocker gains you life on the way. Once either enchantment is on your battlefield, every
 blocker blocks, on any line at all.
-"BLOCKS: none" is right only when every blocker the list offers you falls under the line above.
+That carve-out is OFF whenever the combat header's "you would be at N" number is 8 or
+less. At that life total the damage a body stops is worth more than the body, so block
+with everything the list offers, whatever the parenthesis says.
+"BLOCKS: none" is right only when every blocker the list offers you falls under the carve-out
+above.
 
 === RULE #6 - ATTACKING ===
 All sixteen of your creatures are Defenders and can never attack; the attacker list already leaves
