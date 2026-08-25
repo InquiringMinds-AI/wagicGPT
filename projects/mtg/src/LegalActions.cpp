@@ -557,6 +557,32 @@ bool LegalActionsOracle::hasAnyLegalAction(Player * p)
     if (phase == MTG_PHASE_COMBATBLOCKERS && !myTurn && hasLegalBlock(p))
         return true;
 
+    //CR 509.2 / 510.1a: ordering the blockers of a multi-blocked attacker is
+    //the ATTACKING player's choice, and like the two declarations above it is
+    //neither a cast nor an activated ability - so this oracle used to answer
+    //"nothing to do here" for an attacker with an empty hand, and
+    //GameObserver's no-legal-action phase skip stepped straight over the ORDER
+    //step. The blockers then kept their DECLARATION order, which means the
+    //DEFENDER silently chose which of its own creatures the attacker's damage
+    //killed. Live-observed on Vita (2026-08-24, "sometimes it's not allowing me
+    //to assign damage order, and other times it lets me" - the two cases are
+    //exactly "empty hand" vs "holding an instant", because an instant-speed
+    //response was the only thing that used to keep the window open).
+    //The condition mirrors GuiCombat's own ORDER arm (any of our attackers with
+    //more than one blocker) so the oracle cannot disagree with the UI that
+    //armed the step - GuiCombat already advances the step itself when nothing
+    //is multi-blocked, and that skip stays exactly as it is.
+    if (phase == MTG_PHASE_COMBATBLOCKERS && g->combatStep == ORDER && myTurn)
+    {
+        MTGGameZone * inPlay = p->game->inPlay;
+        for (int i = 0; i < inPlay->nb_cards; i++)
+        {
+            MTGCardInstance * c = inPlay->cards[i];
+            if (c && c->attacker && c->blockers.size() > 1)
+                return true;
+        }
+    }
+
     //A sorcery-speed window of the player's own turn opens up everything the
     //rest of the game forbids: lands, sorceries, creatures, and abilities
     //that are only usable at sorcery speed.
