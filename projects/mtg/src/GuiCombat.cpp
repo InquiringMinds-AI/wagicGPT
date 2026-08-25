@@ -157,6 +157,37 @@ void GuiCombat::addOne(DefenserDamaged* blocker, CombatStep step)
 }
 void GuiCombat::removeOne(DefenserDamaged* blocker, CombatStep)
 {
+    //CR 702.19b: a trampling attacker may assign damage to the player it is
+    //attacking only "once all those blocking creatures are assigned lethal
+    //damage", and "when checking for assigned lethal damage, take into account
+    //damage already marked on the creature ... but not any abilities or effects
+    //that might change the amount of damage that's actually dealt" - so
+    //prevention, protection and fog do NOT shrink the cut a blocker soaks.
+    //(702.19b does permit assigning LESS than lethal to a blocker - "but in
+    //that case can't assign any damage to the player." In this engine that
+    //escape does not exist: GuiCombat::resolve() computes the trample-through
+    //as power minus the blockers' assignments, so every point taken off a
+    //blocker becomes damage to the player. Refusing the reduction is therefore
+    //the faithful reading here, not an over-restriction.)
+    //Without trample there is nowhere else for the point to go (the tail of
+    //this function hands it straight back to another blocker), so the floor
+    //only binds for a trampler, where a removed point becomes damage to the
+    //defending PLAYER. Unguarded, the manual damage-assignment screen let the
+    //attacking player press DOWN off a blocker it could not kill anyway - a
+    //creature with protection from it - and collect the blocker's whole
+    //lethal cut as free trample damage to the face.
+    //autoaffectDamage seeds this screen with the rules-correct split, so the
+    //floor never blocks a legal edit: everything above lethal is still free to
+    //move, and UP is unrestricted.
+    if (activeAtk && activeAtk->card && blocker->card
+        && activeAtk->card->has(Constants::TRAMPLE))
+    {
+        const bool deathtouch = activeAtk->card->has(Constants::DEATHTOUCH)
+            || activeAtk->card->has(Constants::PERPETUALDEATHTOUCH);
+        const int lethal = deathtouch ? 1 : MAX(blocker->card->life, 1);
+        if (blocker->sumDamages() <= lethal)
+            return;
+    }
     blocker->addDamage(-1, activeAtk);
     for (vector<DamagerDamaged*>::iterator it = activeAtk->blockers.begin(); it != activeAtk->blockers.end(); ++it)
         if ((activeAtk->card->has(Constants::DEATHTOUCH) || activeAtk->card->has(Constants::PERPETUALDEATHTOUCH)) ? ((*it)->sumDamages() < 1) : (!(*it)->hasLethalDamage()))

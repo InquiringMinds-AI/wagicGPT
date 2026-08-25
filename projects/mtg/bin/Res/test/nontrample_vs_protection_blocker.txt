@@ -1,0 +1,34 @@
+# CONTROL for trample_vs_protection_blocker.txt on the OTHER axis: same
+# protection blocker, attacker WITHOUT trample. Craw Wurm (green 6/4) blocked by
+# Cerulean Wyvern (3/3 flier, protection from green): all 6 damage is assigned
+# to the blocker and all of it is prevented (702.16e). Nothing carries over to
+# the defending player - a blocked non-trampler assigns nothing to a player
+# (510.1b/510.1c) - so the defender stays at 20 and the Wyvern survives.
+# Isolates the trample clause: any life loss here would mean prevention was
+# being read as "damage that never got assigned" and leaking to the face.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Craw Wurm
+life:20
+[PLAYER2]
+inplay:Cerulean Wyvern
+life:20
+[DO]
+goto attackers
+Craw Wurm
+next
+Cerulean Wyvern
+next
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Craw Wurm
+life:20
+[PLAYER2]
+inplay:Cerulean Wyvern
+life:20
+[END]
