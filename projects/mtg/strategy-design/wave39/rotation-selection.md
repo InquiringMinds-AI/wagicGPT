@@ -79,3 +79,11 @@ NO EXIT. Every guide ships fresh wave-42 edits (25 across 7 decks); menace engin
 owner narration fixes need their first corpus; E7 rework + deck123 obedience restructure
 unvalidated. Wave-43 pool unchanged: 146,152,125,126,162,123,130. Canaries: deck123
 obedience rate at M>=12 (was 72%); deck130 Starstorm release; deck125 W1/W2 vs punishers.
+
+## Wave-43 rotation adjudication (2026-08-24)
+NO EXIT (fifth consecutive). Seat evidence: 146 open S1/S2/S4; 162 under-sampled +
+3-of-4 nulls + S5 gap; 152 confirmed misplay + fix queued; 123 construction case at
+the owner; 125/130/126 fresh HIGH edits. NEW CLASS: structural nulls (mulligan floors
+— rigged hands; trample carve-outs — no ground tramplers in pool) recorded as
+UNREACHABLE-IN-POOL rather than pending; they do not block exit-eligibility and do not
+count as open predictions. Pool unchanged: 146,152,125,126,162,123,130.
