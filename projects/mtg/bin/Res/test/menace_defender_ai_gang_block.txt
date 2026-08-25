@@ -1,0 +1,66 @@
+#NAME: Menace, defender side -- the AI defender NEVER assembles a legal menace block
+#DESC: #W44-8. DELIBERATELY NOT REGISTERED in _tests.txt: the behaviour under test IS
+#DESC: a red (same convention as mandatory_chooser_unanswered.txt). The ASSERT below
+#DESC: states the CORRECT outcome; the engine currently produces the wrong one.
+#DESC:
+#DESC: Scoped run, from projects/mtg/bin:
+#DESC:   printf 'menace_defender_ai_gang_block.txt\n' > Res/test/_probe.txt
+#DESC:   WAGIC_HEADLESS=1 WAGIC_TESTSUITE=1 WAGIC_TESTSUITE_THREADS=1 \
+#DESC:     WAGIC_TESTSUITE_FILE=test/_probe.txt ./wagic
+#DESC:
+#DESC: SCENARIO: both seats AI. Boggart Brute 3/2 (primitives: abilities=menace, no
+#DESC: auto=) attacks a defender holding TWO untapped plain walls, Wall of Stone 0/8
+#DESC: and Wall of Granite 0/7 - either survives the full 3 damage alone, and the pair
+#DESC: is exactly what CR 509.1c requires. A correct defender gang-blocks and takes 0.
+#DESC:
+#DESC: MEASURED 2026-08-24 (wave-44 lane C), 5/5 reruns identical: the defender is at
+#DESC: 17 at the assert - the Brute's first swing went through unblocked. Left running
+#DESC: past the pad it keeps going through (an earlier, longer pad ended at 8: four
+#DESC: unblocked swings of 3). The positive control
+#DESC: menace_defender_ai_control_vanilla.txt is the SAME board, script and budget with
+#DESC: a vanilla Hill Giant 3/3 in the Brute's place and passes at life 20, so the
+#DESC: heuristic chooser can see these walls and they can block a 3-power ground
+#DESC: creature: menace is the whole difference.
+#DESC:
+#DESC: READING: AIPlayerBaka's block chooser is PAIRWISE (canBlock per candidate) and
+#DESC: never assembles a set, so it declares at most one blocker on the Brute, the
+#DESC: rules layer deletes the under-filled declaration, and the defender eats the
+#DESC: swing while believing it blocked - the heuristic-side twin of the CR 509.1c
+#DESC: set-level prune wave-43 added to AIPlayerGPT::decideBlockers. It matters beyond
+#DESC: the heuristic seat: Baka answers EVERY GPT failure, so the LLM opponent inherits
+#DESC: this on every fallback decision.
+AICALLS 80
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Boggart Brute
+[PLAYER2]
+inplay:Wall of Stone,Wall of Granite
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Boggart Brute
+life:20
+[PLAYER2]
+inplay:Wall of Stone,Wall of Granite
+life:20
+[END]

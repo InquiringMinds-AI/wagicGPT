@@ -1877,8 +1877,19 @@ static bool w42CounterLabel(const string& s, string& out)
         }
     }
     string kind = ptWord;
+    //W44-5a: the two COUNTER-ROW emitters (board [counters: ...] and
+    //counterEventNarration) route every engine counter name through
+    //legibleCounterName; this ABILITY-LABEL path - the same counter, named on
+    //the stack and in the option list - never did, so 29 corpus lines read
+    //"put a teferieffect counter" beside a board row that called the very same
+    //counter "bookkeeping (Teferi's +1)". One name per counter, everywhere.
+    //A mapped name is already English prose and is NOT re-cased (w42Lower would
+    //give "teferi's"); only the raw engine token keeps the lowering.
     if (!name.empty())
-        kind += (kind.empty() ? "" : " ") + w42Lower(name);
+    {
+        string legible = legibleCounterName(name);
+        kind += (kind.empty() ? "" : " ") + (legible == name ? w42Lower(name) : legible);
+    }
     if (kind.empty()) return false; //a bare "Counter" tells the pilot nothing the raw label did not
     int count = nb < 0 ? -nb : nb;
     std::ostringstream o;
@@ -3079,12 +3090,29 @@ string zoneDesc(MTGGameZone * z)
 //again. DECISION SURFACES ONLY: it is a bracket, and the owner's ruling keeps
 //bracketed guidance out of the append-only log (stripNarrationDecoration drops
 //every bracket) - see targetLogName for the history-side twin.
+//W44-5b: an UN-ventured dungeon is not in any actionable zone. The engine parks
+//the whole dungeon roster in the SIDEBOARD (MTGPlayerCards' ctor, comment
+//"Dungeons will be added to sideboard zone"), a plain MTGGameZone whose
+//getName() is the base-class placeholder - so 84 corpus dungeon-selection rows
+//read "[your zone]". Naming the true home ("[your sideboard]") would be a TRUE
+//statement in the WRONG SCOPE: it invites the pilot to reason about a sideboard
+//it can never act on, in a format that has no sideboard. A dungeon's location
+//is not a decision fact at all, so say nothing - the row still names the
+//dungeon and, via targetPreviewFacts, its full room path. Pure so both the
+//suppression and the untouched normal shape are provable.
+static string zoneTagText(bool isDungeon, bool mine, const string& zoneName)
+{
+    if (isDungeon)
+        return "";
+    return string(" [") + (mine ? "your " : "opponent's ") + zoneName + "]";
+}
+
 string targetZoneTag(Player * me, MTGCardInstance * c)
 {
     if (!c || !c->currentZone)
         return "";
-    return string(" [") + (c->controller() == me ? "your " : "opponent's ")
-           + zoneDesc(c->currentZone) + "]";
+    return zoneTagText(c->hasType(Subtypes::TYPE_DUNGEON), c->controller() == me,
+                       zoneDesc(c->currentZone));
 }
 
 //#W43-10: how a target is NAMED in the append-only log - identity only (name
@@ -7000,9 +7028,16 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
     //line of the run distinct (N-105f) and therefore no run at all. The
     //planeswalker/dungeon/level case has no such tail, which is exactly why its
     //ticks came out byte-identical.
+    //#W44-LOW (wave-43 defect 4, 15/15 lines): the gate also required ce->added,
+    //so a run of "Your Teferi lost a loyalty counter" came out with no resulting
+    //total while the arrival run beside it carried one. Loyalty SPENT is the
+    //half a pilot has to track (it is what decides whether the walker survives
+    //to tick again), and Counters::removeCounter captures settledNb on exactly
+    //the same line as addCounter does - the fact was there, only the gate
+    //refused it. Removal and addition are one register now.
     int runTotal = -1;
     if (WEventCounters * ce = dynamic_cast<WEventCounters *>(event))
-        if (ce->stateCaptured && ce->added && ce->targetCard && !ce->targetCard->isCreature())
+        if (ce->stateCaptured && ce->targetCard && !ce->targetCard->isCreature())
             runTotal = ce->settledNb;
     if (!line.empty())
         appendNarration(line, runTotal);
@@ -7629,6 +7664,61 @@ string AIPlayerGPT::describeEvent(WEvent * event)
     return ""; //everything else (mana plumbing, taps, micro-steps) is noise
 }
 
+//#W44-6 (wave-43 seat-146/152/162 E-2, trust-doctrine breach): the CURRENT
+//SITUATION frame described the reveal zone as if EVERY reveal were a library
+//search of this seat's own library. When the reveal actually held the
+//OPPONENT'S HAND (Thoughtseize/Duress-class), the frame said three false
+//things at once: it added the opponent's five cards to "Your library" and
+//called them "still in your library", and - because those cards had left the
+//opponent's hand zone to sit in the reveal zone - it announced "Opponent hand
+//size: 0" three lines above a list of the five cards it held. The pilot is
+//INSTRUCTED to believe the frame over its own count, so a false frame is not
+//cosmetic.
+//The fix is attribution, not deletion: a reveal-zone card carries the zone it
+//came FROM (MTGGameZone::removeCard stamps previousZone unconditionally), so
+//each displaced card is counted against its REAL home. Unattributable cards
+//default to the library, which keeps the (correct) library-search frame
+//byte-identical - a search moves library cards and nothing else.
+//Both lines are pure so the search shape and the hand-reveal shape are
+//provable against each other in runParseSelfTest without a game.
+static string yourLibraryLine(int libraryCards, int myLibraryInReveal)
+{
+    std::ostringstream o;
+    o << "Your library: " << (libraryCards + myLibraryInReveal) << " cards";
+    if (myLibraryInReveal > 0)
+        o << " (" << myLibraryInReveal << " of them are the cards listed in the search/reveal"
+             " below - they are still in your library until this decision resolves)";
+    return o.str();
+}
+
+//The hand-size line must never read 0 for a hand that is merely DISPLACED into
+//a reveal zone for the duration of one decision. State the true size and say
+//where the cards are being shown.
+static string opponentZoneCountsLine(int oppHandCards, int oppHandInReveal, int oppLibraryCards)
+{
+    std::ostringstream o;
+    o << "Opponent hand size: " << (oppHandCards + oppHandInReveal);
+    if (oppHandInReveal > 0)
+        o << " - the opponent's hand (" << oppHandInReveal << " card"
+          << (oppHandInReveal == 1 ? "" : "s") << ") is revealed below; those cards"
+             " are still in their hand until this decision resolves";
+    o << " | Opponent library: " << oppLibraryCards << " cards";
+    return o.str();
+}
+
+//The same displacement seen from the other chair: an opponent's discard spell
+//parks YOUR hand in a reveal zone, and "Your hand: " would list what is left
+//behind. Say what is missing rather than let the omission read as an empty hand.
+static string yourHandDisplacedClause(int myHandInReveal)
+{
+    if (myHandInReveal <= 0)
+        return "";
+    std::ostringstream o;
+    o << " (plus " << myHandInReveal << " card" << (myHandInReveal == 1 ? "" : "s")
+      << " of your hand revealed below - still in your hand until this decision resolves)";
+    return o.str();
+}
+
 //N-146f: the "Dungeons completed" status line for CURRENT SITUATION. Empty when
 //neither player has completed one (non-dungeon games untouched). Pure helper so
 //the emitted shape is deterministically provable (runParseSelfTest).
@@ -7878,8 +7968,36 @@ string AIPlayerGPT::serializeGameState()
         out << landDropStatusLine(myTurn, playable, haveLand);
     }
 
+    //#W44-6: attribute every card sitting in EITHER reveal zone to the zone it
+    //was displaced FROM, once, before any count line is written. Unattributable
+    //cards in MY reveal zone default to my library (the library-search case,
+    //unchanged); the opponent's reveal zone only ever contributes HAND
+    //attributions here, exactly as the pre-fix code counted nothing from it.
+    int myLibInReveal = 0, myHandInReveal = 0, oppHandInReveal = 0;
+    {
+        for (int r = 0; r < 2; r++)
+        {
+            MTGGameZone * rz = (r == 0) ? game->reveal : (opp ? opp->game->reveal : NULL);
+            if (!rz)
+                continue;
+            for (int i = 0; i < rz->nb_cards; i++)
+            {
+                MTGCardInstance * rc = rz->cards[i];
+                if (!rc)
+                    continue;
+                if (opp && rc->previousZone == opp->game->hand)
+                    oppHandInReveal++;
+                else if (rc->previousZone == game->hand)
+                    myHandInReveal++;
+                else if (r == 0)
+                    myLibInReveal++;
+            }
+        }
+    }
+
     out << "Your hand: ";
     describeZoneCards(out, game->hand, false);
+    out << yourHandDisplacedClause(myHandInReveal);
     //Surfaced creature COUNTS: a cluttered board line studded with
     //artifacts and [tapped] flags gets miscounted (wave-7 deck140: every
     //sweeper mistiming stood on a wrong creature tally). An integer at the
@@ -7920,8 +8038,8 @@ string AIPlayerGPT::serializeGameState()
     {
         out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures);
         describeZoneCards(out, opp->game->inPlay, true);
-        out << "\nOpponent hand size: " << opp->game->hand->nb_cards
-            << " | Opponent library: " << opp->game->library->nb_cards << " cards";
+        out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
+                                              opp->game->library->nb_cards); //#W44-6
         //Artifact counts feed metalcraft/affinity-style decisions and are
         //tedious to re-count from the board lines.
         int myArtifacts = 0, oppArtifacts = 0;
@@ -7955,14 +8073,9 @@ string AIPlayerGPT::serializeGameState()
     //the game on draw step") and as a render fault, twice in one game. The
     //revealed cards ARE still library cards until the search resolves; count
     //them, and say where they are so the two numbers reconcile.
-    {
-        int inReveal = (game->reveal ? game->reveal->nb_cards : 0);
-        out << "\nYour library: " << (game->library->nb_cards + inReveal) << " cards";
-        if (inReveal > 0)
-            out << " (" << inReveal << " of them are the cards listed in the search/reveal"
-                   " below - they are still in your library until this decision resolves)";
-        out << "\n";
-    }
+    //#W44-6: `myLibInReveal` replaces the raw reveal-zone card count - a reveal
+    //zone can hold cards that were never in this library.
+    out << "\n" << yourLibraryLine(game->library->nb_cards, myLibInReveal) << "\n";
     return out.str();
 }
 
@@ -13133,6 +13246,15 @@ struct CombatTradeStat
     bool indestructible;
     bool trample;
     bool persist;      //has persist AND no -1/-1 counter yet -> returns once if it dies
+    //#W44-LOW (wave-43 seat-162 E-3): lifelink is a LIFE SWING the verdict
+    //hides. "(both die)" was the whole preview for an Unraveler trading with a
+    //lifelink blocker - true about the bodies, silent about the +5 that decided
+    //the race. 'doublestrike' is carried separately from 'firststrike' only to
+    //keep this clause honest: a double striker gains twice and this preview
+    //does not model the two damage steps, so it states the fact without a
+    //number rather than printing half of one.
+    bool lifelink;
+    bool doublestrike;
 };
 
 //W41-5 PREVENTION KINDS. Damage-prevention replacement effects (Fog Bank's
@@ -13304,6 +13426,40 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     if (bKillsA && a.persist)
         o << (attackerSeat ? " (yours returns with a -1/-1 counter (persist))"
                            : " (theirs returns with a -1/-1 counter (persist))");
+    //#W44-LOW (wave-43 seat-162 E-3, D4's adjacent gap): the bodies are not the
+    //whole trade. A lifelink creature that DEALS its combat damage swings its
+    //controller's life by that much, and a verdict of "both die" told the pilot
+    //nothing about the +5 that decided the race. Rides DEALT damage, exactly as
+    //trample and the wither shrink do: nothing is claimed for a creature whose
+    //damage is fully prevented, or that died in the first-strike step before it
+    //could deal. The attacker's full power is dealt whether or not it tramples
+    //(lethal cut plus carry-over is still all of it), so 'ap' is the swing in
+    //both cases. A DOUBLE striker gains in both damage steps and this preview
+    //models only one, so it names the effect and withholds the number rather
+    //than printing an understated one (the same omit-when-unprovable rule the
+    //partial-prevention clause follows).
+    {
+        bool bDeals = b.lifelink && bp > 0 && !bStopped && !bDiesToFirstStrike;
+        bool aDeals = a.lifelink && ap > 0 && !aStopped && !aDiesToFirstStrike;
+        if (bDeals)
+        {
+            const char * who = attackerSeat ? "they gain" : "you gain";
+            if (b.doublestrike)
+                o << " (lifelink + double strike: " << who
+                  << " life in BOTH damage steps - total not computed here)";
+            else
+                o << " (lifelink: " << who << " " << bp << ")";
+        }
+        if (aDeals)
+        {
+            const char * who = attackerSeat ? "you gain" : "they gain";
+            if (a.doublestrike)
+                o << " (lifelink + double strike: " << who
+                  << " life in BOTH damage steps - total not computed here)";
+            else
+                o << " (lifelink: " << who << " " << ap << ")";
+        }
+    }
     //W41-5, the honest-weaker-claim path. A prevention effect applies but its
     //residue is not exactly computable here, so the verdict above is the NAIVE
     //one and says so - the omit-when-unprovable precedent, stated rather than
@@ -13340,6 +13496,8 @@ static CombatTradeStat combatStatOf(MTGCardInstance * c)
     //does not already carry one (the counter is what ends the loop). Undying is
     //the +1/+1 mirror; scoped to persist here (deck59 wave-24).
     s.persist = c->basicAbilities[Constants::PERSIST] && c->counters && !c->counters->hasCounter(-1, -1);
+    s.lifelink = c->basicAbilities[Constants::LIFELINK]; //#W44-LOW (E-3)
+    s.doublestrike = c->basicAbilities[Constants::DOUBLESTRIKE];
     return s;
 }
 
@@ -22458,6 +22616,243 @@ void AIPlayerGPT::runParseSelfTest()
               && !isEngineTokenText("({T}: Add {G}.) It enters tapped.")
               && !isEngineTokenText(""),
               "W43-LOW NEGATIVE real rules text - parenthesised or not - is never dropped");
+    }
+
+    // ---- #W44-5: one name per counter; a dungeon has no actionable zone ----
+    cout << "\n[W44-5] the stack/ability label reads the same counter table as the board\n";
+    {
+        // (a) The board row already said "bookkeeping (Teferi's +1)"; the STACK
+        // and option label for the very same counter said "teferieffect" (29
+        // corpus lines). Two names for one counter is the surface disagreeing
+        // with itself, which the pilot cannot arbitrate.
+        CHECK(renderAbilityLabel("TeferiEffect Counter")
+              == "put a bookkeeping (Teferi's +1) counter",
+              "#W44-5a the ability label routes the counter's NAME through the same table");
+        CHECK(renderAbilityLabel("TeferiEffect Counter").find("teferieffect") == string::npos,
+              "#W44-5a NEGATIVE the raw engine token never reaches the label");
+        CHECK(renderAbilityLabel("TeferiEffect Counter: 2")
+              == "put 2 bookkeeping (Teferi's +1) counters",
+              "#W44-5a the mapped name survives the count/plural composition");
+        CHECK(stackAbilityName("", "TeferiEffect Counter")
+              == "ability: put a bookkeeping (Teferi's +1) counter",
+              "#W44-5a the STACK line - the defect's own path - carries the mapped name");
+        // The mapped name is English prose, not an engine token: it must NOT be
+        // lower-cased the way a raw name is ("teferi's" would be the tell).
+        CHECK(renderAbilityLabel("TeferiEffect Counter").find("Teferi's") != string::npos,
+              "#W44-5a a mapped name keeps its own casing");
+        // NEGATIVE / REGRESSION: every unmapped counter name is untouched, and
+        // the wave-43 shapes still hold exactly.
+        CHECK(renderAbilityLabel("Charge Counter: -2") == "remove 2 charge counters"
+              && renderAbilityLabel(" 1/1 Counter") == "put a +1/+1 counter"
+              && renderAbilityLabel("level Counter") == "put a level counter",
+              "#W44-5a NEGATIVE unmapped counter names keep the lower-cased engine shape");
+        CHECK(renderAbilityLabel("Move 1/1 Counter") == "Move 1/1 Counter",
+              "#W44-5a NEGATIVE the foreign-verb bail-out is untouched");
+
+        // (b) An un-ventured dungeon sits in the SIDEBOARD, whose getName() is
+        // the placeholder "zone" - 84 rows read "[your zone]". Suppress the tag.
+        CHECK(zoneTagText(true, true, "zone").empty()
+              && zoneTagText(true, false, "sideboard").empty(),
+              "#W44-5b a dungeon row carries NO zone tag, whatever the zone is named");
+        CHECK(zoneTagText(false, true, "battlefield") == " [your battlefield]"
+              && zoneTagText(false, false, "graveyard") == " [opponent's graveyard]",
+              "#W44-5b NEGATIVE every non-dungeon row keeps the #W43-9 owner/zone tag");
+        CHECK(zoneTagText(true, true, "zone").find("zone") == string::npos,
+              "#W44-5b NEGATIVE the placeholder name can no longer reach a dungeon row");
+        CHECK(targetZoneTag(NULL, NULL).empty(),
+              "#W44-5b REGRESSION a card with no zone still tags nothing");
+    }
+
+    // ---- #W44-6: the reveal-zone frame tells the truth about WHOSE cards ----
+    cout << "\n[W44-6] a hand reveal is not a library search\n";
+    {
+        // The library search (E-2's control): unchanged, byte for byte.
+        CHECK(yourLibraryLine(55, 0) == "Your library: 55 cards",
+              "#W44-6 REGRESSION no reveal, no parenthetical");
+        CHECK(yourLibraryLine(50, 5)
+              == "Your library: 55 cards (5 of them are the cards listed in the search/reveal"
+                 " below - they are still in your library until this decision resolves)",
+              "#W44-6 REGRESSION the N-166i search frame is preserved exactly");
+        // The defect: the opponent's five revealed HAND cards were counted into
+        // this seat's library and called library cards. Attribution keeps them
+        // out, so the library line reads the same as if no reveal were open.
+        CHECK(yourLibraryLine(55, 0).find("search/reveal") == string::npos,
+              "#W44-6 NEGATIVE an opponent-hand reveal adds nothing to YOUR library line");
+        // The other half: the hand the pilot is looking at read "size: 0".
+        CHECK(opponentZoneCountsLine(0, 5, 45)
+              == "Opponent hand size: 5 - the opponent's hand (5 cards) is revealed below;"
+                 " those cards are still in their hand until this decision resolves"
+                 " | Opponent library: 45 cards",
+              "#W44-6 a displaced hand is counted and located, never reported as empty");
+        CHECK(opponentZoneCountsLine(0, 5, 45).find("hand size: 0") == string::npos,
+              "#W44-6 NEGATIVE the false zero can no longer be printed under a live reveal");
+        CHECK(opponentZoneCountsLine(3, 0, 48)
+              == "Opponent hand size: 3 | Opponent library: 48 cards",
+              "#W44-6 REGRESSION the ordinary line is untouched when nothing is displaced");
+        CHECK(opponentZoneCountsLine(0, 1, 45).find("(1 card) is revealed") != string::npos,
+              "#W44-6 the singular is grammatical");
+        // Same displacement from the other chair.
+        CHECK(yourHandDisplacedClause(0).empty(),
+              "#W44-6 NEGATIVE nothing displaced, nothing said");
+        CHECK(yourHandDisplacedClause(2)
+              == " (plus 2 cards of your hand revealed below - still in your hand"
+                 " until this decision resolves)",
+              "#W44-6 YOUR displaced hand is named too, not silently missing from the list");
+        CHECK(yourHandDisplacedClause(1).find("plus 1 card of") != string::npos,
+              "#W44-6 the singular is grammatical on this side as well");
+    }
+
+    // ---- #W44-7: the stale-plan note's trigger predicate ----
+    cout << "\n[W44-7] the plan-mismatch note fires on the windows the leaks happen in\n";
+    {
+        vector<string> mine;
+        mine.push_back("Staff of Nin");
+        mine.push_back("Supreme Verdict");
+        mine.push_back("Glacial Fortress");
+        mine.push_back("Elixir of Immortality");
+        mine.push_back("Sigarda, Champion of Light");
+
+        // GATE, half 1: the tail is not just the option list. The reply-protocol
+        // example and the standing phase facts both say "cast", so the wave-35
+        // gate matched on PROSE and returned true for every ask - 43/43 of the
+        // corpus's declare-attackers fires were that false positive. Only the
+        // numbered option ROWS are read now.
+        string attackerTail =
+            "Combat: declare ALL attackers for this turn in ONE decision.\n"
+            "Your creatures that can attack:\n"
+            "A1. Sigarda, Champion of Light (4/4) [trample, flying]\n"
+            "This is not your last chance to act this turn: your SECOND MAIN PHASE follows"
+            " combat, so creatures, sorceries and other main-phase cards you do not cast now"
+            " can still be cast after combat on this same turn.\n"
+            "On the FIRST line write ATTACK: ... e.g. \"ATTACK: A1, A3\"\n";
+        CHECK(!gptcaveat::optionsAreActionMenu(gptcaveat::toLower(attackerTail)),
+              "#W44-7 an attackers ask is not an action menu - the surrounding prose is not read");
+        CHECK(!gptcaveat::planActionsStale("Cast Staff of Nin, then ping their face every turn.",
+                                           attackerTail, mine),
+              "#W44-7 NEGATIVE the wave-35 attackers false-fire is dead again");
+        string priorityBoiler =
+            "Which action do you take? On the FIRST line write CHOICE: followed by the number"
+            " (0 = pass priority), e.g. \"CHOICE: 3 (Cast Example Card)\" or \"CHOICE: 0 (pass)\".\n";
+        CHECK(!gptcaveat::optionsAreActionMenu(gptcaveat::toLower(priorityBoiler)),
+              "#W44-7 NEGATIVE the protocol example's own 'Cast Example Card' arms nothing");
+
+        // GATE, half 2: the NARROW windows the four wave-43 fallbacks happened
+        // in - a lone mana tap, a cycling activation, one loyalty ability. They
+        // carry no cast verb, but they ARE card actions (the engine's own
+        // [cost:]/{card text:} annotations say so), and a plan naming a cast is
+        // genuinely absent from them.
+        string manaOnly =
+            "Your legal actions (Main phase 1, YOUR turn):\n"
+            "1. Add 8 green mana with Overgrown Battlement #1 [cost: Tap] {card text: \"Defender"
+            " -- {T}: Add {G} for each creature with defender you control.\"}\n"
+            + priorityBoiler;
+        CHECK(gptcaveat::optionsAreActionMenu(gptcaveat::toLower(manaOnly)),
+              "#W44-7 a mana-ability-only window IS an action menu - a cast could not be here");
+        CHECK(gptcaveat::planActionsStale("Cast Staff of Nin, then ping their face every turn.",
+                                          manaOnly, mine),
+              "#W44-7 POSITIVE the note now reaches the narrow window the leaks land in");
+        string abilityOnly =
+            "Your legal actions (Main phase 1, opponent's turn):\n"
+            "1. Life with Elixir of Immortality #1 [cost: {2}, Tap] {card text: \"{2},{T}: You"
+            " gain 5 life.\"}\n" + priorityBoiler;
+        CHECK(gptcaveat::planActionsStale("Answer their threats, resolve Staff of Nin,"
+                                          " ping their face every turn.",
+                                          abilityOnly, mine),
+              "#W44-7 POSITIVE fallback site 2: an ability-only window with an absent plan card");
+        // ...and the card the window DOES offer still suppresses it.
+        CHECK(!gptcaveat::planActionsStale("Activate Elixir of Immortality to reset my graveyard.",
+                                           abilityOnly, mine),
+              "#W44-7 NEGATIVE a plan whose named card IS on this menu never arms the note");
+
+        // VERB: "resolve" is a cast commitment. It was the word both missed
+        // fallback plans used, and the old table had no entry for it.
+        string landDrop = "Land drop: play Glacial Fortress now?\n"
+                          "1. Play Glacial Fortress\n"
+                          "2. Hold Glacial Fortress - do not play it now\n";
+        CHECK(gptcaveat::windowHasVerb("answer their threats, resolve "),
+              "#W44-7 'resolve' is an affirmative cast-shaped verb");
+        CHECK(gptcaveat::planActionsStale("Answer their threats, resolve Staff of Nin, ping their"
+                                          " face every turn. Clear it with Supreme Verdict.",
+                                          landDrop, mine),
+              "#W44-7 POSITIVE fallback site 1: the land-drop ask under a 'resolve X' plan");
+        CHECK(!gptcaveat::planActionsStale("Do not resolve Staff of Nin into open mana.",
+                                           landDrop, mine),
+              "#W44-7 NEGATIVE the negation guard covers the new verb too");
+        CHECK(!gptcaveat::planActionsStale("Play Glacial Fortress this turn, then hold up mana.",
+                                           landDrop, mine),
+              "#W44-7 NEGATIVE the land the menu offers is still seen as offered");
+
+        // REGRESSION: the wave-35 guards, unchanged.
+        string payLife44 = "1. Pay 3 life\n2. Do not pay\n" + priorityBoiler;
+        CHECK(!gptcaveat::planActionsStale("Cast Staff of Nin, then ping their face every turn.",
+                                           payLife44, mine),
+              "#W44-7 REGRESSION a pay-life sub-ask still arms nothing");
+        CHECK(!gptcaveat::planActionsStale("Attack with Sigarda every turn while they are open.",
+                                           manaOnly, mine),
+              "#W44-7 REGRESSION an attack-only plan still arms nothing");
+    }
+
+    // ---- #W44-LOW batch: lifelink in the trade verdict, loyalty spent ----
+    cout << "\n[W44-LOW] the trade preview states the life swing; a spent counter states its total\n";
+    {
+        // field order: power, toughness, deathtouch, wither, infectLabel,
+        // firststrike, indestructible, trample, persist, lifelink, doublestrike
+        CombatTradeStat llBlk22 = { 2, 2, false, false, false, false, false, false, false, true,  false };
+        CombatTradeStat vanA22  = { 2, 2, false, false, false, false, false, false, false, false, false };
+        CombatTradeStat llAtk55 = { 5, 5, false, false, false, false, false, false, false, true,  false };
+        CombatTradeStat vanB22  = { 2, 2, false, false, false, false, false, false, false, false, false };
+        CombatTradeStat fsAtk33 = { 3, 3, false, false, false, true,  false, false, false, false, false };
+        CombatTradeStat dsLL22  = { 2, 2, false, false, false, true,  false, false, false, true,  true  };
+
+        // E-3's own shape: "(both die)" said nothing about the life it moved.
+        string bd = combatTradePreviewStats(llBlk22, vanA22);
+        cout << "     2/2 lifelink blocker vs 2/2: \"" << bd << "\"  (pre-fix said just \"both die\")\n";
+        CHECK(bd == "both die (lifelink: you gain 2)",
+              "#W44-LOW a trade that kills both still moves life, and now says so");
+        // Same math, attacker's chair - the pronoun flips, the number does not.
+        CHECK(combatTradePreviewStats(llBlk22, vanA22, kPreventNone, kPreventNone,
+                                      kPreventNone, true)
+              == "both die (lifelink: they gain 2)",
+              "#W44-LOW the attackers window voices the same swing as THEIRS");
+        CHECK(combatTradePreviewStats(vanB22, llAtk55)
+              == "your blocker dies, attacker lives (lifelink: they gain 5)",
+              "#W44-LOW a lifelink ATTACKER's gain is its full power, trample or not");
+        // NEGATIVE: no lifelink anywhere, no clause. The control for all of it.
+        CHECK(combatTradePreviewStats(vanB22, vanA22).find("lifelink") == string::npos,
+              "#W44-LOW NEGATIVE a trade with no lifelink gains the clause nothing");
+        // NEGATIVE: the clause rides DEALT damage, exactly like trample and the
+        // wither shrink - prevented damage gains no life...
+        CHECK(combatTradePreviewStats(llBlk22, vanA22, kPreventNone, kPreventFull)
+                  .find("lifelink") == string::npos,
+              "#W44-LOW NEGATIVE prevented damage is not dealt, so it gains nothing");
+        // ...and neither does a blocker killed in the first-strike step.
+        string fs = combatTradePreviewStats(llBlk22, fsAtk33);
+        CHECK(fs.find("lifelink") == string::npos,
+              "#W44-LOW NEGATIVE a blocker dead to first strike never deals, never gains");
+        // DOUBLE STRIKE: two damage steps, and this preview models one. Name the
+        // effect, withhold the number - never print an understated one.
+        string ds = combatTradePreviewStats(dsLL22, vanA22);
+        CHECK(ds.find("lifelink + double strike") != string::npos
+              && ds.find("total not computed here") != string::npos,
+              "#W44-LOW a double striker's gain is named, not half-computed");
+        CHECK(ds.find("lifelink: you gain 2") == string::npos,
+              "#W44-LOW NEGATIVE the single-step number is never claimed for a double striker");
+
+        // Loyalty SPENT: the run collapse always had the total for a removal
+        // (Counters::removeCounter captures settledNb on the same line
+        // addCounter does) - the emitter's gate refused it for 15/15 lines.
+        CHECK(collapsedRunNarration("Your Teferi, Who Slows the Sunset lost a loyalty counter",
+                                    3, 2)
+              == "Your Teferi, Who Slows the Sunset lost 3 loyalty counters (now 2)",
+              "#W44-LOW a spent-loyalty run reads the same register as the gained one");
+        CHECK(collapsedRunNarration("Your Teferi, Who Slows the Sunset got a loyalty counter",
+                                    5, 5)
+              == "Your Teferi, Who Slows the Sunset got 5 loyalty counters (now 5)",
+              "#W44-LOW REGRESSION the got-line shape is untouched");
+        CHECK(collapsedRunNarration("Your Teferi, Who Slows the Sunset lost a loyalty counter",
+                                    3, -1)
+              == "Your Teferi, Who Slows the Sunset lost 3 loyalty counters",
+              "#W44-LOW NEGATIVE no total is invented when the event captured none");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

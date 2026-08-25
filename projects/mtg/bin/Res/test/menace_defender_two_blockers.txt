@@ -1,0 +1,43 @@
+#NAME: Menace, defender side -- a TWO-creature block is legal and holds
+#DESC: #W44-8. The wave-43 menace work (blockCountRequirementTag on the defender's
+#DESC: A-line, and the CR 509.1c set-level prune in AIPlayerGPT::decideBlockers)
+#DESC: shipped with a HONEST NULL on the block side: across four corpora no menace
+#DESC: attacker was ever offered to a defender, so nothing downstream of the render
+#DESC: had ever been exercised from the defending chair. This fixture and its twin
+#DESC: (menace_defender_one_blocker.txt) pin the ENGINE truth those surfaces have to
+#DESC: agree with, in a scenario the random deck pool cannot reach.
+#DESC:
+#DESC: Boggart Brute {2}{R} 3/2 "Menace" (primitives: abilities=menace, no auto=)
+#DESC: attacks into two untapped walls. Wall of Stone 0/8 and Wall of Granite 0/7 are
+#DESC: plain defenders (no flying, no reach-relevant text), so the ONLY thing that can
+#DESC: decide this combat is the menace restriction itself. Both are assigned to the
+#DESC: Brute: that is a legal block, so no damage reaches the defender (life stays 20)
+#DESC: and nothing dies -- the walls take 3 between them against 7-8 toughness, and
+#DESC: the Brute takes 0 back from two 0-power blockers.
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Boggart Brute
+[PLAYER2]
+inplay:Wall of Stone,Wall of Granite
+life:20
+[DO]
+Boggart Brute
+next
+Wall of Stone
+Boggart Brute
+Wall of Granite
+Boggart Brute
+next
+next
+next
+next
+[ASSERT]
+combatend
+[PLAYER1]
+inplay:Boggart Brute
+life:20
+[PLAYER2]
+inplay:Wall of Stone,Wall of Granite
+life:20
+[END]

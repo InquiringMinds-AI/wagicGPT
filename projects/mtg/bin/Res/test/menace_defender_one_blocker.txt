@@ -1,0 +1,41 @@
+#NAME: Menace, defender side -- a ONE-creature block does not block at all
+#DESC: #W44-8, the DISCRIMINATING half of the pair (menace_defender_two_blockers.txt
+#DESC: is the positive control: same board, same script, both walls assigned, and the
+#DESC: defender takes nothing). Here only ONE of the two untapped walls is assigned to
+#DESC: the menace attacker. CR 509.1c: that is not a legal block declaration, so the
+#DESC: creature is UNBLOCKED and its 3 damage reaches the player -- 20 -> 17.
+#DESC:
+#DESC: This is the fact every menace surface in AIPlayerGPT is written against, and
+#DESC: until this fixture nothing asserted it: the wave-43 corpora never once offered a
+#DESC: menace attacker to a defender, so the defender's A-line tag
+#DESC: (blockCountRequirementTag) and the set-level prune in decideBlockers - which
+#DESC: drops an under-filled menace assignment through the mLastDroppedAssignments
+#DESC: accounting rather than letting the rules layer delete it silently - were both
+#DESC: reasoning about a rule the suite had never confirmed. Note WHICH way the engine
+#DESC: fails a single blocker: not "the block happens and the damage is absorbed", but
+#DESC: "the assignment does not exist" - so a seat that declares one blocker and stops
+#DESC: eats the whole hit while believing it blocked. That is exactly the 8/8 silent
+#DESC: deletion (~24 life in one game) the wave-42 seat measured.
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Boggart Brute
+[PLAYER2]
+inplay:Wall of Stone,Wall of Granite
+life:20
+[DO]
+Boggart Brute
+next
+Wall of Stone
+Boggart Brute
+next
+next
+[ASSERT]
+combatend
+[PLAYER1]
+inplay:Boggart Brute
+life:20
+[PLAYER2]
+inplay:Wall of Stone,Wall of Granite
+life:17
+[END]
