@@ -1,0 +1,36 @@
+# CONTROL for combat_damage_order_human_realgame.txt: byte-identical script and
+# expectation, WITHOUT the realgame directive - the suite's skip-free pin holds,
+# so no phase automation runs and the ORDER step is always presented.
+# Pins the damage-order machinery itself (raiseBlockerRankOrder through
+# GameObserver::cardClick's ORDER branch): Stone Golem (4/4) blocked by three
+# 2/2s, the attacker raises Cylian Elf one rank, Bear Cub survives.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Stone Golem
+life:20
+[PLAYER2]
+inplay:Balduvian Bears,Bear Cub,Cylian Elf
+life:20
+[DO]
+goto attackers
+Stone Golem
+next
+Balduvian Bears
+Bear Cub
+Cylian Elf
+next
+Cylian Elf
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+graveyard:Stone Golem
+life:20
+[PLAYER2]
+inplay:Bear Cub
+graveyard:Balduvian Bears,Cylian Elf
+life:20
+[END]

@@ -1,0 +1,38 @@
+# CONTROL for the CORRECT skip. Same realgame conditions and the same empty
+# attacking hand as combat_damage_order_human_realgame.txt, but Stone Golem is
+# blocked by exactly ONE creature: there is no damage-assignment ORDER to make,
+# so the step must NOT be presented and combat must resolve straight through.
+# GuiCombat's own ORDER arm already advances the step when nothing is
+# multi-blocked, and hasAnyLegalAction's ORDER clause mirrors that same
+# more-than-one-blocker condition - this pins the pair against drifting apart
+# (a predicate that answered "there is an action here" for a single block would
+# stop the human on a window with nothing in it).
+# 4 damage kills Balduvian Bears; 2 damage back leaves Stone Golem alive.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Stone Golem
+life:20
+[PLAYER2]
+inplay:Balduvian Bears,Bear Cub,Cylian Elf
+life:20
+[DO]
+realgame
+goto attackers
+Stone Golem
+next
+Balduvian Bears
+next
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Stone Golem
+life:20
+[PLAYER2]
+inplay:Bear Cub,Cylian Elf
+graveyard:Balduvian Bears
+life:20
+[END]

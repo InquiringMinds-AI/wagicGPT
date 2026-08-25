@@ -1,0 +1,43 @@
+# CR 509.2 / 510.1a: the ATTACKING player orders the blockers of a multi-blocked
+# attacker. REAL-PLAY parity fixture (realgame): the seat drops the suite's
+# skip-free pin and poses as the human one, so GameObserver's no-legal-action
+# phase skip - the one a live Vita game runs - is ACTIVE here.
+# Stone Golem (4/4) is blocked by three distinct 2/2s. Four damage kills exactly
+# two of them, so the ORDER step is CONSEQUENTIAL: it decides which blocker
+# lives. Declaration order is Balduvian Bears, Bear Cub, Cylian Elf; the
+# attacking player raises Cylian Elf one rank (the ORDER-step click), making the
+# order Bears, Elf, Cub - so Bears and Elf die and BEAR CUB survives.
+# Without the ORDER window the defender's declaration order stands and CYLIAN ELF
+# survives instead: the attacker's CR 510.1a choice silently handed to the
+# defender.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Stone Golem
+life:20
+[PLAYER2]
+inplay:Balduvian Bears,Bear Cub,Cylian Elf
+life:20
+[DO]
+realgame
+goto attackers
+Stone Golem
+next
+Balduvian Bears
+Bear Cub
+Cylian Elf
+next
+Cylian Elf
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+graveyard:Stone Golem
+life:20
+[PLAYER2]
+inplay:Bear Cub
+graveyard:Balduvian Bears,Cylian Elf
+life:20
+[END]

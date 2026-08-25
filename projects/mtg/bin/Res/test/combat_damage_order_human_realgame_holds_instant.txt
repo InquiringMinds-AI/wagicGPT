@@ -1,0 +1,45 @@
+# DISCRIMINATOR for combat_damage_order_human_realgame.txt. Same realgame
+# conditions, same script, same expectation - the ONLY difference is that the
+# attacking seat holds a castable instant (Healing Salve, with Ancient Den
+# untapped to pay for it).
+# That single fact used to decide whether the human got the CR 510.1a ordering
+# window at all: LegalActionsOracle::hasAnyLegalAction knew nothing about the
+# ORDER step, so with an empty hand it answered "no action here" and
+# GameObserver's no-legal-action phase skip stepped over the ordering, while a
+# player holding any instant-speed response kept the window as a side effect.
+# That is the owner's "sometimes it lets me, sometimes it doesn't".
+# This fixture pins the it-lets-me half; the sibling above pins the other half.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Stone Golem,Ancient Den
+hand:Healing Salve
+life:20
+[PLAYER2]
+inplay:Balduvian Bears,Bear Cub,Cylian Elf
+life:20
+[DO]
+realgame
+goto attackers
+Stone Golem
+next
+Balduvian Bears
+Bear Cub
+Cylian Elf
+next
+Cylian Elf
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Ancient Den
+hand:Healing Salve
+graveyard:Stone Golem
+life:20
+[PLAYER2]
+inplay:Bear Cub
+graveyard:Balduvian Bears,Cylian Elf
+life:20
+[END]
