@@ -103,3 +103,16 @@ the still-live worktree, one gated-fprintf deviation applied, gate green. LESSON
 against the lane's reported file list BEFORE merging; (3) a green gate cannot catch a
 lost contribution unless a test rides with it — fixtures-with-fix is load-bearing, keep
 demanding them.
+
+## OWNER LIVE REPORT (2026-08-24 evening, fixed same-day, merged at 3cd9a0d34, gate 1117/0+36/0 + 1076/0)
+Damage-order window intermittently absent on multi-blocks ("making me lose games"):
+ROOT CAUSE = hasAnyLegalAction had NO clause for the ORDER combat step — the auto-pass
+skipped the human attacker's CR 510.1a window whenever the hand held no instant-speed
+response, and damage fell in the DEFENDER'S declaration order (the AI chose which of its
+blockers died). Owner's "sometimes" = literally whether he held an instant. Fixed with
+an ORDER-step clause mirroring GuiCombat's own arm (blockers>1); 4 fixtures incl. the
+instant-in-hand discriminator pair + the legitimate single-blocker-skip control.
+WAVE-44 SEED (sibling, found not fixed): the DAMAGE step's manual-assignment window
+(trample splits, first-strike multi-blocks) has the same predicate gap — default is
+usually right (lethal to blockers, remainder to player) so lower severity; no harness
+key exists to script a deviation there yet.
