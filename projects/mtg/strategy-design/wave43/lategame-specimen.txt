@@ -1,0 +1,589 @@
+=== seq 119 kind=ask turn=49 ===
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - Final Judgment, Sphinx's Revelation, Fall of the Gavel, Essence Scatter x2, Lightmine Field, Path to Exile x2, Supreme Verdict x2; opponent - Idyllic Tutor x4, Staff of Nin, Sanguine Bond x2, Pride Guardian x3, Perimeter Captain x2, Tribute to Hunger x3, Wall of Omens, Chromatic Lantern; exiled at trim: you - none; opponent - Wall of Omens x2, Overgrown Battlement x3, Perimeter Captain, Pride Guardian)
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Phase: Combat damage
+- Vampire dealt 1 damage to you (now 30)
+- Opponent gained 1 life (now 22)
+=== Turn 25 - YOUR turn ===
+- Phase: Draw
+- You drew Supreme Verdict
+- Phase: Main phase 1
+- You cast Supreme Verdict
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Opponent's Perimeter Captain died
+- Opponent's Pride Guardian died
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Your Supreme Verdict resolved and went to your graveyard
+=== Turn 26 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 29)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 27 - YOUR turn ===
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- You cast Final Judgment
+- Opponent's Perimeter Captain was exiled from the battlefield
+- Opponent's Vampire was exiled from the battlefield
+- Opponent's Vampire (token) ceased to exist and left the opponent's exile
+- Your Final Judgment resolved and went to your graveyard
+=== Turn 28 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 28)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Phase: Main phase 2
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 29 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You announced X = 6 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 6 life (now 34)
+- You drew Essence Scatter
+- You drew Staff of Nin
+- You drew Glacial Fortress
+- You drew Sphinx's Revelation
+- You drew Supreme Verdict
+- You drew Plains
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Glacial Fortress
+- Phase: ---
+- You discarded Essence Scatter
+=== Turn 30 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 33)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 31 - YOUR turn ===
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Plains
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You cast Supreme Verdict
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Your Supreme Verdict resolved and went to your graveyard
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 21)
+=== Turn 32 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 32)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Phase: ---
+- Opponent discarded Tribute to Hunger
+=== Turn 33 - YOUR turn ===
+- Phase: Upkeep
+- You drew Tundra
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 20)
+- Phase: Draw
+- You drew Fall of the Gavel
+- Phase: Main phase 1
+- You played Tundra
+- Phase: Main phase 2
+- You announced X = 1 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 1 life (now 33)
+- You drew Dream Fracture
+- Your Sphinx's Revelation resolved and went to your graveyard
+=== Turn 34 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 32)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+- Opponent cast Idyllic Tutor
+- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
+- Opponent searched their library with Idyllic Tutor
+- Opponent used: choose card with Idyllic Tutor targeting Exquisite Blood
+- Opponent put the revealed Exquisite Blood into their hand
+- Opponent cast Exquisite Blood
+- Opponent's Exquisite Blood resolved and entered the battlefield
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Phase: Combat damage
+- Vampire dealt 1 damage to you (now 31)
+- Opponent gained 1 life (now 21)
+- Opponent gained 1 life (now 22)
+=== Turn 35 - YOUR turn ===
+- Phase: Upkeep
+- You drew Essence Scatter
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 21)
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Seachrome Coast
+- You announced X = 9 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 9 life (now 40)
+- You drew Supreme Verdict
+- You drew Staff of Nin
+- You drew Tundra
+- You drew Lightmine Field
+- You drew Dream Fracture
+- You drew Supreme Verdict
+- You drew Elixir of Immortality
+- You drew Island
+- You drew Dream Fracture
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: ---
+- You discarded Path to Exile
+- You discarded Path to Exile
+- You discarded Essence Scatter
+- You discarded Fall of the Gavel
+- You discarded Dream Fracture
+- You discarded Essence Scatter
+- You discarded Supreme Verdict
+- You discarded Staff of Nin
+=== Turn 36 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 39)
+- Opponent gained 1 life (now 22)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Opponent cast Idyllic Tutor
+- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
+- Opponent searched their library with Idyllic Tutor
+- Opponent used: shuffle with Idyllic Tutor targeting Bayou
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Phase: Combat damage
+- Vampire dealt 1 damage to you (now 38)
+- Vampire dealt 1 damage to you (now 37)
+- Opponent gained 1 life (now 23)
+- Opponent gained 1 life (now 24)
+- Opponent gained 1 life (now 25)
+- Opponent gained 1 life (now 26)
+=== Turn 37 - YOUR turn ===
+- Phase: Upkeep
+- You drew Path to Exile
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 25)
+- Phase: Draw
+- You drew Emrakul, the Aeons Torn
+- Phase: Main phase 1
+- You played Tundra
+- You cast Supreme Verdict
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Opponent's Pride Guardian died
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Opponent's Wall of Omens died
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Your Supreme Verdict resolved and went to your graveyard
+- Phase: Main phase 2
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You cast Lightmine Field
+- Your Lightmine Field resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- You gained 5 life (now 42)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (18 cards) into your library with Elixir of Immortality
+=== Turn 38 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 41)
+- Opponent gained 1 life (now 26)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Phase: Main phase 2
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Phase: ---
+- Opponent discarded Chromatic Lantern
+=== Turn 39 - YOUR turn ===
+- Phase: Upkeep
+- You drew Essence Scatter
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 25)
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Island
+- You cast Emrakul, the Aeons Torn
+- Opponent cast Tribute to Hunger
+- Opponent's Tribute to Hunger resolved and went to the opponent's graveyard
+- Your Emrakul, the Aeons Torn resolved and entered the battlefield
+=== Turn 40 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 24)
+- Phase: Draw
+- You drew Supreme Verdict
+- Phase: Main phase 1
+- You cast Supreme Verdict
+- Opponent cast Tribute to Hunger
+- You targeted Tribute to Hunger with Dream Fracture
+- You cast Dream Fracture
+- Opponent's Tribute to Hunger was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Path to Exile
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Your Emrakul, the Aeons Torn died
+- Your Supreme Verdict resolved and went to your graveyard
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (3 cards) into your library with Emrakul, the Aeons Torn
+=== Turn 41 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 40)
+- Opponent gained 1 life (now 25)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Idyllic Tutor
+- You cast Dream Fracture
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- Opponent's Idyllic Tutor was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Essence Scatter
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Exquisite Blood
+- Opponent's Exquisite Blood resolved and entered the battlefield
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 42 - YOUR turn ===
+- Phase: Upkeep
+- You drew Dream Fracture
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 24)
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Phase: Main phase 2
+- You announced X = 13 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 13 life (now 53)
+- You drew Sphinx's Revelation
+- You drew Lightmine Field
+- You drew Sphinx's Revelation
+- You drew Cancel
+- You drew Supreme Verdict
+- You drew Fall of the Gavel
+- You drew Fall of the Gavel
+- You drew Tundra
+- You drew Glacial Fortress
+- You drew Staff of Nin
+- You drew Island
+- You drew Elixir of Immortality
+- You drew Seachrome Coast
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: ---
+- You discarded Path to Exile
+- You discarded Essence Scatter
+- You discarded Sphinx's Revelation
+- You discarded Path to Exile
+- You discarded Essence Scatter
+- You discarded Dream Fracture
+- You discarded Sphinx's Revelation
+- You discarded Lightmine Field
+- You discarded Sphinx's Revelation
+- You discarded Cancel
+- You discarded Supreme Verdict
+- You discarded Fall of the Gavel
+=== Turn 43 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 52)
+- Opponent gained 1 life (now 25)
+- Opponent gained 1 life (now 26)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+- Phase: Blockers
+- Lightmine Field dealt 1 damage to Vampire
+- Opponent's Vampire died
+- Opponent's Vampire (token) ceased to exist and left the opponent's graveyard
+- Phase: Main phase 2
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 44 - YOUR turn ===
+- Phase: Upkeep
+- You drew Elixir of Immortality
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 25)
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 24)
+- You used: Life with Elixir of Immortality #1
+- You gained 5 life (now 57)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (14 cards) into your library with Elixir of Immortality
+- Phase: Main phase 2
+- You used: Life with Elixir of Immortality
+- You gained 5 life (now 62)
+- Your Elixir of Immortality was put into your library from the battlefield
+=== Turn 45 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 61)
+- Opponent gained 1 life (now 25)
+- Opponent gained 1 life (now 26)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+=== Turn 46 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 25)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 24)
+- You drew Plains
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Phase: Main phase 2
+- You announced X = 15 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 15 life (now 76)
+- You drew Dream Fracture
+- You drew Essence Scatter
+- You drew Path to Exile
+- You drew Dream Fracture
+- You drew Final Judgment
+- You drew Emrakul, the Aeons Torn
+- You drew Cancel
+- You drew Essence Scatter
+- You drew Fall of the Gavel
+- You drew Essence Scatter
+- You drew Sphinx's Revelation
+- You drew Elixir of Immortality
+- You drew Lightmine Field
+- You drew Path to Exile
+- You drew Supreme Verdict
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: ---
+- You discarded Fall of the Gavel
+- You discarded Island
+- You discarded Seachrome Coast
+- You discarded Tundra
+- You discarded Plains
+- You discarded Island
+- You discarded Dream Fracture
+- You discarded Essence Scatter
+- You discarded Path to Exile
+- You discarded Dream Fracture
+- You discarded Final Judgment
+- You discarded Emrakul, the Aeons Torn
+- You discarded Cancel
+- You discarded Essence Scatter
+=== Turn 47 - opponent's turn ===
+- Phase: Untap
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (15 cards) into your library with Emrakul, the Aeons Torn
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 75)
+- Opponent gained 1 life (now 25)
+- Opponent gained 1 life (now 26)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 48 - YOUR turn ===
+- Phase: Upkeep
+- You drew Supreme Verdict
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 25)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 24)
+- You drew Essence Scatter
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- You cast Final Judgment
+- Opponent's Pride Guardian was exiled from the battlefield
+- Opponent's Overgrown Battlement was exiled from the battlefield
+- Opponent's Vampire was exiled from the battlefield
+- Opponent's Vampire (token) ceased to exist and left the opponent's exile
+- Opponent's Vampire was exiled from the battlefield
+- Opponent's Vampire (token) ceased to exist and left the opponent's exile
+- Your Final Judgment resolved and went to your graveyard
+- You announced X = 9 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 9 life (now 84)
+- You drew Path to Exile
+- You drew Island
+- You drew Cancel
+- You drew Sphinx's Revelation
+- You drew Seachrome Coast
+- You drew Supreme Verdict
+- You drew Fall of the Gavel
+- You drew Island
+- You drew Plains
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Plains
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- Phase: ---
+- You discarded Fall of the Gavel
+- You discarded Essence Scatter
+- You discarded Lightmine Field
+- You discarded Path to Exile
+- You discarded Supreme Verdict
+- You discarded Supreme Verdict
+- You discarded Essence Scatter
+- You discarded Path to Exile
+=== Turn 49 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 83)
+- Opponent gained 1 life (now 25)
+- Opponent gained 1 life (now 26)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+- Phase: Main phase 2
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 50 - YOUR turn ===
+- Phase: Upkeep
+- You drew Fall of the Gavel
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 25)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 24)
+- You drew Dream Fracture
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Island
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 83 | Opponent life: 24
+Mana available: 0 total (no untapped sources) | Already in pool: {u}{u}{u}{u}{u}{u}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w}{w} (20 mana ALREADY produced and floating right now - this is SEPARATE from the 0 untapped sources counted above, not a different count of it; spend the floating mana first)
+Land drop: ALREADY USED this turn - you cannot play another land until your next turn. Do not plan mana that depends on a land entering now.
+Your hand: Cancel {1}{u}{u} [instant]; Sphinx's Revelation {u}{u}{w}{x} [instant]; Seachrome Coast (copy 1 of 2 in your hand) (land: taps for {W}{U}); Supreme Verdict {1}{u}{w}{w} [sorcery]; Fall of the Gavel (copy 1 of 2 in your hand) {3}{u}{w} [instant]; Island (land: taps for {U}); Fall of the Gavel (copy 2 of 2 in your hand) {3}{u}{w} [instant]; Dream Fracture {1}{u}{u} [instant]; Seachrome Coast (copy 2 of 2 in your hand) (land: taps for {W}{U})
+Your battlefield (24 permanents listed, of which 0 are creatures): Plains #1 [tapped]; Island #1 [tapped]; Glacial Fortress #1 [tapped]; Plains #2 [tapped]; Island #2 [tapped]; Island #3 [tapped]; Plains #3 [tapped]; Island #4 [tapped]; Seachrome Coast #1 [tapped]; Glacial Fortress #2 [tapped]; Plains #4 [tapped]; Staff of Nin #1 {6} [artifact] [tapped]; Tundra #1 [tapped]; Seachrome Coast #2 [tapped]; Tundra #2 [tapped]; Lightmine Field {2}{w}{w} [enchantment]; Island #5 [tapped]; Glacial Fortress #3 [tapped]; Tundra #3 [tapped]; Staff of Nin #2 {6} [artifact] [tapped]; Glacial Fortress #4 [tapped]; Plains #5 [tapped]; Elixir of Immortality {1} [artifact]; Island #6 [tapped]
+Opponent battlefield (27 permanents listed, of which 3 are creatures): Urborg, Tomb of Yawgmoth; Savannah #1; Sunpetal Grove #1; Swamp; Isolated Chapel #1; Bayou #1; Isolated Chapel #2; Staff of Nin {6} [artifact] [tapped]; Scrubland #1; Sorin, Lord of Innistrad {2}{b}{w} [planeswalker] [counters: 17x loyalty]; Forest; Savannah #2; Sunpetal Grove #2 [tapped]; Savannah #3; Scrubland #2; Scrubland #3; Exquisite Blood #1 {4}{b} [enchantment]; Bayou #2; Sunpetal Grove #3 [tapped]; Exquisite Blood #2 {4}{b} [enchantment]; Savannah #4; Bayou #3; Plains [tapped]; Sunpetal Grove #4 [tapped]; Wall of Omens {1}{w} (0/4) [defender]; Overgrown Battlement {1}{g} (0/4) [defender]; Vampire (1/1) [lifelink]
+Opponent hand size: 7 | Opponent library: 3 cards
+Artifacts in play: you 3 | opponent 1
+Your library: 17 cards
+
+YOUR PLAN (as you last stated it): Untap and ping with both Staffs of Nin each turn until opponent dies. Activate Elixir to recycle answers when needed.
+
+Announce the value of X for Sphinx's Revelation. You can afford X up to 17 with your current mana - higher values are NOT offered (they are unaffordable), so do not plan around an X above 17. Every listed value is affordable; option 1 is the LARGEST X (X = 17). Reply with the OPTION number, not the X value:
+1. X = 17
+2. X = 16
+3. X = 15
+4. X = 14
+5. X = 13
+6. X = 12
+7. X = 11
+8. X = 10
+9. X = 9
+10. X = 8
+11. X = 7
+12. X = 6
+13. X = 5
+14. X = 4
+15. X = 3
+16. X = 2
+17. X = 1
+18. X = 0
+
+On the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 3 (Cast Example Card)" (a placeholder - copy a real number and short name from the list); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+--- REPLY ---
+
+
+CHOICE: 3 (Sphinx's Revelation)
