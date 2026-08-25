@@ -33,6 +33,38 @@ static void rulesProbe(const char* fmt, ...)
 static inline void rulesProbe(const char*, ...) {}
 #endif
 
+//#W44-1 selfplay fairness gates. Source of the finding: the wave-43 seat review
+//at strategy-design/wave43/seats/seat-146-152-162.md ("RIGGED OPENING HANDS").
+//See the AI-vs-AI branch in addExtraRules() for what these unrig, and for why
+//the DEFAULT deliberately stays rigged for now.
+//Semantics: unset or empty -> the default; "0" -> off; anything else -> on.
+static bool rulesEnvFlag(const char * name, bool dflt)
+{
+    const char * v = getenv(name);
+    if (!v || !*v)
+        return dflt;
+    return !(v[0] == '0' && v[1] == '\0');
+}
+
+//The hand gate: deal an AI-vs-AI seat a REAL opening hand instead of a stacked one.
+//DEFAULT ON by owner ruling (2026-08-24, verbatim): "I want legitimate hands. legit
+//mulligans. none of this fixing hands in advance." WAGIC_SELFPLAY_FAIRHAND=0 is a
+//legacy-forensics escape only (restores the pre-wave-44 OptimizedHand rig for A/B);
+//never set it in a corpus. Corpora from wave 44 on are not hand-comparable with
+//earlier waves - accepted with the ruling.
+static bool selfplayFairHand()
+{
+    return rulesEnvFlag("WAGIC_SELFPLAY_FAIRHAND", true);
+}
+
+//The seat gate: drop the agressivity/forceBestAbilityUse pins. Defaults to
+//whatever the hand gate says (so one flag buys a fully fair seat), but can be
+//pinned back on with WAGIC_SELFPLAY_FAIRAI=0 to isolate the hand variable alone.
+static bool selfplayFairAI()
+{
+    return rulesEnvFlag("WAGIC_SELFPLAY_FAIRAI", selfplayFairHand());
+}
+
 //Sorting by displayName
 struct RulesMenuCmp{
     bool operator()(const Rules * a,const Rules * b) const{
@@ -224,10 +256,54 @@ void Rules::addExtraRules(GameObserver* g)
                         a->resolve();
                     else if (p->isAI() && (p->playMode == Player::MODE_AI && p->opponent()->playMode== Player::MODE_AI))
                     {
+                        //#W44-1 (docket item 1; evidence in strategy-design/
+                        //wave43/seats/seat-146-152-162.md, "RIGGED OPENING
+                        //HANDS"). Stock Wagic rigs BOTH seats of an AI-vs-AI
+                        //game - the only shape the selfplay harness ever runs,
+                        //and also the GUI's endless/attract demo:
+                        //  - OptimizedHand(p, handsize, 3, 1, 3) stacks the
+                        //    opening hand with 3 lands + 1 cheap creature + 3
+                        //    cheap spells, "to insure a challanging match";
+                        //  - agressivity += 100 pins the seat aggressive
+                        //    (consumed at AIPlayerBaka.cpp's `agressivity > 80`
+                        //    in chooseAttackers);
+                        //  - forceBestAbilityUse bypasses ability-use randomness
+                        //    (3 consumers in AIPlayerBaka.cpp).
+                        //The wave-43 review measured the cost: 42/42 corpus hands
+                        //held exactly 3 lands and 42/42 were kept. So every
+                        //mulligan teach in every deck guide was UNTESTABLE by this
+                        //harness (no seat ever saw a hand worth refusing), and
+                        //every heuristic-fallback attack decision in every corpus
+                        //ran pinned aggressive with nothing saying so.
+                        //
+                        //WAGIC_SELFPLAY_FAIRHAND=1 opts a run out of the hand rig:
+                        //the seat takes the SAME a->resolve() deal a human seat
+                        //takes, which also finally arms PreGamePhase's London
+                        //mulligan for AI seats (the phase already runs for
+                        //MODE_AI x2 - it just never had a hand worth refusing).
+                        //WAGIC_SELFPLAY_FAIRAI follows the hand gate and drops the
+                        //two seat pins; =0 forces them back on for isolation runs.
+                        //
+                        //THE DEFAULT (no env) IS DELIBERATELY UNCHANGED: the rig
+                        //stays, so corpora from waves <=43 stay comparable.
+                        //Flipping the default is an OWNER decision and NO SUCH
+                        //RULING HAS BEEN MADE - do not flip it without one.
+                        //
+                        //SCOPE: this branch is MODE_AI vs MODE_AI only. Suite
+                        //seats are MODE_TEST_SUITE (they seed hands via INIT) and
+                        //never reach here; a human game leaves players[0]
+                        //MODE_HUMAN, so the single-player difficulty ladder below
+                        //is untouched either way.
                         handsize = ((AADrawer *)a)->getNumCards();
-                        ((AIPlayer *) p)->forceBestAbilityUse = true;
-                        ((AIPlayer *) p)->agressivity += 100;
-                        hand->OptimizedHand(p,handsize, 3, 1, 3);
+                        if (!selfplayFairAI())
+                        {
+                            ((AIPlayer *) p)->forceBestAbilityUse = true;
+                            ((AIPlayer *) p)->agressivity += 100;
+                        }
+                        if (selfplayFairHand())
+                            a->resolve();
+                        else
+                            hand->OptimizedHand(p,handsize, 3, 1, 3);
                     }
                     else if (!p->isAI() && !Optimizedhandcheat)
                         a->resolve();
