@@ -13298,11 +13298,24 @@ static const int kPreventPartial = 2;
 //lie, and the attackers window had no statement at all (the model derived its
 //own and got "Silencer dies to Battlement" and a hallucinated deathtouch). One
 //source of truth for the outcome; two voicings of it.
+//W44 TRAMPLE LETHAL BASIS. 'bRemaining' is the blocker's REMAINING toughness
+//(MTGCardInstance::life - marked damage already counted); -1 means "not known,
+//use printed toughness", which is what the pure struct-only unit tests pass.
+//It exists only for the trample-through clause, and only because CR 702.19b
+//makes marked damage - and ONLY marked damage - shrink the lethal cut a blocker
+//soaks. GuiCombat::autoaffectDamage computes the real assignment off card->life
+//for exactly that reason, so a preview that priced printed toughness would
+//UNDERSTATE the carry-over against a pre-damaged blocker: 6 power into a 4/4
+//with 2 marked tramples 4, not 2. The trust doctrine makes the printed number
+//an instruction, so it has to be the engine's number. Deliberately NOT wired
+//into the who-dies verdicts above: those price printed toughness today
+//(a pre-existing scope, unchanged here).
 static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a,
                                       int preventAtoB = kPreventNone,
                                       int preventBtoA = kPreventNone,
                                       int preventAtoFace = kPreventNone,
-                                      bool attackerSeat = false)
+                                      bool attackerSeat = false,
+                                      int bRemaining = -1)
 {
     int bp = b.power > 0 ? b.power : 0;
     int ap = a.power > 0 ? a.power : 0;
@@ -13371,7 +13384,8 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     //(preventAtoFace) and the only one this clause may lean on.
     if (a.trample && !(b.firststrike && !a.firststrike && bKillsA))
     {
-        int lethalToB = a.deathtouch ? 1 : (bt > 0 ? bt : 0);
+        int lethalBasis = bRemaining >= 0 ? bRemaining : bt;
+        int lethalToB = a.deathtouch ? 1 : (lethalBasis > 0 ? lethalBasis : 0);
         int through = ap - lethalToB;
         if (through > 0)
         {
@@ -13560,7 +13574,8 @@ static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * at
     return combatTradePreviewStats(combatStatOf(blocker), combatStatOf(attacker),
                                    combatPreventionKind(attacker, blocker),
                                    combatPreventionKind(blocker, attacker),
-                                   combatPreventionKindToPlayer(attacker, blocker->controller()));
+                                   combatPreventionKindToPlayer(attacker, blocker->controller()),
+                                   false, blocker->life);
 }
 
 //W42-3: the SAME fight, asked from the attacking seat. Identical arguments in
@@ -13573,7 +13588,7 @@ static string combatAttackOutcome(MTGCardInstance * attacker, MTGCardInstance * 
                                    combatPreventionKind(attacker, blocker),
                                    combatPreventionKind(blocker, attacker),
                                    combatPreventionKindToPlayer(attacker, blocker->controller()),
-                                   true);
+                                   true, blocker->life);
 }
 
 //W36 #2 (139-tier P1 / 158 P3, engine-verified game-affecting): a "whenever ~
@@ -14456,7 +14471,7 @@ int AIPlayerGPT::chooseAttackers()
                                                           combatPreventionKind(attackers[j], c),
                                                           combatPreventionKind(c, attackers[j]),
                                                           combatPreventionKindToPlayer(attackers[j], c->controller()),
-                                                          true);
+                                                          true, c->life);
                     }
                     else
                         outcome = combatAttackOutcome(attackers[j], c);
@@ -15060,7 +15075,8 @@ int AIPlayerGPT::chooseBlockers()
                         trade = combatTradePreviewStats(combatStatOf(blockers[i]), as,
                                                         combatPreventionKind(attackers[k], blockers[i]),
                                                         combatPreventionKind(blockers[i], attackers[k]),
-                                                        combatPreventionKindToPlayer(attackers[k], blockers[i]->controller()));
+                                                        combatPreventionKindToPlayer(attackers[k], blockers[i]->controller()),
+                                                        false, blockers[i]->life);
                         if (!trade.empty())
                         {
                             std::ostringstream bb;
@@ -21037,6 +21053,19 @@ void AIPlayerGPT::runParseSelfTest()
               "W42-3 trample-through is voiced toward the DEFENDING player");
         CHECK(tramp.find("your face") == string::npos,
               "W42-3 NEGATIVE the blocker seat's 'to your face' never reaches an A-line");
+        // W44 TRAMPLE LETHAL BASIS: marked damage shrinks the cut the blocker
+        // soaks (CR 702.19b), so more tramples through. The engine's own
+        // assignment (GuiCombat::autoaffectDamage, card->life) does this; the
+        // preview must not understate it. Same 5/5 trampler, same 0/4 wall, but
+        // the wall already has 2 marked: remaining 2, so 3 tramples, not 1.
+        // The -1 default (no remaining known) must stay on printed toughness.
+        CHECK(combatTradePreviewStats(wall04, tr55, kPreventNone, kPreventNone,
+                                      kPreventNone, true, 2)
+              == "you kill it, your attacker lives, 3 tramples through to them",
+              "W44 a pre-damaged blocker soaks only its REMAINING toughness");
+        CHECK(combatTradePreviewStats(wall04, tr55, kPreventNone, kPreventNone,
+                                      kPreventNone, true, -1) == tramp,
+              "W44 NEGATIVE unknown remaining falls back to printed toughness - 1 tramples");
         CHECK(combatTradePreviewStats(wall04, tr55, kPreventNone, kPreventNone, kPreventFull, true)
                   .find("but its trample damage to them is prevented") != string::npos,
               "W42-3 a fully prevented trample-through says so, in this seat's voice");

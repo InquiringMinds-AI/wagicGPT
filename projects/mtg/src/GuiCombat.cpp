@@ -130,7 +130,7 @@ void GuiCombat::autoaffectDamage(AttackerDamaged* attacker, CombatStep step)
     for (vector<DefenserDamaged*>::iterator it = attacker->blockers.begin(); it != attacker->blockers.end(); ++it)
     {
         (*it)->clearDamage();
-        unsigned actual_damage = MIN(damage, (unsigned)MAX((*it)->card->toughness, 0));
+        unsigned actual_damage = MIN(damage, (unsigned)MAX((*it)->card->life, 0));
         if ((attacker->card->has(Constants::DEATHTOUCH) || attacker->card->has(Constants::PERPETUALDEATHTOUCH)) && actual_damage > 1)
             actual_damage = 1;
         (*it)->addDamage(actual_damage, attacker);

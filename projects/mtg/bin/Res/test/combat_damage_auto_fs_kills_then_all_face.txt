@@ -1,0 +1,53 @@
+# COMBAT DAMAGE AUTO-ASSIGNMENT pins (wave 44). The damage ASSIGNMENT window is
+# auto-skipped by design - the owner's position is that the assignment has a
+# deterministically correct answer, so automating it is reasonable rather than a
+# bug. Because the player never sees that screen, GuiCombat::autoaffectDamage IS
+# the assignment, so these fixtures pin what it computes. Note the SAME function
+# is the AI's assignment too (AIPlayerBaka::affectCombatDamages calls it), so
+# there is one definition for both seats.
+#
+# THE BLOCKER DIES AT FIRST STRIKE AND THE REGULAR STEP HAS NOBODY LEFT.
+# CR 702.19d: "if all creatures blocking [a trampling attacker] are removed from
+# combat ... all of its combat damage is assigned to the player or planeswalker
+# it's attacking." A blocked creature stays blocked (CR 509.1h), but with no
+# blockers left there is nothing to assign lethal damage TO, so the whole regular
+# sub-step goes to the face - it is not reduced, and it is not lost.
+#
+# Rockshard Elemental (Oracle, Scryfall verified 2026-08-24: 4/3 "Double
+# strike") + Rancor = 6/3 double strike trample, blocked by Hill Giant (3/3
+# vanilla). First strike: lethal is 3, so 3 to the Giant and 3 trampled through
+# (20 -> 17); the Giant dies to state-based actions at the end of that sub-step
+# and never deals its own damage back. Regular damage: no blockers remain, so
+# all 6 hit the player (17 -> 11). The Elemental ends the turn untouched with
+# Rancor still on it.
+#
+# This pins a path the earlier double-strike fixtures never reached (in those
+# the damaged blocker survived first strike). A regression that dropped the
+# no-blockers-left case would leave the defender on 17.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Rockshard Elemental
+hand:Rancor
+manapool:{G}
+life:20
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+Rancor
+Rockshard Elemental
+goto attackers
+Rockshard Elemental
+next
+Hill Giant
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Rockshard Elemental,Rancor
+life:20
+[PLAYER2]
+graveyard:Hill Giant
+life:11
+[END]
