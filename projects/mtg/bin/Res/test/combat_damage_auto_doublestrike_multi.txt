@@ -10,14 +10,17 @@
 # and leaves the other damaged. Rockshard Elemental (4/3 double strike) + Rancor
 # = 6/3 double strike trample vs Stone Golem 4/4 then Hill Giant 3/3.
 # First strike: 4 to the Golem (dies at end of the sub-step), 2 to the Giant.
-# Regular damage: the Giant has 1 remaining toughness, but autoaffectDamage
-# computes lethal from its printed toughness (3), so it assigns 3 and tramples
-# 3. Defender ends on 17; the maximal line (1 to the Giant, 5 trampled) would
-# leave it on 15.
+# Regular damage: the Giant carries 2 marked damage, so CR 702.19b's
+# "take into account damage already marked" makes its lethal 1, not its printed
+# 3. autoaffectDamage assigns the Giant 1 and tramples the remaining 5.
+# Defender ends on 15.
 #
-# Same verdict as the single-blocker sibling: LEGAL under CR 510.1c, not
-# maximal, reported not fixed. This pins current behavior; the maximal line
-# would make this 15.
+# Same rules basis as the single-blocker sibling, exercised through a
+# MULTI-blocker loop and across a blocker that left combat mid-turn: lethal is
+# read off card->life per surviving blocker. The old printed-toughness basis
+# assigned 3 here and trampled only 3, leaving the defender on 17 - legal under
+# CR 510.1c, but 2 damage short of the maximal line. A regression back to
+# card->toughness would make this number 17.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -45,5 +48,5 @@ graveyard:Rockshard Elemental
 life:20
 [PLAYER2]
 graveyard:Stone Golem,Hill Giant
-life:17
+life:15
 [END]

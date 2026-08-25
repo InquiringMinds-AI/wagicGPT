@@ -1,0 +1,50 @@
+# COMBAT DAMAGE AUTO-ASSIGNMENT pins (wave 44). The damage ASSIGNMENT window is
+# auto-skipped by design - the owner's position is that the assignment has a
+# deterministically correct answer, so automating it is reasonable rather than a
+# bug. Because the player never sees that screen, GuiCombat::autoaffectDamage IS
+# the assignment, so these fixtures pin what it computes. Note the SAME function
+# is the AI's assignment too (AIPlayerBaka::affectCombatDamages calls it), so
+# there is one definition for both seats.
+#
+# MARKED DAMAGE FROM A NON-COMBAT SOURCE, single strike. CR 702.19b / 510.1c:
+# when checking whether a blocker has been assigned lethal damage, "take into
+# account damage already marked on the creature". So marked damage SHRINKS the
+# cut a blocker soaks - unlike prevention/protection, which does not (see
+# combat_damage_auto_doublestrike_trample_protection).
+#
+# Shock (Oracle, Scryfall verified 2026-08-24: "Shock deals 2 damage to any
+# target.") marks 2 on Stone Golem (4/4 vanilla artifact creature) pre-combat,
+# leaving it 2 remaining toughness. War Mammoth (3/3 trample, Oracle "Trample")
+# then attacks and the Golem blocks. Lethal is 2, not the printed 4, so the
+# Mammoth assigns 2 and tramples 1 through: defender 20 -> 19.
+#
+# The Golem still dies (2 marked + 2 assigned = 4) and its 4 power kills the
+# 3/3 Mammoth. Before the card->toughness -> card->life fix in autoaffectDamage
+# this assigned the full printed 3, trampled 0, and left the defender on 20.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:War Mammoth
+hand:Shock
+manapool:{R}
+life:20
+[PLAYER2]
+inplay:Stone Golem
+life:20
+[DO]
+Shock
+Stone Golem
+goto attackers
+War Mammoth
+next
+Stone Golem
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+graveyard:War Mammoth,Shock
+life:20
+[PLAYER2]
+graveyard:Stone Golem
+life:19
+[END]

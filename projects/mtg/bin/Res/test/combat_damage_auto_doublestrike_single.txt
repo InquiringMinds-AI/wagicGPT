@@ -8,19 +8,20 @@
 #
 # DOUBLE STRIKE + TRAMPLE, one blocker that SURVIVES the first-strike sub-step.
 # Boros Swiftblade (1/2 double strike) + Rancor = 3/2 double strike trample vs
-# Stone Golem 4/4. First strike marks 3 on the Golem, leaving it 1 remaining
-# toughness; at the regular damage sub-step autoaffectDamage computes lethal
-# from card->toughness (4), NOT card->life (1), so it re-assigns 3 to the Golem
-# and tramples 0. Defender ends on 20.
+# Stone Golem 4/4. First strike assigns 3 to the Golem (lethal there is its full
+# 4, so all 3 go in and nothing tramples), leaving it 1 remaining toughness. At
+# the regular damage sub-step CR 702.19b requires lethal to "take into account
+# damage already marked on the creature", so lethal is now 1, not the printed 4:
+# autoaffectDamage assigns the Golem 1 and tramples the other 2 through.
+# Defender ends on 18.
 #
-# This is LEGAL - CR 510.1c lets the attacker assign MORE than lethal to a
-# blocker - but it is not the maximal line: assigning the Golem its 1 remaining
-# point would trample 2 through and leave the defender on 18. Since the player
-# never sees the assignment screen, that 2 damage is simply never available.
-# Reported to the owner 2026-08-24 as suboptimal-but-legal; NO code change was
-# made. The assert below pins CURRENT behavior. If the automation is ever
-# changed to compute lethal from card->life (the same value hasLethalDamage()
-# and GuiCombat::removeOne already use), this number becomes 18.
+# This is the MAXIMAL line and the rules-correct one. Both are true at once -
+# CR 510.1c also permits assigning MORE than lethal, so the old behavior here
+# (3 again at the regular step, 0 trampled, defender on 20) was legal but left
+# 2 damage on the table every time. autoaffectDamage now computes lethal from
+# card->life, the same remaining-toughness value hasLethalDamage() and
+# GuiCombat::removeOne already use. A regression back to card->toughness would
+# make this number 20.
 [INIT]
 FIRSTMAIN
 [PLAYER1]
@@ -47,5 +48,5 @@ graveyard:Boros Swiftblade
 life:20
 [PLAYER2]
 graveyard:Stone Golem
-life:20
+life:18
 [END]

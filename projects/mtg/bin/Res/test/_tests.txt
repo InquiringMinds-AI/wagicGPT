@@ -514,6 +514,9 @@ combat_damage_auto_doublestrike_single.txt
 combat_damage_auto_doublestrike_multi.txt
 combat_damage_auto_trample_control.txt
 combat_damage_auto_notrample_control.txt
+combat_damage_auto_shock_then_trample.txt
+combat_damage_auto_doublestrike_trample_protection.txt
+combat_damage_auto_fs_kills_then_all_face.txt
 composite_golem.txt
 conservator.txt
 consign_to_dream.txt

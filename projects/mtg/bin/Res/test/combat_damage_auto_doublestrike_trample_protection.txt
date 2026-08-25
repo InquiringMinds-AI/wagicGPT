@@ -1,0 +1,55 @@
+# COMBAT DAMAGE AUTO-ASSIGNMENT pins (wave 44). The damage ASSIGNMENT window is
+# auto-skipped by design - the owner's position is that the assignment has a
+# deterministically correct answer, so automating it is reasonable rather than a
+# bug. Because the player never sees that screen, GuiCombat::autoaffectDamage IS
+# the assignment, so these fixtures pin what it computes. Note the SAME function
+# is the AI's assignment too (AIPlayerBaka::affectCombatDamages calls it), so
+# there is one definition for both seats.
+#
+# THE OTHER HALF OF THE LETHAL BASIS - PREVENTED damage, over BOTH double-strike
+# sub-steps. CR 702.19b says to take into account "damage already marked on the
+# creature ... but not any abilities or effects that might change the amount of
+# damage that's actually dealt." Protection prevents the damage when it is DEALT
+# (CR 702.16e), so nothing is ever MARKED and remaining toughness never drops.
+# Remaining toughness - card->life, the basis autoaffectDamage now uses - is
+# therefore exactly the right value at BOTH sub-steps: it falls for marked
+# damage and holds for prevented damage, with no special case for either.
+#
+# Marisi's Twinclaws (Oracle, Scryfall verified 2026-08-24: 2/4 "Double strike",
+# {2}{R/W}{G} - a GREEN creature) + Rancor = 4/4 double strike trample. It is
+# blocked by Cerulean Wyvern (3/3, "Flying, protection from green"), which
+# survives the whole combat value-wise. Each sub-step assigns the Wyvern its
+# full printed lethal 3 (prevention is not marked, so life is still 3 at the
+# regular step exactly as it was at first strike) and tramples 4 - 3 = 1
+# through. Defender takes 2 x (power - printed toughness) = 2 x 1 = 2:
+# 20 -> 18, NOT 20 -> 12 and NOT 20 -> 19.
+#
+# The Wyvern lives (all 6 assigned points prevented) and deals its own 3 back at
+# the regular step, which the 4/4 Twinclaws survives.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Marisi's Twinclaws
+hand:Rancor
+manapool:{G}
+life:20
+[PLAYER2]
+inplay:Cerulean Wyvern
+life:20
+[DO]
+Rancor
+Marisi's Twinclaws
+goto attackers
+Marisi's Twinclaws
+next
+Cerulean Wyvern
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Marisi's Twinclaws,Rancor
+life:20
+[PLAYER2]
+inplay:Cerulean Wyvern
+life:18
+[END]
