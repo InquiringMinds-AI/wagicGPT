@@ -1183,3 +1183,9 @@ ludevics_test_subject_five_counters.txt
 #reach its X announcement - the arming gap used to advance the phase, empty
 #the pool, and drop the cast with no event and no record.
 ai_x_alt_menu_cast_wave43.txt
+#wave-44 CR 510.1a/702.19b: a trampling attacker assigns lethal to a blocker
+#with protection from it (lethal is checked IGNORING prevention); protection
+#then eats that damage when it is DEALT, so only the excess tramples through.
+trample_vs_protection_blocker.txt
+trample_vs_ordinary_blocker.txt
+nontrample_vs_protection_blocker.txt

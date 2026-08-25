@@ -16041,6 +16041,34 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(strFace.find("tramples to your face") == string::npos
               && strFace.find("its trample damage to you is prevented") != string::npos,
               "A3 a fog over YOU replaces the trample number, it does not keep it");
+        // 7b. W44: the SAME clause under PROTECTION rather than a fog, pinned to
+        // the numbers of the engine fixtures trample_vs_protection_blocker.txt /
+        // trample_vs_ordinary_blocker.txt so the forecast and the engine cannot
+        // drift apart. Rootbreaker Wurm (green 6/6 trample) blocked by Cerulean
+        // Wyvern (3/3, protection from green): CR 702.19b checks assigned lethal
+        // IGNORING prevention, so 3 is still soaked and exactly 3 tramples -
+        // protection EATS trample damage, it does not redirect it to the face.
+        // The blocker survives (its 3 is prevented) and its own 3 still lands.
+        CombatTradeStat wyvern33 = { 3, 3, false, false, false, false, false, false, false };
+        CombatTradeStat wurm66T  = { 6, 6, false, false, false, false, false, true,  false };
+        string sProTr = combatTradePreviewStats(wyvern33, wurm66T, kPreventFull, kPreventNone, kPreventNone);
+        cout << "     3/3 pro-green blocker vs 6/6 green TRAMPLE: \"" << sProTr << "\"\n";
+        CHECK(sProTr == "neither dies (the attacker deals NO damage to your blocker - prevented), 3 tramples to your face",
+              "A3 protection soaks its full lethal cut - 3 of 6 tramples through, not 6");
+        CHECK(sProTr.find("6 tramples") == string::npos,
+              "A3 the protected blocker is NOT skipped in the trample math");
+        // The same fight from the ATTACKING seat: identical numbers, flipped voicing.
+        string sProTrA = combatTradePreviewStats(wyvern33, wurm66T, kPreventFull, kPreventNone, kPreventNone, true);
+        cout << "     attacker seat, 6/6 green TRAMPLE into a pro-green 3/3: \"" << sProTrA << "\"\n";
+        CHECK(sProTrA == "neither dies (your attacker deals NO damage to it - prevented), 3 tramples through to them",
+              "A3 the attacker seat reports the same eaten-trample number");
+        // Negative control: the same 6/6 trampler into an ORDINARY 3/3 - same 3
+        // through, only the survival verdict differs. Protection changes WHO
+        // SURVIVES, never how much tramples.
+        string sPlainTr = combatTradePreviewStats(wyvern33, wurm66T);
+        cout << "     3/3 ordinary blocker vs 6/6 TRAMPLE: \"" << sPlainTr << "\"\n";
+        CHECK(sPlainTr == "your blocker dies, attacker lives, 3 tramples to your face",
+              "A3 control: an unprotected 3/3 soaks the same 3 and the same 3 tramples");
         // 8. NOT-COMPUTABLE prevention (a finite shield, absorb, phantom,
         // wilting/vigor): the naive verdict stands and the omission is STATED.
         // The honest weaker claim, never a guess in either direction.

@@ -1,0 +1,40 @@
+# CR 702.19b: a trampling attacker may assign damage to the defending player
+# only "once all those blocking creatures are assigned lethal damage", and
+# "when checking for assigned lethal damage, take into account damage already
+# marked on the creature ... but not any abilities or effects that might change
+# the amount of damage that's actually dealt." Prevention is exactly such an
+# effect, so a blocker with protection is still assigned its full lethal cut.
+# CR 702.16e then prevents that damage when it is DEALT, so the blocker
+# survives and only the EXCESS tramples through. Protection EATS trample damage.
+#
+# Rootbreaker Wurm (green 6/6 trample) blocked by Cerulean Wyvern (3/3 flier,
+# protection from green). Lethal for the Wyvern is 3, ignoring prevention, so
+# exactly 3 tramples through: defender goes 20 -> 17, NOT 20 -> 14.
+# The Wyvern survives (its 3 assigned damage is prevented) and deals its own 3
+# back to the 6/6 Wurm, which lives.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Rootbreaker Wurm
+life:20
+[PLAYER2]
+inplay:Cerulean Wyvern
+life:20
+[DO]
+goto attackers
+Rootbreaker Wurm
+next
+Cerulean Wyvern
+next
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Rootbreaker Wurm
+life:20
+[PLAYER2]
+inplay:Cerulean Wyvern
+life:17
+[END]

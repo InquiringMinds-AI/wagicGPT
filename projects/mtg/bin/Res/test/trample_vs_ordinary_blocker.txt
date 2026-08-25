@@ -1,0 +1,35 @@
+# CONTROL for trample_vs_protection_blocker.txt: identical attacker and
+# identical blocker STATS, no protection. Rootbreaker Wurm (green 6/6 trample)
+# blocked by Hill Giant (3/3, no protection): 3 assigned kills the Giant and 3
+# tramples through, defender 20 -> 17. Same life total as the protection
+# fixture - the whole point of CR 702.19b's "not any abilities or effects that
+# might change the amount of damage that's actually dealt" is that protection
+# changes WHO SURVIVES, never how much tramples.
+# Pins that pairing: if a future change ever routes trample around a prevented
+# blocker, this control stays green while the protection fixture goes red.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Rootbreaker Wurm
+life:20
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+goto attackers
+Rootbreaker Wurm
+next
+Hill Giant
+next
+next
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Rootbreaker Wurm
+life:20
+[PLAYER2]
+graveyard:Hill Giant
+life:17
+[END]
