@@ -50,3 +50,13 @@ are not hand-comparable with waves <=43 (mulligan seams live for the first time;
 rates and game-length distributions may shift for reasons unrelated to guides — the
 first fair-hand corpus is a NEW BASELINE, and its review must not attribute
 hand-variance effects to the wave's edits).
+
+## OWNER AUTHORIZATION (2026-08-24): the DS/marked-damage lethal-basis fix
+After a full rules derivation in conversation (marked-damage accounting incl. the
+Shock-before-combat case; prevention-not-marked; dies-to-FS all-to-face), owner:
+"fascinating. that's a more obvious common bug than I would expect to exist. fine.
+fix it." One-token flip (GuiCombat autoaffectDamage lethal basis toughness->life);
+two pre-registered assert flips; three new pins from the derivation (shock_then_trample,
+DS+protection composite, fs_kills_then_all_face — the last previously unverified);
+stop-and-revert on any unexpected suite movement. Construction case: OWNER RULED OUT
+OF SCOPE at this time. {room effect:} keep call still open.
