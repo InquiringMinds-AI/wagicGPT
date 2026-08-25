@@ -13,20 +13,23 @@
   unregistered: Baka never gang-blocks menace — #W45 seed), loyalty lost-(now N),
   lifelink/DS clauses in trade verdicts.
 
-## IN FLIGHT: the lethal-basis fix lane (owner-authorized "fine. fix it."):
+## COMPLETE (was in flight at first writing): the lethal-basis fix lane (owner-authorized "fine. fix it."):
 one-token GuiCombat autoaffectDamage toughness->life; two pre-registered assert flips
 (20->18, 17->15); three new pins (shock_then_trample, DS+protection composite,
 fs_kills_then_all_face — last one previously unverified, red = separate defect);
 stop-and-revert on any other suite movement; forecast-drift check.
 
-## NEXT (the loop, when owner returns / usage resets THURSDAY):
-1. Merge the lethal lane (FROM THE MAIN TREE — the worktree-merge trap hit 5x this
-   session; cd /home/magi/Projects/wagicGPT FIRST, always).
-2. Rebuild + merged gate (expected: PARSETEST 1080+23(B)+45(C)+lethal-lane's = watch
-   exact sums; suite ~1129/0+37/0-ish — count is registry-dependent, 0-failed + exact
-   fixture deltas is the invariant; 'W43-1 ASSERT' must be 0).
-3. Push; archive binary to ~/wagic-archives/.
-4. LAUNCH THE FIRST FAIR-HAND CORPUS (pool unchanged 146,152,125,126,162,123,130;
+## STEP-1 FULLY MERGED AND GATED (final state at pause, merge 2d09ea75c):
+Lethal lane merged (one token + 3 pins all green incl. fs_kills_then_all_face — the
+engine already implemented 702.19d; forecast bRemaining fix; the PRE-EXISTING who-dies
+preview lie on marked damage deferred to the docket as a separate item). FINAL GATE:
+**suite 1130/0 + 37 AI/0, PARSETEST 1150/0**. The single 'W43-1 ASSERT' firing is
+menace_defender_one_blocker.txt's DELIBERATE illegal-declaration provocation (the suite
+driver bypasses the human refusal path) — the safety net working, NOT a regression;
+expect exactly 1 in future gates. Chain pushed; binary archived ~/wagic-archives/.
+
+## NEXT (resume THURSDAY):
+1. LAUNCH THE FIRST FAIR-HAND CORPUS (pool unchanged 146,152,125,126,162,123,130;
    canonical recipe; done-files on ~/.gatelogs NOT /tmp). Review carries: new-baseline
    discipline (do NOT attribute hand-variance to edits), first-ever mulligan evidence
    (guides' floors face reality; if mull-to-zero appears WITH guides, the seam-floor
