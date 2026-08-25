@@ -1,0 +1,41 @@
+# COMBAT DAMAGE AUTO-ASSIGNMENT pins (wave 44). The damage ASSIGNMENT window is
+# auto-skipped by design - the owner's position is that the assignment has a
+# deterministically correct answer, so automating it is reasonable rather than a
+# bug. Because the player never sees that screen, GuiCombat::autoaffectDamage IS
+# the assignment, so these fixtures pin what it computes. Note the SAME function
+# is the AI's assignment too (AIPlayerBaka::affectCombatDamages calls it), so
+# there is one definition for both seats.
+#
+# CONTROL - ordinary trample, one blocker, no damage marked anywhere. Stone
+# Golem 4/4 + Rancor = 6/4 trample vs Hill Giant 3/3: lethal is 3, so 3 to the
+# Giant and 3 trampled through. Printed toughness and remaining toughness agree
+# here, so this case is CORRECT AND MAXIMAL, and it pins that the ordinary
+# combat the owner sees every game is untouched by anything the two fixtures
+# above describe.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Stone Golem
+hand:Rancor
+manapool:{G}
+life:20
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+Rancor
+Stone Golem
+goto attackers
+Stone Golem
+next
+Hill Giant
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Stone Golem,Rancor
+life:20
+[PLAYER2]
+graveyard:Hill Giant
+life:17
+[END]

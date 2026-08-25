@@ -1,0 +1,51 @@
+# COMBAT DAMAGE AUTO-ASSIGNMENT pins (wave 44). The damage ASSIGNMENT window is
+# auto-skipped by design - the owner's position is that the assignment has a
+# deterministically correct answer, so automating it is reasonable rather than a
+# bug. Because the player never sees that screen, GuiCombat::autoaffectDamage IS
+# the assignment, so these fixtures pin what it computes. Note the SAME function
+# is the AI's assignment too (AIPlayerBaka::affectCombatDamages calls it), so
+# there is one definition for both seats.
+#
+# DOUBLE STRIKE + TRAMPLE, one blocker that SURVIVES the first-strike sub-step.
+# Boros Swiftblade (1/2 double strike) + Rancor = 3/2 double strike trample vs
+# Stone Golem 4/4. First strike marks 3 on the Golem, leaving it 1 remaining
+# toughness; at the regular damage sub-step autoaffectDamage computes lethal
+# from card->toughness (4), NOT card->life (1), so it re-assigns 3 to the Golem
+# and tramples 0. Defender ends on 20.
+#
+# This is LEGAL - CR 510.1c lets the attacker assign MORE than lethal to a
+# blocker - but it is not the maximal line: assigning the Golem its 1 remaining
+# point would trample 2 through and leave the defender on 18. Since the player
+# never sees the assignment screen, that 2 damage is simply never available.
+# Reported to the owner 2026-08-24 as suboptimal-but-legal; NO code change was
+# made. The assert below pins CURRENT behavior. If the automation is ever
+# changed to compute lethal from card->life (the same value hasLethalDamage()
+# and GuiCombat::removeOne already use), this number becomes 18.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Boros Swiftblade
+hand:Rancor
+manapool:{G}
+life:20
+[PLAYER2]
+inplay:Stone Golem
+life:20
+[DO]
+Rancor
+Boros Swiftblade
+goto attackers
+Boros Swiftblade
+next
+Stone Golem
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+hand:Rancor
+graveyard:Boros Swiftblade
+life:20
+[PLAYER2]
+graveyard:Stone Golem
+life:20
+[END]

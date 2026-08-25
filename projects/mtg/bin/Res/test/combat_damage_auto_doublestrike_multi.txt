@@ -1,0 +1,49 @@
+# COMBAT DAMAGE AUTO-ASSIGNMENT pins (wave 44). The damage ASSIGNMENT window is
+# auto-skipped by design - the owner's position is that the assignment has a
+# deterministically correct answer, so automating it is reasonable rather than a
+# bug. Because the player never sees that screen, GuiCombat::autoaffectDamage IS
+# the assignment, so these fixtures pin what it computes. Note the SAME function
+# is the AI's assignment too (AIPlayerBaka::affectCombatDamages calls it), so
+# there is one definition for both seats.
+#
+# DOUBLE STRIKE + TRAMPLE, TWO blockers - the first-strike sub-step kills one
+# and leaves the other damaged. Rockshard Elemental (4/3 double strike) + Rancor
+# = 6/3 double strike trample vs Stone Golem 4/4 then Hill Giant 3/3.
+# First strike: 4 to the Golem (dies at end of the sub-step), 2 to the Giant.
+# Regular damage: the Giant has 1 remaining toughness, but autoaffectDamage
+# computes lethal from its printed toughness (3), so it assigns 3 and tramples
+# 3. Defender ends on 17; the maximal line (1 to the Giant, 5 trampled) would
+# leave it on 15.
+#
+# Same verdict as the single-blocker sibling: LEGAL under CR 510.1c, not
+# maximal, reported not fixed. This pins current behavior; the maximal line
+# would make this 15.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Rockshard Elemental
+hand:Rancor
+manapool:{G}
+life:20
+[PLAYER2]
+inplay:Stone Golem,Hill Giant
+life:20
+[DO]
+Rancor
+Rockshard Elemental
+goto attackers
+Rockshard Elemental
+next
+Stone Golem
+Hill Giant
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+hand:Rancor
+graveyard:Rockshard Elemental
+life:20
+[PLAYER2]
+graveyard:Stone Golem,Hill Giant
+life:17
+[END]

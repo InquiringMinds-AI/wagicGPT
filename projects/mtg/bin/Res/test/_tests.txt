@@ -506,6 +506,14 @@ combat_damage_order_human.txt
 combat_damage_order_human_realgame.txt
 combat_damage_order_human_realgame_holds_instant.txt
 combat_damage_order_human_realgame_single_blocker.txt
+#wave-44 combat DAMAGE-step auto-assignment pins (the assignment screen is
+#auto-skipped by design, so autoaffectDamage IS the assignment - one function
+#for the human default and the AI seats alike).
+combat_damage_auto_deathtouch_trample.txt
+combat_damage_auto_doublestrike_single.txt
+combat_damage_auto_doublestrike_multi.txt
+combat_damage_auto_trample_control.txt
+combat_damage_auto_notrample_control.txt
 composite_golem.txt
 conservator.txt
 consign_to_dream.txt
