@@ -13505,6 +13505,204 @@ static int uniqueNameMatch(const vector<string>& words, const vector<string>& na
     return -1; //zero matches, or ambiguous with no ordinal to break the tie
 }
 
+//#W45-3 BLOCK-TRIGGERED LIFE. The combat preview modeled BODIES and never LIFE
+//that does not ride a keyword on either combatant. `Perimeter Captain (0/4)
+//(neither dies)` was the whole forecast for a block that also gains its
+//controller 2 life per blocking defender, and `Pride Guardian` 3 - two decided
+//games (deck146 vs126, the opponent racing 13 -> 42 while the AI read every
+//wall as inert). The trigger sits on a THIRD permanent, not on the blocker, so
+//the lifelink clause below - the shape this reuses - could not see it.
+//
+//One auto= line, classified. Returns true only for the shape this preview can
+//price honestly: a top-level "whenever ~ blocks" trigger whose whole payload is
+//a life gain for the trigger's own controller. `sourceSpec` is the filter that
+//decides WHICH blocking creature fires it, `amountExpr` the unevaluated amount,
+//`optional` the script's own "may".
+//Deliberately strict - every rejection below is a case where a rendered number
+//would be a claim this cannot support:
+//  * the trigger must OPEN the line: a granted/nested copy (`transforms((,
+//    newability[@combat(blocking)...]))`, an emblem, a lord) lives on a card
+//    that is not the trigger's real source, so the source filter would be
+//    resolved against the wrong permanent.
+//  * `restriction{...}` is a condition evaluated at trigger time, `thisforeach`
+//    a per-counter multiplier, `thatmuch` the resolution-time event variable and
+//    `rand` the game RNG - which rendering must never draw (standing rule).
+//  * the payload must be a life GAIN to the controller. `life:-N` is a loss and
+//    `opponent` is the other seat; both are real cards (Vraska's, the demon
+//    upkeep forms) and both would be voiced backwards by a "gain" clause.
+//Pure over the lowercased script line, so PARSETEST proves it without a game.
+static bool blockingLifeTriggerClause(const string& lowLine, string& sourceSpec,
+                                      string& amountExpr, bool& optional)
+{
+    sourceSpec.clear();
+    amountExpr.clear();
+    optional = false;
+    size_t s = lowLine.find_first_not_of(" \t");
+    if (s == string::npos)
+        return false;
+    static const char kTrig[] = "@combat(blocking)";
+    if (lowLine.compare(s, sizeof(kTrig) - 1, kTrig) != 0)
+        return false;
+    if (lowLine.find("restriction{") != string::npos
+        || lowLine.find("thisforeach") != string::npos
+        || lowLine.find("thatmuch") != string::npos
+        || lowLine.find("rand") != string::npos)
+        return false;
+    //TrCombatTrigger's optional `from(...)` filters on the ATTACKER being
+    //blocked (AllAbilities.h: fromTc->canTarget(blocked->opponent)), a second
+    //condition this pairing-blind scan does not evaluate - so a line carrying
+    //one is left unpriced rather than claimed unconditionally.
+    if (lowLine.find("from(") != string::npos)
+        return false;
+    size_t sp = lowLine.find("source(", s);
+    if (sp == string::npos)
+        return false;
+    size_t close = lowLine.find(')', sp + 7);
+    if (close == string::npos || close <= sp + 7)
+        return false;
+    string spec = lowLine.substr(sp + 7, close - sp - 7);
+    //The payload is whatever follows the FIRST ':' after the trigger header.
+    size_t colon = lowLine.find(':', close);
+    if (colon == string::npos)
+        return false;
+    size_t p = lowLine.find_first_not_of(" \t", colon + 1);
+    if (p == string::npos)
+        return false;
+    if (lowLine.compare(p, 4, "may ") == 0)
+    {
+        optional = true;
+        p = lowLine.find_first_not_of(" \t", p + 4);
+        if (p == string::npos)
+            return false;
+    }
+    if (lowLine.compare(p, 5, "life:") != 0)
+        return false; //a payload that does anything else is not priced here
+    p += 5;
+    size_t end = lowLine.find_first_of(" \t\r\n", p);
+    string expr = lowLine.substr(p, end == string::npos ? string::npos : end - p);
+    if (expr.empty() || expr[0] == '-')
+        return false; //a life LOSS is not what a "gain" clause may voice
+    //Whatever follows the amount names the player: nothing at all is the
+    //script's default (the ability's controller - Goldenglow Moth's bare
+    //"life:4"), "controller" says it outright, and anything else (opponent,
+    //targetedplayer, a chained "&&" clause) is a payload this does not price.
+    if (end != string::npos)
+    {
+        size_t t = lowLine.find_first_not_of(" \t\r\n", end);
+        if (t != string::npos)
+        {
+            size_t te = lowLine.find_first_of(" \t\r\n", t);
+            string who = lowLine.substr(t, te == string::npos ? string::npos : te - t);
+            if (who != "controller")
+                return false;
+            if (te != string::npos && lowLine.find_first_not_of(" \t\r\n", te) != string::npos)
+                return false; //a second chained effect: out of scope, not guessed
+        }
+    }
+    sourceSpec = spec;
+    amountExpr = expr;
+    return true;
+}
+
+//Does `spec` - the source filter of a blocking trigger on `src` - cover this
+//particular blocker? "this" is the self-trigger (Pride Guardian); anything else
+//is asked of the engine's own TargetChooser, the same machinery the rider gate
+//uses, so a filter like `creature[defender]|mybattlefield` is resolved by the
+//engine rather than re-derived from words. Fails CLOSED, unlike
+//riderHasLegalTarget: an unreadable filter is not evidence the trigger fires,
+//and the failure being fixed here is a MISSING fact, never an invented one.
+static bool blockingTriggerCovers(MTGCardInstance * src, const string& spec,
+                                  MTGCardInstance * blocker)
+{
+    if (!src || !blocker)
+        return false;
+    if (spec == "this")
+        return src == blocker;
+    GameObserver * obs = src->getObserver();
+    if (!obs)
+        return false;
+    TargetChooserFactory tcf(obs);
+    TargetChooser * tc = tcf.createTargetChooser(spec, src);
+    if (!tc)
+        return false;
+    bool ok = tc->canTarget(blocker);
+    SAFE_DELETE(tc);
+    return ok;
+}
+
+//Total life `blocker`'s controller gains the moment this creature BLOCKS,
+//summed over every permanent they control that carries such a trigger.
+//Mandatory and optional ("may") gains are kept apart: a "may" is the pilot's
+//own choice and stating it as certain would be the same overclaim the double-
+//strike lifelink clause refuses. Scans the blocking side's battlefield only -
+//`mybattlefield` and `this` are both resolved against the trigger's controller,
+//so an opponent's Noble Stand does not fire on YOUR block.
+static void blockTriggeredLifeFor(MTGCardInstance * blocker, int& sure, int& may)
+{
+    sure = 0;
+    may = 0;
+    if (!blocker || !blocker->controller() || !blocker->controller()->game)
+        return;
+    MTGGameZone * bf = blocker->controller()->game->inPlay;
+    if (!bf)
+        return;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * src = bf->cards[i];
+        if (!src || src->magicText.find("@combat(blocking)") == string::npos)
+            continue;
+        const string& mt = src->magicText;
+        size_t lp = 0;
+        while (lp <= mt.size())
+        {
+            size_t nl = mt.find('\n', lp);
+            string line = mt.substr(lp, nl == string::npos ? string::npos : nl - lp);
+            lp = (nl == string::npos) ? mt.size() + 1 : nl + 1;
+            string spec, expr;
+            bool optional = false;
+            if (!blockingLifeTriggerClause(line, spec, expr, optional))
+                continue;
+            if (!blockingTriggerCovers(src, spec, blocker))
+                continue;
+            //Same WParsedInt path the lifelink/drain magnitudes use - the value
+            //the resolution itself will read, off the trigger's own source.
+            WParsedInt val(expr, NULL, src);
+            int n = val.getValue();
+            if (n <= 0)
+                continue;
+            (optional ? may : sure) += n;
+        }
+    }
+}
+
+//#W45-3, the second half: a "whenever you gain life, that player loses that
+//much life" converter (Sanguine Bond and its class) turns every one of the
+//gains above into DAMAGE, which is how deck146's opponent went 13 -> 42 while
+//taking single turns of +12 and +13. Matched on the script rather than the
+//name: the trigger must OPEN the line, and its payload must be a life LOSS
+//aimed at the opponent. Exquisite Blood (`@lifelostfoeof(player):life:thatmuch
+//controller`) is the mirror, not a converter, and is deliberately not matched.
+//Pure over the lowercased script, so PARSETEST proves both halves.
+static bool lifeToDamageConverterScript(const string& magicText)
+{
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        size_t s = line.find_first_not_of(" \t");
+        if (s == string::npos || line.compare(s, 8, "@lifeof(") != 0)
+            continue;
+        size_t colon = line.find(":life:-", s);
+        if (colon == string::npos)
+            continue;
+        if (line.find("opponent", colon) != string::npos)
+            return true;
+    }
+    return false;
+}
+
 //A terse, NAIVE single-block combat-trade preview: what happens if this ONE
 //blocker blocks this ONE attacker, alone. The model keeps re-deriving
 //first-strike / deathtouch / trample math it distrusts (deck35 wave-18: an
@@ -13537,6 +13735,13 @@ struct CombatTradeStat
     //number rather than printing half of one.
     bool lifelink;
     bool doublestrike;
+    //#W45-3: life the BLOCKING side gains just for blocking, from triggers that
+    //sit on a third permanent (Perimeter Captain, Pride Guardian, Noble Stand).
+    //Only ever read off the 'b' (blocking) side - every call site puts the
+    //blocker there, in both seats. 'blockLifeMay' is the script's own "may",
+    //kept apart from the certain total rather than folded into it.
+    int blockLife;
+    int blockLifeMay;
 };
 
 //W41-5 PREVENTION KINDS. Damage-prevention replacement effects (Fog Bank's
@@ -13756,6 +13961,26 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
                 o << " (lifelink: " << who << " " << ap << ")";
         }
     }
+    //#W45-3: the block itself moves life. Unlike lifelink, trample and the
+    //wither shrink, this rides the DECLARATION of the block and not the damage,
+    //so it is deliberately NOT gated on prevention or on a blocker that dies in
+    //the first-strike step - the trigger has already fired by then, and gating
+    //it would delete a true fact. Voiced from the same seat as the verdict it
+    //follows: 'b' is the blocking side, so the attackers window says "they".
+    if (b.blockLife > 0 || b.blockLifeMay > 0)
+    {
+        const char * subj = attackerSeat ? "they" : "you";
+        o << " (blocking trigger: ";
+        if (b.blockLife > 0)
+        {
+            o << subj << " gain " << b.blockLife;
+            if (b.blockLifeMay > 0)
+                o << " and may gain " << b.blockLifeMay << " more";
+        }
+        else
+            o << subj << " may gain " << b.blockLifeMay;
+        o << ")";
+    }
     //W41-5, the honest-weaker-claim path. A prevention effect applies but its
     //residue is not exactly computable here, so the verdict above is the NAIVE
     //one and says so - the omit-when-unprovable precedent, stated rather than
@@ -13794,6 +14019,10 @@ static CombatTradeStat combatStatOf(MTGCardInstance * c)
     s.persist = c->basicAbilities[Constants::PERSIST] && c->counters && !c->counters->hasCounter(-1, -1);
     s.lifelink = c->basicAbilities[Constants::LIFELINK]; //#W44-LOW (E-3)
     s.doublestrike = c->basicAbilities[Constants::DOUBLESTRIKE];
+    //#W45-3: meaningful only when this creature is the BLOCKER of the pairing,
+    //which is the slot every caller puts it in; the attacker side computes it
+    //and the verdict never reads it.
+    blockTriggeredLifeFor(c, s.blockLife, s.blockLifeMay);
     return s;
 }
 
@@ -14912,6 +15141,51 @@ int AIPlayerGPT::chooseAttackers()
                 " TOGETHER. Any 1-on-1 result listed for it is what would happen"
                 " to that one creature inside such a group block, never on its"
                 " own.\n";
+    //#W45-3, the summary half. A life-to-damage converter turns the blocking
+    //triggers annotated above into a life SWING against the reader, and that is
+    //a board fact no per-attacker line owns - deck146's opponent climbed
+    //13 -> 42 on it while every wall read as inert. ONE line, naming the
+    //permanent so the claim is checkable against the board the reader can see,
+    //and stated as a consequence of blocking rather than as a prediction that
+    //they will block.
+    {
+        vector<string> mineConv, theirsConv;
+        Player * oppc = opponent();
+        for (int side = 0; side < 2; side++)
+        {
+            Player * pl = side == 0 ? (Player *) this : oppc;
+            if (!pl || !pl->game || !pl->game->inPlay)
+                continue;
+            MTGGameZone * bf = pl->game->inPlay;
+            for (int i = 0; i < bf->nb_cards; i++)
+            {
+                MTGCardInstance * c = bf->cards[i];
+                if (!c || !lifeToDamageConverterScript(c->magicText))
+                    continue;
+                (side == 0 ? mineConv : theirsConv).push_back(c->name + instanceHandle(c));
+            }
+        }
+        if (!mineConv.empty() || !theirsConv.empty())
+        {
+            tail << "LIFE-TO-DAMAGE CONVERTER on the battlefield:";
+            for (int side = 0; side < 2; side++)
+            {
+                const vector<string>& v = side == 0 ? mineConv : theirsConv;
+                if (v.empty())
+                    continue;
+                tail << (side == 0 ? " yours - " : " theirs - ");
+                for (size_t i = 0; i < v.size(); i++)
+                    tail << (i ? ", " : "") << v[i];
+                tail << ".";
+            }
+            tail << " While it is in play, life ITS CONTROLLER gains also makes"
+                    " the other player lose that much life. A converter of"
+                    " THEIRS therefore turns every \"blocking trigger\" gain"
+                    " listed above into that much life off YOUR total as well;"
+                    " a converter of YOURS converts life you gain, and leaves"
+                    " their blocking gains alone.\n";
+        }
+    }
     tail << kAttackersTurnFacts;
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
@@ -23505,6 +23779,126 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(xc2 == 2 && !xst2, "#W45-5 echo: the whole annotated row echoes back to its own index");
         CHECK(stripNarrationDecoration(xopts[0]) == "X = 5",
               "#W45-5 echo: the kill annotation leaves no residue in the narrated record");
+    }
+
+    // ---- #W45-3: block-triggered LIFE in the trade verdict ----
+    cout << "\n[W45-3] a block that gains life says so; the converter that turns it to damage is named\n";
+    {
+        // -- the script classifier, on the two ledger-named primitives verbatim.
+        string spec, expr; bool may = false;
+        bool okCap = blockingLifeTriggerClause(
+            "@combat(blocking) source(creature[defender]|mybattlefield):may life:2 controller",
+            spec, expr, may);
+        cout << "     Perimeter Captain -> spec=\"" << spec << "\" amount=\"" << expr
+             << "\" may=" << (may ? "yes" : "no") << "\n";
+        CHECK(okCap && spec == "creature[defender]|mybattlefield" && expr == "2" && may,
+              "#W45-3 Perimeter Captain's blocking trigger parses filter, amount and its 'may'");
+        bool okPride = blockingLifeTriggerClause("@combat(blocking) source(this):life:3 controller",
+                                                 spec, expr, may);
+        CHECK(okPride && spec == "this" && expr == "3" && !may,
+              "#W45-3 Pride Guardian's self-trigger parses as a certain 3");
+        // A bare "life:N" with no player named is the script's own default: the
+        // ability's controller (Goldenglow Moth's "you may gain 4 life").
+        CHECK(blockingLifeTriggerClause("@combat(blocking) source(this):life:4", spec, expr, may)
+              && expr == "4",
+              "#W45-3 an unqualified life: amount is the controller's gain");
+        // NEGATIVES - each one a shape a rendered number could not support.
+        CHECK(!blockingLifeTriggerClause(
+                  "@combat(blocking) source(this):life:-1 controller", spec, expr, may),
+              "#W45-3 NEGATIVE a life LOSS is never voiced by a gain clause");
+        CHECK(!blockingLifeTriggerClause(
+                  "@combat(blocking) source(this) restriction{type(demon|mybattlefield)~lessthan~1}:life:1 controller",
+                  spec, expr, may),
+              "#W45-3 NEGATIVE a restriction{} condition is not resolved at render time");
+        CHECK(!blockingLifeTriggerClause(
+                  "@combat(blocking) source(this):thisforeach(counter{1/1.1}) life:1 controller",
+                  spec, expr, may),
+              "#W45-3 NEGATIVE a per-counter multiplier is not priced");
+        CHECK(!blockingLifeTriggerClause(
+                  "transforms((,newability[@combat(blocking) source(this):life:3 controller]))",
+                  spec, expr, may),
+              "#W45-3 NEGATIVE a GRANTED copy does not open the line - its source is another card");
+        CHECK(!blockingLifeTriggerClause(
+                  "@combat(blocking) source(this):life:2 opponent", spec, expr, may),
+              "#W45-3 NEGATIVE a gain aimed at the opponent is not the controller's");
+        CHECK(!blockingLifeTriggerClause(
+                  "@combat(blocking) source(this):life:thatmuch controller", spec, expr, may),
+              "#W45-3 NEGATIVE a resolution-time amount is not a render-time number");
+        CHECK(!blockingLifeTriggerClause(
+                  "@combat(blocking) source(this):life:rand1_3 controller", spec, expr, may),
+              "#W45-3 NEGATIVE rendering never draws the game RNG");
+        CHECK(!blockingLifeTriggerClause(
+                  "@combat(blocking) source(this):draw:1 controller", spec, expr, may),
+              "#W45-3 NEGATIVE a blocking trigger that does something else is not a life clause");
+        CHECK(!blockingLifeTriggerClause(
+                  "@combat(blocking) source(this) from(creature[flying]|opponentbattlefield):life:2 controller",
+                  spec, expr, may),
+              "#W45-3 NEGATIVE a from() filter on the blocked attacker is a condition this does not evaluate");
+
+        // -- the verdict clause itself. Fields: power, toughness, deathtouch,
+        // wither, infectLabel, firststrike, indestructible, trample, persist,
+        // lifelink, doublestrike, blockLife, blockLifeMay.
+        CombatTradeStat wall04  = { 0, 4, false, false, false, false, false, false, false, false, false, 3, 0 };
+        CombatTradeStat wallMay = { 0, 4, false, false, false, false, false, false, false, false, false, 0, 2 };
+        CombatTradeStat wallBoth= { 0, 4, false, false, false, false, false, false, false, false, false, 3, 2 };
+        CombatTradeStat plain04 = { 0, 4, false, false, false, false, false, false, false, false, false, 0, 0 };
+        CombatTradeStat a22     = { 2, 2, false, false, false, false, false, false, false, false, false, 0, 0 };
+        CombatTradeStat fs55    = { 5, 5, false, false, false, true,  false, false, false, false, false, 0, 0 };
+        string sw = combatTradePreviewStats(wall04, a22);
+        cout << "     Pride Guardian 0/4 vs 2/2: \"" << sw << "\"  (pre-fix said just \"neither dies\")\n";
+        CHECK(sw == "neither dies (blocking trigger: you gain 3)",
+              "#W45-3 a (neither dies) wall states the 3 life the block gains");
+        // Same fight, attacker's chair - the pronoun flips, the number does not.
+        CHECK(combatTradePreviewStats(wall04, a22, kPreventNone, kPreventNone, kPreventNone, true)
+              == "neither dies (blocking trigger: they gain 3)",
+              "#W45-3 the attackers window voices the same gain as THEIRS");
+        CHECK(combatTradePreviewStats(wallMay, a22, kPreventNone, kPreventNone, kPreventNone, true)
+              == "neither dies (blocking trigger: they may gain 2)",
+              "#W45-3 a scripted 'may' is stated as optional, never as certain");
+        CHECK(combatTradePreviewStats(wallBoth, a22)
+              == "neither dies (blocking trigger: you gain 3 and may gain 2 more)",
+              "#W45-3 certain and optional gains are added separately, not merged");
+        // NEGATIVE: no such trigger, no clause. The control for all of it.
+        CHECK(combatTradePreviewStats(plain04, a22).find("blocking trigger") == string::npos,
+              "#W45-3 NEGATIVE a wall with no trigger gains the clause nothing");
+        // The trigger fires on the BLOCK, not on damage: a blocker that dies to
+        // first strike, and one whose damage is fully prevented, still gain.
+        CHECK(combatTradePreviewStats(wall04, fs55).find("blocking trigger: you gain 3") != string::npos,
+              "#W45-3 a blocker dead to first strike still gained - the trigger already fired");
+        CHECK(combatTradePreviewStats(wall04, a22, kPreventFull, kPreventFull)
+                  .find("blocking trigger: you gain 3") != string::npos,
+              "#W45-3 prevention stops damage, not the block that fired the trigger");
+        // The lifelink clause is untouched and the two coexist, in that order.
+        CombatTradeStat llWall = { 1, 4, false, false, false, false, false, false, false, true, false, 3, 0 };
+        string both = combatTradePreviewStats(llWall, a22);
+        CHECK(both.find("(lifelink: you gain 1)") != string::npos
+              && both.find("(blocking trigger: you gain 3)") != string::npos
+              && both.find("lifelink") < both.find("blocking trigger"),
+              "#W45-3 REGRESSION lifelink still renders, and the block clause follows it");
+
+        // -- ECHO SHAPE: the clause rides an attacker's blocker list, so its
+        // digits must not read as attacker indices if the model echoes the row.
+        vector<string> one;
+        one.push_back("Pride Guardian#1 (0/4) (neither dies (blocking trigger: they gain 3))");
+        vector<bool> sel;
+        vector<string> names; names.push_back("Grizzly Bears"); names.push_back("Hill Giant");
+        int r = parseAttackerSet("ATTACK: A1" + potentialBlockersTag(one, one[0]), 2, sel, &names);
+        CHECK(r == 1 && sel.size() == 2 && sel[0] && !sel[1],
+              "#W45-3 ECHO the gain digits inside the tag never parse as an attacker index");
+
+        // -- the life-to-damage converter classifier (Sanguine Bond class).
+        CHECK(lifeToDamageConverterScript("@lifeof(player) from(*[-lifefaker]|*):life:-thatmuch opponent"),
+              "#W45-3 Sanguine Bond's script is recognized as a life-to-damage converter");
+        CHECK(lifeToDamageConverterScript("@lifeof(player) from(*[-lifefaker]|*):life:-1 opponent"),
+              "#W45-3 the fixed-amount member of the same class is recognized");
+        CHECK(!lifeToDamageConverterScript("@lifelostfoeof(player):life:thatmuch controller"),
+              "#W45-3 NEGATIVE Exquisite Blood is the mirror, not a converter");
+        CHECK(!lifeToDamageConverterScript("@lifeof(player) from(*[-lifefaker]|*):counter(1/1)"),
+              "#W45-3 NEGATIVE a life-gain trigger that makes a counter converts nothing");
+        CHECK(!lifeToDamageConverterScript("@lifeof(player) from(*[-lifefaker]|*):life:1 controller"),
+              "#W45-3 NEGATIVE a life-gain doubler is not a life-to-damage converter");
+        CHECK(!lifeToDamageConverterScript(""),
+              "#W45-3 NEGATIVE an empty script converts nothing");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
