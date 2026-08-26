@@ -13,8 +13,9 @@ STEP 1. Read the ask's price line for the "(keeping N)" number. If it says (keep
   applies, you are DONE - do not read another rule in this section.
 STEP 2. Only at (keeping 6) or on your untouched opening 7 may you mulligan at all, and ONLY
   for one of these three: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
-  your colors when the header shows every spell needs it. THIS LIST IS COMPLETE. A one-land
-  hand is NOT on it and is a KEEP. The "KEEP a 7 or a 6 with 2-5 lands" line below describes
+  your colors when the header shows every spell needs it; or ONE land when the hand's spells
+  cost 2 or more (with one land you will not cast a 3-drop on time, and a six is usually a
+  two-lander - ship it). A one-land hand whose spells cost 1 is a keep. The "KEEP a 7 or a 6 with 2-5 lands" line below describes
   hands that are obviously fine - it is NOT a test, and a hand failing it is not a mulligan.
 - THE ENGINE COUNTS YOUR HAND FOR YOU. Every mulligan ask opens with lines like "Your hand (7
   cards), counted by the engine: 3 lands, 4 spells", "Mana sources among those lands, counted by

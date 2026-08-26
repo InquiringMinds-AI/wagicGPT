@@ -402,3 +402,8 @@ question (deck146) was put to the owner separately.
 4. ANNOUNCE_X ORDER — "Keep largest-first". CLOSED; per-row kill facts (#W45-5) are the fix.
 5. LOG SHAPE — "Owner-prefix every line" ('Your X' / 'Opponent's X' on all history lines,
 consistent with the board frame). #W45-20 is now a RENDER LANE for wave-45 step 1b.
+ONE-LAND SEVENS — owner, verbatim (2026-08-26): "the guide is the best effort suggestion, the
+goal is to give a guide which when followed will usually win, but the model not following the
+guide to its exact letter is acceptable behavior. if everything in the hand cost say 3 or more
+mana, 1 land is a terrible hand." APPLIED: deck146 STEP 2's 'one-land = KEEP' absolute replaced
+by the odds rule (one land + spells costing 2+ = ship; one land + one-drops = keep); skill #47.
