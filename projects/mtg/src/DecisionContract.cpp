@@ -301,6 +301,7 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     //Regular menu: items with GetId() > 0 map to action-layer abilities;
     //the trailing cancel item (when the menu is cancellable) is the decline.
     MTGAbility * soleOptionAbility = NULL;
+    MTGAbility * firstOptionAbility = NULL;
     for (unsigned int k = 0; k < object->abilitiesMenu->mObjects.size(); k++)
     {
         if (object->abilitiesMenu->mObjects[k]->GetId() <= 0)
@@ -309,9 +310,20 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
         req.optionTexts.push_back(ab ? ab->getMenuText() : string("(option)"));
         req.menuIndices.push_back((int) k);
         soleOptionAbility = ab;
+        if (!firstOptionAbility && ab)
+            firstOptionAbility = ab;
     }
     if (req.optionTexts.empty())
         return false;
+    //#W45 (wave-44 E-3): a menu armed while its spell RESOLVES (a modal
+    //command's choose-one, already off the stack) has no currentActionCard,
+    //so the consumer rendered the subject-less "A choice is required" header
+    //and the reply's self-reference ("CHOICE: 6 (Silverquill Command)") had
+    //no source to anchor to - INDEX-WINS read a valid answer as a stale echo
+    //and fell back (deck146 vs126 seq 35). The option abilities still carry
+    //their source: name it when the action card is gone.
+    if (!req.contextCard && firstOptionAbility)
+        req.contextCard = validatedCardPointer(g, firstOptionAbility->source);
     //Name the object of a single-option "may"-ability ask. Only when there is
     //exactly ONE real option (the Tergrid/steal shape - one may leg + an
     //implicit decline) so the recovered name cannot be attached to the wrong
