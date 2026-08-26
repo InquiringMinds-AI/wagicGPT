@@ -9576,11 +9576,3 @@ wrong way). Corpus `matchups-20260826-111937`; mulligan seams live for the first
     tiebreakers between keepable hands, never a reason to ship a hand that meets the land
     count. Never write a colour-screw or no-early-play mulligan gate. (Supersedes the wave-44
     deck125 carve-out, removed the same day.)
-
-47. THE GUIDE IS A BEST-EFFORT SUGGESTION (owner ruling 2026-08-26). Its goal is a document
-    that, followed, usually wins; the model departing from its letter is ACCEPTABLE behaviour,
-    not a defect to pin. Reviewers grade a deviation by the odds it took (did it beat the
-    guide's line on this hand/board?), never by conformance alone — a guide-violating keep
-    that the odds favoured is evidence against the guide, not against the pilot. Corollary
-    for mulligan sections (with #46): one land with spells costing 2+ is a terrible hand and
-    ships; one land with one-drops is a keep.
