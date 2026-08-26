@@ -255,8 +255,15 @@ private:
     //silently committed X with no stderr line and no translog record - the
     //same silent-discard shape the ruling forbids. Scoped to ANNOUNCE_X; every
     //other seam keeps the no-call shortcut.
+    //#W47-R13: suppressPlanRequest drops the trailing "then a PLAN: line ..."
+    //clause from the reply instruction. Set it only where a PLAN cannot be
+    //owed - the land-drop binary, whose two slowest windows this corpus were
+    //453 s and 367 s of full-turn monologue over a decision with one right
+    //answer. It suppresses the REQUEST, never the parse: a plan the model
+    //volunteers anyway is still consumed and carried.
     int askModel(const string& decision, const vector<string>& options, bool narrateChoice = true,
-                 const string& pendingSourceName = string(), bool askEvenIfSingle = false);
+                 const string& pendingSourceName = string(), bool askEvenIfSingle = false,
+                 bool suppressPlanRequest = false);
     std::map<string, int> mAskCache;
 
     //Answer a menu-family DecisionRequest (CHOOSE_MENU / CHOOSE_MODE /
