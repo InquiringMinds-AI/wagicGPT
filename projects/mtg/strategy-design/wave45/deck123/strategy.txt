@@ -1,0 +1,371 @@
+INTRUDERS OF THRABEN - WBU TOKEN COMBO
+
+You win by putting Intruder Alarm onto the battlefield next to Thraben Doomsayer or Bloodline
+Keeper, then tapping that creature for a token over and over: every token that enters untaps
+all creatures, so the tap ability comes straight back. Your removal buys the turns; the tokens
+end the game. Every turn is the same three actions: play a land, deploy a token-maker or
+Intruder Alarm, then tap every token-maker you own until your board is an army.
+
+=== RULE 0 - PLAY A LAND, EVERY TURN, BEFORE YOU DO ANYTHING ELSE ===
+The land drop is its own question. It arrives as "Land drop: which land do you play now, if
+any?" with one Play line per land in your hand and one "Play no land right now".
+If ANY "Play" line is listed, take one. Every turn. Answer "Play no land right now" only when
+that is the only option on the screen.
+There is no board and no plan that makes holding a land in hand better than playing it. This
+deck has twenty-four lands and its engine costs three and four mana; every land you did not
+play is a turn you spend at your old mana total.
+"Land drop: NOT yet used this turn" on the CURRENT SITUATION block means the drop is still
+there. It is not spent by casting a spell, and taking it does not cost you a cast.
+READ THE COSTS IN MANA, NOT IN SYMBOLS. {2}{u} is THREE mana - a generic 2 plus one blue.
+{2}{b}{b} is FOUR. {1}{w}{w} is THREE. Compare that number to the "Mana available: N total"
+line, which already counts every untapped source for you. Two untapped lands do NOT cast
+Intruder Alarm. This deck once held a two-land board for seven of its own turns with three
+lands in hand, re-stating "cast Intruder Alarm using Tundra and Underground Sea" in its plan
+every window, and lost that game 42 to 0 without ever making a token.
+If your plan names a spell you cannot afford this window, the fix is the land drop, not
+another pass.
+
+=== RULE 1 - THE TOKEN LINES, AND WHEN TO STOP TAKING THEM ===
+These are the three lines, exactly as you will see them. A second copy of the same card adds a
+handle - "Thraben Doomsayer #1", "Thraben Doomsayer #2" - same line, same rule:
+  "Create human with Thraben Doomsayer [cost: Tap]"
+  "Create vampire with Bloodline Keeper [cost: Tap]"
+  "Create vampire with Lord of Lineage [cost: Tap]"
+BEFORE you take one, read your creature count. Use the FIRST source that is on the screen:
+  1. the option line's own note, "[repeat: ... you control M creatures]" - M is your count.
+  2. no such note on the line? Then your battlefield line: "Your battlefield (K permanents
+     listed, of which M are creatures)" - that M is your count, printed in every window.
+     When the count is one it reads "of which 1 is a creature".
+The note belongs to ONE COPY and ONE TURN: each copy's first two activations of a turn carry no
+note, so with two makers out four activations a turn have none. The battlefield line always does.
+Then, and only then:
+  - M is 11 or less: take the line. Take it again every time it comes back.
+  - M is 12 or more: answer 0 (pass). Take nothing from this list, this window.
+The 12 counts creatures ON YOUR BATTLEFIELD. It does not reset when a new turn starts, it does
+not reset when the "[repeat:]" note disappears, and "I have tapped it 0 times this turn" is not
+a reason to start again. Twelve creatures already standing is the whole of the reason to stop.
+ONE exception: if the opponent has attackers on the board whose damage would take you to 0 this
+turn, keep making tokens past 12 - each new one is another blocker, and a board you never get
+to use is worth nothing.
+Timing: the tokens you make CANNOT attack until your next turn, so making them early in your own
+turn buys you nothing this turn and leaves them standing through the opponent's whole turn. Fire
+the chain on the OPPONENT'S turn - the lines are offered there, in their upkeep, their main phase
+and their attack step. A token made then blocks that same turn and attacks on your very next turn,
+and a sweeper cast on their turn catches fewer of them.
+Fire on your OWN turn only when the creatures you are about to attack with are already on the
+board, or when the opponent has no untapped land left.
+A token you make this turn CANNOT ATTACK this turn. Its battlefield line says so:
+"[summoning sick - cannot attack this turn, but CAN block]". It can block right away, and it
+attacks on your NEXT turn.
+So when you plan, count only the creatures whose lines do NOT say "summoning sick". A plan that
+says "attack with all 12 for lethal" is wrong on the turn you made those 12 - the attack list
+will offer you one creature. Make the tokens anyway; they block this turn and they swing next
+turn.
+
+=== RULE 2 - MARSH FLATS TAKES A DUAL, NOT A BASIC ===
+When lines beginning "Put in Play with Marsh Flats targeting" appear, answer in this order and
+stop at the first one that is listed:
+  1. "targeting Underground Sea"  - makes {U} and {B}
+  2. "targeting Tundra"           - makes {W} and {U}
+  3. "targeting Scrubland"        - makes {W} and {B}
+  4. any basic
+Underground Sea does everything a Swamp does AND makes blue; Tundra does everything a Plains
+does AND makes blue. Both come in untapped. There is nothing a basic gives you that they do not.
+Why this decides games: Intruder Alarm costs {2}{u} and Vision Skeins costs {1}{u}, and only
+10 of your 24 lands make blue. Fetch a basic and your combo piece sits in your hand for the
+rest of the game.
+
+=== RULE 3 - COUNT BOTH BOARDS BEFORE DAMNATION ===
+Damnation destroys ALL creatures, yours included. Both battlefield lines print a creature count
+right after the words "of which" - read YOUR number and THEIR number, and compare them.
+Cast Damnation when THEIR number is bigger than yours. That is the whole test.
+Equal numbers are not a reason to cast it: keep the Damnation and take another action.
+When YOUR number is the bigger one, spend the window on a creature, a token activation or a
+removal spell instead, and keep the Damnation - your creatures are how you win, and a wipe that
+kills two of yours to kill one of theirs has handed them the game.
+Your number is 0 and theirs is 2 or more: that is the best Damnation there is. Take it.
+
+=== RULE 4 - TRAGIC SLIP KILLS TOUGHNESS 1 ===
+Tragic Slip gives -1/-1. That kills a creature whose battlefield line shows toughness 1 - a
+(2/1), a (1/1), a (0/1). Against anything with toughness 2 or more it shrinks the creature and
+it lives.
+Pick the target with toughness 1. If several are listed, take the one with the biggest power.
+The one upgrade: under the CURRENT turn header in the GAME LOG, a line ending in "died" means
+Tragic Slip gives -13/-13 instead and kills anything on the list -
+then take the target with the biggest printed power on the battlefield line.
+No toughness-1 target on the list and no "died" line under this turn: answer "Cast nothing
+right now" and keep the Slip. It costs {B} and it will kill something on a later turn.
+
+=== RULE 5 - THE TWO EDICTS ARE DIFFERENT CARDS ===
+"Cast Tribute to Hunger {2}{b}" - the opponent sacrifices a creature and YOU gain life equal to
+its toughness. This is the one you want.
+Cast it at the opponent whenever it is listed and their battlefield line shows exactly ONE
+creature. With two or more of their creatures listed, they hand over their worst one and keep the
+good one - take Tragic Slip, Damnation or a token activation instead.
+"Cast Devour Flesh {1}{b}" - the player you name sacrifices a creature AND THAT SAME PLAYER
+gains the life. Naming the opponent does NOT gain YOU anything: "remove their blocker and gain
+4 life" is the sentence this deck wrote in its own plan on turn 3 while handing a Sanguine Bond
+deck four life off a 0/4 wall. You gain life from Tribute to Hunger. You never gain life from
+Devour Flesh. That said, giving them the life is still the right price when it takes their ONLY
+body: use Devour Flesh on the opponent when Tribute to Hunger is not on the list and they have
+exactly ONE creature - then the sacrifice takes their only body and the life they gain is worth
+it.
+Before any edict, run this in order: (1) find "of which N are creatures" on the OPPONENT'S
+battlefield line. N is the only number that matters. (2) If N is not exactly 1, do not cast
+an edict - not at 0, not at 2 or more. (3) A creature listed under "ON THE STACK, waiting to
+resolve" is NOT on the battlefield and does not change N. Naming a creature spell on the
+stack in your PLAN is the mistake itself: at N=0 the opponent sacrifices nothing and you have
+thrown away the card.
+Never cast an edict when the opponent's life is at or below the life it gives them. Killing
+their last creature and moving them from 1 life to 4 costs you a game you had already won.
+Do not spend an edict on a creature that is not hurting you. If their only creature is a
+defender, or has power 0 or 1, or its line says it cannot attack, keep the edict and take
+another action - you paid a card and handed them life equal to its toughness to remove
+something that was never going to kill you.
+Both edicts give life to the player who sacrifices. If the OPPONENT'S deck list contains a card
+that rewards them for gaining life, "Cast nothing right now" beats either edict at the
+opponent.
+Both cards let the SACRIFICING player pick, so with TWO OR MORE of their creatures listed no
+edict is ever the play: they hand you their worst. A board of two Fate Unravelers (3/4) and a
+Fog Bank (0/2 defender) gives up the Fog Bank and gains 2 life, and both Unravelers stay. Count
+the number printed after "of which" on the OPPONENT'S battlefield line. If it is not exactly 1,
+take Tragic Slip, Damnation or a token activation instead.
+"Yourself (player, life" is the right answer only when the creature you give up is a Human
+or Vampire TOKEN you can remake next turn. Your Bloodline Keeper, your Thraben Doomsayer and
+your flying Vampires stay on the battlefield.
+
+=== RULE 6 - EQUIP LIGHTNING GREAVES ONCE PER GREAVES ===
+An equip line for Lightning Greaves costs {0}, so the game re-offers it at every window.
+Take it ONE time per Greaves, on Bloodline Keeper if
+it is on the battlefield, otherwise on Thraben Doomsayer.
+The done-signal is on the battlefield line: a creature reading "{attached: Lightning Greaves
+#1}" already has it, and that Greaves is finished. Count your Greaves: one equip each, no more.
+At every later re-offer, take a "[cost: Tap]" line if one is listed, otherwise
+answer 0 (pass) and let combat happen - your remaining windows belong to tokens and removal.
+Equip again only when the equipped creature has DIED, or a token-maker that has never been
+equipped has just arrived.
+Greaves gives haste, so a token-maker can tap for a token the turn it lands, and shroud, which
+means that creature can no longer be targeted by anything - including your own spells.
+
+=== WHAT TO CAST WHEN SEVERAL THINGS ARE LISTED ===
+Take the highest entry on this list that appears in your casting menu:
+ 1. "Cast Bloodline Keeper {2}{b}{b}" - when no token-maker is on your battlefield.
+ 2. "Cast Thraben Doomsayer {1}{w}{w}" - when no token-maker is on your battlefield.
+ 3. "Cast Intruder Alarm {2}{u}" - when no Intruder Alarm is on your battlefield.
+    Intruder Alarm on an empty battlefield does NOTHING. A token-maker with no Alarm still
+    makes one token a turn. The maker goes first, every time.
+ 4. "Cast Idyllic Tutor {2}{w}" - when no Intruder Alarm is on your battlefield or in your hand.
+ 5. "Cast Lightning Greaves {2}" - ONLY when your own battlefield line reads "of which 1 is
+    a creature" or more AND that creature is a token-maker. Read that clause before you take
+    this line: "of which 0 are creatures" means the Greaves equips nothing, does nothing, and
+    is a wasted turn - answer with a removal spell or "Cast nothing right now" and keep it for
+    the turn a maker lands. A Greaves in HAND is not a play you are behind on; a Greaves on an
+    empty board is a card you have already spent. This deck cast it at "of which 0 are
+    creatures" three times in six games.
+ 6. A removal spell, by Rules 3, 4 and 5.
+ 7. "Cast Vision Skeins {1}{u}".
+
+=== INTRUDER ALARM AND IDYLLIC TUTOR ===
+"Cast Intruder Alarm {2}{u}": it is the engine, and it is entry 3 on the cast list above -
+behind both token-makers, because an Alarm with no maker out does nothing.
+One copy does the whole job. With an Intruder Alarm already on your battlefield, spend the
+window on a creature or a removal spell instead.
+It is symmetric: no creature untaps in its controller's untap step, theirs or yours, and ANY
+creature entering - theirs or yours - untaps everything. With a token-maker in play that is
+pure profit. With no token-maker in play, a creature of yours that attacks stays tapped, so get
+Thraben Doomsayer or Bloodline Keeper down before you rely on attacking.
+"Cast Idyllic Tutor {2}{w}" searches for an enchantment. The answer on the reveal list is
+Intruder Alarm, every time. Cast the Alarm the next window it appears in your list.
+
+=== KEY CARDS ===
+Thraben Doomsayer {1}{w}{w} (2/2) - "{T}: Put a 1/1 white Human creature token onto the
+  battlefield". Cast it by the cast list above. Fateful hour: while YOUR life is 5 or less,
+  every OTHER creature you control gets +2/+2, so your 1/1 Humans arrive as 3/3s and your
+  battlefield line shows "(3/3) (printed 1/1)". Low life makes your tokens bigger, not smaller.
+Bloodline Keeper {2}{b}{b} (3/3) flying - "{T}: Put a 2/2 black Vampire creature token with
+  flying". Your best creature. Cast it by the cast list above.
+  When "Transform:backside with Bloodline Keeper [cost: {b}]" appears in your list, take it:
+  it becomes Lord of Lineage, a 5/5 that gives every other Vampire +2/+2 - your 2/2 tokens
+  become 4/4s - and it still makes a token every turn with the same tap. If that line is not
+  listed, nothing changes; keep tapping the Keeper.
+  Transforming needs {B} and five or more Vampires. Casting the Keeper off exactly four lands
+  taps you out, and Intruder Alarm untaps CREATURES, not lands - so the "Transform:backside with
+  Bloodline Keeper [cost: {b}]" line will not appear again that turn. When you can cast the
+  Keeper and still leave one black source untapped, do it: Lord of Lineage gives every OTHER
+  Vampire +2/+2, which turns eleven 2/2 tokens into eleven 4/4s.
+Vision Skeins {1}{u} - EACH player draws two cards, you and them.
+  Cast it only when you have no token-maker and no Intruder Alarm you could cast this window -
+  it is your dig, not your default. They draw two as well, so it is the last card you cast, never
+  the first.
+  When the OPPONENT'S battlefield holds any card that draws them extra cards or punishes card
+  draw - Howling Mine and Liliana's Caress on deck162's board both count - do not cast Vision
+  Skeins at all.
+  When the opponent's battlefield holds a permanent that damages or drains a player for drawing
+  cards, take a different action - that permanent turns your own draw spell against you.
+Lightning Greaves {2} - see Rule 6.
+
+=== COMBAT ===
+ATTACK - four checks, in this order. Stop at the first one that answers and do what it says.
+
+CHECK 1 - THE LIFEGAIN WALL BOARD. Read the "Opponent battlefield" line for these four names:
+PERIMETER CAPTAIN, PRIDE GUARDIAN, SANGUINE BOND, EXQUISITE BLOOD. If ANY of them is on that
+line, answer "ATTACK: none" - this window and every attack window after it - until a Tragic
+Slip, a Damnation or an edict has taken the LAST of them off that line.
+Why, in the numbers the render gives you: Perimeter Captain gains them 2 life for EVERY
+creature with defender that blocks, and each Captain triggers for each blocking defender;
+Pride Guardian gains them 3 more when IT blocks; and every Sanguine Bond turns every point
+they gain into a point you LOSE. Three defenders blocking with two Captains and two Bonds is
+twenty-four life off YOU in one combat step, from an attack in which nothing of yours died.
+YOUR ATTACKER TAGS CANNOT SEE THIS. The "[their untapped blockers: ...]" tag reads
+"(neither dies)" and that is TRUE - the tag counts deaths, it does not count life, and the
+life is what kills you. Twelve attackers into three of these walls took this deck from 20 life
+to 8 in one swing and from 8 to dead in the next, while the opponent went down by nine.
+An arithmetic answer of the form "we deal 30 and they are at 11, so we win" is NOT an
+exception to Check 1. That sum is what you had both times you died here. You do not survive
+to collect it. Damage they will never take does not outrank life you will certainly lose.
+
+CHECK 2 - LIGHTMINE FIELD. If their battlefield line names a permanent that damages each
+attacker by the number of attackers - Lightmine Field on deck125's board says exactly that -
+find the SMALLEST toughness among the creatures you would send and send that many minus one,
+biggest power first. Leave the rest home.
+
+CHECK 3 - THE COUNT, AND WHAT ONE BLOCKER CAN DO. ONE BLOCKER BLOCKS EXACTLY ONE ATTACKER.
+A single 5/5 flier on their side does not "block everything" - it blocks ONE of your creatures
+and the rest connect. Count the creatures on the "Your creatures that can attack:" list, then
+count their UNTAPPED creatures on their battlefield line. If your number is bigger, you have
+that many unblocked attackers and Check 4 applies. Answer "ATTACK: none" on the count alone
+only when their untapped creature count is EQUAL TO OR HIGHER THAN the number you are sending
+and no attacker tag reads "you kill it, your blocker lives".
+
+CHECK 4 - SEND EVERYTHING. "Your creatures that can attack:" has already dropped every creature
+that cannot legally attack, so do not re-check summoning sickness or tapped status yourself.
+Send every creature on that list.
+Know what you are spending: with Intruder Alarm on the battlefield NOTHING untaps in your untap
+step - every battlefield line says so, "[doesn't untap during its controller's untap step]".
+Attackers come back untapped only when a creature ENTERS the battlefield, which for this deck
+means an untapped token-maker tapping for a token. So before you send everything, find a
+token-maker on your battlefield line. If one is there, the whole team is back the moment you
+make your next token and Check 4 costs you nothing. If NO token-maker is on your battlefield,
+the creatures you send stay tapped until one arrives, and they are not blockers next turn -
+send them anyway when the attack advances your clock, but do not plan a block with them.
+One hold-back only: do not send a LONE Thraben Doomsayer or Bloodline Keeper into a board that
+can block and kill it - the maker is the engine, the tokens are the attack. Send it once
+tokens are attacking beside it.
+
+Blocking, in this order. Steps 1 and 2 pick WHICH creature blocks; the rest decide whether to
+block at all.
+ - STEP 1 - WHICH BODY. Every blocker row on the screen is one of your creatures. Spend a TOKEN
+   ("Human", "Vampire" - no mana cost printed on the row) before you ever spend a CARD, and
+   spend Thraben Doomsayer or Bloodline Keeper LAST, after every token is used. Tokens are free
+   and you make more every turn; the maker is the only reason you make any.
+ - STEP 2 - READ THE PARENTHESIS ON THE ROW YOU CHOOSE. "(your blocker dies, attacker lives)"
+   means that creature dies and the attacker does not. It is the engine's computed result and
+   it is never wrong. Do not write "block X with Bloodline Keeper to kill it" against a row
+   that says the Keeper dies and X lives - this deck did exactly that at 12 life against a
+   single 3-power attacker, threw away its Bloodline Keeper and its Lightning Greaves to
+   prevent three damage, made no token for the rest of the game, and lost with the opponent
+   on 4 life. If the row on your maker says "(your blocker dies, attacker lives)", the maker
+   does not block.
+ - Block with your Human and Vampire TOKENS first - they are free and you make more every turn.
+ - WHEN THE PROMPT SAYS LETHAL, ASSIGN TO THE BIGGEST ATTACKERS FIRST. The line
+   "Unblocked, these attackers deal up to N - you would be at ... - LETHAL if it all connects"
+   is the trigger. Every attacker row prints "deals N". Sort those numbers, put your first
+   blocker on the LARGEST one, your second on the next largest, and keep going until you run
+   out of blockers or out of attackers. Blocking their smallest attacker is the one assignment
+   that is always wrong here: with 10 life against 3+3+3+1, blocking the 1 leaves you at 1 and
+   blocking a 3 leaves you at 3, and the difference is a whole turn of the game.
+ - MENACE. An attacker row tagged "[menace ...]" is NOT blocked by one creature - a lone
+   blocker on it does nothing at all and the attacker's full damage still lands. Put TWO
+   blockers on it or none. Never spend your best blocker alone on a menace attacker; the
+   prompt says so on the row and it is telling the truth.
+ - Add up the damage of every attacker with no blocker on it. If that total is your life total
+   minus 4 or more, put a blocker on EVERY attacker - biggest attacker first, Thraben Doomsayer
+   and Bloodline Keeper included - and keep assigning until no attacker is left unblocked. A
+   token-maker you keep alive at 1 life makes tokens for a game you already lost.
+   This rule spends EVERY blocker you have, including your last one. One blocker on one attacker
+   still stops that attacker's whole damage - "I only have one, so it does not matter" is how you
+   go from 10 life to 2 in one combat step. Assign blockers until you run out of blockers or run
+   out of unblocked attackers, whichever comes first.
+ - Otherwise your token-makers do NOT block. Take the damage. A blocker line reading "(both
+   die)" on Thraben Doomsayer or Bloodline Keeper is a trade you decline while your life is
+   comfortable - the maker is worth more than any one attacker.
+
+=== MULLIGAN ===
+The two deck facts that decide every mulligan here: you run TWENTY-FOUR lands in sixty cards,
+and the cards that actually win - Thraben Doomsayer {1}{w}{w}, Bloodline Keeper {2}{b}{b},
+Intruder Alarm {2}{u} - cost three or four mana. So the question is never "can I play on turn
+one", it is "will this hand have three or four lands by the turn it needs them, and does it do
+something when they arrive".
+The comparison to make, on the header line "Your hand (7 cards), counted by the engine: N
+lands, M spells" (read that number, never recount):
+ - TWO OR MORE LANDS: keep. With twenty-four lands the third arrives in the first few draws and
+   the fourth by about turn five, and a six-card hand after shipping a two-lander is most often
+   a two-lander again with one fewer card. Colour is not a reason to ship: read the "Mana
+   sources among those lands" and "Playing every land in this hand would cover the cost of:"
+   lines, and if either token-maker or Intruder Alarm is on that cover list the hand is fine.
+ - ONE LAND: compare the two sides out loud. A one-land seven is a keep only if it is nearly all
+   two-mana cards AND that one land makes the colour they need. A one-land seven whose spells
+   cost three and four - two Intruder Alarms, Idyllic Tutor, Bloodline Keeper - does nothing
+   for four turns and ships.
+ - ZERO LANDS, or ALL lands: ship.
+ - SIX OR MORE LANDS with one spell: this is a keepable hand, not a mulligan. You bottom the
+   extra lands on the keep and you are a four-land hand with your removal spell, which is a
+   functioning hand. Shipping it costs you a card and gives you a fresh seven that may be worse.
+ - AT FIVE CARDS OR FEWER: keep anything that has a land and a spell. Going lower loses more
+   than any hand shape gains.
+
+BOTTOMING - the same decision, second ask. After you keep, the prompt says "you took N
+mulligans and kept, so you must put N cards from your hand on the BOTTOM" and lists your hand.
+Keep, in this order, and bottom what is left over:
+ 1. enough lands to reach FOUR mana, counting the lands already in the list;
+ 2. a token-maker - Thraben Doomsayer or Bloodline Keeper - if the hand has one;
+ 3. Idyllic Tutor, which FINDS Intruder Alarm, or Vision Skeins, which digs;
+ 4. removal;
+ 5. Intruder Alarm LAST. An Alarm with no maker on the battlefield does nothing at all, and a
+    small hand cannot afford a card that waits.
+Never bottom your only way to find or make a creature. This deck kept a four-card hand of Marsh
+Flats, Tundra, Swamp and Intruder Alarm - it bottomed Idyllic Tutor, Vision Skeins and
+Damnation, i.e. both of its ways to find a maker and its only sweeper - and lost that game
+without a creature ever hitting its battlefield.
+
+=== DECIDING SITUATIONS ===
+- A "Land drop:" question is on the screen and any "Play <land>" line is listed: take one.
+  Every turn, before anything else. "Play no land right now" only when nothing else is offered.
+- Your plan names a spell and "Mana available: N total" is smaller than that spell's mana count
+  ({2}{u} = 3, {2}{b}{b} = 4): play a land, do not re-state the plan.
+- "Cast Lightning Greaves {2}" is listed and your battlefield line reads "of which 0 are
+  creatures": do not cast it. Removal, or "Cast nothing right now".
+- You are on the blockers prompt: your first blocker is a Human or Vampire TOKEN. Thraben
+  Doomsayer and Bloodline Keeper block only after every token is assigned.
+- The row you were about to use on a token-maker reads "(your blocker dies, attacker lives)":
+  that maker does not block.
+- You are on the London bottoming ask: keep lands to four mana, then a token-maker, then Idyllic
+  Tutor or Vision Skeins, then removal. Bottom Intruder Alarm before you bottom a way to find a
+  creature.
+- A line ending in "[cost: Tap]" is in your list AND your creature count is 11 or less: take it,
+  this window, whatever your mana says, on either player's turn. Count 12 or more: answer 0.
+- You just took that line and it appears again: read the count again first. 11 or less, take it
+  again. 12 or more, stop - and it stays stopped on later turns and after the "[repeat:]" note
+  has gone.
+- "Put in Play with Marsh Flats targeting Underground Sea" is listed: take it. Otherwise
+  "targeting Tundra". Otherwise "targeting Scrubland".
+- Several casts are listed at once: answer with the highest entry on the cast list above that
+  appears in your menu.
+- "Cast Idyllic Tutor {2}{w}" is taken: choose Intruder Alarm on the reveal list.
+- "Transform:backside with Bloodline Keeper [cost: {b}]" is listed: take it.
+- "Cast Damnation {2}{b}{b}" is listed: compare the two creature counts printed after "of which".
+  Theirs bigger - cast it. Yours bigger - take another action and keep it.
+- "Cast Tragic Slip {b}" is listed: take a target whose line shows toughness 1, or any target if
+  a "died" line sits under this turn's header. Otherwise "Cast nothing right now".
+- An edict is listed and they have exactly one creature: Tribute to Hunger at the opponent
+  first, Devour Flesh at "The opponent" only if Tribute is not listed. Naming "Yourself" is for
+  giving up a token, nothing else.
+- "Equip with Lightning Greaves targeting" is listed and no creature reads "{attached: Lightning
+  Greaves}": equip your best token-maker. Every re-offer after that: 0 (pass).
+- Their battlefield line names Perimeter Captain, Pride Guardian, Sanguine Bond or Exquisite
+  Blood and it is your Attackers step: "ATTACK: none". No damage total overrides this.
+- Their battlefield line names ONE untapped creature and your attack list holds five or more:
+  send them all. One blocker stops one attacker.
+- The blockers prompt says LETHAL: your first blocker goes on the attacker with the largest
+  "deals N", not on the smallest one you can kill.
+- An attacker row says "[menace]": two blockers on it, or none.
