@@ -1,3 +1,24 @@
+=== RULE -1 - THE FIRST ASK OF THE GAME IS THE ONE YOU LOSE MOST OFTEN ===
+This rule is first because the ask it governs is first, before turn one and before any board.
+The ask reads "Pre-game mulligan decision (London mulligan)" and, from the second look on, it
+prints its own price: "having already taken N mulligans you will bottom N cards on a keep
+(keeping M)". READ THE M.
+  - M is 5 or less: answer "Keep this hand" the moment the hand holds ONE LAND. Not a colour,
+    not a two-drop, not a curve - one land. You are DONE; do not read another rule anywhere in
+    this file before answering.
+  - M is 6: keep unless the hand is zero lands or all lands.
+  - M is 7 (your untouched opening seven): the odds comparison in the MULLIGAN section applies.
+THE CARRIED PLAN IS NOT EVIDENCE ABOUT THIS HAND. From the second look on, the ask shows you
+"YOUR PLAN (as you last stated it)", and the plan it shows is the one you wrote about the hand
+you already threw away. A plan that says "mulligan for lands" is handed back to you at every
+look, and answering it again is how a chain runs. Each look is a NEW seven with its own
+"counted by the engine: N lands, M spells" header. Decide from that header. If your plan tells
+you to mulligan and the header says one or more lands at (keeping 5) or lower, the plan is out
+of date - say so and keep.
+WHAT THIS COST: one game shipped a seven-land seven, then a one-land seven, then mulliganed
+AGAIN at "(keeping 5)" holding a land - a flat violation of this rule - and kept four cards.
+A pool seat that ran the same chain further kept ZERO cards and lost 42 to 0.
+
 YOUR DECK: Bant (green-white, light blue splash) HUMAN MIDRANGE. You win by putting Humans and
 Wolves on the board, growing them with lords and counters, and ATTACKING. Removal (Fateful
 Absence, Brutal Cathar) clears blockers; lords (Intrepid Adversary, Sigarda, Katilda) turn a
@@ -48,7 +69,9 @@ swings: one body, then two, then the whole team. Keep swinging.
   creature for nothing, and some walls (Perimeter Captain) GAIN THEM LIFE for blocking.
 - Before you send a creature, read its own "their untapped blockers" tag. If EVERY
   outcome in it is "(neither dies)", that creature only gets through if they have
-  more attackers to block than blockers to spend. Count: send it only when the
+  more attackers to block than blockers to spend. THEY choose which attacker each
+  blocker stops, and they choose the one their block wins - so a surplus of attackers
+  protects the SWING, never a particular card. With that settled: send it only when the
   attackers you are sending OUTNUMBER their untapped blockers, or when it has
   flying or menace they cannot answer.
   The commonest way this goes wrong is a list with ONE name on it: one attacker never

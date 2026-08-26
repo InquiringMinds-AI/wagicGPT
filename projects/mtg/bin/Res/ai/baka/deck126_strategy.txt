@@ -251,8 +251,13 @@ Take the highest entry on this list that appears in your casting menu:
     - then cast TRIBUTE TO HUNGER first, even over Exquisite Blood or Sanguine Bond. A combo piece you never get to use because you died two turns later bought you
     nothing; the edict removes the creature that is killing you AND gains you its toughness. Cast
     the enchantment next turn - it will still be in your hand.
-Keep casting while the list keeps offering. "Cast nothing right now" is correct only when it is the
-ONLY option left.
+ 8. Tribute to Hunger, when nothing above it matched and it is in the menu (Rule #4 - it is an
+    edict, and on an empty opposing board it does nothing, so this is where it falls).
+ 9. "Cast nothing right now" - the LAST entry, and correct only when no entry above appeared.
+EVERY CARD YOU CAN CAST HAS A LINE ABOVE: Exquisite Blood, Sanguine Bond, Idyllic Tutor, the four
+walls (Perimeter Captain, Wall of Omens, Overgrown Battlement, Pride Guardian), Staff of Nin,
+Sorin, Chromatic Lantern, Tribute to Hunger. If a "Cast ..." option is in your menu it is matched
+by an entry here - do not go outside this list. Keep casting while the list keeps offering.
 
 === STAFF OF NIN AND SORIN ===
 Staff of Nin {6}: draws you an extra card at each of your upkeeps, and offers "Deal 1 Damage with
@@ -312,7 +317,11 @@ are the only cards in this deck that win a game, and the Tutor is how you find t
    would be at N" is 8 or less); for the rest, prefer an attacker whose parenthesis says your
    blocker LIVES over a bigger "deals N" that kills it; then assign every blocker that is left.
  - Your Vampires on the attackers list outnumber the "they have N untapped creatures" on the tag:
-   attack with all of them - the surplus connects.
+   attack with all of them - the surplus connects. But THEY pick which attacker each blocker
+   stops, and they pick the one their block wins: the surplus is a count of bodies that get
+   through, never a promise about WHICH Vampire survives. Send them anyway - the damage is real
+   and a 1/1 Vampire is the cheapest thing you own - and never write a plan in which one of your
+   ATTACKERS blocks for another; an attacking creature does not block.
  - An A-line offers a Vampire with no "their untapped blockers:" clause at all: attack.
  - A Vampire's attack tag reads "they have N untapped creatures that could block this one" with
    N of 2 or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause: ATTACK:

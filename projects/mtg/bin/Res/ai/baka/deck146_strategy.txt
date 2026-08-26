@@ -165,7 +165,9 @@ creature, ask what happens on the crack-back with that creature unavailable.
   creature for nothing, and some walls (Perimeter Captain) GAIN THEM LIFE for blocking.
 - Before you send a creature, read its own "their untapped blockers" tag. If EVERY
   outcome in it is "(neither dies)", that creature only gets through if they have
-  more attackers to block than blockers to spend. Count: send it only when the
+  more attackers to block than blockers to spend. THEY choose which attacker each
+  blocker stops, and they choose the one their block wins - so a surplus of attackers
+  protects the SWING, never a particular card. With that settled: send it only when the
   attackers you are sending OUTNUMBER their untapped blockers, or when it has
   flying or menace they cannot answer.
   The commonest way this goes wrong is a list with ONE name on it: one attacker never
