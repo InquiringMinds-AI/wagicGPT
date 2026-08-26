@@ -388,17 +388,14 @@ Maximal-frame alternate: `1787761215-ai_baka_deck126-0x563b923035e0-vs-ai_baka_d
 Richest attack-side alternate: `1787761184-ai_baka_deck123-0x55e881efea80-vs-ai_baka_deck126.jsonl`
 **seq 59** (the #W45-3 window where the render's honesty and its incompleteness sit side by side).
 
-## OWNER RULINGS 2026-08-26 (asked directly; these close OWNER-CALL 1-5)
-1-3. MULLIGAN FLOORS — owner, verbatim: "mulligans are essentially a probability question. what
-are the chances i draw what i need to make this work, as compared to my chances of winning if
-drawing a smaller hand? obviously the deck 125 determined correctly.. i very seldom mulligan a
-2 land hand. the chance for drawing a third land before or on the turn i can drop it is very
-high, and the fourth land is mathematically likely by the 5th. dropping a 2 land hand of 7
-cards is mathematically likely to get a 6 card hand with 2 land, its not a good reason to
-mulligan by that metric." APPLIED: deck125's wave-44 colour-screw carve-out REMOVED (it
-would have shipped the hand he called correctly kept); 2-land keeps stand everywhere; skill
-amendment 46 (mulligan teaches are odds comparisons, never colour/curve floors). The 1-land
-question (deck146) was put to the owner separately.
+## OWNER RULINGS 2026-08-26 (asked directly)
 4. ANNOUNCE_X ORDER — "Keep largest-first". CLOSED; per-row kill facts (#W45-5) are the fix.
-5. LOG SHAPE — "Owner-prefix every line" ('Your X' / 'Opponent's X' on all history lines,
-consistent with the board frame). #W45-20 is now a RENDER LANE for wave-45 step 1b.
+5. LOG SHAPE — "Owner-prefix every line". Shipped as lane E (607ca6bb7).
+1-3. MULLIGAN FLOORS — NOT an owner matter. His remarks on mulligans described how the GAME
+should be played (odds-reasoned, not deterministic) and concern CODE-ENFORCED behaviour (no
+engine/harness-imposed floors or forced keeps) — they are NOT guide-writing rules and must
+not be turned into skill amendments or guide edits (owner, verbatim: "stop trying to make
+guide writing rules out of my statements about code enforced actions"). Guide mulligan
+content is the reviewing agents' responsibility, decided from corpus evidence. An earlier
+set of amendments #46-#49 and deck125/deck146 edits derived from those remarks was REVERTED
+the same day.

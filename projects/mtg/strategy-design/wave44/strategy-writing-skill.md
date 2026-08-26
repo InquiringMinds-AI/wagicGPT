@@ -9566,13 +9566,3 @@ wrong way). Corpus `matchups-20260826-111937`; mulligan seams live for the first
     direction and accumulate windows across corpora until the denominator can separate the
     hypotheses, or drop the numeric half and keep the render check. Do not close a lane on
     a low-power sample, and do not read one favourable sample as a discharge.
-
-46. MULLIGAN TEACHES ARE ODDS COMPARISONS, NOT FLOORS (owner ruling 2026-08-26). A mulligan
-    section states the comparison the owner uses — the chance this hand draws what it needs by
-    the turn it needs it, against the chance a smaller hand wins — and the two deck facts that
-    decide it (land count of the deck; what the cheapest plays cost). Two-land sevens are KEEPS
-    by default: the third land is likely by the turn it is needed, the fourth by turn 5, and a
-    six after shipping a two-lander is most often a two-lander again. Colour and curve are
-    tiebreakers between keepable hands, never a reason to ship a hand that meets the land
-    count. Never write a colour-screw or no-early-play mulligan gate. (Supersedes the wave-44
-    deck125 carve-out, removed the same day.)
