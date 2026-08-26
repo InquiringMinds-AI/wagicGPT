@@ -3285,6 +3285,23 @@ static string ownerTag(bool mine)
     return mine ? "Your " : "Opponent's ";
 }
 
+//#W45-20: whose card is this, for the possessive above. controller() is the
+//LIVE authority and the right one - a stolen permanent reads "Your Bear" from
+//the chair that currently controls it, which is what CURRENT SITUATION shows it
+//as - but it is `lastController` underneath and can be NULL for a card that has
+//never been stamped, so the card's OWNER answers when it is. A card with
+//neither resolves to the opponent's side rather than to nothing: the ruling is
+//that every line is tagged, so there is no untagged fallback to reach.
+static bool narratedCardIsMine(MTGCardInstance * c, const Player * me)
+{
+    if (!c)
+        return false;
+    Player * p = c->controller();
+    if (!p)
+        p = c->owner;
+    return p == me;
+}
+
 //"your graveyard" / "the opponent's graveyard" - a zone in the possessive.
 static string ownedZone(bool mine, const string& zone)
 {
@@ -3737,23 +3754,39 @@ string lifeChangeNarration(bool mine, int amount, int settled)
     return o.str();
 }
 
-//Damage, subject first: "<source> dealt N damage to you".
+//Damage, subject first: "Your <source> dealt N damage to you".
 //W43-R2: when the damage's own life change is known (`haveResult`), this ONE
-//attributed line carries the resulting total - "Dwarven Blastminer dealt 1
-//damage to you (now 34)" - and no separate "lost 1 life (now 34)" line is
-//written. Owner report: "damage is receiving 2 entries, which may be confusing
-//to the model, and is also unnecessarily verbose." The result is only ever
-//appended for damage that ACTUALLY changed a life total (see mDamageLifePlayer:
-//prevented, replaced and creature damage never reach it), so a damage line
-//without "(now N)" is an honest statement that no life result came with it.
-string damageNarration(const string& sourceName, int amount, const string& targetName,
+//attributed line carries the resulting total - "Opponent's Dwarven Blastminer
+//dealt 1 damage to you (now 34)" - and no separate "lost 1 life (now 34)" line
+//is written. Owner report: "damage is receiving 2 entries, which may be
+//confusing to the model, and is also unnecessarily verbose." The result is only
+//ever appended for damage that ACTUALLY changed a life total (see
+//mDamageLifePlayer: prevented, replaced and creature damage never reach it), so
+//a damage line without "(now N)" is an honest statement that no life result
+//came with it.
+//
+//#W45-20 (OWNER RULING 2026-08-26, "owner-prefix every line"): the SUBJECT
+//carries `Your `/`Opponent's ` like every other card line in the register. 402
+//lines of the wave-44 corpus opened with a bare card name, and this pool's
+//decks mirror (deck123 and deck146 both run Nadaar and Hive of the Eye Tyrant),
+//so "Hive of the Eye Tyrant dealt 3 damage to you" named a card BOTH seats
+//control - a rendered sentence the model cannot resolve. `sourceMine` is
+//REQUIRED, not defaulted: no caller can reach this render without answering
+//whose card dealt the damage. The sourceless branch ("3 damage was dealt to
+//you") has no subject to tag and takes none. `targetName` is the OBJECT and is
+//NOT tagged: every mid-sentence card reference in this register is bare
+//("with Staff of Nin", "COUNTERED by Essence Scatter"), and only the subject
+//takes the possessive.
+string damageNarration(bool sourceMine, const string& sourceName, int amount,
+                       const string& targetName,
                        bool haveResult = false, int settledLife = 0)
 {
     std::ostringstream o;
     if (sourceName.empty())
         o << amount << " damage was dealt to " << targetName;
     else
-        o << sourceName << " dealt " << amount << " damage to " << targetName;
+        o << ownerTag(sourceMine) << sourceName << " dealt " << amount
+          << " damage to " << targetName;
     if (haveResult)
         o << " (now " << settledLife << ")";
     return o.str();
@@ -7736,10 +7769,14 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         //the ordinary "Damage: N dealt to you" form, both classes read as life
         //loss, and the ONLY tell that the life total never moved was a MISSING
         //life line - an absent line is not a rendered fact.
+        //#W45-20: all three damage emitters below open on a card, so all three
+        //take the possessive on their SUBJECT. Resolved once, from the same
+        //authority the board frame uses.
+        bool dsrcMine = narratedCardIsMine(dsrc, this);
         if (dp && sourceDealsPoisonInsteadOfDamage(dsrc))
         {
             if (dsrc)
-                out << dsrc->getDisplayName() << " dealt ";
+                out << ownerTag(dsrcMine) << dsrc->getDisplayName() << " dealt ";
             out << e->damage->damage << " infect damage";
             out << " to " << (dp == this ? "you" : "the opponent")
                 << " - dealt as POISON COUNTERS, not life loss: no life was lost"
@@ -7748,13 +7785,19 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         }
         if (dc && dsrc && (dsrc->has(Constants::WITHER) || dsrc->has(Constants::INFECT)))
         {
-            out << dsrc->getDisplayName() << " dealt " << e->damage->damage
+            out << ownerTag(dsrcMine) << dsrc->getDisplayName() << " dealt " << e->damage->damage
                 << (dsrc->has(Constants::WITHER) ? " wither damage" : " infect damage")
                 << " to " << dc->getDisplayName() << " - dealt as " << e->damage->damage
                 << " -1/-1 counter" << (e->damage->damage == 1 ? "" : "s")
                 << ", a permanent shrink that does NOT wear off at end of turn";
             return out.str();
         }
+        //RESIDUAL, deliberately NOT changed here: the damage TARGET stays a bare
+        //card name ("dealt 2 damage to Perimeter Captain"). Every mid-sentence
+        //card reference in this register is bare - "with Staff of Nin",
+        //"COUNTERED by Essence Scatter", "targeting X" - and only the SUBJECT
+        //takes the possessive. Tagging the object here would invent a shape the
+        //log uses nowhere else, so the object half is a separate ruling.
         string dtarget = dp ? string(dp == this ? "you" : "the opponent")
                             : (dc ? dc->getDisplayName() : string("nothing"));
         //W43-R2: ONE attributed entry per damage event. The life-loss half held
@@ -7767,7 +7810,7 @@ string AIPlayerGPT::describeEvent(WEvent * event)
         int settled = mDamageLifeSettled;
         if (haveResult)
             mDamageLifePlayer = NULL;
-        out << damageNarration(dsrc ? dsrc->getDisplayName() : string(),
+        out << damageNarration(dsrcMine, dsrc ? dsrc->getDisplayName() : string(),
                                e->damage->damage, dtarget, haveResult, settled);
         if (dp && dsrc && dsrc->getToxicity() > 0)
             out << " - and toxic " << dsrc->getToxicity() << ": it ALSO puts "
@@ -19965,8 +20008,9 @@ void AIPlayerGPT::runParseSelfTest()
               "W35 a life loss states the total that change settled at");
         CHECK(lifeChangeNarration(false, 3, 23) == "Opponent gained 3 life (now 23)",
               "W35 a life gain reads as a gain");
-        CHECK(damageNarration("Lightning Bolt", 3, "you") == "Lightning Bolt dealt 3 damage to you",
-              "W35 damage is subject-first and past tense");
+        CHECK(damageNarration(false, "Lightning Bolt", 3, "you")
+              == "Opponent's Lightning Bolt dealt 3 damage to you",
+              "W35 damage is subject-first and past tense (#W45-20: possessive subject)");
         // (6) the mulligan Q->A echo becomes its outcome.
         CHECK(mulliganNarration(true, 7) == "You kept your opening hand (7 cards)",
               "W35 the mulligan echo becomes 'You kept your opening hand'");
@@ -20269,7 +20313,7 @@ void AIPlayerGPT::runParseSelfTest()
         NARRATE(zoneChangeNarration(true, "Lightning Bolt", "hand", "stack", false, false, false, ""));
         NARRATE(targetChoiceNarration("Grizzly Bears", "Lightning Bolt", ""));
         NARRATE(zoneChangeNarration(true, "Lightning Bolt", "stack", "graveyard", false, false, false, ""));
-        NARRATE(damageNarration("Lightning Bolt", 3, "Grizzly Bears"));
+        NARRATE(damageNarration(true, "Lightning Bolt", 3, "Grizzly Bears"));
         NARRATE(zoneChangeNarration(false, "Grizzly Bears", "battlefield", "graveyard", true, false, false, ""));
         NARRATE(zoneChangeNarration(true, "Mordor Muster", "hand", "stack", false, false, false, ""));
         NARRATE(zoneChangeNarration(true, "Mordor Muster", "stack", "graveyard", false, false, true, "Counterspell"));
@@ -20291,7 +20335,7 @@ void AIPlayerGPT::runParseSelfTest()
             "- You cast Lightning Bolt\n"
             "- You targeted Grizzly Bears with Lightning Bolt\n"
             "- Your Lightning Bolt resolved and went to your graveyard\n"
-            "- Lightning Bolt dealt 3 damage to Grizzly Bears\n"
+            "- Your Lightning Bolt dealt 3 damage to Grizzly Bears\n"
             "- Opponent's Grizzly Bears died\n"
             "- You cast Mordor Muster\n"
             "- Your Mordor Muster was COUNTERED by Counterspell and went to your graveyard\n"
@@ -22390,28 +22434,30 @@ void AIPlayerGPT::runParseSelfTest()
     // ---- W43-R2: one damage event is ONE attributed line ----
     cout << "\n[W43-R2] damage narrates once, carrying its life result\n";
     {
-        CHECK(damageNarration("Dwarven Blastminer", 1, "the opponent", true, 34)
-              == "Dwarven Blastminer dealt 1 damage to the opponent (now 34)",
+        CHECK(damageNarration(true, "Dwarven Blastminer", 1, "the opponent", true, 34)
+              == "Your Dwarven Blastminer dealt 1 damage to the opponent (now 34)",
               "W43-R2 the owner's specimen: one attributed line carrying the result");
-        CHECK(damageNarration("Dwarven Blastminer", 1, "the opponent", true, 34)
+        CHECK(damageNarration(true, "Dwarven Blastminer", 1, "the opponent", true, 34)
                   .find("lost 1 life") == string::npos,
               "W43-R2 NEGATIVE the separate life-loss entry is gone");
         // NEGATIVE: damage with no life result (prevented/replaced, creature
         // damage, the toxic path that raises no life event) prints no total.
-        CHECK(damageNarration("Wither Fang", 2, "Grizzly Bears")
-              == "Wither Fang dealt 2 damage to Grizzly Bears",
+        CHECK(damageNarration(true, "Wither Fang", 2, "Grizzly Bears")
+              == "Your Wither Fang dealt 2 damage to Grizzly Bears",
               "W43-R2 NEGATIVE damage that caused no life change claims no life result");
-        CHECK(damageNarration("Wither Fang", 2, "Grizzly Bears").find("(now") == string::npos,
+        CHECK(damageNarration(true, "Wither Fang", 2, "Grizzly Bears")
+                  .find("(now") == string::npos,
               "W43-R2 NEGATIVE no '(now N)' is invented for a resultless damage line");
-        CHECK(damageNarration("", 3, "you", true, 17) == "3 damage was dealt to you (now 17)",
+        CHECK(damageNarration(false, "", 3, "you", true, 17)
+              == "3 damage was dealt to you (now 17)",
               "W43-R2 a sourceless damage line carries its result too");
         // SIMULTANEOUS MULTI-SOURCE: each damage line carries the running total
         // after ITS OWN damage; the LAST line therefore shows the final total.
         {
-            string a = damageNarration("Goblin Token", 1, "you", true, 19);
-            string b = damageNarration("Siege-Gang Commander", 2, "you", true, 17);
-            CHECK(a == "Goblin Token dealt 1 damage to you (now 19)"
-                  && b == "Siege-Gang Commander dealt 2 damage to you (now 17)",
+            string a = damageNarration(false, "Goblin Token", 1, "you", true, 19);
+            string b = damageNarration(false, "Siege-Gang Commander", 2, "you", true, 17);
+            CHECK(a == "Opponent's Goblin Token dealt 1 damage to you (now 19)"
+                  && b == "Opponent's Siege-Gang Commander dealt 2 damage to you (now 17)",
                   "W43-R2 each simultaneous damage line carries its own settled total");
         }
         // The standalone life line SURVIVES for every life change that is not
@@ -22422,9 +22468,9 @@ void AIPlayerGPT::runParseSelfTest()
               "W43-R2 the lifelink/lifegain half still narrates as its own line");
         // ECHO SHAPE: the appended result is parenthesised, not bracketed, so
         // stripNarrationDecoration leaves it alone (it identifies the outcome).
-        CHECK(stripNarrationDecoration(damageNarration("Dwarven Blastminer", 1, "the opponent",
-                                                       true, 34))
-              == "Dwarven Blastminer dealt 1 damage to the opponent (now 34)",
+        CHECK(stripNarrationDecoration(damageNarration(true, "Dwarven Blastminer", 1,
+                                                       "the opponent", true, 34))
+              == "Your Dwarven Blastminer dealt 1 damage to the opponent (now 34)",
               "W43-R2 echo: the life result is content, not decoration - it is never stripped");
     }
 
@@ -24181,6 +24227,138 @@ void AIPlayerGPT::runParseSelfTest()
         // The note's own words are untouched by this lane - it is still a nudge.
         CHECK(string(kStalePlanNote).find("not about what is legal for you") != string::npos,
               "#W45-4 REGRESSION the note text is unchanged (gate-only lane)");
+    }
+
+
+    // ---- #W45-20: the history log's OWNER PREFIX (owner ruling 2026-08-26) ----
+    //
+    // "Owner-prefix every line ('Your X' / 'Opponent's X' on all history lines,
+    // consistent with the board frame)." Wave-44 measured 402 lines that opened
+    // on a bare card name; every one of them was a damage line, and this pool's
+    // decks mirror (deck123 and deck146 both run Nadaar, Selfless Paladin and
+    // Hive of the Eye Tyrant), so the subject named a card BOTH seats control.
+    // The wording is the register's existing one - ownerTag's possessive - not a
+    // new spelling.
+    cout << "\n[#W45-20] every damage history line opens on a possessive subject\n";
+    {
+        // POSITIVE, both chairs, both target classes.
+        CHECK(damageNarration(true, "Hive of the Eye Tyrant", 3, "the opponent", true, 12)
+              == "Your Hive of the Eye Tyrant dealt 3 damage to the opponent (now 12)",
+              "#W45-20 my damage opens 'Your <card>'");
+        CHECK(damageNarration(false, "Hive of the Eye Tyrant", 3, "you", true, 12)
+              == "Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 12)",
+              "#W45-20 their damage opens \"Opponent's <card>\"");
+        CHECK(damageNarration(true, "Luminarch Aspirant", 1, "Shield Sphere")
+              == "Your Luminarch Aspirant dealt 1 damage to Shield Sphere",
+              "#W45-20 a creature-target damage line is tagged too");
+        // THE AMBIGUITY THIS CLOSES: the SAME card name, the SAME damage, the
+        // SAME target, from the two chairs - one sentence before, two now.
+        CHECK(damageNarration(true, "Nadaar, Selfless Paladin", 3, "Shield Sphere")
+              != damageNarration(false, "Nadaar, Selfless Paladin", 3, "Shield Sphere"),
+              "#W45-20 a mirrored card name reads differently from each chair");
+        // The prefix is EXACTLY the board frame's, character for character.
+        CHECK(damageNarration(true, "Staff of Nin", 1, "you")
+                  .compare(0, ownerTag(true).size(), ownerTag(true)) == 0
+              && damageNarration(false, "Staff of Nin", 1, "you")
+                  .compare(0, ownerTag(false).size(), ownerTag(false)) == 0,
+              "#W45-20 the wording is ownerTag's, not a second spelling");
+        // NEGATIVE 1: the corpus's exact defect shape must be UNREACHABLE. No
+        // argument to the emitter produces a line that starts on the card name.
+        CHECK(damageNarration(true, "Staff of Nin", 1, "you", true, 19)
+                  != "Staff of Nin dealt 1 damage to you (now 19)"
+              && damageNarration(false, "Staff of Nin", 1, "you", true, 19)
+                  != "Staff of Nin dealt 1 damage to you (now 19)",
+              "#W45-20 NEGATIVE the wave-44 bare-subject shape is not producible");
+        CHECK(damageNarration(false, "Luminarch Aspirant", 1, "the opponent", true, 19)
+                  .find("Luminarch") == ownerTag(false).size(),
+              "#W45-20 NEGATIVE nothing precedes the card name but the possessive");
+        // NEGATIVE 2: the SOURCELESS line has no subject to own, and must not
+        // acquire one - "3 damage was dealt to you" is a passive with no actor,
+        // and inventing "Your"/"Opponent's" there would be a rendered non-fact.
+        CHECK(damageNarration(true, "", 3, "you", true, 17) == "3 damage was dealt to you (now 17)"
+              && damageNarration(false, "", 3, "you", true, 17) == "3 damage was dealt to you (now 17)",
+              "#W45-20 NEGATIVE a sourceless damage line takes NO owner tag on either chair");
+        // NEGATIVE 3: a PLAYER target stays bare. "you"/"the opponent" already
+        // say whose life moved; "Your you" would be nonsense.
+        CHECK(damageNarration(true, "Staff of Nin", 1, "the opponent", true, 18)
+                  .find("Your the opponent") == string::npos,
+              "#W45-20 NEGATIVE the player target is never possessivised");
+        // NEGATIVE 4: this lane touched only the subject. The damage OBJECT is
+        // still a bare card name, like every other mid-sentence card reference
+        // in the register - pinned so a later ruling is a deliberate change and
+        // not a silent drift.
+        CHECK(damageNarration(true, "Goblin", 1, "Pride Guardian")
+              == "Your Goblin dealt 1 damage to Pride Guardian",
+              "#W45-20 NEGATIVE the object half is unchanged (subject-only lane)");
+
+        // ---- the two gates the line still has to pass, unchanged ----
+        // (a) stripNarrationDecoration: the possessive is CONTENT and survives,
+        // exactly as the "(now N)" result does. It is neither brace nor bracket,
+        // so this is a regression pin, not a new behaviour.
+        CHECK(stripNarrationDecoration(damageNarration(false, "Hive of the Eye Tyrant", 3,
+                                                       "you", true, 12))
+              == "Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 12)",
+              "#W45-20 the owner prefix is content - stripNarrationDecoration leaves it");
+        CHECK(stripNarrationDecoration(damageNarration(true, "Staff of Nin", 1,
+                                                       "the opponent") + " {card text: \"x\"}")
+              == "Your Staff of Nin dealt 1 damage to the opponent",
+              "#W45-20 a decorated damage line still strips to the tagged sentence");
+        // (b) the run-collapse gate (#W43-11): a tagged line is still collapsed
+        // by BYTE identity and still re-conjugates nothing it cannot. Two seats'
+        // versions of the same event are now DIFFERENT lines, which is the point
+        // - but each seat only ever writes its own, so no run is broken.
+        {
+            string mineLine = damageNarration(true, "Staff of Nin", 1, "the opponent", true, 12);
+            string theirLine = damageNarration(false, "Staff of Nin", 1, "you", true, 12);
+            CHECK(collapsedRunNarration(mineLine, 4, -1)
+                  == "Your Staff of Nin dealt 1 damage to the opponent (now 12) (x4)",
+                  "#W45-20 a tagged damage run collapses verbatim with its count");
+            CHECK(collapsedRunNarration(mineLine, 1, -1) == mineLine,
+                  "#W45-20 NEGATIVE a run of one is untouched by the collapse gate");
+            CHECK(mineLine != theirLine,
+                  "#W45-20 the two chairs' lines are distinct - each seat writes only its own");
+        }
+        // (c) the assembled log, through the real appender: no line opens on a
+        // bare card name any more. This walks the composed output rather than
+        // asserting a literal, so a NEW unprefixed emitter reaching this shape
+        // would fail here.
+        {
+            string log = "=== Turn 7 - YOUR turn ===\n";
+            string phase = "Phase: Combat damage";
+            const string kNoTrim = "(...earlier events trimmed...)";
+            #define NARRATE20(x) narrationAppend(log, phase, (x), kNoTrim)
+            NARRATE20(damageNarration(true, "Luminarch Aspirant", 1, "the opponent", true, 19));
+            NARRATE20(damageNarration(false, "Fate Unraveler", 1, "you", true, 18));
+            NARRATE20(damageNarration(true, "Staff of Nin", 1, "Shield Sphere"));
+            NARRATE20(damageNarration(false, "", 3, "you", true, 15));
+            NARRATE20(lifeChangeNarration(true, -2, 13));
+            #undef NARRATE20
+            cout << log;
+            bool allTagged = true;
+            size_t at = 0;
+            while ((at = log.find("\n- ", at)) != string::npos)
+            {
+                at += 3;
+                size_t eol = log.find('\n', at);
+                string body = log.substr(at, eol == string::npos ? string::npos : eol - at);
+                //Lines with no card subject at all: the passive sourceless
+                //damage line, the phase furniture, and the player-subject lines.
+                if (body.compare(0, 6, "Phase:") == 0 || body.compare(0, 4, "You ") == 0
+                    || body.compare(0, 9, "Opponent ") == 0
+                    || body.find(" damage was dealt to ") != string::npos)
+                    continue;
+                if (body.compare(0, 5, "Your ") != 0 && body.compare(0, 11, "Opponent's ") != 0)
+                    allTagged = false;
+            }
+            CHECK(allTagged,
+                  "#W45-20 every card-subject line in an assembled log opens on a possessive");
+            CHECK(log.find("- Your Luminarch Aspirant dealt 1 damage to the opponent (now 19)")
+                      != string::npos
+                  && log.find("- Opponent's Fate Unraveler dealt 1 damage to you (now 18)")
+                      != string::npos
+                  && log.find("- 3 damage was dealt to you (now 15)") != string::npos,
+                  "#W45-20 the assembled log carries the tagged shapes verbatim");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
