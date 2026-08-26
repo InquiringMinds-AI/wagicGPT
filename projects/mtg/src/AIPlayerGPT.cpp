@@ -2412,7 +2412,51 @@ static int cardShowsOtherFace(MTGCardInstance * card)
 //{3}{B} ... I cannot afford it") and lost a game at 1 life. The count is the
 //number the arithmetic needs; spell it in words too so a digit cannot be
 //misbound to a colour, and demote the colours to a named sub-clause.
-static string manaAvailableLine(int sources, const string& colors, const string& sourceList)
+//#W46-1 (wave-45 R1, HIGH, cost a game at 6 life): the colour SET answers
+//MEMBERSHIP ("can I make black at all?"), and membership is not the question a
+//coloured cost asks. deck126 read `colours you can make: {g}{u}{r}{b}{w}` over a
+//sub-list holding exactly ONE {b}-capable card, against `Cast Sanguine Bond
+//{3}{B}{B}`; it tapped Overgrown Battlements for green twice, floated ten green,
+//could not cast, and the two tapped walls then could not block (6 -> 1, lost).
+//pregameHandHeaderText already ships the AGGREGATE form ("Mana sources among
+//those lands, counted by the engine: {W} 2, {U} 2") and stops at the opening
+//hand, so in-game the pilot had to re-derive the aggregate by parsing the
+//sub-list one card at a time - the exact re-derivation N-139n's comment block
+//argues only an engine-computed aggregate can close.
+//  Two counting conventions are STATED IN THE CLAUSE rather than assumed,
+//because an unstated convention makes the number a new false surface: a source
+//that makes more than one colour is counted under EACH of them (so the counts do
+//not sum to the total), and a variable-output source counts as ONE, exactly as
+//the total already counts it. Deliberately NOT a mana count: three Battlements
+//are "{G} 3" and can make far more than three green.
+//Pure (takes the per-source colour strings, not a game), so the shape and both
+//conventions are provable in PARSETEST.
+static string perColorSourceCountClause(const std::vector<std::string>& perSourceColors)
+{
+    static const char * kSym[5] = { "{W}", "{U}", "{B}", "{R}", "{G}" };
+    static const char * kLow[5] = { "{w}", "{u}", "{b}", "{r}", "{g}" };
+    int n[5] = { 0, 0, 0, 0, 0 };
+    for (size_t i = 0; i < perSourceColors.size(); i++)
+        for (int k = 0; k < 5; k++)
+            if (perSourceColors[i].find(kLow[k]) != string::npos)
+                n[k]++;
+    std::ostringstream o;
+    bool any = false;
+    for (int k = 0; k < 5; k++)
+        if (n[k])
+        {
+            o << (any ? ", " : "") << kSym[k] << " " << n[k];
+            any = true;
+        }
+    if (!any)
+        return ""; //no coloured source at all: the set clause already says so
+    return " (sources that can make each: " + o.str() + " - counted the same way as"
+           " the total above: one per SOURCE, and a source that makes several colours is"
+           " counted under EACH of them, so these need not add up to the total)";
+}
+
+static string manaAvailableLine(int sources, const string& colors, const string& sourceList,
+                                const std::vector<std::string> * perSourceColors = NULL)
 {
     static const char * kNumWord[] = { "zero", "one", "two", "three", "four", "five",
                                        "six", "seven", "eight", "nine", "ten" };
@@ -2425,8 +2469,11 @@ static string manaAvailableLine(int sources, const string& colors, const string&
     //W36 #9 (105/158, the generic-cost misread class): a pilot read {3} in a
     //cost as needing specific colours. State the payment rule where the count is.
     o << "untapped source" << (sources > 1 ? "s" : "")
-      << ", tapped automatically when you cast; colours you can make: " << colors
-      << "; mana of ANY colour pays a generic cost like {2})";
+      << ", tapped automatically when you cast; colours you can make: " << colors;
+    //#W46-1: the per-colour SOURCE COUNT, beside the set it aggregates.
+    if (perSourceColors)
+        o << perColorSourceCountClause(*perSourceColors);
+    o << "; mana of ANY colour pays a generic cost like {2})";
     //N-166k: the sources themselves, so no colour in the set above is
     //unattributed. Omitted when the engine could not name them (never observed,
     //but a silent gap is preferable to a wrong list).
@@ -3306,6 +3353,39 @@ static bool narratedCardIsMine(MTGCardInstance * c, const Player * me)
 static string ownedZone(bool mine, const string& zone)
 {
     return (mine ? "your " : "the opponent's ") + zone;
+}
+
+//#W46-2 (wave-45 R2, HIGH: the corpus's longest decision, 539.0 s on a TWO-option
+//land drop). A lost card and a held card were the SAME SENTENCE. deck146 drew two
+//Pelakka Predations and discarded one; the history said `- You discarded Pelakka
+//Predation` while `Your hand:` still listed `Pelakka Predation {2}{b} [sorcery]`,
+//and copyOfTag drops its `(copy N of M ...)` at exactly the moment it is needed
+//(it returns "" once total < 2, so the surviving copy goes bare the instant its
+//twin leaves). Both surfaces were individually honest and jointly unresolvable,
+//so the pilot spent 10,360 chars of overrun arbitrating them - verbatim: "This is
+//a contradiction ... I will trust the hand list." This is the trust doctrine's own
+//failure mode: the render made the model doubt the render, and no guide prose can
+//answer it (that would teach doubt). It can only be closed at the emitter.
+//  The fix is ADDITIVE and historical: the departure line states how many copies
+//of that name the ORIGIN zone held and how many it still holds. That leaves the
+//hand line untouched and true (a lone copy carries no copy tag because it IS
+//alone), and makes the two readings agree instead of compete. copyOfTag is NOT
+//changed: a "(copy 1 of 1)" would be a new false surface, and deleting a tag is
+//exactly what the doctrine forbids.
+//  The clause NAMES the card so it cannot attach to a preceding target or zone
+//phrase, and keeps copyOfTag's own "copies in <zone>" register so the two
+//surfaces read as one vocabulary. Pure, so the shape is provable in PARSETEST.
+static string copiesLeftBehindTag(bool mineZone, const string& zone,
+                                  const string& cardName, int remaining)
+{
+    if (remaining < 1 || cardName.empty() || zone.empty())
+        return "";
+    std::ostringstream o;
+    o << " (that " << cardName << " was 1 of " << (remaining + 1) << " copies "
+      << (zone == "battlefield" ? "on " : "in ") << ownedZone(mineZone, zone)
+      << "; the other " << remaining
+      << (remaining == 1 ? " is" : " are") << " still there)";
+    return o.str();
 }
 
 //The destination clause of a spell leaving the stack. Zone duty: the log is the
@@ -7732,10 +7812,40 @@ string AIPlayerGPT::describeEvent(WEvent * event)
                 break;
             }
         }
+        //#W46-2: the copy disambiguator on the DEPARTURE line. The event fires
+        //AFTER the move (MTGGameZones putInZone), so the origin zone's remaining
+        //same-name count is exactly "how many of these are still in that zone" -
+        //a fact about the moment it happened, which is what an append-only log
+        //records. Only when a copy actually remains: a singleton departure was
+        //never ambiguous and pays nothing. The origin zone's OWNER decides the
+        //possessive (the destination's `mine` can be the other player).
+        //ZONE GATE - the clause states a COUNT in a zone, so it may only name a
+        //zone the model is already shown in full: its OWN hand, or either
+        //battlefield. A library, an opponent's hand, a graveyard or an exile
+        //count would be new information the surface does not otherwise carry,
+        //and "you drew X, 2 more are still in your library" is a hidden-zone
+        //leak dressed as a disambiguator. The ambiguity this closes only exists
+        //where the remaining copies are LISTED anyway.
+        //DESTINATION GATE - and only when the card is no longer VISIBLE where it
+        //went. A card that arrived on the battlefield is listed there, with its
+        //own instance handle, so the two surfaces already reconcile themselves
+        //and the clause would be pure cost on every land drop and every deploy.
+        //The 539 s arbitration happened because the card went somewhere the
+        //situation block does NOT show while a same-named card stayed in hand.
+        bool fromMine = (e->from->owner == this);
+        string fromDesc = zoneDesc(e->from);
+        bool countableZone = ((fromDesc == "battlefield") || (fromDesc == "hand" && fromMine))
+                             && toName != "battlefield";
+        int sameNameLeft = 0;
+        for (size_t ci = 0; countableZone && ci < e->from->cards.size(); ci++)
+            if (e->from->cards[ci] && e->from->cards[ci] != e->card
+                && e->from->cards[ci]->getDisplayName() == cardName)
+                sameNameLeft++;
+        string copiesTag = copiesLeftBehindTag(fromMine, fromDesc, cardName, sameNameLeft);
         return zoneChangeNarration(mine, cardName, zoneDesc(e->from), toName,
                                    e->card->isCreature() != 0,
                                    e->card->hasType(Subtypes::TYPE_LAND) != 0,
-                                   countered, counterSource, castTargets);
+                                   countered, counterSource, castTargets) + copiesTag;
     }
 
     //W35 addendum (4): the countering itself. The marker is stashed and the
@@ -8220,10 +8330,15 @@ string AIPlayerGPT::serializeGameState()
     //land and found Katilda, a CREATURE mana source, in its last 320 chars.
     //Name every source the count counts.
     string sourceList;
+    //#W46-1: the same per-source colour strings the sub-list prints, handed to
+    //manaAvailableLine as the AGGREGATE's input. One pass, one source of truth -
+    //a separately-derived count could disagree with the list beneath it.
+    vector<string> perSourceColors;
     {
         std::ostringstream s;
         for (size_t i = 0; i < manaSources.size(); i++)
         {
+            perSourceColors.push_back(manaSources[i].colors);
             s << (i ? "; " : "") << manaSources[i].card->getDisplayName()
               << instanceHandle(manaSources[i].card);
             if (!manaSources[i].colors.empty())
@@ -8245,7 +8360,8 @@ string AIPlayerGPT::serializeGameState()
     //places and loses at distance, so this is a REPRESENTATION fix: lead with the
     //COUNT (the number the arithmetic needs), spell it in words so a digit cannot
     //be misbound to a colour, and demote the colours to a named sub-clause.
-    out << "Mana available: " << manaAvailableLine(sources, colors, sourceList);
+    out << "Mana available: " << manaAvailableLine(sources, colors, sourceList,
+                                                  &perSourceColors);
     out << manaPoolClause(pool, this->getManaPool()->getConvertedCost(), sources);
     out << "\n";
     //R-PAINLAND (wave-21 deck102): the count above hides that some of your
@@ -24359,6 +24475,117 @@ void AIPlayerGPT::runParseSelfTest()
                   && log.find("- 3 damage was dealt to you (now 15)") != string::npos,
                   "#W45-20 the assembled log carries the tagged shapes verbatim");
         }
+    }
+
+
+    // ---- #W46-1: the per-colour SOURCE COUNT on the in-game mana line ----
+    //The wave-45 R1 repro, rebuilt from the seat's own sub-list: three Overgrown
+    //Battlements ({g}, variable) and a Scrubland whose five colours come from a
+    //Chromatic Lantern. The set clause said {g}{u}{r}{b}{w} and the seat tried to
+    //cast Sanguine Bond {3}{B}{B} off ONE black source. Neither clause is an
+    //option row and neither carries a bracketed annotation, so there is no echo
+    //shape to match - the negatives below pin that.
+    {
+        cout << "\n[#W46-1] the mana line prints per-colour source COUNTS, not only a set\n";
+        vector<string> repro;
+        repro.push_back("{g}");                              //Overgrown Battlement #1 (variable)
+        repro.push_back("{w} or {b} or {g} or {r} or {u}");  //Scrubland + Chromatic Lantern
+        repro.push_back("{g}");                              //Overgrown Battlement #2 (variable)
+        repro.push_back("{g}");                              //Overgrown Battlement #3 (variable)
+        string ml = manaAvailableLine(4, "{g}{u}{r}{b}{w}", "", &repro);
+        CHECK(ml.find("sources that can make each: {W} 1, {U} 1, {B} 1, {R} 1, {G} 4")
+                  != string::npos,
+              "#W46-1 the repro window prints the aggregate the pilot had to re-derive");
+        CHECK(ml.find("{B} 1") != string::npos,
+              "#W46-1 THE DECIDING FACT: one black source against a {3}{B}{B} cost");
+        CHECK(ml.find("colours you can make: {g}{u}{r}{b}{w} (sources that can make each:")
+                  != string::npos,
+              "#W46-1 the count clause sits on the set it aggregates, count after set");
+        CHECK(ml.find("a source that makes several colours is counted under EACH of them,"
+                      " so these need not add up to the total") != string::npos,
+              "#W46-1 CONVENTION 1 is stated IN the clause: a dual counts under each colour");
+        CHECK(ml.find("counted the same way as the total above: one per SOURCE")
+                  != string::npos,
+              "#W46-1 CONVENTION 2 is stated IN the clause: a VARIABLE source counts ONCE,"
+              " exactly as the total counts it - one per SOURCE, never per mana");
+        CHECK(ml.find("mana of ANY colour pays a generic cost like {2})") != string::npos,
+              "#W46-1 the generic-cost rule still closes the parenthetical");
+        //The counts are SOURCES, never mana: three Battlements are {G} 3 and can
+        //make far more than three green. Nothing in the clause claims otherwise.
+        CHECK(ml.find("{G} 4 mana") == string::npos && ml.find("green mana") == string::npos,
+              "#W46-1 NEGATIVE the clause never restates a count as an amount of mana");
+        vector<string> dual;
+        dual.push_back("{w} or {b}");
+        CHECK(manaAvailableLine(1, "{w}{b}", "", &dual).find("each: {W} 1, {B} 1")
+                  != string::npos,
+              "#W46-1 one dual source is counted under BOTH its colours");
+        vector<string> mono;
+        mono.push_back("{g}");
+        mono.push_back("{g}");
+        mono.push_back("{g}");
+        CHECK(manaAvailableLine(3, "{g}", "", &mono).find("each: {G} 3") != string::npos,
+              "#W46-1 three mono sources aggregate to one count");
+        //NEGATIVES.
+        vector<string> colourless;
+        colourless.push_back("");
+        colourless.push_back("{x}");
+        CHECK(manaAvailableLine(2, "{2}", "", &colourless).find("sources that can make each")
+                  == string::npos,
+              "#W46-1 NEGATIVE no coloured source at all prints NO count clause");
+        CHECK(manaAvailableLine(5, "{r}{b}", "").find("sources that can make each")
+                  == string::npos,
+              "#W46-1 NEGATIVE a caller without the per-source data renders the old line");
+        CHECK(manaAvailableLine(0, "", "", &repro) == "0 total (no untapped sources)",
+              "#W46-1 REGRESSION the zero-source line is untouched");
+        CHECK(ml.find('[') == string::npos && ml.find(']') == string::npos,
+              "#W46-1 NEGATIVE the clause carries no bracketed annotation to echo");
+        CHECK(ml.find("1. ") == string::npos && ml.find("\n1") == string::npos,
+              "#W46-1 NEGATIVE the clause cannot read as a numbered option row");
+    }
+
+    // ---- #W46-2: a lost card and a held card stop being the same sentence ----
+    {
+        cout << "\n[#W46-2] the departure line disambiguates the copy it took\n";
+        string tag = copiesLeftBehindTag(true, "hand", "Pelakka Predation", 1);
+        CHECK(tag == " (that Pelakka Predation was 1 of 2 copies in your hand;"
+                     " the other 1 is still there)",
+              "#W46-2 the 539-second repro's exact shape");
+        //The whole point: the discard line and the hand line now AGREE.
+        string discard = zoneChangeNarration(true, "Pelakka Predation", "hand", "graveyard",
+                                             false, false, false, "", "") + tag;
+        CHECK(discard == "You discarded Pelakka Predation (that Pelakka Predation was 1 of 2"
+                         " copies in your hand; the other 1 is still there)",
+              "#W46-2 the composed discard line accounts for BOTH copies");
+        CHECK(discard.find("1 of 2 copies in your hand") != string::npos
+                  && copyOfTag(1, 1, "your hand").empty(),
+              "#W46-2 a lone surviving copy stays untagged, and the history says why");
+        CHECK(copiesLeftBehindTag(true, "hand", "Pelakka Predation", 2)
+                  == " (that Pelakka Predation was 1 of 3 copies in your hand;"
+                     " the other 2 are still there)",
+              "#W46-2 plural agreement on a deeper stack");
+        CHECK(copiesLeftBehindTag(true, "battlefield", "Overgrown Battlement", 2)
+                  == " (that Overgrown Battlement was 1 of 3 copies on your battlefield;"
+                     " the other 2 are still there)",
+              "#W46-2 a sacrifice/death names the battlefield with its own preposition");
+        CHECK(copiesLeftBehindTag(false, "battlefield", "Shield Sphere", 1)
+                  .find("on the opponent's battlefield") != string::npos,
+              "#W46-2 the ORIGIN zone's owner decides the possessive");
+        //NEGATIVES.
+        CHECK(copiesLeftBehindTag(true, "hand", "Sanguine Bond", 0).empty(),
+              "#W46-2 NEGATIVE a singleton departure was never ambiguous and pays nothing");
+        CHECK(copiesLeftBehindTag(true, "hand", "", 2).empty()
+                  && copiesLeftBehindTag(true, "", "Swamp", 2).empty(),
+              "#W46-2 NEGATIVE no clause without a card name and a zone to name");
+        CHECK(copiesLeftBehindTag(true, "hand", "Swamp", 1).find("(copy ") == string::npos,
+              "#W46-2 NEGATIVE the history clause never mimics copyOfTag's hand notation");
+        CHECK(copyOfTag(1, 2, "your hand") == " (copy 1 of 2 in your hand)"
+                  && copyOfTag(2, 2, "your hand") == " (copy 2 of 2 in your hand)",
+              "#W46-2 REGRESSION copyOfTag is unchanged - no tag is deleted or invented");
+        CHECK(tag.find('[') == string::npos && tag.find(']') == string::npos,
+              "#W46-2 NEGATIVE the clause carries no bracketed annotation to echo");
+        CHECK(zoneChangeNarration(true, "Swamp", "hand", "battlefield", false, true,
+                                  false, "", "") == "You played Swamp",
+              "#W46-2 REGRESSION the narration register itself is untouched");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
