@@ -1,0 +1,532 @@
+# Wave-45 lategame specimen (owner prompt review, invariant 0)
+# file=1787768357-ai_baka_deck146-0x55bb5ae9e2f0-vs-ai_baka_deck125.jsonl seq=186 kind=ask turn=54 phase=Blockers prompt_chars=26326 latency_ms=11458
+# Binary fd69fadc2 (lanes A-D; pre-lane-E). USER message verbatim:
+
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - Lolth, Spider Queen x2, Silverquill Silencer, Acererak the Archlich x2, Pelakka Predation, Emeria's Call, Soul Shatter x2, Nadaar, Selfless Paladin, Kaya the Inexorable, Triumphant Adventurer, Shineshadow Snarl, Swamp x2, Plains x2, Brightclimb Pathway; opponent - Fall of the Gavel; exiled at trim: you - Triumphant Adventurer x2, Silverquill Silencer x2, Nadaar, Selfless Paladin; opponent - Path to Exile x3, Sphinx's Revelation x3, Cancel x2, Essence Scatter x2, Final Judgment)
+- You used: choose a card with Pelakka Predation targeting Sphinx's Revelation
+- Opponent's revealed Sphinx's Revelation went to their graveyard
+- Opponent put the revealed Plains into their hand
+- Opponent put the revealed Sphinx's Revelation into their hand
+- Opponent put the revealed Plains into their hand
+- Opponent put the revealed Island into their hand
+- Opponent put the revealed Island into their hand
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- You used: becomes beholder with Hive of the Eye Tyrant
+=== Turn 15 - YOUR turn ===
+- Phase: Draw
+- You drew Triumphant Adventurer
+- Phase: Main phase 1
+- You chose Cast Card Normally for Emeria's Call
+- You cast Emeria's Call
+- Opponent cast Dream Fracture
+- Your Emeria's Call was COUNTERED by Dream Fracture and went to your graveyard
+- Opponent drew a card
+- You drew Vanishing Verse
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 25)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent shuffled their graveyard (6 cards) into their library with Elixir of Immortality
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Brightclimb Pathway
+- Phase: Main phase 1
+- You chose Play Land for Brightclimb Pathway
+- You played Brightclimb Pathway
+- Phase: Main phase 2
+- You cast Triumphant Adventurer
+- Your Triumphant Adventurer resolved and entered the battlefield
+- You used: becomes beholder with Hive of the Eye Tyrant
+=== Turn 18 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 19 - YOUR turn ===
+- Phase: Draw
+- You drew Agadeem's Awakening
+- Phase: Main phase 1
+- You used: becomes beholder with Hive of the Eye Tyrant
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant, Triumphant Adventurer
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 2 of that run
+- You chose goblin lair (room 2 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a 1/1 red Goblin creature token.} for Lost Mine of Phandelver
+- You used: goblin lair with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver created a 1/1 Goblin token
+- Phase: Combat damage
+- Triumphant Adventurer dealt 1 damage to the opponent (now 24)
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 21)
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 21 - YOUR turn ===
+- Phase: Draw
+- You drew Shineshadow Snarl
+- Phase: Main phase 1
+- You played Shineshadow Snarl
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant, Triumphant Adventurer, Goblin
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 3 of that run
+- You chose dark pool (room 5 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Each opponent loses 1 life and you gain 1 life.} for Lost Mine of Phandelver
+- You used: dark pool with Lost Mine of Phandelver
+- You gained 1 life (now 21)
+- Opponent lost 1 life (now 20)
+- Phase: Combat damage
+- Triumphant Adventurer dealt 1 damage to the opponent (now 19)
+- Goblin dealt 1 damage to the opponent (now 18)
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 15)
+=== Turn 22 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Path to Exile
+- Your Triumphant Adventurer was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- You targeted Plains with Path to Exile's ability (put a card onto the battlefield)
+- You used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Your Plains entered the battlefield from your library
+=== Turn 23 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant, Goblin
+- Phase: Blockers
+- You used: exile card with Hive of the Eye Tyrant targeting Path to Exile
+- Opponent's Path to Exile was exiled from the opponent's graveyard
+- Phase: Combat damage
+- Goblin dealt 1 damage to the opponent (now 14)
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 11)
+=== Turn 24 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Path to Exile
+- Your Goblin was exiled from the battlefield
+- Your Goblin (token) ceased to exist and left your exile
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- You targeted Swamp with Path to Exile's ability (put a card onto the battlefield)
+- You used: Put a card onto the battlefield with Path to Exile targeting Swamp
+- Your Swamp entered the battlefield from your library
+- Opponent played Island
+- Phase: Main phase 2
+- Opponent cast Sphinx's Revelation
+- You cast Soul Shatter
+- Your Soul Shatter resolved and went to your graveyard
+- Opponent gained 2 life (now 13)
+- Opponent drew a card
+- Opponent drew a card
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+=== Turn 25 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+=== Turn 26 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+- Opponent cast Sphinx's Revelation
+- Opponent gained 4 life (now 17)
+- Opponent drew 4 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Phase: ---
+- Opponent discarded Plains
+- Opponent discarded Island
+- Opponent discarded Island
+=== Turn 27 - YOUR turn ===
+- Phase: Draw
+- You drew Silverquill Silencer
+- Phase: Main phase 1
+- You cast Silverquill Silencer
+- Your Silverquill Silencer resolved and entered the battlefield
+- You used: Choose a name with Silverquill Silencer
+- You chose Silverquill Silencer's mode "Sphinx's Revelation"
+=== Turn 28 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 29 - YOUR turn ===
+- Phase: Upkeep
+- You used: becomes beholder with Hive of the Eye Tyrant
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Nadaar, Selfless Paladin
+- Phase: Main phase 1
+- You cast Nadaar, Selfless Paladin
+- Opponent cast Essence Scatter
+- Your Nadaar, Selfless Paladin was COUNTERED by Essence Scatter and went to your graveyard
+- Opponent's Essence Scatter resolved and went to the opponent's graveyard
+- Phase: Attackers
+- You declared attackers: Silverquill Silencer
+- Phase: Combat damage
+- Silverquill Silencer dealt 3 damage to the opponent (now 14)
+=== Turn 30 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Path to Exile
+- Your Silverquill Silencer was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- You targeted Plains with Path to Exile's ability (put a card onto the battlefield)
+- You used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Your Plains entered the battlefield from your library
+=== Turn 31 - YOUR turn ===
+- Phase: Upkeep
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Vanishing Verse
+- Phase: Main phase 1
+- You used: becomes beholder with Hive of the Eye Tyrant
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant
+- Phase: Blockers
+- You targeted Sphinx's Revelation with Hive of the Eye Tyrant's ability (exile card)
+- You used: exile card with Hive of the Eye Tyrant targeting Sphinx's Revelation
+- Opponent's Sphinx's Revelation was exiled from the opponent's graveyard
+- You targeted Sphinx's Revelation with Hive of the Eye Tyrant's ability (exile card)
+- You used: exile card with Hive of the Eye Tyrant targeting Sphinx's Revelation
+- Opponent's Sphinx's Revelation was exiled from the opponent's graveyard
+- Phase: Combat damage
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 11)
+=== Turn 32 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+=== Turn 33 - YOUR turn ===
+- Phase: Upkeep
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Lolth, Spider Queen
+- Phase: Main phase 1
+- You cast Lolth, Spider Queen
+- Opponent cast Cancel
+- Your Lolth, Spider Queen was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant
+- Phase: Blockers
+- You targeted Path to Exile with Hive of the Eye Tyrant's ability (exile card)
+- You used: exile card with Hive of the Eye Tyrant targeting Path to Exile
+- Opponent's Path to Exile was exiled from the opponent's graveyard
+- Phase: Combat damage
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 8)
+=== Turn 34 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 35 - YOUR turn ===
+- Phase: Draw
+- You drew Soul Shatter
+=== Turn 36 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 37 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+=== Turn 38 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 39 - YOUR turn ===
+- Phase: Upkeep
+- You used: becomes beholder with Hive of the Eye Tyrant
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Shineshadow Snarl
+- Phase: Main phase 1
+- You played Shineshadow Snarl
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant
+- Phase: Blockers
+- You targeted Cancel with Hive of the Eye Tyrant's ability (exile card)
+- You used: exile card with Hive of the Eye Tyrant targeting Cancel
+- Opponent's Cancel was exiled from the opponent's graveyard
+- You targeted Essence Scatter with Hive of the Eye Tyrant's ability (exile card)
+- You used: exile card with Hive of the Eye Tyrant targeting Essence Scatter
+- Opponent's Essence Scatter was exiled from the opponent's graveyard
+- Phase: Combat damage
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 5)
+=== Turn 40 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 41 - YOUR turn ===
+- Phase: Upkeep
+- You used: becomes beholder with Hive of the Eye Tyrant
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Kaya the Inexorable
+- Phase: Main phase 1
+- You cast Kaya the Inexorable
+- Opponent cast Dream Fracture
+- Your Kaya the Inexorable was COUNTERED by Dream Fracture and went to your graveyard
+- Opponent drew a card
+- You drew Silverquill Silencer
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+=== Turn 42 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sphinx's Revelation
+- Opponent gained 6 life (now 11)
+- Opponent drew 6 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent played Glacial Fortress
+- Phase: ---
+- Opponent discarded Emrakul, the Aeons Torn
+- Opponent discarded Final Judgment
+- Opponent discarded Essence Scatter
+- Opponent discarded Supreme Verdict
+- Opponent discarded Lightmine Field
+=== Turn 43 - YOUR turn ===
+- Phase: Untap
+- Opponent used: Put a card into the library with Emrakul, the Aeons Torn
+- Opponent shuffled their graveyard (11 cards) into their library with Emrakul, the Aeons Torn
+- Phase: Draw
+- You drew Nadaar, Selfless Paladin
+- Phase: Main phase 1
+- You cast Nadaar, Selfless Paladin
+- Your Nadaar, Selfless Paladin resolved and entered the battlefield
+- You ventured into Lost Mine of Phandelver: venture step 4 of that run
+- You drew Silverquill Command
+- You used: dungeon completed with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your command zone to your zone
+- You cast Silverquill Silencer
+- Opponent cast Path to Exile
+- Your Nadaar, Selfless Paladin was exiled from the battlefield
+- Opponent's Path to Exile resolved and went to the opponent's graveyard
+- Your Silverquill Silencer resolved and entered the battlefield
+- You used: Choose a name with Silverquill Silencer
+- You chose Silverquill Silencer's mode "Emrakul, the Aeons Torn"
+=== Turn 44 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Phase: Main phase 2
+- Opponent cast Final Judgment
+- Your Silverquill Silencer was exiled from the battlefield
+- Opponent's Final Judgment resolved and went to the opponent's graveyard
+=== Turn 45 - YOUR turn ===
+- Phase: Upkeep
+- You used: becomes beholder with Hive of the Eye Tyrant
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Brightclimb Pathway
+- Phase: Main phase 1
+- You chose Play Land for Brightclimb Pathway
+- You played Brightclimb Pathway
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant
+- Phase: Blockers
+- You targeted Final Judgment with Hive of the Eye Tyrant's ability (exile card)
+- You used: exile card with Hive of the Eye Tyrant targeting Final Judgment
+- Opponent's Final Judgment was exiled from the opponent's graveyard
+- You used: exile card with Hive of the Eye Tyrant targeting Path to Exile
+- Opponent's Path to Exile was exiled from the opponent's graveyard
+- Phase: Combat damage
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 8)
+=== Turn 46 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 47 - YOUR turn ===
+- Phase: Upkeep
+- You used: becomes beholder with Hive of the Eye Tyrant
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Vanishing Verse
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant
+- Phase: Combat damage
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 5)
+=== Turn 48 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+- Opponent cast Sphinx's Revelation
+- Opponent gained 6 life (now 11)
+- Opponent drew 6 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent cast Staff of Nin
+- Opponent's Staff of Nin resolved and entered the battlefield
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 20)
+- Phase: ---
+- Opponent discarded Essence Scatter
+- Opponent discarded Cancel
+=== Turn 49 - YOUR turn ===
+- Phase: Upkeep
+- You used: becomes beholder with Hive of the Eye Tyrant
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Silverquill Command
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant
+- Phase: Blockers
+- You targeted Sphinx's Revelation with Hive of the Eye Tyrant's ability (exile card)
+- You used: exile card with Hive of the Eye Tyrant targeting Sphinx's Revelation
+- Opponent's Sphinx's Revelation was exiled from the opponent's graveyard
+- You targeted Essence Scatter with Hive of the Eye Tyrant's ability (exile card)
+- You used: exile card with Hive of the Eye Tyrant targeting Essence Scatter
+- Opponent's Essence Scatter was exiled from the opponent's graveyard
+- Phase: Combat damage
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 8)
+=== Turn 50 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 19)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 13)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent's Cancel was put into the opponent's library from the opponent's graveyard
+=== Turn 51 - YOUR turn ===
+- Phase: Upkeep
+- You used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Triumphant Adventurer
+- Phase: Main phase 1
+- You cast Triumphant Adventurer
+- Opponent cast Cancel
+- Your Triumphant Adventurer was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+- Phase: Attackers
+- You declared attackers: Hive of the Eye Tyrant
+- Phase: Blockers
+- You used: exile card with Hive of the Eye Tyrant targeting Cancel
+- Opponent's Cancel was exiled from the opponent's graveyard
+- Phase: Combat damage
+- Hive of the Eye Tyrant dealt 3 damage to the opponent (now 10)
+- Phase: Main phase 2
+- You cast Soul Shatter
+- Opponent cast Fall of the Gavel
+- Your Soul Shatter was COUNTERED by Fall of the Gavel and went to your graveyard
+- Opponent gained 5 life (now 15)
+- Opponent's Fall of the Gavel resolved and went to the opponent's graveyard
+=== Turn 52 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 18)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Seachrome Coast
+- Opponent cast Emrakul, the Aeons Torn
+- Opponent's Emrakul, the Aeons Torn resolved and entered the battlefield
+- Phase: Main phase 2
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+=== Turn 53 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 17)
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 20)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent's Fall of the Gavel was put into the opponent's library from the opponent's graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Seachrome Coast
+- Phase: Blockers
+- You targeted Shineshadow Snarl #1 with Emrakul, the Aeons Torn's ability (Sacrifice)
+- You targeted Swamp #1 with Emrakul, the Aeons Torn's ability (Sacrifice)
+- You targeted Swamp #3 with Emrakul, the Aeons Torn's ability (Sacrifice)
+- You targeted Plains #1 with Emrakul, the Aeons Torn's ability (Sacrifice)
+- You targeted Brightclimb Pathway #1 with Emrakul, the Aeons Torn's ability (Sacrifice)
+- You targeted Plains #2 with Emrakul, the Aeons Torn's ability (Sacrifice)
+- You used: Sacrifice with Emrakul, the Aeons Torn targeting Shineshadow Snarl #1, Swamp #1, Swamp #3, Plains #1, Brightclimb Pathway #1, Plains #2
+- Your Shineshadow Snarl was put into your graveyard from the battlefield
+- Your Swamp was put into your graveyard from the battlefield
+- Your Swamp was put into your graveyard from the battlefield
+- Your Plains was put into your graveyard from the battlefield
+- Your Brightclimb Pathway was put into your graveyard from the battlefield
+- Your Plains was put into your graveyard from the battlefield
+- Phase: Combat damage
+- Emrakul, the Aeons Torn dealt 15 damage to you (now 2)
+=== Turn 54 - YOUR turn ===
+- Phase: Draw
+- You drew Acererak the Archlich
+- Phase: Main phase 1
+- You cast Acererak the Archlich
+- Opponent cast Fall of the Gavel
+- Your Acererak the Archlich was COUNTERED by Fall of the Gavel and went to your graveyard
+- Opponent gained 5 life (now 25)
+- Opponent's Fall of the Gavel resolved and went to the opponent's graveyard
+=== Turn 55 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Staff of Nin dealt 1 damage to you (now 1)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Blockers
+- You targeted Swamp #1 with Emrakul, the Aeons Torn's ability (Sacrifice)
+
+--- CURRENT SITUATION ---
+Phase: Blockers | It is the opponent's turn.
+Your life: 1 | Opponent life: 25
+Dungeons completed (you): 1 - effects that check "completed a dungeon" (e.g. a completed-dungeon anthem) are ACTIVE for you.
+Mana available: 6 total (six untapped sources, tapped automatically when you cast; colours you can make: {w}; mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Brightclimb Pathway #1 {w}; Plains #1 {w}; Plains #2 {w}; Plains #3 {w}; Plains #4 {w}; Brightclimb Pathway #2 {w}
+Your hand: Vanishing Verse (copy 1 of 3 in your hand) {b}{w} [instant]; Agadeem's Awakening {b}{b}{b}{x} [sorcery]; Vanishing Verse (copy 2 of 3 in your hand) {b}{w} [instant]; Silverquill Command (copy 1 of 2 in your hand) {2}{b}{w} [sorcery]; Vanishing Verse (copy 3 of 3 in your hand) {b}{w} [instant]; Silverquill Command (copy 2 of 2 in your hand) {2}{b}{w} [sorcery]
+Your battlefield (12 permanents listed, of which 0 are creatures): Swamp #1 [tapped]; Hive of the Eye Tyrant [tapped]; Shineshadow Snarl #1 [tapped]; Brightclimb Pathway #1; Shineshadow Snarl #2 [tapped]; Plains #1; Swamp #2 [tapped]; Plains #2-#4 x3; Shineshadow Snarl #3 [tapped]; Brightclimb Pathway #2
+Opponent battlefield (20 permanents listed, of which 1 is a creature): Tundra #1; Plains #1; Glacial Fortress #1; Plains #2; Plains #3; Island #1; Glacial Fortress #2; Island #2; Island #3; Plains #4; Island #4; Glacial Fortress #3; Island #5; Island #6; Tundra #2; Staff of Nin {6} [artifact] [tapped]; Island #7; Seachrome Coast #1; Emrakul, the Aeons Torn {15} (15/15) [flying, can't be countered, protection from colored spells] [tapped - attacking] [annihilator 6 - whenever it attacks, the defending player sacrifices 6 permanents]; Seachrome Coast #2
+Opponent hand size: 6 | Opponent library: 22 cards
+Artifacts in play: you 0 | opponent 1
+Your library: 19 cards
+
+YOUR PLAN (as you last stated it): Emrakul's Annihilator forces the sacrifice of 6 permanents. I must sacrifice 6 lands to survive the immediate loss. I have exactly 6 untapped/tapped lands available (Swamp #1, Hive, Shineshadow #1, Brightclimb #1, Shineshadow #2, Plains #1, Swamp #2, Plains #2, Plains #3, Plains #4, Shineshadow #3, Brightclimb #2 - wait, I need to pick 6). I will sacrifice the 6 lands listed in the prompt's first 6 options or any 6 lands. The prompt lists 12 options, I need to pick 6 cards to sacrifice. The prompt asks me to "Pick the card you can best AFFORD TO LOSE... Choose card 1 of exactly 6 from the list below". This phrasing is slightly ambiguous. It usually means "Select the cards you are sacrificing". Since I must sacrifice 6, and the interface asks for a single choice number for "SACRIFICE ONE OF YOUR OWN CARDS", this implies I am making one selection per sacrifice trigger? No, Annihilator 6 is a single triggered ability that sacrifices 6. The UI likely presents a list of all my permanents and asks me to choose 6. However, the instruction says "Pick the card you can best AFFORD TO LOSE... Choose card 1 of exactly 6 from the list below". This is a standard MTG GTC prompt format where I select the specific permanents. I will select the 6 least valuable lands. All are lands. I will sacrifice Swamp #1, Hive of the Eye Tyrant, Shineshadow Snarl #1, Brightclimb Pathway #1, Shineshadow Snarl #2, and Plains #1. Wait, the prompt only allows ONE CHOICE line. "Choose card 1 of exactly 6 from the list below". This likely means I need to output the choices for all 6 sacrifices.
+
+SACRIFICE ONE OF YOUR OWN CARDS: your own effect (Emrakul, the Aeons Torn) makes you sacrifice a card from the list below - each option is a card YOU will LOSE, NOT a target you attack or affect. Pick the card you can best AFFORD TO LOSE (usually your LEAST valuable: a spare land or a redundant/dead card; KEEP your best spells, answers, and threats). Choose card 2 of exactly 6 from the list below, and answer with the chosen card's name.
+1. Hive of the Eye Tyrant [land] [your battlefield] [tapped] - "If you control two or more other lands, Hive of the Eye Tyrant enters tapped. -- {T}: Add {B}. -- {3}{B}:..."
+2. Shineshadow Snarl #1 [land] [your battlefield] [tapped] - "As Shineshadow Snarl enters, you may reveal a Plains or Swamp card from your hand. If you don't, Shineshadow..."
+3. Brightclimb Pathway #1 [land] [your battlefield] - "{T}: Add {W}. // Grimclimb Pathway"
+4. Shineshadow Snarl #2 [land] [your battlefield] [tapped] - "As Shineshadow Snarl enters, you may reveal a Plains or Swamp card from your hand. If you don't, Shineshadow..."
+5. Plains #1 [land] [your battlefield] - "W"
+6. Swamp #2 [land] [your battlefield] [tapped] - "B"
+7. Plains #2 [land] [your battlefield] - "W"
+8. Plains #3 [land] [your battlefield] - "W"
+9. Plains #4 [land] [your battlefield] - "W"
+10. Shineshadow Snarl #3 [land] [your battlefield] [tapped] - "As Shineshadow Snarl enters, you may reveal a Plains or Swamp card from your hand. If you don't, Shineshadow..."
+11. Brightclimb Pathway #2 [land] [your battlefield] - "{T}: Add {W}. // Grimclimb Pathway"
+
+On the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 3 (Cast Example Card)" (a placeholder - copy a real number and short name from the list); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+
+# ---- MODEL REPLY ----
+CHOICE: 1 (Hive of the Eye Tyrant)
+PLAN: Sacrifice Hive of the Eye Tyrant (and the other 5 lands as required by the Annihilator 6 trigger, though the UI asks for one selection at a time, I am prioritizing the loss of the Hive which is already tapped and less useful than untapped basic lands for mana fixing). After surviving the sacrifice, I will attempt to cast a spell from hand if possible, but with only 1 life and no mana sources capable of producing Black (Swamps are tapped or sacrificed), I am in a dire position. The primary goal is to survive this turn. I have Vanishing Verse, Agadeem's Awakening, and Silverquill Command in hand. I cannot cast them due to lack of Black mana. I will wait for the next turn to see if I can draw a Swamp or untap a land. If I survive, I will try to cast Kaya or Lolth from graveyard if I can find a way, but currently, I am out of resources. The immediate action is to sacrifice the Hive. Note: The prompt implies I need to make 6 choices. I will provide the first choice here. The subsequent choices will be Plains #1, Swamp #2, Brightclimb Pathway #1, Shineshadow Snarl #2, and Shineshadow Snarl #3 (or similar low-value lands). Since I can only output one line, I will make the first choice. The game engine will likely prompt for the remaining 5 sacrifices in subsequent turns or steps, or I may need to output them if the interface allows. However, the instruction says "Write your reply... ONE line". This suggests I must make the choice for this specific prompt instance. I will sacrifice the Hive.
