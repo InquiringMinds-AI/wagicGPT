@@ -287,7 +287,7 @@ private:
     string describeDeckCards(Player * p, bool withCounts);
     string loadStrategyGuide();
 
-    string serializeGameState();
+    string serializeGameState(const std::string * optionText = NULL);
     //N-146k: the pregame (mulligan/bottoming/leyline) situation block. Hand only
     //- a pregame ask carries no board-state information at all.
     string serializePregameState();

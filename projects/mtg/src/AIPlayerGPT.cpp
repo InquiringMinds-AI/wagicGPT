@@ -361,6 +361,78 @@ size_t boardEffectSnippetLen(size_t distinctNames)
     return 55;
 }
 
+//#W47 (R6, wave-46 HIGH; Sorin, Lord of Innistrad x81 windows, Lolth x83, Ob
+//Nixilis x18, Teferi x32, Kaya x8, Ranger Class x34, Lightning Greaves x72):
+//the budget above is width-aware but not SHAPE-aware, and a planeswalker's
+//rules text is a LIST of loyalty abilities joined by " -- ". One flat truncate
+//therefore always cuts the same end off - the LAST clause, which on a
+//planeswalker is the ULTIMATE, the class of fact that decides late games.
+//Nothing false was ever printed (the cut is visible, "..."), it was simply
+//always the wrong half: Sorin rendered "-2: You get an emblem with "Creatures
+//you control get..." and the -6 was gone in all 81 windows.
+//So budget PER CLAUSE, and spend the LAST clause's allowance FIRST so it can
+//never be the one that falls off. Bounded on purpose: the whole tag may cost at
+//most kBoardEffectClauseFactor x the width tier (the corpus holds text= lines of
+//24 clauses and 900 chars, which an unbounded per-clause budget would let onto a
+//board line), and when the allowance runs out mid-list the number of clauses not
+//shown is STATED - a counted omission, not a silent one. A text with no " -- "
+//takes the old path byte for byte.
+const size_t kBoardEffectClauseFactor = 2;
+const size_t kBoardEffectClauseFloor = 40; //below this a clause is a dangling marker
+
+string boardEffectSnippet(const string& raw, size_t maxLen)
+{
+    string flat = raw;
+    for (size_t i = 0; i < flat.size(); i++)
+        if (flat[i] == '\n')
+            flat[i] = ' ';
+    vector<string> parts;
+    {
+        const string sep = " -- ";
+        size_t at = 0;
+        for (;;)
+        {
+            size_t k = flat.find(sep, at);
+            if (k == string::npos)
+            {
+                parts.push_back(flat.substr(at));
+                break;
+            }
+            parts.push_back(flat.substr(at, k - at));
+            at = k + sep.size();
+        }
+    }
+    if (parts.size() < 2 || flat.size() <= maxLen)
+        return textSnippetCore(flat, maxLen); //single clause, or it all fits
+    const string last = textSnippetCore(parts[parts.size() - 1], maxLen);
+    size_t budget = maxLen * kBoardEffectClauseFactor;
+    budget = budget > last.size() ? budget - last.size() : 0;
+    std::ostringstream head;
+    size_t shown = 0;
+    for (size_t i = 0; i + 1 < parts.size(); i++)
+    {
+        if (budget < kBoardEffectClauseFloor)
+            break;
+        size_t left = parts.size() - 1 - i;
+        size_t per = budget / left;
+        if (per < kBoardEffectClauseFloor)
+            per = kBoardEffectClauseFloor;
+        string one = textSnippetCore(parts[i], per);
+        head << (shown ? " -- " : "") << one;
+        budget = budget > one.size() + 4 ? budget - one.size() - 4 : 0;
+        shown++;
+    }
+    std::ostringstream o;
+    if (shown)
+        o << head.str() << " -- ";
+    size_t skipped = parts.size() - 1 - shown;
+    if (skipped)
+        o << "[" << skipped << " more clause" << (skipped == 1 ? "" : "s")
+          << " of this card's text not shown] -- ";
+    o << last;
+    return o.str();
+}
+
 //The emitted clause. `moreCopies` is true when this battlefield holds more than
 //one permanent of this name: the clause rides the FIRST copy only, and says so,
 //so a later untagged copy reads as "same card" and not as "this one is inert"
@@ -2082,12 +2154,58 @@ static string stackAbilityName(const string& sourceName, const string& menuText)
     return "an ability whose source the engine can no longer name";
 }
 
-static string battlefieldHeaderText(bool mine, int permanents, int creatures)
+//#W47 (R14a): whether this creature carries a STATIC restriction against
+//attacking - the subset of MTGCardInstance::canAttack()'s refusals that does
+//not depend on the moment (tapped, summoning-sick and "is it in play" are
+//deliberately NOT here: on the seat whose turn it is not, those are true of
+//every creature they control and say nothing about the attack that is coming).
+//Pure so PARSETEST can prove every branch without a board.
+static bool attackRestrictionFree(bool cantAttack, bool defenderWithoutOverride,
+                                  bool flyersOnlyWithoutFlying, bool isBattle)
+{
+    return !(cantAttack || defenderWithoutOverride || flyersOnlyWithoutFlying || isBattle);
+}
+
+//#W47 (R14a): the header's per-creature test. `live` is true only on the board
+//of the player whose turn it is, and there the ENGINE's own canAttack() answers
+//(no re-derivation); elsewhere only the static half above is asked.
+static bool boardCreatureCanAttackNow(MTGCardInstance * c, bool live)
+{
+    if (!c || !c->isCreature())
+        return false;
+    if (live)
+        return c->canAttack() != 0;
+    return attackRestrictionFree(c->has(Constants::CANTATTACK) != 0,
+                                 c->has(Constants::DEFENSER) && !c->has(Constants::CANATTACK),
+                                 c->has(Constants::FLYERSONLY) && !c->has(Constants::FLYING),
+                                 c->hasType(Subtypes::TYPE_BATTLE) != 0);
+}
+
+//#W47 (R14a, wave-46 MED): the header stated the creature COUNT and every
+//control guide in the pool then told the pilot to look down the list and work
+//out how many of them can actually come at it - deck125 spent a Supreme Verdict
+//on a board of two WALLS twice this wave, reading "of which 2 are creatures".
+//The engine has the answer at this call site, so it states it. The count is
+//SCOPED, because "able to attack" means two different true things on the two
+//boards (N-166f's rung): on the board of the player whose turn it is, the live
+//engine predicate (canAttack(): tapped, summoning sickness and every printed
+//restriction) answers "right now"; on the other board only the static
+//restrictions are knowable, so that number is stated as what it is - a count of
+//creatures with no restriction against attacking - and claims nothing about
+//their next turn. `ableToAttack` < 0 omits the clause entirely (a count the
+//caller could not compute is not guessed at).
+static string battlefieldHeaderText(bool mine, int permanents, int creatures,
+                                    int ableToAttack = -1, bool liveScope = true)
 {
     std::ostringstream o;
     o << (mine ? "Your" : "Opponent") << " battlefield (" << permanents
       << " permanent" << (permanents == 1 ? "" : "s") << " listed, of which "
-      << creatures << (creatures == 1 ? " is a creature" : " are creatures") << "): ";
+      << creatures << (creatures == 1 ? " is a creature" : " are creatures");
+    if (ableToAttack >= 0)
+        o << ", " << ableToAttack << " of them "
+          << (liveScope ? "able to attack right now"
+                        : "without a restriction against attacking");
+    o << "): ";
     return o.str();
 }
 
@@ -2554,6 +2672,124 @@ static string perColorSourceCountClause(const std::vector<std::string>& perSourc
     return " (sources that can make each: " + o.str() + " - counted the same way as"
            " the total above: one per SOURCE, and a source that makes several colours is"
            " counted under EACH of them, so these need not add up to the total)";
+}
+
+//#W47 (R14b, wave-46 MED): every tap-out rule in every guide is a SUBTRACTION
+//the pilot performs off the mana line ("hold up 4 of 7", "cast only down to
+//3"), and deck125's has been re-written three waves running (6/11, 3-4/7, 4/7)
+//because the number it wants is the one the engine already computed when it
+//decided this row was affordable. State the remainder ON the row. Deliberately
+//a COUNT and not a boolean "you will tap out" warning: a proxy for a number is
+//the defect class this docket is retiring, not a shorthand for it. The M is
+//printed beside the N so the row cannot be read against a different total than
+//the mana line's.
+static string leavesUntappedTag(int untappedSources, int sourcesUsed)
+{
+    if (untappedSources <= 0)
+        return ""; //nothing untapped to leave: the mana line already says so
+    int left = untappedSources - sourcesUsed;
+    if (left < 0)
+        left = 0;
+    std::ostringstream o;
+    o << " {leaves " << left << " of your " << untappedSources << " untapped mana source"
+      << (untappedSources == 1 ? "" : "s") << " untapped";
+    if (left == 0)
+        o << " - casting this taps you out";
+    o << "}";
+    return o.str();
+}
+
+//#W47 (R10, wave-46 MED, 18 emissions at one seat pair): the clause is called
+//"colours you can make" and a COLOURLESS source was reaching it under two
+//spellings that are not colours - `{1}` in the aggregate and `{x}` in the
+//per-source sub-list - and the SAME card rendered `{x}` in one window and `{c}`
+//in a later window of the same game. The flip is now traced: a colourless mana
+//ability's output lives in the MTG_COLOR_ARTIFACT slot (index 0, whose
+//Constants::MTGColorChars entry is 'x', and which ManaCost::toString prints as
+//a bare COUNT), but ManaPool::add REWRITES the cost handed to it from
+//MTG_COLOR_ARTIFACT to MTG_COLOR_WASTE (index 6, char 'c') - and
+//AManaProducer::resolve hands it the ability's OWN `output`, so the first time
+//the source is actually tapped its output is permanently re-slotted and every
+//later render of that same card says `{c}`.
+//Neither the char table nor ManaCost::toString is touched: index 0's 'x' is
+//read back as a colour index by ManaCost's own cost parser and by WFilter, and
+//toString's bare count is the correct rendering of a GENERIC cost ({3} must
+//stay {3}) - the defect is that a payment-side slot distinction reached a
+//surface that asks a colour question. So the SET is rendered here, from the
+//slots, with both colourless slots printing the one symbol `{c}`, last and once.
+//Pure core (the slot indices the potential holds), so both spellings of the
+//same board are provable in PARSETEST without a ManaCost - whose backing vector
+//is sized from Constants::NB_Colors, a value the game app fills in at startup.
+static string manaColourSetSymbols(const vector<int>& slots)
+{
+    std::ostringstream o;
+    bool colourless = false;
+    for (size_t k = 0; k < slots.size(); k++)
+    {
+        const int i = slots[k];
+        if (i == Constants::MTG_COLOR_ARTIFACT || i == Constants::MTG_COLOR_WASTE)
+        {
+            colourless = true; //both slots mean the same thing to a caster
+            continue;
+        }
+        if (i < 0 || i >= Constants::MTG_NB_COLORS)
+            continue;
+        o << "{" << Constants::MTGColorChars[i] << "}";
+    }
+    string s = o.str();
+    if (colourless)
+        s += "{c}"; //after the colours, so the set reads the same in both windows
+    return s;
+}
+
+static string manaColourSetText(ManaCost * potential)
+{
+    if (!potential)
+        return "";
+    vector<int> slots;
+    for (int i = 0; i < Constants::NB_Colors; i++)
+        if (potential->getCost(i))
+            slots.push_back(i);
+    return manaColourSetSymbols(slots);
+}
+
+//#W47 (R10), the sub-list half: the per-source strings come from the same two
+//slots ("{x} or {r} or {g}" / "{c} or {r} or {g}" for one Talisman of Impulse),
+//so one vocabulary is imposed on them too, and a source that ends up naming
+//both slots says the colourless option ONCE.
+static string manaSourceColoursText(const string& raw)
+{
+    vector<string> parts;
+    {
+        const string sep = " or ";
+        size_t at = 0;
+        for (;;)
+        {
+            size_t k = raw.find(sep, at);
+            if (k == string::npos)
+            {
+                parts.push_back(raw.substr(at));
+                break;
+            }
+            parts.push_back(raw.substr(at, k - at));
+            at = k + sep.size();
+        }
+    }
+    std::ostringstream o;
+    vector<string> kept;
+    for (size_t i = 0; i < parts.size(); i++)
+    {
+        string one = (parts[i] == "{x}") ? string("{c}") : parts[i];
+        bool dup = false;
+        for (size_t k = 0; k < kept.size(); k++)
+            if (kept[k] == one)
+                dup = true;
+        if (dup)
+            continue;
+        o << (kept.empty() ? "" : " or ") << one;
+        kept.push_back(one);
+    }
+    return o.str();
 }
 
 static string manaAvailableLine(int sources, const string& colors, const string& sourceList,
@@ -3062,8 +3298,69 @@ string joinZoneEntries(const vector<string>& names, const vector<string>& handle
     return o.str();
 }
 
+//#W47 (R8): the blockers screen's own ranged collapse - joinZoneEntries' rule,
+//applied to the B-rows. Same three tests for a run (identical NAME, identical
+//fact tail byte-for-byte, CONSECUTIVE handle ranks), so no member is ever
+//described by a fact that is not its own, and both ranges - the B labels and the
+//instance handles - are printed in full rather than dropped. PURE, so both the
+//merge and the must-NOT-merge cases are provable without a combat.
+const char * kBlockerRangeNote =
+    "A B-row whose label is a RANGE (\"B4-B9\") is that many SEPARATE creatures"
+    " whose rows were identical, printed once. Every label in the range is a real,"
+    " distinct blocker you can assign: B4 is the first creature of the printed"
+    " handle range, B5 the next, and so on to the last. Name them one at a time"
+    " exactly as you would any other B#.\n";
+
+string joinBlockerRows(const vector<string>& names, const vector<string>& handles,
+                       const vector<string>& rests, bool * rangeUsed)
+{
+    if (rangeUsed)
+        *rangeUsed = false;
+    std::ostringstream o;
+    size_t i = 0;
+    while (i < rests.size())
+    {
+        size_t j = i + 1;
+        int rank = handleRank(handles[i]);
+        if (rank > 0)
+            while (j < rests.size() && names[j] == names[i] && rests[j] == rests[i]
+                   && handleRank(handles[j]) == rank + (int) (j - i))
+                j++;
+        size_t run = j - i;
+        if (rank > 0 && run >= kBattlefieldCollapseFloor)
+        {
+            o << "B" << (i + 1) << "-B" << j << ". " << names[i]
+              << " #" << rank << "-#" << (rank + (int) run - 1)
+              << rests[i] << " x" << run << "\n";
+            if (rangeUsed)
+                *rangeUsed = true;
+            i = j;
+        }
+        else
+        {
+            //run too short, or the handles are not contiguous: this one row,
+            //and re-scan from the next so a gap never swallows what follows
+            o << "B" << (i + 1) << ". " << names[i] << handles[i] << rests[i] << "\n";
+            i++;
+        }
+    }
+    return o.str();
+}
+
+//#W47 (R7): does THIS window's option block already speak for the permanent
+//`name`? Substring, on the rendered option text: a permanent whose ability is on
+//the menu carries its text on that row, and the only thing this can cost is a
+//gloss that was going to be printed twice.
+bool optionRowMentions(const string& optionText, const string& name)
+{
+    return !name.empty() && optionText.find(name) != string::npos;
+}
+
+//#W47 (R7): `effectSkip` names the permanents this window already explains in
+//an OPTION row - see the own-battlefield call site. NULL suppresses nothing.
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus,
-                       const char * copyScope = "your hand", bool effectText = false)
+                       const char * copyScope = "your hand", bool effectText = false,
+                       const std::set<string> * effectSkip = NULL)
 {
     vector<string> entNames, entHandles, entTails;
     //#W46-3 pre-pass: how many DISTINCT effect-bearing names this line will
@@ -3081,6 +3378,11 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 continue;
             if (!boardEffectTextEligible(c->isCreature() != 0, c->isLand() != 0,
                                          c->magicText, c->text))
+                continue;
+            //#W47 (R7): a permanent whose ability is offered as a CHOICE this
+            //window already carries its text on that row; skipped before the
+            //budget is taken so it does not shrink the clauses that remain.
+            if (effectSkip && effectSkip->find(c->getDisplayName()) != effectSkip->end())
                 continue;
             effectCopies[c->getDisplayName()]++;
         }
@@ -3338,7 +3640,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 string nm = card->getDisplayName();
                 std::map<string, int>::iterator ec = effectCopies.find(nm);
                 if (ec != effectCopies.end() && effectDone[nm]++ == 0)
-                    out << boardEffectTag(textSnippetCore(card->text, effectLen),
+                    out << boardEffectTag(boardEffectSnippet(card->text, effectLen),
                                           ec->second > 1);
             }
         }
@@ -7379,7 +7681,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
     if (pregame)
         u << "--- YOUR OPENING HAND ---\n" << serializePregameState();
     else
-        u << "--- CURRENT SITUATION ---\n" << serializeGameState();
+        u << "--- CURRENT SITUATION ---\n" << serializeGameState(&tail);
     //#W47-R9b (wave-46 docket R9; extends the N-146k owner directive of
     //2026-07-27 that pregame asks get the HAND and nothing else): the carried
     //plan is the last board-scoped sentence still reaching the pre-game asks,
@@ -8920,7 +9222,11 @@ static string converterSituationLine(Player * me, Player * opp)
     return converterSummaryText(mineConv, theirsConv);
 }
 
-string AIPlayerGPT::serializeGameState()
+//#W47 (R7): `optionText` is THIS window's option block (assemblePrompt hands it
+//down; the board-hash callers pass nothing). It is read for one purpose - to
+//tell a permanent that already explains itself on an option row from one that
+//does not - and never rendered.
+string AIPlayerGPT::serializeGameState(const std::string * optionText)
 {
     std::ostringstream out;
     Player * opp = this->opponent();
@@ -9048,7 +9354,8 @@ string AIPlayerGPT::serializeGameState()
     ManaCost * potential = NEW ManaCost();
     vector<ManaEngine::ManaSourceView> manaSources;
     int sources = ManaEngine::potentialColorReach(this, manaReachPolicy, potential, &manaSources);
-    string colors = potential->toString();
+    //#W47 (R10): the colour SET, not ManaCost::toString's payment rendering.
+    string colors = manaColourSetText(potential);
     SAFE_DELETE(potential);
     //N-166k (wave-34 audit b1 F-10 / b3 F1 / b4 F5): the colour set had NO
     //source attribution, and an unattributed fact is one the model supplies a
@@ -9067,11 +9374,14 @@ string AIPlayerGPT::serializeGameState()
         std::ostringstream s;
         for (size_t i = 0; i < manaSources.size(); i++)
         {
-            perSourceColors.push_back(manaSources[i].colors);
+            //#W47 (R10): one vocabulary for the colourless slot, in the
+            //sub-list and in the count clause that aggregates it.
+            const string srcColors = manaSourceColoursText(manaSources[i].colors);
+            perSourceColors.push_back(srcColors);
             s << (i ? "; " : "") << manaSources[i].card->getDisplayName()
               << instanceHandle(manaSources[i].card);
-            if (!manaSources[i].colors.empty())
-                s << " " << manaSources[i].colors;
+            if (!srcColors.empty())
+                s << " " << srcColors;
             if (manaSources[i].variable)
                 s << " (VARIABLE output: this ONE source adds more than one mana - its"
                      " amount is a count, read its own rules text; the total above counts"
@@ -9170,6 +9480,11 @@ string AIPlayerGPT::serializeGameState()
     //the header cannot contradict the list underneath it (a mutated-down card
     //folds into its pile's single line and must not be counted twice).
     int myCreatures = 0, oppCreatures = 0, myPermanents = 0, oppPermanents = 0;
+    //#W47 (R14a): the same pass counts how many of those creatures can attack.
+    //Live predicate on the active player's board, static restrictions on the
+    //other one - see battlefieldHeaderText for why the two differ.
+    int myCanAttack = 0, oppCanAttack = 0;
+    Player * activeSeat = observer ? observer->currentPlayer : NULL;
     for (int i = 0; i < game->inPlay->nb_cards; i++)
     {
         MTGCardInstance * c = game->inPlay->cards[i];
@@ -9182,7 +9497,11 @@ string AIPlayerGPT::serializeGameState()
             continue;
         myPermanents++;
         if (c->isCreature())
+        {
             myCreatures++;
+            if (boardCreatureCanAttackNow(c, activeSeat == this))
+                myCanAttack++;
+        }
     }
     if (opp)
         for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
@@ -9194,13 +9513,40 @@ string AIPlayerGPT::serializeGameState()
                 continue;
             oppPermanents++;
             if (c->isCreature())
+            {
                 oppCreatures++;
+                if (boardCreatureCanAttackNow(c, activeSeat == opp))
+                    oppCanAttack++;
+            }
         }
-    out << "\n" << battlefieldHeaderText(true, myPermanents, myCreatures);
-    describeZoneCards(out, game->inPlay, true);
+    //#W47 (R7, wave-46 HIGH): `{effect:}` reached exactly one battlefield - the
+    //OPPONENT's - so deck126's own Sanguine Bond, Exquisite Blood and Staff of
+    //Nin rendered as bare names in the same prompt that glossed the opponent's
+    //Intruder Alarm in full, and the seat re-derived its own assembled combo
+    //from memory in the PLAN field every window of that game (seq 41). The
+    //owner of a combo has to reason about it too. Same class as the opponent
+    //side (non-creature, non-land, has a script and printed text), minus the
+    //permanents this window ALREADY explains in an option row: a permanent
+    //whose ability is on the menu carries its text there, and paying for it
+    //twice is the only cost this rule can add.
+    std::set<string> ownEffectSkip;
+    if (optionText)
+        for (int i = 0; i < game->inPlay->nb_cards; i++)
+        {
+            MTGCardInstance * c = game->inPlay->cards[i];
+            if (!c)
+                continue;
+            const string nm = c->getDisplayName();
+            if (optionRowMentions(*optionText, nm))
+                ownEffectSkip.insert(nm);
+        }
+    out << "\n" << battlefieldHeaderText(true, myPermanents, myCreatures, myCanAttack,
+                                         activeSeat == this);
+    describeZoneCards(out, game->inPlay, true, "your hand", true, &ownEffectSkip);
     if (opp)
     {
-        out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures);
+        out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures, oppCanAttack,
+                                             activeSeat == opp);
         //#W46-3: the opponent's non-creature permanents carry what they DO.
         describeZoneCards(out, opp->game->inPlay, true, "your hand", true);
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
@@ -9435,6 +9781,10 @@ static string stripNarrationDecoration(const string& in)
             //text are the same species as {right now: ...} - decision-time
             //surfaces, re-served on every prompt for the rest of the game if
             //they enter history. Same gate, same reason.
+            //#W47 (R14b): the cast row's "{leaves N of your M ...}" remainder is
+            //the same species again - it is true of the board at the moment of
+            //the offer and false the moment the cast resolves, so it decides,
+            //it does not record.
             //#W47-R4: the last-offer clause is the same species again - a fact
             //about THIS window's offer allowance, true only while the window is
             //open. It is rendered onto the prompt line and never onto the option
@@ -9442,7 +9792,8 @@ static string stripNarrationDecoration(const string& in)
             //route; listed here so it cannot reach it by an abnormal one either.
             drop = (in.compare(i, 12, "{card text: ") == 0) || (in.compare(i, 12, "{right now: ") == 0)
                 || (in.compare(i, 12, "{X pricing: ") == 0) || (in.compare(i, 14, "{target text: ") == 0)
-                || (in.compare(i, 19, "{if you pass here, ") == 0);
+                || (in.compare(i, 19, "{if you pass here, ") == 0)
+                || (in.compare(i, 8, "{leaves ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -12221,6 +12572,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         mStuckCastLines.clear();
         mStuckCastTurn = observer->turn;
     }
+    //#W47 (R14b): the untapped-source TOTAL this window, counted once by the
+    //same engine call the "Mana available:" line counts with, so the row's
+    //remainder and the line's total can never disagree.
+    int untappedSources = ManaEngine::potentialColorReach(this, policy, NULL);
     string boardNow = serializeGameState();
     if (!mLastCastLine.empty())
     {
@@ -12298,6 +12653,35 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 if (!advText.empty())
                     o << " {adventure spell: " << advText << "}";
             }
+        }
+        //#W47 (R14b): what this cast LEAVES UP, from the engine's own auto-tap
+        //plan for this exact cost (ManaEngine::selectAutoTapProducers - the
+        //producers the payment will really activate, pool-aware, no clicks).
+        //Counted per SOURCE CARD, matching the mana line's counting rule, so a
+        //dual scripted as two abilities is one source here too.
+        {
+            ManaCost * payCost = casts[ci].viaAlternative && cost
+                                 ? cost->getAlternative() : cost;
+            //An {X} cost has no remainder yet: X is announced AFTER this pick
+            //(the {X pricing:} block above is where that window is priced), so
+            //any number printed here would be about a payment the pilot has not
+            //made. Print nothing rather than a figure that goes stale one
+            //decision later.
+            if (payCost && (payCost->hasX() || payCost->hasSpecificX()))
+                payCost = NULL; //hasX() alone answers 0 for a {X:colour} cost
+            int used = 0;
+            if (payCost)
+            {
+                vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
+                    this, card, payCost, card->has(Constants::ANYTYPEOFMANA));
+                std::set<MTGCardInstance *> tapped;
+                for (size_t pi = 0; pi < picks.size(); pi++)
+                    if (picks[pi] && picks[pi]->source)
+                        tapped.insert(picks[pi]->source);
+                used = (int) tapped.size();
+            }
+            if (payCost)
+                o << leavesUntappedTag(untappedSources, used);
         }
         //A response option offered because of pending stack objects names what
         //it can hit ("Cast Counterspell {u}{u} - can target on the stack:
@@ -17085,11 +17469,18 @@ int AIPlayerGPT::chooseBlockers()
         bbKind[j] = becomesBlockedSelfPump(attackers[j]->text, bbP[j], bbT[j]);
     tail << "Your available blockers (with, for each attacker it may block, the"
             " naive 1-on-1 trade - before other blockers, pump or combat tricks):\n";
+    //#W47 (R8, wave-46 HIGH): the B-rows are built into three parts - name,
+    //instance handle, and the whole fact tail - so the emitter below can collapse
+    //a RUN of rows that agree in every rendered fact, exactly as the battlefield
+    //line five lines above already collapses the same bodies. deck123 vs130 seq
+    //55 was 16,887 chars of which 2,887 were 22 B-rows, 21 of them differing only
+    //in a #N handle and all reading the identical trade; blockers was the one
+    //decision kind that got both bigger and slower this wave.
+    vector<string> rowName, rowHandle, rowRest;
     for (size_t i = 0; i < blockers.size(); i++)
     {
         std::ostringstream ln;
-        ln << "B" << (i + 1) << ". " << blockers[i]->name << instanceHandle(blockers[i])
-           << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ")";
+        ln << " (" << blockers[i]->power << "/" << blockers[i]->toughness << ")";
         string kw = keywordList(blockers[i]);
         if (!kw.empty())
             ln << " [" << kw << "]";
@@ -17186,9 +17577,29 @@ int AIPlayerGPT::chooseBlockers()
                     if (!trade.empty())
                         ln << " (" << trade << ")";
                 }
-        shownLines.push_back(ln.str());
-        tail << ln.str() << "\n";
+        rowName.push_back(blockers[i]->name);
+        rowHandle.push_back(instanceHandle(blockers[i]));
+        rowRest.push_back(ln.str());
+        //The TRANSLOG keeps one entry per option, uncollapsed: it is the
+        //ordered option list, not the rendered prompt.
+        {
+            std::ostringstream full;
+            full << "B" << (i + 1) << ". " << rowName[i] << rowHandle[i] << rowRest[i];
+            shownLines.push_back(full.str());
+        }
     }
+    //#W47 (R8): the collapse. Same rule as joinZoneEntries - a run must agree in
+    //NAME, in the whole fact tail byte-for-byte, and hold CONSECUTIVE handle
+    //ranks, so any difference (a counter, a keyword, a different trade against
+    //any attacker) splits the run and no member is ever described by a fact that
+    //is not its own. Nothing is deleted: both ranges are printed in full, the
+    //count rides the row, and the note below states that every label inside the
+    //range is still individually nameable - the reply grammar reads B# labels,
+    //which are unchanged, so a collapsed row cannot narrow what is legal.
+    bool anyBlockerRangeRow = false;
+    tail << joinBlockerRows(rowName, rowHandle, rowRest, &anyBlockerRangeRow);
+    if (anyBlockerRangeRow)
+        tail << kBlockerRangeNote;
     //W36 #1: the trade-trust rule, at the tail for salience (see the constant).
     tail << kBlockTradeTrustNote;
     //#W46-5 SCOPE, stated once rather than on every line - the mirror of the
@@ -26836,6 +27247,268 @@ void AIPlayerGPT::runParseSelfTest()
                   "#W47-R15 echo: a bare 'X = 5' binds to its index with the preview present");
             CHECK(stripNarrationDecoration(xr[5]) == "X = 0",
                   "#W47-R15 echo: the null-cast callout leaves no residue in the narrated record");
+    }
+    }
+
+    // ---- #W47-R6: the {effect:} budget is spent PER CLAUSE, and the last one lives ----
+    cout << "\n[#W47-R6] planeswalker text: budget per loyalty ability, ultimate kept\n";
+    {
+        const string lolth =
+            "Whenever a creature you control dies, put a loyalty counter on Lolth, Spider Queen."
+            " -- 0: You draw a card and you lose 1 life."
+            " -- -3: Create two 2/1 black Spider creature tokens with menace and reach."
+            " -- -8: You get an emblem with \"Whenever an opponent is dealt combat damage by one"
+            " or more creatures you control, if that player lost less than 8 life this turn,"
+            " they lose life equal to the difference.\"";
+        string flat = textSnippetCore(lolth, 140);
+        // The DEFECT, restated as a test: the old one-flat-truncate path drops the ultimate.
+        CHECK(flat.find("-8:") == string::npos,
+              "#W47-R6 REPRO the flat truncate at the same width loses the -8 entirely");
+        string fixed = boardEffectSnippet(lolth, 140);
+        CHECK(fixed.find("-8: You get an emblem") != string::npos,
+              "#W47-R6 the ultimate clause is rendered");
+        CHECK(fixed.find("Whenever a creature you control dies") != string::npos
+              && fixed.find("0: You draw a card") != string::npos
+              && fixed.find("-3: Create two") != string::npos,
+              "#W47-R6 every earlier loyalty ability is still on the line");
+        CHECK(fixed.size() <= 140 * kBoardEffectClauseFactor + 32,
+              "#W47-R6 the whole tag stays inside the per-clause allowance");
+        // NEGATIVE: no clause may end as a bare loyalty marker with nothing after it.
+        CHECK(fixed.find("-8: ...") == string::npos && fixed.find("-3: ...") == string::npos
+              && fixed.find("-8:...") == string::npos,
+              "#W47-R6 NEGATIVE no clause is cut to a dangling loyalty marker");
+        // A one-clause text takes the old path byte for byte.
+        const string bond = "Whenever you gain life, target opponent loses that much life.";
+        CHECK(boardEffectSnippet(bond, 140) == textSnippetCore(bond, 140),
+              "#W47-R6 a text with no ' -- ' is unchanged");
+        CHECK(boardEffectSnippet(lolth, 4000) == textSnippetCore(lolth, 4000),
+              "#W47-R6 a text that fits whole takes the plain path");
+        // A very long list is BOUNDED, and what it could not print is COUNTED.
+        {
+            string many;
+            for (int k = 0; k < 24; k++)
+            {
+                std::ostringstream c;
+                c << (k ? " -- " : "") << "clause " << k
+                  << ": a sentence of ordinary length that describes an ability";
+                many += c.str();
+            }
+            string wide = boardEffectSnippet(many, 55);
+            CHECK(wide.size() <= 55 * kBoardEffectClauseFactor + 64,
+                  "#W47-R6 a 24-clause text cannot run away with the board line");
+            CHECK(wide.find("clause 23:") != string::npos,
+                  "#W47-R6 the LAST clause survives even at the narrowest tier");
+            CHECK(wide.find("more clauses of this card's text not shown") != string::npos,
+                  "#W47-R6 what did not fit is COUNTED, never silently dropped");
+        }
+        // The tag it rides in is unchanged in shape.
+        string tag = boardEffectTag(boardEffectSnippet(lolth, 140), false);
+        CHECK(tag.find("{effect: \"") == 0 || tag.find(" {effect: \"") == 0,
+              "#W47-R6 the clause still ships inside the existing {effect: \"...\"} tag");
+    }
+
+    // ---- #W47-R7: the own-side {effect:} skip is the option block, not a card class ----
+    cout << "\n[#W47-R7] own permanents get {effect:} unless this window already offers them\n";
+    {
+        const string opts = "1. Use ability of Staff of Nin #1 - deals 1 damage\n2. Cast nothing\n";
+        CHECK(optionRowMentions(opts, "Staff of Nin"),
+              "#W47-R7 a permanent on the menu is recognised as already explained");
+        CHECK(!optionRowMentions(opts, "Sanguine Bond"),
+              "#W47-R7 NEGATIVE a permanent with no option row is NOT skipped");
+        CHECK(!optionRowMentions(opts, ""),
+              "#W47-R7 NEGATIVE an empty name never matches");
+        CHECK(!optionRowMentions("", "Sanguine Bond"),
+              "#W47-R7 NEGATIVE an empty option block skips nothing");
+        // The class itself is unchanged: still non-creature, non-land, scripted, with text.
+        CHECK(boardEffectTextEligible(false, false, "@each my upkeep:draw:1",
+                                      "Draw a card at the beginning of your upkeep."),
+              "#W47-R7 the eligible class is the same one the opponent side uses");
+    }
+
+    // ---- #W47-R8: the blockers screen collapses identical B-rows into a range ----
+    cout << "\n[#W47-R8] blockers rows: ranged collapse, every label still nameable\n";
+    {
+        vector<string> nm, hd, rs;
+        const string vampRest = " (4/4) [flying] - may block A1 (your blocker dies, attacker lives)";
+        nm.push_back("Lord of Lineage"); hd.push_back(" #1");
+        rs.push_back(" (5/5) [flying] - may block A1 (both die)");
+        for (int k = 1; k <= 21; k++)
+        {
+            std::ostringstream h; h << " #" << k;
+            nm.push_back("Vampire"); hd.push_back(h.str()); rs.push_back(vampRest);
+        }
+        bool ranged = false;
+        string rows = joinBlockerRows(nm, hd, rs, &ranged);
+        CHECK(ranged, "#W47-R8 a run of 21 identical rows collapses");
+        CHECK(rows.find("B1. Lord of Lineage #1 (5/5)") != string::npos,
+              "#W47-R8 the row that differs keeps its own line and its own label");
+        CHECK(rows.find("B2-B22. Vampire #1-#21" + vampRest + " x21") != string::npos,
+              "#W47-R8 the identical run prints ONE row carrying both ranges and the count");
+        CHECK(rows.find("\nB7.") == string::npos && rows.find("B7. Vampire") == string::npos
+              && rows.find("\nB22.") == string::npos,
+              "#W47-R8 NEGATIVE the 21 individual rows are gone from the prompt");
+        {
+            size_t lines = 0;
+            for (size_t k = 0; k < rows.size(); k++)
+                if (rows[k] == '\n')
+                    lines++;
+            CHECK(lines == 2, "#W47-R8 22 rows render as 2 lines");
+        }
+        // MUST NOT MERGE: any difference in the fact tail, the name, or the handle run.
+        {
+            vector<string> n2(nm), h2(hd), r2(rs);
+            r2[3] = " (4/4) [flying] - may block A1 (both die)"; //one different trade
+            bool rg2 = false;
+            string rows2 = joinBlockerRows(n2, h2, r2, &rg2);
+            CHECK(rows2.find("B4. Vampire #3") != string::npos,
+                  "#W47-R8 NEGATIVE a differing trade splits the run and keeps its own row");
+            CHECK(rows2.find("B2. Vampire #1") != string::npos
+                  && rows2.find("B3. Vampire #2") != string::npos
+                  && rows2.find("B5-B22. Vampire #4-#21") != string::npos,
+                  "#W47-R8 the split's short side falls below the floor and prints one row each");
+        }
+        {
+            vector<string> n3(nm), h3(hd), r3(rs);
+            h3[5] = " #99"; //handles no longer consecutive
+            bool rg3 = false;
+            string rows3 = joinBlockerRows(n3, h3, r3, &rg3);
+            CHECK(rows3.find("B6. Vampire #99") != string::npos,
+                  "#W47-R8 NEGATIVE a non-consecutive handle is never swallowed by a range");
+        }
+        {
+            vector<string> n4, h4, r4;
+            for (int k = 1; k <= 2; k++)
+            {
+                std::ostringstream h; h << " #" << k;
+                n4.push_back("Vampire"); h4.push_back(h.str()); r4.push_back(vampRest);
+            }
+            bool rg4 = false;
+            string rows4 = joinBlockerRows(n4, h4, r4, &rg4);
+            CHECK(!rg4 && rows4.find("B1. Vampire #1") != string::npos
+                  && rows4.find("B2. Vampire #2") != string::npos,
+                  "#W47-R8 NEGATIVE a run below the collapse floor stays one row per creature");
+        }
+        // LEGALITY: the reply grammar reads B# labels, which the collapse does not touch.
+        {
+            vector<string> atk; atk.push_back("Rorix Bladewing");
+            vector<string> blk;
+            blk.push_back("Lord of Lineage");
+            for (int k = 0; k < 21; k++) blk.push_back("Vampire");
+            vector<int> assign;
+            int n = parseBlockAssignments("BLOCKS: B22:A1", (int) blk.size(), (int) atk.size(),
+                                          assign, NULL, NULL);
+            CHECK(n >= 1 && assign.size() == blk.size() && assign[21] == 1,
+                  "#W47-R8 a label from INSIDE the collapsed range still parses to its own blocker");
+        }
+        CHECK(string(kBlockerRangeNote).find("Every label in the range is a real, distinct blocker")
+              != string::npos,
+              "#W47-R8 the note states that every label in the range is nameable");
+    }
+
+    // ---- #W47-R10: one symbol for colourless, in the set and in the sub-list ----
+    cout << "\n[#W47-R10] 'colours you can make' never carries a count or an {x}\n";
+    {
+        vector<int> pre1;
+        pre1.push_back(Constants::MTG_COLOR_ARTIFACT);
+        pre1.push_back(Constants::MTG_COLOR_GREEN);
+        pre1.push_back(Constants::MTG_COLOR_RED);
+        vector<int> post1;
+        post1.push_back(Constants::MTG_COLOR_GREEN);
+        post1.push_back(Constants::MTG_COLOR_RED);
+        post1.push_back(Constants::MTG_COLOR_WASTE);
+        string pre = manaColourSetSymbols(pre1);
+        string post = manaColourSetSymbols(post1);
+        CHECK(pre == post,
+              "#W47-R10 the same board reads the same before and after the source is first tapped");
+        CHECK(pre == "{g}{r}{c}", "#W47-R10 colours first, the colourless symbol once and last");
+        CHECK(pre.find("{1}") == string::npos && pre.find("{x}") == string::npos,
+              "#W47-R10 NEGATIVE no bare count and no {x} inside a colour set");
+        vector<int> both;
+        both.push_back(Constants::MTG_COLOR_ARTIFACT);
+        both.push_back(Constants::MTG_COLOR_WASTE);
+        CHECK(manaColourSetSymbols(both) == "{c}",
+              "#W47-R10 both colourless slots at once still say it once");
+        vector<int> colouredOnly;
+        colouredOnly.push_back(Constants::MTG_COLOR_BLUE);
+        CHECK(manaColourSetSymbols(colouredOnly) == "{u}",
+              "#W47-R10 a purely coloured board is unchanged");
+        CHECK(manaColourSetText(NULL).empty(), "#W47-R10 no potential, no set");
+        CHECK(manaColourSetSymbols(vector<int>()).empty(),
+              "#W47-R10 no sources, no set");
+        // The per-source sub-list, both spellings of the same Talisman.
+        CHECK(manaSourceColoursText("{x} or {r} or {g}") == "{c} or {r} or {g}",
+              "#W47-R10 the sub-list's colourless option is {c}");
+        CHECK(manaSourceColoursText("{c} or {r} or {g}") == "{c} or {r} or {g}",
+              "#W47-R10 the already-correct spelling is untouched");
+        CHECK(manaSourceColoursText("{x} or {c}") == "{c}",
+              "#W47-R10 a source naming both slots says the colourless option once");
+        CHECK(manaSourceColoursText("{g}") == "{g}", "#W47-R10 a coloured source is unchanged");
+        CHECK(manaSourceColoursText("").empty(), "#W47-R10 an empty source string stays empty");
+        CHECK(manaSourceColoursText("{x} or {r}").find("{x}") == string::npos,
+              "#W47-R10 NEGATIVE {x} never reaches the sub-list");
+        // The count clause reads the SAME strings and is unmoved by the rewrite.
+        {
+            vector<string> src;
+            src.push_back(manaSourceColoursText("{x} or {r} or {g}"));
+            src.push_back(manaSourceColoursText("{r}"));
+            string cl = perColorSourceCountClause(src);
+            CHECK(cl.find("{R} 2, {G} 1") != string::npos,
+                  "#W47-R10 the per-colour counts are unchanged by the colourless spelling");
+            CHECK(cl.find("{C}") == string::npos,
+                  "#W47-R10 NEGATIVE colourless is not a colour and gets no source count");
+        }
+    }
+
+    // ---- #W47-R14: two engine-side counts, both at call sites that had the data ----
+    cout << "\n[#W47-R14] header 'able to attack' count, and the cast row's remainder\n";
+    {
+        string live = battlefieldHeaderText(false, 6, 2, 0, true);
+        CHECK(live == "Opponent battlefield (6 permanents listed, of which 2 are creatures,"
+                      " 0 of them able to attack right now): ",
+              "#W47-R14a the live scope states the engine's own canAttack count");
+        string stat = battlefieldHeaderText(false, 6, 2, 0, false);
+        CHECK(stat == "Opponent battlefield (6 permanents listed, of which 2 are creatures,"
+                      " 0 of them without a restriction against attacking): ",
+              "#W47-R14a off-turn the count is scoped to the static restriction, not to a turn");
+        CHECK(stat.find("able to attack") == string::npos,
+              "#W47-R14a NEGATIVE the off-turn line never claims a creature can attack 'now'");
+        CHECK(battlefieldHeaderText(true, 12, 3)
+              == "Your battlefield (12 permanents listed, of which 3 are creatures): ",
+              "#W47-R14a an uncomputed count omits the clause rather than guessing one");
+        // The static predicate: every refusal, and the permissive case.
+        CHECK(attackRestrictionFree(false, false, false, false),
+              "#W47-R14a an ordinary creature has no attack restriction");
+        CHECK(!attackRestrictionFree(true, false, false, false)
+              && !attackRestrictionFree(false, true, false, false)
+              && !attackRestrictionFree(false, false, true, false)
+              && !attackRestrictionFree(false, false, false, true),
+              "#W47-R14a cannot-attack, defender, flyers-only and battle each refuse");
+        // (b) the cast row's remainder.
+        CHECK(leavesUntappedTag(7, 3) == " {leaves 4 of your 7 untapped mana sources untapped}",
+              "#W47-R14b the cast row carries the subtraction the guide used to ask for");
+        CHECK(leavesUntappedTag(4, 4)
+              == " {leaves 0 of your 4 untapped mana sources untapped - casting this taps you out}",
+              "#W47-R14b tapping out is stated as the count it is, with its consequence");
+        CHECK(leavesUntappedTag(1, 0) == " {leaves 1 of your 1 untapped mana source untapped}",
+              "#W47-R14b singular grammar");
+        CHECK(leavesUntappedTag(0, 0).empty(),
+              "#W47-R14b NEGATIVE with nothing untapped there is nothing to leave");
+        CHECK(leavesUntappedTag(3, 9) == " {leaves 0 of your 3 untapped mana sources untapped"
+                                         " - casting this taps you out}",
+              "#W47-R14b a plan that outruns the count never prints a negative remainder");
+        CHECK(leavesUntappedTag(7, 3).find("hold up") == string::npos
+              && leavesUntappedTag(7, 3).find("warning") == string::npos,
+              "#W47-R14b NEGATIVE it is a count, not a boolean warning and not advice");
+        // ECHO SHAPE: the annotated cast row still binds to its own index.
+        {
+            vector<string> menu;
+            menu.push_back("Cast Supreme Verdict {1}{w}{w}{u}" + leavesUntappedTag(7, 4));
+            menu.push_back("Cast nothing this window");
+            bool stale = false; string src;
+            int c = parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale, &src);
+            CHECK(c == 1 && !stale, "#W47-R14b echo: the whole annotated row binds to index 1");
+            CHECK(stripNarrationDecoration(menu[0]).find("leaves 3") == string::npos,
+                  "#W47-R14b echo: the annotation leaves no residue in the narrated record");
         }
     }
 
