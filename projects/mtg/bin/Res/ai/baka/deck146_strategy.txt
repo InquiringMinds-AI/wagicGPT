@@ -70,10 +70,17 @@ the rest of the list, and do not weigh a later line against an earlier one.
     activating her next turn. Kaya's -3 exiles ANY nonland permanent - a creature, an enchantment,
     an artifact, a planeswalker - so she answers the boards Vanishing Verse cannot.
  3. Nadaar, Barrowin or Triumphant Adventurer - a body that ventures.
- 4. Silverquill Command (see its own rule for the modes).
- 5. Pelakka Predation, when their hand size is 3 or more.
- 6. Acererak the Archlich - only here, at the bottom, and only when nothing above matched.
- 7. "Cast nothing right now".
+ 4. SILVERQUILL SILENCER - your other real body. It is not a venture creature and it has no rule
+    of its own; it belongs HERE, above the Command, whenever no body from entry 3 is listed.
+ 5. Silverquill Command (see its own rule for the modes).
+ 6. EMERIA'S CALL, when the option is actually listed (that means you can pay its seven).
+ 7. Pelakka Predation, when their hand size is 3 or more.
+ 8. Acererak the Archlich - only here, near the bottom, and only when nothing above matched.
+ 9. "Cast nothing right now".
+EVERY CARD YOU CAN CAST HAS A LINE ABOVE. If you find yourself casting something the list does
+not name, the list has not been read - go back and take the first line that matches. And "Cast
+nothing right now" is the LAST line, not a tiebreaker: it is correct only when every other line
+above it failed to match, never because a listed card looks situational.
 Then take the ask again if the game offers it - you can cast more than one spell in a turn.
 A CREATURE THAT VENTURES IS NOT A REASON TO SKIP A PLANESWALKER. "Develop the board and advance the
 dungeon" is the argument that loses this deck games: the dungeon is value you collect over many
@@ -95,6 +102,11 @@ attack costs you life.
   * "the only legal targets are YOUR OWN right now" -> DO NOT CAST IT. There is nothing on their
     side you can hit. Do something else this turn and keep the card; do not spend a whole
     deliberation arguing with the list, and do not exile your own permanent to "use" the card.
+    EXILE IS NOT A BOUNCE AND IT IS NOT A RE-USE. "I will Verse my own Nadaar to send it back to
+    my hand and venture again" is FALSE: an exiled permanent is GONE - not to your hand, not to
+    your graveyard, and its enter-the-battlefield trigger never happens again. Exiling your own
+    creature costs you the creature AND the removal spell in one action; there is no board on
+    which it is right.
   When their board is all colorless artifacts and Verse keeps coming up dead, stop planning around
   it and win with bodies, Soul Shatter and Kaya instead.
 - KAYA THE INEXORABLE ({3}{W}{B}, planeswalker, starts at 5 loyalty): her -3 EXILES ANY nonland
@@ -106,8 +118,12 @@ attack costs you life.
   value). It does not target, so it answers a hexproof or indestructible bomb, and it answers
   ARTIFACT creatures that Vanishing Verse cannot touch. It does NOTHING if they control no
   creature - do not cast it into a board of only lands, artifacts or planeswalkers.
-- SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only) - entry 4 of THE WHOLE CAST
-  ORDER: CAST IT. It is a two-for-one
+- SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only) - entry 5 of THE WHOLE CAST
+  ORDER: CAST IT. THE TEST IS THE OPTION LIST, NOT THE BOARD: if "Cast Silverquill Command" is
+  printed and no removal spell with a live target and no planeswalker is printed above it, that
+  option IS your answer this ask - write it. "The board is not right for it yet" and "I will
+  find a better pair of modes later" are the two sentences that leave it in your hand; there is
+  no board on which its two best modes are worth less than the turn you spent doing nothing. It is a two-for-one
   and it is not a card to hold: if it is on the list and nothing above it in THE WHOLE CAST ORDER
   matched, take it. There is always a playable pair of modes - with a creature of theirs on the
   board, sacrifice plus draw; with a creature of yours attacking this turn, pump plus sacrifice;
@@ -207,6 +223,13 @@ creature, ask what happens on the crack-back with that creature unavailable.
   OUTNUMBERING THEM DOES NOT PROTECT A CARD. "They have one blocker and I am sending three, so
   mine is safe" is FALSE: their one blocker is spent on whichever attacker they most want dead,
   and that is the one your tag says dies.
+  AND NEITHER DOES A FRIENDLIER A-LINE. "My Triumphant Adventurer is on the same attack and its
+  tag kills that blocker, so it will eat the block" is the same false sentence in a new shape.
+  THEY choose which attacker their blocker stops, and they will not choose the deathtouch 1/1 -
+  they will choose the card your tag says dies. Read ONLY the tag on the line you are deciding;
+  what another A-line's tag says has no bearing on it. Never write a plan in which one of your
+  ATTACKERS "blocks" or "trades with" one of their blockers - an attacking creature does not
+  block, and it does not choose what it fights.
   THE STOP IS ABOUT CARDS, NOT TOKENS. A Goblin token from the dungeon costs you nothing when it
   dies, so send the token WITH the team even on a stop tag - it is bait, and the bait is free. The
   stop stands for every real card in your deck: a Silverquill Silencer, a Nadaar, a Barrowin.
@@ -287,8 +310,8 @@ Triumphant Adventurer (on attack), Nadaar (on enter AND attack), Acererak (on en
   choice correctly - do not try to work it out, and do not question the two names you are shown:
   pick the better of the two effects in front of you and move on.
 
-DEPLOY YOUR CHEAP THREATS AS BLOCKERS - this is entry 3 of THE WHOLE CAST ORDER, and entries 1
-and 2 still outrank it. Triumphant Adventurer is a 1/1 with DEATHTOUCH (and first
+DEPLOY YOUR CHEAP THREATS AS BLOCKERS - this is entry 3 of THE WHOLE CAST ORDER (Silverquill
+Silencer is entry 4), and entries 1 and 2 still outrank it. Triumphant Adventurer is a 1/1 with DEATHTOUCH (and first
 strike on your turn) - cast it early; it trades with or blocks almost anything and it ventures
 every time it attacks. Do not hold it. Nadaar is a 3/3 VIGILANT body that ventures twice and can
 attack without giving up its block.
@@ -300,8 +323,13 @@ while you flood; they are your best late-game engines. Each of your turns they a
 activate an ability:
 - LOLTH, SPIDER QUEEN ({3}{B}{B}, starts at 4, and gains loyalty whenever a creature you control
   dies): -3 makes two 2/1 Spiders with menace and reach (great blockers vs flyers AND attackers)
-  - use this first to build a board; 0 draws you a card and loses 1 life (take it most turns you
-  are not desperate for that life; do not just pass). -8 is the game-ending emblem.
+  - use this first to build a board; 0 draws you a card and loses 1 life. -8 is the game-ending
+  emblem.
+  LOLTH'S 0 HAS A LIFE FLOOR AND IT IS 6. Read your own printed life first. At 6 or less, do NOT
+  take the 0 - PASS, or take -3 if she has the loyalty. That "lose 1 life" is real damage you
+  are dealing to yourself, it is not offset by the card, and a card drawn at 2 life is a card
+  you never get to play. Any opponent permanent that pings - a Staff of Nin, a punisher
+  enchantment, one unblocked 1/1 - finishes a game you handed them one point at a time.
 - KAYA: see #1 rule - her -3 is removal; do not leave her idle.
 
 CLOSE THE GAME - none of this is a cast rule; THE WHOLE CAST ORDER decides what you cast, and
@@ -313,9 +341,16 @@ you have nothing better to cast; it is a late-game mana sink, not a cheap threat
 - BEFORE YOU ANSWER "becomes beholder", RUN THESE TWO CHECKS IN ORDER AND STOP AT THE FIRST
   ONE THAT ANSWERS. This is the single most expensive mistake available to this deck: each
   activation is FOUR mana, and paying it twice for one creature is four mana set on fire.
-  CHECK 1 - WHAT PHASE IS IT? The prompt's "Phase:" line says. If it says Upkeep, the answer is
-  PASS. The animation lasts until end of turn either way, and spending {3}{B} before your draw
-  step is spending it before you know what you drew. There is no exception to this.
+  CHECK 0 - IS THIS THE TURN IT WINS? Read the opponent's printed life, then add the power of
+  every creature of yours that is UNTAPPED and could attack this turn, plus 3 for the animated
+  Hive. If that total is at or above their printed life, ANIMATE NOW and swing, whatever phase
+  it is - a manland is a win condition on the turn it closes, and this check outranks both
+  checks below. Your Hive's activation is usually offered to you only during your UPKEEP, so
+  "I will do it in my main phase instead" can mean you never get asked again this turn: when
+  CHECK 0 says the game ends this turn, the upkeep offer is the only offer and you take it.
+  CHECK 1 - WHAT PHASE IS IT? The prompt's "Phase:" line says. If it says Upkeep and CHECK 0 did
+  NOT fire, the answer is PASS. The animation lasts until end of turn either way, and spending
+  {3}{B} before your draw step is spending it before you know what you drew.
   CHECK 2 - IS IT ALREADY A CREATURE? Find that Hive on your battlefield line. An animated one is
   printed "Hive of the Eye Tyrant #1 (3/3) [menace]" and is counted in the "of which N are
   creatures" number. If it already reads (3/3), the answer is PASS.
@@ -379,13 +414,22 @@ DECIDING SITUATIONS (recognize -> do):
   or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause -> that creature
   stays home if it is a CARD; only a dungeon Goblin token goes. A collapsed tag never triggers
   the Shield Sphere exception.
-- The "becomes beholder" option is offered -> read the "Phase:" line first. Upkeep -> PASS, no
-  exceptions. Otherwise find that Hive on your battlefield line: already (3/3) -> PASS. And a
+- The "becomes beholder" option is offered and the opponent's printed life is at or below 3 plus
+  the power of your untapped attackers -> ANIMATE, whatever phase it says; that is the game.
+- The "becomes beholder" option is offered and it is NOT lethal -> read the "Phase:" line. Upkeep
+  -> PASS. Otherwise find that Hive on your battlefield line: already (3/3) -> PASS. And a
   second offer in a turn where you already animated -> PASS; the option coming back is not a new
   opportunity.
 - Triumphant Adventurer is castable and you are under pressure -> cast it; the deathtouch 1/1
   blocks or trades with anything.
 - Soul Shatter is offered but the opponent controls no creature -> do not cast it.
+- Lolth is on your battlefield and your printed life is 6 or less -> do NOT take her 0. Pass or
+  take -3. The 1 life she costs is life you will be killed by.
+- An attacker's tag says your attacker dies, and a DIFFERENT A-line's tag says that same blocker
+  dies to it -> the stop still stands for the first creature. They choose the block, and they
+  will not choose the one that kills their creature.
+- "Cast Silverquill Silencer" is on the list and no removal-with-a-live-target, no planeswalker
+  and no venture body is -> cast the Silencer; it is entry 4 of THE WHOLE CAST ORDER.
 - Lolth or Kaya is castable in your hand -> CAST IT this turn, even when a creature (Barrowin,
   Nadaar, Acererak) is on the same list and even when that creature would venture. Only a removal
   spell with a live target outranks her. A bomb walker in hand does nothing, and "I will cast her

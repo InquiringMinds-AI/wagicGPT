@@ -6,6 +6,30 @@ all creatures, so the tap ability comes straight back. Your removal buys the tur
 end the game. Every turn is the same three actions: play a land, deploy a token-maker or
 Intruder Alarm, then tap every token-maker you own until your board is an army.
 
+=== RULE -1 - THE FIRST ASK OF THE GAME IS THE ONE YOU LOSE MOST OFTEN ===
+This rule is first because the ask it governs is first. Two of six games were decided here,
+before turn one, and neither of them was close.
+The ask reads "Pre-game mulligan decision (London mulligan)" and, from the second look on, it
+prints its own price: "having already taken N mulligans you will bottom N cards on a keep
+(keeping M)". READ THE M.
+  - M is 5 or less: answer "Keep this hand" the moment the hand holds ONE LAND. Not a colour,
+    not a curve, not a token-maker - one land. You are DONE; do not read another rule anywhere
+    in this file before answering.
+  - M is 6: keep unless the hand is zero lands or all lands.
+  - M is 7 (your untouched opening seven): the comparison in the MULLIGAN section applies.
+THE CARRIED PLAN IS NOT EVIDENCE ABOUT THIS HAND. From the second look on, the ask shows you
+"YOUR PLAN (as you last stated it)", and the plan it shows is the one you wrote about the hand
+you already threw away. A plan that says "mulligan to find 4+ lands" will be handed back to you
+at every single look, and answering it again is how a chain runs. Each look is a NEW seven with
+its own "counted by the engine: N lands, M spells" header. Decide from that header. If your plan
+tells you to mulligan and the header says two or more lands, the plan is out of date - say so
+and keep.
+WHAT THIS COST: one game shipped seven hands in a row and kept ZERO cards, bottoming its whole
+hand at the CR 103.5 ask, and lost 42 to 0. Another shipped six and kept ONE card, made a single
+decision in the entire game, and was dead on turn 13. In both chains a hand with three lands and
+a castable spell was on the screen at "(keeping 5)" and was thrown away. A three-land five-card
+hand beats every hand you have not seen.
+
 === RULE 0 - PLAY A LAND, EVERY TURN, BEFORE YOU DO ANYTHING ELSE ===
 The land drop is its own question. It arrives as "Land drop: which land do you play now, if
 any?" with one Play line per land in your hand and one "Play no land right now".
@@ -31,28 +55,28 @@ handle - "Thraben Doomsayer #1", "Thraben Doomsayer #2" - same line, same rule:
   "Create human with Thraben Doomsayer [cost: Tap]"
   "Create vampire with Bloodline Keeper [cost: Tap]"
   "Create vampire with Lord of Lineage [cost: Tap]"
-BEFORE you take one, read your creature count. Use the FIRST source that is on the screen:
-  1. the option line's own note, "[repeat: ... you control M creatures]" - M is your count.
-  2. no such note on the line? Then your battlefield line: "Your battlefield (K permanents
-     listed, of which M are creatures)" - that M is your count, printed in every window.
-     When the count is one it reads "of which 1 is a creature".
-The note belongs to ONE COPY and ONE TURN: each copy's first two activations of a turn carry no
-note, so with two makers out four activations a turn have none. The battlefield line always does.
-Then, and only then:
-  - M is 19 or less: take the line. Take it again every time it comes back.
-  - M is 20 or more: answer 0 (pass). Take nothing from this list, this window.
-The 20 counts creatures ON YOUR BATTLEFIELD. It does not reset when a new turn starts, it does
-not reset when the "[repeat:]" note disappears, and "I have tapped it 0 times this turn" is not
-a reason to start again. Twenty creatures already standing is the whole of the reason to stop.
-WHY THE NUMBER IS 20, so no later turn has to re-argue it: the board render COLLAPSES a wide
-board into a range - "Human #2-#11 (1/1) ... x10" - and it held a 22-permanent board to about
-19,000 characters, so board width is not costing you anything below 20. The older stop at 12
-was crossed ten times in one corpus and every crossing was the better play, because each token
-is a free flying blocker for a deck whose only plan is bodies. 20 is where the render stops
-being flat. It is still the only line in this section that ever says stop, so it still stops.
-ONE exception: if the opponent has attackers on the board whose damage would take you to 0 this
-turn, keep making tokens past 20 - each new one is another blocker, and a board you never get
-to use is worth nothing.
+BEFORE you take one, read your own battlefield line - "Your battlefield (K permanents listed, of
+which M are creatures)" - which prints in every window, and read the printed (P/T) on each
+creature entry there. The option line's "[repeat: ... you control M creatures]" note is the same
+M when it appears, but it belongs to ONE COPY and ONE TURN, so most activations do not carry it.
+The battlefield line always does; use it.
+Then, and only then - and the test is POWER, not a headcount:
+  - Add up the printed power of the creatures on your battlefield line that do NOT read
+    "summoning sick". Call that number P, and read the "Opponent life:" number.
+  - P is less than the opponent's life: TAKE THE LINE. Take it again every time it comes back.
+  - P is at or above the opponent's life AND it is your own turn: stop taking the line and go
+    to the ATTACK section - you already have the game and another token does not add to it.
+  - P is at or above the opponent's life and it is the OPPONENT'S turn: take it anyway. A token
+    made on their turn is a blocker now and an attacker on your next turn, and it costs nothing.
+THERE IS NO CREATURE-COUNT CAP, and the old one at 12 and then at 20 is GONE. Both numbers were
+crossed repeatedly and no crossing ever cost a game; both were also obeyed below the number in
+windows where taking the line was right, so the number was doing harm in two directions. What
+replaced it is the only stop that has ever been true here: you stop when you can kill them.
+The render carries no width cost that would argue for a lower stop - the board line COLLAPSES a
+wide board into a range ("Human #2-#11 (1/1) ... x10"), and the largest prompt this seat has ever
+been given at 23 creatures is the same size as its largest at 12.
+"I have tapped it 0 times this turn" is not a reason and never was; the count on the battlefield
+line is the state, not the "[repeat:]" note.
 Timing: the tokens you make CANNOT attack until your next turn, so making them early in your own
 turn buys you nothing this turn and leaves them standing through the opponent's whole turn. Fire
 the chain on the OPPONENT'S turn - the lines are offered there, in their upkeep, their main phase
@@ -82,6 +106,13 @@ Why this decides games: Intruder Alarm costs {2}{u} and Vision Skeins costs {1}{
 rest of the game.
 
 === RULE 3 - COUNT BOTH BOARDS BEFORE DAMNATION ===
+DAMNATION DESTROYS CREATURES AND NOTHING ELSE. Its own row prints the whole card: "Destroy all
+creatures. They can't be regenerated." An enchantment, an artifact, a planeswalker and a land
+all survive it. "Cast Damnation to remove Sanguine Bond" is a sentence this deck wrote in its
+own plan while holding fourteen Humans; the Damnation killed its fourteen Humans, the Sanguine
+Bond was still on the battlefield in the very next window, and it lost that game 42 to 0 having
+never rebuilt. Nothing in this deck removes an enchantment. Read the row before you believe a
+card does something its text does not say.
 Damnation destroys ALL creatures, yours included. Both battlefield lines print a creature count
 right after the words "of which" - read YOUR number and THEIR number, and compare them.
 Cast Damnation when THEIR number is bigger than yours. That is the whole test.
@@ -90,6 +121,10 @@ When YOUR number is the bigger one, spend the window on a creature, a token acti
 removal spell instead, and keep the Damnation - your creatures are how you win, and a wipe that
 kills two of yours to kill one of theirs has handed them the game.
 Your number is 0 and theirs is 2 or more: that is the best Damnation there is. Take it.
+THE HARD STOP, because this rule was broken at 14 against 6: if YOUR "of which N are creatures"
+number is 4 or more, do not cast Damnation at all, whatever theirs says. Four bodies is a board
+you win with; there is no opposing board this deck needs to trade four of its own creatures to
+answer. Take a token activation, a removal spell or "Cast nothing right now" instead.
 
 === RULE 4 - TRAGIC SLIP KILLS TOUGHNESS 1 ===
 Tragic Slip gives -1/-1. That kills a creature whose battlefield line shows toughness 1 - a
@@ -116,6 +151,12 @@ Devour Flesh. That said, giving them the life is still the right price when it t
 body: use Devour Flesh on the opponent when Tribute to Hunger is not on the list and they have
 exactly ONE creature - then the sacrifice takes their only body and the life they gain is worth
 it.
+AN EDICT CANNOT TOUCH A PLANESWALKER. Both rows say "sacrifices a creature". A planeswalker on
+their battlefield line - it prints "[planeswalker] [counters: Nx loyalty]" - is not a creature
+and is not a legal outcome of either card. "Use Tribute to Hunger to remove Sorin" is a sentence
+this deck wrote on a board with SEVEN of their creatures listed; the opponent handed over a 1/1
+token and Sorin kept ticking up. If a planeswalker is what is beating you, an edict is not the
+answer and neither is any other card in this deck: build the board and attack it.
 Before any edict, run this in order: (1) find "of which N are creatures" on the OPPONENT'S
 battlefield line. N is the only number that matters. (2) If N is not exactly 1, do not cast
 an edict - not at 0, not at 2 or more. (3) A creature listed under "ON THE STACK, waiting to
@@ -216,9 +257,31 @@ CHECK 3 is the one exception: it never ends your answer, it only removes creatur
 list you are about to send, and then you go on.
 
 CHECK 1 - THE LIFEGAIN WALL BOARD. Read the "Opponent battlefield" line for these four names:
-PERIMETER CAPTAIN, PRIDE GUARDIAN, SANGUINE BOND, EXQUISITE BLOOD. If ANY of them is on that
-line, answer "ATTACK: none" - this window and every attack window after it - until a Tragic
-Slip, a Damnation or an edict has taken the LAST of them off that line.
+PERIMETER CAPTAIN, PRIDE GUARDIAN, SANGUINE BOND, EXQUISITE BLOOD.
+FIRST, THE PART THAT WAS WRONG AND COST A GAME: Sanguine Bond and Exquisite Blood are
+ENCHANTMENTS. Tragic Slip, Damnation and both edicts kill CREATURES. Nothing in this deck
+removes an enchantment - there is no such card in the sixty. So "wait until they are gone" is
+not a plan against those two; it is a decision never to attack again. Held to the letter it kept
+fourteen Humans at home from turn 15 until the game ended 42 to 0.
+So the check has TWO branches, and which one you are in is decided by which names are on the
+line.
+BRANCH A - only PERIMETER CAPTAIN or PRIDE GUARDIAN (both are creatures, both are removable):
+answer "ATTACK: none" this window and every attack window after it, until removal has taken the
+LAST of them off that line. Then attack normally.
+BRANCH B - SANGUINE BOND or EXQUISITE BLOOD is on the line: you are never removing it, so you
+attack on ARITHMETIC instead of on the name. Count two numbers off the screen: A, the creatures
+on your "Your creatures that can attack:" list, and B, their UNTAPPED creatures on their
+battlefield line. Every one of their bodies that blocks gains them at most 3 (Pride Guardian) or
+2 (Perimeter Captain, once per blocking defender) or 1 (a lifelink blocker), and Sanguine Bond
+turns each of those gains into that much off YOUR life.
+  - Attack when A is at least 3 times B plus 3. At that width the unblocked damage beats every
+    life they can gain from the blocks, and it keeps beating it every turn after.
+  - Below that, answer "ATTACK: none", and spend the window making more tokens. A is the number
+    you grow; B is the number they have to keep paying for.
+  - Lethal overrides both branches: if the total power of what you can send is at or above their
+    printed life, send it all - a life gain that happens after they are dead is not a life gain.
+This is the ONE place in this file where a damage total does override a "do not attack" rule,
+and it overrides it only in BRANCH B, only on the printed life number, and only for lethal.
 Why, in the numbers the render gives you: Perimeter Captain gains them 2 life for EVERY
 creature with defender that blocks, and each Captain triggers for each blocking defender;
 Pride Guardian gains them 3 more when IT blocks; and every Sanguine Bond turns every point
@@ -377,6 +440,9 @@ without a creature ever hitting its battlefield.
 === DECIDING SITUATIONS ===
 - A "Land drop:" question is on the screen and any "Play <land>" line is listed: take one.
   Every turn, before anything else. "Play no land right now" only when nothing else is offered.
+- The mulligan ask prints "(keeping 5)" or a smaller number and the hand holds one land: KEEP,
+  and stop reading. The plan shown above that ask was written about a hand you already threw
+  away; it is not evidence about this one.
 - Your plan names a spell and "Mana available: N total" is smaller than that spell's mana count
   ({2}{u} = 3, {2}{b}{b} = 4): play a land, do not re-state the plan.
 - "Cast Lightning Greaves {2}" is listed and your battlefield line reads "of which 0 are
@@ -391,11 +457,11 @@ without a creature ever hitting its battlefield.
   Tutor or Vision Skeins, then removal. Bottom Intruder Alarm before you bottom a way to find a
   creature. Never bottom a land down to fewer than three, and never bottom your last castable
   spell.
-- A line ending in "[cost: Tap]" is in your list AND your creature count is 19 or less: take it,
-  this window, whatever your mana says, on either player's turn. Count 20 or more: answer 0.
-- You just took that line and it appears again: read the count again first. 19 or less, take it
-  again. 20 or more, stop - and it stays stopped on later turns and after the "[repeat:]" note
-  has gone.
+- A line ending in "[cost: Tap]" is in your list: take it, this window, whatever your mana says,
+  on either player's turn - unless it is YOUR turn and the total power of your non-summoning-sick
+  creatures already reaches their printed life, in which case go and attack instead.
+- You just took that line and it appears again: take it again on the same test. There is no
+  creature-count cap in this file any more.
 - "Put in Play with Marsh Flats targeting Underground Sea" is listed: take it. Otherwise
   "targeting Tundra". Otherwise "targeting Scrubland".
 - Several casts are listed at once: answer with the highest entry on the cast list above that
@@ -411,8 +477,16 @@ without a creature ever hitting its battlefield.
   giving up a token, nothing else.
 - "Equip with Lightning Greaves targeting" is listed and no creature reads "{attached: Lightning
   Greaves}": equip your best token-maker. Every re-offer after that: 0 (pass).
-- Their battlefield line names Perimeter Captain, Pride Guardian, Sanguine Bond or Exquisite
-  Blood and it is your Attackers step: "ATTACK: none". No damage total overrides this.
+- Their battlefield line names Perimeter Captain or Pride Guardian and it is your Attackers
+  step: "ATTACK: none" until removal has taken the last of them off that line.
+- Their battlefield line names Sanguine Bond or Exquisite Blood: you cannot remove either one -
+  attack when your attacker count is at least 3 times their untapped creature count plus 3, or
+  when your total power is at or above their printed life. Otherwise make more tokens.
+- "Cast Damnation" is on the screen and Sanguine Bond or Exquisite Blood is what you want gone:
+  Damnation does not touch either. Do not cast it for that reason.
+- Your own battlefield line reads "of which 4 are creatures" or more: do not cast Damnation.
+- An edict is on the screen and a planeswalker is what is beating you: an edict cannot touch a
+  planeswalker. Take another action.
 - Their battlefield line names ONE untapped creature and your attack list holds five or more:
   send them all. One blocker stops one attacker.
 - An attacker's tag reads "they have N untapped creatures that could block this one" with N of

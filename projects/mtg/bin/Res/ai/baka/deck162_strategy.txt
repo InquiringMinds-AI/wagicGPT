@@ -8,6 +8,25 @@ cards. Every turn you do one of three things: land a punisher, put a wall in fro
 creatures, or - once a punisher is out - stack another draw engine on top. You are never idle and
 you never wait to stabilize.
 
+=== RULE 0 - PLAY A LAND EVERY TURN YOU ARE OFFERED ONE. NOTHING OUTRANKS THIS ===
+When a "Land drop:" question is put to you and one of its options plays a land, PLAY THE LAND.
+The land drop is its OWN decision - the prompt says so on its own line. It costs no mana, it is
+not part of your casting decision, and taking it does not spend anything you were going to cast
+this turn: you play the land AND cast the spell, on the same turn, in that order. "I am casting
+Underworld Dreams this turn, so I will hold the land" and "I will play it next turn when I know
+what I need" are the two sentences that lose this deck games before turn six - both are false.
+Your punishers cost three to five mana and every land you skip is a turn they arrive late.
+Never answer "Play no land right now" or "Hold ..." while any land is playable, and when several
+are offered take the one whose colour your hand needs (black for the punishers first).
+
+=== RULE 0b - TRUST THE "Mana available" LINE. DO NOT RE-DERIVE YOUR MANA ===
+"Mana available: N total (... colours you can make: {u}{b})" gives you two facts and both are
+correct: N is what you can spend this window, and the colour list names which COLOURED pips you
+can pay. GENERIC IS NOT A COLOUR - Underworld Dreams {B}{B}{B} needs three black sources, but
+Howling Mine {2} and Fog Bank {1}{U} take any source for their generic. Never spend a decision
+asking "do I have generic mana"; there is no such thing as not having it. And if a spell is
+printed as a numbered "Cast ..." option, it IS payable - the game has already checked. Pick it.
+
 === RULE 1 - THE PUNISHER GOES FIRST. ALWAYS. READ YOUR CAST LIST TOP TO BOTTOM ===
 Your three punishers are UNDERWORLD DREAMS {b}{b}{b}, FATE UNRAVELER {3}{b}, OB NIXILIS, THE
 HATE-TWISTED {3}{b}{b}. Every time you are asked "which card do you cast now", scan the numbered
@@ -101,6 +120,14 @@ Only when the header does NOT say LETHAL, or once you have already secured the l
 margin, do the numbered rules below decide anything.
 
 Run this over the offered block lines, every combat, in this order:
+0. HOW MUCH GETS THROUGH IF I TAKE THIS BLOCK? Before rung 1, read the header's "you would be at
+   N" and read every attacker's "deals N". When ONE blocker is offered several attackers, the
+   free kill is only free if what walks past you is survivable. Subtract the damage you would
+   stop from the total: if the number left would put your printed life at 8 OR LESS, block the
+   BIGGEST "deals N" you are allowed to block instead, even when that line kills your blocker
+   and even when a free kill on a small attacker is sitting right there. A free kill on a 2/2
+   while a 4/4 walks past and drops you to 4 is a loss you chose two turns early. Only when the
+   damage getting past you leaves your life ABOVE 8 does rung 1 below decide anything.
 1. A line ending "(you kill it, your blocker lives)" - take that block. Free kill, every time.
 2. A line ending "(neither dies)" - take that block. One wall per attacker, spending your walls
    on the attackers with the biggest "deals N" numbers first. A second wall added to an attacker
@@ -163,6 +190,12 @@ FOG BANK {1}{u} - 0/2 flying defender that prevents all combat damage to and fro
 Read each attacker's own "their untapped blockers" tag and answer from it. The tag is the
 engine's computed result - do not argue with it, and do not answer ATTACK: none out of a
 general wish to keep your board.
+NO "their untapped blockers" TAG AT ALL ON A LINE MEANS NOTHING THEY CONTROL CAN BLOCK IT.
+That is free, unopposed damage and the answer is SEND, every time, at every life total - it is
+the one attack in this deck that has no downside to weigh. "I will keep it back as a blocker"
+is not a reason here: they have no creature that can be blocked, or none that can block this
+one, which is exactly why the tag is empty. Only the low-life rule at the bottom of this
+section overrides it, and only for your LAST untapped body.
 SEND IT when every outcome on that creature's tag reads "(you kill it, your attacker lives)".
 That line says your creature SURVIVES and theirs does not: there is no trade to fear and no
 punisher to lose. Either they decline the block and take the damage, or they block and hand
@@ -175,16 +208,38 @@ first, and dead it stops the draw damage that wins you the game, for a creature 
 replace. The tag also does not tell you what the BLOCKER gains - a lifelink blocker hands them
 life on top of the trade. Below the lethal check, both of those lines mean ATTACK: none for
 Fate Unraveler.
+A "(blocking trigger:" CLAUSE OR A "(lifelink:" TAIL IS ALSO A PRICE, AND SOMETIMES IT IS THE
+WHOLE GAME. This deck gains no life and has no removal for enchantments, so life THEY gain is
+progress you cannot undo. Two tags carry that price:
+  "(neither dies (blocking trigger: they may gain 2))" - the block costs you nothing and pays
+  them; a tag containing one is NOT an all-free tag, and the send rung above does not fire.
+  "(you kill it, your attacker lives (lifelink: they gain 1))" - you get the kill and they get
+  the life. Against 1/1 lifelink tokens their controller remakes every turn, that trade is
+  theirs, not yours.
+AND WHEN THE PROMPT ALSO PRINTS "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs", EVERY
+ONE OF THOSE NUMBERS IS DOUBLE AND POINTED AT YOU. That line means life THEY gain also comes
+off YOUR total. Three 1/1 lifelink blockers eating one attacker is 3 life to them and 3 life
+off you, and their controller may hold a second enchantment that turns that loop into your
+death in a single combat. So: with that converter line on the screen, send ONLY creatures whose
+A-line prints no "(blocking trigger:" and no "(lifelink:" anywhere in it. If no attacker
+qualifies, the answer is ATTACK: none and you win on the draw step instead - your punishers
+deal their damage whether or not you attacked, and that is the whole point of this deck.
 ONE FATAL NAME IN THE LIST IS A STOP, HOWEVER MANY FRIENDLY NAMES SIT BESIDE IT. A tag reading
 "Tovolar's Huntmaster (6/6) (your attacker dies, their blocker lives); Wolf #2 (2/2) (you kill
 it, your attacker lives); Wolf #3 (2/2) (you kill it, your attacker lives)" is a STOP. Two of
 those three are good for you and it does not matter: THEY choose which one blocks, and they
 choose the Huntmaster. Price the WORST name on the list, always. SEND requires that EVERY name
 on the tag reads "(you kill it, your attacker lives)".
-AND A LOW LIFE TOTAL IS A REASON TO KEEP IT HOME, NOT A REASON TO SWING. At 2 life your Fate
-Unraveler is also your blocker: attacking taps it out of the block you are about to need, and
-the punisher damage arrives on THEIR draw step whether or not you attacked. "I have to do
-something" is not a rule. The rule is the tag.
+AND A LOW LIFE TOTAL IS A REASON TO KEEP IT HOME, NOT A REASON TO SWING - AND THIS APPLIES TO
+WHICHEVER CREATURE IS YOUR LAST UNTAPPED BODY, NOT ONLY TO FATE UNRAVELER. Count the creatures
+on YOUR battlefield line that are untapped and not summoning sick. If that count is ONE and
+your printed life is 8 or less, that creature does not attack, whatever its tag says and even
+when its tag is empty - it is the only thing standing between you and the next combat, and an
+attacker is tapped for their whole turn. Master of the Feast is the card this rule is usually
+about: a 5/5 flier is your best blocker exactly when you are low, and swinging it for 5 while
+they hold three ground creatures is trading your life for damage you did not need. The punisher
+damage arrives on THEIR draw step whether or not you attacked; that is what buys the turns.
+"I have to do something" is not a rule. The rule is the tag and the count.
 MASTER OF THE FEAST AND THE COLLAPSED TAG. When a creature's tag does NOT list their blockers
 one by one but instead reads "they have N untapped creatures that could block this one, biggest
 X (you kill it, your attacker lives)", that parenthesis prices ONE blocker only - the biggest -
@@ -256,8 +311,18 @@ below that a land is never the right card to lose.
 - Teferi's Puzzle Box, Forced Fruition or a Dictate is in the SAME list as a punisher: the
   punisher is number 1 in the cast order and the Box is number 5. Cast the punisher this ask.
   A Puzzle Box with nothing to convert its cards is a gift, however big the number looks.
-- An attacker's tag reads only "(you kill it, your attacker lives)" - EVERY name on it: send
-  that attacker.
+- A "Land drop:" question offers a land: play it. Every turn, no exceptions, whatever you plan
+  to cast afterwards.
+- An attacker's A-line prints NO "their untapped blockers" tag at all: send it - nothing they
+  control can block it.
+- An attacker's tag reads only "(you kill it, your attacker lives)" - EVERY name on it, with no
+  "(blocking trigger:" and no "(lifelink:" anywhere in it: send that attacker.
+- The prompt prints "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs": send only attackers
+  whose tag prints no "(blocking trigger:" and no "(lifelink:". If none qualifies, ATTACK: none
+  - the punishers still fire on their draw step.
+- You control exactly ONE untapped creature and your life is 8 or less: it stays home.
+- ONE blocker, several attackers, and taking the free kill would leave your life at 8 or less:
+  block the biggest "deals N" instead, whatever its parenthesis says.
 - An attacker's tag lists several blockers and ONE of them reads "your attacker dies, their
   blocker lives": ATTACK: none for that creature. They pick the blocker and they pick that one.
 - An attacker's tag reads "they have N untapped creatures that could block this one" with N of

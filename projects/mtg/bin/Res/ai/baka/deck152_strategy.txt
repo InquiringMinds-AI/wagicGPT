@@ -25,6 +25,16 @@ already did the math for you:
   spend the decision arguing about it or recounting your lands. Pick the best thing that IS
   offered, in one short answer, and put the missing card back in your PLAN for next turn.
 
+#1a RULE - THE LAND DROP IS FREE AND IT IS NEVER A CHOICE. When a "Land drop:" question is put
+to you and its options include playing a land, PLAY THE LAND. It is its OWN decision: it costs
+no mana, it competes with nothing, and taking it does not reduce what you can cast this turn -
+the prompt says so on its own line. "I would rather cast Katilda this turn" and "I will hold
+this land for the colour I need later" are the two sentences that cost this deck games; both
+are false, because playing the land and then casting the spell are the same turn. The ONLY
+answer that is ever right is "Play <land>", and when several lands are offered take the one
+whose colour your hand needs most. Never answer "Play no land right now" or "Hold ..." while a
+land is playable.
+
 #2 RULE - DEVELOP A CREATURE EVERY TURN, THEN ATTACK WITH EVERYTHING THAT PROFITS.
 Play a land, cast the biggest/most useful creature you can, then ATTACK with each listed creature
 that has any of: no untapped blocker opposite it; flying they cannot block (Elite Spellbinder and
@@ -63,15 +73,36 @@ swings: one body, then two, then the whole team. Keep swinging.
   attacker they will not.
   When the tag is collapsed and prints NO "GANG BLOCK:" clause, use the parenthesis it does print
   - if that parenthesis already says your attacker dies, that is a stop on its own.
+  A FRIENDLY PARENTHESIS DOES NOT CANCEL A GANG CLAUSE. "Human (1/1) (you kill it, your attacker
+  lives); Bloodline Keeper (3/3) (you kill it, your attacker lives) - GANG BLOCK: any 2 of them
+  together deal 4, enough to kill this attacker" is a STOP: both named results are good for you
+  and the clause is still the answer, because the clause is what happens when two of them block
+  at once and the parentheses are lone-blocker prices only.
+  FLYING DOES NOT EXEMPT SIGARDA. She is the best card in the deck and the one this rule exists
+  to save. A collapsed tag counts only the creatures that CAN block her, so "they have 9 untapped
+  creatures that could block this one, biggest Lord of Lineage (5/5) (your attacker dies, their
+  blocker lives)" means nine of their fliers and reach bodies are available and the biggest one
+  kills her. Trample and flying change nothing about that parenthesis. She stays home.
   A 7/7 Luminarch Aspirant carrying seven counters is your whole board in one body. Trading it
   for six 1/1 tokens their Thraben Doomsayer remakes every turn is the worst trade in this
   matchup, and the render told you the price before you answered.
 - OUTNUMBERING THEM DOES NOT MAKE A LIFEGAIN WALL FREE. PERIMETER CAPTAIN gives them 2 life
   every time ANY defender they control blocks; PRIDE GUARDIAN gives them 3 whenever it blocks.
-  The tag still reads "(neither dies)" - it does not print their life gain. Count the 0/N
-  defenders on their battlefield line before you swing: at two or more, the attack PAYS them
-  and the outnumber clause does not apply. Send only what actually gets through (Sigarda and
-  Elite Spellbinder FLY) and grind with removal instead of feeding the wall.
+  THE TAG NOW PRINTS IT, inside the same parentheses as the outcome: "(you kill it, your
+  attacker lives (blocking trigger: they gain 3))", "(neither dies (blocking trigger: they may
+  gain 2))". The words to look for are "blocking trigger:". Count how many blockers on that
+  A-line print one: at two or more, the swing PAYS them and the outnumber clause does not apply.
+  Send only what actually gets through (Sigarda and Elite Spellbinder FLY) and grind with
+  removal instead of feeding the wall.
+  AND WITH A CONVERTER OF THEIRS OUT, EVERY "blocking trigger:" IS DOUBLE. This is the one
+  combination that has killed this deck from a winning board. A "LIFE-TO-DAMAGE CONVERTER on the
+  battlefield: theirs" line plus a "(blocking trigger: they gain N)" tag means that block costs
+  you 2N: N life to them AND N life off you. Three walls blocking three attackers is nine life
+  gained and nine life lost - one swing can take you from 20 to 11 while THEY go up. So when
+  BOTH lines are on the screen at once, the lifegain-wall rule gets STRICTER, not looser: send
+  ONLY the creatures whose own A-line prints no "blocking trigger:" anywhere in it - normally
+  that means your fliers and nothing else - and never send a body into a wall "to trade" while
+  a converter of theirs is in play.
 - A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
   ANYWHERE IN ITS LIST is a per-creature STOP, not a note about the whole attack. Leave THAT
   creature home even when the rest of the team is attacking - "attack with everything that
@@ -138,6 +169,12 @@ error" is ALWAYS FALSE - it is never an error.
   Take the 1 damage every time.
 BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
 this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ FIRST LINE OF EVERY BLOCK ANSWER, BEFORE ANYTHING ELSE: find the header's "you would be at N"
+ number and write it down. N of 9 or LESS means you are blocking something - there is no reading
+ of this screen at N of 9 or less on which "BLOCKS: none" is the answer, and that includes the
+ case where the only block offered loses your creature. "I will take the 6 damage and drop to 8"
+ is that answer written out longhand, and it is the single most expensive sentence this deck
+ produces: the creature you saved blocks nothing next turn if the 6 you took was the margin.
  WHEN "BLOCKS: none" IS ALLOWED - READ THIS BEFORE THE LADDER, NOT AFTER IT. You may answer
  "BLOCKS: none" in exactly one case: every offered block reads "(your blocker dies, attacker
  lives)" AND the header's "you would be at N" number is 10 or more. In every other case you are
@@ -210,9 +247,15 @@ YOUR LORDS AND GROWTH:
   attacker facing a Fog Bank builds a 10/10 that never deals a point.
   AND DO NOT PUT EVERY COUNTER ON ONE BODY EVEN WHEN IT IS CONNECTING. Once a creature is
   carrying four or more counters it is your whole board in one card, and one gang block or one
-  removal spell takes all of it at once. From the fifth counter on, put it on a SECOND creature
-  instead - two 4/4s beat one 8/8 against a board that can block with six bodies. Never put the
-  counter on the Aspirant itself while another creature of yours can attack.
+  removal spell takes all of it at once. Two 4/4s beat one 8/8 against a board that can block
+  with six bodies.
+  THE TEST IS THE SIZE PRINTED ON THE OPTION ROW, and you never have to count counters to run
+  it: each choice in the target list shows that creature's CURRENT size. If the creature you
+  were about to pick is already printed at 6/6 or larger, PICK A DIFFERENT ONE - any other
+  creature of yours on the list, preferring one that flies. Picking the biggest body on the list
+  is the habit this rule exists to break; a Sigarda taken from 4/4 to 11/11 one counter at a
+  time is six counters that could have been a second threat. Never put the counter on the
+  Aspirant itself while another creature of yours can attack.
 - RANGER CLASS ({1}{G}): cast it for the 2/2 Wolf immediately. Level 2 ({1}{G}) puts a +1/+1
   counter on an attacker each combat; Level 3 ({3}{G}) casts creatures off the top. Level with
   SPARE mana only - never instead of casting a creature.
@@ -326,6 +369,11 @@ cards on a keep, bottom the most expensive spell you cannot reach and never bott
 early play. NEVER bottom a land unless the hand you keep would still hold at least FOUR - the
 keep you just made was priced on the engine's land count, and bottoming a land undoes it at the
 very next ask.
+THAT FOUR-LAND FLOOR APPLIES ONLY WHILE YOU ARE KEEPING FIVE CARDS OR MORE. Read the ask's own
+sentence, "You will be left with a N-card hand". At N of 4 or fewer a four-land hand is not a
+hand at all: bottom down to the best MIX you can - two lands and your two cheapest spells - and
+lands are the right cards to lose to get there. The floor protects a six or a five; it must
+never turn a four-card hand into four lands.
 
 MATCHUP POSTURE:
 - vs REMOVAL/GRIND: keep deploying anyway. Their removal answers one creature at a time and your
@@ -342,10 +390,16 @@ MATCHUP POSTURE:
   CONVERTER on the battlefield: theirs - Sanguine Bond", naming the card. YOU CANNOT ANSWER IT.
   This deck has no way to destroy an enchantment - Fateful Absence hits creatures and
   planeswalkers only, and Brutal Cathar exiles a creature. So when that line names a converter of
-  THEIRS, the game has become a race with a deadline you cannot see, and the correct posture is
-  the most aggressive one available: attack with everything that is not held home by a stop,
-  every turn, and spend nothing on incremental value. A turn spent gaining 2 life off Teferi's +1
-  while they are at 3 is a turn you needed for the last 3 damage.
+  THEIRS, the game has become a race with a deadline you cannot see. Race it with your EVASION,
+  not with your whole board.
+  RACE MEANS DAMAGE THROUGH, NOT ATTACKERS DECLARED, AND THE CONVERTER LINE NEVER LICENSES A
+  SWING THE TAGS PRICE AGAINST YOU. A creature you send into a "(blocking trigger:" wall deals
+  ZERO to their life and hands them N, which the converter takes off you as well - it moves the
+  race backwards in both directions at once. So with a converter of THEIRS on the line: send
+  every creature whose A-line prints no "(blocking trigger:" and no stop - your fliers first -
+  and hold every creature whose tag prints one. Spend nothing on incremental value (a turn
+  gaining 2 life off Teferi's +1 while they are at 3 is a turn you needed for the last 3
+  damage), but "the most aggressive posture available" is never a reason to overrule a tag.
 - vs INFECT / POISON (creatures tagged [infect]): the prompt prints your poison total on its own
   line - "Poison counters (you): 4 of 10" - and the blocker window prices infect swings in
   counters, not life: "these attackers put up to 2 POISON COUNTERS on you - you would be at 6 of
