@@ -9574,14 +9574,7 @@ wrong way). Corpus `matchups-20260826-111937`; mulligan seams live for the first
     by default: the third land is likely by the turn it is needed, the fourth by turn 5, and a
     six after shipping a two-lander is most often a two-lander again. Colour and curve are
     tiebreakers between keepable hands, never a reason to ship a hand that meets the land
-    count. Never write a colour-screw or no-early-play mulligan gate.
-    THE FACTORS the comparison weighs (owner, 2026-08-26): what the hand DOES if the missing
-    lands arrive (a combo hand that wins on the spot off two more mana can be worth a dicey
-    keep); spells that make mana (they shorten the wait); how many draws the wait costs
-    (expect 4-6 turns to see two land draws from one land); the SPEED of the opponent's deck
-    (can you afford those turns?); and the hand's DISRUPTION (can it buy them?). A mulligan
-    section names which of these matter for THIS deck and its pool opponents and states the
-    comparison in those terms — the pilot makes the call on the exact cards. (Supersedes the wave-44
+    count. Never write a colour-screw or no-early-play mulligan gate. (Supersedes the wave-44
     deck125 carve-out, removed the same day.)
 
 47. THE GUIDE IS A BEST-EFFORT SUGGESTION (owner ruling 2026-08-26). Its goal is a document
