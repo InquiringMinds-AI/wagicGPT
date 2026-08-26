@@ -53,3 +53,12 @@ window auto-pass; Baka menace gang-block behaviour (red pin, probe deck owed).
 
 ## Owner prompt review (invariant 0)
 Pull ONE verbatim lategame prompt into wave45/lategame-specimen.txt (wave-44's is still unread).
+
+## Added after corpus launch (NOT in the wave-45 corpus binary fd69fadc2)
+- Lane E 607ca6bb7 (#W45-20, owner ruling): damage-family history lines take the owner prefix
+  ('Your X dealt N damage to ...'); merged 2d5954da0. Prediction: unprefixed card-SUBJECT history
+  lines 0/N — testable from wave 46 on. Residual for the docket: the damage OBJECT stays a bare
+  name ('... to Perimeter Captain'), ambiguous in mirrors the same way; needs an owner-tag ruling
+  for mid-sentence references before changing (pinned by a negative case).
+- Guide edits after launch: deck125 carve-out removed, deck146 one-land teach = odds rule
+  (a9bd0ce21, de9a1d6dd, c01ece06a). Wave-45 games loaded the PRE-edit guides.
