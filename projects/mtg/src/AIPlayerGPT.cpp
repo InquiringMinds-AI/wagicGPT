@@ -4271,7 +4271,12 @@ struct XDamVictim
     int lethalX;     //smallest X that kills it; <=0 = damage cannot kill it
     bool mine;
     bool pluralVerb; //"you NEED X>=6", not "you needs" - the caster's own row
-    XDamVictim() : lethalX(0), mine(false), pluralVerb(false) {}
+    //#W45-5: a PLAYER row ("you" / "the opponent"), only ever produced by the
+    //TARGETED class, where a player is a legal target. It is not a creature and
+    //belongs on neither side's kill list, so xVictimList skips it and the
+    //player-lethality clause states it in its own words instead.
+    bool isPlayer;
+    XDamVictim() : lethalX(0), mine(false), pluralVerb(false), isPlayer(false) {}
 };
 
 //Five identical 1/1 Elves are five rows saying the same thing. A board wipe's
@@ -4310,7 +4315,8 @@ static string xVictimList(const std::vector<XDamVictim>& victims, int atX, bool 
 {
     std::vector<XDamVictim> dying;
     for (size_t i = 0; i < victims.size(); i++)
-        if (victims[i].mine == mine && victims[i].lethalX > 0 && victims[i].lethalX <= atX)
+        if (!victims[i].isPlayer && victims[i].mine == mine && victims[i].lethalX > 0
+            && victims[i].lethalX <= atX)
             dying.push_back(victims[i]);
     //Grouping is by NAME, not by adjacency: same-named permanents are not
     //necessarily neighbours in a battlefield zone.
@@ -4594,27 +4600,51 @@ static void collectXDamageClauses(const string& magicText,
     }
 }
 
-//Board-facing wrapper: turns the clause scan + the engine's affordability answer
-//into the rendered annotation. Returns "" for a non-X spell (every other cast
-//line is byte-identical to before).
-string xSpellPricing(MTGCardInstance * card, Player * me)
+//#W45-5: the board survey the CAST-row annotation and the ANNOUNCE_X row
+//annotation both read. It was the body of xSpellPricing and is unchanged in
+//what it computes; it now HANDS BACK the priced facts instead of formatting
+//them, so the announce menu prices its rows off the same evaluator that priced
+//the cast row a moment earlier (the two surfaces cannot disagree - the same
+//rail wave-23's cap header runs on).
+struct XVictimSurvey
+{
+    int maxX;      //the engine's own affordability answer at survey time
+    int baseCMC;
+    bool priceable; //a damage clause of the SPELL'S OWN was found and priced
+    bool sweep;     //sweep class: every listed victim dies at the same X
+    bool hitsMe, hitsOpp; //sweep class only: the spell also damages that player
+    int myLife, oppLife;
+    std::vector<XDamVictim> victims;
+    XVictimSurvey()
+        : maxX(0), baseCMC(0), priceable(false), sweep(false), hitsMe(false), hitsOpp(false),
+          myLife(0), oppLife(0)
+    {
+    }
+};
+
+//Returns false for a non-X spell or one whose script draws the RNG (nothing is
+//annotated at all); true with priceable=false when the spell is an {X} spell
+//with no priceable damage clause (affordability only).
+static bool xSurveyBoard(MTGCardInstance * card, Player * me, XVictimSurvey & sv)
 {
     if (!card || !me)
-        return "";
+        return false;
     ManaCost * cost = card->getManaCost();
     if (!cost || !cost->hasX())
-        return "";
+        return false;
     if (xScriptDrawsRng(card->magicText))
-        return ""; //rendering must never draw the game RNG
+        return false; //rendering must never draw the game RNG
     int maxX = ManaEngine::maxAnnounceableX(me, cost, card->has(Constants::ANYTYPEOFMANA));
     int baseCMC = cost->getConvertedCost();
+    sv.maxX = maxX;
+    sv.baseCMC = baseCMC;
     std::vector<string> sweepSpecs, targetSpecs;
     bool implicitTarget = false;
     collectXDamageClauses(card->magicText, sweepSpecs, targetSpecs, implicitTarget);
     GameObserver * obs = card->getObserver();
     if (!obs || !obs->players[0] || !obs->players[1]
         || (sweepSpecs.empty() && targetSpecs.empty() && !implicitTarget))
-        return xAffordabilityCore(maxX, baseCMC);
+        return true; //an {X} spell with nothing priceable: affordability only
 
     TargetChooserFactory tcf(obs);
     std::vector<XDamVictim> victims;
@@ -4660,8 +4690,14 @@ string xSpellPricing(MTGCardInstance * card, Player * me)
             SAFE_DELETE(tc);
         }
         Player * opp = ordered[0];
-        return xDamageSweepCore(maxX, baseCMC, victims, hitsMe, hitsOpp,
-                                me->life, opp ? opp->life : 0);
+        sv.priceable = true;
+        sv.sweep = true;
+        sv.hitsMe = hitsMe;
+        sv.hitsOpp = hitsOpp;
+        sv.myLife = me->life;
+        sv.oppLife = opp ? opp->life : 0;
+        sv.victims.swap(victims);
+        return true;
     }
 
     //Targeted (explicit spec, or the card's own target= line for a bare
@@ -4692,6 +4728,7 @@ string xSpellPricing(MTGCardInstance * card, Player * me)
                 v.name = (pp == me) ? "you" : "the opponent";
                 v.baseName = "";
                 v.mine = false;
+                v.isPlayer = true;
                 v.pluralVerb = (pp == me); //"you need", not "you needs"
                 v.lethalX = pp->life > 0 ? pp->life : 1;
                 bool dup = false;
@@ -4721,7 +4758,142 @@ string xSpellPricing(MTGCardInstance * card, Player * me)
         }
         SAFE_DELETE(tc);
     }
-    return xDamageTargetedCore(maxX, baseCMC, victims);
+    sv.priceable = true;
+    sv.sweep = false;
+    sv.myLife = me->life;
+    sv.oppLife = ordered[0] ? ordered[0]->life : 0;
+    sv.victims.swap(victims);
+    return true;
+}
+
+//Board-facing wrapper: turns the survey into the rendered CAST-row annotation.
+//Returns "" for a non-X spell (every other cast line is byte-identical to
+//before).
+string xSpellPricing(MTGCardInstance * card, Player * me)
+{
+    XVictimSurvey sv;
+    if (!xSurveyBoard(card, me, sv))
+        return "";
+    if (!sv.priceable)
+        return xAffordabilityCore(sv.maxX, sv.baseCMC);
+    if (sv.sweep)
+        return xDamageSweepCore(sv.maxX, sv.baseCMC, sv.victims, sv.hitsMe, sv.hitsOpp,
+                                sv.myLife, sv.oppLife);
+    return xDamageTargetedCore(sv.maxX, sv.baseCMC, sv.victims);
+}
+
+//#W45-5 (wave-44 seat130, two lost games): the {X pricing:} block above rides
+//the CAST row and is ABSENT from the ANNOUNCE_X menu that follows it - the
+//moment X is actually chosen, the rows read "1. X = 5 / 2. X = 4 / ..." and
+//nothing else. deck130 read a priced cast row saying its own Rorix Bladewing
+//(its whole clock, two swings from lethal) dies at X=5, chose "Cast Starstorm",
+//and then picked X=5 off a bare menu twice, in games it was winning. The facts
+//that decide the pick must be ON the rows that offer it, per-row: what dies for
+//THIS X, on BOTH sides.
+//
+//Truthfulness rails:
+//  * The YOURS: half is MANDATORY and prints "none" rather than being omitted -
+//    the caster's own casualties are the half that lost both games, and a
+//    silent omission is the gap the model confabulates into (trust doctrine).
+//  * The TARGETED class says "(one target only)" before its lists: a targeted
+//    X spell kills ONE of the named bodies, not all of them, and the sweep
+//    wording under a targeted spell would be a false surface.
+//  * Nothing here evaluates a script expression or draws the RNG (it reads the
+//    same survey the cast row read); no option is added, removed or reordered,
+//    and req.optionTexts - the staleness key - is untouched.
+static string xKillRowCore(const std::vector<XDamVictim>& victims, int atX, bool sweep,
+                           bool hitsMe, bool hitsOpp, int myLife, int oppLife)
+{
+    std::ostringstream o;
+    //The channel name is the CAST row's own ("{X pricing: ...}") because this
+    //IS that pricing, one X at a time: it reuses the same evaluator, and - the
+    //load-bearing half - stripNarrationDecoration already gates that prefix out
+    //of the append-only log, so a decision-time kill list cannot ride an echo
+    //into history and be re-served on every prompt for the rest of the game
+    //(the W43-7/W43-8 rule, inherited rather than re-implemented).
+    o << " {X pricing: kills " << (sweep ? "" : "(one target only) ")
+      << "THEIRS: " << xVictimList(victims, atX, false)
+      << "; YOURS: " << xVictimList(victims, atX, true);
+    //The player half. A sweep that reaches players says so per SIDE (the same
+    //asymmetry rail xDamageSweepCore runs on); a TARGETED spell reaches a
+    //player only when that player is a legal target, which the survey already
+    //recorded as an isPlayer row.
+    bool lethalMe = false, lethalOpp = false;
+    if (sweep)
+    {
+        lethalMe = hitsMe && myLife > 0 && atX >= myLife;
+        lethalOpp = hitsOpp && oppLife > 0 && atX >= oppLife;
+    }
+    else
+    {
+        for (size_t i = 0; i < victims.size(); i++)
+        {
+            if (!victims[i].isPlayer || victims[i].lethalX <= 0 || victims[i].lethalX > atX)
+                continue;
+            if (victims[i].pluralVerb) //the "you" row
+                lethalMe = true;
+            else
+                lethalOpp = true;
+        }
+    }
+    //Own risk first: the row that can end the caster's own game leads.
+    if (lethalMe)
+        o << "; at this X it KILLS YOU (you are at " << myLife << " life)";
+    if (lethalOpp)
+        o << "; this X is LETHAL to the opponent (at " << oppLife << " life)";
+    o << "}";
+    return o.str();
+}
+
+//One annotation per offered X, LARGEST FIRST - the order the ANNOUNCE_X menu is
+//shown in (option 1 = the largest X). A run of X values that kills exactly the
+//same bodies collapses to "{same as X=N}", pointing at the nearest row ALREADY
+//SHOWN above it: the kill set only grows with X, so the explicit facts land on
+//the largest X of each run - which is where the menu's own header points the
+//pilot, and where both lost games were decided. (Menu ORDER is an open owner
+//call; if it ever flips to ascending, this reference flips with the display
+//order, because the rule is "point at the row the reader has already read".)
+static void xKillRowAnnotations(const std::vector<XDamVictim>& victims, int capX, bool sweep,
+                                bool hitsMe, bool hitsOpp, int myLife, int oppLife,
+                                std::vector<string>& out)
+{
+    out.clear();
+    string prevText;
+    int prevX = 0;
+    bool have = false;
+    for (int x = capX; x >= 0; x--)
+    {
+        string t = xKillRowCore(victims, x, sweep, hitsMe, hitsOpp, myLife, oppLife);
+        if (have && t == prevText)
+        {
+            std::ostringstream c;
+            c << " {X pricing: same as X=" << prevX << "}";
+            out.push_back(c.str());
+            continue;
+        }
+        out.push_back(t);
+        prevText = t;
+        prevX = x;
+        have = true;
+    }
+}
+
+//Board-facing wrapper for the ANNOUNCE_X menu. capX comes from the MENU (the
+//option count), never from a second affordability query: the rows being
+//annotated are the rows the engine built, and a disagreement between the two
+//would put a kill list on an X that is not on offer. Returns false when there
+//is nothing priceable to say (the rows then render exactly as before).
+static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
+                              std::vector<string>& out)
+{
+    if (capX < 0)
+        return false;
+    XVictimSurvey sv;
+    if (!xSurveyBoard(card, me, sv) || !sv.priceable)
+        return false;
+    xKillRowAnnotations(sv.victims, capX, sv.sweep, sv.hitsMe, sv.hitsOpp,
+                        sv.myLife, sv.oppLife, out);
+    return true;
 }
 
 //W43-R1 (owner report, verbatim: "'Seachrome Coast enters tapped unless you
@@ -11945,6 +12117,19 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                 narr.push_back("You announced " + stripNarrationDecoration(shown[xi])
                                + " for " + xName);
             setAskNarration(narr);
+        }
+        //#W45-5: price each X row with what dies for it, on BOTH sides, off the
+        //same survey that priced the cast row (see xKillRowCore). Presentation
+        //only: req.optionTexts is untouched, and the option count and ORDER are
+        //unchanged, so the shown-space -> index==X mapping below still holds.
+        //The size guard is the contract rail - if the menu is ever built with
+        //something other than one option per X from capX down to 0, nothing is
+        //annotated rather than something mis-aligned being claimed.
+        {
+            std::vector<string> xKills;
+            if (xAnnounceRowKills(ctx, this, capX, xKills) && xKills.size() == shown.size())
+                for (size_t ki = 0; ki < shown.size(); ki++)
+                    shown[ki] += xKills[ki];
         }
         //askEvenIfSingle: a zero-slack {X} cast offers exactly one value, and
         //the generic one-option shortcut answered it with no model call, no
@@ -22882,6 +23067,108 @@ void AIPlayerGPT::runParseSelfTest()
                                     3, -1)
               == "Your Teferi, Who Slows the Sunset lost 3 loyalty counters",
               "#W44-LOW NEGATIVE no total is invented when the event captured none");
+    }
+
+    // ---- #W45-5: the ANNOUNCE_X rows carry the kill facts ----
+    cout << "\n[#W45-5] each offered X states what dies for it, on BOTH sides\n";
+    {
+        // The deck130 vs126 seq-46 window, exactly. Starstorm (baseCMC 2), seven
+        // floating mana -> the menu offers X = 5 down to X = 0. Opponent board:
+        // Pride Guardian x2 (0/3), Wall of Omens x2 (0/4), Vampire (1/1). The
+        // pilot's own board: Rorix Bladewing (6/5) - its whole clock, and two
+        // swings from lethal. It read a bare "1. X = 5" and picked it.
+        std::vector<XDamVictim> v;
+        XDamVictim pg1; pg1.baseName = "Pride Guardian"; pg1.name = "Pride Guardian #1";
+        pg1.lethalX = 3; v.push_back(pg1);
+        XDamVictim wo1; wo1.baseName = "Wall of Omens"; wo1.name = "Wall of Omens #1";
+        wo1.lethalX = 4; v.push_back(wo1);
+        XDamVictim wo2 = wo1; wo2.name = "Wall of Omens #2"; v.push_back(wo2);
+        XDamVictim pg2 = pg1; pg2.name = "Pride Guardian #2"; v.push_back(pg2);
+        XDamVictim vam; vam.baseName = "Vampire"; vam.name = "Vampire"; vam.lethalX = 1;
+        v.push_back(vam);
+        XDamVictim rx; rx.baseName = "Rorix Bladewing"; rx.name = "Rorix Bladewing";
+        rx.lethalX = 5; rx.mine = true; v.push_back(rx);
+        std::vector<string> rows;
+        xKillRowAnnotations(v, 5, true, false, false, 19, 9, rows);
+        for (size_t ri = 0; ri < rows.size(); ri++)
+            cout << "     X = " << (5 - (int) ri) << rows[ri] << "\n";
+        CHECK(rows.size() == 6, "#W45-5 one annotation per offered X, largest first");
+        // POSITIVE: the row the pilot actually picked names its own casualty.
+        CHECK(rows[0] == " {X pricing: kills THEIRS: Pride Guardian x2, Wall of Omens x2, Vampire;"
+                         " YOURS: Rorix Bladewing}",
+              "#W45-5 the X=5 row names both boards, the caster's own clock included");
+        // The X=4 row is the play that was available and unstated: the same
+        // opponent board dies and Rorix lives.
+        CHECK(rows[1] == " {X pricing: kills THEIRS: Pride Guardian x2, Wall of Omens x2, Vampire;"
+                         " YOURS: none}",
+              "#W45-5 the X=4 row prices the same sweep with the caster's clock intact");
+        CHECK(rows[1].find("Rorix") == string::npos,
+              "#W45-5 NEGATIVE a row that costs the caster nothing does not name a casualty");
+        CHECK(rows[2] == " {X pricing: kills THEIRS: Pride Guardian x2, Vampire; YOURS: none}",
+              "#W45-5 a smaller X prices its smaller kill set");
+        CHECK(rows[3] == " {X pricing: kills THEIRS: Vampire; YOURS: none}",
+              "#W45-5 the cheapest killing X is priced on its own row");
+        // COLLAPSE: X=1 kills exactly what X=2 kills, so it points at the row
+        // already shown above it rather than repeating it.
+        CHECK(rows[4] == " {X pricing: same as X=2}",
+              "#W45-5 an identical consecutive row collapses to the row already shown");
+        CHECK(rows[5] == " {X pricing: kills THEIRS: none; YOURS: none}",
+              "#W45-5 X=0 states both empty halves rather than going silent");
+        // The MANDATORY half: every priced row states YOURS, empty or not.
+        int missing = 0;
+        for (size_t ri = 0; ri < rows.size(); ri++)
+            if (rows[ri].find("; YOURS: ") == string::npos
+                && rows[ri].find("same as X=") == string::npos)
+                missing++;
+        CHECK(missing == 0, "#W45-5 the YOURS: half is never omitted from a priced row");
+        // NEGATIVE: the sweep wording claims no targeting restriction.
+        CHECK(rows[0].find("one target only") == string::npos,
+              "#W45-5 NEGATIVE a sweep row does not claim a single target");
+        // TARGETED class: one of the named bodies dies, not all of them.
+        std::vector<XDamVictim> t;
+        XDamVictim opp; opp.name = "the opponent"; opp.lethalX = 9; opp.isPlayer = true;
+        t.push_back(opp);
+        XDamVictim ss; ss.baseName = "Shield Sphere"; ss.name = "Shield Sphere";
+        ss.lethalX = 5; t.push_back(ss);
+        XDamVictim gob; gob.baseName = "Goblin"; gob.name = "Goblin #1"; gob.lethalX = 1;
+        gob.mine = true; t.push_back(gob);
+        string t5 = xKillRowCore(t, 5, false, false, false, 1, 9);
+        cout << "     targeted X = 5" << t5 << "\n";
+        CHECK(t5 == " {X pricing: kills (one target only) THEIRS: Shield Sphere;"
+                    " YOURS: Goblin #1}",
+              "#W45-5 a targeted X row states the one-target restriction, and both sides");
+        // The PLAYER row is not a creature and belongs on neither kill list; the
+        // lethality it implies is stated in its own words, at the X that reaches it.
+        CHECK(t5.find("the opponent") == string::npos,
+              "#W45-5 NEGATIVE a player row is not listed as a creature kill");
+        string t9 = xKillRowCore(t, 9, false, false, false, 1, 9);
+        CHECK(t9.find("this X is LETHAL to the opponent (at 9 life)") != string::npos,
+              "#W45-5 the X that can be aimed at the opponent for the win says so");
+        CHECK(t5.find("LETHAL to the opponent") == string::npos,
+              "#W45-5 NEGATIVE an X below their life total claims no lethality");
+        // OWN RISK on a symmetric sweep: the X that kills the caster leads.
+        string kills_me = xKillRowCore(v, 5, true, true, true, 4, 9);
+        CHECK(kills_me.find("at this X it KILLS YOU (you are at 4 life)") != string::npos,
+              "#W45-5 a sweep that reaches the caster states its own lethal X");
+        CHECK(xKillRowCore(v, 3, true, true, true, 4, 9).find("KILLS YOU") == string::npos,
+              "#W45-5 NEGATIVE an X below the caster's life total does not cry lethal");
+        // ECHO SHAPE: the model may echo the annotated row back verbatim.
+        vector<string> xopts;
+        for (size_t ri = 0; ri < rows.size(); ri++)
+        {
+            std::ostringstream lab;
+            lab << "X = " << (5 - (int) ri) << rows[ri];
+            xopts.push_back(lab.str());
+        }
+        string xsrc = "Starstorm";
+        bool xst = false;
+        int xc = parseChoice("CHOICE: 2 (X = 4)", 6, &xopts, &xst, &xsrc);
+        CHECK(xc == 2 && !xst, "#W45-5 echo: a bare 'X = 4' still binds through the annotation");
+        bool xst2 = false;
+        int xc2 = parseChoice("CHOICE: 2 (" + xopts[1] + ")", 6, &xopts, &xst2, &xsrc);
+        CHECK(xc2 == 2 && !xst2, "#W45-5 echo: the whole annotated row echoes back to its own index");
+        CHECK(stripNarrationDecoration(xopts[0]) == "X = 5",
+              "#W45-5 echo: the kill annotation leaves no residue in the narrated record");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
