@@ -2230,17 +2230,28 @@ static string potentialBlockersTag(const vector<string>& entries, const string& 
 //Restriction-first is not the register here: this is a cost the seat is about to
 //pay, so it leads with the outcome and names the assumption the listed results
 //carry. Pure, so PARSETEST proves both phrasings and the silent cases.
-static string gangBlockPriceTag(int need, int damage, bool anyOfThem)
+//#W46-5 (wave-45 ledger, MED): the SAME clause is owed to the BLOCKERS window,
+//where the seat is the one fielding the group - deck123 vs152 seq 47 handed the
+//pilot thirteen rows all reading "(your blocker dies, attacker lives)" against a
+//7/7 with no group price anywhere on the screen, and it spent ~250 words deriving
+//"I need exactly 7 blockers" against the prompt's own "do not re-derive these
+//outcomes; use them". One builder, two voicings ('mine' flips the possessives and
+//points at the B-lines, which sit BELOW the attacker line rather than above it):
+//forking it would let the two windows drift apart on the same arithmetic.
+static string gangBlockPriceTag(int need, int damage, bool anyOfThem, bool mine = false)
 {
     if (need < 2 || damage <= 0)
         return "";
     std::ostringstream o;
     o << "GANG BLOCK: ";
     if (anyOfThem)
-        o << "any " << need << " of them together deal " << damage;
+        o << "any " << need << (mine ? " of yours" : " of them")
+          << " together deal " << damage;
     else
-        o << "their " << need << " biggest together deal " << damage;
-    o << ", enough to kill this attacker; each result above is a LONE blocker only";
+        o << (mine ? "your " : "their ") << need << " biggest together deal " << damage;
+    o << ", enough to kill this attacker; "
+      << (mine ? "each B-line result below is a LONE blocker only"
+               : "each result above is a LONE blocker only");
     return o.str();
 }
 
@@ -13912,6 +13923,10 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     //blocker still soaks its full lethal cut - what changes is whether the
     //carried-over damage reaches YOU, which is a separate prevention question
     //(preventAtoFace) and the only one this clause may lean on.
+    //#W46-9: the carry-over is ALSO what decides whether a blocked attacker
+    //reaches the defending player's life at all, which the lifelink tail below
+    //has to state. Captured here rather than recomputed there.
+    int trampleThrough = 0;
     if (a.trample && !(b.firststrike && !a.firststrike && bKillsA))
     {
         int lethalBasis = bRemaining >= 0 ? bRemaining : bt;
@@ -13919,6 +13934,7 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         int through = ap - lethalToB;
         if (through > 0)
         {
+            trampleThrough = through;
             if (preventAtoFace == kPreventFull)
                 o << (attackerSeat ? ", but its trample damage to them is prevented"
                                    : ", but its trample damage to you is prevented");
@@ -13996,12 +14012,36 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         }
         if (aDeals)
         {
+            //#W46-9 (wave-45 ledger, MED). A benefit inside a fatal parenthesis
+            //reads as an ADDITION. deck152 vs162 seq 28 was handed
+            //"(your attacker dies, their blocker lives (lifelink: you gain 3))"
+            //and answered "gain 3 life each via lifelink (total +6 life) AND
+            //deal 6 damage to the opponent" - both halves of a fight that has
+            //exactly one branch. The bodies clause is honest and the number is
+            //honest; nothing bound the number to the branch it belongs to. So
+            //bind it: this gain exists only if this attacker is BLOCKED here,
+            //and a blocked attacker's damage goes to the blocker, not to their
+            //life. The no-face half is claimed only where it is exactly true -
+            //a trampler that carries damage through gets the honest alternative
+            //(the gain already counts that carry-over) instead of a false
+            //restriction, and a PARTIALLY prevented carry-over is not computed
+            //in either direction, so neither clause is claimed for it.
             const char * who = attackerSeat ? "you gain" : "they gain";
+            const bool noFace = (trampleThrough <= 0 || preventAtoFace == kPreventFull);
+            const bool someFace = (trampleThrough > 0 && preventAtoFace == kPreventNone);
+            const char * whoseLife = attackerSeat ? " their life" : " your life";
             if (a.doublestrike)
                 o << " (lifelink + double strike: " << who
-                  << " life in BOTH damage steps - total not computed here)";
+                  << " life in BOTH damage steps of this block - total not"
+                     " computed here";
             else
-                o << " (lifelink: " << who << " " << ap << ")";
+                o << " (lifelink: " << who << " " << ap << " from this block only";
+            if (noFace)
+                o << ", and this attacker deals nothing to" << whoseLife;
+            else if (someFace)
+                o << " - that number already counts the damage it tramples"
+                     " through";
+            o << ")";
         }
     }
     //#W45-3: the block itself moves life. Unlike lifelink, trample and the
@@ -15592,6 +15632,9 @@ int AIPlayerGPT::chooseBlockers()
             for (size_t k = 0; k < attackers.size(); k++)
                 if (attackers[k] == legal[i][j])
                     canBlockCount[k]++;
+    //#W46-5: set when any attacker line carried a gang price, so the scope note
+    //that explains the clause is stated once and only when it applies.
+    bool anyGangPriced = false;
     tail << "Attackers:\n";
     for (size_t j = 0; j < attackers.size(); j++)
     {
@@ -15662,6 +15705,92 @@ int AIPlayerGPT::chooseBlockers()
         //on a body the seat cannot block - it says what a legal answer for it
         //has to look like.
         ln << blockCountRequirementTag(attackers[j]->minBlockersRequired());
+        //#W46-5 (wave-45 ledger, MED). The mirror of the attackers window's
+        //#W45-2 clause, in the seat that actually fields the group. Every B-line
+        //parenthetical below is a ONE-blocker forecast, so a board whose every
+        //row reads "(your blocker dies, attacker lives)" says nothing about the
+        //group that kills the attacker outright - and the pilot at deck123 vs152
+        //seq 47 re-derived it by hand, ~250 words, against the trust note's own
+        //"never re-derive it".
+        //TRUST DOCTRINE, gate-for-gate identical to the attackers side: the
+        //number is claimed ONLY where a sum of powers is the whole fight. First
+        //or double strike on the attacker removes blockers before their damage
+        //lands; deathtouch/wither/infect on a blocker kills on a threshold this
+        //sum does not model; indestructible and persist/undying mean the sum
+        //kills nothing lasting; a prevention shield means the damage never
+        //arrives; a when-blocked self-pump changes the toughness being priced.
+        //A wrong N is strictly worse than no N.
+        {
+            int bbSelfP = 0, bbSelfT = 0;
+            bool gangOk = attackers[j]->toughness > 0
+                          && !attackers[j]->basicAbilities[Constants::INDESTRUCTIBLE]
+                          && !attackers[j]->basicAbilities[Constants::FIRSTSTRIKE]
+                          && !attackers[j]->basicAbilities[Constants::DOUBLESTRIKE]
+                          && !attackers[j]->basicAbilities[Constants::PERSIST]
+                          && !attackers[j]->basicAbilities[Constants::UNDYING]
+                          && becomesBlockedSelfPump(attackers[j]->text, bbSelfP, bbSelfT) == 0;
+            //The candidate set is the ENGINE's own legal-per-blocker map, the
+            //same source the B-lines and canBlockCount read - so the group can
+            //never contain a body that may not legally block this attacker.
+            vector<int> gangPowers;
+            for (size_t i = 0; i < blockers.size(); i++)
+            {
+                bool canB = false;
+                for (size_t g = 0; g < legal[i].size() && !canB; g++)
+                    canB = (legal[i][g] == attackers[j]);
+                if (!canB)
+                    continue;
+                if (blockers[i]->basicAbilities[Constants::DEATHTOUCH]
+                    || blockers[i]->basicAbilities[Constants::WITHER]
+                    || blockers[i]->basicAbilities[Constants::INFECT]
+                    || combatPreventionKind(blockers[i], attackers[j]) != kPreventNone)
+                    gangOk = false;
+                gangPowers.push_back(blockers[i]->power > 0 ? blockers[i]->power : 0);
+            }
+            if (gangOk && gangPowers.size() >= 2)
+            {
+                vector<int> asc(gangPowers);
+                std::sort(asc.begin(), asc.end());
+                //`need` from the LARGEST first: the smallest group that can do
+                //it at all. `anyOfThem` re-runs the same count from the
+                //SMALLEST, and is true only when even the weakest `need` of
+                //them reach the toughness - what makes the word "any" a fact.
+                int need = 0, dmg = 0;
+                for (size_t i = asc.size(); i-- > 0 && dmg < attackers[j]->toughness; )
+                {
+                    dmg += asc[i];
+                    need++;
+                }
+                //W43-1 interaction: a group SMALLER than the declaration
+                //minimum is not a legal block at all, so the price is raised to
+                //the minimum (more blockers only add power) rather than printed
+                //at an illegal size. Below that many candidates, nothing is
+                //claimed.
+                const int minBlk = attackers[j]->minBlockersRequired();
+                if (minBlk > need && (int) asc.size() >= minBlk)
+                {
+                    need = minBlk;
+                    dmg = 0;
+                    for (int i = 0; i < need; i++)
+                        dmg += asc[asc.size() - 1 - i];
+                }
+                if (dmg >= attackers[j]->toughness && need >= 2
+                    && need >= minBlk && (int) asc.size() >= need)
+                {
+                    int lowSum = 0;
+                    for (int i = 0; i < need; i++)
+                        lowSum += asc[i];
+                    bool anyOfThem = (lowSum >= attackers[j]->toughness);
+                    string gp = gangBlockPriceTag(need, anyOfThem ? lowSum : dmg,
+                                                  anyOfThem, true);
+                    if (!gp.empty())
+                    {
+                        anyGangPriced = true;
+                        ln << " [" << gp << "]";
+                    }
+                }
+            }
+        }
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
     }
@@ -15778,6 +15907,19 @@ int AIPlayerGPT::chooseBlockers()
     }
     //W36 #1: the trade-trust rule, at the tail for salience (see the constant).
     tail << kBlockTradeTrustNote;
+    //#W46-5 SCOPE, stated once rather than on every line - the mirror of the
+    //attackers window's gang-block scope line. The trust note above ends on
+    //"Only gang-blocks, pumps or combat tricks can change it", which names the
+    //gang block without pricing it; this says the price is already on the
+    //attacker line when it is exactly computable, so the group arithmetic is
+    //not something to re-derive either.
+    if (anyGangPriced)
+        tail << "A \"GANG BLOCK:\" clause on an attacker line is the cheapest lethal"
+                " group YOUR listed blockers can field against that attacker,"
+                " computed from their powers: several DIFFERENT blockers may block"
+                " one attacker and their power adds together, which no 1-on-1 trade"
+                " above includes. Use that number; do not re-derive it. Each"
+                " blocker can still join only ONE such group.\n";
     //Wave-35 churn driver #5, defender side. Main phase 2 is NOT true here (it
     //is the opponent's turn), so only the priority fact is stated - a true
     //statement in the wrong scope is a lie (trust doctrine).
@@ -23531,8 +23673,11 @@ void AIPlayerGPT::runParseSelfTest()
                                       kPreventNone, true)
               == "both die (lifelink: they gain 2)",
               "#W44-LOW the attackers window voices the same swing as THEIRS");
+        //#W46-9 UPDATED: the gain is still the attacker's full power; the tail
+        //now names the branch it belongs to (see the #W46-9 block at the end).
         CHECK(combatTradePreviewStats(vanB22, llAtk55)
-              == "your blocker dies, attacker lives (lifelink: they gain 5)",
+              == "your blocker dies, attacker lives (lifelink: they gain 5 from this"
+                 " block only, and this attacker deals nothing to your life)",
               "#W44-LOW a lifelink ATTACKER's gain is its full power, trample or not");
         // NEGATIVE: no lifelink anywhere, no clause. The control for all of it.
         CHECK(combatTradePreviewStats(vanB22, vanA22).find("lifelink") == string::npos,
@@ -24359,6 +24504,151 @@ void AIPlayerGPT::runParseSelfTest()
                   && log.find("- 3 damage was dealt to you (now 15)") != string::npos,
                   "#W45-20 the assembled log carries the tagged shapes verbatim");
         }
+    }
+
+
+    // ---- #W46-5: the BLOCKERS screen prices the gang, not just the pairs ----
+    // deck123 vs152 seq 47: one 7/7 attacker, thirteen B-rows all reading
+    // "(your blocker dies, attacker lives)", no group price anywhere - and ~250
+    // words of hand arithmetic in the reply, on a prompt whose own trust note
+    // says "never re-derive it". Same builder as the attackers window, second
+    // voicing.
+    cout << "\n[#W46-5] the blockers window states the cheapest lethal gang from YOUR blockers\n";
+    {
+        // POSITIVE, the "any" phrasing: even the smallest 7 of them reach it.
+        string mineAny = gangBlockPriceTag(7, 7, true, true);
+        cout << "     seq-47 shape: \"" << mineAny << "\"\n";
+        CHECK(mineAny == "GANG BLOCK: any 7 of yours together deal 7, enough to kill this"
+                         " attacker; each B-line result below is a LONE blocker only",
+              "#W46-5 the seat's own group is priced in the seat's own possessive");
+        // POSITIVE, the narrowed phrasing: only the BIGGEST N get there.
+        CHECK(gangBlockPriceTag(3, 8, false, true)
+              == "GANG BLOCK: your 3 biggest together deal 8, enough to kill this"
+                 " attacker; each B-line result below is a LONE blocker only",
+              "#W46-5 when the smallest N fall short the claim narrows to the biggest N");
+        // The attackers-window voicing is UNCHANGED - one builder, two seats,
+        // and neither may drift into the other's chair.
+        CHECK(gangBlockPriceTag(2, 4, true)
+              == "GANG BLOCK: any 2 of them together deal 4, enough to kill this"
+                 " attacker; each result above is a LONE blocker only",
+              "#W46-5 REGRESSION the wave-45 attackers-side string is byte-identical");
+        CHECK(gangBlockPriceTag(2, 4, true, false) == gangBlockPriceTag(2, 4, true),
+              "#W46-5 REGRESSION the new parameter defaults to the attackers-side voicing");
+        CHECK(gangBlockPriceTag(3, 8, false)
+                  .find("their 3 biggest") != string::npos
+              && gangBlockPriceTag(3, 8, false, true).find("their") == string::npos,
+              "#W46-5 the two voicings never share a possessive");
+        // NEGATIVES: the silent cases are silent in BOTH voicings. need<2 is a
+        // lone blocker (the B-line result already says it) and a 0 sum kills
+        // nothing - a wrong N is strictly worse than no N.
+        CHECK(gangBlockPriceTag(1, 9, true, true).empty()
+              && gangBlockPriceTag(0, 9, false, true).empty(),
+              "#W46-5 NEGATIVE a group of fewer than two is not a gang, in either seat");
+        CHECK(gangBlockPriceTag(4, 0, true, true).empty()
+              && gangBlockPriceTag(4, -3, false, true).empty(),
+              "#W46-5 NEGATIVE a group that deals nothing is never priced");
+        // ECHO SHAPE: the price rides a BRACKET on an A-line of the blockers
+        // prompt, so its digits must forge no assignment if the reply echoes
+        // the row back. "7" is deliberately outside the label range here.
+        string bracket = " [" + mineAny + "]";
+        vector<string> bn2; bn2.push_back("Shield Sphere"); bn2.push_back("Wall of Omens");
+        vector<string> an2; an2.push_back("Luminarch Aspirant"); an2.push_back("Fate Unraveler");
+        vector<vector<int> > lg2(2);
+        lg2[0].push_back(0); lg2[0].push_back(1);
+        lg2[1].push_back(0); lg2[1].push_back(1);
+        vector<int> pk2;
+        int pr2 = parseBlockAssignments("BLOCKS: B1:A1" + bracket, 2, 2, pk2, &bn2, &an2, &lg2);
+        cout << "     echoed price: pairs=" << pr2 << " B1=" << pk2[0] << " B2=" << pk2[1] << "\n";
+        CHECK(pr2 == 1 && pk2[0] == 1 && pk2[1] == 0,
+              "#W46-5 echo: an echoed gang price still assigns B1:A1 and nothing else");
+        vector<int> pk3;
+        CHECK(parseBlockAssignments("BLOCKS: none" + bracket, 2, 2, pk3, &bn2, &an2, &lg2) == 0
+              && pk3[0] == 0 && pk3[1] == 0,
+              "#W46-5 echo NEGATIVE a decline carrying the price stays a decline");
+        CHECK(stripNarrationDecoration("A1. Luminarch Aspirant (7/7) deals 7" + bracket)
+              == "A1. Luminarch Aspirant (7/7) deals 7",
+              "#W46-5 echo: the bracket never reaches the narration");
+    }
+
+    // ---- #W46-9: a benefit inside a fatal parenthesis names its branch ----
+    // deck152 vs162 seq 28 read "(your attacker dies, their blocker lives
+    // (lifelink: you gain 3))" and answered "gain 3 life each (total +6) AND
+    // deal 6 damage to the opponent" - the two branches of one fight, summed.
+    cout << "\n[#W46-9] the lifelink number is bound to the branch that produces it\n";
+    {
+        // power, toughness, deathtouch, wither, infectLabel, firststrike,
+        // indestructible, trample, persist, lifelink, doublestrike
+        CombatTradeStat blk34   = { 3, 4, false, false, false, false, false, false, false, false, false };
+        CombatTradeStat llAtk32 = { 3, 2, false, false, false, false, false, false, false, true,  false };
+        CombatTradeStat llTr55  = { 5, 5, false, false, false, false, false, true,  false, true,  false };
+        CombatTradeStat blk22   = { 2, 2, false, false, false, false, false, false, false, false, false };
+        CombatTradeStat dsLLAtk = { 2, 2, false, false, false, true,  false, false, false, true,  true  };
+        CombatTradeStat blk15   = { 1, 5, false, false, false, false, false, false, false, false, false };
+
+        // THE RECORD'S OWN SHAPE, attacker's chair: the attacker dies and its
+        // lifelink still pays - and the face damage it did NOT deal is named.
+        string seq28 = combatTradePreviewStats(blk34, llAtk32, kPreventNone, kPreventNone,
+                                               kPreventNone, true);
+        cout << "     seq-28 shape: \"" << seq28 << "\"\n";
+        CHECK(seq28 == "your attacker dies, their blocker lives (lifelink: you gain 3 from"
+                       " this block only, and this attacker deals nothing to their life)",
+              "#W46-9 the gain is bound to the block, and the un-dealt face damage is stated");
+        CHECK(seq28.find("deals nothing to their life") != string::npos,
+              "#W46-9 the restriction that refutes the +face reading is present in words");
+        // The blockers chair reads the same fight about YOUR life.
+        CHECK(combatTradePreviewStats(blk34, llAtk32)
+              == "you kill it, your blocker lives (lifelink: they gain 3 from this block"
+                 " only, and this attacker deals nothing to your life)",
+              "#W46-9 the defender's chair is told whose life is spared, in its own voice");
+        // TRAMPLE: some damage DOES reach the face, so the no-face restriction
+        // would be a lie - the honest alternative says the gain already counts
+        // the carry-over instead (never a second, additive number).
+        string tr = combatTradePreviewStats(blk22, llTr55, kPreventNone, kPreventNone,
+                                            kPreventNone, true);
+        cout << "     trampling lifelinker: \"" << tr << "\"\n";
+        CHECK(tr.find("3 tramples through to them") != string::npos
+              && tr.find("you gain 5 from this block only - that number already counts the"
+                         " damage it tramples through") != string::npos,
+              "#W46-9 a trampler's gain names the carry-over it already includes");
+        CHECK(tr.find("deals nothing to") == string::npos,
+              "#W46-9 NEGATIVE the no-face restriction is never claimed over live trample damage");
+        // PARTIAL prevention of the carry-over: neither clause is provable, so
+        // neither is printed (the omit-when-unprovable rung).
+        string trP = combatTradePreviewStats(blk22, llTr55, kPreventNone, kPreventNone,
+                                             kPreventPartial, true);
+        CHECK(trP.find("lifelink: you gain 5 from this block only)") != string::npos
+              && trP.find("deals nothing to") == string::npos
+              && trP.find("already counts") == string::npos,
+              "#W46-9 an uncomputable carry-over gets the bare binding and no claim either way");
+        // FULLY prevented carry-over: nothing reaches their life after all, so
+        // the restriction is true again and is stated.
+        CHECK(combatTradePreviewStats(blk22, llTr55, kPreventNone, kPreventNone,
+                                      kPreventFull, true)
+                  .find("and this attacker deals nothing to their life") != string::npos,
+              "#W46-9 a prevented carry-over restores the no-face restriction");
+        // DOUBLE STRIKE keeps its withheld total AND gains the branch binding.
+        string ds9 = combatTradePreviewStats(blk15, dsLLAtk, kPreventNone, kPreventNone,
+                                             kPreventNone, true);
+        CHECK(ds9.find("lifelink + double strike: you gain life in BOTH damage steps of this"
+                       " block - total not computed here, and this attacker deals nothing to"
+                       " their life") != string::npos,
+              "#W46-9 the un-numbered double-strike clause is bound to its branch too");
+        CHECK(ds9.find("you gain 2 from this block") == string::npos,
+              "#W46-9 NEGATIVE the single-step number is still never claimed for a double striker");
+        // REGRESSION: the BLOCKING side's lifelink is untouched - that number
+        // was never confusable with face damage, and this lane does not reword it.
+        CombatTradeStat llBlk22b = { 2, 2, false, false, false, false, false, false, false, true, false };
+        CombatTradeStat vanA22b  = { 2, 2, false, false, false, false, false, false, false, false, false };
+        CHECK(combatTradePreviewStats(llBlk22b, vanA22b) == "both die (lifelink: you gain 2)",
+              "#W46-9 REGRESSION a blocker's lifelink clause is byte-identical to wave 44");
+        // NEGATIVE: no lifelink, no clause, and no stray branch wording.
+        CHECK(combatTradePreviewStats(blk34, vanA22b).find("from this block") == string::npos,
+              "#W46-9 NEGATIVE a fight with no lifelink gains no branch clause");
+        // NEGATIVE: a lifelink attacker whose damage is fully prevented deals
+        // nothing, so it gains nothing and the clause stays absent entirely.
+        CHECK(combatTradePreviewStats(blk34, llAtk32, kPreventFull).find("lifelink")
+              == string::npos,
+              "#W46-9 NEGATIVE prevented damage gains nothing, so there is no number to bind");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
