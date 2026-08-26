@@ -12,7 +12,7 @@ STEP 1. Read the ask's price line for the "(keeping N)" number. If it says (keep
   4-card hand every time, and there is no hand at 4 or fewer you can win from. If the floor
   applies, you are DONE - do not read another rule in this section.
 STEP 2. Only at (keeping 6) or on your untouched opening 7 may you mulligan at all, and ONLY
-  for one of these three: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
+  for one of these four: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
   your colors when the header shows every spell needs it; or ONE land when the hand's spells
   cost 2 or more (with one land you will not cast a 3-drop on time, and a six is usually a
   two-lander - ship it). A one-land hand whose spells cost 1 is a keep. The "KEEP a 7 or a 6 with 2-5 lands" line below describes
