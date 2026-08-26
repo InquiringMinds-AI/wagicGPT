@@ -1,0 +1,556 @@
+# Wave-44 lategame specimen (owner prompt review, invariant 0)
+# file=1787761221-ai_baka_deck125-0x558033705f60-vs-ai_baka_deck152.jsonl seq=125 kind=priority turn=52 phase=Upkeep prompt_chars=27196 latency_ms=5894
+# The per-decision USER message, verbatim (system prompt = Res/ai/gpt/system_prompt.txt + guide, unchanged):
+
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - Dream Fracture x2, Cancel x2, Path to Exile x3, Fall of the Gavel, Supreme Verdict, Essence Scatter; opponent - Briarbridge Tracker, Sigarda, Champion of Light x2, Brutal Cathar x3, Elite Spellbinder x3, Fateful Absence, Tovolar's Huntmaster, Luminarch Aspirant, Ranger Class x2, Intrepid Adversary, Katilda, Dawnhart Prime; exiled at trim: you - Sphinx's Revelation, Final Judgment; opponent - Luminarch Aspirant x3, Sigarda, Champion of Light, Brutal Cathar, Elite Spellbinder, Katilda, Dawnhart Prime)
+- Opponent cast Brutal Cathar
+- Opponent's Brutal Cathar resolved and entered the battlefield
+- Phase: Combat damage
+- Elite Spellbinder dealt 3 damage to you (now 13)
+- Brutal Cathar dealt 2 damage to you (now 11)
+- Phase: Main phase 2
+- Opponent cast Elite Spellbinder
+- Opponent's Elite Spellbinder resolved and entered the battlefield
+- Opponent used: exile a non-land card with Elite Spellbinder #2 targeting Supreme Verdict
+- Your Supreme Verdict was exiled from your hand
+=== Turn 16 - YOUR turn ===
+- Phase: Upkeep
+- You drew Elixir of Immortality
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 18)
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- You cast Supreme Verdict from your exile
+- Opponent's Brutal Cathar died
+- Opponent's Elite Spellbinder died
+- Opponent's Brutal Cathar died
+- Opponent's Elite Spellbinder died
+- Your Supreme Verdict resolved and went to your graveyard
+=== Turn 17 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Luminarch Aspirant
+- Opponent's Luminarch Aspirant resolved and entered the battlefield
+- Phase: Combat begins
+- Opponent used: Put a +1/+1 counter with Luminarch Aspirant targeting Luminarch Aspirant
+- Opponent's Luminarch Aspirant got a +1/+1 counter (now 2/2)
+=== Turn 18 - YOUR turn ===
+- Phase: Upkeep
+- You drew Cancel
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 17)
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Seachrome Coast
+- You cast Path to Exile
+- Opponent cast Fateful Absence
+- You targeted Fateful Absence with Cancel
+- You cast Cancel
+- Opponent's Fateful Absence was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+- Opponent's Luminarch Aspirant was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Forest
+- Opponent's Forest entered the battlefield from the opponent's library
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 19 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sigarda, Champion of Light
+- Opponent's Sigarda, Champion of Light resolved and entered the battlefield
+=== Turn 20 - YOUR turn ===
+- Phase: Upkeep
+- You drew Lightmine Field
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 16)
+- You used: Life with Elixir of Immortality
+- You gained 5 life (now 16)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (7 cards) into your library with Elixir of Immortality
+- Phase: Draw
+- You drew Fall of the Gavel
+=== Turn 21 - opponent's turn ===
+- Phase: Untap
+- It became Night
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Barkchannel Pathway
+- Phase: Combat damage
+- Sigarda, Champion of Light dealt 4 damage to you (now 12)
+=== Turn 22 - YOUR turn ===
+- Phase: Upkeep
+- You drew Path to Exile
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 15)
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- You cast Final Judgment
+- Opponent's Sigarda, Champion of Light was exiled from the battlefield
+- Your Final Judgment resolved and went to your graveyard
+=== Turn 23 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Brutal Cathar
+- Opponent's Brutal Cathar resolved and entered the battlefield
+- Opponent's Brutal Cathar transformed into Moonrage Brute (now 3/3 first strike, nightbound)
+=== Turn 24 - YOUR turn ===
+- Phase: Upkeep
+- You drew Fall of the Gavel
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 14)
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- You cast Path to Exile
+- Opponent used: this spell costs 3 life more with Moonrage Brute targeting Path to Exile
+- You chose Path to Exile's mode "pay 3 life"
+- You lost 3 life (now 9)
+- Opponent's Moonrage Brute was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Opponent's Plains entered the battlefield from the opponent's library
+=== Turn 25 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Luminarch Aspirant
+- Opponent's Luminarch Aspirant resolved and entered the battlefield
+- Phase: Combat begins
+- Opponent used: Put a +1/+1 counter with Luminarch Aspirant targeting Luminarch Aspirant
+- Opponent's Luminarch Aspirant got a +1/+1 counter (now 2/2)
+=== Turn 26 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 13)
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Main phase 1
+- You played Island
+- You cast Path to Exile
+- Opponent's Luminarch Aspirant was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- You cast Lightmine Field
+- Your Lightmine Field resolved and entered the battlefield
+=== Turn 27 - opponent's turn ===
+- Phase: Untap
+- It became Day
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Elite Spellbinder
+- You cast Essence Scatter
+- Opponent's Elite Spellbinder was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 28 - YOUR turn ===
+- Phase: Upkeep
+- You drew Seachrome Coast
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 12)
+- Phase: Draw
+- You drew Supreme Verdict
+- Phase: Main phase 1
+- You played Seachrome Coast
+- Phase: Main phase 2
+- You cast Supreme Verdict
+- Your Supreme Verdict resolved and went to your graveyard
+=== Turn 29 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Hengegate Pathway
+=== Turn 30 - YOUR turn ===
+- Phase: Untap
+- It became Night
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 11)
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Island
+- You announced X = 7 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 7 life (now 16)
+- You drew Plains
+- You drew Dream Fracture
+- You drew Tundra
+- You drew Cancel
+- You drew Path to Exile
+- You drew Glacial Fortress
+- You drew Dream Fracture
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: ---
+- You discarded Lightmine Field
+- You discarded Fall of the Gavel
+- You discarded Fall of the Gavel
+- You discarded Dream Fracture
+=== Turn 31 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Tovolar's Huntmaster
+- Opponent's Tovolar's Huntmaster resolved and entered the battlefield
+- Opponent's Tovolar's Huntmaster created a 2/2 Wolf token
+- Opponent's Tovolar's Huntmaster created a 2/2 Wolf token
+- Opponent's Tovolar's Packleader created a 2/2 Wolf token
+- Opponent's Tovolar's Packleader created a 2/2 Wolf token
+- Opponent's Tovolar's Huntmaster transformed into Tovolar's Packleader (now 7/7 nightbound)
+=== Turn 32 - YOUR turn ===
+- Phase: Upkeep
+- You drew Supreme Verdict
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 10)
+- Phase: Draw
+- You drew Supreme Verdict
+- Phase: Main phase 1
+- You cast Supreme Verdict
+- Opponent's Wolf died
+- Opponent's Wolf (token) ceased to exist and left the opponent's graveyard
+- Opponent's Tovolar's Packleader died
+- Opponent's Wolf died
+- Opponent's Wolf (token) ceased to exist and left the opponent's graveyard
+- Opponent's Wolf died
+- Opponent's Wolf (token) ceased to exist and left the opponent's graveyard
+- Opponent's Wolf died
+- Opponent's Wolf (token) ceased to exist and left the opponent's graveyard
+- Your Supreme Verdict resolved and went to your graveyard
+- Phase: Main phase 2
+- You played Plains
+=== Turn 33 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Hengegate Pathway
+=== Turn 34 - YOUR turn ===
+- Phase: Upkeep
+- You drew Seachrome Coast
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 9)
+- Phase: Draw
+- You drew Path to Exile
+- Phase: ---
+- You discarded Dream Fracture
+- You discarded Tundra
+=== Turn 35 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sigarda, Champion of Light
+- You cast Cancel
+- Opponent's Sigarda, Champion of Light was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 36 - YOUR turn ===
+- Phase: Upkeep
+- You drew Final Judgment
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 8)
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You played Glacial Fortress
+- You used: Life with Elixir of Immortality
+- You gained 5 life (now 21)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (14 cards) into your library with Elixir of Immortality
+=== Turn 37 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Luminarch Aspirant
+- You cast Dream Fracture
+- Opponent's Luminarch Aspirant was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Path to Exile
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset resolved and entered the battlefield
+- Opponent's Teferi, Who Slows the Sunset got 5 loyalty counters (now 5)
+- Opponent used: +1: tap or untap permanents with Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset got a bookkeeping (Teferi's +1) counter
+- Opponent used: choose a land with Teferi, Who Slows the Sunset
+- Opponent used: choose your land with Teferi, Who Slows the Sunset targeting Hengegate Pathway #1
+- Opponent used: choose an artifact with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent artifact with Teferi, Who Slows the Sunset targeting Staff of Nin
+- Opponent gained 2 life (now 10)
+- Opponent's Teferi, Who Slows the Sunset lost a bookkeeping (Teferi's +1) counter
+=== Turn 38 - YOUR turn ===
+- Phase: Untap
+- It became Day
+- Phase: Upkeep
+- You drew Tundra
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 9)
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 39 - opponent's turn ===
+- Phase: Untap
+- It became Night
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Ranger Class
+- You cast Cancel
+- Opponent's Ranger Class was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 40 - YOUR turn ===
+- Phase: Upkeep
+- You drew Glacial Fortress
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 8)
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 41 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Elite Spellbinder
+- Opponent's Elite Spellbinder resolved and entered the battlefield
+- Opponent used: exile a non-land card with Elite Spellbinder targeting Final Judgment
+- Your Final Judgment was exiled from your hand
+- Opponent's Teferi, Who Slows the Sunset got a loyalty counter
+- Opponent used: +1: tap or untap permanents with Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset got a bookkeeping (Teferi's +1) counter
+- Opponent used: choose a land with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent land with Teferi, Who Slows the Sunset targeting Glacial Fortress #3
+- Opponent used: choose a creature with Teferi, Who Slows the Sunset
+- Opponent used: choose your creature with Teferi, Who Slows the Sunset targeting Elite Spellbinder
+- Opponent used: choose an artifact with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent artifact with Teferi, Who Slows the Sunset targeting Staff of Nin
+- Opponent gained 2 life (now 10)
+- Opponent's Teferi, Who Slows the Sunset lost a bookkeeping (Teferi's +1) counter
+=== Turn 42 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 9)
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Seachrome Coast
+- You cast Path to Exile
+- Opponent's Elite Spellbinder was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+=== Turn 43 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Katilda, Dawnhart Prime
+- Opponent's Katilda, Dawnhart Prime resolved and entered the battlefield
+- Opponent's Teferi, Who Slows the Sunset got a loyalty counter
+- Opponent used: +1: tap or untap permanents with Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset got a bookkeeping (Teferi's +1) counter
+- Opponent used: choose a land with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent land with Teferi, Who Slows the Sunset targeting Tundra
+- Opponent used: choose a creature with Teferi, Who Slows the Sunset
+- Opponent used: choose your creature with Teferi, Who Slows the Sunset targeting Katilda, Dawnhart Prime
+- Opponent used: choose an artifact with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent artifact with Teferi, Who Slows the Sunset targeting Staff of Nin
+- Opponent gained 2 life (now 11)
+- Opponent's Teferi, Who Slows the Sunset lost a bookkeeping (Teferi's +1) counter
+=== Turn 44 - YOUR turn ===
+- Phase: Upkeep
+- You drew Fall of the Gavel
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 10)
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- You played Island
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You cast Path to Exile
+- Opponent's Katilda, Dawnhart Prime was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 9)
+=== Turn 45 - opponent's turn ===
+- Phase: Untap
+- It became Day
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent used: Flip Side with Branchloft Pathway
+- Opponent used: an ability with Boulderloft Pathway
+- Opponent played Boulderloft Pathway
+- Opponent's Teferi, Who Slows the Sunset lost a loyalty counter
+- Opponent's Teferi, Who Slows the Sunset lost a loyalty counter
+- Opponent used: -2: reveal top 3 cards with Teferi, Who Slows the Sunset
+- Opponent revealed their Brutal Cathar from their library
+- Opponent revealed their Katilda, Dawnhart Prime from their library
+- Opponent revealed their Hengegate Pathway from their library
+- Opponent used: Put a card into hand with Teferi, Who Slows the Sunset targeting Brutal Cathar
+- Opponent put the revealed Brutal Cathar into their hand
+- Opponent put the revealed Katilda, Dawnhart Prime into their library
+- Opponent put the revealed Hengegate Pathway into their library
+- Opponent cast Brutal Cathar
+- You cast Fall of the Gavel
+- Opponent's Brutal Cathar was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 26)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 46 - YOUR turn ===
+- Phase: Upkeep
+- You drew Plains
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 8)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 7)
+- You drew Dream Fracture
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- You played Island
+=== Turn 47 - opponent's turn ===
+- Phase: Untap
+- It became Night
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Intrepid Adversary
+- You cast Cancel
+- Opponent's Intrepid Adversary was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+- Opponent's Teferi, Who Slows the Sunset got a loyalty counter
+- Opponent used: +1: tap or untap permanents with Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset got a bookkeeping (Teferi's +1) counter
+- Opponent used: choose a land with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent land with Teferi, Who Slows the Sunset targeting Plains #4
+- Opponent used: choose an artifact with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent artifact with Teferi, Who Slows the Sunset targeting Staff of Nin #1
+- Opponent gained 2 life (now 9)
+- Opponent's Teferi, Who Slows the Sunset lost a bookkeeping (Teferi's +1) counter
+=== Turn 48 - YOUR turn ===
+- Phase: Upkeep
+- You drew Island
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 8)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 7)
+- You drew Tundra
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 49 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Ranger Class
+- You cast Dream Fracture
+- Opponent's Ranger Class was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Final Judgment
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent played Deserted Beach
+- Opponent's Teferi, Who Slows the Sunset got a loyalty counter
+- Opponent used: +1: tap or untap permanents with Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset got a bookkeeping (Teferi's +1) counter
+- Opponent used: choose a land with Teferi, Who Slows the Sunset
+- Opponent used: choose your land with Teferi, Who Slows the Sunset targeting Boulderloft Pathway
+- Opponent used: choose an artifact with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent artifact with Teferi, Who Slows the Sunset targeting Staff of Nin #2
+- Opponent gained 2 life (now 9)
+- Opponent's Teferi, Who Slows the Sunset lost a bookkeeping (Teferi's +1) counter
+=== Turn 50 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 8)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 7)
+- You drew Seachrome Coast
+- Phase: Draw
+- You drew Essence Scatter
+- Phase: Main phase 1
+- You played Plains
+- Phase: ---
+- You discarded Supreme Verdict
+- You discarded Path to Exile
+=== Turn 51 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Katilda, Dawnhart Prime
+- You cast Essence Scatter
+- Opponent's Katilda, Dawnhart Prime was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+- Opponent's Teferi, Who Slows the Sunset got a loyalty counter
+- Opponent used: +1: tap or untap permanents with Teferi, Who Slows the Sunset
+- Opponent's Teferi, Who Slows the Sunset got a bookkeeping (Teferi's +1) counter
+- Opponent used: choose a land with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent land with Teferi, Who Slows the Sunset targeting Tundra #1
+- Opponent used: choose an artifact with Teferi, Who Slows the Sunset
+- Opponent used: choose opponent artifact with Teferi, Who Slows the Sunset targeting Staff of Nin #1
+- Opponent gained 2 life (now 9)
+- Opponent's Teferi, Who Slows the Sunset lost a bookkeeping (Teferi's +1) counter
+=== Turn 52 - YOUR turn ===
+- Phase: Upkeep
+- You drew Dream Fracture
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 8)
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Staff of Nin dealt 1 damage to the opponent (now 7)
+- You drew Emrakul, the Aeons Torn
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You cast Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn resolved and entered the battlefield
+- Phase: ---
+- You discarded Path to Exile
+=== Turn 53 - YOUR turn ===
+- Phase: Upkeep
+- You drew Cancel
+
+--- CURRENT SITUATION ---
+Phase: Upkeep | It is your turn.
+It is currently Night.
+Your life: 26 | Opponent life: 7
+ON THE STACK, waiting to resolve (top resolves FIRST - you can respond now):
+  1 (top): ability: Draw 1 [triggered/activated ability]
+Mana available: 19 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{w}; mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Plains #1 {w}; Island #1 {u}; Plains #2 {w}; Glacial Fortress #1 {w} or {u}; Plains #3 {w}; Plains #4 {w}; Seachrome Coast #1 {w} or {u}; Island #2 {u}; Seachrome Coast #2 {w} or {u}; Island #3 {u}; Plains #5 {w}; Glacial Fortress #2 {w} or {u}; Tundra #1 {w} or {u}; Glacial Fortress #3 {w} or {u}; Seachrome Coast #3 {w} or {u}; Island #4 {u}; Island #5 {u}; Tundra #2 {w} or {u}; Plains #6 {w}
+Land drop: NOT yet used this turn - you can still play a land. The land drop is its OWN decision (a "Land drop:" question with its own Play options); it is never listed in a casting, ability or target menu, so its absence from the choices below does not mean it is gone.
+Your hand: Island (land: taps for {U}); Glacial Fortress (land: taps for {W}{U}); Final Judgment {4}{w}{w} [sorcery]; Sphinx's Revelation (copy 1 of 2 in your hand) {u}{u}{w}{x} [instant]; Seachrome Coast (land: taps for {W}{U}); Dream Fracture {1}{u}{u} [instant]; Sphinx's Revelation (copy 2 of 2 in your hand) {u}{u}{w}{x} [instant]; Cancel {1}{u}{u} [instant]
+Your battlefield (23 permanents listed, of which 1 is a creature): Plains #1; Island #1; Plains #2; Glacial Fortress #1; Plains #3; Plains #4; Staff of Nin #1 {6} [artifact]; Seachrome Coast #1; Island #2; Lightmine Field {2}{w}{w} [enchantment]; Seachrome Coast #2; Island #3; Plains #5; Glacial Fortress #2; Tundra #1; Glacial Fortress #3; Seachrome Coast #3; Island #4; Staff of Nin #2 {6} [artifact]; Island #5; Tundra #2; Plains #6; Emrakul, the Aeons Torn {15} (15/15) [flying, can't be countered, protection from colored spells] [annihilator 6 - whenever it attacks, the defending player sacrifices 6 permanents]
+Opponent battlefield (14 permanents listed, of which 0 are creatures): Plains #1; Overgrown Farmland; Plains #2; Deserted Beach #1; Branchloft Pathway; Barkchannel Pathway #1; Forest [tapped]; Barkchannel Pathway #2 [tapped]; Plains #3; Hengegate Pathway #1; Hengegate Pathway #2; Teferi, Who Slows the Sunset {2}{u}{w} [planeswalker] [counters: 8x loyalty]; Boulderloft Pathway [tapped]; Deserted Beach #2 [tapped]
+Opponent hand size: 0 | Opponent library: 23 cards
+Artifacts in play: you 2 | opponent 0
+Your library: 16 cards
+
+YOUR PLAN (as you last stated it): Attack with Emrakul. Ping opponent with Staffs. Answer threats with counters/removal. Win via Emrakul combat damage and Annihilator.
+
+Your legal actions (Upkeep, YOUR turn):
+1. Deal 1 damage with Staff of Nin #1 targeting Emrakul, the Aeons Torn [your battlefield] [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+2. Deal 1 damage with Staff of Nin #1 targeting Teferi, Who Slows the Sunset [opponent's battlefield] [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+3. Deal 1 damage with Staff of Nin #1 targeting the opponent [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+4. Deal 1 damage with Staff of Nin #1 targeting you [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+5. Deal 1 damage with Staff of Nin #2 targeting Emrakul, the Aeons Torn [your battlefield] [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+6. Deal 1 damage with Staff of Nin #2 targeting Teferi, Who Slows the Sunset [opponent's battlefield] [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+7. Deal 1 damage with Staff of Nin #2 targeting the opponent [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+8. Deal 1 damage with Staff of Nin #2 targeting you [cost: Tap] {card text: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}
+
+Still ahead of you this turn: BOTH your main phases. Creatures, sorceries and other main-phase cards are NOT castable in this window - your main phase's own Casting decision is where you cast them, later this same turn.
+You will have priority again later this turn, so instants and activated abilities you hold stay castable this turn.
+
+Which action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. "CHOICE: 3 (Cast Example Card)" (a placeholder - copy a real number and short name from the list) or "CHOICE: 0 (pass)"; then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+
+# ---- MODEL REPLY ----
+CHOICE: 3 (Deal 1 damage with Staff of Nin #1 targeting the opponent)
+PLAN: Attack with Emrakul. Ping opponent with Staffs. Answer threats with counters/removal. Win via Emrakul combat damage and Annihilator.
