@@ -2121,6 +2121,17 @@ static string zeroPowerAttackerTag(int power)
 //RESTRICTION FIRST - the thing this body cannot do, before the thing it can.
 //It is deliberately un-numbered: the legal set mixes restricted and
 //unrestricted attackers, so no single N is true across it.
+//#W47-R12 (wave-46 ledger, MED): the STOPS quantity carried no DURATION and was
+//read as a standing property of the wall - a 0/4 Perimeter Captain traded itself
+//for ONE point of stopped damage against a 1/1 first-strike deathtoucher, and a
+//0/3 Pride Guardian took the 3-damage attacker that kills it over the 1-damage
+//attacker it survives (deck126 vs146 seq 5 and 8, both blocks lost the game).
+//The quantity is true for THIS combat and for no combat after it, so it says
+//so. Scoped on the two positive non-menace rungs, which are the ones that make
+//an unqualified STOP claim; the menace rungs already defer per-A-line, and the
+//trample rung already qualifies. What is NOT added: a verdict. "Do not block"
+//is strategy and belongs in the guide - this asks only that the quantity stop
+//overstating its reach.
 static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample, bool anyMenace = false)
 {
     if (maxP <= 0)
@@ -2145,13 +2156,13 @@ static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample, bool anyM
     {
         std::ostringstream o;
         o << " [deals 0 - this block kills nothing, but it STOPS all " << maxP
-          << " damage from reaching you]";
+          << " damage from reaching you THIS COMBAT]";
         return o.str();
     }
     if (maxP > 0 && !anyTrample)
         return " [deals 0 - this block kills nothing, but it STOPS all of the"
-               " damage from whichever attacker it blocks - each A-line above"
-               " says how much]";
+               " damage from whichever attacker it blocks THIS COMBAT - each"
+               " A-line above says how much]";
     return " [deals 0 - this block kills nothing; it stops the blocked"
            " attacker's damage except what a trampler pushes through -"
            " each A-line above says how much]";
@@ -2273,6 +2284,27 @@ static string potentialBlockersTag(const vector<string>& entries, const string& 
         o << " - " << extraNote;
     o << "]";
     return o.str();
+}
+
+//#W47-R11 (wave-46 ledger, MED). The CONVERSE of the tag above, and the reason
+//it exists: an A-line with no "their untapped blockers" tag says nothing, and
+//absence is the least legible state a surface can be in. Six of deck162's eight
+//attack windows carried untagged A-lines - honest in every case, the opponent
+//had no creature that could block - and the pilot declined free attacks at
+//opponent life 13 and at 4, reasoning "preserve it as a blocker" against a
+//player with no creatures at all; deck126 threw away a free lifelink point the
+//same way (deck162 vs123 seq 15 and 19, deck126 vs123 seq 18). The trust
+//doctrine cuts the same way: teaching a pilot to read meaning into a MISSING
+//clause is teaching it to doubt the render. So the true fact is stated, in the
+//same positive register as the menace tag beside it. Bracketed like every other
+//A-line tag so an echoed line still parses as a declaration. Emitted only when
+//the scan found ZERO candidates and the attacker carries no declaration
+//minimum - a menace attacker their board cannot legally gang up on already has
+//menaceAttackRestrictionTag's "it cannot be blocked at all this combat", and
+//two tags saying one thing is a token cost with no decision value.
+static string noPotentialBlockersTag()
+{
+    return " [no creature they control can block this attacker]";
 }
 
 //#W45-2, the priced half. Every outcome in the tag above - collapsed or
@@ -14130,6 +14162,24 @@ static bool lifeToDamageConverterScript(const string& magicText)
     return false;
 }
 
+//#W47-R3 (wave-46 ledger, HIGH). Does this player control a life-to-damage
+//converter right now? The board question behind the per-tag binding below.
+//Same scan converterSituationLine runs for the CURRENT SITUATION paragraph, so
+//the tag and the paragraph can never disagree about whether one is in play.
+static bool playerHasLifeToDamageConverter(Player * p)
+{
+    if (!p || !p->game || !p->game->inPlay)
+        return false;
+    MTGGameZone * bf = p->game->inPlay;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        if (c && lifeToDamageConverterScript(c->magicText))
+            return true;
+    }
+    return false;
+}
+
 //A terse, NAIVE single-block combat-trade preview: what happens if this ONE
 //blocker blocks this ONE attacker, alone. The model keeps re-deriving
 //first-strike / deathtouch / trample math it distrusts (deck35 wave-18: an
@@ -14224,12 +14274,29 @@ static const int kPreventPartial = 2;
 //an instruction, so it has to be the engine's number. Deliberately NOT wired
 //into the who-dies verdicts above: those price printed toughness today
 //(a pre-existing scope, unchanged here).
+//#W47-R3 (wave-46 ledger, HIGH). 'bGainConverted' says the BLOCKING side's
+//controller has a life-to-damage converter (Sanguine Bond and its class) on the
+//battlefield, so every point of life this pairing gives that side ALSO comes
+//off the other player's total. The converter paragraph in CURRENT SITUATION and
+//the priced tail on these lines were both true and both present in the deck152
+//and deck162 prompts, and the multiplication between them was left to the
+//reader: deck152 attacked into gaining walls three combats running (20 -> 11 ->
+//5 while the opponent went 28 -> 37) and lost at -1; deck162 sent a 3/4 into
+//three 1/1 lifelinkers and went 19 -> 0 in one combat. So the doubling is bound
+//to the number it doubles, exactly as #W46-9 bound the lifelink gain to the
+//branch it belongs to. SCOPE, deliberately one-sided: only the blocking side's
+//gains are priced this way, because that is the side whose gain is a COST to
+//the reader in both windows; a converter on the reader's own side pricing the
+//reader's own gain is a benefit, and the CURRENT SITUATION paragraph already
+//states it. Defaulted false so every existing caller and PARSETEST case is
+//untouched.
 static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTradeStat& a,
                                       int preventAtoB = kPreventNone,
                                       int preventBtoA = kPreventNone,
                                       int preventAtoFace = kPreventNone,
                                       bool attackerSeat = false,
-                                      int bRemaining = -1)
+                                      int bRemaining = -1,
+                                      bool bGainConverted = false)
 {
     int bp = b.power > 0 ? b.power : 0;
     int ap = a.power > 0 ? a.power : 0;
@@ -14377,11 +14444,26 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         if (bDeals)
         {
             const char * who = attackerSeat ? "they gain" : "you gain";
+            //#W47-R3: the converter multiplies THIS number, so it says so here
+            //rather than a paragraph away. Voiced from the reading seat: in the
+            //attackers window the gainer is "they" and the loser is the reader.
+            const char * conv = attackerSeat ? ", and their converter takes that"
+                                               " much off you"
+                                             : ", and your converter takes that"
+                                               " much off them";
             if (b.doublestrike)
                 o << " (lifelink + double strike: " << who
-                  << " life in BOTH damage steps - total not computed here)";
+                  << " life in BOTH damage steps - total not computed here"
+                  << (bGainConverted ? conv : "") << ")";
             else
-                o << " (lifelink: " << who << " " << bp << ")";
+            {
+                o << " (lifelink: " << who << " " << bp;
+                if (bGainConverted)
+                    o << (attackerSeat ? ", and their converter takes "
+                                       : ", and your converter takes ")
+                      << bp << (attackerSeat ? " off you" : " off them");
+                o << ")";
+            }
         }
         if (aDeals)
         {
@@ -14427,6 +14509,13 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
     {
         const char * subj = attackerSeat ? "they" : "you";
         o << " (blocking trigger: ";
+        //#W47-R3: when a converter of that side's is in play the gain and the
+        //drain are ONE fact, so they are printed as one clause. The certain and
+        //the "may" halves are kept apart exactly as above - a single number is
+        //restated, a split total is bound with "that much" rather than inventing
+        //a sum the script does not promise.
+        const bool split = (b.blockLife > 0 && b.blockLifeMay > 0);
+        const int lone = (b.blockLife > 0) ? b.blockLife : b.blockLifeMay;
         if (b.blockLife > 0)
         {
             o << subj << " gain " << b.blockLife;
@@ -14435,6 +14524,23 @@ static string combatTradePreviewStats(const CombatTradeStat& b, const CombatTrad
         }
         else
             o << subj << " may gain " << b.blockLifeMay;
+        if (bGainConverted)
+        {
+            //A gain the script only MAY take is a drain that only may happen -
+            //the condition travels with the number, never dropped to make the
+            //clause read stronger.
+            if (b.blockLife <= 0)
+                o << (attackerSeat ? ", and if they do their converter takes "
+                                   : ", and if you do your converter takes ");
+            else
+                o << (attackerSeat ? ", and their converter takes "
+                                   : ", and your converter takes ");
+            if (split)
+                o << "that much";
+            else
+                o << lone;
+            o << (attackerSeat ? " off you" : " off them");
+        }
         o << ")";
     }
     //W41-5, the honest-weaker-claim path. A prevention effect applies but its
@@ -14542,7 +14648,8 @@ static string combatBlockOutcome(MTGCardInstance * blocker, MTGCardInstance * at
                                    combatPreventionKind(attacker, blocker),
                                    combatPreventionKind(blocker, attacker),
                                    combatPreventionKindToPlayer(attacker, blocker->controller()),
-                                   false, blocker->life);
+                                   false, blocker->life,
+                                   playerHasLifeToDamageConverter(blocker->controller()));
 }
 
 //W42-3: the SAME fight, asked from the attacking seat. Identical arguments in
@@ -14555,7 +14662,8 @@ static string combatAttackOutcome(MTGCardInstance * attacker, MTGCardInstance * 
                                    combatPreventionKind(attacker, blocker),
                                    combatPreventionKind(blocker, attacker),
                                    combatPreventionKindToPlayer(attacker, blocker->controller()),
-                                   true, blocker->life);
+                                   true, blocker->life,
+                                   playerHasLifeToDamageConverter(blocker->controller()));
 }
 
 //W36 #2 (139-tier P1 / 158 P3, engine-verified game-affecting): a "whenever ~
@@ -15456,7 +15564,8 @@ int AIPlayerGPT::chooseAttackers()
                                                           combatPreventionKind(attackers[j], c),
                                                           combatPreventionKind(c, attackers[j]),
                                                           combatPreventionKindToPlayer(attackers[j], c->controller()),
-                                                          true, c->life);
+                                                          true, c->life,
+                                                          playerHasLifeToDamageConverter(c->controller()));
                     }
                     else
                         outcome = combatAttackOutcome(attackers[j], c);
@@ -15502,6 +15611,9 @@ int AIPlayerGPT::chooseAttackers()
             //legality but not menace, so a body nobody could legally block
             //alone still carried "(neither dies)" 1-on-1 tags and was read as
             //free damage in the wrong direction.
+            //#W47-R11: read BEFORE the menace branch below can clear the
+            //list, so a cleared set is never mistaken for an empty board.
+            const bool noneCouldBlock = entries.empty();
             const int minB = attackers[j]->minBlockersRequired();
             ln << menaceAttackRestrictionTag(minB, (int) entries.size());
             if (minB > 1 && (int) entries.size() < minB)
@@ -15542,6 +15654,8 @@ int AIPlayerGPT::chooseAttackers()
             if (!pb.empty())
                 anyPotentialBlockers = true;
             ln << pb;
+            if (noneCouldBlock && minB < 2)
+                ln << noPotentialBlockersTag();
         }
         shownLines.push_back(ln.str());
         tail << ln.str() << "\n";
@@ -15586,7 +15700,19 @@ int AIPlayerGPT::chooseAttackers()
                 " list, so the results you see are not all the results there are;"
                 " a \"GANG BLOCK:\" clause, when present, is the cheapest lethal"
                 " group the listed creatures can field. They choose whether to"
-                " block. Do not re-derive these outcomes; use them.\n";
+                " block. Do not re-derive these outcomes; use them.\n"
+    //#W47-R3, the companion half. Every parenthetical inside a listed result
+    //that names life THEY gain is a COST attached to that outcome, and the
+    //model read it as part of the outcome: deck162 sent a 3/4 into three 1/1
+    //lifelinkers whose lines each said "(you kill it, your attacker lives
+    //(lifelink: they gain 1))" and went 19 -> 0 in that combat. #W46-9 bound
+    //the gain to the branch for the FATAL branch only; the friendly branches
+    //carry the same tail unframed, so the framing is stated once here for all
+    //of them.
+                "Inside a listed result, a parenthesis naming life THEY gain is"
+                " the PRICE of that outcome, not part of it: the fight result is"
+                " the first clause and the gain happens as well as it, never"
+                " instead of it.\n";
     //W43-1 SCOPE, stated once. The listed 1-on-1 outcomes on a set-restricted
     //attacker describe a fight that can only happen as part of a multi-creature
     //block, so say which way the restriction cuts rather than leaving the model
@@ -16224,7 +16350,8 @@ int AIPlayerGPT::chooseBlockers()
                                                         combatPreventionKind(attackers[k], blockers[i]),
                                                         combatPreventionKind(blockers[i], attackers[k]),
                                                         combatPreventionKindToPlayer(attackers[k], blockers[i]->controller()),
-                                                        false, blockers[i]->life);
+                                                        false, blockers[i]->life,
+                                                        playerHasLifeToDamageConverter(blockers[i]->controller()));
                         if (!trade.empty())
                         {
                             std::ostringstream bb;
@@ -21513,9 +21640,12 @@ void AIPlayerGPT::runParseSelfTest()
     // ---- W39 #5: the wall-block annotation leads with the STOP and its N ----
     cout << "\n[W39-5] W39-WALLBLOCK: 9 free life declined behind a vague tail\n";
     {
+        //#W47-R12 UPDATED: the quantity now carries its DURATION (see the
+        //#W47-R12 block at the end of this corpus). The STOP still leads and
+        //still carries N; only the scope was missing.
         CHECK(zeroPowerBlockerTag(2, 2, false)
               == " [deals 0 - this block kills nothing, but it STOPS all 2 damage"
-                 " from reaching you]",
+                 " from reaching you THIS COMBAT]",
               "W39-5 one shared attacker power -> the STOP leads and carries N");
         string mixed5 = zeroPowerBlockerTag(2, 5, false);
         CHECK(mixed5.find("STOPS all of the damage from whichever attacker") != string::npos,
@@ -25263,6 +25393,199 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(idx == 1 && !st, "#W47-E2 echo: a reply that copies the exemplar binds to index 1, not stale");
         CHECK(askExemplar(vector<string>()) == "CHOICE: 1 (Example option)",
               "#W47-E2 empty menu still yields a well-formed placeholder");
+    }
+
+    // ---- #W47-R3 / R11 / R12 (wave-46 ledger): three combat-surface repairs ----
+    // R3: a life-to-damage converter of THEIRS doubles every price the combat
+    // tags carry, and the multiplication was left between two true strings a
+    // page apart. deck152 vs126 seq 29/37/46 went 20 -> 11 -> 5 into gaining
+    // walls and lost at -1; deck162 vs126 seq 17 sent a 3/4 into three 1/1
+    // lifelinkers and went 19 -> 0 in one combat.
+    cout << "\n[#W47-R3] the converter's doubling rides the tag that carries the number\n";
+    {
+        CombatTradeStat wall;  // Pride Guardian: 0/3, gains 3 on block
+        wall.power = 0; wall.toughness = 3; wall.deathtouch = false; wall.wither = false;
+        wall.infectLabel = false; wall.firststrike = false; wall.indestructible = false;
+        wall.trample = false; wall.persist = false; wall.lifelink = false;
+        wall.doublestrike = false; wall.blockLife = 3; wall.blockLifeMay = 0;
+        CombatTradeStat wolf;  // a plain 5/5 attacker
+        wolf.power = 5; wolf.toughness = 5; wolf.deathtouch = false; wolf.wither = false;
+        wolf.infectLabel = false; wolf.firststrike = false; wolf.indestructible = false;
+        wolf.trample = false; wolf.persist = false; wolf.lifelink = false;
+        wolf.doublestrike = false; wolf.blockLife = 0; wolf.blockLifeMay = 0;
+
+        string atkOff = combatTradePreviewStats(wall, wolf, kPreventNone, kPreventNone,
+                                                kPreventNone, true, -1, false);
+        string atkOn  = combatTradePreviewStats(wall, wolf, kPreventNone, kPreventNone,
+                                                kPreventNone, true, -1, true);
+        cout << "     converter off: \"" << atkOff << "\"\n";
+        cout << "     converter on : \"" << atkOn << "\"\n";
+        // POSITIVE 1: the drain is inside the parenthesis that holds the gain.
+        CHECK(atkOn.find("(blocking trigger: they gain 3, and their converter takes"
+                         " 3 off you)") != string::npos,
+              "#W47-R3 the blocking-trigger gain and its conversion are ONE clause");
+        // NEGATIVE 1 (REGRESSION): the flag defaults off and the old string is
+        // byte-identical - every existing caller and case is untouched.
+        CHECK(atkOff == combatTradePreviewStats(wall, wolf, kPreventNone, kPreventNone,
+                                                kPreventNone, true, -1)
+              && atkOff.find("converter") == string::npos,
+              "#W47-R3 NEGATIVE no converter in play leaves the tail byte-identical");
+        // POSITIVE 2: the blockers seat is the same fact in its own voice - the
+        // converter is the reader's and the drain lands on them.
+        string blkOn = combatTradePreviewStats(wall, wolf, kPreventNone, kPreventNone,
+                                               kPreventNone, false, -1, true);
+        CHECK(blkOn.find("(blocking trigger: you gain 3, and your converter takes"
+                         " 3 off them)") != string::npos,
+              "#W47-R3 the blockers window voices the same binding from its own seat");
+        // POSITIVE 3: a "may" gain is a "may" drain - the condition travels.
+        CombatTradeStat mayWall = wall; mayWall.blockLife = 0; mayWall.blockLifeMay = 2;
+        string mayOn = combatTradePreviewStats(mayWall, wolf, kPreventNone, kPreventNone,
+                                               kPreventNone, true, -1, true);
+        cout << "     may-gain      : \"" << mayOn << "\"\n";
+        CHECK(mayOn.find("(blocking trigger: they may gain 2, and if they do their"
+                         " converter takes 2 off you)") != string::npos,
+              "#W47-R3 an optional gain converts optionally, condition intact");
+        // NEGATIVE 2: the optional form never states the drain as certain.
+        CHECK(mayOn.find("and their converter takes 2") == string::npos,
+              "#W47-R3 NEGATIVE a may-gain never prints an unconditional drain");
+        // POSITIVE 4: a split certain+optional total is bound with "that much"
+        // rather than a sum the script does not promise.
+        CombatTradeStat splitWall = wall; splitWall.blockLifeMay = 2;
+        string splitOn = combatTradePreviewStats(splitWall, wolf, kPreventNone, kPreventNone,
+                                                 kPreventNone, true, -1, true);
+        cout << "     split gain    : \"" << splitOn << "\"\n";
+        CHECK(splitOn.find("(blocking trigger: they gain 3 and may gain 2 more, and"
+                           " their converter takes that much off you)") != string::npos,
+              "#W47-R3 a split gain converts as 'that much', never as an invented sum");
+        CHECK(splitOn.find("takes 5 off") == string::npos,
+              "#W47-R3 NEGATIVE the certain and optional halves are never summed");
+        // POSITIVE 5: deck162's actual shape - the price was LIFELINK, not a
+        // blocking trigger, and it is the same doubling.
+        CombatTradeStat vamp;  // 1/1 lifelink Vampire
+        vamp.power = 1; vamp.toughness = 1; vamp.deathtouch = false; vamp.wither = false;
+        vamp.infectLabel = false; vamp.firststrike = false; vamp.indestructible = false;
+        vamp.trample = false; vamp.persist = false; vamp.lifelink = true;
+        vamp.doublestrike = false; vamp.blockLife = 0; vamp.blockLifeMay = 0;
+        CombatTradeStat unraveler; // 3/4
+        unraveler.power = 3; unraveler.toughness = 4; unraveler.deathtouch = false;
+        unraveler.wither = false; unraveler.infectLabel = false; unraveler.firststrike = false;
+        unraveler.indestructible = false; unraveler.trample = false; unraveler.persist = false;
+        unraveler.lifelink = false; unraveler.doublestrike = false;
+        unraveler.blockLife = 0; unraveler.blockLifeMay = 0;
+        string llOn = combatTradePreviewStats(vamp, unraveler, kPreventNone, kPreventNone,
+                                              kPreventNone, true, -1, true);
+        cout << "     lifelink      : \"" << llOn << "\"\n";
+        CHECK(llOn.find("(lifelink: they gain 1, and their converter takes 1 off you)")
+              != string::npos,
+              "#W47-R3 a blocker's lifelink gain converts on the same binding");
+        CHECK(combatTradePreviewStats(vamp, unraveler, kPreventNone, kPreventNone,
+                                      kPreventNone, true, -1, false)
+              == combatTradePreviewStats(vamp, unraveler, kPreventNone, kPreventNone,
+                                         kPreventNone, true),
+              "#W47-R3 NEGATIVE REGRESSION the lifelink tail is untouched without a converter");
+        // NEGATIVE 3: the ATTACKER's own lifelink is out of this binding's
+        // scope by construction - only the blocking side's gain is priced.
+        CombatTradeStat llAtk = unraveler; llAtk.lifelink = true;
+        string aSide = combatTradePreviewStats(wall, llAtk, kPreventNone, kPreventNone,
+                                               kPreventNone, true, -1, true);
+        CHECK(aSide.find("(lifelink: you gain 3, and") == string::npos,
+              "#W47-R3 NEGATIVE the reader's own lifelink gain is not priced by this flag");
+        // ECHO SHAPE: the whole tail rides inside the untapped-blockers bracket,
+        // which the reply scanner drops whole - an echoed A-line still parses.
+        {
+            vector<string> ent;
+            ent.push_back("Pride Guardian (0/3) (" + atkOn + ")");
+            string tag = potentialBlockersTag(ent, ent[0]);
+            CHECK(tag.find("their converter takes 3 off you") != string::npos
+                  && tag[tag.size() - 1] == ']',
+                  "#W47-R3 the converted price rides inside the tag's own bracket");
+            vector<string> an; an.push_back("Wolf"); an.push_back("Augur of Autumn");
+            vector<bool> sel;
+            int r = parseAttackerSet("ATTACK: A1" + tag, 2, sel, &an);
+            CHECK(r == 1 && sel[0] && !sel[1],
+                  "#W47-R3 echo: an A-line carrying the converted tail still parses as A1");
+            CHECK(parseAttackerSet("ATTACK: none" + tag, 2, sel, &an) == 0
+                  && !sel[0] && !sel[1],
+                  "#W47-R3 echo NEGATIVE the numbers inside the tag never forge a declaration");
+        }
+    }
+
+    // R11: an A-line with no "their untapped blockers" tag says nothing, and
+    // absence read as danger - deck162 vs123 seq 15/19 declined free attacks at
+    // opponent life 13 and 4; deck126 vs123 seq 18 threw away a lifelink point.
+    cout << "\n[#W47-R11] a board that cannot block says so, affirmatively\n";
+    {
+        string nb = noPotentialBlockersTag();
+        cout << "     no-blocker tag: \"" << nb << "\"\n";
+        CHECK(nb == " [no creature they control can block this attacker]",
+              "#W47-R11 the affirmative form is stated in the menace tag's register");
+        // NEGATIVE 1: it is NOT the enumerated tag and cannot be confused for a
+        // list - the footnote that governs "their untapped blockers" does not
+        // apply to it, and no entry text can hide inside it.
+        CHECK(nb.find("their untapped blockers") == string::npos
+              && nb.find("(") == string::npos,
+              "#W47-R11 NEGATIVE it carries no blocker list and no 1-on-1 forecast");
+        // NEGATIVE 2: restriction-first doctrine - no affirmative-action
+        // substring about the attacker's own future ("can attack", "is safe")
+        // for the model to latch onto. The claim is about THEIR board only.
+        CHECK(nb.find("can attack") == string::npos && nb.find("safe") == string::npos
+              && nb.find("free") == string::npos,
+              "#W47-R11 NEGATIVE the tag promises nothing about the attack's outcome");
+        // NEGATIVE 3: the enumerated builder still says nothing when it has
+        // entries to show - the two surfaces never both fire on one line.
+        vector<string> one; one.push_back("Wall of Omens (0/4) (neither dies)");
+        CHECK(potentialBlockersTag(one, one[0]).find("no creature they control")
+              == string::npos,
+              "#W47-R11 NEGATIVE a populated tag never carries the empty-board claim");
+        CHECK(potentialBlockersTag(vector<string>(), string()).empty(),
+              "#W47-R11 NEGATIVE the enumerated builder is still silent on an empty set");
+        // ECHO SHAPE: bracketed like every other A-line tag.
+        {
+            vector<string> an; an.push_back("Fate Unraveler"); an.push_back("Master of the Feast");
+            vector<bool> sel;
+            int r = parseAttackerSet("ATTACK: A1, A2" + nb, 2, sel, &an);
+            CHECK(r == 2 && sel[0] && sel[1],
+                  "#W47-R11 echo: an A-line carrying the affirmative tag still parses");
+            CHECK(parseAttackerSet("ATTACK: none" + nb, 2, sel, &an) == 0,
+                  "#W47-R11 echo NEGATIVE the tag forges no attacker index");
+        }
+    }
+
+    // R12: the STOPS quantity had no duration and beat the verdict beside it -
+    // deck126 vs146 seq 5 and 8, a 0/4 traded itself for ONE stopped damage and
+    // a 0/3 took the attacker that kills it over the one it survives.
+    cout << "\n[#W47-R12] the zero-power STOP claim is scoped to THIS COMBAT\n";
+    {
+        string one = zeroPowerBlockerTag(1, 1, false);
+        string many = zeroPowerBlockerTag(2, 5, false);
+        cout << "     numbered : \"" << one << "\"\n";
+        cout << "     un-numbered: \"" << many << "\"\n";
+        CHECK(one == " [deals 0 - this block kills nothing, but it STOPS all 1 damage"
+                     " from reaching you THIS COMBAT]",
+              "#W47-R12 the numbered rung scopes its quantity to this combat");
+        CHECK(many == " [deals 0 - this block kills nothing, but it STOPS all of the"
+                      " damage from whichever attacker it blocks THIS COMBAT - each"
+                      " A-line above says how much]",
+              "#W47-R12 the un-numbered rung is scoped the same way");
+        // NEGATIVE 1: the unscoped wording is unreachable on both rungs.
+        CHECK(one.find("from reaching you]") == string::npos
+              && many.find("it blocks -") == string::npos,
+              "#W47-R12 NEGATIVE the standing-property wording is not producible");
+        // NEGATIVE 2: the render carries NO verdict - "do not block" is guide
+        // content and the ledger's ask explicitly withholds it here.
+        CHECK(one.find("do not block") == string::npos && one.find("should") == string::npos
+              && one.find("worth") == string::npos && many.find("do not block") == string::npos
+              && many.find("should") == string::npos,
+              "#W47-R12 NEGATIVE the tag prices the block and never rules on it");
+        // NEGATIVE 3 (REGRESSION): the rungs that already deferred per A-line or
+        // had no STOP to scope are byte-identical.
+        CHECK(zeroPowerBlockerTag(0, 0, false)
+              == " [deals 0 - this block kills nothing, and every attacker it can"
+                 " block already deals 0 damage]",
+              "#W47-R12 REGRESSION the 0-damage rung is untouched");
+        CHECK(zeroPowerBlockerTag(3, 3, true).find("THIS COMBAT") == string::npos
+              && zeroPowerBlockerTag(3, 3, false, true).find("THIS COMBAT") == string::npos,
+              "#W47-R12 REGRESSION the trample and menace rungs are untouched");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
