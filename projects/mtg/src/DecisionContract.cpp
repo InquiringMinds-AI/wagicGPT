@@ -139,6 +139,36 @@ namespace
         return g->validateCardPointer(card);
     }
 
+    //#W46-6: a card that cannot name itself. `ability$!...!$` payloads do not
+    //resolve on their card: ATargetedAbilityCreator::resolve builds a bare
+    //MTGCardInstance carrying only the payload's magicText, parks it in the
+    //garbage zone and resolves it as a Spell, stamping the REAL creator into
+    //storedSourceCard. A `choice ... _ choice ...` sub-ask inside such a
+    //payload therefore arms its menu on that DUMMY (Teferi, Who Slows the
+    //Sunset's +1 side chooser): currentActionCard is non-NULL, so the wave-45
+    //E-3 option-source fallback below never fires, but the dummy has no name
+    //and no model - and the seat rendered the subject-less "A choice is
+    //required - choose an option:" header over "choose your land / choose
+    //opponent land" (9 records, wave-45 corpus). Hand back the stamped source
+    //when the card in hand has no name of its own; every named card, and every
+    //nameless one with nothing stamped, is returned untouched.
+    MTGCardInstance * nameableCardPointer(GameObserver * g, MTGCardInstance * card)
+    {
+        if (!card)
+            return NULL;
+        bool namesItself = !card->getDisplayName().empty()
+                           || (card->model && card->model->data
+                               && !card->model->data->getName().empty());
+        if (namesItself || !card->storedSourceCard)
+            return card;
+        //Same dangle rail as every other pointer this file hands out: the
+        //stamped source is validated before it can be dereferenced by a
+        //consumer, and an unvalidatable one leaves the dummy in place.
+        if (MTGCardInstance * src = g->validateCardPointer(card->storedSourceCard))
+            return src;
+        return card;
+    }
+
     //For a triggered/activated "may" ability whose effect acts on an object
     //supplied by the trigger event (all(trigger[to]) moveto - the Tergrid
     //steal class), recover that resolved object so the ask can NAME it.
@@ -241,7 +271,10 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     req.player = p;
     //validated: consumers render contextCard's name into prompts; a stale
     //pointer must become NULL (generic prompt text), never a deref
-    req.contextCard = validatedCardPointer(g, object->currentActionCard);
+    //#W46-6: unwrap an ability$! payload dummy to the card that spawned it -
+    //the menu's subject is the permanent the pilot can see, never the
+    //nameless carrier the engine resolved the payload on.
+    req.contextCard = nameableCardPointer(g, validatedCardPointer(g, object->currentActionCard));
     req.optionTexts.clear();
     req.menuIndices.clear();
     req.canDecline = false;
@@ -323,7 +356,7 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     //and fell back (deck146 vs126 seq 35). The option abilities still carry
     //their source: name it when the action card is gone.
     if (!req.contextCard && firstOptionAbility)
-        req.contextCard = validatedCardPointer(g, firstOptionAbility->source);
+        req.contextCard = nameableCardPointer(g, validatedCardPointer(g, firstOptionAbility->source));
     //Name the object of a single-option "may"-ability ask. Only when there is
     //exactly ONE real option (the Tergrid/steal shape - one may leg + an
     //implicit decline) so the recovered name cannot be attached to the wrong

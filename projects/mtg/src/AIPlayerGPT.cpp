@@ -5155,8 +5155,10 @@ static string xKillRowCore(const std::vector<XDamVictim>& victims, int atX, bool
 
 //One annotation per offered X, LARGEST FIRST - the order the ANNOUNCE_X menu is
 //shown in (option 1 = the largest X). A run of X values that kills exactly the
-//same bodies collapses to "{same as X=N}", pointing at the nearest row ALREADY
-//SHOWN above it: the kill set only grows with X, so the explicit facts land on
+//same bodies collapses to "{same kills as X=N, for M less mana}" - naming the
+//nearest row ALREADY SHOWN above it, and pricing the difference on THIS row
+//(#W46-8: the bare "same as X=N" made the cheaper equal X read as the
+//derivative one): the kill set only grows with X, so the explicit facts land on
 //the largest X of each run - which is where the menu's own header points the
 //pilot, and where both lost games were decided. (Menu ORDER is an open owner
 //call; if it ever flips to ascending, this reference flips with the display
@@ -5174,8 +5176,17 @@ static void xKillRowAnnotations(const std::vector<XDamVictim>& victims, int capX
         string t = xKillRowCore(victims, x, sweep, hitsMe, hitsOpp, myLife, oppLife);
         if (have && t == prevText)
         {
+            //#W46-8: "same as X=N" pointed UP the menu and nothing else, so
+            //the row it named read as the real one and this row as its
+            //derivative - at deck130 vs146 seq 17->18 the plan said X=1 and
+            //the answer was X=2 for an identical kill list. The kill set is
+            //the same by construction (that is what collapsed the row), so
+            //the only fact that separates the two rows is PRICE, and it
+            //belongs on the row that is cheaper: this one. Both halves stated,
+            //neither row implied to be the derivative of the other.
             std::ostringstream c;
-            c << " {X pricing: same as X=" << prevX << "}";
+            c << " {X pricing: same kills as X=" << prevX << ", for "
+              << (prevX - x) << " less mana}";
             out.push_back(c.str());
             continue;
         }
@@ -6115,7 +6126,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mManaOnlyWindowsSkipped(0), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -6597,6 +6608,10 @@ void AIPlayerGPT::logGameEnd()
         {"turn", observer->turn},
         {"my_life", life},
         {"opp_life", opponent() ? opponent()->life : 0},
+        //#W46-7: priority windows this seat auto-passed as mana-only (no
+        //record of their own). Without it a corpus reading the translog cannot
+        //tell a window that was never offered from one the gate skipped.
+        {"mana_only_windows_skipped", mManaOnlyWindowsSkipped},
     };
     std::ofstream f(mTransLogPath.c_str(), std::ios::app);
     if (f)
@@ -8685,6 +8700,29 @@ static AATurnSide * asTurnSide(MTGAbility * a)
     if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
         return dynamic_cast<AATurnSide *>(na->ability);
     return NULL;
+}
+
+//#W46-7: is this ranked action nothing but MANA PRODUCTION? Mirrors the
+//oracle's own isWrappedManaProducer (LegalActions.cpp) - the same three shapes
+//it recognises, so "making mana is not a response" has ONE definition on both
+//sides of the seam: a bare AManaProducer, one wrapped in a cost-bearing
+//GenericActivatedAbility, and the per-permanent count form (AForeach) that
+//Overgrown Battlement's "Add {G} for each creature with defender" takes.
+static bool isManaOnlyAction(MTGAbility * a)
+{
+    if (!a)
+        return false;
+    if (dynamic_cast<AManaProducer *>(a))
+        return true;
+    if (GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility *>(a))
+    {
+        if (dynamic_cast<AManaProducer *>(gmp->ability))
+            return true;
+        if (AForeach * fmp = dynamic_cast<AForeach *>(gmp->ability))
+            if (dynamic_cast<AManaProducer *>(fmp->ability))
+                return true;
+    }
+    return false;
 }
 
 //The mana a land face taps for, read off its rules text ("{T}: Add {W}" ->
@@ -10882,6 +10920,39 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (allTurnSide)
     {
         DebugTrace("AIPlayerGPT[ph" << phase << "]: only display-toggle (Flip Side) options; auto-passing without a model call");
+        return NULL;
+    }
+    //#W46-7 (carried #W44-9): mana-only priority window. Floating mana with
+    //nothing to spend it on is not a play - the pool empties at the end of the
+    //step and the board is where it was - yet 39 of deck126's 46 priority
+    //windows across three games (85%) offered nothing but "Add 3 green mana
+    //with Overgrown Battlement", each one a full prompt assembly and a round
+    //trip to answer "pass". The gate is the ledger's, both halves required:
+    //EVERY shown option is a mana activation (isManaOnlyAction - one real
+    //action of any other kind and the window is asked as before), AND nothing
+    //is waiting to be PAID. The payment half is what keeps the guide's "float
+    //for the Tribute in this same window" legal: a pending extra payment, an
+    //armed menu or target chooser, and mana already floating in the pool each
+    //mean this window is mid-transaction, and the model keeps it.
+    //This is the same shape as the N-152b display-toggle gate above and takes
+    //nothing away: a mana ability is never the only route to a play - the cast
+    //and land menus tap for their own costs (ManaEngine::autoTapForCost).
+    bool allManaOnly = !shown.empty();
+    for (size_t s = 0; s < shown.size(); s++)
+        if (!isManaOnlyAction(shown[s]->ability))
+        {
+            allManaOnly = false;
+            break;
+        }
+    if (allManaOnly
+        && !observer->mExtraPayment
+        && !observer->mLayers->actionLayer()->menuObject
+        && !observer->mLayers->actionLayer()->getCurrentTargetChooser()
+        && !getManaPool()->getConvertedCost())
+    {
+        mManaOnlyWindowsSkipped++;
+        DebugTrace("AIPlayerGPT[ph" << phase << "]: only mana production and no pending cost; auto-passing without a model call (skipped "
+                   << mManaOnlyWindowsSkipped << " this game)");
         return NULL;
     }
     //Wave-35 churn driver #5 (batch5 #12, batch6 P5): a priority ask named the
@@ -24156,15 +24227,15 @@ void AIPlayerGPT::runParseSelfTest()
               "#W45-5 the cheapest killing X is priced on its own row");
         // COLLAPSE: X=1 kills exactly what X=2 kills, so it points at the row
         // already shown above it rather than repeating it.
-        CHECK(rows[4] == " {X pricing: same as X=2}",
-              "#W45-5 an identical consecutive row collapses to the row already shown");
+        CHECK(rows[4] == " {X pricing: same kills as X=2, for 1 less mana}",
+              "#W46-8 an identical consecutive row collapses to the row already shown, priced");
         CHECK(rows[5] == " {X pricing: kills THEIRS: none; YOURS: none}",
               "#W45-5 X=0 states both empty halves rather than going silent");
         // The MANDATORY half: every priced row states YOURS, empty or not.
         int missing = 0;
         for (size_t ri = 0; ri < rows.size(); ri++)
             if (rows[ri].find("; YOURS: ") == string::npos
-                && rows[ri].find("same as X=") == string::npos)
+                && rows[ri].find("same kills as X=") == string::npos)
                 missing++;
         CHECK(missing == 0, "#W45-5 the YOURS: half is never omitted from a priced row");
         // NEGATIVE: the sweep wording claims no targeting restriction.
@@ -25075,6 +25146,68 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(zoneChangeNarration(true, "Swamp", "hand", "battlefield", false, true,
                                   false, "", "") == "You played Swamp",
               "#W46-2 REGRESSION the narration register itself is untouched");
+    }
+
+    // ---- #W46-8: the collapsed X row prices itself instead of deferring ----
+    cout << "\n[#W46-8] an equal-kill X row states its own saving, not its ancestry\n";
+    {
+        // deck130 vs146 seq 17->18, the corpus's ONE plan-vs-chosen-X divergence:
+        // a Goblin (1 toughness) and a Triumphant Adventurer (1 toughness) both
+        // die at any X >= 1, the plan said X=1, and the menu's "{X pricing: same
+        // as X=2}" on the X=1 row made the smaller X read as the derivative one.
+        std::vector<XDamVictim> w8;
+        XDamVictim gob8; gob8.baseName = "Goblin"; gob8.name = "Goblin"; gob8.lethalX = 1;
+        w8.push_back(gob8);
+        XDamVictim ta8; ta8.baseName = "Triumphant Adventurer";
+        ta8.name = "Triumphant Adventurer"; ta8.lethalX = 1; w8.push_back(ta8);
+        std::vector<string> r8;
+        xKillRowAnnotations(w8, 3, true, false, false, 20, 9, r8);
+        for (size_t ri = 0; ri < r8.size(); ri++)
+            cout << "     X = " << (3 - (int) ri) << r8[ri] << "\n";
+        CHECK(r8.size() == 4, "#W46-8 one annotation per offered X, largest first");
+        // POSITIVE 1: the reference row is priced in full, as before.
+        CHECK(r8[0] == " {X pricing: kills THEIRS: Goblin, Triumphant Adventurer; YOURS: none}",
+              "#W46-8 the largest X of a run still carries the explicit kill list");
+        // POSITIVE 2: the collapsed row names the same kills AND its own saving.
+        CHECK(r8[1] == " {X pricing: same kills as X=3, for 1 less mana}",
+              "#W46-8 an equal-kill row states the mana it saves over the row named");
+        // POSITIVE 3: the saving is measured against the row NAMED, so a run of
+        // three counts down rather than repeating "1 less".
+        CHECK(r8[2] == " {X pricing: same kills as X=3, for 2 less mana}",
+              "#W46-8 each collapsed row prices itself against the reference X");
+        // NEGATIVE 1: the wave-45 wording, which pointed up and said nothing
+        // about price, is unreachable.
+        CHECK(r8[1].find("same as X=") == string::npos
+              && r8[2].find("same as X=") == string::npos,
+              "#W46-8 NEGATIVE the bare 'same as X=N' shape is not producible");
+        // NEGATIVE 2: a row whose kill set genuinely DIFFERS never claims a
+        // saving - X=0 kills nothing and is priced on its own facts.
+        CHECK(r8[3] == " {X pricing: kills THEIRS: none; YOURS: none}"
+              && r8[3].find("less mana") == string::npos,
+              "#W46-8 NEGATIVE a distinct row states its own kills and no saving");
+        // NEGATIVE 3: the collapsed row does not re-list bodies - the claim it
+        // makes is sameness, and a second list could drift from the first.
+        CHECK(r8[1].find("kills THEIRS") == string::npos,
+              "#W46-8 NEGATIVE the collapsed row makes no second kill list");
+        // ECHO SHAPE: the row rides its option label into the reply.
+        {
+            vector<string> x8;
+            for (size_t ri = 0; ri < r8.size(); ri++)
+            {
+                std::ostringstream lab;
+                lab << "X = " << (3 - (int) ri) << r8[ri];
+                x8.push_back(lab.str());
+            }
+            string src8 = "Starstorm";
+            bool st8 = false;
+            int c8 = parseChoice("CHOICE: 3 (X = 1)", 4, &x8, &st8, &src8);
+            CHECK(c8 == 3 && !st8, "#W46-8 echo: the cheap row's bare 'X = 1' binds to its index");
+            bool st8b = false;
+            int c8b = parseChoice("CHOICE: 3 (" + x8[2] + ")", 4, &x8, &st8b, &src8);
+            CHECK(c8b == 3 && !st8b, "#W46-8 echo: the whole priced row echoes back to its own index");
+            CHECK(stripNarrationDecoration(x8[2]) == "X = 1",
+                  "#W46-8 echo: the pricing leaves no residue in the narrated record");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

@@ -450,6 +450,13 @@ private:
     //mPassDeclineCount.
     std::map<MTGCardInstance *, int> mFlipDoneCount;
 
+    //#W46-7: priority windows auto-passed because every option was a mana
+    //activation and nothing was pending payment. Counted, not silent: an
+    //auto-pass writes no per-decision record, so the closing gameend record
+    //carries the count - a corpus can still see how many windows the seat was
+    //offered and how many of them never reached the model.
+    int mManaOnlyWindowsSkipped;
+
     //W42-D2 activation de-dup. WEventAbilityActivated is the ONE source of
     //truth for activation lines and fires on both seats; where this seat has
     //ALREADY written the same activation as a consumed decision, the event must
