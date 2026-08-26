@@ -224,10 +224,10 @@ Tiebreakers between keepable hands only, never a reason to mulligan on their own
 with a land that makes both colours (Tundra, Glacial Fortress, Seachrome Coast), and prefer the hand
 with at least one counterspell. Colour is only a tiebreaker: 18 of your lands make {W} and 20 make
 {U}, so a one-colour opener still casts spells.
-The ONE hand that passes the land count and is still a mulligan: the engine's "Mana sources among
-those lands" line names a single colour, AND the "Playing every land in this hand would cover the
-cost of:" line names only one card. That hand has two lands and five cards it cannot cast; ship it.
-Any other hand with 2 to 5 lands is a keep.
+Any hand with 2 to 5 lands is a keep. A two-land hand whose lands make one colour is STILL a keep: your
+odds of drawing the third land and the second colour before you need them beat the odds of a better
+six-card hand (a six after shipping a two-lander is most often a two-lander again).
+
 When a keep makes you bottom cards, bottom Emrakul first, then your lands beyond the fifth.
 
 === DECIDING SITUATIONS ===
