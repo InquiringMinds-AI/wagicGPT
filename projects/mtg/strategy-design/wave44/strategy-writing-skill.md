@@ -9593,21 +9593,3 @@ wrong way). Corpus `matchups-20260826-111937`; mulligan seams live for the first
     ships; one land with mostly one/two-drops is a JUDGMENT KEEP on the specific cards
     (owner: "a hand of mostly 2 drops with 1 land is a hand i might take, depending on what
     those were") — write the comparison, not a verdict.
-
-48. NO MULLIGAN FLOOR AT ANY HAND SIZE (owner ruling 2026-08-26, verbatim: "every time you
-    look at your hand in the mulligan phase, its the same process. 5 is not an acceptable
-    floor by any means. drawing 5 cmc 5 cost cards with no mana or casting methods? you
-    better fuckin mull that. if i wanted deterministic play rather than reasoned play, i
-    wouldnt need an llm."). Guides never write 'never go below N' / 'at (keeping N) KEEP
-    with any land' imperatives; every look, 7 down to 1, is the same #46 comparison. A
-    mull-to-four that the odds favoured is correct play; one the odds did not favour is a
-    guide-teach question (what comparison did the section fail to state?), never a floor.
-    Supersedes every existing floor line (deck146 STEP 1, deck123/162 'never keep fewer
-    than 5', deck126/162 'never mulligan more than once') — strip them at the next edit.
-
-49. DECK-STRATEGY DESIGN IS THE REVIEWING AGENT'S RESPONSIBILITY (owner ruling 2026-08-26:
-    "im not interested in designing deck strategies at this time. that's the responsibility
-    of the reviewing agent."). A rule whose rationale is unrecorded (deck123's 12-token cap)
-    is the reviewer's to adjudicate from evidence — keep it with a written WHY, or delete it
-    — never an owner question. Owner questions are reserved for RULES OF THE LOOP
-    (floors/process, render-shape conventions, scope), not deck content.

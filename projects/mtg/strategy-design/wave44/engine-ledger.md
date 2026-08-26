@@ -415,9 +415,3 @@ the game, something with spells that make mana maybe? a combo hand. I could see 
 in the right deck. it would be a dicey choice, expecting 4-6 rounds before reaching 2 land
 draws. id have to consider the speed of my opponents deck, or disruption options." -> the
 factor list in skill #46.
-OWNER RULINGS 2026-08-26 (second direct ask): (a) "im not interested in designing deck
-strategies at this time. that's the responsibility of the reviewing agent." -> deck123's
-12-token cap goes back to the deck123 reviewer/synthesis to decide from evidence (skill #49).
-(b) No mulligan floor at any size — verbatim in skill #48; deck146's STEP-1 imperative and all
-'never below N' lines are to be stripped (skill #48). Both mull-to-four cascades are graded by
-odds, not floors.
