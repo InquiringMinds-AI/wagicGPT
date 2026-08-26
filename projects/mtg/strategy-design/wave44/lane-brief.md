@@ -1,15 +1,13 @@
 # Wave-45 step-1 lane brief (common)
 
-Repo: your worktree of /home/magi/Projects/wagicGPT (branch given to you). Game dir projects/mtg.
+Repo: your lane WORKTREE path is given in your task (a checkout of /home/magi/Projects/wagicGPT on branch w45-lane-X). Work ONLY there; cd to it with an absolute path in every command (cwd persists across calls). bin/User and objs-sdl are pre-populated (incremental build). Game dir projects/mtg.
 Your docket item is in projects/mtg/strategy-design/wave44/engine-ledger.md (HIGH section) — read
 it in full, then the repro records in ~/.Wagic/ai/gpt/selfplay-runs/matchups-20260826-111937/
 (python, not eyes) BEFORE reading code. Verify any card fact against
 projects/mtg/bin/Res/sets/primitives/*.txt (/usr/bin/grep; bare grep drops matches).
 
 RULES (all standing, each cost real damage):
-- Before building: `cp -r /home/magi/Projects/wagicGPT/projects/mtg/bin/User projects/mtg/bin/`
-  in your worktree (startup hangs without it). Build: `cd projects/mtg && make -f Makefile.sdl -j8`;
-  g++ is ground truth (ignore clangd). Add no sources.
+- Build: `cd <worktree>/projects/mtg && make -f Makefile.sdl -j8`; g++ is ground truth (ignore clangd). Add no sources.
 - MEMORY CAP, every wagic invocation, no exceptions: prefix with
   `systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 --`. A kill under the cap is a
   RED test pointing at an allocation loop in YOUR diff — audit every loop you touched.
