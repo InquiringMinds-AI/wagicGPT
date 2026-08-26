@@ -5130,6 +5130,441 @@ static bool xSurveyBoard(MTGCardInstance * card, Player * me, XVictimSurvey & sv
     return true;
 }
 
+//#W47 R1 (wave-46 HIGH, two seats, both fatal): the board frame carries the
+//LIFE-TO-DAMAGE CONVERTER warning for one hidden cost class and NOTHING for
+//its mirror - permanents that damage a player FOR DRAWING. deck130 sat at 3
+//life with Underworld Dreams + Fate Unraveler + Ob Nixilis on the opposing
+//board (three separate battlefield entries, each rendered with its own
+//{effect:} trigger text, all three named in the seat's own plan one sentence
+//earlier) and answered "cycling with Starstorm", which draws one card for
+//exactly 3 damage. Dead at 0 the same turn. deck125 at 6 life against two
+//Underworld Dreams cast Sphinx's Revelation for X=1 and drew itself to 4.
+//Both had every fact and neither SUMMED them, which is the condition the loop
+//answers with a summary line rather than guide prose.
+//
+//Truthfulness rails: the per-draw price is summed only from clauses whose
+//amount is exactly computable off the script; a permanent whose amount is
+//conditional is NAMED without a number (never guessed), and when no amount at
+//all is claimable the line says the cost exists without inventing a figure.
+//Pure over the two name lists and the two summed prices, so both shapes are
+//provable in PARSETEST without a board.
+static string drawPunisherSummaryText(const vector<string>& mine, int minePerDraw,
+                                      const vector<string>& theirs, int theirsPerDraw)
+{
+    if (mine.empty() && theirs.empty())
+        return "";
+    std::ostringstream o;
+    o << "DRAW PUNISHERS on the battlefield:";
+    for (int side = 0; side < 2; side++)
+    {
+        const vector<string>& v = (side == 0) ? mine : theirs;
+        if (v.empty())
+            continue;
+        o << (side == 0 ? " yours - " : " theirs - ");
+        for (size_t i = 0; i < v.size(); i++)
+            o << (i ? ", " : "") << v[i];
+        o << ".";
+    }
+    //THEIRS first: it is the half that ends the reader's own game.
+    if (!theirs.empty())
+    {
+        o << " Every card YOU draw costs you ";
+        if (theirsPerDraw > 0)
+            o << theirsPerDraw << " life";
+        else
+            o << "life (the amount is not fixed - read the permanents named)";
+        o << " to theirs.";
+    }
+    if (!mine.empty())
+    {
+        o << " Every card the OPPONENT draws costs them ";
+        if (minePerDraw > 0)
+            o << minePerDraw << " life";
+        else
+            o << "life (the amount is not fixed - read the permanents named)";
+        o << " to yours.";
+    }
+    o << " They fire on EVERY draw - the draw step, a cycling ability, a draw"
+         " spell, any extra draw - and the loss lands as the card is drawn, before"
+         " anything can be done with it. Count that cost before choosing to draw.";
+    return o.str();
+}
+
+//The script scan behind it. A draw punisher is a permanent whose OWN trigger
+//line opens with "@drawfoeof(" - the engine's "whenever an opponent of my
+//controller draws a card" hook - and whose payload is an unconditional damage
+//or life LOSS aimed at that "opponent", i.e. at the player who drew. Verified
+//against the primitives the repro board actually held: Underworld Dreams,
+//Fate Unraveler and Ob Nixilis, the Hate-Twisted all carry
+//`auto=@drawfoeof(player):damage:1 opponent`.
+//
+//`conditional` is set (and the amount NOT summed) whenever the line carries a
+//restriction{...} gate, a "may", a pay/ability wrapper, or a non-numeric
+//amount - each of those makes the per-draw price something other than the
+//number on the line, and the ask's own rail is to name the permanent rather
+//than guess a figure. Pure over the lowercased script, so PARSETEST proves
+//both halves against the real primitive lines.
+static bool drawPunisherClause(const string& magicText, int& perDraw, bool& conditional)
+{
+    perDraw = 0;
+    conditional = false;
+    bool found = false;
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        string low = line;
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        size_t s = low.find_first_not_of(" \t\r");
+        if (s == string::npos || low.compare(s, 11, "@drawfoeof(") != 0)
+            continue;
+        size_t colon = low.find(':', s);
+        if (colon == string::npos)
+            continue;
+        string head = low.substr(s, colon - s);
+        string payload = low.substr(colon + 1);
+        size_t pb = payload.find_first_not_of(" \t\r");
+        if (pb == string::npos)
+            continue;
+        payload = payload.substr(pb);
+        //A leading name(...) label is presentation, not payload (the emblem
+        //form: "@drawfoeof(player):name(Damage opponent) damage:1 opponent").
+        if (payload.compare(0, 5, "name(") == 0)
+        {
+            int depth = 0;
+            size_t p = 4;
+            for (; p < payload.size(); p++)
+            {
+                if (payload[p] == '(')
+                    depth++;
+                else if (payload[p] == ')' && --depth == 0)
+                    break;
+            }
+            if (p >= payload.size())
+                continue;
+            size_t r = payload.find_first_not_of(" \t\r", p + 1);
+            if (r == string::npos)
+                continue;
+            payload = payload.substr(r);
+        }
+        //A "may" makes the trigger optional: the permanent is still a punisher
+        //and is NAMED, but the number is not the player's to count on.
+        bool optional = (payload.compare(0, 4, "may ") == 0);
+        if (optional)
+            payload = payload.substr(4);
+        bool isDamage = (payload.compare(0, 7, "damage:") == 0);
+        bool isLoss = (payload.compare(0, 6, "life:-") == 0);
+        if (!isDamage && !isLoss)
+            continue;
+        //It must land on the DRAWING player: the trigger's "opponent" is the
+        //opponent of this permanent's controller, which is exactly who drew.
+        if (payload.find("opponent") == string::npos)
+            continue;
+        size_t as = isDamage ? 7 : 6;
+        size_t ae = payload.find_first_of(" \t\r", as);
+        string amt = payload.substr(as, ae == string::npos ? string::npos : ae - as);
+        bool numeric = !amt.empty();
+        for (size_t k = 0; k < amt.size(); k++)
+            if (!isdigit((unsigned char) amt[k]))
+                numeric = false;
+        found = true;
+        if (optional || head.find("restriction{") != string::npos
+            || payload.find("ability$") != string::npos || payload.find("pay(") != string::npos
+            || !numeric || atoi(amt.c_str()) <= 0)
+        {
+            conditional = true;
+            continue;
+        }
+        perDraw += atoi(amt.c_str());
+    }
+    return found;
+}
+
+//The board scan: name every draw punisher on either battlefield with its
+//instance handle (so the claim is checkable against the lines above it), and
+//sum the per-draw price each side inflicts. `theirsPerDraw` is what THIS seat
+//pays per card it draws.
+static void drawPunisherScan(Player * me, Player * opp,
+                             std::vector<std::string>& mine, int& minePerDraw,
+                             std::vector<std::string>& theirs, int& theirsPerDraw)
+{
+    minePerDraw = 0;
+    theirsPerDraw = 0;
+    for (int side = 0; side < 2; side++)
+    {
+        Player * pl = (side == 0) ? me : opp;
+        if (!pl || !pl->game || !pl->game->inPlay)
+            continue;
+        MTGGameZone * bf = pl->game->inPlay;
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            int per = 0;
+            bool cond = false;
+            if (!c || !drawPunisherClause(c->magicText, per, cond))
+                continue;
+            (side == 0 ? mine : theirs).push_back(c->name + instanceHandle(c));
+            (side == 0 ? minePerDraw : theirsPerDraw) += per;
+        }
+    }
+}
+
+static string drawPunisherSituationLine(Player * me, Player * opp)
+{
+    vector<string> mine, theirs;
+    int minePer = 0, theirsPer = 0;
+    drawPunisherScan(me, opp, mine, minePer, theirs, theirsPer);
+    return drawPunisherSummaryText(mine, minePer, theirs, theirsPer);
+}
+
+//#W47 R1, the second half: the summary line states the standing price, but the
+//cost never reached the ROW that pays it - a cycling row printed its mana cost
+//and said nothing about the draw, and that is the row deck130 answered at 3
+//life. The tag is bracketed, so stripNarrationDecoration keeps it out of the
+//append-only history (it is a decision-time surface, not a record of what
+//happened). Pure over its three inputs.
+static string drawPriceRowTag(int cards, int perDraw, const string& punishers)
+{
+    if (cards <= 0 || perDraw <= 0 || punishers.empty())
+        return "";
+    std::ostringstream o;
+    o << " [DRAW PRICE: this draws " << cards << " card" << (cards == 1 ? "" : "s")
+      << ", and the opponent's " << punishers << " punish every draw, so taking it"
+         " costs you " << (cards * perDraw) << " life right now]";
+    return o.str();
+}
+
+//How many cards the ability named `abilityName` draws, read off its OWN script
+//line ("{3}{cycle}:name(cycling) draw:1" -> 1). 0 when the name is absent, the
+//line draws nothing, or the amount is not a plain number - the tag is then not
+//emitted at all rather than claiming a count the script does not state.
+static int scriptAbilityDrawCount(const string& script, const string& abilityName)
+{
+    if (abilityName.empty())
+        return 0;
+    string lowName = abilityName;
+    for (size_t i = 0; i < lowName.size(); i++)
+        lowName[i] = (char) tolower((unsigned char) lowName[i]);
+    string needle = "name(" + lowName + ")";
+    int total = 0;
+    size_t lp = 0;
+    while (lp <= script.size())
+    {
+        size_t nl = script.find('\n', lp);
+        string line = script.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? script.size() + 1 : nl + 1;
+        string low = line;
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        size_t at = low.find(needle);
+        if (at == string::npos)
+            continue;
+        //A trigger line is not this activation (and prices a different event).
+        size_t s = low.find_first_not_of(" \t\r");
+        if (s != string::npos && low[s] == '@')
+            continue;
+        size_t d = low.find("draw:", at);
+        while (d != string::npos)
+        {
+            size_t as = d + 5;
+            size_t ae = low.find_first_of(" \t\r", as);
+            string amt = low.substr(as, ae == string::npos ? string::npos : ae - as);
+            bool numeric = !amt.empty();
+            for (size_t k = 0; k < amt.size(); k++)
+                if (!isdigit((unsigned char) amt[k]))
+                    numeric = false;
+            //WHO draws. A draw aimed at anyone but this ability's controller is
+            //not a cost the pilot pays, and pricing it against the pilot's own
+            //life would be a false surface. The engine's default (no player
+            //token, or "controller") is the controller.
+            bool mine = true;
+            if (ae != string::npos)
+            {
+                size_t ws = low.find_first_not_of(" \t\r", ae);
+                if (ws != string::npos)
+                {
+                    size_t we = low.find_first_of(" \t\r", ws);
+                    string who = low.substr(ws, we == string::npos ? string::npos : we - ws);
+                    if (who.find("opponent") != string::npos
+                        || who.find("target") != string::npos
+                        || who.find("player") != string::npos
+                        || who.find("each") != string::npos)
+                        mine = false;
+                }
+            }
+            if (numeric && mine)
+                total += atoi(amt.c_str());
+            d = low.find("draw:", d + 5);
+        }
+    }
+    return total;
+}
+
+//#W47 R15 (carried #W46-4, re-armed): the ANNOUNCE_X rows are priced by
+//xKillRowCore only for the DAMAGE class - sv.priceable has nothing to price on
+//`auto=life:X && draw:X`, so deck125 answered 17 Sphinx's Revelation menus off
+//bare "X = N" rows - and X = 0 is never called out as a null cast anywhere.
+//deck130 announced X=0 on a damage spell it meant to cycle, at an unmarked
+//row, and lost the game (the R2 specimen, seq 62). Both halves below are read
+//off the spell's OWN auto= script: nothing is inferred about a class the
+//script does not state.
+
+//TRUE when every effect the cast itself has is the X damage already priced -
+//so at X=0 the spell resolves and does nothing at all. Any other segment (a
+//draw, a counter, a token) makes "does nothing" false, and the weaker, still
+//true "it deals 0 damage" is said instead. Pure over the script.
+static bool xCastIsOnlyXDamage(const string& magicText)
+{
+    bool any = false;
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        size_t sp = 0;
+        while (sp <= line.size())
+        {
+            size_t amp = line.find("&&", sp);
+            string seg = line.substr(sp, amp == string::npos ? string::npos : amp - sp);
+            sp = (amp == string::npos) ? line.size() + 1 : amp + 2;
+            size_t b = seg.find_first_not_of(" \t\r");
+            if (b == string::npos)
+                continue;
+            string low = seg.substr(b);
+            for (size_t i = 0; i < low.size(); i++)
+                low[i] = (char) tolower((unsigned char) low[i]);
+            if (low.compare(0, 8, "damage:x") != 0
+                || (low.size() > 8 && isalnum((unsigned char) low[8])))
+                return false;
+            any = true;
+        }
+    }
+    return any;
+}
+
+//The NON-damage X class this item exists for: a cast whose every segment is
+//`life:X` or `draw:X` on the caster (Sphinx's Revelation:
+//`auto=life:X && draw:X`). Returns false the moment a segment is anything
+//else - including a targeted or opponent-facing life clause, which would make
+//"you gain X" a lie. Pure over the script.
+static bool xLifeDrawClauses(const string& magicText, int& lifePerX, int& drawPerX)
+{
+    lifePerX = 0;
+    drawPerX = 0;
+    bool any = false;
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        size_t sp = 0;
+        while (sp <= line.size())
+        {
+            size_t amp = line.find("&&", sp);
+            string seg = line.substr(sp, amp == string::npos ? string::npos : amp - sp);
+            sp = (amp == string::npos) ? line.size() + 1 : amp + 2;
+            size_t b = seg.find_first_not_of(" \t\r");
+            if (b == string::npos)
+                continue;
+            string low = seg.substr(b);
+            for (size_t i = 0; i < low.size(); i++)
+                low[i] = (char) tolower((unsigned char) low[i]);
+            while (!low.empty() && (low[low.size() - 1] == ' ' || low[low.size() - 1] == '\t'
+                                    || low[low.size() - 1] == '\r'))
+                low.erase(low.size() - 1);
+            //"controller" is the engine's explicit spelling of the default.
+            if (low == "life:x controller")
+                low = "life:x";
+            else if (low == "draw:x controller")
+                low = "draw:x";
+            if (low == "life:x")
+                lifePerX++;
+            else if (low == "draw:x")
+                drawPerX++;
+            else
+                return false;
+            any = true;
+        }
+    }
+    return any && (lifePerX > 0 || drawPerX > 0);
+}
+
+//What one point of X buys, as the CAST row states it. Pure.
+static string xLifeDrawEffectClause(int lifePerX, int drawPerX)
+{
+    std::ostringstream o;
+    o << "each point of X ";
+    if (lifePerX > 0)
+    {
+        o << "gains you " << lifePerX << " life";
+        if (drawPerX > 0)
+            o << " and ";
+    }
+    if (drawPerX > 0)
+        o << "draws you " << drawPerX << " card" << (drawPerX == 1 ? "" : "s");
+    return o.str();
+}
+
+//One ANNOUNCE_X row of the non-damage class. States the totals for THIS X, and
+//- when the opponent has draw punishers standing - the life those draws cost
+//and the NET, which is the whole decision at a low life total (deck125 vs162
+//seq 36: 6 life, two Underworld Dreams, cast for X=1 and drew itself to 4).
+//X = 0 is called out as a null cast, the second half of this item. Pure.
+static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
+                               int punisherPerDraw, const string& punishers)
+{
+    std::ostringstream o;
+    o << " {X pricing: X=" << x << " - ";
+    int gain = x * lifePerX;
+    int cards = x * drawPerX;
+    if (x <= 0)
+    {
+        o << "this cast does NOTHING: ";
+        if (lifePerX > 0)
+        {
+            o << "you gain 0 life";
+            if (drawPerX > 0)
+                o << " and ";
+        }
+        if (drawPerX > 0)
+            o << (lifePerX > 0 ? "draw" : "you draw") << " 0 cards";
+        o << ", and the spell is spent}";
+        return o.str();
+    }
+    if (lifePerX > 0)
+    {
+        o << "you gain " << gain << " life";
+        if (drawPerX > 0)
+            o << " and ";
+    }
+    if (drawPerX > 0)
+        o << (lifePerX > 0 ? "draw" : "you draw") << " " << cards
+          << " card" << (cards == 1 ? "" : "s");
+    if (cards > 0 && punisherPerDraw > 0 && !punishers.empty())
+        o << "; the opponent's " << punishers << " punish every draw, so those draws"
+             " cost you " << (cards * punisherPerDraw) << " life - NET "
+          << (gain - cards * punisherPerDraw) << " life for this cast";
+    o << "}";
+    return o.str();
+}
+
+//One annotation per offered X, LARGEST FIRST (the order the menu is shown in).
+//No run-collapse here: every row of this class states a DIFFERENT pair of
+//totals, so there is never an identical neighbour to collapse into. Pure.
+static void xLifeDrawRowAnnotations(int capX, int lifePerX, int drawPerX,
+                                    int punisherPerDraw, const string& punishers,
+                                    std::vector<string>& out)
+{
+    out.clear();
+    for (int x = capX; x >= 0; x--)
+        out.push_back(xLifeDrawRowCore(x, lifePerX, drawPerX, punisherPerDraw, punishers));
+}
+
 //Board-facing wrapper: turns the survey into the rendered CAST-row annotation.
 //Returns "" for a non-X spell (every other cast line is byte-identical to
 //before).
@@ -5139,7 +5574,20 @@ string xSpellPricing(MTGCardInstance * card, Player * me)
     if (!xSurveyBoard(card, me, sv))
         return "";
     if (!sv.priceable)
-        return xAffordabilityCore(sv.maxX, sv.baseCMC);
+    {
+        //#W47 R15: the non-damage X class states what a point of X actually
+        //buys, off the spell's own auto=. Spliced INSIDE the existing
+        //{X pricing: ...} braces so the channel stays one block (and stays
+        //gated out of the narrated record by stripNarrationDecoration).
+        int lifePerX = 0, drawPerX = 0;
+        string base = xAffordabilityCore(sv.maxX, sv.baseCMC);
+        if (xLifeDrawClauses(card->magicText, lifePerX, drawPerX) && !base.empty())
+        {
+            base.erase(base.size() - 1);
+            base += "; " + xLifeDrawEffectClause(lifePerX, drawPerX) + "}";
+        }
+        return base;
+    }
     if (sv.sweep)
         return xDamageSweepCore(sv.maxX, sv.baseCMC, sv.victims, sv.hitsMe, sv.hitsOpp,
                                 sv.myLife, sv.oppLife);
@@ -5221,6 +5669,7 @@ static string xKillRowCore(const std::vector<XDamVictim>& victims, int atX, bool
 //order, because the rule is "point at the row the reader has already read".)
 static void xKillRowAnnotations(const std::vector<XDamVictim>& victims, int capX, bool sweep,
                                 bool hitsMe, bool hitsOpp, int myLife, int oppLife,
+                                bool castIsOnlyXDamage,
                                 std::vector<string>& out)
 {
     out.clear();
@@ -5229,6 +5678,24 @@ static void xKillRowAnnotations(const std::vector<XDamVictim>& victims, int capX
     bool have = false;
     for (int x = capX; x >= 0; x--)
     {
+        //#W47 R15, second half: X=0 is a NULL CAST and no row said so. deck130
+        //answered "Cast Card Normally" meaning to cycle, then picked X=0 off a
+        //menu whose zero row read "same kills as X=8, for 8 less mana" - true,
+        //and silent about the only fact that mattered. The stronger claim ("does
+        //NOTHING") is made only when the cast's every effect IS the X damage;
+        //otherwise the row states the damage fact alone, which is always true.
+        if (x == 0)
+        {
+            std::ostringstream z;
+            z << " {X pricing: X=0 - ";
+            if (castIsOnlyXDamage)
+                z << "this cast does NOTHING: it deals 0 damage and the spell is spent";
+            else
+                z << "it deals 0 damage; only the spell's other effects happen";
+            z << "}";
+            out.push_back(z.str());
+            continue;
+        }
         string t = xKillRowCore(victims, x, sweep, hitsMe, hitsOpp, myLife, oppLife);
         if (have && t == prevText)
         {
@@ -5264,10 +5731,32 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
     if (capX < 0)
         return false;
     XVictimSurvey sv;
-    if (!xSurveyBoard(card, me, sv) || !sv.priceable)
+    if (!xSurveyBoard(card, me, sv))
         return false;
+    if (!sv.priceable)
+    {
+        //#W47 R15: the class sv.priceable has nothing to price - life:X /
+        //draw:X. Priced off the spell's own script, with the standing draw
+        //punishers folded in because they are what turns a life GAIN into a
+        //net loss (deck125 vs162 seq 36).
+        int lifePerX = 0, drawPerX = 0;
+        if (!xLifeDrawClauses(card->magicText, lifePerX, drawPerX))
+            return false;
+        int theirsPer = 0, minePer = 0;
+        vector<string> mineP, theirsP;
+        GameObserver * obs = card->getObserver();
+        Player * opp = NULL;
+        if (obs && obs->players[0] && obs->players[1])
+            opp = (me == obs->players[0]) ? obs->players[1] : obs->players[0];
+        drawPunisherScan(me, opp, mineP, minePer, theirsP, theirsPer);
+        std::ostringstream names;
+        for (size_t ni = 0; ni < theirsP.size(); ni++)
+            names << (ni ? ", " : "") << theirsP[ni];
+        xLifeDrawRowAnnotations(capX, lifePerX, drawPerX, theirsPer, names.str(), out);
+        return true;
+    }
     xKillRowAnnotations(sv.victims, capX, sv.sweep, sv.hitsMe, sv.hitsOpp,
-                        sv.myLife, sv.oppLife, out);
+                        sv.myLife, sv.oppLife, xCastIsOnlyXDamage(card->magicText), out);
     return true;
 }
 
@@ -8759,6 +9248,14 @@ string AIPlayerGPT::serializeGameState()
         if (!conv.empty())
             out << "\n" << conv;
     }
+    //#W47 R1: the mirror class - permanents that damage a player FOR DRAWING -
+    //in the same board frame, for the same reason. Two seats died holding every
+    //fact separately (see drawPunisherSummaryText).
+    {
+        string punish = drawPunisherSituationLine(this, opp);
+        if (!punish.empty())
+            out << "\n" << punish;
+    }
     out << "\n" << yourLibraryLine(game->library->nb_cards, myLibInReveal) << "\n";
     return out.str();
 }
@@ -9405,6 +9902,31 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         if (!txt.empty())
             out << " {card text: \"" << txt << "\"}";
         out << dynamicMagnitudes(src);
+        //#W47 R1, the row half: when THIS activation draws and the opponent has
+        //draw punishers out, the price of the draw rides the row that pays it.
+        //deck130 vs162 seq 27 answered "cycling with Starstorm [cost: {3},
+        //Cycle]" at 3 life into Underworld Dreams + Fate Unraveler + Ob Nixilis
+        //and died at 0 on its own turn: the mana cost was on the row, the LIFE
+        //cost was three battlefield entries away. The count is read off the
+        //ability's own script line, never inferred from the label.
+        if (action.ability)
+        {
+            string aname = action.ability->getMenuText();
+            int cards = scriptAbilityDrawCount(src->magicText, aname);
+            for (map<string, string>::const_iterator mi = src->magicTexts.begin();
+                 mi != src->magicTexts.end(); ++mi)
+                cards += scriptAbilityDrawCount(mi->second, aname);
+            if (cards > 0)
+            {
+                vector<string> mineP, theirsP;
+                int minePer = 0, theirsPer = 0;
+                drawPunisherScan(this, opponent(), mineP, minePer, theirsP, theirsPer);
+                std::ostringstream names;
+                for (size_t ni = 0; ni < theirsP.size(); ni++)
+                    names << (ni ? ", " : "") << theirsP[ni];
+                out << drawPriceRowTag(cards, theirsPer, names.str());
+            }
+        }
     }
     return out.str();
 }
@@ -12723,6 +13245,157 @@ static string uniqueNamedIn(const string& text, const vector<string>& names)
     return found;
 }
 
+//#W47 R2 (wave-46 HIGH; the same seat, the same card, two corpora running):
+//the "Choose an option for <card>:" cast-mode menu is the only BARE menu left
+//in the loop. Its rows render as "1. Cast Card Normally / 2. cycling / 3.
+//Decline - do nothing": no cost on either path, no effect on either path, no
+//draw named on the cycling row - while the CAST row one screen earlier carries
+//a full {X pricing:} + {card text:} and the ANNOUNCE menu one screen later
+//carries an annotation per option. deck130 vs125 arrived at this menu with the
+//plan "Cast Starstorm at X=0 TO CYCLE IT ... per Strategy Guide Rule #1",
+//answered "1. Cast Card Normally", then announced X=0 - a spell that draws
+//nothing - and lost the game. The guide lane is declared exhausted for this
+//failure (skill amendment 85); the remedy named in writing is this annotation.
+//
+//Everything below is read off the card's OWN cost and printed text; nothing is
+//inferred about what a path does not do. Presentation only: req.optionTexts
+//(the staleness key) is untouched, and only trailing text is appended, so the
+//option count, ORDER and answer index are all unchanged.
+
+//The " -- "-separated clause of a printed card text that BEGINS with `label`
+//(case-insensitive): Starstorm's "Cycling {3} ({3}, Discard this card: Draw a
+//card.)" for the "cycling" row. Empty when no clause starts with it - the row
+//then carries its cost and nothing invented.
+static string printedClauseFor(const string& cardText, const string& label)
+{
+    if (cardText.empty() || label.empty())
+        return "";
+    size_t lp = 0;
+    while (lp <= cardText.size())
+    {
+        size_t sep = cardText.find(" -- ", lp);
+        string clause = cardText.substr(lp, sep == string::npos ? string::npos : sep - lp);
+        lp = (sep == string::npos) ? cardText.size() + 1 : sep + 4;
+        size_t b = clause.find_first_not_of(" \t\r\n");
+        if (b == string::npos)
+            continue;
+        clause = clause.substr(b);
+        if (clause.size() < label.size())
+            continue;
+        bool match = true;
+        for (size_t i = 0; i < label.size() && match; i++)
+            match = tolower((unsigned char) clause[i]) == tolower((unsigned char) label[i]);
+        if (match)
+            return clause;
+    }
+    return "";
+}
+
+//The FIRST clause of a printed card text - what casting the card normally
+//does. Same splitter, so the two halves of the menu cannot drift apart.
+static string printedFirstClause(const string& cardText)
+{
+    size_t sep = cardText.find(" -- ");
+    string clause = cardText.substr(0, sep == string::npos ? string::npos : sep);
+    size_t b = clause.find_first_not_of(" \t\r\n");
+    return (b == string::npos) ? string("") : clause.substr(b);
+}
+
+//The cost tokens standing in front of the ability named `abilityName` in a
+//script ("{3}{cycle}:name(cycling) draw:1" -> "{3}{cycle}"). Empty when the
+//name is absent or the line has no cost prefix.
+static string scriptAbilityCost(const string& script, const string& abilityName)
+{
+    if (abilityName.empty())
+        return "";
+    string lowName = abilityName;
+    for (size_t i = 0; i < lowName.size(); i++)
+        lowName[i] = (char) tolower((unsigned char) lowName[i]);
+    string needle = "name(" + lowName + ")";
+    size_t lp = 0;
+    while (lp <= script.size())
+    {
+        size_t nl = script.find('\n', lp);
+        string line = script.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? script.size() + 1 : nl + 1;
+        string low = line;
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        if (low.find(needle) == string::npos)
+            continue;
+        size_t s = low.find_first_not_of(" \t\r");
+        if (s == string::npos || low[s] == '@')
+            continue; //a trigger, not an activation the pilot pays
+        size_t colon = low.find(':', s);
+        if (colon == string::npos || colon <= s)
+            continue;
+        return line.substr(s, colon - s);
+    }
+    return "";
+}
+
+//Read a script cost prefix as English. Mana symbols pass through untouched
+//(they are the same tokens every other cost surface prints); the engine's
+//non-mana cost braces are named, and an UNRECOGNISED brace is passed through
+//verbatim rather than dropped - a silent omission is the gap the model
+//confabulates a rule into (trust doctrine).
+static string scriptCostGloss(const string& costTokens)
+{
+    string mana, extras;
+    size_t i = 0;
+    while (i < costTokens.size())
+    {
+        if (costTokens[i] != '{')
+        {
+            i++;
+            continue;
+        }
+        size_t end = costTokens.find('}', i);
+        if (end == string::npos)
+            break;
+        string tok = costTokens.substr(i, end - i + 1);
+        i = end + 1;
+        string low = tok;
+        for (size_t k = 0; k < low.size(); k++)
+            low[k] = (char) tolower((unsigned char) low[k]);
+        const char * gloss = NULL;
+        if (low == "{cycle}")
+            gloss = "discard this card";
+        else if (low == "{t}")
+            gloss = "tap it";
+        else if (low == "{q}")
+            gloss = "untap it";
+        if (gloss)
+        {
+            if (!extras.empty())
+                extras += ", ";
+            extras += gloss;
+        }
+        else
+            mana += tok;
+    }
+    if (mana.empty())
+        return extras;
+    if (extras.empty())
+        return mana;
+    return mana + ", " + extras;
+}
+
+//One row's annotation: its own cost, then its own printed text. Both halves
+//are optional (a free path prints no cost clause; a card with no printed text
+//for that path prints no quote) and the tag is empty when neither exists.
+static string castModeRowTag(const string& costBody, const string& clause)
+{
+    if (costBody.empty() && clause.empty())
+        return "";
+    std::ostringstream o;
+    if (!costBody.empty())
+        o << " [cost: " << costBody << "]";
+    if (!clause.empty())
+        o << " {card text: \"" << clause << "\"}";
+    return o.str();
+}
+
 int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & act)
 {
     MTGCardInstance * ctx = req.contextCard;
@@ -13101,6 +13774,60 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
                            " is where you cast, and it offers the other face as an"
                            " alternative-cost cast - you do not need this.]";
         }
+    //#W47 R2: the cast-mode menu ("Cast Card Normally" beside one or more
+    //alternative/hand paths). Give every row its own cost and its own printed
+    //text, read off the card itself - see castModeRowTag above for the two lost
+    //games. Self-gating on the engine's own "Cast Card Normally" label, so no
+    //other menu shape is touched; append-only, so the answer index and the
+    //req.optionTexts staleness key are unchanged.
+    bool castModeMenu = false;
+    for (size_t i = 0; i < opts.size() && !castModeMenu; i++)
+        if (req.optionTexts.size() > i && req.optionTexts[i] == "Cast Card Normally")
+            castModeMenu = true;
+    if (castModeMenu && ctx)
+    {
+        //The hand-zone script carries the alternative paths (cycling and its
+        //siblings live in autohand=); the battlefield script carries the rest.
+        string handScript;
+        for (map<string, string>::const_iterator mi = ctx->magicTexts.begin();
+             mi != ctx->magicTexts.end(); ++mi)
+            handScript += (handScript.empty() ? "" : "\n") + mi->second;
+        //The draw punishers standing right now, so a path that DRAWS prices
+        //that too (#W47 R1's row half, on the menu that offers the draw).
+        vector<string> mineP, theirsP;
+        int minePer = 0, theirsPer = 0;
+        drawPunisherScan(this, opponent(), mineP, minePer, theirsP, theirsPer);
+        std::ostringstream pnames;
+        for (size_t ni = 0; ni < theirsP.size(); ni++)
+            pnames << (ni ? ", " : "") << theirsP[ni];
+        for (size_t i = 0; i < opts.size() && i < req.optionTexts.size(); i++)
+        {
+            const string& label = req.optionTexts[i];
+            if (label == "Flip Side")
+                continue; //already annotated above, with its own truth rails
+            if (label == "Cast Card Normally")
+            {
+                string cost;
+                if (ctx->model && ctx->model->data && ctx->model->data->getManaCost())
+                    cost = ctx->model->data->getManaCost()->toString();
+                else if (ctx->getManaCost())
+                    cost = ctx->getManaCost()->toString();
+                opts[i] += castModeRowTag(cost, printedFirstClause(ctx->text));
+                continue;
+            }
+            string costTokens = scriptAbilityCost(handScript, label);
+            if (costTokens.empty())
+                costTokens = scriptAbilityCost(ctx->magicText, label);
+            string tag = castModeRowTag(scriptCostGloss(costTokens),
+                                        printedClauseFor(ctx->text, label));
+            if (tag.empty())
+                continue;
+            opts[i] += tag;
+            int cards = scriptAbilityDrawCount(handScript, label)
+                        + scriptAbilityDrawCount(ctx->magicText, label);
+            opts[i] += drawPriceRowTag(cards, theirsPer, pnames.str());
+        }
+    }
     //Dungeon room-BRANCH menu (deck146 N-146b): advancing WITHIN a dungeon offers
     //the next room as a bare name ("Veils of Fear" / "Oubliette") with ZERO effect
     //text - the deciding fact for the venture path is absent (standing P1/P4), and
@@ -24482,7 +25209,7 @@ void AIPlayerGPT::runParseSelfTest()
         XDamVictim rx; rx.baseName = "Rorix Bladewing"; rx.name = "Rorix Bladewing";
         rx.lethalX = 5; rx.mine = true; v.push_back(rx);
         std::vector<string> rows;
-        xKillRowAnnotations(v, 5, true, false, false, 19, 9, rows);
+        xKillRowAnnotations(v, 5, true, false, false, 19, 9, true, rows);
         for (size_t ri = 0; ri < rows.size(); ri++)
             cout << "     X = " << (5 - (int) ri) << rows[ri] << "\n";
         CHECK(rows.size() == 6, "#W45-5 one annotation per offered X, largest first");
@@ -24505,13 +25232,21 @@ void AIPlayerGPT::runParseSelfTest()
         // already shown above it rather than repeating it.
         CHECK(rows[4] == " {X pricing: same kills as X=2, for 1 less mana}",
               "#W46-8 an identical consecutive row collapses to the row already shown, priced");
-        CHECK(rows[5] == " {X pricing: kills THEIRS: none; YOURS: none}",
-              "#W45-5 X=0 states both empty halves rather than going silent");
+        //#W47 R15 supersedes the wave-45 X=0 row: an empty kill list on both
+        //sides is TRUE and says nothing about the fact that decides the row -
+        //that the cast resolves for no effect at all.
+        CHECK(rows[5] == " {X pricing: X=0 - this cast does NOTHING: it deals 0 damage"
+                         " and the spell is spent}",
+              "#W47-R15 X=0 on an only-damage cast is called out as a NULL CAST");
+        CHECK(rows[5].find("less mana") == string::npos
+              && rows[5].find("kills THEIRS") == string::npos,
+              "#W47-R15 NEGATIVE the X=0 row never prices itself as a cheaper equal");
         // The MANDATORY half: every priced row states YOURS, empty or not.
         int missing = 0;
         for (size_t ri = 0; ri < rows.size(); ri++)
             if (rows[ri].find("; YOURS: ") == string::npos
-                && rows[ri].find("same kills as X=") == string::npos)
+                && rows[ri].find("same kills as X=") == string::npos
+                && rows[ri].find("X=0 - ") == string::npos)
                 missing++;
         CHECK(missing == 0, "#W45-5 the YOURS: half is never omitted from a priced row");
         // NEGATIVE: the sweep wording claims no targeting restriction.
@@ -25437,7 +26172,7 @@ void AIPlayerGPT::runParseSelfTest()
         XDamVictim ta8; ta8.baseName = "Triumphant Adventurer";
         ta8.name = "Triumphant Adventurer"; ta8.lethalX = 1; w8.push_back(ta8);
         std::vector<string> r8;
-        xKillRowAnnotations(w8, 3, true, false, false, 20, 9, r8);
+        xKillRowAnnotations(w8, 3, true, false, false, 20, 9, true, r8);
         for (size_t ri = 0; ri < r8.size(); ri++)
             cout << "     X = " << (3 - (int) ri) << r8[ri] << "\n";
         CHECK(r8.size() == 4, "#W46-8 one annotation per offered X, largest first");
@@ -25458,9 +26193,10 @@ void AIPlayerGPT::runParseSelfTest()
               "#W46-8 NEGATIVE the bare 'same as X=N' shape is not producible");
         // NEGATIVE 2: a row whose kill set genuinely DIFFERS never claims a
         // saving - X=0 kills nothing and is priced on its own facts.
-        CHECK(r8[3] == " {X pricing: kills THEIRS: none; YOURS: none}"
+        CHECK(r8[3] == " {X pricing: X=0 - this cast does NOTHING: it deals 0 damage"
+                       " and the spell is spent}"
               && r8[3].find("less mana") == string::npos,
-              "#W46-8 NEGATIVE a distinct row states its own kills and no saving");
+              "#W46-8 + #W47-R15 NEGATIVE the X=0 row claims no saving; it is the null cast");
         // NEGATIVE 3: the collapsed row does not re-list bodies - the claim it
         // makes is sameness, and a second list could drift from the first.
         CHECK(r8[1].find("kills THEIRS") == string::npos,
@@ -25816,6 +26552,291 @@ void AIPlayerGPT::runParseSelfTest()
         bool stL = false;
         CHECK(parseChoice("CHOICE: 1 (Play Underground Sea)", 2, &ld, &stL, NULL) == 1 && !stL,
               "#W47-R13 echo: the land-drop answer binds unchanged under the new question text");
+    }
+
+
+    // ---- #W47 R1: the DRAW-PUNISHER summary line and the per-draw row price ----
+    // The wave-46 repro board, card for card: deck130 vs162 seq 27 sat at 3 life
+    // against Underworld Dreams + Fate Unraveler + Ob Nixilis, the Hate-Twisted -
+    // three separate battlefield entries, each carrying its own {effect:} trigger
+    // text, all three named in the seat's own plan - and answered "cycling with
+    // Starstorm", which draws one card for exactly 3 damage. Dead at 0 the same
+    // turn. Every script line below is the REAL primitive (verified in
+    // bin/Res/sets/primitives: mtg.txt for Underworld Dreams / Fate Unraveler,
+    // planeswalkers.txt for Ob Nixilis).
+    cout << "\n[#W47-R1] DRAW PUNISHERS get a board-frame summary, and draw rows get the price\n";
+    {
+        vector<string> none, theirs, mine;
+        theirs.push_back("Underworld Dreams");
+        theirs.push_back("Fate Unraveler");
+        theirs.push_back("Ob Nixilis, the Hate-Twisted");
+        CHECK(drawPunisherSummaryText(none, 0, none, 0).empty(),
+              "#W47-R1 NEGATIVE no punisher on either battlefield -> no line at all");
+        string t = drawPunisherSummaryText(none, 0, theirs, 3);
+        cout << "     " << t << "\n";
+        CHECK(t.find("DRAW PUNISHERS on the battlefield: theirs - Underworld Dreams,"
+                     " Fate Unraveler, Ob Nixilis, the Hate-Twisted.") == 0,
+              "#W47-R1 the repro board is named in full, theirs-side only");
+        CHECK(t.find(" yours - ") == string::npos,
+              "#W47-R1 NEGATIVE an empty own side is not named");
+        CHECK(t.find("Every card YOU draw costs you 3 life to theirs.") != string::npos,
+              "#W47-R1 THE DECIDING FACT: the three separate triggers are SUMMED to one price");
+        CHECK(t.find("a cycling ability") != string::npos
+              && t.find("before anything can be done with it") != string::npos,
+              "#W47-R1 the line states that it covers every draw, not only the draw step");
+        CHECK(t[t.size() - 1] != '\n',
+              "#W47-R1 the summary carries no trailing newline: its callers place it");
+        mine.push_back("Underworld Dreams #1");
+        string both = drawPunisherSummaryText(mine, 1, theirs, 3);
+        CHECK(both.find(" yours - Underworld Dreams #1.") != string::npos
+              && both.find("Every card the OPPONENT draws costs them 1 life to yours.") != string::npos,
+              "#W47-R1 a punisher of YOURS prices the opponent's draws, on its own side");
+        CHECK(both.find("Every card YOU draw costs you 3 life to theirs.")
+              < both.find("Every card the OPPONENT draws"),
+              "#W47-R1 the half that can end the reader's own game leads");
+        // UNKNOWABLE AMOUNT: named, never guessed.
+        string unk = drawPunisherSummaryText(none, 0, theirs, 0);
+        CHECK(unk.find("costs you life (the amount is not fixed - read the permanents named)")
+                  != string::npos
+              && unk.find("costs you 0 life") == string::npos,
+              "#W47-R1 an unsummable board names the permanents and claims NO number");
+        // The script scan, against the real primitive lines.
+        int per = 0; bool cond = false;
+        CHECK(drawPunisherClause("@drawfoeof(player):damage:1 opponent", per, cond)
+              && per == 1 && !cond,
+              "#W47-R1 Underworld Dreams / Fate Unraveler: the real line prices at 1 per draw");
+        CHECK(drawPunisherClause("counter(0/0,5,loyalty)\n"
+                                 "@drawfoeof(player):damage:1 opponent\n"
+                                 "{C(0/0,-2,Loyalty)}:name(-2: Destroy target creature and draw two cards)"
+                                 " destroy target(creature) && draw:2 targetcontroller", per, cond)
+              && per == 1 && !cond,
+              "#W47-R1 Ob Nixilis: the punisher line is found among loyalty and activated lines");
+        CHECK(drawPunisherClause("@drawfoeof(player):name(Damage opponent) damage:1 opponent",
+                                 per, cond) && per == 1 && !cond,
+              "#W47-R1 a leading name(...) label is presentation and does not hide the payload");
+        CHECK(drawPunisherClause("@drawfoeof(player):life:-2 opponent", per, cond)
+              && per == 2 && !cond,
+              "#W47-R1 the life-LOSS spelling of the same class prices the same way");
+        // NEGATIVES: everything that makes the amount something other than the
+        // number on the line is named without a number, never summed.
+        CHECK(drawPunisherClause("@drawfoeof(player) restriction{type(*[red]|myBattlefield)"
+                                 "~morethan~0}:may damage:1 opponent", per, cond)
+              && per == 0 && cond,
+              "#W47-R1 NEGATIVE a restricted/may punisher is found but contributes NO number");
+        CHECK(!drawPunisherClause("@drawfoeof(player):draw:1", per, cond),
+              "#W47-R1 NEGATIVE a draw-triggered DRAW is not a punisher");
+        CHECK(!drawPunisherClause("@drawfoeof(player):damage:1 targetedplayer ueot", per, cond),
+              "#W47-R1 NEGATIVE a punisher aimed somewhere other than the drawing player is not counted");
+        CHECK(!drawPunisherClause("@drawof(player):life:-2 opponent", per, cond),
+              "#W47-R1 NEGATIVE the OWN-draw trigger is a different hook and is not read as this one");
+        CHECK(!drawPunisherClause("", per, cond),
+              "#W47-R1 NEGATIVE an empty script is not a punisher");
+        // The ROW half: the price rides the row that pays it.
+        string row = drawPriceRowTag(1, 3, "Underworld Dreams, Fate Unraveler,"
+                                           " Ob Nixilis, the Hate-Twisted");
+        cout << "     cycling with Starstorm [cost: {3}, Cycle]" << row << "\n";
+        CHECK(row == " [DRAW PRICE: this draws 1 card, and the opponent's Underworld Dreams,"
+                     " Fate Unraveler, Ob Nixilis, the Hate-Twisted punish every draw, so"
+                     " taking it costs you 3 life right now]",
+              "#W47-R1 the cycling row that killed deck130 now prices its own draw");
+        CHECK(drawPriceRowTag(2, 3, "Underworld Dreams").find("this draws 2 cards") != string::npos
+              && drawPriceRowTag(2, 3, "Underworld Dreams").find("costs you 6 life") != string::npos,
+              "#W47-R1 a multi-card draw multiplies the per-draw price");
+        CHECK(drawPriceRowTag(1, 0, "Underworld Dreams").empty(),
+              "#W47-R1 NEGATIVE no summable price -> no tag (the summary line carries the warning)");
+        CHECK(drawPriceRowTag(0, 3, "Underworld Dreams").empty(),
+              "#W47-R1 NEGATIVE a row that draws nothing is never tagged");
+        CHECK(drawPriceRowTag(1, 3, "").empty(),
+              "#W47-R1 NEGATIVE no named punisher -> no tag, never a bare number");
+        // The draw COUNT is read off the ability's own script line - the real
+        // _macros.txt expansion of Starstorm's autohand=__CYCLING__({3}).
+        CHECK(scriptAbilityDrawCount("{3}{cycle}:name(cycling) draw:1", "cycling") == 1,
+              "#W47-R1 the cycling ability's own line states the one card it draws");
+        CHECK(scriptAbilityDrawCount("{3}{cycle}:name(cycling) draw:1", "Cycling") == 1,
+              "#W47-R1 the label match is case-insensitive (live labels are lowercased scripts)");
+        CHECK(scriptAbilityDrawCount("{3}{cycle}:name(cycling) draw:1", "flashback") == 0,
+              "#W47-R1 NEGATIVE a label with no line of its own draws nothing");
+        CHECK(scriptAbilityDrawCount("@drawfoeof(player):name(cycling) draw:1", "cycling") == 0,
+              "#W47-R1 NEGATIVE a TRIGGER line is not an activation the pilot is choosing to pay");
+        CHECK(scriptAbilityDrawCount("{2}{cycle}:name(basic landcycling) moveTo(myhand)"
+                                     " target(land[basic]|mylibrary)", "basic landcycling") == 0,
+              "#W47-R1 NEGATIVE landcycling TUTORS rather than draws - no draw price is claimed");
+        CHECK(scriptAbilityDrawCount("", "cycling") == 0 && scriptAbilityDrawCount("x", "") == 0,
+              "#W47-R1 NEGATIVE empty inputs claim nothing");
+        CHECK(scriptAbilityDrawCount("{2}{t}:name(gift) draw:1 opponent", "gift") == 0,
+              "#W47-R1 NEGATIVE a draw aimed at the OPPONENT is not a cost the pilot pays");
+        CHECK(scriptAbilityDrawCount("{2}{t}:name(dig) draw:2 controller", "dig") == 2,
+              "#W47-R1 the explicit 'controller' spelling of the default is still the pilot's draw");
+        // ECHO SHAPE: the tag rides the option label into the reply and out of history.
+        {
+            vector<string> cyc;
+            cyc.push_back("cycling with Starstorm [cost: {3}, Cycle]" + row);
+            cyc.push_back("Pass priority");
+            bool st = false; string src = "Starstorm";
+            CHECK(parseChoice("CHOICE: 1 (cycling with Starstorm)", 2, &cyc, &st, &src) == 1 && !st,
+                  "#W47-R1 echo: the bare row name still binds to its index with the tag present");
+            bool st2 = false;
+            CHECK(parseChoice("CHOICE: 1 (" + cyc[0] + ")", 2, &cyc, &st2, &src) == 1 && !st2,
+                  "#W47-R1 echo: a reply copying the whole tagged row binds to the same index");
+            CHECK(stripNarrationDecoration(cyc[0]) == "cycling with Starstorm",
+                  "#W47-R1 echo: the DRAW PRICE tag leaves no residue in the narrated record");
+        }
+    }
+
+    // ---- #W47 R2: the cast-mode menu stops being the loop's only bare menu ----
+    // deck130 vs125 seq 60 -> 61 -> 62: it read a fully priced CAST row, arrived
+    // at "1. Cast Card Normally / 2. cycling / 3. Decline - do nothing" carrying
+    // the plan "Cast Starstorm at X=0 TO CYCLE IT ... per Strategy Guide Rule #1",
+    // answered option 1, announced X=0, and lost the game. Starstorm's real
+    // primitive: mana={X}{R}{R}, auto=damage:X all(creature),
+    // autohand=__CYCLING__({3}), text= as quoted below.
+    cout << "\n[#W47-R2] the cast-mode menu carries each row's own cost and text\n";
+    {
+        const string ssText = "Starstorm deals X damage to each creature."
+                              " -- Cycling {3} ({3}, Discard this card: Draw a card.)";
+        const string ssHand = "{3}{cycle}:name(cycling) draw:1";
+        CHECK(printedFirstClause(ssText) == "Starstorm deals X damage to each creature.",
+              "#W47-R2 the normal-cast row quotes the spell's own first clause");
+        CHECK(printedClauseFor(ssText, "cycling")
+              == "Cycling {3} ({3}, Discard this card: Draw a card.)",
+              "#W47-R2 the cycling row quotes the clause that names the discard AND the draw");
+        CHECK(printedClauseFor(ssText, "flashback").empty(),
+              "#W47-R2 NEGATIVE a row with no clause of its own quotes nothing invented");
+        CHECK(printedClauseFor("", "cycling").empty() && printedClauseFor(ssText, "").empty(),
+              "#W47-R2 NEGATIVE empty inputs quote nothing");
+        CHECK(scriptAbilityCost(ssHand, "cycling") == "{3}{cycle}",
+              "#W47-R2 the alternative path's cost comes off its own script line");
+        CHECK(scriptAbilityCost(ssHand, "kicker").empty(),
+              "#W47-R2 NEGATIVE an absent label has no cost");
+        CHECK(scriptAbilityCost("@drawfoeof(player):name(cycling) draw:1", "cycling").empty(),
+              "#W47-R2 NEGATIVE a trigger line is not a cost the pilot pays");
+        CHECK(scriptCostGloss("{3}{cycle}") == "{3}, discard this card",
+              "#W47-R2 the {cycle} token is named: the cost includes discarding this card");
+        CHECK(scriptCostGloss("{2}{g}") == "{2}{g}",
+              "#W47-R2 mana symbols pass through as the same tokens every other cost surface prints");
+        CHECK(scriptCostGloss("{t}") == "tap it" && scriptCostGloss("{cycle}") == "discard this card",
+              "#W47-R2 a cost that is ONLY an extra cost still renders it");
+        CHECK(scriptCostGloss("{3}{unknownextra}") == "{3}{unknownextra}",
+              "#W47-R2 NEGATIVE an unrecognised token is passed through verbatim, never dropped");
+        string castRow = castModeRowTag("{X}{R}{R}", printedFirstClause(ssText));
+        string cycRow = castModeRowTag(scriptCostGloss(scriptAbilityCost(ssHand, "cycling")),
+                                       printedClauseFor(ssText, "cycling"));
+        cout << "     1. Cast Card Normally" << castRow << "\n";
+        cout << "     2. cycling" << cycRow << "\n";
+        CHECK(castRow == " [cost: {X}{R}{R}] {card text: \"Starstorm deals X damage to each"
+                         " creature.\"}",
+              "#W47-R2 the normal-cast row states its cost and what casting it does");
+        CHECK(cycRow == " [cost: {3}, discard this card] {card text: \"Cycling {3} ({3},"
+                        " Discard this card: Draw a card.)\"}",
+              "#W47-R2 THE DECIDING FACT: the cycling row now names the {3}, the discard and the draw");
+        CHECK(castRow.find("Draw a card") == string::npos,
+              "#W47-R2 NEGATIVE the normal-cast row never borrows the cycling clause's draw");
+        CHECK(castModeRowTag("", "").empty(),
+              "#W47-R2 NEGATIVE a row with neither cost nor text gets no empty furniture");
+        // ECHO SHAPE: the annotated rows still bind, and leave no history residue.
+        {
+            vector<string> menu;
+            menu.push_back("Cast Card Normally" + castRow);
+            menu.push_back("cycling" + cycRow);
+            menu.push_back("Decline - do nothing");
+            bool st = false; string src = "Starstorm";
+            CHECK(parseChoice("CHOICE: 2 (cycling)", 3, &menu, &st, &src) == 2 && !st,
+                  "#W47-R2 echo: the answer the plan called for binds to its own index");
+            bool st2 = false;
+            CHECK(parseChoice("CHOICE: 1 (Cast Card Normally)", 3, &menu, &st2, &src) == 1 && !st2,
+                  "#W47-R2 echo: the wave-45/46 losing answer still binds - nothing was made illegal");
+            CHECK(stripNarrationDecoration(menu[1]) == "cycling",
+                  "#W47-R2 echo: the row annotation leaves no residue in the narrated record");
+        }
+    }
+
+    // ---- #W47 R15: the non-damage X class, and X = 0 as a NULL CAST ----
+    // Sphinx's Revelation's real primitive is auto=life:X && draw:X - nothing
+    // sv.priceable can price, so deck125 answered 17 of these menus off bare
+    // "X = N" rows, and at 6 life against two Underworld Dreams (seq 36) cast it
+    // for X=1 and drew itself DOWN to 4.
+    cout << "\n[#W47-R15] the life/draw X class is previewed, and X=0 is called a null cast\n";
+    {
+        int lifePerX = 0, drawPerX = 0;
+        CHECK(xLifeDrawClauses("life:X && draw:X", lifePerX, drawPerX)
+              && lifePerX == 1 && drawPerX == 1,
+              "#W47-R15 Sphinx's Revelation's real script is read as 1 life and 1 card per X");
+        CHECK(xLifeDrawClauses("draw:x", lifePerX, drawPerX) && lifePerX == 0 && drawPerX == 1,
+              "#W47-R15 a draw-only X spell prices only the draws");
+        CHECK(xLifeDrawClauses("life:x controller", lifePerX, drawPerX) && lifePerX == 1,
+              "#W47-R15 the explicit 'controller' spelling of the default is the same clause");
+        CHECK(!xLifeDrawClauses("damage:X all(creature)", lifePerX, drawPerX),
+              "#W47-R15 NEGATIVE the damage class is not claimed by this one");
+        CHECK(!xLifeDrawClauses("life:X opponent", lifePerX, drawPerX),
+              "#W47-R15 NEGATIVE an opponent-facing life clause never renders as 'you gain'");
+        CHECK(!xLifeDrawClauses("life:X && draw:X && counter(1/1.x)", lifePerX, drawPerX),
+              "#W47-R15 NEGATIVE any unaccounted segment blocks the preview rather than half-stating it");
+        CHECK(!xLifeDrawClauses("", lifePerX, drawPerX),
+              "#W47-R15 NEGATIVE an empty script previews nothing");
+        CHECK(xLifeDrawEffectClause(1, 1) == "each point of X gains you 1 life and draws you 1 card",
+              "#W47-R15 the CAST row states what one point of X buys");
+        CHECK(xLifeDrawEffectClause(0, 1) == "each point of X draws you 1 card",
+              "#W47-R15 a draw-only spell's cast row says only what is true of it");
+        // The rows, at the repro's own numbers: 8 mana, cap X=5, two Underworld
+        // Dreams and an Ob Nixilis standing on their side.
+        std::vector<string> rows;
+        xLifeDrawRowAnnotations(5, 1, 1, 2, "Underworld Dreams, Ob Nixilis, the Hate-Twisted", rows);
+        for (size_t ri = 0; ri < rows.size(); ri++)
+            cout << "     X = " << (5 - (int) ri) << rows[ri] << "\n";
+        CHECK(rows.size() == 6, "#W47-R15 one annotation per offered X, largest first");
+        CHECK(rows[0] == " {X pricing: X=5 - you gain 5 life and draw 5 cards; the opponent's"
+                         " Underworld Dreams, Ob Nixilis, the Hate-Twisted punish every draw,"
+                         " so those draws cost you 10 life - NET -5 life for this cast}",
+              "#W47-R15 THE DECIDING FACT: a life-GAIN spell reads as a NET LOSS under punishers");
+        CHECK(rows[4].find("you gain 1 life and draw 1 card;") != string::npos
+              && rows[4].find("NET -1 life for this cast") != string::npos,
+              "#W47-R15 the X=1 deck125 actually answered is priced at its own net");
+        CHECK(rows[5] == " {X pricing: X=0 - this cast does NOTHING: you gain 0 life and"
+                         " draw 0 cards, and the spell is spent}",
+              "#W47-R15 X=0 on the life/draw class is called out as a null cast");
+        CHECK(rows[5].find("NET") == string::npos,
+              "#W47-R15 NEGATIVE the null row prices no draws - there are none to price");
+        // Without punishers the preview is the totals alone: no invented cost.
+        std::vector<string> clean;
+        xLifeDrawRowAnnotations(2, 1, 1, 0, "", clean);
+        CHECK(clean[0] == " {X pricing: X=2 - you gain 2 life and draw 2 cards}",
+              "#W47-R15 NEGATIVE with no punisher out the row states the totals and nothing else");
+        CHECK(clean[0].find("punish") == string::npos && clean[0].find("NET") == string::npos,
+              "#W47-R15 NEGATIVE no punisher on the board -> no punisher clause");
+        // The null-cast half of the DAMAGE class (the deck130 seq 62 row).
+        CHECK(xCastIsOnlyXDamage("damage:X all(creature)"),
+              "#W47-R15 Starstorm's whole cast effect IS the X damage, so X=0 does nothing");
+        CHECK(!xCastIsOnlyXDamage("damage:X target(creature) && draw:1"),
+              "#W47-R15 NEGATIVE a cast with another effect never claims to do nothing at X=0");
+        CHECK(!xCastIsOnlyXDamage("damage:XX all(creature)"),
+              "#W47-R15 NEGATIVE an overload 'damage:XX' is not X damage");
+        CHECK(!xCastIsOnlyXDamage(""),
+              "#W47-R15 NEGATIVE an empty script claims nothing");
+        {
+            std::vector<XDamVictim> nobody;
+            std::vector<string> z;
+            xKillRowAnnotations(nobody, 0, true, false, false, 20, 16, false, z);
+            CHECK(z.size() == 1
+                  && z[0] == " {X pricing: X=0 - it deals 0 damage; only the spell's other"
+                             " effects happen}",
+                  "#W47-R15 a cast with other effects states the damage fact only - the true, weaker claim");
+        }
+        // ECHO SHAPE: the announce rows carry the annotation into the reply and
+        // out of history, exactly as the damage rows already do.
+        {
+            vector<string> xr;
+            for (size_t ri = 0; ri < rows.size(); ri++)
+            {
+                std::ostringstream lab;
+                lab << "X = " << (5 - (int) ri) << rows[ri];
+                xr.push_back(lab.str());
+            }
+            bool st = false; string src = "Sphinx's Revelation";
+            CHECK(parseChoice("CHOICE: 1 (X = 5)", 6, &xr, &st, &src) == 1 && !st,
+                  "#W47-R15 echo: a bare 'X = 5' binds to its index with the preview present");
+            CHECK(stripNarrationDecoration(xr[5]) == "X = 0",
+                  "#W47-R15 echo: the null-cast callout leaves no residue in the narrated record");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
