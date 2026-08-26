@@ -2551,6 +2551,30 @@ static string manaAvailableLine(int sources, const string& colors, const string&
     return o.str();
 }
 
+//#W47-R13, the latency half. The standing reply instruction asks for a
+//conditional PLAN line on every ask. On the land-drop binary that request is
+//what the corpus's two slowest two-option windows were spent answering (453 s
+//and 367 s of full-turn strategic monologue over a decision with one right
+//answer). Suppressed only where a PLAN cannot be owed; the suppressed form is a
+//restriction on the REPLY, never a claim about the reply rules, and the parser
+//still consumes and carries a plan the model volunteers anyway.
+//Pure so both branches are provable without a game.
+static string planRequestClause(bool suppress)
+{
+    return suppress
+        ? string("; this decision needs no PLAN line.")
+        : string("; then a PLAN: line only if the reply rules call for one (no plan shown"
+                 " yet, or part of yours is now done or false).");
+}
+
+//#W47-R13: the land drop's CONSEQUENCE, appended to the land-drop question
+//itself. It is a fact about the special action, not advice: playing a land
+//costs no mana and consumes nothing a spell would have used, so the drop can
+//never be the reason a planned cast does not happen this turn.
+const char * kLandDropConsequence =
+    " (playing a land costs no mana and uses up no cast: it does not reduce what you can"
+    " cast this turn)";
+
 //N-166m (wave-34 audit: b4 F3 39/91, b6 P2 34/146, b3 11 traces - 34-39% of a
 //corpus). The land drop is asked as its OWN decision (FindCardToPlay's "land"
 //branch), so no cast or ability menu ever lists it - and nothing said so. The
@@ -6835,7 +6859,20 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
         u << "--- YOUR OPENING HAND ---\n" << serializePregameState();
     else
         u << "--- CURRENT SITUATION ---\n" << serializeGameState();
-    if (!mCurrentPlan.empty())
+    //#W47-R9b (wave-46 docket R9; extends the N-146k owner directive of
+    //2026-07-27 that pregame asks get the HAND and nothing else): the carried
+    //plan is the last board-scoped sentence still reaching the pre-game asks,
+    //and the mulligan chain is the one loop that asks the SAME question up to
+    //seven times with no state change but a counter - so the plan the pilot
+    //wrote about a hand it has already shipped comes back as the answer to a
+    //question about the hand now on screen. deck123 wrote "Mulligan to find a
+    //hand with 4+ lands ..." at look 2 and re-emitted that exact string as its
+    //reply at looks 3, 4, 5, 6 and 7: seven mulligans, kept ZERO cards, lost
+    //42-0 (and 6 mulligans / kept ONE in the second game). A plan stated about
+    //a hand that no longer exists is not evidence about the hand on screen, and
+    //re-scoping it in words would still leave the sentence in the frame; the
+    //directive's own remedy is to leave the pregame frame hand-derived.
+    if (!pregame && !mCurrentPlan.empty())
     {
         u << "\nYOUR PLAN (as you last stated it): " << mCurrentPlan << "\n";
         //Item-1: the carried plan preserves intent across decisions, but when
@@ -8869,8 +8906,14 @@ static string stripNarrationDecoration(const string& in)
             //text are the same species as {right now: ...} - decision-time
             //surfaces, re-served on every prompt for the rest of the game if
             //they enter history. Same gate, same reason.
+            //#W47-R4: the last-offer clause is the same species again - a fact
+            //about THIS window's offer allowance, true only while the window is
+            //open. It is rendered onto the prompt line and never onto the option
+            //text the narration keeps, so it cannot reach history by the normal
+            //route; listed here so it cannot reach it by an abnormal one either.
             drop = (in.compare(i, 12, "{card text: ") == 0) || (in.compare(i, 12, "{right now: ") == 0)
-                || (in.compare(i, 12, "{X pricing: ") == 0) || (in.compare(i, 14, "{target text: ") == 0);
+                || (in.compare(i, 12, "{X pricing: ") == 0) || (in.compare(i, 14, "{target text: ") == 0)
+                || (in.compare(i, 19, "{if you pass here, ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -10744,6 +10787,30 @@ static string fetchLineKey(const string& line)
     return (t == string::npos) ? line : line.substr(0, t);
 }
 
+//#W47-R4 (wave-46 docket R4, deck146 vs125 seq 50/51): OFFER TIMING made
+//legible. `becomes beholder with Hive of the Eye Tyrant` was surfaced 31x at
+//Upkeep, 11x on the blockers screen, 4x at Main phase 1 and 0x at Main phase 2
+//against 17 Main-1 and 13 Main-2 priority windows in the same games - and the
+//cause is THIS seam's own two-decline allowance, not an oracle filter: two
+//passes on a line retire it for the rest of the turn (one pass at each of two
+//upkeep windows is enough), so a pilot correctly told by its guide to "wait for
+//the main phase" waits for a window that its own previous answer deleted. At
+//turn 23 with the opponent at 1 life the animation was exactly lethal, both
+//upkeep windows were passed, and the option never came back; the opponent went
+//1 -> 6 -> 11 -> 17 -> 25 and won on turn 41.
+//The allowance stays (it is the churn brake that made these menus affordable);
+//what was missing is the fact the model cannot derive - that THIS window is the
+//last one at which the option appears. Stated only where it is true by
+//construction: one more decline reaches the cap for this exact key. Restriction
+//first, conditional on the pass (picking another option costs nothing), and no
+//affirmative "you will be offered this again" converse - absence stays silent
+//rather than becoming a promise the seam cannot keep.
+static string lastOfferClause(bool retiresOnPass)
+{
+    return retiresOnPass ? " {if you pass here, this option is not offered again this turn}"
+                         : "";
+}
+
 const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranking)
 {
     if (!ranking.size() || mEndpoint.empty())
@@ -10894,12 +10961,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //class the allowance matters most for.
         std::map<string, int>::iterator dc = mPassDeclineCount.find(fetchLine ? fetchLineKey(line)
                                                                               : stripRepeatAnnotation(line));
-        if (dc != mPassDeclineCount.end() && dc->second >= (fetchLine ? 1 : 2))
+        int declineCap = fetchLine ? 1 : 2;
+        int declines = (dc != mPassDeclineCount.end()) ? dc->second : 0;
+        if (declines >= declineCap)
             continue;
         shown.push_back(cand);
+        //#W47-R4: shownLines keeps the PURE line - it is the decline/de-dup key
+        //and the translog record. The last-offer clause is a fact about this
+        //window's allowance, not about the action, and must never enter the key
+        //(a clause that appears on the second offer would mint a fresh key and
+        //silently un-retire every capped option).
         shownLines.push_back(line);
         index++;
-        tail << index << ". " << line << "\n";
+        tail << index << ". " << line << lastOfferClause(declines + 1 >= declineCap) << "\n";
     }
     //Every distinct action is suppressed as already-declined: pass without
     //another model call (that IS the model's standing answer this turn).
@@ -11178,7 +11252,8 @@ static string askExemplar(const vector<string>& options)
 }
 
 int AIPlayerGPT::askModel(const string& decision, const vector<string>& options, bool narrateChoice,
-                          const string& pendingSourceName, bool askEvenIfSingle)
+                          const string& pendingSourceName, bool askEvenIfSingle,
+                          bool suppressPlanRequest)
 {
     //W35: consume the caller's per-option register lines FIRST, on every exit
     //path, so a set of lines can never leak onto a later, unrelated ask.
@@ -11207,7 +11282,8 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     //hard-coded "Cast Example Card" - on cast-free screens (damage order, mode
     //menus) that placeholder was the only affirmative "Cast ..." substring and
     //the model latched it (4 replies, 2 stale_echo fallbacks in wave 46).
-    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. \"" << askExemplar(options) << "\" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
+    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. \"" << askExemplar(options) << "\" (a worked example of the format using the first option - choose the option YOU want)"
+         << planRequestClause(suppressPlanRequest) << " Write nothing else.";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -11514,7 +11590,20 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             q << "Land drop: play " << lands[0].card->getDisplayName() << " now?";
         else
             q << "Land drop: which land do you play now, if any?";
-        int pick = askModel(q.str(), opts, false); //the play narrates itself as a zone event
+        //#W47-R13 (wave-46 docket R13): the ask already explains that the land
+        //drop is its OWN decision (N-166m, above) - which answers a question the
+        //pilot was not getting wrong. What it got wrong is the RESOURCE: all
+        //nine declines this corpus reason the drop against a spell ("Cast
+        //Intrepid Adversary. Next turn play land"), as if the two competed.
+        //State the consequence instead of the mechanism.
+        q << kLandDropConsequence;
+        //#W47-R13, latency half: the corpus's two slowest two-option asks were
+        //both this menu (453 s and 367 s, the second with answer_replaced), both
+        //spent on a full-turn strategic monologue in the PLAN field over a
+        //binary with one right answer. A land drop cannot falsify a plan, so the
+        //request for one is pure cost here. Nothing is removed from the reply
+        //rules: a volunteered PLAN is still parsed and carried.
+        int pick = askModel(q.str(), opts, false, string(), false, true); //the play narrates itself as a zone event
         if (pick == kChoicePending)
         {
             gotPayments.clear(); //nothing plays this tick; re-poll next tick
@@ -16917,6 +17006,25 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
 
 //---- Pre-game (opening-hand) decision hooks (PreGamePhase, before turn 1) ----
 
+//#W47-R9a: the price of taking THIS mulligan, on the row that takes it. `next`
+//is the hand size a keep AFTER this mulligan would leave (this hand's size
+//minus the one further card the London mulligan bottoms). Clamped at zero, and
+//zero is spelled out - "keeping 0" is the point at which the option stops being
+//a search and becomes a concession, and two seats reached it this corpus.
+//Pure so both branches are provable without a game.
+static string mulliganRowLabel(int next)
+{
+    if (next < 0)
+        next = 0;
+    std::ostringstream o;
+    o << "Mulligan (a keep after this one would keep " << next << " card"
+      << (next == 1 ? "" : "s");
+    if (next == 0)
+        o << " - your entire hand goes to the bottom";
+    o << ")";
+    return o.str();
+}
+
 int AIPlayerGPT::pregameMulliganDecision(int mullsTaken)
 {
     mPregameMullsSeen = mullsTaken; //the true count, for the bottom ask (N-139i)
@@ -16936,7 +17044,13 @@ int AIPlayerGPT::pregameMulliganDecision(int mullsTaken)
       << " again, bottoming one more at the next keep)?";
     vector<string> opts;
     opts.push_back("Keep this hand");
-    opts.push_back("Mulligan");
+    //#W47-R9a: the Mulligan row is the one unpriced row in this loop - casts
+    //carry {X pricing:}, targets carry {target text:}, blockers carry the
+    //computed trade, and the mulligan's price lived only in the header sentence
+    //ABOVE, never on the row being chosen. Price it where it is chosen, and
+    //make the terminal case readable rather than arithmetic: at a keep of zero
+    //the whole hand goes to the bottom.
+    opts.push_back(mulliganRowLabel(startingHandSize() - mullsTaken - 1));
     //W35 addendum (6): the mulligan was the last full question-and-answer echo
     //in the log ("Pre-game mulligan decision (London mulligan). ... ? -> Keep
     //this hand"). It records its OUTCOME: a keep states the hand it kept, a
@@ -25263,6 +25377,122 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(idx == 1 && !st, "#W47-E2 echo: a reply that copies the exemplar binds to index 1, not stale");
         CHECK(askExemplar(vector<string>()) == "CHOICE: 1 (Example option)",
               "#W47-E2 empty menu still yields a well-formed placeholder");
+    }
+
+    // ---- #W47-R4: the priority row states when it is the turn's LAST offer ----
+    cout << "\n[#W47-R4] the activated-ability row says when passing retires it for the turn\n";
+    {
+        // POSITIVE: at the last window the allowance affords, the clause is on
+        // the row - the fact the pilot cannot derive (deck146 vs125 seq 51: the
+        // second and final upkeep offer of a LETHAL animation, opponent at 1).
+        CHECK(lastOfferClause(true) == " {if you pass here, this option is not offered again this turn}",
+              "#W47-R4 the last-offer clause states the restriction on this window's pass");
+        // NEGATIVE 1: with allowance left, the row says nothing at all - absence
+        // is never turned into a promise the seam cannot keep (whether a later
+        // window occurs at all is not knowable here).
+        CHECK(lastOfferClause(false).empty(),
+              "#W47-R4 NEGATIVE a row with allowance left carries no timing clause");
+        // NEGATIVE 2: no affirmative converse a pilot could latch as permission
+        // to wait ("you will be offered this again ...").
+        CHECK(lastOfferClause(true).find("will be offered") == string::npos
+              && lastOfferClause(true).find("main phase") == string::npos,
+              "#W47-R4 NEGATIVE the clause promises no later window and names no phase");
+        // NEGATIVE 3: it is conditional on the PASS, not on the window - picking
+        // another option costs the offer nothing.
+        CHECK(lastOfferClause(true).find("if you pass here") != string::npos,
+              "#W47-R4 the restriction is conditioned on passing, not on the window");
+        // ECHO SHAPE: the clause is rendered onto the prompt line only; the
+        // de-dup/decline key and the translog keep the pure option text. A reply
+        // that copies the whole decorated line still binds to its own index.
+        vector<string> pri;
+        pri.push_back("becomes beholder with Hive of the Eye Tyrant [cost: {3}{b}]");
+        pri.push_back("+0: draw card and lose life with Lolth, Spider Queen");
+        bool stR4 = false;
+        CHECK(parseChoice("CHOICE: 1 (becomes beholder with Hive of the Eye Tyrant)",
+                          2, &pri, &stR4, NULL) == 1 && !stR4,
+              "#W47-R4 echo: the bare short name binds while the clause is on the prompt");
+        bool stR4b = false;
+        CHECK(parseChoice("CHOICE: 1 (" + pri[0] + lastOfferClause(true) + ")",
+                          2, &pri, &stR4b, NULL) == 1 && !stR4b,
+              "#W47-R4 echo: a reply copying the clause too still binds to index 1");
+        CHECK(stripNarrationDecoration(pri[0] + lastOfferClause(true))
+              == stripNarrationDecoration(pri[0]),
+              "#W47-R4 echo: the clause leaves no residue in the narrated record");
+    }
+
+    // ---- #W47-R9a: the Mulligan row is priced where it is chosen ----
+    cout << "\n[#W47-R9a] the mulligan row states the hand a keep after it would keep\n";
+    {
+        CHECK(mulliganRowLabel(4) == "Mulligan (a keep after this one would keep 4 cards)",
+              "#W47-R9a the row prices the next keep in cards");
+        CHECK(mulliganRowLabel(1) == "Mulligan (a keep after this one would keep 1 card)",
+              "#W47-R9a the singular is spelled singular");
+        // The terminal case, made readable rather than arithmetic: deck123
+        // reached it twice this corpus (7 mulligans, kept ZERO, lost 42-0).
+        CHECK(mulliganRowLabel(0) == "Mulligan (a keep after this one would keep 0 cards"
+                                     " - your entire hand goes to the bottom)",
+              "#W47-R9a a keep of zero says what zero means");
+        CHECK(mulliganRowLabel(-2) == mulliganRowLabel(0),
+              "#W47-R9a the count is clamped at zero, never negative");
+        // NEGATIVE: the unpriced row is no longer producible, and the label
+        // carries no advice about which way to answer.
+        CHECK(mulliganRowLabel(4) != "Mulligan"
+              && mulliganRowLabel(4).find("should") == string::npos
+              && mulliganRowLabel(0).find("should") == string::npos,
+              "#W47-R9a NEGATIVE the row is priced, not recommended, and never bare");
+        // ECHO SHAPE: both the bare verb and the whole priced row bind to index 2.
+        vector<string> mull;
+        mull.push_back("Keep this hand");
+        mull.push_back(mulliganRowLabel(4));
+        bool stM = false;
+        CHECK(parseChoice("CHOICE: 2 (Mulligan)", 2, &mull, &stM, NULL) == 2 && !stM,
+              "#W47-R9a echo: the bare verb still binds to the mulligan row");
+        bool stM2 = false;
+        CHECK(parseChoice("CHOICE: 2 (" + mull[1] + ")", 2, &mull, &stM2, NULL) == 2 && !stM2,
+              "#W47-R9a echo: the whole priced row echoes back to its own index");
+        bool stM3 = false;
+        CHECK(parseChoice("CHOICE: 1 (Keep this hand)", 2, &mull, &stM3, NULL) == 1 && !stM3,
+              "#W47-R9a NEGATIVE the priced row does not capture a keep answer");
+    }
+
+    // ---- #W47-R13: the land drop states its consequence and asks for no plan ----
+    cout << "\n[#W47-R13] the land-drop binary prices its consequence, not its mechanism\n";
+    {
+        string lc = kLandDropConsequence;
+        CHECK(lc.find("does not reduce what you can cast this turn") != string::npos,
+              "#W47-R13 the clause states the consequence the declines got wrong");
+        CHECK(lc.find("costs no mana and uses up no cast") != string::npos,
+              "#W47-R13 the clause names the two resources a land drop does not spend");
+        // NEGATIVE 1: it is a fact about the special action, never an instruction
+        // to play the land - the option row still owns the choice.
+        CHECK(lc.find("you should") == string::npos && lc.find("always play") == string::npos,
+              "#W47-R13 NEGATIVE the clause recommends nothing");
+        // NEGATIVE 2: it is not the N-166m mechanism sentence restated - that one
+        // explains the question's independence, which was never the miss.
+        CHECK(lc.find("its OWN decision") == string::npos,
+              "#W47-R13 NEGATIVE the consequence clause is not the independence text");
+        CHECK(landDropStatusLine(true, true, true).find("its OWN decision") != string::npos,
+              "#W47-R13 the independence text still ships on the status line, unchanged");
+        // The PLAN request, both branches. Suppressed only where a PLAN cannot be
+        // owed; the suppressed form is a restriction on the reply.
+        CHECK(planRequestClause(false).find("then a PLAN: line only if the reply rules call for one")
+              != string::npos,
+              "#W47-R13 the default ask keeps the conditional PLAN request verbatim");
+        CHECK(planRequestClause(true) == "; this decision needs no PLAN line.",
+              "#W47-R13 the suppressed form states that no plan is owed here");
+        // NEGATIVE 3: the suppressed form never FORBIDS a plan (the parser still
+        // consumes one) and never re-states the reply rules.
+        CHECK(planRequestClause(true).find("PLAN:") == string::npos
+              && planRequestClause(true).find("reply rules") == string::npos,
+              "#W47-R13 NEGATIVE the suppressed form neither cites the rules nor bans a plan");
+        // ECHO SHAPE: a land-drop answer given under the suppressed request binds
+        // exactly as before - the clause rides the QUESTION, not any option.
+        vector<string> ld;
+        ld.push_back("Play Underground Sea");
+        ld.push_back("Hold Underground Sea - do not play it now");
+        bool stL = false;
+        CHECK(parseChoice("CHOICE: 1 (Play Underground Sea)", 2, &ld, &stL, NULL) == 1 && !stL,
+              "#W47-R13 echo: the land-drop answer binds unchanged under the new question text");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
