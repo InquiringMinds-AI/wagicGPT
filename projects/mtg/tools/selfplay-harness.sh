@@ -30,16 +30,16 @@
 #   tools/selfplay-harness.sh [-p "44,135,140,..."] [-r REPS] [-j JOBS]
 #                             [-t TOTAL_CAP_S] [-T GAME_TIMEOUT_S] [-o OUTDIR]
 #                             [-u URL] [-m MODEL] [-k KEY] [--thinking]
-#                             [--fairhand]
+#                             [--riggedhand]
 #
-# --fairhand exports WAGIC_SELFPLAY_FAIRHAND=1 (docket #W44-1): the AI seats get
-# a REAL random opening hand instead of the engine's stacked AI-vs-AI hand
-# (Rules.cpp OptimizedHand 3 lands/1 creature/3 spells - 42/42 wave-43 corpus
-# hands held exactly 3 lands and none was ever mulliganed), and the seats run
-# WITHOUT the agressivity+=100 / forceBestAbilityUse pins. This is what makes
-# mulligan teaches testable at all. It is OFF by default, and the default is an
-# OWNER call that has not been made: a --fairhand corpus is NOT hand-comparable
-# with the rigged-hand corpora waves 1-43 produced.
+# Hands are FAIR by default (owner ruling 2026-08-24, wave-44 lane A: "I want
+# legitimate hands. legit mulligans. none of this fixing hands in advance."):
+# the AI seats get a REAL random opening hand and run WITHOUT the
+# agressivity+=100 / forceBestAbilityUse pins, so mulligan seams are live.
+# --riggedhand exports WAGIC_SELFPLAY_FAIRHAND=0, the legacy-forensics escape
+# back to the engine's old stacked AI-vs-AI hand (OptimizedHand 3 lands/1
+# creature/3 spells) - NEVER for a corpus; waves <=43 were rigged and are not
+# hand-comparable with wave 44+.
 # Defaults: the locked 7-deck hard pool, 1 rep/pair, j=8, Spark qwen35 keyless.
 #
 # Run from projects/mtg (needs ./bin/wagic and ./bin/Res).
@@ -65,7 +65,7 @@ MODEL="qwen35"
 KEY=""
 THINKING=0
 FASTCLOCK=0.1   # game-seconds per engine tick; 0 = real-time pacing
-FAIRHAND=0      # #W44-1: 1 = un-rig the AI-vs-AI opening hand and the seat pins
+FAIRHAND=1      # engine default; 0 = --riggedhand legacy-forensics escape
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -81,6 +81,7 @@ while [ $# -gt 0 ]; do
         --thinking) THINKING=1; shift;;
         --realtime) FASTCLOCK=0; shift;;
         --fairhand) FAIRHAND=1; shift;;
+        --riggedhand) FAIRHAND=0; shift;;
         *) echo "unknown arg: $1" >&2; exit 2;;
     esac
 done
@@ -150,7 +151,7 @@ echo "  games  : $NGAMES ($(( ${#DECKS[@]} * (${#DECKS[@]} - 1) / 2 )) pairings 
 if [ "$THINKING" = "1" ]; then DEFAULT_GPT_TIMEOUT=420; else DEFAULT_GPT_TIMEOUT=240; fi
 echo "  model  : $MODEL @ $URL (thinking=$THINKING, gpt timeout=${WAGIC_GPT_TIMEOUT:-$DEFAULT_GPT_TIMEOUT}s)"
 echo "  caps   : ${TOTAL_CAP_S}s total, $([ "$GAME_TIMEOUT_S" = "0" ] && echo 'NO per-game cap' || echo "${GAME_TIMEOUT_S}s/game") (fastclock=$FASTCLOCK)"
-echo "  hands  : $([ "$FAIRHAND" = "1" ] && echo 'FAIR (real deal, seats unpinned) - NOT comparable with rigged-hand corpora' || echo 'stock rigged AI-vs-AI (OptimizedHand 3/1/3 + agressivity pin)')"
+echo "  hands  : $([ "$FAIRHAND" = "1" ] && echo 'FAIR (real deal, seats unpinned; wave 44+ baseline)' || echo 'RIGGED legacy (OptimizedHand 3/1/3 + agressivity pin) - forensics only, NOT a corpus')"
 echo "  outdir : $OUTDIR"
 
 cd "$HERE/bin"
@@ -164,7 +165,7 @@ run_one_game() {
     local fastclock_env=()
     [ "$FASTCLOCK" != "0" ] && fastclock_env=(WAGIC_FASTCLOCK="$FASTCLOCK")
     local fairhand_env=()
-    [ "$FAIRHAND" = "1" ] && fairhand_env=(WAGIC_SELFPLAY_FAIRHAND=1)
+    fairhand_env=(WAGIC_SELFPLAY_FAIRHAND=$FAIRHAND)
     timeout -k 10 "${GAME_TIMEOUT_S}s" env \
         WAGIC_HEADLESS=1 "${fastclock_env[@]}" "${fairhand_env[@]}" \
         WAGIC_SELFPLAY=1 WAGIC_SELFPLAY_ONESHOT=1 \
