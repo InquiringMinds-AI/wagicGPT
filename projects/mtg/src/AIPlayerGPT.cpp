@@ -8594,7 +8594,14 @@ string AIPlayerGPT::serializeGameState()
         }
     }
 
-    out << "Your hand: ";
+    //#W47 (wave-46 seat-125-126 HIGH): the in-game hand line carried no COUNT
+    //while the opponent's did - the pilot called eleven listed cards "hand
+    //size 6" and priced Sphinx's Revelation off it (4/17 X-ceiling misses).
+    //Same shape as the pregame header and #W46-1: state the integer, once.
+    {
+        int myHandCount = game->hand->nb_cards;
+        out << "Your hand (" << myHandCount << " card" << (myHandCount == 1 ? "" : "s") << "): ";
+    }
     describeZoneCards(out, game->hand, false);
     out << yourHandDisplacedClause(myHandInReveal);
     //Surfaced creature COUNTS: a cluttered board line studded with
