@@ -49,6 +49,23 @@ swings: one body, then two, then the whole team. Keep swinging.
   blocks, so a "(neither dies)" line against Shield Sphere is not a wasted swing - it is
   how you kill it. Send into a Shield Sphere whether or not you outnumber them, and read
   the proof off their battlefield line as its printed toughness falls: 0/6, 0/5, 0/4.
+- THE COLLAPSED TAG AND THE "GANG BLOCK:" CLAUSE - THIS IS HOW YOUR BEST CREATURE DIES.
+  On a wide board the tag stops listing their blockers one by one and reads instead:
+  "they have N untapped creatures that could block this one, biggest X (you kill it, your
+  attacker lives) - GANG BLOCK: their 6 biggest together deal 7, enough to kill this attacker;
+  each result above is a LONE blocker only".
+  That parenthesis prices ONE blocker. The GANG BLOCK clause prices what actually happens.
+  READ THE GANG BLOCK CLAUSE, NOT THE PARENTHESIS. When it says a group of them is "enough to
+  kill this attacker", that creature stays home - the answer for it is ATTACK: none - unless the
+  lethal check has cleared (their printed life is at or below the total power of everything you
+  are sending). "But the biggest one dies to me" is exactly the sentence the clause was written
+  to refuse: they do not have to block with the biggest one alone, and against a lone big
+  attacker they will not.
+  When the tag is collapsed and prints NO "GANG BLOCK:" clause, use the parenthesis it does print
+  - if that parenthesis already says your attacker dies, that is a stop on its own.
+  A 7/7 Luminarch Aspirant carrying seven counters is your whole board in one body. Trading it
+  for six 1/1 tokens their Thraben Doomsayer remakes every turn is the worst trade in this
+  matchup, and the render told you the price before you answered.
 - OUTNUMBERING THEM DOES NOT MAKE A LIFEGAIN WALL FREE. PERIMETER CAPTAIN gives them 2 life
   every time ANY defender they control blocks; PRIDE GUARDIAN gives them 3 whenever it blocks.
   The tag still reads "(neither dies)" - it does not print their life gain. Count the 0/N
@@ -56,19 +73,29 @@ swings: one body, then two, then the whole team. Keep swinging.
   and the outnumber clause does not apply. Send only what actually gets through (Sigarda and
   Elite Spellbinder FLY) and grind with removal instead of feeding the wall.
 - A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
-  is a per-creature STOP, not a note about the whole attack. Leave THAT creature home even
-  when the rest of the team is attacking - "attack with everything that profits" is decided
-  one A-line at a time, and a creature that dies to a blocker they already control profits
-  nothing. Send it anyway only when the lethal check clears: the printed opponent life is at
-  or below the total power of everything you are sending.
-  VIGILANCE IS NOT A LICENCE. "It has vigilance, so attacking costs me nothing" is FALSE
-  against that tag: a vigilant attacker that dies is gone from your board for the rest of the
-  game, which is far worse than being tapped for one turn. Briarbridge Tracker's vigilance
-  does not change a "your attacker dies, their blocker lives" line - keep it home.
-  THE STOP IS ABOUT CARDS, NOT TOKENS. A Wolf token costs you nothing when it dies, and one
-  untapped blocker can only block ONE attacker: when the stop-tagged body is a TOKEN and your
-  attackers outnumber their untapped blockers, send it as bait so their block is spent on the
-  token instead of on a lord.
+  ANYWHERE IN ITS LIST is a per-creature STOP, not a note about the whole attack. Leave THAT
+  creature home even when the rest of the team is attacking - "attack with everything that
+  profits" is decided one A-line at a time, and a creature that dies to a blocker they already
+  control profits nothing. Send it anyway only when the lethal check clears: the printed opponent
+  life is at or below the total power of everything you are sending.
+  LIFELINK IS NOT A PAYMENT FOR THE TRADE, AND YOU NEVER GET BOTH HALVES. The tag on your
+  Intrepid Adversary reads "(your attacker dies, their blocker lives (lifelink: you gain 3))".
+  That "you gain 3" is what the BLOCKED fight pays you while the Adversary dies - it is not
+  added to the 3 damage the Adversary would have dealt their face. Exactly one of those two
+  things happens, and the tag has already told you which one it expects. Never write "the
+  Adversaries gain 3 life each AND deal 6 damage to the opponent": that sentence counts the
+  blocked outcome and the unblocked outcome at the same time, and it is how you lose lords.
+  Three life is not worth a lord; a lord that dies is gone for the rest of the game.
+  VIGILANCE IS NOT A LICENCE EITHER. "It has vigilance, so attacking costs me nothing" is FALSE
+  against that tag. Briarbridge Tracker's vigilance does not change a "your attacker dies,
+  their blocker lives" line - keep it home.
+  OUTNUMBERING THEM DOES NOT PROTECT A CARD. "They have one blocker and I am sending three, so
+  mine is safe" is FALSE: THEY choose which attacker that blocker stops, and they choose the one
+  their block kills - which is the one your tag says dies. A tag with two friendly names and one
+  fatal name is a fatal line; price the WORST name on the list, always.
+  THE STOP IS ABOUT CARDS, NOT TOKENS. A Wolf token costs you nothing when it dies, so send a
+  stop-tagged TOKEN with the team - it is free bait. The stop stands for every real card:
+  Intrepid Adversary, Briarbridge Tracker, Elite Spellbinder, Sigarda, Katilda, Brutal Cathar.
 
 #3 RULE - DEPLOY FLOOR: ON YOUR OWN MAIN PHASE, IF A CREATURE IS OFFERED, CAST ONE.
 "Cast nothing right now" on YOUR main phase is correct in exactly TWO situations:
@@ -111,6 +138,13 @@ error" is ALWAYS FALSE - it is never an error.
   Take the 1 damage every time.
 BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
 this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ WHEN "BLOCKS: none" IS ALLOWED - READ THIS BEFORE THE LADDER, NOT AFTER IT. You may answer
+ "BLOCKS: none" in exactly one case: every offered block reads "(your blocker dies, attacker
+ lives)" AND the header's "you would be at N" number is 10 or more. In every other case you are
+ blocking something, and the ladder below says with what. In particular: if ANY offered block
+ reads "(neither dies)", "(you kill it, your blocker lives)" or "(both die)", "BLOCKS: none" is
+ WRONG - those cost you nothing or trade evenly, and passing them up is a decision to take damage
+ for free. Take the block and then write the answer.
  SURVIVAL COMES BEFORE THE LADDER. When the header says the attack IS LETHAL, the first
  question is not "which block is free" - it is "which assignment leaves me alive". Each
  attacker prints its own "deals N". Add them up and assign your blockers so the damage still
@@ -139,7 +173,11 @@ CHANGES the forecast number: each non-trampler you block deals you ZERO. "I take
 way" is FALSE against a non-trampler, and so is "I will preserve this creature for future blocks"
 and "let the attackers through" - a creature you preserved at N of 9 or less is a creature
 you kept for a turn you will not get.
-"BLOCKS: none" is correct only when every offered block is rung 3 above your floor.
+THE ONE ARITHMETIC STEP, EVERY BLOCK WINDOW: read the header's "you would be at N", compare N to
+9, and answer. N of 9 or less means you are blocking - take the best block the ladder offers, and
+if the only one offered is rung 3, take that. N of 10 or more and rung 3 is the only offer means
+"BLOCKS: none". That is the whole decision; a two-line "BLOCKS: none" answer that never mentions
+N is an answer that skipped the ladder.
 Katilda is a mana source, not a
 trading piece: she blocks to save your life, never to swap with a 1/1 mana creature - and she
 joins INFECT blocks only from "8 of 10" poison upward (see the infect rule for the exact test).
@@ -170,6 +208,11 @@ YOUR LORDS AND GROWTH:
   that creature is worth exactly zero. Grow a different body instead, preferring one they cannot
   block at all: Sigarda and Elite Spellbinder FLY. Stacking nine counters onto one grounded
   attacker facing a Fog Bank builds a 10/10 that never deals a point.
+  AND DO NOT PUT EVERY COUNTER ON ONE BODY EVEN WHEN IT IS CONNECTING. Once a creature is
+  carrying four or more counters it is your whole board in one card, and one gang block or one
+  removal spell takes all of it at once. From the fifth counter on, put it on a SECOND creature
+  instead - two 4/4s beat one 8/8 against a board that can block with six bodies. Never put the
+  counter on the Aspirant itself while another creature of yours can attack.
 - RANGER CLASS ({1}{G}): cast it for the 2/2 Wolf immediately. Level 2 ({1}{G}) puts a +1/+1
   counter on an attacker each combat; Level 3 ({3}{G}) casts creatures off the top. Level with
   SPARE mana only - never instead of casting a creature.
@@ -233,15 +276,29 @@ SECOND white source on the board before Teferi becomes castable. Do not contort 
 Teferi - keep the GW curve on line. Once out, +1 (untap yours / tap theirs, gain 2 life) is the
 default; -2 digs three when you need gas.
 
-MULLIGAN - THE KEEP FLOOR COMES FIRST, THE PREFERENCES ARE ONLY TIEBREAKERS.
+MULLIGAN - THIS IS AN ODDS COMPARISON, NOT A CHECKLIST.
 The prompt counts your opening hand for you, in these exact lines:
   "Your hand (7 cards), counted by the engine: 3 lands, 4 spells."
   "Mana sources among those lands, counted by the engine: {W} 3, {G} 1."
   "Playing every land in this hand would cover the cost of: ..."
-THE FLOOR, and it overrides everything below it: if the "Playing every land in this hand would
-cover the cost of:" line NAMES EVEN ONE CARD, KEEP THE HAND. That line is the engine telling you
-this hand casts real spells. Only when it says "would not cover any spell in it", or when the
-hand has two or fewer lands, is a mulligan on the table at all.
+Use those counts; never recount the hand yourself.
+THE QUESTION IS ALWAYS THE SAME: is this seven more likely to win than a fresh six? Weigh it on
+the deck facts. You run 25 lands, so a third land by turn three and a fourth by turn five are
+both likely, and a six you ship is most often a two-lander again - shipping costs you a card and
+usually does not fix the land count. Your cheapest spells cost TWO, so two lands is enough to
+start on curve.
+- TWO OR MORE LANDS: KEEP. That is the floor and it is not a close call. If the "would cover the
+  cost of" line names even one card, it is not close at all.
+- ONE LAND: weigh it on what the spells cost. One land with a hand of THREES and up (Sigarda,
+  Tovolar's Huntmaster, Teferi) is a ship - you will not cast anything for four turns. One land
+  with three or four TWO-drops (Katilda, Luminarch Aspirant, Intrepid Adversary, Ranger Class) is
+  a judgment call on those exact cards: one more land turns it into a real curve, and against a
+  slower opponent the wait is affordable. Take that keep when the cheap cards themselves win the
+  early turns; ship it when they do not. Colour is not part of this call - see THE FORBIDDEN
+  THOUGHT below.
+- ZERO LANDS: ship, always.
+Colour and curve are TIEBREAKERS between hands that already clear the land count, never a reason
+to ship a hand that clears it.
 THE FORBIDDEN THOUGHT, in the words you will otherwise write yourself: "this hand has no white
 source / no green source, so it is effectively dead for my deck." IT IS NOT. Your 25 lands split
 14 green and 15 white and only the four Overgrown Farmlands make BOTH, so a one-color opener is
@@ -269,6 +326,14 @@ MATCHUP POSTURE:
   Adversary's lifelink, then take over with your lords.
 - vs LIFEGAIN: their life total is not a clock you can outrace - kill or exile the lifelinker as
   soon as it lands instead of racing it.
+- vs A LIFE-TO-DAMAGE CONVERTER: the attackers prompt prints its own warning line, "LIFE-TO-DAMAGE
+  CONVERTER on the battlefield: theirs - Sanguine Bond", naming the card. YOU CANNOT ANSWER IT.
+  This deck has no way to destroy an enchantment - Fateful Absence hits creatures and
+  planeswalkers only, and Brutal Cathar exiles a creature. So when that line names a converter of
+  THEIRS, the game has become a race with a deadline you cannot see, and the correct posture is
+  the most aggressive one available: attack with everything that is not held home by a stop,
+  every turn, and spend nothing on incremental value. A turn spent gaining 2 life off Teferi's +1
+  while they are at 3 is a turn you needed for the last 3 damage.
 - vs INFECT / POISON (creatures tagged [infect]): the prompt prints your poison total on its own
   line - "Poison counters (you): 4 of 10" - and the blocker window prices infect swings in
   counters, not life: "these attackers put up to 2 POISON COUNTERS on you - you would be at 6 of

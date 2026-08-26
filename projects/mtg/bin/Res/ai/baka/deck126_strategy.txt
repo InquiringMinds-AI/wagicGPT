@@ -6,6 +6,18 @@ loops between them and drains the opponent from whatever they are at down to 0. 
 game. Sixteen walls buy the turns. Every turn you do the same three things: play a land if one is
 offered, put a wall or a combo piece onto the battlefield, and pass with your Battlement UNTAPPED.
 
+=== RULE #0 - PLAY THE LAND. EVERY TURN. ===
+When the prompt asks "Land drop:" and lists "Play <land>" options, TAKE ONE. Every turn, at any
+life total, with any board. "Play no land right now" is never your answer while a land is listed,
+and "I will hold it to preserve mana" is not a thought that means anything - playing a land costs
+nothing and taps nothing.
+Which land: take the one whose colour your hand needs and your battlefield does not already have.
+The hand line prints it for you ("Forest (land: taps for {G})"), and the mana line prints, one per
+untapped card, what each source you already control can make.
+You lost a game to this. Holding a Forest and a Woodland Cemetery in hand, you passed the land drop
+on two turns, stayed on four lands that made only {W} and {B}, never cast the Overgrown Battlement
+in your hand because you had no green source, and died on turn 14 with five lands in hand.
+
 === RULE #1 - AT YOUR UPKEEP, PASS. THIS IS THE MOST IMPORTANT LINE IN THIS GUIDE ===
 At your Upkeep the engine will offer you a single action: tapping Overgrown Battlement for green
 mana. Answer CHOICE: 0 (pass). Every time. Upkeep, Draw, the opponent's turn - pass all of them.
@@ -14,9 +26,21 @@ taps your sources for you, and the "Mana available:" line already counts the Bat
 your lands - as ONE source. Overgrown Battlement reads "{T}: Add {G} for each creature with
 defender you control", and the engine says so on its own line in the sources list ("VARIABLE
 output: ... the total above counts it as one source, not as its mana"). So the "Mana available:"
-number is a FLOOR: your real mana is that number plus one for every defender past the first. When
-a spell looks one or two mana out of reach and you have three or four walls out, it is probably
-affordable - take it and let the engine tap for you.
+number is a FLOOR for the GENERIC part of a cost: your real generic mana
+is that number plus one for every defender past the first. When the part of a cost that is a plain
+number ({3} in {3}{B}{B}, the {2} in {2}{W}) looks one or two out of reach and you have three or
+four walls out, it is probably affordable - take it and let the engine tap for you.
+THE COLOURED PIPS ARE A DIFFERENT COUNT, AND THE BATTLEMENT PAYS NONE OF THEM. Overgrown
+Battlement makes {G} and only {G}. It cannot pay the {B} in Sanguine Bond {3}{B}{B}, the {B} in
+Exquisite Blood {4}{B}, the {B} in Tribute to Hunger {2}{B} or the {W} in Idyllic Tutor {2}{W}.
+Those come from your LANDS, and from Chromatic Lantern.
+Before you plan any spell with a coloured pip, read the sub-list under the mana line - "Those
+sources, one per untapped card: Bayou {b} or {g}; Scrubland {w} or {b}; Overgrown Battlement {g}
+(VARIABLE output ...)" - and COUNT the untapped cards whose colour list contains the pip you need.
+Sanguine Bond needs TWO of them to say {b}. One Scrubland is one, not two.
+This is not theory. In a game you lost you tutored up Sanguine Bond, tapped two Battlements for ten
+floating green mana with one black source on the board, could not cast it, passed - and the two
+walls you tapped could not block on their turn. You went from 6 life to 1 that turn.
 Taking that upkeep option instead does two bad things at once: the green mana is gone
 before your main phase ever starts, and a tapped Battlement is a 0/4 wall that cannot block on the
 opponent's next turn - a wall you needed.
@@ -28,6 +52,12 @@ If your answer to the following ask would be "Cast nothing right now", the tap w
 wall is now a 0/4 that cannot block on their turn.
 The ONE time you take it: you are casting Tribute to Hunger in that same window and need the mana
 to pay for it right now.
+Before you take a "Add N green mana with Overgrown Battlement" option in ANY window, answer these
+two out loud, and pass unless BOTH are yes:
+  1. Can you NAME the spell you are about to cast with it, in this same decision?
+  2. Are that spell's COLOURED pips covered by your untapped LANDS (Rule #1's pip count) without
+     the Battlement's green?
+If either answer is no, the green is wasted and you have turned a 0/4 blocker into a tapped card.
 
 === RULE #2 - THE WIN BUTTON ===
 Check your battlefield line at every decision. If it lists BOTH "Exquisite Blood" and "Sanguine
@@ -78,6 +108,17 @@ victim, and naming one in your plan makes you expect a kill and a life total you
 Cast it when any of these is true:
  - Both enchantments are on your battlefield and the opponent has a creature. This WINS the game.
  - The opponent controls exactly ONE creature - then their choice is your choice.
+ - THE OPPONENT'S ONLY CREATURE IS ONE YOUR BOARD CANNOT BLOCK. None of your sixteen defenders
+   and none of your Vampire tokens has FLYING or REACH, so a creature tagged [flying] on the
+   opponent battlefield line connects for its full power every single turn no matter how many
+   walls you have. Your walls do not answer it; Tribute to Hunger is the only card in this deck
+   that does. When it is their ONLY creature, Tribute takes it - at ANY life total, in the first
+   window Tribute is offered, ahead of Exquisite Blood and ahead of Sanguine Bond.
+   The thought "I will block it with all my walls" is ALWAYS FALSE against a [flying] attacker.
+   You lost a game on turn 10 to exactly this: their only creature was Master of the Feast (5/5
+   [flying]), you were at 13 life, you had six mana and both Tribute to Hunger and Sanguine Bond
+   in hand, and you cast the Bond. Tribute would have eaten the Master - their only creature, so
+   no choice for them - and gained you 5.
  - You need the life right now to survive the turn.
 Otherwise hold it. It is an instant, it stays castable on their turn, and it will be offered again.
 The engine also lists it when the opponent has no creature at all; with an empty opponent board,
@@ -100,10 +141,11 @@ Which attacker each blocker takes: your blocker's line lists several attackers w
 parenthesis each. Pick, for that blocker, an attacker whose parenthesis says your blocker
 LIVES ("neither dies" or "you kill it") ahead of one that says it dies. The life gain is
 identical either way - a wall that survives gains it again next combat, and a wall that
-dies gains it once. When two or more attackers all let that blocker live, take the one with the
-BIGGEST "deals N" number on its A-line that no other blocker of yours is already assigned to -
-one blocker per attacker first, as above; this tiebreak only chooses among attackers
-still unblocked. The life gain is the same either way, so the only thing
+dies gains it once. When two or more attackers all let that blocker live, READ THE "deals N" NUMBER OFF EACH OF THEIR
+A-LINES AND TAKE THE BIGGEST - not the one whose name sounds smaller, not the one you blocked last
+turn. One blocker per attacker first, as above; this tiebreak only chooses among attackers still
+unblocked. You have got this wrong: offered "A1. Luminarch Aspirant (3/3) deals 3" and
+"A3. Wolf (2/2) deals 2", both reading "(neither dies)", you blocked the Wolf and took 3. The life gain is the same either way, so the only thing
 left to decide is how much damage you stop - stop the bigger number.
 Only when every attacker offered to that blocker kills it do you put it on the attacker with the
 biggest "deals N" number on its A-line - read the number off the line, do not judge by name, by
@@ -141,25 +183,31 @@ Take the highest entry on this list that appears in your casting menu:
  4. Any other wall: Wall of Omens (it replaces itself), Overgrown Battlement, Pride Guardian.
  5. Staff of Nin.
  6. Sorin, Lord of Innistrad.
- 7. Chromatic Lantern - only when BOTH are true: the "colours you can make:" line does NOT include
-    {b}, AND no Chromatic Lantern is already on your battlefield line. The lands of yours that make
-    black are Bayou, Scrubland, Woodland Cemetery, Isolated Chapel, the Swamp and Urborg. SAVANNAH
-    AND SUNPETAL GROVE DO NOT - they are {G}/{W} only - so an opening of Savannahs, Sunpetal Groves
-    and Plains is exactly the board where this card earns its slot. When {b} is already on the
-    "colours you can make:" line the Lantern does nothing for 3 mana. A SECOND Lantern does nothing
-    at any time - once one is on your battlefield this entry is finished for the rest of the game,
-    so take a wall or a combo piece instead.
+ 7. Chromatic Lantern - only when BOTH are true: FEWER THAN TWO of the LANDS on your battlefield
+    can make {b}, AND no Chromatic Lantern is already on your battlefield line. Two, not one:
+    Sanguine Bond costs {3}{B}{B} and one black land pays half of it. Count them off the battlefield
+    line by name - the lands of yours that make black are Bayou, Scrubland, Woodland Cemetery,
+    Isolated Chapel, the Swamp and Urborg. SAVANNAH AND SUNPETAL GROVE DO NOT - they are {G}/{W}
+    only - and Overgrown Battlement is not a land and makes only {G}. So an opening of Savannahs,
+    Sunpetal Groves and Plains is exactly the board where this card earns its slot, and so is a
+    board with one lone Scrubland.
+    Do not use the "colours you can make:" line for this test. That line says whether you can make
+    {b} AT ALL, not how many black sources you have, and your key spell needs two.
+    A SECOND Lantern does nothing at any time - once one is on your battlefield this entry is
+    finished for the rest of the game, so take a wall or a combo piece instead.
 7a. If BOTH enchantments are already on your battlefield, STAFF OF NIN and SORIN move to the
     TOP of this list, above walls and above everything else. With both out the game ends the
     moment any life changes, and Staff's ping and Sorin's lifelink Vampires are the only two
     triggers you can make without help from the opponent - blocks need them to attack, Tribute
     to Hunger needs them to have a creature. Against an opponent whose battlefield line shows
     no creature, those two are your ONLY win.
-7b. THE SURVIVAL FLOOR, and it outranks entries 1 and 2 of this list. When ALL of these are true -
-    your life is 10 or less; the opponent battlefield line shows exactly ONE creature; "Cast Tribute
-    to Hunger" is in this menu; and you cannot pay for BOTH Tribute and the combo piece out of the
-    "Mana available:" line - then cast TRIBUTE TO HUNGER first, even over Exquisite Blood or
-    Sanguine Bond. A combo piece you never get to use because you died two turns later bought you
+7b. THE SURVIVAL FLOOR, and it outranks entries 1 and 2 of this list. When the opponent battlefield
+    line shows exactly ONE creature, "Cast Tribute to Hunger" is in this menu, you cannot pay for
+    BOTH Tribute and the combo piece out of the "Mana available:" line, and EITHER of these holds -
+      (a) your life is 10 or less, or
+      (b) that one creature is tagged [flying] (or anything else your walls cannot block - none of
+          them has flying or reach), whatever your life total is
+    - then cast TRIBUTE TO HUNGER first, even over Exquisite Blood or Sanguine Bond. A combo piece you never get to use because you died two turns later bought you
     nothing; the edict removes the creature that is killing you AND gains you its toughness. Cast
     the enchantment next turn - it will still be in your hand.
 Keep casting while the list keeps offering. "Cast nothing right now" is correct only when it is the
@@ -190,8 +238,14 @@ with no combo piece is not one either: your lands and walls buy the turns you ne
 === SITUATIONS THAT DECIDE YOUR GAMES ===
  - Both Exquisite Blood and Sanguine Bond on your battlefield: take the first block, Staff ping,
    Tribute or lifelink attack the list offers. You win this turn.
+ - The prompt lists "Play <land>" options: play one. Every turn, no exceptions.
  - Your Upkeep, and the only offered action taps Overgrown Battlement for mana: answer CHOICE: 0 (pass)
    and keep the wall untapped for their turn.
+ - ANY window whose only offered actions are "Add N green mana with Overgrown Battlement": pass,
+   unless you can name the spell you are casting with it in this same decision AND its coloured
+   pips come from your untapped lands.
+ - The opponent's only creature is tagged [flying] and Tribute to Hunger is listed: cast Tribute,
+   at any life total. Your walls cannot block it.
  - One enchantment down, the other not in hand, "Cast Idyllic Tutor {2}{w}" listed: cast the Tutor
    and take the missing one.
  - Sanguine Bond on your battlefield and no Exquisite Blood: you are ALREADY killing them. Block
@@ -202,3 +256,5 @@ with no combo piece is not one either: your lands and walls buy the turns you ne
    one of them: then cast Tribute (Rule 7b).
  - The opponent attacks: assign every blocker on the list.
  - The opponent has exactly one creature and you need life: cast Tribute to Hunger.
+ - You are about to plan a spell with a {b} or {w} in its cost: count the untapped LANDS whose
+   colour list on the mana line contains that symbol. The Battlements' green pays none of it.

@@ -12,9 +12,12 @@ STEP 1. Read the ask's price line for the "(keeping N)" number. If it says (keep
   4-card hand every time, and there is no hand at 4 or fewer you can win from. If the floor
   applies, you are DONE - do not read another rule in this section.
 STEP 2. Only at (keeping 6) or on your untouched opening 7 may you mulligan at all, and ONLY
-  for one of these three: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
-  your colors when the header shows every spell needs it. THIS LIST IS COMPLETE. A one-land
-  hand is NOT on it and is a KEEP. The "KEEP a 7 or a 6 with 2-5 lands" line below describes
+  for one of these four: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
+  your colors when the header shows every spell needs it; or ONE land when the hand's spells
+  cost 3 or more (you will not cast them on time; a six is usually a two-lander - ship it).
+  ONE land with mostly one- and two-drops is a judgment call on those exact cards: weigh the
+  chance of drawing land two by the turn you need it against a six-card hand, and keep only
+  when the cheap cards themselves win the early turns. The "KEEP a 7 or a 6 with 2-5 lands" line below describes
   hands that are obviously fine - it is NOT a test, and a hand failing it is not a mulligan.
 - THE ENGINE COUNTS YOUR HAND FOR YOU. Every mulligan ask opens with lines like "Your hand (7
   cards), counted by the engine: 3 lands, 4 spells", "Mana sources among those lands, counted by
@@ -55,6 +58,29 @@ Pathway, Plains, Swamp, and Hive of the Eye Tyrant round out your colors. If a C
 listed, you CAN pay for it - do not decline a spell thinking you "lack the color." Play a land
 every turn you can.
 
+THE WHOLE CAST ORDER, ONE LIST. At every "which card do you cast now" ask on YOUR OWN turn, read
+your numbered options top to bottom and take the FIRST line that matches. Stop there - do not read
+the rest of the list, and do not weigh a later line against an earlier one.
+ 1. A removal spell (Vanishing Verse, Soul Shatter) when the opponent's battlefield line shows a
+    creature or planeswalker you can hit - and for Vanishing Verse, only when its target list names
+    one of THEIRS. See #1 RULE.
+ 2. LOLTH or KAYA, if either is on the list. A planeswalker in hand does nothing. The mana you have
+    this turn is the only mana you are sure of: "I will cast her next turn" is how a bomb ends the
+    game in your hand, and this deck's mana goes DOWN as often as up. Cast her now and start
+    activating her next turn. Kaya's -3 exiles ANY nonland permanent - a creature, an enchantment,
+    an artifact, a planeswalker - so she answers the boards Vanishing Verse cannot.
+ 3. Nadaar, Barrowin or Triumphant Adventurer - a body that ventures.
+ 4. Silverquill Command (see its own rule for the modes).
+ 5. Pelakka Predation, when their hand size is 3 or more.
+ 6. Acererak the Archlich - only here, at the bottom, and only when nothing above matched.
+ 7. "Cast nothing right now".
+Then take the ask again if the game offers it - you can cast more than one spell in a turn.
+A CREATURE THAT VENTURES IS NOT A REASON TO SKIP A PLANESWALKER. "Develop the board and advance the
+dungeon" is the argument that loses this deck games: the dungeon is value you collect over many
+turns, and a walker is the turn you take over. When a 3/3 and a planeswalker are both on the same
+list, the walker is the answer. Read the option's own annotation too - a Barrowin printed
+"{right now: returns NOTHING - your graveyard has no creature cards}" is a vanilla 3/3 this turn.
+
 #1 RULE - SPEND YOUR REMOVAL ON THEIR BEST THREAT, ON TIME. You are a removal deck. When the
 opponent has a real creature or planeswalker out and you can answer it, DO IT - do not hold removal
 for a "better" target that may never come, especially against aggro where every extra turn they
@@ -80,7 +106,12 @@ attack costs you life.
   value). It does not target, so it answers a hexproof or indestructible bomb, and it answers
   ARTIFACT creatures that Vanishing Verse cannot touch. It does NOTHING if they control no
   creature - do not cast it into a board of only lands, artifacts or planeswalkers.
-- SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only): choose TWO of - a creature
+- SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only): CAST IT. It is a two-for-one
+  and it is not a card to hold: if it is on the list and nothing above it in THE WHOLE CAST ORDER
+  matched, take it. There is always a playable pair of modes - with a creature of theirs on the
+  board, sacrifice plus draw; with a creature of yours attacking this turn, pump plus sacrifice;
+  with neither, draw aimed at yourself plus return a two-drop from your graveyard. "I will wait
+  for a better board" is how two Commands sit in your hand while you lose. It chooses TWO of - a creature
   gets +3/+3 and flying until end of turn / return a creature card with mana value 2 or less from
   your graveyard to the battlefield / a player draws a card AND loses 1 life / the opponent
   sacrifices a creature of their choice. Against aggro, the sacrifice mode plus a defensive mode
@@ -128,27 +159,38 @@ creature, ask what happens on the crack-back with that creature unavailable.
   blocks, so a "(neither dies)" line against Shield Sphere is not a wasted swing - it is
   how you kill it. Send into a Shield Sphere whether or not you outnumber them, and read
   the proof off their battlefield line as its printed toughness falls: 0/6, 0/5, 0/4.
-- OUTNUMBERING THEM DOES NOT MAKE A LIFEGAIN WALL FREE. Some 0/N defenders PAY THEM for
-  blocking, and every extra body you send is one more payment: PERIMETER CAPTAIN gives them
-  2 life every time ANY defender they control blocks, and PRIDE GUARDIAN gives them 3 more
-  whenever it blocks. The tag will still read "(neither dies)" - it does not print their
-  life gain. So before you send a "(neither dies)" body into their board, count the 0/N
-  defenders on their battlefield line: if there are two or more, the swing PAYS them and
-  the outnumber clause does not apply. Send only the attackers that get through (flying,
-  menace, or a body whose tag kills something), keep the rest home, and win with removal,
-  Kaya and the dungeon drains instead of feeding the wall.
+- A LIFEGAIN WALL IS NAMED IN THE TAG ITSELF - READ FOR IT. Some defenders PAY their controller
+  every time they block, and every extra body you send is one more payment. The tag prints it,
+  inside the same parentheses as the outcome: "Pride Guardian (0/3) (you kill it, your attacker
+  lives (blocking trigger: they gain 3))", "Perimeter Captain (0/4) (neither dies (blocking
+  trigger: they may gain 2))". The words to look for are "blocking trigger:".
+  THE TEST IS THAT CLAUSE, NOT A BODY COUNT. If two or more blockers on this creature's tag print
+  a "(blocking trigger:" clause, the swing PAYS them: send only the attackers that get through
+  (flying, menace, or a body whose tag kills something), keep the rest home, and win with removal,
+  Kaya and the dungeon drains instead. If NO blocker on the tag prints that clause, their walls
+  cost them nothing and cost you nothing - a 0/4 Wall of Omens is just a wall - so the ordinary
+  attack rules apply and a vigilant attacker (Nadaar) can be sent freely, because vigilance means
+  it is still untapped to block on their turn.
 - A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
-  is a per-creature STOP, not a note about the whole attack. Leave THAT creature home even
-  when the rest of the team is attacking - "attack with everything that profits" is decided
-  one A-line at a time, and a creature that dies to a blocker they already control profits
-  nothing. Send it anyway only when the lethal check clears: the printed opponent life is at
-  or below the total power of everything you are sending.
-  THE STOP IS ABOUT CARDS, NOT TOKENS. A Goblin token from the dungeon costs you nothing
-  when it dies, and their one untapped blocker can only block ONE attacker: send the token
-  WITH the team and their blocker spends itself on the token instead of on a Silencer or a
-  Nadaar. So when the stop-tagged body is a TOKEN and the attackers you are sending
-  outnumber their untapped blockers, send it - it is bait, and the bait is the point. The
-  stop stands for every real card in your deck.
+  ANYWHERE IN ITS LIST is a per-creature STOP, not a note about the whole attack. Leave THAT
+  creature home even when the rest of the team is attacking - "attack with everything that
+  profits" is decided one A-line at a time, and a creature that dies to a blocker they already
+  control profits nothing. Send it anyway only when the lethal check clears: the printed opponent
+  life is at or below the total power of everything you are sending.
+  THE OTHER NAMES ON THE LIST DO NOT CANCEL IT. A tag reading "Shield Sphere #1 (0/6) (neither
+  dies); Shield Sphere #2 (0/6) (neither dies); Fate Unraveler (3/4) (your attacker dies, their
+  blocker lives)" is a STOP for that creature. THEY choose which of those three blocks, and they
+  will choose the one that kills your card. Two friendly outcomes and one fatal one is a fatal
+  line: price the WORST name on the list, always.
+  THIS BEATS THE SHIELD SPHERE EXCEPTION. When a Shield Sphere and a creature that kills your
+  attacker are on the SAME tag, the stop wins and that creature stays home. The Shield Sphere
+  exception applies only when EVERY name on the tag is a Shield Sphere.
+  OUTNUMBERING THEM DOES NOT PROTECT A CARD. "They have one blocker and I am sending three, so
+  mine is safe" is FALSE: their one blocker is spent on whichever attacker they most want dead,
+  and that is the one your tag says dies.
+  THE STOP IS ABOUT CARDS, NOT TOKENS. A Goblin token from the dungeon costs you nothing when it
+  dies, so send the token WITH the team even on a stop tag - it is bait, and the bait is free. The
+  stop stands for every real card in your deck: a Silverquill Silencer, a Nadaar, a Barrowin.
 BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
 this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
  SURVIVAL COMES BEFORE THE LADDER. When the header says the attack IS LETHAL, the first
@@ -246,17 +288,20 @@ grind with your planeswalkers, and finish. A game left even to the turn cap is a
 Hive of the Eye Tyrant is a manland: pay {3}{B} - FOUR mana, not two - to make it a 3/3 menace
 attacker until end of turn. That is a whole turn's mana in the mid-game, so animate it only when
 you have nothing better to cast; it is a late-game mana sink, not a cheap threat.
-- ONE ANIMATION PER HIVE PER TURN, AND NEVER IN YOUR UPKEEP. Your battlefield line tells you
-  which Hives are already animated: an animated one is printed "Hive of the Eye Tyrant #1 (3/3)
-  [menace]" and is counted in the "of which N are creatures" number. Activating a Hive that
-  ALREADY reads (3/3) buys you NOTHING - it is a second four-mana payment for a creature you
-  already have, and it is the single most expensive mistake available to this deck. Before you
-  answer "becomes beholder", find that Hive on your battlefield line: if it already shows
-  (3/3), the answer is pass. Animate a SECOND Hive only if you still have four spare mana after
-  the first.
-- Do it in your MAIN PHASE, not in your upkeep. The animation lasts until end of turn either
-  way, and spending {3}{B} before your draw step is spending it before you know what you drew.
-  In upkeep, pass.
+- BEFORE YOU ANSWER "becomes beholder", RUN THESE TWO CHECKS IN ORDER AND STOP AT THE FIRST
+  ONE THAT ANSWERS. This is the single most expensive mistake available to this deck: each
+  activation is FOUR mana, and paying it twice for one creature is four mana set on fire.
+  CHECK 1 - WHAT PHASE IS IT? The prompt's "Phase:" line says. If it says Upkeep, the answer is
+  PASS. The animation lasts until end of turn either way, and spending {3}{B} before your draw
+  step is spending it before you know what you drew. There is no exception to this.
+  CHECK 2 - IS IT ALREADY A CREATURE? Find that Hive on your battlefield line. An animated one is
+  printed "Hive of the Eye Tyrant #1 (3/3) [menace]" and is counted in the "of which N are
+  creatures" number. If it already reads (3/3), the answer is PASS.
+  AND THE OPTION COMING BACK IS NOT A NEW OPPORTUNITY. The game will offer you "becomes beholder"
+  again later in the same turn - after a spell resolves, at another priority, in the same upkeep.
+  That is the same Hive and the same 3/3 you already paid for. A second offer in a turn where you
+  already animated is always PASS. Animate a SECOND, DIFFERENT Hive only if you still have four
+  spare mana after the first.
 Emeria's Call is your seven-mana haymaker: two 4/4 flying Angels AND your NON-ANGEL creatures gain
 indestructible until your next turn (the two new Angels do not get it), so it doubles as a blowout
 against a board wipe or a big attack.
@@ -298,15 +343,29 @@ DECIDING SITUATIONS (recognize -> do):
 - You need combat math -> read the (P/T) already printed on each creature; do not rebuild it.
 - The block header says the attack IS LETHAL -> assign blockers to the biggest "deals N"
   attackers until the damage still coming through is below your life, THEN use the ladder.
-- Their battlefield shows two or more 0/N defenders (Perimeter Captain, Pride Guardian) ->
-  a "(neither dies)" swing PAYS them life. Send only what gets through; hold the rest.
-- The "becomes beholder" option is offered and that Hive already reads (3/3) [menace] on your
-  battlefield line -> it is already animated. Pass. And never animate during your upkeep.
+- Two or more blockers on an attacker's tag print "(blocking trigger: they gain N)" or
+  "(blocking trigger: they may gain N)" -> that swing PAYS them life. Send only what gets
+  through; hold the rest. No "(blocking trigger:" on the tag -> their walls are free to attack
+  into and the ordinary rules apply.
+- An attacker's tag lists several blockers and ONE of them reads "your attacker dies, their
+  blocker lives" -> that creature stays home if it is a CARD. They pick the blocker, and they
+  pick that one. Only a token goes anyway.
+- A Silverquill Silencer, Nadaar or Barrowin shares a tag with both a Shield Sphere and a
+  creature that kills it -> the stop wins; the Shield Sphere exception is only for tags where
+  EVERY name is a Shield Sphere.
+- The "becomes beholder" option is offered -> read the "Phase:" line first. Upkeep -> PASS, no
+  exceptions. Otherwise find that Hive on your battlefield line: already (3/3) -> PASS. And a
+  second offer in a turn where you already animated -> PASS; the option coming back is not a new
+  opportunity.
 - Triumphant Adventurer is castable and you are under pressure -> cast it; the deathtouch 1/1
   blocks or trades with anything.
 - Soul Shatter is offered but the opponent controls no creature -> do not cast it.
-- Lolth or Kaya is castable in your hand -> CAST IT this turn; a bomb walker in hand does
-  nothing. Once one is on your battlefield on your turn -> activate an ability (Lolth -3 for
+- Lolth or Kaya is castable in your hand -> CAST IT this turn, even when a creature (Barrowin,
+  Nadaar, Acererak) is on the same list and even when that creature would venture. Only a removal
+  spell with a live target outranks her. A bomb walker in hand does nothing, and "I will cast her
+  next turn" assumes mana you do not have yet.
+- Silverquill Command is on the list and no removal-with-a-target and no planeswalker is ->
+  cast it. There is always a playable pair of modes. Once one is on your battlefield on your turn -> activate an ability (Lolth -3 for
   Spiders or 0 to draw; Kaya -3 to exile their threat) - do not pass with an idle planeswalker.
 - You have completed a dungeon and control Nadaar -> your team is +1/+1 (creatures render above
   their printed stats); attack accordingly.

@@ -28,6 +28,17 @@ a priority option beginning "cycling with " and ending "Cycle]", and a cast menu
                      with no creatures it is a blank card and you are the player who must find
                      action; holding four blanks is how you deck yourself. With a Forgotten Cave in
                      hand, cycle the Cave first.
+                     CASTING IT AT X=0 IS NOT CYCLING. The menu "Choose an option for Starstorm:"
+                     offers "Cast Card Normally" and "cycling" as separate rows. Only the cycling
+                     row draws you a card; casting the spell at X=0 deals 0 damage to every
+                     creature, draws nothing, and puts the card in the graveyard for no effect.
+                     If your reason for casting is "spend the card" or "cycle it legally", the
+                     answer you want is the cycling row. This deck answered "Cast Card Normally"
+                     and then X=0 against an empty board while stuck on four lands with two Rorix
+                     and two Siege-Gang uncastable in hand - the cycling row was on the same
+                     screen, it costs {3}, and the card it draws was the land that game needed.
+                     NEVER announce X=0. If the only X you can afford is 0, you are not casting
+                     this spell.
 
 AND: when the line reads "Phase: Upkeep | It is your turn", answer CHOICE: 0 (pass) unless the option
 in front of you destroys a land or kills a creature. Cycling in your own upkeep spends the mana that
@@ -145,6 +156,22 @@ FORGOTTEN CAVE enters tapped - play it on a turn you were not going to spend all
 =====================================================================
 COMBAT
 =====================================================================
+RACE CHECK - do this BEFORE the attack floor, and only when your attack list holds exactly ONE
+creature and that creature is Rorix Bladewing or Siege-Gang Commander.
+Your one creature is also your only blocker, and Rorix does not come back untapped in time to
+block on the turn he attacks. So compare two numbers you can read off the screen:
+  THEIR turns to kill you  = your "Your life:" number divided by the total printed power of
+                             their untapped creatures (a creature with vigilance attacks AND
+                             blocks, so it counts here even while it is attacking).
+  YOUR turns to kill them  = their "Opponent life:" number divided by your attacker's power.
+If THEIR number is smaller than or equal to YOURS, you lose the race: answer "ATTACK: none" and
+keep the body home to block. A 6/5 that blocks a 4/4 kills it and lives - the trade line on the
+blockers screen will say so - and once their attacker is dead the race restarts in your favour.
+At 4 life against a 4/4 with vigilance, with the opponent on 15, this deck sent Rorix for 6 on
+each of two turns and died on the second; holding Rorix home kills the 4/4 for free and the game
+is still winnable.
+Only when you WIN the race, or when their untapped creatures total 0 power, go on to the floor.
+
 ATTACK FLOOR - read the "Your creatures that can attack:" list, then take the first case that
 applies. FIRST: if Dwarven Blastminer is the ONLY creature on that list, answer "ATTACK: none" -
 always, and stop reading. He is worth {2}{R} of land destruction every turn he stays untapped, and
@@ -156,13 +183,21 @@ legally attack, so do not re-check summoning sickness or tapped status yourself.
 turn]" (they untap for their turn).
 ONE EXCEPTION INSIDE THE FLOOR: if their untapped creatures' printed power totals your life or more,
 send only Rorix this turn and keep the Goblins home.
-BLOCKING - take any block where your creature kills theirs and lives, and any block where both die.
+BLOCKING - take any block where your creature kills theirs and lives. Take a "(both die)" block
+with a GOBLIN token, always. Do NOT take a "(both die)" block with SIEGE-GANG COMMANDER or RORIX
+BLADEWING: those are cards, they are the only bodies this deck has, and Siege-Gang's sacrifice
+ability needs Siege-Gang alive. Trading either one for a 2/2 token the opponent will replace is
+not an even trade even though the parenthesis says both creatures die. Send a Goblin instead, or
+take the damage while your life is comfortable.
 Block where only your creature dies when the damage otherwise puts you at 5 life or less. A Goblin
 is worth more as a blocker than as 2 points of face damage.
-WHEN THE PROMPT SAYS LETHAL, CHUMP THE BIGGEST ATTACKER. The line "Unblocked, these attackers deal
-up to N - you would be at ... - LETHAL if it all connects" means the arithmetic, not the trade, is
-the whole question. Every attacker row prints "deals N". Put your blocker in front of the LARGEST
-of those numbers, even when the trade line says "your blocker dies, attacker lives" - subtracting
+WHEN THE PROMPT SAYS LETHAL, CHUMP THE BIGGEST ATTACKER YOU ARE ALLOWED TO BLOCK. The line
+"Unblocked, these attackers deal up to N - you would be at ... - LETHAL if it all connects" means
+the arithmetic, not the trade, is the whole question. Every attacker row prints "deals N".
+FIRST narrow the list: an attacker row tagged "[NONE of your available blockers can block this
+attacker ...]", or one that is missing from your blocker's own "may block" line, is not on the
+menu at all - its damage is going to happen whatever you do, so subtract it and stop thinking
+about it. Among what is LEFT, put your blocker in front of the LARGEST "deals N", even when the trade line says "your blocker dies, attacker lives" - subtracting
 their biggest number from the incoming total is the only thing that decides whether you are alive
 next turn. At 3 life against a 4 and a 2, blocking the 4 leaves you at 1 and blocking the 2 leaves
 you dead; this deck blocked the 2.
@@ -194,13 +229,25 @@ DECIDING SITUATIONS (recognise -> do)
   "Cast Card Normally", then aim at that creature.
 - You control 3 lands and their board shows 3 or 4 lands -> Stone Rain or Molten Rain, now.
 - Their board shows a planeswalker -> every damage spell points at it until it is gone.
-- Their board shows two or more creatures and Starstorm is in hand -> cast Starstorm, and cast it
-  BEFORE you cast Siege-Gang Commander.
+- Their board shows two or more creatures that are NOT marked "[defender]", Starstorm is in hand,
+  and NEITHER Rorix Bladewing NOR Siege-Gang Commander is on your battlefield -> cast Starstorm,
+  and cast it BEFORE you cast Siege-Gang Commander. If Rorix or Siege-Gang IS already out, or
+  every creature the annotation kills of theirs is "[defender]", hold the card (rule #2, step 0)
+  - this deck held it correctly through five such windows in one game while Rorix raced the
+  opponent from 20 to dead.
 - The "{X pricing:" annotation's YOURS list at the X you were going to pick names Rorix Bladewing
   or Siege-Gang Commander -> do not cast Starstorm at all this window, whatever it kills of theirs.
 - The only creature the annotation kills of theirs is marked "[defender]" -> do not cast Starstorm.
 - You are on the "Announce the value of X" menu -> answer the option whose text reads "X = " and
-  your number. Option 1 is the LARGEST X, never X=1.
+  your number. Option 1 is the LARGEST X, never X=1. Each row now carries its own
+  "{X pricing: kills THEIRS: ...; YOURS: ...}" or "(same as X=N)" - read the row you are about to
+  answer, not the one you read two screens ago.
+- The only X you can afford is 0, or the pricing says "there is no creature on the battlefield for
+  it to damage" -> do not cast Starstorm at all. Cycle it if their creature count is 0, otherwise
+  hold it.
+- "Choose an option for Starstorm:" is on the screen and you wanted to spend the card rather than
+  use its effect -> answer the "cycling" row, never "Cast Card Normally".
+- Your attack list holds exactly ONE creature -> run the RACE CHECK in COMBAT before you send it.
 - The blockers prompt says LETHAL -> your blocker goes in front of the attacker with the largest
   "deals N", trade line notwithstanding.
 - You control 5 lands and Siege-Gang Commander is in hand -> cast it, and sacrifice no Goblin while
