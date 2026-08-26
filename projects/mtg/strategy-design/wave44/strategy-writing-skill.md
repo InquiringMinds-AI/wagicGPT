@@ -9582,5 +9582,7 @@ wrong way). Corpus `matchups-20260826-111937`; mulligan seams live for the first
     not a defect to pin. Reviewers grade a deviation by the odds it took (did it beat the
     guide's line on this hand/board?), never by conformance alone — a guide-violating keep
     that the odds favoured is evidence against the guide, not against the pilot. Corollary
-    for mulligan sections (with #46): one land with spells costing 2+ is a terrible hand and
-    ships; one land with one-drops is a keep.
+    for mulligan sections (with #46): one land with spells costing 3+ is a terrible hand and
+    ships; one land with mostly one/two-drops is a JUDGMENT KEEP on the specific cards
+    (owner: "a hand of mostly 2 drops with 1 land is a hand i might take, depending on what
+    those were") — write the comparison, not a verdict.

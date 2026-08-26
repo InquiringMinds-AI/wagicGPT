@@ -407,3 +407,6 @@ goal is to give a guide which when followed will usually win, but the model not 
 guide to its exact letter is acceptable behavior. if everything in the hand cost say 3 or more
 mana, 1 land is a terrible hand." APPLIED: deck146 STEP 2's 'one-land = KEEP' absolute replaced
 by the odds rule (one land + spells costing 2+ = ship; one land + one-drops = keep); skill #47.
+Refinement, owner verbatim: "a hand of mostly 2 drops with 1 land is a hand i might take.
+depending on what those were" -> one land + 3+-cost = ship; one land + cheap spells = judgment
+on the exact cards (deck146 + skill #47 updated).
