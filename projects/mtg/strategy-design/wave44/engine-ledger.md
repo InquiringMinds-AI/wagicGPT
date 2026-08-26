@@ -410,3 +410,8 @@ by the odds rule (one land + spells costing 2+ = ship; one land + one-drops = ke
 Refinement, owner verbatim: "a hand of mostly 2 drops with 1 land is a hand i might take.
 depending on what those were" -> one land + 3+-cost = ship; one land + cheap spells = judgment
 on the exact cards (deck146 + skill #47 updated).
+Owner verbatim (same thread): "a hand where if i drew two mana then i could immediately win
+the game, something with spells that make mana maybe? a combo hand. I could see it happening.
+in the right deck. it would be a dicey choice, expecting 4-6 rounds before reaching 2 land
+draws. id have to consider the speed of my opponents deck, or disruption options." -> the
+factor list in skill #46.
