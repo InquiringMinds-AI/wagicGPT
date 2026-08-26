@@ -173,3 +173,20 @@ Agadeem's Awakening 0 casts / 21 offers; the Shield Sphere attrition exception *
 proven live** (0/6 -> 0/5 -> 0/4 on their battlefield line); all-"(you kill it, your attacker
 lives)" tags sent 6/6; Acererak-vs-removal 6/6 in substance. The wave-43 S4 deletion (hold-back
 gate) remains costless. The mulligan STEP-1 floor violation is an **OWNER QUESTION**, not patched.
+
+---
+
+## THRESHOLD WHYS (skill amendment 61) - reviewer boundary pass, wave-45 step 4
+- T = 10 ("you would be at N", block ladder rung 3) because rung 3 is the only rung the forecast
+  decides at all; above 10 the creature is worth more than the damage, at or below it the
+  creature is one you kept for a turn you will not get.
+- T = "(keeping 5)" (STEP 1, the mulligan chain stop) NOT MOVED this wave. It is the tested text;
+  its one violation this corpus was the seat's worst loss (-41), which is evidence FOR the floor,
+  and skill 66 forbids moving a floor on one window in either direction.
+- T = 4 lands (never bottom a land unless the keep still holds at least four) because the keep was
+  priced on the engine's land count and bottoming below four undoes it at the very next ask.
+- T = 3 mana value (Pelakka Predation's discard) is the CARD's own number, not a guide threshold -
+  it cannot take their cheap cards, so the rule is "strip a bomb", never "strip their curve".
+- T = 2 (the collapsed tag's N) because at N of 2 they may gang the attacker and the parenthesis
+  prices only the single biggest blocker; a collapsed tag also never proves every blocker is a
+  Shield Sphere, which is why it outranks that exception.

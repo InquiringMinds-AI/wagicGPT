@@ -213,3 +213,19 @@ unblocked. You have got this wrong: offered "A1. Luminarch Aspirant (3/3) deals 
  - You are about to plan a spell with a {b} or {w} in its cost: count the untapped LANDS whose
    colour list on the mana line contains that symbol. The Battlements' green pays none of it.
 ```
+
+---
+
+## THRESHOLD WHYS (skill amendment 61) - reviewer boundary pass, wave-45 step 4
+- T = 2 black LANDS (the Chromatic Lantern gate) because Sanguine Bond costs {3}{B}{B} - two
+  black pips - and one black land pays half of it. The old test read the "colours you can make:"
+  line, which answers whether you can make {b} AT ALL, not how many sources make it.
+- T = 10 life (the 7b survival floor) because below it the creature killing you kills you before
+  a five-mana enchantment ever resolves; above it the combo piece is still the faster win.
+- T = 8 ("you would be at N" turning the block carve-out OFF) because at 8 or less the damage a
+  wall stops is worth more than the wall, and every wall you keep back is a wall that gains no
+  life this combat.
+- T = 2 (the collapsed tag's N) because at N of 2 any two of their bodies may gang one 1/1
+  lifelink Vampire; at N = 1 the parenthesis prices the whole fight exactly.
+- T = 3 lands (the bottoming land floor) because the enchantments cost five and the Battlement
+  pays none of their black pips, so a two-land keep cannot cast either half.

@@ -106,7 +106,8 @@ attack costs you life.
   value). It does not target, so it answers a hexproof or indestructible bomb, and it answers
   ARTIFACT creatures that Vanishing Verse cannot touch. It does NOTHING if they control no
   creature - do not cast it into a board of only lands, artifacts or planeswalkers.
-- SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only): CAST IT. It is a two-for-one
+- SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only) - entry 4 of THE WHOLE CAST
+  ORDER: CAST IT. It is a two-for-one
   and it is not a card to hold: if it is on the list and nothing above it in THE WHOLE CAST ORDER
   matched, take it. There is always a playable pair of modes - with a creature of theirs on the
   board, sacrifice plus draw; with a creature of yours attacking this turn, pump plus sacrifice;
@@ -155,6 +156,24 @@ creature, ask what happens on the crack-back with that creature unavailable.
   outnumbers one untapped blocker. If your only attacker's tag is all "(neither dies)",
   the answer is ATTACK: none - it deals nothing to their life total and it is tapped out
   of blocking on their turn.
+- THE COLLAPSED TAG AND THE "GANG BLOCK:" CLAUSE - READ THIS BEFORE THE SHIELD SPHERE
+  EXCEPTION BELOW. On a wide board the tag stops naming their blockers one by one and reads
+  instead "they have N untapped creatures that could block this one, biggest X (you kill it,
+  your attacker lives)", sometimes with "- GANG BLOCK: their 6 biggest together deal 7, enough
+  to kill this attacker; each result above is a LONE blocker only".
+  That parenthesis prices ONE blocker. The GANG BLOCK clause prices what actually happens: any
+  number of them may block the same attacker TOGETHER, and your creature's toughness is measured
+  against the SUM of their bodies, not against the biggest one.
+  * The tag prints "GANG BLOCK: ... enough to kill this attacker", or N is 2 or more -> that
+    creature stays home if it is a CARD (Nadaar, Barrowin, Triumphant Adventurer, Silverquill
+    Silencer, an animated Hive). A dungeon GOBLIN TOKEN goes anyway; the bait is free.
+  * N is 1 and no GANG BLOCK clause -> the parenthesis is the whole story; use it.
+  "But the biggest one dies to me" is the sentence the clause was written to refuse: they do not
+  have to block with the biggest one alone, and against your one real body they will not. THIS
+  BEATS THE SHIELD SPHERE EXCEPTION - a collapsed tag does not tell you every blocker is a
+  Shield Sphere, so the exception cannot apply to it at all.
+  The lethal check is the only override: the printed opponent life at or below the total power
+  of everything you are sending.
   ONE named exception: SHIELD SPHERE. It takes a permanent -0/-1 counter every time it
   blocks, so a "(neither dies)" line against Shield Sphere is not a wasted swing - it is
   how you kill it. Send into a Shield Sphere whether or not you outnumber them, and read
@@ -268,13 +287,15 @@ Triumphant Adventurer (on attack), Nadaar (on enter AND attack), Acererak (on en
   choice correctly - do not try to work it out, and do not question the two names you are shown:
   pick the better of the two effects in front of you and move on.
 
-DEPLOY YOUR CHEAP THREATS AS BLOCKERS. Triumphant Adventurer is a 1/1 with DEATHTOUCH (and first
+DEPLOY YOUR CHEAP THREATS AS BLOCKERS - this is entry 3 of THE WHOLE CAST ORDER, and entries 1
+and 2 still outrank it. Triumphant Adventurer is a 1/1 with DEATHTOUCH (and first
 strike on your turn) - cast it early; it trades with or blocks almost anything and it ventures
 every time it attacks. Do not hold it. Nadaar is a 3/3 VIGILANT body that ventures twice and can
 attack without giving up its block.
 
-PLANESWALKERS - USE THEM EVERY TURN THEY ARE OUT. A planeswalker that does nothing on your turn
-is wasted. The moment you can afford one, CAST IT - do not leave Lolth or Kaya rotting in hand
+PLANESWALKERS - USE THEM EVERY TURN THEY ARE OUT. Casting one is entry 2 of THE WHOLE CAST
+ORDER: a removal spell with a live target still outranks her, and nothing else does. A
+planeswalker that does nothing on your turn is wasted. The moment you can afford one, CAST IT - do not leave Lolth or Kaya rotting in hand
 while you flood; they are your best late-game engines. Each of your turns they are in play,
 activate an ability:
 - LOLTH, SPIDER QUEEN ({3}{B}{B}, starts at 4, and gains loyalty whenever a creature you control
@@ -283,7 +304,8 @@ activate an ability:
   are not desperate for that life; do not just pass). -8 is the game-ending emblem.
 - KAYA: see #1 rule - her -3 is removal; do not leave her idle.
 
-CLOSE THE GAME. Once you are stable, PRESS - attack with Adventurer/Nadaar to venture and chip,
+CLOSE THE GAME - none of this is a cast rule; THE WHOLE CAST ORDER decides what you cast, and
+animating the Hive is what you do with mana it left over. Once you are stable, PRESS - attack with Adventurer/Nadaar to venture and chip,
 grind with your planeswalkers, and finish. A game left even to the turn cap is a LOSS risk.
 Hive of the Eye Tyrant is a manland: pay {3}{B} - FOUR mana, not two - to make it a 3/3 menace
 attacker until end of turn. That is a whole turn's mana in the mid-game, so animate it only when
@@ -353,6 +375,10 @@ DECIDING SITUATIONS (recognize -> do):
 - A Silverquill Silencer, Nadaar or Barrowin shares a tag with both a Shield Sphere and a
   creature that kills it -> the stop wins; the Shield Sphere exception is only for tags where
   EVERY name is a Shield Sphere.
+- An attacker's tag reads "they have N untapped creatures that could block this one" with N of 2
+  or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause -> that creature
+  stays home if it is a CARD; only a dungeon Goblin token goes. A collapsed tag never triggers
+  the Shield Sphere exception.
 - The "becomes beholder" option is offered -> read the "Phase:" line first. Upkeep -> PASS, no
   exceptions. Otherwise find that Hive on your battlefield line: already (3/3) -> PASS. And a
   second offer in a turn where you already animated -> PASS; the option coming back is not a new

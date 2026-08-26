@@ -266,6 +266,16 @@ a Lightmine Field. Ending your turn with all your mana unspent is right only whe
 nothing but counterspells.
 
 === MULLIGAN ===
+STEP 1 - READ THE PRICE LINE FIRST, AND STOP THERE IF IT ANSWERS. The ask prints the number:
+"having already taken 2 mulligans you will bottom 2 cards on a keep (keeping 5)". If it says
+(keeping 5) or ANY lower number: KEEP, if the hand holds at least one land - you are DONE, do
+not read another rule in this section. The bar is ONE LAND and nothing else: not a colour, not
+a counterspell, not a curve.
+The London mulligan already shaves a seven to six for one card, so a third look buys a fresh
+seven at the price of TWO. Two seats in one corpus went to four cards and both lost.
+STEP 2 - only on your untouched opening seven, or at "(keeping 6)", is the comparison below the
+question at all.
+
 The question is never "does this hand meet a number". It is: what are the odds THIS hand does
 something in time, against the odds a six-card hand does something in time? Two facts about this
 deck set that comparison, and the prompt gives you the rest:
@@ -294,7 +304,11 @@ land that makes both colours (Tundra, Glacial Fortress, Seachrome Coast), and pr
 at least one counterspell. Colour alone is not a reason to mulligan - 18 of your lands make {W} and
 20 make {U}, so a one-colour opener is usually two draws from the other.
 
-When a keep makes you bottom cards, bottom Emrakul first, then your lands beyond the fifth.
+When a keep makes you bottom cards, bottom in this order: Emrakul first, then a second copy of
+a card you already hold, then your lands beyond the fifth.
+NEVER bottom a land when the hand you keep would hold fewer than THREE. NEVER bottom your last
+counterspell and never bottom your last Path to Exile - this deck answers threats or it loses,
+and a hand with no answer in it is a loss you chose at this ask, not one you were dealt.
 
 === DECIDING SITUATIONS ===
 - The prompt lists "Play <land>" options: play one. Every turn, no exceptions.

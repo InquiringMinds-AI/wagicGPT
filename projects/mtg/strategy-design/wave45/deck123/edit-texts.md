@@ -171,3 +171,34 @@ keep-order line.
   with `{right now: -13/-13 (a creature died this turn, so Morbid applies)}` on the row and
   aimed it at the biggest body (Fate Unraveler 3/4). Correct. No text touched.
 - THE DECK123 CONSTRUCTION CASE. Owner-ruled OUT OF SCOPE; not reviewed.
+
+---
+
+## REVIEWER BOUNDARY PASS (wave-45 step 4) - deck123
+
+### RECORDED FALSIFIER for the Check-1 lifegain-wall absolute (finding B14, skill #30)
+The absolute stands as written - "Their battlefield line names Perimeter Captain, Pride Guardian,
+Sanguine Bond or Exquisite Blood and it is your Attackers step: ATTACK: none. No damage total
+overrides this." No wording change; its rationale is already in CHECK 1 with the two deaths that
+produced it, and the quick-reference line agrees with the rule exactly.
+FALSIFIER: a genuinely lethal alpha strike - one that ends the game on the spot, before any
+lifegain trigger can matter. Recorded UNREACHABLE-IN-POOL for deck123: across waves 43-45 it has
+never had lethal on a wall board. RE-CHECK IN WAVE 46. If a lethal window arises on a wall board,
+the absolute gains a named lethal-check exception; until one does, it does not.
+
+### THRESHOLD WHYS (skill amendment 61) - every numeric threshold this wave ships
+- T = 20 creatures (the token stop) because the board render collapses wide boards into a range
+  ("Human #2-#11 (1/1) ... x10") and held a 22-permanent board to ~19,000 characters, so board
+  width costs no decision quality below 20; the old T = 12 was crossed ten times in one corpus
+  and every crossing was odds-favourable. Raised, not deleted, because it is the only stop in
+  that section. SUNSET: if wave 46 shows 0 violations at 20, no prompt-size cost and no
+  decision-quality cost, wave 47 deletes it under skill #35.
+- T = "(keeping 5)" (the mulligan chain stop) because the London mulligan already shaves a seven
+  to six for one card, so a third look buys a fresh seven at the price of two; the seat took
+  three mulligans, kept four cards, and lost 42-0 having never made a token.
+- T = 3 lands (the bottoming land floor) because the deck's engine costs three and four mana and
+  a kept hand below three lands cannot reach it before the game is decided.
+- T = 4 mana (the bottoming keep-order target) because Bloodline Keeper {2}{B}{B} and Damnation
+  {2}{B}{B} are four, and a hand that stops at three never casts the deck's best card.
+- T = 2 (the collapsed tag's N) because at N of 2 the defender may gang the attacker and the
+  parenthesis prices only the biggest single blocker; at N = 1 the parenthesis is exact.

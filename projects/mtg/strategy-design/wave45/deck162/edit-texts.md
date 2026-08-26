@@ -168,3 +168,16 @@ restoration is validated. Rule 2 engine-brake 22/26; three of the four breaks ar
 shape (vs125 s6/s23/s35) and **deck162 won that game** — reported directionally, not loosened,
 per amendment #45. Blocking otherwise clean, including the corpus's only menace-attacker window
 (no solo menace block offered or taken).
+
+---
+
+## THRESHOLD WHYS (skill amendment 61) - reviewer boundary pass, wave-45 step 4
+- T = 2 (the collapsed tag's N, and the GANG BLOCK clause that prices it) because at N of 2 any
+  two of their bodies may block the same attacker and your creature's toughness is measured
+  against the SUM; at N = 1 the parenthesis is the whole story.
+- T = 8 of your life (the block-always exception, and the survival release) because inside one
+  attack of dying the damage a body stops is worth more than the body itself.
+- T = 4 lands (never bottom a land unless the keep still holds at least four) because the keep was
+  priced on the engine's land count, and this seat bottomed a land from a 5-land keep - the
+  deviation was right, which is exactly why the prohibition needed the carve-out rather than
+  deletion.

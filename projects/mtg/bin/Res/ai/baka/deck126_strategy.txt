@@ -168,6 +168,19 @@ them out, so never re-derive who is eligible. An empty attacker list means ATTAC
 costs you nothing.
 When the list DOES offer a Vampire token, it has lifelink: attack with every Vampire offered, every
 turn. Each point that connects is life gained, and with Sanguine Bond out that is the win.
+THE COLLAPSED TAG. On a wide board the Vampire's attack tag stops listing their blockers one by
+one and reads "they have N untapped creatures that could block this one, biggest X (...)",
+sometimes with "- GANG BLOCK: their 3 biggest together deal 4, enough to kill this attacker;
+each result above is a LONE blocker only". That parenthesis prices ONE blocker; the GANG BLOCK
+clause prices what actually happens, because any number of them may block the same Vampire
+together. Your Vampires are 1/1s, so any two bodies eat one.
+  - The tag prints a "GANG BLOCK: ... enough to kill this attacker" clause, or N is 2 or more:
+    ATTACK: none for that Vampire. Keep it home as a LIFELINK BLOCKER - with both enchantments
+    out one block wins the game outright, and a lifelink blocker with Sanguine Bond out is
+    already draining them.
+  - N is 1 and no GANG BLOCK clause: the parenthesis is the whole story; use it.
+The exception is the win button: with BOTH enchantments on your battlefield, one point of
+lifelink damage connecting ends the game, so send if their side is empty of untapped blockers.
 ONE stop, and read it off your own narration: if the last time you attacked it says your attacker
 took damage and died before combat damage - "<something> dealt N damage to Vampire" then "Your
 Vampire died" - the opponent controls a permanent that kills anything you send, and the next
@@ -234,6 +247,14 @@ The thought "I will keep whatever I draw next" is how you end up with a four-car
 one instead.
 Your cheapest spell costs ONE mana, so "no early play" is never a reason to mulligan, and a hand
 with no combo piece is not one either: your lands and walls buy the turns you need to draw one.
+WHEN A KEEP MAKES YOU BOTTOM CARDS - the section does not end at the keep. The prompt says "you
+took N mulligans and kept, so you must put N cards from your hand on the BOTTOM" and lists your
+hand. Bottom your most expensive spell first, then a duplicate wall - you run sixteen of them and
+the second copy of one wall is the cheapest card in any hand.
+NEVER bottom Sanguine Bond, NEVER bottom Exquisite Blood, and NEVER bottom Idyllic Tutor: those
+are the only cards in this deck that win a game, and the Tutor is how you find the other two.
+NEVER bottom a land when the hand you keep would hold fewer than THREE - you need five mana for
+an enchantment and the Battlement pays none of its black pips.
 
 === SITUATIONS THAT DECIDE YOUR GAMES ===
  - Both Exquisite Blood and Sanguine Bond on your battlefield: take the first block, Staff ping,
@@ -255,6 +276,13 @@ with no combo piece is not one either: your lands and walls buy the turns you ne
    life or less with exactly one opponent creature and Tribute to Hunger listed and mana for only
    one of them: then cast Tribute (Rule 7b).
  - The opponent attacks: assign every blocker on the list.
+ - A Vampire's attack tag reads "they have N untapped creatures that could block this one" with
+   N of 2 or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause: ATTACK:
+   none for that Vampire - it is worth more as a lifelink blocker.
+ - The mulligan ask says "(keeping 5)" or fewer and the hand holds a land: KEEP.
+ - You kept and the game asks which cards to bottom: most expensive spell first, then a
+   duplicate wall. Never Sanguine Bond, Exquisite Blood or Idyllic Tutor, and never a land down
+   to fewer than three.
  - The opponent has exactly one creature and you need life: cast Tribute to Hunger.
  - You are about to plan a spell with a {b} or {w} in its cost: count the untapped LANDS whose
    colour list on the mana line contains that symbol. The Battlements' green pays none of it.

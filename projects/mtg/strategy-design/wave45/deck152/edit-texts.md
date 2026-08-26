@@ -180,3 +180,20 @@ ruling stated in the model's own words and it held: no colour mulligan was taken
 Deploy floor **33/33** (was 45/47). Counter-placement connection teach: **PASS**. Day/Night line
 present on every daybound frame. The own-only-targets stop got **0 windows** — UNTESTED, kept
 verbatim, and deck146's identical render-string rule ran 27/27, so nothing argues against it.
+
+---
+
+## THRESHOLD WHYS (skill amendment 61) - reviewer boundary pass, wave-45 step 4
+- T = 9 ("you would be at N", the one arithmetic step at every block window) because it is one
+  comparison against one printed number, hoisted above the ladder so the exit condition is read
+  before the procedure it releases rather than at the bottom of 25 lines.
+- T = 2 defenders printing a "(blocking trigger:" clause (the lifegain-wall gate) because the
+  first payment is affordable and the second is what turns an attack into a life swing.
+- T = "(keeping 5)" (the mulligan chain stop, new this pass) because the London mulligan already
+  shaves a seven to six for one card, so a third look buys a fresh seven at the price of two.
+- T = 4 lands (never bottom a land unless the keep still holds at least four, new this pass)
+  because the keep was priced on the engine's land count; deck162 bottoming a land from a 5-land
+  keep is the deviation that made this the tested form.
+- T = 2 (the collapsed tag's N / the GANG BLOCK clause) because at N of 2 their bodies may block
+  together and the sum, not the biggest, is what your attacker's toughness is measured against -
+  the clause priced the fatal attack on the 7/7 Aspirant exactly and in advance.

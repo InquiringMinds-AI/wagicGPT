@@ -155,3 +155,21 @@ see the seat file, #W45-5 PASS); and the RACE CHECK pointer for a one-creature a
   Spellbomb {1}") that the floor keeps and that WON. Under amendment #38 a floor is never moved on
   behaviour and never on n=1; the one-land keep is routed to the owner in the seat file as a #47
   judgment case, with the hand.
+
+---
+
+## THRESHOLD WHYS (skill amendment 61) - reviewer boundary pass, wave-45 step 4
+- T = 4 of their lands (land destruction is worth a card at or below it) because Stone Rain and
+  Molten Rain buy a whole turn while they are still on four lands and buy nothing once they can
+  cast their hand anyway.
+- T = 8 of your own lands (cycle Lay Waste above it) because past eight lands a land kill no
+  longer changes what they cast that turn, so the card is worth more as a draw.
+- T = 6 opponent life (the face-damage floor) because four Pyrite Spellbombs plus three Spark
+  Sprays are 11 damage total, which is not a clock - the damage only pays at the number where it
+  finishes them.
+- T = 5 of your life (block where only your creature dies) because a Goblin is worth more as a
+  blocker than as 2 points of face damage once you are inside one attack of dying.
+- T = 2 (the collapsed tag's N) because at N of 2 the gang kills a 6/5 Rorix that no single
+  blocker on the tag could touch.
+- T = 3 lands (the bottoming land floor) because Siege-Gang wants five lands and Rorix six; a
+  two-land keep never reaches either body.

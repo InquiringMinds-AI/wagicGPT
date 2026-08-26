@@ -327,3 +327,20 @@ When a keep makes you bottom cards, bottom Emrakul first, then your lands beyond
   is listed: cast it, then on the X menu announce 8 MINUS THE NUMBER OF CARDS ON YOUR HAND LINE -
   not the largest number offered. If your hand line reads 8 or more, do not cast it at all.
 ```
+
+---
+
+## THRESHOLD WHYS (skill amendment 61) - reviewer boundary pass, wave-45 step 4
+- T = 8 (Sphinx's Revelation X sizing, `8 - handline`) because the hand line is the one printed
+  number the executor never miscounts, and folding the "minus one" correction into the constant
+  removes the intermediate value that lost the rule 6 of 12 windows. The 8 is the 7-card hand
+  limit plus the one card the Revelation itself has already left the hand.
+- T = 8 (the "do not cast Revelation at hand N or more" gate) because it is the SAME boundary as
+  the sizing formula above; two independently-stated numbers for one boundary is a contradiction
+  the executor resolves by whichever it read last, and the earlier pair (7 and 8) was cast
+  through 6 of 12 times.
+- T = "(keeping 5)" (the mulligan chain stop) because the London mulligan already shaves a seven
+  to six for one card, so a third look buys a fresh seven at the price of two; two seats in the
+  wave-45 corpus reached four cards and both lost.
+- T = 3 lands (the bottoming land floor) because this deck's answers cost {1}{U} to {1}{W}{W}{U}
+  and a two-land keep cannot hold a counter up on the turn the first real threat lands.

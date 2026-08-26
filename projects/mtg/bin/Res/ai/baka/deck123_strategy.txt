@@ -39,13 +39,19 @@ BEFORE you take one, read your creature count. Use the FIRST source that is on t
 The note belongs to ONE COPY and ONE TURN: each copy's first two activations of a turn carry no
 note, so with two makers out four activations a turn have none. The battlefield line always does.
 Then, and only then:
-  - M is 11 or less: take the line. Take it again every time it comes back.
-  - M is 12 or more: answer 0 (pass). Take nothing from this list, this window.
-The 12 counts creatures ON YOUR BATTLEFIELD. It does not reset when a new turn starts, it does
+  - M is 19 or less: take the line. Take it again every time it comes back.
+  - M is 20 or more: answer 0 (pass). Take nothing from this list, this window.
+The 20 counts creatures ON YOUR BATTLEFIELD. It does not reset when a new turn starts, it does
 not reset when the "[repeat:]" note disappears, and "I have tapped it 0 times this turn" is not
-a reason to start again. Twelve creatures already standing is the whole of the reason to stop.
+a reason to start again. Twenty creatures already standing is the whole of the reason to stop.
+WHY THE NUMBER IS 20, so no later turn has to re-argue it: the board render COLLAPSES a wide
+board into a range - "Human #2-#11 (1/1) ... x10" - and it held a 22-permanent board to about
+19,000 characters, so board width is not costing you anything below 20. The older stop at 12
+was crossed ten times in one corpus and every crossing was the better play, because each token
+is a free flying blocker for a deck whose only plan is bodies. 20 is where the render stops
+being flat. It is still the only line in this section that ever says stop, so it still stops.
 ONE exception: if the opponent has attackers on the board whose damage would take you to 0 this
-turn, keep making tokens past 12 - each new one is another blocker, and a board you never get
+turn, keep making tokens past 20 - each new one is another blocker, and a board you never get
 to use is worth nothing.
 Timing: the tokens you make CANNOT attack until your next turn, so making them early in your own
 turn buys you nothing this turn and leaves them standing through the opponent's whole turn. Fire
@@ -205,7 +211,9 @@ Vision Skeins {1}{u} - EACH player draws two cards, you and them.
 Lightning Greaves {2} - see Rule 6.
 
 === COMBAT ===
-ATTACK - four checks, in this order. Stop at the first one that answers and do what it says.
+ATTACK - five checks, in this order. Stop at the first one that answers and do what it says.
+CHECK 3 is the one exception: it never ends your answer, it only removes creatures from the
+list you are about to send, and then you go on.
 
 CHECK 1 - THE LIFEGAIN WALL BOARD. Read the "Opponent battlefield" line for these four names:
 PERIMETER CAPTAIN, PRIDE GUARDIAN, SANGUINE BOND, EXQUISITE BLOOD. If ANY of them is on that
@@ -229,15 +237,37 @@ attacker by the number of attackers - Lightmine Field on deck125's board says ex
 find the SMALLEST toughness among the creatures you would send and send that many minus one,
 biggest power first. Leave the rest home.
 
-CHECK 3 - THE COUNT, AND WHAT ONE BLOCKER CAN DO. ONE BLOCKER BLOCKS EXACTLY ONE ATTACKER.
+CHECK 3 - THE COLLAPSED TAG AND THE "GANG BLOCK:" CLAUSE. On a wide board their side stops
+being listed blocker by blocker and the tag reads instead "they have N untapped creatures that
+could block this one, biggest X (you kill it, your attacker lives)", sometimes with a clause
+"- GANG BLOCK: their 6 biggest together deal 7, enough to kill this attacker; each result above
+is a LONE blocker only".
+That parenthesis prices ONE blocker. The GANG BLOCK clause prices what actually happens: any
+number of them may block the same attacker together, and your attacker's toughness is measured
+against the SUM of their bodies.
+  - The tag prints a "GANG BLOCK: ... enough to kill this attacker" clause, or N is 2 or more:
+    a TOKEN goes anyway - a 1/1 Human or a 2/2 Vampire costs you nothing and you make more next
+    turn - and a CARD stays home. The cards are Thraben Doomsayer, Bloodline Keeper, Lord of
+    Lineage and anything wearing Lightning Greaves.
+  - N is 1 and no GANG BLOCK clause: the parenthesis is the whole story; use it.
+"But the biggest one dies to me" is the sentence the clause exists to refuse - they do not have
+to block with the biggest one alone, and against your one real body they will not. This is what
+killed another deck's 7/7 in one swing while the render had priced it in advance.
+The lethal check overrides this: when the printed opponent life is at or below the total power
+of everything you are sending, send it all.
+CHECK 3 does not end your answer. Cross the cards it names off the list and go on to CHECK 4.
+
+CHECK 4 - THE COUNT, AND WHAT ONE BLOCKER CAN DO. ONE BLOCKER BLOCKS EXACTLY ONE ATTACKER.
 A single 5/5 flier on their side does not "block everything" - it blocks ONE of your creatures
 and the rest connect. Count the creatures on the "Your creatures that can attack:" list, then
 count their UNTAPPED creatures on their battlefield line. If your number is bigger, you have
-that many unblocked attackers and Check 4 applies. Answer "ATTACK: none" on the count alone
+that many unblocked attackers and Check 5 applies. Outnumbering them is NOT protection for any
+one creature: THEY choose which attacker each blocker takes, and they choose the one their
+block wins. It tells you damage gets through; it never tells you a card of yours is safe. Answer "ATTACK: none" on the count alone
 only when their untapped creature count is EQUAL TO OR HIGHER THAN the number you are sending
 and no attacker tag reads "you kill it, your blocker lives".
 
-CHECK 4 - SEND EVERYTHING. "Your creatures that can attack:" has already dropped every creature
+CHECK 5 - SEND EVERYTHING. "Your creatures that can attack:" has already dropped every creature
 that cannot legally attack, so do not re-check summoning sickness or tapped status yourself.
 Send every creature on that list.
 Know what you are spending: with Intruder Alarm on the battlefield NOTHING untaps in your untap
@@ -245,7 +275,7 @@ step - every battlefield line says so, "[doesn't untap during its controller's u
 Attackers come back untapped only when a creature ENTERS the battlefield, which for this deck
 means an untapped token-maker tapping for a token. So before you send everything, find a
 token-maker on your battlefield line. If one is there, the whole team is back the moment you
-make your next token and Check 4 costs you nothing. If NO token-maker is on your battlefield,
+make your next token and Check 5 costs you nothing. If NO token-maker is on your battlefield,
 the creatures you send stay tapped until one arrives, and they are not blockers next turn -
 send them anyway when the attack advances your clock, but do not plan a block with them.
 One hold-back only: do not send a LONE Thraben Doomsayer or Bloodline Keeper into a board that
@@ -291,6 +321,18 @@ block at all.
    comfortable - the maker is worth more than any one attacker.
 
 === MULLIGAN ===
+STEP 1 - THE CHAIN STOPS AT THE SECOND LOOK. Read the ask's own price line for the "(keeping N)"
+number - "having already taken 2 mulligans you will bottom 2 cards on a keep (keeping 5)". If it
+says (keeping 5) or ANY lower number: KEEP, if the hand holds at least one land. The bar is ONE
+LAND and nothing else - not a colour, not a curve, not a token-maker. If that applies you are
+DONE: do not read another rule in this section.
+Why the stop is there: the London mulligan already shaves a seven down to six for one card, so a
+THIRD look buys a fresh seven at the price of two cards where the shave costs one. This deck took
+three mulligans in one game, kept four cards, bottomed both of its ways to find a token-maker,
+never put a creature on the battlefield, and lost 42 to 0.
+STEP 2 - only on your untouched opening seven, or at "(keeping 6)", may you mulligan at all, and
+then by the comparison below.
+
 The two deck facts that decide every mulligan here: you run TWENTY-FOUR lands in sixty cards,
 and the cards that actually win - Thraben Doomsayer {1}{w}{w}, Bloodline Keeper {2}{b}{b},
 Intruder Alarm {2}{u} - cost three or four mana. So the question is never "can I play on turn
@@ -311,8 +353,8 @@ lands, M spells" (read that number, never recount):
  - SIX OR MORE LANDS with one spell: this is a keepable hand, not a mulligan. You bottom the
    extra lands on the keep and you are a four-land hand with your removal spell, which is a
    functioning hand. Shipping it costs you a card and gives you a fresh seven that may be worse.
- - AT FIVE CARDS OR FEWER: keep anything that has a land and a spell. Going lower loses more
-   than any hand shape gains.
+ - AT FIVE CARDS OR FEWER: STEP 1 has already answered - keep any hand with a land in it. You do
+   not need a spell as well; going lower loses more than any hand shape can gain back.
 
 BOTTOMING - the same decision, second ask. After you keep, the prompt says "you took N
 mulligans and kept, so you must put N cards from your hand on the BOTTOM" and lists your hand.
@@ -323,6 +365,10 @@ Keep, in this order, and bottom what is left over:
  4. removal;
  5. Intruder Alarm LAST. An Alarm with no maker on the battlefield does nothing at all, and a
     small hand cannot afford a card that waits.
+NEVER bottom a land when the hand you keep would hold fewer than THREE, and never bottom your
+last castable spell - a hand of nothing but lands does nothing at all, and a hand of nothing but
+four-drops does nothing for four turns. Both are losses you chose at this ask, not losses you
+were dealt.
 Never bottom your only way to find or make a creature. This deck kept a four-card hand of Marsh
 Flats, Tundra, Swamp and Intruder Alarm - it bottomed Idyllic Tutor, Vision Skeins and
 Damnation, i.e. both of its ways to find a maker and its only sweeper - and lost that game
@@ -339,13 +385,16 @@ without a creature ever hitting its battlefield.
   Doomsayer and Bloodline Keeper block only after every token is assigned.
 - The row you were about to use on a token-maker reads "(your blocker dies, attacker lives)":
   that maker does not block.
+- The mulligan ask's price line says "(keeping 5)" or fewer and the hand holds a land: KEEP.
+  No exceptions, and read no further rule in that section.
 - You are on the London bottoming ask: keep lands to four mana, then a token-maker, then Idyllic
   Tutor or Vision Skeins, then removal. Bottom Intruder Alarm before you bottom a way to find a
-  creature.
-- A line ending in "[cost: Tap]" is in your list AND your creature count is 11 or less: take it,
-  this window, whatever your mana says, on either player's turn. Count 12 or more: answer 0.
-- You just took that line and it appears again: read the count again first. 11 or less, take it
-  again. 12 or more, stop - and it stays stopped on later turns and after the "[repeat:]" note
+  creature. Never bottom a land down to fewer than three, and never bottom your last castable
+  spell.
+- A line ending in "[cost: Tap]" is in your list AND your creature count is 19 or less: take it,
+  this window, whatever your mana says, on either player's turn. Count 20 or more: answer 0.
+- You just took that line and it appears again: read the count again first. 19 or less, take it
+  again. 20 or more, stop - and it stays stopped on later turns and after the "[repeat:]" note
   has gone.
 - "Put in Play with Marsh Flats targeting Underground Sea" is listed: take it. Otherwise
   "targeting Tundra". Otherwise "targeting Scrubland".
@@ -366,6 +415,10 @@ without a creature ever hitting its battlefield.
   Blood and it is your Attackers step: "ATTACK: none". No damage total overrides this.
 - Their battlefield line names ONE untapped creature and your attack list holds five or more:
   send them all. One blocker stops one attacker.
+- An attacker's tag reads "they have N untapped creatures that could block this one" with N of
+  2 or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause: tokens go
+  anyway, and Thraben Doomsayer, Bloodline Keeper, Lord of Lineage or anything wearing the
+  Greaves stays home - unless their printed life is at or below the power you are sending.
 - The blockers prompt says LETHAL: your first blocker goes on the attacker with the largest
   "deals N", not on the smallest one you can kill.
 - An attacker row says "[menace]": two blockers on it, or none.

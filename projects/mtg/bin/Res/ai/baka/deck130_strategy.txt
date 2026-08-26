@@ -117,6 +117,27 @@ deals 2 extra damage for those, and they are what fixes the opponent's colours. 
 "[land] [opponent's battlefield]"; a tapped land is a fine target.
 
 =====================================================================
+THE WHOLE CAST ORDER, ONE LIST
+=====================================================================
+At every "which card do you cast now" ask on your own turn, read your numbered options top to
+bottom and take the FIRST line below that matches something in your menu. Stop there - do not
+weigh a later line against an earlier one. The card sections underneath are detail hanging off
+these entries, never a separate instruction.
+ 1. STARSTORM, when rule #2 step 0 says take it (the THEIRS list at an affordable X names TWO OR
+    MORE creatures, and the YOURS list names neither Rorix nor Siege-Gang). It answers a board;
+    nothing else here does.
+ 2. A single-target damage spell (Pyrite Spellbomb, Spark Spray, Hammer of Bogardan) aimed by
+    rule #2 - a planeswalker first, then a creature whose printed toughness it reaches.
+ 3. STONE RAIN, MOLTEN RAIN or LAY WASTE at one of their lands, while their battlefield shows
+    FOUR OR FEWER lands. This is the deck's job; do not hold it for a better target.
+ 4. RORIX BLADEWING at six lands, or SIEGE-GANG COMMANDER at five - but never into a board where
+    Starstorm is still the card you want to cast; sweep FIRST, deploy after.
+ 5. DWARVEN BLASTMINER or TALISMAN OF IMPULSE early, when nothing above matched.
+ 6. A cycling row, by the #1 RULE table, with mana you were not going to spend.
+ 7. "Cast nothing right now".
+Then take the ask again if the game offers it - you can cast more than one spell in a turn.
+
+=====================================================================
 YOUR CARDS - ONE LINE EACH
 =====================================================================
 DWARVEN BLASTMINER (1/1) is a land-destruction machine, not a creature. His ability shows as
@@ -181,6 +202,21 @@ legally attack, so do not re-check summoning sickness or tapped status yourself.
 "ATTACK: none" only when every listed attacker would die to a blocker and kill nothing - not to
 "hold blockers", and not because their creatures are marked "[tapped - cannot attack or block this
 turn]" (they untap for their turn).
+THE COLLAPSED TAG, INSIDE THE FLOOR. On a wide board an attacker's tag stops listing their
+blockers one by one and reads "they have N untapped creatures that could block this one, biggest
+X (...)", sometimes with "- GANG BLOCK: their 2 biggest together deal 5, enough to kill this
+attacker; each result above is a LONE blocker only". That parenthesis prices ONE blocker only.
+The GANG BLOCK clause prices what actually happens: any number of them may block that attacker
+together, and your creature's toughness is measured against the SUM.
+  - The tag prints a "GANG BLOCK: ... enough to kill this attacker" clause, or N is 2 or more:
+    that creature stays home. A GOBLIN token goes anyway - it costs you nothing and Siege-Gang
+    makes more. RORIX goes anyway ONLY when every blocker the tag names is grounded and Rorix
+    flies over all of them; SIEGE-GANG COMMANDER never goes on such a tag, because its sacrifice
+    ability needs it alive.
+  - N is 1 and no GANG BLOCK clause: the parenthesis is the whole story; use it.
+"But the biggest one dies to me" is the sentence the clause exists to refuse - they do not have
+to block with the biggest one alone. This deck sent Rorix past a "they have 5 untapped creatures"
+collapse and survived only because he flies.
 ONE EXCEPTION INSIDE THE FLOOR: if their untapped creatures' printed power totals your life or more,
 send only Rorix this turn and keep the Goblins home.
 BLOCKING - take any block where your creature kills theirs and lives. Take a "(both die)" block
@@ -214,6 +250,16 @@ Your cheapest cards cost ONE mana (Pyrite Spellbomb, Spark Spray), so a missing 
 a reason to mulligan; every land you own makes {R}, so colour never is either. The header
 "counted by the engine:" gives the real land and spell counts - decide from those, never from your
 own recount. Mulligan only a hand with zero lands, or a hand that is all lands.
+THE COVERAGE LINE DECIDES THE CLOSE ONES. The header also prints "Playing every land in this hand
+would cover the cost of: ..." - the engine has ALREADY checked your mana against your hand. If it
+names even one card, this hand ACTS, and that is a keep, however few lands it holds: this deck
+kept a one-land seven whose coverage line named exactly one card and won that game. If it reads
+"would not cover any spell in it", the hand does nothing at all until you draw - that is the one
+shape where seven cards can be worse than six.
+WHEN A KEEP MAKES YOU BOTTOM CARDS - the section does not end at the keep. Bottom your most
+expensive spell first (Rorix Bladewing, Siege-Gang Commander), then a duplicate Molten Rain or
+Stone Rain. NEVER bottom your only Starstorm - it is the only card here that answers a board -
+and NEVER bottom a land when the hand you keep would hold fewer than THREE.
 
 =====================================================================
 DECIDING SITUATIONS (recognise -> do)
@@ -253,6 +299,16 @@ DECIDING SITUATIONS (recognise -> do)
 - You control 5 lands and Siege-Gang Commander is in hand -> cast it, and sacrifice no Goblin while
   the opponent is above 6 life.
 - Rorix Bladewing is castable -> cast him and attack with him the same turn.
+- Several casts are listed at once -> answer with the highest entry in THE WHOLE CAST ORDER that
+  appears in your menu.
+- An attacker's tag reads "they have N untapped creatures that could block this one" with N of 2
+  or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause -> a Goblin goes
+  anyway; Rorix goes only if every blocker named is grounded; Siege-Gang stays home.
+- The mulligan header's coverage line names even one card -> keep, whatever the land count.
+  (The stop above it stands: never go below 6 cards.)
+- You kept and the game asks which cards to bottom -> most expensive spell first, then a
+  duplicate land-destruction spell. Never your only Starstorm, never a land down to fewer than
+  three.
 - "Opponent life:" went UP since your last decision -> stop aiming damage at the face for the rest
   of the game; kill creatures and planeswalkers only.
 - A damage spell's only targets are "the opponent, you" and the opponent is above 6 life -> do
