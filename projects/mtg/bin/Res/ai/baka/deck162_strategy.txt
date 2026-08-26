@@ -41,6 +41,11 @@ Look at YOUR battlefield line and count the names Underworld Dreams, Fate Unrave
   Fruition all wait for the punisher.
 The thought "drawing more cards is the priority, I need to find my win condition" is ALWAYS FALSE
 for this deck - a card you hand the opponent with no punisher out is a card that kills you.
+THE EXACT SHAPE THAT LOSES GAMES: a Howling Mine is already on your battlefield line, no
+punisher is, and the ask offers a SECOND Mine, a Dictate of Kruphix or a Puzzle Box. Every one
+of those is an extra card per turn for a deck that is assembling something. Take the wall, the
+Liliana's Caress or "Cast nothing right now" instead, every single time, until a punisher name
+appears on YOUR battlefield line. Count the names on the line - do not count the ones in hand.
 ONE exception to the brake, and only this one: MASTER OF THE FEAST is a 5/5 flying body as
 well as a gift, and it is the only card behind this brake that defends you. With NO punisher
 out, cast it whenever the opponent's battlefield line shows a creature - the body is worth the
@@ -137,18 +142,35 @@ SHIELD SPHERE {0} - 0/6 defender, free. Gets a -0/-1 counter each time it blocks
 FOG BANK {1}{u} - 0/2 flying defender that prevents all combat damage to and from itself. Rule 3.
 
 === ATTACKING ===
-Never send Fate Unraveler into a "their untapped blockers" tag that reads "your attacker dies,
-their blocker lives". That tag is the engine's own computed result - do not argue with it. Fate
-Unraveler is a punisher first: dead, it stops the draw damage that wins you the game. If the
-lethal check has not cleared and that tag is on its line, the answer is ATTACK: none.
-The same answer covers "(both die)". Fate Unraveler trading itself for one creature is still
-a punisher that stops dealing draw damage, and the creature it kills is one they replace. The
-tag also does not tell you what the BLOCKER gains: a lifelink blocker hands them life on top
-of the trade. Below the lethal check, "(both die)" on Fate Unraveler's line reads exactly like
-"your attacker dies": ATTACK: none.
-The one time Fate Unraveler goes: the printed opponent life is at or below the total power of
-every attacker you are sending including it - then run the lethal check below, swing with
-everything and end it.
+Read each attacker's own "their untapped blockers" tag and answer from it. The tag is the
+engine's computed result - do not argue with it, and do not answer ATTACK: none out of a
+general wish to keep your board.
+SEND IT when every outcome on that creature's tag reads "(you kill it, your attacker lives)".
+That line says your creature SURVIVES and theirs does not: there is no trade to fear and no
+punisher to lose. Either they decline the block and take the damage, or they block and hand
+you a free kill. "I might trade them away" is FALSE against that tag - the tag already told
+you the attacker lives. This is the commonest way this deck throws away free damage, and it
+costs you the turns your punishers are buying.
+DO NOT SEND Fate Unraveler into a tag that reads "your attacker dies, their blocker lives",
+and do not send it into "(both die)" either: Fate Unraveler is a punisher first, and dead it
+stops the draw damage that wins you the game, for a creature they simply replace. The tag also
+does not tell you what the BLOCKER gains - a lifelink blocker hands them life on top of the
+trade. Below the lethal check, both of those lines mean ATTACK: none for Fate Unraveler.
+MASTER OF THE FEAST AND THE COLLAPSED TAG. When a creature's tag does NOT list their blockers
+one by one but instead reads "they have N untapped creatures that could block this one, biggest
+X (you kill it, your attacker lives)", that parenthesis prices ONE blocker only - the biggest -
+and the footnote under it says the numbers are computed "before gang-blocks". N is how many
+creatures can block that attacker, and any two of them may block it TOGETHER. So read N, not
+the parenthesis:
+  N = 1  -> the parenthesis is the whole story; use it.
+  N >= 2 -> a gang block is available and your attacker's toughness is measured against the
+            SUM of their bodies, not against the biggest one. Unless the lethal check has
+            cleared, the answer for that creature is ATTACK: none.
+Master of the Feast is a 5/5 flier and your fastest clock, but it does not untap while Intruder
+Alarm or a similar effect is out (its battlefield line will say so), and three 2/2 tokens gang
+it to death for nothing. Do not swing it into an N >= 2 board.
+The one time everything goes: the printed opponent life is at or below the total power of every
+attacker you are sending - then run the lethal check below, swing with everything, and end it.
 
 === LETHAL CHECK - RUN IT EVERY TURN ===
 Count the punisher names on your battlefield (Underworld Dreams, Fate Unraveler, Ob Nixilis) - call
@@ -176,11 +198,22 @@ never find a one-drop. Colour is a tiebreaker and never a gate: 18 of your 26 la
 18 make blue, and ten of them make both.
 If the prompt says "having already taken 1 mulligan", this is your LAST look: answer "Keep this
 hand". "I will keep whatever I draw next" is how you end up with a 4-card hand - keep THIS one.
+WHEN YOU KEEP AFTER A MULLIGAN THE GAME ASKS WHICH CARDS TO BOTTOM. Never bottom a land, and
+never bottom SHIELD SPHERE - it costs ZERO mana, so it is free defence you can deploy on any
+turn no matter what your lands are doing, and it is the cheapest card in the deck to keep.
+Never bottom your only punisher either. Bottom your most EXPENSIVE spell first: Forced Fruition,
+Peer into the Abyss, Teferi's Puzzle Box, a second copy of a draw engine - in that order.
 
 === DECIDING SITUATIONS ===
 - Underworld Dreams, Fate Unraveler or Ob Nixilis is anywhere in your cast list: cast it this ask,
   ahead of everything else.
 - Two spells are both payable and one is a punisher: the punisher goes first, then spend the rest.
+- Teferi's Puzzle Box, Forced Fruition or a Dictate is in the SAME list as a punisher: the
+  punisher is number 1 in the cast order and the Box is number 5. Cast the punisher this ask.
+  A Puzzle Box with nothing to convert its cards is a gift, however big the number looks.
+- An attacker's tag reads only "(you kill it, your attacker lives)": send that attacker.
+- An attacker's tag reads "they have N untapped creatures that could block this one" with N of
+  2 or more: ATTACK: none for that creature unless the lethal check has cleared.
 - No Underworld Dreams, no Fate Unraveler and no Ob Nixilis on your battlefield, and a Howling Mine
   is already out: cast a wall or a Liliana's Caress - or "Cast nothing right now".
 - A punisher IS on your battlefield: cast every Howling Mine, Dictate, Puzzle Box and Forced

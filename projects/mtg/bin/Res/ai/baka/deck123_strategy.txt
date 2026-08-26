@@ -179,31 +179,57 @@ Vision Skeins {1}{u} - EACH player draws two cards, you and them.
 Lightning Greaves {2} - see Rule 6.
 
 === COMBAT ===
-"Your creatures that can attack:" already excludes every creature that cannot attack. Send all
-of them.
-One exception, read off THEIR battlefield: if a permanent there damages each attacker by the
-number of attackers - Lightmine Field on deck125's board says so in its text - then attacking
-with N creatures deals N damage to each of your attackers before any combat damage happens.
-Count it off the battlefield line: find the SMALLEST toughness among the creatures you would send,
-and send that many minus one, biggest power first. Leave the rest home.
-Before you send anything, read the "[their untapped blockers: ...]" tag on your own attacker
-lines. If EVERY outcome in it reads "(neither dies)", you are not sending an attack - you are
-feeding blockers. Count their untapped creatures. If they have as many untapped creatures as
-you are sending, or more, answer ATTACK: none and keep building.
-Two walls make this actively lethal to you, and their names are on their battlefield line:
-PERIMETER CAPTAIN gains them 2 life for EVERY defender they block with, and PRIDE GUARDIAN
-gains them 3 more. With SANGUINE BOND or EXQUISITE BLOOD also on that line, each point they
-gain is a point you lose - a twelve-creature attack into six walls gained one opponent 26 life
-and took 19 off you in a single turn. When their battlefield line names Perimeter Captain,
-Pride Guardian, Sanguine Bond or Exquisite Blood, ATTACK: none is the answer until a token
-activation, a Tragic Slip or a Damnation has removed the wall that gains them the life.
-Send the army only when at least one attacker's tag says "you kill it, your blocker lives"
-or their untapped creature count is lower than the number you are sending.
-One more hold-back: do not send a lone Thraben Doomsayer or Bloodline Keeper into a board that
-can block and kill it. The maker is the engine; your tokens are the attack. Send it once you
-have tokens attacking beside it.
+ATTACK - four checks, in this order. Stop at the first one that answers and do what it says.
+
+CHECK 1 - THE LIFEGAIN WALL BOARD. Read the "Opponent battlefield" line for these four names:
+PERIMETER CAPTAIN, PRIDE GUARDIAN, SANGUINE BOND, EXQUISITE BLOOD. If ANY of them is on that
+line, answer "ATTACK: none" - this window and every attack window after it - until a Tragic
+Slip, a Damnation or an edict has taken the LAST of them off that line.
+Why, in the numbers the render gives you: Perimeter Captain gains them 2 life for EVERY
+creature with defender that blocks, and each Captain triggers for each blocking defender;
+Pride Guardian gains them 3 more when IT blocks; and every Sanguine Bond turns every point
+they gain into a point you LOSE. Three defenders blocking with two Captains and two Bonds is
+twenty-four life off YOU in one combat step, from an attack in which nothing of yours died.
+YOUR ATTACKER TAGS CANNOT SEE THIS. The "[their untapped blockers: ...]" tag reads
+"(neither dies)" and that is TRUE - the tag counts deaths, it does not count life, and the
+life is what kills you. Twelve attackers into three of these walls took this deck from 20 life
+to 8 in one swing and from 8 to dead in the next, while the opponent went down by nine.
+An arithmetic answer of the form "we deal 30 and they are at 11, so we win" is NOT an
+exception to Check 1. That sum is what you had both times you died here. You do not survive
+to collect it. Damage they will never take does not outrank life you will certainly lose.
+
+CHECK 2 - LIGHTMINE FIELD. If their battlefield line names a permanent that damages each
+attacker by the number of attackers - Lightmine Field on deck125's board says exactly that -
+find the SMALLEST toughness among the creatures you would send and send that many minus one,
+biggest power first. Leave the rest home.
+
+CHECK 3 - THE COUNT, AND WHAT ONE BLOCKER CAN DO. ONE BLOCKER BLOCKS EXACTLY ONE ATTACKER.
+A single 5/5 flier on their side does not "block everything" - it blocks ONE of your creatures
+and the rest connect. Count the creatures on the "Your creatures that can attack:" list, then
+count their UNTAPPED creatures on their battlefield line. If your number is bigger, you have
+that many unblocked attackers and Check 4 applies. Answer "ATTACK: none" on the count alone
+only when their untapped creature count is EQUAL TO OR HIGHER THAN the number you are sending
+and no attacker tag reads "you kill it, your blocker lives".
+
+CHECK 4 - SEND EVERYTHING. "Your creatures that can attack:" has already dropped every creature
+that cannot legally attack, so do not re-check summoning sickness or tapped status yourself.
+Send every creature on that list. One hold-back only: do not send a LONE Thraben Doomsayer or
+Bloodline Keeper into a board that can block and kill it - the maker is the engine, the tokens
+are the attack. Send it once tokens are attacking beside it.
+
 Blocking, in this order:
  - Block with your Human and Vampire TOKENS first - they are free and you make more every turn.
+ - WHEN THE PROMPT SAYS LETHAL, ASSIGN TO THE BIGGEST ATTACKERS FIRST. The line
+   "Unblocked, these attackers deal up to N - you would be at ... - LETHAL if it all connects"
+   is the trigger. Every attacker row prints "deals N". Sort those numbers, put your first
+   blocker on the LARGEST one, your second on the next largest, and keep going until you run
+   out of blockers or out of attackers. Blocking their smallest attacker is the one assignment
+   that is always wrong here: with 10 life against 3+3+3+1, blocking the 1 leaves you at 1 and
+   blocking a 3 leaves you at 3, and the difference is a whole turn of the game.
+ - MENACE. An attacker row tagged "[menace ...]" is NOT blocked by one creature - a lone
+   blocker on it does nothing at all and the attacker's full damage still lands. Put TWO
+   blockers on it or none. Never spend your best blocker alone on a menace attacker; the
+   prompt says so on the row and it is telling the truth.
  - Add up the damage of every attacker with no blocker on it. If that total is your life total
    minus 4 or more, put a blocker on EVERY attacker - biggest attacker first, Thraben Doomsayer
    and Bloodline Keeper included - and keep assigning until no attacker is left unblocked. A
@@ -243,3 +269,10 @@ Your cheapest card costs ONE mana, so "no early play" is never a reason to ship 
   giving up a token, nothing else.
 - "Equip with Lightning Greaves targeting" is listed and no creature reads "{attached: Lightning
   Greaves}": equip your best token-maker. Every re-offer after that: 0 (pass).
+- Their battlefield line names Perimeter Captain, Pride Guardian, Sanguine Bond or Exquisite
+  Blood and it is your Attackers step: "ATTACK: none". No damage total overrides this.
+- Their battlefield line names ONE untapped creature and your attack list holds five or more:
+  send them all. One blocker stops one attacker.
+- The blockers prompt says LETHAL: your first blocker goes on the attacker with the largest
+  "deals N", not on the smallest one you can kill.
+- An attacker row says "[menace]": two blockers on it, or none.

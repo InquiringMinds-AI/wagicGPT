@@ -49,12 +49,26 @@ swings: one body, then two, then the whole team. Keep swinging.
   blocks, so a "(neither dies)" line against Shield Sphere is not a wasted swing - it is
   how you kill it. Send into a Shield Sphere whether or not you outnumber them, and read
   the proof off their battlefield line as its printed toughness falls: 0/6, 0/5, 0/4.
+- OUTNUMBERING THEM DOES NOT MAKE A LIFEGAIN WALL FREE. PERIMETER CAPTAIN gives them 2 life
+  every time ANY defender they control blocks; PRIDE GUARDIAN gives them 3 whenever it blocks.
+  The tag still reads "(neither dies)" - it does not print their life gain. Count the 0/N
+  defenders on their battlefield line before you swing: at two or more, the attack PAYS them
+  and the outnumber clause does not apply. Send only what actually gets through (Sigarda and
+  Elite Spellbinder FLY) and grind with removal instead of feeding the wall.
 - A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
   is a per-creature STOP, not a note about the whole attack. Leave THAT creature home even
   when the rest of the team is attacking - "attack with everything that profits" is decided
   one A-line at a time, and a creature that dies to a blocker they already control profits
   nothing. Send it anyway only when the lethal check clears: the printed opponent life is at
   or below the total power of everything you are sending.
+  VIGILANCE IS NOT A LICENCE. "It has vigilance, so attacking costs me nothing" is FALSE
+  against that tag: a vigilant attacker that dies is gone from your board for the rest of the
+  game, which is far worse than being tapped for one turn. Briarbridge Tracker's vigilance
+  does not change a "your attacker dies, their blocker lives" line - keep it home.
+  THE STOP IS ABOUT CARDS, NOT TOKENS. A Wolf token costs you nothing when it dies, and one
+  untapped blocker can only block ONE attacker: when the stop-tagged body is a TOKEN and your
+  attackers outnumber their untapped blockers, send it as bait so their block is spent on the
+  token instead of on a lord.
 
 #3 RULE - DEPLOY FLOOR: ON YOUR OWN MAIN PHASE, IF A CREATURE IS OFFERED, CAST ONE.
 "Cast nothing right now" on YOUR main phase is correct in exactly TWO situations:
@@ -97,6 +111,14 @@ error" is ALWAYS FALSE - it is never an error.
   Take the 1 damage every time.
 BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
 this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ SURVIVAL COMES BEFORE THE LADDER. When the header says the attack IS LETHAL, the first
+ question is not "which block is free" - it is "which assignment leaves me alive". Each
+ attacker prints its own "deals N". Add them up and assign your blockers so the damage still
+ getting through is LESS than your printed life, taking the BIGGEST "deals N" attackers first,
+ whatever their parentheses say. A rung-1 free kill on a 2/2 while a 7/7 walks past you is a
+ LOSS you chose: with ONE blocker against three attackers you do not get to pick the pretty
+ block, you pick the one you survive. Only once you are alive does the ladder below decide
+ anything.
  0. "(neither dies)" - TAKE THAT BLOCK. Nothing of yours dies, nothing of theirs dies, and
     the damage is gone. It is strictly free; no number on this screen can make it wrong.
  1. "(you kill it, your blocker lives)" - TAKE THAT BLOCK, always, at every life total and every
@@ -140,6 +162,14 @@ YOUR LORDS AND GROWTH:
 - LUMINARCH ASPIRANT ({1}{W}, 1/1): free +1/+1 counter each of your combats. Keep it alive -
   but "keep it alive" is about not ATTACKING it into death, never about declining a block the
   ladder tells you to take. On the block ladder the ladder wins.
+  PUT THE COUNTER ON A CREATURE THAT CAN CONNECT, NOT ON THE BIGGEST ONE. A counter is damage
+  only if the body carrying it gets through. Before you answer, read the attack tags you were
+  shown last combat: if your biggest creature is being stopped every turn by the SAME blocker -
+  a FOG BANK (prevents all combat damage to and from itself, so any size is stopped dead), a
+  Shield Sphere, or any wall whose line reads "(neither dies)" - then every further counter on
+  that creature is worth exactly zero. Grow a different body instead, preferring one they cannot
+  block at all: Sigarda and Elite Spellbinder FLY. Stacking nine counters onto one grounded
+  attacker facing a Fog Bank builds a 10/10 that never deals a point.
 - RANGER CLASS ({1}{G}): cast it for the 2/2 Wolf immediately. Level 2 ({1}{G}) puts a +1/+1
   counter on an attacker each combat; Level 3 ({3}{G}) casts creatures off the top. Level with
   SPARE mana only - never instead of casting a creature.
@@ -151,6 +181,13 @@ do not reason about it, never delay an attack to arrange it.
 REMOVAL:
 - FATEFUL ABSENCE ({1}{W}, instant): destroys a creature or planeswalker (they get a Clue). Save
   it for their best creature or a planeswalker. This is the ONE card worth holding with mana up.
+  THE OPTION LINE'S TARGET LIST IS THE ONLY TRUTH ABOUT WHAT IT CAN HIT, and it has one reading
+  that is always a STOP: when the line says "the only legal targets are YOUR OWN right now",
+  DO NOT CAST IT. There is nothing of theirs to kill; casting it destroys your own creature and
+  hands them a Clue for the privilege. Do something else this turn and keep the card - the
+  option comes back the moment they play a threat. Never build a reason to fire it at your own
+  board ("it dies to their removal anyway", "it denies them the fetch") - those are always
+  wrong, and a board you emptied yourself is a clock you no longer have.
 - BRUTAL CATHAR ({2}{W}, 2/2 Human Werewolf): ETB exiles an opponent creature until Cathar
   leaves - it COMES BACK if Cathar dies, so never throw Cathar into a bad block.
 

@@ -128,14 +128,36 @@ creature, ask what happens on the crack-back with that creature unavailable.
   blocks, so a "(neither dies)" line against Shield Sphere is not a wasted swing - it is
   how you kill it. Send into a Shield Sphere whether or not you outnumber them, and read
   the proof off their battlefield line as its printed toughness falls: 0/6, 0/5, 0/4.
+- OUTNUMBERING THEM DOES NOT MAKE A LIFEGAIN WALL FREE. Some 0/N defenders PAY THEM for
+  blocking, and every extra body you send is one more payment: PERIMETER CAPTAIN gives them
+  2 life every time ANY defender they control blocks, and PRIDE GUARDIAN gives them 3 more
+  whenever it blocks. The tag will still read "(neither dies)" - it does not print their
+  life gain. So before you send a "(neither dies)" body into their board, count the 0/N
+  defenders on their battlefield line: if there are two or more, the swing PAYS them and
+  the outnumber clause does not apply. Send only the attackers that get through (flying,
+  menace, or a body whose tag kills something), keep the rest home, and win with removal,
+  Kaya and the dungeon drains instead of feeding the wall.
 - A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
   is a per-creature STOP, not a note about the whole attack. Leave THAT creature home even
   when the rest of the team is attacking - "attack with everything that profits" is decided
   one A-line at a time, and a creature that dies to a blocker they already control profits
   nothing. Send it anyway only when the lethal check clears: the printed opponent life is at
   or below the total power of everything you are sending.
+  THE STOP IS ABOUT CARDS, NOT TOKENS. A Goblin token from the dungeon costs you nothing
+  when it dies, and their one untapped blocker can only block ONE attacker: send the token
+  WITH the team and their blocker spends itself on the token instead of on a Silencer or a
+  Nadaar. So when the stop-tagged body is a TOKEN and the attackers you are sending
+  outnumber their untapped blockers, send it - it is bait, and the bait is the point. The
+  stop stands for every real card in your deck.
 BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
 this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ SURVIVAL COMES BEFORE THE LADDER. When the header says the attack IS LETHAL, the first
+ question is not "which block is free" - it is "which assignment leaves me alive". Read the
+ "deals N" number on each attacker, add them up, and assign your blockers so that the damage
+ still coming through is LESS than your printed life. Block the BIGGEST "deals N" attackers
+ first, whatever their parentheses say. A rung-1 free kill on a 2/2 while a 7/7 walks past
+ you into lethal is a LOSS you chose: at lethal, the biggest number on the board outranks
+ every parenthesis. Only once you are alive do you spend spare blockers by the ladder below.
  0. "(neither dies)" - TAKE THAT BLOCK. Nothing of yours dies, nothing of theirs dies, and
     the damage is gone. It is strictly free; no number on this screen can make it wrong.
  1. "(you kill it, your blocker lives)" - TAKE THAT BLOCK, always, at every life total and every
@@ -224,6 +246,17 @@ grind with your planeswalkers, and finish. A game left even to the turn cap is a
 Hive of the Eye Tyrant is a manland: pay {3}{B} - FOUR mana, not two - to make it a 3/3 menace
 attacker until end of turn. That is a whole turn's mana in the mid-game, so animate it only when
 you have nothing better to cast; it is a late-game mana sink, not a cheap threat.
+- ONE ANIMATION PER HIVE PER TURN, AND NEVER IN YOUR UPKEEP. Your battlefield line tells you
+  which Hives are already animated: an animated one is printed "Hive of the Eye Tyrant #1 (3/3)
+  [menace]" and is counted in the "of which N are creatures" number. Activating a Hive that
+  ALREADY reads (3/3) buys you NOTHING - it is a second four-mana payment for a creature you
+  already have, and it is the single most expensive mistake available to this deck. Before you
+  answer "becomes beholder", find that Hive on your battlefield line: if it already shows
+  (3/3), the answer is pass. Animate a SECOND Hive only if you still have four spare mana after
+  the first.
+- Do it in your MAIN PHASE, not in your upkeep. The animation lasts until end of turn either
+  way, and spending {3}{B} before your draw step is spending it before you know what you drew.
+  In upkeep, pass.
 Emeria's Call is your seven-mana haymaker: two 4/4 flying Angels AND your NON-ANGEL creatures gain
 indestructible until your next turn (the two new Angels do not get it), so it doubles as a blowout
 against a board wipe or a big attack.
@@ -263,6 +296,12 @@ DECIDING SITUATIONS (recognize -> do):
   drains the opponent over one that only makes a Treasure, adds a counter, or scries, and do
   not try to work out which room number you are on.
 - You need combat math -> read the (P/T) already printed on each creature; do not rebuild it.
+- The block header says the attack IS LETHAL -> assign blockers to the biggest "deals N"
+  attackers until the damage still coming through is below your life, THEN use the ladder.
+- Their battlefield shows two or more 0/N defenders (Perimeter Captain, Pride Guardian) ->
+  a "(neither dies)" swing PAYS them life. Send only what gets through; hold the rest.
+- The "becomes beholder" option is offered and that Hive already reads (3/3) [menace] on your
+  battlefield line -> it is already animated. Pass. And never animate during your upkeep.
 - Triumphant Adventurer is castable and you are under pressure -> cast it; the deathtouch 1/1
   blocks or trades with anything.
 - Soul Shatter is offered but the opponent controls no creature -> do not cast it.

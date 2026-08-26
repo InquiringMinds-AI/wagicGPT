@@ -46,15 +46,30 @@ Pyrite Spellbomb, Spark Spray, Starstorm, Hammer of Bogardan and Siege-Gang's sa
 print their choices as a list - either after "legal targets right now:" or as one menu row per
 target, with the face row reading "targeting a player". Procedure, top down, every time:
   0. FIRST read the "{X pricing:" annotation on the Cast Starstorm line, and read the WHOLE of
-     it - the "At X=..." clause after the first sentence, not just the first number. Find the
-     largest X you can afford and the list of THEIRS it kills at that X. If that list names TWO
-     OR MORE creatures, casting Starstorm at that X is the play and it OUTRANKS every
-     single-target damage spell you hold and every land destruction spell in your hand - Hammer
-     of Bogardan, Pyrite Spellbomb and Spark Spray each kill exactly one. "smallest X that
-     kills anything: kills THEIRS: none" does NOT mean Starstorm is blank; it usually means the
-     smallest X only kills your own Dwarven Blastminer. Keep reading to the "At X=" clause
-     before you dismiss the card. Losing your own Blastminer to kill two of their creatures is
-     a trade you take.
+     it - the "At X=..." clause after the first sentence, not just the first number. The
+     annotation prints TWO lists at each X: what it kills of THEIRS and what it kills of
+     YOURS. Both halves are binding.
+     TAKE IT when the THEIRS list at an affordable X names TWO OR MORE creatures. At that X it
+     OUTRANKS every single-target damage spell you hold and every land destruction spell in
+     your hand - Hammer of Bogardan, Pyrite Spellbomb and Spark Spray each kill exactly one.
+     "kills THEIRS: none" in the first sentence does NOT mean Starstorm is blank; keep reading
+     to the "At X=" clause. Losing your own Dwarven Blastminer or a Goblin to kill two of
+     their creatures is a trade you take.
+     DO NOT TAKE IT - answer "Cast nothing right now", at ANY X - when either of these is true:
+       (a) the YOURS list at that X names RORIX BLADEWING or SIEGE-GANG COMMANDER. Those two
+           are the only way this deck ends a game. A sweeper that kills your own clock has
+           handed them the match: at 1 life against an opponent on 9, this deck cast Starstorm
+           at X=5, killed its own Rorix, its Blastminer and both Goblins to kill one 0/5 wall,
+           and died with an empty board. Rorix on the table beats any number on the annotation.
+       (b) the THEIRS list at that X names only creatures whose battlefield line reads
+           "[defender]". A defender never attacks you. It is not worth one card, and it is
+           never worth a creature of yours.
+     AND WHEN YOU DO CAST IT, READ THE X MENU'S OWN SENTENCE. The "Announce the value of X"
+     list states which option holds the largest X and lists them largest first: it says
+     "option 1 is the LARGEST X (X = N)", so option 1 is that N, not X=1. Decide your number
+     first, then find the row whose text reads "X = " followed by that number, and answer with
+     THAT row's number. This deck once wrote "cast at X=1" in its own plan, answered
+     "CHOICE: 1", and cast X=5 into its own board.
   1. An opponent PLANESWALKER on the list -> aim there. A live planeswalker wins their game.
   2. An opponent CREATURE whose printed toughness this damage reaches -> aim there. Spark Spray
      kills 1 toughness; Pyrite Spellbomb kills 2; Hammer of Bogardan kills 3. The battlefield line
@@ -102,9 +117,12 @@ His ability's target row now names the owner: "Destroy with Dwarven Blastminer t
 <land> [opponent's battlefield]". Take rows tagged [opponent's battlefield]; never a row
 tagged [your battlefield].
 STARSTORM ({X}{R}{R}, instant) deals X to EVERY creature, including yours. Cast it when the opponent
-battlefield line shows two or more creatures. Its X menu says "option 1 is the LARGEST X"; pick the
-smallest X that reaches the toughness you must kill. Because it kills your own Blastminers, goblins
-and Siege-Gang too, SWEEP FIRST and deploy Siege-Gang AFTER.
+battlefield line shows two or more creatures that are NOT marked "[defender]". Its X menu says
+"option 1 is the LARGEST X" - option 1 is therefore never X=1; read each row's "X = " text and
+answer that row's number. Pick the smallest X that reaches the toughness you must kill. Because it
+kills your own Blastminers, Goblins, Siege-Gang AND RORIX too, SWEEP FIRST and deploy your bodies
+AFTER - and once Rorix or Siege-Gang is already on the battlefield, Starstorm is a card you hold,
+not a card you cast (rule #2, step 0).
 SIEGE-GANG COMMANDER brings FOUR BODIES (a 2/2 plus three 1/1 Goblins) - your board and your
 blockers. Its "Sacrifice a Goblin" ability is for killing a creature or finishing a player at 6 or
 less life; a Goblin spent on 2 face damage against a healthy opponent is the worst trade in the deck.
@@ -141,6 +159,16 @@ send only Rorix this turn and keep the Goblins home.
 BLOCKING - take any block where your creature kills theirs and lives, and any block where both die.
 Block where only your creature dies when the damage otherwise puts you at 5 life or less. A Goblin
 is worth more as a blocker than as 2 points of face damage.
+WHEN THE PROMPT SAYS LETHAL, CHUMP THE BIGGEST ATTACKER. The line "Unblocked, these attackers deal
+up to N - you would be at ... - LETHAL if it all connects" means the arithmetic, not the trade, is
+the whole question. Every attacker row prints "deals N". Put your blocker in front of the LARGEST
+of those numbers, even when the trade line says "your blocker dies, attacker lives" - subtracting
+their biggest number from the incoming total is the only thing that decides whether you are alive
+next turn. At 3 life against a 4 and a 2, blocking the 4 leaves you at 1 and blocking the 2 leaves
+you dead; this deck blocked the 2.
+AND: the "may block" list is the LEGALITY list. If an attacker is named on your blocker's
+"may block" line, you CAN block it - "my 1/1 cannot block their 4/4" is not a rule, it is a
+sentence this deck told itself on the turn it died.
 
 =====================================================================
 MULLIGAN
@@ -168,12 +196,22 @@ DECIDING SITUATIONS (recognise -> do)
 - Their board shows a planeswalker -> every damage spell points at it until it is gone.
 - Their board shows two or more creatures and Starstorm is in hand -> cast Starstorm, and cast it
   BEFORE you cast Siege-Gang Commander.
+- The "{X pricing:" annotation's YOURS list at the X you were going to pick names Rorix Bladewing
+  or Siege-Gang Commander -> do not cast Starstorm at all this window, whatever it kills of theirs.
+- The only creature the annotation kills of theirs is marked "[defender]" -> do not cast Starstorm.
+- You are on the "Announce the value of X" menu -> answer the option whose text reads "X = " and
+  your number. Option 1 is the LARGEST X, never X=1.
+- The blockers prompt says LETHAL -> your blocker goes in front of the attacker with the largest
+  "deals N", trade line notwithstanding.
 - You control 5 lands and Siege-Gang Commander is in hand -> cast it, and sacrifice no Goblin while
   the opponent is above 6 life.
 - Rorix Bladewing is castable -> cast him and attack with him the same turn.
 - "Opponent life:" went UP since your last decision -> stop aiming damage at the face for the rest
   of the game; kill creatures and planeswalkers only.
-- A damage spell's only targets are "the opponent, you" and the opponent is above 6 life -> hold the
-  card if it is Starstorm; otherwise fire it at the opponent and move on, do not agonise.
+- A damage spell's only targets are "the opponent, you" and the opponent is above 6 life -> do
+  NOT fire it at the face. Hold the card. Nine face-burn casts in one game moved an opponent
+  from 25 to 24 while they gained back more than they lost - that is not a clock, it is a card
+  spent. Cast it the turn a creature or a planeswalker appears on their side, or the turn their
+  life is 6 or less. The one exception is the LETHAL-THIS-TURN chain in rule #2.
 - Dwarven Blastminer appears in "Your creatures that can attack:" -> leave him out of the ATTACK
   line and spend {2}{R} destroying a land instead.

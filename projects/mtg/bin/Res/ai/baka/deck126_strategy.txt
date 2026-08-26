@@ -11,7 +11,13 @@ At your Upkeep the engine will offer you a single action: tapping Overgrown Batt
 mana. Answer CHOICE: 0 (pass). Every time. Upkeep, Draw, the opponent's turn - pass all of them.
 You never have to tap the Battlement by hand. When you cast a spell in your MAIN PHASE the engine
 taps your sources for you, and the "Mana available:" line already counts the Battlement in with
-your lands. Taking that upkeep option instead does two bad things at once: the green mana is gone
+your lands - as ONE source. Overgrown Battlement reads "{T}: Add {G} for each creature with
+defender you control", and the engine says so on its own line in the sources list ("VARIABLE
+output: ... the total above counts it as one source, not as its mana"). So the "Mana available:"
+number is a FLOOR: your real mana is that number plus one for every defender past the first. When
+a spell looks one or two mana out of reach and you have three or four walls out, it is probably
+affordable - take it and let the engine tap for you.
+Taking that upkeep option instead does two bad things at once: the green mana is gone
 before your main phase ever starts, and a tapped Battlement is a 0/4 wall that cannot block on the
 opponent's next turn - a wall you needed.
 The thought "I should ramp first so I can afford Sanguine Bond" is ALWAYS FALSE in the upkeep
@@ -36,10 +42,21 @@ Any one of these wins from any life total, yours or theirs. You do not need a bi
 enough, because the loop runs itself until the opponent is at 0. Do not wait for a better turn and
 do not build a bigger board first.
 
-=== RULE #3 - ASSEMBLING THE PAIR (your only win condition) ===
+=== RULE #3 - ASSEMBLING THE PAIR (your fastest win condition) ===
 Exquisite Blood {4}{B}: whenever an opponent loses life, you gain that much life.
 Sanguine Bond {3}{B}{B}: whenever you gain life, the opponent loses that much life.
-Neither does anything useful alone. Both together end the game.
+Both together end the game the moment any life changes. But the two halves are NOT the same card:
+ - SANGUINE BOND ALONE IS ALREADY A CLOCK. Every point of life you gain takes a point off the
+   opponent, and this deck gains life constantly: 2 per defender that blocks with a Perimeter
+   Captain out, 3 whenever Pride Guardian blocks, the toughness of whatever Tribute to Hunger eats,
+   1 for every point a lifelink Vampire connects with. With a Bond down and three walls blocking
+   under a Captain you take 6 off them in one combat, and a SECOND Bond doubles it. Games of yours
+   have been won from 20 with a Bond and walls and no Exquisite Blood anywhere. So once Sanguine
+   Bond has resolved, keep blocking with everything and keep pinging - you are already killing
+   them, and finding Exquisite Blood only makes it instant.
+ - EXQUISITE BLOOD ALONE DOES NOTHING you can start yourself: it only pays you when the opponent
+   is ALREADY losing life. Against an opponent with no creatures and no burn it is a blank.
+So when you have NEITHER piece, Sanguine Bond is the one to look for first.
  1. The turn either one appears in your casting list, CAST IT. Not later, not after a wall, not
     once you can afford both.
  2. If one is already on your battlefield and the other is not in your hand, "Cast Idyllic Tutor
@@ -48,7 +65,8 @@ Neither does anything useful alone. Both together end the game.
     cast it for 5, and Tutor plus enchantment in one turn costs 8 mana. So cast the Tutor the FIRST
     turn it is listed - the turn you spend tutoring is a turn you are not casting the enchantment.
  4. The Tutor then shows you your whole library as a long numbered list. Pick the one of the two you
-    do NOT already have; if you have neither, pick either.
+    do NOT already have; if you have NEITHER, pick SANGUINE BOND - it is the half that wins on its
+    own (Rule #3).
  5. You run four Idyllic Tutors and two copies of each enchantment. If a piece is countered or
     exiled, tutor for the next copy and cast it again. There is no other way to win this game.
 
@@ -124,16 +142,26 @@ Take the highest entry on this list that appears in your casting menu:
  5. Staff of Nin.
  6. Sorin, Lord of Innistrad.
  7. Chromatic Lantern - only when BOTH are true: the "colours you can make:" line does NOT include
-    {b}, AND no Chromatic Lantern is already on your battlefield line. Your Bayous, Scrublands,
-    Savannahs and Urborg already make black; when {b} is on that line the Lantern does nothing for
-    3 mana. A SECOND Lantern does nothing at any time - once one is on your battlefield this entry
-    is finished for the rest of the game, so take a wall or a combo piece instead.
+    {b}, AND no Chromatic Lantern is already on your battlefield line. The lands of yours that make
+    black are Bayou, Scrubland, Woodland Cemetery, Isolated Chapel, the Swamp and Urborg. SAVANNAH
+    AND SUNPETAL GROVE DO NOT - they are {G}/{W} only - so an opening of Savannahs, Sunpetal Groves
+    and Plains is exactly the board where this card earns its slot. When {b} is already on the
+    "colours you can make:" line the Lantern does nothing for 3 mana. A SECOND Lantern does nothing
+    at any time - once one is on your battlefield this entry is finished for the rest of the game,
+    so take a wall or a combo piece instead.
 7a. If BOTH enchantments are already on your battlefield, STAFF OF NIN and SORIN move to the
     TOP of this list, above walls and above everything else. With both out the game ends the
     moment any life changes, and Staff's ping and Sorin's lifelink Vampires are the only two
     triggers you can make without help from the opponent - blocks need them to attack, Tribute
     to Hunger needs them to have a creature. Against an opponent whose battlefield line shows
     no creature, those two are your ONLY win.
+7b. THE SURVIVAL FLOOR, and it outranks entries 1 and 2 of this list. When ALL of these are true -
+    your life is 10 or less; the opponent battlefield line shows exactly ONE creature; "Cast Tribute
+    to Hunger" is in this menu; and you cannot pay for BOTH Tribute and the combo piece out of the
+    "Mana available:" line - then cast TRIBUTE TO HUNGER first, even over Exquisite Blood or
+    Sanguine Bond. A combo piece you never get to use because you died two turns later bought you
+    nothing; the edict removes the creature that is killing you AND gains you its toughness. Cast
+    the enchantment next turn - it will still be in your hand.
 Keep casting while the list keeps offering. "Cast nothing right now" is correct only when it is the
 ONLY option left.
 
@@ -166,6 +194,11 @@ with no combo piece is not one either: your lands and walls buy the turns you ne
    and keep the wall untapped for their turn.
  - One enchantment down, the other not in hand, "Cast Idyllic Tutor {2}{w}" listed: cast the Tutor
    and take the missing one.
- - An enchantment in hand and castable: cast it this turn, at any life total, ahead of anything else.
+ - Sanguine Bond on your battlefield and no Exquisite Blood: you are ALREADY killing them. Block
+   with everything, ping with Staff, attack with every Vampire - each point of life you gain comes
+   straight off their total.
+ - An enchantment in hand and castable: cast it this turn, ahead of anything else - EXCEPT at 10
+   life or less with exactly one opponent creature and Tribute to Hunger listed and mana for only
+   one of them: then cast Tribute (Rule 7b).
  - The opponent attacks: assign every blocker on the list.
  - The opponent has exactly one creature and you need life: cast Tribute to Hunger.

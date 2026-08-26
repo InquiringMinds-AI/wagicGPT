@@ -64,11 +64,12 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
        (b) the THEIRS list at that X names only creatures whose battlefield line reads
            "[defender]". A defender never attacks you. It is not worth one card, and it is
            never worth a creature of yours.
-     AND WHEN YOU DO CAST IT, THE X MENU IS UPSIDE DOWN. The "Announce the value of X" list
-     puts the LARGEST X on option 1 - the prompt says so - so option 1 is NOT X=1. Find the
-     row whose text reads "X = " followed by the number you decided on, and answer with THAT
-     row's number. This deck once wrote "cast at X=1" in its own plan, answered "CHOICE: 1",
-     and cast X=5 into its own board.
+     AND WHEN YOU DO CAST IT, READ THE X MENU'S OWN SENTENCE. The "Announce the value of X"
+     list states which option holds the largest X and lists them largest first: it says
+     "option 1 is the LARGEST X (X = N)", so option 1 is that N, not X=1. Decide your number
+     first, then find the row whose text reads "X = " followed by that number, and answer with
+     THAT row's number. This deck once wrote "cast at X=1" in its own plan, answered
+     "CHOICE: 1", and cast X=5 into its own board.
   1. An opponent PLANESWALKER on the list -> aim there. A live planeswalker wins their game.
   2. An opponent CREATURE whose printed toughness this damage reaches -> aim there. Spark Spray
      kills 1 toughness; Pyrite Spellbomb kills 2; Hammer of Bogardan kills 3. The battlefield line
