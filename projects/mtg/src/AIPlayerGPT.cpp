@@ -2053,8 +2053,36 @@ static string zeroPowerAttackerTag(int power)
 //takes an honest qualifier and points at the A-lines that DO carry the number.
 //`maxP`/`minP` are the clamped powers of the attackers this blocker may block
 //(minP < 0 when the legal set is empty). Pure, so PARSETEST proves all four rungs.
-static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample)
+//#W45-1 (wave-44 ledger, HIGH): `anyMenace` is the block-DECLARATION half of
+//this tag's honesty. The Pride Guardian row read "[deals 0 - this block kills
+//nothing, but it STOPS all of the damage from whichever attacker it blocks]"
+//in a prompt whose A-line for a menace attacker said one creature alone does
+//not block it at all: for that attacker the STOP claim is flatly false, and it
+//is the only affirmative clause on the row. The parameter is defaulted so the
+//non-menace rungs (and their PARSETEST cases) are untouched, and the branch is
+//RESTRICTION FIRST - the thing this body cannot do, before the thing it can.
+//It is deliberately un-numbered: the legal set mixes restricted and
+//unrestricted attackers, so no single N is true across it.
+static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample, bool anyMenace = false)
 {
+    if (maxP <= 0)
+        return " [deals 0 - this block kills nothing, and every attacker it can"
+               " block already deals 0 damage]";
+    if (anyMenace)
+    {
+        if (anyTrample)
+            return " [deals 0 - this block kills nothing, and against any attacker"
+                   " whose A-line states a two-or-more requirement this creature"
+                   " alone does not block it at all, so it stops NOTHING there;"
+                   " against the others it stops the blocked attacker's damage"
+                   " except what a trampler pushes through - each A-line above"
+                   " says how much]";
+        return " [deals 0 - this block kills nothing, and against any attacker"
+               " whose A-line states a two-or-more requirement this creature"
+               " alone does not block it at all, so it stops NOTHING there;"
+               " against the others it stops all of the damage from whichever"
+               " attacker it blocks - each A-line above says how much]";
+    }
     if (maxP > 0 && !anyTrample && minP == maxP)
     {
         std::ostringstream o;
@@ -2066,12 +2094,9 @@ static string zeroPowerBlockerTag(int minP, int maxP, bool anyTrample)
         return " [deals 0 - this block kills nothing, but it STOPS all of the"
                " damage from whichever attacker it blocks - each A-line above"
                " says how much]";
-    if (maxP > 0)
-        return " [deals 0 - this block kills nothing; it stops the blocked"
-               " attacker's damage except what a trampler pushes through -"
-               " each A-line above says how much]";
-    return " [deals 0 - this block kills nothing, and every attacker it can"
-           " block already deals 0 damage]";
+    return " [deals 0 - this block kills nothing; it stops the blocked"
+           " attacker's damage except what a trampler pushes through -"
+           " each A-line above says how much]";
 }
 
 //W39-UNREACHABLE (wave-39 ledger #6). The B-lines carry a POSITIVE "may block
@@ -2154,23 +2179,68 @@ static string heldBackBlockTag(const vector<string>& cannotBlock, int totalOppos
 //tag: the reply scanner drops [prose] annotations whole, so an echoed line still
 //parses as a declaration. Returns "" when nothing of theirs could block it -
 //silence, not "no blockers" spam on every line of every empty-board attack.
+//#W45-2 (wave-44 ledger, HIGH): THE COLLAPSE THRESHOLD, named and in the open.
+//It used to be a bare `> 4` literal inside the builder, invisible to every
+//reviewer reading the corpus - and the collapsed form it selects is a different
+//surface from the enumerated one: it shows exactly ONE outcome, the biggest
+//defender's, which on a wide board is the FAVOURABLE one. deck162 vs123 attackers
+//seq 13: "they have 6 untapped creatures that could block this one, biggest
+//Bloodline Keeper #1 (3/3) (you kill it, your attacker lives)" - true, and three
+//2/2 Vampires then gang-blocked and killed the 5/5. All seven strategy guides are
+//written against the ENUMERATED form; none mentions this one. Raising this number
+//widens the enumerated (honest-by-construction) form at a token cost that grows
+//with board width; the collapse is the token-budget compromise, so the price of
+//the gang block travels with it (`gangNote`, computed by the caller where the
+//candidates' powers are in hand).
+static const size_t kPotentialBlockersEnumerateMax = 4;
+
 static string potentialBlockersTag(const vector<string>& entries, const string& biggest,
-                                   const string& extraNote = string())
+                                   const string& extraNote = string(),
+                                   const string& gangNote = string())
 {
     if (entries.empty())
         return "";
     std::ostringstream o;
     o << " [their untapped blockers: ";
-    if (entries.size() > 4)
+    if (entries.size() > kPotentialBlockersEnumerateMax)
         o << "they have " << entries.size()
           << " untapped creatures that could block this one, biggest "
           << (biggest.empty() ? entries[0] : biggest);
     else
         for (size_t i = 0; i < entries.size(); i++)
             o << (i ? "; " : "") << entries[i];
+    if (!gangNote.empty())
+        o << " - " << gangNote;
     if (!extraNote.empty())
         o << " - " << extraNote;
     o << "]";
+    return o.str();
+}
+
+//#W45-2, the priced half. Every outcome in the tag above - collapsed or
+//enumerated - is a ONE-blocker forecast, and the once-per-prompt scope line's
+//"before gang-blocks" is a disclaimer, not a number: it tells the model that a
+//gang block exists without telling it the gang block is AVAILABLE and CHEAP
+//right now. This states the cheapest lethal gang the board can actually field.
+//`need` is the smallest number of their listed candidates whose combined power
+//reaches the attacker's toughness, `damage` that combined power, and `anyOfThem`
+//is true only when the `need` SMALLEST of them already suffice (so "any N" is
+//literally true); otherwise the claim is narrowed to their N biggest. The caller
+//emits nothing at all unless the arithmetic is exact - see the gates there.
+//Restriction-first is not the register here: this is a cost the seat is about to
+//pay, so it leads with the outcome and names the assumption the listed results
+//carry. Pure, so PARSETEST proves both phrasings and the silent cases.
+static string gangBlockPriceTag(int need, int damage, bool anyOfThem)
+{
+    if (need < 2 || damage <= 0)
+        return "";
+    std::ostringstream o;
+    o << "GANG BLOCK: ";
+    if (anyOfThem)
+        o << "any " << need << " of them together deal " << damage;
+    else
+        o << "their " << need << " biggest together deal " << damage;
+    o << ", enough to kill this attacker; each result above is a LONE blocker only";
     return o.str();
 }
 
@@ -2197,6 +2267,33 @@ static string blockCountRequirementTag(int minBlockers)
                " it at all]";
     return " [menace - only a block by TWO OR MORE of your creatures counts;"
            " one creature alone does not block it at all]";
+}
+
+//#W45-1 (wave-44 ledger, HIGH). The DEFENDER's B-line pairing. The A-line
+//already carried blockCountRequirementTag, but the B-row loop printed the naive
+//1-on-1 trade for EVERY pairing it listed, menace included - 8 of 8 such rows in
+//the fair-hand corpus - and the once-per-prompt line under them says "Trust it
+//over your own arithmetic; never re-derive it". deck123 vs146 seq 17 read
+//"A4 (you kill it, your blocker lives)" off a menace attacker at 1 life,
+//declared the solo block, the rules layer deleted it (dropped_assignments: 1)
+//and the 4 damage killed it.
+//The attack side already states the rule this follows (menaceAttackRestrictionTag,
+//below): BELOW THE MINIMUM THE FORECAST IS SUPPRESSED, NOT QUALIFIED - a 1-on-1
+//result for a fight that cannot happen is not a hedged truth, it is a false one.
+//So this REPLACES the parenthetical rather than decorating it, in the same
+//restriction-first register and with no affirmative substring ("you kill it",
+//"lives", "both die") left for a skimming model to latch onto. The pairing
+//itself is still listed: the creature CAN take part in a legal block, and
+//deleting the pairing would be its own lie. Pure, so PARSETEST proves it.
+static string menaceBlockPairingTag(int minBlockers)
+{
+    if (minBlockers < 2)
+        return "";
+    if (minBlockers >= 3)
+        return " (no 1-on-1 result exists - only a block by THREE OR MORE of your"
+               " creatures counts; this one alone does not block it at all)";
+    return " (no 1-on-1 result exists - only a block by TWO OR MORE of your"
+           " creatures counts; this one alone does not block it at all)";
 }
 
 //The ATTACKER's A-line: whether the defender can even field a legal block, and
@@ -14441,6 +14538,24 @@ int AIPlayerGPT::chooseAttackers()
             int biggestPower = -1, biggestToughness = -1;
             int bbP = 0, bbT = 0;
             int bbKind = becomesBlockedSelfPump(attackers[j]->text, bbP, bbT);
+            //#W45-2: the gang price, computed HERE because this is the only
+            //place each candidate's power is in hand. TRUST DOCTRINE: the
+            //number is claimed only where it is exactly computable, so the
+            //whole claim is abandoned (gangOk=false) the moment anything in the
+            //fight is not plain simultaneous damage - first strike removes a
+            //blocker's damage from the total before it lands, deathtouch/wither
+            //kill on a number this sum does not model, indestructible and
+            //persist/undying mean the sum kills nothing lasting, and a
+            //prevention shield means the damage never arrives. A wrong N is
+            //strictly worse than no N.
+            vector<int> gangPowers;
+            bool gangOk = attackers[j]->toughness > 0
+                          && !attackers[j]->basicAbilities[Constants::INDESTRUCTIBLE]
+                          && !attackers[j]->basicAbilities[Constants::FIRSTSTRIKE]
+                          && !attackers[j]->basicAbilities[Constants::DOUBLESTRIKE]
+                          && !attackers[j]->basicAbilities[Constants::PERSIST]
+                          && !attackers[j]->basicAbilities[Constants::UNDYING]
+                          && bbKind == 0;
             Player * opp = opponent();
             if (opp && opp->game && opp->game->inPlay)
             {
@@ -14481,6 +14596,12 @@ int AIPlayerGPT::chooseAttackers()
                     if (!outcome.empty())
                         e << " (" << outcome << ")";
                     entries.push_back(e.str());
+                    if (c->basicAbilities[Constants::DEATHTOUCH]
+                        || c->basicAbilities[Constants::WITHER]
+                        || c->basicAbilities[Constants::INFECT]
+                        || combatPreventionKind(c, attackers[j]) != kPreventNone)
+                        gangOk = false;
+                    gangPowers.push_back(c->power > 0 ? c->power : 0);
                     //"biggest" is decided by POWER first and toughness as the
                     //tie-break: a board of 0-power walls is exactly the case the
                     //cap fires on, and naming a 0/2 Fog Bank as the biggest body
@@ -14520,7 +14641,34 @@ int AIPlayerGPT::chooseAttackers()
             }
             else if (minB > 1)
                 anyMenaceRestricted = true;
-            string pb = potentialBlockersTag(entries, biggest, bbNote);
+            //#W45-2: the cheapest lethal gang, from the powers of exactly the
+            //candidates listed above. `need` is found from the LARGEST first
+            //(the smallest number that can do it at all); `anyOfThem` re-runs
+            //the same count from the SMALLEST, and is true only when even the
+            //weakest `need` of them reach the toughness - which is what makes
+            //the word "any" a fact rather than a flourish. need<2 means a lone
+            //blocker already kills it and the listed 1-on-1 results say so.
+            string gangNote;
+            if (gangOk && entries.size() >= 2 && gangPowers.size() == entries.size())
+            {
+                vector<int> asc(gangPowers);
+                std::sort(asc.begin(), asc.end());
+                int need = 0, dmg = 0;
+                for (size_t i = asc.size(); i-- > 0 && dmg < attackers[j]->toughness; )
+                {
+                    dmg += asc[i];
+                    need++;
+                }
+                if (dmg >= attackers[j]->toughness && need >= 2)
+                {
+                    int lowSum = 0;
+                    for (int i = 0; i < need; i++)
+                        lowSum += asc[i];
+                    bool anyOfThem = (lowSum >= attackers[j]->toughness);
+                    gangNote = gangBlockPriceTag(need, anyOfThem ? lowSum : dmg, anyOfThem);
+                }
+            }
+            string pb = potentialBlockersTag(entries, biggest, bbNote, gangNote);
             if (!pb.empty())
                 anyPotentialBlockers = true;
             ln << pb;
@@ -14552,12 +14700,23 @@ int AIPlayerGPT::chooseAttackers()
     //naive 1-on-1 fight and the defender chooses whether to block at all, so say
     //so; and say the outcome is computed, because the failure being fixed here
     //is the model deriving it itself and getting it wrong.
+    //#W45-2: "before gang-blocks" was the whole disclaimer, and it is not one -
+    //it says a gang block is unmodelled without saying it is available. Name the
+    //assumption every listed result carries (ONE blocker), say that the tag may
+    //be collapsed to the biggest body rather than enumerated, and point at the
+    //GANG BLOCK clause that prices it when the price is exactly computable.
     if (anyPotentialBlockers)
         tail << "A \"their untapped blockers\" tag lists each of their currently"
                 " untapped creatures that could legally block that attacker, with"
-                " the computed 1-on-1 result if it does - before gang-blocks, pump"
-                " or combat tricks. They choose whether to block. Do not re-derive"
-                " these outcomes; use them.\n";
+                " the computed 1-on-1 result if it does - before pump or combat"
+                " tricks. EVERY such result assumes ONE blocker: two or more of"
+                " theirs may block the same attacker together and add their power,"
+                " which no listed result includes. On a wide board the tag is"
+                " collapsed to a count plus their biggest body instead of the full"
+                " list, so the results you see are not all the results there are;"
+                " a \"GANG BLOCK:\" clause, when present, is the cheapest lethal"
+                " group the listed creatures can field. They choose whether to"
+                " block. Do not re-derive these outcomes; use them.\n";
     //W43-1 SCOPE, stated once. The listed 1-on-1 outcomes on a set-restricted
     //attacker describe a fight that can only happen as part of a multi-creature
     //block, so say which way the restriction cuts rather than leaving the model
@@ -15040,6 +15199,11 @@ int AIPlayerGPT::chooseBlockers()
         {
             int minP = -1, maxP = 0;
             bool anyTrample = false;
+            //#W45-1: a set-restricted attacker in the legal list makes the
+            //unqualified STOP claim false for that attacker, so the tag has to
+            //know. Read from the engine's own minBlockersRequired(), the same
+            //source both A-line tags use.
+            bool anyMenace = false;
             for (size_t j = 0; j < legal[i].size(); j++)
             {
                 int p = legal[i][j]->power > 0 ? legal[i][j]->power : 0;
@@ -15049,8 +15213,10 @@ int AIPlayerGPT::chooseBlockers()
                     maxP = p;
                 if (legal[i][j]->basicAbilities[Constants::TRAMPLE])
                     anyTrample = true;
+                if (legal[i][j]->minBlockersRequired() > 1)
+                    anyMenace = true;
             }
-            ln << zeroPowerBlockerTag(minP, maxP, anyTrample);
+            ln << zeroPowerBlockerTag(minP, maxP, anyTrample, anyMenace);
         }
         ln << " - may block";
         for (size_t j = 0; j < legal[i].size(); j++)
@@ -15063,6 +15229,16 @@ int AIPlayerGPT::chooseBlockers()
                     //W36 #2: a simple when-blocked self-pump is folded IN and
                     //said; an uncomputable trigger is flagged as not included.
                     string trade;
+                    //#W45-1: below the declaration minimum there is no 1-on-1
+                    //fight to forecast, so none is printed - the restriction
+                    //takes the parenthetical instead. Checked BEFORE the
+                    //forecast is computed so no favourable string is ever built
+                    //for a pairing that cannot happen alone.
+                    if (attackers[k]->minBlockersRequired() > 1)
+                    {
+                        ln << menaceBlockPairingTag(attackers[k]->minBlockersRequired());
+                        continue;
+                    }
                     if (bbKind[k] == 1)
                     {
                         CombatTradeStat as = combatStatOf(attackers[k]);
@@ -22882,6 +23058,166 @@ void AIPlayerGPT::runParseSelfTest()
                                     3, -1)
               == "Your Teferi, Who Slows the Sunset lost 3 loyalty counters",
               "#W44-LOW NEGATIVE no total is invented when the event captured none");
+    }
+
+    // ---- #W45-1: the menace false affordance on the BLOCK side ----
+    // deck123 vs146 seq 17, at 1 life: the A-line said "one creature alone does
+    // not block it at all" and the B-line under it said "A4 (you kill it, your
+    // blocker lives)". The seat declared the solo block, the rules layer deleted
+    // it (dropped_assignments: 1) and the 4 damage was lethal. The attack side
+    // already had the rule - below the minimum the forecast is SUPPRESSED, not
+    // qualified - and the B-rows never got it.
+    cout << "\n[#W45-1] menace on the B-line: the 1-on-1 forecast is suppressed, not priced\n";
+    {
+        // POSITIVE, both rungs.
+        string m2 = menaceBlockPairingTag(2);
+        string m3 = menaceBlockPairingTag(3);
+        cout << "     menace pairing: \"" << m2 << "\"\n";
+        CHECK(m2 == " (no 1-on-1 result exists - only a block by TWO OR MORE of your"
+                    " creatures counts; this one alone does not block it at all)",
+              "#W45-1 a menace pairing states the declaration rule instead of a fight");
+        CHECK(m3.find("THREE OR MORE") != string::npos
+              && m3.find("does not block it at all") != string::npos,
+              "#W45-1 the three-or-more rung carries its own number");
+        // NEGATIVE: an unrestricted attacker must NOT match - the ordinary
+        // pairing keeps its computed trade, untouched.
+        CHECK(menaceBlockPairingTag(1).empty() && menaceBlockPairingTag(0).empty(),
+              "#W45-1 NEGATIVE minBlockersRequired 1 or 0 emits nothing at all");
+        // NEGATIVE: not one favourable substring survives for a skimming model
+        // to latch onto - these are the exact strings the seq-17 row carried.
+        CHECK(m2.find("you kill it") == string::npos
+              && m2.find("your blocker lives") == string::npos
+              && m2.find("both die") == string::npos
+              && m3.find("you kill it") == string::npos,
+              "#W45-1 NEGATIVE no combat-verdict vocabulary survives into the restriction");
+        // ECHO SHAPE: this rides the parenthetical slot, so a reply copying the
+        // whole B-row must still declare exactly the one pairing it named - and
+        // the tag's own "1-on-1" digits must not forge a second one.
+        vector<int> outm;
+        int pm = parseBlockAssignments("BLOCKS: B1:A4" + m2, 2, 4, outm);
+        cout << "     echoed menace pairing: pairs=" << pm << " B1->A" << outm[0]
+             << " B2->A" << outm[1] << "\n";
+        CHECK(pm == 1 && outm[0] == 4 && outm[1] <= 0,
+              "#W45-1 echo: an echoed restriction still declares B1:A4 and nothing else");
+        vector<int> outn;
+        int pn = parseBlockAssignments(string("BLOCKS: none") + m2, 2, 4, outn);
+        CHECK(pn == 0 && outn[0] <= 0 && outn[1] <= 0,
+              "#W45-1 echo NEGATIVE a decline carrying the restriction stays a decline");
+    }
+
+    // ---- #W45-1: the 0-power blocker's STOP claim, under a menace attacker ----
+    // The Pride Guardian row: "[deals 0 - this block kills nothing, but it STOPS
+    // all of the damage from whichever attacker it blocks]" is flatly false for
+    // the menace attacker in the same legal set - alone it blocks nothing, so it
+    // stops nothing. The tag is attacker-agnostic by construction, so the caller
+    // has to tell it, and the branch leads with what the body CANNOT do.
+    cout << "\n[#W45-1] zeroPowerBlockerTag: a set-restricted attacker in the legal set\n";
+    {
+        string men = zeroPowerBlockerTag(4, 4, false, true);
+        cout << "     0-power + menace: \"" << men << "\"\n";
+        CHECK(men.find("stops NOTHING there") != string::npos
+              && men.find("two-or-more requirement") != string::npos,
+              "#W45-1 the restricted attacker's non-block leads the clause");
+        CHECK(men.find("STOPS all 4 damage") == string::npos
+              && men.find("STOPS all of the damage") == string::npos,
+              "#W45-1 NEGATIVE the unqualified STOP claim is gone when the set is mixed");
+        CHECK(zeroPowerBlockerTag(4, 4, true, true).find("except what a trampler pushes"
+                                                         " through") != string::npos,
+              "#W45-1 the trample qualifier survives inside the menace branch");
+        // NEGATIVE / REGRESSION: every pre-existing rung is byte-identical when
+        // no set-restricted attacker is in the legal set (defaulted parameter).
+        CHECK(zeroPowerBlockerTag(2, 2, false, false) == zeroPowerBlockerTag(2, 2, false)
+              && zeroPowerBlockerTag(2, 5, false, false) == zeroPowerBlockerTag(2, 5, false)
+              && zeroPowerBlockerTag(5, 5, true, false) == zeroPowerBlockerTag(5, 5, true)
+              && zeroPowerBlockerTag(0, 0, false, false) == zeroPowerBlockerTag(0, 0, false),
+              "#W45-1 REGRESSION all four original rungs are untouched without menace");
+        // A legal set that deals no damage at all outranks the menace branch:
+        // there is no STOP to qualify, and the honest line is the old one.
+        CHECK(zeroPowerBlockerTag(0, 0, false, true) == zeroPowerBlockerTag(0, 0, false),
+              "#W45-1 NEGATIVE a 0-damage legal set states that, not a menace hedge");
+    }
+
+    // ---- #W45-2: the collapsed blocker summary prints only the good outcome ----
+    // deck162 vs123 attackers seq 13: "they have 6 untapped creatures that could
+    // block this one, biggest Bloodline Keeper #1 (3/3) (you kill it, your
+    // attacker lives)". True, and the ONLY outcome shown. Three 2/2 Vampires
+    // gang-blocked and killed the 5/5; the game was lost at -21.
+    cout << "\n[#W45-2] the gang price that travels with the collapsed summary\n";
+    {
+        // POSITIVE: "any N" is claimed only when the N SMALLEST already suffice.
+        string anyTwo = gangBlockPriceTag(2, 4, true);
+        cout << "     gang price: \"" << anyTwo << "\"\n";
+        CHECK(anyTwo == "GANG BLOCK: any 2 of them together deal 4, enough to kill this"
+                        " attacker; each result above is a LONE blocker only",
+              "#W45-2 the cheapest lethal gang is priced in damage, not implied");
+        CHECK(gangBlockPriceTag(3, 7, false)
+              == "GANG BLOCK: their 3 biggest together deal 7, enough to kill this"
+                 " attacker; each result above is a LONE blocker only",
+              "#W45-2 an uneven board narrows the claim to their N biggest");
+        // NEGATIVE: nothing is said when a lone blocker already kills it (the
+        // listed 1-on-1 results carry that), and nothing when there is no damage.
+        CHECK(gangBlockPriceTag(1, 9, true).empty() && gangBlockPriceTag(0, 9, true).empty(),
+              "#W45-2 NEGATIVE need<2 is the enumerated case - no gang clause at all");
+        CHECK(gangBlockPriceTag(2, 0, true).empty(),
+              "#W45-2 NEGATIVE a 0-damage board is never priced as lethal");
+        // The clause rides INSIDE the bracket, both forms, ahead of any
+        // becomes-blocked note, so the reply scanner still drops it whole.
+        vector<string> six;
+        for (int i = 0; i < 6; i++)
+            six.push_back("Vampire (2/2) (you kill it, your attacker lives)");
+        string coll = potentialBlockersTag(six, "Bloodline Keeper #1 (3/3)"
+                                                " (you kill it, your attacker lives)",
+                                           string(), anyTwo);
+        cout << "     collapsed + priced: \"" << coll << "\"\n";
+        CHECK(coll.find("they have 6 untapped creatures") != string::npos
+              && coll.find("GANG BLOCK: any 2 of them together deal 4") != string::npos
+              && coll[coll.size() - 1] == ']',
+              "#W45-2 the collapsed summary carries the price inside its own bracket");
+        vector<string> two;
+        two.push_back("Vampire #1 (2/2) (you kill it, your attacker lives)");
+        two.push_back("Vampire #2 (2/2) (you kill it, your attacker lives)");
+        CHECK(potentialBlockersTag(two, two[0], string(), anyTwo).find("GANG BLOCK:")
+              != string::npos,
+              "#W45-2 the ENUMERATED form carries it too - same lone-blocker assumption");
+        CHECK(potentialBlockersTag(six, six[0], "each outcome above OMITS its"
+                                   " becomes-blocked trigger: read its text", anyTwo)
+                  .find("GANG BLOCK: any 2 of them together deal 4, enough to kill this"
+                        " attacker; each result above is a LONE blocker only - each outcome"
+                        " above OMITS") != string::npos,
+              "#W45-2 the gang price precedes the becomes-blocked note, both intact");
+        // NEGATIVE: silence is preserved everywhere it was silent before.
+        vector<string> none2;
+        CHECK(potentialBlockersTag(none2, "", string(), anyTwo).empty(),
+              "#W45-2 NEGATIVE no candidates -> still no tag, priced or not");
+        CHECK(potentialBlockersTag(six, six[0]) == potentialBlockersTag(six, six[0], string(),
+                                                                       string()),
+              "#W45-2 REGRESSION an unpriceable board renders exactly as before");
+        // THE THRESHOLD, asserted rather than left as a literal: 4 enumerates,
+        // 5 collapses. A reviewer reading this line knows where the surface
+        // changes shape.
+        vector<string> four2, five2;
+        for (int i = 0; i < 4; i++) four2.push_back("Bear (2/2) (both die)");
+        for (int i = 0; i < 5; i++) five2.push_back("Bear (2/2) (both die)");
+        CHECK(kPotentialBlockersEnumerateMax == 4
+              && potentialBlockersTag(four2, four2[0]).find("they have") == string::npos
+              && potentialBlockersTag(five2, five2[0]).find("they have 5 untapped") != string::npos,
+              "#W45-2 the collapse threshold is 4 enumerated, 5+ collapsed - named, not literal");
+        // ECHO SHAPE: the price sits in a bracket on an A-line, and its digits
+        // ("2", "4") must not forge an attacker in a declaration that echoes it.
+        vector<string> anames;
+        anames.push_back("Master of the Feast");
+        anames.push_back("Fate Unraveler");
+        vector<bool> asel;
+        int ra = parseAttackerSet("ATTACK: A1" + coll, 2, asel, &anames);
+        cout << "     echoed price: named=" << ra << " A1=" << asel[0] << " A2=" << asel[1] << "\n";
+        CHECK(ra == 1 && asel[0] && !asel[1],
+              "#W45-2 echo: an echoed gang price still declares A1 only");
+        CHECK(parseAttackerSet("ATTACK: none" + coll, 2, asel, &anames) == 0
+              && !asel[0] && !asel[1],
+              "#W45-2 echo NEGATIVE a decline carrying the price stays a decline");
+        CHECK(stripNarrationDecoration("A1. Master of the Feast (5/5)" + coll)
+              == "A1. Master of the Feast (5/5)",
+              "#W45-2 echo: the bracket never reaches the narration");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
