@@ -152,13 +152,22 @@ namespace
     //opponent land" (9 records, wave-45 corpus). Hand back the stamped source
     //when the card in hand has no name of its own; every named card, and every
     //nameless one with nothing stamped, is returned untouched.
+    //A card the consumer can NAME: display name, raw instance name (the
+    //ability$!!$ carrier's only rung - see resolveOwningCardName in the seat),
+    //or the model's name. NULL names nothing.
+    bool cardNamesItself(const MTGCardInstance * card)
+    {
+        if (!card)
+            return false;
+        return !card->getDisplayName().empty() || !card->name.empty()
+               || (card->model && card->model->data && !card->model->data->getName().empty());
+    }
+
     MTGCardInstance * nameableCardPointer(GameObserver * g, MTGCardInstance * card)
     {
         if (!card)
             return NULL;
-        bool namesItself = !card->getDisplayName().empty()
-                           || (card->model && card->model->data
-                               && !card->model->data->getName().empty());
+        bool namesItself = cardNamesItself(card);
         if (namesItself || !card->storedSourceCard)
             return card;
         //Same dangle rail as every other pointer this file hands out: the
@@ -355,8 +364,15 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     //no source to anchor to - INDEX-WINS read a valid answer as a stale echo
     //and fell back (deck146 vs126 seq 35). The option abilities still carry
     //their source: name it when the action card is gone.
-    if (!req.contextCard && firstOptionAbility)
-        req.contextCard = nameableCardPointer(g, validatedCardPointer(g, firstOptionAbility->source));
+    //#W47 (wave-46 E-1): the rescue used to fire only on a NULL pointer. An
+    //`auto=choice` payload (Silverquill Command) arms its menu on a NAMELESS
+    //carrier with no storedSourceCard, so nameableCardPointer handed the dummy
+    //back and the rescue was skipped - 4 bare headers, 2 stale_echo fallbacks
+    //(deck146 vs152 seq 13). Gate on the NAME being unresolvable, not the pointer.
+    if (firstOptionAbility && !cardNamesItself(req.contextCard))
+        if (MTGCardInstance * alt = nameableCardPointer(g, validatedCardPointer(g, firstOptionAbility->source)))
+            if (cardNamesItself(alt))
+                req.contextCard = alt;
     //Name the object of a single-option "may"-ability ask. Only when there is
     //exactly ONE real option (the Tergrid/steal shape - one may leg + an
     //implicit decline) so the recovered name cannot be attached to the wrong

@@ -8960,7 +8960,11 @@ static string stripNarrationDecoration(const string& in)
 //[...] so this decision-time state never enters the narration history, and
 //stripRenderAnnotationsLc drops every [...] so an echoed annotation can never
 //collide with answer matching. A {...} form would do neither.
-static const int kRepeatActivationFloor = 2;
+//#W47 (wave-46 engine seat): floor 1, not 2 - with 2 the FIRST repeat's option
+//row was byte-identical to the previous tick's, and a one-option Doomsayer +
+//Intruder Alarm loop spun the model for the full 900 s timeout (deck123 vs130
+//seq 13); latency collapsed 20 s -> 7 s the moment the tag appeared at seq 14.
+static const int kRepeatActivationFloor = 1;
 
 //The ability whose counters the engine actually increments. A GenericActivated
 //wrapper is BOTH a NestedAbility and an ActivatedAbility, and it is the OUTER
@@ -11150,6 +11154,22 @@ int AIPlayerGPT::selectHintAbility()
     return AIPlayerBaka::selectHintAbility();
 }
 
+//The reply-format exemplar for a generic ask: option 1's own short name
+//(annotations and bracket tags stripped, cut at the first annotation brace),
+//so the example can never contain an action word absent from the menu.
+static string askExemplar(const vector<string>& options)
+{
+    string core = options.empty() ? string("Example option") : stripNarrationDecoration(options[0]);
+    size_t brace = core.find(" {");
+    if (brace != string::npos)
+        core = core.substr(0, brace);
+    while (!core.empty() && isspace((unsigned char) core[core.size() - 1]))
+        core.erase(core.size() - 1);
+    if (core.size() > 48)
+        core = core.substr(0, 48);
+    return "CHOICE: 1 (" + core + ")";
+}
+
 int AIPlayerGPT::askModel(const string& decision, const vector<string>& options, bool narrateChoice,
                           const string& pendingSourceName, bool askEvenIfSingle)
 {
@@ -11176,7 +11196,11 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     tail << decision << "\n";
     for (size_t i = 0; i < options.size(); i++)
         tail << (i + 1) << ". " << options[i] << "\n";
-    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and short name from the list); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
+    //#W47 (wave-46 E-2): the worked example names THIS window's option 1, not a
+    //hard-coded "Cast Example Card" - on cast-free screens (damage order, mode
+    //menus) that placeholder was the only affirmative "Cast ..." substring and
+    //the model latched it (4 replies, 2 stale_echo fallbacks in wave 46).
+    tail << "\nOn the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. \"" << askExemplar(options) << "\" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
     string tailStr = tail.str();
 
     //State-plus-question answer cache: the same questions are re-polled
@@ -13070,13 +13094,14 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     //shockland pay-or-tap menu arms on a stripped copy with name cleared AND
     //model == NULL (verified w26a probe), so its name comes from the
     //battlefield recovery above instead.
-    string ctxName;
-    if (ctx)
-    {
-        ctxName = ctx->getDisplayName();
-        if (ctxName.empty() && ctx->model && ctx->model->data)
-            ctxName = ctx->model->data->getName();
-    }
+    //#W47 (wave-46 E-1): the same three-rung ladder the narration uses one
+    //tick later (display name -> raw instance name -> granting card), so an
+    //ability$!!$ carrier that names itself only through c->name (Silverquill
+    //Command's auto=choice menu) gets the "Choose an option for X:" header
+    //instead of the subject-less fallback.
+    string ctxName = resolveOwningCardName(ctx);
+    if (ctxName.empty() && ctx && ctx->model && ctx->model->data)
+        ctxName = ctx->model->data->getName();
     if (ctxName.empty() && etbPayOrTap)
         ctxName = etbLandName;
     string decision;
@@ -25208,6 +25233,29 @@ void AIPlayerGPT::runParseSelfTest()
             CHECK(stripNarrationDecoration(x8[2]) == "X = 1",
                   "#W46-8 echo: the pricing leaves no residue in the narrated record");
         }
+    }
+
+    // ---- #W47 (wave-46 E-2): the ask exemplar names THIS window's option 1 ----
+    cout << "\n[#W47-E2] the reply exemplar is drawn from the menu, never a hard-coded cast\n";
+    {
+        vector<string> dmg;
+        dmg.push_back("Vampire (2/2) [flying] {card text: \"Flying\"}");
+        dmg.push_back("Vampire (2/2) [flying]");
+        string ex = askExemplar(dmg);
+        CHECK(ex == "CHOICE: 1 (Vampire (2/2))",
+              "#W47-E2 exemplar = option 1's core name, annotations and tags stripped");
+        CHECK(ex.find("Cast ") == string::npos,
+              "#W47-E2 NEGATIVE a cast-free menu's exemplar carries no 'Cast' substring");
+        vector<string> castMenu;
+        castMenu.push_back("Cast Lightning Bolt {r} {card text: \"3 damage\"}");
+        castMenu.push_back("Cast nothing this window");
+        CHECK(askExemplar(castMenu) == "CHOICE: 1 (Cast Lightning Bolt)",
+              "#W47-E2 a real cast menu's exemplar keeps its own verb");
+        bool st = false; string src;
+        int idx = parseChoice(ex, (int) dmg.size(), &dmg, &st, &src);
+        CHECK(idx == 1 && !st, "#W47-E2 echo: a reply that copies the exemplar binds to index 1, not stale");
+        CHECK(askExemplar(vector<string>()) == "CHOICE: 1 (Example option)",
+              "#W47-E2 empty menu still yields a well-formed placeholder");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
