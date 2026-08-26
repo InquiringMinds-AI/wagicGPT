@@ -22800,10 +22800,17 @@ void AIPlayerGPT::runParseSelfTest()
                           "2. Hold Glacial Fortress - do not play it now\n";
         CHECK(gptcaveat::windowHasVerb("answer their threats, resolve "),
               "#W44-7 'resolve' is an affirmative cast-shaped verb");
-        CHECK(gptcaveat::planActionsStale("Answer their threats, resolve Staff of Nin, ping their"
-                                          " face every turn. Clear it with Supreme Verdict.",
-                                          landDrop, mine),
-              "#W44-7 POSITIVE fallback site 1: the land-drop ask under a 'resolve X' plan");
+        // SUPERSEDED BY #W45-4 (wave-44 corpus): this fired on 327 of 419 land
+        // drops, and the land-drop prompt itself says, three lines above the
+        // note, "its absence from the choices below does not mean it is gone".
+        // The note asserted the opposite of the surface it was printed under.
+        // A land drop cannot offer a cast, so it now arms nothing; the verb
+        // "resolve" this case was written to prove is still checked directly
+        // below and on the action menus above.
+        CHECK(!gptcaveat::planActionsStale("Answer their threats, resolve Staff of Nin, ping their"
+                                           " face every turn. Clear it with Supreme Verdict.",
+                                           landDrop, mine),
+              "#W45-4 supersedes #W44-7 site 1: a land drop is structurally cast-free");
         CHECK(!gptcaveat::planActionsStale("Do not resolve Staff of Nin into open mana.",
                                            landDrop, mine),
               "#W44-7 NEGATIVE the negation guard covers the new verb too");
@@ -22882,6 +22889,281 @@ void AIPlayerGPT::runParseSelfTest()
                                     3, -1)
               == "Your Teferi, Who Slows the Sunset lost 3 loyalty counters",
               "#W44-LOW NEGATIVE no total is invented when the event captured none");
+    }
+
+    // ---- #W45-4: the plan-mismatch note stops asserting a falsehood ----
+    // Every fixture below is REPLAYED from corpus matchups-20260826-111937: the
+    // plan is the record's own "YOUR PLAN" text and the menu is its own rendered
+    // option rows. All six fired the note in that corpus while the row the plan
+    // named was on screen; the note said the list "does not contain the actions
+    // your plan names" about a list whose first row began with them.
+    cout << "\n[W45-4] the plan-mismatch note tells the truth about the menu on screen\n";
+    {
+        string protocol =
+            "\nOn the FIRST line write CHOICE: followed by the number of your choice and its"
+            " SHORT NAME in parentheses, e.g. \"CHOICE: 3 (Cast Example Card)\"; then a PLAN:"
+            " line only if the reply rules call for one. Write nothing else.\n";
+
+        // FALSE FIRE 1 - deck146-0x5559288b224 seq 84. The plan writes the card
+        // short ("Cast Acererak"), the row spells it out ("Cast Acererak the
+        // Archlich"). The old head-match stopped at a comma, so the plan's own
+        // execution was invisible; what DID arm the note was the dungeon named
+        // in the same clause's parenthesis (Lost Mine of Phandelver, in a zone
+        // and not on any menu).
+        vector<string> mine84;
+        mine84.push_back("Acererak the Archlich");
+        mine84.push_back("Lost Mine of Phandelver");
+        mine84.push_back("Hive of the Eye Tyrant");
+        mine84.push_back("Silverquill Command");
+        mine84.push_back("Vanishing Verse");
+        mine84.push_back("Barrowin of Clan Undurr");
+        string cast84 =
+            "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+            "1. Cast Silverquill Command {2}{b}{w} {card text: \"Choose two...\"}\n"
+            "2. Cast Agadeem's Awakening {b}{b}{b}{x} {X pricing: max affordable X=10}\n"
+            "3. Cast Acererak the Archlich {2}{b} (5/5) {card text: \"When Acererak the Archlich"
+            " enters...\"}\n"
+            "4. Cast Barrowin of Clan Undurr {2}{b}{w} (3/3) {card text: \"When Barrowin...\"}\n"
+            "5. Cast nothing right now\n" + protocol;
+        string plan84 =
+            "Cast Acererak to venture into the dungeon (Lost Mine of Phandelver). This is the only"
+            " productive play available, as Vanishing Verse has no legal opponent targets and"
+            " Silverquill Command is a sorcery that requires a specific target or mode combination"
+            " that doesn't improve the board state immediately. After casting Acererak, I will"
+            " animate Hive of the Eye Tyrant #1 and attack with it to apply pressure.";
+        CHECK(!gptcaveat::planActionsStale(plan84, cast84, mine84),
+              "#W45-4 FALSE-FIRE 1 dead: 'Cast Acererak' sees the row 'Cast Acererak the Archlich'");
+
+        // FALSE FIRE 2 - deck126-0x5603808fbfc seq 9. "Next turn, cast Perimeter
+        // Captain" is a future clause AND names option 1. Two independent
+        // reasons the note must stay silent; the old gate had neither (the
+        // window's "hold it" negated the only mention it looked at).
+        vector<string> mine9;
+        mine9.push_back("Perimeter Captain");
+        mine9.push_back("Pride Guardian");
+        mine9.push_back("Sanguine Bond");
+        mine9.push_back("Exquisite Blood");
+        string cast9 =
+            "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+            "1. Cast Perimeter Captain {w} (0/4) {card text: \"Defender...\"}\n"
+            "2. Cast Pride Guardian {w} (0/3) {card text: \"Defender...\"}\n"
+            "3. Cast nothing right now\n" + protocol;
+        string plan9 =
+            "Cast the found Sanguine Bond this turn if mana allows, otherwise hold it. Next turn,"
+            " cast Perimeter Captain and a wall. Continue casting walls and enchantments"
+            " (Exquisite Blood) to assemble the win condition.";
+        CHECK(!gptcaveat::planActionsStale(plan9, cast9, mine9),
+              "#W45-4 FALSE-FIRE 2 dead: option 1 is the card the plan names for next turn");
+        CHECK(gptcaveat::planClauseIsFuture(gptcaveat::toLower(plan9),
+                                            gptcaveat::toLower(plan9).find("perimeter captain")),
+              "#W45-4 'Next turn, cast X' is a future clause, not a claim about this menu");
+
+        // FALSE FIRE 3 - deck126-0x563b923035e seq 39. The plan names the ONE
+        // card on the menu in order to DECLINE it ("I will not cast Tribute to
+        // Hunger yet"). The note's sentence is false either way: the list does
+        // contain a card the plan names.
+        vector<string> mine39;
+        mine39.push_back("Tribute to Hunger");
+        mine39.push_back("Idyllic Tutor");
+        mine39.push_back("Sanguine Bond");
+        string cast39 =
+            "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+            "1. Cast Tribute to Hunger {2}{b} - legal targets right now: the opponent"
+            " {card text: \"Target opponent sacrifices a creature...\"}\n"
+            "2. Cast nothing right now\n" + protocol;
+        CHECK(!gptcaveat::planActionsStale(
+                  "I have Exquisite Blood on the battlefield but not Sanguine Bond. I will cast"
+                  " Idyllic Tutor to find Sanguine Bond. I will not cast Tribute to Hunger yet as"
+                  " I don't have the combo to win with it immediately.",
+                  cast39, mine39),
+              "#W45-4 FALSE-FIRE 3 dead: the menu's only card is named in the plan");
+
+        // FALSE FIRES 4 and 5 - deck146-0x563b90fca49 seq 24 and seq 72. Same
+        // seat, same card, two different plan phrasings ("then cast Acererak to
+        // venture", "we can cast Acererak (bounce, vent)"); Acererak the
+        // Archlich is on the menu both times.
+        vector<string> mine24;
+        mine24.push_back("Acererak the Archlich");
+        mine24.push_back("Silverquill Command");
+        mine24.push_back("Silverquill Silencer");
+        mine24.push_back("Soul Shatter");
+        mine24.push_back("Emeria's Call");
+        mine24.push_back("Hive of the Eye Tyrant");
+        mine24.push_back("Triumphant Adventurer");
+        string cast24 =
+            "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+            "1. Cast Soul Shatter {2}{b} {card text: \"Each opponent sacrifices...\"}\n"
+            "2. Cast Silverquill Command {2}{b}{w} {right now: returns NOTHING}\n"
+            "3. Cast Acererak the Archlich {2}{b} (5/5) {card text: \"When Acererak...\"}\n"
+            "4. Cast Silverquill Silencer {b}{w} (3/2) {card text: \"As Silverquill Silencer"
+            " enters...\"}\n"
+            "5. Cast nothing right now\n" + protocol;
+        CHECK(!gptcaveat::planActionsStale(
+                  "Activate Hive of the Eye Tyrant #2 to make it a 3/3 menace manland. In Main 1,"
+                  " attack with Triumphant Adventurer, Barrowin, and both Goblins. In Main 2, cast"
+                  " Emeria's Call to create two 4/4 Angel tokens, then cast Acererak to venture"
+                  " into the next dungeon.",
+                  cast24, mine24),
+              "#W45-4 FALSE-FIRE 4 dead: 'cast Acererak' matches row 3 of this same menu");
+        string cast72 =
+            "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+            "1. Cast Acererak the Archlich {2}{b} (5/5) {card text: \"When Acererak...\"}\n"
+            "2. Cast nothing right now\n" + protocol;
+        CHECK(!gptcaveat::planActionsStale(
+                  "Activate Hive #1 to animate it. Then in Main 1, cast Silverquill Command on"
+                  " Barrowin. Actually, with 7 mana, we can cast Acererak (bounce, vent) or just"
+                  " cast the Command. Safest play: Pump Barrowin + Draw/Life. Then attack with"
+                  " everything.",
+                  cast72, mine24),
+              "#W45-4 FALSE-FIRE 5 dead: the menu's single row is the card the plan weighs");
+
+        // FALSE FIRE 6 - deck125-0x5653db89c3b seq 25. "Clear the board with
+        // Supreme Verdict now" - option 2 is Cast Supreme Verdict. The note
+        // fired because the plan's FIRST clause names Staff of Nin, which is
+        // not on this menu; naming one absent card does not make the sentence
+        // "this list does not contain the actions your plan names" true.
+        vector<string> mine25;
+        mine25.push_back("Staff of Nin");
+        mine25.push_back("Supreme Verdict");
+        mine25.push_back("Lightmine Field");
+        mine25.push_back("Sphinx's Revelation");
+        string cast25 =
+            "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+            "1. Cast Lightmine Field {2}{w}{w} {card text: \"Whenever one or more creatures"
+            " attack...\"}\n"
+            "2. Cast Supreme Verdict {1}{u}{w}{w} {card text: \"Supreme Verdict can't be"
+            " countered. -- Destroy all creatures.\"}\n"
+            "3. Cast nothing right now\n" + protocol;
+        CHECK(!gptcaveat::planActionsStale(
+                  "Answer their threats, resolve Staff of Nin, ping their face every turn. Clear"
+                  " the board with Supreme Verdict now to remove the Siege-Gang Commander and"
+                  " goblins. Win by pinging with Staff of Nin once it is cast.",
+                  cast25, mine25),
+              "#W45-4 FALSE-FIRE 6 dead: one absent card does not falsify a menu the plan names");
+
+        // VERB-MISMATCH SUBCLASS (52 of 193 fires at deck123's seat; repro
+        // deck123 vs162 seq 48). The plan says "Tap Lord of Lineage"; the row
+        // says "Create vampire with Lord of Lineage #1". Same card, different
+        // verb - and the row is right there. Names, not verbs, decide this.
+        vector<string> mine48;
+        mine48.push_back("Lord of Lineage");
+        mine48.push_back("Thraben Doomsayer");
+        mine48.push_back("Bloodline Keeper");
+        mine48.push_back("Underground Sea");
+        string acts48 =
+            "Your legal actions (Upkeep, YOUR turn):\n"
+            "1. Create human with Thraben Doomsayer [cost: Tap] {card text: \"{T}: Put a 1/1"
+            " white Human creature token onto the battlefield.\"}\n"
+            "2. Create vampire with Lord of Lineage #1 [cost: Tap] {card text: \"Flying...\"}\n"
+            "3. Create vampire with Lord of Lineage #2 [cost: Tap] {card text: \"Flying...\"}\n"
+            + protocol;
+        CHECK(!gptcaveat::planActionsStale(
+                  "Tap Lord of Lineage to create a Vampire token. Tap Bloodline Keeper #2 to"
+                  " create a Vampire token. Tap Thraben Doomsayer to create a Human token. Play"
+                  " Underground Sea. Cast Bloodline Keeper. Attack with all 20 creatures.",
+                  acts48, mine48),
+              "#W45-4 VERB-MISMATCH dead: 'Tap X' sees the row 'Create vampire with X #1'");
+
+        // STRUCTURALLY CAST-FREE MENUS. A land drop cannot offer a cast, and its
+        // own prompt says so ("its absence from the choices below does not mean
+        // it is gone") three lines above where the note was printed.
+        string landDrop45 =
+            "Land drop: which land do you play now, if any?\n"
+            "1. Play Island\n2. Play Swamp\n3. Play Drowned Catacomb\n"
+            "4. Play no land right now\n" + protocol;
+        CHECK(gptcaveat::castFreeAskHeader(gptcaveat::toLower(landDrop45)),
+              "#W45-4 the land-drop ask is a structurally cast-free menu");
+        vector<string> mineLand; //deck162-0x557787294490 seq 2's own vocabulary
+        mineLand.push_back("Fate Unraveler");
+        mineLand.push_back("Fog Bank");
+        mineLand.push_back("Howling Mine");
+        mineLand.push_back("Drowned Catacomb");
+        CHECK(!gptcaveat::planActionsStale(
+                  "Play lands to cast Fate Unraveler on turn 3. If the opponent plays a creature"
+                  " before then, cast Fog Bank to block. Once Fate Unraveler is on the"
+                  " battlefield, begin casting draw engines (Howling Mine) to deal damage.",
+                  landDrop45, mineLand),
+              "#W45-4 the note never fires on a land drop (was 327/419)");
+        string announceX =
+            "Announce the value of X for Agadeem's Awakening. You can afford X up to 10 with your"
+            " current mana - higher values are NOT offered. Every listed value is affordable;"
+            " option 1 is the LARGEST X (X = 10). Reply with the OPTION number, not the X value:\n"
+            "1. Cast for X = 10\n2. Cast for X = 9\n" + protocol;
+        CHECK(gptcaveat::castFreeAskHeader(gptcaveat::toLower(announceX)),
+              "#W45-4 the ANNOUNCE_X ask is a structurally cast-free menu (the spell is already"
+              " being cast)");
+        string modeAsk =
+            "Choose an option for Branchloft Pathway:\n"
+            "1. Play Land\n2. Flip Side [DISPLAY TOGGLE only]\n3. Decline - do nothing\n"
+            + protocol;
+        CHECK(gptcaveat::castFreeAskHeader(gptcaveat::toLower(modeAsk)),
+              "#W45-4 a mode sub-ask is a structurally cast-free menu");
+        vector<string> mineMode; //deck152-0x557785f52f40 seq 13's own vocabulary
+        mineMode.push_back("Intrepid Adversary");
+        mineMode.push_back("Luminarch Aspirant");
+        mineMode.push_back("Branchloft Pathway");
+        CHECK(!gptcaveat::planActionsStale("Cast Intrepid Adversary and pay {1}{W} once for a"
+                                           " +1/+1 counter. Attack with Luminarch Aspirant #1"
+                                           " (4/4) and Intrepid Adversary (4/1).",
+                                           modeAsk, mineMode),
+              "#W45-4 the note never fires on a mode sub-ask");
+        // NEGATIVE on the gate itself: a real cast menu is NOT cast-free, and
+        // neither is the priority action menu the true fires live on.
+        CHECK(!gptcaveat::castFreeAskHeader(gptcaveat::toLower(cast25)),
+              "#W45-4 NEGATIVE a Casting decision is not matched by the cast-free header table");
+        CHECK(!gptcaveat::castFreeAskHeader(gptcaveat::toLower(acts48)),
+              "#W45-4 NEGATIVE a legal-actions ask is not matched by the cast-free header table");
+
+        // TRUE FIRES KEPT. Both are corpus decisions where the note's sentence
+        // is exactly right: the plan commits to a cast THIS window and the menu
+        // on screen names no card the plan names.
+        vector<string> mineT;
+        mineT.push_back("Howling Mine");
+        mineT.push_back("Teferi's Puzzle Box");
+        mineT.push_back("Shield Sphere");
+        mineT.push_back("Fate Unraveler");
+        string castShield =
+            "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+            "1. Cast Shield Sphere {0} (0/6) {card text: \"Defender...\"}\n"
+            "2. Cast nothing right now\n" + protocol;
+        CHECK(gptcaveat::planActionsStale(
+                  "Punisher (Fate Unraveler) and Dictate of Kruphix are established. I must cast"
+                  " Howling Mine {2} and Teferi's Puzzle Box {4} this turn to maximize the"
+                  " opponent's draw damage next turn.",
+                  castShield, mineT),
+              "#W45-4 TRUE FIRE 1: a this-turn cast commitment, and neither card is on the menu");
+        vector<string> mineT2;
+        mineT2.push_back("Staff of Nin");
+        mineT2.push_back("Dream Fracture");
+        mineT2.push_back("Sphinx's Revelation");
+        string castFracture =
+            "Casting decision (Main phase 1, opponent's turn): which card do you cast now, if"
+            " any?\n"
+            "1. Cast Dream Fracture {1}{u}{u} - can target on the stack: Lay Waste {3}{r}"
+            " {card text: \"Counter target spell.\"}\n"
+            "2. Cast nothing right now\n" + protocol;
+        CHECK(gptcaveat::planActionsStale(
+                  "Answer their threats, resolve Staff of Nin, ping their face every turn. Play"
+                  " lands and draw with Sphinx's Revelation when mana allows.",
+                  castFracture, mineT2),
+              "#W45-4 TRUE FIRE 2: 'resolve Staff of Nin' against a menu that offers neither");
+        // ...and the same window with the plan's card ON it stays silent, which
+        // is the whole distinction the note is supposed to be making.
+        CHECK(!gptcaveat::planActionsStale(
+                  "Answer their threats, resolve Staff of Nin, counter their threats with Dream"
+                  " Fracture when they commit.",
+                  castFracture, mineT2),
+              "#W45-4 NEGATIVE the same window goes silent once the plan names the offered card");
+        // A future-only plan is not a claim about this window either.
+        CHECK(!gptcaveat::planActionsStale(
+                  "Attack with both Luminarchs. Next turn, cast Howling Mine to start the engine.",
+                  castShield, mineT),
+              "#W45-4 NEGATIVE a plan whose only cast clause is 'Next turn' arms nothing");
+        CHECK(!gptcaveat::planClauseIsFuture("cast howling mine this turn", 5),
+              "#W45-4 NEGATIVE a this-turn clause is not read as future");
+        // The note's own words are untouched by this lane - it is still a nudge.
+        CHECK(string(kStalePlanNote).find("not about what is legal for you") != string::npos,
+              "#W45-4 REGRESSION the note text is unchanged (gate-only lane)");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

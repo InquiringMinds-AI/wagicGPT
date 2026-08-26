@@ -28,6 +28,7 @@
 #include <vector>
 #include <set>
 #include <cctype>
+#include <cstring>
 
 namespace gptcaveat {
 
@@ -195,11 +196,111 @@ inline bool optionsAreActionMenu(const std::string& optsLower)
         || lines.find("{card text:") != std::string::npos;
 }
 
+// #W45-4 (wave-44 corpus, the note fired on 870/2035 = 42.8% of decisions): the
+// note's claim is about a menu that COULD have carried a cast/activation of the
+// plan's card. Several asks are structurally cast-free - their option rows can
+// never be a cast or an activation of a card in hand, whatever words they use:
+//   - the LAND DROP ask ("1. Play Island"), whose own prompt says three lines
+//     above "its absence from the choices below does not mean it is gone" - the
+//     note asserted the opposite of the surface it was printed under, on
+//     327/419 land-drop asks;
+//   - the ANNOUNCE_X ask (the spell is already being cast; the menu is a number);
+//   - the MODE / sub-ask family ("Choose an option for X:", "Choose one mode
+//     for X:", dungeon-room and venture menus, target lists, the pregame
+//     mulligan, the forced exile/sacrifice asks). The chosen card is not being
+//     cast FROM this list at all.
+// Matched on the ask HEADER at a line start, which is what names the ask. The
+// board frame's own "Land drop: ..." availability line is NOT in this string -
+// it lives in the CURRENT SITUATION block, above the plan, never in the tail.
+inline bool castFreeAskHeader(const std::string& optsLower)
+{
+    static const char * heads[] = {
+        "land drop:", "announce the value of x for ", "choose an option for ",
+        "choose one mode for ", "venture - choose a dungeon", "dungeon room choice",
+        "target choice for ", "pre-game mulligan decision",
+        "exile one of your own cards:", "sacrifice one of your own cards:",
+        "a choice is required - choose an option:"
+    };
+    size_t pos = 0;
+    while (pos <= optsLower.size())
+    {
+        size_t eol = optsLower.find('\n', pos);
+        size_t end = (eol == std::string::npos) ? optsLower.size() : eol;
+        std::string line = optsLower.substr(pos, end - pos);
+        size_t i = 0;
+        while (i < line.size() && (line[i] == ' ' || line[i] == '\t'))
+            i++;
+        for (size_t h = 0; h < sizeof(heads) / sizeof(heads[0]); h++)
+            if (line.compare(i, std::strlen(heads[h]), heads[h]) == 0)
+                return true;
+        if (eol == std::string::npos)
+            break;
+        pos = eol + 1;
+    }
+    return false;
+}
+
+// #W45-4: the forms of a card name a PLAN will use for the card the OPTION row
+// spells out in full. Plans write "cast Acererak"; the row reads "Cast Acererak
+// the Archlich" - the pre-comma head (wave-35) does not reach that one, so the
+// plan's own execution of the offered action was invisible and the note fired
+// on a menu whose first row literally began with the plan's card (deck146
+// seq 84, deck146 seq 24/72). The head before " of " / " the " covers the
+// "Name the Title" and "Name of Place" shapes. Used on the PLAN side of the
+// OFFERED test only, which can only SUPPRESS the note, never arm it.
+inline void planNameForms(const std::string& lowerName, std::vector<std::string>& out)
+{
+    out.push_back(lowerName);
+    size_t comma = lowerName.find(',');
+    if (comma != std::string::npos && comma >= 4)
+        out.push_back(lowerName.substr(0, comma));
+    static const char * seps[] = { " of ", " the " };
+    for (size_t s = 0; s < 2; s++)
+    {
+        size_t i = lowerName.find(seps[s]);
+        if (i != std::string::npos && i >= 4)
+            out.push_back(lowerName.substr(0, i));
+    }
+}
+
+// #W45-4: a plan clause that opens with "Next turn" / "then" is a statement
+// about a LATER window, not about this menu. "Cast the found Sanguine Bond this
+// turn if mana allows... Next turn, cast Perimeter Captain and a wall" was read
+// as a commitment to Perimeter Captain and armed the note on the very ask whose
+// option 1 was "Cast Perimeter Captain" (deck126 seq 9). `pos` is where the card
+// name starts in `plan`; the clause is what precedes it back to the last
+// sentence break.
+inline bool planClauseIsFuture(const std::string& plan, size_t pos)
+{
+    size_t start = plan.find_last_of(".;!?\n", pos ? pos - 1 : 0);
+    start = (start == std::string::npos) ? 0 : start + 1;
+    while (start < pos && (plan[start] == ' ' || plan[start] == '\t'))
+        start++;
+    std::string clause = plan.substr(start, pos - start);
+    static const char * openers[] = { "next turn", "then ", "then,", "later",
+                                      "after that", "afterward", "eventually" };
+    for (size_t i = 0; i < sizeof(openers) / sizeof(openers[0]); i++)
+        if (clause.compare(0, std::strlen(openers[i]), openers[i]) == 0)
+            return true;
+    // "...attack with everything, then cast X" - the future marker sits mid
+    // sentence, inside the same window the verb was found in.
+    size_t ws = clause.size() > 40 ? clause.size() - 40 : 0;
+    std::string win = clause.substr(ws);
+    return win.find(", then ") != std::string::npos
+        || win.find("next turn") != std::string::npos
+        || win.find("after that") != std::string::npos;
+}
+
 // planRaw / optsRaw as assembled; myCardNames = display names from the
 // caster's own zones (the vocabulary the plan can name). True when the plan
-// affirmatively commits to acting on >=1 named card and NONE of those cards
-// appear among the current options (as an action, not merely as another
-// spell's listed target).
+// affirmatively commits, FOR THIS WINDOW, to acting on >=1 named card and the
+// menu names none of the cards the plan names (as an action, not merely as
+// another spell's listed target). #W45-4 fixed the asymmetry that made the
+// note assert a falsehood about the list under it: what SILENCES the note is
+// now decided from the rendered option rows' card NAMES alone, with no verb
+// and no negation test, so any card the plan names and the menu offers is
+// enough - while what ARMS it still needs a cast/activation verb, unnegated,
+// in a clause about THIS turn.
 inline bool planActionsStale(const std::string& planRaw, const std::string& optsRaw,
                              const std::vector<std::string>& myCardNames)
 {
@@ -207,6 +308,8 @@ inline bool planActionsStale(const std::string& planRaw, const std::string& opts
         return false;
     std::string plan = toLower(planRaw);
     std::string opts = stripTargetEnumerations(toLower(optsRaw));
+    if (castFreeAskHeader(opts))
+        return false; //#W45-4: this ask's rows are structurally not casts
     if (!optionsAreActionMenu(opts))
         return false; //not a cast/activation menu: the caveat has nothing to claim
     bool anyAffirmative = false;
@@ -222,13 +325,39 @@ inline bool planActionsStale(const std::string& planRaw, const std::string& opts
             continue;
         if (!seen.insert(nm).second)
             continue;
+        //#W45-4, the OFFERED half, decided FIRST and independently of any verb.
+        //The note's claim is falsified the moment the plan names a card this
+        //menu offers - however the plan phrases it ("I will not cast Tribute to
+        //Hunger yet", "Next turn, cast Perimeter Captain", "cast Acererak").
+        //The old test only looked at cards it had already accepted as verb-
+        //affirmed, so a plan whose wording missed the verb table left the note
+        //asserting that a row it could read verbatim was not there: 5 strictly
+        //verified false fires, plus the 52/193 verb-mismatch subclass at
+        //deck123 ("Tap Lord of Lineage" vs "Create vampire with Lord of
+        //Lineage #1"). Matching NAMES off the rendered rows, not verbs.
+        bool onMenu = (opts.find(nm) != std::string::npos
+                       || opts.find(full) != std::string::npos);
+        if (onMenu)
+        {
+            std::vector<std::string> forms;
+            planNameForms(full, forms);
+            if (nm != full)
+                planNameForms(nm, forms);
+            for (size_t fI = 0; fI < forms.size(); fI++)
+                if (forms[fI].size() >= 4 && plan.find(forms[fI]) != std::string::npos)
+                {
+                    anyOffered = true;
+                    break;
+                }
+        }
         size_t pos = 0;
         bool cardAffirmed = false;
         while ((pos = plan.find(nm, pos)) != std::string::npos)
         {
             size_t ws = pos > 40 ? pos - 40 : 0;
             std::string win = plan.substr(ws, pos - ws);
-            if (windowHasVerb(win) && !windowNegated(win))
+            //#W45-4: a clause about a LATER turn is not a claim about this menu.
+            if (windowHasVerb(win) && !windowNegated(win) && !planClauseIsFuture(plan, pos))
             {
                 cardAffirmed = true;
                 break;
@@ -236,11 +365,7 @@ inline bool planActionsStale(const std::string& planRaw, const std::string& opts
             pos += nm.size();
         }
         if (cardAffirmed)
-        {
             anyAffirmative = true;
-            if (opts.find(nm) != std::string::npos || opts.find(full) != std::string::npos)
-                anyOffered = true;
-        }
     }
     return anyAffirmative && !anyOffered;
 }
