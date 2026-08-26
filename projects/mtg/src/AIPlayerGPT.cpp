@@ -315,6 +315,64 @@ string cardTextSnippet(MTGCardInstance * card, size_t maxLen)
     return textSnippetCore(card->text, maxLen);
 }
 
+//#W46-3 (R3, carried three waves; the specimen decided a game). The opponent's
+//NON-CREATURE permanents reached every decision surface as a name, a cost and a
+//type word - `Sanguine Bond {3}{b}{b} [enchantment]`, `Staff of Nin {6}
+//[artifact]`, `Exquisite Blood`, `Howling Mine`, `Lightmine Field` - while the
+//TARGET rows in the same prompt carry `{target text: "..."}` at 100% and the
+//seat's OWN board line carries per-property glosses ([tapping for mana deals
+//1 damage...], [defender...]). The channel existed and was selective: triggered
+//abilities of opponent artifacts and enchantments simply had no glosser. deck125
+//died on turn 29 from 30 life to an ASSEMBLED Sanguine Bond + 2x Exquisite Blood
+//loop plus a Staff of Nin ping, every piece of which was textless on the board it
+//was reading (seq 67-70).
+//
+//The rule is deliberately UNGATED inside its class - every opponent non-creature
+//non-land permanent that has a script (`auto=` lines; CardPrimitive joins them
+//into magicText) gets its printed rules text - rather than a whitelist of trigger
+//shapes, because a per-shape gate is exactly what produced the gap: a permanent
+//that falls through a gate renders as one that does nothing, and the model
+//confabulates rules into silence. LANDS are out of the class (their scripts are
+//mana production, they are numerous, and the board line already carries the
+//painland/tap glosses); CREATURES are out (their line already carries live
+//keywords, P/T, combat state and summoning-sickness, and that is the budget).
+bool boardEffectTextEligible(bool isCreature, bool isLand, const string& magicText,
+                             const string& text)
+{
+    if (isCreature || isLand)
+        return false;
+    if (magicText.empty()) //no auto= script: nothing the type word does not say
+        return false;
+    if (text.empty() || isEngineTokenText(text)) //W43-LOW: token bookkeeping is not rules text
+        return false;
+    return true;
+}
+
+//Budget: the clause is per-NAME, not per-copy, and its length shrinks as the
+//number of distinct effect-bearing permanents on the line grows, so a wide
+//artifact board cannot run away with the prompt. Truncation is visible ("...")
+//and never silent - no card is dropped from the line at any width.
+size_t boardEffectSnippetLen(size_t distinctNames)
+{
+    if (distinctNames <= 3)
+        return 140;
+    if (distinctNames <= 6)
+        return 90;
+    return 55;
+}
+
+//The emitted clause. `moreCopies` is true when this battlefield holds more than
+//one permanent of this name: the clause rides the FIRST copy only, and says so,
+//so a later untagged copy reads as "same card" and not as "this one is inert"
+//(silent omissions are worse than wrong text).
+string boardEffectTag(const string& snippet, bool moreCopies)
+{
+    if (snippet.empty())
+        return "";
+    return string(" {effect") + (moreCopies ? " (each copy of this card does this)" : "")
+           + ": \"" + snippet + "\"}";
+}
+
 //State-computed payoff magnitudes: cards like Gray Merchant carry their
 //payoff as a live expression in the auto= script ("lifeleech:
 //-type:manab:mybattlefield" = devotion to black). Static rules text
@@ -2891,9 +2949,29 @@ string joinZoneEntries(const vector<string>& names, const vector<string>& handle
 }
 
 void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withStatus,
-                       const char * copyScope = "your hand")
+                       const char * copyScope = "your hand", bool effectText = false)
 {
     vector<string> entNames, entHandles, entTails;
+    //#W46-3 pre-pass: how many DISTINCT effect-bearing names this line will
+    //carry (sets the per-clause budget) and how many copies each has (sets the
+    //"each copy" note). Counted before any entry is built so the budget is the
+    //same for the first clause and the last.
+    std::map<string, int> effectCopies;
+    if (effectText && withStatus)
+        for (int i = 0; i < zone->nb_cards; i++)
+        {
+            MTGCardInstance * c = zone->cards[i];
+            if (!c || (c->mutation && !c->parentCards.empty()))
+                continue;
+            if (!boardEntryIsPermanent(c->hasType(Subtypes::TYPE_EMBLEM)))
+                continue;
+            if (!boardEffectTextEligible(c->isCreature() != 0, c->isLand() != 0,
+                                         c->magicText, c->text))
+                continue;
+            effectCopies[c->getDisplayName()]++;
+        }
+    const size_t effectLen = boardEffectSnippetLen(effectCopies.size());
+    std::map<string, int> effectDone;
     for (int i = 0; i < zone->nb_cards; i++)
     {
         MTGCardInstance * card = zone->cards[i];
@@ -3139,6 +3217,15 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                         stack.push_back(u->childrenCards[k]);
                 }
                 out << mutatedPileTag(underNames);
+            }
+            //#W46-3: what this permanent DOES, last on the line, once per name.
+            if (effectText && !effectCopies.empty())
+            {
+                string nm = card->getDisplayName();
+                std::map<string, int>::iterator ec = effectCopies.find(nm);
+                if (ec != effectCopies.end() && effectDone[nm]++ == 0)
+                    out << boardEffectTag(textSnippetCore(card->text, effectLen),
+                                          ec->second > 1);
             }
         }
         entTails.push_back(out.str());
@@ -8081,6 +8168,64 @@ string AIPlayerGPT::serializePregameState()
     return out.str();
 }
 
+//#W46-3, the second half. The LIFE-TO-DAMAGE CONVERTER summary - the one place
+//the Sanguine Bond mechanism is ever explained - was built inside the ATTACKERS
+//window only. It rendered 5 times in the wave-45 corpus and never once at the
+//seat that was dying to it: a creatureless control seat is never asked to
+//declare attackers, so it never reached the explanation of the permanent that
+//was killing it. A board fact belongs in the board frame, so the naming and the
+//mechanism move to CURRENT SITUATION (every decision kind carries that block)
+//and the attackers window keeps only the sentence that ties it to the blocking
+//triggers listed on ITS screen. Pure over the two name lists, so the shape is
+//provable in PARSETEST without a board.
+static bool lifeToDamageConverterScript(const string& magicText); //defined with its class docs below
+
+string converterSummaryText(const vector<string>& mine, const vector<string>& theirs)
+{
+    if (mine.empty() && theirs.empty())
+        return "";
+    std::ostringstream o;
+    o << "LIFE-TO-DAMAGE CONVERTER on the battlefield:";
+    for (int side = 0; side < 2; side++)
+    {
+        const vector<string>& v = (side == 0) ? mine : theirs;
+        if (v.empty())
+            continue;
+        o << (side == 0 ? " yours - " : " theirs - ");
+        for (size_t i = 0; i < v.size(); i++)
+            o << (i ? ", " : "") << v[i];
+        o << ".";
+    }
+    o << " While it is in play, life ITS CONTROLLER gains also makes the other"
+         " player lose that much life. A converter of THEIRS turns every life"
+         " THEY gain - lifelink, blocking triggers, drains, any of it - into that"
+         " much life off YOUR total as well; a converter of YOURS does the same"
+         " to life YOU gain, and leaves their gains alone.";
+    return o.str();
+}
+
+//The board scan behind it: name every converter on either battlefield, with the
+//instance handle so the claim is checkable against the lines above it.
+static string converterSituationLine(Player * me, Player * opp)
+{
+    vector<string> mineConv, theirsConv;
+    for (int side = 0; side < 2; side++)
+    {
+        Player * pl = (side == 0) ? me : opp;
+        if (!pl || !pl->game || !pl->game->inPlay)
+            continue;
+        MTGGameZone * bf = pl->game->inPlay;
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            if (!c || !lifeToDamageConverterScript(c->magicText))
+                continue;
+            (side == 0 ? mineConv : theirsConv).push_back(c->name + instanceHandle(c));
+        }
+    }
+    return converterSummaryText(mineConv, theirsConv);
+}
+
 string AIPlayerGPT::serializeGameState()
 {
     std::ostringstream out;
@@ -8349,7 +8494,8 @@ string AIPlayerGPT::serializeGameState()
     if (opp)
     {
         out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures);
-        describeZoneCards(out, opp->game->inPlay, true);
+        //#W46-3: the opponent's non-creature permanents carry what they DO.
+        describeZoneCards(out, opp->game->inPlay, true, "your hand", true);
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
                                               opp->game->library->nb_cards); //#W44-6
         //Artifact counts feed metalcraft/affinity-style decisions and are
@@ -8387,6 +8533,14 @@ string AIPlayerGPT::serializeGameState()
     //them, and say where they are so the two numbers reconcile.
     //#W44-6: `myLibInReveal` replaces the raw reveal-zone card count - a reveal
     //zone can hold cards that were never in this library.
+    //#W46-3: the life-to-damage converter summary, in the board frame that
+    //EVERY decision kind carries - not only the attackers window a creatureless
+    //seat is never asked to fill in.
+    {
+        string conv = converterSituationLine(this, opp);
+        if (!conv.empty())
+            out << "\n" << conv;
+    }
     out << "\n" << yourLibraryLine(game->library->nb_cards, myLibInReveal) << "\n";
     return out.str();
 }
@@ -15184,51 +15338,19 @@ int AIPlayerGPT::chooseAttackers()
                 " TOGETHER. Any 1-on-1 result listed for it is what would happen"
                 " to that one creature inside such a group block, never on its"
                 " own.\n";
-    //#W45-3, the summary half. A life-to-damage converter turns the blocking
-    //triggers annotated above into a life SWING against the reader, and that is
-    //a board fact no per-attacker line owns - deck146's opponent climbed
-    //13 -> 42 on it while every wall read as inert. ONE line, naming the
-    //permanent so the claim is checkable against the board the reader can see,
-    //and stated as a consequence of blocking rather than as a prediction that
-    //they will block.
-    {
-        vector<string> mineConv, theirsConv;
-        Player * oppc = opponent();
-        for (int side = 0; side < 2; side++)
-        {
-            Player * pl = side == 0 ? (Player *) this : oppc;
-            if (!pl || !pl->game || !pl->game->inPlay)
-                continue;
-            MTGGameZone * bf = pl->game->inPlay;
-            for (int i = 0; i < bf->nb_cards; i++)
-            {
-                MTGCardInstance * c = bf->cards[i];
-                if (!c || !lifeToDamageConverterScript(c->magicText))
-                    continue;
-                (side == 0 ? mineConv : theirsConv).push_back(c->name + instanceHandle(c));
-            }
-        }
-        if (!mineConv.empty() || !theirsConv.empty())
-        {
-            tail << "LIFE-TO-DAMAGE CONVERTER on the battlefield:";
-            for (int side = 0; side < 2; side++)
-            {
-                const vector<string>& v = side == 0 ? mineConv : theirsConv;
-                if (v.empty())
-                    continue;
-                tail << (side == 0 ? " yours - " : " theirs - ");
-                for (size_t i = 0; i < v.size(); i++)
-                    tail << (i ? ", " : "") << v[i];
-                tail << ".";
-            }
-            tail << " While it is in play, life ITS CONTROLLER gains also makes"
-                    " the other player lose that much life. A converter of"
-                    " THEIRS therefore turns every \"blocking trigger\" gain"
-                    " listed above into that much life off YOUR total as well;"
-                    " a converter of YOURS converts life you gain, and leaves"
-                    " their blocking gains alone.\n";
-        }
-    }
+    //#W45-3, the summary half - #W46-3 re-scoped. The NAMING and the mechanism
+    //now live in the CURRENT SITUATION block above (converterSituationLine), so
+    //every decision kind carries them and a creatureless control seat, which is
+    //never asked to declare attackers, finally reads the explanation of the
+    //permanent that is killing it. What stays here is the one fact only THIS
+    //screen owns: the "blocking trigger" gains annotated on the lines above are
+    //life gains, so a converter converts them. Stated as a consequence of
+    //blocking, not as a prediction that they will block.
+    if (!converterSituationLine(this, opponent()).empty())
+        tail << "The \"blocking trigger\" gains listed above are LIFE GAINS, so the"
+                " LIFE-TO-DAMAGE CONVERTER named in the CURRENT SITUATION block"
+                " applies to them: a converter of THEIRS turns each such gain into"
+                " that much life off YOUR total as well.\n";
     tail << kAttackersTurnFacts;
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
@@ -24359,6 +24481,84 @@ void AIPlayerGPT::runParseSelfTest()
                   && log.find("- 3 damage was dealt to you (now 15)") != string::npos,
                   "#W45-20 the assembled log carries the tagged shapes verbatim");
         }
+    }
+
+    // ---- #W46-3: opponent non-creature permanents carry what they DO, and the
+    // life-to-damage converter summary reaches every decision kind ----
+    cout << "\n[W46-3] the opponent's artifacts/enchantments stop being four bare words\n";
+    {
+        // The five specimens from deck125 vs deck126 seq 67-70, with the auto=
+        // and text= lines verified against Res/sets/primitives/mtg.txt.
+        const char * bondScript = "@lifeof(player) from(*[-lifefaker]|*):life:-thatmuch opponent";
+        const char * bondText   = "Whenever you gain life, target opponent loses that much life.";
+        const char * bloodScript = "@lifelostfoeof(player):life:thatmuch controller";
+        const char * bloodText   = "Whenever an opponent loses life, you gain that much life.";
+        const char * staffScript = "@each my upkeep:draw:1\n{T}:damage:1 target(anytarget)";
+        const char * staffText   = "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target.";
+        const char * mineScript  = "@each my draw sourcenottap:draw:1 controller\n@each opponent draw sourcenottap:draw:1 opponent";
+        const char * mineText    = "At the beginning of each player's draw step, if Howling Mine is untapped, that player draws an additional card.";
+        const char * fieldScript = "@each blockers:foreach(creature[attacking]|Battlefield) damage:1 all(creature[attacking]|Battlefield)";
+        const char * fieldText   = "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures.";
+        CHECK(boardEffectTextEligible(false, false, bondScript, bondText)
+              && boardEffectTextEligible(false, false, bloodScript, bloodText)
+              && boardEffectTextEligible(false, false, staffScript, staffText)
+              && boardEffectTextEligible(false, false, mineScript, mineText)
+              && boardEffectTextEligible(false, false, fieldScript, fieldText),
+              "#W46-3 all five textless specimens (@lifeof, @lifelost, @each upkeep/draw, @each blockers, {T}:damage) are eligible");
+        // NEGATIVES that must NOT gain a clause.
+        CHECK(!boardEffectTextEligible(true, false, bondScript, bondText),
+              "#W46-3 NEGATIVE a creature keeps its keyword/P-T budget, no effect clause");
+        CHECK(!boardEffectTextEligible(false, true, "@each my upkeep:life:1", "gains you 1 life"),
+              "#W46-3 NEGATIVE a land is out of the class (mana scripts, and the painland gloss already covers it)");
+        CHECK(!boardEffectTextEligible(false, false, "", "A vanilla permanent with no script."),
+              "#W46-3 NEGATIVE no auto= script -> no clause (the type word already says it all)");
+        CHECK(!boardEffectTextEligible(false, false, "@each my upkeep:draw:1", ""),
+              "#W46-3 NEGATIVE a script with no printed text renders nothing rather than an empty blob");
+        CHECK(!boardEffectTextEligible(false, false, "@each my upkeep:draw:1",
+                                       "() source: Dwarven Blastminer"),
+              "#W46-3 NEGATIVE a token's engine bookkeeping text is not rules text (W43-LOW)");
+        // The emitted shapes.
+        string one = boardEffectTag(textSnippetCore(bondText, boardEffectSnippetLen(1)), false);
+        string two = boardEffectTag(textSnippetCore(bloodText, boardEffectSnippetLen(4)), true);
+        cout << "     Sanguine Bond #1 {3}{b}{b} [enchantment]" << one << "\n";
+        cout << "     Exquisite Blood #1 {4}{b} [enchantment]" << two << "\n";
+        CHECK(one == " {effect: \"Whenever you gain life, target opponent loses that much life.\"}",
+              "#W46-3 the single-copy clause is the exact {effect: \"...\"} shape");
+        CHECK(two.find("{effect (each copy of this card does this): \"") != string::npos,
+              "#W46-3 with 2+ copies the first copy's clause says it covers them, so an untagged copy does not read as inert");
+        CHECK(boardEffectTag("", false).empty(),
+              "#W46-3 NEGATIVE an empty snippet emits no clause at all, never an empty {effect: \"\"}");
+        // Budget: shrinks with distinct names, never drops a card, truncation visible.
+        CHECK(boardEffectSnippetLen(1) == 140 && boardEffectSnippetLen(5) == 90
+              && boardEffectSnippetLen(9) == 55,
+              "#W46-3 the per-clause budget shrinks as the board widens (140/90/55)");
+        string wide = boardEffectTag(textSnippetCore(fieldText, boardEffectSnippetLen(9)), false);
+        cout << "     wide board (9 distinct):" << wide << "\n";
+        CHECK(wide.size() < 90 && wide.find("...") != string::npos,
+              "#W46-3 on a wide board the clause truncates VISIBLY rather than the card being dropped");
+    }
+    cout << "\n[W46-3] LIFE-TO-DAMAGE CONVERTER moves into the board frame every kind carries\n";
+    {
+        vector<string> none, mine, theirs;
+        mine.push_back("Sanguine Bond #1");
+        theirs.push_back("Sanguine Bond #1");
+        CHECK(converterSummaryText(none, none).empty(),
+              "#W46-3 NEGATIVE no converter on either battlefield -> no line at all");
+        string t = converterSummaryText(none, theirs);
+        cout << "     " << t << "\n";
+        CHECK(t.find("LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs - Sanguine Bond #1.") == 0
+              && t.find(" yours - ") == string::npos,
+              "#W46-3 theirs-only names only their side, with the instance handle");
+        CHECK(t.find("life ITS CONTROLLER gains also makes the other player lose that much life")
+                  != string::npos
+              && t.find("lifelink, blocking triggers, drains, any of it") != string::npos,
+              "#W46-3 the mechanism is stated kind-neutrally (no longer 'the gains listed above')");
+        CHECK(t[t.size() - 1] != '\n',
+              "#W46-3 the summary carries no trailing newline: its callers place it");
+        string both = converterSummaryText(mine, theirs);
+        CHECK(both.find(" yours - Sanguine Bond #1.") != string::npos
+              && both.find(" theirs - Sanguine Bond #1.") != string::npos,
+              "#W46-3 both battlefields are named separately when both hold one");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
