@@ -1,0 +1,7 @@
+#NAME:W48N Loop Probe
+#DESC:Doomsayer + Intruder Alarm stacked loop probe (wave-48 lane N)
+Thraben Doomsayer (*) *12
+Intruder Alarm (*) *8
+Hallowed Fountain (*) *8
+Plains (*) *16
+Island (*) *16

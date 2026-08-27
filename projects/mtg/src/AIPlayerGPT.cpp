@@ -6973,7 +6973,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mManaOnlyWindowsSkipped(0), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -9948,9 +9948,48 @@ static int creatureCountOnBattlefield(Player * p)
     return n;
 }
 
+//#W48-F2 / D13 - THE MECHANISM THE TAG WAS HIDING.
+//
+//The wave-47 measurement of the tag is that it was "present, truthful and
+//inert": it counted to 1,868 and changed nothing. Two things were missing from
+//it, and both are facts the pilot cannot derive from anything else on the
+//screen.
+//
+//(1) THE TURN DOES NOT ADVANCE. A priority window is not a free look: the turn
+//moves on only when priority is passed, so a pilot whose stated payoff is "on
+//my next main phase, attack with all creatures to win" cannot reach it from
+//inside this window by taking this option again. That is a RESTRICTION on the
+//turn, not advice about the option, and it is unconditionally true wherever
+//this annotation renders.
+//
+//(2) THE COUNT THAT DOES NOT RESET (docket D13). `counters` is the engine's own
+//per-TURN number - reset to 0 at MTG_PHASE_AFTER_EOT - while the loop it
+//annotates runs straight through the boundary: deck123 vs126 rendered
+//"activated this turn 15 times already; you control 1539 creatures" at turn 11
+//on a board that had already banked 1,099 activations, and the deck guide's
+//">= 20" tripwire could not fire in the game shape it was written for. The
+//loop-scoped count added here is this seat's CONSECUTIVE takes of the same
+//activation with no other action in between; it survives the turn boundary and
+//is reset only by the loop actually breaking.
+//
+//BOTH numbers stay engine-read and both keep their scope IN THE WORDING - the
+//per-turn one still says "this turn", the loop-scoped one says "in a row" - so
+//neither a pilot nor a guide can key a threshold to a number whose meaning it
+//cannot see. Restriction-first, no advice, no affirmative-action substring.
+//Pure, so PARSETEST proves the clause and its silent case without a game.
+static string repeatMechanismClause(int loopCount)
+{
+    std::ostringstream o;
+    o << " This turn will not advance while you keep taking this option";
+    if (loopCount >= 2)
+        o << "; you have taken it " << loopCount << " times in a row with no other action in between";
+    o << ".";
+    return o.str();
+}
+
 //"" for everything below the floor: no annotation, no token cost, no change to
 //any line the pilot sees today.
-static string repeatActivationNote(const OrderedAIAction& action)
+string AIPlayerGPT::repeatActivationNote(const OrderedAIAction& action)
 {
     ActivatedAbility * aa = asActivatedForCount(action.ability);
     if (!aa || aa->counters < kRepeatActivationFloor)
@@ -9964,7 +10003,10 @@ static string repeatActivationNote(const OrderedAIAction& action)
         if (ctrl)
             o << "; you control " << creatureCountOnBattlefield(ctrl) << " creatures";
     }
-    o << "]";
+    o << "."
+      << repeatMechanismClause((action.ability == mLoopAbility && action.click == mLoopClick)
+                               ? mLoopCount : 0)
+      << "]";
     return o.str();
 }
 
@@ -9982,6 +10024,185 @@ static string stripRepeatAnnotation(const string& line)
     if (c == string::npos)
         return line.substr(0, p);
     return line.substr(0, p) + line.substr(c + 1);
+}
+
+//#W48-F3 (wave-47 docket D1, affordance F3) - THE DECLINE AS A REAL ROW.
+//
+//3,818 of the corpus's 4,128 priority windows offered exactly ONE option, and
+//in every one of them the only way to decline was to invent a number that was
+//not in the list: "pass" existed only inside the reply-format sentence as
+//"0 = pass priority". The house ordering rule (declines go LAST, where the
+//model's option-1 bias cannot land on them) was therefore not honoured on any
+//single-option window, and the turn-10 measurement is the consequence -
+//1,871 windows, 1,869 takes, ZERO passes.
+//This adds the row the rule always assumed was there. It removes nothing,
+//changes no number the parser already accepts (0 has always been the pass
+//index), and states the decline in the same shape as every other row so it can
+//be chosen the same way. Scoped to single-option windows: that is where the
+//absence was measured and where the row is the whole menu's other half.
+static const char * kPassPriorityRowText = "Pass priority (take no action this window)";
+
+//#W48-F1 - THE REPEAT-N ROW: MTG 720/721's announced shortcut as an option row.
+//
+//An unbounded legal loop (a {T} token-maker under Intruder Alarm) is not a
+//legality defect - it is rules-correct, optional and genuinely a win condition
+//on two of the corpus's boards. What was missing was a STOPPING ACT the pilot
+//could reach: taking the option is one window, and so is taking it the next
+//1,870 times. Per the owner doctrine the fix ADDS a choice rather than deleting
+//the legal one - the loop row stays exactly as it was, and a second row lets
+//the model name how many times it wants the engine to perform it.
+//
+//The floor is K >= 2 takes this turn (the same evidence the [repeat:] tag
+//keys on: a third offer of the same ability in the same turn is the earliest
+//point at which repetition is the salient fact), and the ceiling stated in the
+//row is real - N is clamped to it at parse.
+static const int kRepeatRowFloor = 2;
+static const int kRepeatRowMax = 200;
+//How many consecutive windows a plan's option may be missing from the menu
+//before the plan is called finished, while something is still resolving on the
+//stack. Generous on purpose: each waiting window costs no model call, and the
+//definitive stop (an empty stack with the option gone) does not use it.
+static const int kRepeatAbsentWindows = 12;
+
+//"Its cost is repayable from state the activation restores" made checkable:
+//the cost spends nothing this seam can watch it spend. TAPPING THE SOURCE is
+//the one cost that qualifies - it is exactly the state an untapper (Intruder
+//Alarm, a vigilance-like effect, an untap trigger) hands back, and it is the
+//cost of every loop in the corpus. A mana cost, an X cost, or any other extra
+//cost (sacrifice, discard, exile, life) spends a resource the activation does
+//NOT hand back, and no repeat row is offered for those.
+//The tap cost arrives as a TapCost in ManaCost::extraCosts (it is what renders
+//"[cost: Tap]"), not as a mana component, so the extra-cost list is inspected
+//rather than rejected wholesale - rejecting it wholesale is what silently
+//withheld the row from Thraben Doomsayer, the docket's own repro, in the first
+//live probe. This predicate only decides whether the row is worth OFFERING -
+//payability itself is re-checked per iteration, against the engine's own
+//ranking, and ends the plan when it fails.
+static bool repeatRowEligible(ActivatedAbility * aa)
+{
+    if (!aa || aa->counters < kRepeatRowFloor)
+        return false;
+    ManaCost * c = aa->getCost();
+    if (!c)
+        return true;
+    if (c->getConvertedCost() > 0 || c->hasX())
+        return false;
+    if (c->extraCosts)
+        for (size_t i = 0; i < c->extraCosts->costs.size(); i++)
+            if (!dynamic_cast<TapCost *>(c->extraCosts->costs[i]))
+                return false;
+    return true;
+}
+
+//The short name a repeat row is built from: the option's own text with every
+//annotation stripped and cut at the first brace/bracket, so the row can never
+//name an action word absent from the menu (the askExemplar rule) and never
+//re-prints the base row's card text.
+static string repeatShortName(const string& line)
+{
+    string core = stripNarrationDecoration(stripRepeatAnnotation(line));
+    size_t cut = core.find(" {");
+    size_t b = core.find(" [");
+    if (b != string::npos && (cut == string::npos || b < cut))
+        cut = b;
+    if (cut != string::npos)
+        core = core.substr(0, cut);
+    while (!core.empty() && isspace((unsigned char) core[core.size() - 1]))
+        core.erase(core.size() - 1);
+    if (core.size() > 60)
+        core = core.substr(0, 60);
+    return core;
+}
+
+//The row itself. It carries its OWN index in its worked example, so the model
+//copies a number that is true for this window; and it states the two facts that
+//make the shortcut safe to take - the cost is re-checked every iteration and
+//priority comes back here - plus the ceiling, which is enforced.
+//Pure, so PARSETEST proves the shape and the echo without a game.
+static string repeatRowLine(const string& shortName, int rowIndex)
+{
+    std::ostringstream o;
+    o << shortName << ", repeated N times, then stop"
+      << " [you name N on the CHOICE line, e.g. \"CHOICE: " << rowIndex << " ("
+      << shortName << " x50)\"; the engine performs it N times, re-checking the cost each"
+         " iteration and stopping early if it becomes unpayable, then returns priority to you"
+         " here; N is at most " << kRepeatRowMax << "]";
+    return o.str();
+}
+
+//The N named on the reply's CHOICE line. Two shapes are accepted: the row's own
+//exemplar ("x50", "x 50") and the natural-language form ("50 times"). The 'x'
+//form requires a non-alphanumeric character before the x so a card name ending
+//in a letter+x ("Cast Ox") can never be read as a count. The LAST count named
+//wins, for the same reason salvageLoopedChoice keeps the last clean index: a
+//decode spiral's final statement is its answer. Returns -1 when no count is
+//named. Pure; PARSETEST proves both shapes and the negatives.
+static int scanRepeatCountInLine(const string& line)
+{
+    int found = -1;
+    for (size_t i = 0; i < line.size(); i++)
+    {
+        if (line[i] == 'x' && (i == 0 || !isalnum((unsigned char) line[i - 1])))
+        {
+            size_t d = i + 1;
+            while (d < line.size() && line[d] == ' ') d++;
+            if (d < line.size() && isdigit((unsigned char) line[d]))
+            {
+                int n = 0;
+                while (d < line.size() && isdigit((unsigned char) line[d]) && n < 100000)
+                    n = n * 10 + (line[d++] - '0');
+                found = n;
+            }
+        }
+        else if (isdigit((unsigned char) line[i]) && (i == 0 || !isalnum((unsigned char) line[i - 1])))
+        {
+            size_t d = i;
+            int n = 0;
+            while (d < line.size() && isdigit((unsigned char) line[d]) && n < 100000)
+                n = n * 10 + (line[d++] - '0');
+            size_t w = d;
+            while (w < line.size() && line[w] == ' ') w++;
+            if (w + 5 <= line.size() && line.compare(w, 5, "times") == 0)
+                found = n;
+            i = d - 1;
+        }
+    }
+    return found;
+}
+
+//Where to look. The caller normally hands over consumePlan's ANSWER SEGMENT,
+//which has already had the "CHOICE:" label consumed off the front (live probe,
+//2026-08-27: keying only on a literal "choice:" read every repeat answer as
+//countless and collapsed it to a single activation). So: scan every
+//"choice:"-anchored line when the label is present, and otherwise scan the
+//segment's own first line - never the whole reply, whose plan prose is full of
+//numbers that are not counts.
+static int parseRepeatCount(const string& reply)
+{
+    string low = reply;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    int found = -1;
+    size_t scan = 0;
+    bool sawLabel = false;
+    while ((scan = low.find("choice:", scan)) != string::npos)
+    {
+        sawLabel = true;
+        size_t eol = low.find('\n', scan);
+        int n = scanRepeatCountInLine(low.substr(scan, (eol == string::npos) ? string::npos : eol - scan));
+        if (n >= 0)
+            found = n;
+        scan += 7;
+    }
+    if (!sawLabel)
+    {
+        size_t start = low.find_first_not_of(" \t\r\n");
+        if (start == string::npos)
+            return -1;
+        size_t eol = low.find('\n', start);
+        found = scanRepeatCountInLine(low.substr(start, (eol == string::npos) ? string::npos : eol - start));
+    }
+    return found;
 }
 
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
@@ -11746,6 +11967,47 @@ static string lastOfferClause(bool retiresOnPass)
                          : "";
 }
 
+//#W48-D13: the loop-scoped consecutive count. Keyed on the (ability, click)
+//pair the seam actually returned, so a second maker feeding the same loop
+//restarts the count honestly rather than inheriting the first one's.
+void AIPlayerGPT::noteLoopTake(MTGAbility * ability, MTGCardInstance * click)
+{
+    if (ability == mLoopAbility && click == mLoopClick)
+    {
+        mLoopCount++;
+        return;
+    }
+    mLoopAbility = ability;
+    mLoopClick = click;
+    mLoopCount = 1;
+}
+
+//#W48-F1: the plan's receipt. The pilot named N once and then saw nothing for
+//however many ticks the engine took; the narration owes it the count that
+//actually happened. Written on every exit - exhausted, no longer offered, no
+//longer changing anything, or the turn ended - so the log never implies more
+//activations than occurred.
+void AIPlayerGPT::endRepeatPlan(const char * why)
+{
+    if (mRepeatTotal > 0)
+    {
+        std::ostringstream o;
+        o << "Your repeated activation ran " << mRepeatDone << " of the "
+          << mRepeatTotal << " times you named";
+        if (why && *why)
+            o << " (" << why << ")";
+        narrateDecision(o.str());
+    }
+    mRepeatAbility = NULL;
+    mRepeatClick = NULL;
+    mRepeatRemaining = 0;
+    mRepeatTotal = 0;
+    mRepeatDone = 0;
+    mRepeatBoardKey.clear();
+    mRepeatNoProgress = 0;
+    mRepeatAbsent = 0;
+}
+
 const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranking)
 {
     if (!ranking.size() || mEndpoint.empty())
@@ -11830,6 +12092,13 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         mPassDeclineCount.clear();
         mFlipDoneCount.clear();
         mPassDeclineTurn = observer->turn;
+        //#W48-F1: a repeat-N plan is an answer about THIS turn's priority
+        //windows ("returns priority to you here"). It never rides a turn
+        //boundary - the loop-scoped count in the [repeat:] tag does that job,
+        //deliberately, and a plan that outlived the turn would be taking
+        //actions in a window the model was never shown.
+        if (mRepeatTotal > 0)
+            endRepeatPlan(mRepeatRemaining > 0 ? "the turn ended" : "");
     }
     //LIVELOCK ROOT FIX (146v36, 2026-08-21): the ranking order is NOT stable
     //across priority windows - Baka seeds several ability efficiencies with
@@ -11917,6 +12186,115 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         DebugTrace("AIPlayerGPT[ph" << phase << "]: all actions pass-declined this turn; passing");
         return NULL;
     }
+    const int baseIndex = index;
+
+    //#W48-F1: the repeat-N rows, appended AFTER every real option (they are
+    //shortcuts over a row that is already on the menu, not new plays) and
+    //BEFORE the decline row (declines stay last). Each carries the same
+    //OrderedAIAction pointer as the row it repeats, so every downstream
+    //consumer - describeAction, the narration, the activation stamp - reads the
+    //base action; only the rendered line and the plan differ.
+    vector<int> repeatBaseRow;
+    repeatBaseRow.assign(shown.size(), -1);
+    for (int rb = 0; rb < baseIndex; rb++)
+    {
+        if (isManaOnlyAction(shown[rb]->ability))
+            continue; //a mana window is auto-passed below; a repeat there buys nothing
+        if (!repeatRowEligible(asActivatedForCount(shown[rb]->ability)))
+            continue;
+        string rline = repeatRowLine(repeatShortName(shownLines[rb]), index + 1);
+        index++;
+        shown.push_back(shown[rb]);
+        shownLines.push_back(rline);
+        repeatBaseRow.push_back(rb);
+        tail << index << ". " << rline << "\n";
+    }
+
+    //#W48-F3: on a single-option window the decline becomes a real, numbered
+    //LAST row instead of a clause buried in the reply-format sentence. The
+    //index is 0, which the parser has always accepted, so nothing about the
+    //answer grammar changes - only the model's ability to see the choice.
+    if (baseIndex == 1)
+        tail << "0. " << kPassPriorityRowText << "\n";
+
+    //#W48-F1: a repeat-N plan the model already answered consumes THIS window
+    //with no model call and no prompt assembly. Two exits, both taken here
+    //rather than by a cap:
+    // * the option is no longer on the menu - the engine has stopped offering
+    //   it, which is the only honest payability re-check available at this
+    //   seam (the ranking is rebuilt from isReactingToClick every tick), so the
+    //   plan stops early exactly as the row promised;
+    // * the activations have stopped moving the board - a repeat that changes
+    //   nothing is a stall, not a repeat. Two consecutive unmoved
+    //   serializations are required, because an activation resolving off the
+    //   stack can leave one tick's board identical.
+    //The dispatch is ONE action per tick onto the ordinary clickstream - never
+    //a synchronous burst, which the latent ability-GC double-destroy makes
+    //fatal (DecisionContract design section 4, and how planCastSpell's PLAN is
+    //consumed). Each iteration stamps the activation so the shared
+    //WEventAbilityActivated narration writes one line for the decision rather
+    //than one per iteration.
+    if (mRepeatTotal > 0 && mRepeatRemaining <= 0)
+        endRepeatPlan("");
+    if (mRepeatRemaining > 0)
+    {
+        int found = -1;
+        for (int r = 0; r < baseIndex; r++)
+            if (shown[r]->ability == mRepeatAbility && shown[r]->click == mRepeatClick)
+            {
+                found = r;
+                break;
+            }
+        if (found < 0)
+        {
+            //ABSENT THIS WINDOW is not the same fact as UNPAYABLE. The loop's
+            //own untap (Intruder Alarm's ETB trigger) rides the stack, and this
+            //seam is reached during that resolution too - the source is still
+            //tapped, the option is legitimately off the menu, and it comes back
+            //the moment the trigger resolves. Live probe 2026-08-27: ending the
+            //plan on the first absence cut EVERY named 25 to 1 or 2. So end the
+            //plan only where absence is definitive - an EMPTY stack, nothing
+            //left to resolve that could restore the cost - and otherwise take no
+            //action this window (which passes priority, letting the trigger
+            //resolve) for a bounded number of windows.
+            bool resolving = observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) > 0;
+            if (resolving && ++mRepeatAbsent <= kRepeatAbsentWindows)
+            {
+                DebugTrace("AIPlayerGPT[ph" << phase << "]: repeat plan waiting on the stack ("
+                           << mRepeatAbsent << "/" << kRepeatAbsentWindows << ")");
+                return NULL;
+            }
+            endRepeatPlan("the cost could no longer be paid");
+        }
+        else
+        {
+            mRepeatAbsent = 0;
+            string board = serializeGameState();
+            bool moved = (board != mRepeatBoardKey);
+            if (moved)
+            {
+                mRepeatNoProgress = 0;
+                mRepeatBoardKey = board;
+            }
+            else
+                mRepeatNoProgress++;
+            if (!moved && mRepeatNoProgress >= 2)
+            {
+                endRepeatPlan("it stopped changing anything");
+            }
+            else
+            {
+                mRepeatRemaining--;
+                mRepeatDone++;
+                noteLoopTake(shown[found]->ability, shown[found]->click);
+                if (ActivatedAbility * revAct = eventRaisingActivation(*shown[found]))
+                    stampSelfActivation(revAct);
+                DebugTrace("AIPlayerGPT[ph" << phase << "]: repeat plan iteration "
+                           << mRepeatDone << "/" << mRepeatTotal << " (no model call)");
+                return shown[found];
+            }
+        }
+    }
     //N-152b: cosmetic-only priority window. When the ONLY non-pass options are
     //modal-DFC Flip-Side display toggles (AATurnSide), the model can gain
     //nothing here and demonstrably loses - it burns a full round trip (deck152:
@@ -12002,7 +12380,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
     //plan, and a full-prompt key would read that as a state change.
-    string askKey = serializeGameState() + tail.str();
+    string boardKey = serializeGameState();
+    string askKey = boardKey + tail.str();
     string userMsg = assemblePrompt(tail.str());
     bool unchanged = (askKey == mLastAskKey);
 
@@ -12078,6 +12457,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //the heuristic rather than execute the retracted digit.
         bool retracted = false;
         int reanswer = -1;
+        //#W48-F1: N as the model named it (0 = this was not a repeat row, or no
+        //count was named and the row collapses to a single activation).
+        int repeatN = 0;
         if (choice >= 0 && !content.empty()
             && choiceRetractedNoReplacement(content, index, &shownLines, &reanswer))
         {
@@ -12097,6 +12479,30 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
         {
+            //#W48-F1: resolve a repeat row to the action it repeats. The rows
+            //share an OrderedAIAction pointer, so everything below reads the
+            //base row; only the plan and the narration know about the N.
+            int actRow = choice - 1;
+            if (actRow >= baseIndex && actRow < (int) repeatBaseRow.size()
+                && repeatBaseRow[actRow] >= 0)
+            {
+                int named = parseRepeatCount(decisionPart.empty() ? content : decisionPart);
+                actRow = repeatBaseRow[actRow];
+                if (named > kRepeatRowMax)
+                {
+                    named = kRepeatRowMax; //the ceiling the row states, enforced
+                    appendParseNote(&mLastParseNote, "repeat_count_clamped");
+                }
+                if (named >= 2)
+                    repeatN = named;
+                else
+                {
+                    //The row was taken without the count it asks for. Perform
+                    //the single activation the base row would have performed -
+                    //never a guessed N - and record why in the translog.
+                    appendParseNote(&mLastParseNote, "repeat_count_missing");
+                }
+            }
             //W42-D2: an ACTIVATION taken here is narrated in the SHARED
             //activation wording ("You used: <label> with <Card>"), so this
             //seat's line and the peer's event line are one sentence with the
@@ -12104,10 +12510,16 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //the click does not write it a second time. Non-activations
             //(attacks, blocks, land drops) keep their conjugated form - no
             //other seat narrates those, so there is nothing to agree with.
-            ActivatedAbility * evAct = eventRaisingActivation(*shown[choice - 1]);
+            ActivatedAbility * evAct = eventRaisingActivation(*shown[actRow]);
             string takenLine = actionTakenNarration(
-                stripNarrationDecoration(describeAction(*shown[choice - 1])),
+                stripNarrationDecoration(describeAction(*shown[actRow])),
                 evAct != NULL);
+            if (repeatN >= 2 && !takenLine.empty())
+            {
+                std::ostringstream rn;
+                rn << takenLine << " (you named " << repeatN << " repeats of it)";
+                takenLine = rn.str();
+            }
             narrateDecision(takenLine);
             //Gated on a line having actually been written: a CAST narrates ""
             //here (its zone events tell that story instead), and stamping one
@@ -12121,14 +12533,31 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //next window is churn, not a decision (deck133's single-option
             //re-ask multiplier; deck44's target-flip re-ask). Next turn
             //re-offers.
-            if (isFetchCrackLine(shownLines[choice - 1]))
-                mPassDeclineCount[fetchLineKey(shownLines[choice - 1])] = 2;
+            if (isFetchCrackLine(shownLines[actRow]))
+                mPassDeclineCount[fetchLineKey(shownLines[actRow])] = 2;
             //Count a consumed DFC flip toward the per-turn thrash cap.
-            if (AATurnSide * cats = asTurnSide(shown[choice - 1]->ability))
+            if (AATurnSide * cats = asTurnSide(shown[actRow]->ability))
             {
-                MTGCardInstance * ccard = shown[choice - 1]->click ? shown[choice - 1]->click : cats->source;
+                MTGCardInstance * ccard = shown[actRow]->click ? shown[actRow]->click : cats->source;
                 if (ccard)
                     mFlipDoneCount[ccard]++;
+            }
+            //#W48-D13: the loop-scoped consecutive count, which does NOT reset
+            //at a turn boundary - that reset is exactly what made the per-turn
+            //[repeat:] number unusable as a stopping signal.
+            noteLoopTake(shown[actRow]->ability, shown[actRow]->click);
+            //#W48-F1: arm the plan. One decision, one translog record, one
+            //narration line; the remaining iterations are dispatched above with
+            //no further model calls.
+            if (repeatN >= 2)
+            {
+                mRepeatAbility = shown[actRow]->ability;
+                mRepeatClick = shown[actRow]->click;
+                mRepeatTotal = repeatN;
+                mRepeatRemaining = repeatN - 1;
+                mRepeatDone = 1;
+                mRepeatBoardKey = boardKey;
+                mRepeatNoProgress = 0;
             }
         }
 
@@ -12137,14 +12566,33 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //A fresh deliberate pass declines every offered line (cached
         //replays of the same window don't re-count - one look, one vote).
         if (choice == 0)
-            for (size_t s = 0; s < shownLines.size(); s++)
+            //#W48-F1: base rows only. A repeat row is a shortcut over a row
+            //already counted here; keying its own text would spend a second
+            //decline allowance on the same action and retire it a window early.
+            for (int s = 0; s < baseIndex; s++)
                 mPassDeclineCount[isFetchCrackLine(shownLines[s])
                                   ? fetchLineKey(shownLines[s])
                                   : stripRepeatAnnotation(shownLines[s])]++;
+        //#W48-D13: a pass, or a decision handed to the heuristic, is the loop
+        //being broken - the consecutive count starts again from nothing.
+        if (choice <= 0)
+        {
+            mLoopAbility = NULL;
+            mLoopClick = NULL;
+            mLoopCount = 0;
+        }
         {
             const char * fb = (choice >= 0) ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
                           : (choice == 0 ? string("pass") : string());
+            //#W48-F1: ONE record carries the whole repeat - the action and the
+            //N the model named for it.
+            if (repeatN >= 2)
+            {
+                std::ostringstream rc;
+                rc << chosen << " x" << repeatN;
+                chosen = rc.str();
+            }
             writeTransLog("priority", userMsg, content, choice, index, chosen, fb, &shownLines);
         }
         DebugTrace("AIPlayerGPT: model chose " << choice << " of " << index);
@@ -27588,6 +28036,122 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(!ret && rep == -1, "#W48-E1 NEGATIVE a quoted format string is neither a retraction nor a replacement");
         CHECK(choiceRetractedNoReplacement(r34, (int) loop.size(), &loop) == true,
               "#W48-E1 REGRESSION the boolean verdict without an out-param is unchanged");
+    }
+
+
+    // ---- #W48-N (docket D1 F1/F2/F3 + D13): the loop's stopping affordances ----
+    cout << "\n[#W48-F3] the decline is a real, numbered LAST row on a single-option window\n";
+    {
+        string row = string("0. ") + kPassPriorityRowText;
+        CHECK(row == "0. Pass priority (take no action this window)",
+              "#W48-F3 the decline row renders in the same shape as every other row");
+        // NEGATIVE: it is a decline, not an instruction to decline.
+        string lc = kPassPriorityRowText;
+        for (size_t i = 0; i < lc.size(); i++) lc[i] = (char) tolower((unsigned char) lc[i]);
+        CHECK(lc.find("you should") == string::npos && lc.find("recommend") == string::npos
+              && lc.find("instead") == string::npos,
+              "#W48-F3 NEGATIVE the row states the act, never advises taking it");
+        // ECHO: the row echoed back in full still resolves to index 0 (pass).
+        {
+            vector<string> menu;
+            menu.push_back("Create human with Thraben Doomsayer [cost: Tap]");
+            bool stale = false; string src;
+            int c = parseChoice(string("CHOICE: 0 (") + kPassPriorityRowText + ")",
+                                (int) menu.size(), &menu, &stale, &src);
+            CHECK(c == 0, "#W48-F3 echo: the whole decline row answers as 0 (pass)");
+        }
+    }
+
+    cout << "\n[#W48-F1] the repeat-N row: an added option that names its own index and ceiling\n";
+    {
+        string sn = repeatShortName("Create human with Thraben Doomsayer [cost: Tap]"
+                                    " [repeat: activated this turn 8 times already;"
+                                    " you control 12 creatures.]"
+                                    " {card text: \"{T}: Create a 1/1 white Human...\"}");
+        CHECK(sn == "Create human with Thraben Doomsayer",
+              "#W48-F1 the short name drops the cost, the repeat tag and the card text");
+        CHECK(repeatShortName("Add 3 green mana with Overgrown Battlement").find('[') == string::npos,
+              "#W48-F1 NEGATIVE an unannotated line survives unchanged (no bracket residue)");
+        string row = repeatRowLine(sn, 2);
+        CHECK(row.find("Create human with Thraben Doomsayer, repeated N times, then stop") == 0,
+              "#W48-F1 the row leads with the action and the shortcut, not the explanation");
+        CHECK(row.find("\"CHOICE: 2 (Create human with Thraben Doomsayer x50)\"") != string::npos,
+              "#W48-F1 the worked example carries THIS row's own index");
+        CHECK(repeatRowLine(sn, 7).find("\"CHOICE: 7 (") != string::npos,
+              "#W48-F1 the example index follows the row, never a hard-coded number");
+        CHECK(row.find("re-checking the cost each iteration and stopping early if it becomes unpayable") != string::npos
+              && row.find("returns priority to you here") != string::npos,
+              "#W48-F1 the row states the two facts that make the shortcut safe to take");
+        CHECK(row.find("N is at most 200") != string::npos,
+              "#W48-F1 the stated ceiling is the enforced one (kRepeatRowMax)");
+        // ECHO: the row's own exemplar, answered verbatim, binds to the row.
+        {
+            vector<string> menu;
+            menu.push_back("Create human with Thraben Doomsayer [cost: Tap]"
+                           " [repeat: activated this turn 8 times already; you control 12 creatures."
+                           " This turn will not advance while you keep taking this option.]");
+            menu.push_back(row);
+            bool stale = false; string src;
+            int c = parseChoice("CHOICE: 2 (Create human with Thraben Doomsayer x50)",
+                                (int) menu.size(), &menu, &stale, &src);
+            CHECK(c == 2 && !stale,
+                  "#W48-F1 echo: the exemplar answer binds to the repeat row, not to the base row");
+            CHECK(stripNarrationDecoration(menu[1]).find("[repeat") == string::npos,
+                  "#W48-F1 echo: no bracketed row state reaches the narrated record");
+        }
+    }
+
+    cout << "\n[#W48-F1] the count N the model names on its CHOICE line\n";
+    {
+        CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x50)") == 50,
+              "#W48-F1 the exemplar's own 'x50' shape parses");
+        CHECK(parseRepeatCount("CHOICE: 2 (Create human x 12)") == 12,
+              "#W48-F1 'x 12' with a space parses");
+        CHECK(parseRepeatCount("CHOICE: 2 (Create human, 30 times)") == 30,
+              "#W48-F1 the natural-language '30 times' shape parses");
+        CHECK(parseRepeatCount("CHOICE: 1 (Cast Ox)") == -1,
+              "#W48-F1 NEGATIVE a name ending in a letter+x is not a count");
+        CHECK(parseRepeatCount("CHOICE: 0 (pass)") == -1,
+              "#W48-F1 NEGATIVE a plain decline names no count");
+        CHECK(parseRepeatCount("PLAN: I have 50 creatures and will attack for 50.") == -1,
+              "#W48-F1 NEGATIVE plan prose numbers are never read as a count");
+        CHECK(parseRepeatCount("CHOICE: 2 (Create human x5)\nCHOICE: 2 (Create human x40)") == 40,
+              "#W48-F1 a re-answered count keeps the LAST named, as the choice resolver does");
+        CHECK(parseRepeatCount("CHOICE: 2 (Create human x9999)") == 9999
+              && 9999 > kRepeatRowMax,
+              "#W48-F1 an over-ceiling count parses and is clamped by the seam, never taken raw");
+        // The shape consumePlan actually hands over: the CHOICE: label is
+        // already consumed, so the segment is a bare " N (name xK)".
+        CHECK(parseRepeatCount(" 4 (Create human with Thraben Doomsayer #1 x25)") == 25,
+              "#W48-F1 the label-stripped answer segment (what consumePlan returns) still yields the count");
+        CHECK(parseRepeatCount(" 1 (Create human with Thraben Doomsayer #2)") == -1,
+              "#W48-F1 NEGATIVE a label-stripped segment with no count names none");
+        CHECK(parseRepeatCount("CHOICE: 4 (Create human with Thraben Doomsayer #1 x25)") == 25,
+              "#W48-F1 an instance handle before the count does not swallow it");
+        CHECK(parseRepeatCount(" 2 (Create human x30)\nI have 99 creatures and 99 times over that is plenty.") == 30,
+              "#W48-F1 NEGATIVE only the answer line is scanned - trailing prose numbers are not counts");
+    }
+
+    cout << "\n[#W48-F2/D13] the repeat tag states the mechanism, in a scope that survives the turn\n";
+    {
+        CHECK(repeatMechanismClause(0)
+              == " This turn will not advance while you keep taking this option.",
+              "#W48-F2 the mechanism sentence is stated wherever the tag renders");
+        CHECK(repeatMechanismClause(1099)
+              == " This turn will not advance while you keep taking this option;"
+                 " you have taken it 1099 times in a row with no other action in between.",
+              "#W48-D13 the loop-scoped count is the one that does not reset at a turn boundary");
+        CHECK(repeatMechanismClause(1).find("in a row") == string::npos,
+              "#W48-D13 NEGATIVE a single take is not a run and states no run count");
+        // NEGATIVE: restriction-first - no affirmative permission to latch onto.
+        string lc = repeatMechanismClause(1099);
+        for (size_t i = 0; i < lc.size(); i++) lc[i] = (char) tolower((unsigned char) lc[i]);
+        CHECK(lc.find("you may") == string::npos && lc.find("you can") == string::npos
+              && lc.find("again") == string::npos && lc.find("should") == string::npos,
+              "#W48-F2 NEGATIVE the clause carries no affirmative-action substring and no advice");
+        // The two scopes stay legible in the wording: "this turn" vs "in a row".
+        CHECK(lc.find("this turn") != string::npos && lc.find("in a row") != string::npos,
+              "#W48-D13 both scopes are named in the tag, so no threshold is keyed to a hidden reset");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
