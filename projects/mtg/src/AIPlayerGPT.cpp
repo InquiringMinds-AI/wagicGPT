@@ -505,7 +505,20 @@ string optionCardTextCore(const string& raw, size_t maxLen)
         string one = (b == string::npos) ? string() : faces[i].substr(b, e - b + 1);
         if (one.empty())
             continue;
-        o << (shown++ ? " // " : "") << boardEffectSnippet(one, maxLen);
+        string face = boardEffectSnippet(one, maxLen);
+        //#W49-U D12 (wave-48 ledger, MED; 118 blocks ended on a bare `// <name>`).
+        //A transforming/modal card's `text=` carries its BACK face as the bare
+        //name after the `//` (the back face's own text lives on the transformed
+        //primitive) - so the block ended "// Lord of Lineage" and read as a
+        //complete card whose back face does nothing. Not a mid-word cut, an
+        //UNMARKED truncation: say the text is not here, so the omission is
+        //counted rather than silent (the {0}-cost lesson: gaps get confabulated).
+        //A bare name has no sentence punctuation; any face with a '.', ':' or
+        //'(' carries rules text and is left byte-identical.
+        if (shown > 0 && face.find('.') == string::npos && face.find(':') == string::npos
+            && face.find('(') == string::npos)
+            face += " (text omitted)";
+        o << (shown++ ? " // " : "") << face;
     }
     return shown ? o.str() : boardEffectSnippet(flat, maxLen);
 }
@@ -5997,15 +6010,222 @@ static string drawPunisherSituationLine(Player * me, Player * opp)
 //life. The tag is bracketed, so stripNarrationDecoration keeps it out of the
 //append-only history (it is a decision-time surface, not a record of what
 //happened). Pure over its three inputs.
+//#W49-U D6: verb agreement - one punisher "punishes", a list "punish".
+static const char * punisherVerb(const string& punishers)
+{
+    return punishers.find(", ") == string::npos ? " punishes" : " punish";
+}
+
 static string drawPriceRowTag(int cards, int perDraw, const string& punishers)
 {
     if (cards <= 0 || perDraw <= 0 || punishers.empty())
         return "";
     std::ostringstream o;
     o << " [DRAW PRICE: this draws " << cards << " card" << (cards == 1 ? "" : "s")
-      << ", and the opponent's " << punishers << " punish every draw, so taking it"
-         " costs you " << (cards * perDraw) << " life right now]";
+      << ", and the opponent's " << punishers << punisherVerb(punishers)
+      << " every draw, so taking it costs you " << (cards * perDraw) << " life right now]";
     return o.str();
+}
+
+//#W49-U D6 (c): an OPPOSING permanent that makes the caster draw whenever it
+//casts a spell (Forced Fruition: `@movedTo(*[-land]|opponentstack):draw:7
+//opponent`). The engine's "opponent" in that payload is the opponent of the
+//permanent's controller - i.e. the CASTER - which is exactly the reading the
+//pilot got backwards ("that player" read as THEM: deck130 vs162 seq 23 cast
+//Rorix at 1 life into it). Only the cast-trigger hook with a plain numeric
+//draw aimed at the caster is counted; anything gated or non-numeric is not a
+//number the pilot can count on and is left unclaimed. Pure over the script.
+static int castTriggerDrawCount(const string& magicText)
+{
+    int total = 0;
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        string low = line;
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        size_t st = low.find_first_not_of(" \t\r");
+        if (st == string::npos || low.compare(st, 9, "@movedto(") != 0)
+            continue;
+        size_t colon = low.find("):", st);
+        if (colon == string::npos)
+            continue;
+        string head = low.substr(st, colon - st);
+        if (head.find("|opponentstack") == string::npos)
+            continue;
+        if (head.find("restriction{") != string::npos)
+            continue;
+        string payload = low.substr(colon + 2);
+        size_t pb = payload.find_first_not_of(" \t\r");
+        if (pb == string::npos)
+            continue;
+        payload = payload.substr(pb);
+        if (payload.compare(0, 5, "draw:") != 0)
+            continue;
+        size_t ae = payload.find_first_of(" \t\r", 5);
+        string amt = payload.substr(5, ae == string::npos ? string::npos : ae - 5);
+        bool numeric = !amt.empty();
+        for (size_t k = 0; k < amt.size(); k++)
+            if (!isdigit((unsigned char) amt[k]))
+                numeric = false;
+        if (!numeric)
+            continue;
+        if (payload.find("opponent") == string::npos)
+            continue; //a draw for the permanent's own controller is not the caster's
+        total += atoi(amt.c_str());
+    }
+    return total;
+}
+
+//The board scan: every such permanent the OPPONENT controls, named with its
+//handle, and the cards the pilot draws per spell it casts.
+static void castTriggerDrawScan(Player * opp, std::vector<std::string>& names, int& perCast)
+{
+    perCast = 0;
+    if (!opp || !opp->game || !opp->game->inPlay)
+        return;
+    MTGGameZone * bf = opp->game->inPlay;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        int n = c ? castTriggerDrawCount(c->magicText) : 0;
+        if (n <= 0)
+            continue;
+        names.push_back(c->name + instanceHandle(c));
+        perCast += n;
+    }
+}
+
+//The CAST-row tag for it. Says WHO draws (the caster - the reading that was
+//inverted) and, when draw punishers stand, what those draws cost. Pure.
+static string castDrawPriceRowTag(int perCast, const string& castNames,
+                                  int perDraw, const string& punishers)
+{
+    if (perCast <= 0 || castNames.empty())
+        return "";
+    std::ostringstream o;
+    o << " [DRAW PRICE: casting this draws YOU " << perCast << " card" << (perCast == 1 ? "" : "s")
+      << " (their " << castNames << ")";
+    if (perDraw > 0 && !punishers.empty())
+        o << ", and their " << punishers << (punishers.find(", ") == string::npos ? " deals" : " deal")
+          << " you " << (perCast * perDraw);
+    o << "]";
+    return o.str();
+}
+
+//#W49-U D6 (a): the draw:X cast row's half. The {X pricing:} clause already
+//states what a point of X buys; under draw punishers it now states what each
+//of those cards COSTS, and the worst case at the affordable cap, so the row
+//carries the number (Sphinx's Revelation under Fate Unraveler: deck125 vs162
+//seq 38/41, untagged). Pure.
+static string xDrawPunishClause(int maxX, int drawPerX, int perDraw, const string& punishers)
+{
+    if (maxX <= 0 || drawPerX <= 0 || perDraw <= 0 || punishers.empty())
+        return "";
+    std::ostringstream o;
+    int cards = maxX * drawPerX;
+    o << "DRAW PRICE: every card X draws costs you " << perDraw << " life to their " << punishers
+      << " (at X=" << maxX << ": " << cards << " card" << (cards == 1 ? "" : "s") << " = "
+      << (cards * perDraw) << " life)";
+    return o.str();
+}
+
+//#W49-U D6 (d): the next DRAW STEP, forecast. `extras` are the named additional-
+//draw permanents (Howling Mine 1, Dictate of Kruphix 1, Teferi's Puzzle Box:
+//hand size ...) with the cards each adds for THIS seat; `base` is the step's
+//own 1. Under punishers the life it costs is multiplied out - deck123 vs162
+//seq 35 sat at 9 life in front of a 9-card draw step at 2 each, with K stated
+//nowhere. Pure.
+static string drawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
+                                   int perDraw)
+{
+    int k = base;
+    for (size_t i = 0; i < extras.size(); i++)
+        k += extras[i].second;
+    std::ostringstream o;
+    o << "DRAW FORECAST: your next draw step draws " << k << " card" << (k == 1 ? "" : "s");
+    if (!extras.empty())
+    {
+        o << " (" << base;
+        for (size_t i = 0; i < extras.size(); i++)
+            o << " + " << extras[i].first << " " << extras[i].second;
+        o << ")";
+    }
+    if (perDraw > 0)
+        o << " = " << k << " x " << perDraw << " = " << (k * perDraw) << " life to the punishers above";
+    o << ".";
+    return o.str();
+}
+
+//The scan behind it: `@each my draw:...draw:N controller` on the seat's own
+//permanents and `@each opponent draw:...draw:N opponent` on the other side both
+//fire on THIS seat's draw step. `sourcenottap` (Howling Mine) is honoured. The
+//Puzzle Box form (`count(type:*:myhand) ... draw:countedamount`) draws the hand
+//size and is named with it; any other non-numeric amount names the permanent
+//with 0 rather than inventing a count.
+static void drawStepExtrasScan(Player * me, Player * opp,
+                               std::vector<std::pair<std::string, int> >& extras)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        Player * pl = (side == 0) ? me : opp;
+        if (!pl || !pl->game || !pl->game->inPlay || !me || !me->game || !me->game->hand)
+            continue;
+        const string hook = (side == 0) ? "@each my draw" : "@each opponent draw";
+        const string drawer = (side == 0) ? "controller" : "opponent";
+        MTGGameZone * bf = pl->game->inPlay;
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            if (!c)
+                continue;
+            const string& mt = c->magicText;
+            size_t lp = 0;
+            while (lp <= mt.size())
+            {
+                size_t nl = mt.find('\n', lp);
+                string line = mt.substr(lp, nl == string::npos ? string::npos : nl - lp);
+                lp = (nl == string::npos) ? mt.size() + 1 : nl + 1;
+                string low = line;
+                for (size_t q = 0; q < low.size(); q++)
+                    low[q] = (char) tolower((unsigned char) low[q]);
+                size_t st = low.find_first_not_of(" \t\r");
+                if (st == string::npos || low.compare(st, hook.size(), hook) != 0)
+                    continue;
+                size_t colon = low.find(':', st);
+                if (colon == string::npos)
+                    continue;
+                string head = low.substr(st, colon - st);
+                if (head.find("sourcenottap") != string::npos && c->isTapped())
+                    continue;
+                if (head.find("restriction{") != string::npos)
+                    continue;
+                string payload = low.substr(colon + 1);
+                size_t d = payload.find("draw:");
+                if (d == string::npos)
+                    continue;
+                size_t ae = payload.find_first_of(" \t\r", d + 5);
+                string amt = payload.substr(d + 5, ae == string::npos ? string::npos : ae - d - 5);
+                string rest = (ae == string::npos) ? string() : payload.substr(ae);
+                if (rest.find(drawer) == string::npos && rest.find_first_not_of(" \t\r") != string::npos)
+                    continue; //aimed at someone else
+                bool numeric = !amt.empty();
+                for (size_t k = 0; k < amt.size(); k++)
+                    if (!isdigit((unsigned char) amt[k]))
+                        numeric = false;
+                if (numeric)
+                    extras.push_back(std::make_pair(c->name + instanceHandle(c), atoi(amt.c_str())));
+                else if (amt == "countedamount" && payload.find("hand)") != string::npos)
+                    extras.push_back(std::make_pair(c->name + instanceHandle(c) + ": your hand size",
+                                                    me->game->hand->nb_cards));
+                else
+                    extras.push_back(std::make_pair(c->name + instanceHandle(c) + " (amount not fixed)", 0));
+            }
+        }
+    }
 }
 
 //The `draw:N` segments of ONE already-lowercased script line, counted only when
@@ -6271,7 +6491,7 @@ static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
         o << (lifePerX > 0 ? "draw" : "you draw") << " " << cards
           << " card" << (cards == 1 ? "" : "s");
     if (cards > 0 && punisherPerDraw > 0 && !punishers.empty())
-        o << "; the opponent's " << punishers << " punish every draw, so those draws"
+        o << "; the opponent's " << punishers << punisherVerb(punishers) << " every draw, so those draws"
              " cost you " << (cards * punisherPerDraw) << " life - NET "
           << (gain - cards * punisherPerDraw) << " life for this cast";
     o << "}";
@@ -6309,7 +6529,21 @@ string xSpellPricing(MTGCardInstance * card, Player * me)
         if (xLifeDrawClauses(card->magicText, lifePerX, drawPerX) && !base.empty())
         {
             base.erase(base.size() - 1);
-            base += "; " + xLifeDrawEffectClause(lifePerX, drawPerX) + "}";
+            base += "; " + xLifeDrawEffectClause(lifePerX, drawPerX);
+            //#W49-U D6 (a): under draw punishers, what each of those cards costs.
+            if (drawPerX > 0 && me)
+            {
+                vector<string> mineP, theirsP;
+                int minePer = 0, theirsPer = 0;
+                drawPunisherScan(me, me->opponent(), mineP, minePer, theirsP, theirsPer);
+                std::ostringstream pn;
+                for (size_t ni = 0; ni < theirsP.size(); ni++)
+                    pn << (ni ? ", " : "") << theirsP[ni];
+                string dp = xDrawPunishClause(sv.maxX, drawPerX, theirsPer, pn.str());
+                if (!dp.empty())
+                    base += "; " + dp;
+            }
+            base += "}";
         }
         return base;
     }
@@ -7451,6 +7685,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mStaleDropStreak(0), mLastStaleLivelock(false),
       mInPregameAsk(false),
       mInAnnounceXAsk(false),
+      mPlanEchoCount(0),
       mMayBatchVerdict(kMayBatchNone), mMayBatchRemaining(0)
 
 {
@@ -8168,6 +8403,29 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
     //#W48 D9: and the ANNOUNCE_X menu, for the same reason one screen later -
     //the plan's X was fixed at the cast row, before this menu's kill lists
     //existed, so re-showing it re-answers the question with the stale number.
+    //#W49-U D7 (wave-48 ledger MED = R34): the carried plan was IMMORTAL when
+    //it named no action - deck130 vs125 seq 84-131 re-read "The game is lost
+    //... Passing is the only legal action" for 48 windows, and under it aimed
+    //Hammer of Bogardan at itself and cast Starstorm at X=12 into an empty
+    //board. R11's principle (pregame + land drop) generalised: a plan that
+    //names no card of the pilot's and no verb from this action menu is not a
+    //plan about this game, and a plan echoed verbatim 5 times has stopped
+    //carrying intent. Either way the block is DROPPED and the carry cleared,
+    //so the reply rules' own "no plan shown yet" clause asks for a fresh one.
+    if (!pregame && !mInAnnounceXAsk && !mCurrentPlan.empty())
+    {
+        std::vector<string> planNames;
+        MTGGameZone * pz[] = { game->library, game->hand, game->inPlay, game->graveyard };
+        for (int z = 0; z < 4; z++)
+            for (int i = 0; i < pz[z]->nb_cards; i++)
+                planNames.push_back(pz[z]->cards[i]->getDisplayName());
+        if (mPlanEchoCount >= kPlanEchoLimit
+            || gptcaveat::planNamesNoAction(mCurrentPlan, tail, planNames))
+        {
+            mCurrentPlan.clear();
+            mPlanEchoCount = 0;
+        }
+    }
     if (!pregame && !mInAnnounceXAsk && !mCurrentPlan.empty())
     {
         u << "\nYOUR PLAN (as you last stated it): " << mCurrentPlan << "\n";
@@ -8673,6 +8931,8 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
             if (dot != string::npos && dot > plan.size() / 2)
                 plan = plan.substr(0, dot + 1);
         }
+        //#W49-U D7: count verbatim echoes of the plan already carried.
+        mPlanEchoCount = (plan == mCurrentPlan) ? mPlanEchoCount + 1 : 0;
         mCurrentPlan = plan;
     }
     //Labeled answer (the contract): the decision is the label line's
@@ -9721,8 +9981,21 @@ string AIPlayerGPT::serializePregameState()
 //triggers listed on ITS screen. Pure over the two name lists, so the shape is
 //provable in PARSETEST without a board.
 static bool lifeToDamageConverterScript(const string& magicText); //defined with its class docs below
+static bool lifeLossMirrorScript(const string& magicText); //#W49-U D5, same place
 
-string converterSummaryText(const vector<string>& mine, const vector<string>& theirs)
+//#W49-U D5 (wave-48 ledger HIGH = R12, a lost game: deck152 vs126 seq 25 went
+//20 -> 0 in one combat with BOTH halves on the opponent's battlefield and the
+//block naming Sanguine Bond alone). `mineMirror`/`theirsMirror` are that side's
+//Exquisite Blood class (`@lifelostfoeof(player):life:thatmuch controller` -
+//"whenever an opponent loses life, you gain that much"). A converter and a
+//mirror on ONE battlefield close a LOOP: each gain drains, each drain gains,
+//without limit - so the block names the PAIR and says any nonzero payment is
+//fatal, not merely expensive. And the single-converter case gets one clause
+//of DIRECTION: deck146 read the fold as "net 0" in 3 of 4 windows and attacked
+//into it (146 vs126 s72) - it is not a trade, both totals move in the same
+//event. Pure over the four name lists.
+string converterSummaryText(const vector<string>& mine, const vector<string>& theirs,
+                            const vector<string>& mineMirror, const vector<string>& theirsMirror)
 {
     if (mine.empty() && theirs.empty())
         return "";
@@ -9743,14 +10016,42 @@ string converterSummaryText(const vector<string>& mine, const vector<string>& th
          " THEY gain - lifelink, blocking triggers, drains, any of it - into that"
          " much life off YOUR total as well; a converter of YOURS does the same"
          " to life YOU gain, and leaves their gains alone.";
+    if (!theirs.empty())
+        o << " This is not a trade: when they gain N, their total goes UP by N and"
+             " yours goes DOWN by N in the same event.";
+    else
+        o << " This is not a trade: when you gain N, your total goes UP by N and"
+             " theirs goes DOWN by N in the same event.";
+    for (int side = 0; side < 2; side++)
+    {
+        const vector<string>& conv = (side == 0) ? mine : theirs;
+        const vector<string>& mir = (side == 0) ? mineMirror : theirsMirror;
+        if (conv.empty() || mir.empty())
+            continue;
+        o << " Both halves of a life LOOP are on " << (side == 0 ? "YOUR" : "THEIR")
+          << " battlefield (" << conv[0] << " + " << mir[0] << "): " << mir[0]
+          << " turns every life the other player loses back into life for "
+          << (side == 0 ? "you" : "them") << ", which " << conv[0]
+          << " turns into life loss again, without limit. ";
+        if (side == 0)
+            o << "Any life you gain, or any life they lose, chains until they are at 0.";
+        else
+            o << "Any life they gain, or any life you lose, chains until YOU are at 0 - so"
+                 " ANY nonzero payment on a tag above is fatal, not merely expensive.";
+    }
     return o.str();
+}
+
+string converterSummaryText(const vector<string>& mine, const vector<string>& theirs)
+{
+    return converterSummaryText(mine, theirs, vector<string>(), vector<string>());
 }
 
 //The board scan behind it: name every converter on either battlefield, with the
 //instance handle so the claim is checkable against the lines above it.
 static string converterSituationLine(Player * me, Player * opp)
 {
-    vector<string> mineConv, theirsConv;
+    vector<string> mineConv, theirsConv, mineMir, theirsMir;
     for (int side = 0; side < 2; side++)
     {
         Player * pl = (side == 0) ? me : opp;
@@ -9760,12 +10061,15 @@ static string converterSituationLine(Player * me, Player * opp)
         for (int i = 0; i < bf->nb_cards; i++)
         {
             MTGCardInstance * c = bf->cards[i];
-            if (!c || !lifeToDamageConverterScript(c->magicText))
+            if (!c)
                 continue;
-            (side == 0 ? mineConv : theirsConv).push_back(c->name + instanceHandle(c));
+            if (lifeToDamageConverterScript(c->magicText))
+                (side == 0 ? mineConv : theirsConv).push_back(c->name + instanceHandle(c));
+            if (lifeLossMirrorScript(c->magicText)) //#W49-U D5
+                (side == 0 ? mineMir : theirsMir).push_back(c->name + instanceHandle(c));
         }
     }
-    return converterSummaryText(mineConv, theirsConv);
+    return converterSummaryText(mineConv, theirsConv, mineMir, theirsMir);
 }
 
 //#W47 (R7): `optionText` is THIS window's option block (assemblePrompt hands it
@@ -10164,7 +10468,21 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
     {
         string punish = drawPunisherSituationLine(this, opp);
         if (!punish.empty())
+        {
             out << "\n" << punish;
+            //#W49-U D6 (d): beside the standing price, the next draw step's size
+            //and what it will cost - the number the pilot at 9 life in front of
+            //a 9-card step never saw.
+            vector<string> mineP, theirsP;
+            int minePer = 0, theirsPer = 0;
+            drawPunisherScan(this, opp, mineP, minePer, theirsP, theirsPer);
+            if (!theirsP.empty())
+            {
+                std::vector<std::pair<std::string, int> > extras;
+                drawStepExtrasScan(this, opp, extras);
+                out << "\n" << drawStepForecastText(1, extras, theirsPer);
+            }
+        }
     }
     out << "\n" << yourLibraryLine(game->library->nb_cards, myLibInReveal) << "\n";
     return out.str();
@@ -10183,6 +10501,28 @@ static AATurnSide * asTurnSide(MTGAbility * a)
     if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
         return dynamic_cast<AATurnSide *>(na->ability);
     return NULL;
+}
+
+//#W49-U D6 (b): the cards an ACTIVATION draws for its controller, read off
+//the ability object (an AADrawer, possibly one NestedAbility layer down - a
+//cost-bearing GenericActivatedAbility wraps it). 0 when it is not a drawer,
+//the amount is not a plain number, or the draw is aimed at anyone else.
+static int abilityObjectDrawCount(MTGAbility * a)
+{
+    if (!a)
+        return 0;
+    AADrawer * d = dynamic_cast<AADrawer *>(a);
+    if (!d)
+        if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+            d = dynamic_cast<AADrawer *>(na->ability);
+    if (!d || d->nbcardsStr.empty())
+        return 0;
+    for (size_t k = 0; k < d->nbcardsStr.size(); k++)
+        if (!isdigit((unsigned char) d->nbcardsStr[k]))
+            return 0;
+    if (d->who != TargetChooser::UNSET && d->who != TargetChooser::CONTROLLER)
+        return 0;
+    return atoi(d->nbcardsStr.c_str());
 }
 
 //#W46-7: is this ranked action nothing but MANA PRODUCTION? Mirrors the
@@ -11053,6 +11393,16 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             for (map<string, string>::const_iterator mi = src->magicTexts.begin();
                  mi != src->magicTexts.end(); ++mi)
                 cards += scriptAbilityDrawCount(mi->second, aname);
+            //#W49-U D6 (b): a token's granted ability (Clue: `newability[{2}{S}:
+            //draw:1]`) has no name(...) and no script line of its own to scan,
+            //so the count came back 0 and "Draw 1 with Clue [cost: {2},
+            //Sacrifice]" was cracked at 8 life under 2-per-draw punishers
+            //(deck152 vs162 seq 28/29). Read the ability object itself: the
+            //drawer's own count, when it is a plain number and the drawer is
+            //the controller (the engine's default) - the same rail the script
+            //scan applies.
+            if (cards <= 0)
+                cards = abilityObjectDrawCount(action.ability);
             if (cards > 0)
             {
                 vector<string> mineP, theirsP;
@@ -14082,6 +14432,25 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 o << drawPriceRowTag(drawn, theirsPer, pn.str());
             }
         }
+        //#W49-U D6 (c): and what CASTING it makes the caster draw, when an
+        //opposing permanent punishes the cast that way (Forced Fruition).
+        {
+            std::vector<std::string> castNames;
+            int perCast = 0;
+            castTriggerDrawScan(opponent(), castNames, perCast);
+            if (perCast > 0)
+            {
+                vector<string> mineP, theirsP;
+                int minePer = 0, theirsPer = 0;
+                drawPunisherScan(this, opponent(), mineP, minePer, theirsP, theirsPer);
+                std::ostringstream cn, pn;
+                for (size_t ni = 0; ni < castNames.size(); ni++)
+                    cn << (ni ? ", " : "") << castNames[ni];
+                for (size_t ni = 0; ni < theirsP.size(); ni++)
+                    pn << (ni ? ", " : "") << theirsP[ni];
+                o << castDrawPriceRowTag(perCast, cn.str(), theirsPer, pn.str());
+            }
+        }
         if (mStuckCastLines.count(o.str()))
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
@@ -16511,6 +16880,57 @@ static bool lifeToDamageConverterScript(const string& magicText)
     return false;
 }
 
+//#W49-U D5: the MIRROR half (Exquisite Blood: `@lifelostfoeof(player):life:
+//thatmuch controller` - whenever an opponent loses life, its controller gains
+//that much). Alone it is a gain engine; next to a converter of the same side
+//it closes the loop. The trigger must OPEN the line and its payload must be a
+//`thatmuch` gain for the controller (an "opponent" payload would be a drain,
+//not the mirror). Pure over the lowercased script.
+static bool lifeLossMirrorScript(const string& magicText)
+{
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        size_t s = line.find_first_not_of(" \t");
+        if (s == string::npos || line.compare(s, 15, "@lifelostfoeof(") != 0)
+            continue;
+        size_t colon = line.find(":life:thatmuch", s);
+        if (colon == string::npos)
+            continue;
+        if (line.find("opponent", colon) == string::npos)
+            return true;
+    }
+    return false;
+}
+
+//#W49-U D5: does this player hold BOTH halves (a converter and a mirror)?
+static bool playerHasLifeLoop(Player * p)
+{
+    if (!p || !p->game || !p->game->inPlay)
+        return false;
+    bool conv = false, mir = false;
+    MTGGameZone * bf = p->game->inPlay;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        if (!c)
+            continue;
+        conv = conv || lifeToDamageConverterScript(c->magicText);
+        mir = mir || lifeLossMirrorScript(c->magicText);
+    }
+    return conv && mir;
+}
+
+//The A-row clause for it (attackers window): the loop is THEIRS, so every life
+//they gain off this combat, or every point you lose to it, chains. Worded from
+//the mechanism (gain-or-loss chains), not from a prediction about damage.
+static const char * kLifeLoopAttackerRowTag =
+    " (their life LOOP is in play: any life they gain or you lose in this combat"
+    " chains without limit - fatal to you, not a trade)";
+
 //#W47-R3 (wave-46 ledger, HIGH). Does this player control a life-to-damage
 //converter right now? The board question behind the per-tag binding below.
 //Same scan converterSituationLine runs for the CURRENT SITUATION paragraph, so
@@ -18098,6 +18518,8 @@ int AIPlayerGPT::chooseAttackers()
             if (noneCouldBlock && minB < 2)
                 ln << noPotentialBlockersTag();
         }
+        if (playerHasLifeLoop(opponent())) //#W49-U D5
+            ln << kLifeLoopAttackerRowTag;
         aRowName.push_back(attackers[j]->name);
         aRowHandle.push_back(instanceHandle(attackers[j]));
         aRowRest.push_back(ln.str());
@@ -18187,10 +18609,20 @@ int AIPlayerGPT::chooseAttackers()
     //life gains, so a converter converts them. Stated as a consequence of
     //blocking, not as a prediction that they will block.
     if (!converterSituationLine(this, opponent()).empty())
+    {
         tail << "The \"blocking trigger\" gains listed above are LIFE GAINS, so the"
                 " LIFE-TO-DAMAGE CONVERTER named in the CURRENT SITUATION block"
                 " applies to them: a converter of THEIRS turns each such gain into"
-                " that much life off YOUR total as well.\n";
+                " that much life off YOUR total as well.";
+        //#W49-U D5: with both halves of the loop on their side, the screen's own
+        //rule is stated where the ATTACK: line is written.
+        if (playerHasLifeLoop(opponent()))
+            tail << " Both halves of their life LOOP are in play (see CURRENT"
+                    " SITUATION): any life they gain or you lose in combat chains"
+                    " until you are at 0, so an attack that lets them gain ANY"
+                    " life, or costs you ANY life, is fatal.";
+        tail << "\n";
+    }
     tail << kAttackersTurnFacts;
     tail << "On the FIRST line write ATTACK: followed by the attackers you send,"
             " comma-separated (e.g. \"ATTACK: A1, A3\"), or \"ATTACK: none\" to"
@@ -18741,6 +19173,8 @@ int AIPlayerGPT::chooseBlockers()
                 }
             }
         }
+        if (playerHasLifeLoop(opponent())) //#W49-U D5
+            ln << kLifeLoopAttackerRowTag;
         aRowName.push_back(attackers[j]->name);
         aRowHandle.push_back(instanceHandle(attackers[j]));
         aRowRest.push_back(ln.str());
@@ -29551,6 +29985,183 @@ void AIPlayerGPT::runParseSelfTest()
             bool stale = false; string src;
             int pick = parseChoice(string("CHOICE: 2 (X = 4") + kXMostKillsMarker + ")", 2, &menu, &stale, &src);
             CHECK(pick == 2 && !stale, "#W48-D9 echo: the marked row binds to index 2");
+        }
+    }
+
+    // ==================== #W49-U (wave-48 docket D5 / D6 / D7 / D12) ====================
+    // ---- #W49-U D5: the converter PAIR loop clause + the direction sentence ----
+    cout << "\n[#W49-U D5] both halves of the life loop are named, and a fold is not a trade\n";
+    {
+        const char * bondScript = "@lifeof(player) from(*[-lifefaker]|*):life:-thatmuch opponent";
+        const char * bloodScript = "@lifelostfoeof(player):life:thatmuch controller";
+        CHECK(lifeLossMirrorScript(bloodScript),
+              "#W49-U D5 Exquisite Blood's script is the MIRROR half");
+        CHECK(!lifeLossMirrorScript(bondScript),
+              "#W49-U D5 NEGATIVE Sanguine Bond is the converter, not the mirror");
+        CHECK(!lifeLossMirrorScript("@lifelostfoeof(player):life:-thatmuch opponent"),
+              "#W49-U D5 NEGATIVE a loss-for-loss drain aimed at the opponent is not the mirror");
+        CHECK(!lifeLossMirrorScript("") && !lifeLossMirrorScript("lifeleech:-X opponent"),
+              "#W49-U D5 NEGATIVE an empty script and a plain drain are not the mirror");
+        vector<string> none, theirs, theirsMir, mine, mineMir;
+        theirs.push_back("Sanguine Bond");
+        theirsMir.push_back("Exquisite Blood");
+        string single = converterSummaryText(none, theirs, none, none);
+        cout << "     " << single << "\n";
+        CHECK(single.find("This is not a trade: when they gain N, their total goes UP by N and"
+                          " yours goes DOWN by N in the same event.") != string::npos,
+              "#W49-U D5 the single-converter block carries the DIRECTION sentence");
+        CHECK(single.find("LOOP") == string::npos,
+              "#W49-U D5 NEGATIVE one half alone names no loop");
+        string pair = converterSummaryText(none, theirs, none, theirsMir);
+        cout << "     " << pair << "\n";
+        CHECK(pair.find("Both halves of a life LOOP are on THEIR battlefield (Sanguine Bond + Exquisite Blood)")
+                  != string::npos,
+              "#W49-U D5 both halves on their side: the PAIR is named");
+        CHECK(pair.find("ANY nonzero payment on a tag above is fatal, not merely expensive") != string::npos,
+              "#W49-U D5 ... and the fatality rule is stated");
+        mine.push_back("Sanguine Bond");
+        mineMir.push_back("Exquisite Blood");
+        string mineLoop = converterSummaryText(mine, none, mineMir, none);
+        CHECK(mineLoop.find("on YOUR battlefield") != string::npos
+              && mineLoop.find("until they are at 0") != string::npos
+              && mineLoop.find("fatal, not merely expensive") == string::npos,
+              "#W49-U D5 the pilot's OWN loop is voiced as theirs to lose, never as a payment warning");
+        CHECK(converterSummaryText(none, none, none, theirsMir).empty(),
+              "#W49-U D5 NEGATIVE the mirror alone (no converter anywhere) keeps the block silent");
+        CHECK(converterSummaryText(none, theirs) == single,
+              "#W49-U D5 REGRESSION the two-list form is the four-list form with no mirrors");
+        // Echo shape: the A-row tag is a parenthetical; an answer that echoes it still binds.
+        string row = string("Elite Spellbinder (7/5) [flying]") + kLifeLoopAttackerRowTag;
+        vector<bool> send;
+        int r = parseAttackerSet(string("ATTACK: A1 ") + kLifeLoopAttackerRowTag, 1, send, NULL);
+        CHECK(r >= 0 && send.size() == 1 && send[0],
+              "#W49-U D5 echo: an ATTACK line trailing the loop tag still binds A1");
+        CHECK(row.find("fatal to you, not a trade") != string::npos
+              && row.find("damage") == string::npos,
+              "#W49-U D5 the row tag states the mechanism (gain-or-loss chains), not a damage prediction");
+    }
+
+    // ---- #W49-U D6: [DRAW PRICE:] reaches draw:X, token draws, cast-trigger draws; DRAW FORECAST ----
+    cout << "\n[#W49-U D6] three more row classes pay their draw, and the next draw step is forecast\n";
+    {
+        // (c) the opposing cast-trigger drawer, off the real primitive line.
+        CHECK(castTriggerDrawCount("@movedTo(*[-land]|opponentstack):draw:7 opponent") == 7,
+              "#W49-U D6 Forced Fruition's cast trigger draws the CASTER 7");
+        CHECK(castTriggerDrawCount("@movedTo(*[-land]|mystack):draw:1 controller") == 0,
+              "#W49-U D6 NEGATIVE a self-cast trigger drawing its own controller is not the caster's price");
+        CHECK(castTriggerDrawCount("@movedTo(*[-land]|opponentstack):draw:x opponent") == 0
+              && castTriggerDrawCount("@movedTo(*|opponentstack):damage:1 opponent") == 0
+              && castTriggerDrawCount("") == 0,
+              "#W49-U D6 NEGATIVE non-numeric or non-draw payloads claim no number");
+        CHECK(castTriggerDrawCount("@movedTo(*[-land]|opponentstack) restriction{mylife>5}:draw:7 opponent") == 0,
+              "#W49-U D6 NEGATIVE a gated cast trigger is not a count the pilot can rely on");
+        string ct = castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams");
+        cout << "     Cast Rorix Bladewing" << ct << "\n";
+        CHECK(ct == " [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition),"
+                    " and their Underworld Dreams deals you 7]",
+              "#W49-U D6 the cast row says WHO draws and what the punisher takes");
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 0, "") ==
+                  " [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition)]",
+              "#W49-U D6 without a punisher the tag still names the draw and its owner");
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 2, "Underworld Dreams, Fate Unraveler")
+                  .find("deal you 14]") != string::npos,
+              "#W49-U D6 a list of punishers takes the plural verb and the summed price");
+        CHECK(castDrawPriceRowTag(0, "Forced Fruition", 1, "Underworld Dreams").empty()
+              && castDrawPriceRowTag(7, "", 1, "Underworld Dreams").empty(),
+              "#W49-U D6 NEGATIVE no cast-trigger drawer, no tag");
+        CHECK(stripNarrationDecoration("Cast Rorix Bladewing" + ct) == "Cast Rorix Bladewing",
+              "#W49-U D6 echo: the cast-trigger tag leaves no residue in the narrated record");
+        {
+            vector<string> menu;
+            menu.push_back("Cast Rorix Bladewing" + ct);
+            bool stale = false; string src;
+            int pick = parseChoice("CHOICE: 1 (Cast Rorix Bladewing" + ct + ")", 1, &menu, &stale, &src);
+            CHECK(pick == 1 && !stale, "#W49-U D6 echo: a reply that parrots the tag still binds the row");
+        }
+        // Verb agreement on the existing tag.
+        CHECK(drawPriceRowTag(1, 2, "Fate Unraveler").find("Fate Unraveler punishes every draw") != string::npos,
+              "#W49-U D6 one punisher: 'punishes'");
+        CHECK(drawPriceRowTag(1, 2, "Fate Unraveler, Underworld Dreams").find("Dreams punish every draw") != string::npos,
+              "#W49-U D6 REGRESSION two punishers: 'punish'");
+        CHECK(xLifeDrawRowCore(2, 1, 1, 1, "Fate Unraveler").find("Fate Unraveler punishes every draw") != string::npos,
+              "#W49-U D6 the ANNOUNCE_X row agrees too");
+        // (a) draw:X on the cast row.
+        string xd = xDrawPunishClause(4, 1, 1, "Fate Unraveler");
+        cout << "     {X pricing: ...; " << xd << "}\n";
+        CHECK(xd == "DRAW PRICE: every card X draws costs you 1 life to their Fate Unraveler"
+                    " (at X=4: 4 cards = 4 life)",
+              "#W49-U D6 Sphinx's Revelation under Fate Unraveler prices every card X draws");
+        CHECK(xDrawPunishClause(4, 1, 0, "").empty() && xDrawPunishClause(0, 1, 1, "Fate Unraveler").empty()
+              && xDrawPunishClause(4, 0, 1, "Fate Unraveler").empty(),
+              "#W49-U D6 NEGATIVE no punisher, X=0, or a non-drawing X spell: no clause");
+        // (d) the draw-step forecast.
+        std::vector<std::pair<std::string, int> > extras;
+        extras.push_back(std::make_pair(string("Howling Mine"), 1));
+        extras.push_back(std::make_pair(string("Dictate of Kruphix"), 1));
+        extras.push_back(std::make_pair(string("Teferi's Puzzle Box: your hand size"), 6));
+        string fc = drawStepForecastText(1, extras, 2);
+        cout << "     " << fc << "\n";
+        CHECK(fc == "DRAW FORECAST: your next draw step draws 9 cards (1 + Howling Mine 1"
+                    " + Dictate of Kruphix 1 + Teferi's Puzzle Box: your hand size 6)"
+                    " = 9 x 2 = 18 life to the punishers above.",
+              "#W49-U D6 the 9-card step that killed deck123 is stated with its price");
+        std::vector<std::pair<std::string, int> > noneX;
+        CHECK(drawStepForecastText(1, noneX, 2) == "DRAW FORECAST: your next draw step draws 1 card = 1 x 2 = 2 life to the punishers above.",
+              "#W49-U D6 a plain draw step is still forecast under punishers");
+        CHECK(drawStepForecastText(1, extras, 0).find(" life") == string::npos,
+              "#W49-U D6 NEGATIVE no per-draw price known, no life arithmetic invented");
+        CHECK(stripNarrationDecoration(fc) == fc,
+              "#W49-U D6 the forecast is an unbracketed situation line (it never enters the narration)");
+    }
+
+    // ---- #W49-U D7: the carried plan expires when it names no action ----
+    cout << "\n[#W49-U D7] a plan naming no card and no menu verb is dropped\n";
+    {
+        vector<string> mine;
+        mine.push_back("Hammer of Bogardan");
+        mine.push_back("Starstorm");
+        mine.push_back("Mountain");
+        string castMenu = "1. Cast Hammer of Bogardan [cost: {1}{R}{R}]\n2. Activate Starstorm cycling\n3. Play Mountain\n";
+        CHECK(gptcaveat::planNamesNoAction("The game is lost. Passing is the only legal action with no impact.",
+                                           castMenu, mine),
+              "#W49-U D7 the 48-window 'game is lost' plan names no action");
+        CHECK(!gptcaveat::planNamesNoAction("Hold Hammer of Bogardan for their next creature.", castMenu, mine),
+              "#W49-U D7 NEGATIVE a plan naming one of the pilot's cards is kept");
+        CHECK(!gptcaveat::planNamesNoAction("Cast nothing this turn and wait for a target.", castMenu, mine),
+              "#W49-U D7 NEGATIVE a plan using a row verb (Cast) is kept");
+        CHECK(!gptcaveat::planNamesNoAction("Keep passing until they overextend.",
+                                            "A1. Grishnakh (3/3)\nA2. Orc Army (2/2)\n", mine),
+              "#W49-U D7 NEGATIVE an attackers window has no row verbs to judge by: not this rule's call");
+        CHECK(!gptcaveat::planNamesNoAction("", castMenu, mine),
+              "#W49-U D7 NEGATIVE an empty plan is nothing to drop");
+        CHECK(AIPlayerGPT::kPlanEchoLimit == 5,
+              "#W49-U D7 the verbatim-echo limit is 5 windows");
+    }
+
+    // ---- #W49-U D12: the bare back face gets a truncation marker ----
+    cout << "\n[#W49-U D12] `// <face>` with no text says so\n";
+    {
+        string keeper = "Flying -- {T}: Put a 2/2 black Vampire creature token with flying onto the"
+                        " battlefield. -- {B}: Transform Bloodline Keeper. Activate this ability only"
+                        " if you control five or more Vampires. // Lord of Lineage";
+        string r = optionCardTextCore(keeper, 220);
+        cout << "     " << r << "\n";
+        CHECK(r.size() >= 30 && r.compare(r.size() - 30, 30, "Lord of Lineage (text omitted)") == 0,
+              "#W49-U D12 Bloodline Keeper's block ends on the marked back face");
+        string pathway = "({T}: Add {W}.) // Boulderloft Pathway";
+        CHECK(optionCardTextCore(pathway, 140) == "({T}: Add {W}.) // Boulderloft Pathway (text omitted)",
+              "#W49-U D12 a pathway's back face is marked");
+        string realBack = "Flying // Moonrage Brute: Menace. Moonrage Brute can't be blocked by more than one creature.";
+        CHECK(optionCardTextCore(realBack, 220).find("(text omitted)") == string::npos,
+              "#W49-U D12 NEGATIVE a back face that carries text is not marked");
+        CHECK(optionCardTextCore("Flying. Deathtouch.", 140) == "Flying. Deathtouch.",
+              "#W49-U D12 NEGATIVE a single-face text is byte-identical");
+        {
+            vector<string> menu;
+            menu.push_back("Cast Bloodline Keeper {card text: \"" + r + "\"}");
+            bool stale = false; string src;
+            int pick = parseChoice("CHOICE: 1 (Cast Bloodline Keeper // Lord of Lineage (text omitted))", 1, &menu, &stale, &src);
+            CHECK(pick == 1 && !stale, "#W49-U D12 echo: a reply that parrots the marked face still binds");
         }
     }
 
