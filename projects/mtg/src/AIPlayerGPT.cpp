@@ -3573,6 +3573,131 @@ string joinBlockerRows(const vector<string>& names, const vector<string>& handle
     return o.str();
 }
 
+//#W49-R (D13, wave-48 ledger LOW): the A-rows and B-rows are built in the
+//engine's candidate order, and on a real board that order interleaves - deck146
+//vs162 seq 15 printed "A1. Triumphant Adventurer #1 / A2. Silverquill Silencer /
+//A3. Triumphant Adventurer #2", and D1's board "B1. Pride Guardian #1 / B2.
+//Overgrown Battlement / B3. Pride Guardian #2" - so two rows that read the same
+//never sit together and the adjacency-only range collapse above cannot see
+//them. Same remedy as groupNumberedRows, applied one step EARLIER: the
+//CANDIDATE VECTORS themselves are permuted (before any row is built) so that
+//every card sharing a printed NAME sits at the position of that name's first
+//member, in ascending instance rank. Keying on the name (not the whole row)
+//is what lets this run before the rows exist, and it loses nothing: a range
+//still needs byte-identical facts and consecutive ranks, and same-name cards
+//are the only rows that could ever pass those tests. The caller permutes the
+//request's parallel vectors with the order it gets back, so an A#/B# label
+//still indexes the card the reply parser and the apply path resolve against.
+//Identity when no name repeats (an unchanged board renders an unchanged
+//prompt); the floor is TWO because the point is adjacency, and a pair that is
+//adjacent is at least readable as a pair even where no range is minted.
+void groupCombatCandidates(const vector<string>& names, const vector<string>& handles,
+                           vector<size_t>& order)
+{
+    order.resize(names.size());
+    for (size_t i = 0; i < names.size(); i++)
+        order[i] = i;
+    std::map<string, int> count;
+    for (size_t i = 0; i < names.size(); i++)
+        count[names[i]]++;
+    bool worth = false;
+    for (size_t i = 0; i < names.size() && !worth; i++)
+        if (count[names[i]] >= 2 && handleRank(handles[i]) > 0)
+            worth = true;
+    if (!worth)
+        return;
+    std::set<string> done;
+    vector<size_t> out;
+    out.reserve(names.size());
+    for (size_t i = 0; i < names.size(); i++)
+    {
+        if (count[names[i]] < 2)
+        {
+            out.push_back(i);
+            continue;
+        }
+        if (!done.insert(names[i]).second)
+            continue; //already gathered at its first member
+        vector<std::pair<int, size_t> > members;
+        for (size_t j = i; j < names.size(); j++)
+            if (names[j] == names[i])
+                members.push_back(std::make_pair(handleRank(handles[j]), j));
+        std::stable_sort(members.begin(), members.end());
+        for (size_t m = 0; m < members.size(); m++)
+            out.push_back(members[m].second);
+    }
+    if (out.size() == names.size())
+        order.swap(out);
+}
+
+//#W49-R (D1, wave-48 ledger HIGH): the B-row's "may block" clause was the last
+//uncollapsed enumeration on the combat screens - deck126 vs123 seq 15 printed
+//256 attacker handles with ONE distinct parenthetical, 22,926 chars on B1 and
+//again on B2 and B3 (61,240 chars, the corpus's largest prompt by 2x). PURE:
+//`labels` are the 1-based A-indices this blocker may block, ASCENDING (the
+//caller walks the attacker list, not the legal list, so consecutive labels are
+//consecutive rows), and `parens` the per-pairing parenthetical, either empty
+//or " (...)" in full. Two collapses, both lossless:
+//  (a) a RUN of consecutive labels with a byte-identical parenthetical prints
+//      as one label range, "A3-A257 (neither dies)", at the same floor the
+//      A-rows use, so no label is ever described by a forecast that is not its
+//      own and every handle inside the range is a real printed A-row label;
+//  (b) when EVERY pairing carries the same non-empty parenthetical it is said
+//      once, at the end: "may block A1, A3-A257 (all: neither dies (...))".
+//A single label, a mixed list, or an all-empty list renders exactly as before.
+//`rangeUsed` reports (a) so the caller can print the A-range note even when no
+//A-row itself was ranged (a label range must never appear unexplained).
+string renderMayBlockList(const vector<int>& labels, const vector<string>& parens,
+                          bool * rangeUsed)
+{
+    if (rangeUsed)
+        *rangeUsed = false;
+    std::ostringstream o;
+    if (labels.empty())
+        return o.str();
+    bool factor = labels.size() >= 2 && !parens[0].empty();
+    for (size_t i = 1; i < labels.size() && factor; i++)
+        if (parens[i] != parens[0])
+            factor = false;
+    size_t i = 0;
+    bool first = true;
+    while (i < labels.size())
+    {
+        size_t j = i + 1;
+        while (j < labels.size() && labels[j] == labels[i] + (int) (j - i) && parens[j] == parens[i])
+            j++;
+        size_t run = j - i;
+        o << (first ? " A" : ", A") << labels[i];
+        first = false;
+        if (run >= kBattlefieldCollapseFloor)
+        {
+            o << "-A" << labels[j - 1];
+            if (rangeUsed)
+                *rangeUsed = true;
+        }
+        else
+            j = i + 1; //below the floor: one label per pairing, re-scan from the next
+        if (!factor)
+            o << parens[i];
+        i = j;
+    }
+    if (factor)
+        o << " (all: " << parens[0].substr(2); //" (X)" -> " (all: X)"
+    return o.str();
+}
+
+//#W49-R (D9, wave-48 ledger MED): the battlefield header's two attack buckets
+//must PARTITION the creatures - "N of them are attacking right now, M more able
+//to attack right now" - and a vigilance attacker (untapped, so canAttack() is
+//still true of it) was counted in BOTH: deck123 vs152 seq 26 said "2 attacking,
+//3 more able" over a board of four creatures. The "more" bucket is by its own
+//word the creatures NOT already in the attack, so an attacking body is excluded
+//from it whatever its tap state says.
+bool headerCountsAsMoreAbleToAttack(bool canAttackNow, bool attacking)
+{
+    return canAttackNow && !attacking;
+}
+
 //#W48 (D2): the numbered-option-list half of the same collapse. A priority menu
 //and a target menu carry no name/handle/tail decomposition - they carry one
 //rendered string per option - so the identity handle is recovered FROM the
@@ -10059,7 +10184,11 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
         if (c->isCreature())
         {
             myCreatures++;
-            if (boardCreatureCanAttackNow(c, activeSeat == this))
+            //#W49-R (D9): the "more able" bucket excludes bodies already in the
+            //attack - a vigilance attacker is untapped and canAttack() is still
+            //true of it, so it was counted in both buckets.
+            if (headerCountsAsMoreAbleToAttack(boardCreatureCanAttackNow(c, activeSeat == this),
+                                               c->isAttacker() != 0))
                 myCanAttack++;
             if (c->isAttacker()) //#W48-D3
                 myAttacking++;
@@ -10077,7 +10206,8 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
             if (c->isCreature())
             {
                 oppCreatures++;
-                if (boardCreatureCanAttackNow(c, activeSeat == opp))
+                if (headerCountsAsMoreAbleToAttack(boardCreatureCanAttackNow(c, activeSeat == opp),
+                                                   c->isAttacker() != 0)) //#W49-R (D9)
                     oppCanAttack++;
                 if (c->isAttacker()) //#W48-D3
                     oppAttacking++;
@@ -17852,6 +17982,23 @@ int AIPlayerGPT::chooseAttackers()
     if (!DecisionManager::buildDeclareAttackers(this, req))
         return 1;
     vector<MTGCardInstance *> & attackers = req.candidates;
+    //#W49-R (D13): same-name candidates gathered adjacently, rank ascending,
+    //BEFORE any row is built - the A# labels below index this permuted vector,
+    //and so do the reply parser and the apply path (pointer membership).
+    {
+        vector<string> gn, gh;
+        for (size_t j = 0; j < attackers.size(); j++)
+        {
+            gn.push_back(attackers[j]->name);
+            gh.push_back(instanceHandle(attackers[j]));
+        }
+        vector<size_t> ord;
+        groupCombatCandidates(gn, gh, ord);
+        vector<MTGCardInstance *> perm;
+        for (size_t j = 0; j < ord.size(); j++)
+            perm.push_back(attackers[ord[j]]);
+        attackers.swap(perm);
+    }
 
     //ONE bundled decision for the whole attack. Per-creature asks decided
     //each attacker in isolation (a bad line for alpha strikes and racing)
@@ -18524,6 +18671,43 @@ int AIPlayerGPT::chooseBlockers()
     vector<MTGCardInstance *> & attackers = req.attackers;
     vector<MTGCardInstance *> & blockers = req.blockers;
     vector<vector<MTGCardInstance *> > & legal = req.legalPerBlocker;
+    //#W49-R (D13): same-name cards gathered adjacently, rank ascending, on BOTH
+    //lists before any row is built. `legal` is parallel to `blockers` and moves
+    //with it; the A#/B# labels, the reply parser's index tables and the apply
+    //path all read these same vectors, so a label still names its card.
+    {
+        vector<string> gn, gh;
+        for (size_t j = 0; j < attackers.size(); j++)
+        {
+            gn.push_back(attackers[j]->name);
+            gh.push_back(instanceHandle(attackers[j]));
+        }
+        vector<size_t> ord;
+        groupCombatCandidates(gn, gh, ord);
+        vector<MTGCardInstance *> perm;
+        for (size_t j = 0; j < ord.size(); j++)
+            perm.push_back(attackers[ord[j]]);
+        attackers.swap(perm);
+    }
+    {
+        vector<string> gn, gh;
+        for (size_t i = 0; i < blockers.size(); i++)
+        {
+            gn.push_back(blockers[i]->name);
+            gh.push_back(instanceHandle(blockers[i]));
+        }
+        vector<size_t> ord;
+        groupCombatCandidates(gn, gh, ord);
+        vector<MTGCardInstance *> perm;
+        vector<vector<MTGCardInstance *> > permLegal;
+        for (size_t i = 0; i < ord.size(); i++)
+        {
+            perm.push_back(blockers[ord[i]]);
+            permLegal.push_back(legal[ord[i]]);
+        }
+        blockers.swap(perm);
+        legal.swap(permLegal);
+    }
 
     //ONE bundled decision for the whole combat. Sequential per-blocker asks
     //cannot coordinate (each one's local best answer piled every wall onto
@@ -18752,12 +18936,18 @@ int AIPlayerGPT::chooseBlockers()
             shownLines.push_back(full.str());
         }
     }
+    bool anyAttackerRangeRowShown = false;
     {
         bool anyAttackerRangeRow = false;
         tail << joinBlockerRows(aRowName, aRowHandle, aRowRest, &anyAttackerRangeRow, "A");
         if (anyAttackerRangeRow)
             tail << kAttackerRangeNote;
+        anyAttackerRangeRowShown = anyAttackerRangeRow;
     }
+    //#W49-R (D1): a B-row's "may block A3-A257" uses the A-label range form;
+    //when no A-row itself was ranged, the note that defines the form is printed
+    //after the B-rows instead, so it never appears unexplained.
+    bool anyMayBlockRange = false;
     //W36 #2: classify each attacker's becomes-blocked trigger once; the B-line
     //trades below fold a simple self-pump into the computed result and flag
     //anything else as not-included.
@@ -18821,11 +19011,19 @@ int AIPlayerGPT::chooseBlockers()
             ln << zeroPowerBlockerTag(minP, maxP, anyTrample, anyMenace);
         }
         ln << " - may block";
-        for (size_t j = 0; j < legal[i].size(); j++)
-            for (size_t k = 0; k < attackers.size(); k++)
+        //#W49-R (D1): walk the ATTACKER list (so labels come out ascending)
+        //and collect (label, parenthetical) pairs; renderMayBlockList ranges
+        //consecutive labels with an identical parenthetical and factors an
+        //all-identical one. The parenthetical text per pairing is unchanged;
+        //`pn` collects it in place of the row stream.
+        vector<int> mbLabels;
+        vector<string> mbParens;
+        for (size_t k = 0; k < attackers.size(); k++)
+            for (size_t j = 0; j < legal[i].size(); j++)
                 if (attackers[k] == legal[i][j])
                 {
-                    ln << (j ? "," : "") << " A" << (k + 1);
+                    std::ostringstream pn;
+                    mbLabels.push_back((int) (k + 1));
                     //The computed trade rides the B#:A# pairing so there is
                     //nothing left to re-derive (block-outcome annotation).
                     //W36 #2: a simple when-blocked self-pump is folded IN and
@@ -18838,8 +19036,8 @@ int AIPlayerGPT::chooseBlockers()
                     //for a pairing that cannot happen alone.
                     if (attackers[k]->minBlockersRequired() > 1)
                     {
-                        ln << menaceBlockPairingTag(attackers[k]->minBlockersRequired());
-                        continue;
+                        mbParens.push_back(menaceBlockPairingTag(attackers[k]->minBlockersRequired()));
+                        break;
                     }
                     if (bbKind[k] == 1)
                     {
@@ -18872,8 +19070,16 @@ int AIPlayerGPT::chooseBlockers()
                                      " included here: read its text";
                     }
                     if (!trade.empty())
-                        ln << " (" << trade << ")";
+                        pn << " (" << trade << ")";
+                    mbParens.push_back(pn.str());
+                    break;
                 }
+        {
+            bool mbRange = false;
+            ln << renderMayBlockList(mbLabels, mbParens, &mbRange);
+            if (mbRange)
+                anyMayBlockRange = true;
+        }
         rowName.push_back(blockers[i]->name);
         rowHandle.push_back(instanceHandle(blockers[i]));
         rowRest.push_back(ln.str());
@@ -18897,6 +19103,8 @@ int AIPlayerGPT::chooseBlockers()
     tail << joinBlockerRows(rowName, rowHandle, rowRest, &anyBlockerRangeRow);
     if (anyBlockerRangeRow)
         tail << kBlockerRangeNote;
+    if (anyMayBlockRange && !anyAttackerRangeRowShown) //#W49-R (D1)
+        tail << kAttackerRangeNote;
     //W36 #1: the trade-trust rule, at the tail for salience (see the constant).
     tail << kBlockTradeTrustNote;
     //#W46-5 SCOPE, stated once rather than on every line - the mirror of the
@@ -29552,6 +29760,144 @@ void AIPlayerGPT::runParseSelfTest()
             int pick = parseChoice(string("CHOICE: 2 (X = 4") + kXMostKillsMarker + ")", 2, &menu, &stale, &src);
             CHECK(pick == 2 && !stale, "#W48-D9 echo: the marked row binds to index 2");
         }
+    }
+
+
+    // ---- #W49-R: lane R, wave-49 step 1 - combat screens (render) ----
+    // D1: the B-row "may block" list is ranged and factored (renderMayBlockList).
+    {
+        const string neither = " (neither dies (blocking trigger: you gain 3, and your converter takes 3 off them))";
+        vector<int> lb; vector<string> pr;
+        lb.push_back(1); pr.push_back(neither);
+        for (int k = 3; k <= 257; k++) { lb.push_back(k); pr.push_back(neither); }
+        bool rg = false;
+        string s = renderMayBlockList(lb, pr, &rg);
+        cout << "     may block" << s << "\n";
+        CHECK(s == " A1, A3-A257 (all: neither dies (blocking trigger: you gain 3, and your converter takes 3 off them))",
+              "#W49-R D1 the deck126 specimen: 256 handles, one parenthetical -> one range + one factored clause");
+        CHECK(rg && s.size() < 120, "#W49-R D1 the range flag is raised and the clause is under 120 chars (was 22,926)");
+        // NEGATIVE must-NOT-merge: a differing parenthetical splits the run and refuses the factor.
+        vector<int> lb2; vector<string> pr2;
+        lb2.push_back(1); pr2.push_back(" (both die)");
+        lb2.push_back(2); pr2.push_back(" (kills it, survives)");
+        lb2.push_back(3); pr2.push_back(" (both die)");
+        bool rg2 = false;
+        string s2 = renderMayBlockList(lb2, pr2, &rg2);
+        CHECK(s2 == " A1 (both die), A2 (kills it, survives), A3 (both die)" && !rg2,
+              "#W49-R D1 NEGATIVE a mixed list renders exactly as before - no range, no factor");
+        // NEGATIVE: a gap in the labels never mints a range across it.
+        vector<int> lb3; vector<string> pr3;
+        int gapL[] = {1, 2, 3, 5, 6, 7};
+        for (int k = 0; k < 6; k++) { lb3.push_back(gapL[k]); pr3.push_back(" (both die)"); }
+        bool rg3 = false;
+        string s3 = renderMayBlockList(lb3, pr3, &rg3);
+        CHECK(s3 == " A1-A3, A5-A7 (all: both die)" && rg3,
+              "#W49-R D1 NEGATIVE a skipped label splits the range; the identical parenthetical still factors");
+        // NEGATIVE: a run of two is under the floor - listed, not ranged; factor still applies.
+        vector<int> lb4; vector<string> pr4;
+        lb4.push_back(1); pr4.push_back(" (both die)");
+        lb4.push_back(2); pr4.push_back(" (both die)");
+        bool rg4 = false;
+        CHECK(renderMayBlockList(lb4, pr4, &rg4) == " A1, A2 (all: both die)" && !rg4,
+              "#W49-R D1 NEGATIVE two consecutive labels stay enumerated (floor 3) and factor once");
+        // Partial run: the identical prefix ranges, the odd one keeps its own parenthetical.
+        vector<int> lb5; vector<string> pr5;
+        for (int k = 1; k <= 4; k++) { lb5.push_back(k); pr5.push_back(k < 4 ? " (both die)" : " (your blocker dies, attacker lives)"); }
+        bool rg5 = false;
+        CHECK(renderMayBlockList(lb5, pr5, &rg5) == " A1-A3 (both die), A4 (your blocker dies, attacker lives)" && rg5,
+              "#W49-R D1 a partial run ranges its own members and no member wears another's forecast");
+        // REGRESSION: a single pairing and an all-empty list render as before.
+        vector<int> lb6(1, 4); vector<string> pr6(1, " (both die)");
+        CHECK(renderMayBlockList(lb6, pr6, NULL) == " A4 (both die)",
+              "#W49-R D1 REGRESSION a lone pairing is byte-identical to the pre-fix form");
+        vector<int> lb7; vector<string> pr7;
+        for (int k = 1; k <= 3; k++) { lb7.push_back(k); pr7.push_back(""); }
+        bool rg7 = false;
+        CHECK(renderMayBlockList(lb7, pr7, &rg7) == " A1-A3" && rg7,
+              "#W49-R D1 an all-empty parenthetical list ranges the labels and factors nothing");
+        // ECHO SHAPE: the model echoes the factored clause / the A-range into BLOCKS:.
+        {
+            vector<int> out; int dropped = 0; bool gc = false;
+            int pairs = parseBlockAssignments("B1:A3 (all: neither dies (blocking trigger: you gain 3, and your converter takes 3 off them))",
+                                              3, 257, out, NULL, NULL, NULL, &dropped, &gc);
+            CHECK(pairs == 1 && out[0] == 3 && dropped == 0 && !gc,
+                  "#W49-R D1 echo: the factored parenthetical after a pair is inert (no spurious B-scan hit)");
+            vector<int> out2; int dropped2 = 0;
+            int pairs2 = parseBlockAssignments("BLOCKS: B1-B3:A1 (all: neither dies)", 3, 257, out2, NULL, NULL, NULL, &dropped2, NULL);
+            //(dropped2 is not asserted: the scanner re-reads a B-range's upper label
+            //as its own "B3:A1" and counts one drop - pre-existing, lane S's seam.)
+            CHECK(pairs2 == 3 && out2[0] == 1 && out2[1] == 1 && out2[2] == 1,
+                  "#W49-R D1 echo: a B-range with the factored clause assigns every blocker in the range");
+            vector<int> out3; int dropped3 = 0;
+            int pairs3 = parseBlockAssignments("B2:A3-A257", 3, 257, out3, NULL, NULL, NULL, &dropped3, NULL);
+            CHECK(pairs3 == 1 && out3[1] == 3 && dropped3 == 0,
+                  "#W49-R D1 echo: an A-range on the attacker side binds to its first label, nothing dropped");
+        }
+    }
+    // D13: same-name candidates gathered adjacently, rank ascending (groupCombatCandidates).
+    {
+        vector<string> n, h;
+        n.push_back("Triumphant Adventurer"); h.push_back(" #1");
+        n.push_back("Silverquill Silencer");  h.push_back("");
+        n.push_back("Triumphant Adventurer"); h.push_back(" #2");
+        n.push_back("Goblin");                h.push_back("");
+        vector<size_t> ord;
+        groupCombatCandidates(n, h, ord);
+        CHECK(ord.size() == 4 && ord[0] == 0 && ord[1] == 2 && ord[2] == 1 && ord[3] == 3,
+              "#W49-R D13 the deck146 specimen: #2 joins #1 at the first member's slot, the others keep their order");
+        // rank ascending inside the gather, whatever the input order
+        vector<string> n2, h2;
+        n2.push_back("Vampire"); h2.push_back(" #10");
+        n2.push_back("Human");   h2.push_back(" #1");
+        n2.push_back("Vampire"); h2.push_back(" #2");
+        n2.push_back("Vampire"); h2.push_back(" #1");
+        vector<size_t> ord2;
+        groupCombatCandidates(n2, h2, ord2);
+        CHECK(ord2[0] == 3 && ord2[1] == 2 && ord2[2] == 0 && ord2[3] == 1,
+              "#W49-R D13 members sort by handle RANK (#1, #2, #10), not by text, and the unique row follows");
+        // NEGATIVE: no repeated name -> identity (an unchanged board renders an unchanged prompt).
+        vector<string> n3, h3;
+        n3.push_back("Vampire"); h3.push_back("");
+        n3.push_back("Human");   h3.push_back("");
+        n3.push_back("Goblin");  h3.push_back("");
+        vector<size_t> ord3;
+        groupCombatCandidates(n3, h3, ord3);
+        CHECK(ord3[0] == 0 && ord3[1] == 1 && ord3[2] == 2,
+              "#W49-R D13 NEGATIVE no repeated name -> identity permutation");
+        // The gather feeds the existing range collapse: interleaved identical rows now range.
+        vector<string> n4, h4, r4;
+        const string rest = " (1/1) deals 1";
+        n4.push_back("Human"); h4.push_back(" #1"); r4.push_back(rest);
+        n4.push_back("Elder"); h4.push_back("");    r4.push_back(" (2/2) deals 2");
+        n4.push_back("Human"); h4.push_back(" #3"); r4.push_back(rest);
+        n4.push_back("Human"); h4.push_back(" #2"); r4.push_back(rest);
+        vector<size_t> ord4;
+        groupCombatCandidates(n4, h4, ord4);
+        vector<string> pn, ph, pr;
+        for (size_t k = 0; k < ord4.size(); k++) { pn.push_back(n4[ord4[k]]); ph.push_back(h4[ord4[k]]); pr.push_back(r4[ord4[k]]); }
+        bool rg = false;
+        string rows = joinBlockerRows(pn, ph, pr, &rg, "A");
+        CHECK(rg && rows == "A1-A3. Human #1-#3" + rest + " x3\nA4. Elder (2/2) deals 2\n",
+              "#W49-R D13 an interleaved trio ranges once gathered; the unique row keeps its relative place");
+        // NEGATIVE must-NOT-merge: gathered but with a differing fact -> still one row each.
+        vector<string> pr5(pr);
+        pr5[1] = " (1/1) [tapped] deals 1";
+        bool rg5 = false;
+        string rows5 = joinBlockerRows(pn, ph, pr5, &rg5, "A");
+        CHECK(!rg5 && rows5.find("A2. Human #2 (1/1) [tapped]") != string::npos,
+              "#W49-R D13 NEGATIVE adjacency never relaxes the byte-identical-facts test");
+    }
+    // D9: the header's "more able to attack" bucket excludes bodies already attacking.
+    {
+        CHECK(!headerCountsAsMoreAbleToAttack(true, true),
+              "#W49-R D9 a vigilance attacker (canAttack() still true) is NOT in the more-able bucket");
+        CHECK(headerCountsAsMoreAbleToAttack(true, false) && !headerCountsAsMoreAbleToAttack(false, false)
+              && !headerCountsAsMoreAbleToAttack(false, true),
+              "#W49-R D9 the bucket is exactly can-attack AND not-attacking");
+        CHECK(battlefieldHeaderText(false, 12, 4, 2, true, 2)
+              == "Opponent battlefield (12 permanents listed, of which 4 are creatures, 2 of them are"
+                 " attacking right now, 2 more able to attack right now): ",
+              "#W49-R D9 the deck123 vs152 seq 26 header now partitions: 2 attacking + 2 more = 4 creatures");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
