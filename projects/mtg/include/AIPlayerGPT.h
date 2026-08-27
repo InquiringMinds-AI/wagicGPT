@@ -926,12 +926,17 @@ private:
     //is, is final for this state. Cleared when the board moves on.
     string mPriorityReaskBoard;
     string mPriorityReaskLine;
-    string mPriorityReaskKind; //"named_row" | "repeat_count"
+    string mPriorityReaskKind; //"named_row" | "repeat_count" | "plan_choice" (#W51-C D4)
     //Same mechanism for askModel (cast menus, targets, modes): keyed on the
     //ORIGINAL askKey (state + question), the corrected question is asked once.
     string mAskReaskKey;
     string mAskReaskLine;
     string mAskReaskKind; //"named_row" | "no_pass" (#W50-Y D9)
+    //#W51-C (D3): the rows of the LAST consumed window (priority or ask). An
+    //in-range index whose parenthetical names no row on THIS menu is a stale
+    //echo only when the name echoes one of these rows; otherwise it is an
+    //off-menu name and earns the one named_row re-ask, never Baka.
+    std::vector<string> mPrevWindowRows;
     //#W49-S (D2): answer_replaced is FALSE whenever the answer that EXECUTED
     //is the reply's first coded line - the seams set this right before their
     //translog write; writeTransLog consumes and clears it.
