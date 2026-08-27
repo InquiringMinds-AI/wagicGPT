@@ -12082,6 +12082,88 @@ static string headParenthetical(const string& answer)
     return name;
 }
 
+//#W51-C (D3): does the reply's parenthetical echo one of the PREVIOUS window's
+//rows? A stale echo proper is the prior row carried into this menu (a land
+//drop echoed into a cast menu, the cast echoed into its target menu); an
+//in-range index with a name that echoes NO prior row is an off-menu name
+//(deck126 vs125 seq 14: "CHOICE: 1 (Cast Sanguine Bond)" over "Cast Overgrown
+//Battlement / Cast nothing", the prior reply "Play Savannah") and gets the
+//named_row re-ask instead of Baka. Case-insensitive; the NAME inside a prior
+//ROW (one direction: a prior bare reveal row "Sanguine Bond" does not make
+//"Cast Sanguine Bond" an echo - deck126 vs162 seq 16 was a fresh off-menu
+//cast wish after a PUT, and Baka cast the Lantern for it). A name under 3
+//chars or an empty prior window never echoes.
+static bool nameEchoesRow(const string& nameIn, const vector<string>& rows)
+{
+    string name = nameIn;
+    for (size_t i = 0; i < name.size(); i++)
+        name[i] = (char) tolower((unsigned char) name[i]);
+    if (name.size() < 3)
+        return false;
+    for (size_t r = 0; r < rows.size(); r++)
+    {
+        string row = rows[r];
+        for (size_t i = 0; i < row.size(); i++)
+            row[i] = (char) tolower((unsigned char) row[i]);
+        if (row.find(name) != string::npos)
+            return true;
+    }
+    return false;
+}
+
+//#W51-C (D4b): the PLAN line says this window is a pass. Scanned on PLAN-
+//labelled lines only (post-think): "this window: pass" / "stop reached" -
+//the answer-first protocol writes the count before the subtraction, so a
+//CHOICE count on the repeat row under such a PLAN is a contradiction the
+//model is asked to resolve once (deck123 vs126 seq 32: x25 under "This
+//window: pass", M 33 -> 58 past a stop of 30). Prose outside the PLAN line
+//is never read.
+static bool planSaysPassThisWindow(const string& replyIn)
+{
+    string low = replyIn;
+    size_t thinkEnd = low.rfind("</think>");
+    if (thinkEnd != string::npos)
+        low = low.substr(thinkEnd + 8);
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    size_t scan = 0;
+    while ((scan = low.find("plan:", scan)) != string::npos)
+    {
+        size_t eol = low.find('\n', scan);
+        string line = low.substr(scan, (eol == string::npos) ? string::npos : eol - scan);
+        if (line.find("this window: pass") != string::npos
+            || line.find("this window pass") != string::npos
+            || line.find("window: pass") != string::npos
+            || line.find("stop reached") != string::npos)
+            return true;
+        scan += 5;
+    }
+    return false;
+}
+
+//#W51-C (D4b): the first line carrying the label, trimmed, for the re-ask to
+//quote back. Post-think; empty when absent.
+static string firstLabelledLine(const string& replyIn, const char * labelLc)
+{
+    string text = replyIn;
+    size_t thinkEnd = text.rfind("</think>");
+    if (thinkEnd != string::npos)
+        text = text.substr(thinkEnd + 8);
+    string low = text;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    size_t at = low.find(labelLc);
+    if (at == string::npos)
+        return string();
+    size_t eol = text.find('\n', at);
+    string line = text.substr(at, (eol == string::npos) ? string::npos : eol - at);
+    size_t e = line.find_last_not_of(" \t\r");
+    line = (e == string::npos) ? string() : line.substr(0, e + 1);
+    if (line.size() > 160)
+        line = line.substr(0, 160);
+    return line;
+}
+
 //#W49-S (D8): the cast menu's exit row. On the model's own first main phase
 //the true next thing after this decision is combat - said on the row, so a
 //pilot that wants to attack ("CHOICE: 5 (Attack with all creatures)" over a
@@ -13465,6 +13547,8 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             if (echoNoMatch && n != 0 && echoStaleForIndex(n))
             {
                 if (staleEcho) *staleEcho = true;
+                if (n >= 1 && n <= optionCount)
+                    appendParseNote(noteOut, "stale_echo_in_range"); //#W51-C D3
                 return -1;
             }
             return n;
@@ -13567,6 +13651,8 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     if (echoNoMatch && choice > 0 && echoStaleForIndex(choice))
     {
         if (staleEcho) *staleEcho = true;
+        if (choice <= optionCount)
+            appendParseNote(noteOut, "stale_echo_in_range"); //#W51-C D3
         return -1;
     }
     //Name-over-index on the trailing-scan path too (W36 item 4): a unique
@@ -14661,6 +14747,17 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             appendParseNote(&mLastParseNote, "named_row_not_offered");
         bool namedRowFail = (choice < 0 && !content.empty()
                              && parseNote.find("named_row_not_offered") != string::npos);
+        //#W51-C (D3): an in-range index whose name echoes no row of the
+        //previous window is an off-menu name -> the named_row re-ask lane
+        //(the stale_echo label stays for a genuine echo of a prior row).
+        if (staleEcho && choice < 0 && !content.empty()
+            && parseNote.find("stale_echo_in_range") != string::npos
+            && !nameEchoesRow(headParenthetical(decisionPart.empty() ? content : decisionPart), mPrevWindowRows))
+        {
+            staleEcho = false;
+            namedRowFail = true;
+            appendParseNote(&mLastParseNote, "off_menu_name_in_range");
+        }
         bool repeatRowTaken = (choice >= 1 && choice <= index && choice - 1 >= baseIndex
                                && choice - 1 < (int) repeatBaseRow.size()
                                && repeatBaseRow[choice - 1] >= 0);
@@ -14669,12 +14766,26 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //(... x20)." named 20 and ran 19. parseRepeatCount is CHOICE-anchored
         //(plan prose is never scanned) and skips quoted and rejection tokens.
         int namedCount = repeatRowTaken ? parseRepeatCount(content) : -1;
+        //#W51-C (D4a): "x0" on the repeat row is the model's stated pass, not
+        //one activation (deck123 vs162 seq 35: x0 under "M is 26 now. Pass."
+        //ran once). Resolved to the pass row here; x1 stays a single.
+        if (repeatRowTaken && namedCount == 0)
+        {
+            DebugTrace("AIPlayerGPT: repeat row named x0 -> pass");
+            choice = 0;
+            repeatRowTaken = false;
+            namedCount = -1;
+            appendParseNote(&mLastParseNote, "repeat_count_zero_pass");
+        }
+        //#W51-C (D4b): a count on the repeat row under a PLAN line that says
+        //this window is a pass is a contradiction -> one re-ask quoting both.
+        bool planChoiceConflict = (repeatRowTaken && namedCount >= 1 && planSaysPassThisWindow(content));
         //#W49-S (D8/D3): ONE re-ask per board state, before the heuristic (D8)
         //or before the single activation (D3). The corrected question is put
         //in flight now and answered on a later tick, exactly like a first ask;
         //the record written here carries the reply that earned the re-ask.
         if (!content.empty() && mPriorityReaskBoard != boardKey
-            && (namedRowFail || (repeatRowTaken && namedCount < 0)))
+            && (namedRowFail || (repeatRowTaken && namedCount < 0) || planChoiceConflict))
         {
             std::ostringstream corr;
             const char * fb;
@@ -14685,6 +14796,15 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                      << ", or 0 (pass).";
                 fb = "named_row_reask";
                 mPriorityReaskKind = "named_row";
+            }
+            else if (planChoiceConflict)
+            {
+                corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
+                     << firstLabelledLine(content, "choice:") << "\") but your PLAN line says this window is a pass (\""
+                     << firstLabelledLine(content, "plan:") << "\"). Answer again: 0 (pass) if you meant to pass,"
+                        " or the repeat row with the count you want performed now.";
+                fb = "plan_choice_conflict";
+                mPriorityReaskKind = "plan_choice";
             }
             else
             {
@@ -14699,7 +14819,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 mLastParseNote = parseNote;
             writeTransLog("priority", userMsg, content, choice, index, "", fb, &shownLines);
             setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
-                                   : "the repeat row was taken without a count - asking again", 5.0f);
+                      : planChoiceConflict ? "the count contradicts the plan's pass - asking again"
+                                           : "the repeat row was taken without a count - asking again", 5.0f);
             DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
             string corrected;
             pollCompletionRetry(assemblePrompt(tail.str() + "\n" + mPriorityReaskLine), corrected);
@@ -14714,11 +14835,15 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             if (mPriorityReaskKind == "named_row")
                 appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                               : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
+            else if (mPriorityReaskKind == "plan_choice") //#W51-C D4b: the second answer executes as given
+                appendParseNote(&mLastParseNote, planChoiceConflict ? "plan_choice_conflict_exhausted"
+                                                                    : (choice >= 0 ? "plan_choice_conflict_recovered" : "plan_choice_conflict_unanswered"));
             else if (repeatRowTaken)
                 appendParseNote(&mLastParseNote, namedCount >= 2 ? "repeat_count_reask_recovered"
                                                                  : "repeat_count_reask_exhausted");
             mPriorityReaskKind.clear();
         }
+        mPrevWindowRows = shownLines; //#W51-C D3: this window is now the prior one
         if (content.empty())
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
@@ -15060,6 +15185,18 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
         appendParseNote(&mLastParseNote, "named_row_not_offered"); //#W49-S (D2)
     bool namedRowFail = (choice < 0 && !content.empty()
                          && parseNote.find("named_row_not_offered") != string::npos);
+    //#W51-C (D3): an in-range index naming a card no row offers (deck126
+    //vs125 seq 14, "CHOICE: 1 (Cast Sanguine Bond)" over Battlement/nothing)
+    //is an off-menu name, not a stale echo, unless the name echoes a row of
+    //the previous window -> the one named_row re-ask, never Baka first.
+    if (staleEcho && choice < 0 && !content.empty()
+        && parseNote.find("stale_echo_in_range") != string::npos
+        && !nameEchoesRow(headParenthetical(decisionPart.empty() ? content : decisionPart), mPrevWindowRows))
+    {
+        staleEcho = false;
+        namedRowFail = true;
+        appendParseNote(&mLastParseNote, "off_menu_name_in_range");
+    }
     //#W50-Y D9 (wave-49 ledger MED): a coded 0 on an ask with NO pass row is
     //not an answer. First the reply's own coded siblings: the last clean
     //line that names an OFFERED row is taken (deck123 vs130 seq 31 led with
@@ -15119,6 +15256,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
             appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                           : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
     }
+    mPrevWindowRows = options; //#W51-C D3: this window is now the prior one
     if (content.empty())
         noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
@@ -32256,8 +32394,8 @@ void AIPlayerGPT::runParseSelfTest()
               "#W49-S D8 NEGATIVE index 3 of 2 naming an OFFERED row remaps to it (the shipped repair), no note");
         st = false; note.clear();
         c = parseChoice("1 (Cast Acererak the Archlich)", 2, &two, &st, NULL, &note);
-        CHECK(c == -1 && st && note.find("named_row_not_offered") == string::npos,
-              "#W49-S D8 NEGATIVE an IN-RANGE index with a foreign name stays stale_echo (not this class)");
+        CHECK(c == -1 && st && note.find("named_row_not_offered") == string::npos && note.find("stale_echo_in_range") != string::npos,
+              "#W49-S D8 NEGATIVE an IN-RANGE index with a foreign name is not named_row_not_offered at parse time; #W51-C signs it stale_echo_in_range for the seams");
         st = false; note.clear();
         c = parseChoice("0 (pass)", 2, &two, &st, NULL, &note);
         CHECK(c == 0 && note.empty(), "#W49-S D8 NEGATIVE a pass is untouched");
@@ -32870,6 +33008,89 @@ static const char * kW50Y_r94 =
               "#W50-W D6 the clause leaves no residue in the narrated record");
         CHECK(string(kSelfOnlyWindowNote).find("0 (pass)") != string::npos,
               "#W50-W D6 the all-self window note names the pass answer");
+    }
+
+    cout << "\n[#W51-C D3/D4] in-range off-menu name -> re-ask lane; x0 = pass; CHOICE count vs PLAN pass\n";
+    {
+        //D3: the three wave-50 fallbacks, on their menus.
+        vector<string> m14;
+        m14.push_back("Cast Overgrown Battlement {1}{g} (0/4) {leaves 3 of your 5 untapped mana sources untapped} {card text: \"Defender -- {T}: Add {G} for each creature with defender you control.\"}");
+        m14.push_back("Cast nothing right now (combat comes next this turn)");
+        vector<string> prev13;
+        prev13.push_back("Play Savannah");
+        prev13.push_back("Hold Savannah - do not play it now");
+        bool st = false; string note;
+        int c = parseChoice("CHOICE: 1 (Cast Sanguine Bond)", 2, &m14, &st, NULL, &note);
+        CHECK(c == -1 && st && note.find("stale_echo_in_range") != string::npos,
+              "#W51-C D3 deck126 vs125 seq 14: in-range 1 naming Sanguine Bond parses stale AND is signed stale_echo_in_range");
+        CHECK(!nameEchoesRow(headParenthetical("CHOICE: 1 (Cast Sanguine Bond)"), prev13),
+              "#W51-C D3 seq 14: 'Cast Sanguine Bond' echoes no row of the prior window (Play/Hold Savannah) -> off-menu name -> named_row_reask");
+        CHECK(nameEchoesRow("Play Savannah", prev13) && nameEchoesRow("Savannah", prev13),
+              "#W51-C D3 NEGATIVE a name that IS the prior window's row (or its head) is a genuine stale echo - stays stale_echo");
+        CHECK(nameEchoesRow("Cast Overgrown Battlement", m14) && !nameEchoesRow("Cast Overgrown Battlement {1}{g} (0/4) {leaves 9}", m14),
+              "#W51-C D3 NEGATIVE a bare echo of an annotated prior row is an echo; a name the prior row does not contain is not");
+        vector<string> m16;
+        m16.push_back("Cast Chromatic Lantern {3} {leaves 1 of your 4 untapped mana sources untapped} {card text: \"Lands you control have \"{T}: Add one mana of any color.\" -- {T}: Add one mana of any color.\"}");
+        m16.push_back("Cast nothing right now (combat comes next this turn)");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 1 (Cast Sanguine Bond)", 2, &m16, &st, NULL, &note);
+        CHECK(c == -1 && st && note.find("stale_echo_in_range") != string::npos,
+              "#W51-C D3 deck126 vs162 seq 16: in-range 1 naming Sanguine Bond over a Lantern menu is signed");
+        vector<string> prevReveal;
+        prevReveal.push_back("Staff of Nin");
+        prevReveal.push_back("Sanguine Bond");
+        prevReveal.push_back("Urborg, Tomb of Yawgmoth");
+        CHECK(!nameEchoesRow("Cast Sanguine Bond", prevReveal) && nameEchoesRow("Sanguine Bond", prevReveal),
+              "#W51-C D3 seq 16: the prior PUT reveal's bare 'Sanguine Bond' row is not an echo of 'Cast Sanguine Bond' (-> re-ask); the bare name itself would be");
+        vector<string> m13;
+        m13.push_back("Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures - at 0 this does nothing} {leaves 1 of your 4 untapped mana sources untapped} - legal targets right now: the opponent {card text: \"Target opponent sacrifices a creature of their choice. You gain life equal to that creature's toughness.\"}");
+        m13.push_back("Cast nothing right now (combat comes next this turn)");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 1 (Cast Exquisite Blood)", 2, &m13, &st, NULL, &note);
+        CHECK(c == -1 && st && note.find("stale_echo_in_range") != string::npos,
+              "#W51-C D3 deck126 vs130 seq 13: in-range 1 naming Exquisite Blood over a Tribute menu is signed");
+        CHECK(!nameEchoesRow("Cast Exquisite Blood", m14) && !nameEchoesRow("Cast Exquisite Blood", vector<string>()),
+              "#W51-C D3 NEGATIVE an empty prior window never echoes; a foreign prior menu never echoes");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 1 (Cast Overgrown Battlement)", 2, &m14, &st, NULL, &note);
+        CHECK(c == 1 && !st && note.find("stale_echo_in_range") == string::npos,
+              "#W51-C D3 NEGATIVE the on-menu name binds to its row with no signing");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 2 (Cast nothing right now)", 2, &m14, &st, NULL, &note);
+        CHECK(c == 2 && !st && note.empty(), "#W51-C D3 NEGATIVE the decline row binds clean");
+        st = false; note.clear();
+        c = parseChoice("3 (Cast Sanguine Bond)", 2, &m14, &st, NULL, &note);
+        CHECK(c == -1 && !st && note.find("named_row_not_offered") != string::npos && note.find("stale_echo_in_range") == string::npos,
+              "#W51-C D3 NEGATIVE an index PAST the menu (the seams hand over the label-stripped segment) keeps the lane-S class, never the in-range signing");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 3 (Cast Sanguine Bond)", 2, &m14, &st, NULL, &note);
+        CHECK(c == -1 && note.find("stale_echo_in_range") == string::npos,
+              "#W51-C D3 NEGATIVE an out-of-range index is never signed in-range, label or not");
+
+        //D4a: x0 is a pass; x1 a single; D4b: the PLAN pass detector.
+        CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x0)\nPLAN: Stop at M = 25. M is 26 now. Pass.") == 0,
+              "#W51-C D4a deck123 vs162 seq 35: x0 parses as the count 0 (the seam turns it into the pass row)");
+        CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x1)\nPLAN: Stop at M = 27 (L=20, C=4); M is 23 now; this window: pass.") == 1,
+              "#W51-C D4a deck123 vs130 seq 31: x1 is the count 1 (a single, and a plan conflict)");
+        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create human with Thraben Doomsayer x0)\nPLAN: Stop at M = 25. M is 26 now. Pass."),
+              "#W51-C D4b seq 35: a bare 'Pass.' in the plan is not the window claim - x0 handles that reply");
+        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create human with Thraben Doomsayer x1)\nPLAN: Stop at M = 27 (L=20, C=4); M is 23 now; this window: pass. Next turn: Attack with all creatures."),
+              "#W51-C D4b deck123 vs130 seq 31: 'this window: pass' under x1 is a conflict");
+        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create vampire with Lord of Lineage x3)\nPLAN: stop at M = 20 + 4 + 3 = 27; M is 31 now; this window: pass (stop reached)."),
+              "#W51-C D4b deck123 vs130 seq 46: 'pass (stop reached)' is a conflict under x3");
+        string r32 = "CHOICE: 2 (Create vampire with Lord of Lineage x25)\nPLAN: Stop at M = 25 + 2 + 3 = 30. M is 33 now. This window: pass. Next turn: Attack with all creatures to win.";
+        CHECK(planSaysPassThisWindow(r32) && parseRepeatCount(r32) == 25,
+              "#W51-C D4b deck123 vs126 seq 32: x25 under 'This window: pass' -> plan_choice_conflict re-ask (was 25 tokens past the stop)");
+        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire with Lord of Lineage x17)\nPLAN: Stop at M = 30. M is 13 now; make 17 this window, then pass priority next window."),
+              "#W51-C D4b NEGATIVE a plan that passes LATER is not a pass claim about this window");
+        CHECK(!planSaysPassThisWindow("This window: pass.\nCHOICE: 2 (Create vampire x5)"),
+              "#W51-C D4b NEGATIVE the phrase outside a PLAN line is never read");
+        CHECK(!planSaysPassThisWindow("<think>PLAN: this window: pass</think>\nCHOICE: 2 (Create vampire x5)\nPLAN: make 5 now."),
+              "#W51-C D4b NEGATIVE a think-block plan is dropped");
+        CHECK(firstLabelledLine(r32, "plan:") == "PLAN: Stop at M = 25 + 2 + 3 = 30. M is 33 now. This window: pass. Next turn: Attack with all creatures to win."
+              && firstLabelledLine(r32, "choice:") == "CHOICE: 2 (Create vampire with Lord of Lineage x25)"
+              && firstLabelledLine("no labels", "plan:").empty(),
+              "#W51-C D4b the re-ask quotes both lines verbatim; absent label -> empty");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
