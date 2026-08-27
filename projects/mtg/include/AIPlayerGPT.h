@@ -1002,6 +1002,11 @@ private:
     //seat for 4.6h). At kStaleLivelockLimit the ask gives up to the bounded
     //heuristic fallback for THIS decision instead of looping forever.
     int mStaleDropStreak;
+    //#W52-G (D-1): the board the streak is being counted ON. A drop is only a
+    //livelock symptom when the state did NOT move between drops; a drop
+    //because the state legitimately moved (a scripted repeat plan advancing
+    //the board every tick) is the async design working, and restarts the count.
+    string mStaleDropBoard;
     bool mLastStaleLivelock; //the last no-answer was the breaker firing
     bool mLastFinishLength;  //the last reply stopped at the token cap
     long mLastReasoningTokens; //the server's own reasoning-token count when it

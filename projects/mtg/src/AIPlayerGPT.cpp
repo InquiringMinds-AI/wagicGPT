@@ -8114,6 +8114,21 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             //before the deterministic-order fix). Give this ONE decision to
             //the bounded heuristic fallback instead; the game moves on and
             //the translog records the give-up as its own class.
+            //#W52-G (D-1): the streak is a property of ONE board state. The
+            //corpus livelock (deck123 vs deck126 seq 48) was six drops across
+            //six DIFFERENT boards - a repeat plan adding a token per tick - and
+            //the breaker handed a moving, healthy loop to the heuristic (Baka
+            //cast Devour Flesh mid-loop; the model then targeted itself). A drop
+            //on a moved board restarts the count; only drops on the SAME board
+            //accumulate, which is exactly the Kaya-menu shape this was built for.
+            {
+                string board = serializeGameState();
+                if (board != mStaleDropBoard)
+                {
+                    mStaleDropBoard = board;
+                    mStaleDropStreak = 0;
+                }
+            }
             if (++mStaleDropStreak >= kStaleLivelockLimit)
             {
                 DebugTrace("AIPlayerGPT: " << mStaleDropStreak
@@ -13301,6 +13316,33 @@ static bool isRenderVocabWord(const string& w)
     return false;
 }
 
+//#W52-G (wave-51 engine seat D-2): a rendered row is LABEL + annotations -
+//"Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures - at 0
+//this does nothing}", "Cast Idyllic Tutor {2}{w} [already owned: ...]". The
+//reply protocol tells the model to echo the SHORT NAME and copy nothing from
+//the annotations, so a name echo is matched against the label - the text
+//before the first " {" or " [" - never the annotation vocabulary. The
+//corpus defect: "Cast nothing right now" echoed on a menu whose edict rows
+//carried "at 0 this does nothing" matched every such row on the word
+//"nothing", the conflict let the index stand, and a dead Idyllic Tutor was
+//cast (deck123 vs deck125 seq 48; seq 49 the same echo went unparsed). A
+//mana cost ({2}{b}) is cut with the annotations - it is furniture, not the
+//name. Parentheses are kept: "Vampire #3 (2/2)", "Yourself (player, life 17)"
+//are the rendered short names. A row that opens with an annotation, or whose
+//cut leaves nothing, is returned whole.
+static string optionLabel(const string& row)
+{
+    size_t b = row.find(" {");
+    size_t k = row.find(" [");
+    size_t cut = (b == string::npos) ? k : (k == string::npos ? b : (b < k ? b : k));
+    if (cut == string::npos || cut == 0)
+        return row;
+    size_t end = row.find_last_not_of(" \t", cut - 1);
+    if (end == string::npos)
+        return row;
+    return row.substr(0, end + 1);
+}
+
 //---- W36 lane-B items 2/4 helpers (pure; PARSETEST-provable) ----
 
 static int nameOrdinal(const string& seg);            //defined with the combat name parsers below
@@ -13641,17 +13683,41 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             if (!words.empty())
             {
                 int match = -1;
-                for (size_t o = 0; o < optionTexts->size(); o++)
+                //#W52-G (D-2): tier 1 - the echo's LABEL words against each
+                //row's LABEL (optionLabel: annotations and mana furniture cut
+                //from both sides). Tier 2 - the old full-text pass - runs only
+                //when no label matches at all, so a reply that echoes nothing
+                //but annotation vocabulary still binds to the one row carrying
+                //it; it can no longer make a row ambiguous with a row whose
+                //NAME the model actually wrote.
                 {
-                    string low = (*optionTexts)[o];
-                    for (size_t i = 0; i < low.size(); i++)
-                        low[i] = (char) tolower((unsigned char) low[i]);
-                    bool all = true;
-                    for (size_t k = 0; k < words.size() && all; k++)
-                        all = low.find(words[k]) != string::npos;
-                    if (all)
-                        echoMatches.push_back((int) o);
+                    vector<string> labelWords;
+                    echoSignificantWords(optionLabel(echo), labelWords);
+                    if (!labelWords.empty())
+                        for (size_t o = 0; o < optionTexts->size(); o++)
+                        {
+                            string low = optionLabel((*optionTexts)[o]);
+                            for (size_t i = 0; i < low.size(); i++)
+                                low[i] = (char) tolower((unsigned char) low[i]);
+                            bool all = true;
+                            for (size_t k = 0; k < labelWords.size() && all; k++)
+                                all = low.find(labelWords[k]) != string::npos;
+                            if (all)
+                                echoMatches.push_back((int) o);
+                        }
                 }
+                if (echoMatches.empty())
+                    for (size_t o = 0; o < optionTexts->size(); o++)
+                    {
+                        string low = (*optionTexts)[o];
+                        for (size_t i = 0; i < low.size(); i++)
+                            low[i] = (char) tolower((unsigned char) low[i]);
+                        bool all = true;
+                        for (size_t k = 0; k < words.size() && all; k++)
+                            all = low.find(words[k]) != string::npos;
+                        if (all)
+                            echoMatches.push_back((int) o);
+                    }
                 if (echoMatches.size() == 1)
                     match = echoMatches[0];
                 else if (echoMatches.size() > 1)
@@ -13675,7 +13741,7 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                         {
                             bool allNums = true;
                             for (size_t k = 0; k < nums.size() && allNums; k++)
-                                allNums = optionHasNumericToken((*optionTexts)[echoMatches[m]], nums[k]);
+                                allNums = optionHasNumericToken(optionLabel((*optionTexts)[echoMatches[m]]), nums[k]); //#W52-G: label, not {right now: N} numbers
                             if (allNums)
                             {
                                 if (survivor >= 0)
@@ -13725,7 +13791,7 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                         //Strip that suffix before extracting the option's anchor
                         //words - life is not identifying. Scoped to this exact
                         //pattern; index-wins and the uniqueness guard are intact.
-                        string src = (*optionTexts)[o];
+                        string src = optionLabel((*optionTexts)[o]); //#W52-G: the row's anchor words are its label's
                         {
                             size_t pl = src.find("(player, life ");
                             if (pl != string::npos)
@@ -13808,9 +13874,13 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                 if (!nums.empty() && !alphaToks.empty())
                 {
                     vector<int> relaxed;
+                    //#W52-G: labels first (tier 0), the full row only when no
+                    //label carries the tokens (tier 1) - same two tiers as the
+                    //significant-words pass above.
+                    for (int tier = 0; tier < 2 && relaxed.empty(); tier++)
                     for (size_t o = 0; o < optionTexts->size(); o++)
                     {
-                        string low = (*optionTexts)[o];
+                        string low = tier == 0 ? optionLabel((*optionTexts)[o]) : (*optionTexts)[o];
                         for (size_t i2 = 0; i2 < low.size(); i2++)
                             low[i2] = (char) tolower((unsigned char) low[i2]);
                         bool all = true;
@@ -15956,6 +16026,24 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     //No endpoint, or a scripted combo is mid-execution: heuristic as-is.
     if (mEndpoint.empty() || comboCards.size())
         return AIPlayerBaka::FindCardToPlay(pMana, type);
+
+    //#W52-G (D-1): a repeat-N plan is executing (chooseOrderedAction dispatches
+    //one iteration per tick). The plan IS this priority sequence's decision -
+    //the row's contract reads "then stop" and priority returns to the model
+    //when it ends - so this seam must not open a cast or land ask underneath
+    //it. Every such ask was launched against a board the very next iteration
+    //moved past, so each one came back stale and was dropped (deck123 vs
+    //deck126 turn 14: six launches, six drops, zero consumed answers, and the
+    //streak breaker gave the decision to Baka at 7/17). Not asking is the fix:
+    //no wasted round trips, no drops, and the model gets its cast decision at
+    //the window the plan promised, with the finished board in front of it.
+    if (mRepeatRemaining > 0)
+    {
+        DebugTrace("AIPlayerGPT: " << (strcmp(type, "land") ? "cast" : "land-drop")
+                   << " ask NOT issued - repeat plan in progress (" << mRepeatDone << "/"
+                   << mRepeatTotal << " done); the plan is this priority sequence's decision");
+        return NULL;
+    }
 
     //Lands: enumerate every DISTINCT playable land as its own option. The
     //old shape (heuristic proposes ONE land, model keeps a veto) never
@@ -19594,7 +19682,7 @@ static int becomesBlockedSelfPump(const string& text, int& dp, int& dt)
 //Forward declarations: the salvage helpers below re-parse a labeled line
 //through the same validators the primary path uses (defined further down).
 static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
-                            const vector<string> * optionNames);
+                            const vector<string> * optionNames = NULL, bool echoBinds = false);
 static int parseBlockAssignments(const string& content, size_t nBlockers, size_t nAttackers, vector<int>& out,
                                  const vector<string> * blockerNames = NULL,
                                  const vector<string> * attackerNames = NULL,
@@ -20285,8 +20373,15 @@ static bool combatLineIsClean(const string& line, const vector<string> * rosterA
 //-1 = unusable (empty or no name/number signal at all -> caller falls back).
 //The 0/-1 split matters: attacking with nobody is a legitimate choice, so
 //"none" must NOT trigger the heuristic override the way a garbled reply does.
+//#W52-G (wave-51 seat E-1): echoBinds - the reply's "N (name)" parentheticals
+//are ECHOES of row N (the PUT: card lists: cleanup discard, reveal, London
+//bottom), reconciled by the CHOICE rule - a name that uniquely names a
+//DIFFERENT row wins over the index, a name naming NO row un-trusts the index
+//(the caller's under-pick fallback then answers, announced), a name consistent
+//with its index (or ambiguous but including it) keeps it. Off for the ATTACK
+//grammar, whose parentheticals are free-form.
 static int parseAttackerSet(const string& content, size_t nAttackers, vector<bool>& out,
-                            const vector<string> * optionNames = NULL)
+                            const vector<string> * optionNames, bool echoBinds)
 {
     out.assign(nAttackers, false);
     int named = 0;
@@ -20424,6 +20519,98 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
                 out[match] = true;
                 named++;
             }
+        }
+    }
+    //#W52-G (E-1): index-vs-echo reconciliation on the PUT: grammars (see the
+    //echoBinds note at the signature). deck162 vs deck146 seq 17 executed row 2
+    //(Liliana's Caress) off "2 (Cast Liliana's Caress)" - that line was a
+    //CHOICE: cast intent the label walk wrongly selected for a PUT: ask (fixed
+    //at the seams, which now pass their own label) - and the same seam would
+    //have discarded row 1 off "PUT: 1 (Liliana's Caress)" with the index
+    //binding blind. Only an index the scan above accepted, immediately followed
+    //by a balanced parenthetical, is reconciled.
+    if (echoBinds && optionNames && named > 0)
+    {
+        size_t limit = optionNames->size() < nAttackers ? optionNames->size() : nAttackers;
+        for (size_t i = 0; i < scan.size(); i++)
+        {
+            if (!isdigit((unsigned char) scan[i]))
+                continue;
+            char prev = (i > 0) ? scan[i - 1] : ' ';
+            if (prev == '#' || prev == '+' || prev == '/' || (isalnum((unsigned char) prev) && prev != 'A' && prev != 'a'))
+                continue;
+            size_t j = i;
+            int n = 0;
+            while (j < scan.size() && isdigit((unsigned char) scan[j]))
+                n = n * 10 + (scan[j++] - '0');
+            if (j < scan.size() && scan[j] == '/')
+            {
+                i = j;
+                continue;
+            }
+            size_t k = j;
+            while (k < scan.size() && scan[k] == ' ')
+                k++;
+            if (k >= scan.size() || scan[k] != '(')
+            {
+                i = j;
+                continue;
+            }
+            int depth = 0;
+            size_t e = k;
+            for (; e < scan.size(); e++)
+            {
+                if (scan[e] == '(')
+                    depth++;
+                else if (scan[e] == ')' && --depth == 0)
+                    break;
+            }
+            if (e >= scan.size())
+                break;
+            string echo = scan.substr(k + 1, e - k - 1);
+            i = e;
+            if (n < 1 || n > (int) nAttackers || !out[n - 1])
+                continue;
+            vector<string> words;
+            significantWords(echo, words);
+            if (words.empty())
+                continue;
+            vector<int> matches;
+            for (size_t o = 0; o < limit; o++)
+            {
+                string low = (*optionNames)[o];
+                for (size_t q = 0; q < low.size(); q++)
+                    low[q] = (char) tolower((unsigned char) low[q]);
+                bool all = true;
+                for (size_t w = 0; w < words.size() && all; w++)
+                    all = low.find(words[w]) != string::npos;
+                if (all)
+                    matches.push_back((int) o);
+            }
+            bool consistent = false;
+            for (size_t m = 0; m < matches.size(); m++)
+                if (matches[m] == n - 1)
+                    consistent = true;
+            if (consistent)
+                continue;
+            if (matches.size() == 1)
+            {
+                //the name wins over the index (the CHOICE echo_index_conflict rule)
+                out[n - 1] = false;
+                named--;
+                if (!out[matches[0]])
+                {
+                    out[matches[0]] = true;
+                    named++;
+                }
+            }
+            else if (matches.empty())
+            {
+                //a stale echo: the index is not trusted (the CHOICE stale_echo rule)
+                out[n - 1] = false;
+                named--;
+            }
+            //ambiguous and foreign to the index: no better information, the index stands
         }
     }
     if (named > 0)
@@ -22239,14 +22426,18 @@ int AIPlayerGPT::decideReveal(const vector<MTGCardInstance*>& revealed,
 
     //Plan split BEFORE the subset parse: bare numbers in the plan prose must
     //not read as card picks.
-    string decisionPart = consumePlan(content);
+    //#W52-G (E-1): this ask's own label, so a trailing CHOICE: line (a cast
+    //intent the model appended) is never taken as the PUT: answer.
+    string decisionPart = consumePlan(content, "PUT:");
+    if (decisionPart.empty() && !content.empty())
+        decisionPart = consumePlan(content); //no PUT: line at all: any labeled answer
     vector<bool> send;
     vector<string> names;
     names.reserve(revealed.size());
     for (size_t j = 0; j < revealed.size(); j++)
         names.push_back(revealed[j]->name);
     int result = content.empty() ? -1
-                 : parseAttackerSet(decisionPart, revealed.size(), send, &names);
+                 : parseAttackerSet(decisionPart, revealed.size(), send, &names, true);
 
     //Repeat-loop salvage: the reveal seam's worst fallbacks are 12k+ decode
     //spirals; if one stated a valid PUT: line before degenerating, recover it
@@ -22516,13 +22707,15 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
             status = PREGAME_PENDING;
             return NULL; //call in flight; PreGamePhase re-polls next tick
         }
-        string decisionPart = consumePlan(content);
+        string decisionPart = consumePlan(content, "PUT:"); //#W52-G (E-1): own label
+        if (decisionPart.empty() && !content.empty())
+            decisionPart = consumePlan(content);
         vector<bool> send;
         vector<string> names;
         for (size_t j = 0; j < hand.size(); j++)
             names.push_back(hand[j]->name);
         int result = content.empty() ? -1
-                     : parseAttackerSet(decisionPart, hand.size(), send, &names);
+                     : parseAttackerSet(decisionPart, hand.size(), send, &names, true);
         //Natural-stop reconciliation (wave-25 ITEM 2): the coded FIRST line is
         //answer-first, but a reply that reasoned to a DIFFERENT bottom set and
         //stated it in PROSE while terminating naturally (deck27 vs137: line 1
@@ -22673,9 +22866,15 @@ int AIPlayerGPT::cleanupDiscard(int over)
         userMsg = assemblePrompt(buildCleanupDiscardAskText(hand, limit, over));
         if (pollCompletionRetry(userMsg, content) == kChoicePending)
             return 1; //call in flight; the base Act neither acts nor passes
-        string decisionPart = consumePlan(content);
+        //#W52-G (E-1): the discard ask's own label. deck162 vs deck146 seq 17:
+        //"PUT: 3 (Forced Fruition)" twice, then a stray "CHOICE: 2 (Cast
+        //Liliana's Caress)" as the reply's LAST coded line - the any-label walk
+        //took the CHOICE line and the seat discarded Liliana's Caress.
+        string decisionPart = consumePlan(content, "PUT:");
+        if (decisionPart.empty() && !content.empty())
+            decisionPart = consumePlan(content); //no PUT: line at all: any labeled answer
         result = content.empty() ? -1
-                 : parseAttackerSet(decisionPart, hand.size(), send, &names);
+                 : parseAttackerSet(decisionPart, hand.size(), send, &names, true);
         if (result < 0 && !content.empty())
         {
             int sal = salvageLoopedSubset(content, "PUT:", hand.size(), names, send);
@@ -33833,6 +34032,110 @@ static const char * kW50Y_r94 =
             pick = parseChoice("CHOICE: 1 (Cast Soul Shatter)", 1, &menu, &stale, &src);
             CHECK(pick == 1 && !stale, "#W51-D D10 echo: the bare row name binds with the clause on the row");
         }
+    }
+
+    // ==================== #W52-G (wave-51 engine seat D-2) ====================
+    //Corpus specimens (matchups-20260827-155545, deck123 vs deck125 seq 48 / 49):
+    //the name echo is matched on the row's LABEL, never on its annotations.
+    cout << "\n[#W52-G] name echoes bind to row labels, not annotation vocabulary\n";
+    {
+        vector<string> m6;
+        m6.push_back("Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures - at 0 this does nothing}");
+        m6.push_back("Cast Devour Flesh {1}{b} {right now: they control 0 creatures - at 0 this does nothing}");
+        m6.push_back("Cast Damnation {2}{b}{b}");
+        m6.push_back("Cast Vision Skeins {1}{u}");
+        m6.push_back("Cast Idyllic Tutor {2}{w} [already owned: Intruder Alarm on your battlefield - this finds only an enchantment card]");
+        m6.push_back("Cast nothing right now");
+        bool st = false;
+        string note;
+        int c = parseChoice(" 5 (Cast nothing right now)", 6, &m6, &st, NULL, &note);
+        cout << "     seq 48 ' 5 (Cast nothing right now)' -> " << c << " note=" << note << "\n";
+        CHECK(c == 6 && note.find("echo_index_conflict") != string::npos && note.find("ambiguous") == string::npos,
+              "#W52-G D-2 seq 48: the decline echo at index 5 remaps to the decline row (was ambiguous -> a dead Idyllic Tutor)");
+        vector<string> m3;
+        m3.push_back(m6[0]);
+        m3.push_back(m6[1]);
+        m3.push_back("Cast nothing right now");
+        st = false; note.clear();
+        c = parseChoice(" 4 (Cast nothing right now)", 3, &m3, &st, NULL, &note);
+        cout << "     seq 49 ' 4 (Cast nothing right now)' -> " << c << " note=" << note << "\n";
+        CHECK(c == 3 && !st, "#W52-G D-2 seq 49: an out-of-range index with the decline echo repairs to the decline row (was unparsed_reply -> Baka)");
+        st = false; note.clear();
+        c = parseChoice(" 1 (Cast Tribute to Hunger)", 6, &m6, &st, NULL, &note);
+        CHECK(c == 1 && note.empty(), "#W52-G NEGATIVE a name echo agreeing with its index stays silent on an annotated menu");
+        st = false; note.clear();
+        c = parseChoice(" 5 (Cast Idyllic Tutor [already owned: Intruder Alarm on your battlefield - this finds only an enchantment card])", 6, &m6, &st, NULL, &note);
+        CHECK(c == 5 && !st && note.empty(), "#W52-G an echo that copies the row's [..] tag still binds through its label");
+        st = false; note.clear();
+        c = parseChoice(" 2 (Cast Idyllic Tutor from my hand)", 6, &m6, &st, NULL, &note);
+        CHECK(c == 5 && note.find("echo_index_conflict") != string::npos,
+              "#W52-G the option-subset pass anchors on label words, so a fuller echo of an annotated row remaps");
+        vector<string> m2;
+        m2.push_back(m6[0]);
+        m2.push_back("Cast Damnation {2}{b}{b}");
+        m2.push_back("Cast nothing right now");
+        st = false; note.clear();
+        c = parseChoice(" 1 (they control 0 creatures)", 3, &m2, &st, NULL, &note);
+        CHECK(c == 1 && !st, "#W52-G an echo of annotation words alone still binds to the one row carrying them (full-text tier 2)");
+        st = false; note.clear();
+        c = parseChoice(" 2 (Cast nothing right now)", 3, &m2, &st, NULL, &note);
+        CHECK(c == 3 && note.find("echo_index_conflict") != string::npos,
+              "#W52-G NEGATIVE-SHAPE the edict clause's 'nothing' cannot pull the decline echo onto Damnation's index");
+        CHECK(optionLabel("Cast Tribute to Hunger {2}{b} {right now: x}") == "Cast Tribute to Hunger"
+              && optionLabel("Vampire #3 (2/2) [flying]") == "Vampire #3 (2/2)"
+              && optionLabel("Cast nothing right now") == "Cast nothing right now"
+              && optionLabel("{weird}") == "{weird}",
+              "#W52-G optionLabel cuts at the first ' {' / ' [' and keeps the short name's parentheses");
+    }
+    //E-1 (wave-51 seat 146/152/162): the PUT: discard reply binds by index AND
+    //by the echoed name. Corpus specimen deck162 vs deck146 seq 17 (abridged).
+    cout << "\n[#W52-G E-1] PUT: replies - own label, index validated against the echoed name\n";
+    {
+        vector<string> hand;
+        hand.push_back("Peer into the Abyss");   //1
+        hand.push_back("Liliana's Caress");      //2
+        hand.push_back("Forced Fruition");       //3
+        hand.push_back("Dictate of Kruphix");    //4
+        hand.push_back("Teferi's Puzzle Box");   //5
+        hand.push_back("Underworld Dreams");     //6
+        hand.push_back("Forced Fruition");       //7
+        hand.push_back("Swamp");                 //8
+        const string reply17 =
+            "PUT: 3 (Forced Fruition)\nPLAN: Opponent is at 15 life, I am at 4. I will cast Underworld Dreams"
+            " next turn if I can. I can cast Liliana's Caress! {1}{B}. I will cast Caress.\n\n"
+            "PLAN: Cast Liliana's Caress. Use Ob Nixilis -2 to remove a Triumphant Adventurer.\n\n"
+            "PUT: 3 (Forced Fruition)\nCHOICE: 2 (Cast Liliana's Caress)\n"
+            "PLAN: Cast Liliana's Caress. Survive as long as possible.";
+        int run = 0, rej = 0;
+        string segAny = answerSegmentStatic(reply17, NULL, &run, &rej);
+        string segPut = answerSegmentStatic(reply17, "PUT:", &run, &rej);
+        cout << "     any-label segment='" << segAny << "'  PUT: segment='" << segPut << "'\n";
+        CHECK(segAny.find("Caress") != string::npos,
+              "#W52-G E-1 the defect shape: with no expected label the last coded line (a CHOICE: cast intent) is the segment");
+        CHECK(segPut.find("Forced Fruition") != string::npos && segPut.find("Caress") == string::npos,
+              "#W52-G E-1 seq 17: asked for PUT:, the walk returns the PUT: line, never the trailing CHOICE: line");
+        vector<bool> send;
+        int r = parseAttackerSet(segPut, hand.size(), send, &hand, true);
+        CHECK(r == 1 && send[2] && !send[1] && !send[6],
+              "#W52-G E-1 'PUT: 3 (Forced Fruition)' discards row 3 only (the second copy at 7 is ambiguous-but-consistent)");
+        r = parseAttackerSet("1 (Liliana's Caress)", hand.size(), send, &hand, true);
+        CHECK(r == 1 && send[1] && !send[0],
+              "#W52-G E-1 index 1 with the echo of row 2: the NAME wins - Liliana's Caress, not Peer into the Abyss");
+        r = parseAttackerSet("2 (Cast Liliana's Caress)", hand.size(), send, &hand, true);
+        CHECK(r == 1 && send[1] && !send[0] && !send[2],
+              "#W52-G E-1 NEGATIVE an echo consistent with its index (verb prefix and all) binds silently");
+        r = parseAttackerSet("4 (Lightning Bolt)", hand.size(), send, &hand, true);
+        CHECK(r <= 0 && !send[3],
+              "#W52-G E-1 an echo naming NO row un-trusts the index: nothing binds, the caller's announced fallback answers");
+        r = parseAttackerSet("7 (Forced Fruition)", hand.size(), send, &hand, true);
+        CHECK(r == 1 && send[6] && !send[2],
+              "#W52-G E-1 a same-name duplicate: the index picks WHICH copy, the ambiguous echo does not override it");
+        r = parseAttackerSet("PUT: 1, 3 (Forced Fruition)", hand.size(), send, &hand, true);
+        CHECK(r == 2 && send[0] && send[2],
+              "#W52-G E-1 a two-card PUT: keeps the un-echoed index and the consistent echoed one");
+        r = parseAttackerSet("1 (Liliana's Caress)", hand.size(), send, &hand);
+        CHECK(r == 2 && send[0] && send[1],
+              "#W52-G E-1 NEGATIVE the ATTACK grammar (echoBinds off) is unchanged: index and name still union");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
