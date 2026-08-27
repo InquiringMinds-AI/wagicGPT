@@ -1,0 +1,5 @@
+#NAME:W50V Bears Probe
+#DESC:cheap creatures into a counter wall (wave-50 lane V double-tap probe)
+Grizzly Bears (*) *20
+Fog (*) *8
+Forest (*) *32

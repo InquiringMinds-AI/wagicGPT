@@ -1,0 +1,21 @@
+PRE-FIX (probe4-before.stderr, instrumented w49-engine binary): re-payment signatures = 18
+first occurrence:
+Action added to stack: Cancel
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Grizzly Bears
+-  Cost: {1}{g}
+AIPlayerBaka: the Mana was already in the manapool or could be Paid with potential mana, using potential Mana now.
+W50V legacycast turn=10 owner=Player 1 card=Grizzly Bears gotPayments=0 qlen=3 pool=
+W50V pump turn=10 phase=4 owner=Player 1 ability=13AManaProducer src=Forest click=Forest stackNR=2 pool= qlen=3
+W50V producer turn=10 ctrl=Player 1 src=Forest pump=1 acting=Player 1 interrupting=Player 1 stackNR=2 pool=
+W50V pump turn=10 phase=4 owner=Player 1 ability=13AManaProducer src=Forest click=Forest stackNR=2 pool={g} qlen=2
+W50V producer turn=10 ctrl=Player 1 src=Forest pump=1 acting=Player 1 interrupting=Player 1 stackNR=2 pool={g}
+W50V pump turn=10 phase=4 owner=Player 1 ability=- src=- click=Grizzly Bears stackNR=2 pool={g}{g} qlen=1
+AIPlayer:Using Activated ability
+AIPlayerBaka: AI attempting to pay a mana cost.
+-  Target: Fog
+-  Cost: NULL
+AIPlayerBaka: Mana cost is NULL.  
+
+POST-FIX (probe4-after.stderr): re-payment signatures = 0
+(game natural, winner=0, 3 Cancels cast, 0 'dropping a carried cast pick' guard fires)
