@@ -422,6 +422,97 @@ inline bool planActionsStale(const std::string& planRaw, const std::string& opts
     return anyAffirmative && !anyOffered;
 }
 
+// #W50-Y D10 (wave-49 ledger MED): a plan that OPENS with a verdict is not a
+// plan. deck123 vs125 seq 53-56 and deck130 vs125 seq 125 carried "The game is
+// lost. ..." - text that goes on to name cards, so planNamesNoAction could not
+// fire - and under it the pilot aimed at itself. The verdict sits in the FIRST
+// sentence (or the first 80 chars when there is no sentence break): a resigned
+// clause later in an otherwise action-naming plan ("cast X; if that fails the
+// game is lost") is a contingency, not the plan's headline, and is kept.
+// Content-keyed, never count-keyed: the raw echo count is a report field only
+// (a verbatim echo of a CORRECT plan - deck152 vs126 s31-41's loop-lockout
+// "ATTACK: none", deck125 vs126 s69-96's "ping their face" - is the model
+// holding a line it should hold, and a count trigger expired both).
+inline bool planOpensWithVerdict(const std::string& planRaw)
+{
+    if (planRaw.empty())
+        return false;
+    std::string plan = toLower(planRaw);
+    size_t start = plan.find_first_not_of(" \t\r\n\"'*");
+    if (start == std::string::npos)
+        return false;
+    size_t brk = plan.find_first_of(".!?;:\n", start);
+    size_t end = (brk == std::string::npos) ? plan.size() : brk;
+    if (end - start > 80)
+        end = start + 80;
+    std::string head = plan.substr(start, end - start);
+    static const char * verdicts[] = {
+        "the game is lost", "game is lost", "this game is lost", "the game is over",
+        "game over", "we have lost", "i have lost", "we lose", "i lose", "we are dead",
+        "i am dead", "no way to win", "cannot win", "can't win", "can not win",
+        "no outs", "nothing to do", "nothing i can do", "nothing we can do",
+        "nothing can be done", "no play", "no legal action", "no action",
+        "no meaningful", "no relevant", "concede", "conceding", "give up", "resign",
+        "it is over", "it's over", "we are lost", "i am lost", "lost cause",
+        "no hope", "hopeless", "unwinnable"
+    };
+    for (size_t i = 0; i < sizeof(verdicts) / sizeof(verdicts[0]); i++)
+        if (head.find(verdicts[i]) != std::string::npos)
+            return true;
+    return false;
+}
+
+// #W50-Y D10 (ii): the carried plan names a TARGET this target window does
+// not list. deck130 G4: both self-hits (D6) carried a plan naming a target
+// the window did not offer, and the pilot aimed at the row it did offer.
+// `boardNames` are the permanents on BOTH battlefields (what a plan can aim
+// at); a name counts as the plan's target only when a targeting verb sits in
+// the 40 chars before it ("kill X", "bolt X", "target X", "aim at X", "exile
+// X", "equip X" ...) - a card the plan merely mentions is not a target claim,
+// and the note must never say something false about the list under it. True
+// when >= 1 such target is named and NONE of them appears anywhere in the
+// window (rows AND header - the header's own spell name never arms it).
+inline bool planTargetAbsent(const std::string& planRaw, const std::string& optsRaw,
+                             const std::vector<std::string>& boardNames)
+{
+    if (planRaw.empty() || boardNames.empty())
+        return false;
+    std::string plan = toLower(planRaw);
+    std::string opts = toLower(optsRaw);
+    static const char * verbs[] = {
+        "target", "kill", "destroy", "exile", "remove", "bounce", "burn", "shoot",
+        "shock", "bolt", "hit ", "aim", "point", "fire", " at ", "equip", "attach",
+        "enchant", "tap down", "sacrifice their", "edict", "counter"
+    };
+    bool anyTarget = false;
+    std::set<std::string> seen;
+    for (size_t n = 0; n < boardNames.size(); n++)
+    {
+        std::string full = toLower(boardNames[n]);
+        if (full.size() < 4)
+            continue;
+        std::string nm = shortName(full);
+        if (nm.size() < 4 || !seen.insert(nm).second)
+            continue;
+        size_t pos = 0;
+        bool targeted = false;
+        while ((pos = plan.find(nm, pos)) != std::string::npos && !targeted)
+        {
+            size_t ws = pos > 40 ? pos - 40 : 0;
+            std::string win = plan.substr(ws, pos - ws);
+            for (size_t v = 0; v < sizeof(verbs) / sizeof(verbs[0]) && !targeted; v++)
+                targeted = (win.find(verbs[v]) != std::string::npos);
+            pos += nm.size();
+        }
+        if (!targeted)
+            continue;
+        anyTarget = true;
+        if (opts.find(nm) != std::string::npos || opts.find(full) != std::string::npos)
+            return false; //a named target IS on this window
+    }
+    return anyTarget;
+}
+
 } // namespace gptcaveat
 
 #endif
