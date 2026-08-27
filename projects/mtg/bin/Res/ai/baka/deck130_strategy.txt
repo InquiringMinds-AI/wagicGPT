@@ -292,7 +292,7 @@ with a GOBLIN token, always. Do NOT take a "(both die)" block with SIEGE-GANG CO
 BLADEWING: those are cards, they are the only bodies this deck has, and Siege-Gang's sacrifice
 ability needs Siege-Gang alive. Trading either one for a 2/2 token the opponent will replace is
 not an even trade even though the parenthesis says both creatures die. Send a Goblin instead, or
-take the damage while your life is comfortable.
+take the damage while the combat header's "you would be at N" is above 5.
 Block where only your creature dies when the damage otherwise puts you at 5 life or less. A Goblin
 is worth more as a blocker than as 2 points of face damage.
 WHEN THE PROMPT SAYS LETHAL, CHUMP THE BIGGEST ATTACKER YOU ARE ALLOWED TO BLOCK. The line

@@ -80,10 +80,14 @@ Then:
   - M reaches L + C + 3: STOP. Answer "CHOICE: 0 (pass)".
     Every token is at least a 1/1, so at L + C + 3 bodies they cannot block enough of them to
     live through your next attack, and a body past that number wins nothing.
-  - HARD TRIPWIRE, above every other line in this rule. The option row prints
-    "[repeat: activated this turn N times already]". If that N is 20 OR MORE, answer
-    "CHOICE: 0 (pass)" and stop reading. There is no board in this pool that needs a
-    twenty-first activation in one turn, and past that the loop is the only thing happening.
+  - MONOTONE CEILING, above every other line in this rule, and this number never resets. Read
+    your own battlefield line's "of which M are creatures" again: at 50 OR MORE, answer
+    "CHOICE: 0 (pass)" and stop reading, whatever the rest of this rule says. Use M, not the
+    row's "[repeat: activated this turn N times already]" tag: that N is accurate but scoped -
+    it counts only THIS turn and only THIS ability, so it starts over at every turn boundary and
+    reads small when two makers feed one loop. On this deck it read 650 on one turn and 14 on
+    the next with 1,539 creatures already out. M is the only number in this rule that the line
+    moves and never gives back.
 PASSING IS ALWAYS AVAILABLE, EVEN WHEN THE LOOP IS THE ONLY ROW ON THE SCREEN. These windows
 routinely list exactly one action - the token line - and no "pass" row. Pass is not a row; it is
 the number 0, and the reply instructions on that same screen say so: "the number (0 = pass
@@ -235,6 +239,8 @@ Take the highest entry on this list that appears in your casting menu:
     creatures" three times in six games.
  6. A removal spell, by Rules 3, 4 and 5.
  7. "Cast Vision Skeins {1}{u}".
+ 8. "Cast nothing right now" - the LAST entry, and correct only when no entry above appeared in
+    your casting menu. Every card you can cast has a line above this one.
 
 === INTRUDER ALARM AND IDYLLIC TUTOR ===
 "Cast Intruder Alarm {2}{u}": it is the engine, and it is entry 3 on the cast list above -
@@ -404,8 +410,8 @@ block at all.
    go from 10 life to 2 in one combat step. Assign blockers until you run out of blockers or run
    out of unblocked attackers, whichever comes first.
  - Otherwise your token-makers do NOT block. Take the damage. A blocker line reading "(both
-   die)" on Thraben Doomsayer or Bloodline Keeper is a trade you decline while your life is
-   comfortable - the maker is worth more than any one attacker.
+   die)" on Thraben Doomsayer or Bloodline Keeper is a trade you decline while the combat
+   header's "you would be at N" is above 5 - the maker is worth more than any one attacker.
 
 === MULLIGAN ===
 STEP 1 - THE CHAIN STOPS AT THE SECOND LOOK. Read the ask's own price line for the "(keeping N)"

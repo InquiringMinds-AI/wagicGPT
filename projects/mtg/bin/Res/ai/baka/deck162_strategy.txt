@@ -41,9 +41,12 @@ The order is the single most important thing you decide.
 ONE named exception: when your life is 8 or less AND the opponent's battlefield shows a creature,
 "Cast Fog Bank {1}{u}" goes ahead of the punisher for that one ask - then cast the punisher with
 what is left, or on your next turn.
-WHICH PUNISHER, WHEN TWO ARE OFFERED: TAKE THE ONE THAT IS ALSO A BODY. Fate Unraveler (3/4) and
-Master of the Feast (5/5 flying) are Enchantment CREATURES - they punish AND they block.
+WHICH PUNISHER, WHEN TWO ARE OFFERED: TAKE THE ONE THAT IS ALSO A BODY. Fate Unraveler (3/4) is
+the only PUNISHER of the three that is also a body - it punishes AND it blocks.
 Underworld Dreams and Ob Nixilis are not creatures and will never stop a single point of damage.
+Master of the Feast (5/5 flying) is not a punisher at all: its own text makes the OPPONENT draw,
+so it is a draw ENGINE with a body, it is entry 5 on the cast list, and RULE 2's brake still
+governs it. It never goes ahead of a punisher.
 Read your own battlefield line's "of which N are creatures" number and their battlefield line's
 "of which M are creatures, M of them without a restriction against attacking". When your N is 0
 and their M is 1 or more, the punisher with a body goes first, every time - the damage race is
@@ -96,7 +99,9 @@ Shield Sphere and Fog Bank are your entire defence - this deck has no removal ex
 
 THE WHOLE CAST ORDER, ONE LIST. At every "which card do you cast now" ask, read your numbered
 options top to bottom and take the FIRST line that matches:
-1. Underworld Dreams, Fate Unraveler or Ob Nixilis.
+1a. Fate Unraveler - whenever your own battlefield line reads "of which 0 are creatures" and
+   theirs shows 1 or more "of them without a restriction against attacking".
+1b. Underworld Dreams or Ob Nixilis - otherwise, or when 1a's condition does not hold.
 2. Peer into the Abyss, when a punisher is already on your battlefield.
 3. Shield Sphere (it is free).
 4. Fog Bank, when the opponent controls a creature.
@@ -317,7 +322,8 @@ below that a land is never the right card to lose.
 
 === DECIDING SITUATIONS ===
 - Underworld Dreams, Fate Unraveler or Ob Nixilis is anywhere in your cast list: cast it this ask,
-  ahead of everything else.
+  ahead of everything else. TWO of the three offered in the same ask, and your own battlefield
+  line reads "of which 0 are creatures": take Fate Unraveler, the one with a body.
 - Two spells are both payable and one is a punisher: the punisher goes first, then spend the rest.
 - Teferi's Puzzle Box, Forced Fruition or a Dictate is in the SAME list as a punisher: the
   punisher is number 1 in the cast order and the Box is number 5. Cast the punisher this ask.

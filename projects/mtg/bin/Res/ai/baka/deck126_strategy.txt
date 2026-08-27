@@ -27,9 +27,10 @@ your lands - as ONE source. Overgrown Battlement reads "{T}: Add {G} for each cr
 defender you control", and the engine says so on its own line in the sources list ("VARIABLE
 output: ... the total above counts it as one source, not as its mana"). So the "Mana available:"
 number is a FLOOR for the GENERIC part of a cost: your real generic mana
-is that number plus one for every defender past the first. When the part of a cost that is a plain
-number ({3} in {3}{B}{B}, the {2} in {2}{W}) looks one or two out of reach and you have three or
-four walls out, it is probably affordable - take it and let the engine tap for you.
+is that number plus one for every defender past the first. Take the cast when the plain-number
+part of the cost (the {3} in {3}{B}{B}, the {2} in {2}{W}) is at most your "Mana available:"
+number plus one for every defender past the first on your battlefield line; below that, do not.
+Inside that number, take it and let the engine tap for you.
 THE COLOURED PIPS ARE A DIFFERENT COUNT, AND THE BATTLEMENT PAYS NONE OF THEM. Overgrown
 Battlement makes {G} and only {G}. It cannot pay the {B} in Sanguine Bond {3}{B}{B}, the {B} in
 Exquisite Blood {4}{B}, the {B} in Tribute to Hunger {2}{B} or the {W} in Idyllic Tutor {2}{W}.

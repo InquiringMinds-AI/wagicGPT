@@ -88,11 +88,11 @@ The stack line and the counter option both print the target's TYPE, MANA COST an
 from the numbers, not from the name:
   - (creature P/T) with printed POWER 2 or more: COUNTER IT.
   - a WALL, at ANY printed power: LET IT RESOLVE. A defender cannot attack, so it can never take a
-    point off you, and you have no creature for it to block. RECOGNISE ONE ON THE STACK BY ITS
-    TEXT, NOT BY A TAG: the stack line and the counter row do not print [defender] - that tag only
-    exists once the creature is on the battlefield. A spell whose {target text: ...} BEGINS with
-    "Defender", or whose printed power is 0, is a wall. You spent a Cancel on "Perimeter Captain
-    {w} (creature 0/4) {target text: "Defender -- ..."}" looking for a tag that row never carries.
+    point off you, and you have no creature for it to block. RECOGNISE ONE BY WHAT THE ROW DOES
+    CARRY: a spell whose {target text: ...} BEGINS with "Defender", or whose printed power is 0,
+    is a wall. You spent a Cancel on "Perimeter Captain {w} (creature 0/4) {target text:
+    "Defender -- ..."}" while that row was already telling you. When the stack row starts
+    printing [defender], key this rule to the tag instead.
     Pride Guardian (0/3), Wall of Omens (0/4), Perimeter Captain (0/4), Fog Bank (0/2) and Shield
     Sphere (0/6) are this shape. This line has no exception: a counter spent on a wall is a counter you do not have
     for the enchantment that kills you. In a game you lost you spent Dream Fracture on a Pride

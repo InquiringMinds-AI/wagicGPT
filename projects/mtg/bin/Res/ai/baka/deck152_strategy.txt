@@ -139,11 +139,9 @@ swings: one body, then two, then the whole team. Keep swinging.
   profits" is decided one A-line at a time, and a creature that dies to a blocker they already
   control profits nothing. Send it anyway only when the lethal check clears: the printed opponent
   life is at or below the total power of everything you are sending.
-  LIFELINK IS NOT A PAYMENT FOR THE TRADE, AND YOU NEVER GET BOTH HALVES. The tag on your
-  Intrepid Adversary reads "(your attacker dies, their blocker lives (lifelink: you gain 3))".
-  That "you gain 3" is what the BLOCKED fight pays you while the Adversary dies - it is not
-  added to the 3 damage the Adversary would have dealt their face. Exactly one of those two
-  things happens, and the tag has already told you which one it expects. Never write "the
+  LIFELINK IS NOT A PAYMENT FOR THE TRADE, AND YOU NEVER GET BOTH HALVES. The tag says it
+  itself: "(lifelink: you gain N from this block only, and this attacker deals nothing to their
+  life)". Exactly one of those two things happens. Never write "the
   Adversaries gain 3 life each AND deal 6 damage to the opponent": that sentence counts the
   blocked outcome and the unblocked outcome at the same time, and it is how you lose lords.
   Three life is not worth a lord; a lord that dies is gone for the rest of the game.
