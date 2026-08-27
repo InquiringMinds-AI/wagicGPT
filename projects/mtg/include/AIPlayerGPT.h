@@ -668,13 +668,25 @@ private:
     //bypasses stale_echo protection (a stale line re-parses to -1 here too).
     static int salvageLoopedChoice(const string& content, int optionCount,
                                    const std::vector<string> * optionTexts = NULL);
+    //#W49-S (D2): the FIRST well-formed line-leading CHOICE line's parse (-1
+    //when none parses) - the seams compare it with what executed so
+    //answer_replaced states whether the EXECUTED answer differs from the
+    //first coded one, not merely whether the reply's first and last coded
+    //lines differ as strings.
+    static int firstCodedChoice(const string& content, int optionCount,
+                                const std::vector<string> * optionTexts = NULL);
 
     //True when a well-formed CHOICE was superseded by an explicit
     //self-retraction with no replacing CHOICE - the answer must route to the
     //heuristic instead of using the retracted digit (deck135 HARNESS-1).
+    //#W49-S (D2): `namedRowNotOffered` is set when the trailing re-answer's
+    //parenthetical names a row that is NOT on the menu at that index (or any
+    //index) - the earlier, offered answer is kept and the function returns
+    //false; the caller records `named_row_not_offered` as a parse note.
     static bool choiceRetractedNoReplacement(const string& content, int optionCount,
                                              const std::vector<string> * optionTexts = NULL,
-                                             int * replacement = NULL);
+                                             int * replacement = NULL,
+                                             bool * namedRowNotOffered = NULL);
 
     string mEndpoint; //base URL, empty if nothing answered
     string mModel;
@@ -861,6 +873,30 @@ private:
     //read that as "state changed" and defeat the deadlock breaker.
     string mLastAskKey;
     int mLastChoice;
+    //#W49-S (D8/D3): the priority seam's ONE re-ask per board state. When a
+    //reply names an index past the menu with a card that matches no row
+    //(D8), or takes the repeat row without naming its count (D3), the
+    //question is re-put once with a terse correction line appended. Keyed on
+    //the serialized board so the corrected question has its own askKey (a
+    //different question, a fresh call) and so the second answer, whatever it
+    //is, is final for this state. Cleared when the board moves on.
+    string mPriorityReaskBoard;
+    string mPriorityReaskLine;
+    string mPriorityReaskKind; //"named_row" | "repeat_count"
+    //Same mechanism for askModel (cast menus, targets, modes): keyed on the
+    //ORIGINAL askKey (state + question), the corrected question is asked once.
+    string mAskReaskKey;
+    string mAskReaskLine;
+    //#W49-S (D2): answer_replaced is FALSE whenever the answer that EXECUTED
+    //is the reply's first coded line - the seams set this right before their
+    //translog write; writeTransLog consumes and clears it.
+    bool mAnswerReplacedFalse;
+    //#W49-S (D8, the wave-47 D10 sentence): the turn/phase on which this
+    //seat's Casting decision was actually put to the model, so the priority
+    //ask that follows it in the same phase can say the casting question is
+    //already answered (the off-menu "CHOICE: 8 (Cast Acererak)" shape).
+    int mCastAskTurn;
+    int mCastAskPhase;
     //Answer-locked decode-garbage retry (ITEM: decode-collapse mitigation).
     //mRetryActivePrompt: the retry userMsg (prefix + base) currently in flight;
     //empty when no retry is pending. mRetryBase: the base userMsg that active
