@@ -1,0 +1,33 @@
+#W50-W (D4): the cleanup-step hand-size discard is the AI seat's DECISION, not
+#the engine's silent hand->cards[0] (oldest card) discard at the phase advance.
+#Corpus 20260827 123v152 seq 4-5: the engine discarded the combo deck's only
+#Intruder Alarm for the seat with no decision record. Baka's policy (and the GPT
+#seat's fallback) discards the highest-mana-value cards first: with nine cards
+#in hand at cleanup, Shivan Dragon {4}{R}{R} and Serra Angel {3}{W}{W} go, the
+#seven cheaper cards stay. PRE-FIX the two OLDEST cards (Ornithopter, Grizzly
+#Bears) were discarded instead.
+AICALLS 40
+[INIT]
+CLEANUP
+[PLAYER1]
+hand:Ornithopter,Grizzly Bears,Millstone,Icehide Golem,Ohran Viper,Hill Giant,Juggernaut,Serra Angel,Shivan Dragon
+library:Mind Stone,Mind Stone,Mind Stone
+[PLAYER2]
+library:Mind Stone,Mind Stone,Mind Stone
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+[ASSERT]
+UPKEEP
+[PLAYER1]
+hand:Ornithopter,Grizzly Bears,Millstone,Icehide Golem,Ohran Viper,Hill Giant,Juggernaut
+graveyard:Serra Angel,Shivan Dragon
+library:Mind Stone,Mind Stone,Mind Stone
+[PLAYER2]
+library:Mind Stone,Mind Stone,Mind Stone
+[END]

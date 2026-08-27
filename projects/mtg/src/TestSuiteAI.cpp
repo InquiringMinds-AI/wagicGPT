@@ -587,6 +587,19 @@ int TestSuiteAI::Act(float)
         observer->mForceInteractiveReveal = true;
         DebugTrace("TESTSUITE interactivereveal: aicode reveal/scry -> interactive display [" << suite->filename << "]");
     }
+    else if (action.compare(0, 12, "revealasync ") == 0)
+    {
+        //W50-W (D2): opt this fixture into the interactive-AI reveal DRIVER
+        //(driveInteractiveReveal) with a stub decideReveal picking the named
+        //cards - the per-observer form of the WAGIC_REVEAL_TEST_ASYNC env hook,
+        //so the fixture can be REGISTERED and run under the threaded suite.
+        observer->mRevealTestAsyncPicks = action.substr(12);
+        DebugTrace("TESTSUITE revealasync: picks='" << observer->mRevealTestAsyncPicks << "'");
+    }
+    else if (action.compare(0, 17, "revealasyncticks ") == 0)
+    {
+        observer->mRevealTestAsyncTicks = atoi(action.substr(17).c_str());
+    }
     else if (action.find("revealok") != string::npos || action.find("revealnext") != string::npos)
     {
         //Drive an open reveal display (MTGRevealingCards). The engine's AI

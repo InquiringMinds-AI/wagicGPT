@@ -1219,3 +1219,7 @@ oracle_selftap_westvale_5_lands.txt
 oracle_selftap_westvale_6_lands.txt
 autotap_generic_scarce_colour_2W.txt
 autotap_generic_mono_before_dual_2W.txt
+probe/w50w_pelakka_async_putback.txt
+probe/w50w_pelakka_async_driver_pick.txt
+probe/w50w_tribute_to_hunger_edict.txt
+probe/w50w_ai_cleanup_discard_policy.txt

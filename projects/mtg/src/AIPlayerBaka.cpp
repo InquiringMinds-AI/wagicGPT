@@ -3601,6 +3601,15 @@ int AIPlayerBaka::computeActions()
             return 1;
     }
 
+    //W50-W (D4): the cleanup hand-size discard is this seat's decision, made
+    //here (before the phase advances and GameObserver::nextGamePhase discards
+    //hand->cards[0] for it). Mirrors that rule's exact condition.
+    {
+        int over = cleanupDiscardOwed();
+        if (over > 0 && cleanupDiscard(over))
+            return 1;
+    }
+
     //Engine-issued combat decisions (W3b): the ENGINE decides when a
     //declaration is due (right phase/step, stack settled - attack triggers
     //resolve BEFORE blocks - nothing else in flight, legal set non-empty).
@@ -4721,6 +4730,57 @@ AIPlayer(observer, file, fileSmall, deck)
         mAvatar->SetHFlip(true);
 
     initTimer();
+}
+
+int AIPlayerBaka::cleanupDiscardOwed()
+{
+    if (observer->getCurrentGamePhase() != MTG_PHASE_CLEANUP || observer->currentPlayer != this)
+        return 0;
+    if (nomaxhandsize)
+        return 0;
+    int limit = handsize + handmodifier;
+    if (limit < 0)
+        limit = 0;
+    int over = game->hand->nb_cards - limit;
+    return over > 0 ? over : 0;
+}
+
+//The click is the engine's own cleanup discard path (GameObserver::cardClick's
+//cleanup branch: a hand card clicked during the cleanup step while over the
+//limit goes to the graveyard with a WEventCardDiscard for THAT card).
+void AIPlayerBaka::cleanupDiscardCards(const vector<MTGCardInstance*>& cards)
+{
+    for (size_t i = 0; i < cards.size(); i++)
+        if (cards[i] && game->hand->hasCard(cards[i]))
+            observer->cardClick(cards[i], cards[i]);
+}
+
+int AIPlayerBaka::cleanupDiscard(int over)
+{
+    vector<MTGCardInstance*> chosen;
+    while ((int) chosen.size() < over)
+    {
+        MTGCardInstance * pick = NULL;
+        int pc = -1;
+        for (int i = 0; i < game->hand->nb_cards; i++)
+        {
+            MTGCardInstance * c = game->hand->cards[i];
+            bool already = false;
+            for (size_t k = 0; k < chosen.size(); k++)
+                if (chosen[k] == c) { already = true; break; }
+            if (already)
+                continue;
+            int cost = c->getManaCost() ? c->getManaCost()->getConvertedCost() : 0;
+            if (cost > pc) { pc = cost; pick = c; }
+        }
+        if (!pick)
+            break;
+        chosen.push_back(pick);
+    }
+    if (chosen.empty())
+        return 0;
+    cleanupDiscardCards(chosen);
+    return 1;
 }
 
 int AIPlayerBaka::Act(float dt)

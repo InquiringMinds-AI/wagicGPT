@@ -1,0 +1,27 @@
+# W50-W D2 sibling pin: Tribute to Hunger at an opponent with one creature -
+# the edict chooser's candidate set is the TARGET's battlefield; one creature
+# is sacrificed and the caster gains its toughness (Oracle: "Target opponent
+# sacrifices a creature of their choice. You gain life equal to that
+# creature's toughness."). Hill Giant is 3/3 -> +3 life.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Tribute to Hunger
+manapool:{2}{B}
+life:20
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+Tribute to Hunger
+p2
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Tribute to Hunger
+life:23
+[PLAYER2]
+graveyard:Hill Giant
+life:20
+[END]

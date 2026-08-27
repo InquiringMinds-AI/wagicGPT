@@ -188,6 +188,15 @@ class AIPlayerBaka: public AIPlayer{
     virtual bool decisionPending(float dt) { (void) dt; return false; }
     void initTimer();
     virtual int computeActions();
+    //W50-W (D4): the cleanup-step hand-size discard as an AI DECISION. Before
+    //this the engine discarded hand->cards[0] (the oldest card) for every AI
+    //seat when the phase advanced - a combo deck lost its only Intruder Alarm
+    //that way. Baka's policy: discard the `over` highest-mana-value cards
+    //(least castable), ties by hand order; AIPlayerGPT puts the same choice to
+    //the model and falls back to this policy. Returns 1 when it acted.
+    virtual int cleanupDiscard(int over);
+    int cleanupDiscardOwed(); //cards over the limit at cleanup, else 0
+    void cleanupDiscardCards(const vector<MTGCardInstance*>& cards);
     virtual void Render();
     virtual int receiveEvent(WEvent * event);
     virtual ~AIPlayerBaka();
