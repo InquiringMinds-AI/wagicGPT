@@ -3659,6 +3659,19 @@ int AIPlayerBaka::computeActions()
                 //if theres mana i can use there then potential is true.
                 ipotential = true;
             }
+            //W50-D4: a pick carried in from an earlier tick is only a pick while
+            //the card is still somewhere it can be cast FROM. A card that has
+            //already gone to the stack (its cast was queued and clicked) must
+            //never be paid for again - the fresh-pick path below applies the
+            //same zone test; this makes the carried path apply it too.
+            if (nextCardToPlay && !p->game->hand->hasCard(nextCardToPlay)
+                && !p->game->graveyard->hasCard(nextCardToPlay)
+                && !p->game->exile->hasCard(nextCardToPlay)
+                && !p->game->commandzone->hasCard(nextCardToPlay))
+            {
+                DebugTrace("AIPlayerBaka: dropping a carried cast pick that left its zone: " << nextCardToPlay->name);
+                nextCardToPlay = NULL;
+            }
             if (!nextCardToPlay)
             {
                 nextCardToPlay = FindCardToPlay(icurrentMana, ""); //Now AI will not search just for instant cards.
@@ -3946,6 +3959,7 @@ int AIPlayerBaka::computeActions()
                         {
                             AIAction * a = NEW AIAction(this, nextCardToPlay);
                             clickstream.push(a);
+                            nextCardToPlay = NULL; //W50-D4: consumed (see below)
                             return 1;
                         }
                         nextCardToPlay = NULL;
@@ -3990,6 +4004,18 @@ int AIPlayerBaka::computeActions()
                             gotPayments.clear();
                         }
                     }
+                    //W50-D4: the pick is consumed HERE - its payment and cast
+                    //click are on the clickstream (or the payment was refused).
+                    //This member used to outlive the tick, and the interrupt
+                    //branch above reads a non-NULL nextCardToPlay as "already
+                    //chosen this window": when the opponent answered the cast
+                    //with a counterspell, the response window re-paid the
+                    //spell's cost from potential mana and clicked a card that
+                    //was already on the stack - twice the pips tapped, the
+                    //difference floating (corpus 20260827: 12 of 234 casts,
+                    //11 of them answered by a counter). Same discipline as the
+                    //interrupt branch's own epilogue.
+                    nextCardToPlay = NULL;
                     return 1;
                 }
                 else

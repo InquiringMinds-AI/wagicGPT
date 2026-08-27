@@ -1,0 +1,4 @@
+#NAME:W50V Counter Wall
+#DESC:Cancel wall (wave-50 lane V double-tap probe)
+Cancel (*) *24
+Island (*) *36

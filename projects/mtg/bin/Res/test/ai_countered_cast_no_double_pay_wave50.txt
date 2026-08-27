@@ -1,0 +1,70 @@
+#Wave-50 lane V (wave-49 engine seat D-4) -- a cast that gets COUNTERED must not
+#be paid for a second time.
+#
+#SYMPTOM (corpus 20260827-094106, 12 of 234 non-X casts; 20260827-072004, 7):
+#the AI seat casts a spell in its main phase, the opponent answers with a
+#counterspell, and by the seat's next window TWICE the spell's pips are tapped
+#with the difference floating in the pool ("Already in pool: {b}{w}") - the
+#response mana is gone in the exact window the counter is on the stack.
+#
+#MECHANISM: AIPlayerBaka::computeActions' main-phase branch queues the cast's
+#payment + click and returns WITHOUT clearing the nextCardToPlay member. The
+#interrupt branch (entered when the opponent's counter opens a response window
+#for this seat) reads a non-NULL nextCardToPlay as "already chosen this window",
+#skips FindCardToPlay, and pays for it AGAIN from potential mana - the card is
+#on the stack, so the cast click is a no-op and the mana floats until end of
+#phase. Only visible when the remaining untapped sources can afford the cost a
+#second time, which is why it correlated with counters on rich boards.
+#
+#WITNESS (both seats AI): P1 holds Grizzly Bears {1}{G} and a Giant Growth over
+#four Forests; P2 holds Cancel over three Islands and controls a Grizzly Bears.
+#Giant Growth is what makes P1's response window EXIST (its only legal target
+#is the opponent's bear, so the oracle offers the window but the heuristic
+#never casts it - a Fog here gets cast in that window and muddies the count).
+#P1's Bears is cast (2 Forests tapped) and countered. PRE-FIX the response
+#window re-pays the countered spell: all four Forests tapped, {G}{G} floating.
+#POST-FIX exactly two Forests are tapped after the counter resolves.
+FORCEABILITY
+AICALLS 60
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest,Forest,Forest
+hand:Grizzly Bears,Giant Growth
+life:20
+[PLAYER2]
+inplay:Island,Island,Island,Grizzly Bears
+hand:Cancel
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Forest,Forest,Forest,Forest
+tappedinplay:2
+hand:Giant Growth
+graveyard:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Island,Island,Island,Grizzly Bears
+tappedinplay:3
+graveyard:Cancel
+life:20
+[END]
