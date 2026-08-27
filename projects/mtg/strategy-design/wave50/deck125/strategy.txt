@@ -1,0 +1,540 @@
+REVELATION FRACTURE - UW DRAW-GO CONTROL
+
+You never have a creature on the battlefield and nothing in this deck attacks. You win by answering
+every threat the opponent makes and then killing them one damage at a time with Staff of Nin, while
+Elixir of Immortality shuffles your spent answers back into your deck. Every turn is the same three
+actions: play a land, answer the most dangerous thing on their side, and tap every Staff of Nin you
+control at their face. You are the control player in every matchup and you have all the time in the
+world - but you take one of those three actions EVERY turn, never none.
+
+=== #0 - PLAY THE LAND. EVERY TURN. BEFORE ANYTHING ELSE. ===
+When the prompt asks "Land drop:" and lists "Play <land>" options, TAKE ONE. Every turn, at
+any life total, with any hand, however many lands you already have. "Play no land right now"
+is never your answer while a land is listed.
+A land in play is a counterspell you can pay for on their turn; a land in your hand is a card
+you discard at seven. The land drop does not carry over - a turn you skip it is a turn of mana
+you never get back, and it is a card that stays in your hand and pushes something else out at
+end of turn.
+Which land: take the one whose colour you have fewest of. 18 of your lands make {W} and 20 make
+{U}; the "Mana available:" line names, one per untapped card, what each source can make. If both
+colours are already covered, any land will do - just take one.
+Games of yours have been lost this way. In one you passed the land drop on six straight turns
+holding a Plains and an Island, then could not pay for a second counterspell on the turn their
+engine landed. In another you skipped three drops, hit seven cards, and DISCARDED a Cancel -
+then the spell that killed you resolved four turns later with nothing in hand to stop it.
+
+=== #1 - STAFF OF NIN IS YOUR WIN CONDITION. EMRAKUL IS NOT YOUR PLAN. ===
+Emrakul, the Aeons Torn costs {15} - fifteen mana. Your mana is 26 lands and nothing else: this deck
+has no ramp, no mana rock and no cost reduction, so one land per turn is all the mana you will ever
+have. Your plan is therefore this, and you can write it as your PLAN line word for word:
+   "Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that
+   counter's cost; ping their face every turn."
+The thought "ramp to 15 mana and cast Emrakul", the thought "I just need to survive until I can cast
+Emrakul", and the thought "attack when board presence allows" are ALWAYS FALSE in this deck. There is
+no ramp to do, and you have no creature to attack with. When one of them shows up in the plan you
+were given, replace the plan with the line above.
+If "Cast Emrakul, the Aeons Torn" is ever actually printed in your numbered list, take it - the game
+only prints a cast you can already pay for. Until that line appears, Emrakul is a blank card and
+changes nothing you do this turn.
+This line outranks the heading above it. "Emrakul is not your plan" describes what you do while
+Emrakul is uncastable; the moment "Cast Emrakul, the Aeons Torn" is printed in your numbered list
+it IS castable, so you take it - including on a turn when the opponent is nearly dead and your
+Staff would finish them anyway, because Emrakul finishes them sooner. IT ALSO OUTRANKS THE TAP-OUT
+GATE, and it is the only card in this deck that does: fifteen mana is your whole board, so its row
+always reads "leaves 0" and a gate could never pass it. Take it anyway. Read its cost off the row -
+a tax effect makes the printed {15} appear as {17}, and the game only prints a cast you can pay
+for. The extra turn is real: the log prints "Turn 37 - YOUR turn" straight after "Turn 36 - YOUR
+turn", and on that extra turn Emrakul attacks for 15 with annihilator 6.
+THE ONE BOARD WHERE THAT LINE IS OFF, and it outranks it. Read the OPPONENT battlefield line
+before you take the Emrakul row, and read the game log. If that line prints an [enchantment] whose
+{effect:} reads "Whenever an opponent loses life, you gain that much life" (Exquisite Blood) or
+"Whenever you gain life, ... loses that much life" (Sanguine Bond), or the log prints "Opponent
+used: Gain life equal to its toughness with Tribute to Hunger" or a Devour Flesh, Emrakul is not a
+finisher, it is a fifteen-life gift: an edict makes them sacrifice it and gain 15, a Sanguine Bond
+turns that 15 into 15 off you, and with Exquisite Blood beside it the loop runs from any life total
+to 0. You cast it at 48 life with a Staff ticking them down; they answered Tribute to Hunger and
+you were at -12. You cast it again at 33 life with "Exquisite Blood {4}{b} [enchantment]" printed
+on their line and your own plan line saying not to. On that board answer "Cast nothing right now"
+to the Emrakul row every time and let the Staff finish - it was finishing.
+Once an Emrakul of yours IS on the battlefield, the sentences about having no creature stop
+applying to it: declare it as an attacker in every attackers window that offers it, and assign it
+as a blocker whenever the block line does not read "your blocker dies". And READ THE SWEEPER ROW'S
+LAST NUMBER: "Cast Supreme Verdict ... {right now: destroys 10 of their creatures (...), 1 of
+yours}" - that "1 of yours" is your Emrakul. Supreme Verdict and Final Judgment kill every creature,
+yours included; with an Emrakul out, any sweeper row whose tail reads "1 of yours" is answered
+"Cast nothing right now". You cast a Verdict off exactly that row on Emrakul's extra turn, at 33
+life against ten walls that could not attack: it killed your Emrakul and nothing that mattered,
+and the opponent's loop finished you four turns later.
+
+=== STAFF OF NIN - THE CLOCK ===
+Staff of Nin {6} artifact, two copies. Its line reads: "At the beginning of your upkeep, draw a card.
+-- {T}: Staff of Nin deals 1 damage to any target." It is the only damage and the only extra card
+this deck has.
+THE TAP-OUT GATE, and it covers EVERY mana you spend on your own turn - a Sphinx's Revelation, a
+Staff of Nin, an Elixir of Immortality ACTIVATION, a Lightmine Field. The one spend it does NOT
+cover is the Elixir CAST: {1} for a card that then waits on your battlefield is always paid, at any
+N, the turn it is listed; the gate governs its {2} activation.
+THE GATE IS A PRICE, AND THE PRICE IS PRINTED IN YOUR HAND. Your hand line prints every
+counterspell with its cost: Essence Scatter {1}{u} is 2 mana, Cancel {1}{u}{u} and Dream Fracture
+{1}{u}{u} are 3, Fall of the Gavel {3}{u}{w} is 5. THE OPTION ROW PRINTS WHAT IS LEFT: every
+"Cast ..." line ends with "{leaves N of your M untapped mana sources untapped}", or "casting this
+taps you out" which is N = 0. N is what is left the instant the spell resolves - read it off the
+row, do not compute it. Take the row only when N is AT LEAST the cost of the cheapest counter in
+your hand THAT CAN HIT WHAT THIS OPPONENT CASTS:
+  - Cancel, Dream Fracture and Fall of the Gavel counter anything. If any of them is in your
+    hand, N must cover the cheapest of them - 3, or 5 when the Gavel is the only one.
+  - Essence Scatter counters CREATURE SPELLS ONLY. It counts - N must cover its 2 - when the
+    opponent's battlefield line or the game log shows they cast creatures. Against an opponent
+    whose line and log show only enchantments, artifacts and sorceries (Underworld Dreams, Howling
+    Mine, Dictate of Kruphix, Forced Fruition, Peer into the Abyss) a Scatter in hand is not a
+    reason to hold mana: it stops nothing they cast. You held two open for a Staff at "leaves 0"
+    against exactly that deck - the Staff was right, and the sorcery that killed you next turn was
+    not a creature.
+  - No counter in your hand that counts: the gate is open at any N.
+This gate does NOT cover a counter you are casting at something on the stack - that is the mana
+doing its job. If N is below the price, PASS: the spell you wanted still costs the same next turn
+with a land behind it, and the turn you spend tapped out is the turn their engine lands
+uncountered. A resolved Sanguine Bond, Exquisite Blood or Underworld Dreams costs you the game;
+three extra cards do not win it. Three games of yours have been lost by a Staff cast at "taps you
+out" with a live counter in hand against a creature deck: a Tovolar's Huntmaster resolved on the
+next turn with no window offered, and it and its Wolves took you from 18 to dead in two combats.
+- A STAFF ROW WHOSE N IS BELOW THE PRICE OF A COUNTER THAT COUNTS IS ANSWERED "Cast nothing right
+  now". Read the row, not the "Mana available:" total: the row already did the subtraction. This
+  rule outranks "cast it the first turn it appears" and "no answer is needed this turn"; nothing
+  else does. The plan line carries the gate so it is in front of you at every cast ask; the Staff
+  is still in your hand next turn, with a land more behind it.
+- Keep taking the "Deal 1 Damage with Staff of Nin ... targeting a player" option in every window it
+  is offered, including upkeep, and with EVERY Staff you control. That damage is how the game ends.
+- Point it at a creature or a planeswalker only when 1 damage finishes it: printed toughness 1, or a
+  planeswalker showing exactly 1 loyalty counter. Otherwise it goes at the player.
+
+=== SPEND YOUR ANSWERS ON WHAT ACTUALLY KILLS YOU ===
+You hold 13 counterspells - 4 Essence Scatter {1}{U} (creature spells only), 3 Dream Fracture
+{1}{U}{U} (counters anything, you both draw), 3 Cancel {1}{U}{U}, 3 Fall of the Gavel {3}{W}{U}
+(counters anything and gains you 5 life). You can afford to spend them freely; each one is still only
+worth whatever it stopped.
+The stack line and the counter option both print the target's TYPE, MANA COST and (P/T):
+"1 (top): opponent's Overgrown Battlement {1}{g} (creature 0/4) [spell]". Read them and decide
+from the numbers, not from the name:
+  - (creature P/T) with printed POWER 2 or more: COUNTER IT.
+  - a WALL, at ANY printed power: LET IT RESOLVE. A defender cannot attack, so it can never take a
+    point off you, and you have no creature for it to block. RECOGNISE ONE BY ITS TAG: the stack
+    line and the counter row print it - "Perimeter Captain {w} (creature 0/4) [defender]". A stack
+    row tagged [defender], or printing power 0, is a wall. Pride Guardian (0/3), Wall of Omens
+    (0/4), Perimeter Captain (0/4), Fog Bank (0/2) and Shield Sphere (0/6) are this shape. Zero
+    counters on walls for two corpora running - keep it that way. This line has no exception: a
+    counter spent on a wall is a counter you do not have for the enchantment that kills you. In a
+    game you lost you spent Dream Fracture on a Pride Guardian and Fall of the Gavel on a Wall of
+    Omens on the same turn; four turns later the opponent tutored up Sanguine Bond and resolved it
+    with your hand empty of answers.
+  - (creature P/T) with printed power 0 or 1 and NOT tagged [defender]: LET IT RESOLVE - unless
+    its {target text: ...} on that same option line contains "{T}:", "Whenever ... attacks", "At
+    the beginning of" or "venture". A creature spell whose text says one of those DOES SOMETHING
+    EVERY TURN and its printed power does not measure it: COUNTER IT, whatever the P/T reads.
+    Dwarven Blastminer (1/1, "{2}{R},{T}: Destroy target nonbasic land"), Luminarch Aspirant (1/1,
+    a +1/+1 counter every combat), Katilda (1/1, "{T}: Add") and Triumphant Adventurer (1/1,
+    ventures on every attack) are this shape - the same shape the Path section names, read one
+    step earlier while it is still on the stack. Otherwise LET IT RESOLVE: it cannot kill you, and
+    Path to Exile or a sweeper answers it later for less mana. This holds however expensive it was
+    and however much the reasoning wants the counter spent.
+  - anything printed (land), (artifact) with no P/T, or (instant)/(sorcery) that only draws or
+    searches: LET IT RESOLVE. A MANA ARTIFACT is the sharpest case of this line and the one you
+    keep getting wrong: Chromatic Lantern {3}, Talisman of Impulse {2}, any artifact whose
+    {target text:} says "Add" and nothing else. It deals no damage, draws no card and kills
+    nothing; all it does is let them cast the spell you actually need the counter for. In a game
+    you lost you spent Dream Fracture on a Chromatic Lantern on turn 7; the Sanguine Bond it was
+    fixing the mana for resolved on turn 12 with no counter left in your hand.
+COUNTER ON SIGHT regardless of the numbers - these are the names whose danger is not visible in a
+P/T, and this list is short on purpose:
+  - every planeswalker;
+  - every permanent that hits you or grows them EVERY turn: Underworld Dreams, Fate Unraveler,
+    Sanguine Bond, Exquisite Blood, Howling Mine, Staff of Nin, Nuisance Engine,
+    Liliana's Caress;
+  - Idyllic Tutor: it is not a permanent, but it fetches the enchantment half of their combo.
+  - anything whose text makes a player DRAW extra cards, whatever its printed type: Howling Mine,
+    Teferi's Puzzle Box, Dictate of Kruphix, Forced Fruition, Peer into the Abyss. This one
+    outranks the "(artifact) with no P/T: let it resolve" line above. Extra cards cost you life
+    whenever they have Underworld Dreams or Fate Unraveler out, and cost you library either way.
+    Peer into the Abyss under two Underworld Dreams drew you half your library at 2 life a card
+    and killed you from 14.
+
+=== PATH TO EXILE - YOUR ONLY ANSWER TO A CREATURE THAT ALREADY LANDED ===
+Path to Exile {W} instant, four copies: "Exile target creature." These are the ONLY cards in your
+deck that remove one creature that is already on the battlefield. Essence Scatter and every other
+counter you own can only stop a spell on the stack; once a creature has resolved they do nothing to
+it.
+The "legal targets right now:" clause prints each candidate's (P/T) and its tags right there on
+the option line, and the TARGET ask that follows lists the same candidates one per row. Read them
+off those lines.
+BEFORE you use the power rule below, read each candidate's own rules text on the
+opponent battlefield line. A creature whose text contains "{T}:", "Whenever ...
+attacks", "At the beginning of", or "venture" DOES SOMETHING EVERY TURN, and printed
+power 1 does not measure it. Path THAT creature the first window it is offered, at any
+life total: it is the same danger the counter-on-sight list names, and Path is the only
+answer you have once it has landed. Dwarven Blastminer (1/1, "{2}{R},{T}: Destroy
+target nonbasic land"), Triumphant Adventurer (1/1, ventures on every attack) and
+Luminarch Aspirant (1/1, a +1/+1 counter every combat) are this shape. You took the Aspirant over
+a 4/5 Augur at 10 life and the Fate Unraveler over a Shield Sphere at 17: both right.
+Only when NO candidate has such a line do you use the power rule:
+Then: cast Path to Exile at the creature with the HIGHEST printed power. If EVERY candidate on that
+clause reads printed power 0 or 1, or is tagged [defender] - printed "(creature 0/4) [defender]"
+or "(artifact creature 0/6) [defender]" alike - answer "Cast nothing right now" and keep the Path -
+at any life total above 12, whatever else is on the board and however many turns you have been
+holding it. A 0/4 wall is never a Path target, and neither is a token with no {target text:} at
+all - "Goblin (creature 1/1)", a Spirit, a Human, a Wolf: you Pathed a lone Goblin token twice at
+20 life with ten lands open.
+YOUR LIFE IS 12 OR LESS AND ANY CANDIDATE READS PRINTED POWER 2 OR MORE: CAST THE PATH AT THE
+BIGGEST OF THEM, IN THAT WINDOW. Not next turn, not after you find a sweeper, not once you have
+seen it attack. You once held THREE Path to Exile at 12 then 10 then 5 then 1 life against two 2/1
+Spiders and a 3/3, answering "Cast nothing right now" every time. This corpus you took the 7/7
+Packleader at 7 life and the Aspirant at 10: keep doing that.
+TAPPED IS NOT SAFE: "[tapped - cannot attack or block this turn]" says nothing about next turn, and
+it untaps. Neither is "my blockers can handle it" - you have no blockers, ever, and no reasoning
+that ends in one of yours blocking is about this deck.
+A creature tagged [defender] still never gets the Path, at any life
+total: it cannot attack, so it is not what is killing you.
+Path lets its controller fetch a basic land. That cost is the point of the card; always pay it.
+
+=== SWEEPERS - THE HEADER COUNTS THE ATTACKERS FOR YOU ===
+Your battlefield has no creatures while no Emrakul of yours is out, so a board wipe then only costs
+the opponent (with an Emrakul out, read #1: the row's "1 of yours" tail is the Emrakul). The
+opponent battlefield header prints TWO numbers and this section uses only the SECOND: "Opponent
+battlefield (11 permanents listed, of which 3 are creatures, 0 of them without a restriction
+against attacking)". That second number is the engine's own count of their creatures that can come
+at you - walls and Defenders are already taken off it. Subtract nothing yourself; you got that
+subtraction wrong four times in one game. (On whichever board belongs to the player whose turn it
+is the same number is worded "N of them able to attack right now"; use it the same way.) A creature
+tagged [tapped] is still counted: tapped is not a restriction, and it untaps.
+The sweeper row prints the same fact beside the header, in the same words: "{right now: destroys
+3 of their creatures (3 without a restriction against attacking), 0 of yours}" is three attackers;
+"destroys 10 of their creatures (all of them carry a restriction against attacking), 0 of yours"
+is ten walls; "destroys 1 of their creature (it carries a restriction against attacking)" is one
+wall; "destroys 0 of their creatures" is an empty board. The number in the parenthesis is the
+header's second number; the row's first number counts walls too.
+IF THAT SECOND NUMBER IS 0, SUPREME VERDICT AND FINAL JUDGMENT ARE NOT CASTABLE PLAYS THIS TURN -
+in your FIRST main phase and in your SECOND main phase alike. The header does not change
+between them, and neither does this answer. Answer "Cast nothing right now" and keep them. This
+line outranks every other reason to cast a sweeper - being ahead, having spare mana, wanting to
+use the turn, the plan naming a wipe. It outranks the turn count too: the tenth window that offers
+the sweeper at 0 has the same answer as the first, main phase 2 has the same answer as main phase
+1, and a menu whose only cast row is the sweeper still answers "Cast nothing right now" - one
+castable card on the menu is not a reason to cast it. Forty-one windows at 0 this corpus, forty
+declined; the one you cast was the Verdict that killed your own Emrakul (#1). A wipe with nothing
+to kill is a card you threw away AND a turn you spent tapped out, and the turn you spend tapped
+out is the turn their engine lands uncountered. Only when that SECOND number is 1 or more do you
+read on, and every count in the branches below means that second number:
+- 2 or more creatures: cast Supreme Verdict {1}{W}{W}{U} - its own line says "can't be countered", and
+  it means it, so it resolves through their counterspells. With six mana, Final Judgment {4}{W}{W}
+  EXILES instead of destroying; use Final Judgment against anything that returns from a graveyard.
+- exactly 1 creature, and that creature is tagged [defender], or shows printed power 0 or 1 with
+  none of the engine text the Path section names: cast NOTHING - no sweeper, no Path. It cannot
+  hurt you and you have no creature for it to block, so a card aimed at it kills nothing that was
+  going to deal you damage - and the sweeper leaves you tapped out. This holds at any life total.
+  You have cast a Supreme Verdict at a lone Fog Bank (0/2 defender) at 23 life, a Final Judgment
+  at a lone Wall of Omens (0/4 defender) at 31 life, and a Supreme Verdict at a lone Spirit token
+  (1/1) at 33 life with two Paths in hand; each cost you a card and a turn of open mana and
+  killed nothing that mattered.
+- exactly 1 creature with printed power 2 or more, and Path to Exile is in your list: take the
+  Path and keep the sweeper. A {W} instant is the right price for one creature; a sweeper is not.
+- exactly 1 creature with printed power 2 or more, and Path to Exile is NOT in your list: cast the
+  sweeper when that creature's printed power is 4 or more, otherwise answer "Cast nothing right
+  now" and keep it - unless your life is 10 or less and nothing else in your list answers that
+  creature: then cast the sweeper whatever its printed power. You spent a Verdict on a lone 3/1
+  flier at 17 life this corpus; it was the sweeper you needed at 3 creatures eight turns later.
+- 3 or more creatures, and Lightmine Field is in your list: cast Lightmine Field. At 0, 1 or 2
+  creatures on that header it kills nothing at any size, so keep it and spend the mana on a Path
+  or a sweeper instead - unless nothing else in your list is worth casting this turn and your
+  "Mana available:" line still reads 4 or more AFTER the mana you keep open for a counterspell:
+  then cast it in EITHER main phase, so it is already there when the crowd arrives.
+- 0 creatures: answer "Cast nothing right now" and keep the sweeper (the hard line at the top of
+  this section).
+
+=== SPHINX'S REVELATION - X IS ALWAYS 3 ===
+Sphinx's Revelation {X}{W}{U}{U} instant: "You gain X life and draw X cards." At X = 0 it gains
+nothing and draws nothing; at X = 3 it costs six mana and draws you three cards, and three is the
+answer every time you cast it. The whole section below is about WHEN to cast it, not how big.
+THE TAP-OUT GATE from the Staff section covers a Revelation too: take its row only when the row's
+"leaves N" covers the price of a counter in your hand that counts.
+Its row also prints the size it can be: "{X pricing: max affordable X=N ...}". Cast Sphinx's
+Revelation only from a row whose max affordable X reads 3 or more - that is the X = 3 you will
+announce. At a max affordable X of 1 or 2, answer "Cast nothing right now" and hold it - it is an
+instant and it will still be there next turn with one more land behind it - unless your life is
+10 or less and no other option in your list is worth casting: then cast it at the largest X the
+menu offers. Sixteen windows at "max affordable X=1" or "X=2" this corpus, sixteen holds: read
+the N off the row, and 3 is the floor.
+BEFORE you take Sphinx's Revelation, or any other optional draw, read the line "Your library: N
+cards". If N is 5 or less, answer "Cast nothing right now" and keep the card: drawing your last
+card loses the game outright, and Sphinx's Revelation draws X on top of your normal draw step.
+Cast it only when you have something to DO with the cards. If your "Your hand:" line already runs
+past the width of a single reading - if you can see a counterspell, a Path and a sweeper in it
+already - answer "Cast nothing right now" and keep the Revelation. It is an instant; it will still
+be there on the turn your hand is empty and you need it. A Revelation cast onto a full hand is
+three cards discarded at end of turn.
+THE DRAW-IS-DAMAGE STOP, AND IT OUTRANKS EVERY OTHER LINE IN THIS SECTION. Read the OPPONENT
+battlefield line before you take any draw. If any permanent there prints an {effect:} containing
+"Whenever an opponent draws" - Underworld Dreams, Fate Unraveler, Ob Nixilis the Hate-Twisted are
+the ones in this pool - then EVERY card you draw takes 1 life off you PER SUCH PERMANENT, and they
+stack. The Revelation row prices it for you: "[DRAW PRICE: every card X draws costs you 2 life to
+their Underworld Dreams #1, Underworld Dreams #2 (at X=3: 3 cards = 6 life)]". Do not cast Sphinx's
+Revelation at all while one of them is on that line, at any mana, at any hand size, at any life
+total. Answer "Cast nothing right now" and hold it. The same goes for any other optional draw. Your
+answer to those permanents is a counterspell on the stack, never a bigger hand afterwards. You lost
+a game to this: their line showed Fate Unraveler, two Underworld Dreams and an Ob Nixilis beside
+three Howling Mines, one draw step took you from 20 to 5, and you then cast a Sphinx's Revelation
+at 6 life and drew yourself down to 4.
+Once the opponent's printed life is 10 or less and you control a Staff of Nin, stop drawing
+entirely: the Staff clock finishes the game on its own and every extra card is a turn of library
+you are spending for nothing.
+When your hand holds no counter and no Path to Exile you need the cards more than you need
+anything else - but the draw-is-damage stop above and the library floor below still bind, because a
+card drawn out of an empty library, or drawn under an Underworld Dreams, is not a card you get to
+use.
+YOUR X IS 3. NOT THE LARGEST NUMBER ON THE MENU.
+The X menu prints its values largest first and its own sentence tells you the largest X you can
+AFFORD. Affordable is not correct: the largest affordable X has been your answer in games you then
+threw away, because everything you hold above seven cards at end of turn is DISCARDED - cards you
+paid mana for and threw away - and if the opponent battlefield line shows Liliana's Caress,
+Underworld Dreams or Fate Unraveler, each discarded card ALSO costs you life on the way to the
+graveyard.
+So: reply with the OPTION number whose line reads "X = 3". Every time, and with no arithmetic in
+front of it. Each row prints what it buys - "X = 3 {X pricing: X=3 - you gain 3 life and draw 3
+cards}" - and the X = 0 row says outright that the cast does nothing. Read the row, take the 3, and
+stop. Six casts this corpus, six at 3, off menus reaching 4, 5 and 7: this rule works and there is
+nothing to work out.
+THE ONE COMPARISON THAT CAN LOWER IT, and nothing can raise it: read "Your library: N cards".
+Subtract 2, and one more for EACH Staff of Nin on your battlefield. If that number is smaller than
+3, announce THAT number instead. Drawing from an empty library loses the game outright.
+If "X = 3" is not on the menu, take the largest value the menu does offer that is below 3.
+Worked examples, both from real games of yours. Library 31, one Staff, menu up to 13: 31-2-1 = 28,
+which is not below 3, so X = 3 - not the 13 the menu topped out at. Library 20, two Staffs, menu up
+to 13: 20-2-2 = 16, still not below 3, so X = 3 - the 8 you announced discarded five cards at end
+of turn.
+
+=== FORCED FRUITION - EVERY SPELL YOU CAST DRAWS YOU SEVEN ===
+Forced Fruition {4}{U}{U} enchantment (deck162 runs it): "Whenever an opponent casts a spell, that
+player draws seven cards." Once it is on the opponent battlefield line, every spell YOU cast draws
+you seven before it does anything - a counter, an Elixir, a Staff, a sweeper, all of them - and two
+copies ("Forced Fruition #1-#2 x2") draw fourteen. Only CASTING triggers it: activating an Elixir
+already on your battlefield does not, and a land drop does not.
+Read the opponent battlefield line for it at every cast ask, then:
+ - Forced Fruition there AND any "Whenever an opponent draws" permanent there (Underworld Dreams,
+   Fate Unraveler, Ob Nixilis): every spell you cast costs you 7 life per Fruition per punisher.
+   Cast NOTHING on your own turn - no Elixir cast, no Staff, no sweeper, no Revelation - and on
+   their turn cast a counter ONLY when that price is below your life minus 1. Read the price off
+   the line before the CHOICE: one Fruition and one Dreams is 7; two Fruitions and one Dreams is
+   14. At 15 life you cast an Elixir under one of each, drew seven and finished at 13 for the five
+   life it gained; at 11 life you cast Cancel under two Fruitions and a Dreams, drew fourteen, and
+   died on the spot.
+ - Forced Fruition there and NO punisher: each spell still draws you seven. Read "Your library: N
+   cards": cast nothing when N is 14 or less, and use the Elixir ACTIVATION (an ability, not a
+   spell - Fruition does not see it) to refill the library first.
+ - The answer to Forced Fruition is the counter you cast at it while it is ON THE STACK: it is on
+   the counter-on-sight list above. Once it has resolved you do not cast your way out of it.
+
+=== ELIXIR OF IMMORTALITY - THE RECYCLER ===
+Elixir of Immortality {1} artifact, two copies: "{2},{T}: You gain 5 life. Shuffle Elixir of
+Immortality and your graveyard into library." Every counterspell and every Path you have already
+spent goes back into your deck, and the Elixir goes back with them, so you can draw it and cast it
+again. That is why this deck never runs out of answers.
+Cast it the turn it is listed when you have a spare {1}. ACTIVATING it is the same spend as
+casting a spell and the tap-out gate covers it: the {2} has to leave your "Mana available:" line at
+or above the price of a counter in your hand that counts (2 for a Scatter against a creature deck,
+3 for Cancel or Fracture, 5 for a lone Gavel). Otherwise activate it only when your life is 15 or
+less or your library is 16 or less - those two are worth a tapped-out turn and a spare {2} in a
+full hand is not. On turn 2 of a game you activated it from "Mana available: 2" to 0 at 20 life
+with a library of 53 and a Scatter and a Gavel in hand: nothing bought, a counter's mana gone.
+You lost a game to this: on your turn 11 you cast the Elixir and activated it down to two open mana
+with a Fall of the Gavel in hand, and their Sanguine Bond - the first name on your counter-on-sight
+list - resolved on turn 12 with no window offered, because you could not pay for one.
+Read "Your library: N cards" at every decision. If N is 16 or less and an Elixir of
+Immortality of yours is on the battlefield untapped, ACTIVATE IT IN THAT WINDOW, ahead
+of a Staff ping and ahead of any spell. Sixteen, not twelve: with two Staffs of Nin you draw three
+cards a turn, and the window that offers the Elixir is a priority window that only comes around
+every other turn - by the time N reads 12 the next offer can be at 6.
+Shuffling your graveyard back is the only thing that stops this deck from drawing its last
+card, and drawing from an empty library loses the game outright at any life total. This rule has
+nothing to do with your life: at 98 life with 17 cards left you are the player who is losing.
+
+=== LIGHTMINE FIELD - IT ONLY PUNISHES A CROWD ===
+Lightmine Field {2}{W}{W}: "Whenever one or more creatures attack, Lightmine Field deals damage to
+each of those creatures equal to the number of attacking creatures." Three attackers take 3 each and
+die; ONE attacker takes 1 damage, which kills nothing however large it is.
+ITS GATE IS THE SWEEPER SECOND NUMBER, and its row prints the same count: "{right now: they
+control 3 creatures able to attack - deals 3 to each if all 3 attack}" is a cast; "they control 1
+creature able to attack - deals 1 to each" and "they control 0 creatures able to attack - deals 0
+until they have an attacker" are "Cast nothing" rows. Do not cast Lightmine Field while that count
+is below 3 - not at 0, not at 1, not at 2, in either main phase, however much spare mana you have.
+It is an enchantment - it costs the same on the turn the crowd arrives. And when the row reads 3,
+CAST IT: "[tapped]" on their creatures is not a reason to wait - the row already counted them,
+and they untap. You declined a "they control 3 creatures able to attack" row at 25 life because
+all three were tapped.
+
+=== READING THE MANA LINE ===
+Every rule in this guide that says "your Mana available: line" means the number on that line -
+with one exception the render tells you about itself. When the line reads
+"Mana available: 0 total (no untapped sources) | Already in pool: {u}{w}{w}... (N mana ALREADY
+produced and floating right now)", the number you have to spend IN THIS DECISION is N, the
+floating one. Use N wherever a rule below asks for "Mana available:".
+But floating mana is spent-or-lost: it is produced mana, not an untapped land, and it does not
+survive to the opponent's turn. Mana you are "keeping open" for a counterspell has to be an
+UNTAPPED SOURCE, never a pool. So when the whole of your mana is floating, the counterspell
+subtraction below cannot be satisfied at all - spend the pool this turn on whatever the rules
+name, and do not tell yourself you are holding a counter up.
+
+=== YOUR MANA AND YOUR WINDOWS ===
+You get a window on the opponent's turn only when they cast a spell, and the prompt shows it to you
+under "ON THE STACK". You are never offered an end-of-their-turn window, so mana you hold open
+through a turn where they cast nothing is mana you threw away.
+So keep {1}{U} open for Essence Scatter, or {1}{U}{U} for Cancel or Dream Fracture, and spend
+everything ABOVE that on your own turn - a Staff of Nin, an Elixir activation, a Sphinx's Revelation,
+a Lightmine Field. Ending your turn with all your mana unspent is right only when your hand is
+nothing but counterspells.
+
+=== CLEANUP DISCARD - THE ENGINE ASKS YOU WHICH CARDS TO SEND ===
+When your hand is above seven at end of turn the ask prints your hand as a NUMBERED list and tells
+you how many to send ("PUT: n, m"). What you are choosing is the hand you KEEP: counterspells you
+can pay for and a Path, then everything else. Send, in this order, as many as the ask demands:
+  1. Lightmine Field, unless the header second number reads 3 or more.
+  2. A land beyond the second in hand.
+  3. A second Supreme Verdict or Final Judgment (one sweeper in hand is enough).
+  4. Emrakul, the Aeons Torn - unless your battlefield line already prints 13 or more lands, in
+     which case it is two turns from castable and stays.
+  5. A Sphinx's Revelation beyond the first.
+  6. Only then a counterspell, cheapest last: send a Fall of the Gavel before a Cancel, a Cancel
+     before an Essence Scatter - and an Essence Scatter first when the opponent casts no creatures.
+You sent a Cancel from a hand holding a Lightmine Field at 44 life against an empty board, and two
+Essence Scatters from a hand of six counters with Emrakul at 34 life on sixteen lands; that second
+one was fine, the first was a counter thrown away.
+
+=== MULLIGAN ===
+The question at every look is the same one, and it is about ODDS, never about a number the hand
+has to meet: what are the odds THIS hand does something in time, against the odds the NEXT hand -
+one card smaller - does? Two facts about this deck set the comparison, and the prompt gives you
+the rest:
+  - 26 of your 60 cards are lands, so a two-land seven sees its third land inside two or three
+    draws and its fourth by about turn five. Waiting for lands is a bet you usually win.
+  - Your job is REACTIVE. Nothing here has to happen on turn two; the cost of a slow start is only
+    the cost of the threats that land before you can answer them.
+The prompt hands you the three numbers the comparison needs, and you read them rather than counting
+the hand yourself:
+  "Your hand (7 cards), counted by the engine: N lands, M spells."
+  "Mana sources among those lands, counted by the engine: {W} n, {U} n."
+  "Playing every land in this hand would cover the cost of: ..." - or "would not cover any spell
+  in it."
+And the mulligan row prices the next look for you: "Mulligan (a keep after this one would keep 5
+cards)". Every look costs a card; the London mulligan gives you a fresh seven and takes the cost
+at the keep. A six-card hand that does something beats a seven that does nothing; a five-card hand
+that does something beats a six that does nothing; but a hand of five or fewer that already does
+something is almost never beaten by the next look, because a smaller hand loses answers faster
+than it fixes lands.
+So, at each look:
+  - A hand of 2 to 5 lands whose coverage line names at least one card can already act on their
+    first threat, and the odds of improving it by shipping a card are against you: KEEP. At any
+    price. You shipped a four-land hand whose coverage line named Dream Fracture AND Supreme
+    Verdict at the "would keep 5 cards" row, then shipped a two-land hand at the "would keep 4
+    cards" row, kept four, and lost a game you never got to play.
+  - The coverage line reads "would not cover any spell in it": this hand does nothing until you
+    draw both a land and a colour, and it is the one shape where a smaller hand can be better.
+    Weigh how many draws until it casts ANYTHING - sharpest when the spells left are Final
+    Judgment {4}{W}{W}, Staff of Nin {6} or Emrakul {15} rather than a Path to Exile {W} or an
+    Elixir {1} - against what the next look costs. On a fresh seven or a six, ship it when the
+    answer is "four or more turns and they have a creature on turn two". At a row reading "would
+    keep 5 cards" or smaller, the next look costs more than that wait does: keep it if it holds a
+    land and a spell you can cast within two draws, and ship it only when it holds no land at all
+    or no spell at all.
+  - Seven lands and no spell, or seven spells and no land, ships at any price - those hands do
+    nothing however long you wait, and the odds of the next look beating "nothing" are as good as
+    odds get. You shipped a one-land seven that covered nothing and kept the two-land six behind
+    it (Scatter and Elixir covered) - and won.
+Tiebreakers between keepable hands, never a reason to ship on their own: prefer the hand with a
+land that makes both colours (Tundra, Glacial Fortress, Seachrome Coast), and prefer the hand with
+at least one counterspell. Colour alone is not a reason to mulligan - 18 of your lands make {W} and
+20 make {U}, so a one-colour opener is usually two draws from the other.
+
+When a keep makes you bottom cards the ask prints your hand as a NUMBERED list and tells you how
+many to send. What you are choosing is the hand you KEEP, and the hand you keep needs two things:
+lands to cast with and answers to cast. Read the numbered list once, decide which cards those are,
+and bottom the rest - in this order of preference, taking as many as the ask demands:
+  1. Emrakul, the Aeons Torn.
+  2. Any card whose line says "(copy 2 of 2 in your hand)" - a duplicate of anything, a duplicate
+     LAND included. Two Islands in a seven is a duplicate and it is the answer; you bottomed a
+     Sphinx's Revelation past two Islands instead.
+  3. A land beyond the fifth, or beyond the third when the ask makes you send three.
+  4. Your most expensive spell, then the next most expensive.
+  5. Only when the list is exhausted: the cheapest card that is neither a land nor an answer
+     (an Elixir before a Path, a Path before a counterspell).
+The hand you keep should hold at least as many lands as it can play in its first two or three
+turns and at least one card that answers a threat - a counterspell or a Path. When the ask makes
+you send more cards than that leaves room for, keep the LANDS and ONE answer and let the rest go:
+a counterspell you cannot pay for is not an answer, and a land with nothing to cast is not a hand.
+You once sent an Island, a Fall of the Gavel and an Essence Scatter from a three-land four-spell
+hand and kept two lands with a Path and an Elixir - three cards had to go, and the three that
+should have gone were the Gavel, the Elixir and the Path, leaving three lands and a Scatter.
+
+=== DECIDING SITUATIONS ===
+- The prompt lists "Play <land>" options: play one. Every turn, no exceptions.
+- The plan you were given talks about ramping to Emrakul or about attacking: write the plan "keep
+  the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that
+  counter's cost; ping their face every turn" instead.
+- "Deal 1 Damage with Staff of Nin ... targeting a player" is in your list: take it, every window,
+  with every Staff.
+- "Cast Staff of Nin" is in your list: read the counters on your hand line and their costs; take
+  the Staff only from a row whose "leaves N" covers the cheapest one that can hit what this
+  opponent casts (an Essence Scatter counts only against a creature deck), or with no such
+  counter in hand. Below that: cast nothing, and cast it next turn.
+- Their spell on the stack is tagged [defender], or prints printed power 0: let it resolve. Walls
+  never get a counter.
+- Their spell on the stack prints (creature P/T) with printed power 0 or 1, or prints no P/T at
+  all: let it resolve and keep the counter - unless its {target text:} contains "{T}:",
+  "Whenever ... attacks", "At the beginning of" or "venture": then counter it now.
+- Their spell on the stack prints (creature P/T) with printed power 2 or more, or is a
+  planeswalker, or is one of the named permanents above: counter it now.
+- "Cast Emrakul, the Aeons Torn" is printed in your numbered list: TAKE IT - unless the opponent
+  battlefield line prints an [enchantment] whose {effect:} says "you gain that much life" or
+  "loses that much life" (Exquisite Blood, Sanguine Bond), or the log shows they used Tribute to
+  Hunger or Devour Flesh: then cast nothing and let the Staff finish. Otherwise the game only
+  prints a cast you can already pay for, and it ends the game faster than the Staff does.
+- An Emrakul of yours is on the battlefield: attack with it every window; and a Supreme Verdict or
+  Final Judgment row whose tail reads "1 of yours" is answered "Cast nothing right now" - it
+  kills your Emrakul.
+- The opponent header's SECOND number ("N of them without a restriction against attacking", or "N
+  of them able to attack right now") reads 2 or more: cast Supreme Verdict, or Final Judgment
+  against anything that comes back from a graveyard. Read that number, never the creature count.
+- That second number reads 0: cast NOTHING - no Supreme Verdict, no Final Judgment, no Lightmine
+  Field, at any life total, with any spare mana, in either main phase, however many turns it has
+  been offered, and when it is the only cast row on the menu. "3 creatures, 0 of them without a
+  restriction against attacking" is a board of walls; "0 creatures" is an empty board; no card of
+  yours is worth spending on either.
+- That second number reads exactly 1 and the creature prints power 2 or more: Path to Exile it
+  and keep the sweeper. It prints power 0 or 1, or [defender], with no engine text: cast nothing.
+- That second number reads 3 or more and Lightmine Field is in your list: cast it, tapped
+  creatures included. Below 3, never.
+- Your life is 12 or less and any Path candidate reads printed power 2 or more: cast Path to Exile
+  at the biggest of them, in this window. "[tapped]" is not a reason to wait.
+- The only Path targets offered are defenders or 1-power creatures and your life is above 12: cast
+  nothing and keep the Path.
+- The opponent battlefield line shows Underworld Dreams, Fate Unraveler or Ob Nixilis the
+  Hate-Twisted - anything whose {effect:} says "Whenever an opponent draws" - do NOT cast Sphinx's
+  Revelation and do not take any optional draw, at any mana and any life total. Each card you draw
+  costs you 1 life per such permanent; the row's [DRAW PRICE:] prints the total.
+- "Mana available:" reads 6 or more and Sphinx's Revelation is listed with none of those permanents
+  on their line: cast it, then on the X menu announce X = 3 - not the largest number offered, and
+  never a number you counted off your own hand.
+- Your life is 15 or less, or your library is 16 or less, and Elixir of Immortality is on your
+  battlefield untapped: activate it. At a life above 15 and a library above 16, activate it only if
+  the {2} still leaves your "Mana available:" line at or above the price of a counter that counts.
+- A counter that counts is in your hand and the row of the spell you are about to cast on your
+  own turn reads a "leaves N" below its price: do not cast it. Emrakul is the one exception; a
+  counter answering the stack is not covered at all.
+- Nothing in your list answers anything and you have mana above your counterspell's cost: spend it on
+  Staff of Nin, on Elixir, or on Sphinx's Revelation rather than passing the turn with it unused -
+  the tap-out gate still binds, and so does the draw-is-damage stop. NEVER on Supreme Verdict,
+  Final Judgment or Lightmine Field: those three are spent only by the header number, and a turn
+  that ends with mana unused is the right turn when that number is 0.
+- Their spell on the stack prints (artifact) whose text only says "Add" - Chromatic Lantern,
+  Talisman of Impulse: let it resolve. A mana rock has never killed you.
+- "Forced Fruition" is on the opponent battlefield line beside Underworld Dreams, Fate Unraveler or
+  Ob Nixilis: cast nothing on your turn, and cast a counter only when 7 x (Fruitions) x (punishers)
+  is below your life minus 1. Activating an Elixir already on your battlefield is still free.
+- The cleanup ask ("PUT: n, m"): send Lightmine Field, spare lands, a second sweeper, Emrakul
+  (below 13 lands), a spare Revelation - a counterspell last.

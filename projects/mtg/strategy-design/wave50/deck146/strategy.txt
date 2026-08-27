@@ -1,0 +1,559 @@
+YOUR DECK: Orzhov (white-black) dungeon MIDRANGE. You have premium flexible REMOVAL, value
+creatures that VENTURE INTO THE DUNGEON, two planeswalkers, and a manland. You are the BEATDOWN
+against slow/control decks (venture, grind value, close with planeswalkers) and the CONTROL
+against aggro (deploy blockers early, spend removal ON CURVE to survive, then take over). Read the
+opponent: if they are faster than you, your job is to trade and survive to the mid-game where your
+card quality wins. Do NOT sit on removal - a Vanishing Verse in hand while you die does nothing.
+
+MULLIGAN - READ THE PRICE LINE FIRST, THEN WEIGH THE ODDS.
+STEP 1 - WHAT DOES THE NEXT LOOK COST? Read the ask's "(keeping N)" number. Each mulligan is a
+  fresh seven you must shave by one more card, and a fresh seven from a 21-land deck is a
+  two-lander about as often as anything else - shipping rarely fixes lands, it only shrinks the
+  hand. So at "(keeping 5)" or lower the question is no longer "is this hand good" but "is a
+  five-card (or four-card) hand more likely to win than THIS hand shaved at the bottom ask" -
+  and with even ONE land in front of you the answer is keep, because the bottom ask lets you
+  shed the uncastable cards and keep the land plus your cheapest spells, while the ship hands
+  you one card fewer and the same land odds. Colour is not a reason to ship here: nine of your
+  21 lands make both colours (four Snarls and four Pathways, plus the Hives for black), so the
+  second colour arrives with the second land. "No white source" was the sentence this seat
+  wrote at (keeping 5) holding a Swamp; it shipped to a three-card hand and lost. Zero lands,
+  or nothing but lands, at (keeping 5) is the one hand where a fresh look is worth the card -
+  even then, weigh it: a four-card seven with one land is what you are buying.
+STEP 2. On your untouched opening 7, or at (keeping 6), a mulligan is a fair trade only for
+  one of these four: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
+  your colors when the header shows every spell needs it; or ONE land under the header line
+  "Playing every land in this hand would not cover any spell in it". That coverage line is
+  the engine's own arithmetic and it is the whole one-land test: one land that covers nothing
+  is a hand that casts nothing, and a six is not worth keeping for its second turn. ONE land
+  under "would cover the cost of:" naming a card is a judgment call on that card: keep when
+  that card wins the early turns by itself, ship when it does not. WHAT THIS COST: a one-land
+  six was kept here under "would not cover any spell in it" (Snarl, two Soul Shatters, a
+  Silencer, Nadaar, Barrowin, Emeria's Call); the seat drew no second land until turn 19,
+  discarded six cards at cleanup on one Snarl, and lost. The "KEEP a 7 or a 6 with 2-5
+  lands" line below describes hands that are obviously fine - it is NOT a test, and a hand
+  failing it is not a mulligan.
+- THE ENGINE COUNTS YOUR HAND FOR YOU. Every mulligan ask opens with lines like "Your hand (7
+  cards), counted by the engine: 3 lands, 4 spells", "Mana sources among those lands, counted by
+  the engine: {W} 2, {B} 2", "Cheapest spell in this hand: Vanishing Verse {b}{w} (mana value 2)"
+  and "Playing every land in this hand would cover the cost of: ...". Those counts are correct and
+  they are the whole basis of this decision. DECIDE FROM THEM. Never write "this hand has zero
+  lands" when the count says otherwise, and never recount the hand yourself.
+- WHERE YOU ARE IN THE MULLIGAN IS THE "(keeping N)" NUMBER, NOTHING ELSE. Every mulligan hand
+  you are shown is a fresh 7 cards, so never judge "I am still at 7" from the cards in front of
+  you: read the ask's price line ("having already taken 2 mulligans you will bottom 2 cards on a
+  keep (keeping 5)") and let that N decide which STEP above applies.
+- WHEN YOU KEEP AFTER MULLIGANS, THE GAME THEN ASKS WHICH CARDS TO PUT ON THE BOTTOM, AND THAT
+  ASK IS WHERE THE HAND IS ACTUALLY BUILT. The ask says "You will be left with an N-card hand".
+  Build the best N: the lands you need to cast what you keep, then the cheapest spells those
+  lands cover, and bottom the rest starting with the most expensive (Emeria's Call, Agadeem's
+  Awakening, a second planeswalker, then the priciest card left). A hand of nothing but lands
+  draws one card a turn and casts it a turn late every time - at N of 3 that is two lands and
+  your cheapest spell, never three lands; at N of 5 or 6 it is three or four lands and the spells
+  they cover. Hive of the Eye Tyrant IS a land for this count. A LAND GOES UNDER ONLY FROM A
+  KEEP OF FIVE OR MORE LANDS: with two lands or fewer in front of you the PUT line holds spell
+  numbers only - those lands are the whole reason the keep was priced at all. Write the PUT
+  line as the numbers of the highest-cost spells, most expensive first, and read it against
+  your own plan sentence before you send it: a plan that says "play Snarl and Pathway" with
+  Pathway's number in the PUT line is the plan bottoming itself. WHAT THIS COST, twice: from a
+  (keeping 3) look holding three lands, Kaya, Pelakka Predation and two Soul Shatters, this
+  seat's plan said "cast Kaya" and its bottom answer put Kaya and every other spell under the
+  deck; it kept Plains, Pathway, Snarl and lost with sixteen decisions and no cast before turn
+  10. And from a (keeping 5) look holding Pathway, Snarl, Kaya, Nadaar, Barrowin, Adventurer
+  and Verse, the plan said "play Shineshadow Snarl and Brightclimb Pathway" and the PUT line
+  sent Pathway and Kaya under; the seat sat on two lands from turn 3 to turn 14 with Lolth,
+  Nadaar and Barrowin in hand and lost 0 to 35.
+- KEEP a 7 or a 6 with 2-5 lands including a white source and a black source. Shineshadow Snarl
+  alone counts as BOTH colors. Brightclimb Pathway is your white source, Hive and Swamp are black.
+- "Prefer a hand with an early play" is a TIEBREAKER between two keepable hands, NOT a requirement.
+  A 5-land hand with two Lolths is a KEEP - you will draw spells. Never mulligan a hand for having
+  too many lands or for lacking a one-drop.
+- EMERIA'S CALL AND AGADEEM'S AWAKENING ARE NOT LANDS FOR YOU. They are printed with a land on the
+  back, but the game NEVER offers you their land face - it has not appeared on a single land-drop
+  menu. Count them as SPELLS ONLY: a hand with two lands and an Emeria's Call is a TWO-land hand.
+  The same is true of Pelakka Predation - it is a SORCERY only, never a land.
+- Two of your lands can arrive tapped, which is a reason to take a land, never to ship a hand:
+  Shineshadow Snarl enters TAPPED unless you reveal a Plains or a Swamp from your hand, and Hive of
+  the Eye Tyrant enters TAPPED once you already control TWO OR MORE OTHER LANDS (so it comes in
+  untapped as your first or second land, and tapped from your third land onward).
+
+YOUR MANA. You need BOTH white and black - most of your spells cost {B}{W} or a WB pip each.
+Shineshadow Snarl taps for {W} OR {B} (a single Snarl by itself gives you both colors). Brightclimb
+Pathway, Plains, Swamp, and Hive of the Eye Tyrant round out your colors. If a Cast option is
+listed, you CAN pay for it - do not decline a spell thinking you "lack the color." Play a land
+every turn you can.
+
+THE WHOLE CAST ORDER, ONE LIST. At every "which card do you cast now" ask on YOUR OWN turn, read
+your numbered options top to bottom and take the FIRST line that matches. Stop there - do not read
+the rest of the list, and do not weigh a later line against an earlier one.
+ 1. A removal spell (Vanishing Verse, Soul Shatter) when the opponent's battlefield line shows a
+    creature you can hit - and for Vanishing Verse, only when its target list names one of THEIRS
+    (a planeswalker or an enchantment of theirs on that list counts too; Soul Shatter needs a
+    CREATURE on their line and does nothing on a board of only a planeswalker). See #1 RULE.
+ 2. LOLTH or KAYA, if either is on the list. A planeswalker in hand does nothing. The mana you have
+    this turn is the only mana you are sure of: "I will cast her next turn" is how a bomb ends the
+    game in your hand, and this deck's mana goes DOWN as often as up. Cast her now and start
+    activating her next turn. Kaya's -3 exiles ANY nonland permanent - a creature, an enchantment,
+    an artifact, a planeswalker - so she answers the boards Vanishing Verse cannot.
+ 3. Nadaar, Barrowin or Triumphant Adventurer - a body that ventures.
+ 4. SILVERQUILL SILENCER - your other real body. It is not a venture creature and it has no rule
+    of its own; it belongs HERE, above the Command, whenever no body from entry 3 is listed.
+ 5. Silverquill Command - when at least ONE of these three is true on the screen: their
+    battlefield line shows a creature (the sacrifice mode is live); your battlefield line shows a
+    creature (the pump mode is live); the Command row's own "{right now:" text names a card it
+    would return. Two live modes is a two-for-one and it is not a card to hold. When NONE of the
+    three is true, its only live mode is a card for 1 life and it drops to entry 8b.
+ 6. EMERIA'S CALL, when the option is actually listed (that means you can pay its seven).
+ 7. Pelakka Predation, when their hand size is 3 or more.
+ 8. Acererak the Archlich - only here, near the bottom, and only when nothing above matched.
+ 8b. Silverquill Command with NONE of its three conditions true (a cantrip for one life) - here,
+    below Acererak's free dungeon room, and still above "nothing".
+ 9. "Cast nothing right now".
+EVERY CARD YOU CAN CAST HAS A LINE ABOVE. If you find yourself casting something the list does
+not name, the list has not been read - go back and take the first line that matches. And "Cast
+nothing right now" is the LAST line, not a tiebreaker: it is correct only when every other line
+above it failed to match, never because a listed card looks situational. AND YOU MUST SHOW THE
+WORK: when you answer "Cast nothing right now", your reply names the highest entry that was on
+this menu and the reason it did not match, in the shape "nothing right now: entry <number>
+<card name> was on this menu; it did not match because <a fact printed on this screen>". Fill
+the three blanks from THIS menu and THIS board - a sentence about a card that is not on the menu
+is not the work, it is the list going unread. A bare "CHOICE: n (Cast nothing right now)" with no
+such sentence is the same. If you cannot fill the blanks, the answer is not "nothing" - go back
+and take the first line that matched.
+Then take the ask again if the game offers it - you can cast more than one spell in a turn.
+A CREATURE THAT VENTURES IS NOT A REASON TO SKIP A PLANESWALKER. "Develop the board and advance the
+dungeon" is the argument that loses this deck games: the dungeon is value you collect over many
+turns, and a walker is the turn you take over. When a 3/3 and a planeswalker are both on the same
+list, the walker is the answer. Read the option's own annotation too - a Barrowin printed
+"{right now: returns NOTHING - your graveyard has no creature cards}" is a vanilla 3/3 this turn.
+
+#1 RULE - SPEND YOUR REMOVAL ON THEIR BEST THREAT, ON TIME. You are a removal deck. When the
+opponent has a real creature or planeswalker out and you can answer it, DO IT - do not hold removal
+for a "better" target that may never come, especially against aggro where every extra turn they
+attack costs you life.
+- VANISHING VERSE ({W}{B}, instant): exiles ONE MONOCOLORED permanent - a permanent that has
+  exactly one color. It exiles cleanly - no death triggers, no recursion. It cannot hit a
+  MULTICOLORED permanent, and it cannot hit a COLORLESS one - and most artifacts and almost every
+  land are colorless, so an artifact deck's board is usually untouchable. But the test is COLOR,
+  not card type: an artifact creature that costs {1}{B} is monocolored black and IS a legal target.
+  THE OPTION LINE'S TARGET LIST IS THE ONLY TRUTH ABOUT WHAT IT CAN HIT. Read it and obey it:
+  * "legal targets right now: X, Y" -> those are your choices. Fire it at their best one.
+  * That list names "Sanguine Bond" or "Exquisite Blood" -> exile THAT, above any creature on
+    the list. Each is a monocolored black enchantment - Verse's cleanest target in the game -
+    and the two together are the one board this deck cannot come back from (see DECIDING
+    SITUATIONS). Kaya's -3 takes either one the same way. WHAT THIS COST: Verse was spent on a
+    0/4 wall on turn 4; Sanguine Bond landed on turn 16 with no answer left, Exquisite Blood
+    on turn 26, and the first lifelink attack after that ended the game from 11 life.
+  * "the only legal targets are YOUR OWN right now" -> DO NOT CAST IT. There is nothing on their
+    side you can hit. Do something else this turn and keep the card; do not spend a whole
+    deliberation arguing with the list, and do not exile your own permanent to "use" the card.
+    EXILE IS NOT A BOUNCE AND IT IS NOT A RE-USE. "I will Verse my own Nadaar to send it back to
+    my hand and venture again" is FALSE: an exiled permanent is GONE - not to your hand, not to
+    your graveyard, and its enter-the-battlefield trigger never happens again. Exiling your own
+    creature costs you the creature AND the removal spell in one action; there is no board on
+    which it is right.
+  When their board is all colorless artifacts and Verse keeps coming up dead, stop planning around
+  it and win with bodies, Soul Shatter and Kaya instead.
+- KAYA THE INEXORABLE ({3}{W}{B}, planeswalker, starts at 5 loyalty): her -3 EXILES ANY nonland
+  permanent - multicolored, colorless, artifact, anything Vanishing Verse cannot touch. She is your
+  answer to the boards Verse cannot fight. Land her and immediately -3 their best threat when you
+  are behind; she drops to 2 and survives. Use +1 (ghostform on one of your own nontoken creatures)
+  only when you are ahead and have nothing worth exiling.
+- SOUL SHATTER ({2}{B}, instant): the opponent SACRIFICES their biggest creature (highest mana
+  value). It does not target, so it answers a hexproof or indestructible bomb, and it answers
+  ARTIFACT creatures that Vanishing Verse cannot touch. It does NOTHING if they control no
+  creature - do not cast it into a board of only lands, artifacts or planeswalkers.
+- SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only): WHEN to cast it is decided
+  by entry 5 of THE WHOLE CAST ORDER and nothing here - its three conditions are read straight
+  off the screen, and when one of them is true and nothing above entry 5 matched, the option IS
+  your answer this ask. This section only says HOW to pick the modes. It chooses TWO of - a
+  creature gets +3/+3 and flying until end of turn / return a creature card with mana value 2 or
+  less from your graveyard to the battlefield / a player draws a card AND loses 1 life / the
+  opponent sacrifices a creature of their choice. Against aggro, the sacrifice mode plus a
+  defensive mode is a two-for-one blowout. Three rules decide every Command:
+  * TIMING: if you take the pump mode to win a combat, cast Command in your FIRST main phase,
+    BEFORE you declare attackers. It is a sorcery and the +3/+3 lasts only UNTIL END OF THIS
+    TURN. A MAIN-2 PUMP BUFFS NOBODY: there is no combat left this turn, and the attack such a
+    plan imagines is NEXT turn - by then the pump is gone and the creature is back to its
+    printed size. Never write a plan shaped "pump now ... attack next turn" or "cast Command in
+    second main and then attack." If you cast Command after combat, or when no creature of
+    yours can attack this turn, do NOT pick the pump mode at all - pair the sacrifice mode with
+    the draw mode instead.
+  * TARGET: when the game asks you to pick ONE creature on the battlefield for Command, that
+    creature RECEIVES THE +3/+3 - so pick YOUR OWN creature, ALWAYS, even when the list also
+    shows the opponent's. You never pick the sacrifice: the OPPONENT chooses which of their
+    creatures they sacrifice.
+  * THE DRAW MODE: whichever player you aim it at draws a card AND loses 1 life - both halves
+    hit the same player. Aim it at the OPPONENT only when that 1 life finishes them or nearly
+    does; otherwise you are handing them a free CARD. Aimed at YOURSELF it is a card for 1 life
+    - a good deal at healthy life, a bad one at 5 or less.
+- PELAKKA PREDATION ({2}{B}, sorcery): the opponent reveals their hand and you make them discard
+  ONE card with MANA VALUE 3 OR MORE - any card type, not just creatures. It CANNOT take their
+  cheap cards, so it is a way to strip a bomb, not a way to strip their curve. It is a spell only;
+  you can never play it as a land.
+
+COMBAT - ATTACKING TAPS YOUR BLOCKERS. THIS IS THE OTHER WAY THIS DECK LOSES.
+Every creature you declare as an attacker is TAPPED for the opponent's whole next turn and CANNOT
+BLOCK - the only exception is Nadaar, who has vigilance and attacks for free. Before you send a
+creature, ask what happens on the crack-back with that creature unavailable.
+- TWO NUMBERED CHECKS BEFORE ANY OTHER ATTACK RULE - STOP AT THE FIRST ONE THAT ANSWERS.
+  CHECK A - YOUR LAST BODY. Read your printed life. If it is 8 or less, count the creatures on
+    YOUR battlefield line that carry no "[tapped" and no "[summoning sick" tag. If that count is
+    ONE, that creature does not attack, whatever its tag says and even when its tag is empty: it
+    is the only blocker you will have on their turn, and an attacker is tapped for their whole
+    turn. Nadaar (vigilance) is the one creature this check lets go.
+  CHECK B - ONE ATTACKER, EVERY NAME "(neither dies)". If you are sending exactly ONE creature and
+    every name on its tag reads "(neither dies)", the answer is ATTACK: none. It deals nothing to
+    their life and comes back tapped. Damage on a wall does not carry over - "it deals 3 to the
+    Wall, leaving it at 1 toughness" is false; the Wall is 0/4 again next turn, and this seat
+    swung the same Silencer into the same Wall three times for nothing.
+- NEVER plan to block with a creature you are attacking with in the same turn. If your plan says
+  "attack with these, then block with these," the plan is impossible - rewrite it.
+- "(neither dies)" on the ATTACK side is the OPPOSITE of free damage. It means that
+  blocker stops every point you were sending and nothing dies - you spent a tapped
+  creature for nothing, and some walls (Perimeter Captain) GAIN THEM LIFE for blocking.
+- Before you send a creature, read its own "their untapped blockers" tag. If EVERY
+  outcome in it is "(neither dies)", that creature only gets through if they have
+  more attackers to block than blockers to spend. THEY choose which attacker each
+  blocker stops, and they choose the one their block wins - so a surplus of attackers
+  protects the SWING, never a particular card. With that settled: send it only when the
+  attackers you are sending OUTNUMBER their untapped blockers, or when it has
+  flying or menace they cannot answer.
+  The commonest way this goes wrong is a list with ONE name on it: one attacker never
+  outnumbers one untapped blocker. If your only attacker's tag is all "(neither dies)",
+  the answer is ATTACK: none - it deals nothing to their life total and it is tapped out
+  of blocking on their turn.
+- THE COLLAPSED TAG AND THE "GANG BLOCK:" CLAUSE - READ THIS BEFORE THE SHIELD SPHERE
+  EXCEPTION BELOW. On a wide board the tag stops naming their blockers one by one and reads
+  instead "they have N untapped creatures that could block this one, biggest X (you kill it,
+  your attacker lives)", sometimes with "- GANG BLOCK: their 6 biggest together deal 7, enough
+  to kill this attacker; each result above is a LONE blocker only".
+  That parenthesis prices ONE blocker. The GANG BLOCK clause prices what actually happens: any
+  number of them may block the same attacker TOGETHER, and your creature's toughness is measured
+  against the SUM of their bodies, not against the biggest one.
+  * The tag prints "GANG BLOCK: ... enough to kill this attacker", or N is 2 or more -> that
+    creature stays home if it is a CARD (Nadaar, Barrowin, Triumphant Adventurer, Silverquill
+    Silencer, an animated Hive). A dungeon GOBLIN TOKEN goes anyway; the bait is free.
+  * N is 1 and no GANG BLOCK clause -> the parenthesis is the whole story; use it.
+  "But the biggest one dies to me" is the sentence the clause was written to refuse: they do not
+  have to block with the biggest one alone, and against your one real body they will not. THIS
+  BEATS THE SHIELD SPHERE EXCEPTION - a collapsed tag does not tell you every blocker is a
+  Shield Sphere, so the exception cannot apply to it at all.
+  The lethal check is the only override: the printed opponent life at or below the total power
+  of everything you are sending.
+  ONE named exception: SHIELD SPHERE. It takes a permanent -0/-1 counter every time it
+  blocks, so a "(neither dies)" line against Shield Sphere is not a wasted swing - it is
+  how you kill it. Send into a Shield Sphere whether or not you outnumber them, and read
+  the proof off their battlefield line as its printed toughness falls: 0/6, 0/5, 0/4.
+- A LIFEGAIN WALL IS NAMED IN THE TAG ITSELF - READ FOR IT. Some defenders PAY their controller
+  every time they block, and every extra body you send is one more payment. The tag prints it,
+  inside the same parentheses as the outcome: "Pride Guardian (0/3) (you kill it, your attacker
+  lives (blocking trigger: they gain 3))", "Perimeter Captain (0/4) (neither dies (blocking
+  trigger: they may gain 2))". The words to look for are "blocking trigger:".
+  THE TEST IS THAT CLAUSE, NOT A BODY COUNT - AND ONE PRINTED CLAUSE IS ENOUGH. If ANY blocker on
+  this creature's tag prints a "(blocking trigger:" clause or a "(lifelink: they gain" clause,
+  the swing PAYS them: send only the attackers that get through
+  (flying, menace, or a body whose tag kills something), keep the rest home, and win with removal,
+  Kaya and the dungeon drains instead. If NO blocker on the tag prints either clause, their walls
+  cost them nothing and cost you nothing - a 0/4 Wall of Omens is just a wall - so the ordinary
+  attack rules apply and a vigilant attacker (Nadaar) can be sent freely, because vigilance means
+  it is still untapped to block on their turn.
+  A CONVERTER OF THEIRS TURNS EVERY ONE OF THOSE PAYMENTS INTO DAMAGE ON YOU. When the prompt
+  prints "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs", every "(blocking trigger:" and
+  "(lifelink:" price on an A-line is paid by YOU - the tag says it in words: "their converter
+  takes N off you". Their life goes UP by N and yours goes DOWN by N. That is not a wash, it is
+  not "net 0", and nothing is "drained from them" - the drain is pointed at you. With that line
+  up, a priced attacker STAYS HOME however many attackers you have and whatever it would kill;
+  the only bodies that go are the ones whose tag reads "[no creature they control can block this
+  attacker]". Your own life total is not a resource to spend on a board like that: you win it
+  with Kaya, Soul Shatter and the dungeon drains.
+  CHECK YOUR OWN PLAN SENTENCE BEFORE YOU WRITE THE ATTACK LINE. If it contains "net 0",
+  "netting us 0", "net zero", "they gain N which Sanguine Bond drains from them", or "the game
+  ends before that damage matters", THE PLAN IS ALREADY WRONG - those are the exact sentences this
+  seat wrote before paying 1, 4, 1 and, from 4 life, 6 into that board and dying on its own
+  attack. Take the priced attacker back out of the ATTACK line.
+  A collapsed tag ("they have N untapped creatures that could block this one, biggest <name>")
+  prints the biggest body's price and, when the priciest defender is a different one, adds
+  "most expensive to attack into: <name> (...)". That clause IS the price of the swing; read it,
+  not the "biggest" parenthesis, and with a converter of theirs up it means the attacker stays
+  home.
+- A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
+  ANYWHERE IN ITS LIST is a per-creature STOP, not a note about the whole attack. Leave THAT
+  creature home even when the rest of the team is attacking - "attack with everything that
+  profits" is decided one A-line at a time, and a creature that dies to a blocker they already
+  control profits nothing. Send it anyway only when the lethal check clears: the printed opponent
+  life is at or below the total power of everything you are sending.
+  THE OTHER NAMES ON THE LIST DO NOT CANCEL IT. A tag reading "Shield Sphere #1 (0/6) (neither
+  dies); Shield Sphere #2 (0/6) (neither dies); Fate Unraveler (3/4) (your attacker dies, their
+  blocker lives)" is a STOP for that creature. THEY choose which of those three blocks, and they
+  will choose the one that kills your card. Two friendly outcomes and one fatal one is a fatal
+  line: price the WORST name on the list, always.
+  THIS BEATS THE SHIELD SPHERE EXCEPTION. When a Shield Sphere and a creature that kills your
+  attacker are on the SAME tag, the stop wins and that creature stays home. The Shield Sphere
+  exception applies only when EVERY name on the tag is a Shield Sphere.
+  OUTNUMBERING THEM DOES NOT PROTECT A CARD. "They have one blocker and I am sending three, so
+  mine is safe" is FALSE: their one blocker is spent on whichever attacker they most want dead,
+  and that is the one your tag says dies.
+  AND NEITHER DOES A FRIENDLIER A-LINE. "My Triumphant Adventurer is on the same attack and its
+  tag kills that blocker, so it will eat the block" is the same false sentence in a new shape.
+  THEY choose which attacker their blocker stops, and they will not choose the deathtouch 1/1 -
+  they will choose the card your tag says dies. Read ONLY the tag on the line you are deciding;
+  what another A-line's tag says has no bearing on it. Never write a plan in which one of your
+  ATTACKERS "blocks" or "trades with" one of their blockers - an attacking creature does not
+  block, and it does not choose what it fights.
+  THE STOP IS ABOUT CARDS, NOT TOKENS. A Goblin token from the dungeon costs you nothing when it
+  dies, so send the token WITH the team even on a stop tag - it is bait, and the bait is free. The
+  stop stands for every real card in your deck: a Silverquill Silencer, a Nadaar, a Barrowin.
+BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
+this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ SURVIVAL COMES BEFORE THE LADDER. When the header says the attack IS LETHAL, the first
+ question is not "which block is free" - it is "which assignment leaves me alive". Read the
+ "deals N" number on each attacker, add them up, and assign your blockers so that the damage
+ still coming through is LESS than your printed life. Block the BIGGEST "deals N" attackers
+ first, whatever their parentheses say. A rung-1 free kill on a 2/2 while a 7/7 walks past
+ you into lethal is a LOSS you chose: at lethal, the biggest number on the board outranks
+ every parenthesis. Only once you are alive do you spend spare blockers by the ladder below.
+ 0. "(neither dies)" - TAKE THAT BLOCK. Nothing of yours dies, nothing of theirs dies, and
+    the damage is gone. It is strictly free; no number on this screen can make it wrong.
+ 1. "(you kill it, your blocker lives)" - TAKE THAT BLOCK, always, at every life total and every
+    forecast number. It costs you nothing: their creature dies, yours does not, and the damage is
+    gone. No number on this screen can make this block wrong.
+ 2. "(both die)" - TAKE THAT BLOCK unless the attacker it kills is worth less than your blocker.
+    A body for a body is a trade you want, and the damage is gone as well.
+ 3. "(your blocker dies, attacker lives)" - THIS is the chump line, and it is the ONLY line the
+    forecast number decides. Read "you would be at N". Take this block when N is 10 or less,
+    or when the header says the attack IS lethal. When N is above 10, leave that attacker
+    unblocked and keep your creature.
+    ONE EXCEPTION, and the parenthesis itself tells you: when it ends "...N tramples to your
+    face", the block does NOT stop the damage - N still hits you. On a trampler, a chump block
+    buys only (attacker's power minus N) life. Do that ONLY when the header says the attack IS
+    lethal. Never spend two blockers on one trampler: the second one buys almost nothing.
+ONE BLOCKER STOPS ALL OF A NON-TRAMPLING ATTACKER'S DAMAGE, however big the attacker is. Blocking
+CHANGES the forecast number: each non-trampler you block deals you ZERO. "I take the damage either
+way" is FALSE against a non-trampler, and so is "I will preserve this creature for future blocks"
+and "let the attackers through" - a creature you preserved at N of 10 or less is a creature
+you kept for a turn you will not get.
+"BLOCKS: none" is correct only when every offered block is rung 3 above your floor.
+- Triumphant Adventurer is your best defensive body: 1/1 DEATHTOUCH (and first strike on your turn)
+  blocks or trades with anything they have. Keep it untapped when you are the one under pressure.
+- THE BOARD RENDER ALREADY DID YOUR COMBAT MATH. A creature is printed with its CURRENT power and
+  toughness - "Barrowin of Clan Undurr (5/5) (printed 3/3)" means it hits for 5 RIGHT NOW, counters
+  and anthems included. Add up the numbers in front of you; never rebuild them from base stats.
+
+VENTURE / THE DUNGEON. Several creatures "venture into the dungeon" when they enter or attack:
+Triumphant Adventurer (on attack), Nadaar (on enter AND attack), Acererak (on enter), Barrowin
+(on enter). Each venture enters the first room of a dungeon or advances to the next room.
+- ACERERAK THE ARCHLICH IS NOT A BODY - HE BOUNCES HIMSELF. His printed (5/5) is a lie about what
+  you get. Oracle: "When Acererak enters, IF YOU HAVE NOT COMPLETED TOMB OF ANNIHILATION, RETURN
+  ACERERAK TO ITS OWNER'S HAND and venture into the dungeon." You are told below to pick LOST MINE,
+  never Tomb - so Acererak will bounce EVERY SINGLE TIME. He goes battlefield -> hand instantly.
+  He will NEVER be on the battlefield when you declare attackers or blockers, so his attack trigger
+  (opponent sacrifices a creature or you get a Zombie) can NEVER FIRE. Do not plan to attack with
+  him, block with him, or count his 5 power in any damage math - it is not there.
+  What he actually IS: a {2}{B} REPEATABLE VENTURE - three mana, one dungeon room, card back in
+  hand. That is real value in a quiet turn and nothing at all in a turn where you needed to act.
+  So: cast Acererak ONLY with mana you have nothing better to do with. If a removal spell is on
+  the menu and the opponent has a real threat, THE REMOVAL WINS - always. Never spend the turn on
+  Acererak while a Vanishing Verse and a live target are sitting in front of you.
+- WHICH DUNGEON: when you first venture (and again after you complete one) you CHOOSE one of
+  three dungeons. **Pick LOST MINE OF PHANDELVER by NAME** (answer with the dungeon's name -
+  the option NUMBERS are not fixed, so read the names, not "option 2"). Every one of Lost Mine's
+  rooms is pure UPSIDE for you: it makes a 1/1 Goblin (a free blocker), a Treasure (ramp/fix),
+  puts a +1/+1 counter on a creature, and drains the opponent - and it completes for a card
+  (Temple of Dumathoin: draw a card). Nothing in it costs YOU life. THIS APPLIES EVERY TIME THE
+  THREE-DUNGEON LIST APPEARS, including after you have already completed one - answer LOST MINE
+  again, and make sure the name you write is one of the names on the list in front of you.
+- Do NOT pick TOMB OF ANNIHILATION unless you are RACING and clearly ahead on life - every one
+  of its rooms makes BOTH players lose life or sacrifice, so it hurts you as much as them. Its
+  completion reward is a 4/4 deathtouch God (The Atropal), which is strong, but you pay life the
+  whole way there - only worth it when you are winning the race.
+- Do NOT pick DUNGEON OF THE MAD MAGE unless it is a slow grind and you want raw cards - it is
+  the longest dungeon at nine rooms (you will rarely finish it) but pure card advantage if you do.
+- COMPLETING A DUNGEON MATTERS AND IT WORKS: once you complete ANY dungeon, Nadaar gives your
+  creatures a PERMANENT +1/+1 anthem, and Barrowin's attacks reanimate a MV<=3 creature from your
+  graveyard. So keep venturing to FINISH the dungeon - every Lost Mine room is upside on the way.
+- ROOM BRANCHES: the venture asks you to pick between two rooms and SHOWS each one's effect (e.g.
+  "goblin lair {room effect: Create a 1/1 red Goblin creature token}", "dark pool {room effect:
+  each opponent loses 1 life and you gain 1}"). DECIDE ON THE EFFECT TEXT ALONE. Take the room
+  that MAKES A BODY (Goblin Lair) or DAMAGES the opponent (Dark Pool) over one that only makes
+  a Treasure, only puts a +1/+1 counter on a creature, or only scries.
+  You do not need to know which room number you are on or how many rooms are left to make this
+  choice correctly - do not try to work it out, and do not question the two names you are shown:
+  pick the better of the two effects in front of you and move on.
+
+DEPLOY YOUR CHEAP THREATS AS BLOCKERS - this is entry 3 of THE WHOLE CAST ORDER (Silverquill
+Silencer is entry 4), and entries 1 and 2 still outrank it. Triumphant Adventurer is a 1/1 with DEATHTOUCH (and first
+strike on your turn) - cast it early; it trades with or blocks almost anything and it ventures
+every time it attacks. Do not hold it. Nadaar is a 3/3 VIGILANT body that ventures twice and can
+attack without giving up its block.
+
+PLANESWALKERS - USE THEM EVERY TURN THEY ARE OUT. Casting one is entry 2 of THE WHOLE CAST
+ORDER: a removal spell with a live target still outranks her, and nothing else does. A
+planeswalker that does nothing on your turn is wasted. The moment you can afford one, CAST IT - do not leave Lolth or Kaya rotting in hand
+while you flood; they are your best late-game engines. Each of your turns they are in play,
+activate an ability:
+- LOLTH, SPIDER QUEEN ({3}{B}{B}, starts at 4, and gains loyalty whenever a creature you control
+  dies): -3 makes two 2/1 Spiders with menace and reach (great blockers vs flyers AND attackers)
+  - use this first to build a board; 0 draws you a card and loses 1 life. -8 is the game-ending
+  emblem.
+  LOLTH'S 0 HAS A LIFE FLOOR AND IT IS 6. Read your own printed life first. At 6 or less, do NOT
+  take the 0 - PASS, or take -3 if she has the loyalty. That "lose 1 life" is real damage you
+  are dealing to yourself, it is not offset by the card, and a card drawn at 2 life is a card
+  you never get to play. Any opponent permanent that pings - a Staff of Nin, a punisher
+  enchantment, one unblocked 1/1 - finishes a game you handed them one point at a time.
+- KAYA: see #1 rule - her -3 is removal; do not leave her idle.
+
+CLOSE THE GAME - none of this is a cast rule; THE WHOLE CAST ORDER decides what you cast, and
+animating the Hive is what you do with mana it left over. Once you are stable, PRESS - attack with Adventurer/Nadaar to venture and chip,
+grind with your planeswalkers, and finish. A game left even to the turn cap is a LOSS risk.
+Hive of the Eye Tyrant is a manland: pay {3}{B} - FOUR mana, not two - to make it a 3/3 menace
+attacker until end of turn. That is a whole turn's mana in the mid-game, so animate it only when
+you have nothing better to cast; it is a late-game mana sink, not a cheap threat.
+- BEFORE YOU ANSWER "becomes beholder", RUN THESE TWO CHECKS IN ORDER AND STOP AT THE FIRST
+  ONE THAT ANSWERS. This is the single most expensive mistake available to this deck: each
+  activation is FOUR mana, and paying it twice for one creature is four mana set on fire.
+  CHECK 0 - IS THIS THE TURN IT WINS? Read the opponent's printed life, then add the power of
+  every creature of yours that is UNTAPPED and could attack this turn, plus 3 for the animated
+  Hive. WRITE THAT SUM AND THEIR PRINTED LIFE INTO YOUR REPLY. If you do not write the two
+  numbers, CHECK 0 did not fire and you go straight on to CHECK 1 - "it might be useful" is not
+  CHECK 0. If that total is at or above their printed life, ANIMATE NOW and swing, whatever phase
+  it is - a manland is a win condition on the turn it closes, and this check outranks both
+  checks below. Your Hive's activation is usually offered to you only during your UPKEEP, so
+  "I will do it in my main phase instead" can mean you never get asked again this turn: when
+  CHECK 0 says the game ends this turn, the upkeep offer is the only offer and you take it.
+  CHECK 1 - WHAT PHASE IS IT? The prompt's "Phase:" line says. If it says Upkeep and CHECK 0 did
+  NOT fire, the answer is PASS. The animation lasts until end of turn either way, and spending
+  {3}{B} before your draw step is spending it before you know what you drew.
+  CHECK 2 - IS IT ALREADY A CREATURE? Find that Hive on your battlefield line. An animated one
+  carries a (P/T) - "Hive of the Eye Tyrant #1 (4/4) (printed 3/3) [doesn't untap during its
+  controller's untap step, menace (can't be blocked except by two or more creatures)]" - and is
+  counted in the "of which N are creatures" number. If it carries ANY (P/T), the answer is PASS;
+  an anthem makes that number bigger than the printed 3/3.
+  CHECK 3 - IS THAT HIVE TAPPED, AND WHAT PAYS FOR IT? Find the Hive the row names on your
+  battlefield line. If its entry reads "[tapped]", the answer is PASS: a tapped land animates into
+  a tapped 3/3 that cannot attack this turn - four mana for nothing. Then read the mana line's
+  "Those sources, one per untapped card:" list. If the only "{b}" source on it is a Hive that is
+  ALREADY a (3/3), animating this one taps that one, and you attack with neither. This seat did
+  exactly that: eight mana, two tapped Hives, zero attackers. A second Hive is animated only when
+  a Swamp or a Shineshadow Snarl is still on the sources list to pay its {B}.
+  AND THE ROW OFTEN SAYS SO ITSELF. An option printed "[repeat: activated this turn N times
+  already]" is the game handing you the receipt for the mana you already spent on it this turn.
+  That tag is an unconditional PASS - the cheapest observable on the screen, and it cannot be
+  wrong. Read it before you read anything else on the row.
+  AND THE OPTION COMING BACK IS NOT A NEW OPPORTUNITY. The game will offer you "becomes beholder"
+  again later in the same turn - after a spell resolves, at another priority, in the same upkeep.
+  That is the same Hive and the same 3/3 you already paid for. A second offer in a turn where you
+  already animated is always PASS. Animate a SECOND, DIFFERENT Hive only if you still have four
+  spare mana after the first.
+Emeria's Call is your seven-mana haymaker: two 4/4 flying Angels AND your NON-ANGEL creatures gain
+indestructible until your next turn (the two new Angels do not get it), so it doubles as a blowout
+against a board wipe or a big attack.
+DO NOT CAST AGADEEM'S AWAKENING - EVER. Its text returns CREATURE CARDS from your graveyard, and
+ONLY creature cards: Kaya and Lolth are PLANESWALKERS, not creature cards - no X you pay can ever
+return them, and no other card type qualifies either. Do not re-argue this from the card text
+when your graveyard fills up: in this game, choosing Agadeem's Awakening taps out your whole
+board and then nothing happens - the card stays in your hand and the turn is gone. There is no X,
+no graveyard, and no board that makes it a good cast. Cast a creature or hold removal instead.
+
+DECIDING SITUATIONS (recognize -> do):
+- Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> any damage you
+  deal them and any life they gain repeats without limit. ATTACK: none, whatever the tags say,
+  until one is gone. A "[lifelink]" attacker of theirs on that board ends the game whether you
+  block it or not: it deals its damage to your blocker, they gain, and the gain chains - the
+  B-row's "(you kill it, your blocker lives (lifelink: they gain 1 ...))" is that chain's first
+  link, and "there is no loop" is the sentence this seat wrote one window before it lost. So
+  the pair is answered BEFORE it closes: the turn ONE of the two names is on their line or in
+  Verse's target list, Verse or Kaya -3 takes it above every creature.
+- Verse's "legal targets right now:" list, or Kaya's -3 list, names Sanguine Bond or Exquisite
+  Blood -> take it, above any creature.
+- The mulligan ask says "(keeping 5)" or fewer and the hand has a land and a spell -> keep it;
+  a fresh seven shaved to four is the same land odds with one card fewer, and a missing colour
+  arrives with the next land (nine of 21 make both).
+- You kept, and the game asks which cards to bottom -> read "You will be left with an N-card
+  hand" and build the best N: the lands that cover your cheapest spells, those spells, and the
+  expensive cards under the deck (Emeria's Call, Agadeem's Awakening, spare planeswalkers).
+  Never all lands; Hive of the Eye Tyrant counts as a land; and never a land from a keep of
+  two lands or fewer - the PUT line there is spell numbers only.
+- The engine's hand header says "2 lands" -> it is a two-land hand. Use its count, not your own.
+- Opponent has a real creature/planeswalker and you can remove it, and you are not ahead ->
+  fire Vanishing Verse (read its target list) or Kaya -3 (any nonland) NOW; do not hold it.
+- The Vanishing Verse option says "the only legal targets are YOUR OWN" -> do not cast it at all.
+- The opponent's board is colorless artifacts -> Verse is dead this turn. Answer with Soul Shatter,
+  Kaya -3, or the Silverquill Command sacrifice mode, and race with your creatures.
+- A monocolored (single-color) artifact creature IS on Verse's target list -> it is a legal target;
+  treat it like any other creature.
+- You want Silverquill Command's +3/+3 to matter in combat -> cast it in MAIN 1, before you
+  declare attackers. After combat, the pump mode is wasted - pick other modes or hold the card.
+  A "pump now, attack next turn" plan is always wrong: the +3/+3 ends this turn.
+- Silverquill Command asks you to pick one creature on the battlefield -> pick YOUR OWN creature
+  (it gets the +3/+3); never the opponent's, whatever the list shows.
+- A block line reads "(you kill it, your blocker lives)" -> take it, whatever the forecast says.
+- A block line reads "(both die)" -> take it unless their creature is worth less than yours.
+- Only "(your blocker dies, attacker lives)" is decided by the forecast: take it at 10 or less,
+  leave it above 10. A blocked non-trampler deals you ZERO - you never "take it either way", and
+  "preserve it for future blocks" is not a reason at 10 or less.
+- The three-dungeon list is offered (first venture OR after completing one) -> answer LOST MINE OF
+  PHANDELVER by name, unless you are ahead and racing.
+- A room branch is offered -> read the {room effect} text; take the room that makes a body or
+  drains the opponent over one that only makes a Treasure, adds a counter, or scries, and do
+  not try to work out which room number you are on.
+- You need combat math -> read the (P/T) already printed on each creature; do not rebuild it.
+- The block header says the attack IS LETHAL -> assign blockers to the biggest "deals N"
+  attackers until the damage still coming through is below your life, THEN use the ladder.
+- ANY blocker on an attacker's tag prints "(blocking trigger: they gain N)", "(blocking trigger:
+  they may gain N)" or "(lifelink: they gain N)" -> that swing PAYS them life. Send only what gets
+  through; hold the rest. No such clause on the tag -> their walls are free to attack
+  into and the ordinary rules apply.
+- "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs" is printed AND any attacker's tag prints
+  a "(blocking trigger:" or "(lifelink:" price -> that attacker STAYS HOME; "their converter
+  takes N off you" is N off YOUR life, not theirs. Only bodies the tag says cannot be blocked at
+  all go in. Your plan says "net 0" or "drained from them" -> the plan is wrong; leave it home.
+  A collapsed tag's "most expensive to attack into:" clause is the price of the swing.
+- An attacker's tag lists several blockers and ONE of them reads "your attacker dies, their
+  blocker lives" -> that creature stays home if it is a CARD. They pick the blocker, and they
+  pick that one. Only a token goes anyway.
+- A Silverquill Silencer, Nadaar or Barrowin shares a tag with both a Shield Sphere and a
+  creature that kills it -> the stop wins; the Shield Sphere exception is only for tags where
+  EVERY name is a Shield Sphere.
+- An attacker's tag reads "they have N untapped creatures that could block this one" with N of 2
+  or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause -> that creature
+  stays home if it is a CARD; only a dungeon Goblin token goes. A collapsed tag never triggers
+  the Shield Sphere exception.
+- The "becomes beholder" option is offered and the opponent's printed life is at or below 3 plus
+  the power of your untapped attackers -> ANIMATE, whatever phase it says; that is the game.
+- The "becomes beholder" option is offered and it is NOT lethal -> read the "Phase:" line. Upkeep
+  -> PASS. Otherwise find that Hive on your battlefield line: already (3/3) -> PASS. And a
+  second offer in a turn where you already animated -> PASS; the option coming back is not a new
+  opportunity.
+- The "becomes beholder" row prints "[repeat: activated this turn N times already]" -> PASS, at
+  any life total and in any phase. You have already bought that 3/3 this turn.
+- You are about to answer "becomes beholder" in Upkeep and your reply does not contain their
+  printed life and your own attackers' summed power -> the answer is PASS.
+- Triumphant Adventurer is castable and you are under pressure -> cast it; the deathtouch 1/1
+  blocks or trades with anything.
+- Soul Shatter is offered but the opponent controls no creature -> do not cast it.
+- Lolth is on your battlefield and your printed life is 6 or less -> do NOT take her 0. Pass or
+  take -3. The 1 life she costs is life you will be killed by.
+- An attacker's tag says your attacker dies, and a DIFFERENT A-line's tag says that same blocker
+  dies to it -> the stop still stands for the first creature. They choose the block, and they
+  will not choose the one that kills their creature.
+- "Cast Silverquill Silencer" is on the list and no removal-with-a-live-target, no planeswalker
+  and no venture body is -> cast the Silencer; it is entry 4 of THE WHOLE CAST ORDER.
+- Lolth or Kaya is castable in your hand -> CAST IT this turn, even when a creature (Barrowin,
+  Nadaar, Acererak) is on the same list and even when that creature would venture. Only a removal
+  spell with a live target outranks her. A bomb walker in hand does nothing, and "I will cast her
+  next turn" assumes mana you do not have yet.
+- Silverquill Command is on the list, no removal-with-a-target and no planeswalker is, and their
+  line shows a creature OR your line shows a creature OR its row names a card it returns -> cast
+  it. None of the three true -> it sits below Acererak (entry 8b), still above "nothing".
+- A planeswalker is on your battlefield on your turn -> activate an ability (Lolth -3 for
+  Spiders or 0 to draw; Kaya -3 to exile their threat) - do not pass with an idle planeswalker.
+- You have completed a dungeon and control Nadaar -> your team is +1/+1 (creatures render above
+  their printed stats); attack accordingly.
+- Cast Acererak and Cast Vanishing Verse (or any removal) are both on the menu and the opponent
+  has a threat worth killing -> FIRE THE REMOVAL. Acererak bounces to your hand and leaves nothing
+  behind; he will still be there next turn. The threat will not wait.
+- You are flooding with nothing to do and Acererak is castable -> cast him for the free dungeon
+  room. That is the only turn he is the right play.
+- Your hand is Emeria's Call, Agadeem's Awakening or Pelakka Predation plus lands -> those are
+  SPELLS, not lands. Play a real land, hold Emeria's Call for seven mana, and leave Agadeem's
+  Awakening alone - it is never cast, see CLOSE THE GAME.
