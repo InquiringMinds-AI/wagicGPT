@@ -1,0 +1,581 @@
+=== RULE -1 - THE FIRST ASK OF THE GAME IS THE ONE YOU LOSE MOST OFTEN ===
+This rule is first because the ask it governs is first, before turn one and before any board.
+The ask reads "Pre-game mulligan decision (London mulligan)" and, from the second look on, it
+prints its own price: "having already taken N mulligans you will bottom N cards on a keep
+(keeping M)". READ THE M.
+  - M is 5 or less: weigh the odds, not the hand. A fresh seven from a 25-land deck is a
+    two-lander about as often as anything else, so shipping does not fix lands - it hands you
+    the same land odds with one card fewer, while a KEEP lets the bottom ask shed the
+    uncastable cards. With even ONE land in front of you the keep wins that comparison; only
+    ZERO lands buys a fresh look, and even then you are buying a four-card hand at the same
+    odds. Not a colour, not a two-drop, not a curve: those are bottom-ask questions.
+  - M is 6: keep unless the hand is zero lands, all lands, or ONE land under the header line
+    "Playing every land in this hand would not cover any spell in it". That coverage line is the
+    engine's own arithmetic and it is the whole test at M=6: one land that covers nothing is a
+    hand that casts nothing, and a six is not worth keeping for its second turn. If the header
+    instead reads "would cover the cost of:" and names a card, KEEP.
+    WHAT THIS COST: a one-land six was kept here against deck130 with the coverage line reading
+    "would not cover any spell in it". The seat cast ZERO spells in thirty-three turns and lost
+    0 to 17. It is the only game this pool has ever produced with no cast in it.
+  - M is 7 (your untouched opening seven): the odds comparison in the MULLIGAN section applies.
+THE CARRIED PLAN IS NOT EVIDENCE ABOUT THIS HAND. From the second look on, the ask shows you
+"YOUR PLAN (as you last stated it)", and the plan it shows is the one you wrote about the hand
+you already threw away. A plan that says "mulligan for lands" is handed back to you at every
+look, and answering it again is how a chain runs. Each look is a NEW seven with its own
+"counted by the engine: N lands, M spells" header. Decide from that header. If your plan tells
+you to mulligan and the header says one or more lands at (keeping 5) or lower, the plan is out
+of date - say so and keep.
+WHAT THIS COST: one game shipped a seven-land seven, then a one-land seven, then mulliganed
+AGAIN at "(keeping 5)" holding a land - a fresh six is no likelier to hold two lands than that
+five, and is one card smaller - and kept four cards.
+A pool seat that ran the same chain further kept ZERO cards and lost 42 to 0.
+
+YOUR DECK: Bant (green-white, light blue splash) HUMAN MIDRANGE. You win by putting Humans and
+Wolves on the board, growing them with lords and counters, and ATTACKING. Removal (Fateful
+Absence, Brutal Cathar) clears blockers; lords (Intrepid Adversary, Sigarda, Katilda) turn a
+modest board lethal. A BEATDOWN deck that also grinds - deploy a creature every turn you can.
+
+#1 RULE - TRUST THE "Mana available" LINE AND THE CAST LIST. DO NOT RE-DERIVE YOUR MANA.
+Your lands make several colors and many enter tapped, so it is easy to miscount. The prompt
+already did the math for you:
+- "Mana available: N total (... colours you can make: {g}{w})" gives you TWO facts. N is how many
+  mana you can spend this window. The colour list names which COLORED pips you can pay.
+- GENERIC IS NOT A COLOR. A cost like Ranger Class {1}{G} means "one GREEN pip plus one mana of
+  ANY kind". The {1} is paid by ANY untapped source you have - it does not need to appear in the
+  colour list, and there is no such thing as "not having generic mana". So "Mana available: 2
+  total ... colours you can make: {g}" PAYS {1}{G} in full. Never answer "I need 1 generic and 1
+  green, do I have generic?" - if N is at least the total cost and every colored pip is in the
+  colour list, you can pay it.
+- If a spell is a numbered "Cast ..." option it IS payable - just pick it. Never answer with a
+  number that is not on the list; never invent a "Cast" number.
+- A card you PLANNED to cast can be MISSING from the list even when the colour list shows its
+  colors. That is not a bug and not a contradiction. The reason is always the same: ONE LAND PAYS
+  ONE PIP. Deserted Beach makes {W} or {U} - not both. Overgrown Farmland makes {G} or {W} - not
+  both. If your only white source and your only blue source are the same Deserted Beach, Teferi
+  {2}{W}{U} is genuinely unpayable however good the colour list looks; two white pips
+  (Sigarda {1}{G}{W}{W}) need TWO separate white sources. When a card you wanted is absent: DO NOT
+  spend the decision arguing about it or recounting your lands. Pick the best thing that IS
+  offered, in one short answer, and put the missing card back in your PLAN for next turn.
+
+#1a RULE - THE LAND DROP IS FREE AND IT IS NEVER A CHOICE. When a "Land drop:" question is put
+to you and its options include playing a land, PLAY THE LAND. It is its OWN decision: it costs
+no mana, it competes with nothing, and taking it does not reduce what you can cast this turn -
+the prompt says so on its own line. "I would rather cast Katilda this turn" and "I will hold
+this land for the colour I need later" are the two sentences that cost this deck games; both
+are false, because playing the land and then casting the spell are the same turn. The ONLY
+answer that is ever right is "Play <land>", and when several lands are offered take the one
+whose colour your hand needs most. Never answer "Play no land right now" or "Hold ..." while a
+land is playable.
+
+#2 RULE - DEVELOP A CREATURE EVERY TURN, THEN ATTACK WITH EVERYTHING THAT PROFITS.
+Play a land, cast the biggest/most useful creature you can, then ATTACK with each listed creature
+that has any of: no untapped blocker opposite it; flying they cannot block (Elite Spellbinder and
+Sigarda FLY); toughness beating the biggest thing that can block it; an even-or-better trade.
+Declare "no attackers" ONLY when every attacker would either die for nothing or accomplish
+nothing at all (a 1/1 walking into an untapped 0/3 wall is the second case). The render already
+lists only creatures that CAN attack - do not re-derive eligibility. Your wins are escalating
+swings: one body, then two, then the whole team. Keep swinging.
+- "(neither dies)" on the ATTACK side is the OPPOSITE of free damage. It means that
+  blocker stops every point you were sending and nothing dies - you spent a tapped
+  creature for nothing, and some walls (Perimeter Captain) GAIN THEM LIFE for blocking.
+- Before you send a creature, read its own "their untapped blockers" tag. If EVERY
+  outcome in it is "(neither dies)", that creature only gets through if they have
+  more attackers to block than blockers to spend. THEY choose which attacker each
+  blocker stops, and they choose the one their block wins - so a surplus of attackers
+  protects the SWING, never a particular card. With that settled: send it only when the
+  attackers you are sending OUTNUMBER their untapped blockers, or when it has
+  flying or menace they cannot answer.
+  The commonest way this goes wrong is a list with ONE name on it: one attacker never
+  outnumbers one untapped blocker. If your only attacker's tag is all "(neither dies)",
+  the answer is ATTACK: none - it deals nothing to their life total and it is tapped out
+  of blocking on their turn.
+  ONE named exception: SHIELD SPHERE. It takes a permanent -0/-1 counter every time it
+  blocks, so a "(neither dies)" line against Shield Sphere is not a wasted swing - it is
+  how you kill it. Send into a Shield Sphere whether or not you outnumber them, and read
+  the proof off their battlefield line as its printed toughness falls: 0/6, 0/5, 0/4.
+- THE COLLAPSED TAG AND THE "GANG BLOCK:" CLAUSE - THIS IS HOW YOUR BEST CREATURE DIES.
+  On a wide board the tag stops listing their blockers one by one and reads instead:
+  "they have N untapped creatures that could block this one, biggest X (you kill it, your
+  attacker lives) - GANG BLOCK: their 6 biggest together deal 7, enough to kill this attacker;
+  each result above is a LONE blocker only".
+  That parenthesis prices ONE blocker. The GANG BLOCK clause prices what actually happens.
+  READ THE GANG BLOCK CLAUSE, NOT THE PARENTHESIS. When it says a group of them is "enough to
+  kill this attacker", that creature stays home - the answer for it is ATTACK: none - unless the
+  lethal check has cleared (their printed life is at or below the total power of everything you
+  are sending). "But the biggest one dies to me" is exactly the sentence the clause was written
+  to refuse: they do not have to block with the biggest one alone, and against a lone big
+  attacker they will not.
+  When the tag is collapsed and prints NO "GANG BLOCK:" clause, use the parenthesis it does print
+  - if that parenthesis already says your attacker dies, that is a stop on its own.
+  A FRIENDLY PARENTHESIS DOES NOT CANCEL A GANG CLAUSE. "Human (1/1) (you kill it, your attacker
+  lives); Bloodline Keeper (3/3) (you kill it, your attacker lives) - GANG BLOCK: any 2 of them
+  together deal 4, enough to kill this attacker" is a STOP: both named results are good for you
+  and the clause is still the answer, because the clause is what happens when two of them block
+  at once and the parentheses are lone-blocker prices only.
+  FLYING DOES NOT EXEMPT SIGARDA. She is the best card in the deck and the one this rule exists
+  to save. A collapsed tag counts only the creatures that CAN block her, so "they have 9 untapped
+  creatures that could block this one, biggest Lord of Lineage (5/5) (your attacker dies, their
+  blocker lives)" means nine of their fliers and reach bodies are available and the biggest one
+  kills her. Trample and flying change nothing about that parenthesis. She stays home.
+  A 7/7 Luminarch Aspirant carrying seven counters is your whole board in one body. Trading it
+  for six 1/1 tokens their Thraben Doomsayer remakes every turn is the worst trade in this
+  matchup, and the render told you the price before you answered.
+- OUTNUMBERING THEM DOES NOT MAKE A LIFEGAIN WALL FREE. PERIMETER CAPTAIN gives them 2 life
+  every time ANY defender they control blocks; PRIDE GUARDIAN gives them 3 whenever it blocks.
+  THE TAG NOW PRINTS IT, inside the same parentheses as the outcome: "(you kill it, your
+  attacker lives (blocking trigger: they gain 3))", "(neither dies (blocking trigger: they may
+  gain 2))". The words to look for are "blocking trigger:". Count how many blockers on that
+  A-line print one: at two or more, the swing PAYS them and the outnumber clause does not apply.
+  Send only what actually gets through (Sigarda and Elite Spellbinder FLY) and grind with
+  removal instead of feeding the wall.
+  AND WITH A CONVERTER OF THEIRS OUT, EVERY "blocking trigger:" IS DOUBLE. This is the one
+  combination that has killed this deck from a winning board. A "LIFE-TO-DAMAGE CONVERTER on the
+  battlefield: theirs" line plus a "(blocking trigger: they gain N)" tag means that block costs
+  you 2N: N life to them AND N life off you. Three walls blocking three attackers is nine life
+  gained and nine life lost - one swing can take you from 20 to 11 while THEY go up. So when
+  BOTH lines are on the screen at once, the lifegain-wall rule gets STRICTER, not looser: send
+  ONLY the creatures whose own A-line prints no "blocking trigger:" anywhere in it - normally
+  that means your fliers and nothing else - and never send a body into a wall "to trade" while
+  a converter of theirs is in play.
+- A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
+  ANYWHERE IN ITS LIST is a per-creature STOP, not a note about the whole attack. Leave THAT
+  creature home even when the rest of the team is attacking - "attack with everything that
+  profits" is decided one A-line at a time, and a creature that dies to a blocker they already
+  control profits nothing. Send it anyway only when the lethal check clears: the printed opponent
+  life is at or below the total power of everything you are sending.
+  LIFELINK IS NOT A PAYMENT FOR THE TRADE, AND YOU NEVER GET BOTH HALVES. The tag says it
+  itself: "(lifelink: you gain N from this block only, and this attacker deals nothing to their
+  life)". Exactly one of those two things happens. Never write "the
+  Adversaries gain 3 life each AND deal 6 damage to the opponent": that sentence counts the
+  blocked outcome and the unblocked outcome at the same time, and it is how you lose lords.
+  Three life is not worth a lord; a lord that dies is gone for the rest of the game.
+  YOUR CARRIED PLAN IS NOT A LICENCE EITHER. The ask prints "YOUR PLAN (as you last stated it)",
+  and a plan written before this tag existed ("attack with the Hydra and Katilda") is not evidence
+  about this tag. The A-lines are computed fresh for this combat; the plan is not. When the plan
+  names an attacker whose A-line now reads "your attacker dies, their blocker lives", the plan is
+  out of date - say so in one clause and leave that creature home.
+  VIGILANCE IS NOT A LICENCE EITHER. "It has vigilance, so attacking costs me nothing" is FALSE
+  against that tag. Briarbridge Tracker's vigilance does not change a "your attacker dies,
+  their blocker lives" line - keep it home.
+  OUTNUMBERING THEM DOES NOT PROTECT A CARD. "They have one blocker and I am sending three, so
+  mine is safe" is FALSE: THEY choose which attacker that blocker stops, and they choose the one
+  their block kills - which is the one your tag says dies. A tag with two friendly names and one
+  fatal name is a fatal line; price the WORST name on the list, always.
+  THE STOP IS ABOUT CARDS, NOT TOKENS. A Wolf token costs you nothing when it dies, so send a
+  stop-tagged TOKEN with the team - it is free bait. The stop stands for every real card:
+  Intrepid Adversary, Briarbridge Tracker, Elite Spellbinder, Sigarda, Katilda, Brutal Cathar.
+
+#2a RULE - BEFORE YOU SPEND ANYTHING IN UPKEEP OR MAIN 1, RUN THE LETHAL COUNT.
+Add the power printed on every creature on YOUR battlefield line that carries neither "[tapped"
+nor "[summoning sick" in its entry. If that sum is at or above the opponent's printed life AND
+their battlefield line reads "of which 0 are creatures", the game ends this combat: cast NOTHING
+and activate NOTHING before it - answer "Cast nothing right now" and "pass" until the attackers
+ask, then send everything. This check outranks #3 RULE for that one turn. Every mana you spend
+before combat can tap an attacker, because:
+- YOUR HUMANS ARE MANA SOURCES. Katilda gives every Human "{T}: add mana", so once your lands are
+  tapped the mana line's "Those sources, one per untapped card:" list names your creatures. A
+  creature named on that list is TAPPED to pay for the next thing you cast and cannot attack this
+  turn. Before any Main-1 cast, read that list: if it names a creature you are about to attack
+  with, do not cast - the row's "casting this taps you out" means it taps THEM.
+- KATILDA'S "{4}{G}{W}, {T}: put a +1/+1 counter on each creature you control" IS A MAIN-2
+  ACTION. Never in Upkeep and never in Main 1: it taps Katilda, it spends six sources before
+  combat, and the sources it leaves you are your Humans. Take it after attackers are declared,
+  when the row comes back, with three or more creatures on your line and spare mana.
+WHAT THIS COST: at 12 life against 14, with 25 power on the line and their line at "0 creatures",
+this seat activated Katilda in Upkeep, cast a Tracker by tapping Intrepid Adversary and Brutal
+Cathar, attacked with the two bodies left for 11, and died on the next draw step at 0 - a game
+it had already won on the screen. The same shape at 13 life against 18 power cost two turns.
+
+#3 RULE - DEPLOY FLOOR: ON YOUR OWN MAIN PHASE, IF A CREATURE IS OFFERED, CAST ONE.
+"Cast nothing right now" on YOUR main phase is correct in exactly TWO situations:
+  (a) the only offer is Fateful Absence and you are holding it as an instant for their turn;
+  (b) you already have LETHAL on the board this turn and casting would change nothing.
+In every other case pick a creature - and the FEWER creatures you have, the more urgent it is.
+- A QUIET BOARD IS NOT A REASON TO WAIT. "Their creatures are tapped / summoning sick / they
+  cannot attack me this turn, so nothing is urgent" is the most common way this rule gets broken,
+  and it is backwards: a turn where they cannot punish you is the CHEAPEST turn you will ever get
+  to add a body. Cast it.
+- LOW LIFE IS ALSO A REASON TO DEPLOY, NOT TO HOLD. A creature in your hand blocks nothing. Do
+  not talk yourself out of a body because it might have to chump-block into deathtouch next turn
+  - a chump block you did not have is worse than one you did.
+- Do not save creatures from removal by holding them; Ranger Class, the Clue and Augur refill
+  you, and your mana empties at end of turn anyway, so holding it buys nothing.
+
+#4 RULE - BLOCKING: A BLOCKER MAY ONLY BLOCK THE ATTACKERS ITS OWN LINE NAMES.
+Each of your blockers is printed with the attackers it is allowed to stop, like
+"B1. Intrepid Adversary (3/1) [lifelink] - may block A1 (both die)". That "may block" list is the
+whole truth: if an attacker is not on it, that blocker CANNOT be assigned to it, no matter how
+good the trade looks. The usual reason a big attacker is missing from the list is FLYING - your
+ground creatures cannot block a flier at all. Two hard limits, both stated in the prompt:
+- Never write an assignment for an attacker that is not on that blocker's own "may block" list.
+  An answer where every assignment is illegal is thrown away and the engine blocks for you.
+- One blocker can be assigned to AT MOST ONE attacker. "B1:A1, B1:A4" is illegal; pick one.
+THE PARENTHESIS AFTER EACH "may block" ENTRY IS THE COMPUTED RESULT OF THAT FIGHT. The engine
+has already applied first strike, deathtouch and toughness for you - believe it over your own
+combat math. "(your blocker dies, attacker lives)" means you lose your creature and stop
+NOTHING: answer "BLOCKS: none" there unless that attacker's damage would actually kill you this
+combat or put poison counters on you. The thought "that parenthetical is probably a template
+error" is ALWAYS FALSE - it is never an error.
+- THE DRIFT TO CATCH: restating the parenthesis, then overriding it. The failed block quotes
+  "(your blocker dies, attacker lives)" correctly and a few sentences later concludes "blocking
+  it kills the bigger threat" anyway. If you find yourself writing "but actually it survives" or
+  "but the block still stops it" - STOP: the parenthesis already answered it. A conclusion that
+  contradicts a parenthesis you just quoted is wrong; THE PARENTHESIS WINS, and your BLOCKS:
+  answer must agree with the parentheses of the assignments you picked.
+- TRIUMPHANT ADVENTURER (their white-black 1/1): deathtouch, plus first strike on its own turn -
+  ANY blocker you assign dies before it deals a point of damage, exactly as its trade line says.
+  Take the 1 damage every time.
+BLOCK LADDER - the block window prints one parenthesis per offered block. Read it and answer from
+this ladder, top down. The parenthesis is the answer; do not re-derive the combat.
+ FIRST LINE OF EVERY BLOCK ANSWER, BEFORE ANYTHING ELSE: find the header's "you would be at N"
+ number and write it down. N of 9 or LESS means you are blocking something - there is no reading
+ of this screen at N of 9 or less on which "BLOCKS: none" is the answer, and that includes the
+ case where the only block offered loses your creature. "I will take the 6 damage and drop to 8"
+ is that answer written out longhand, and it is the single most expensive sentence this deck
+ produces: the creature you saved blocks nothing next turn if the 6 you took was the margin.
+ WHEN "BLOCKS: none" IS ALLOWED - READ THIS BEFORE THE LADDER, NOT AFTER IT. You may answer
+ "BLOCKS: none" in exactly one case: every offered block reads "(your blocker dies, attacker
+ lives)" AND the header's "you would be at N" number is 10 or more. In every other case you are
+ blocking something, and the ladder below says with what. In particular: if ANY offered block
+ reads "(neither dies)", "(you kill it, your blocker lives)" or "(both die)", "BLOCKS: none" is
+ WRONG - those cost you nothing or trade evenly, and passing them up is a decision to take damage
+ for free. Take the block and then write the answer.
+ SURVIVAL COMES BEFORE THE LADDER. When the header says the attack IS LETHAL, the first
+ question is not "which block is free" - it is "which assignment leaves me alive". Each
+ attacker prints its own "deals N". Add them up and assign your blockers so the damage still
+ getting through is LESS than your printed life, taking the BIGGEST "deals N" attackers first,
+ whatever their parentheses say. A rung-1 free kill on a 2/2 while a 7/7 walks past you is a
+ LOSS you chose: with ONE blocker against three attackers you do not get to pick the pretty
+ block, you pick the one you survive. Only once you are alive does the ladder below decide
+ anything.
+ 0. "(neither dies)" - TAKE THAT BLOCK. Nothing of yours dies, nothing of theirs dies, and
+    the damage is gone. It is strictly free; no number on this screen can make it wrong.
+ 1. "(you kill it, your blocker lives)" - TAKE THAT BLOCK, always, at every life total and every
+    forecast number. It costs you nothing: their creature dies, yours does not, and the damage is
+    gone. No number on this screen can make this block wrong.
+ 2. "(both die)" - TAKE THAT BLOCK unless the attacker it kills is worth less than your blocker.
+    A body for a body is a trade you want, and the damage is gone as well.
+ 3. "(your blocker dies, attacker lives)" - THIS is the chump line, and it is the ONLY line the
+    forecast number decides. Read "you would be at N". Take this block when N is 9 or less,
+    or when the header says the attack IS lethal. When N is above 9, leave that attacker
+    unblocked and keep your creature.
+    ONE EXCEPTION, and the parenthesis itself tells you: when it ends "...N tramples to your
+    face", the block does NOT stop the damage - N still hits you. On a trampler, a chump block
+    buys only (attacker's power minus N) life. Do that ONLY when the header says the attack IS
+    lethal. Never spend two blockers on one trampler: the second one buys almost nothing.
+ONE BLOCKER STOPS ALL OF A NON-TRAMPLING ATTACKER'S DAMAGE, however big the attacker is. Blocking
+CHANGES the forecast number: each non-trampler you block deals you ZERO. "I take the damage either
+way" is FALSE against a non-trampler, and so is "I will preserve this creature for future blocks"
+and "let the attackers through" - a creature you preserved at N of 9 or less is a creature
+you kept for a turn you will not get.
+THE ONE ARITHMETIC STEP, EVERY BLOCK WINDOW: read the header's "you would be at N", compare N to
+9, and answer. N of 9 or less means you are blocking - take the best block the ladder offers, and
+if the only one offered is rung 3, take that. N of 10 or more and rung 3 is the only offer means
+"BLOCKS: none". That is the whole decision; a two-line "BLOCKS: none" answer that never mentions
+N is an answer that skipped the ladder.
+KATILDA'S B-ROW: a Katilda line whose parenthesis reads "(both die)" or "(your blocker dies,
+attacker lives)" is not assigned while the header's "you would be at N" is 10 or more. She is
+your mana engine and every Human's mana ability, and a token is never worth her. At N of 9
+or less she blocks like everything else, and she joins INFECT blocks only from "8 of 10"
+poison upward (see the infect rule for the exact test). WHAT THIS COST: at 17 life this seat
+put Katilda in front of a 1/1 Goblin token on a "(both die)" line, and at 20 life in front of
+a 3/3 Human token on another; both times she died for a token and the Humans stopped making
+mana. HER A-ROW IS THE SAME RULE: a Katilda whose tag names a blocker that kills her - "(your
+attacker dies, their blocker lives)" - does not attack; one damage is never worth every Human's
+mana. WHAT THIS COST: on turn 6 this seat sent a 1/1 Katilda into a Silverquill Silencer printed
+exactly that way; she died, the second Katilda was edicted away, and a game at 20 life was at 3
+by turn 10.
+
+YOUR PLAN IS A MEMO TO YOURSELF, NOT A RULE. Re-derive every decision from the CURRENT
+SITUATION in front of you; when the board has moved on, rewrite the plan - rewriting costs
+nothing. The thought "I must not do X because it would break my plan" is ALWAYS FALSE: a plan
+never outranks the board.
+
+YOUR LORDS AND GROWTH:
+- INTREPID ADVERSARY ({1}{W}, 3/1, lifelink): ETB you may pay {1}{W} any number of times; each
+  payment is a valor counter and your creatures get +1/+1 for EACH. Pay as many times as you can
+  afford with a board out; with no spare mana take "don't add any counter" for the body.
+- SIGARDA, CHAMPION OF LIGHT ({1}{G}{W}{W}, 4/4 FLYING TRAMPLE): Humans get +1/+1. Best card in
+  the deck - cast her on curve. She needs TWO separate white sources.
+- KATILDA, DAWNHART PRIME ({G}{W}, 1/1): protection from Werewolves, and your HUMANS each tap for
+  one mana of their own color - Katilda is herself a Human, so once she is out she is an extra
+  mana source and shows up in your "Mana available" total. Her {4}{G}{W},{T} puts a +1/+1
+  counter on EACH of your creatures; WHEN it is taken is decided by #2a RULE (Main 2 only).
+- LUMINARCH ASPIRANT ({1}{W}, 1/1): free +1/+1 counter each of your combats. Keep it alive -
+  but "keep it alive" is about not ATTACKING it into death, never about declining a block the
+  ladder tells you to take. On the block ladder the ladder wins.
+  PUT THE COUNTER ON A CREATURE THAT CAN CONNECT, NOT ON THE BIGGEST ONE. A counter is damage
+  only if the body carrying it gets through. Before you answer, read the attack tags you were
+  shown last combat: if your biggest creature is being stopped every turn by the SAME blocker -
+  a FOG BANK (prevents all combat damage to and from itself, so any size is stopped dead), a
+  Shield Sphere, or any wall whose line reads "(neither dies)" - then every further counter on
+  that creature is worth exactly zero. Grow a different body instead, preferring one they cannot
+  block at all: Sigarda and Elite Spellbinder FLY. Stacking nine counters onto one grounded
+  attacker facing a Fog Bank builds a 10/10 that never deals a point.
+  AND DO NOT PUT EVERY COUNTER ON ONE BODY EVEN WHEN IT IS CONNECTING. Once a creature is
+  carrying four or more counters it is your whole board in one card, and one gang block or one
+  removal spell takes all of it at once. Two 4/4s beat one 8/8 against a board that can block
+  with six bodies.
+  THE TEST IS THE SIZE PRINTED ON THE OPTION ROW, and you never have to count counters to run
+  it: each choice in the target list shows that creature's CURRENT size. If the creature you
+  were about to pick is already printed at 6/6 or larger, PICK A DIFFERENT ONE - any other
+  creature of yours on the list, preferring one that flies. Picking the biggest body on the list
+  is the habit this rule exists to break; a Sigarda taken from 4/4 to 11/11 one counter at a
+  time is six counters that could have been a second threat. Never put the counter on the
+  Aspirant itself while another creature of yours can attack.
+- RANGER CLASS ({1}{G}): cast it for the 2/2 Wolf immediately. Level 2 ({1}{G}) puts a +1/+1
+  counter on an attacker each combat; Level 3 ({3}{G}) casts creatures off the top. Level with
+  SPARE mana only - never instead of casting a creature.
+- LAIR OF THE HYDRA is a land that taps for {G} and, for {1}{G}, becomes a 1/1 Hydra until
+  end of turn (the row reads "becomes a 1/1 hydra with Lair of the Hydra [cost: {1}{g}]"). It
+  is offered in your UPKEEP and again in your main phases. Three forms of that row are a PASS on
+  sight: one printed "[Upkeep offer: this animation lasts only until end of turn, and the same
+  row is offered again in your main phase ...]" (the engine's own note that the main-phase offer
+  is coming - pass it here), one printed "[this land is TAPPED: animated, it still cannot attack
+  this turn]" (two mana for a 1/1 that does nothing), and one printed "[repeat: activated this
+  turn N times already]" (you already bought this 1/1 this turn; a second payment adds nothing).
+  Otherwise
+  animate it in MAIN 1 only, only with mana left after the creature you are casting this
+  turn, and only when its A-line would read "[no creature they control can block this
+  attacker]" - a 1/1 into any blocker is two mana for nothing. WHAT THIS COST: this seat
+  animated a [this land is TAPPED] Lair twice and paid the [repeat:] row twice in one corpus
+  - eight mana for no damage; a corpus later it took the "[Upkeep offer" row and then tapped that
+  Hydra to pay for a Spellbinder in Main 1 - the cast row said "{paying this taps: Lair of the
+  Hydra - it cannot attack this turn}" - two more mana for a Hydra that never attacked.
+
+COVEN (three-plus creatures with DIFFERENT POWERS) turns on Augur of Autumn's cast-from-top and
+Sigarda's attack dig. It happens by itself from playing a mix of bodies - do not count powers,
+do not reason about it, never delay an attack to arrange it.
+
+REMOVAL:
+- FATEFUL ABSENCE ({1}{W}, instant): destroys a creature or planeswalker (they get a Clue). Save
+  it for their best creature or a planeswalker. This is the ONE card worth holding with mana up.
+  THE OPTION LINE'S TARGET LIST IS THE ONLY TRUTH ABOUT WHAT IT CAN HIT, and it has one reading
+  that is always a STOP: when the line says "the only legal targets are YOUR OWN right now",
+  DO NOT CAST IT. There is nothing of theirs to kill; casting it destroys your own creature and
+  hands them a Clue for the privilege. Do something else this turn and keep the card - the
+  option comes back the moment they play a threat. Never build a reason to fire it at your own
+  board ("it dies to their removal anyway", "it denies them the fetch") - those are always
+  wrong, and a board you emptied yourself is a clock you no longer have.
+- BRUTAL CATHAR ({2}{W}, 2/2 Human Werewolf): ETB exiles an opponent creature until Cathar
+  leaves - it COMES BACK if Cathar dies, so never throw Cathar into a bad block.
+- ELITE SPELLBINDER ({2}{W}, 3/1 flier): its hand look is the only way this deck touches an
+  enchantment before it lands - and it is a TAX, not an answer: the card text says its owner may
+  still cast the exiled card, for {2} more, so the exile buys turns, never safety. When the list
+  shows "Exquisite Blood" or "Sanguine Bond", exile THAT - above a planeswalker, above a creature,
+  above anything; the card it leaves in their hand is the one that assembles the loop described
+  under MATCHUP POSTURE. When NEITHER name is on the list, IDYLLIC TUTOR is the name - its text
+  is "Search your library for an enchantment card", it is how the pair gets found - above a
+  Staff, a Lantern or a wall. WHAT THIS COST: offered Exquisite Blood and Sorin, this seat took
+  Sorin; the Blood resolved, the Bond was tutored, and the pair killed it from 20 in one combat.
+  A corpus later, offered Staff of Nin and two Idyllic Tutors on turn 7, it took the Staff; the
+  Tutor found the Bond, the Blood followed, and eleven creatures at 37 life could not attack and
+  lost 0 to 51 to the loop.
+
+WEREWOLVES / DAY-NIGHT - READ THE BATTLEFIELD LINE, DO NOT ASSUME A FACE:
+Brutal Cathar and Tovolar's Huntmaster ({4}{G}{G}, 6/6, ETB two 2/2 Wolves) are "daybound". The
+battlefield line always shows a "Day" or a "Night" designation - that word is the answer, read it
+instead of predicting it. It becomes NIGHT after a turn in which its controller cast no spells,
+and DAY again if a player casts two-plus spells in their own turn, so either face can arrive and
+either face can leave. Never build a plan that needs one face to stay, and never assume the face
+you last saw is still there - look at the line.
+- Day side, BRUTAL CATHAR: a 2/2 whose ETB/transform exiles one of their creatures.
+- Night side, MOONRAGE BRUTE: a 3/3 with FIRST STRIKE and Ward-Pay 3 life - it kills a
+  3-toughness attacker before that attacker deals damage, so blocks that look like trades are
+  clean kills, and their removal costs them 3 life to aim at it.
+- Day side, TOVOLAR'S HUNTMASTER: a 6/6 that made two 2/2 Wolves when it entered.
+- Night side, TOVOLAR'S PACKLEADER: a 7/7 that makes TWO more 2/2 Wolves every time it enters OR
+  ATTACKS, plus {2}{G}{G}: another Wolf/Werewolf of yours fights their creature. Once Packleader
+  is out ATTACKING IS PURE PROFIT - each attack adds two Wolves whether or not the 7/7 connects.
+  Swing with it every single turn.
+Sizes on the battlefield line: the FIRST pair is always the creature's real current size. If a
+"(printed X/Y)" tag follows it, that is only the card's original printed size and the difference
+is a real buff from counters or a lord - "Wolf (3/3) (printed 2/2)" is a 3/3. A creature with no
+such tag is exactly the size shown. A "{0}" printed next to a permanent's name is a display
+artifact, not a cost you can pay - it never means a card is free to cast.
+
+"FLIP SIDE" - ONE narrow use on LANDS; ignore it everywhere else:
+- On BRUTAL CATHAR and TOVOLAR'S HUNTMASTER (in hand or anywhere), "Flip Side" is a pure DISPLAY
+  TOGGLE. Those cards are never cast as their other face - they only transform on the
+  battlefield through daybound/nightbound. Never spend a decision on it there.
+- Your PATHWAY lands each carry TWO land faces, and "Play Land" plays whichever face is
+  CURRENTLY SHOWN - so on a LAND-DROP menu, "Flip Side" is how you choose the face:
+    Branchloft Pathway {G} / Boulderloft Pathway {W}
+    Barkchannel Pathway {G} / Tidechannel Pathway {U}
+    Hengegate Pathway {W} / Mistgate Pathway {U}
+  Default: play the shown face and move on. Take "Flip Side" FIRST - once, then "Play Land" -
+  only when the OTHER face's colour is one your stuck hand needs and the shown face's is not
+  (green cards stranded with a white face showing: flip to the {G} face; Teferi wanting {U}
+  with Hengegate showing: flip to Mistgate). One flip, then play; never flip anything twice.
+
+TEFERI ({2}{W}{U}) is your ONLY blue card. DESERTED BEACH taps for {W} or {U} - lead on Beach
+when you want Teferi; that is how he gets cast. Because one Beach pays only one pip, you need a
+SECOND white source on the board before Teferi becomes castable. Do not contort your mana for
+Teferi - keep the GW curve on line. Once out, +1 (untap yours / tap theirs, gain 2 life) is the
+default; -2 digs three when you need gas.
+
+MULLIGAN - THIS IS AN ODDS COMPARISON, NOT A CHECKLIST.
+STEP 1 - READ THE ASK'S PRICE LINE FOR THE "(keeping N)" NUMBER, BEFORE YOU LOOK AT THE CARDS.
+Each look is a fresh seven you must shave by one more card, at the SAME land odds: 25 lands in
+sixty, so a fresh seven is a two-lander about as often as anything else, and a mulligan rarely
+fixes lands - it only shrinks the hand. At (keeping 5) or lower the question is no longer "is
+this hand good" but "is a five-card (or four-card) hand more likely to win than THIS hand
+shaved at the bottom ask" - and with even ONE land in front of you the answer is keep, because
+the bottom ask lets you shed the uncastable cards and keep the land plus your cheapest spells.
+Colour, two-drops and curve are bottom-ask questions, not reasons to ship. Zero lands is the
+one hand where a fresh look is worth the card - even then, weigh it: a four-card seven is what
+you are buying.
+WHAT THIS COST: two seats in one corpus reached four cards and both lost, one of them at minus
+41 after shipping a hand with a land at (keeping 5).
+STEP 2 - only on your untouched opening seven, or at "(keeping 6)", do the land-count branches
+below apply at all. At "(keeping 6)" RULE -1's M-is-6 line decides first (zero lands, all lands,
+or one land under "would not cover any spell" ships; the rest keeps); the branches below are for
+the untouched seven.
+
+The prompt counts your opening hand for you, in these exact lines:
+  "Your hand (7 cards), counted by the engine: 3 lands, 4 spells."
+  "Mana sources among those lands, counted by the engine: {W} 3, {G} 1."
+  "Playing every land in this hand would cover the cost of: ..."
+Use those counts; never recount the hand yourself.
+THE QUESTION IS ALWAYS THE SAME: is this seven more likely to win than a fresh six? Weigh it on
+the deck facts. You run 25 lands, so a third land by turn three and a fourth by turn five are
+both likely, and a six you ship is most often a two-lander again - shipping costs you a card and
+usually does not fix the land count. Your cheapest spells cost TWO, so two lands is enough to
+start on curve.
+- TWO OR MORE LANDS AND AT LEAST ONE SPELL: KEEP. That is the floor and it is not a close call. If
+  the "would cover the cost of" line names even one card, it is not close at all. ALL LANDS: ship -
+  it casts nothing.
+- ONE LAND: weigh it on what the spells cost. One land with a hand of THREES and up (Sigarda,
+  Tovolar's Huntmaster, Teferi) is a ship - you will not cast anything for four turns. One land
+  with three or four TWO-drops (Katilda, Luminarch Aspirant, Intrepid Adversary, Ranger Class) is
+  a judgment call on those exact cards: one more land turns it into a real curve, and against a
+  slower opponent the wait is affordable. Take that keep when the cheap cards themselves win the
+  early turns; ship it when they do not. Colour is not part of this call - see THE FORBIDDEN
+  THOUGHT below.
+- ZERO LANDS: ship, always.
+Colour and curve are TIEBREAKERS between hands that already clear the land count, never a reason
+to ship a hand that clears it.
+THE FORBIDDEN THOUGHT, in the words you will otherwise write yourself: "this hand has no white
+source / no green source, so it is effectively dead for my deck." IT IS NOT. Your 25 lands split
+14 green and 15 white and only the four Overgrown Farmlands make BOTH, so a one-color opener is
+completely ordinary and you will draw the other color from a 25-land deck within a turn or two.
+A mono-green opener that casts Ranger Class on turn 2 is a KEEP. A mono-white opener that casts
+Luminarch Aspirant and holds Fateful Absence is a KEEP. Mulliganing these is how you end up
+keeping five cards and losing to a deck you were favored against.
+Your cheapest cards cost TWO mana, so "no one-drop" is never a reason to mulligan - you will
+never find one. Katilda {G}{W} is the only two-drop that needs both colors; everything else at
+two needs one color plus generic.
+TIEBREAKERS between keepable hands only (never a reason to mulligan on their own): prefer more
+lands over fewer, prefer a hand with Luminarch Aspirant, Intrepid Adversary, Ranger Class or
+Briarbridge Tracker, prefer the hand whose coverage line names more cards. When you must BOTTOM
+cards on a keep, read the ask's own sentence, "You will be left with a N-card hand", and build
+the best N in this PREFERENCE ORDER - an order, so it works at any N: first the lands that
+cover your cheapest spells (up to four, because the keep was priced on the engine's land
+count), then those cheap spells - your only early play stays above every other spell - then the
+rest by cost, the most expensive spell you cannot reach first under the deck. At N of 5 or 6
+that is three or four lands and the two-drops they cover; at N of 4 or fewer it is two lands
+and your two cheapest spells, and lands are the right cards to lose to get there - a four-card
+hand of four lands is not a hand at all.
+
+CLEANUP DISCARD IS THE SAME ORDER, READ FROM THE END. When your hand is above seven at end of turn
+the ask prints your hand as a NUMBERED list ("your hand has N cards and your maximum hand size is
+7"; the log calls it "Cleanup discard (hand N, limit 7)") and you answer "PUT: n, m" - the numbers
+of the cards you SEND, most expensive first: the most expensive spell your lands cannot reach in
+the next two turns, then a duplicate of a spell already in hand, then a land beyond the fourth in
+hand when your battlefield line already prints four or more lands. Never your only two-drop, and
+never Luminarch Aspirant, Intrepid Adversary, Ranger Class or Briarbridge Tracker while a cheaper
+card is left to send. Read the PUT line back against your own plan sentence before you send it: a
+plan that says "cast the Tracker next turn" with the Tracker's number in the PUT line is the plan
+discarding itself.
+
+MATCHUP POSTURE:
+- vs REMOVAL/GRIND: keep deploying anyway. Their removal answers one creature at a time and your
+  board is what wins the game; a creature you held in hand blocks nothing and deals nothing. Cast
+  the best creature offered on every one of your main phases, and keep attacking so the clock
+  forces trades.
+- vs AGGRO / GO-WIDE / TOKEN-ARMY (one creature that keeps growing): you cannot win by holding
+  cards, you must match their board. Deploy every turn, block early with your bigger bodies,
+  spend Fateful Absence or Brutal Cathar on their best attacker, gain life off Intrepid
+  Adversary's lifelink, then take over with your lords.
+- vs LIFEGAIN: their life total is not a clock you can outrace - kill or exile the lifelinker as
+  soon as it lands instead of racing it.
+- vs A LIFE-TO-DAMAGE CONVERTER: the attackers prompt prints its own warning line, "LIFE-TO-DAMAGE
+  CONVERTER on the battlefield: theirs - Sanguine Bond", naming the card. YOU CANNOT ANSWER IT.
+  This deck has no way to destroy an enchantment - Fateful Absence hits creatures and
+  planeswalkers only, and Brutal Cathar exiles a creature. So when that line names a converter of
+  THEIRS, the game has become a race with a deadline you cannot see.
+  FIRST, READ THEIR BATTLEFIELD LINE FOR THE SECOND NAME. If it shows "Sanguine Bond" AND
+  "Exquisite Blood" together, the two are a LOOP: life they gain drains you (Bond), life you lose
+  gains them (Blood), and that repeats without limit. ONE point of damage you deal them, one
+  lifelink Vampire that connects with you, one wall that gains them 3 - any of it ends the game on
+  the spot. With BOTH names printed: ATTACK: none, every combat, fliers included - "no creature
+  they control can block this attacker" is exactly why it kills you, the damage lands and the loop
+  starts; block every attacker whose A-line prints "[lifelink]" if any block for it is offered;
+  cast the rest of your hand as blockers. You are not racing. WHAT THIS COST: at 20 life, holding
+  every priced ground attacker home correctly for two combats, this seat sent a 7/5 unblockable
+  flier into both names and was at 0 before the combat ended.
+  With ONE of the two names printed, the race is real: race it with your EVASION, not with your
+  whole board.
+  RACE MEANS DAMAGE THROUGH, NOT ATTACKERS DECLARED, AND THE CONVERTER LINE NEVER LICENSES A
+  SWING THE TAGS PRICE AGAINST YOU. A creature you send into a "(blocking trigger:" wall deals
+  ZERO to their life and hands them N, which the converter takes off you as well - it moves the
+  race backwards in both directions at once. So with a converter of THEIRS on the line: send
+  every creature whose A-line prints no "(blocking trigger:" and no stop - your fliers first -
+  and hold every creature whose tag prints one. Spend nothing on incremental value (a turn
+  gaining 2 life off Teferi's +1 while they are at 3 is a turn you needed for the last 3
+  damage), but "the most aggressive posture available" is never a reason to overrule a tag.
+- vs INFECT / POISON (creatures tagged [infect]): the prompt prints your poison total on its own
+  line - "Poison counters (you): 4 of 10" - and the blocker window prices infect swings in
+  counters, not life: "these attackers put up to 2 POISON COUNTERS on you - you would be at 6 of
+  10 poison". READ THOSE NUMBERS AND USE THEM. Your life total is not your clock in this matchup.
+  The blocker window's "taking damage while ahead is often correct" advice is about LIFE - it
+  never applies to [infect] attackers, and neither does any life-race arithmetic: poison never
+  resets and nothing in your deck removes it, so every counter is permanent progress toward
+  losing. Block infect attackers even when the block loses you the creature and even when you
+  are at a healthy life total. Kill or exile [infect] creatures on sight - spend Fateful
+  Absence on one early rather than saving it for something bigger. KATILDA is the ONE exception
+  to block-always: while the window's "you would be at N of 10 poison" number is 7 or less she
+  stays OUT of infect chump-blocks (her mana engine is worth more than one early counter); once
+  that number reads 8 or more she blocks like everything else - a dead mana engine beats a
+  tenth counter.
+- vs FLIERS (evasive creatures you cannot block): your only maindeck answer is Fateful Absence.
+  Do not spend both copies on ground creatures you could have blocked, and remember your ground
+  creatures will not appear as legal blockers for a flier at all.
+
+DECIDING SITUATIONS (recognize -> do):
+- Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> ATTACK: none, every
+  combat, fliers included; block every "[lifelink]" attacker you are offered a block for.
+- Their line shows ONE of the two names -> race it with your EVASION: send every creature whose
+  A-line prints no "(blocking trigger:" and no stop, fliers first; hold every creature whose
+  tag prints one.
+- Elite Spellbinder's hand look lists "Exquisite Blood" or "Sanguine Bond" -> exile it, above
+  everything else on the list.
+- Your untapped, non-summoning-sick power is at or above their printed life and their line reads
+  "of which 0 are creatures" -> cast nothing and activate nothing before combat; attack with all.
+- The "Those sources, one per untapped card:" list names a creature you mean to attack with ->
+  do not cast in Main 1; casting taps that creature. Attack first, cast it in Main 2.
+- "put 1/1 counters with Katilda" is offered in Upkeep or Main 1 -> pass; it is a Main-2 action.
+- The Lair of the Hydra row prints "[Upkeep offer: ...]", "[this land is TAPPED: ...]" or
+  "[repeat: activated this turn ...]" -> pass; an untapped Lair is animated in Main 1 with spare
+  mana only, and only when nothing they control can block a 1/1.
+- Katilda's A-line tag names a blocker printed "(your attacker dies, their blocker lives)" ->
+  she stays home; her mana is worth more than one damage.
+- Elite Spellbinder's list shows neither "Exquisite Blood" nor "Sanguine Bond" but shows
+  "Idyllic Tutor" -> exile the Tutor; it is the card that finds them.
+- Katilda's block line reads "(both die)" or "(your blocker dies, attacker lives)" and "you
+  would be at N" is 10 or more -> she stays out of the block.
+- A "DRAW PUNISHERS" line is printed, a "Draw 1 with Clue" row is offered, and your printed life
+  is 10 or less -> pass; the draw costs the N the line prints.
+- The mulligan ask says "(keeping 5)" or fewer and the hand has a land -> keep it (RULE -1): a
+  fresh seven shaved to four is the same land odds with one card fewer.
+- A "Land drop:" question offers a land -> play it (#1a RULE).
+- A creature is offered on your own main phase -> cast one (#3 RULE), unless #2a says the game
+  ends this combat.
+- The Fateful Absence row says "the only legal targets are YOUR OWN" -> do not cast it; hold
+  it for the next window that lists a creature or planeswalker of THEIRS.
+- A block line reads "(neither dies)", "(you kill it, your blocker lives)" or "(both die)" ->
+  take it; "BLOCKS: none" only when every offered block is rung 3 and "you would be at N" is 10
+  or more.
+- An A-line reads "your attacker dies, their blocker lives" anywhere on its tag and the attacker
+  is a CARD -> it stays home unless the lethal check clears; a Wolf token goes anyway.
+- A GANG BLOCK clause says "enough to kill this attacker" -> that creature stays home.
