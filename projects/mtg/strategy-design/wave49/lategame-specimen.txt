@@ -1,0 +1,421 @@
+# wave-49 lategame specimen: 1787841701-ai_baka_deck125-0x562af3b37450-vs-ai_baka_deck126.jsonl seq 116 turn 60 phase Main phase 1 options 3 prompt 17692 chars
+
+GAME LOG (everything that has happened so far):
+=== Turn 1 - YOUR turn ===
+- Your opening hand (7 cards): Supreme Verdict; Final Judgment; Essence Scatter; Seachrome Coast; Plains; Elixir of Immortality; Elixir of Immortality
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- You played Plains
+- You cast Elixir of Immortality (that Elixir of Immortality was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 2 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Urborg, Tomb of Yawgmoth
+=== Turn 3 - YOUR turn ===
+- Phase: Draw
+- You drew Supreme Verdict
+- Phase: Main phase 1
+- You played Seachrome Coast
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 4 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 5 - YOUR turn ===
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+- You used: Life with Elixir of Immortality #1
+- You gained 5 life (now 25)
+- Your Elixir of Immortality was put into your library from the battlefield (that Elixir of Immortality was 1 of 2 copies on your battlefield; the other 1 is still there)
+=== Turn 6 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+- Opponent cast Chromatic Lantern
+- Opponent's Chromatic Lantern resolved and entered the battlefield
+=== Turn 7 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 8 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+- Opponent cast Sanguine Bond
+- You used: Life with Elixir of Immortality
+- You gained 5 life (now 30)
+- Your Elixir of Immortality was put into your library from the battlefield
+- Opponent's Sanguine Bond resolved and entered the battlefield
+=== Turn 9 - YOUR turn ===
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 10 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+- Opponent cast Exquisite Blood
+- Opponent's Exquisite Blood resolved and entered the battlefield
+=== Turn 11 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+=== Turn 12 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Sorin, Lord of Innistrad
+- You cast Dream Fracture
+- Opponent's Sorin, Lord of Innistrad was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Seachrome Coast
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+=== Turn 13 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Swamp
+=== Turn 15 - YOUR turn ===
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Woodland Cemetery
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 18 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Forest
+=== Turn 19 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- You played Island
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+- You used: Life with Elixir of Immortality
+- You gained 5 life (now 35)
+- Your Elixir of Immortality was put into your library from the battlefield
+- Your Dream Fracture was put into your library from your graveyard
+=== Turn 21 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+=== Turn 22 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+=== Turn 23 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 24 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+=== Turn 25 - YOUR turn ===
+- Phase: Draw
+- You drew Supreme Verdict
+=== Turn 26 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 27 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 28 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+=== Turn 29 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 30 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 31 - YOUR turn ===
+- Phase: Draw
+- You drew Fall of the Gavel
+=== Turn 32 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+=== Turn 33 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: ---
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 3 copies in your hand; the other 2 are still there)
+=== Turn 34 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+=== Turn 35 - YOUR turn ===
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- You cast Final Judgment (that Final Judgment was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Overgrown Battlement was exiled from the battlefield (that Overgrown Battlement was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Perimeter Captain was exiled from the battlefield (that Perimeter Captain was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Pride Guardian was exiled from the battlefield
+- Opponent's Perimeter Captain was exiled from the battlefield
+- Opponent's Overgrown Battlement was exiled from the battlefield
+- Your Final Judgment resolved and went to your graveyard
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 36 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 37 - YOUR turn ===
+- Phase: Upkeep
+- You used: Life with Elixir of Immortality
+- You gained 5 life (now 40)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (2 cards) into your library with Elixir of Immortality
+- Phase: Draw
+- You drew Cancel
+=== Turn 38 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Woodland Cemetery
+=== Turn 39 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: ---
+- You discarded Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 40 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+=== Turn 41 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 42 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+=== Turn 43 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 44 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 45 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 46 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sorin, Lord of Innistrad
+- You cast Cancel
+- Opponent's Sorin, Lord of Innistrad was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 47 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+=== Turn 48 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 49 - YOUR turn ===
+- Phase: Draw
+- You drew Cancel
+- Phase: ---
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 50 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Opponent cast Chromatic Lantern
+- You cast Dream Fracture
+- Opponent's Chromatic Lantern was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Island
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Phase: Main phase 2
+- Opponent cast Chromatic Lantern
+- You cast Fall of the Gavel
+- Opponent's Chromatic Lantern was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 45)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 51 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Island
+=== Turn 52 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Opponent cast Exquisite Blood
+- You cast Cancel
+- Opponent's Exquisite Blood was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 53 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation (that Sphinx's Revelation was 1 of 2 copies in your hand; the other 1 is still there)
+- You gained 3 life (now 48)
+- You drew Supreme Verdict
+- You drew Plains
+- You drew Seachrome Coast
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Plains
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 19)
+=== Turn 54 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+=== Turn 55 - YOUR turn ===
+- Phase: Upkeep
+- You drew Seachrome Coast
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 18)
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 56 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Savannah
+=== Turn 57 - YOUR turn ===
+- Phase: Upkeep
+- You drew Glacial Fortress
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 17)
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Seachrome Coast
+- Phase: ---
+- You discarded Essence Scatter
+=== Turn 58 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+=== Turn 59 - YOUR turn ===
+- Phase: Upkeep
+- You drew Plains
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 16)
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Phase: ---
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 60 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Chromatic Lantern
+- Opponent's Chromatic Lantern resolved and entered the battlefield
+=== Turn 61 - YOUR turn ===
+- Phase: Upkeep
+- You drew Elixir of Immortality
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 15)
+- Phase: Draw
+- You drew Emrakul, the Aeons Torn
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 48 | Opponent life: 15
+Mana available: 20 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{b}{w} (sources that can make each: {W} 12, {U} 18, {B} 20 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Plains #1 {w} or {b}; Seachrome Coast #1 {w} or {u} or {b}; Tundra #1 {w} or {u} or {b}; Island #1 {u} or {b}; Tundra #2 {w} or {u} or {b}; Seachrome Coast #2 {w} or {u} or {b}; Tundra #3 {w} or {u} or {b}; Glacial Fortress #1 {w} or {u} or {b}; Island #2 {u} or {b}; Glacial Fortress #2 {w} or {u} or {b}; Island #3 {u} or {b}; Island #4 {u} or {b}; Island #5 {u} or {b}; Island #6 {u} or {b}; Island #7 {u} or {b}; Island #8 {u} or {b}; Plains #2 {w} or {b}; Seachrome Coast #3 {w} or {u} or {b}; Seachrome Coast #4 {w} or {u} or {b}; Glacial Fortress #3 {w} or {u} or {b}
+Land drop: NOT yet used this turn - you can still play a land. The land drop is its OWN decision (a "Land drop:" question with its own Play options); it is never listed in a casting, ability or target menu, so its absence from the choices below does not mean it is gone.
+Your hand (9 cards): Final Judgment {4}{w}{w} [sorcery]; Sphinx's Revelation (copy 1 of 3 in your hand) {u}{u}{w}{x} [instant]; Supreme Verdict {1}{u}{w}{w} [sorcery]; Sphinx's Revelation (copy 2 of 3 in your hand) {u}{u}{w}{x} [instant]; Glacial Fortress (land: taps for {W}{U}); Plains (land: taps for {W}); Sphinx's Revelation (copy 3 of 3 in your hand) {u}{u}{w}{x} [instant]; Elixir of Immortality {1} [artifact]; Emrakul, the Aeons Torn {15} (15/15) [creature]
+Your battlefield (21 permanents listed, of which 0 are creatures, 0 of them able to attack right now): Glacial Fortress #1-#3 x3; Island #1-#8 x8; Plains #1; Plains #2; Seachrome Coast #1-#4 x4; Staff of Nin {6} [artifact] [tapped] {effect: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra #1-#3 x3
+Opponent battlefield (28 permanents listed, of which 4 are creatures, 0 of them without a restriction against attacking): Bayou #1; Bayou #2; Chromatic Lantern #2 {3} [artifact]; Chromatic Lantern #1 {3} [artifact] {effect (each copy of this card does this): "Lands you control have "{T}: Add one mana of any color." -- {T}: Add one mana of any color."}; Exquisite Blood {4}{b} [enchantment] {effect: "Whenever an opponent loses life, you gain that much life."}; Forest; Isolated Chapel #1; Isolated Chapel #2; Overgrown Battlement {1}{g} (0/4) [defender]; Perimeter Captain {w} (0/4) [defender]; Plains; Pride Guardian {w} (0/3) [defender]; Sanguine Bond {3}{b}{b} [enchantment] {effect: "Whenever you gain life, target opponent loses that much life."}; Savannah #1-#4 x4; Scrubland #1-#3 x3; Sunpetal Grove #1-#3 [tapped] x3; Swamp; Urborg, Tomb of Yawgmoth; Wall of Omens {1}{w} (0/4) [defender]; Woodland Cemetery #1; Woodland Cemetery #2
+Opponent hand size: 2 | Opponent library: 20 cards
+Artifacts in play: you 1 | opponent 2
+LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs - Sanguine Bond. While it is in play, life ITS CONTROLLER gains also makes the other player lose that much life. A converter of THEIRS turns every life THEY gain - lifelink, blocking triggers, drains, any of it - into that much life off YOUR total as well; a converter of YOURS does the same to life YOU gain, and leaves their gains alone. This is not a trade: when they gain N, their total goes UP by N and yours goes DOWN by N in the same event. Both halves of a life LOOP are on THEIR battlefield (Sanguine Bond + Exquisite Blood): Exquisite Blood turns every life the other player loses back into life for them, which Sanguine Bond turns into life loss again, without limit. Any life they gain, or any life you lose, chains until YOU are at 0 - so ANY nonzero payment on a tag above is fatal, not merely expensive.
+Your library: 21 cards
+
+YOUR PLAN (as you last stated it): Answer their threats, resolve Staff of Nin from a row reading leaves 5 or more, ping their face every turn.
+
+Land drop: which land do you play now, if any? (playing a land costs no mana and uses up no cast: it does not reduce what you can cast this turn)
+1. Play Glacial Fortress
+2. Play Plains
+3. Play no land right now
+
+On the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Play Glacial Fortress)" (a worked example of the format using the first option - choose the option YOU want); this decision needs no PLAN line. Write nothing else.
+
+=== REPLY ===
+CHOICE: 1 (Play Glacial Fortress)
