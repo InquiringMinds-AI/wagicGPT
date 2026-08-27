@@ -40691,7 +40691,7 @@ type=Instant
 name=Flare of Malice
 other={S(creature[-token;black]|myBattlefield)} name(Sacrifice)
 otherrestriction=type(creature[-token;black]|myBattlefield)~morethan~0
-auto=ability$!name(sacrifice) notaTarget(creature[manacost=convertedcost:highest:*:myBattlefield]|myBattlefield) sacrifice !$ opponent
+auto=ability$!name(sacrifice) notaTarget(*[creature;planeswalker;manacost=convertedcost:highest:creature^planeswalker:myBattlefield]|myBattlefield) sacrifice !$ opponent
 text=You may sacrifice a nontoken black creature rather than pay this spell's mana cost. -- Each opponent sacrifices a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control.
 mana={2}{B}{B}
 type=Instant
@@ -93498,7 +93498,7 @@ toughness=2
 [/card]
 [card]
 name=Riveteers Charm
-auto=choice name(Sacrifice a creature or planeswalker) ability$!sacrifice notaTarget(*[creature;planeswalker;manacost=convertedcost:highest:*:myBattlefield]|myBattlefield)!$ target(opponent)
+auto=choice name(Sacrifice a creature or planeswalker) ability$!sacrifice notaTarget(*[creature;planeswalker;manacost=convertedcost:highest:creature^planeswalker:myBattlefield]|myBattlefield)!$ target(opponent)
 auto=choice all(*[zpos<=3]|mylibrary) moveto(myexile) and!( transforms((,newability[canplayfromexile])) uent )!
 auto=choice name(Exile opponent's graveyard) all(*|opponentgraveyard) moveto(exile)
 auto=choice name(Exile your graveyard) all(*|mygraveyard) moveto(exile)
@@ -106090,7 +106090,7 @@ type=Instant
 [/card]
 [card]
 name=Soul Shatter
-auto=ability$!name(Sacrifice a creature or planeswalker) name(Sacrifice a creature or planeswalker) sacrifice notaTarget(creature[manacost=convertedcost:highest:*:myBattlefield]|myBattlefield)!$ opponent
+auto=ability$!name(Sacrifice a creature or planeswalker) name(Sacrifice a creature or planeswalker) sacrifice notaTarget(*[creature;planeswalker;manacost=convertedcost:highest:creature^planeswalker:myBattlefield]|myBattlefield)!$ opponent
 text=Each opponent sacrifices a creature or planeswalker with the highest mana value among creatures and planeswalkers they control.
 mana={2}{B}
 type=Instant

@@ -1,0 +1,19 @@
+# W51-A D-1: the minimal edict - caster controls nothing, the opponent's only
+# creature or planeswalker is Hill Giant (MV 4). It must be sacrificed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Soul Shatter
+manapool:{2}{B}
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+Soul Shatter
+Hill Giant
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Soul Shatter
+[PLAYER2]
+graveyard:Hill Giant
+[END]

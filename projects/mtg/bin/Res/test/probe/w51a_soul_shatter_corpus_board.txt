@@ -1,0 +1,26 @@
+# W51-A D-1 pin (wave-50 corpus deck146-vs-deck162 seq 25->26): Soul Shatter
+# resolved as a no-op. Board shape from the record: caster has a MV-2
+# creature; opponent has one creature (Master of the Feast, MV 3) and one
+# planeswalker (MV 5). Oracle: "Each opponent sacrifices a creature or
+# planeswalker with the greatest mana value among creatures and planeswalkers
+# they control" -> the planeswalker (MV 5) goes, the creature stays.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Soul Shatter
+inplay:Grizzly Bears
+manapool:{2}{B}
+[PLAYER2]
+inplay:Master of the Feast,Chandra Nalaar
+[DO]
+Soul Shatter
+Chandra Nalaar
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Soul Shatter
+inplay:Grizzly Bears
+[PLAYER2]
+inplay:Master of the Feast
+graveyard:Chandra Nalaar
+[END]
