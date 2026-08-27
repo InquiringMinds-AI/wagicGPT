@@ -1195,6 +1195,7 @@ ludevics_test_subject_five_counters.txt
 #the pool, and drop the cast with no event and no record.
 ai_x_alt_menu_cast_wave43.txt
 ai_countered_cast_no_double_pay_wave50.txt
+ai_opponent_turn_empty_stack_instant_wave52.txt
 ai_hive_animation_receipt_wave51.txt
 ai_activation_receipt_from_pool_wave51.txt
 #wave-44 CR 510.1a/702.19b: a trampling attacker assigns lethal to a blocker

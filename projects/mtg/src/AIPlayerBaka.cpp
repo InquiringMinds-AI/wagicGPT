@@ -3708,13 +3708,26 @@ int AIPlayerBaka::computeActions()
 #endif //AI_CHANGE_TESTING
 
     Interruptible * action = observer->mLayers->stackLayer()->getAt(-1);
-    Spell * spell = dynamic_cast<Spell *>(action);
-    Player * lastStackActionController = spell ? spell->source->controller() : NULL;         
+    //W52-I (wave-51 seat-123-130 H1): a response window is any window the
+    //engine handed this seat that is NOT on its own spell/ability. The old
+    //reach test demanded either an opposing SPELL on top or ZERO NOT_RESOLVED
+    //objects - but the priority stops the engine grants on the OPPONENT's
+    //turn (userRequestNextGamePhase -> AddNextGamePhase, gated on
+    //hasInstantResponse) sit on a NextGamePhase object that counts as
+    //NOT_RESOLVED, and an opposing ACTIVATED/TRIGGERED ability on top is not
+    //a Spell. Both fell through to the abilities-only branch at the bottom:
+    //selectAbility, never FindCardToPlay("") - so an instant in hand was
+    //castable ONLY in response to an opposing spell (corpus 20260827-155545:
+    //51 opponent-turn empty-stack windows, 41 with an instant in hand, 0 Cast
+    //rows; Tribute to Hunger never offered at a resolved Emrakul). Own-spell
+    //windows (INTERRUPTMYSPELLS) keep the old abilities-only path.
+    Player * topController = (action && action->source) ? action->source->controller() : NULL;
     if (observer->isInterrupting == this
         && this == currentP 
         //and i am the currentlyActivePlayer
-        && ((lastStackActionController && lastStackActionController != this) || (observer->mLayers->stackLayer()->count(0, NOT_RESOLVED) == 0)))
-        //am im not interupting my own spell, or the stack contains nothing.
+        && topController != this)
+        //am im not interupting my own spell/ability (a NextGamePhase or an
+        //empty stack has no controller and is a response window too).
     {
         bool ipotential = false;
         if(p->game->hand->hasType("instant") || p->game->hand->hasAbility(Constants::FLASH) || p->game->hand->hasAbility(Constants::ASFLASH) ||

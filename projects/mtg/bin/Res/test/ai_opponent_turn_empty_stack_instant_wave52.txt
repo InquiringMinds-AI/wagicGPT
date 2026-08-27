@@ -1,0 +1,63 @@
+#Wave-52 lane I (wave-51 seat-123-130 review, engine H1) -- an AI seat holding
+#an instant on the OPPONENT's turn must be offered the cast at its own
+#empty-stack priority stops, not only in response to an opposing spell.
+#
+#SYMPTOM (corpus matchups-20260827-155545): 51 opponent-turn empty-stack
+#priority windows, 41 with an [instant] in hand, 0 Cast rows; every such
+#window carried only activated-ability rows (Marsh Flats x5, deck123 vs130
+#seq 8). deck123 vs125 seq 111->112: Tribute to Hunger was never offered
+#against a resolved Emrakul before annihilator ended the game.
+#
+#MECHANISM: the opponent-turn windows the engine grants at phase boundaries
+#(GameObserver::userRequestNextGamePhase -> AddNextGamePhase, gated on
+#hasInstantResponse) sit on a NextGamePhase stack object, which counts as
+#NOT_RESOLVED. AIPlayerBaka::computeActions' response branch demanded either
+#"top of stack is an opposing SPELL" or "zero NOT_RESOLVED objects", so a
+#NextGamePhase top (and an opposing ABILITY top) fell through to the
+#abilities-only branch: selectAbility, never FindCardToPlay("").
+#
+#WITNESS (both seats AI): P1 (active, first main) controls a Grizzly Bears
+#and holds nothing; P2 holds Terror over two Swamps. P2's only windows this
+#turn are phase-boundary windows on P1's turn. PRE-FIX the Bears survive the
+#whole turn and Terror stays in hand with both Swamps untapped. POST-FIX
+#Terror resolves on the Bears before P1's end step.
+FORCEABILITY
+AICALLS 60
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:
+life:20
+[PLAYER2]
+inplay:Swamp,Swamp
+hand:Terror
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+end
+[PLAYER1]
+graveyard:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Swamp,Swamp
+tappedinplay:2
+graveyard:Terror
+[END]
