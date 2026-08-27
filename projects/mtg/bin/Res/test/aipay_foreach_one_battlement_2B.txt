@@ -1,0 +1,25 @@
+# W52-H (wave-51 seat 125-126 engine HIGH #1), the corpus shape: a {2}{B} cost (Tribute to Hunger)
+# over three Overgrown Battlements and one black land (deck126 vs152 seq18->19 paid it with all
+# THREE Battlements + Woodland Cemetery). The Battlement's {G} pays no pip here, so it is a generic
+# filler: ONE Battlement ({G}{G}{G}) covers the {2} with a mana to spare; the Swamp pays {B}.
+# EXPECTED: exactly two sources tapped (one Battlement + the Swamp), pool {B}{G}{G}{G}.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Overgrown Battlement,Overgrown Battlement,Overgrown Battlement,Swamp
+hand:Tribute to Hunger
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+aipay tribute to hunger
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Overgrown Battlement,Overgrown Battlement,Overgrown Battlement,Swamp
+hand:Tribute to Hunger
+tappedinplay:2
+manapool:{B}{G}{G}{G}
+[PLAYER2]
+[END]
