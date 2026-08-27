@@ -3112,6 +3112,40 @@ static string paymentTapsClause(const std::vector<std::string>& names, bool cann
     return o.str();
 }
 
+//#W52-K D7 (wave-51 seat-123-130 H3, deck130 vs126 seq 85, the LAST life
+//point): the auto-tap plan paid Spark Spray's {r} with Talisman of Impulse
+//(`{T}:Add{R} and!( damage:1 controller )!`) at 1 life and the row printed
+//nothing lethal - the frame's `CAUTION - some usable mana sources DAMAGE YOU`
+//line names the sources, not the PLAN. The plan is known at render time
+//(the same selectAutoTapProducers call that prices {leaves N}), and each pick
+//is one ability, so a Talisman picked for a generic pip (its {1} ability)
+//costs nothing while the same card picked for {R} costs 1 - priced per PICK,
+//never per card. The resulting life is stated as a number and the lethal
+//case is named outright. Pure, so the shape is provable in PARSETEST.
+static string paymentLifeCostClause(const std::vector<std::string>& names,
+                                    const std::vector<int>& damage, int life)
+{
+    int total = 0;
+    for (size_t i = 0; i < names.size() && i < damage.size(); i++)
+        total += damage[i] > 0 ? damage[i] : 0;
+    if (total <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {paying this costs you " << total << " life (";
+    bool any = false;
+    for (size_t i = 0; i < names.size() && i < damage.size(); i++)
+        if (damage[i] > 0)
+        {
+            o << (any ? "; " : "") << names[i] << ": " << damage[i] << " damage";
+            any = true;
+        }
+    o << ") - you would be at " << (life - total);
+    if (life - total <= 0)
+        o << " - this KILLS you";
+    o << "}";
+    return o.str();
+}
+
 //#W49-D11: a `becomes <creature>` activation offered on a source that is
 //ALREADY tapped animates a creature that cannot attack this turn - stated on
 //the row, restriction first, so the pilot does not pay {3}{b} for a body
@@ -11827,7 +11861,10 @@ static string stripNarrationDecoration(const string& in)
                 //#W51-E D9: the strand clause is decision-time pricing too.
                 || (in.compare(i, 8, "{spends ") == 0)
                 //#W51-F D11: the feeds count is decision-time pricing, not history.
-                || (in.compare(i, 8, "{feeds: ") == 0);
+                || (in.compare(i, 8, "{feeds: ") == 0)
+                //#W52-K D7 / D11: the life-cost and from-exile clauses are decision-time pricing.
+                || (in.compare(i, 23, "{paying this costs you ") == 0)
+                || (in.compare(i, 20, "{castable from exile") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -12592,21 +12629,123 @@ static string tutorSearchType(const string& magicText)
             return ""; //a compound filter ("*", "creature[flying]") is not one type
     return type;
 }
-static string alreadyOwnedTag(const vector<string>& names, const string& findsOnly)
+//#W52-K D10 (wave-51 seat-125-126 MED #3): the wave-51 `[already owned: X on
+//your battlefield]` tag marked SAME-NAME, not dead. 15 of its 21 takes were
+//stackable duplicates that were the plan (Howling Mine, Underworld Dreams),
+//two were legendaries that bought a legend-rule bin with no clause, and the
+//Tutor form named the half the pilot HAD and read as a warning against the
+//correct Tutor (`126 vs125` seq 21: Exquisite Blood out, Sanguine Bond the
+//card to find). Three forms now, each stating what is TRUE of that row:
+//  legendary  -> the legend rule (the engine's MTGLegendRule offers Keep New /
+//                Keep Old to the controller, so "you choose which" is exact);
+//  stackable  -> both stay; no legend rule (whether the EFFECT stacks is the
+//                card's text, which rides the row already - never asserted);
+//  tutor      -> what the search can still FIND, read off the library, split
+//                into cards not yet controlled or held and copies of ones that
+//                are. The decklist is in the system prompt, so the library's
+//                remaining names are the pilot's own knowledge, not a peek.
+static string legendTwinTag(const string& name)
 {
-    if (names.empty())
+    return " [legendary: you already control " + name
+           + " - legend rule: casting this sends one copy to your graveyard (you choose which)]";
+}
+static string secondCopyTag(const string& name)
+{
+    return " [second copy: you already control " + name
+           + "; both stay on the battlefield - no legend rule]";
+}
+static void appendCappedNames(std::ostringstream& o, const vector<string>& names, size_t cap)
+{
+    for (size_t i = 0; i < names.size() && i < cap; i++)
+        o << (i ? ", " : "") << names[i];
+    if (names.size() > cap)
+        o << " +" << (names.size() - cap) << " more";
+}
+static string tutorFindsTag(const string& type, const vector<string>& fresh, const vector<string>& copies)
+{
+    if (type.empty())
         return "";
     std::ostringstream o;
-    o << " [already owned: ";
-    for (size_t i = 0; i < names.size() && i < 4; i++)
-        o << (i ? ", " : "") << names[i];
-    if (names.size() > 4)
-        o << " +" << (names.size() - 4) << " more";
-    o << " on your battlefield";
-    if (!findsOnly.empty())
-        o << " - this finds only " << (strchr("aeiou", findsOnly[0]) ? "an " : "a ") << findsOnly << " card";
+    o << " [finds only " << (strchr("aeiou", type[0]) ? "an " : "a ") << type << " card - ";
+    if (!fresh.empty())
+    {
+        o << "still in your library, not on your battlefield or in your hand: ";
+        appendCappedNames(o, fresh, 6);
+        if (!copies.empty())
+        {
+            o << "; also there, but you already control or hold a copy: ";
+            appendCappedNames(o, copies, 6);
+        }
+    }
+    else if (!copies.empty())
+    {
+        o << "every " << type << " left in your library is a copy of one you already control or hold: ";
+        appendCappedNames(o, copies, 6);
+    }
+    else
+        o << "none left in your library";
     o << "]";
     return o.str();
+}
+
+//#W52-K D11 (wave-51 seat-125-126 MED #2, deck123 A51-3): a bare `[from
+//exile]` cast row was read as "exiled, I cannot cast it" four windows running
+//and as "a distractor ... illegal" for 248 s. The row is on the menu BECAUSE
+//it is legal; say why it is castable from there (the permanent that granted
+//it - Elite Spellbinder's `canplayfromexile` - or the card's own adventure)
+//and what the grant costs (Spellbinder's `changecost(colorless:2)` is already
+//folded into the printed {N} on the row; state the delta so {4}{w} beside a
+//decklist {2}{w} is not read as a typo). Pure; the caller reads the cause
+//off the battlefields and the tax off current-vs-printed converted cost.
+static string fromExileClause(bool yours, bool adventure, const string& causeName,
+                              bool causeTheirs, int tax)
+{
+    std::ostringstream o;
+    o << " {castable from exile";
+    if (!causeName.empty())
+        o << " - " << (yours ? "your card, " : "") << "exiled by " << (causeTheirs ? "their " : "your ")
+          << causeName << ", which lets you cast it from there";
+    else if (adventure)
+        o << " - it went on its adventure; casting the creature face from there is the normal route";
+    else
+        o << " - a legal cast, not a dead row";
+    if (tax > 0)
+        o << "; it costs {" << tax << "} more than printed, already counted in the cost shown";
+    else
+        o << "; at its printed cost";
+    o << "}";
+    return o.str();
+}
+//The cause: a non-token permanent on either battlefield whose script grants
+//canplayfromexile (the opponent's first - that is the Spellbinder shape);
+//the tax: this instance's converted cost minus the printed one.
+static string exileCastNote(Player * me, MTGCardInstance * card, const string& zoneLabel)
+{
+    if (!me || !card || zoneLabel != " [from exile]" || !me->getObserver())
+        return "";
+    string causeName;
+    bool causeTheirs = false;
+    for (int pass = 0; pass < 2 && causeName.empty(); pass++) //opponent first, then own
+    {
+        Player * p = (pass == 0) ? me->opponent() : me;
+        if (!p || !p->game || !p->game->inPlay)
+            continue;
+        for (int i = 0; i < p->game->inPlay->nb_cards && causeName.empty(); i++)
+        {
+            MTGCardInstance * c = p->game->inPlay->cards[i];
+            if (!c || c->isToken || c == card)
+                continue;
+            if (toLowerCopy(c->magicText).find("canplayfromexile") != string::npos)
+            {
+                causeName = c->getDisplayName();
+                causeTheirs = (p != me);
+            }
+        }
+    }
+    int tax = 0;
+    if (card->getManaCost() && card->model && card->model->data && card->model->data->getManaCost())
+        tax = card->getManaCost()->getConvertedCost() - card->model->data->getManaCost()->getConvertedCost();
+    return fromExileClause(card->owner == me, card->has(Constants::ADVENTURE) > 0, causeName, causeTheirs, tax);
 }
 
 //#W51-E D9 (wave-50 seat-123-130 M3, third corpus): an activated ability
@@ -12630,15 +12769,40 @@ static string strandsHandCardTag(int used, int untapped, const string& name, con
 }
 const char * kSelfOnlyWindowNote =
     "Every action here targets your own permanent; 0 (pass) is the usual answer.\n";
-static bool isHarmToTargetAbility(MTGAbility * a)
+//#W52-K D9 (wave-51 seat-146-152-162 E-5): Kaya's `-3: Exile target nonland
+//permanent` was aimed at Kaya herself at 1 life and the row carried nothing -
+//the clause was gated on damage/destroy only. A move OFF the battlefield is
+//the same class of harm: exile, graveyard, library, and a bounce to hand all
+//remove the permanent (a blink to hand is still stated - it is a fact about
+//the row, and the tag is not a prohibition). A move TO the battlefield is
+//not removal. Pure over the mover's destination string, provable in PARSETEST.
+static bool isRemovalDestination(const string& destination)
 {
-    if (!a)
+    string d = destination;
+    for (size_t i = 0; i < d.size(); i++)
+        d[i] = (char) tolower((unsigned char) d[i]);
+    if (d.find("battlefield") != string::npos || d.find("inplay") != string::npos)
         return false;
-    if (dynamic_cast<AADamager *>(a) || dynamic_cast<AADestroyCard *>(a))
+    return d.find("exile") != string::npos || d.find("graveyard") != string::npos
+        || d.find("library") != string::npos || d.find("hand") != string::npos;
+}
+//Damage, destroy, sacrifice, or a removal-class move, anywhere inside the
+//cost/nested/multi wrapping a loyalty or activated ability rides in.
+static bool isHarmToTargetAbility(MTGAbility * a, int depth = 0)
+{
+    if (!a || depth > 5)
+        return false;
+    if (dynamic_cast<AADamager *>(a) || dynamic_cast<AADestroyCard *>(a)
+        || dynamic_cast<AASacrificeCard *>(a))
         return true;
+    if (AAMover * mv = dynamic_cast<AAMover *>(a))
+        return isRemovalDestination(mv->destination);
     if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
-        return na->ability && (dynamic_cast<AADamager *>(na->ability)
-                               || dynamic_cast<AADestroyCard *>(na->ability));
+        return isHarmToTargetAbility(na->ability, depth + 1);
+    if (MultiAbility * ma = dynamic_cast<MultiAbility *>(a))
+        for (size_t i = 0; i < ma->abilities.size(); i++)
+            if (isHarmToTargetAbility(ma->abilities[i], depth + 1))
+                return true;
     return false;
 }
 
@@ -12963,9 +13127,19 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
                     this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY));
                 std::set<MTGCardInstance *> tapped;
+                std::vector<std::string> painNames; //#W52-K D7
+                std::vector<int> painDamage;
                 for (size_t pi = 0; pi < picks.size(); pi++)
-                    if (picks[pi] && picks[pi]->source)
-                        tapped.insert(picks[pi]->source);
+                    if (picks[pi] && picks[pi]->source && tapped.insert(picks[pi]->source).second)
+                    {
+                        int selfDmg = ManaEngine::producerSelfDamageOf(picks[pi]);
+                        if (selfDmg > 0)
+                        {
+                            painNames.push_back(picks[pi]->source->getDisplayName()
+                                                + instanceHandle(picks[pi]->source));
+                            painDamage.push_back(selfDmg);
+                        }
+                    }
                 int used = (int) tapped.size();
                 int left = untapped - used;
                 if (left < 0)
@@ -12990,6 +13164,9 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 if (best)
                     out << strandsHandCardTag(used, untapped, best->getDisplayName(),
                                               best->getManaCost()->toString(), bestNeed);
+                //#W52-K D7: same emitter as the cast rows - an activation paid
+                //through a pain source is priced in life on its own row.
+                out << paymentLifeCostClause(painNames, painDamage, life);
             }
         }
     }
@@ -16191,32 +16368,53 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (card->isCreature())
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << casts[ci].zoneLabel;
+            o << exileCastNote(this, card, casts[ci].zoneLabel); //#W52-K D11
             o << hybridPipNote(cost);
             o << dynamicMagnitudes(card);
             //W43-7: {X} spells are unpriceable by dynamicMagnitudes (it skips
             //the amount "x" - X is announced AFTER this pick). Price them here.
             o << xSpellPricing(card, this);
-            //#W51-E D8: what is already owned - the twin of a non-stacking
-            //permanent, or the owned permanents a tutor's search type covers.
+            //#W51-E D8 / #W52-K D10: what is already controlled - a legendary
+            //twin (legend rule), a stackable second copy (both stay), or what a
+            //tutor's search type can still find in the library.
             {
-                bool twinClass = card->hasType(Subtypes::TYPE_LEGENDARY)
-                    || (!card->isCreature() && !card->hasType(Subtypes::TYPE_LAND)
-                        && !card->hasType(Subtypes::TYPE_INSTANT) && !card->hasType(Subtypes::TYPE_SORCERY));
+                bool legendary = card->hasType(Subtypes::TYPE_LEGENDARY);
+                bool stackClass = !legendary && !card->isCreature() && !card->hasType(Subtypes::TYPE_LAND)
+                    && !card->hasType(Subtypes::TYPE_INSTANT) && !card->hasType(Subtypes::TYPE_SORCERY);
                 string want = tutorSearchType(card->magicText);
-                vector<string> owned;
-                std::set<string> seenOwned;
                 MTGGameZone * bf = game ? game->inPlay : NULL;
+                MTGCardInstance * twin = NULL;
+                std::set<string> heldOfType; //battlefield + hand names of the tutor's type
                 for (int bi = 0; bf && bi < bf->nb_cards; bi++)
                 {
                     MTGCardInstance * bc = bf->cards[bi];
                     if (!bc || bc->isToken)
                         continue;
-                    bool hit = (twinClass && bc->name == card->name)
-                        || (!want.empty() && bc->hasType(want));
-                    if (hit && seenOwned.insert(bc->getDisplayName()).second)
-                        owned.push_back(bc->getDisplayName());
+                    if ((legendary || stackClass) && !twin && bc->name == card->name)
+                        twin = bc;
+                    if (!want.empty() && bc->hasType(want))
+                        heldOfType.insert(bc->getDisplayName());
                 }
-                o << alreadyOwnedTag(owned, want);
+                if (twin)
+                    o << (legendary ? legendTwinTag(twin->getDisplayName())
+                                    : secondCopyTag(twin->getDisplayName()));
+                if (!want.empty() && game && game->library)
+                {
+                    for (int hi = 0; game->hand && hi < game->hand->nb_cards; hi++)
+                        if (game->hand->cards[hi] && game->hand->cards[hi] != card
+                            && game->hand->cards[hi]->hasType(want))
+                            heldOfType.insert(game->hand->cards[hi]->getDisplayName());
+                    vector<string> fresh, copies;
+                    std::set<string> seenLib;
+                    for (int li = 0; li < game->library->nb_cards; li++)
+                    {
+                        MTGCardInstance * lc = game->library->cards[li];
+                        if (!lc || !lc->hasType(want) || !seenLib.insert(lc->getDisplayName()).second)
+                            continue;
+                        (heldOfType.count(lc->getDisplayName()) ? copies : fresh).push_back(lc->getDisplayName());
+                    }
+                    o << tutorFindsTag(want, fresh, copies);
+                }
             }
         }
         else
@@ -16242,6 +16440,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (card->isCreature() && !isAdventureCast)
                 o << " (" << card->power << "/" << card->toughness << ")";
             o << casts[ci].zoneLabel;
+            o << exileCastNote(this, card, casts[ci].zoneLabel); //#W52-K D11
             o << hybridPipNote(cost->getAlternative());
             //Name the card an exile/pitch extra cost will consume, so a free
             //alt-cast cannot silently eat the deck's finisher unseen (#1d).
@@ -16286,6 +16485,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 payCost = NULL; //hasX() alone answers 0 for a {X:colour} cost
             int used = 0;
             std::vector<std::string> creatureTaps; //#W49-D11
+            std::vector<std::string> painNames; //#W52-K D7
+            std::vector<int> painDamage;
             if (payCost)
             {
                 vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
@@ -16294,9 +16495,18 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 for (size_t pi = 0; pi < picks.size(); pi++)
                     if (picks[pi] && picks[pi]->source)
                     {
-                        if (tapped.insert(picks[pi]->source).second
-                            && picks[pi]->source->isCreature())
-                            creatureTaps.push_back(picks[pi]->source->getDisplayName());
+                        if (tapped.insert(picks[pi]->source).second)
+                        {
+                            if (picks[pi]->source->isCreature())
+                                creatureTaps.push_back(picks[pi]->source->getDisplayName());
+                            int selfDmg = ManaEngine::producerSelfDamageOf(picks[pi]);
+                            if (selfDmg > 0)
+                            {
+                                painNames.push_back(picks[pi]->source->getDisplayName()
+                                                    + instanceHandle(picks[pi]->source));
+                                painDamage.push_back(selfDmg);
+                            }
+                        }
                     }
                 used = (int) tapped.size();
             }
@@ -16310,6 +16520,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     && observer->getCurrentGamePhase() < MTG_PHASE_COMBATATTACKERS;
                 o << paymentTapsClause(creatureTaps, beforeAttack);
             }
+            //#W52-K D7: the life this payment plan spends, and where it leaves you.
+            o << paymentLifeCostClause(painNames, painDamage, life);
         }
         //A response option offered because of pending stack objects names what
         //it can hit ("Cast Counterspell {u}{u} - can target on the stack:
@@ -33853,17 +34065,11 @@ static const char * kW50Y_r94 =
         CHECK(tutorSearchType("damage:3 target(<1>creature|mybattlefield)").empty()
               && tutorSearchType("").empty(),
               "#W51-E D8 NEGATIVE a battlefield target is not a library search");
+        //(#W52-K D10 re-drafted the wave-51 `[already owned:` forms; the
+        //W51-E echo shape is kept on the new tutor form.)
         vector<string> own1; own1.push_back("Intruder Alarm");
-        CHECK(alreadyOwnedTag(own1, "enchantment") == " [already owned: Intruder Alarm on your battlefield - this finds only an enchantment card]",
-              "#W51-E D8 the Tutor row with an Alarm out");
-        CHECK(alreadyOwnedTag(own1, "") == " [already owned: Intruder Alarm on your battlefield]",
-              "#W51-E D8 the second-copy row");
         vector<string> own0;
-        CHECK(alreadyOwnedTag(own0, "enchantment").empty(), "#W51-E D8 NEGATIVE nothing owned, no tag");
-        vector<string> own2; own2.push_back("Chromatic Lantern"); own2.push_back("Lightning Greaves");
-        CHECK(alreadyOwnedTag(own2, "artifact").find("Chromatic Lantern, Lightning Greaves on your battlefield - this finds only an artifact card") != string::npos,
-              "#W51-E D8 two names join with a comma");
-        vector<string> d8; d8.push_back("Cast Idyllic Tutor {2}{w}" + alreadyOwnedTag(own1, "enchantment")); d8.push_back("Cast nothing this window");
+        vector<string> d8; d8.push_back("Cast Idyllic Tutor {2}{w}" + tutorFindsTag("enchantment", own1, own0)); d8.push_back("Cast nothing this window");
         bool st8 = false;
         CHECK(parseChoice("CHOICE: 1 (Cast Idyllic Tutor)", 2, &d8, &st8, NULL) == 1 && !st8, "#W51-E D8 echo: the bare short name binds");
         bool st8b = false;
@@ -34136,6 +34342,141 @@ static const char * kW50Y_r94 =
         r = parseAttackerSet("1 (Liliana's Caress)", hand.size(), send, &hand);
         CHECK(r == 2 && send[0] && send[1],
               "#W52-G E-1 NEGATIVE the ATTACK grammar (echoBinds off) is unchanged: index and name still union");
+    }
+    // ---- #W52-K: D7 life-cost payment, D9 removal-class self-hit, D10 owned forms, D11 from-exile ----
+    cout << "\n[#W52-K] D7 / D9 / D10 / D11\n";
+    {
+        //D7: the life a payment plan spends.
+        vector<string> pn; vector<int> pd;
+        pn.push_back("Talisman of Impulse #1"); pd.push_back(1);
+        CHECK(paymentLifeCostClause(pn, pd, 1)
+              == " {paying this costs you 1 life (Talisman of Impulse #1: 1 damage) - you would be at 0 - this KILLS you}",
+              "#W52-K D7 the Talisman-paid cast at 1 life is named lethal (the deck130 seq 85 shape)");
+        CHECK(paymentLifeCostClause(pn, pd, 3)
+              == " {paying this costs you 1 life (Talisman of Impulse #1: 1 damage) - you would be at 2}",
+              "#W52-K D7 at 3 life the same plan prints the resulting life and no lethal word");
+        pn.push_back("Ancient Tomb"); pd.push_back(2);
+        CHECK(paymentLifeCostClause(pn, pd, 3)
+              == " {paying this costs you 3 life (Talisman of Impulse #1: 1 damage; Ancient Tomb: 2 damage) - you would be at 0 - this KILLS you}",
+              "#W52-K D7 two pain sources sum, join with '; ', and lethal is at exactly 0");
+        CHECK(paymentLifeCostClause(pn, pd, 2).find("you would be at -1 - this KILLS you") != string::npos,
+              "#W52-K D7 below zero is still stated as the number, and lethal");
+        vector<string> pn0; vector<int> pd0;
+        CHECK(paymentLifeCostClause(pn0, pd0, 1).empty(), "#W52-K D7 NEGATIVE no pain pick, no clause");
+        vector<string> pnz; vector<int> pdz; pnz.push_back("Talisman of Impulse #2"); pdz.push_back(0);
+        CHECK(paymentLifeCostClause(pnz, pdz, 1).empty(),
+              "#W52-K D7 NEGATIVE a Talisman picked for its {1} ability (0 damage) prints nothing");
+        CHECK(paymentLifeCostClause(pn, pd, 20).find("KILLS") == string::npos,
+              "#W52-K D7 NEGATIVE at 20 life no lethal word");
+        {
+            vector<string> menu;
+            menu.push_back(string("Cast Spark Spray {r} {leaves 0 of your 1 untapped mana source untapped - casting this taps you out}")
+                           + paymentLifeCostClause(pn, pd, 1));
+            menu.push_back("Cast nothing right now");
+            bool stale = false; string src;
+            int pick = parseChoice("CHOICE: 1 (Cast Spark Spray)", 2, &menu, &stale, &src);
+            CHECK(pick == 1 && !stale, "#W52-K D7 echo: the bare row name binds with the life clause on the row");
+            pick = parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale, &src);
+            CHECK(pick == 1 && !stale, "#W52-K D7 echo: the whole row incl. the life clause binds");
+            CHECK(stripNarrationDecoration(menu[0]).find("costs you") == string::npos
+                  && stripNarrationDecoration(menu[0]).find("Cast Spark Spray {r}") == 0,
+                  "#W52-K D7 the life clause leaves no residue in history");
+        }
+        //D9: removal-class destinations.
+        CHECK(isRemovalDestination("exile") && isRemovalDestination("myexile")
+              && isRemovalDestination("ownergraveyard") && isRemovalDestination("hand")
+              && isRemovalDestination("library"),
+              "#W52-K D9 exile / graveyard / hand / library moves are removal");
+        CHECK(!isRemovalDestination("battlefield") && !isRemovalDestination("mybattlefield")
+              && !isRemovalDestination("inplay") && !isRemovalDestination(""),
+              "#W52-K D9 NEGATIVE a move to the battlefield (or nowhere) is not removal");
+        {
+            vector<string> pri;
+            pri.push_back(string("-3: exile non-land permanent with Kaya the Inexorable targeting Kaya the Inexorable"
+                                 " [your battlefield] [cost: Counters]") + kSelfTargetClause);
+            pri.push_back("-3: exile non-land permanent with Kaya the Inexorable targeting Teferi, Who Slows the Sunset [opponent's battlefield] [cost: Counters]");
+            bool stale = false; string src;
+            int pick = parseChoice("CHOICE: 2 (-3: exile non-land permanent with Kaya the Inexorable targeting Teferi, Who Slows the Sunset)", 2, &pri, &stale, &src);
+            CHECK(pick == 2 && !stale, "#W52-K D9 echo: the untagged opposing-target row binds beside the tagged self row");
+            pick = parseChoice("CHOICE: 1 (" + pri[0] + ")", 2, &pri, &stale, &src);
+            CHECK(pick == 1 && !stale, "#W52-K D9 echo: the self-exile row echoed with its clause binds to 1");
+        }
+        //D10: the three owned forms.
+        CHECK(legendTwinTag("Teferi, Who Slows the Sunset")
+              == " [legendary: you already control Teferi, Who Slows the Sunset - legend rule: casting this sends one copy to your graveyard (you choose which)]",
+              "#W52-K D10 the legendary twin carries the legend rule");
+        CHECK(secondCopyTag("Howling Mine")
+              == " [second copy: you already control Howling Mine; both stay on the battlefield - no legend rule]",
+              "#W52-K D10 the stackable second copy is not marked dead");
+        CHECK(secondCopyTag("Howling Mine").find("already owned") == string::npos
+              && legendTwinTag("Lolth").find("already owned") == string::npos,
+              "#W52-K D10 NEGATIVE the wave-51 'already owned' wording is retired");
+        vector<string> fresh1; fresh1.push_back("Sanguine Bond");
+        vector<string> copies1; copies1.push_back("Exquisite Blood");
+        vector<string> none;
+        CHECK(tutorFindsTag("enchantment", fresh1, copies1)
+              == " [finds only an enchantment card - still in your library, not on your battlefield or in your hand: Sanguine Bond; also there, but you already control or hold a copy: Exquisite Blood]",
+              "#W52-K D10 the Tutor row names the half NOT owned first (the 126 vs125 seq 21 shape)");
+        CHECK(tutorFindsTag("enchantment", none, copies1)
+              == " [finds only an enchantment card - every enchantment left in your library is a copy of one you already control or hold: Exquisite Blood]",
+              "#W52-K D10 with both halves out the search finds only copies, and says so");
+        CHECK(tutorFindsTag("artifact", none, none) == " [finds only an artifact card - none left in your library]",
+              "#W52-K D10 an emptied library says so ('an' before a vowel)");
+        CHECK(tutorFindsTag("creature", fresh1, none) == " [finds only a creature card - still in your library, not on your battlefield or in your hand: Sanguine Bond]",
+              "#W52-K D10 fresh only: no copies clause ('a' before a consonant)");
+        CHECK(tutorFindsTag("", fresh1, copies1).empty(), "#W52-K D10 NEGATIVE no search type, no tag");
+        {
+            vector<string> eight;
+            for (int i = 0; i < 8; i++) { std::ostringstream n; n << "Card " << i; eight.push_back(n.str()); }
+            string t = tutorFindsTag("enchantment", eight, none);
+            CHECK(t.find("Card 5 +2 more") != string::npos && t.find("Card 6") == string::npos,
+                  "#W52-K D10 the library list caps at 6 names with a '+N more' count");
+        }
+        {
+            vector<string> menu;
+            menu.push_back("Cast Idyllic Tutor {2}{w}" + tutorFindsTag("enchantment", fresh1, copies1));
+            menu.push_back("Cast Teferi, Who Slows the Sunset {2}{u}{w}" + legendTwinTag("Teferi, Who Slows the Sunset"));
+            menu.push_back("Cast Howling Mine {2}" + secondCopyTag("Howling Mine"));
+            menu.push_back("Cast nothing right now");
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Cast Idyllic Tutor)", 4, &menu, &stale, &src) == 1 && !stale,
+                  "#W52-K D10 echo: the bare Tutor name binds with the finds tag on the row");
+            CHECK(parseChoice("CHOICE: 2 (" + menu[1] + ")", 4, &menu, &stale, &src) == 2 && !stale,
+                  "#W52-K D10 echo: the legend row echoed whole binds to 2");
+            CHECK(parseChoice("CHOICE: 3 (Cast Howling Mine)", 4, &menu, &stale, &src) == 3 && !stale,
+                  "#W52-K D10 echo: the bare stackable name binds with the second-copy tag on the row");
+            CHECK(stripNarrationDecoration(menu[0]) == "Cast Idyllic Tutor {2}{w}"
+                  && stripNarrationDecoration(menu[1]) == "Cast Teferi, Who Slows the Sunset {2}{u}{w}"
+                  && stripNarrationDecoration(menu[2]) == "Cast Howling Mine {2}",
+                  "#W52-K D10 all three tags leave no residue in history");
+        }
+        //D11: the from-exile clause.
+        CHECK(fromExileClause(true, false, "Elite Spellbinder", true, 2)
+              == " {castable from exile - your card, exiled by their Elite Spellbinder, which lets you cast it from there; it costs {2} more than printed, already counted in the cost shown}",
+              "#W52-K D11 the Spellbinder shape: cause, owner, and the {2} tax");
+        CHECK(fromExileClause(true, true, "", false, 0)
+              == " {castable from exile - it went on its adventure; casting the creature face from there is the normal route; at its printed cost}",
+              "#W52-K D11 an adventure creature face names its own route, no tax");
+        CHECK(fromExileClause(true, false, "", false, 0)
+              == " {castable from exile - a legal cast, not a dead row; at its printed cost}",
+              "#W52-K D11 no cause found still says the row is legal");
+        CHECK(fromExileClause(false, false, "Kaya the Inexorable", false, 0).find("your card") == string::npos
+              && fromExileClause(false, false, "Kaya the Inexorable", false, 0).find("exiled by your Kaya the Inexorable") != string::npos,
+              "#W52-K D11 NEGATIVE a card you do not own is not called yours; an own granter reads 'your'");
+        CHECK(fromExileClause(true, true, "Elite Spellbinder", true, 2).find("adventure") == string::npos,
+              "#W52-K D11 NEGATIVE a found cause outranks the adventure wording");
+        {
+            vector<string> menu;
+            menu.push_back("Cast Idyllic Tutor {4}{w} [from exile]" + fromExileClause(true, false, "Elite Spellbinder", true, 2));
+            menu.push_back("Cast nothing right now");
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Cast Idyllic Tutor)", 2, &menu, &stale, &src) == 1 && !stale,
+                  "#W52-K D11 echo: the bare name binds with the exile clause on the row");
+            CHECK(parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale, &src) == 1 && !stale,
+                  "#W52-K D11 echo: the whole row incl. the exile clause binds");
+            CHECK(stripNarrationDecoration(menu[0]).find("castable from exile") == string::npos,
+                  "#W52-K D11 the exile clause leaves no residue in history");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

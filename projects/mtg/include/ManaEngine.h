@@ -130,6 +130,11 @@ public:
     //   rider is never evaluated - it would draw the game RNG).
     static int selfDamageOnTap(MTGCardInstance * card);
     static std::vector<std::string> selfDamageManaSources(Player * p);
+    // producerSelfDamageOf: the self-damage rider of ONE producer ability (as
+    //   selectAutoTapProducers picks them), so a payment PLAN can be priced in
+    //   life per pick: a Talisman tapped for {1} costs nothing, tapped for {R}
+    //   costs 1. 0 for a non-producer or a rider that hits someone else.
+    static int producerSelfDamageOf(MTGAbility * producer);
 
     //N-166k (wave-34 audit, b1 F-10 / b2 R1 / b3 F1 / b4 F5): one usable mana
     //SOURCE, as the render needs to name it. potentialColorReach returns a bare
