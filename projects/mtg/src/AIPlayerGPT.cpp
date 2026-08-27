@@ -1085,7 +1085,15 @@ static string playerBranchLabel(const string& raw)
 //The board count is a number the engine has and the pilot re-derives (or
 //does not) from the battlefield line; state it where the cast is decided.
 //Pure over counts so every branch is provable in PARSETEST.
-static string edictClause(int theirCreatures, const string& onlyName, int onlyToughness, bool gainsToughness)
+//#W50-X D3 (wave-49 ledger HIGH, the corpus's one render falsehood): the
+//gain RECIPIENT is read off the script's dynamicability target token, not
+//assumed. Devour Flesh is `toughnesslifegain targetcontroller` - the TARGETED
+//player (the one sacrificing) gains - and the row printed "you gain 5" while
+//the opponent went 20 -> 25 (deck123 vs162 seq 8; 10 rows, believed twice).
+//Tribute to Hunger (`targetopponent`) and Consuming Vapors (`abilitycontroller`)
+//keep "you gain": their recipient is the caster.
+static string edictClause(int theirCreatures, const string& onlyName, int onlyToughness, bool gainsToughness,
+                          bool targetGains = false)
 {
     std::ostringstream o;
     if (theirCreatures <= 0)
@@ -1093,7 +1101,9 @@ static string edictClause(int theirCreatures, const string& onlyName, int onlyTo
     if (theirCreatures == 1)
     {
         o << "they control 1 creature - " << onlyName << " is sacrificed";
-        if (gainsToughness)
+        if (gainsToughness && targetGains)
+            o << ", they gain " << onlyToughness << " - the sacrificing player gains, not you";
+        else if (gainsToughness)
             o << ", you gain " << onlyToughness;
         return o.str();
     }
@@ -1101,11 +1111,26 @@ static string edictClause(int theirCreatures, const string& onlyName, int onlyTo
     return o.str();
 }
 
-static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttack, int mine)
+//#W50-X D13 (wave-49 ledger MED): "(K able to attack)" was canAttack() on the
+//OPPONENT's board during the caster's turn, where tapped and summoning-sick are
+//true of every creature they control - 323 fresh tokens rendered "(0 able to
+//attack)" beside a header saying "323 of them without a restriction against
+//attacking", and five walls rendered the same "(0 able to attack)". The count
+//now rides the header's own scope rule (boardCreatureCanAttackNow: live
+//predicate on the active player's board, static restrictions elsewhere) and
+//SAYS which scope it is, so the row's K and the header's K agree.
+static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttack, int mine,
+                            bool liveScope = false)
 {
     std::ostringstream o;
-    o << verb << " " << theirs << " of their creature" << (theirs == 1 ? "" : "s")
-      << " (" << theirsAbleToAttack << " able to attack), " << mine << " of yours";
+    o << verb << " " << theirs << " of their creature" << (theirs == 1 ? "" : "s") << " (";
+    if (theirs > 0 && theirsAbleToAttack <= 0)
+        o << (theirs == 1 ? "it carries a restriction against attacking"
+                          : "all of them carry a restriction against attacking");
+    else
+        o << theirsAbleToAttack
+          << (liveScope ? " able to attack right now" : " without a restriction against attacking");
+    o << "), " << mine << " of yours";
     return o.str();
 }
 
@@ -1125,8 +1150,10 @@ static string attackPunisherClause(int theirsAbleToAttack)
 //shapes (`all(creature)`, `notaTarget(creature|mybattlefield)` under a
 //targeted player, `creature[attacking]` under `@each blockers`); a filtered
 //variant is left unpriced rather than mispriced.
+static bool boardCreatureCanAttackNow(MTGCardInstance * c, bool live); //defined below (#W47 R14a)
+
 static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & theirsAttack, int & mine,
-                                MTGCardInstance ** theirOnly)
+                                MTGCardInstance ** theirOnly, bool * liveScope = NULL)
 {
     theirs = theirsAttack = mine = 0;
     if (theirOnly)
@@ -1135,6 +1162,11 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
     Player * opp = me ? me->opponent() : NULL;
     if (!me || !opp || !me->game || !opp->game || !me->game->inPlay || !opp->game->inPlay)
         return false;
+    //#W50-X D13: the header's scope rule - the live engine predicate only on
+    //the board whose controller is the active player.
+    bool live = card->getObserver() && card->getObserver()->currentPlayer == opp;
+    if (liveScope)
+        *liveScope = live;
     for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
     {
         MTGCardInstance * c = opp->game->inPlay->cards[i];
@@ -1143,7 +1175,7 @@ static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & thei
         theirs++;
         if (theirOnly)
             *theirOnly = c;
-        if (c->canAttack())
+        if (boardCreatureCanAttackNow(c, live))
             theirsAttack++;
     }
     for (int i = 0; i < me->game->inPlay->nb_cards; i++)
@@ -1170,13 +1202,15 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
         && lowText.find("damage:") != string::npos;
     if (!edict && !sweepVerb && !attackPunisher)
         return "";
-    if (!boardCreatureCounts(card, theirs, theirsAttack, mine, &only))
+    bool live = false;
+    if (!boardCreatureCounts(card, theirs, theirsAttack, mine, &only, &live))
         return "";
     if (edict)
         return edictClause(theirs, only ? only->getDisplayName() : "", only ? only->toughness : 0,
-                           lowText.find("toughnesslifegain") != string::npos);
+                           lowText.find("toughnesslifegain") != string::npos,
+                           lowText.find("toughnesslifegain targetcontroller") != string::npos);
     if (sweepVerb)
-        return sweeperClause(sweepVerb, theirs, theirsAttack, mine);
+        return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live);
     return attackPunisherClause(theirsAttack);
 }
 
@@ -2100,6 +2134,23 @@ static string tappedCreatureTag(bool canBlockTapped, bool attacking, const strin
 //cannot block, the permission clause is simply false and must not print. The
 //affirmative substring is still REQUIRED in the can-block branch - that is the
 //N-139k finding, and it is what this branch keeps intact.
+//#W50-X D14: the chosen-name tag on a permanent's line. Pure.
+static string chosenNameTag(const string& chosen)
+{
+    if (chosen.empty())
+        return "";
+    return " [named: " + chosen + "]";
+}
+
+//#W50-X D14: the narration line, once, when a permanent's chosen name becomes
+//known to this seat. Pure.
+static string chosenNameNarration(bool mine, const string& cardName, const string& chosen)
+{
+    if (chosen.empty() || cardName.empty())
+        return "";
+    return (mine ? "Your " : "Opponent's ") + cardName + " named " + chosen;
+}
+
 static string summoningSickTag(bool canBlock)
 {
     return canBlock
@@ -3686,6 +3737,85 @@ string joinZoneEntries(const vector<string>& names, const vector<string>& handle
     return o.str();
 }
 
+//#W50-X D5 (wave-49 ledger HIGH): the cast row's `legal targets right now:`
+//clause was the last uncollapsed enumeration - 323 `Vampire #n (creature 4/4)
+//[flying, ...]` handles, ONE distinct body, 28,755 chars on one option row
+//beside a battlefield line already reading `Vampire #1-#322 ... x322`. Same
+//rule as joinZoneEntries (identical name, byte-identical fact tail,
+//CONSECUTIVE handle ranks), same floor, ", " separated as the clause always
+//was. Entries are grouped by identical rendered text in first-appearance order
+//(so the opponent-first order of the clause survives), a group's members sit
+//in ascending rank, and runs shorter than the floor print one entry each. The
+//per-name text note (`{target text: ...}`, quoted once per distinct card) rides
+//the FIRST emitted entry of that name, outside the collapse key. Reply parsing
+//binds a target by name+handle against the ENGINE's target set, never against
+//this clause, so `Vampire #200` still resolves when only `#1-#322` was printed.
+string joinTargetEntries(const vector<string>& names, const vector<string>& handles,
+                         const vector<string>& tails, const std::map<string, string>& notes)
+{
+    std::ostringstream o;
+    std::set<string> noted;
+    std::vector<string> keyOrder;
+    std::map<string, std::vector<size_t> > groups;
+    for (size_t k = 0; k < names.size(); k++)
+    {
+        string key = names[k] + "\x01" + tails[k];
+        if (groups.find(key) == groups.end())
+            keyOrder.push_back(key);
+        groups[key].push_back(k);
+    }
+    bool first = true;
+    for (size_t g = 0; g < keyOrder.size(); g++)
+    {
+        std::vector<size_t>& idx = groups[keyOrder[g]];
+        //ascending rank inside a group (stable insertion sort; groups are small
+        //except the one that pays for this)
+        for (size_t a = 1; a < idx.size(); a++)
+        {
+            size_t v = idx[a];
+            size_t b = a;
+            while (b > 0 && handleRank(handles[idx[b - 1]]) > handleRank(handles[v]))
+            {
+                idx[b] = idx[b - 1];
+                b--;
+            }
+            idx[b] = v;
+        }
+        size_t i = 0;
+        while (i < idx.size())
+        {
+            size_t j = i + 1;
+            int rank = handleRank(handles[idx[i]]);
+            if (rank > 0)
+                while (j < idx.size() && handleRank(handles[idx[j]]) == rank + (int) (j - i))
+                    j++;
+            size_t run = j - i;
+            if (!first)
+                o << ", ";
+            first = false;
+            const string& nm = names[idx[i]];
+            if (rank > 0 && run >= kBattlefieldCollapseFloor)
+            {
+                o << nm << " #" << rank << "-#" << (rank + (int) run - 1) << tails[idx[i]] << " x" << run;
+                i = j;
+            }
+            else
+            {
+                o << nm << handles[idx[i]] << tails[idx[i]];
+                i++;
+            }
+            if (noted.find(nm) == noted.end())
+            {
+                noted.insert(nm);
+                std::map<string, string>::const_iterator nt = notes.find(nm);
+                if (nt != notes.end() && !nt->second.empty())
+                    o << nt->second;
+            }
+        }
+    }
+    return o.str();
+}
+
 //#W47 (R8): the blockers screen's own ranged collapse - joinZoneEntries' rule,
 //applied to the B-rows. Same three tests for a run (identical NAME, identical
 //fact tail byte-for-byte, CONSECUTIVE handle ranks), so no member is ever
@@ -4274,6 +4404,11 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 out << summoningSickTag(!card->has(Constants::CANTBLOCK));
             //Annihilator is a triggered ability, invisible to the keyword list.
             out << annihilatorTag(card->magicText);
+            //#W50-X D14 (wave-49 ledger MED): a "choose a name" permanent carried
+            //its chosen name NOWHERE - the pilot cast the named Vision Skeins
+            //into Silverquill Silencer at 15, 4 and 1 life. The engine holds it
+            //(MTGCardInstance::chooseaname); say it on the line.
+            out << chosenNameTag(card->chooseaname);
             //Combat status. When the creature is tapped the tapped tag above
             //already named the cause (N-122c), so do not print it twice.
             if (!card->isTapped())
@@ -6431,6 +6566,39 @@ static string xDrawPunishClause(int maxX, int drawPerX, int perDraw, const strin
 //own 1. Under punishers the life it costs is multiplied out - deck123 vs162
 //seq 35 sat at 9 life in front of a 9-card draw step at 2 each, with K stated
 //nowhere. Pure.
+//#W50-X D16 (wave-49 ledger LOW): the mirror. 98/98 punished-seat prompts
+//carried the forecast; 0/63 on the seat HOLDING the punishers did, so the
+//pilot with Underworld Dreams out never saw what the opponent's next draw
+//step pays it. `extras` are the OPPONENT's additional-draw permanents (the
+//same scan, seats swapped); a Puzzle Box entry labelled for the drawer's own
+//hand is relabelled for this chair. Pure.
+static string theirDrawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
+                                        int perDraw)
+{
+    int k = base;
+    for (size_t i = 0; i < extras.size(); i++)
+        k += extras[i].second;
+    std::ostringstream o;
+    o << "DRAW FORECAST (theirs): their next draw step draws " << k << " card" << (k == 1 ? "" : "s");
+    if (!extras.empty())
+    {
+        o << " (" << base;
+        for (size_t i = 0; i < extras.size(); i++)
+        {
+            string label = extras[i].first;
+            size_t hs = label.find(": your hand size");
+            if (hs != string::npos)
+                label.replace(hs, 16, ": their hand size");
+            o << " + " << label << " " << extras[i].second;
+        }
+        o << ")";
+    }
+    if (perDraw > 0)
+        o << " = " << k << " x " << perDraw << " = " << (k * perDraw) << " life to you from your punishers above";
+    o << ".";
+    return o.str();
+}
+
 static string drawStepForecastText(int base, const std::vector<std::pair<std::string, int> >& extras,
                                    int perDraw)
 {
@@ -9502,6 +9670,7 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
     //#W43-11: a day/night transition is narrated once, on the tick it changes -
     //the marker card's own zone events are filtered out (see describeEvent).
     noteDesignationChange();
+    noteChosenNames(); //#W50-X D14
     return result;
 }
 
@@ -9530,6 +9699,36 @@ string AIPlayerGPT::scanDayNightDesignation()
         }
     }
     return now;
+}
+
+//#W50-X D14: a "choose a name" resolution leaves no event of its own (the
+//activation event fires BEFORE the name is picked, so "Opponent used: Choose a
+//name with Silverquill Silencer" narrates a menu, not a choice). Scan both
+//battlefields after every event and narrate each (card, name) pair once.
+void AIPlayerGPT::noteChosenNames()
+{
+    if (!observer)
+        return;
+    for (int pi = 0; pi < 2; pi++)
+    {
+        Player * pl = observer->players[pi];
+        if (!pl || !pl->game || !pl->game->inPlay)
+            continue;
+        MTGGameZone * bf = pl->game->inPlay;
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            if (!c || c->chooseaname.empty())
+                continue;
+            std::ostringstream key;
+            key << (void *) c << "\x01" << c->chooseaname;
+            if (mNarratedChosenNames.find(key.str()) != mNarratedChosenNames.end())
+                continue;
+            mNarratedChosenNames.insert(key.str());
+            appendNarration(chosenNameNarration(pl == this, c->getDisplayName() + instanceHandle(c),
+                                                c->chooseaname));
+        }
+    }
 }
 
 void AIPlayerGPT::noteDesignationChange()
@@ -10783,6 +10982,14 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
                 std::vector<std::pair<std::string, int> > extras;
                 drawStepExtrasScan(this, opp, extras);
                 out << "\n" << drawStepForecastText(1, extras, theirsPer);
+            }
+            //#W50-X D16: the punisher's own seat - what THEIR next draw step
+            //pays this chair. Same scan, seats swapped.
+            if (!mineP.empty() && opp)
+            {
+                std::vector<std::pair<std::string, int> > theirExtras;
+                drawStepExtrasScan(opp, this, theirExtras);
+                out << "\n" << theirDrawStepForecastText(1, theirExtras, minePer);
             }
         }
     }
@@ -14880,7 +15087,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     //textless (vanilla) target adds nothing by construction; and
                     //two instances of the same card quote their shared text ONCE
                     //(the second is byte-identical prompt weight).
-                    std::vector<string> textedNames;
+                    //#W50-X D5: (name, handle, fact-tail) triples + a per-name
+                    //text note, joined by joinTargetEntries (ranged collapse).
+                    std::vector<string> tgtNames, tgtHandles, tgtTails;
+                    std::map<string, string> tgtNotes;
                     Player * ordered[2] = { this->opponent(), this };
                     for (int oi = 0; oi < 2; oi++)
                     {
@@ -14895,42 +15105,37 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                     {
                                         MTGCardInstance * tgt = zz[zi]->cards[cj];
                                         (tgt->controller() == this ? ownT : oppT)++;
-                                        tNames << (tShown++ ? ", " : "") << tgt->getDisplayName()
-                                               << instanceHandle(tgt)
+                                        tShown++;
                                         //W41-8: cost + type + (P/T) + live
                                         //keywords, the SAME facts W39-STACKFACTS
                                         //put on the stack clause. At exactly one
                                         //legal target the engine makes no model
                                         //call for the target, so this preview is
                                         //the ONLY surface carrying them.
-                                               << targetPreviewFacts(tgt);
+                                        string tail = targetPreviewFacts(tgt);
                                         //N-158k: the SAME helper the target menu
                                         //now uses, so the cast preview and the
                                         //commit seat cannot drift apart.
                                         if (lifeCostPerTarget)
-                                            tNames << perTargetLifeCostNote(tgt);
+                                            tail += perTargetLifeCostNote(tgt);
+                                        tgtNames.push_back(tgt->getDisplayName());
+                                        tgtHandles.push_back(instanceHandle(tgt));
+                                        tgtTails.push_back(tail);
                                         //#W44-3: what the target DOES, quoted
                                         //once per distinct card (see above).
-                                        string ttxt = stackTargetTextNote(tgt);
-                                        if (!ttxt.empty())
-                                        {
-                                            string tkey = tgt->getDisplayName();
-                                            bool quoted = false;
-                                            for (size_t ti = 0; ti < textedNames.size() && !quoted; ti++)
-                                                quoted = (textedNames[ti] == tkey);
-                                            if (!quoted)
-                                            {
-                                                textedNames.push_back(tkey);
-                                                tNames << ttxt;
-                                            }
-                                        }
+                                        if (tgtNotes.find(tgt->getDisplayName()) == tgtNotes.end())
+                                            tgtNotes[tgt->getDisplayName()] = stackTargetTextNote(tgt);
                                     }
                         if (tc->canTarget(pp))
                         {
                             (pp == this ? ownT : oppT)++;
-                            tNames << (tShown++ ? ", " : "") << (pp == this ? "you" : "the opponent");
+                            tShown++;
+                            tgtNames.push_back(pp == this ? "you" : "the opponent");
+                            tgtHandles.push_back("");
+                            tgtTails.push_back("");
                         }
                     }
+                    tNames << joinTargetEntries(tgtNames, tgtHandles, tgtTails, tgtNotes);
                     if (ownT && !oppT && firstHit)
                     {
                         //W42-D5 (trust doctrine): this branch used to name
@@ -15824,12 +16029,45 @@ static string printedClauseFor(const string& cardText, const string& label)
 
 //The FIRST clause of a printed card text - what casting the card normally
 //does. Same splitter, so the two halves of the menu cannot drift apart.
+//#W50-X D17 (wave-49 ledger LOW; 6 bare `// <name>` endings on the
+//`Choose an option for <MDFC>:` menu's Cast Card Normally row): this emitter
+//took the first ` -- ` clause verbatim, and an MDFC whose front face is a
+//single clause (Pelakka Predation) has its back face's bare name INSIDE that
+//clause. Same face rule as optionCardTextCore: a face after the `//` with no
+//'.', ':' or '(' is a name, not text, and says so.
+static string markBareBackFaces(const string& clause)
+{
+    const string sep = "//";
+    size_t k = clause.find(sep);
+    if (k == string::npos)
+        return clause;
+    std::ostringstream o;
+    o << clause.substr(0, k);
+    size_t at = k;
+    while (at != string::npos)
+    {
+        size_t next = clause.find(sep, at + sep.size());
+        string face = clause.substr(at + sep.size(), next == string::npos ? string::npos : next - at - sep.size());
+        size_t e = face.find_last_not_of(' ');
+        string trimmed = (e == string::npos) ? string() : face.substr(0, e + 1);
+        o << sep << trimmed;
+        if (!trimmed.empty() && trimmed.find_first_not_of(' ') != string::npos
+            && trimmed.find('.') == string::npos && trimmed.find(':') == string::npos
+            && trimmed.find('(') == string::npos)
+            o << " (text omitted)";
+        if (next != string::npos && e != string::npos)
+            o << face.substr(e + 1); //the spacing before the next separator, kept
+        at = next;
+    }
+    return o.str();
+}
+
 static string printedFirstClause(const string& cardText)
 {
     size_t sep = cardText.find(" -- ");
     string clause = cardText.substr(0, sep == string::npos ? string::npos : sep);
     size_t b = clause.find_first_not_of(" \t\r\n");
-    return (b == string::npos) ? string("") : clause.substr(b);
+    return (b == string::npos) ? string("") : markBareBackFaces(clause.substr(b));
 }
 
 //The cost tokens standing in front of the ability named `abilityName` in a
@@ -31181,11 +31419,11 @@ void AIPlayerGPT::runParseSelfTest()
               "#W49-T D10 NEGATIVE no life clause on a plain edict");
         CHECK(edictClause(4, "Goblin #1", 1, true) == "they control 4 creatures - they choose which one",
               "#W49-T D10 edict at N>1 says they choose");
-        CHECK(sweeperClause("destroys", 0, 0, 0) == "destroys 0 of their creatures (0 able to attack), 0 of yours",
+        CHECK(sweeperClause("destroys", 0, 0, 0) == "destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours",
               "#W49-T D10 sweeper at 0/0");
-        CHECK(sweeperClause("destroys", 5, 0, 1) == "destroys 5 of their creatures (0 able to attack), 1 of yours",
+        CHECK(sweeperClause("destroys", 5, 0, 1) == "destroys 5 of their creatures (all of them carry a restriction against attacking), 1 of yours",
               "#W49-T D10 sweeper: five walls, none able to attack, one of mine");
-        CHECK(sweeperClause("exiles", 1, 1, 0) == "exiles 1 of their creature (1 able to attack), 0 of yours",
+        CHECK(sweeperClause("exiles", 1, 1, 0) == "exiles 1 of their creature (1 without a restriction against attacking), 0 of yours",
               "#W49-T D10 sweeper verb and singular");
         CHECK(attackPunisherClause(0) == "they control 0 creatures able to attack - deals 0 until they have an attacker",
               "#W49-T D10 Lightmine at 0");
@@ -31401,6 +31639,191 @@ void AIPlayerGPT::runParseSelfTest()
             CHECK(taken == 0 && send[0] && send[1],
                   "#W49-S D2b NEGATIVE a trailing prose combat-math line leaves the first declaration in force");
         }
+    }
+
+    // ==================================================================
+    // #W50-X (wave-49 ledger D3 / D5 / D13 / D14 / D16 / D17): render lane
+    // ==================================================================
+    cout << "\n[#W50-X D3] the edict row names the gain RECIPIENT off the script token\n";
+    {
+        CHECK(edictClause(1, "Master of the Feast", 5, true, true)
+                  == "they control 1 creature - Master of the Feast is sacrificed, they gain 5 - the sacrificing player gains, not you",
+              "#W50-X D3 Devour Flesh (targetcontroller): the TARGETED player gains");
+        CHECK(edictClause(1, "Siege-Gang Commander", 2, true, false)
+                  == "they control 1 creature - Siege-Gang Commander is sacrificed, you gain 2",
+              "#W50-X D3 Tribute to Hunger (targetopponent): the caster gains, unchanged");
+        CHECK(edictClause(1, "Siege-Gang Commander", 2, true)
+                  == "they control 1 creature - Siege-Gang Commander is sacrificed, you gain 2",
+              "#W50-X D3 the default recipient is the caster (byte-identical to wave 49)");
+        CHECK(edictClause(1, "Goblin", 1, false, true) == "they control 1 creature - Goblin is sacrificed",
+              "#W50-X D3 NEGATIVE no toughness gain -> no gain clause for either recipient");
+        CHECK(edictClause(3, "Goblin #1", 1, true, true) == "they control 3 creatures - they choose which one",
+              "#W50-X D3 NEGATIVE at N>1 no toughness is known, no gain is printed");
+        CHECK(edictClause(1, "X", 5, true, true).find("you gain") == string::npos,
+              "#W50-X D3 NEGATIVE the targeted-player form never contains 'you gain'");
+    }
+
+    cout << "\n[#W50-X D13] the sweeper row's K rides the header's scope rule and says so\n";
+    {
+        CHECK(sweeperClause("destroys", 323, 323, 0)
+                  == "destroys 323 of their creatures (323 without a restriction against attacking), 0 of yours",
+              "#W50-X D13 323 fresh tokens on the opponent's board during your turn: the static count, the header's number");
+        CHECK(sweeperClause("exiles", 5, 0, 1)
+                  == "exiles 5 of their creatures (all of them carry a restriction against attacking), 1 of yours",
+              "#W50-X D13 five walls: the zero is explained as a restriction, not an 'able' count");
+        CHECK(sweeperClause("destroys", 1, 0, 0)
+                  == "destroys 1 of their creature (it carries a restriction against attacking), 0 of yours",
+              "#W50-X D13 singular wall");
+        CHECK(sweeperClause("destroys", 4, 2, 1, true)
+                  == "destroys 4 of their creatures (2 able to attack right now), 1 of yours",
+              "#W50-X D13 live scope (their turn): the live predicate, said as 'right now'");
+        CHECK(sweeperClause("destroys", 4, 2, 1).find("able to attack") == string::npos,
+              "#W50-X D13 NEGATIVE the static-scope row never claims 'able to attack'");
+        CHECK(sweeperClause("destroys", 0, 0, 0)
+                  == "destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours",
+              "#W50-X D13 NEGATIVE an empty board does not print the restriction explanation");
+    }
+
+    cout << "\n[#W50-X D5] the cast row's 'legal targets right now:' clause collapses identical bodies\n";
+    {
+        vector<string> n, h, t;
+        std::map<string, string> notes;
+        n.push_back("Lord of Lineage"); h.push_back(""); t.push_back(" (creature 5/5) [flying]");
+        notes["Lord of Lineage"] = " {target text: \"Flying -- Other Vampire creatures you control get +2/+2.\"}";
+        for (int i = 1; i <= 322; i++)
+        {
+            std::ostringstream hh; hh << " #" << i;
+            n.push_back("Vampire"); h.push_back(hh.str()); t.push_back(" (creature 4/4) [flying, doesn't untap during its controller's untap step]");
+        }
+        n.push_back("the opponent"); h.push_back(""); t.push_back("");
+        string j = joinTargetEntries(n, h, t, notes);
+        cout << "     " << j << "\n";
+        CHECK(j == "Lord of Lineage (creature 5/5) [flying] {target text: \"Flying -- Other Vampire creatures you control get +2/+2.\"}, "
+                   "Vampire #1-#322 (creature 4/4) [flying, doesn't untap during its controller's untap step] x322, the opponent",
+              "#W50-X D5 deck125 vs123 seq 13: 322 identical Vampire handles collapse to one ranged entry; order kept; player row last");
+        CHECK(j.size() < 3000, "#W50-X D5 the clause is under the 3,000-char row bar (was 28,755)");
+        // the text note rides the FIRST entry of a name, outside the collapse key
+        vector<string> n2, h2, t2;
+        std::map<string, string> notes2;
+        for (int i = 1; i <= 4; i++)
+        {
+            std::ostringstream hh; hh << " #" << i;
+            n2.push_back("Dwarven Blastminer"); h2.push_back(hh.str()); t2.push_back(" (creature 1/1)");
+        }
+        notes2["Dwarven Blastminer"] = " {target text: \"{2}{R}, {T}: Destroy target nonbasic land.\"}";
+        CHECK(joinTargetEntries(n2, h2, t2, notes2)
+                  == "Dwarven Blastminer #1-#4 (creature 1/1) x4 {target text: \"{2}{R}, {T}: Destroy target nonbasic land.\"}",
+              "#W50-X D5 the per-name text note is quoted once, after the ranged entry");
+        // NEGATIVE: a differing tail splits the run (a tapped one is its own fact)
+        vector<string> n3, h3, t3;
+        std::map<string, string> none;
+        n3.push_back("Vampire"); h3.push_back(" #1"); t3.push_back(" (creature 2/2)");
+        n3.push_back("Vampire"); h3.push_back(" #2"); t3.push_back(" (creature 2/2) [tapped]");
+        n3.push_back("Vampire"); h3.push_back(" #3"); t3.push_back(" (creature 2/2)");
+        n3.push_back("Vampire"); h3.push_back(" #4"); t3.push_back(" (creature 2/2)");
+        string j3 = joinTargetEntries(n3, h3, t3, none);
+        CHECK(j3 == "Vampire #1 (creature 2/2), Vampire #3 (creature 2/2), Vampire #4 (creature 2/2), Vampire #2 (creature 2/2) [tapped]",
+              "#W50-X D5 NEGATIVE a differing fact tail is never merged; non-consecutive ranks stay individual");
+        CHECK(j3.find("-#") == string::npos, "#W50-X D5 NEGATIVE no range below the collapse floor / across a rank gap");
+        // NEGATIVE: two members only - below the floor, both printed
+        vector<string> n4, h4, t4;
+        n4.push_back("Goblin"); h4.push_back(" #1"); t4.push_back(" (creature 1/1)");
+        n4.push_back("Goblin"); h4.push_back(" #2"); t4.push_back(" (creature 1/1)");
+        CHECK(joinTargetEntries(n4, h4, t4, none) == "Goblin #1 (creature 1/1), Goblin #2 (creature 1/1)",
+              "#W50-X D5 NEGATIVE a pair prints as two entries");
+        // NEGATIVE: singleton names (no handle) never range
+        vector<string> n5, h5, t5;
+        n5.push_back("Bloodghast"); h5.push_back(""); t5.push_back(" (creature 2/1)");
+        n5.push_back("Guttersnipe"); h5.push_back(""); t5.push_back(" (creature 2/2)");
+        CHECK(joinTargetEntries(n5, h5, t5, none) == "Bloodghast (creature 2/1), Guttersnipe (creature 2/2)",
+              "#W50-X D5 NEGATIVE handle-less singletons pass through in order");
+        CHECK(joinTargetEntries(vector<string>(), vector<string>(), vector<string>(), none).empty(),
+              "#W50-X D5 NEGATIVE no targets -> empty clause body");
+        // echo shape: a reply naming a member INSIDE a printed range still resolves by name
+        vector<string> menu;
+        menu.push_back("Cast Path to Exile {w} - legal targets right now: Vampire #1-#322 (creature 4/4) [flying] x322");
+        menu.push_back("Cast nothing");
+        bool st = false;
+        CHECK(parseChoice("1 (Path to Exile)", 2, &menu, &st, NULL) == 1 && !st,
+              "#W50-X D5 echo: the cast row with a ranged target clause still parses by its short name");
+        CHECK(parseChoice("2 (Cast nothing)", 2, &menu, &st, NULL) == 2,
+              "#W50-X D5 echo: the decline row beside a ranged clause is unaffected");
+    }
+
+    cout << "\n[#W50-X D14] a chosen name rides the permanent's line and is narrated once\n";
+    {
+        CHECK(chosenNameTag("Vision Skeins") == " [named: Vision Skeins]", "#W50-X D14 the tag");
+        CHECK(chosenNameTag("").empty(), "#W50-X D14 NEGATIVE no chosen name, no tag");
+        CHECK(chosenNameNarration(false, "Silverquill Silencer", "Vision Skeins")
+                  == "Opponent's Silverquill Silencer named Vision Skeins",
+              "#W50-X D14 the opponent's naming, narrated");
+        CHECK(chosenNameNarration(true, "Silverquill Silencer #2", "Idyllic Tutor")
+                  == "Your Silverquill Silencer #2 named Idyllic Tutor",
+              "#W50-X D14 your own naming, narrated with the handle");
+        CHECK(chosenNameNarration(false, "Silverquill Silencer", "").empty(),
+              "#W50-X D14 NEGATIVE an unchosen name narrates nothing");
+        // echo shape: the model copies the bracket tag into its answer
+        vector<string> menu;
+        menu.push_back("Cast Devour Flesh {1}{b}");
+        menu.push_back("Cast Vision Skeins {1}{u}");
+        menu.push_back("Cast nothing");
+        bool st = false;
+        CHECK(parseChoice("2 (Vision Skeins [named: Vision Skeins])", 3, &menu, &st, NULL) == 2 && !st,
+              "#W50-X D14 echo: a [named: ...] tail copied into the answer is stripped, the row still binds");
+        vector<string> tmenu;
+        tmenu.push_back("Silverquill Silencer {b}{w} (3/2) [named: Vision Skeins]");
+        tmenu.push_back("Grizzly Bears (2/2)");
+        CHECK(parseChoice("1 (Silverquill Silencer)", 2, &tmenu, &st, NULL) == 1 && !st,
+              "#W50-X D14 echo: a target row carrying the tag matches its bare name");
+    }
+
+    cout << "\n[#W50-X D16] the DRAW FORECAST mirror on the punisher's own seat\n";
+    {
+        std::vector<std::pair<std::string, int> > none;
+        CHECK(theirDrawStepForecastText(1, none, 1)
+                  == "DRAW FORECAST (theirs): their next draw step draws 1 card = 1 x 1 = 1 life to you from your punishers above.",
+              "#W50-X D16 deck162 vs125 seq 13: Underworld Dreams out, the opponent's plain draw step priced");
+        std::vector<std::pair<std::string, int> > extras;
+        extras.push_back(std::make_pair(string("Howling Mine"), 1));
+        extras.push_back(std::make_pair(string("Teferi's Puzzle Box: your hand size"), 5));
+        CHECK(theirDrawStepForecastText(1, extras, 2)
+                  == "DRAW FORECAST (theirs): their next draw step draws 7 cards (1 + Howling Mine 1 + Teferi's Puzzle Box: their hand size 5) = 7 x 2 = 14 life to you from your punishers above.",
+              "#W50-X D16 extras listed; the drawer-relative hand-size label is re-seated for this chair");
+        CHECK(theirDrawStepForecastText(1, none, 0).find(" life") == string::npos,
+              "#W50-X D16 NEGATIVE no per-draw price -> no life arithmetic");
+        CHECK(theirDrawStepForecastText(1, none, 1).find("your next draw step") == string::npos,
+              "#W50-X D16 NEGATIVE the mirror never reads as the punished seat's own forecast");
+        CHECK(drawStepForecastText(1, none, 2) == "DRAW FORECAST: your next draw step draws 1 card = 1 x 2 = 2 life to the punishers above.",
+              "#W50-X D16 the punished seat's line is byte-identical to wave 49");
+    }
+
+    cout << "\n[#W50-X D17] the cast-mode menu's Cast Card Normally row marks a bare back face\n";
+    {
+        string pp = "Target opponent reveals their hand. You may choose a card from it with mana value 3 or greater. That player discards that card. // Pelakka Caverns";
+        string r = printedFirstClause(pp);
+        cout << "     " << r << "\n";
+        CHECK(r == "Target opponent reveals their hand. You may choose a card from it with mana value 3 or greater. That player discards that card. // Pelakka Caverns (text omitted)",
+              "#W50-X D17 deck146 vs125 seq 6: the bare back-face name is marked");
+        CHECK(printedFirstClause("Flying // Vampire creatures you control get +2/+2.")
+                  == "Flying // Vampire creatures you control get +2/+2.",
+              "#W50-X D17 NEGATIVE a back face carrying rules text is left byte-identical");
+        CHECK(printedFirstClause("Counter target spell. -- Cycling {2}") == "Counter target spell.",
+              "#W50-X D17 NEGATIVE no '//' -> the first clause, unchanged");
+        CHECK(printedFirstClause("Destroy target creature.").find("text omitted") == string::npos,
+              "#W50-X D17 NEGATIVE a single-faced text gets no marker");
+        CHECK(markBareBackFaces("A. // B // C.") == "A. // B (text omitted) // C.",
+              "#W50-X D17 three faces: only the bare one is marked");
+        string row = castModeRowTag("{2}{b}", printedFirstClause(pp));
+        CHECK(row.find("// Pelakka Caverns (text omitted)\"}") != string::npos,
+              "#W50-X D17 the row's {card text: ...} quote ends on the marker");
+        // echo shape: the marker copied into an answer is annotation, stripped
+        vector<string> menu;
+        menu.push_back("Flip Side");
+        menu.push_back("Cast Card Normally [cost: {2}{b}] {card text: \"... // Pelakka Caverns (text omitted)\"}");
+        menu.push_back("Decline - do nothing");
+        bool st = false;
+        CHECK(parseChoice("2 (Cast Card Normally)", 3, &menu, &st, NULL) == 2 && !st,
+              "#W50-X D17 echo: the Cast Card Normally row still binds by its short name");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

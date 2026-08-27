@@ -376,6 +376,8 @@ private:
     void writeNarration(const string& line);
     //#W43-11: narrate a day/night transition, once, when it actually changes.
     void noteDesignationChange();
+    //#W50-X D14: narrate a permanent's chosen name once it is known.
+    void noteChosenNames();
     //#W44-4: the game-wide day/night designation read LIVE off both
     //battlefields ("Day", "Night", or empty). Shared by the narration's change
     //line and the CURRENT SITUATION state line.
@@ -840,6 +842,8 @@ private:
     //("Day", "Night", or empty for neither). The marker card itself is filtered
     //off every object surface, so this is the only place the fact lives.
     string mDayNight;
+    //#W50-X D14: (instance, chosen name) pairs already narrated.
+    std::set<string> mNarratedChosenNames;
     //W41-3(c): the pending bulk graveyard->library run. `mBulkMoveFirstLine` is
     //the ordinary named line for the FIRST move, kept so a run of length one
     //flushes as itself rather than as a "1 card" count.
