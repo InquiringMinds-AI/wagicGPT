@@ -1,0 +1,59 @@
+#Wave-52 ledger D13 (planner half) -- a land ANIMATED this turn is a mana source of LAST
+#RESORT for the AI's own payment: it is drawn into the bill only after every other
+#would-be attacker, whatever its power.
+#
+#SYMPTOM (corpus 20260827 deck152 vs125 seq36->39): the seat paid {3}{g} at Upkeep to make
+#Lair of the Hydra a 3/3, then the Main-1 cast tapped the Lair for mana - the animation
+#bought nothing. The wave-20/21 attacker-sparing draws would-be attackers into the bill
+#WEAKEST FIRST, so an animated 2/2 land was tapped ahead of a 3/3 mana creature although
+#the land's body was the one the seat had just paid for.
+#
+#WITNESS: Mutavault (animated to a 2/2 by the script: one Mind Stone floats the {1}),
+#Skyshroud Troopers (3/3, {T}: Add {G}) and three more Mind Stones. The AI casts
+#Juggernaut {4}: the three rocks pay 3, so ONE attacker-source must be tapped. PRE-FIX
+#weakest-first tapped the 2/2 Mutavault and the Troopers swung for 3 (opponent 20 -> 17).
+#POST-FIX the animated land is the last resort: the Troopers are tapped and Mutavault
+#attacks for 2 (opponent 20 -> 18). Juggernaut is summoning-sick either way.
+FORCEABILITY
+AICALLS 80
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mutavault,Skyshroud Troopers,Mind Stone,Mind Stone,Mind Stone,Mind Stone
+hand:Juggernaut
+[PLAYER2]
+life:20
+[DO]
+Mind Stone
+Mutavault
+choice 1
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Mutavault,Skyshroud Troopers,Mind Stone,Mind Stone,Mind Stone,Mind Stone,Juggernaut
+[PLAYER2]
+life:18
+[END]

@@ -1241,5 +1241,6 @@ autotap_colour_mono_before_dual_W.txt
 autotap_generic_dual_vs_mono_2.txt
 aipay_foreach_one_battlement_2G.txt
 aipay_foreach_one_battlement_2B.txt
+aipay_animated_land_last_resort.txt
 autotap_foreach_one_battlement_2G.txt
 autotap_foreach_one_battlement_2B.txt

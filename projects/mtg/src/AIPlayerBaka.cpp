@@ -1910,8 +1910,16 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
                     neutral->add(zamp->output);
             }
         }
+        //#W52-L (D13): an animated land is the last attacker-source drawn in
+        //(ManaEngine::isAnimatedLand) - same order as ManaEngine::planPayment.
         std::sort(attackerProd.begin(), attackerProd.end(),
-            [](AManaProducer * a, AManaProducer * b) { return a->source->power < b->source->power; });
+            [](AManaProducer * a, AManaProducer * b)
+            {
+                bool aa = ManaEngine::isAnimatedLand(a->source), ba = ManaEngine::isAnimatedLand(b->source);
+                if (aa != ba)
+                    return !aa;
+                return a->source->power < b->source->power;
+            });
         while (!neutral->canAfford(cost, 0) && atkNeed < attackerProd.size())
         {
             neutral->add(attackerProd[atkNeed]->output);
