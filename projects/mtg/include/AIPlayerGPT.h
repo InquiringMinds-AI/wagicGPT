@@ -73,6 +73,30 @@ string zoneChangeNarration(bool mine, const string& cardName, const string& from
                            bool countered, const string& counterSource,
                            const string& targets = "");
 
+//#W48 (D11): the narration log's repetition holder, extracted as a PURE object
+//so a whole loop can be pinned in PARSETEST through the same code the game runs.
+//#W43-11 held a run of ONE byte-identical line; the loop it was aimed at repeats
+//a CYCLE ("You used: Create vampire" / "Your Lord of Lineage created a 2/2
+//Vampire token", alternating ~180 times - ~90% of a 26 KB prompt, with no count
+//anywhere), so the holder recognises a repeating block of up to
+//kNarrationCycleMaxPeriod lines and the single-line run is its period-1 case.
+//`add` appends to `out` exactly the lines that are ready to be written (the
+//holder keeps the rest); `flush` empties it. Nothing is ever dropped: a block
+//below the collapse floor is written verbatim, and a collapsed block writes one
+//sentence per DISTINCT line carrying the exact number of times it happened.
+struct NarrationCycleHolder
+{
+    vector<string> cycle;      //the established repeating block (empty = none)
+    vector<int> totals;        //per-position family total of the LAST repetition
+    int reps;                  //completed repetitions of `cycle`
+    vector<string> pend;       //lines since the last complete repetition, which
+    vector<int> pendTotals;    //double as the candidate buffer while none is held
+    NarrationCycleHolder() : reps(0) {}
+    bool empty() const { return cycle.empty() && pend.empty(); }
+    void add(const string& line, int total, vector<string>& out);
+    void flush(vector<string>& out);
+};
+
 class AIPlayerGPT : public AIPlayerBaka
 {
 public:
@@ -703,16 +727,32 @@ private:
     Player * mDamageLifePlayer;
     int mDamageLifeAmount;
     int mDamageLifeSettled;
-    //#W43-11: the pending run of BYTE-IDENTICAL narration lines. `mRunLine` is
-    //held, not written, until a different line arrives or the prompt is
-    //assembled - the same flush-buffer discipline W41-3(c) and #W42-D1 use, so
-    //the collapsed line lands in the log exactly where its run happened.
-    //`mRunTotal` is the family total the LAST line of the run settled at (the
-    //counter event's own settledNb), or -1 when the emitter has no such total;
-    //it is the only number the collapsed line may claim.
-    string mRunLine;
-    int mRunCount;
-    int mRunTotal;
+    //#W43-11 / #W48 (D11): the pending REPEATING BLOCK of narration lines, held
+    //rather than written until the repetition breaks or the prompt is assembled -
+    //the same flush-buffer discipline W41-3(c) and #W42-D1 use, so the collapsed
+    //lines land in the log exactly where their repetition happened. #W43-11
+    //collapsed a run of ONE byte-identical line; the loop it was aimed at repeats
+    //a CYCLE ("You used: Create vampire" / "Your Lord of Lineage created a 2/2
+    //Vampire token", alternating ~180 times - ~90% of a 26 KB prompt, with no
+    //count anywhere), so the holder is a cycle of up to kNarrationCycleMaxPeriod
+    //lines and the single-line run is the period-1 case of it.
+    //`mCycleLines` is the established block (empty when none), `mCycleReps` its
+    //completed repetitions, `mCycleTotals` the per-position family total the LAST
+    //repetition settled at (a counter event's own settledNb, or -1 when the
+    //emitter has none - the only number a collapsed line may claim), and
+    //`mPendLines`/`mPendTotals` the lines received since the last complete
+    //repetition, which double as the candidate buffer while no cycle is held.
+    //#W48 (D11): the run holder above is RUN-LENGTH over a single line, and the
+    //loop it exists for does not repeat one line - it repeats a CYCLE ("You used:
+    //Create vampire" / "Your Lord of Lineage created a 2/2 Vampire token",
+    //alternating ~180 times, ~90% of a 26 KB prompt with no count anywhere).
+    //`mCycleLines` is the established repeating block (empty when none),
+    //`mCycleReps` its completed repetitions, `mCycleTotals` the per-position
+    //family total the LAST repetition settled at, and `mPendLines`/`mPendTotals`
+    //the lines received since the last complete repetition - which double as the
+    //candidate buffer while no cycle is established. Same flush-buffer discipline
+    //as every holder above: flushEventRun writes them, clearing before it writes.
+    NarrationCycleHolder mEventRun;
     //#W43-11: the game-wide day/night designation as this seat last narrated it
     //("Day", "Night", or empty for neither). The marker card itself is filtered
     //off every object surface, so this is the only place the fact lives.
