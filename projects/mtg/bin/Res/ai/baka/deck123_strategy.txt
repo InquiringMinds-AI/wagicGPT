@@ -12,9 +12,12 @@ before turn one, and neither of them was close.
 The ask reads "Pre-game mulligan decision (London mulligan)" and, from the second look on, it
 prints its own price: "having already taken N mulligans you will bottom N cards on a keep
 (keeping M)". READ THE M.
-  - M is 5 or less: answer "Keep this hand" the moment the hand holds ONE LAND. Not a colour,
-    not a curve, not a token-maker - one land. You are DONE; do not read another rule anywhere
-    in this file before answering.
+  - M is 5 or less: weigh the odds, not the hand. A fresh seven from a 24-land deck is a
+    two-lander about as often as anything else, so shipping does not fix lands - it hands you
+    the same land odds with one card fewer, while a KEEP lets the bottom ask shed the
+    uncastable cards. With even ONE land in front of you the keep wins that comparison; only
+    ZERO lands buys a fresh look, and even then you are buying a four-card hand at the same
+    odds. Not a colour, not a curve, not a token-maker: those are bottom-ask questions.
   - M is 6: keep unless the hand is zero lands or all lands.
   - M is 7 (your untouched opening seven): the comparison in the MULLIGAN section applies.
 THE CARRIED PLAN IS NOT EVIDENCE ABOUT THIS HAND. From the second look on, the ask shows you
@@ -84,7 +87,7 @@ Then:
     and write N exactly the way the row's own example writes it: the short name, a space, then
     "x" and the number, inside the parentheses -
         CHOICE: 2 (Create human with Thraben Doomsayer x17)
-    No other spelling is read. "N=17" and a bare "repeated N times, then stop" with no number
+    Write it exactly that way: in this corpus "N=17" and the bare row label with no number
     were each carried out as ONE token, three times in one turn, and the pilot that had
     computed 17 correctly came back for another window each time. The next window after the
     repeat row is "CHOICE: 0 (pass)"; the log will show "(you named 17 repeats of it)".
@@ -433,17 +436,21 @@ creature blocks; the rest decide whether to block at all.
    header's "you would be at N" is above 5 - the maker is worth more than any one attacker.
 
 === MULLIGAN ===
-STEP 1 - THE CHAIN STOPS AT THE SECOND LOOK. Read the ask's own price line for the "(keeping N)"
-number - "having already taken 2 mulligans you will bottom 2 cards on a keep (keeping 5)". If it
-says (keeping 5) or ANY lower number: KEEP, if the hand holds at least one land. The bar is ONE
-LAND and nothing else - not a colour, not a curve, not a token-maker. If that applies you are
-DONE: do not read another rule in this section.
-Why the stop is there: the London mulligan already shaves a seven down to six for one card, so a
-THIRD look buys a fresh seven at the price of two cards where the shave costs one. This deck took
-three mulligans in one game, kept four cards, bottomed both of its ways to find a token-maker,
-never put a creature on the battlefield, and lost 42 to 0.
-STEP 2 - only on your untouched opening seven, or at "(keeping 6)", may you mulligan at all, and
-then by the comparison below.
+STEP 1 - WHAT DOES THE NEXT LOOK COST? Read the ask's own price line for the "(keeping N)"
+number - "having already taken 2 mulligans you will bottom 2 cards on a keep (keeping 5)". Each
+look is a fresh seven you must shave by one more card, at the SAME land odds: twenty-four lands
+in sixty, so a fresh seven is a two-lander about as often as anything else, and a mulligan
+rarely fixes lands - it only shrinks the hand. At (keeping 5) or lower the question is no
+longer "is this hand good" but "is a five-card (or four-card) hand more likely to win than
+THIS hand shaved at the bottom ask" - and with even ONE land in front of you the answer is
+keep, because the bottom ask lets you shed the uncastable cards and keep the land plus your
+cheapest spells. Colour is not a reason to ship: the Marsh Flats and Tundras make more than one
+colour and the second colour arrives with the second land. Zero lands is the one hand where
+a fresh look is worth the card - even then, weigh it: a four-card seven is what you are buying.
+WHAT THIS COST: this deck took three mulligans in one game, kept four cards, bottomed both of
+its ways to find a token-maker, never put a creature on the battlefield, and lost 42 to 0.
+STEP 2 - on your untouched opening seven, or at "(keeping 6)", a mulligan is a fair trade only
+by the comparison below.
 
 The two deck facts that decide every mulligan here: you run TWENTY-FOUR lands in sixty cards,
 and the cards that actually win - Thraben Doomsayer {1}{w}{w}, Bloodline Keeper {2}{b}{b},
@@ -465,23 +472,27 @@ lands, M spells" (read that number, never recount):
  - SIX OR MORE LANDS with one spell: this is a keepable hand, not a mulligan. You bottom the
    extra lands on the keep and you are a four-land hand with your removal spell, which is a
    functioning hand. Shipping it costs you a card and gives you a fresh seven that may be worse.
- - AT FIVE CARDS OR FEWER: STEP 1 has already answered - keep any hand with a land in it. You do
-   not need a spell as well; going lower loses more than any hand shape can gain back.
+ - AT FIVE CARDS OR FEWER: STEP 1's odds apply - a hand with a land in it is a keep, spell or
+   no spell, because the ship buys the same land odds with one card fewer.
 
 BOTTOMING - the same decision, second ask. After you keep, the prompt says "you took N
 mulligans and kept, so you must put N cards from your hand on the BOTTOM" and lists your hand.
-Keep, in this order, and bottom what is left over:
- 1. enough lands to reach FOUR mana, counting the lands already in the list;
+This ask is where the hand is actually BUILT: read "You will be left with an N-card hand" and
+build the best N. Keep, in this PREFERENCE ORDER, and bottom what is left over - the order
+works at any N because it is an order, not a set of floors:
+ 1. the lands that cover the cheapest spell you are keeping - at N of 3 that is two lands and
+    one spell, never three lands; at N of 5 or 6 it is three or four lands and the spells they
+    cover, up to FOUR mana;
  2. a token-maker - Thraben Doomsayer or Bloodline Keeper - if the hand has one;
  3. Idyllic Tutor, which FINDS Intruder Alarm, or Vision Skeins, which digs;
  4. removal;
  5. Intruder Alarm LAST. An Alarm with no maker on the battlefield does nothing at all, and a
     small hand cannot afford a card that waits.
-NEVER bottom a land when the hand you keep would hold fewer than THREE, and never bottom your
-last castable spell - a hand of nothing but lands does nothing at all, and a hand of nothing but
-four-drops does nothing for four turns. Both are losses you chose at this ask, not losses you
-were dealt.
-Never bottom your only way to find or make a creature. This deck kept a four-card hand of Marsh
+A hand of nothing but lands does nothing at all, and a hand of nothing but four-drops does
+nothing for four turns; the order above avoids both at every N. Those are losses you chose at
+this ask, not losses you were dealt.
+Bottom a way to find or make a creature only after everything below it in the order is gone.
+This deck kept a four-card hand of Marsh
 Flats, Tundra, Swamp and Intruder Alarm - it bottomed Idyllic Tutor, Vision Skeins and
 Damnation, i.e. both of its ways to find a maker and its only sweeper - and lost that game
 without a creature ever hitting its battlefield.
@@ -489,9 +500,10 @@ without a creature ever hitting its battlefield.
 === DECIDING SITUATIONS ===
 - A "Land drop:" question is on the screen and any "Play <land>" line is listed: take one.
   Every turn, before anything else. "Play no land right now" only when nothing else is offered.
-- The mulligan ask prints "(keeping 5)" or a smaller number and the hand holds one land: KEEP,
-  and stop reading. The plan shown above that ask was written about a hand you already threw
-  away; it is not evidence about this one.
+- The mulligan ask prints "(keeping 5)" or a smaller number and the hand holds one land: keep
+  it - a fresh seven shaved to four is the same land odds with one card fewer. The plan shown
+  above that ask was written about a hand you already threw away; it is not evidence about
+  this one.
 - Your plan names a spell and "Mana available: N total" is smaller than that spell's mana count
   ({2}{u} = 3, {2}{b}{b} = 4): play a land, do not re-state the plan.
 - "Cast Lightning Greaves {2}" is listed and your battlefield line reads "of which 0 are
@@ -507,12 +519,12 @@ without a creature ever hitting its battlefield.
   Doomsayer and Bloodline Keeper block only after every token is assigned.
 - The row you were about to use on a token-maker reads "(your blocker dies, attacker lives)":
   that maker does not block.
-- The mulligan ask's price line says "(keeping 5)" or fewer and the hand holds a land: KEEP.
-  No exceptions, and read no further rule in that section.
-- You are on the London bottoming ask: keep lands to four mana, then a token-maker, then Idyllic
-  Tutor or Vision Skeins, then removal. Bottom Intruder Alarm before you bottom a way to find a
-  creature. Never bottom a land down to fewer than three, and never bottom your last castable
-  spell.
+- The mulligan ask's price line says "(keeping 5)" or fewer and the hand holds a land: keep
+  it; only a zero-land hand buys a fresh look, at the price of one more card.
+- You are on the London bottoming ask: read "You will be left with an N-card hand" and build
+  the best N in this order - the lands that cover your cheapest spell (up to four mana), then
+  a token-maker, then Idyllic Tutor or Vision Skeins, then removal, Intruder Alarm last. Never
+  all lands, never all four-drops.
 - A line ending in "[cost: Tap]" is in your list and M is below L + C + 3: take it, this window,
   whatever your mana says, on either player's turn - unless it is YOUR turn and the total power
   of your non-summoning-sick creatures already reaches their printed life, in which case go and

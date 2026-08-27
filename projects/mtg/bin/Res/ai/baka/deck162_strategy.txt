@@ -339,6 +339,9 @@ two-spell keep has a land to spare and the spell is worth more; a four-land keep
 below that a land is never the right card to lose.
 
 === DECIDING SITUATIONS ===
+- Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> any damage you
+  deal them and any life they gain repeats without limit. ATTACK: none, whatever the tags say,
+  until one is gone; the punishers still fire on their draw step.
 - Underworld Dreams, Fate Unraveler or Ob Nixilis is anywhere in your cast list: cast it this ask,
   ahead of everything else. TWO of the three offered in the same ask, and your own battlefield
   line reads "of which 0 are creatures": take Fate Unraveler, the one with a body.

@@ -3,9 +3,12 @@ This rule is first because the ask it governs is first, before turn one and befo
 The ask reads "Pre-game mulligan decision (London mulligan)" and, from the second look on, it
 prints its own price: "having already taken N mulligans you will bottom N cards on a keep
 (keeping M)". READ THE M.
-  - M is 5 or less: answer "Keep this hand" the moment the hand holds ONE LAND. Not a colour,
-    not a two-drop, not a curve - one land. You are DONE; do not read another rule anywhere in
-    this file before answering.
+  - M is 5 or less: weigh the odds, not the hand. A fresh seven from a 25-land deck is a
+    two-lander about as often as anything else, so shipping does not fix lands - it hands you
+    the same land odds with one card fewer, while a KEEP lets the bottom ask shed the
+    uncastable cards. With even ONE land in front of you the keep wins that comparison; only
+    ZERO lands buys a fresh look, and even then you are buying a four-card hand at the same
+    odds. Not a colour, not a two-drop, not a curve: those are bottom-ask questions.
   - M is 6: keep unless the hand is zero lands, all lands, or ONE land under the header line
     "Playing every land in this hand would not cover any spell in it". That coverage line is the
     engine's own arithmetic and it is the whole test at M=6: one land that covers nothing is a
@@ -381,12 +384,17 @@ default; -2 digs three when you need gas.
 
 MULLIGAN - THIS IS AN ODDS COMPARISON, NOT A CHECKLIST.
 STEP 1 - READ THE ASK'S PRICE LINE FOR THE "(keeping N)" NUMBER, BEFORE YOU LOOK AT THE CARDS.
-If it says (keeping 5) or ANY lower number: KEEP, if the hand holds at least one land - you are
-DONE, do not read another rule in this section. The bar is ONE LAND and nothing else: not a
-colour, not a two-drop, not a curve.
-The London mulligan already shaves a seven to six for one card, so a THIRD look buys a fresh
-seven at the price of two. Two seats in one corpus reached four cards and both lost, one of them
-at minus 41 in flat violation of this very rule.
+Each look is a fresh seven you must shave by one more card, at the SAME land odds: 25 lands in
+sixty, so a fresh seven is a two-lander about as often as anything else, and a mulligan rarely
+fixes lands - it only shrinks the hand. At (keeping 5) or lower the question is no longer "is
+this hand good" but "is a five-card (or four-card) hand more likely to win than THIS hand
+shaved at the bottom ask" - and with even ONE land in front of you the answer is keep, because
+the bottom ask lets you shed the uncastable cards and keep the land plus your cheapest spells.
+Colour, two-drops and curve are bottom-ask questions, not reasons to ship. Zero lands is the
+one hand where a fresh look is worth the card - even then, weigh it: a four-card seven is what
+you are buying.
+WHAT THIS COST: two seats in one corpus reached four cards and both lost, one of them at minus
+41 after shipping a hand with a land at (keeping 5).
 STEP 2 - only on your untouched opening seven, or at "(keeping 6)", do the land-count branches
 below apply at all.
 
@@ -425,15 +433,14 @@ two needs one color plus generic.
 TIEBREAKERS between keepable hands only (never a reason to mulligan on their own): prefer more
 lands over fewer, prefer a hand with Luminarch Aspirant, Intrepid Adversary, Ranger Class or
 Briarbridge Tracker, prefer the hand whose coverage line names more cards. When you must BOTTOM
-cards on a keep, bottom the most expensive spell you cannot reach and never bottom your only
-early play. NEVER bottom a land unless the hand you keep would still hold at least FOUR - the
-keep you just made was priced on the engine's land count, and bottoming a land undoes it at the
-very next ask.
-THAT FOUR-LAND FLOOR APPLIES ONLY WHILE YOU ARE KEEPING FIVE CARDS OR MORE. Read the ask's own
-sentence, "You will be left with a N-card hand". At N of 4 or fewer a four-land hand is not a
-hand at all: bottom down to the best MIX you can - two lands and your two cheapest spells - and
-lands are the right cards to lose to get there. The floor protects a six or a five; it must
-never turn a four-card hand into four lands.
+cards on a keep, read the ask's own sentence, "You will be left with a N-card hand", and build
+the best N in this PREFERENCE ORDER - an order, so it works at any N: first the lands that
+cover your cheapest spells (up to four, because the keep was priced on the engine's land
+count), then those cheap spells - your only early play stays above every other spell - then the
+rest by cost, the most expensive spell you cannot reach first under the deck. At N of 5 or 6
+that is three or four lands and the two-drops they cover; at N of 4 or fewer it is two lands
+and your two cheapest spells, and lands are the right cards to lose to get there - a four-card
+hand of four lands is not a hand at all.
 
 MATCHUP POSTURE:
 - vs REMOVAL/GRIND: keep deploying anyway. Their removal answers one creature at a time and your
@@ -492,20 +499,25 @@ MATCHUP POSTURE:
 DECIDING SITUATIONS (recognize -> do):
 - Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> ATTACK: none, every
   combat, fliers included; block every "[lifelink]" attacker you are offered a block for.
+- Their line shows ONE of the two names -> race it with your EVASION: send every creature whose
+  A-line prints no "(blocking trigger:" and no stop, fliers first; hold every creature whose
+  tag prints one.
 - Elite Spellbinder's hand look lists "Exquisite Blood" or "Sanguine Bond" -> exile it, above
   everything else on the list.
 - Your untapped, non-summoning-sick power is at or above their printed life and their line reads
   "of which 0 are creatures" -> cast nothing and activate nothing before combat; attack with all.
 - The "Those sources, one per untapped card:" list names a creature you mean to attack with ->
-  do not cast in Main 1; casting taps that creature.
+  do not cast in Main 1; casting taps that creature. Attack first, cast it in Main 2.
 - "put 1/1 counters with Katilda" is offered in Upkeep or Main 1 -> pass; it is a Main-2 action.
 - A "DRAW PUNISHERS" line is printed, a "Draw 1 with Clue" row is offered, and your printed life
   is 10 or less -> pass; the draw costs the N the line prints.
-- The mulligan ask says "(keeping 5)" or fewer and the hand has a land -> KEEP (RULE -1).
+- The mulligan ask says "(keeping 5)" or fewer and the hand has a land -> keep it (RULE -1): a
+  fresh seven shaved to four is the same land odds with one card fewer.
 - A "Land drop:" question offers a land -> play it (#1a RULE).
 - A creature is offered on your own main phase -> cast one (#3 RULE), unless #2a says the game
   ends this combat.
-- The Fateful Absence row says "the only legal targets are YOUR OWN" -> do not cast it.
+- The Fateful Absence row says "the only legal targets are YOUR OWN" -> do not cast it; hold
+  it for the next window that lists a creature or planeswalker of THEIRS.
 - A block line reads "(neither dies)", "(you kill it, your blocker lives)" or "(both die)" ->
   take it; "BLOCKS: none" only when every offered block is rung 3 and "you would be at N" is 10
   or more.

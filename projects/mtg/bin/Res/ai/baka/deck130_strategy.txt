@@ -358,8 +358,11 @@ kept a one-land seven whose coverage line named exactly one card and won that ga
 shape where seven cards can be worse than six.
 WHEN A KEEP MAKES YOU BOTTOM CARDS - the section does not end at the keep. Bottom your most
 expensive spell first (Rorix Bladewing, Siege-Gang Commander), then a duplicate Molten Rain or
-Stone Rain. NEVER bottom your only Starstorm - it is the only card here that answers a board -
-and NEVER bottom a land when the hand you keep would hold fewer than THREE.
+Stone Rain. Read "You will be left with an N-card hand" and build the best N in this
+PREFERENCE ORDER, which works at any N: the lands that cover the cheapest spells you keep
+(three if N allows it), then your only Starstorm - the one card here that answers a board -
+then your cheapest spells, then the rest by cost. A land or the Starstorm goes under only when
+nothing below it in the order is left.
 
 =====================================================================
 DECIDING SITUATIONS (recognise -> do)

@@ -435,6 +435,9 @@ board and then nothing happens - the card stays in your hand and the turn is gon
 no graveyard, and no board that makes it a good cast. Cast a creature or hold removal instead.
 
 DECIDING SITUATIONS (recognize -> do):
+- Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> any damage you
+  deal them and any life they gain repeats without limit. ATTACK: none, whatever the tags say,
+  until one is gone; block every "[lifelink]" attacker you are offered a block for.
 - The mulligan ask says "(keeping 5)" or fewer and the hand has a land -> keep it; a fresh
   seven shaved to four is the same land odds with one card fewer, and a missing colour arrives
   with the next land (nine of 21 make both).

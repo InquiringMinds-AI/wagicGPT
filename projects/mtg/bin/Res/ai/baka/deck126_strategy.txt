@@ -318,8 +318,11 @@ Keep almost everything. The pregame prompt prints "Your hand (7 cards), counted 
 lands, M spells." KEEP whenever N is 2 or more. Also KEEP whenever the line "Playing every land in
 this hand would cover the cost of:" names even one card - that line already checked your mana
 against your hand and it is right.
-Never mulligan more than once. If the prompt contains the words "having already taken", this is your
-last look: answer 1 (Keep this hand).
+From the second look on, weigh the odds, not the hand: each look is a fresh seven you must
+shave by one more card, at the same land odds, so shipping rarely fixes lands - it only shrinks
+the hand. At "(keeping 5)" or lower a hand with even ONE land is a keep, because the bottom ask
+lets you shed what it cannot cast; a fresh look is worth the card only at ZERO lands, and even
+then you are buying a four-card hand at the same odds.
 The thought "I will keep whatever I draw next" is how you end up with a four-card hand - keep THIS
 one instead.
 Your cheapest spell costs ONE mana, so "no early play" is never a reason to mulligan, and a hand
@@ -334,8 +337,12 @@ pips. You bottomed a Woodland Cemetery out of a three-land hand that also held a
 {3}, and you did it while the Cemetery was one of only two black sources in the hand.
 THEN bottom your most expensive SPELL, then a duplicate wall - you run sixteen of them and the
 second copy of one wall is the cheapest card in any hand.
-NEVER bottom Sanguine Bond, NEVER bottom Exquisite Blood, and NEVER bottom Idyllic Tutor: those
-are the only cards in this deck that win a game, and the Tutor is how you find the other two.
+Read "You will be left with an N-card hand" and build the best N in this PREFERENCE ORDER,
+which works at any N: the lands that cover the cheapest spells you keep, then one of Sanguine
+Bond / Exquisite Blood / Idyllic Tutor (the only cards here that win a game; the Tutor finds
+the other two), then your cheapest wall, then a second combo piece, then the rest by cost with
+duplicate walls first under the deck. Bottom a combo piece only when nothing below it in the
+order is left.
 
 === SITUATIONS THAT DECIDE YOUR GAMES ===
  - Both Exquisite Blood and Sanguine Bond on your battlefield: take the first block, Staff ping,
@@ -382,10 +389,11 @@ are the only cards in this deck that win a game, and the Tutor is how you find t
    none for that Vampire - it is worth more as a lifelink blocker. UNLESS both enchantments are on
    your battlefield: then send every Vampire, blocked or not - lifelink damage to a blocker starts
    the loop.
- - The mulligan ask says "(keeping 5)" or fewer and the hand holds a land: KEEP.
- - You kept and the game asks which cards to bottom: rule out every land first if bottoming one
-   would leave fewer than three, THEN most expensive spell, then a duplicate wall. Never Sanguine
-   Bond, Exquisite Blood or Idyllic Tutor.
+ - The mulligan ask says "(keeping 5)" or fewer and the hand holds a land: keep it - a fresh
+   seven shaved to four is the same land odds with one card fewer.
+ - You kept and the game asks which cards to bottom: build the best N in order - lands that
+   cover your cheapest spells, a combo piece or the Tutor, the cheapest wall, then the rest by
+   cost, duplicate walls first. A combo piece goes under only when nothing below it is left.
  - "Cast Chromatic Lantern" is in your menu, nothing from entries 1-6 of Rule #7 is beside it, and
    no Chromatic Lantern is on your battlefield line: cast it. A wall or a combo piece on the same
    menu, or a Lantern already out: take that instead.
