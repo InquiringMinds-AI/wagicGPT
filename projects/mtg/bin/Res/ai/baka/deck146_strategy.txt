@@ -25,8 +25,9 @@ STEP 2. On your untouched opening 7, or at (keeping 6), a mulligan is a fair tra
   line "Playing every land in this hand would not cover any spell in it". That coverage line is
   the engine's own arithmetic and it is the whole one-land test: one land that covers nothing
   is a hand that casts nothing, and a six is not worth keeping for its second turn. ONE land
-  under "would cover the cost of:" naming a card is a judgment call on that card: keep when
-  that card wins the early turns by itself, ship when it does not. WHAT THIS COST: a one-land
+  under "would cover the cost of:" naming a card is a keep: the second land is in your next two
+  draws about three times in five (20 lands in 53), and the ship buys a fresh seven that is a
+  one-lander or worse about one time in five. Which card it covers is not a reason either way. WHAT THIS COST: a one-land
   six was kept here under "would not cover any spell in it" (Snarl, two Soul Shatters, a
   Silencer, Nadaar, Barrowin, Emeria's Call); the seat drew no second land until turn 19,
   discarded six cards at cleanup on one Snarl, and lost. The "KEEP a 7 or a 6 with 2-5

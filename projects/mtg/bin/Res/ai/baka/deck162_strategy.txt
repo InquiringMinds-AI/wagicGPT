@@ -341,8 +341,8 @@ need to reach four or five mana on time - that is what the land count is for.
 - ONE LAND AT THE SECOND LOOK ("(keeping 6)"): now the ship costs TWO cards for the same land
   odds, and the bottom ask lets you shave the six yourself. Keep it when the "would cover the
   cost of:" line names a card or the hand holds a punisher you can reach on the third land
-  (Fate Unraveler at four); ship it when the hand is one land and nothing castable before turn
-  four. This seat shipped a one-land six holding three Underworld Dreams, a Shield Sphere and a
+  (Fate Unraveler at four); ship it when the coverage line reads "would not cover any spell in it"
+  and no punisher is in the hand. This seat shipped a one-land six holding three Underworld Dreams, a Shield Sphere and a
   Fog Bank, found a three-lander with two punishers at (keeping 5) and won - the ship was a fair
   bet there because none of the six was castable before the third land.
 - ONE LAND AT "(keeping 5)" OR LOWER: keep. Each further look is a fresh seven shaved by yet

@@ -428,8 +428,9 @@ So, at each look:
     corpus, kept the two-land six behind it, and won. At a row reading "would keep 5 cards" or
     smaller the next look costs more than the wait does: keep a one-land hand there if the
     coverage line names a card, and ship only a hand with no land at all.
-  - Seven lands and no spell ships at any price; six lands and one spell is a keep if the spell
-    is a wall or the Tutor.
+  - Seven lands and no spell ships at any price; six lands and one spell is a keep - which spell
+    it is is not a reason to ship (36 of the 53 cards left are spells, and a bottom ask, when
+    there is one, sheds the extra lands).
 The thought "I will keep whatever I draw next" is how you end up with a four-card hand - weigh the
 hand in front of you.
 WHEN A KEEP MAKES YOU BOTTOM CARDS the ask prints your hand as a NUMBERED list, each land marked

@@ -445,13 +445,14 @@ start on curve.
 - TWO OR MORE LANDS AND AT LEAST ONE SPELL: KEEP. That is the floor and it is not a close call. If
   the "would cover the cost of" line names even one card, it is not close at all. ALL LANDS: ship -
   it casts nothing.
-- ONE LAND: weigh it on what the spells cost. One land with a hand of THREES and up (Sigarda,
-  Tovolar's Huntmaster, Teferi) is a ship - you will not cast anything for four turns. One land
-  with three or four TWO-drops (Katilda, Luminarch Aspirant, Intrepid Adversary, Ranger Class) is
-  a judgment call on those exact cards: one more land turns it into a real curve, and against a
-  slower opponent the wait is affordable. Take that keep when the cheap cards themselves win the
-  early turns; ship it when they do not. Colour is not part of this call - see THE FORBIDDEN
-  THOUGHT below.
+- ONE LAND: read the coverage line. "would cover the cost of:" naming a card is a keep - the
+  second land is in your next two draws about seven times in ten (24 lands in 53), and the ship
+  buys a fresh seven that is a one-lander or worse about one time in eight. "would not cover any
+  spell in it" ships on the untouched seven: nothing happens until a draw, and that is as true
+  of a hand of two-drops (Katilda, Luminarch Aspirant, Ranger Class) as of a hand of threes and
+  up (Sigarda, Tovolar's Huntmaster, Teferi) - the ship costs one card for the same land odds
+  either way. What the spells cost is not part of this call, and neither is colour - see THE
+  FORBIDDEN THOUGHT below.
 - ZERO LANDS: ship, always.
 Colour and curve are TIEBREAKERS between hands that already clear the land count, never a reason
 to ship a hand that clears it.

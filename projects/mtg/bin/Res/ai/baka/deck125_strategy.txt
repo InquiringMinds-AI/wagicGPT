@@ -461,7 +461,9 @@ So, at each look:
     Weigh how many draws until it casts ANYTHING - sharpest when the spells left are Final
     Judgment {4}{W}{W}, Staff of Nin {6} or Emrakul {15} rather than a Path to Exile {W} or an
     Elixir {1} - against what the next look costs. On a fresh seven or a six, ship it when the
-    answer is "four or more turns and they have a creature on turn two". At a row reading "would
+    answer is "four or more turns" - every deck in this pool casts creatures, and the cheap ones
+    come down on the first turns, so that wait is a threat you cannot answer; their turn two is not on the header and is not a
+    reason either way. At a row reading "would
     keep 5 cards" or smaller, the next look costs more than that wait does: keep it if it holds a
     land and a spell you can cast within two draws, and ship it only when it holds no land at all
     or no spell at all.

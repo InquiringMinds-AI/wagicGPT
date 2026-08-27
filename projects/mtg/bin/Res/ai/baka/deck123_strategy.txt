@@ -610,10 +610,12 @@ lands, M spells" (read that number, never recount):
    a two-lander again with one fewer card. Colour is not a reason to ship: read the "Mana
    sources among those lands" and "Playing every land in this hand would cover the cost of:"
    lines, and if either token-maker or Intruder Alarm is on that cover list the hand is fine.
- - ONE LAND: compare the two sides out loud. A one-land seven is a keep only if it is nearly all
-   two-mana cards AND that one land makes the colour they need. A one-land seven whose spells
-   cost three and four - two Intruder Alarms, Idyllic Tutor, Bloodline Keeper - does nothing
-   for four turns and ships.
+ - ONE LAND: read the coverage line. "would cover the cost of:" naming a card is a keep - the
+   second land is in your next two draws about two times in three (23 lands in 53), and the
+   ship buys a fresh seven that is a one-lander or worse about one time in seven. "would not
+   cover any spell in it" ships on the untouched seven: nothing happens until a draw. Colour and
+   what the spells cost are not part of this call - a one-land seven of two Intruder Alarms,
+   Idyllic Tutor and Bloodline Keeper prints "would not cover", and that line is the reason.
  - ZERO LANDS, or ALL lands: ship.
  - SIX OR MORE LANDS with one spell: this is a keepable hand, not a mulligan. You bottom the
    extra lands on the keep and you are a four-land hand with your removal spell, which is a
