@@ -100,6 +100,11 @@ struct NarrationCycleHolder
 class AIPlayerGPT : public AIPlayerBaka
 {
 public:
+    //#W50-Y D7: the clean-line grammar and the rejection test for a coded
+    //CHOICE line's payload (everything after the "CHOICE:" label). Public and
+    //static so PARSETEST pins the grammar directly.
+    static bool choiceLineIsClean(const string& payload);
+    static bool choiceLineIsRejection(const string& payload);
     AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck = NULL);
 
     //true when the player launched the game with WAGIC_AI=gpt
@@ -422,8 +427,10 @@ private:
     //CHOICE: lines the answer line heads (>=2 = the model listed several
     //picks line-by-line for a single-pick ask; the FIRST of the run is the
     //answer taken - see findAnswerLabelLine).
+    //#W50-Y D7: `rejectedLines` (out, optional) counts the line-leading coded
+    //CHOICE lines the answer scan refused as rejections/unclean trailers.
     string consumePlan(const string& content, const char * expectedLabel = NULL,
-                       int * choiceRunLen = NULL);
+                       int * choiceRunLen = NULL, int * rejectedLines = NULL);
 
     //Decision seams return this while the model call for their prompt is
     //still in flight. Callers unwind for the current tick and re-poll on the
@@ -652,6 +659,11 @@ private:
     //conservative: an ordinary long unparsed reply (real prose, no coded line)
     //is NOT garbage and is never retried.
     static bool isDecodeGarbage(const string& content);
+    //#W50-Y D19: the fallback class of a reply that carried no usable answer -
+    //"degenerate_decode" when isDecodeGarbage says the text is a decode
+    //collapse (mojibake, CJK spray, punctuation soup, a looping token), else
+    //"unparsed_reply" (real prose that simply never coded an answer).
+    static const char * unparsedReplyClass(const string& content);
     //Serialize the chat request (system prompt + the pending user message)
     //for the worker thread; built on the game thread, nothing shared.
     string buildRequestBody(const string& userMsg);
@@ -678,8 +690,13 @@ private:
     //(one the model stated before spiraling) and re-parse it through the
     //same echo/staleness checks. Returns the 1-based choice or -1. Never
     //bypasses stale_echo protection (a stale line re-parses to -1 here too).
+    //#W50-Y D9: `minChoice` = 1 skips coded 0 lines - on an ask with no pass
+    //row a "CHOICE: 0 (pass)" sibling is not an offered choice.
+    //#W50-Y D7: rejection lines (see choiceLineIsRejection) are never taken;
+    //the last CLEAN line wins, else the last non-rejection line.
     static int salvageLoopedChoice(const string& content, int optionCount,
-                                   const std::vector<string> * optionTexts = NULL);
+                                   const std::vector<string> * optionTexts = NULL,
+                                   int minChoice = 0);
     //#W49-S (D2): the FIRST well-formed line-leading CHOICE line's parse (-1
     //when none parses) - the seams compare it with what executed so
     //answer_replaced states whether the EXECUTED answer differs from the
@@ -745,9 +762,11 @@ private:
     //forward (the protocol tells it so, and to restate the plan in full)
     string mCurrentPlan;
     //#W49-U D7: consecutive replies whose PLAN: was byte-identical to the one
-    //already carried; at kPlanEchoLimit the carry is dropped and re-asked.
+    //already carried. #W50-Y D10: a REPORT FIELD only (translog plan_echo_count)
+    //- the wave-49 "5 echoes expire the carry" trigger is RETIRED; expiry is
+    //keyed on the plan's CONTENT (gptcaveat::planOpensWithVerdict /
+    //planNamesNoAction), never on how often the model re-states it.
     int mPlanEchoCount;
-    static const int kPlanEchoLimit = 5;
     //W38 mutate host-intent carry (wave-37 validation #3, 139v152 s30-31):
     //the over/under placement and the host pick are SEPARATE model calls,
     //and the pilot's host intent did not survive the boundary (chose "over"
@@ -905,6 +924,7 @@ private:
     //ORIGINAL askKey (state + question), the corrected question is asked once.
     string mAskReaskKey;
     string mAskReaskLine;
+    string mAskReaskKind; //"named_row" | "no_pass" (#W50-Y D9)
     //#W49-S (D2): answer_replaced is FALSE whenever the answer that EXECUTED
     //is the reply's first coded line - the seams set this right before their
     //translog write; writeTransLog consumes and clears it.
