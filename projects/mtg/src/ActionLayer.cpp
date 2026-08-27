@@ -408,6 +408,7 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
     abilitiesMenu = NEW SimpleMenu(observer->getInput(), observer->getResourceManager(), 10, this, Fonts::MAIN_FONT, 100, 100, object->getDisplayName().c_str());
     abilitiesTriggered = NEW SimpleMenu(observer->getInput(), observer->getResourceManager(), 10, this, Fonts::MAIN_FONT, 100, 100, object->getDisplayName().c_str());
     currentActionCard = (MTGCardInstance*)object;
+    menuObjectName = object->getDisplayName();
     for (size_t i = 0; i < mObjects.size(); i++)
     {
         ActionElement * currentAction = (ActionElement *) mObjects[i];
@@ -455,6 +456,7 @@ void ActionLayer::setCustomMenuObject(Targetable * object, bool must,vector<MTGA
     }
     menuObject = object;
     menuArmedSerial++;
+    menuObjectName = object->getDisplayName(); //#W48 D6, same capture as setMenuObject
     SAFE_DELETE(abilitiesMenu);
     abilitiesMenu = NEW SimpleMenu(observer->getInput(), observer->getResourceManager(), 10, this, Fonts::MAIN_FONT, 100, 100, customName.size()?customName.c_str():object->getDisplayName().c_str());
     currentActionCard = NULL;
@@ -536,6 +538,7 @@ void ActionLayer::ButtonPressed(int, int controlid)
         {
             menuObject = 0;
             currentActionCard = NULL;
+            menuObjectName.clear();
         }
     }
     else if (controlid == kCancelMenuID)
@@ -543,6 +546,7 @@ void ActionLayer::ButtonPressed(int, int controlid)
         observer->mLayers->stackLayer()->endOfInterruption(false);
         menuObject = 0;
         currentActionCard = NULL;
+        menuObjectName.clear();
     }
     else
     {
@@ -579,6 +583,7 @@ void ActionLayer::ButtonPressedOnMultipleChoice(int choice)
     }
     menuObject = 0;
     currentActionCard = NULL;
+    menuObjectName.clear();
 }
 
 ActionLayer::ActionLayer(GameObserver *observer)
