@@ -57,6 +57,14 @@ public:
     std::vector<std::string> optionTexts;
     std::vector<int> menuIndices;
     MTGCardInstance * contextCard;
+    //#W48 D6: the menu subject's NAME as the action layer captured it when the
+    //menu armed. contextCard is a POINTER and every consumer validates it
+    //against the game's zones before dereferencing (the dangle rail); a menu
+    //armed by a resolving spell's `choice` payload is armed on a card that is
+    //in no zone, so the pointer is correctly refused and the name went with it.
+    //This string is snapshotted while the object is provably alive, so it names
+    //the subject when no pointer can. Empty when the object had no name.
+    std::string contextName;
     bool canDecline;
     //CHOOSE_MENU, triggered/activated "may"-ability ask (the all(trigger[to])
     //moveto class - Tergrid's steal): the card-script option label is a

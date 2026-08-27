@@ -245,6 +245,21 @@ protected:
         PregameAskScope(AIPlayerGPT * _p) : p(_p) { p->mInPregameAsk = true; }
         ~PregameAskScope() { p->mInPregameAsk = false; }
     };
+    //#W48 D9 (wave-47 D9 = R10): TRUE only while the ANNOUNCE_X ask is
+    //assembling its prompt. Same shape as mInPregameAsk, same reason: the
+    //carried plan named an X chosen ONE SCREEN EARLIER, at the cast row, before
+    //the kill lists this menu prints existed - and the pilot restated it
+    //verbatim over a strictly better row (deck130 vs126 seq 37: "Cast Starstorm
+    //at X=3 to kill both Pride Guardians", replied X=3, with "X = 4 {kills
+    //THEIRS: Pride Guardian x2, Perimeter Captain; YOURS: none}" on screen).
+    //A plan written before the evidence is not evidence about it.
+    bool mInAnnounceXAsk;
+    struct AnnounceXAskScope
+    {
+        AIPlayerGPT * p;
+        AnnounceXAskScope(AIPlayerGPT * _p) : p(_p) { p->mInAnnounceXAsk = true; }
+        ~AnnounceXAskScope() { p->mInAnnounceXAsk = false; }
+    };
     string buildPregameBottomAskText(const vector<MTGCardInstance*>& hand, int need,
                                      int alreadyBottomed);
 

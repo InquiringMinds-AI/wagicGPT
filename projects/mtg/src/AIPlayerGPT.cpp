@@ -281,8 +281,23 @@ string textSnippetCore(const string& raw, size_t maxLen)
             text[i] = ' ';
     if (text.size() > maxLen)
     {
+        //#W48 D5 (wave-47 D5 = R6): the old rule cut at exactly maxLen whenever
+        //the last space sat in the FRONT half of the budget - a mid-word cut,
+        //which renders a token the card does not contain ("...battlefiel..." is
+        //a word the reader has no way to complete). A truncation may drop text,
+        //visibly; it may not invent a word. So take the last word boundary
+        //wherever it is; failing that (no space in the budget at all) spend
+        //forward to the next one, bounded at twice the budget; and only a string
+        //with no word boundary within that - which is not prose - is cut where
+        //the budget ends.
         size_t cut = text.rfind(' ', maxLen);
-        text = text.substr(0, (cut == string::npos || cut < maxLen / 2) ? maxLen : cut) + "...";
+        if (cut == string::npos)
+        {
+            size_t fwd = text.find(' ', maxLen);
+            cut = (fwd == string::npos || fwd > maxLen * 2) ? maxLen : fwd;
+        }
+        if (cut < text.size())
+            text = text.substr(0, cut) + "...";
     }
     return text;
 }
@@ -444,6 +459,57 @@ string boardEffectTag(const string& snippet, bool moreCopies)
     return string(" {effect") + (moreCopies ? " (each copy of this card does this)" : "")
            + ": \"" + snippet + "\"}";
 }
+
+//#W48 D5 (wave-47 D5 = R6; 7,291 truncated option rows, 28 distinct tails).
+//The clause budget above is the BOARD line's. The OPTION row - the surface the
+//decision is actually made on - still ran ONE flat truncate over the whole
+//text=, so it always cut the same end off: Thraben Doomsayer's Fateful-hour
+//lord clause was gone in 2,015 windows, and Lord of Lineage's ENTIRE back face
+//(everything after the `//` face separator) in 1,751. Both are exactly the
+//shape lane M fixed for the battlefield line, one surface over.
+//So the option row budgets the same way, plus the face rule: `//` separates two
+//printed FACES, and a truncation that stops at the separator drops a whole card
+//while looking complete. Each face gets its own clause-aware budget, so no face
+//can be the one that falls off, and the omission inside a face stays COUNTED
+//("[N more clauses ... not shown]") rather than silent.
+string optionCardTextCore(const string& raw, size_t maxLen)
+{
+    string flat = raw;
+    for (size_t i = 0; i < flat.size(); i++)
+        if (flat[i] == '\n')
+            flat[i] = ' ';
+    std::vector<string> faces;
+    {
+        const string sep = "//";
+        size_t at = 0;
+        for (;;)
+        {
+            size_t k = flat.find(sep, at);
+            if (k == string::npos)
+            {
+                faces.push_back(flat.substr(at));
+                break;
+            }
+            faces.push_back(flat.substr(at, k - at));
+            at = k + sep.size();
+        }
+    }
+    if (faces.size() < 2)
+        return boardEffectSnippet(flat, maxLen); //one face: the clause budget alone
+    std::ostringstream o;
+    int shown = 0;
+    for (size_t i = 0; i < faces.size(); i++)
+    {
+        size_t b = faces[i].find_first_not_of(' ');
+        size_t e = faces[i].find_last_not_of(' ');
+        string one = (b == string::npos) ? string() : faces[i].substr(b, e - b + 1);
+        if (one.empty())
+            continue;
+        o << (shown++ ? " // " : "") << boardEffectSnippet(one, maxLen);
+    }
+    return shown ? o.str() : boardEffectSnippet(flat, maxLen);
+}
+
 
 //State-computed payoff magnitudes: cards like Gray Merchant carry their
 //payoff as a live expression in the auto= script ("lifeleech:
@@ -963,6 +1029,31 @@ static int appendVerbMagnitudes(MTGCardInstance * card, const string& text,
     return count;
 }
 
+//#W48 D6, second half (wave-47 D6 = R7 / seat E7). An `auto=choice` list names
+//its own branches, and the names are SCRIPT tokens: Peer into the Abyss offers
+//"1. target opponent" / "2. target controller" (borderline.txt:82590-1). The
+//first is readable; the second is not - "controller" means the player who
+//controls the spell, i.e. the player being asked, and no reader can derive that
+//from the label. Nothing else on the row says who draws half their library and
+//loses half their life, so the ask was a coin flip between "them" and "me"
+//dressed as jargon. Closed set, exact match only: the two engine-side player
+//tokens, mapped to the two players the reader knows. Every other label - every
+//card-authored branch name - comes back verbatim.
+static string playerBranchLabel(const string& raw)
+{
+    string low;
+    for (size_t i = 0; i < raw.size(); i++)
+        low += (char) tolower((unsigned char) raw[i]);
+    size_t b = low.find_first_not_of(" \t");
+    size_t e = low.find_last_not_of(" \t");
+    low = (b == string::npos) ? string() : low.substr(b, e - b + 1);
+    if (low == "target opponent")
+        return "the opponent";
+    if (low == "target controller")
+        return "you";
+    return raw;
+}
+
 string dynamicMagnitudes(MTGCardInstance * card)
 {
     //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
@@ -1033,7 +1124,7 @@ string dynamicMagnitudes(MTGCardInstance * card)
             size_t nl = rawText.find('\n', lp);
             string rawLine = rawText.substr(lp, nl == string::npos ? string::npos : nl - lp);
             lp = (nl == string::npos) ? rawText.size() + 1 : nl + 1;
-            string label = choiceBranchLabel(rawLine);
+            string label = playerBranchLabel(choiceBranchLabel(rawLine));
             if (label.empty())
                 continue;
             branches++;
@@ -3117,6 +3208,22 @@ string pileAwareCardText(MTGCardInstance * c, size_t maxLen)
             return combined;
     }
     return c ? cardTextSnippet(c, maxLen) : string();
+}
+
+//The option/target emitters' text: mutate-pile aware (unchanged), and
+//clause/face-aware for every single card. Engine token bookkeeping still
+//renders nothing at all (isEngineTokenText).
+string optionCardText(MTGCardInstance * c, size_t maxLen)
+{
+    if (!c)
+        return "";
+    std::vector<MTGCardInstance *> pile;
+    collectMutatePile(c, pile);
+    if (pile.size() >= 2)
+        return pileAwareCardText(c, maxLen);
+    if (isEngineTokenText(c->text))
+        return "";
+    return optionCardTextCore(c->text, maxLen);
 }
 
 //W41-8 (wave-40 seat125 §5.2): when exactly ONE target is legal the engine
@@ -5901,6 +6008,47 @@ static string drawPriceRowTag(int cards, int perDraw, const string& punishers)
     return o.str();
 }
 
+//The `draw:N` segments of ONE already-lowercased script line, counted only when
+//the amount is a plain number and the drawer is the line's own controller. A
+//draw aimed at anyone else is not a cost the pilot pays, and pricing it against
+//the pilot's own life would be a false surface; the engine's default (no player
+//token, or "controller") is the controller. `from` is where to start scanning -
+//an ability line starts at its own name(...), a spell line at 0.
+static int lineControllerDrawCount(const string& low, size_t from)
+{
+    int total = 0;
+    size_t d = low.find("draw:", from);
+    while (d != string::npos)
+    {
+        size_t as = d + 5;
+        size_t ae = low.find_first_of(" \t\r", as);
+        string amt = low.substr(as, ae == string::npos ? string::npos : ae - as);
+        bool numeric = !amt.empty();
+        for (size_t k = 0; k < amt.size(); k++)
+            if (!isdigit((unsigned char) amt[k]))
+                numeric = false;
+        bool mine = true;
+        if (ae != string::npos)
+        {
+            size_t ws = low.find_first_not_of(" \t\r", ae);
+            if (ws != string::npos)
+            {
+                size_t we = low.find_first_of(" \t\r", ws);
+                string who = low.substr(ws, we == string::npos ? string::npos : we - ws);
+                if (who.find("opponent") != string::npos
+                    || who.find("target") != string::npos
+                    || who.find("player") != string::npos
+                    || who.find("each") != string::npos)
+                    mine = false;
+            }
+        }
+        if (numeric && mine)
+            total += atoi(amt.c_str());
+        d = low.find("draw:", d + 5);
+    }
+    return total;
+}
+
 //How many cards the ability named `abilityName` draws, read off its OWN script
 //line ("{3}{cycle}:name(cycling) draw:1" -> 1). 0 when the name is absent, the
 //line draws nothing, or the amount is not a plain number - the tag is then not
@@ -5920,6 +6068,20 @@ static int scriptAbilityDrawCount(const string& script, const string& abilityNam
         size_t nl = script.find('\n', lp);
         string line = script.substr(lp, nl == string::npos ? string::npos : nl - lp);
         lp = (nl == string::npos) ? script.size() + 1 : nl + 1;
+        //#W48 D8 (wave-47 D8 = R9): the MACRO line. Every cycling card in the
+        //pool writes its cycling as `autohand=__CYCLING__({R})` (Forgotten Cave,
+        //Starstorm, Secluded Steppe ...) and _macros.txt expands that to
+        //`{R}{cycle}:name(cycling) draw:1` only inside AbilityFactory, on a
+        //LOCAL copy - CardPrimitive keeps the unexpanded token. So this scanner
+        //met an opaque `__cycling__({r})`, found no `name(cycling)`, returned 0,
+        //and the tag never reached the row it was written for: 2 emissions in
+        //the whole corpus, while a `cycling with Forgotten Cave` row sat on the
+        //same screen as the DRAW PUNISHERS line (deck130 vs162 seq 34/35/42/43).
+        //Expand through the engine's own AutoLineMacro::Process, per line and
+        //after the raw line has been read for '@', exactly as the amass scanner
+        //does - the render then cannot disagree with what the factory built.
+        if (line.find('@') == string::npos && line.find('_') != string::npos)
+            line = AutoLineMacro::Process(line);
         string low = line;
         for (size_t i = 0; i < low.size(); i++)
             low[i] = (char) tolower((unsigned char) low[i]);
@@ -5930,39 +6092,38 @@ static int scriptAbilityDrawCount(const string& script, const string& abilityNam
         size_t s = low.find_first_not_of(" \t\r");
         if (s != string::npos && low[s] == '@')
             continue;
-        size_t d = low.find("draw:", at);
-        while (d != string::npos)
-        {
-            size_t as = d + 5;
-            size_t ae = low.find_first_of(" \t\r", as);
-            string amt = low.substr(as, ae == string::npos ? string::npos : ae - as);
-            bool numeric = !amt.empty();
-            for (size_t k = 0; k < amt.size(); k++)
-                if (!isdigit((unsigned char) amt[k]))
-                    numeric = false;
-            //WHO draws. A draw aimed at anyone but this ability's controller is
-            //not a cost the pilot pays, and pricing it against the pilot's own
-            //life would be a false surface. The engine's default (no player
-            //token, or "controller") is the controller.
-            bool mine = true;
-            if (ae != string::npos)
-            {
-                size_t ws = low.find_first_not_of(" \t\r", ae);
-                if (ws != string::npos)
-                {
-                    size_t we = low.find_first_of(" \t\r", ws);
-                    string who = low.substr(ws, we == string::npos ? string::npos : we - ws);
-                    if (who.find("opponent") != string::npos
-                        || who.find("target") != string::npos
-                        || who.find("player") != string::npos
-                        || who.find("each") != string::npos)
-                        mine = false;
-                }
-            }
-            if (numeric && mine)
-                total += atoi(amt.c_str());
-            d = low.find("draw:", d + 5);
-        }
+        total += lineControllerDrawCount(low, at);
+    }
+    return total;
+}
+
+//#W48 D8, the CAST row's half. The ability-row tag prices an ACTIVATION that
+//draws; a SPELL that draws when it resolves (Divination, Sphinx's Revelation,
+//a cantrip) reached its cast row with a mana cost and no life price at all,
+//while the DRAW PUNISHERS summary stood on the same screen. Same rule, same
+//number, one surface over: count only what the spell's own script draws for its
+//CONTROLLER, unconditionally. Deliberately narrow - a line that is triggered
+//('@'), optional ('may '), modal ('choice ') or conditional ('if(') does not
+//happen just because the spell resolved, and claiming its cards would be a
+//false price. Those rows keep their current (untagged) text.
+static int scriptSelfDrawCount(const string& script)
+{
+    int total = 0;
+    size_t lp = 0;
+    while (lp <= script.size())
+    {
+        size_t nl = script.find('\n', lp);
+        string line = script.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? script.size() + 1 : nl + 1;
+        if (line.find('@') == string::npos && line.find('_') != string::npos)
+            line = AutoLineMacro::Process(line); //#W48 D8: same macro rail
+        string low = line;
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        if (low.find('@') != string::npos || low.find("may ") != string::npos
+            || low.find("choice ") != string::npos || low.find("if(") != string::npos)
+            continue;
+        total += lineControllerDrawCount(low, 0);
     }
     return total;
 }
@@ -6284,14 +6445,59 @@ static void xKillRowAnnotations(const std::vector<XDamVictim>& victims, int capX
     }
 }
 
+//#W48 D9, second half. Every comparative phrase on the ANNOUNCE_X screen is
+//about MANA SAVED ("same kills as X=N, for M less mana") - a real fact, and the
+//wrong axis: nothing on the screen said which row kills the most. The kill set
+//only grows with X, so the answer is a SUMMARY of rows already printed (the
+//same standing as the header's "option 1 is the LARGEST X"), not a new claim:
+//the X that kills the most of THEIRS while killing none of YOURS, and the
+//CHEAPEST such X when several tie. Returns -1 when no affordable X kills
+//anything for free - then nothing is marked, rather than a row being pointed at
+//for an empty reason. Pure over the survey.
+static int xBestFreeKillX(const std::vector<XDamVictim>& victims, int capX)
+{
+    int bestX = -1, bestKills = 0;
+    for (int x = 0; x <= capX; x++) //ascending: a tie keeps the cheapest X
+    {
+        int theirs = 0, mine = 0;
+        for (size_t i = 0; i < victims.size(); i++)
+        {
+            if (victims[i].isPlayer || victims[i].lethalX <= 0 || victims[i].lethalX > x)
+                continue;
+            if (victims[i].mine)
+                mine++;
+            else
+                theirs++;
+        }
+        if (mine)
+            continue; //not free: this X takes something of yours with it
+        if (theirs > bestKills)
+        {
+            bestKills = theirs;
+            bestX = x;
+        }
+    }
+    return bestKills > 0 ? bestX : -1;
+}
+
+//The marker itself, once per menu, on the row it names. BRACKETED, like every
+//other decision-time guidance annotation: brackets are dropped wholesale from
+//the narrated record (the owner's ruling - guidance never enters history) and
+//from the reply-protocol's worked example, so the exemplar still reads
+//"CHOICE: 1 (X = 1)" instead of a marker cut off mid-word.
+static const char * kXMostKillsMarker =
+    " [<- most kills at any affordable X that costs you nothing]";
+
 //Board-facing wrapper for the ANNOUNCE_X menu. capX comes from the MENU (the
 //option count), never from a second affordability query: the rows being
 //annotated are the rows the engine built, and a disagreement between the two
 //would put a kill list on an X that is not on offer. Returns false when there
 //is nothing priceable to say (the rows then render exactly as before).
 static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
-                              std::vector<string>& out)
+                              std::vector<string>& out, int * bestFreeKillX = NULL)
 {
+    if (bestFreeKillX)
+        *bestFreeKillX = -1;
     if (capX < 0)
         return false;
     XVictimSurvey sv;
@@ -6321,6 +6527,8 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
     }
     xKillRowAnnotations(sv.victims, capX, sv.sweep, sv.hitsMe, sv.hitsOpp,
                         sv.myLife, sv.oppLife, xCastIsOnlyXDamage(card->magicText), out);
+    if (bestFreeKillX)
+        *bestFreeKillX = xBestFreeKillX(sv.victims, capX); //#W48 D9
     return true;
 }
 
@@ -7242,6 +7450,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
       mStaleDropStreak(0), mLastStaleLivelock(false),
       mInPregameAsk(false),
+      mInAnnounceXAsk(false),
       mMayBatchVerdict(kMayBatchNone), mMayBatchRemaining(0)
 
 {
@@ -7956,7 +8165,10 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
     //a hand that no longer exists is not evidence about the hand on screen, and
     //re-scoping it in words would still leave the sentence in the frame; the
     //directive's own remedy is to leave the pregame frame hand-derived.
-    if (!pregame && !mCurrentPlan.empty())
+    //#W48 D9: and the ANNOUNCE_X menu, for the same reason one screen later -
+    //the plan's X was fixed at the cast row, before this menu's kill lists
+    //existed, so re-showing it re-answers the question with the stale number.
+    if (!pregame && !mInAnnounceXAsk && !mCurrentPlan.empty())
     {
         u << "\nYOUR PLAN (as you last stated it): " << mCurrentPlan << "\n";
         //Item-1: the carried plan preserves intent across decisions, but when
@@ -10822,7 +11034,8 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
     {
         //W41-4: pile-aware (this emitter serves battlefield activations, where a
         //mutate pile is a legal source).
-        string txt = pileAwareCardText(src, 140);
+        //#W48 D5: clause/face-aware - this is an OPTION row.
+        string txt = optionCardText(src, 140);
         if (!txt.empty())
             out << " {card text: \"" << txt << "\"}";
         out << dynamicMagnitudes(src);
@@ -13847,9 +14060,27 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         {
             //Same SHAPE as the ability-line emitter (quoted): one annotation
             //form across both surfaces, so the model reads one convention.
-            string ct = cardTextSnippet(card, 220);
+            //#W48 D5: and the same clause/face-aware budget.
+            string ct = optionCardText(card, 220);
             if (!ct.empty())
                 o << " {card text: \"" << ct << "\"}";
+        }
+        //#W48 D8: and the price of what it DRAWS, when the opponent punishes
+        //draws. The summary line on the same screen states the standing rate;
+        //the row that incurs it carries the number (deck130 G47-5's general
+        //principle, applied to the cast row).
+        {
+            int drawn = scriptSelfDrawCount(card->magicText);
+            if (drawn > 0)
+            {
+                vector<string> mineP, theirsP;
+                int minePer = 0, theirsPer = 0;
+                drawPunisherScan(this, opponent(), mineP, minePer, theirsP, theirsPer);
+                std::ostringstream pn;
+                for (size_t ni = 0; ni < theirsP.size(); ni++)
+                    pn << (ni ? ", " : "") << theirsP[ni];
+                o << drawPriceRowTag(drawn, theirsPer, pn.str());
+            }
         }
         if (mStuckCastLines.count(o.str()))
             continue; //this exact entry no-op'd this turn; do not re-offer
@@ -14678,6 +14909,9 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
 
     if (req.kind == DecisionRequest::ANNOUNCE_X)
     {
+        //#W48 D9: the carried plan is suppressed for the whole assembly of this
+        //ask (see mInAnnounceXAsk).
+        AnnounceXAskScope announceScope(this);
         //option index IS the X value, and presenting X = 0 as option 1 set
         //an index/value trap: the model computed the X it wanted in its
         //plan, then replied that VALUE as the option number - one off in
@@ -14720,9 +14954,20 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
         //annotated rather than something mis-aligned being claimed.
         {
             std::vector<string> xKills;
-            if (xAnnounceRowKills(ctx, this, capX, xKills) && xKills.size() == shown.size())
+            int bestFreeX = -1;
+            if (xAnnounceRowKills(ctx, this, capX, xKills, &bestFreeX)
+                && xKills.size() == shown.size())
+            {
                 for (size_t ki = 0; ki < shown.size(); ki++)
                     shown[ki] += xKills[ki];
+                //#W48 D9: mark the maximal row ONCE. shown is largest-X-first,
+                //so the row for X is at index capX - X; the guard is the same
+                //contract rail the annotations ride (nothing is marked if the
+                //menu is ever built with something other than one row per X).
+                if (bestFreeX >= 0 && bestFreeX <= capX
+                    && (size_t)(capX - bestFreeX) < shown.size())
+                    shown[(size_t)(capX - bestFreeX)] += kXMostKillsMarker;
+            }
         }
         //askEvenIfSingle: a zero-slack {X} cast offers exactly one value, and
         //the generic one-option shortcut answered it with no model call, no
@@ -14775,6 +15020,11 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
 
     //CHOOSE_MENU
     vector<string> opts = req.optionTexts;
+    //#W48 D6: engine player tokens -> the players the reader knows. Presentation
+    //only - req.optionTexts (the staleness key) and the option order are
+    //untouched, so the answer index still means what applyMenuChoice thinks.
+    for (size_t li = 0; li < opts.size(); li++)
+        opts[li] = playerBranchLabel(opts[li]);
     if (req.canDecline)
         opts.push_back("Decline - do nothing");
     //One real option and no way to decline: only one outcome, no model call.
@@ -15233,6 +15483,13 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
     string ctxName = resolveOwningCardName(ctx);
     if (ctxName.empty() && ctx && ctx->model && ctx->model->data)
         ctxName = ctx->model->data->getName();
+    //#W48 D6: the last rung, and the only one that survives a menu armed on a
+    //card the game can no longer validate (an `auto=choice` list resolving off
+    //the stack - Silverquill Command, Peer into the Abyss). The contract
+    //captured the subject's name while the object was alive; a pointer ladder
+    //cannot reach it, a string can. See DecisionContract::buildMenuChoice.
+    if (ctxName.empty())
+        ctxName = req.contextName;
     if (ctxName.empty() && etbPayOrTap)
         ctxName = etbLandName;
     string decision;
@@ -29099,6 +29356,202 @@ void AIPlayerGPT::runParseSelfTest()
         // The two scopes stay legible in the wording: "this turn" vs "in a row".
         CHECK(lc.find("this turn") != string::npos && lc.find("in a row") != string::npos,
               "#W48-D13 both scopes are named in the tag, so no threshold is keyed to a hidden reset");
+    }
+
+    // ---- #W48-D5: the option row's card text budgets per clause and per face ----
+    cout << "\n[#W48-D5] {card text:} on an option row: no mid-word cut, no lost clause, no lost face\n";
+    {
+        const string doomsayer =
+            "{T}: Put a 1/1 white Human creature token onto the battlefield. -- Fateful hour -"
+            " As long as you have 5 or less life, other creatures you control get +2/+2.";
+        string d = optionCardTextCore(doomsayer, 140);
+        CHECK(d.find("Fateful hour") != string::npos && d.find("+2/+2") != string::npos,
+              "#W48-D5 Thraben Doomsayer's Fateful-hour clause survives the 140-char row budget");
+        CHECK(d.find("{T}: Put a 1/1 white Human") != string::npos,
+              "#W48-D5 ... and so does the clause that was surviving before");
+        CHECK(textSnippetCore(doomsayer, 140).find("get +2/+2") == string::npos,
+              "#W48-D5 NEGATIVE the flat truncate - what the row used to run - cut that clause off"
+              " mid-sentence (the corpus tail: '...other creatures you...')");
+        const string lordOfLineage =
+            "Flying -- Other Vampire creatures you control get +2/+2. -- {T}: Put a 2/2 black"
+            " Vampire creature token with flying onto the battlefield. // Bloodline Keeper";
+        string l = optionCardTextCore(lordOfLineage, 140);
+        CHECK(l.find("// Bloodline Keeper") != string::npos,
+              "#W48-D5 the back face survives: a cut AT the // separator drops a whole card");
+        CHECK(l.find("Flying") != string::npos && l.find("2/2 black") != string::npos,
+              "#W48-D5 ... with the front face still present");
+        CHECK(textSnippetCore(lordOfLineage, 140).find("Bloodline Keeper") == string::npos,
+              "#W48-D5 NEGATIVE the flat truncate stopped at ' //' and printed no back face");
+        // NEVER MID-WORD. The old rule cut at exactly maxLen whenever the last
+        // space sat in the front half of the budget.
+        {
+            string wordy = "aa " + string(60, 'b') + " cc dd";
+            string t = textSnippetCore(wordy, 40);
+            CHECK(t == "aa...", "#W48-D5 a word that overruns the budget is dropped whole, not halved");
+            CHECK(t.find(string(10, 'b')) == string::npos,
+                  "#W48-D5 NEGATIVE no fragment of the overrunning word is rendered");
+            string noSpace = string(200, 'q');
+            CHECK(textSnippetCore(noSpace, 140).size() == 143,
+                  "#W48-D5 NEGATIVE a string with no word boundary at all is still bounded");
+        }
+        // A text with neither separator is byte-identical to the old path.
+        CHECK(optionCardTextCore("Flying, trample", 140) == textSnippetCore("Flying, trample", 140)
+              && optionCardTextCore("Flying, trample", 140) == "Flying, trample",
+              "#W48-D5 NEGATIVE a single-clause single-face text is unchanged");
+        // COUNTED omission, never silent: a clause list too long for the budget
+        // says how many clauses it did not show.
+        {
+            string many;
+            for (int i = 0; i < 12; i++)
+            {
+                std::ostringstream c;
+                c << "clause number " << i << " does a thing that takes some words to say";
+                many += (i ? " -- " : "") + c.str();
+            }
+            string m = optionCardTextCore(many, 55);
+            CHECK(m.find("more clause") != string::npos,
+                  "#W48-D5 an over-long clause list states how many clauses are not shown");
+            CHECK(m.find("clause number 11") != string::npos,
+                  "#W48-D5 ... and the LAST clause is the one that can never fall off");
+        }
+        // ECHO SHAPE: the row still binds to its index with the fuller text on it.
+        {
+            vector<string> menu;
+            menu.push_back("Create human with Thraben Doomsayer [cost: Tap] {card text: \""
+                           + optionCardTextCore(doomsayer, 140) + "\"}");
+            menu.push_back("Pass priority");
+            bool stale = false; string src;
+            int c = parseChoice("CHOICE: 1 (" + menu[0] + ")", 2, &menu, &stale, &src);
+            CHECK(c == 1 && !stale, "#W48-D5 echo: the whole annotated row binds to index 1");
+            CHECK(stripNarrationDecoration(menu[0]).find("Fateful hour") == string::npos,
+                  "#W48-D5 echo: the card-text blob leaves no residue in the narrated record");
+        }
+    }
+
+    // ---- #W48-D6: an auto=choice list's player tokens name the players ----
+    cout << "\n[#W48-D6] 'target controller' is not a player a reader can identify\n";
+    {
+        CHECK(playerBranchLabel("Target opponent") == "the opponent",
+              "#W48-D6 Peer into the Abyss's first branch names the opponent");
+        CHECK(playerBranchLabel("Target controller") == "you",
+              "#W48-D6 ... and its second names YOU - which 'controller' never said");
+        CHECK(playerBranchLabel("target controller") == "you",
+              "#W48-D6 the engine's own casing does not matter");
+        CHECK(playerBranchLabel("Target creature") == "Target creature"
+              && playerBranchLabel("Return creature and you draw") == "Return creature and you draw",
+              "#W48-D6 NEGATIVE every card-authored branch name comes back verbatim");
+        CHECK(playerBranchLabel("Target controller of that spell") == "Target controller of that spell",
+              "#W48-D6 NEGATIVE exact match only - a longer label is not rewritten");
+        CHECK(playerBranchLabel("") == "", "#W48-D6 NEGATIVE an empty label stays empty");
+        // The SAME mapping on the cast row's per-branch magnitude clause, so the
+        // cast row and the mode menu one screen later cannot name the same
+        // branch two different ways (deck196 probe seq 17: the row read
+        // 'if you choose "target controller": life -8, draws 22').
+        CHECK(playerBranchLabel("Target controller") == "you"
+              && playerBranchLabel(" target opponent ") == "the opponent",
+              "#W48-D6 the branch label maps the same way wherever it is quoted");
+        // ECHO SHAPE: the mapped label is what the model sees, so it is what it echoes.
+        {
+            vector<string> menu;
+            menu.push_back(playerBranchLabel("Target opponent"));
+            menu.push_back(playerBranchLabel("Target controller"));
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 2 (you)", 2, &menu, &stale, &src) == 2 && !stale,
+                  "#W48-D6 echo: the mapped label binds to its own index");
+        }
+    }
+
+    // ---- #W48-D8: [DRAW PRICE:] reaches the rows that draw ----
+    cout << "\n[#W48-D8] the macro-defined cycling row, and the spell that draws on resolution\n";
+    {
+        // _macros.txt is loaded with the card collection; register it here too so
+        // the check states its own precondition rather than depending on load order.
+        AutoLineMacro::AddMacro("__CYCLING__($cost) $cost{cycle}:name(cycling) draw:1");
+        // The primitive stores auto lines LOWERCASED (CardPrimitive::addMagicText),
+        // and the macro table is lowercased to match - so the scanner meets
+        // "__cycling__({r})", which is what it must expand.
+        CHECK(scriptAbilityDrawCount("__cycling__({r})", "cycling") == 1,
+              "#W48-D8 a macro-defined cycling ability is counted (Forgotten Cave, Starstorm)");
+        CHECK(scriptAbilityDrawCount("{r}{cycle}:name(cycling) draw:1", "cycling") == 1,
+              "#W48-D8 REGRESSION the hand-spelled form still counts 1");
+        CHECK(scriptAbilityDrawCount("__cycling__({r})", "flashback") == 0,
+              "#W48-D8 NEGATIVE the expansion does not answer for a different ability name");
+        CHECK(scriptAbilityDrawCount("@each my upkeep:name(cycling) draw:1", "cycling") == 0,
+              "#W48-D8 NEGATIVE a trigger line is still not this activation");
+        CHECK(scriptSelfDrawCount("draw:2 controller") == 2,
+              "#W48-D8 a spell that draws on resolution prices its own draw");
+        CHECK(scriptSelfDrawCount("draw:1") == 1,
+              "#W48-D8 ... and the engine's default drawer is the controller");
+        CHECK(scriptSelfDrawCount("draw:1 opponent") == 0
+              && scriptSelfDrawCount("draw:1 targetedplayer") == 0,
+              "#W48-D8 NEGATIVE a draw aimed at anyone else is not a price the pilot pays");
+        CHECK(scriptSelfDrawCount("@each my upkeep:draw:1") == 0
+              && scriptSelfDrawCount("may draw:2") == 0
+              && scriptSelfDrawCount("choice name(you draw) draw:1 controller") == 0
+              && scriptSelfDrawCount("if(mylife>5) draw:1") == 0,
+              "#W48-D8 NEGATIVE triggered, optional, modal and conditional draws are not claimed");
+        CHECK(scriptSelfDrawCount("draw:x controller") == 0,
+              "#W48-D8 NEGATIVE an unannounced X draw states no number");
+        CHECK(drawPriceRowTag(scriptSelfDrawCount("draw:2 controller"), 3, "Underworld Dreams")
+                  .find("costs you 6 life") != string::npos,
+              "#W48-D8 the cast row's tag is the same tag, with the same arithmetic");
+        CHECK(drawPriceRowTag(scriptAbilityDrawCount("__cycling__({r})", "cycling"), 0,
+                              "Underworld Dreams").empty(),
+              "#W48-D8 NEGATIVE no punisher on board, no tag");
+    }
+
+    // ---- #W48-D9: the ANNOUNCE_X menu marks the maximal free-kill row ----
+    cout << "\n[#W48-D9] which X kills the most for nothing\n";
+    {
+        std::vector<XDamVictim> v;
+        XDamVictim a; a.name = "Pride Guardian #1"; a.baseName = "Pride Guardian"; a.lethalX = 3; a.mine = false; v.push_back(a);
+        XDamVictim b; b.name = "Pride Guardian #2"; b.baseName = "Pride Guardian"; b.lethalX = 3; b.mine = false; v.push_back(b);
+        XDamVictim c; c.name = "Perimeter Captain"; c.baseName = "Perimeter Captain"; c.lethalX = 4; c.mine = false; v.push_back(c);
+        XDamVictim d; d.name = "Ranger of Eos"; d.baseName = "Ranger of Eos"; d.lethalX = 5; d.mine = true; v.push_back(d);
+        CHECK(xBestFreeKillX(v, 6) == 4,
+              "#W48-D9 X=4 kills three of theirs and none of yours; X=5 starts costing you");
+        CHECK(xBestFreeKillX(v, 3) == 3,
+              "#W48-D9 the cap bounds it: at capX=3 the best free row is X=3");
+        {
+            std::vector<XDamVictim> one;
+            XDamVictim t; t.baseName = "Wall"; t.name = "Wall"; t.lethalX = 2; t.mine = false; one.push_back(t);
+            CHECK(xBestFreeKillX(one, 8) == 2,
+                  "#W48-D9 a tie across X values keeps the CHEAPEST X that kills them all");
+        }
+        {
+            std::vector<XDamVictim> mineOnly;
+            XDamVictim t; t.baseName = "Elf"; t.name = "Elf"; t.lethalX = 1; t.mine = true; mineOnly.push_back(t);
+            CHECK(xBestFreeKillX(mineOnly, 5) == -1,
+                  "#W48-D9 NEGATIVE nothing is marked when every X only kills your own");
+        }
+        {
+            std::vector<XDamVictim> none;
+            CHECK(xBestFreeKillX(none, 5) == -1 && xBestFreeKillX(v, -1) == -1,
+                  "#W48-D9 NEGATIVE an empty board and an empty menu mark nothing");
+        }
+        {
+            std::vector<XDamVictim> pl;
+            XDamVictim t; t.baseName = "you"; t.name = "you"; t.lethalX = 2; t.mine = true; t.isPlayer = true; pl.push_back(t);
+            CHECK(xBestFreeKillX(pl, 5) == -1,
+                  "#W48-D9 NEGATIVE a PLAYER row is not a body and is never counted as a kill");
+        }
+        CHECK(string(kXMostKillsMarker).find("most kills") != string::npos
+              && string(kXMostKillsMarker).find("costs you nothing") != string::npos,
+              "#W48-D9 the marker states both halves of what it claims");
+        CHECK(stripNarrationDecoration(string("X = 4") + kXMostKillsMarker) == "X = 4",
+              "#W48-D9 the marker is decision-time guidance and leaves no residue in history");
+        CHECK(askExemplar(std::vector<string>(1, string("X = 5 {X pricing: kills THEIRS: none}")
+                                              + kXMostKillsMarker)) == "CHOICE: 1 (X = 5)",
+              "#W48-D9 the worked example names the row, not a truncated marker");
+        // ECHO SHAPE: the marked row still binds to its own index.
+        {
+            vector<string> menu;
+            menu.push_back("X = 5");
+            menu.push_back(string("X = 4") + kXMostKillsMarker);
+            bool stale = false; string src;
+            int pick = parseChoice(string("CHOICE: 2 (X = 4") + kXMostKillsMarker + ")", 2, &menu, &stale, &src);
+            CHECK(pick == 2 && !stale, "#W48-D9 echo: the marked row binds to index 2");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

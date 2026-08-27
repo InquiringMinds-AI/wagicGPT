@@ -284,6 +284,15 @@ bool DecisionManager::buildMenuChoice(Player * p, DecisionRequest & req)
     //the menu's subject is the permanent the pilot can see, never the
     //nameless carrier the engine resolved the payload on.
     req.contextCard = nameableCardPointer(g, validatedCardPointer(g, object->currentActionCard));
+    //#W48 D6 (wave-47 D6 = R7; 4/4 bare headers, Silverquill Command x3 + Peer
+    //into the Abyss): the arm-time name. Both cards are `auto=choice name(...)`
+    //lists, which parse into MayAbilities whose menu arms on the RESOLVING
+    //spell - a card that names itself in full but sits in no game zone, so
+    //validatedCardPointer refuses it (verified by probe: disp='Silverquill
+    //Command' ... valid=(nil)) and BOTH the contextCard and the wave-45
+    //option-source rescue below came back empty. A name captured at arm time
+    //cannot dangle, so it survives the validation the pointer cannot.
+    req.contextName = object->menuObjectName;
     req.optionTexts.clear();
     req.menuIndices.clear();
     req.canDecline = false;

@@ -26,6 +26,15 @@ public:
     SimpleMenu * abilitiesMenu;
     SimpleMenu * abilitiesTriggered;
     MTGCardInstance * currentActionCard;
+    //#W48 D6: the NAME of the object this menu was armed on, captured at arm
+    //time. A menu armed by a resolving spell's `choice` payload (Silverquill
+    //Command, Peer into the Abyss) holds a currentActionCard that names itself
+    //perfectly but is in NO game zone, so every consumer-side pointer validation
+    //(the dangle rail) refuses it and the prompt header fell back to the
+    //subject-less "A choice is required". A string captured while the object is
+    //provably alive cannot dangle, so the name survives the validation the
+    //pointer cannot. Empty when the object had no name.
+    std::string menuObjectName;
     //#W43-6. Bumped by every setMenuObject / setCustomMenuObject. A menu's
     //IDENTITY cannot be read off menuObject (the alternative-cost menu and the
     //{X} announcement it chains into are both armed on the SAME card) nor off
