@@ -1,0 +1,52 @@
+  probe  : qwen36-35b-a3b ok at http://100.116.136.74:8084 (0.007703s)
+== selfplay harness (matchups) ==
+  pool   : 146,152,125,126,162,123,130
+  games  : 21 (21 pairings x 1 reps), 21 concurrent
+  model  : qwen36-35b-a3b @ http://100.116.136.74:8084 (thinking=0, gpt timeout=900s)
+  caps   : 86400s total, NO per-game cap (fastclock=0.1)
+  hands  : FAIR (real deal, seats unpinned; wave 44+ baseline)
+  outdir : /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260827-072004
+  launched 1/21: deck152 vs deck123  (1 running, 2s elapsed)
+  launched 2/21: deck152 vs deck125  (2 running, 4s elapsed)
+  launched 3/21: deck146 vs deck125  (3 running, 6s elapsed)
+  launched 4/21: deck162 vs deck130  (4 running, 9s elapsed)
+  launched 5/21: deck125 vs deck130  (5 running, 11s elapsed)
+  launched 6/21: deck123 vs deck130  (6 running, 13s elapsed)
+  launched 7/21: deck146 vs deck130  (7 running, 15s elapsed)
+  launched 8/21: deck125 vs deck126  (8 running, 17s elapsed)
+  launched 9/21: deck146 vs deck162  (9 running, 19s elapsed)
+  launched 10/21: deck125 vs deck123  (10 running, 21s elapsed)
+  launched 11/21: deck125 vs deck162  (11 running, 23s elapsed)
+  launched 12/21: deck146 vs deck126  (12 running, 25s elapsed)
+  launched 13/21: deck126 vs deck130  (13 running, 27s elapsed)
+  launched 14/21: deck152 vs deck126  (14 running, 29s elapsed)
+  launched 15/21: deck146 vs deck152  (15 running, 31s elapsed)
+  launched 16/21: deck126 vs deck162  (16 running, 33s elapsed)
+  launched 17/21: deck162 vs deck123  (17 running, 35s elapsed)
+  launched 18/21: deck152 vs deck162  (18 running, 37s elapsed)
+  launched 19/21: deck126 vs deck123  (19 running, 39s elapsed)
+  launched 20/21: deck152 vs deck130  (20 running, 41s elapsed)
+  launched 21/21: deck146 vs deck123  (21 running, 43s elapsed)
+waiting for in-flight games to finish...
+
+== harvested 42 player-game logs, 1813 decisions ==
+  ask        1240
+  priority   364
+  attackers  71
+  gamestart  42
+  gameend    42
+  blockers   26
+  reveal     20
+  bottom     8
+
+== results (21 games, 0 timeouts/draws, 0 life-adjudicated at cap, 0 CRASHED - no winner, rerun owed) ==
+  deck162  5/6 wins  (83%)
+  deck126  4/6 wins  (67%)
+  deck152  4/6 wins  (67%)
+  deck125  3/6 wins  (50%)
+  deck146  2/6 wins  (33%)
+  deck130  2/6 wins  (33%)
+  deck123  1/6 wins  (17%)
+
+logs + results.tsv in: /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260827-072004
+exit=0
