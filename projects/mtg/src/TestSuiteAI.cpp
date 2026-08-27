@@ -114,6 +114,17 @@ bool TestSuiteAI::parseLine(const string& s)
 //holds the STACK instance -> putInZone delivers the CLONE -> the gate decides
 //"countered" or "resolved" -> zoneChangeNarration renders the words. Only stack
 //departures are recorded, so the other ~1050 tests pay almost nothing.
+void TestSuiteAI::notePaymentQueued(ManaCost * cost, MTGCardInstance * target, const vector<MTGCardInstance*>& sources)
+{
+#ifdef WITH_GPT_AI
+    string line = AIPlayerGPT::paymentReceipt(cost, target, sources, getManaPool()->getConvertedCost());
+    if (!line.empty())
+        mNarrationLog.push_back(line);
+#else
+    (void) cost; (void) target; (void) sources;
+#endif
+}
+
 int TestSuiteAI::receiveEvent(WEvent * event)
 {
     int result = AIPlayerBaka::receiveEvent(event);

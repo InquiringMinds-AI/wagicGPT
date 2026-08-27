@@ -1,0 +1,42 @@
+#Wave-51 lane D (wave-50 engine ledger D5), the pool-covered shape -- the Lair
+#of the Hydra miss: `becomes a 1/1 hydra` {1}{g} taken while {g}{g}{w} floated
+#(corpus 20260827-115759 deck152 vs126 seq 24->25). payTheManaCost's potential-
+#mana walk queued no producer click (the pool already covered the cost) and the
+#receipt was gated on "something was tapped", so the activation left no `- Paid`
+#line at all.
+#
+#WITNESS: Hive of the Eye Tyrant alone on the battlefield with {B}{B}{B}{B}
+#already floating. Nothing can be tapped for the {3}{B} (the Hive is the
+#target of its own activation); the payment is the pool. PRE-FIX: no receipt.
+#POST-FIX: "Paid {3}{b} for Hive of the Eye Tyrant from mana already floating".
+#The 3/3 then attacks past the Bears (opponent 20 -> 17): the activation resolved.
+FORCEABILITY
+AICALLS 40
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hive of the Eye Tyrant
+manapool:{B}{B}{B}{B}
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Hive of the Eye Tyrant
+narration:paid {3}{b} for hive of the eye tyrant from mana already floating
+nonarration:with no source tapped
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:17
+[END]

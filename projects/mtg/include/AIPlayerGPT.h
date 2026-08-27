@@ -348,8 +348,17 @@ private:
     //which no free function can see.
     string repeatActivationNote(const OrderedAIAction& action);
     string stepKey() const; //#W50-Z (D12): "turn:phase"
-    //#W50-Z (D18): the payment receipt, narrated as "Paid {cost} for X with A, B".
+    //#W50-Z (D18): the payment receipt, narrated as "Paid {cost} for X with A; B".
     virtual void notePaymentQueued(ManaCost * cost, MTGCardInstance * target, const vector<MTGCardInstance*>& sources);
+public:
+    //#W51-D (D5): the receipt text itself, "" when the cost carries no mana.
+    //Static so the suite's scripted seat records the SAME line the live seat
+    //narrates (a fixture then pins the receipt, not a copy of its format).
+    static string paymentReceipt(ManaCost * cost, MTGCardInstance * target,
+                                 const vector<MTGCardInstance*>& sources, int poolConvertedCost);
+    //#W51-D (D18): the translog `turn` field = the narrated turn number.
+    static int translogTurn(int observerTurn);
+private:
     //#W48-D13: record that this seat has just taken (ability, click) at a
     //priority window, maintaining the loop-scoped consecutive count.
     void noteLoopTake(MTGAbility * ability, MTGCardInstance * click);
