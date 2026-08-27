@@ -80,7 +80,13 @@ the rest of the list, and do not weigh a later line against an earlier one.
 EVERY CARD YOU CAN CAST HAS A LINE ABOVE. If you find yourself casting something the list does
 not name, the list has not been read - go back and take the first line that matches. And "Cast
 nothing right now" is the LAST line, not a tiebreaker: it is correct only when every other line
-above it failed to match, never because a listed card looks situational.
+above it failed to match, never because a listed card looks situational. AND YOU MUST SHOW THE
+WORK: when you answer "Cast nothing right now", your reply names the highest entry that was on
+this menu and the reason it did not match - "nothing right now: the Command is entry 5, their
+board is empty and I control no creature, so both of its useful mode pairs do nothing". A bare
+"CHOICE: n (Cast nothing right now)" with no such sentence is the list going unread. If you
+cannot write that sentence, the answer is not "nothing" - go back and take the first line that
+matched.
 Then take the ask again if the game offers it - you can cast more than one spell in a turn.
 A CREATURE THAT VENTURES IS NOT A REASON TO SKIP A PLANESWALKER. "Develop the board and advance the
 dungeon" is the argument that loses this deck games: the dungeon is value you collect over many
@@ -201,13 +207,29 @@ creature, ask what happens on the crack-back with that creature unavailable.
   inside the same parentheses as the outcome: "Pride Guardian (0/3) (you kill it, your attacker
   lives (blocking trigger: they gain 3))", "Perimeter Captain (0/4) (neither dies (blocking
   trigger: they may gain 2))". The words to look for are "blocking trigger:".
-  THE TEST IS THAT CLAUSE, NOT A BODY COUNT. If two or more blockers on this creature's tag print
-  a "(blocking trigger:" clause, the swing PAYS them: send only the attackers that get through
+  THE TEST IS THAT CLAUSE, NOT A BODY COUNT - AND ONE PRINTED CLAUSE IS ENOUGH. If ANY blocker on
+  this creature's tag prints a "(blocking trigger:" clause or a "(lifelink: they gain" clause,
+  the swing PAYS them: send only the attackers that get through
   (flying, menace, or a body whose tag kills something), keep the rest home, and win with removal,
-  Kaya and the dungeon drains instead. If NO blocker on the tag prints that clause, their walls
+  Kaya and the dungeon drains instead. If NO blocker on the tag prints either clause, their walls
   cost them nothing and cost you nothing - a 0/4 Wall of Omens is just a wall - so the ordinary
   attack rules apply and a vigilant attacker (Nadaar) can be sent freely, because vigilance means
   it is still untapped to block on their turn.
+  A CONVERTER OF THEIRS TURNS EVERY ONE OF THOSE PAYMENTS INTO DAMAGE ON YOU. When the prompt
+  prints "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs", each life they gain comes off
+  YOUR total as well, so a wall that gains them 3 costs you 3. With that line up, every attacker
+  whose tag prints a "(blocking trigger:" or a "(lifelink:" price STAYS HOME no matter how many
+  attackers you have; the only bodies that go are the ones the tag says cannot be blocked at all
+  ("[no creature they control can block this attacker]", or a menace line that says they cannot
+  field two blockers). Your own life total is not a resource to spend on a board like that: you
+  win it with Kaya, Soul Shatter and the dungeon drains.
+  AND THE PRICE YOU CAN SEE IS NOT THE PRICE YOU PAY WHEN THE TAG IS COLLAPSED. A tag reading
+  "they have N untapped creatures that could block this one, biggest <name>" prints the price of
+  their BIGGEST body only, and the biggest body is rarely the expensive one - it is their cheap
+  0/3 and 0/4 walls that carry the large lifegain triggers, and the collapse hides them. Read N,
+  then read their battlefield line for the defenders it did not print. With a converter of theirs
+  up and N of 2 or more, price the swing as paying you out for EVERY defender on that line, not
+  for the one life the tag showed you.
 - A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
   ANYWHERE IN ITS LIST is a per-creature STOP, not a note about the whole attack. Leave THAT
   creature home even when the rest of the team is attacking - "attack with everything that
@@ -345,7 +367,9 @@ you have nothing better to cast; it is a late-game mana sink, not a cheap threat
   activation is FOUR mana, and paying it twice for one creature is four mana set on fire.
   CHECK 0 - IS THIS THE TURN IT WINS? Read the opponent's printed life, then add the power of
   every creature of yours that is UNTAPPED and could attack this turn, plus 3 for the animated
-  Hive. If that total is at or above their printed life, ANIMATE NOW and swing, whatever phase
+  Hive. WRITE THAT SUM AND THEIR PRINTED LIFE INTO YOUR REPLY. If you do not write the two
+  numbers, CHECK 0 did not fire and you go straight on to CHECK 1 - "it might be useful" is not
+  CHECK 0. If that total is at or above their printed life, ANIMATE NOW and swing, whatever phase
   it is - a manland is a win condition on the turn it closes, and this check outranks both
   checks below. Your Hive's activation is usually offered to you only during your UPKEEP, so
   "I will do it in my main phase instead" can mean you never get asked again this turn: when
@@ -356,6 +380,10 @@ you have nothing better to cast; it is a late-game mana sink, not a cheap threat
   CHECK 2 - IS IT ALREADY A CREATURE? Find that Hive on your battlefield line. An animated one is
   printed "Hive of the Eye Tyrant #1 (3/3) [menace]" and is counted in the "of which N are
   creatures" number. If it already reads (3/3), the answer is PASS.
+  AND THE ROW OFTEN SAYS SO ITSELF. An option printed "[repeat: activated this turn N times
+  already]" is the game handing you the receipt for the mana you already spent on it this turn.
+  That tag is an unconditional PASS - the cheapest observable on the screen, and it cannot be
+  wrong. Read it before you read anything else on the row.
   AND THE OPTION COMING BACK IS NOT A NEW OPPORTUNITY. The game will offer you "becomes beholder"
   again later in the same turn - after a spell resolves, at another priority, in the same upkeep.
   That is the same Hive and the same 3/3 you already paid for. A second offer in a turn where you
@@ -402,10 +430,14 @@ DECIDING SITUATIONS (recognize -> do):
 - You need combat math -> read the (P/T) already printed on each creature; do not rebuild it.
 - The block header says the attack IS LETHAL -> assign blockers to the biggest "deals N"
   attackers until the damage still coming through is below your life, THEN use the ladder.
-- Two or more blockers on an attacker's tag print "(blocking trigger: they gain N)" or
-  "(blocking trigger: they may gain N)" -> that swing PAYS them life. Send only what gets
-  through; hold the rest. No "(blocking trigger:" on the tag -> their walls are free to attack
+- ANY blocker on an attacker's tag prints "(blocking trigger: they gain N)", "(blocking trigger:
+  they may gain N)" or "(lifelink: they gain N)" -> that swing PAYS them life. Send only what gets
+  through; hold the rest. No such clause on the tag -> their walls are free to attack
   into and the ordinary rules apply.
+- "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs" is printed AND any attacker's tag prints
+  a "(blocking trigger:" or "(lifelink:" price -> that attacker STAYS HOME. Only bodies the tag
+  says cannot be blocked at all go in. A collapsed tag ("they have N untapped creatures ...,
+  biggest <name>") shows you their biggest body's price, never their most expensive one.
 - An attacker's tag lists several blockers and ONE of them reads "your attacker dies, their
   blocker lives" -> that creature stays home if it is a CARD. They pick the blocker, and they
   pick that one. Only a token goes anyway.
@@ -422,6 +454,10 @@ DECIDING SITUATIONS (recognize -> do):
   -> PASS. Otherwise find that Hive on your battlefield line: already (3/3) -> PASS. And a
   second offer in a turn where you already animated -> PASS; the option coming back is not a new
   opportunity.
+- The "becomes beholder" row prints "[repeat: activated this turn N times already]" -> PASS, at
+  any life total and in any phase. You have already bought that 3/3 this turn.
+- You are about to answer "becomes beholder" in Upkeep and your reply does not contain their
+  printed life and your own attackers' summed power -> the answer is PASS.
 - Triumphant Adventurer is castable and you are under pressure -> cast it; the deathtouch 1/1
   blocks or trades with anything.
 - Soul Shatter is offered but the opponent controls no creature -> do not cast it.

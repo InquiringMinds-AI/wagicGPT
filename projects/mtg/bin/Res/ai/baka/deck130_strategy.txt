@@ -13,14 +13,18 @@ reason to mulligan or to decline a spell, and the "Mana available:" line is corr
 This is above the cycling rule because it OVERRIDES it, and because it killed this deck on its
 own turn. Every "cycling" row, every Forgotten Cave cycle and Pyrite Spellbomb's "Draw 1" mode
 DRAWS A CARD. Some permanents charge you life for that.
-Scan the "Opponent battlefield" line for any permanent whose printed {effect:} text contains the
-words "draws a card" together with damage or life loss to that player. In this pool they are
-UNDERWORLD DREAMS, FATE UNRAVELER and OB NIXILIS, THE HATE-TWISTED, and their text is on their
-own battlefield entry - you do not have to remember them, you have to read the line.
-  - ONE such permanent on their line: cycle only when your life is above 5.
-  - TWO OR MORE: DO NOT DRAW AT ALL. Not cycling, not Forgotten Cave, not Spellbomb's draw mode.
-    Pass instead. Passing costs a card you were not going to cast; drawing costs life you cannot
-    replace, and this deck gains none.
+YOU NO LONGER HAVE TO SCAN FOR THEM, AND YOU NO LONGER COUNT THEM. The board frame prints its
+own summary line whenever any are out, and it prints the PRICE, already summed:
+"DRAW PUNISHERS on the battlefield: theirs - Fate Unraveler. Every card YOU draw costs you 1
+life to theirs." Call that number N. If the line is not on the screen, there is no punisher and
+this rule does not apply this window. (The cards behind it in this pool are UNDERWORLD DREAMS,
+FATE UNRAVELER and OB NIXILIS, THE HATE-TWISTED; you do not have to remember them, and you do
+not have to add them up - the line does it.)
+Decide on N and your life, not on how many permanents are named:
+  - N is 1 and "Your life:" is above 5: you may cycle.
+  - N is 2 or more, OR N is at or above your life minus 5: DO NOT DRAW AT ALL. Not cycling, not
+    Forgotten Cave, not Spellbomb's draw mode. Pass instead. Passing costs a card you were not
+    going to cast; drawing costs life you cannot replace, and this deck gains none.
 At 3 life, against Underworld Dreams AND Fate Unraveler AND Ob Nixilis all on the same line -
 each one printing "deals 1 damage" on every draw - this deck cycled a Starstorm to "dig for an
 answer" and dealt itself exactly its remaining 3 life. Its own plan named all three punishers in
@@ -105,6 +109,12 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
      The "Announce the value of X" list says "option 1 is the LARGEST X (X = N)", so option 1 is
      that N, never X=1. Every row now carries its own "{X pricing: kills THEIRS: ...; YOURS:
      ...}", or the collapsed form "{X pricing: same kills as X=N, for K less mana}".
+       STEP 0. IF YOUR CARRIED PLAN ALREADY NAMES AN X, IGNORE IT AND READ THE ROWS. The plan
+               you wrote one screen ago was written before this menu existed, and the screen
+               hands it back to you as "YOUR PLAN (as you last stated it)". This deck arrived
+               here with "Cast Starstorm at X=3 to kill both Pride Guardians", answered X=3
+               verbatim, and never read the X=4 row above it. An X in a plan is a guess; an X
+               on a row comes with the kill list attached.
        STEP 1. Find the row with the LARGEST "kills THEIRS" list whose "YOURS:" reads "none".
                That is your X. Bigger is free when YOURS is none - the mana you save buys
                nothing if you have nothing else to cast this turn, and a creature you left
@@ -198,7 +208,11 @@ tagged [your battlefield].
 STARSTORM ({X}{R}{R}, instant) deals X to EVERY creature, including yours. Cast it when the opponent
 battlefield line shows two or more creatures that are NOT marked "[defender]". Its X menu says
 "option 1 is the LARGEST X" - option 1 is therefore never X=1; read each row's "X = " text and
-answer that row's number. Pick the smallest X that reaches the toughness you must kill. Because it
+answer that row's number. DO NOT pick the smallest X that reaches the toughness you must kill -
+that sentence used to live here and it is wrong; it is how this deck answered X=3 with an X=4 row
+one line above it reading "kills THEIRS: Pride Guardian x2, Perimeter Captain; YOURS: none", and
+let the Captain live for one mana. The X is chosen by rule #2 STEP 1 - the LARGEST "kills THEIRS"
+list whose "YOURS:" reads "none" - and by nothing else. Because it
 kills your own Blastminers, Goblins, Siege-Gang AND RORIX too, SWEEP FIRST and deploy your bodies
 AFTER - and once Rorix or Siege-Gang is already on the battlefield, Starstorm is a card you hold,
 not a card you cast (rule #2, step 0).

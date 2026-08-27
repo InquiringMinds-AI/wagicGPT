@@ -48,6 +48,10 @@ lands in hand, re-stating "cast Intruder Alarm using Tundra and Underground Sea"
 every window, and lost that game 42 to 0 without ever making a token.
 If your plan names a spell you cannot afford this window, the fix is the land drop, not
 another pass.
+This applies hardest in COMBAT. On a blockers screen at 9 life this deck worked out, correctly,
+that Tribute to Hunger after blockers would let it survive - with "Mana available: 1 total" on
+the same screen and Tribute costing {2}{b}, three mana. A spell you cannot pay for is not a
+survival plan; check "Mana available: N total" BEFORE you build a line around a card in hand.
 
 === RULE 1 - THE TOKEN LINES, AND WHEN TO STOP TAKING THEM ===
 These are the three lines, exactly as you will see them. A second copy of the same card adds a
@@ -56,27 +60,43 @@ handle - "Thraben Doomsayer #1", "Thraben Doomsayer #2" - same line, same rule:
   "Create vampire with Bloodline Keeper [cost: Tap]"
   "Create vampire with Lord of Lineage [cost: Tap]"
 BEFORE you take one, read your own battlefield line - "Your battlefield (K permanents listed, of
-which M are creatures)" - which prints in every window, and read the printed (P/T) on each
-creature entry there. The option line's "[repeat: ... you control M creatures]" note is the same
-M when it appears, but it belongs to ONE COPY and ONE TURN, so most activations do not carry it.
-The battlefield line always does; use it.
-Then, and only then - and the test is POWER, not a headcount:
-  - Add up the printed power of the creatures on your battlefield line that do NOT read
-    "summoning sick". Call that number P, and read the "Opponent life:" number.
-  - P is less than the opponent's life: TAKE THE LINE. Take it again every time it comes back.
-  - P is at or above the opponent's life AND it is your own turn: stop taking the line and go
-    to the ATTACK section - you already have the game and another token does not add to it.
-  - P is at or above the opponent's life and it is the OPPONENT'S turn: take it anyway. A token
-    made on their turn is a blocker now and an attacker on your next turn, and it costs nothing.
-THERE IS NO CREATURE-COUNT CAP, and the old one at 12 and then at 20 is GONE. Both numbers were
-crossed repeatedly and no crossing ever cost a game; both were also obeyed below the number in
-windows where taking the line was right, so the number was doing harm in two directions. What
-replaced it is the only stop that has ever been true here: you stop when you can kill them.
-The render carries no width cost that would argue for a lower stop - the board line COLLAPSES a
-wide board into a range ("Human #2-#11 (1/1) ... x10"), and the largest prompt this seat has ever
-been given at 23 creatures is the same size as its largest at 12.
+which M are creatures)" - which prints in every window. The option line's "[repeat: ... you
+control M creatures]" note carries the same M, but it belongs to ONE COPY and ONE TURN. The
+battlefield line always prints; use it, and use the "[repeat:]" count as the tripwire below.
+THE STOP IS A HEADCOUNT AFTER ALL, BECAUSE POWER CANNOT MEASURE THIS LOOP.
+With Intruder Alarm out, the line comes back after every single activation, and the tokens you
+just made are summoning sick, so the "power of creatures that are not summoning sick" number
+does NOT MOVE when you take the line. A stop written on that number can never be reached: this
+deck took the line 1,868 times in ONE turn, wrote "on my next main phase, attack with all
+creatures to win the game" in its plan every time, and never once got to that main phase - the
+game was killed with the loop still running. Two other games took it 1,540 and 214 times.
+Use the two numbers that DO move, both printed in every window:
+  - M = the number after "of which" on YOUR battlefield line: "Your battlefield (K permanents
+    listed, of which M are creatures)". Every activation adds one to M, summoning sick or not.
+  - L = "Opponent life:", and C = the number after "of which" on the OPPONENT'S battlefield
+    line, i.e. how many blockers they own.
+Then:
+  - M is BELOW L + C + 3: TAKE THE LINE. Take it again every time it comes back.
+  - M reaches L + C + 3: STOP. Answer "CHOICE: 0 (pass)".
+    Every token is at least a 1/1, so at L + C + 3 bodies they cannot block enough of them to
+    live through your next attack, and a body past that number wins nothing.
+  - HARD TRIPWIRE, above every other line in this rule. The option row prints
+    "[repeat: activated this turn N times already]". If that N is 20 OR MORE, answer
+    "CHOICE: 0 (pass)" and stop reading. There is no board in this pool that needs a
+    twenty-first activation in one turn, and past that the loop is the only thing happening.
+PASSING IS ALWAYS AVAILABLE, EVEN WHEN THE LOOP IS THE ONLY ROW ON THE SCREEN. These windows
+routinely list exactly one action - the token line - and no "pass" row. Pass is not a row; it is
+the number 0, and the reply instructions on that same screen say so: "the number (0 = pass
+priority)". "Create human ..." being the only option does NOT mean you must take it.
+WHY STOPPING MATTERS EVEN WHEN YOU ARE WINNING: the board you build is also the board the game
+has to describe back to you. At 1,541 creatures the attack screen handed this deck a 233,662
+character prompt with 1,525 separate attacker rows to name by hand. The stop above keeps the
+board at a size you can still read and answer.
+THERE IS NO CREATURE-COUNT CAP AT 12 OR AT 20 - those numbers are gone and are not coming back;
+they were crossed with no punishment and obeyed where taking the line was right. L + C + 3 is
+not a cap, it is the point where more tokens stop buying anything.
 "I have tapped it 0 times this turn" is not a reason and never was; the count on the battlefield
-line is the state, not the "[repeat:]" note.
+line is the state.
 Timing: the tokens you make CANNOT attack until your next turn, so making them early in your own
 turn buys you nothing this turn and leaves them standing through the opponent's whole turn. Fire
 the chain on the OPPONENT'S turn - the lines are offered there, in their upkeep, their main phase
@@ -138,11 +158,20 @@ No toughness-1 target on the list and no "died" line under this turn: answer "Ca
 right now" and keep the Slip. It costs {B} and it will kill something on a later turn.
 
 === RULE 5 - THE TWO EDICTS ARE DIFFERENT CARDS ===
+IF YOUR PLAN NAMES WHICH CREATURE AN EDICT WILL REMOVE, THE PLAN IS ALREADY WRONG. Check your
+own sentence before you check the board: "Tribute to Hunger on Sigarda", "Tribute to Hunger on
+Briarbridge Tracker", "Tribute to Hunger to remove Sorin" are all sentences this deck has
+written, and all three are impossible. You NEVER pick. The row itself prints the whole card -
+{card text: "Target opponent sacrifices a creature of their choice. You gain life equal to that
+creature's toughness."} - and "of their choice" is the entire rule. The only thing you choose is
+whether to cast it at all, and the answer to that is the count of their creatures.
 "Cast Tribute to Hunger {2}{b}" - the opponent sacrifices a creature and YOU gain life equal to
 its toughness. This is the one you want.
 Cast it at the opponent whenever it is listed and their battlefield line shows exactly ONE
 creature. With two or more of their creatures listed, they hand over their worst one and keep the
-good one - take Tragic Slip, Damnation or a token activation instead.
+good one - take Tragic Slip, Damnation or a token activation instead. This deck cast it at FIVE
+of their creatures and at THREE of their creatures in the same corpus, and got a body it did not
+want both times.
 "Cast Devour Flesh {1}{b}" - the player you name sacrifices a creature AND THAT SAME PLAYER
 gains the life. Naming the opponent does NOT gain YOU anything: "remove their blocker and gain
 4 life" is the sentence this deck wrote in its own plan on turn 3 while handing a Sanguine Bond
@@ -172,11 +201,6 @@ something that was never going to kill you.
 Both edicts give life to the player who sacrifices. If the OPPONENT'S deck list contains a card
 that rewards them for gaining life, "Cast nothing right now" beats either edict at the
 opponent.
-Both cards let the SACRIFICING player pick, so with TWO OR MORE of their creatures listed no
-edict is ever the play: they hand you their worst. A board of two Fate Unravelers (3/4) and a
-Fog Bank (0/2 defender) gives up the Fog Bank and gains 2 life, and both Unravelers stay. Count
-the number printed after "of which" on the OPPONENT'S battlefield line. If it is not exactly 1,
-take Tragic Slip, Damnation or a token activation instead.
 "Yourself (player, life" is the right answer only when the creature you give up is a Human
 or Vampire TOKEN you can remake next turn. Your Bloodline Keeper, your Thraben Doomsayer and
 your flying Vampires stay on the battlefield.

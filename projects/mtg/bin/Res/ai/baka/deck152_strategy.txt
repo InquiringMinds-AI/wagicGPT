@@ -6,7 +6,14 @@ prints its own price: "having already taken N mulligans you will bottom N cards 
   - M is 5 or less: answer "Keep this hand" the moment the hand holds ONE LAND. Not a colour,
     not a two-drop, not a curve - one land. You are DONE; do not read another rule anywhere in
     this file before answering.
-  - M is 6: keep unless the hand is zero lands or all lands.
+  - M is 6: keep unless the hand is zero lands, all lands, or ONE land under the header line
+    "Playing every land in this hand would not cover any spell in it". That coverage line is the
+    engine's own arithmetic and it is the whole test at M=6: one land that covers nothing is a
+    hand that casts nothing, and a six is not worth keeping for its second turn. If the header
+    instead reads "would cover the cost of:" and names a card, KEEP.
+    WHAT THIS COST: a one-land six was kept here against deck130 with the coverage line reading
+    "would not cover any spell in it". The seat cast ZERO spells in thirty-three turns and lost
+    0 to 17. It is the only game this pool has ever produced with no cast in it.
   - M is 7 (your untouched opening seven): the odds comparison in the MULLIGAN section applies.
 THE CARRIED PLAN IS NOT EVIDENCE ABOUT THIS HAND. From the second look on, the ask shows you
 "YOUR PLAN (as you last stated it)", and the plan it shows is the one you wrote about the hand
@@ -140,6 +147,11 @@ swings: one body, then two, then the whole team. Keep swinging.
   Adversaries gain 3 life each AND deal 6 damage to the opponent": that sentence counts the
   blocked outcome and the unblocked outcome at the same time, and it is how you lose lords.
   Three life is not worth a lord; a lord that dies is gone for the rest of the game.
+  YOUR CARRIED PLAN IS NOT A LICENCE EITHER. The ask prints "YOUR PLAN (as you last stated it)",
+  and a plan written before this tag existed ("attack with the Hydra and Katilda") is not evidence
+  about this tag. The A-lines are computed fresh for this combat; the plan is not. When the plan
+  names an attacker whose A-line now reads "your attacker dies, their blocker lives", the plan is
+  out of date - say so in one clause and leave that creature home.
   VIGILANCE IS NOT A LICENCE EITHER. "It has vigilance, so attacking costs me nothing" is FALSE
   against that tag. Briarbridge Tracker's vigilance does not change a "your attacker dies,
   their blocker lives" line - keep it home.

@@ -41,6 +41,17 @@ The order is the single most important thing you decide.
 ONE named exception: when your life is 8 or less AND the opponent's battlefield shows a creature,
 "Cast Fog Bank {1}{u}" goes ahead of the punisher for that one ask - then cast the punisher with
 what is left, or on your next turn.
+WHICH PUNISHER, WHEN TWO ARE OFFERED: TAKE THE ONE THAT IS ALSO A BODY. Fate Unraveler (3/4) and
+Master of the Feast (5/5 flying) are Enchantment CREATURES - they punish AND they block.
+Underworld Dreams and Ob Nixilis are not creatures and will never stop a single point of damage.
+Read your own battlefield line's "of which N are creatures" number and their battlefield line's
+"of which M are creatures, M of them without a restriction against attacking". When your N is 0
+and their M is 1 or more, the punisher with a body goes first, every time - the damage race is
+the same either way and only one of the two answers also holds the board.
+WHAT THIS COST: at 16 life with zero creatures against three attackers, this seat was offered
+Underworld Dreams and Fate Unraveler in the same ask and took Underworld Dreams. It never blocked
+once, cast Fate Unraveler four turns later at 3 life, and lost at turn 12 - the only game it
+lost this corpus.
 
 === RULE 2 - HOW MANY DRAW ENGINES YOU MAY HAVE OUT ===
 Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box, Forced Fruition and Master of the Feast all

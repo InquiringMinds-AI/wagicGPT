@@ -110,7 +110,17 @@ The thought "cast Tribute to Hunger on their best creature" is ALWAYS FALSE - yo
 victim, and naming one in your plan makes you expect a kill and a life total you will not get.
 Cast it when any of these is true:
  - Both enchantments are on your battlefield and the opponent has a creature. This WINS the game.
- - The opponent controls exactly ONE creature - then their choice is your choice.
+ - THE OPPONENT CONTROLS EXACTLY ONE CREATURE. Their choice is your choice, so the edict is a
+   removal spell with no downside, and this is the one condition that does not wait. You do not
+   read this off the names: the opponent battlefield header prints it - "Opponent battlefield (6
+   permanents listed, of which 1 is a creature, ...)". When that creature count reads exactly 1
+   and "Cast Tribute to Hunger" is in the menu, CAST IT IN THAT WINDOW, ahead of Sanguine Bond,
+   ahead of Exquisite Blood, ahead of Idyllic Tutor and ahead of every wall. Five windows this
+   corpus met that condition and you took none of them: three turns running against a Silverquill
+   Silencer (3/2) that then took you from 20 to 10, and one against a Fate Unraveler (3/4) - their
+   only creature and half of the draw lock that killed you on turn 12 - where you cast Sanguine
+   Bond instead and the Bond gained you nothing for the rest of the game. The enchantment is still
+   in your hand next turn; the creature is not still on their board.
  - THE OPPONENT'S ONLY CREATURE IS ONE YOUR BOARD CANNOT BLOCK. None of your sixteen defenders
    and none of your Vampire tokens has FLYING or REACH, so a creature tagged [flying] on the
    opponent battlefield line connects for its full power every single turn no matter how many
@@ -124,8 +134,9 @@ Cast it when any of these is true:
    no choice for them - and gained you 5.
  - You need the life right now to survive the turn.
 Otherwise hold it. It is an instant, it stays castable on their turn, and it will be offered again.
-The engine also lists it when the opponent has no creature at all; with an empty opponent board,
-take a different option.
+THE ZERO STOP: the engine lists Tribute even when they have NO creature. Read the header - "of
+which 0 are creatures" - and never cast it there. It sacrifices nothing, gains nothing and taps you
+out for {2}{B}. You did exactly that on turn 7 of a game, for your whole three mana.
 
 === RULE #5 - BLOCKING IS HOW THIS DECK DEALS DAMAGE ===
 The combat prompt prints a general hint about trades and about taking damage while ahead on
@@ -145,12 +156,26 @@ much damage in EVERY combat after it.
    lost the wall, and two turns later you had no blockers at all and took 10.
  - If EVERY attacker offered to that blocker says "your blocker dies", leave that blocker OUT -
    unless an enchantment of yours is on the battlefield, or the combat header's "you would be at N"
-   number is 8 or less. You blocked a Triumphant Adventurer (1/1, first strike, deathtouch) with
+   number is 8 or less, or the blocker is a lifelink Vampire. Read the header's N before you bench
+   anything: at 8 or less the carve-out is OFF and everything blocks. You answered "BLOCKS: none"
+   to a header reading "you would be at 7" with a lifelink Vampire offered - a body you had no
+   other use for, three damage you did not have to take, and a life gain thrown away. You blocked a Triumphant Adventurer (1/1, first strike, deathtouch) with
    Perimeter Captain at 20 life to stop ONE damage, and the Captain - the card that turns every
    future block into 2 more life - died to it on turn 4. That game ended on turn 10.
 STEP 2 - assign every blocker that STEP 1 did not rule out, in every combat:
  - Give each attacker one blocker first, then put the leftovers on the biggest attacker. Several of
    your blockers may gang up on one attacker; each triggers its own life gain.
+ - MENACE NEEDS TWO OR IT NEEDS NONE. An A-line reading "[menace - only a block by TWO OR MORE of
+   your creatures counts; one creature alone does not block it at all]" cannot be blocked by one
+   body: a single blocker on it stops NOTHING and the attacker deals its full damage anyway. So
+   either put TWO blockers on that attacker or put none there. Two 0/4 walls on a menace attacker
+   is the cheapest block in this deck - neither of them can die to it in a way that costs you
+   anything, and both still trigger their life gain.
+ - AND DO NOT STACK YOUR WHOLE BOARD ON ONE ATTACKER while another blockable one goes through.
+   Twice in one game you answered a five-attacker window with all five blockers on the SAME 3/2,
+   stopping 3 of 16 damage while a menace Spider walked in unblocked because you never gave it the
+   pair it needed. One blocker per blockable attacker first - menace attackers take two - and only
+   then the leftovers.
  - Perimeter Captain gains you 2 life for EACH defender you control that blocks. Three walls
    blocking with the Captain out is 6 life on top of what those walls gain themselves.
  - Pride Guardian gains you 3 life whenever it blocks.
@@ -243,16 +268,21 @@ Take the highest entry on this list that appears in your casting menu:
     to Hunger needs them to have a creature. Against an opponent whose battlefield line shows
     no creature, those two are your ONLY win.
 7b. THE SURVIVAL FLOOR, and it outranks entries 1 and 2 of this list. When the opponent battlefield
-    line shows exactly ONE creature, "Cast Tribute to Hunger" is in this menu, you cannot pay for
-    BOTH Tribute and the combo piece out of the "Mana available:" line, and EITHER of these holds -
+    HEADER reads "of which 1 is a creature" and "Cast Tribute to Hunger" is in this menu, cast
+    TRIBUTE TO HUNGER first, even over Exquisite Blood or Sanguine Bond - at any life total,
+    whatever that creature is, and whether or not you could also pay for the enchantment. One
+    creature means THEIR choice is YOUR choice, so the edict is clean removal, and it is the only
+    removal this deck has. It went 0 for 5 this corpus while you cast enchantments and tutors over
+    it. The two shapes below are the same rule at its sharpest and are kept because each already
+    cost you a game -
       (a) your life is 10 or less, or
       (b) that one creature is tagged [flying] (or anything else your walls cannot block - none of
-          them has flying or reach), whatever your life total is
-    - then cast TRIBUTE TO HUNGER first, even over Exquisite Blood or Sanguine Bond. A combo piece you never get to use because you died two turns later bought you
+          them has flying or reach), whatever your life total is. A combo piece you never get to use because you died two turns later bought you
     nothing; the edict removes the creature that is killing you AND gains you its toughness. Cast
     the enchantment next turn - it will still be in your hand.
- 8. Tribute to Hunger, when nothing above it matched and it is in the menu (Rule #4 - it is an
-    edict, and on an empty opposing board it does nothing, so this is where it falls).
+ 8. Tribute to Hunger when the header shows TWO OR MORE of their creatures and nothing above it
+    matched - at one creature it is 7b and it goes first, and at ZERO creatures it is never cast at
+    all (Rule #4's zero stop: it sacrifices nothing and taps you out).
  9. "Cast nothing right now" - the LAST entry, and correct only when no entry above appeared.
 EVERY CARD YOU CAN CAST HAS A LINE ABOVE: Exquisite Blood, Sanguine Bond, Idyllic Tutor, the four
 walls (Perimeter Captain, Wall of Omens, Overgrown Battlement, Pride Guardian), Staff of Nin,
@@ -302,20 +332,28 @@ are the only cards in this deck that win a game, and the Tutor is how you find t
  - ANY window whose only offered actions are "Add N green mana with Overgrown Battlement": pass,
    unless you can name the spell you are casting with it in this same decision AND its coloured
    pips come from your untapped lands.
- - The opponent's only creature is tagged [flying] and Tribute to Hunger is listed: cast Tribute,
-   at any life total. Your walls cannot block it.
+ - The opponent battlefield header reads "of which 1 is a creature" and Tribute to Hunger is
+   listed: CAST TRIBUTE, in this window, at any life total, ahead of Sanguine Bond, Exquisite
+   Blood, Idyllic Tutor and every wall. One creature means their choice is your choice. This is the
+   line you missed five times.
+ - That header reads "of which 0 are creatures": never cast Tribute to Hunger. It does nothing and
+   taps you out.
  - One enchantment down, the other not in hand, "Cast Idyllic Tutor {2}{w}" listed: cast the Tutor
    and take the missing one.
  - Sanguine Bond on your battlefield and no Exquisite Blood: you are ALREADY killing them. Block
    with everything, ping with Staff, attack with every Vampire - each point of life you gain comes
    straight off their total.
- - An enchantment in hand and castable: cast it this turn, ahead of anything else - EXCEPT at 10
-   life or less with exactly one opponent creature and Tribute to Hunger listed and mana for only
-   one of them: then cast Tribute (Rule 7b).
+ - An enchantment in hand and castable: cast it this turn, ahead of anything else - EXCEPT when the
+   opponent header reads exactly one creature and Tribute to Hunger is listed: then cast Tribute
+   first (Rule 7b), at any life total and whether or not you could pay for both.
  - The opponent attacks: read each blocker's parenthesis FIRST. Leave out any blocker whose every
-   offered attacker says "your blocker dies" (unless an enchantment is out or the header's "you
-   would be at N" is 8 or less); for the rest, prefer an attacker whose parenthesis says your
-   blocker LIVES over a bigger "deals N" that kills it; then assign every blocker that is left.
+   offered attacker says "your blocker dies" (unless an enchantment is out, or the header's "you
+   would be at N" is 8 or less, or it is a lifelink Vampire); for the rest, prefer an attacker whose
+   parenthesis says your blocker LIVES over a bigger "deals N" that kills it; then assign every
+   blocker that is left.
+ - An attacker's A-line carries the "[menace - only a block by TWO OR MORE ...]" tag: give it TWO
+   blockers or none. One alone stops nothing at all. And never pile every blocker onto one attacker
+   while another blockable attacker is unblocked.
  - Your Vampires on the attackers list outnumber the "they have N untapped creatures" on the tag:
    attack with all of them - the surplus connects. But THEY pick which attacker each blocker
    stops, and they pick the one their block wins: the surplus is a count of bodies that get
@@ -334,6 +372,6 @@ are the only cards in this deck that win a game, and the Tutor is how you find t
    on your "Mana available:" line. Cast it only if that clause reads "{B} 1" or shows no {B} at
    all, and only if no Chromatic Lantern is already on your battlefield line. Otherwise take
    something else.
- - The opponent has exactly one creature and you need life: cast Tribute to Hunger.
+ - The opponent has exactly one creature: cast Tribute to Hunger. You do not need to need the life.
  - You are about to plan a spell with a {b} or {w} in its cost: count the untapped LANDS whose
    colour list on the mana line contains that symbol. The Battlements' green pays none of it.
