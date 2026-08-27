@@ -579,3 +579,13 @@ seq **116** — the small, clean Blastminer attackers window that shows **D14** 
 **Extreme, if the pathological case is wanted:**
 `1787786558-ai_baka_deck126-0x55fa89ab8040-vs-ai_baka_deck123.jsonl` seq **19** (116,148 bytes,
 431 options) or `...deck123-0x55fa8add5b20-vs-deck126.jsonl` seq **1570** (233,662 bytes).
+
+## Added 2026-08-27 (owner concern, mid-wave-48): frontend token overload
+D20 (MED, frontend/human seat): no hard cap on battlefield size, but GuiPlay::Render's
+RenderSpell does a linear scan of all CardViews per card per frame (O(n^2)) and HorzStack
+spreads >=16 cards across (SCREEN_WIDTH-50)/total px — a 1,539-creature loop board (w47)
+would be a smeared pile at seconds-per-frame, unusable on PSP/Vita, CardSelector unnavigable.
+Owner's pointer: Arena-style grouping of identical permanents (same name/tapped/counters/
+sickness/attachments) into one CardView with a xN badge, expand-on-click. Same equivalence key
+lane O already uses for the LLM's battlefield rows. Measure the frame-time knee with a windowed
+Doomsayer+Alarm probe before designing. Kill the O(n^2) scan regardless.
