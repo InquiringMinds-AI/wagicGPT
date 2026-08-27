@@ -1,0 +1,23 @@
+# W51-A D-1 sibling: Flare of Malice shares Soul Shatter's edict ("Each
+# opponent sacrifices a creature or planeswalker with the greatest mana value
+# among creatures and planeswalkers they control"). A higher-MV enchantment
+# (Dictate of Kruphix, MV 3) must not shield the opponent's only creature
+# (Grizzly Bears, MV 2).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Flare of Malice
+manapool:{2}{B}{B}
+[PLAYER2]
+inplay:Grizzly Bears,Dictate of Kruphix
+[DO]
+Flare of Malice
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Flare of Malice
+[PLAYER2]
+inplay:Dictate of Kruphix
+graveyard:Grizzly Bears
+[END]

@@ -1223,6 +1223,11 @@ autotap_generic_mono_before_dual_2W.txt
 probe/w50w_pelakka_async_putback.txt
 probe/w50w_pelakka_async_driver_pick.txt
 probe/w50w_tribute_to_hunger_edict.txt
+probe/w51a_soul_shatter_corpus_board.txt
+probe/w51a_soul_shatter_one_creature.txt
+probe/w51a_soul_shatter_noncreature_higher_mv.txt
+probe/w51a_flare_of_malice_noncreature_higher_mv.txt
+probe/w51a_riveteers_charm_planeswalker_edict.txt
 probe/w50w_ai_cleanup_discard_policy.txt
 oracle_ability_dual_not_double_4_lands.txt
 oracle_ability_dual_5_lands.txt
