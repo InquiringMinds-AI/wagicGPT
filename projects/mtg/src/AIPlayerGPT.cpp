@@ -3266,16 +3266,80 @@ string joinZoneEntries(const vector<string>& names, const vector<string>& handle
 {
     if (names.empty())
         return "(none)";
+    //#W48 (D12): the collapse was RUN-LENGTH only, so interleaving defeated it -
+    //alternating Vampire/Human tokens rendered one row each while the adjacent
+    //run collapsed to x174, and two runs of the same body were split by a single
+    //interposed permanent. Group by identical rendered TEXT rather than by
+    //adjacency: when some (name, fact-tail) key occurs at least the collapse
+    //floor's many times and its entries are NOT already contiguous, the entries
+    //are stably reordered so that key's members sit together in ascending rank,
+    //and the unchanged run rule then collapses them. Nothing about the merge test
+    //is relaxed - a run still needs identical name, byte-identical tail and
+    //CONSECUTIVE handles - so no member is ever described by a fact that is not
+    //its own, and the reorder is skipped entirely when adjacency already suffices
+    //(an unchanged board still renders a byte-identical line).
+    vector<size_t> ord(names.size());
+    for (size_t k = 0; k < names.size(); k++)
+        ord[k] = k;
+    if (collapse)
+    {
+        std::map<string, int> keyCount;
+        std::map<string, size_t> keyLast;
+        bool needSort = false;
+        for (size_t k = 0; k < names.size(); k++)
+        {
+            string key = names[k] + "\x01" + tails[k];
+            std::map<string, size_t>::iterator kl = keyLast.find(key);
+            if (kl != keyLast.end() && kl->second + 1 != k)
+                needSort = true;   //this key already appeared, but not adjacently
+            keyLast[key] = k;
+            keyCount[key]++;
+        }
+        if (needSort)
+        {
+            bool worth = false;
+            for (std::map<string, int>::const_iterator it = keyCount.begin();
+                 it != keyCount.end() && !worth; ++it)
+                if (it->second >= (int) kBattlefieldCollapseFloor)
+                    worth = true;
+            if (worth)
+            {
+                //stable, so entries the reorder does not separate keep their
+                //board order; rank ascending inside a key is what lets the
+                //existing consecutive-rank test see a run at all.
+                vector<string> keys(names.size());
+                vector<int> ranks(names.size());
+                for (size_t k = 0; k < names.size(); k++)
+                {
+                    keys[k] = names[k] + "\x01" + tails[k];
+                    ranks[k] = handleRank(handles[k]);
+                }
+                for (size_t a = 1; a < ord.size(); a++)
+                {
+                    size_t v = ord[a];
+                    size_t b = a;
+                    while (b > 0
+                           && (keys[ord[b - 1]] > keys[v]
+                               || (keys[ord[b - 1]] == keys[v] && ranks[ord[b - 1]] > ranks[v])))
+                    {
+                        ord[b] = ord[b - 1];
+                        b--;
+                    }
+                    ord[b] = v;
+                }
+            }
+        }
+    }
     std::ostringstream o;
     bool first = true;
     size_t i = 0;
-    while (i < names.size())
+    while (i < ord.size())
     {
         size_t j = i + 1;
-        int rank = handleRank(handles[i]);
+        int rank = handleRank(handles[ord[i]]);
         if (collapse && rank > 0)
-            while (j < names.size() && names[j] == names[i] && tails[j] == tails[i]
-                   && handleRank(handles[j]) == rank + (int) (j - i))
+            while (j < ord.size() && names[ord[j]] == names[ord[i]] && tails[ord[j]] == tails[ord[i]]
+                   && handleRank(handles[ord[j]]) == rank + (int) (j - i))
                 j++;
         size_t run = j - i;
         if (!first)
@@ -3283,15 +3347,15 @@ string joinZoneEntries(const vector<string>& names, const vector<string>& handle
         first = false;
         if (collapse && rank > 0 && run >= kBattlefieldCollapseFloor)
         {
-            o << names[i] << " #" << rank << "-#" << (rank + (int) run - 1)
-              << tails[i] << " x" << run;
+            o << names[ord[i]] << " #" << rank << "-#" << (rank + (int) run - 1)
+              << tails[ord[i]] << " x" << run;
             i = j;
         }
         else
         {
             //run too short (or handles not contiguous) - emit this one entry and
             //re-scan from the next, so a gap never swallows the entries after it
-            o << names[i] << handles[i] << tails[i];
+            o << names[ord[i]] << handles[ord[i]] << tails[ord[i]];
             i++;
         }
     }
@@ -3309,10 +3373,28 @@ const char * kBlockerRangeNote =
     " whose rows were identical, printed once. Every label in the range is a real,"
     " distinct blocker you can assign: B4 is the first creature of the printed"
     " handle range, B5 the next, and so on to the last. Name them one at a time"
-    " exactly as you would any other B#.\n";
+    " exactly as you would any other B#, or name the whole range at once"
+    " (\"BLOCKS: B4-B9:A2\" assigns every one of them to A2).\n";
 
+//#W48 (D2): the same note for the ATTACKER labels, on both combat screens. The
+//attackers screen answers with ATTACK:, the blockers screen's A-rows are named
+//by BLOCKS: assignments, so both reply forms are stated - the render may not
+//show a label the grammar refuses.
+const char * kAttackerRangeNote =
+    "An A-row whose label is a RANGE (\"A4-A9\") is that many SEPARATE creatures"
+    " whose rows were identical, printed once. Every label in the range is a real,"
+    " distinct creature: A4 is the first creature of the printed handle range, A5"
+    " the next, and so on to the last. Name them one at a time exactly as you"
+    " would any other A#, or name the whole range at once (\"ATTACK: A4-A9\"), or"
+    " write \"ATTACK: all\" to declare every listed attacker.\n";
+
+//#W48 (D2): the label is a parameter because the identical rule governs the
+//A-rows of BOTH combat screens (198 A-rows in one blockers prompt, 1,525 in one
+//attackers prompt, all but one differing only in a #N handle) - R8 collapsed the
+//B-rows, whose corpus-wide maximum was 5.
 string joinBlockerRows(const vector<string>& names, const vector<string>& handles,
-                       const vector<string>& rests, bool * rangeUsed)
+                       const vector<string>& rests, bool * rangeUsed,
+                       const char * label = "B")
 {
     if (rangeUsed)
         *rangeUsed = false;
@@ -3329,7 +3411,7 @@ string joinBlockerRows(const vector<string>& names, const vector<string>& handle
         size_t run = j - i;
         if (rank > 0 && run >= kBattlefieldCollapseFloor)
         {
-            o << "B" << (i + 1) << "-B" << j << ". " << names[i]
+            o << label << (i + 1) << "-" << label << j << ". " << names[i]
               << " #" << rank << "-#" << (rank + (int) run - 1)
               << rests[i] << " x" << run << "\n";
             if (rangeUsed)
@@ -3340,7 +3422,145 @@ string joinBlockerRows(const vector<string>& names, const vector<string>& handle
         {
             //run too short, or the handles are not contiguous: this one row,
             //and re-scan from the next so a gap never swallows what follows
-            o << "B" << (i + 1) << ". " << names[i] << handles[i] << rests[i] << "\n";
+            o << label << (i + 1) << ". " << names[i] << handles[i] << rests[i] << "\n";
+            i++;
+        }
+    }
+    return o.str();
+}
+
+//#W48 (D2): the numbered-option-list half of the same collapse. A priority menu
+//and a target menu carry no name/handle/tail decomposition - they carry one
+//rendered string per option - so the identity handle is recovered FROM the
+//string: the first " #<digits>" token whose digits end the token. Two rows merge
+//only when everything either side of that token is byte-identical and the ranks
+//are consecutive, which is the same three tests joinZoneEntries applies.
+//Returns false (and leaves the outputs untouched) for a row with no handle.
+bool splitRowHandle(const string& row, string& head, string& tail, int& rank)
+{
+    for (size_t i = 0; i + 2 < row.size(); i++)
+    {
+        if (row[i] != ' ' || row[i + 1] != '#' || !isdigit((unsigned char) row[i + 2]))
+            continue;
+        size_t j = i + 2;
+        while (j < row.size() && isdigit((unsigned char) row[j]))
+            j++;
+        //the token has to END there: "#12abc" is not an instance ordinal
+        if (j < row.size() && (isalnum((unsigned char) row[j]) || row[j] == '/'))
+            continue;
+        head = row.substr(0, i);
+        tail = row.substr(j);
+        rank = atoi(row.c_str() + i + 2);
+        return rank > 0;
+    }
+    return false;
+}
+
+//#W48 (D2): the option list, rows numbered from 1, collapsed the same way. The
+//NUMBERING IS NEVER REWRITTEN - a collapsed row prints the label range it
+//covers ("5-430."), so the number the model answers with still indexes the
+//option list the parser reads, which is kept uncollapsed (shownLines). Nothing
+//is deleted: both ranges are printed in full and the count rides the row.
+const char * kOptionRangeNote =
+    "An option whose number is a RANGE (\"5-430.\") is that many SEPARATE options"
+    " whose text was identical apart from the instance ordinal, printed once."
+    " Every number in the range is a real, separately choosable option: 5 is the"
+    " option for the first instance of the printed #N range, 6 the next, and so on"
+    " to the last. Answer with ONE number from inside the range exactly as you"
+    " would any other option number.\n";
+
+//#W48 (D2 + D12's lesson): the numbered lists are ordered by the engine, and
+//that order is LEXICOGRAPHIC on the target name - "Vampire #1, #10, #100, #101,
+//... #11, #110" - so 424 rows that are the same activation 424 times hold
+//consecutive ranks almost nowhere and an adjacency-only collapse recovers only
+//89 of them. Group by identical rendered text first, exactly as the battlefield
+//line now does: a STABLE permutation that gathers every member of a repeated key
+//at the position of its FIRST member, in ascending rank. The caller permutes the
+//parallel action list with it, so the option NUMBERS still index the actions the
+//reply parser resolves against; the deliberate ordering of everything else
+//(usually-correct first, declines last) is preserved because a decline line is
+//unique and no unique line ever moves. Identity permutation when nothing
+//qualifies, so an unchanged window still renders an unchanged prompt.
+void groupNumberedRows(const vector<string>& rows, vector<size_t>& order)
+{
+    order.resize(rows.size());
+    for (size_t i = 0; i < rows.size(); i++)
+        order[i] = i;
+    vector<string> key(rows.size());
+    vector<int> rank(rows.size(), -1);
+    std::map<string, int> count;
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        string head, tail;
+        int r = -1;
+        if (splitRowHandle(rows[i], head, tail, r))
+        {
+            key[i] = head + "\x01" + tail;
+            rank[i] = r;
+            count[key[i]]++;
+        }
+    }
+    bool worth = false;
+    for (std::map<string, int>::const_iterator it = count.begin(); it != count.end() && !worth; ++it)
+        if (it->second >= (int) kBattlefieldCollapseFloor)
+            worth = true; //nothing to gather below the collapse floor
+    if (!worth)
+        return;
+    std::set<string> done;
+    vector<size_t> out;
+    out.reserve(rows.size());
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        if (rank[i] <= 0 || count[key[i]] < (int) kBattlefieldCollapseFloor)
+        {
+            out.push_back(i);
+            continue;
+        }
+        if (!done.insert(key[i]).second)
+            continue; //already gathered at its first member
+        vector<std::pair<int, size_t> > members;
+        for (size_t j = i; j < rows.size(); j++)
+            if (rank[j] > 0 && key[j] == key[i])
+                members.push_back(std::make_pair(rank[j], j));
+        std::sort(members.begin(), members.end());
+        for (size_t m = 0; m < members.size(); m++)
+            out.push_back(members[m].second);
+    }
+    if (out.size() == rows.size())
+        order.swap(out);
+}
+
+string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
+{
+    if (rangeUsed)
+        *rangeUsed = false;
+    std::ostringstream o;
+    vector<string> head(rows.size()), tail(rows.size());
+    vector<int> rank(rows.size(), -1);
+    for (size_t i = 0; i < rows.size(); i++)
+        if (!splitRowHandle(rows[i], head[i], tail[i], rank[i]))
+            rank[i] = -1;
+    size_t i = 0;
+    while (i < rows.size())
+    {
+        size_t j = i + 1;
+        if (rank[i] > 0)
+            while (j < rows.size() && rank[j] == rank[i] + (int) (j - i)
+                   && head[j] == head[i] && tail[j] == tail[i])
+                j++;
+        size_t run = j - i;
+        if (rank[i] > 0 && run >= kBattlefieldCollapseFloor)
+        {
+            o << (i + 1) << "-" << j << ". " << head[i]
+              << " #" << rank[i] << "-#" << (rank[i] + (int) run - 1)
+              << tail[i] << " x" << run << "\n";
+            if (rangeUsed)
+                *rangeUsed = true;
+            i = j;
+        }
+        else
+        {
+            o << (i + 1) << ". " << rows[i] << "\n";
             i++;
         }
     }
@@ -4416,6 +4636,11 @@ string trimMarkerLine(const string& myGrave, const string& oppGrave,
 //Pure over the line text, so every shape (and every non-shape) is provable in
 //PARSETEST without a game.
 const int kEventRunCollapseFloor = 3;
+
+//#W48 (D11): the longest repeating BLOCK the narration holder will recognise.
+//The observed loop alternates two lines; four leaves room for an activation that
+//narrates a cost, an effect and a trigger without holding an unbounded buffer.
+const size_t kNarrationCycleMaxPeriod = 4;
 
 string collapsedRunNarration(const string& line, int count, int total)
 {
@@ -6986,8 +7211,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     mLastPoison[0] = mLastPoison[1] = 0; //N-105a: poison deltas start from zero
     mBulkMoveCount = 0;                  //W41-3(c): no bulk move pending
     mBulkMoveMine = false;
-    mRunCount = 0;                       //#W43-11: no identical-line run held
-    mRunTotal = -1;
+    //#W43-11/#W48 (D11): mEventRun starts empty (its own ctor); nothing held.
     mSearchRevealMine = false;           //#W42-D1: no search run pending
     mSearchIsFullDump = false;
     mSearchIsWholeZone = false;
@@ -7813,41 +8037,114 @@ void AIPlayerGPT::appendNarration(const string& line, int runTotal)
     flushSearchReveal();  //#W42-D1: same reason, same re-entry discipline
     flushPregameBottom(); //#W42-D9: the bottoming precedes turn 1's first line
     flushOpeningHand(); //the deal precedes whatever is being narrated
-    //#W43-11: hold a run of BYTE-IDENTICAL lines instead of writing each one.
-    //Same flush-buffer discipline as the four above: the run is written by
-    //flushEventRun, which clears its count BEFORE it writes, so the recursion
-    //through writeNarration is a single hop and never a loop.
-    if (mRunCount > 0 && line == mRunLine)
+    //#W43-11 / #W48 (D11): hold a REPEATING BLOCK of lines instead of writing
+    //each one. Same flush-buffer discipline as the four above: the holder hands
+    //back only the lines that are ready, and flushEventRun clears it BEFORE it
+    //writes, so the recursion through writeNarration is a single hop, never a loop.
+    vector<string> out;
+    mEventRun.add(line, runTotal, out);
+    for (size_t k = 0; k < out.size(); k++)
+        writeNarration(out[k]);
+}
+
+//The holder's rule, pure (see the header). Establishes a cycle the moment the
+//buffer ends on two identical adjacent blocks, smallest period first.
+void NarrationCycleHolder::add(const string& line, int total, vector<string>& out)
+{
+    if (!cycle.empty())
     {
-        mRunCount++;
-        mRunTotal = runTotal; //the total the LAST line of the run settled at
+        if (line == cycle[pend.size()])
+        {
+            pend.push_back(line);
+            pendTotals.push_back(total);
+            if (pend.size() == cycle.size())
+            {
+                reps++;
+                totals = pendTotals; //the totals the LAST repetition settled at
+                pend.clear();
+                pendTotals.clear();
+            }
+            return;
+        }
+        flush(out); //the repetition broke: everything held is written now
+    }
+    pend.push_back(line);
+    pendTotals.push_back(total);
+    const size_t n = pend.size();
+    for (size_t period = 1; period * 2 <= n && period <= kNarrationCycleMaxPeriod; period++)
+    {
+        bool same = true;
+        for (size_t k = 0; k < period && same; k++)
+            same = (pend[n - 2 * period + k] == pend[n - period + k]);
+        if (!same)
+            continue;
+        //Whatever preceded the two repetitions is not part of them: write it
+        //verbatim, in order, before the block starts holding.
+        size_t head = n - 2 * period;
+        for (size_t k = 0; k < head; k++)
+            out.push_back(pend[k]);
+        cycle.assign(pend.begin() + head + period, pend.end());
+        totals.assign(pendTotals.begin() + head + period, pendTotals.end());
+        reps = 2;
+        pend.clear();
+        pendTotals.clear();
         return;
     }
-    flushEventRun();
-    mRunLine = line;
-    mRunCount = 1;
-    mRunTotal = runTotal;
+    //Bound the candidate buffer: a line that can no longer become the head of a
+    //cycle within the period cap is written out, in order.
+    while (pend.size() > kNarrationCycleMaxPeriod * 2)
+    {
+        out.push_back(pend.front());
+        pend.erase(pend.begin());
+        pendTotals.erase(pendTotals.begin());
+    }
+}
+
+void NarrationCycleHolder::flush(vector<string>& out)
+{
+    if (cycle.empty() && pend.empty())
+        return;
+    vector<string> blk, tail;
+    vector<int> blkTotals;
+    blk.swap(cycle);           //cleared BEFORE the writes, per the flush idiom
+    blkTotals.swap(totals);
+    tail.swap(pend);
+    pendTotals.clear();
+    int n = reps;
+    reps = 0;
+    if (!blk.empty())
+    {
+        if (n < kEventRunCollapseFloor)
+        {
+            //Two repetitions are not the noise class this collapse exists for,
+            //and their per-line detail is still cheap.
+            for (int r = 0; r < n; r++)
+                for (size_t k = 0; k < blk.size(); k++)
+                    out.push_back(blk[k]);
+        }
+        else
+        {
+            //One sentence per DISTINCT line of the block, each carrying the exact
+            //number of times it happened - the count is the fact the log was
+            //hiding. The per-line conjugation (and the "(now X)" total, claimed
+            //only where the emitter supplied one) is #W43-11's, unchanged.
+            for (size_t k = 0; k < blk.size(); k++)
+                out.push_back(collapsedRunNarration(blk[k], n,
+                                                    k < blkTotals.size() ? blkTotals[k] : -1));
+        }
+    }
+    for (size_t k = 0; k < tail.size(); k++)
+        out.push_back(tail[k]);
 }
 
 void AIPlayerGPT::flushEventRun()
 {
-    if (mRunCount <= 0)
+    if (mEventRun.empty())
         return;
-    int n = mRunCount;
-    int total = mRunTotal;
-    string line = mRunLine;
-    mRunCount = 0;             //cleared BEFORE the write, per the flush idiom
-    mRunTotal = -1;
-    mRunLine.clear();
-    if (n < kEventRunCollapseFloor)
-    {
-        //A run of one or two stays verbatim: two lines are not the noise class
-        //this collapse exists for, and their per-line detail is still cheap.
-        for (int i = 0; i < n; i++)
-            writeNarration(line);
-        return;
-    }
-    writeNarration(collapsedRunNarration(line, n, total));
+    vector<string> out;
+    mEventRun.flush(out);
+    for (size_t k = 0; k < out.size(); k++)
+        writeNarration(out[k]);
 }
 
 void AIPlayerGPT::writeNarration(const string& line)
@@ -11864,6 +12161,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                         const std::pair<string, const OrderedAIAction *>& b)
                      { return (asTurnSide(a.second->ability) != NULL)
                               < (asTurnSide(b.second->ability) != NULL); });
+    vector<string> renderRows; //#W48 (D2): the rendered option rows, pre-collapse
     for (size_t c = 0; c < renderOrder.size(); c++)
     {
         const OrderedAIAction * cand = renderOrder[c].second;
@@ -11908,7 +12206,39 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //silently un-retire every capped option).
         shownLines.push_back(line);
         index++;
-        tail << index << ". " << line << lastOfferClause(declines + 1 >= declineCap) << "\n";
+        //#W48 (D2): rows are accumulated and emitted through the numbered-row
+        //collapse below - one priority window carried 432 options / 116 KB, ~425
+        //of them the same Staff of Nin activation differing only in its target's
+        //instance ordinal. The NUMBERING is untouched (a collapsed row prints the
+        //label range it covers), and shownLines stays uncollapsed, so the reply
+        //parser reads exactly the option list it read before.
+        renderRows.push_back(line + lastOfferClause(declines + 1 >= declineCap));
+    }
+    {
+        //#W48 (D2): gather repeated rows before collapsing, permuting the action
+        //list and the translog's option list with them so option N still names
+        //shown[N-1] on every surface.
+        vector<size_t> order;
+        groupNumberedRows(renderRows, order);
+        bool reordered = false;
+        for (size_t k = 0; k < order.size() && !reordered; k++)
+            reordered = (order[k] != k);
+        if (reordered && order.size() == renderRows.size()
+            && order.size() == shown.size() && order.size() == shownLines.size())
+        {
+            vector<string> rr(renderRows), sl(shownLines);
+            vector<const OrderedAIAction *> sh(shown);
+            for (size_t k = 0; k < order.size(); k++)
+            {
+                renderRows[k] = rr[order[k]];
+                shownLines[k] = sl[order[k]];
+                shown[k] = sh[order[k]];
+            }
+        }
+        bool anyOptionRangeRow = false;
+        tail << joinNumberedRows(renderRows, &anyOptionRangeRow);
+        if (anyOptionRangeRow)
+            tail << kOptionRangeNote;
     }
     //Every distinct action is suppressed as already-declined: pass without
     //another model call (that IS the model's standing answer this turn).
@@ -12220,8 +12550,17 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
 
     std::ostringstream tail;
     tail << decision << "\n";
-    for (size_t i = 0; i < options.size(); i++)
-        tail << (i + 1) << ". " << options[i] << "\n";
+    //#W48 (D2): the same numbered-row collapse the priority menu uses. A target
+    //menu over a wide token board is the widest list this seam renders; the
+    //option INDICES are unchanged (a collapsed row prints its label range) and
+    //`options` itself is what parseChoice reads, so the answer surface is
+    //untouched by the render.
+    {
+        bool anyOptionRangeRow = false;
+        tail << joinNumberedRows(options, &anyOptionRangeRow);
+        if (anyOptionRangeRow)
+            tail << kOptionRangeNote;
+    }
     //#W47 (wave-46 E-2): the worked example names THIS window's option 1, not a
     //hard-coded "Cast Example Card" - on cast-free screens (damage order, mode
     //menus) that placeholder was the only affirmative "Cast ..." substring and
@@ -16605,12 +16944,74 @@ static int parseAttackerSet(const string& content, size_t nAttackers, vector<boo
             n = n * 10 + (scan[j++] - '0');
         if (j < scan.size() && scan[j] == '/')
             continue; //a "3/3" power echo, not an attacker index
-        if (n >= 1 && n <= (int) nAttackers && !out[n - 1])
+        //#W48 (D2): the A-rows now carry RANGE labels ("A4-A9" is nine identical
+        //creatures printed once), so the grammar has to accept what the render
+        //prints. "A4-A9", "A4-9" and "A4 - A9" all declare every attacker in the
+        //range; a hyphen followed by anything else is ordinary prose and leaves
+        //the single index exactly as it parsed before.
+        int hi = n;
         {
-            out[n - 1] = true;
-            named++;
+            size_t k = j;
+            while (k < scan.size() && scan[k] == ' ')
+                k++;
+            if (k < scan.size() && scan[k] == '-')
+            {
+                k++;
+                while (k < scan.size() && scan[k] == ' ')
+                    k++;
+                if (k < scan.size() && (scan[k] == 'A' || scan[k] == 'a')
+                    && k + 1 < scan.size() && isdigit((unsigned char) scan[k + 1]))
+                    k++;
+                if (k < scan.size() && isdigit((unsigned char) scan[k]))
+                {
+                    int m = 0;
+                    size_t e = k;
+                    while (e < scan.size() && isdigit((unsigned char) scan[e]))
+                        m = m * 10 + (scan[e++] - '0');
+                    //not a range if the trailing number is a P/T echo's tail
+                    if (m > n && (e >= scan.size() || scan[e] != '/'))
+                    {
+                        hi = m;
+                        j = e;
+                    }
+                }
+            }
         }
+        for (int v = n; v <= hi; v++)
+            if (v >= 1 && v <= (int) nAttackers && !out[v - 1])
+            {
+                out[v - 1] = true;
+                named++;
+            }
         i = j; //advance past the number
+    }
+    //#W48 (D2): "ATTACK: all" - the range note offers it, so the grammar owes it.
+    //Only when the reply named no index at all AND says nothing that reads as a
+    //decline, so "hold all of them back" still declines rather than alpha-strikes.
+    if (named == 0)
+    {
+        string low;
+        for (size_t i = 0; i < scan.size() && i < 400; i++)
+            low += (char) tolower((unsigned char) scan[i]);
+        bool declines = low.find("none") != string::npos || low.find("hold") != string::npos
+                        || low.find("no attack") != string::npos || low.find("nobody") != string::npos
+                        || low.find("pass") != string::npos || low.find("don't attack") != string::npos
+                        || low.find("not attack") != string::npos;
+        bool sawAll = false;
+        for (size_t i = 0; !declines && i + 3 <= low.size(); i++)
+            if (low.compare(i, 3, "all") == 0
+                && (i == 0 || !isalpha((unsigned char) low[i - 1]))
+                && (i + 3 >= low.size() || !isalpha((unsigned char) low[i + 3])))
+                sawAll = true;
+        if (sawAll)
+        {
+            for (size_t v = 0; v < nAttackers; v++)
+                if (!out[v])
+                {
+                    out[v] = true;
+                    named++;
+                }
+        }
     }
     //Name->index reconcile (mirrors parseChoice's echo philosophy). The
     //A-index scan silently DROPPED any name token in a mixed reply
@@ -16704,11 +17105,14 @@ int AIPlayerGPT::chooseAttackers()
     bool anyHeldBack = false; //W41-13: at least one hold-back restriction shown
     bool anyPotentialBlockers = false; //W42-3: at least one trade forecast shown
     bool anyMenaceRestricted = false; //W43-1: at least one set-restricted attacker
+    vector<string> aRowName, aRowHandle, aRowRest; //#W48 (D2): A-row collapse parts
     for (size_t j = 0; j < attackers.size(); j++)
     {
         std::ostringstream ln;
-        ln << "A" << (j + 1) << ". " << attackers[j]->name << instanceHandle(attackers[j])
-           << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
+        //#W48 (D2): the row is built WITHOUT its label/name/handle prefix so the
+        //emitter below can collapse a run of rows that agree in every rendered
+        //fact - the same three tests joinZoneEntries and R8's B-rows apply.
+        ln << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
         string kw = keywordList(attackers[j]);
         if (!kw.empty())
             ln << " [" << kw << "]";
@@ -16905,8 +17309,22 @@ int AIPlayerGPT::chooseAttackers()
             if (noneCouldBlock && minB < 2)
                 ln << noPotentialBlockersTag();
         }
-        shownLines.push_back(ln.str());
-        tail << ln.str() << "\n";
+        aRowName.push_back(attackers[j]->name);
+        aRowHandle.push_back(instanceHandle(attackers[j]));
+        aRowRest.push_back(ln.str());
+        //The TRANSLOG keeps one entry per option, uncollapsed: it is the ordered
+        //option list, not the rendered prompt.
+        {
+            std::ostringstream full;
+            full << "A" << (j + 1) << ". " << aRowName[j] << aRowHandle[j] << aRowRest[j];
+            shownLines.push_back(full.str());
+        }
+    }
+    {
+        bool anyAttackerRangeRow = false;
+        tail << joinBlockerRows(aRowName, aRowHandle, aRowRest, &anyAttackerRangeRow, "A");
+        if (anyAttackerRangeRow)
+            tail << kAttackerRangeNote;
     }
     //Wave-35 churn driver #5 (batch5 #12): the attackers ask stated neither of
     //the two facts that decide it, so the model derived them from scratch - one
@@ -17141,6 +17559,26 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
         int b = 0;
         while (j < content.size() && isdigit(content[j]))
             b = b * 10 + (content[j++] - '0');
+        //#W48 (D2): R8's B-rows already print RANGE labels ("B4-B9"), and the
+        //grammar refused them - "B4-B9:A2" parsed B4, met a 'B' where it wanted
+        //an attacker, and dropped the whole pair. A hyphen followed by another
+        //B-index is the range form; anything else is still the ordinary
+        //"B4-A2" separator run below.
+        int bHi = b;
+        if (j + 2 < content.size() && content[j] == '-'
+            && (content[j + 1] == 'B' || content[j + 1] == 'b')
+            && isdigit(content[j + 2]))
+        {
+            size_t k = j + 2;
+            int m = 0;
+            while (k < content.size() && isdigit(content[k]))
+                m = m * 10 + (content[k++] - '0');
+            if (m > b)
+            {
+                bHi = m;
+                j = k;
+            }
+        }
         while (j < content.size() && (content[j] == ':' || content[j] == '-' || content[j] == '>'
                                       || content[j] == '=' || content[j] == ' '))
             j++;
@@ -17163,19 +17601,24 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                 (*dropped)++;
             continue;
         }
-        if (out[b - 1] != 0)
+        if (bHi > (int) nBlockers)
+            bHi = (int) nBlockers;
+        for (int bb = b; bb <= bHi; bb++)
         {
-            if (dropped)
-                (*dropped)++;
-            if (gangConflict && a >= 1 && out[b - 1] != a)
-                *gangConflict = true; //same blocker, DIFFERENT attacker: the
-                                      //illegal one-blocker-many-attackers shape
-            continue; //first assignment wins: a creature blocks at most one
-                      //attacker, so ignore a later "B1:A3" after "B1:A1"
-                      //(the model occasionally double-assigns one blocker).
+            if (out[bb - 1] != 0)
+            {
+                if (dropped)
+                    (*dropped)++;
+                if (gangConflict && a >= 1 && out[bb - 1] != a)
+                    *gangConflict = true; //same blocker, DIFFERENT attacker: the
+                                          //illegal one-blocker-many-attackers shape
+                continue; //first assignment wins: a creature blocks at most one
+                          //attacker, so ignore a later "B1:A3" after "B1:A1"
+                          //(the model occasionally double-assigns one blocker).
+            }
+            out[bb - 1] = a;
+            pairs++;
         }
-        out[b - 1] = a;
-        pairs++;
     }
 
     //Name->label reconcile pass (opt-in via the name tables). Fills only
@@ -17351,11 +17794,14 @@ int AIPlayerGPT::chooseBlockers()
     //that explains the clause is stated once and only when it applies.
     bool anyGangPriced = false;
     tail << "Attackers:\n";
+    vector<string> aRowName, aRowHandle, aRowRest; //#W48 (D2): A-row collapse parts
     for (size_t j = 0; j < attackers.size(); j++)
     {
         std::ostringstream ln;
-        ln << "A" << (j + 1) << ". " << attackers[j]->name << instanceHandle(attackers[j])
-           << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
+        //#W48 (D2): the row is built WITHOUT its label/name/handle prefix so the
+        //emitter below can collapse a run of rows that agree in every rendered
+        //fact - the same three tests joinZoneEntries and R8's B-rows apply.
+        ln << " (" << attackers[j]->power << "/" << attackers[j]->toughness << ")";
         //POWER is the damage number, not toughness. The model misread a
         //Saproling "(2/4)" as dealing 4 (deck35 wave-18 G1); state the damage
         //explicitly at the line that decides.
@@ -17506,8 +17952,22 @@ int AIPlayerGPT::chooseBlockers()
                 }
             }
         }
-        shownLines.push_back(ln.str());
-        tail << ln.str() << "\n";
+        aRowName.push_back(attackers[j]->name);
+        aRowHandle.push_back(instanceHandle(attackers[j]));
+        aRowRest.push_back(ln.str());
+        //The TRANSLOG keeps one entry per option, uncollapsed: it is the ordered
+        //option list, not the rendered prompt.
+        {
+            std::ostringstream full;
+            full << "A" << (j + 1) << ". " << aRowName[j] << aRowHandle[j] << aRowRest[j];
+            shownLines.push_back(full.str());
+        }
+    }
+    {
+        bool anyAttackerRangeRow = false;
+        tail << joinBlockerRows(aRowName, aRowHandle, aRowRest, &anyAttackerRangeRow, "A");
+        if (anyAttackerRangeRow)
+            tail << kAttackerRangeNote;
     }
     //W36 #2: classify each attacker's becomes-blocked trigger once; the B-line
     //trades below fold a simple self-pump into the computed result and flag
@@ -27588,6 +28048,286 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(!ret && rep == -1, "#W48-E1 NEGATIVE a quoted format string is neither a retraction nor a replacement");
         CHECK(choiceRetractedNoReplacement(r34, (int) loop.size(), &loop) == true,
               "#W48-E1 REGRESSION the boolean verdict without an out-param is unchanged");
+    }
+
+
+    // ---- #W48-D2: the ranged collapse on the A-rows and the numbered lists ----
+    cout << "\n[#W48-D2] the A-rows of both combat screens, and numbered option lists, collapse\n";
+    {
+        //198 A-rows of which 196 were the same Vampire differing only in a #N
+        //handle (blockers, 74,063 chars for 2 real options); 1,525 A-rows in one
+        //attackers prompt. Same rule as the B-rows: identical NAME, identical
+        //fact tail byte-for-byte, CONSECUTIVE handle ranks.
+        vector<string> n, h, r;
+        const string rest = " (4/4) [flying] deals 4";
+        for (int i = 1; i <= 5; i++)
+        {
+            n.push_back("Vampire");
+            std::ostringstream hh; hh << " #" << i;
+            h.push_back(hh.str());
+            r.push_back(rest);
+        }
+        bool ranged = false;
+        string rows = joinBlockerRows(n, h, r, &ranged, "A");
+        cout << "     " << rows;
+        CHECK(ranged, "#W48-D2 five identical A-rows collapse to one ranged row");
+        CHECK(rows == "A1-A5. Vampire #1-#5" + rest + " x5\n",
+              "#W48-D2 the A-label range, the handle range and the count are all printed in full");
+        CHECK(rows.find("A2") == string::npos && rows.find("A3") == string::npos,
+              "#W48-D2 the interior labels are named by the range, not enumerated");
+        //NEGATIVE: one differing fact splits the run - no member may be described
+        //by a fact that is not its own.
+        vector<string> r2(r);
+        r2[2] = " (4/4) [flying, deathtouch] deals 4";
+        bool rg2 = false;
+        string rows2 = joinBlockerRows(n, h, r2, &rg2, "A");
+        CHECK(!rg2 && rows2.find("-A") == string::npos,
+              "#W48-D2 NEGATIVE a differing fact tail refuses the merge (runs of 2 are under the floor)");
+        CHECK(rows2.find("A3. Vampire #3 (4/4) [flying, deathtouch]") != string::npos,
+              "#W48-D2 NEGATIVE the odd row keeps its own label, handle and facts");
+        //NEGATIVE: non-consecutive handles never form a range.
+        vector<string> h3(h);
+        h3[3] = " #9";
+        bool rg3 = false;
+        string rows3 = joinBlockerRows(n, h3, r, &rg3, "A");
+        CHECK(rows3.find("#1-#5") == string::npos,
+              "#W48-D2 NEGATIVE a gap in the handle ranks never mints a range that names a skipped body");
+        //REGRESSION: the B-label default is unchanged.
+        bool rgb = false;
+        CHECK(joinBlockerRows(n, h, r, &rgb).compare(0, 6, "B1-B5.") == 0,
+              "#W48-D2 REGRESSION the default label is still B (R8's blocker rows)");
+    }
+    {
+        //The numbered-option half: one priority window carried 432 options /
+        //116,128 chars, ~425 of them the same Staff of Nin activation differing
+        //only in its target's instance ordinal.
+        string head, tail; int rank = -1;
+        CHECK(splitRowHandle("Deal 1 damage with Staff of Nin targeting Vampire #98 [opponent's battlefield]",
+                             head, tail, rank)
+              && rank == 98 && head == "Deal 1 damage with Staff of Nin targeting Vampire"
+              && tail == " [opponent's battlefield]",
+              "#W48-D2 the instance ordinal is recovered from the middle of an option row");
+        CHECK(!splitRowHandle("Cast Lightning Bolt {r}", head, tail, rank),
+              "#W48-D2 NEGATIVE a row with no instance ordinal has no handle to collapse on");
+        CHECK(!splitRowHandle("Attack for 3 #2a", head, tail, rank),
+              "#W48-D2 NEGATIVE a '#N' glued to more text is not an instance ordinal");
+        vector<string> opts;
+        opts.push_back("Cast Lightning Bolt {r}");
+        for (int i = 1; i <= 4; i++)
+        {
+            std::ostringstream o;
+            o << "Deal 1 damage with Staff of Nin targeting Vampire #" << i << " [cost: Tap]";
+            opts.push_back(o.str());
+        }
+        bool ranged = false;
+        string rows = joinNumberedRows(opts, &ranged);
+        cout << "     " << rows;
+        CHECK(ranged, "#W48-D2 four identical target rows collapse to one ranged option row");
+        CHECK(rows == "1. Cast Lightning Bolt {r}\n"
+                      "2-5. Deal 1 damage with Staff of Nin targeting Vampire #1-#4 [cost: Tap] x4\n",
+              "#W48-D2 the option NUMBERING is untouched - the collapsed row prints the label range it covers");
+        //NEGATIVE: the option indices a reply may name are unchanged, so a
+        //two-row run stays enumerated rather than renumbering anything.
+        vector<string> few;
+        few.push_back("Deal 1 damage with Staff of Nin targeting Vampire #1 [cost: Tap]");
+        few.push_back("Deal 1 damage with Staff of Nin targeting Vampire #2 [cost: Tap]");
+        bool rg2 = false;
+        CHECK(joinNumberedRows(few, &rg2) == "1. " + few[0] + "\n2. " + few[1] + "\n" && !rg2,
+              "#W48-D2 NEGATIVE a run under the collapse floor stays one row per option");
+        vector<string> mixed(opts);
+        mixed[3] = "Deal 1 damage with Staff of Nin targeting Human #3 [cost: Tap]";
+        bool rg3 = false;
+        string rows3 = joinNumberedRows(mixed, &rg3);
+        CHECK(rows3.find("#1-#4") == string::npos && rows3.find("4. Deal 1 damage with Staff of Nin targeting Human #3") != string::npos,
+              "#W48-D2 NEGATIVE a differing row splits the run and keeps its own number");
+    }
+    {
+        //The engine orders these rows lexicographically on the target name, so
+        //424 rows of the same activation held consecutive ranks almost nowhere
+        //and adjacency alone recovered 89 of them. Gather first.
+        vector<string> rows;
+        rows.push_back("Cast Lightning Bolt {r}");
+        const char * ord[] = { "1", "10", "2", "3", "4", "5", "6", "7", "8", "9" };
+        for (size_t i = 0; i < 10; i++)
+            rows.push_back(string("Deal 1 damage with Staff of Nin targeting Vampire #") + ord[i] + " [cost: Tap]");
+        rows.push_back("Pass priority");
+        vector<size_t> order;
+        groupNumberedRows(rows, order);
+        CHECK(order.size() == rows.size() && order[0] == 0 && order[11] == 11,
+              "#W48-D2 the unique rows keep their places - a decline never moves");
+        vector<string> perm;
+        for (size_t k = 0; k < order.size(); k++)
+            perm.push_back(rows[order[k]]);
+        CHECK(perm[1].find(" #1 ") != string::npos && perm[2].find(" #2 ") != string::npos
+              && perm[3].find(" #3 ") != string::npos && perm[10].find(" #10 ") != string::npos,
+              "#W48-D2 the repeated rows are gathered at the first member, in ascending rank");
+        bool ranged = false;
+        string joined = joinNumberedRows(perm, &ranged);
+        cout << "     " << joined;
+        CHECK(ranged && joined.find("2-11. Deal 1 damage with Staff of Nin targeting Vampire #1-#10 [cost: Tap] x10") != string::npos,
+              "#W48-D2 gathering lets the lexicographically-scattered rows collapse to one ranged row");
+        //NEGATIVE: nothing to gather leaves the order byte-identical, so an
+        //unchanged window still renders an unchanged prompt.
+        vector<string> plain;
+        plain.push_back("Cast Lightning Bolt {r}");
+        plain.push_back("Deal 1 damage with Staff of Nin targeting Vampire #1 [cost: Tap]");
+        plain.push_back("Pass priority");
+        vector<size_t> o2;
+        groupNumberedRows(plain, o2);
+        CHECK(o2.size() == 3 && o2[0] == 0 && o2[1] == 1 && o2[2] == 2,
+              "#W48-D2 NEGATIVE below the collapse floor the permutation is the identity");
+    }
+    {
+        //ECHO SHAPE: the render prints range labels, so the reply grammar has to
+        //accept them - a surface may not print a label the parser refuses.
+        vector<bool> send;
+        int r = parseAttackerSet("ATTACK: A2-A5", 6, send);
+        CHECK(r == 4 && !send[0] && send[1] && send[2] && send[3] && send[4] && !send[5],
+              "#W48-D2 echo: 'ATTACK: A2-A5' declares every attacker in the range");
+        r = parseAttackerSet("ATTACK: A2 - A4", 6, send);
+        CHECK(r == 3 && send[1] && send[2] && send[3],
+              "#W48-D2 echo: the spaced range form declares the same set");
+        r = parseAttackerSet("ATTACK: all", 4, send);
+        CHECK(r == 4 && send[0] && send[1] && send[2] && send[3],
+              "#W48-D2 echo: 'ATTACK: all' declares every listed attacker");
+        r = parseAttackerSet("ATTACK: none", 4, send);
+        CHECK(r == 0 && !send[0] && !send[3],
+              "#W48-D2 echo NEGATIVE 'none' is still an explicit decline");
+        r = parseAttackerSet("ATTACK: hold all of them back this turn", 4, send);
+        CHECK(r == 0 && !send[0] && !send[3],
+              "#W48-D2 echo NEGATIVE the word 'all' inside a decline never alpha-strikes");
+        r = parseAttackerSet("ATTACK: A1, A3", 4, send);
+        CHECK(r == 2 && send[0] && !send[1] && send[2] && !send[3],
+              "#W48-D2 echo REGRESSION the plain comma list is unchanged");
+        vector<int> assign;
+        int pairs = parseBlockAssignments("BLOCKS: B4-B6:A2", 8, 3, assign);
+        CHECK(pairs == 3 && assign[3] == 2 && assign[4] == 2 && assign[5] == 2
+              && assign[0] == 0 && assign[6] == 0,
+              "#W48-D2 echo: 'BLOCKS: B4-B6:A2' assigns every blocker in the range to A2");
+        pairs = parseBlockAssignments("BLOCKS: B1:A2, B3:A1", 4, 3, assign);
+        CHECK(pairs == 2 && assign[0] == 2 && assign[2] == 1 && assign[1] == 0,
+              "#W48-D2 echo REGRESSION the plain assignment list is unchanged");
+        pairs = parseBlockAssignments("BLOCKS: B1-A2", 4, 3, assign);
+        CHECK(pairs == 1 && assign[0] == 2,
+              "#W48-D2 echo REGRESSION 'B1-A2' is still the hyphen SEPARATOR form, not a range");
+    }
+
+    // ---- #W48-D12: the battlefield collapse groups by text, not by adjacency ----
+    cout << "\n[#W48-D12] interleaved identical bodies collapse\n";
+    {
+        //deck146 vs123 seq 26: alternating Vampire/Human tokens rendered one row
+        //each while the adjacent run collapsed to x174.
+        vector<string> n, h, t;
+        for (int i = 1; i <= 4; i++)
+        {
+            std::ostringstream hv, hh;
+            hv << " #" << i; hh << " #" << (100 + i);
+            n.push_back("Vampire"); h.push_back(hv.str()); t.push_back(" (4/4)");
+            n.push_back("Human");   h.push_back(hh.str()); t.push_back(" (1/1)");
+        }
+        string line = joinZoneEntries(n, h, t, true);
+        cout << "     " << line << "\n";
+        CHECK(line.find("Vampire #1-#4 (4/4) x4") != string::npos,
+              "#W48-D12 the interleaved Vampires collapse into one ranged entry");
+        CHECK(line.find("Human #101-#104 (1/1) x4") != string::npos,
+              "#W48-D12 the interleaved Humans collapse into their own ranged entry");
+        CHECK(line.find("Vampire #2") == string::npos && line.find("Human #102") == string::npos,
+              "#W48-D12 no member of a collapsed group is also printed on its own");
+        //A single interposed permanent no longer splits one body into two runs.
+        vector<string> n2, h2, t2;
+        for (int i = 1; i <= 3; i++)
+        {
+            std::ostringstream hh; hh << " #" << i;
+            n2.push_back("Human"); h2.push_back(hh.str()); t2.push_back(" (1/1)");
+        }
+        n2.push_back("Thraben Doomsayer"); h2.push_back(""); t2.push_back(" (2/2)");
+        for (int i = 4; i <= 6; i++)
+        {
+            std::ostringstream hh; hh << " #" << i;
+            n2.push_back("Human"); h2.push_back(hh.str()); t2.push_back(" (1/1)");
+        }
+        string line2 = joinZoneEntries(n2, h2, t2, true);
+        cout << "     " << line2 << "\n";
+        CHECK(line2.find("Human #1-#6 (1/1) x6") != string::npos,
+              "#W48-D12 an interposed permanent no longer splits one body into two runs");
+        CHECK(line2.find("Thraben Doomsayer (2/2)") != string::npos,
+              "#W48-D12 the interposed permanent is still rendered, in full");
+        //NEGATIVE: a differing fact still refuses the merge, wherever it sits.
+        vector<string> t3(t2);
+        t3[4] = " (1/1) [summoning sick - cannot attack or block this turn]";
+        string line3 = joinZoneEntries(n2, h2, t3, true);
+        CHECK(line3.find("#1-#6") == string::npos
+              && line3.find("[summoning sick - cannot attack or block this turn]") != string::npos,
+              "#W48-D12 NEGATIVE a differing fact tail is never folded into a range");
+        //NEGATIVE: the hand line still renders one entry per card.
+        CHECK(joinZoneEntries(n, h, t, false).find("-#") == string::npos,
+              "#W48-D12 NEGATIVE the uncollapsed (hand) form is untouched");
+    }
+
+    // ---- #W48-D11: the GAME LOG collapses a repeating BLOCK, not just a line ----
+    cout << "\n[#W48-D11] the token-loop narration collapses to one sentence per line plus a count\n";
+    {
+        //The loop file seq 1921: ~180 alternating pairs, ~90% of a 26 KB prompt,
+        //with no count anywhere - #W43-11's run-length holder never saw a run.
+        const string used = "You used: Create human with Thraben Doomsayer";
+        const string made = "Your Thraben Doomsayer created a 1/1 Human token";
+        NarrationCycleHolder h;
+        vector<string> out;
+        for (int i = 0; i < 180; i++)
+        {
+            h.add(used, -1, out);
+            h.add(made, -1, out);
+        }
+        h.flush(out);
+        CHECK(out.size() == 2, "#W48-D11 360 alternating lines collapse to two sentences");
+        cout << "     " << out[0] << "\n     " << out[1] << "\n";
+        CHECK(out[0] == used + " (x180)"
+              && out[1] == "Your Thraben Doomsayer created 180 1/1 Human tokens",
+              "#W48-D11 each distinct line is printed once, carrying the exact count"
+              " (in #W43-11's own conjugation where it has one)");
+        //Lines before the loop, and a line that breaks it, keep their place.
+        NarrationCycleHolder h2;
+        vector<string> o2;
+        h2.add("You played Mountain", -1, o2);
+        for (int i = 0; i < 5; i++)
+        {
+            h2.add(used, -1, o2);
+            h2.add(made, -1, o2);
+        }
+        h2.add("Opponent drew a card", -1, o2);
+        h2.flush(o2);
+        CHECK(o2.size() == 4 && o2[0] == "You played Mountain"
+              && o2[1] == used + " (x5)"
+              && o2[2] == "Your Thraben Doomsayer created 5 1/1 Human tokens"
+              && o2[3] == "Opponent drew a card",
+              "#W48-D11 the lines around the loop keep their order and their text");
+        //REGRESSION: the period-1 case is #W43-11's identical-line run, unchanged.
+        NarrationCycleHolder h3;
+        vector<string> o3;
+        for (int i = 0; i < 5; i++)
+            h3.add("Your Ranger Class got a level counter", 5, o3);
+        h3.flush(o3);
+        CHECK(o3.size() == 1 && o3[0] == "Your Ranger Class got 5 level counters (now 5)",
+              "#W48-D11 REGRESSION a run of one identical line still collapses as #W43-11 wrote it");
+        //NEGATIVE: below the floor nothing is collapsed and nothing is dropped.
+        NarrationCycleHolder h4;
+        vector<string> o4;
+        h4.add(used, -1, o4);
+        h4.add(made, -1, o4);
+        h4.add(used, -1, o4);
+        h4.add(made, -1, o4);
+        h4.flush(o4);
+        CHECK(o4.size() == 4 && o4[0] == used && o4[1] == made && o4[2] == used && o4[3] == made,
+              "#W48-D11 NEGATIVE two repetitions stay verbatim - nothing is collapsed and nothing is lost");
+        //NEGATIVE: a non-repeating sequence is written through unchanged, in order.
+        NarrationCycleHolder h5;
+        vector<string> o5;
+        const char * seq[] = { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k" };
+        for (size_t i = 0; i < 11; i++)
+            h5.add(seq[i], -1, o5);
+        h5.flush(o5);
+        CHECK(o5.size() == 11 && o5[0] == "a" && o5[10] == "k",
+              "#W48-D11 NEGATIVE a non-repeating log is passed through in order, none of it held forever");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
