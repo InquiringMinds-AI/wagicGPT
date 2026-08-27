@@ -5365,6 +5365,8 @@ public:
     vector<MTGAbility *> currentAbilities;
     bool face;
     AAMorph(GameObserver* observer, int id, MTGCardInstance * card, MTGCardInstance * _target, ManaCost * _cost = NULL);
+    bool sourceIsFaceDown() const;
+    int isReactingToClick(MTGCardInstance * card, ManaCost * mana = NULL);
     int resolve();
     int testDestroy();
     const string getMenuText();

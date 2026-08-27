@@ -345,6 +345,15 @@ namespace
                 continue;
             if (aa->source->isPhased)
                 continue;
+            //W50-MORPH: an ability whose source instance has been superseded
+            //(the card flipped / re-entered: `next` points at the live copy) is
+            //not on the board any more; and a morph "Face Up" ability is only
+            //usable while its permanent is face-down.
+            if (aa->source->next)
+                continue;
+            if (AAMorph * am = dynamic_cast<AAMorph *>(aa))
+                if (!am->sourceIsFaceDown())
+                    continue;
             if (isWrappedManaProducer(aa))
                 continue; //making mana is not a response
             //turn-scoped activations are wrong-turn regardless of speed

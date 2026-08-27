@@ -5474,12 +5474,41 @@ int AAMorph::resolve()
     return 1;
 }
 
+//W50-MORPH (owner live-play report, Vita, 2026-08-27): a Mystic of the Hidden
+//Way that had been turned face up still offered its "Face Up" ability. The
+//flip walks `target->next` to the NEW face-up instance and clears the flags
+//there, but this test read the ORIGINAL face-down instance (`target`), whose
+//isMorphed never clears - so the ability was never reaped. Judge liveness on
+//the instance at the end of the chain.
+static MTGCardInstance * morphLiveInstance(Targetable * t)
+{
+    MTGCardInstance * c = (MTGCardInstance *) t;
+    while (c && c->next)
+        c = c->next;
+    return c;
+}
+
+bool AAMorph::sourceIsFaceDown() const
+{
+    MTGCardInstance * live = morphLiveInstance(target ? target : (Targetable *) source);
+    return live && (live->isMorphed || live->morphed);
+}
+
+int AAMorph::isReactingToClick(MTGCardInstance * card, ManaCost * mana)
+{
+    if (!sourceIsFaceDown())
+        return 0; //only a face-down permanent can be turned face up
+    return ActivatedAbility::isReactingToClick(card, mana);
+}
+
 int AAMorph::testDestroy()
 {
     MTGCardInstance * _target = (MTGCardInstance *) target;
     if(target)
     {
-        if(_target->turningOver && !_target->isMorphed && !_target->morphed)
+        MTGCardInstance * live = morphLiveInstance(_target);
+        if((_target->turningOver && !_target->isMorphed && !_target->morphed)
+            || (live && live != _target && !live->isMorphed && !live->morphed))
         {
             game->removeObserver(this);
             return 1;

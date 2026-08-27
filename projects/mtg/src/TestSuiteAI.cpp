@@ -787,6 +787,19 @@ int TestSuiteAI::Act(float)
             std::cerr << "TESTSUITE " << (wantCast ? "assertcastable" : "assertusable")
                       << ": '" << cname << "' expected " << expect << " got " << got
                       << " [" << suite->filename << "]" << std::endl;
+            if (!wantCast)
+            {
+                //diagnostic: which activated abilities the oracle sees on this card
+                ActionLayer * al = observer->mLayers->actionLayer();
+                for (size_t i = 1; i < al->mObjects.size(); i++)
+                {
+                    ActivatedAbility * aa = dynamic_cast<ActivatedAbility *>((MTGAbility *) al->mObjects[i]);
+                    if (aa && aa->source == ac)
+                        std::cerr << "TESTSUITE assertusable:   ability '" << aa->getMenuText()
+                                  << "' cost " << (aa->getCost() ? aa->getCost()->toString() : string("(none)"))
+                                  << " needsTapping=" << aa->needsTapping << std::endl;
+                }
+            }
             suite->commandAssertFailures++;
         }
     }
