@@ -1,0 +1,19 @@
+# W50 display/oracle pin (owner Vita report). Same board plus a fifth land: usable.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Ironroot Warlord,Selesnya Guildgate,Forest,Forest,Plains,Plains
+hand:Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+assertusable 1 ironroot warlord
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Ironroot Warlord,Selesnya Guildgate,Forest,Forest,Plains,Plains
+hand:Grizzly Bears
+[PLAYER2]
+[END]

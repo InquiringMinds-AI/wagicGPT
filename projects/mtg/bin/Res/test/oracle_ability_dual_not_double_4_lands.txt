@@ -1,0 +1,19 @@
+# W50 display/oracle pin (owner Vita report). Ironroot Warlord {3}{G}{W} over Guildgate+Forest+Forest+Plains (4 lands): NOT usable (pre-fix: the dual counted twice = 5).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Ironroot Warlord,Selesnya Guildgate,Forest,Forest,Plains
+hand:Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+assertusable 0 ironroot warlord
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Ironroot Warlord,Selesnya Guildgate,Forest,Forest,Plains
+hand:Grizzly Bears
+[PLAYER2]
+[END]

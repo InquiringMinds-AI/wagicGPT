@@ -1163,7 +1163,7 @@ int MTGAlternativeCostRule::isReactingToClick(MTGCardInstance * card, ManaCost *
         if (!game->currentlyActing()->isAI() && Delve::alternativeIsDelve(card->getManaCost()))
         {
             ManaEngine::FreeProducerPolicy freePolicy;
-            ManaCost * potential = ManaEngine::potentialManaPermissive(game->currentlyActing(), freePolicy);
+            ManaCost * potential = ManaEngine::potentialMana(game->currentlyActing(), freePolicy, card); //strict; W50-PERMISSIVE
             potential->add(playerMana);
             bool ok = Delve::offerable(card, potential);
             delete potential;

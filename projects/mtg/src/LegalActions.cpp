@@ -376,21 +376,25 @@ namespace
                     for (size_t k = 0; k < cost->extraCosts->costs.size() && !tapsSource; k++)
                         if (dynamic_cast<TapCost *>(cost->extraCosts->costs[k]))
                             tapsSource = true; //{T} in an ability cost is a TapCost extra
-                if (tapsSource)
+                //W50-PERMISSIVE (owner live-play report, Vita, 2026-08-27: Ironroot
+                //Warlord's {3}{G}{W} bordered usable over FOUR lands). The caller's
+                //`pMana` is potentialManaPermissive, which SUMS every mana ability of
+                //every card - a dual land (Selesnya Guildgate add{G} + add{W}) counts as
+                //TWO mana, so four lands with one dual read as five. Price the ability
+                //the way casts are priced: the strict one-ability-per-card potential
+                //(the source itself excluded when the ability taps it), and when that
+                //under-counts a dual's second colour, the colour-aware payment planner
+                //(which excludes the source - conservative for a non-tap ability).
                 {
-                    ManaCost * without = NEW ManaCost(pMana);
-                    for (size_t m = 0; m < g->mLayers->actionLayer()->manaObjects.size(); m++)
-                    {
-                        AManaProducer * own = dynamic_cast<AManaProducer *>(
-                            (MTGAbility *) g->mLayers->actionLayer()->manaObjects[m]);
-                        if (own && own->source == aa->source && own->output)
-                            without->remove(own->output);
-                    }
-                    affordable = without->canAfford(cost, 0) != 0;
-                    SAFE_DELETE(without);
+                    ManaEngine::FreeProducerPolicy strictPolicy;
+                    ManaCost * strict = ManaEngine::potentialMana(p, strictPolicy,
+                        tapsSource ? aa->source : NULL);
+                    strict->add(p->getManaPool());
+                    affordable = strict->canAfford(cost, 0) != 0;
+                    SAFE_DELETE(strict);
+                    if (!affordable)
+                        affordable = ManaEngine::planPayment(p, strictPolicy, aa->source, cost, 0).size() > 0;
                 }
-                else
-                    affordable = pMana->canAfford(cost, 0) != 0;
                 if (!affordable)
                     continue;
             }

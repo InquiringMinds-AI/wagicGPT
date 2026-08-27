@@ -1,5 +1,6 @@
 #include "PrecompiledHeader.h"
 
+#include "ManaEngine.h"
 #include "ExtraCost.h"
 #include "TargetChooser.h"
 #include "MTGCardInstance.h"
@@ -1279,7 +1280,15 @@ bool Delve::offerable(MTGCardInstance * source, ManaCost * floatable)
         exilable = generic;
     if (exilable > 0)
         reduced->remove(Constants::MTG_COLOR_ARTIFACT, exilable);
-    bool ok = floatable->canAfford(reduced, source->has(Constants::ANYTYPEOFMANA)) != 0;
+    int anytype = source->has(Constants::ANYTYPEOFMANA);
+    bool ok = floatable->canAfford(reduced, anytype) != 0;
+    if (!ok)
+    {
+        //W50-PERMISSIVE: `floatable` may be the strict one-ability-per-card
+        //potential (a dual's second colour missing); ask the planner.
+        ManaEngine::FreeProducerPolicy freePolicy;
+        ok = ManaEngine::planPayment(p, freePolicy, source, reduced, anytype).size() > 0;
+    }
     SAFE_DELETE(reduced);
     return ok;
 }
