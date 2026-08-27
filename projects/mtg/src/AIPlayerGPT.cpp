@@ -260,6 +260,15 @@ const char * kMainPhasesAheadFact =
 const char * kPriorityAgainFact =
     "You will have priority again later this turn, so instants and activated abilities you hold "
     "stay castable this turn.\n";
+//#W49-S (D8; the wave-47 D10 ask): a priority ask that directly follows this
+//phase's Casting decision was being answered as if it were the SAME menu -
+//deck146 vs125 seq 80 "CHOICE: 3 (Cast Acererak the Archlich)" over two
+//activated-ability rows, naming a card from the cast menu it had just
+//declined. Restriction-first, and only stated where it is true (a cast ask
+//was actually put to the model this turn, in this phase).
+const char * kCastAnsweredFact =
+    "You have already answered this phase's Casting decision (a card you did not cast there is "
+    "not re-offered below). The rows below are the OTHER actions available now.\n";
 //The caveat is a nudge about THIS menu, never a ruling about legality - see the
 //emitter in assemblePrompt for the measured failure it replaces.
 const char * kStalePlanNote =
@@ -7960,7 +7969,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStuckCastTurn(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -8383,7 +8392,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //Written on EVERY record, present or zero, so a seat review can divide by
     //the record count without inferring absence.
     rec["post_answer_overrun"] = postAnswerOverrun(reply);
-    rec["answer_replaced"] = answerReplaced(reply);
+    //#W49-S (D2): false whenever the EXECUTED answer is the reply's first coded
+    //line (the seam that executed says so via mAnswerReplacedFalse); deck146
+    //vs126 seq 48 read `answer_replaced: true` on a record whose first line was
+    //what ran. Consumed here so the flag can never leak onto a later record.
+    rec["answer_replaced"] = mAnswerReplacedFalse ? false : answerReplaced(reply);
+    mAnswerReplacedFalse = false;
     rec["coded_answers"] = codedAnswerCount(reply);
     //Assignments the combat validator pruned as illegal on this record.
     if (!mLastPrunedPairs.empty())
@@ -11334,31 +11348,74 @@ static string repeatRowLine(const string& shortName, int rowIndex)
 //named. Pure; PARSETEST proves both shapes and the negatives.
 static int scanRepeatCountInLine(const string& line)
 {
+    //#W49-S (D3): FIVE spellings, all seen in the wave-48 corpus - "x17",
+    //"17 times", "N=17", "N = 17" and a bare count closing the parenthetical
+    //(", 17)"). deck123 vs162 seq 28 ended "..., then stop, N=17)" after the
+    //pilot had computed 17 correctly three times, and the one-spelling scanner
+    //read it as countless -> ONE activation, ~262 s of latency in that turn.
+    //Still never a count: the row's own index ("CHOICE: 2 ("), an instance
+    //ordinal ("#1"), the row's stated ceiling ("N is at most 200]") and a P/T
+    //echo - each fails the anchor its spelling requires.
     int found = -1;
-    for (size_t i = 0; i < line.size(); i++)
+    const size_t n = line.size();
+    for (size_t i = 0; i < n; i++)
     {
-        if (line[i] == 'x' && (i == 0 || !isalnum((unsigned char) line[i - 1])))
+        char c = (char) tolower((unsigned char) line[i]);
+        bool wordStart = (i == 0 || !isalnum((unsigned char) line[i - 1]));
+        if (c == 'x' && wordStart)
         {
             size_t d = i + 1;
-            while (d < line.size() && line[d] == ' ') d++;
-            if (d < line.size() && isdigit((unsigned char) line[d]))
+            while (d < n && line[d] == ' ') d++;
+            if (d < n && isdigit((unsigned char) line[d]))
             {
-                int n = 0;
-                while (d < line.size() && isdigit((unsigned char) line[d]) && n < 100000)
-                    n = n * 10 + (line[d++] - '0');
-                found = n;
+                int v = 0;
+                while (d < n && isdigit((unsigned char) line[d]) && v < 100000)
+                    v = v * 10 + (line[d++] - '0');
+                found = v;
             }
         }
-        else if (isdigit((unsigned char) line[i]) && (i == 0 || !isalnum((unsigned char) line[i - 1])))
+        else if (c == 'n' && wordStart && !(i + 1 < n && isalnum((unsigned char) line[i + 1])))
+        {
+            //a lone "N" followed by "=" or ":" and the count ("N=17", "N = 17")
+            size_t d = i + 1;
+            while (d < n && line[d] == ' ') d++;
+            if (d < n && (line[d] == '=' || line[d] == ':'))
+            {
+                d++;
+                while (d < n && line[d] == ' ') d++;
+                if (d < n && isdigit((unsigned char) line[d]))
+                {
+                    int v = 0;
+                    while (d < n && isdigit((unsigned char) line[d]) && v < 100000)
+                        v = v * 10 + (line[d++] - '0');
+                    found = v;
+                }
+            }
+        }
+        else if (isdigit((unsigned char) c) && wordStart)
         {
             size_t d = i;
-            int n = 0;
-            while (d < line.size() && isdigit((unsigned char) line[d]) && n < 100000)
-                n = n * 10 + (line[d++] - '0');
+            int v = 0;
+            while (d < n && isdigit((unsigned char) line[d]) && v < 100000)
+                v = v * 10 + (line[d++] - '0');
             size_t w = d;
-            while (w < line.size() && line[w] == ' ') w++;
-            if (w + 5 <= line.size() && line.compare(w, 5, "times") == 0)
-                found = n;
+            while (w < n && line[w] == ' ') w++;
+            bool timesWord = (w + 5 <= n);
+            for (size_t t = 0; t < 5 && timesWord; t++)
+                timesWord = (tolower((unsigned char) line[w + t]) == "times"[t]);
+            if (timesWord)
+                found = v;
+            else
+            {
+                //", 17)" / ", 17" closing the answer: a count set off by a comma
+                //and followed by nothing but the closing paren (or the end)
+                size_t p = i;
+                while (p > 0 && line[p - 1] == ' ') p--;
+                bool afterComma = (p > 0 && line[p - 1] == ',');
+                bool closes = (w >= n) || line[w] == ')' || line[w] == ']' || line[w] == '.';
+                if (afterComma && closes)
+                    found = v;
+            }
             i = d - 1;
         }
     }
@@ -11398,6 +11455,41 @@ static int parseRepeatCount(const string& reply)
         found = scanRepeatCountInLine(low.substr(start, (eol == string::npos) ? string::npos : eol - start));
     }
     return found;
+}
+
+//#W49-S (D8): the name the reply put in its parenthetical - what the re-ask
+//quotes back ("<name>" is not on this list). First line of the answer segment
+//only; the outermost (...) on it; else the line itself, bounded. Pure.
+static string headParenthetical(const string& answer)
+{
+    size_t start = answer.find_first_not_of(" \t\r\n");
+    if (start == string::npos)
+        return string();
+    size_t eol = answer.find('\n', start);
+    string line = answer.substr(start, (eol == string::npos) ? string::npos : eol - start);
+    size_t open = line.find('(');
+    size_t close = line.rfind(')');
+    string name = (open != string::npos && close != string::npos && close > open + 1)
+                  ? line.substr(open + 1, close - open - 1) : line;
+    size_t a = name.find_first_not_of(" \t");
+    size_t b = name.find_last_not_of(" \t\r");
+    name = (a == string::npos) ? string() : name.substr(a, b - a + 1);
+    if (name.size() > 60)
+        name = name.substr(0, 60);
+    return name;
+}
+
+//#W49-S (D8): the cast menu's exit row. On the model's own first main phase
+//the true next thing after this decision is combat - said on the row, so a
+//pilot that wants to attack ("CHOICE: 5 (Attack with all creatures)" over a
+//4-row cast menu, deck123 vs126 seq 29) finds the way there instead of
+//naming a row that does not exist. Stated ONLY where it is true: on the
+//opponent's turn, or in any other phase, the row is the plain decline. Pure,
+//so PARSETEST proves both faces and the echo of the annotated one.
+static string castDeclineRow(bool combatNext)
+{
+    return combatNext ? "Cast nothing right now (combat comes next this turn)"
+                      : "Cast nothing right now";
 }
 
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
@@ -12721,6 +12813,18 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
         //out-of-range index, but the echo names a real option: repair
         if (echoRemap > 0 && !echoConflict)
             return echoRemap;
+        //#W49-S (D2/D8): an index PAST the menu whose parenthetical names no
+        //offered row ("CHOICE: 3 (Cast Acererak the Archlich)" over two rows)
+        //is a named row that is not on this list - not an unreadable reply.
+        //Signed as its own class so the corpus counts it apart from
+        //unparsed_reply, and returned here rather than falling through to the
+        //digit scan below, which could only execute a number the model never
+        //meant.
+        if (n > optionCount && echoNoMatch)
+        {
+            appendParseNote(noteOut, "named_row_not_offered");
+            return -1;
+        }
     }
     else if (echoRemap > 0 && !echoConflict)
         return echoRemap; //non-numeric head, but the echo names the intent
@@ -12922,6 +13026,47 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
     return salvaged;
 }
 
+//#W49-S (D2): the FIRST line-leading CHOICE line that parses to an offered
+//option (same walk as salvageLoopedChoice, first-wins instead of last-wins).
+//-1 when no line parses. Used only to make answer_replaced truthful: the
+//field must be false when what EXECUTED is the reply's first coded answer.
+int AIPlayerGPT::firstCodedChoice(const string& content, int optionCount,
+                                  const std::vector<string> * optionTexts)
+{
+    size_t lineStart = 0;
+    while (lineStart <= content.size())
+    {
+        size_t lineEnd = content.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? content.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (content[s] == ' ' || content[s] == '\t'
+                           || content[s] == '*' || content[s] == '#' || content[s] == '-'))
+            s++;
+        if (end - s >= 7)
+        {
+            static const char * kLabel = "CHOICE:";
+            bool m = true;
+            for (int k = 0; k < 7 && m; k++)
+                m = (toupper((unsigned char) content[s + k]) == kLabel[k]);
+            if (m)
+            {
+                string line = content.substr(s + 7, end - (s + 7));
+                if (!isTemplatePlaceholderLine(line))
+                {
+                    bool st = false;
+                    int c = parseChoice(line, optionCount, optionTexts, &st);
+                    if (c >= 0)
+                        return c;
+                }
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    return -1;
+}
+
 //True when the resolved (last line-leading) coded CHOICE is not the model's
 //committed answer - route to the heuristic instead of executing the digit.
 //
@@ -12957,10 +13102,13 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
 //retracted digit) is the harmful case we still catch.
 bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int optionCount,
                                                const std::vector<string> * optionTexts,
-                                               int * replacement)
+                                               int * replacement,
+                                               bool * namedRowNotOffered)
 {
     if (replacement)
         *replacement = -1;
+    if (namedRowNotOffered)
+        *namedRowNotOffered = false;
     string text = content;
     size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
@@ -13142,7 +13290,34 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
                             later += 7;
                         }
                         if (!anyLater)
-                            *replacement = n;
+                        {
+                            //#W49-S (D2): the replacement executes an INDEX,
+                            //so its parenthetical must name the row at that
+                            //index (or, uniquely, another offered row - the
+                            //echo-wins rule parseChoice already applies to a
+                            //line-1 answer). deck126 vs130 seq 25: line 1
+                            //"CHOICE: 2 (Cast nothing right now)", tail
+                            //"CHOICE: 1 (Cast Sanguine Bond)" - Sanguine Bond
+                            //was in HAND, not on the two-row menu, and index 1
+                            //cast Tribute to Hunger into an empty board. Run
+                            //the re-answer's own line through parseChoice: a
+                            //consistent or remapped name is the decision; a
+                            //name foreign to every row is NOT a re-answer of
+                            //this menu, so the earlier, offered answer stands
+                            //and the divergence is signed named_row_not_offered.
+                            size_t le = text.find('\n', d);
+                            string reLine = text.substr(d, (le == string::npos) ? string::npos : le - d);
+                            bool st = false;
+                            int v = parseChoice(reLine, optionCount, optionTexts, &st);
+                            if (v >= 0)
+                                *replacement = v;
+                            else
+                            {
+                                if (namedRowNotOffered)
+                                    *namedRowNotOffered = true;
+                                return false; //keep the earlier matching coded answer
+                            }
+                        }
                     }
                     return true; //genuine second, contradictory coded index
                 }
@@ -13655,12 +13830,30 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (phase < MTG_PHASE_ENDOFTURN)
         tail << (observer->currentPlayer == this && phase < MTG_PHASE_SECONDMAIN ? "" : "\n")
              << kPriorityAgainFact;
+    //#W49-S (D8): the casting question of this phase was already put to the
+    //model - say so, where it is true.
+    if (mCastAskTurn == observer->turn && mCastAskPhase == phase)
+        tail << (tail.str().empty() || tail.str()[tail.str().size() - 1] == '\n' ? "" : "\n") << kCastAnsweredFact;
     tail << "\nWhich action do you take? On the FIRST line write CHOICE: followed by the number (0 = pass priority) and its SHORT NAME in parentheses (the action and card name only - copy nothing from the {...} annotations), e.g. \"CHOICE: 3 (Cast Example Card)\" (a placeholder - copy a real number and short name from the list) or \"CHOICE: 0 (pass)\"; then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.";
 
     //The dedupe/deadlock key is board state + question, NOT the assembled
     //prompt: consuming an answer appends to the narration and updates the
     //plan, and a full-prompt key would read that as a state change.
     string boardKey = serializeGameState();
+    //#W49-S (D8/D3): the one re-ask for this board state. Appending the
+    //correction makes this a DIFFERENT question (its own askKey, a fresh
+    //call); the board moving on retires it. It is deliberately NOT cleared on
+    //exhaustion: the corrected question must stay this state's question so
+    //the cached -1 replays instead of re-minting the original key and paying
+    //another round trip (the W39-D1(b) trap).
+    if (!mPriorityReaskBoard.empty() && mPriorityReaskBoard != boardKey)
+    {
+        mPriorityReaskBoard.clear();
+        mPriorityReaskLine.clear();
+        mPriorityReaskKind.clear();
+    }
+    if (!mPriorityReaskBoard.empty())
+        tail << "\n" << mPriorityReaskLine;
     string askKey = boardKey + tail.str();
     string userMsg = assemblePrompt(tail.str());
     bool unchanged = (askKey == mLastAskKey);
@@ -13737,11 +13930,13 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //the heuristic rather than execute the retracted digit.
         bool retracted = false;
         int reanswer = -1;
+        bool namedNotOffered = false;
         //#W48-F1: N as the model named it (0 = this was not a repeat row, or no
         //count was named and the row collapses to a single activation).
         int repeatN = 0;
+        string repeatReceipt; //#W49-S (D3): the narrated receipt of a countless take
         if (choice >= 0 && !content.empty()
-            && choiceRetractedNoReplacement(content, index, &shownLines, &reanswer))
+            && choiceRetractedNoReplacement(content, index, &shownLines, &reanswer, &namedNotOffered))
         {
             if (reanswer >= 0)
             {
@@ -13755,6 +13950,66 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 retracted = true;
             }
         }
+        //#W49-S (D2): the trailing re-answer named a row not on this menu - the
+        //earlier offered answer executes; the divergence is signed.
+        if (namedNotOffered)
+            appendParseNote(&mLastParseNote, "named_row_not_offered");
+        bool namedRowFail = (choice < 0 && !content.empty()
+                             && parseNote.find("named_row_not_offered") != string::npos);
+        bool repeatRowTaken = (choice >= 1 && choice <= index && choice - 1 >= baseIndex
+                               && choice - 1 < (int) repeatBaseRow.size()
+                               && repeatBaseRow[choice - 1] >= 0);
+        int namedCount = repeatRowTaken ? parseRepeatCount(decisionPart.empty() ? content : decisionPart) : -1;
+        //#W49-S (D8/D3): ONE re-ask per board state, before the heuristic (D8)
+        //or before the single activation (D3). The corrected question is put
+        //in flight now and answered on a later tick, exactly like a first ask;
+        //the record written here carries the reply that earned the re-ask.
+        if (!content.empty() && mPriorityReaskBoard != boardKey
+            && (namedRowFail || (repeatRowTaken && namedCount < 0)))
+        {
+            std::ostringstream corr;
+            const char * fb;
+            if (namedRowFail)
+            {
+                corr << "[RE-ASK] \"" << headParenthetical(decisionPart.empty() ? content : decisionPart)
+                     << "\" is not on this list. Answer with a number from 1 to " << index
+                     << ", or 0 (pass).";
+                fb = "named_row_reask";
+                mPriorityReaskKind = "named_row";
+            }
+            else
+            {
+                corr << "[RE-ASK] You chose the repeat row but named no count. Answer again with"
+                        " the number of repeats on the CHOICE line, in the row's own format.";
+                fb = "repeat_count_reask";
+                mPriorityReaskKind = "repeat_count";
+            }
+            mPriorityReaskBoard = boardKey;
+            mPriorityReaskLine = corr.str();
+            if (!parseNote.empty())
+                mLastParseNote = parseNote;
+            writeTransLog("priority", userMsg, content, choice, index, "", fb, &shownLines);
+            setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
+                                   : "the repeat row was taken without a count - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
+            string corrected;
+            pollCompletionRetry(assemblePrompt(tail.str() + "\n" + mPriorityReaskLine), corrected);
+            //mLastAskKey is left as it was: the corrected question's own key
+            //differs from it, so the next tick polls (and eventually consumes)
+            //the corrected call rather than replaying this failed answer.
+            return NULL; //in flight; decisionPending() holds the pass
+        }
+        if (mPriorityReaskBoard == boardKey && !mPriorityReaskKind.empty())
+        {
+            //the second answer for this state, whatever it is, is final
+            if (mPriorityReaskKind == "named_row")
+                appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
+                                                              : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
+            else if (repeatRowTaken)
+                appendParseNote(&mLastParseNote, namedCount >= 2 ? "repeat_count_reask_recovered"
+                                                                 : "repeat_count_reask_exhausted");
+            mPriorityReaskKind.clear();
+        }
         if (content.empty())
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
         else if (choice >= 1 && choice <= index)
@@ -13763,10 +14018,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //share an OrderedAIAction pointer, so everything below reads the
             //base row; only the plan and the narration know about the N.
             int actRow = choice - 1;
-            if (actRow >= baseIndex && actRow < (int) repeatBaseRow.size()
-                && repeatBaseRow[actRow] >= 0)
+            if (repeatRowTaken)
             {
-                int named = parseRepeatCount(decisionPart.empty() ? content : decisionPart);
+                int named = namedCount;
                 actRow = repeatBaseRow[actRow];
                 if (named > kRepeatRowMax)
                 {
@@ -13779,8 +14033,20 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 {
                     //The row was taken without the count it asks for. Perform
                     //the single activation the base row would have performed -
-                    //never a guessed N - and record why in the translog.
-                    appendParseNote(&mLastParseNote, "repeat_count_missing");
+                    //never a guessed N - and record why in the translog AND in
+                    //the narration (#W49-S D3: the pilot is owed the receipt).
+                    std::ostringstream rc;
+                    if (named < 0)
+                    {
+                        appendParseNote(&mLastParseNote, "repeat_count_missing");
+                        rc << " - ran 1 time (you named no count)";
+                    }
+                    else
+                    {
+                        appendParseNote(&mLastParseNote, "repeat_count_under_two");
+                        rc << " - ran 1 time (you named " << named << ")";
+                    }
+                    repeatReceipt = rc.str();
                 }
             }
             //W42-D2: an ACTIVATION taken here is narrated in the SHARED
@@ -13800,6 +14066,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 rn << takenLine << " (you named " << repeatN << " repeats of it)";
                 takenLine = rn.str();
             }
+            else if (!repeatReceipt.empty() && !takenLine.empty())
+                takenLine += repeatReceipt;
             narrateDecision(takenLine);
             //Gated on a line having actually been written: a CAST narrates ""
             //here (its zone events tell that story instead), and stamping one
@@ -13862,7 +14130,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             mLoopCount = 0;
         }
         {
-            const char * fb = (choice >= 0) ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
+            const char * fb = (choice >= 0) ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : (namedRowFail ? "named_row_not_offered" : "unparsed_reply"))));
+            //#W49-S (D2): what executed IS the first coded line -> not replaced
+            if (choice >= 0 && firstCodedChoice(content, index, &shownLines) == choice)
+                mAnswerReplacedFalse = true;
             string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
                           : (choice == 0 ? string("pass") : string());
             //#W48-F1: ONE record carries the whole repeat - the action and the
@@ -13973,7 +14244,13 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     //narration and the plan (see the header) so that consuming one answer
     //cannot invalidate another already given for this same state - the
     //earlier picks of a multi-target selection re-derive from this cache.
-    string askKey = serializeGameState() + tailStr;
+    string askKey0 = serializeGameState() + tailStr;
+    //#W49-S (D8): this state+question already earned its one re-ask - the
+    //corrected question is THE question from here on (its own cache slot).
+    bool reasked = (!mAskReaskKey.empty() && mAskReaskKey == askKey0);
+    if (reasked)
+        tailStr += "\n" + mAskReaskLine;
+    string askKey = reasked ? serializeGameState() + tailStr : askKey0;
     std::map<string, int>::iterator cached = mAskCache.find(askKey);
     if (cached != mAskCache.end())
         return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
@@ -14015,8 +14292,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     //took back with no replacement is not its decision.
     bool retracted = false;
     int reanswer = -1;
+    bool namedNotOffered = false;
     if (choice >= 0 && !content.empty()
-        && choiceRetractedNoReplacement(content, (int) options.size(), &options, &reanswer))
+        && choiceRetractedNoReplacement(content, (int) options.size(), &options, &reanswer, &namedNotOffered))
     {
         if (reanswer >= 0)
         {
@@ -14030,6 +14308,32 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
             retracted = true;
         }
     }
+    if (namedNotOffered)
+        appendParseNote(&mLastParseNote, "named_row_not_offered"); //#W49-S (D2)
+    bool namedRowFail = (choice < 0 && !content.empty()
+                         && parseNote.find("named_row_not_offered") != string::npos);
+    //#W49-S (D8): an index past the menu naming no offered row gets ONE re-ask
+    //before the heuristic. deck123 vs126 seq 29: "CHOICE: 5 (Attack with all
+    //creatures)" over a 4-row Main-1 cast menu.
+    if (namedRowFail && !reasked)
+    {
+        std::ostringstream corr;
+        corr << "[RE-ASK] \"" << headParenthetical(decisionPart.empty() ? content : decisionPart)
+             << "\" is not on this list. Answer with a number from 1 to " << options.size() << ".";
+        mAskReaskKey = askKey0;
+        mAskReaskLine = corr.str();
+        if (!parseNote.empty())
+            mLastParseNote = parseNote;
+        writeTransLog("ask", userMsg, content, choice, (int) options.size(), "", "named_row_reask", &options);
+        setNotice("that answer named nothing on the list - asking again", 5.0f);
+        DebugTrace("AIPlayerGPT: named_row_reask -> re-asking once");
+        string corrected;
+        pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine), corrected);
+        return kChoicePending; //the caller unwinds; the corrected call answers later
+    }
+    if (reasked)
+        appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
+                                                      : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
     if (content.empty())
         noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
     else if (narrateChoice && choice >= 1 && choice <= (int) options.size())
@@ -14051,7 +14355,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     mAskCache[askKey] = choice;
     {
         bool valid = choice >= 1 && choice <= (int) options.size();
-        const char * fb = valid ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : "unparsed_reply")));
+        const char * fb = valid ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : (namedRowFail ? "named_row_not_offered" : "unparsed_reply"))));
+        //#W49-S (D2): what executed IS the first coded line -> not replaced
+        if (choice >= 0 && firstCodedChoice(content, (int) options.size(), &options) == choice)
+            mAnswerReplacedFalse = true;
         writeTransLog("ask", userMsg, content, choice, (int) options.size(),
                       valid ? options[choice - 1] : string(), fb, &options);
     }
@@ -14845,7 +15152,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
     for (int attempt = 0; ; attempt++)
     {
         vector<string> menu(opts);
-        menu.push_back("Cast nothing right now"); //the decline goes LAST
+        menu.push_back(castDeclineRow(observer->currentPlayer == this
+                                      && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN)); //the decline goes LAST
 
         std::ostringstream q;
         q << "Casting decision (" << observer->getCurrentGamePhaseName()
@@ -14858,6 +15166,8 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                  " is still open: decide again over what remains.";
 
         //no narration: a cast narrates itself as zone events, "nothing" is a non-action
+        mCastAskTurn = observer->turn; //#W49-S (D8): the priority ask after this can say so
+        mCastAskPhase = observer->getCurrentGamePhase();
         int pick = askModel(q.str(), menu, false);
         if (pick == kChoicePending)
             return NULL; //no cast this tick; the answer is consumed on a later poll
@@ -18433,6 +18743,85 @@ static string stripAnnotationBrackets(const string& s)
     return out;
 }
 
+//#W49-S (D2b): the LAST-CODED-LINE rule for combat replies. deck146 vs126
+//seq 48 opened "ATTACK: A1, A2", reasoned for 2,500 chars ("Do not sacrifice
+//Spider"), and ended "ATTACK: A1" - the engine sent both and Spider died. The
+//wave-23 first-usable-line rule exists because a CoT combat-math line can
+//share the answer's label ("Attack: Deal 1, Take 5. Net -4 life.", deck109
+//vs62 s21) and parse to a bogus subset; so a LATER line replaces the first
+//only when it is CLEAN - every word on it is a label index, a range, a count,
+//a declension word, or a word of the roster it declares over. Prose fails
+//that test; a re-answer passes it.
+static bool combatLineIsClean(const string& line, const vector<string> * rosterA,
+                              const vector<string> * rosterB)
+{
+    static const char * kWords[] = {
+        "all", "none", "and", "with", "nobody", "hold", "back", "this", "turn", "no",
+        "attack", "attacks", "attacking", "block", "blocks", "blocking", "blocked", "by",
+        "everyone", "everything", "them", "the", "a", "an", "creature", "creatures", "my",
+        "of", "only", "just", "alone", "it", "nothing", "none", "both", "each", "every"
+    };
+    string scan = stripAnnotationBrackets(line);
+    //the roster's own words, lowercased, whole tokens
+    vector<string> rosterWords;
+    for (int r = 0; r < 2; r++)
+    {
+        const vector<string> * roster = r ? rosterB : rosterA;
+        if (!roster)
+            continue;
+        for (size_t k = 0; k < roster->size(); k++)
+        {
+            string t;
+            const string& nm = (*roster)[k];
+            for (size_t q = 0; q <= nm.size(); q++)
+            {
+                char c = (q < nm.size()) ? (char) tolower((unsigned char) nm[q]) : ' ';
+                if (isalnum((unsigned char) c) || c == '\'' || c == '#')
+                    t += c;
+                else
+                {
+                    if (!t.empty())
+                        rosterWords.push_back(t);
+                    t.clear();
+                }
+            }
+        }
+    }
+    bool anyToken = false;
+    string t;
+    for (size_t q = 0; q <= scan.size(); q++)
+    {
+        char c = (q < scan.size()) ? (char) tolower((unsigned char) scan[q]) : ' ';
+        if (isalnum((unsigned char) c) || c == '\'' || c == '#')
+        {
+            t += c;
+            continue;
+        }
+        if (t.empty())
+            continue;
+        anyToken = true;
+        bool ok = false;
+        //A1 / B3 / 7 / #2 - a label index, a bare count, an ordinal
+        {
+            size_t d = 0;
+            if (t[0] == 'a' || t[0] == 'b' || t[0] == '#')
+                d = 1;
+            bool digits = d < t.size();
+            for (size_t z = d; z < t.size() && digits; z++)
+                digits = isdigit((unsigned char) t[z]) != 0;
+            ok = digits;
+        }
+        for (size_t w = 0; w < sizeof(kWords) / sizeof(kWords[0]) && !ok; w++)
+            ok = (t == kWords[w]);
+        for (size_t w = 0; w < rosterWords.size() && !ok; w++)
+            ok = (t == rosterWords[w]);
+        if (!ok)
+            return false;
+        t.clear();
+    }
+    return anyToken;
+}
+
 //Scan a bundled-attacker reply for the set of attackers to send: "A<n>"
 //tokens (or bare numbers) in [1..nAttackers]. Returns >0 = that many named,
 //0 = an explicit decline (a "none/hold/pass" keyword with no numbers) OR a
@@ -19024,12 +19413,32 @@ int AIPlayerGPT::chooseAttackers()
             stripped = stripped.substr(te + 8);
         vector<string> attackLines;
         collectLabeledLines(stripped, "ATTACK:", attackLines);
+        int takenLine = -1;
         for (size_t li = 0; li < attackLines.size(); li++)
         {
             vector<bool> s;
             int r = parseAttackerSet(attackLines[li], attackers.size(), s, &attackerNames);
-            if (r >= 0) { send = s; result = r; break; } //first usable declaration
+            if (r >= 0) { send = s; result = r; takenLine = (int) li; break; } //first usable declaration
         }
+        //#W49-S (D2b): the last CLEAN coded line is the model's final answer
+        //(see combatLineIsClean); a prose combat-math line never replaces.
+        for (size_t li = attackLines.size(); takenLine >= 0 && li-- > (size_t) takenLine + 1; )
+        {
+            if (!combatLineIsClean(attackLines[li], &attackerNames, NULL))
+                continue;
+            vector<bool> s;
+            int r = parseAttackerSet(attackLines[li], attackers.size(), s, &attackerNames);
+            if (r >= 0)
+            {
+                send = s;
+                result = r;
+                takenLine = (int) li;
+                appendParseNote(&mLastParseNote, "attack_last_line_taken");
+            }
+            break;
+        }
+        if (takenLine == 0)
+            mAnswerReplacedFalse = true; //what executed is the first coded line
     }
     //Fallback for a reply that named attackers WITHOUT a line-leading ATTACK:
     //label (consumePlan's short-bare-answer path) - unchanged behavior.
@@ -19801,7 +20210,41 @@ int AIPlayerGPT::chooseBlockers()
 
     //Plan split BEFORE the assignment parse: a "B2" or bare numbers in the
     //plan prose must not read as block assignments.
-    string decisionPart = consumePlan(content);
+    //#W49-S (D2b): the answer is a BLOCKS: line (consumePlan's default took
+    //the last line-leading label of ANY kind, so a trailing CoT "Attack:" line
+    //could stand in for the assignment); among several BLOCKS: lines the LAST
+    //CLEAN one is the final answer, the first one otherwise (the same rule the
+    //attackers seam applies - see combatLineIsClean).
+    string decisionPart = consumePlan(content, "BLOCKS:");
+    bool blocksFirstLine = true;
+    if (!content.empty())
+    {
+        string strippedB = content;
+        size_t te = strippedB.rfind("</think>");
+        if (te != string::npos)
+            strippedB = strippedB.substr(te + 8);
+        vector<string> blockLines;
+        collectLabeledLines(strippedB, "BLOCKS:", blockLines);
+        if (blockLines.size() >= 2)
+        {
+            vector<string> bNames, aNames;
+            for (size_t j = 0; j < blockers.size(); j++)
+                bNames.push_back(blockers[j]->name);
+            for (size_t j = 0; j < attackers.size(); j++)
+                aNames.push_back(attackers[j]->name);
+            size_t pickLine = 0;
+            for (size_t li = blockLines.size(); li-- > 1; )
+                if (combatLineIsClean(blockLines[li], &bNames, &aNames))
+                {
+                    pickLine = li;
+                    break;
+                }
+            decisionPart = blockLines[pickLine];
+            blocksFirstLine = (pickLine == 0);
+            if (pickLine > 0)
+                appendParseNote(&mLastParseNote, "blocks_last_line_taken");
+        }
+    }
     //Name tables for the block name->label reconcile (mirror of the shipped
     //ATTACK reconcile): the display names as shown in the B#/A# labels, plus
     //each blocker's legal attacker index set so an ambiguous attacker name
@@ -19829,6 +20272,8 @@ int AIPlayerGPT::chooseBlockers()
     int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick,
                                                              &blockerNames, &attackerNames, &legalIdx,
                                                              &mLastDroppedAssignments, &gangConflict);
+    if (blocksFirstLine && !content.empty())
+        mAnswerReplacedFalse = true; //#W49-S (D2): what executes is the first coded line
 
     //W36 item 1: an illegal one-blocker-many-attackers reply is RE-ASKED once
     //(with the correction appended - see the tail above) instead of silently
@@ -30788,6 +31233,173 @@ void AIPlayerGPT::runParseSelfTest()
             CHECK(stripNarrationDecoration(menu[0]).find("paying this taps") == string::npos
                   && stripNarrationDecoration(menu[0]).find("Cast Briarbridge Tracker {2}{g}") == 0,
                   "#W49-T D11 the paying-taps clause leaves no residue in history");
+    }
+    }
+    // ======================================================================
+    // #W49-S: reply parsing - D2 (replacement name-vs-index, last coded
+    // combat line, truthful answer_replaced), D3 (repeat count grammar +
+    // receipt), D8 (index past the menu -> one re-ask; the exit row)
+    // ======================================================================
+    cout << "\n[#W49-S D2] the E1 replacement must name the row at its index\n";
+    {
+        vector<string> menu;
+        menu.push_back("Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures}");
+        menu.push_back("Cast nothing right now");
+        //deck126 vs130 seq 25: line-1 decline, 2.5k of prose, a trailing
+        //"CHOICE: 1 (Cast Sanguine Bond)" naming a card in HAND, not on the menu
+        string r25 = "CHOICE: 2 (Cast nothing right now)\nPLAN: The opponent has 0 creatures, so Tribute is useless.\n"
+                     "I have Sanguine Bond in hand... I will cast it. So: CHOICE: 1 (Cast Sanguine Bond)";
+        int rep = -1; bool nro = false;
+        bool ret = choiceRetractedNoReplacement(r25, (int) menu.size(), &menu, &rep, &nro);
+        CHECK(!ret && rep == -1 && nro,
+              "#W49-S D2 a re-answer naming a row NOT on the menu is not a replacement: the earlier answer stands, named_row_not_offered set");
+        {
+            int c = salvageLoopedChoice(r25, (int) menu.size(), &menu);
+            int rr = -1;
+            if (c >= 0 && choiceRetractedNoReplacement(r25, (int) menu.size(), &menu, &rr)) c = rr;
+            CHECK(c == 2, "#W49-S D2 the resolver executes the line-1 decline (2), never Tribute into an empty board");
+            CHECK(firstCodedChoice(r25, (int) menu.size(), &menu) == 2 && firstCodedChoice(r25, (int) menu.size(), &menu) == c,
+                  "#W49-S D2 what executed IS the first coded line -> answer_replaced is owed a false");
+        }
+        //POSITIVE: a trailing re-answer whose name IS the row at that index still replaces
+        string rOk = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\nThey have 3 creatures after all. So CHOICE: 1 (Cast Tribute to Hunger)";
+        rep = -1; nro = true;
+        ret = choiceRetractedNoReplacement(rOk, (int) menu.size(), &menu, &rep, &nro);
+        CHECK(ret && rep == 1 && !nro, "#W49-S D2 POSITIVE a trailing re-answer naming the row at its index replaces (#W48-E1 intact)");
+        //ECHO-WINS on the re-answer: a wrong index with the right name lands on the named row
+        string rRemap = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\nSo CHOICE: 1 (Cast nothing right now)";
+        rep = -1; nro = true;
+        ret = choiceRetractedNoReplacement(rRemap, (int) menu.size(), &menu, &rep, &nro);
+        CHECK(ret && rep == 2 && !nro, "#W49-S D2 a re-answer whose name is another offered row remaps to that row (echo wins), not to its digit");
+        //firstCodedChoice: first-wins where salvage is last-wins
+        string rTwo = "CHOICE: 2 (Cast nothing right now)\nPLAN: pass.\n\nCHOICE: 1 (Cast Tribute to Hunger)";
+        CHECK(firstCodedChoice(rTwo, (int) menu.size(), &menu) == 2 && salvageLoopedChoice(rTwo, (int) menu.size(), &menu) == 1,
+              "#W49-S D2 firstCodedChoice is the first coded line (2) where the resolver takes the last (1)");
+        CHECK(firstCodedChoice("no coded line here", (int) menu.size(), &menu) == -1,
+              "#W49-S D2 NEGATIVE firstCodedChoice is -1 with no coded line");
+    }
+    cout << "\n[#W49-S D2/D8] an index past the menu naming no row is named_row_not_offered, not unparsed\n";
+    {
+        vector<string> two;
+        two.push_back("becomes beholder with Hive of the Eye Tyrant [cost: {3}{b}]");
+        two.push_back("Flip Side with Tergrid's Lantern");
+        bool st = false; string note;
+        int c = parseChoice("3 (Cast Acererak the Archlich)", 2, &two, &st, NULL, &note);
+        CHECK(c == -1 && note.find("named_row_not_offered") != string::npos && !st,
+              "#W49-S D8 deck146 vs125 seq 80: index 3 of 2 naming an off-menu card -> -1, note named_row_not_offered, not stale_echo");
+        st = false; note.clear();
+        c = parseChoice("3 (Flip Side with Tergrid's Lantern)", 2, &two, &st, NULL, &note);
+        CHECK(c == 2 && note.find("named_row_not_offered") == string::npos,
+              "#W49-S D8 NEGATIVE index 3 of 2 naming an OFFERED row remaps to it (the shipped repair), no note");
+        st = false; note.clear();
+        c = parseChoice("1 (Cast Acererak the Archlich)", 2, &two, &st, NULL, &note);
+        CHECK(c == -1 && st && note.find("named_row_not_offered") == string::npos,
+              "#W49-S D8 NEGATIVE an IN-RANGE index with a foreign name stays stale_echo (not this class)");
+        st = false; note.clear();
+        c = parseChoice("0 (pass)", 2, &two, &st, NULL, &note);
+        CHECK(c == 0 && note.empty(), "#W49-S D8 NEGATIVE a pass is untouched");
+        CHECK(headParenthetical("CHOICE: 3 (Cast Acererak the Archlich)\nPLAN: venture.") == "Cast Acererak the Archlich",
+              "#W49-S D8 the re-ask quotes the parenthetical of the head line");
+        CHECK(headParenthetical(" 5 (Attack with all creatures)") == "Attack with all creatures",
+              "#W49-S D8 ... also on consumePlan's label-stripped answer segment");
+        CHECK(headParenthetical("CHOICE: 7") == "CHOICE: 7",
+              "#W49-S D8 no parenthetical -> the line itself is quoted");
+    }
+    cout << "\n[#W49-S D8] the cast menu's exit row says what comes next, only where true\n";
+    {
+        CHECK(castDeclineRow(true) == "Cast nothing right now (combat comes next this turn)",
+              "#W49-S D8 on the model's own first main the exit row names combat as next");
+        CHECK(castDeclineRow(false) == "Cast nothing right now",
+              "#W49-S D8 NEGATIVE elsewhere (opponent's turn, other phases) the row is the plain decline");
+        vector<string> cm;
+        cm.push_back("Cast Thraben Doomsayer {1}{w}{w}");
+        cm.push_back("Cast Lightning Greaves {2}");
+        cm.push_back(castDeclineRow(true));
+        bool st = false;
+        CHECK(parseChoice("3 (Cast nothing right now (combat comes next this turn))", 3, &cm, &st) == 3 && !st,
+              "#W49-S D8 ECHO the annotated exit row binds to its index");
+        st = false;
+        CHECK(parseChoice("3 (Cast nothing right now)", 3, &cm, &st) == 3 && !st,
+              "#W49-S D8 ECHO the bare exit row still binds");
+        st = false;
+        CHECK(parseChoice("1 (Cast Thraben Doomsayer)", 3, &cm, &st) == 1 && !st,
+              "#W49-S D8 NEGATIVE a cast row is unaffected by the annotated exit row");
+        CHECK(string(kCastAnsweredFact).find("already answered") != string::npos
+              && string(kCastAnsweredFact).find("Casting decision") != string::npos,
+              "#W49-S D8 the priority ask after a cast ask says the casting question is answered");
+    }
+    cout << "\n[#W49-S D3] the repeat row's count: five spellings, and the shapes that are never a count\n";
+    {
+        const string row = "Create human with Thraben Doomsayer #1, repeated N times, then stop";
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + ", N=45)\nPLAN: make 17 tokens.\n\nCHOICE: 2 (" + row + ", N=17)") == 17,
+              "#W49-S D3 deck123 vs162 seq 28: 'N=17' on the last CHOICE line is the count (last named wins)");
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + ", N = 17)") == 17, "#W49-S D3 'N = 17'");
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + " x17)") == 17, "#W49-S D3 'x17' (the row's own exemplar)");
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + ", 17 times)") == 17, "#W49-S D3 '17 times'");
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + ", 17)") == 17, "#W49-S D3 ', 17)' - a bare count closing the parenthetical");
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + ", N:17)") == 17, "#W49-S D3 'N:17'");
+        CHECK(parseRepeatCount("choice: 2 (create human with thraben doomsayer #1, repeated n times, then stop, n=17)") == 17,
+              "#W49-S D3 the lowercased answer segment reads the same");
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + ")") == -1,
+              "#W49-S D3 NEGATIVE deck123 vs162 seq 29: the row's label echoed with no number is countless");
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + ") [N is at most 200]") == -1,
+              "#W49-S D3 NEGATIVE the row's stated ceiling is not a count");
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + ")\nPLAN: 17 tokens, then attack with 22 creatures.") == -1,
+              "#W49-S D3 NEGATIVE numbers in the PLAN are not the count (the scan is CHOICE-line-anchored)");
+        CHECK(parseRepeatCount("CHOICE: 12 (Cast Ox)") == -1, "#W49-S D3 NEGATIVE the index and a letter+x name are not counts");
+        CHECK(parseRepeatCount("CHOICE: 2 (Human #3, 5/5)") == -1, "#W49-S D3 NEGATIVE a P/T echo after a comma is not a count");
+        CHECK(parseRepeatCount("CHOICE: 2 (" + row + " #1, N=17)") == 17, "#W49-S D3 an ordinal before the count does not shadow it");
+    }
+    cout << "\n[#W49-S D2b] the last CLEAN coded combat line is the answer; prose never is\n";
+    {
+        vector<string> an; an.push_back("Silverquill Silencer"); an.push_back("Spider");
+        CHECK(combatLineIsClean(" A1", &an, NULL), "#W49-S D2b 'ATTACK: A1' is a clean coded line");
+        CHECK(combatLineIsClean(" A1, A2", &an, NULL), "#W49-S D2b 'A1, A2' is clean");
+        CHECK(combatLineIsClean(" A1 (Silverquill Silencer #1) only", &an, NULL), "#W49-S D2b a roster name and an ordinal are clean");
+        CHECK(combatLineIsClean(" none", &an, NULL), "#W49-S D2b 'none' is clean");
+        CHECK(combatLineIsClean(" A2-A5", &an, NULL), "#W49-S D2b a range is clean");
+        CHECK(!combatLineIsClean(" Deal 1, Take 5. Net -4 life. Opponent -1 life.", &an, NULL),
+              "#W49-S D2b NEGATIVE deck109 vs62 s21's CoT combat-math line is NOT clean (the wave-23 decoy stays out)");
+        CHECK(!combatLineIsClean(" A1 is correct, do not sacrifice Spider", &an, NULL),
+              "#W49-S D2b NEGATIVE a sentence about the answer is not the answer");
+        CHECK(!combatLineIsClean("", &an, NULL), "#W49-S D2b NEGATIVE an empty payload is not clean");
+        vector<string> bn; bn.push_back("Wall of Omens"); bn.push_back("Pride Guardian");
+        CHECK(combatLineIsClean(" B1:A2, B2:none", &bn, &an), "#W49-S D2b a BLOCKS assignment list is clean");
+        CHECK(combatLineIsClean(" Wall of Omens blocks Spider", &bn, &an), "#W49-S D2b a name-form block is clean");
+        //the composition the attackers seam runs: first usable, then the last clean later line
+        {
+            vector<string> lines; lines.push_back(" A1, A2"); lines.push_back(" A1 is correct. Do not sacrifice Spider."); lines.push_back(" A1");
+            int taken = -1; vector<bool> send;
+            for (size_t li = 0; li < lines.size(); li++)
+            {
+                vector<bool> s2; int r = parseAttackerSet(lines[li], 2, s2, &an);
+                if (r >= 0) { send = s2; taken = (int) li; break; }
+            }
+            for (size_t li = lines.size(); taken >= 0 && li-- > (size_t) taken + 1; )
+            {
+                if (!combatLineIsClean(lines[li], &an, NULL)) continue;
+                vector<bool> s2; int r = parseAttackerSet(lines[li], 2, s2, &an);
+                if (r >= 0) { send = s2; taken = (int) li; }
+                break;
+            }
+            CHECK(taken == 2 && send[0] && !send[1],
+                  "#W49-S D2b deck146 vs126 seq 48: 'ATTACK: A1, A2' ... 'ATTACK: A1' sends A1 only (the last clean line)");
+            vector<string> decoy; decoy.push_back(" A1, A2"); decoy.push_back(" Deal 1, Take 5. Net -4 life.");
+            taken = -1; send.clear();
+            for (size_t li = 0; li < decoy.size(); li++)
+            {
+                vector<bool> s2; int r = parseAttackerSet(decoy[li], 2, s2, &an);
+                if (r >= 0) { send = s2; taken = (int) li; break; }
+            }
+            for (size_t li = decoy.size(); taken >= 0 && li-- > (size_t) taken + 1; )
+            {
+                if (!combatLineIsClean(decoy[li], &an, NULL)) continue;
+                vector<bool> s2; int r = parseAttackerSet(decoy[li], 2, s2, &an);
+                if (r >= 0) { send = s2; taken = (int) li; }
+                break;
+            }
+            CHECK(taken == 0 && send[0] && send[1],
+                  "#W49-S D2b NEGATIVE a trailing prose combat-math line leaves the first declaration in force");
         }
     }
 
