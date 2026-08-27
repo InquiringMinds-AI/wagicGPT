@@ -1228,6 +1228,12 @@ int ManaEngine::selfDamageOnTap(MTGCardInstance * card)
     return worst;
 }
 
+int ManaEngine::producerSelfDamageOf(MTGAbility * producer)
+{
+    AManaProducer * amp = dynamic_cast<AManaProducer*>(producer);
+    return amp ? producerSelfDamage(amp) : 0;
+}
+
 vector<string> ManaEngine::selfDamageManaSources(Player * p)
 {
     vector<string> out;
