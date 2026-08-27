@@ -1787,8 +1787,13 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
                 if((!cost->hasX() && !cost->hasAnotherCost()) || k == gotPayments.size()-1)
                 {
                     SAFE_DELETE(paid);
+                    vector<MTGCardInstance*> paidWith; //#W50-Z (D18)
                     for(size_t clicking = 0; clicking < clicks.size(); ++clicking)
+                    {
+                        paidWith.push_back(clicks[clicking]->click);
                         clickstream.push(clicks[clicking]);
+                    }
+                    notePaymentQueued(cost, target, paidWith);
                     return true;
                 }
             }
@@ -1883,6 +1888,7 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
         for (size_t k = atkNeed; k < attackerProd.size(); k++)
             used[attackerProd[k]->source] = true;
     }
+    vector<MTGCardInstance*> paidWith; //#W50-Z (D18)
     for (size_t i = 1; i < observer->mLayers->actionLayer()->mObjects.size(); ++i)
     { //0 is not a mtgability...hackish
         //Make sure we can use the ability
@@ -1912,11 +1918,14 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
                 {
                     AIAction * action = NEW AIAction(this, amp, card);
                     clickstream.push(action);
+                    paidWith.push_back(card);
                 }
             }
         }
     }
     delete (diff);
+    if (!paidWith.empty())
+        notePaymentQueued(cost, target, paidWith);
     return true;
 }
 
@@ -3787,13 +3796,21 @@ int AIPlayerBaka::computeActions()
                                     vector<MTGAbility*> castProducers;
                                     if (DecisionManager::planCastSpell(castReq, castAct, castPolicy, castProducers))
                                     {
+                                        vector<MTGCardInstance*> paidWith; //#W50-Z (D18)
                                         for (size_t pk = 0; pk < castProducers.size(); pk++)
                                         {
                                             if (AManaProducer * amp = dynamic_cast<AManaProducer*>(castProducers[pk]))
+                                            {
                                                 clickstream.push(NEW AIAction(this, amp, amp->source));
+                                                paidWith.push_back(amp->source);
+                                            }
                                             else if (GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(castProducers[pk]))
+                                            {
                                                 clickstream.push(NEW AIAction(this, gmp, gmp->source));
+                                                paidWith.push_back(gmp->source);
+                                            }
                                         }
+                                        notePaymentQueued(nextCardToPlay->getManaCost(), nextCardToPlay, paidWith);
                                         clickstream.push(NEW AIAction(this, nextCardToPlay));
                                         committed = true;
                                     }

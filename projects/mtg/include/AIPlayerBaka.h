@@ -151,6 +151,13 @@ class AIPlayerBaka: public AIPlayer{
     virtual int getEfficiency(OrderedAIAction * action);
     virtual int getEfficiency(MTGAbility * ability);
     virtual bool payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardInstance * card = NULL,vector<MTGAbility*> gotPayment = vector<MTGAbility*>());
+    //#W50-Z (D18): the payment RECEIPT seam. Called at every point where this
+    //seat commits producer clicks for a cost - the contract cast plan, a
+    //planned ability payment, and the potential-mana fallback - with the
+    //sources the plan will tap, in tap order. Baka ignores it; AIPlayerGPT
+    //narrates it so the auto-tap order is adjudicable by string. Fires once
+    //per committed plan: a cast that pays twice writes two receipts.
+    virtual void notePaymentQueued(ManaCost * cost, MTGCardInstance * target, const vector<MTGCardInstance*>& sources) {}
     virtual int getCreaturesInfo(Player * player, int neededInfo = INFO_NBCREATURES , int untapMode = 0, int canAttack = 0);
     virtual ManaCost * getPotentialMana(MTGCardInstance * card = NULL);
     virtual int selectAbility();

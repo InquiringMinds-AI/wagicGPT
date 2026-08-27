@@ -335,6 +335,9 @@ private:
     //option line. A member since W48 - it reads the loop-scoped count above,
     //which no free function can see.
     string repeatActivationNote(const OrderedAIAction& action);
+    string stepKey() const; //#W50-Z (D12): "turn:phase"
+    //#W50-Z (D18): the payment receipt, narrated as "Paid {cost} for X with A, B".
+    virtual void notePaymentQueued(ManaCost * cost, MTGCardInstance * target, const vector<MTGCardInstance*>& sources);
     //#W48-D13: record that this seat has just taken (ability, click) at a
     //priority window, maintaining the loop-scoped consecutive count.
     void noteLoopTake(MTGAbility * ability, MTGCardInstance * click);
@@ -554,6 +557,13 @@ private:
     //carries the count - a corpus can still see how many windows the seat was
     //offered and how many of them never reached the model.
     int mManaOnlyWindowsSkipped;
+    //#W50-Z (D12): the "turn:phase" step in which THIS seat last took a mana
+    //activation of its own choosing. Floating mana keeps a mana-only window
+    //open only in that step (the seat is mid-float by its own decision); mana
+    //left floating by anything else - an auto-tap overpay, a countered cast's
+    //residue (D1) - buys nothing on an all-mana menu and no longer leaks the
+    //window to the model.
+    string mSeatFloatStepKey;
 
     //W42-D2 activation de-dup. WEventAbilityActivated is the ONE source of
     //truth for activation lines and fires on both seats; where this seat has

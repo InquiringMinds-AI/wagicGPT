@@ -11196,6 +11196,68 @@ static string repeatMechanismClause(int loopCount)
     return o.str();
 }
 
+//#W50-Z (D12): the mana-only gate's rule, pure so PARSETEST proves the leak is
+//closed and the two real windows stay open. Skippable = every row is a mana
+//activation, nothing is mid-payment, and any floating mana is NOT the seat's
+//own float in this step.
+static bool manaOnlyWindowSkippable(bool allManaOnly, bool midTransaction, int poolMana,
+                                    const string& seatFloatStepKey, const string& nowStepKey)
+{
+    if (!allManaOnly || midTransaction)
+        return false;
+    if (poolMana > 0 && seatFloatStepKey == nowStepKey)
+        return false;
+    return true;
+}
+
+//#W50-Z (D12): "turn:phase" - the step a floating pool lives in (it empties at
+//the end of the step), so a seat-floated pool is recognised only where it can
+//still be spent.
+string AIPlayerGPT::stepKey() const
+{
+    std::ostringstream o;
+    o << observer->turn << ":" << observer->getCurrentGamePhase();
+    return o.str();
+}
+
+//#W50-Z (D18): the receipt. "Paid {1}{u} for Fog Bank with Island #1, Drowned
+//Catacomb #1" - the cost as the engine holds it, the thing paid for, and the
+//sources in the order the plan taps them (the order lane T's scarcity rule is
+//adjudicated on). Mana already floating is named as such, so a receipt that
+//taps fewer sources than the cost has pips is not misread as an underpayment.
+//One line per committed plan; a cast that pays twice (D1) writes two.
+static string paymentReceiptLine(const string& cost, const string& target,
+                                 const vector<string>& sources, bool fromPool)
+{
+    std::ostringstream o;
+    o << "Paid " << cost;
+    if (!target.empty())
+        o << " for " << target;
+    if (!sources.empty())
+    {
+        o << " with ";
+        for (size_t i = 0; i < sources.size(); i++)
+            o << (i ? ", " : "") << sources[i];
+        if (fromPool)
+            o << " and mana already floating";
+    }
+    else if (fromPool)
+        o << " from mana already floating";
+    return o.str();
+}
+
+void AIPlayerGPT::notePaymentQueued(ManaCost * cost, MTGCardInstance * target, const vector<MTGCardInstance*>& sources)
+{
+    if (!cost || !cost->getConvertedCost())
+        return;
+    vector<string> names;
+    for (size_t i = 0; i < sources.size(); i++)
+        if (sources[i])
+            names.push_back(sources[i]->getDisplayName() + instanceHandle(sources[i]));
+    appendNarration(paymentReceiptLine(cost->toString(), target ? target->getDisplayName() : "",
+                                       names, getManaPool()->getConvertedCost() > 0));
+}
+
 //"" for everything below the floor: no annotation, no token cost, no change to
 //any line the pilot sees today.
 string AIPlayerGPT::repeatActivationNote(const OrderedAIAction& action)
@@ -11204,14 +11266,18 @@ string AIPlayerGPT::repeatActivationNote(const OrderedAIAction& action)
     if (!aa || aa->counters < kRepeatActivationFloor)
         return "";
     std::ostringstream o;
-    o << " [repeat: activated this turn " << aa->counters << " times already";
+    //#W50-Z (D11): the creature count LEADS - it is the number a token loop's
+    //stop arithmetic is written against (guide "stop at M"), and the pilot
+    //overshot its own stop while the count sat behind the per-turn tally.
+    o << " [repeat: ";
     if (makesCreatureToken(action.ability))
     {
         MTGCardInstance * src = action.click ? action.click : aa->source;
         Player * ctrl = src ? src->controller() : NULL;
         if (ctrl)
-            o << "; you control " << creatureCountOnBattlefield(ctrl) << " creatures";
+            o << "you control " << creatureCountOnBattlefield(ctrl) << " creatures; ";
     }
+    o << "activated this turn " << aa->counters << " times already";
     o << "."
       << repeatMechanismClause((action.ability == mLoopAbility && action.click == mLoopClick)
                                ? mLoopCount : 0)
@@ -11328,12 +11394,21 @@ static string repeatShortName(const string& line)
 //make the shortcut safe to take - the cost is re-checked every iteration and
 //priority comes back here - plus the ceiling, which is enforced.
 //Pure, so PARSETEST proves the shape and the echo without a game.
-static string repeatRowLine(const string& shortName, int rowIndex)
+//#W50-Z (D11): the row carries the CURRENT creature count when the action makes
+//creature tokens (creatureCount < 0 = not a token maker, nothing printed), so
+//a guide's "stop at M" arithmetic has its M on the row it is answered from;
+//and the example is the placeholder "x<N>" - the old "x50" was the row's only
+//number and was taken verbatim (deck123 vs125: x50 with no arithmetic).
+//"x<N>" parses as NO count (the count scanner needs a digit after the x), so
+//a pilot that echoes the placeholder gets the repeat-count re-ask, not 50.
+static string repeatRowLine(const string& shortName, int rowIndex, int creatureCount = -1)
 {
     std::ostringstream o;
-    o << shortName << ", repeated N times, then stop"
-      << " [you name N on the CHOICE line, e.g. \"CHOICE: " << rowIndex << " ("
-      << shortName << " x50)\"; the engine performs it N times, re-checking the cost each"
+    o << shortName << ", repeated N times, then stop [";
+    if (creatureCount >= 0)
+        o << "you control " << creatureCount << " creatures right now; ";
+    o << "you name N on the CHOICE line, e.g. \"CHOICE: " << rowIndex << " ("
+      << shortName << " x<N>)\"; the engine performs it N times, re-checking the cost each"
          " iteration and stopping early if it becomes unpayable, then returns priority to you"
          " here; N is at most " << kRepeatRowMax << "]";
     return o.str();
@@ -13657,7 +13732,14 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             continue; //a mana window is auto-passed below; a repeat there buys nothing
         if (!repeatRowEligible(asActivatedForCount(shown[rb]->ability)))
             continue;
-        string rline = repeatRowLine(repeatShortName(shownLines[rb]), index + 1);
+        int creatureCount = -1; //#W50-Z (D11)
+        if (makesCreatureToken(shown[rb]->ability))
+        {
+            MTGCardInstance * rsrc = shown[rb]->click ? shown[rb]->click : shown[rb]->ability->source;
+            if (rsrc && rsrc->controller())
+                creatureCount = creatureCountOnBattlefield(rsrc->controller());
+        }
+        string rline = repeatRowLine(repeatShortName(shownLines[rb]), index + 1, creatureCount);
         index++;
         shown.push_back(shown[rb]);
         shownLines.push_back(rline);
@@ -13797,11 +13879,19 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             allManaOnly = false;
             break;
         }
-    if (allManaOnly
-        && !observer->mExtraPayment
-        && !observer->mLayers->actionLayer()->menuObject
-        && !observer->mLayers->actionLayer()->getCurrentTargetChooser()
-        && !getManaPool()->getConvertedCost())
+    //#W50-Z (D12): the floating-pool half is SCOPED to the seat's own float.
+    //Wave 49 (deck126 vs125 seq 66/68/75/77/85/87): six single-row Battlement
+    //windows reached the model, three of them with an EMPTY stack, every one
+    //carrying `Already in pool: ...` left behind by a countered cast (D1's
+    //residue) - mana the seat never chose to float and that buys nothing on
+    //an all-mana menu (a cast row is offered on potential + pool, so floating
+    //never unlocks a row). Only mana this seat floated by taking a mana row in
+    //THIS step keeps the window; residue auto-passes like an empty pool.
+    bool midTransaction = observer->mExtraPayment
+        || observer->mLayers->actionLayer()->menuObject
+        || observer->mLayers->actionLayer()->getCurrentTargetChooser();
+    if (manaOnlyWindowSkippable(allManaOnly, midTransaction, getManaPool()->getConvertedCost(),
+                                mSeatFloatStepKey, stepKey()))
     {
         mManaOnlyWindowsSkipped++;
         DebugTrace("AIPlayerGPT[ph" << phase << "]: only mana production and no pending cost; auto-passing without a model call (skipped "
@@ -14094,6 +14184,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //at a turn boundary - that reset is exactly what made the per-turn
             //[repeat:] number unusable as a stopping signal.
             noteLoopTake(shown[actRow]->ability, shown[actRow]->click);
+            //#W50-Z (D12): a mana row taken here is the seat's OWN float.
+            if (isManaOnlyAction(shown[actRow]->ability))
+                mSeatFloatStepKey = stepKey();
             //#W48-F1: arm the plan. One decision, one translog record, one
             //narration line; the remaining iterations are dispatched above with
             //no further model calls.
@@ -30581,8 +30674,8 @@ void AIPlayerGPT::runParseSelfTest()
         string row = repeatRowLine(sn, 2);
         CHECK(row.find("Create human with Thraben Doomsayer, repeated N times, then stop") == 0,
               "#W48-F1 the row leads with the action and the shortcut, not the explanation");
-        CHECK(row.find("\"CHOICE: 2 (Create human with Thraben Doomsayer x50)\"") != string::npos,
-              "#W48-F1 the worked example carries THIS row's own index");
+        CHECK(row.find("\"CHOICE: 2 (Create human with Thraben Doomsayer x<N>)\"") != string::npos,
+              "#W48-F1 the worked example carries THIS row's own index (#W50-Z: and the x<N> placeholder)");
         CHECK(repeatRowLine(sn, 7).find("\"CHOICE: 7 (") != string::npos,
               "#W48-F1 the example index follows the row, never a hard-coded number");
         CHECK(row.find("re-checking the cost each iteration and stopping early if it becomes unpayable") != string::npos
@@ -31401,6 +31494,84 @@ void AIPlayerGPT::runParseSelfTest()
             CHECK(taken == 0 && send[0] && send[1],
                   "#W49-S D2b NEGATIVE a trailing prose combat-math line leaves the first declaration in force");
         }
+    }
+
+    cout << "\n[#W50-Z] D11 the repeat row carries the creature count and the x<N> placeholder\n";
+    {
+        string sn = "Create human with Thraben Doomsayer";
+        string row = repeatRowLine(sn, 2, 223);
+        CHECK(row.find("Create human with Thraben Doomsayer, repeated N times, then stop [you control 223 creatures right now; you name N") == 0,
+              "#W50-Z D11 the row leads with the shortcut and then the CURRENT creature count");
+        CHECK(row.find("\"CHOICE: 2 (Create human with Thraben Doomsayer x<N>)\"") != string::npos
+              && row.find("x50") == string::npos,
+              "#W50-Z D11 the example is the x<N> placeholder; no literal count remains on the row");
+        CHECK(repeatRowLine(sn, 3).find("you control") == string::npos,
+              "#W50-Z D11 NEGATIVE a non-token action's repeat row prints no creature count");
+        CHECK(repeatRowLine(sn, 3, 0).find("you control 0 creatures right now") != string::npos,
+              "#W50-Z D11 a count of zero is printed, not treated as absent");
+        // ECHO: the placeholder echoed verbatim binds to the row but names NO count
+        {
+            vector<string> menu;
+            menu.push_back("Create human with Thraben Doomsayer [cost: Tap]"
+                           " [repeat: you control 223 creatures; activated this turn 8 times already."
+                           " This turn will not advance while you keep taking this option.]");
+            menu.push_back(row);
+            bool stale = false; string src;
+            int c = parseChoice("CHOICE: 2 (Create human with Thraben Doomsayer x<N>)",
+                                (int) menu.size(), &menu, &stale, &src);
+            CHECK(c == 2 && !stale, "#W50-Z D11 echo: the placeholder answer binds to the repeat row");
+            CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x<N>)") == -1,
+                  "#W50-Z D11 echo: the x<N> placeholder is NOT a count (-> the repeat-count re-ask, never 50)");
+            CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x17)") == 17,
+                  "#W50-Z D11 a real count in the placeholder's slot still parses");
+            CHECK(parseRepeatCount("CHOICE: 2 (Create human with Thraben Doomsayer x<N>) I need 17 more") == -1,
+                  "#W50-Z D11 NEGATIVE prose after the placeholder does not become the count");
+            //the re-ordered [repeat:] tag: count first; strip and short-name unchanged
+            CHECK(stripRepeatAnnotation(menu[0]).find("[repeat") == string::npos,
+                  "#W50-Z D11 the count-first [repeat:] tag still strips for key purposes");
+            CHECK(repeatShortName(menu[0]) == sn,
+                  "#W50-Z D11 the count-first [repeat:] tag still yields the bare short name");
+            CHECK(stripNarrationDecoration(menu[0]).find("223") == string::npos,
+                  "#W50-Z D11 the count never reaches the narrated record (it goes stale)");
+        }
+    }
+
+    cout << "\n[#W50-Z] D12 the mana-only gate: residue auto-passes, the seat's own float keeps the window\n";
+    {
+        CHECK(manaOnlyWindowSkippable(true, false, 0, "", "3:4"),
+              "#W50-Z D12 all-mana rows, nothing pending, empty pool -> auto-pass (the #W46-7 case)");
+        CHECK(manaOnlyWindowSkippable(true, false, 4, "", "3:4"),
+              "#W50-Z D12 deck126 vs125 seq 68: all-mana rows + {g}{b}{b}{w} the seat never floated -> auto-pass");
+        CHECK(manaOnlyWindowSkippable(true, false, 3, "2:4", "3:4"),
+              "#W50-Z D12 a float from an EARLIER step is residue -> auto-pass");
+        CHECK(!manaOnlyWindowSkippable(true, false, 3, "3:4", "3:4"),
+              "#W50-Z D12 NEGATIVE the seat floated in THIS step -> the window stays (the guide's same-window float)");
+        CHECK(!manaOnlyWindowSkippable(true, true, 0, "", "3:4"),
+              "#W50-Z D12 NEGATIVE a pending extra payment / menu / chooser keeps the window");
+        CHECK(!manaOnlyWindowSkippable(false, false, 4, "", "3:4"),
+              "#W50-Z D12 NEGATIVE one real action on the menu and the window is asked as before");
+    }
+
+    cout << "\n[#W50-Z] D18 the payment receipt line\n";
+    {
+        vector<string> srcs; srcs.push_back("Island #1"); srcs.push_back("Drowned Catacomb #1");
+        CHECK(paymentReceiptLine("{1}{u}", "Fog Bank", srcs, false)
+              == "Paid {1}{u} for Fog Bank with Island #1, Drowned Catacomb #1",
+              "#W50-Z D18 cost, what it paid for, and the sources in tap order");
+        CHECK(paymentReceiptLine("{2}{b}", "Idyllic Tutor", srcs, true)
+              == "Paid {2}{b} for Idyllic Tutor with Island #1, Drowned Catacomb #1 and mana already floating",
+              "#W50-Z D18 a pool contribution is named, so fewer sources than pips is not an underpayment");
+        CHECK(paymentReceiptLine("{2}", "Elixir of Immortality", vector<string>(), true)
+              == "Paid {2} for Elixir of Immortality from mana already floating",
+              "#W50-Z D18 a payment made entirely from the pool names no source");
+        {
+            string narr, pend; string delta;
+            narrationAppend(narr, pend, paymentReceiptLine("{1}{u}", "Fog Bank", srcs, false), "", &delta);
+            CHECK(narr == "- Paid {1}{u} for Fog Bank with Island #1, Drowned Catacomb #1\n",
+                  "#W50-Z D18 the receipt narrates as one dashed GAME LOG line with its braces intact");
+        }
+        CHECK(paymentReceiptLine("{1}{u}", "Fog Bank", srcs, false).find('[') == string::npos,
+              "#W50-Z D18 NEGATIVE no bracketed annotation on a receipt (nothing for an echo to strip)");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
