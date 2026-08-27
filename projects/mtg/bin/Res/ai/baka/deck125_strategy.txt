@@ -27,8 +27,8 @@ then the spell that killed you resolved four turns later with nothing in hand to
 Emrakul, the Aeons Torn costs {15} - fifteen mana. Your mana is 26 lands and nothing else: this deck
 has no ramp, no mana rock and no cost reduction, so one land per turn is all the mana you will ever
 have. Your plan is therefore this, and you can write it as your PLAN line word for word:
-   "Answer their threats, resolve Staff of Nin from a row reading leaves 5 or more, ping their
-   face every turn."
+   "Keep a counterspell's mana open; Staff of Nin only from a row reading leaves 5 or more;
+   ping their face every turn."
 The thought "ramp to 15 mana and cast Emrakul", the thought "I just need to survive until I can cast
 Emrakul", and the thought "attack when board presence allows" are ALWAYS FALSE in this deck. There is
 no ramp to do, and you have no creature to attack with. When one of them shows up in the plan you
@@ -45,6 +45,16 @@ always reads "leaves 0" or "leaves 1" and a gate asking for 5 could never pass i
 You declined it three times in one game reading exactly those rows. Read its cost off the row too -
 a tax effect makes the printed {15} appear as {17}, and the game only prints a cast you can pay
 for.
+THE ONE BOARD WHERE THAT LINE IS OFF, and it outranks it: the opponent battlefield line shows
+Sanguine Bond or Exquisite Blood, or the game log shows the opponent has cast Tribute to Hunger or
+Devour Flesh ("sacrifices a creature ... gains life equal to its toughness"). Against that
+opponent Emrakul is not a finisher, it is a fifteen-life gift: an edict makes them sacrifice it
+and gain 15, a Sanguine Bond turns that 15 into 15 off you, and with Exquisite Blood beside it
+the loop runs from any life total to 0. You cast Emrakul at 48 life with a Staff already ticking
+them down from 15; they answered Tribute to Hunger and you were at -12 before your turn ended.
+Another game, they cast Devour Flesh on it and went from 2 life back to 17. On that board answer
+"Cast nothing right now" to the Emrakul row every time and let the Staff finish - it was
+finishing.
 Once an Emrakul of yours IS on the battlefield, the two sentences above about having no creature
 stop applying to it: declare it as an attacker in every attackers window that offers it, and
 assign it as a blocker whenever the block line does not read "your blocker dies". Nothing else in
@@ -69,15 +79,17 @@ counter you are casting at something on the stack - that is the mana doing its j
 you wanted still costs the same next turn with a land behind it, and the turn you spend tapped out
 is the turn their engine lands uncountered. A resolved Sanguine Bond, Exquisite Blood or
 Underworld Dreams costs you the game; three extra cards do not win it.
-- CAST STAFF OF NIN ONLY WHEN ITS OWN OPTION ROW READS "leaves 5" OR MORE. Not the "Mana
-  available:" total, not a subtraction: the row already did it. The only exception is a hand with NO
-  counterspell in it at all. At "leaves 4" or less, and at every row saying "casting this taps you
-  out", pass and cast it next turn with a land to spare. This rule outranks "cast it the first turn
-  it appears"; nothing else does. Two of six Staff casts this corpus broke it, at "leaves 2" and
-  "leaves 0", a counterspell in hand both times - and the "leaves 2" one was followed, on the very
-  next turn, by an Underworld Dreams resolving with no window offered to you, because you could
-  not pay for one. That was the turn that lost the game. The plan line now carries this number so
-  it is in front of you at every cast ask.
+- A STAFF ROW READING "casting this taps you out", OR "leaves 4" OR LESS, WITH ANY COUNTERSPELL
+  IN YOUR HAND, IS ANSWERED "Cast nothing right now". Read the row, not the "Mana available:"
+  total: the row already did the subtraction. Cast Staff of Nin only from a row reading "leaves 5"
+  or more - or, the one exception, when your hand holds NO counterspell at all. This rule outranks
+  "cast it the first turn it appears" and "no answer is needed this turn"; nothing else does. You
+  have broken it in six corpora running. This one: three of six Staff casts, at "taps you out",
+  "taps you out" and "leaves 1", a counterspell in hand every time, and the first of them lost the
+  game - a Tovolar's Huntmaster resolved on the next turn with no window offered to you because you
+  could not pay for the Essence Scatter in your hand, and it and its Wolves took you from 18 to
+  dead in two combats. The plan line carries this gate first so it is in front of you at every
+  cast ask; the Staff is still in your hand next turn, with a land more behind it.
 - Keep taking the "Deal 1 Damage with Staff of Nin ... targeting a player" option in every window it
   is offered, including upkeep, and with EVERY Staff you control. That damage is how the game ends.
 - Point it at a creature or a planeswalker only when 1 damage finishes it: printed toughness 1, or a
@@ -149,7 +161,9 @@ target nonbasic land"), Triumphant Adventurer (1/1, ventures on every attack) an
 Luminarch Aspirant (1/1, a +1/+1 counter every combat) are this shape.
 Only when NO candidate has such a line do you use the power rule:
 Then: cast Path to Exile at the creature with the HIGHEST printed power. If EVERY candidate on that
-clause reads printed power 0 or 1, or is tagged [defender], answer "Cast
+clause reads printed power 0 or 1, or is tagged [defender] - printed "(creature 0/4) [defender]"
+or "(artifact creature 0/6) [defender]" alike; you Pathed a Shield Sphere off the second form at
+13 life - answer "Cast
 nothing right now" and keep the Path - at any life total above 12, whatever else is on the board
 and however many turns you have been holding it. A 0/4 wall is never a Path target, and neither is
 a token with no {target text:} at all - "Goblin (creature 1/1)", a Human, a Wolf: you Pathed a lone
@@ -185,9 +199,11 @@ being ahead, having spare mana, wanting to use the turn, the plan naming a wipe.
 turn count too: the tenth window that offers the sweeper at 0 has the same answer as the first,
 main phase 2 has the same answer as main phase 1, and a menu whose only cast row is the sweeper
 still answers "Cast nothing right now" - one castable card on the menu is not a reason to cast it.
-Four sweepers this corpus went into a 0, and every one took one of those shapes: two into an
-opposing board with NO creature on it at all, one into five walls, one in main phase 2 of a turn
-whose main phase 1 you had passed correctly. A wipe with nothing
+The sweeper row prints the same fact beside the header: "{right now: exiles 5 of their creatures
+(0 able to attack), 0 of yours}" next to a header second number of 0 is five walls, and "destroys
+0 of their creatures" is an empty board. Read the header number; the row's first number counts
+walls too. You cast a Final Judgment off exactly that "exiles 5 ... (0 able to attack)" row at 35
+life with no clock on you, one corpus after four sweepers went into a 0. A wipe with nothing
 to kill is a card you threw away AND a turn you spent tapped out, and the turn you spend tapped out
 is the turn their engine lands uncountered. Only when that SECOND number is 1 or more do you read
 on, and every count in the branches below means that second number:
@@ -219,25 +235,15 @@ on, and every count in the branches below means that second number:
 Sphinx's Revelation {X}{W}{U}{U} instant: "You gain X life and draw X cards." At X = 0 it gains
 nothing and draws nothing; at X = 3 it costs six mana and draws you three cards, and three is the
 answer every time you cast it. The whole section below is about WHEN to cast it, not how big.
-THE TAP-OUT GATE, and it covers EVERY mana you spend on your own turn - a Sphinx's Revelation, a
-Staff of Nin, an Elixir of Immortality ACTIVATION, a Lightmine Field. The one spend it does NOT
-cover is the Elixir CAST: {1} for a card that then waits on your battlefield is always paid, at any
-N, the turn it is listed; the gate governs its {2} activation. Look at your hand for
-ANY of Essence Scatter, Cancel, Dream Fracture or Fall of the Gavel - all four, not the three
-cheap ones. THE OPTION ROW PRINTS THE ANSWER: every "Cast ..." line ends with "{leaves N of your M
-untapped mana sources untapped}", or "casting this taps you out" which is N = 0. N is what is left
-the instant the spell resolves - read it off the row, do not compute it. If any counterspell at all
-is in your hand, take the row only when its N is 5 or more. Five, because Fall of the Gavel costs
-{3}{U}{W} and it is the counter you are most often holding alone. This gate does NOT cover a
-counter you are casting at something on the stack - that is the mana doing its job. If N is below
-5, PASS: the spell
-you wanted still costs the same next turn with a land behind it, and the turn you spend tapped out
-is the turn their engine lands uncountered. A resolved Sanguine Bond, Exquisite Blood or
-Underworld Dreams costs you the game; three extra cards do not win it.
-Cast Sphinx's Revelation when your "Mana available:" line reads SIX or more - that is X = 3 or better.
-Below six, answer "Cast nothing right now" and hold it - it is an instant and it will still be
-there next turn with one more land behind it - unless your life is 10 or less and no other option
-in your list is worth casting: then cast it, at the same X = 3 as any other Revelation.
+THE TAP-OUT GATE from the Staff section covers a Revelation too: with any counterspell in your
+hand, take its row only when the row's "leaves N" reads 5 or more.
+Its row also prints the size it can be: "{X pricing: max affordable X=N ...}". Cast Sphinx's
+Revelation only from a row whose max affordable X reads 3 or more - that is the X = 3 you will
+announce. At a max affordable X of 1 or 2, answer "Cast nothing right now" and hold it - it is an
+instant and it will still be there next turn with one more land behind it - unless your life is
+10 or less and no other option in your list is worth casting: then cast it at the largest X the
+menu offers. Five casts this corpus went off rows reading "max affordable X=1" or "X=2" for one
+or two cards: read the N off the row, and 3 is the floor.
 BEFORE you take Sphinx's Revelation, or any other optional draw, read the line "Your library: N
 cards". If N is 5 or less, answer "Cast nothing right now" and keep the card: drawing your last
 card loses the game outright, and Sphinx's Revelation draws X on top of your normal draw step.
@@ -332,9 +338,10 @@ each of those creatures equal to the number of attacking creatures." Three attac
 die; ONE attacker takes 1 damage, which kills nothing however large it is.
 ITS GATE IS THE SWEEPER SECOND NUMBER, and it is a hard stop: do not cast Lightmine Field while
 "N of them without a restriction against attacking" is below 3. Not at 0, not at 1, not at 2, in
-either main phase, however much spare mana you have. It is an enchantment - it costs the same on
-the turn the crowd arrives. All three casts this corpus were at that number = 0, one of them on
-turn 6 for your whole four mana with a Dream Fracture in hand.
+either main phase, however much spare mana you have. Its row says so itself: "{right now: they
+control 0 creatures able to attack - deals 0 until they have an attacker}" is a "Cast nothing"
+row. It is an enchantment - it costs the same on the turn the crowd arrives. You cast it off that
+"deals 0" row at a header of 2 this corpus, after three casts at 0 the corpus before.
 
 === READING THE MANA LINE ===
 Every rule in this guide that says "your Mana available: line" means the number on that line -
@@ -423,12 +430,14 @@ should have gone were the Gavel, the Elixir and the Path, leaving three lands an
 
 === DECIDING SITUATIONS ===
 - The prompt lists "Play <land>" options: play one. Every turn, no exceptions.
-- The plan you were given talks about ramping to Emrakul or about attacking: write the plan "answer
-  their threats, resolve Staff of Nin from a row reading leaves 5 or more, ping their face every
-  turn" instead.
+- The plan you were given talks about ramping to Emrakul or about attacking: write the plan "keep a
+  counterspell's mana open; Staff of Nin only from a row reading leaves 5 or more; ping their
+  face every turn" instead.
 - "Deal 1 Damage with Staff of Nin ... targeting a player" is in your list: take it, every window,
   with every Staff.
-- "Cast Staff of Nin" is in your list and no answer is needed this turn: take it.
+- "Cast Staff of Nin" is in your list: take it only from a row reading "leaves 5" or more, or
+  with no counterspell in your hand. Its row reads "taps you out" or "leaves 4" or less with a
+  counterspell in hand: cast nothing, and cast it next turn.
 - Their spell on the stack is tagged [defender], or prints printed power 0: let it resolve. Walls
   never get a counter.
 - Their spell on the stack prints (creature P/T) with printed power 0 or 1, or prints no P/T at
@@ -436,9 +445,10 @@ should have gone were the Gavel, the Elixir and the Path, leaving three lands an
   "Whenever ... attacks", "At the beginning of" or "venture": then counter it now.
 - Their spell on the stack prints (creature P/T) with printed power 2 or more, or is a
   planeswalker, or is one of the named permanents above: counter it now.
-- "Cast Emrakul, the Aeons Torn" is printed in your numbered list: TAKE IT. The game only prints a
-  cast you can already pay for, and it ends the game faster than the Staff does. You declined it
-  four times in one game.
+- "Cast Emrakul, the Aeons Torn" is printed in your numbered list: TAKE IT - unless the opponent
+  battlefield line shows Sanguine Bond or Exquisite Blood, or the log shows they cast Tribute to
+  Hunger or Devour Flesh: then cast nothing and let the Staff finish. Otherwise the game only
+  prints a cast you can already pay for, and it ends the game faster than the Staff does.
 - The opponent header's SECOND number ("N of them without a restriction against attacking", or "N
   of them able to attack right now") reads 2 or more: cast Supreme Verdict, or Final Judgment
   against anything that comes back from a graveyard. Read that number, never the creature count.

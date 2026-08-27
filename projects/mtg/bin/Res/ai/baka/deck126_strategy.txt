@@ -67,19 +67,31 @@ menu too - which means the answer to question 1 is a real card, or the answer is
 Check your battlefield line at every decision. If it lists BOTH "Exquisite Blood" and "Sanguine
 Bond", you are one life-gain away from winning outright. Take the first of these the list offers,
 immediately, and the game ends:
+ - "Cast Tribute to Hunger" with its row reading "{right now: they control N creatures ...}" and N
+   1 or more: CAST IT. They sacrifice one, you gain its toughness, the loop takes the rest. This is
+   the win you press on your OWN turn with no creature of yours anywhere - the blocks and Vampires
+   below need a combat first. You had both enchantments out and this row at "they control 7
+   creatures" in three windows across two turns, cast a Wall of Omens and an Overgrown Battlement
+   and passed once "waiting for the opponent to attack"; in the fourth window you cast it and won
+   on the spot.
  - Declare a block with ANY wall, if Perimeter Captain is on your battlefield (2 life).
  - Declare a block with Pride Guardian (3 life, Captain or no Captain).
  - Deal 1 Damage with Staff of Nin targeting a player - pick the OPPONENT.
- - Cast Tribute to Hunger while the opponent has a creature (you gain its toughness).
  - Attack with a lifelink Vampire and connect.
 Any one of these wins from any life total, yours or theirs. You do not need a big number - 1 life is
-enough, because the loop runs itself until the opponent is at 0. Do not wait for a better turn and
-do not build a bigger board first.
+enough, because the loop runs itself until the opponent is at 0. Do not wait for a better turn, do
+not wait for their attack, and do not build a bigger board first: a wall cast with the win on the
+menu is a turn given away.
 
 === RULE #3 - ASSEMBLING THE PAIR (your fastest win condition) ===
 Exquisite Blood {4}{B}: whenever an opponent loses life, you gain that much life.
 Sanguine Bond {3}{B}{B}: whenever you gain life, the opponent loses that much life.
-Both together end the game the moment any life changes. But the two halves are NOT the same card:
+Both together end the game the moment any life changes. THE PAIR IS TWO DIFFERENT NAMES: one
+Sanguine Bond AND one Exquisite Blood on your battlefield line. "Exquisite Blood #1-#2 x2" is one
+half twice, not the pair, and a second copy of either enchantment does nothing at all. Read both
+names off your battlefield line before you write "both enchantments": you cast a second Exquisite
+Blood with the first already there, wrote "Both enchantments are now on the battlefield", and
+Sanguine Bond was still in your library. And the two halves are NOT the same card:
  - SANGUINE BOND ALONE IS ALREADY A CLOCK. Every point of life you gain takes a point off the
    opponent, and this deck gains life constantly: 2 per defender that blocks with a Perimeter
    Captain out, 3 whenever Pride Guardian blocks, the toughness of whatever Tribute to Hunger eats,
@@ -164,14 +176,18 @@ much damage in EVERY combat after it.
    the dies one has the bigger "deals N". You put Pride Guardian on Nadaar (3/3, "your blocker
    dies") when the same line offered a Goblin at "neither dies"; you stopped 3 instead of 1 and
    lost the wall, and two turns later you had no blockers at all and took 10.
- - If EVERY attacker offered to that blocker says "your blocker dies", leave that blocker OUT -
-   unless an enchantment of yours is on the battlefield, or the combat header's "you would be at N"
-   number is 8 or less, or the blocker is a lifelink Vampire. Read the header's N before you bench
-   anything: at 8 or less the carve-out is OFF and everything blocks. You answered "BLOCKS: none"
-   to a header reading "you would be at 7" with a lifelink Vampire offered - a body you had no
-   other use for, three damage you did not have to take, and a life gain thrown away. You blocked a Triumphant Adventurer (1/1, first strike, deathtouch) with
-   Perimeter Captain at 20 life to stop ONE damage, and the Captain - the card that turns every
-   future block into 2 more life - died to it on turn 4. That game ended on turn 10.
+ - A B-row whose EVERY parenthesis reads "your blocker dies, attacker lives" stays OUT of your
+   BLOCKS line - "BLOCKS: none" when it is your only blocker - unless one of three things is
+   printed: an enchantment of yours on your battlefield line, the combat header's "you would be
+   at N" at 8 or less, or the blocker is a lifelink Vampire. Read the header's N before you bench
+   anything: at 8 or less the carve-out is OFF and everything blocks. Three corpora running you
+   have put Pride Guardian on a "your blocker dies" attacker at 18 to 21 life with no enchantment
+   out - this time on Nadaar, Selfless Paladin at "you would be at 18": you gained 3, the wall
+   died, and with no blocker left the next two combats took you from 24 to 9. A wall that lives
+   gains that 3 in every combat after; a wall that dies gains it once. You have also answered
+   "BLOCKS: none" to a header reading "you would be at 7" with a lifelink Vampire offered - a
+   body you had no other use for, three damage you did not have to take, and a life gain thrown
+   away.
 STEP 2 - assign every blocker that STEP 1 did not rule out, in every combat:
  - Give each attacker one blocker first, then put the leftovers on the biggest attacker. Several of
    your blockers may gang up on one attacker; each triggers its own life gain.
@@ -254,7 +270,10 @@ game outright. Attack again only once that permanent is gone from their battlefi
 
 === RULE #7 - WHAT TO CAST WHEN SEVERAL THINGS ARE LISTED ===
 Take the highest entry on this list that appears in your casting menu:
- 1. Exquisite Blood or Sanguine Bond - whichever is missing from your battlefield.
+ 1. Exquisite Blood or Sanguine Bond - whichever NAME is missing from your battlefield line, at any
+    "leaves N", including "casting this taps you out". A copy of a name already on that line is
+    not this entry; skip it. You cast a Wall of Omens over an Exquisite Blood at five mana to
+    "ramp for Sorin"; the Blood was the card that mattered and it waited two turns.
  2. Idyllic Tutor, when either enchantment is missing from both your hand and your battlefield.
  3. Perimeter Captain - it turns every future block by every wall into 2 more life.
  4. Any other wall: Wall of Omens (it replaces itself), Overgrown Battlement, Pride Guardian.
@@ -265,9 +284,11 @@ Take the highest entry on this list that appears in your casting menu:
     adds a mana of its own, so a Lantern cast on a turn with nothing else to cast is a turn spent
     well, not a wasted one - three times this corpus it was the only real row beside "Cast nothing
     right now", you cast it, and two of those games you won. Do NOT count black sources by name to
-    decide this; the entry above it on this list decides it. A SECOND Lantern does nothing at any
-    time - once one is there this entry is finished for the rest of the game, so take a wall or a
-    combo piece instead. You have cast a second one with the first still in play.
+    decide this; the entry above it on this list decides it - you cast a Lantern over a Wall of Omens
+    and another over a Pride Guardian this corpus, both walls one entry higher. A SECOND Lantern
+    does nothing at any time - once "Chromatic Lantern" is on your battlefield line this entry is
+    finished for the rest of the game, so take a wall or a combo piece instead, or cast nothing.
+    You cast four second Lanterns this corpus with the first still in play.
 7a. If BOTH enchantments are already on your battlefield, STAFF OF NIN and SORIN move to the
     TOP of this list, above walls and above everything else. With both out the game ends the
     moment any life changes, and Staff's ping and Sorin's lifelink Vampires are the only two
@@ -314,39 +335,55 @@ life, and win the game once both enchantments are out.
 If neither is in your hand, nothing above changes.
 
 === MULLIGAN ===
-Keep almost everything. The pregame prompt prints "Your hand (7 cards), counted by the engine: N
-lands, M spells." KEEP whenever N is 2 or more. Also KEEP whenever the line "Playing every land in
-this hand would cover the cost of:" names even one card - that line already checked your mana
-against your hand and it is right.
-From the second look on, weigh the odds, not the hand: each look is a fresh seven you must
-shave by one more card, at the same land odds, so shipping rarely fixes lands - it only shrinks
-the hand. At "(keeping 5)" or lower a hand with even ONE land is a keep, because the bottom ask
-lets you shed what it cannot cast; a fresh look is worth the card only at ZERO lands, and even
-then you are buying a four-card hand at the same odds.
-The thought "I will keep whatever I draw next" is how you end up with a four-card hand - keep THIS
-one instead.
-Your cheapest spell costs ONE mana, so "no early play" is never a reason to mulligan, and a hand
-with no combo piece is not one either: your lands and walls buy the turns you need to draw one.
-WHEN A KEEP MAKES YOU BOTTOM CARDS - the section does not end at the keep. The prompt says "you
-took N mulligans and kept, so you must put N cards from your hand on the BOTTOM" and lists your
-hand as a NUMBERED list, each land marked "(land: taps for ...)".
-FIRST, RULE THE LANDS OUT. Count the "(land: taps for" lines. If bottoming a land would leave you
-with fewer than THREE, no land on that list is an answer - cross them all off before you look at
-anything else. You need five mana for an enchantment and the Battlement pays none of its black
-pips. You bottomed a Woodland Cemetery out of a three-land hand that also held a Chromatic Lantern
-{3}, and you did it while the Cemetery was one of only two black sources in the hand.
-THEN bottom your most expensive SPELL, then a duplicate wall - you run sixteen of them and the
-second copy of one wall is the cheapest card in any hand.
-Read "You will be left with an N-card hand" and build the best N in this PREFERENCE ORDER,
-which works at any N: the lands that cover the cheapest spells you keep, then one of Sanguine
-Bond / Exquisite Blood / Idyllic Tutor (the only cards here that win a game; the Tutor finds
-the other two), then your cheapest wall, then a second combo piece, then the rest by cost with
-duplicate walls first under the deck. Bottom a combo piece only when nothing below it in the
-order is left.
+The question at every look is about ODDS, never about a number the hand has to meet: what are the
+odds THIS hand does something in time, against the odds the NEXT hand - one card smaller - does?
+Three facts about this deck set the comparison:
+  - 24 of your 60 cards are lands, and most of them make two colours (Bayou, Scrubland, Savannah,
+    Isolated Chapel, Sunpetal Grove, Woodland Cemetery), so a two-land seven sees its third land
+    inside two or three draws and a one-colour opener is usually one draw from the other.
+  - Your cheapest spells cost ONE mana (Perimeter Captain, Pride Guardian) and sixteen of your
+    cards are walls, so almost any hand with two lands does something on turn one or two. "No
+    early play" and "no combo piece" are not reasons to ship: the walls buy the turns you need to
+    draw one, and Idyllic Tutor finds it.
+  - An enchantment costs five with two black pips that the Battlement cannot pay, so a hand of
+    lands that make no {B} is slower to the win, not dead - it still walls.
+The prompt gives you the three numbers the comparison needs; read them rather than counting the
+hand yourself: "Your hand (7 cards), counted by the engine: N lands, M spells", "Mana sources among
+those lands, counted by the engine: ...", and "Playing every land in this hand would cover the cost
+of: ..." or "would not cover any spell in it". The mulligan row prices the next look: "Mulligan (a
+keep after this one would keep 5 cards)". Every look costs a card at the keep; the London mulligan
+gives you a fresh seven each time, so shipping rarely fixes lands - it only shrinks the hand.
+So, at each look:
+  - Two or more lands and a coverage line that names even one card: KEEP, at any price. That line
+    already checked your mana against your hand and it is right. Three keeps of this shape this
+    corpus, at 3, 3 and 5 lands, and all three games were won.
+  - Zero lands, or one land: the hand casts nothing until it draws lands, and a fresh seven at
+    24-in-60 beats waiting - ship it on a seven and on a six. You shipped a zero-land seven and two
+    one-land sevens this corpus, kept the sixes that followed at 3, 3 and 5 lands, and lost none of
+    them to the mulligan. At a row reading "would keep 5 cards" or smaller the next look costs more
+    than the wait does: keep a one-land hand there if the coverage line names a card, and ship only
+    a hand with no land at all.
+  - Seven lands and no spell ships at any price; six lands and one spell is a keep if the spell
+    is a wall or the Tutor.
+The thought "I will keep whatever I draw next" is how you end up with a four-card hand - weigh the
+hand in front of you.
+WHEN A KEEP MAKES YOU BOTTOM CARDS the ask prints your hand as a NUMBERED list, each land marked
+"(land: taps for ...)", and tells you how many to send. What you are choosing is the hand you KEEP;
+build it in this PREFERENCE ORDER, which works at any size: the lands that cover the cheapest
+spells you keep (a land that makes {B} ahead of one that does not), then one of Sanguine Bond /
+Exquisite Blood / Idyllic Tutor (the only cards here that win a game; the Tutor finds the other
+two), then your cheapest wall, then a second combo piece, then the rest by cost. Send the rest, in
+this order: a duplicate wall first (you run sixteen; the second copy is the cheapest card in any
+hand), then a Chromatic Lantern or a Staff of Nin, then your most expensive remaining spell, then
+a land only when the hand still holds more lands than the spells you kept can use. A combo piece
+goes under only when nothing else is left to send. You once bottomed a Woodland Cemetery from a
+three-land hand that also held a Chromatic Lantern - the Lantern was the card to send, and the
+Cemetery was one of only two black sources in the hand.
 
 === SITUATIONS THAT DECIDE YOUR GAMES ===
- - Both Exquisite Blood and Sanguine Bond on your battlefield: take the first block, Staff ping,
-   Tribute or lifelink attack the list offers. You win this turn.
+ - Both Exquisite Blood and Sanguine Bond on your battlefield: take the first of these the list
+   offers - "Cast Tribute to Hunger" at "they control 1" or more creatures, a block, a Staff ping,
+   a lifelink attack. You win this turn; a wall cast instead is a turn given away.
  - The prompt lists "Play <land>" options: play one. Every turn, no exceptions.
  - Your Upkeep, and the only offered action taps Overgrown Battlement for mana: answer CHOICE: 0 (pass)
    and keep the wall untapped for their turn.
@@ -389,11 +426,13 @@ order is left.
    none for that Vampire - it is worth more as a lifelink blocker. UNLESS both enchantments are on
    your battlefield: then send every Vampire, blocked or not - lifelink damage to a blocker starts
    the loop.
- - The mulligan ask says "(keeping 5)" or fewer and the hand holds a land: keep it - a fresh
-   seven shaved to four is the same land odds with one card fewer.
+ - The mulligan ask: two or more lands and a coverage line naming a card is a keep at any price;
+   zero or one land ships on a seven or a six; at "would keep 5 cards" or smaller, keep one land
+   with a named card and ship only a hand with no land.
  - You kept and the game asks which cards to bottom: build the best N in order - lands that
    cover your cheapest spells, a combo piece or the Tutor, the cheapest wall, then the rest by
-   cost, duplicate walls first. A combo piece goes under only when nothing below it is left.
+   cost; send duplicate walls, then Lantern or Staff, then the most expensive spell. A combo
+   piece goes under only when nothing else is left.
  - "Cast Chromatic Lantern" is in your menu, nothing from entries 1-6 of Rule #7 is beside it, and
    no Chromatic Lantern is on your battlefield line: cast it. A wall or a combo piece on the same
    menu, or a Lantern already out: take that instead.
