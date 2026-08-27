@@ -1,0 +1,26 @@
+# W51-B (wave-50 engine seat D-2, colour-only shape): the AI seat pays Savannah Lions {W} over
+# Glacial Fortress ({W} or {U}), Plains (corpus 20260827-115759 deck125 vs152 seq34->35: "Paid {w}
+# for Path to Exile with Seachrome Coast", two Plains untapped). PRE-FIX the Fortress, listed first,
+# paid. EXPECTED: the mono Plains pays; the Fortress (the only blue source) stays untapped. The
+# second aipay makes it observable: Flying Men {U} can only be paid if the Fortress is still open.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Glacial Fortress,Plains
+hand:Savannah Lions,Flying Men
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+aipay savannah lions
+aipay flying men
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Glacial Fortress,Plains
+hand:Savannah Lions,Flying Men
+tappedinplay:2
+manapool:{W}{U}
+[PLAYER2]
+[END]

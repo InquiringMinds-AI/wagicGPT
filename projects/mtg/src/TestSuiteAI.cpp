@@ -737,6 +737,41 @@ int TestSuiteAI::Act(float)
             && !autoTapPayer->getManaPool()->canAfford(autoTapCard->getManaCost(), autoTapAny))
             ManaEngine::autoTapForCost(autoTapPayer, autoTapCard, autoTapCard->getManaCost(), autoTapAny);
     }
+    else if (action.find("aipay ") == 0)
+    {
+        //#W51-B: the AI seat's OWN casting payment, driven directly.
+        //AIPlayerBaka::payTheManaCost with NO plan in mind is what every
+        //main-phase cast the board plainly affords rides (FindCardToPlay
+        //only asks the planner when potential mana falls short), and an [AI]
+        //fixture cannot pin which sources it tapped: the suite's AI seat gets
+        //one cast per main phase before the assert phase freezes it, and the
+        //assert grammar counts tapped cards without naming them. Call the
+        //same entry point with the same arguments the cast path uses, then
+        //run the queued producer clicks, so the fixture asserts the taps and
+        //the pool exactly as `autotap` does for the human path.
+        string cname = action.substr(6);
+        MTGCardInstance * payCard = getCard(cname);
+        if (!payCard || !payCard->getManaCost())
+        {
+            std::cerr << "TESTSUITE aipay: no card '" << cname << "' with a mana cost"
+                         " (state unchanged) [" << suite->filename << "]" << std::endl;
+            return 1;
+        }
+        TestSuiteAI * payer = dynamic_cast<TestSuiteAI *>(payCard->controller());
+        if (payer && !payer->getManaPool()->canAfford(payCard->getManaCost(), payCard->has(Constants::ANYTYPEOFMANA)))
+        {
+            vector<MTGAbility*> noPlan;
+            payer->payTheManaCost(payCard->getManaCost(), payCard->has(Constants::ANYTYPEOFMANA), payCard, noPlan);
+            while (!payer->clickstream.empty())
+            {
+                AIAction * a = payer->clickstream.front();
+                payer->clickstream.pop();
+                if (a->ability) //producer clicks only; never the cast click
+                    a->Act();
+                SAFE_DELETE(a);
+            }
+        }
+    }
     else if (action.find("humancast ") == 0)
     {
         //W48-GATE: the HUMAN castability gate (MTGPutInPlayRule::isReactingToClick's

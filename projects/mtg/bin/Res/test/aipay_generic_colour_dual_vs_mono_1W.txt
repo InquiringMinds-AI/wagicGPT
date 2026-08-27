@@ -1,0 +1,26 @@
+# W51-B (wave-50 engine seat D-2, generic+colour shape - 65 of the 87 flagged receipts): the AI
+# seat pays Intrepid Adversary {1}{W} over Overgrown Farmland ({G} or {W}), Plains, Plains (corpus
+# 20260827-115759 deck152 vs123 seq15->16: "Paid {1}{w} for Intrepid Adversary with Plains #2,
+# Overgrown Farmland #2", Plains #1 untapped). PRE-FIX: the no-plan walk skipped the earliest sources
+# by surplus colour and tapped the dual -> pool {G}{W} or {W}{W} with the Farmland spent.
+# EXPECTED: both Plains pay -> pool {W}{W}; the Farmland (the only green source) stays untapped.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Overgrown Farmland,Plains,Plains
+hand:Intrepid Adversary
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+aipay intrepid adversary
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Overgrown Farmland,Plains,Plains
+hand:Intrepid Adversary
+tappedinplay:2
+manapool:{W}{W}
+[PLAYER2]
+[END]

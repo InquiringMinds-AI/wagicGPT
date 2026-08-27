@@ -1,0 +1,27 @@
+# W51-B (wave-50 engine seat D-2, pure-generic shape): the AI seat's own payment for Howling Mine
+# {2} over Drowned Catacomb, Drowned Catacomb, Swamp (corpus 20260827-115759 deck162 vs123 seq5->6:
+# "Paid {2} for Howling Mine with Drowned Catacomb #1, Drowned Catacomb #2", Swamp untapped).
+# PRE-FIX: payTheManaCost had no plan in mind (potential mana covers {2}) and its layer-order walk
+# skipped the Swamp by surplus colour, tapping both Catacombs -> pool {U}{U}, the seat's only blue
+# sources gone. EXPECTED: Swamp + one Catacomb -> pool {B}{B} (the Catacomb adds its abundant colour);
+# one Catacomb stays untapped.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Drowned Catacomb,Drowned Catacomb,Swamp
+hand:Howling Mine
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+aipay howling mine
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Drowned Catacomb,Drowned Catacomb,Swamp
+hand:Howling Mine
+tappedinplay:2
+manapool:{B}{B}
+[PLAYER2]
+[END]

@@ -1226,3 +1226,8 @@ probe/w50w_tribute_to_hunger_edict.txt
 probe/w50w_ai_cleanup_discard_policy.txt
 oracle_ability_dual_not_double_4_lands.txt
 oracle_ability_dual_5_lands.txt
+aipay_generic_dual_vs_mono_2.txt
+aipay_generic_colour_dual_vs_mono_1W.txt
+aipay_colour_mono_before_dual_W.txt
+autotap_colour_mono_before_dual_W.txt
+autotap_generic_dual_vs_mono_2.txt
