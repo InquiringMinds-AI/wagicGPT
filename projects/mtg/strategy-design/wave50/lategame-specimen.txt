@@ -1,0 +1,559 @@
+# wave-50 lategame specimen: 1787849917-ai_baka_deck123-0x55f93524f640-vs-ai_baka_deck125.jsonl seq 162 turn 53 phase Main phase 1 options 4 prompt 24401 chars
+
+GAME LOG (everything that has happened so far):
+=== Turn 1 - opponent's turn ===
+- Your opening hand (7 cards): Bloodline Keeper; Swamp; Bloodline Keeper; Tribute to Hunger; Arcane Sanctum; Isolated Chapel; Underground Sea
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+=== Turn 2 - YOUR turn ===
+- Phase: Draw
+- You drew Thraben Doomsayer
+- Phase: Main phase 1
+- You played Arcane Sanctum
+=== Turn 3 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Phase: Main phase 2
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 25)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+=== Turn 4 - YOUR turn ===
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 5 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+=== Turn 6 - YOUR turn ===
+- Phase: Draw
+- You drew Tragic Slip
+- Phase: Main phase 1
+- You played Isolated Chapel
+- Paid {1}{w}{w} for Thraben Doomsayer with Arcane Sanctum, Tundra, Isolated Chapel
+- You cast Thraben Doomsayer
+- Opponent cast Essence Scatter
+- Your Thraben Doomsayer was COUNTERED by Essence Scatter and went to your graveyard
+- Opponent's Essence Scatter resolved and went to the opponent's graveyard
+=== Turn 7 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 8 - YOUR turn ===
+- Phase: Draw
+- You drew Underground Sea
+- Phase: Main phase 1
+- You played Swamp
+- Paid {2}{b}{b} for Bloodline Keeper with Arcane Sanctum, Isolated Chapel, Tundra, Swamp
+- You cast Bloodline Keeper (that Bloodline Keeper was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Bloodline Keeper resolved and entered the battlefield
+=== Turn 9 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+=== Turn 10 - YOUR turn ===
+- Phase: Draw
+- You drew Bloodline Keeper
+- Phase: Main phase 1
+- You played Underground Sea
+- Paid {2}{b}{b} for Bloodline Keeper with Arcane Sanctum, Isolated Chapel, Tundra, Underground Sea
+- You cast Bloodline Keeper (that Bloodline Keeper was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Bloodline Keeper resolved and entered the battlefield
+- Phase: Attackers
+- You declared attackers: Bloodline Keeper
+- Phase: Combat damage
+- Your Bloodline Keeper dealt 3 damage to the opponent (now 22)
+=== Turn 11 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Supreme Verdict
+- Your Bloodline Keeper died (that Bloodline Keeper was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Bloodline Keeper died
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+=== Turn 12 - YOUR turn ===
+- Phase: Draw
+- You drew Damnation
+- Phase: Main phase 1
+- You played Underground Sea
+- Paid {2}{b}{b} for Bloodline Keeper with Arcane Sanctum, Isolated Chapel, Underground Sea #1, Underground Sea #2
+- You cast Bloodline Keeper
+- Your Bloodline Keeper resolved and entered the battlefield
+=== Turn 13 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+=== Turn 14 - YOUR turn ===
+- Phase: Upkeep
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- Phase: Draw
+- You drew Thraben Doomsayer
+- Phase: Main phase 1
+- Paid {1}{w}{w} for Thraben Doomsayer with Tundra, Isolated Chapel, Underground Sea #2
+- You cast Thraben Doomsayer
+- Opponent cast Cancel
+- Your Thraben Doomsayer was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+=== Turn 15 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+=== Turn 16 - YOUR turn ===
+- Phase: Upkeep
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- Phase: Draw
+- You drew Marsh Flats
+- Phase: Main phase 1
+- You played Marsh Flats
+- Phase: Attackers
+- You declared attackers: Vampire
+- Phase: Combat damage
+- Your Vampire dealt 2 damage to the opponent (now 20)
+=== Turn 17 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Lightmine Field
+- Opponent's Lightmine Field resolved and entered the battlefield
+=== Turn 18 - YOUR turn ===
+- Phase: Upkeep
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- Phase: Draw
+- You drew Vision Skeins
+- Phase: Main phase 1
+- Paid {1}{u} for Vision Skeins with Underground Sea #1, Underground Sea #2
+- You cast Vision Skeins
+- Opponent drew a card
+- Opponent drew a card
+- You drew Idyllic Tutor
+- You drew Devour Flesh
+- Your Vision Skeins resolved and went to your graveyard
+- Paid {2}{w} for Idyllic Tutor with Tundra, Isolated Chapel, Swamp
+- You cast Idyllic Tutor
+- Your Idyllic Tutor resolved and went to your graveyard
+- You searched your library with Idyllic Tutor
+- You used: choose card with Idyllic Tutor targeting Intruder Alarm
+- Your revealed Intruder Alarm went to your hand
+- Phase: Attackers
+- You declared attackers: Vampire, Vampire
+- Phase: Blockers
+- Opponent's Lightmine Field dealt 1 damage to Vampire (x3)
+- Your Vampire died (that Vampire was 1 of 3 copies on your battlefield; the other 2 are still there)
+- Your Vampire (token) ceased to exist and left your graveyard
+- Opponent's Lightmine Field dealt 1 damage to Vampire
+- Your Vampire died (that Vampire was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Vampire (token) ceased to exist and left your graveyard
+=== Turn 19 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 25)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent shuffled their graveyard (3 cards) into their library with Elixir of Immortality
+=== Turn 20 - YOUR turn ===
+- Phase: Upkeep
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- Phase: Draw
+- You drew Lightning Greaves
+- Phase: Main phase 1
+- Paid {2}{u} for Intruder Alarm with Swamp, Underground Sea #1, Underground Sea #2
+- You cast Intruder Alarm
+- Opponent cast Dream Fracture
+- Your Intruder Alarm was COUNTERED by Dream Fracture and went to your graveyard
+- Opponent drew a card
+- You drew Vision Skeins
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+- Paid {2} for Lightning Greaves with Tundra, Isolated Chapel
+- You cast Lightning Greaves
+- Your Lightning Greaves resolved and entered the battlefield
+- You used: Equip with Lightning Greaves targeting Bloodline Keeper
+- Phase: Attackers
+- You declared attackers: Vampire
+- Phase: Blockers
+- Opponent's Lightmine Field dealt 1 damage to Vampire
+- Phase: Combat damage
+- Your Vampire dealt 2 damage to the opponent (now 23)
+=== Turn 21 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 22 - YOUR turn ===
+- Phase: Upkeep
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+- Paid {1}{u} for Vision Skeins with Underground Sea #1, Underground Sea #2
+- You cast Vision Skeins
+- Opponent cast Fall of the Gavel
+- Your Vision Skeins was COUNTERED by Fall of the Gavel and went to your graveyard
+- Opponent gained 5 life (now 28)
+- Opponent's Fall of the Gavel resolved and went to the opponent's graveyard
+- Phase: Attackers
+- You declared attackers: Vampire, Vampire
+- Phase: Blockers
+- Opponent's Lightmine Field dealt 1 damage to Vampire (x3)
+- Your Vampire died (that Vampire was 1 of 3 copies on your battlefield; the other 2 are still there)
+- Your Vampire (token) ceased to exist and left your graveyard
+- Opponent's Lightmine Field dealt 1 damage to Vampire
+- Your Vampire died (that Vampire was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Vampire (token) ceased to exist and left your graveyard
+=== Turn 23 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Staff of Nin
+- Opponent's Staff of Nin resolved and entered the battlefield
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 19)
+=== Turn 24 - YOUR turn ===
+- Phase: Upkeep
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- Phase: Draw
+- You drew Scrubland
+- Phase: Main phase 1
+- You played Scrubland
+- Phase: Attackers
+- You declared attackers: Vampire
+- Phase: Blockers
+- Opponent's Lightmine Field dealt 1 damage to Vampire
+- Phase: Combat damage
+- Your Vampire dealt 2 damage to the opponent (now 26)
+=== Turn 25 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 18)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Supreme Verdict
+- Your Vampire died (that Vampire was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Vampire (token) ceased to exist and left your graveyard
+- Your Bloodline Keeper died
+- Your Vampire died
+- Your Vampire (token) ceased to exist and left your graveyard
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+=== Turn 26 - YOUR turn ===
+- Phase: Draw
+- You drew Idyllic Tutor
+- Phase: Main phase 1
+- Paid {2}{w} for Idyllic Tutor with Underground Sea #1, Underground Sea #2, Scrubland
+- You cast Idyllic Tutor
+- Your Idyllic Tutor resolved and went to your graveyard
+- You searched your library with Idyllic Tutor
+- You used: choose card with Idyllic Tutor targeting Intruder Alarm
+- Your revealed Intruder Alarm went to your hand
+- Paid {2}{u} for Intruder Alarm with Arcane Sanctum, Swamp, Tundra #1
+- You cast Intruder Alarm
+- Your Intruder Alarm resolved and entered the battlefield
+=== Turn 27 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 17)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 31)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent shuffled their graveyard (3 cards) into their library with Elixir of Immortality
+=== Turn 28 - YOUR turn ===
+- Phase: Draw
+- You drew Scrubland
+- Phase: Main phase 1
+- You played Scrubland
+=== Turn 29 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 16)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Seachrome Coast
+=== Turn 30 - YOUR turn ===
+- Phase: Draw
+- You drew Damnation
+=== Turn 31 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 15)
+- Phase: Draw
+- Opponent drew a card
+=== Turn 32 - YOUR turn ===
+- Phase: Draw
+- You drew Underground Sea
+- Phase: Main phase 1
+- You played Underground Sea
+=== Turn 33 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 14)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sphinx's Revelation
+- Opponent gained 3 life (now 34)
+- Opponent drew 3 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent played Island
+- Phase: Cleanup
+- Opponent discarded Final Judgment
+- Opponent discarded Emrakul, the Aeons Torn
+- Opponent discarded Island
+- Opponent used: Put a card into the library with Emrakul, the Aeons Torn
+- Opponent shuffled their graveyard (4 cards) into their library with Emrakul, the Aeons Torn
+=== Turn 34 - YOUR turn ===
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 35 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 13)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Essence Scatter
+- Opponent discarded Essence Scatter
+=== Turn 36 - YOUR turn ===
+- Phase: Draw
+- You drew Bloodline Keeper
+- Phase: Main phase 1
+- Paid {2}{b}{b} for Bloodline Keeper with Arcane Sanctum, Isolated Chapel, Tundra #1, Underground Sea #1
+- You cast Bloodline Keeper
+- Opponent cast Cancel
+- Your Bloodline Keeper was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+=== Turn 37 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 12)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 39)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent shuffled their graveyard (3 cards) into their library with Elixir of Immortality
+=== Turn 38 - YOUR turn ===
+- Phase: Draw
+- You drew Tragic Slip
+=== Turn 39 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 11)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+=== Turn 40 - YOUR turn ===
+- Phase: Draw
+- You drew Idyllic Tutor
+- Phase: Main phase 1
+- Paid {2}{w} for Idyllic Tutor with Underground Sea #2, Underground Sea #3, Tundra #3
+- You cast Idyllic Tutor
+- Opponent cast Cancel
+- Your Idyllic Tutor was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+=== Turn 41 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 10)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+=== Turn 42 - YOUR turn ===
+- Phase: Draw
+- You drew Devour Flesh
+=== Turn 43 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 9)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Emrakul, the Aeons Torn
+- Opponent discarded Sphinx's Revelation
+- Opponent used: Put a card into the library with Emrakul, the Aeons Torn
+- Opponent shuffled their graveyard (3 cards) into their library with Emrakul, the Aeons Torn
+=== Turn 44 - YOUR turn ===
+- Phase: Draw
+- You drew Isolated Chapel
+- Phase: Main phase 1
+- You played Isolated Chapel
+- Phase: Main phase 2
+- Paid {2}{b}{b} for Damnation with Arcane Sanctum, Isolated Chapel #1, Scrubland #1, Scrubland #2
+- You cast Damnation (that Damnation was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent cast Fall of the Gavel
+- Your Damnation was COUNTERED by Fall of the Gavel and went to your graveyard
+- Opponent gained 5 life (now 44)
+- Opponent's Fall of the Gavel resolved and went to the opponent's graveyard
+=== Turn 45 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 8)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+=== Turn 46 - YOUR turn ===
+- Phase: Draw
+- You drew Damnation
+=== Turn 47 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 7)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Phase: Cleanup
+- Opponent discarded Cancel
+=== Turn 48 - YOUR turn ===
+- Phase: Draw
+- You drew Idyllic Tutor
+- Phase: Main phase 1
+- Paid {2}{w} for Idyllic Tutor with Underground Sea #2, Underground Sea #3, Isolated Chapel #2
+- You cast Idyllic Tutor
+- Opponent cast Fall of the Gavel
+- Your Idyllic Tutor was COUNTERED by Fall of the Gavel and went to your graveyard
+- Opponent gained 5 life (now 49)
+- Opponent's Fall of the Gavel resolved and went to the opponent's graveyard
+- Paid {2}{b}{b} for Damnation with Arcane Sanctum, Isolated Chapel #1, Scrubland #1, Scrubland #2
+- You cast Damnation (that Damnation was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent cast Dream Fracture
+- Your Damnation was COUNTERED by Dream Fracture and went to your graveyard
+- Opponent drew a card
+- You drew Underground Sea
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+- You played Underground Sea
+- Paid {2}{b}{b} for Damnation with Swamp, Underground Sea #1, Tundra #1, Tundra #2
+- You cast Damnation
+- Opponent cast Dream Fracture
+- Your Damnation was COUNTERED by Dream Fracture and went to your graveyard
+- Opponent drew a card
+- You drew Tundra
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+=== Turn 49 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 6)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 50 - YOUR turn ===
+- Phase: Draw
+- You drew Lightning Greaves
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 51 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 5)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Staff of Nin
+- Opponent's Staff of Nin resolved and entered the battlefield
+- Opponent used: Deal 1 damage with Staff of Nin #2 targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 4)
+=== Turn 52 - YOUR turn ===
+- Phase: Draw
+- You drew Intruder Alarm
+- Phase: Main phase 1
+- Paid {2}{u} for Intruder Alarm with Underground Sea #2, Underground Sea #3, Underground Sea #4
+- You cast Intruder Alarm
+- Your Intruder Alarm resolved and entered the battlefield
+=== Turn 53 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin #1 targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 3)
+- Opponent used: Deal 1 damage with Staff of Nin #2 targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 2)
+- Opponent drew a card
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Phase: Cleanup
+- Opponent discarded Lightmine Field
+- Opponent discarded Supreme Verdict
+=== Turn 54 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 2 | Opponent life: 49
+Mana available: 15 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{b}{w} (sources that can make each: {W} 10, {U} 9, {B} 10 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Arcane Sanctum {w} or {u} or {b}; Tundra #1 {w} or {u}; Isolated Chapel #1 {w} or {b}; Swamp {b}; Underground Sea #1 {u} or {b}; Underground Sea #2 {u} or {b}; Tundra #2 {w} or {u}; Scrubland #1 {w} or {b}; Scrubland #2 {w} or {b}; Underground Sea #3 {u} or {b}; Tundra #3 {w} or {u}; Isolated Chapel #2 {w} or {b}; Underground Sea #4 {u} or {b}; Tundra #4 {w} or {u}; Plains {w}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (6 cards): Tribute to Hunger {2}{b} [instant]; Tragic Slip (copy 1 of 2 in your hand) {b} [instant]; Devour Flesh (copy 1 of 2 in your hand) {1}{b} [instant]; Tragic Slip (copy 2 of 2 in your hand) {b} [instant]; Devour Flesh (copy 2 of 2 in your hand) {1}{b} [instant]; Lightning Greaves {2} [artifact]
+Your battlefield (19 permanents listed, of which 0 are creatures, 0 of them able to attack right now): Arcane Sanctum; Intruder Alarm #2 {2}{u} [enchantment]; Intruder Alarm #1 {2}{u} [enchantment] {effect (each copy of this card does this): "Creatures don't untap during their controllers' untap steps. -- Whenever a creature enters, untap all creatures."}; Isolated Chapel #1; Isolated Chapel #2; Lightning Greaves {2} [artifact]; Marsh Flats; Plains; Scrubland #1; Scrubland #2; Swamp; Tundra #1-#4 x4; Underground Sea #1-#4 x4
+Opponent battlefield (22 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking): Glacial Fortress #1; Glacial Fortress #2; Island #1-#6 x6; Lightmine Field {2}{w}{w} [enchantment] {effect: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}; Plains #1-#6 x6; Seachrome Coast; Staff of Nin #2 {6} [artifact] [tapped]; Staff of Nin #1 {6} [artifact] [tapped] {effect (each copy of this card does this): "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra #1-#4 x4
+Opponent hand size: 7 | Opponent library: 24 cards
+Artifacts in play: you 1 | opponent 2
+Your library: 19 cards
+
+YOUR PLAN (as you last stated it): Pass upkeep. Cast creature/tutor in main phase 1. If no creature/tutor castable, cast Vision Skeins to dig.
+(note: this decision's list does not contain the actions your plan names. That is about this menu, not about what is legal for you - pick the best option below, and re-state your plan if it has gone out of date.)
+
+Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?
+1. Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures - at 0 this does nothing} {leaves 12 of your 15 untapped mana sources untapped} - legal targets right now: the opponent {card text: "Target opponent sacrifices a creature of their choice. You gain life equal to that creature's toughness."}
+2. Cast Devour Flesh {1}{b} {right now: they control 0 creatures - at 0 this does nothing} {leaves 13 of your 15 untapped mana sources untapped} - legal targets right now: the opponent, you {card text: "Target player sacrifices a creature, then gains life equal to that creature's toughness."}
+3. Cast Lightning Greaves {2} {leaves 13 of your 15 untapped mana sources untapped} {card text: "Equipped creature has haste and shroud. (It can't be the target of spells or abilities.) -- Equip {0} ({0}: Attach to target creature you control. Equip only as a sorcery. This card enters unattached and stays on the battlefield if the creature leaves.)"}
+4. Cast nothing right now (combat comes next this turn)
+
+On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Tribute to Hunger)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+
+=== REPLY ===
+CHOICE: 4 (Cast nothing right now)
+PLAN: You are at 2 life. Opponent has 0 creatures. You have no creatures. You cannot attack. You must cast a creature to win. You have no creatures in hand or library to cast immediately (Intruder Alarm is already on board, but no maker). You need to find a creature. You have Idyllic Tutor? No, it's in graveyard. You have Vision Skeins? No, not in hand. You have Lightning Greaves, but no target. You have removal/edicts, but no targets. You are stuck. Wait, you have Intruder Alarm on board. You need a token maker. You have no token makers in hand. You have no way to get a token maker into play this turn. You passed. Next turn you draw. You have 19 cards left. Do you have a token maker? The deck has 4 Bloodline Keeper and 4 Thraben Doomsayer. You haven't cast any yet. You are losing because you never casted your creatures. Now it's too late. You have 2 life. Opponent has 49. They have 2 Staffs of Nin. They will kill you next upkeep. There is nothing you can do.
