@@ -316,6 +316,17 @@ private:
     //- a pregame ask carries no board-state information at all.
     string serializePregameState();
     string describeAction(const OrderedAIAction& action);
+    //#W41-6 / #W48-D13: the repeat-activation countable rendered onto an
+    //option line. A member since W48 - it reads the loop-scoped count above,
+    //which no free function can see.
+    string repeatActivationNote(const OrderedAIAction& action);
+    //#W48-D13: record that this seat has just taken (ability, click) at a
+    //priority window, maintaining the loop-scoped consecutive count.
+    void noteLoopTake(MTGAbility * ability, MTGCardInstance * click);
+    //#W48-F1: end the repeat-N plan in flight and write its receipt into the
+    //narration (how many of the named N actually happened, and why it stopped).
+    //`why` empty means the plan ran to the count the model named.
+    void endRepeatPlan(const char * why);
     string describeEvent(WEvent * event);
 
     //Assemble the user message: narration head, one fresh board snapshot,
@@ -480,6 +491,47 @@ private:
     //pointer is stable across flips. Clears on turn change alongside
     //mPassDeclineCount.
     std::map<MTGCardInstance *, int> mFlipDoneCount;
+
+    //#W48-D13 (wave-47 docket D13) - the LOOP-SCOPED activation count.
+    //`ActivatedAbility::counters` is the engine's own per-TURN number and is
+    //reset to 0 at MTG_PHASE_AFTER_EOT; the loop it annotates does not stop at
+    //a turn boundary. Measured on deck123 vs126, the [repeat:] tag read
+    //"activated this turn 15 times already; you control 1539 creatures" on a
+    //board that had already run 1,099 activations of the same loop - a fresh
+    //small number under a huge board, and the deck's guide tripwire (">= 20")
+    //could not fire in the game shape it was written for.
+    //This pair counts CONSECUTIVE takes of the SAME activation by this seat
+    //with no other action in between. It never resets on a turn boundary; it
+    //resets on a different action, on a pass, and on a heuristic answer - i.e.
+    //exactly when the loop it is counting has actually been broken. Pointers
+    //are compared, never dereferenced.
+    MTGAbility * mLoopAbility;
+    MTGCardInstance * mLoopClick;
+    int mLoopCount;
+
+    //#W48-F1 - the repeat-N plan in flight (wave-47 docket D1, affordance F1).
+    //The model names N once, on one CHOICE line; this seam then dispatches the
+    //SAME activation one per AI tick - never a synchronous click burst, which
+    //the latent ability-GC double-destroy makes fatal (DecisionContract design
+    //section 4) - re-checking payability by the only honest test available
+    //here: is the option still in the engine's ranking THIS tick. It is not a
+    //cap: the row is an addition to the menu, nothing is removed, and the plan
+    //ends the moment the engine stops offering the action.
+    //mRepeatAbility/mRepeatClick are compared, never dereferenced, and the plan
+    //is bounded by mRepeatRemaining, so a freed ability can at worst end it.
+    MTGAbility * mRepeatAbility;
+    MTGCardInstance * mRepeatClick;
+    int mRepeatRemaining;
+    int mRepeatTotal;
+    int mRepeatDone;
+    //Board serialization at the previous repeat dispatch, and the count of
+    //consecutive dispatches that did not move it: a repeat whose activations
+    //change nothing is not a repeat, it is a stall, and it ends.
+    string mRepeatBoardKey;
+    int mRepeatNoProgress;
+    //Consecutive windows the plan's option has been missing from the menu while
+    //something is still resolving on the stack (the loop's own untap trigger).
+    int mRepeatAbsent;
 
     //#W46-7: priority windows auto-passed because every option was a mana
     //activation and nothing was pending payment. Counted, not silent: an

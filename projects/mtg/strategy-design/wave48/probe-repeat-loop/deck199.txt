@@ -1,0 +1,3 @@
+#NAME:W48N Passive Probe
+#DESC:Landfall-free passive opponent for the wave-48 lane N loop probe
+Forest (*) *60
