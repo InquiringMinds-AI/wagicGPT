@@ -62,6 +62,9 @@ protected:
     // executing scripted actions. Preserve the observed terminal result for
     // an explicit [ASSERT] gameover: assertion.
     int observedGameOver;
+    //W48: failures raised by scripted assert commands (assertcastable /
+    //assertusable), folded into the [ASSERT] verdict.
+    int commandAssertFailures;
 
     static boost::mutex mMutex;
     virtual void handleResults(bool wasAI, int error);

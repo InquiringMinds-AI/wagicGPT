@@ -3,6 +3,7 @@
 #include "CardSelector.h"
 #include "MTGRules.h"
 #include "ManaEngine.h"
+#include "ExtraCost.h"
 #include "Translate.h"
 #include "Subtypes.h"
 #include "Credits.h"
@@ -1156,6 +1157,18 @@ int MTGAlternativeCostRule::isReactingToClick(MTGCardInstance * card, ManaCost *
             }
         }
 
+        //W48-DELVE: the delve alternative is a {0} shell - price the reduced
+        //printed cost against pool + potential mana (human seat; the AI's
+        //oracle prices it the same way) instead of "can afford nothing".
+        if (!game->currentlyActing()->isAI() && Delve::alternativeIsDelve(card->getManaCost()))
+        {
+            ManaEngine::FreeProducerPolicy freePolicy;
+            ManaCost * potential = ManaEngine::potentialManaPermissive(game->currentlyActing(), freePolicy);
+            potential->add(playerMana);
+            bool ok = Delve::offerable(card, potential);
+            delete potential;
+            return ok ? 1 : 0;
+        }
         if (playerMana->canAfford(alternateManaCost,card->has(Constants::ANYTYPEOFMANA)))
         {
             return 1;

@@ -1,0 +1,19 @@
+# W48 display/oracle pin. Gurmag Angler, one Swamp, SIX graveyard cards: castable (exile 6 pays {6}).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Swamp
+hand:Gurmag Angler
+graveyard:Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+assertcastable 1 gurmag angler
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Swamp
+hand:Gurmag Angler
+graveyard:Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears,Grizzly Bears
+[PLAYER2]
+[END]

@@ -1,0 +1,19 @@
+# W48 display/oracle pin. Gurmag Angler, two Swamps, THREE graveyard cards: {3}{B} remains, NOT castable.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Swamp,Swamp
+hand:Gurmag Angler
+graveyard:Grizzly Bears,Grizzly Bears,Grizzly Bears
+[PLAYER2]
+life:20
+[DO]
+assertcastable 0 gurmag angler
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Swamp,Swamp
+hand:Gurmag Angler
+graveyard:Grizzly Bears,Grizzly Bears,Grizzly Bears
+[PLAYER2]
+[END]

@@ -1,6 +1,7 @@
 #include "PrecompiledHeader.h"
 
 #include "LegalActions.h"
+#include "ExtraCost.h"
 #include "Player.h"
 #include "GameObserver.h"
 #include "AllAbilities.h"
@@ -17,7 +18,12 @@ bool LegalActionsOracle::payable(Player * p, ManaEngine::ManaPolicy & policy, MT
         return true;
     if (pMana->canAfford(cost, card->has(Constants::ANYTYPEOFMANA)))
         return true;
-    if (cost->getAlternative() && pMana->canAfford(cost->getAlternative(), 0))
+    if (cost->getAlternative() && Delve::alternativeIsDelve(cost))
+    {
+        if (Delve::offerable(card, pMana)) //W48-DELVE: never the {0} shell
+            return true;
+    }
+    else if (cost->getAlternative() && pMana->canAfford(cost->getAlternative(), 0))
         return true;
     if (cost->getMorph() && pMana->canAfford(cost->getMorph(), 0))
         return true;
@@ -137,6 +143,8 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
             bool altOk = zone == p->game->hand && cost && cost->getAlternative()
                 && (altIsConvoke
                     ? Convoke::offerable(card, pMana)
+                    : Delve::alternativeIsDelve(cost)
+                    ? Delve::offerable(card, pMana) //W48-DELVE
                     : (pMana->canAfford(cost->getAlternative(), 0)
                        || ManaEngine::planPayment(p, policy, card, cost->getAlternative(), 0).size()));
 
@@ -354,8 +362,38 @@ namespace
             if (aa->needsTapping && (aa->source->isTapped() || aa->source->hasSummoningSickness()))
                 continue;
             ManaCost * cost = aa->getCost();
-            if (cost && cost->getConvertedCost() && !pMana->canAfford(cost, 0))
-                continue;
+            if (cost && cost->getConvertedCost())
+            {
+                //W48-SELFTAP (owner live-play report, Vita, 2026-08-27: Westvale
+                //Abbey's {5},{T} showed activatable as one of FIVE untapped
+                //lands). `pMana` is the whole board's potential, the source's
+                //own {T}: Add {1} included - but an ability that TAPS its
+                //source cannot also tap it for mana. Subtract the source's own
+                //producer output before pricing a tap ability.
+                bool affordable;
+                bool tapsSource = aa->needsTapping != 0;
+                if (!tapsSource && cost->extraCosts)
+                    for (size_t k = 0; k < cost->extraCosts->costs.size() && !tapsSource; k++)
+                        if (dynamic_cast<TapCost *>(cost->extraCosts->costs[k]))
+                            tapsSource = true; //{T} in an ability cost is a TapCost extra
+                if (tapsSource)
+                {
+                    ManaCost * without = NEW ManaCost(pMana);
+                    for (size_t m = 0; m < g->mLayers->actionLayer()->manaObjects.size(); m++)
+                    {
+                        AManaProducer * own = dynamic_cast<AManaProducer *>(
+                            (MTGAbility *) g->mLayers->actionLayer()->manaObjects[m]);
+                        if (own && own->source == aa->source && own->output)
+                            without->remove(own->output);
+                    }
+                    affordable = without->canAfford(cost, 0) != 0;
+                    SAFE_DELETE(without);
+                }
+                else
+                    affordable = pMana->canAfford(cost, 0) != 0;
+                if (!affordable)
+                    continue;
+            }
             //Non-mana costs gate usability too: removing counters the card
             //does not have, sacrificing with no legal fodder. Each cost's
             //canPay carries the ENGINE's semantics, not the CR's - LifeCost,

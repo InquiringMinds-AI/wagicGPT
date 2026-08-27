@@ -5,6 +5,7 @@
 #include "AllAbilities.h"
 #include "ExtraCost.h"
 #include "ManaEngine.h"
+#include "LegalActions.h"
 #include "MTGRules.h"
 #include "ActionLayer.h"
 #include "GuiCombat.h"
@@ -742,6 +743,40 @@ int TestSuiteAI::Act(float)
             && !hcPayer->getManaPool()->canAfford(hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA)))
             ManaEngine::autoTapForCost(hcPayer, hc, hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA));
     }
+    else if (action.find("assertcastable ") == 0 || action.find("assertusable ") == 0)
+    {
+        //W48: pin the DISPLAY/oracle predicates the human borders read
+        //(castableNow <- LegalActionsOracle::castableForDisplay, the ability
+        //border <- LegalActionsOracle::hasUsableAbility). Syntax:
+        //  assertcastable <0|1> <card name>   /  assertusable <0|1> <card name>
+        bool wantCast = action.find("assertcastable ") == 0;
+        string rest = action.substr(wantCast ? 15 : 13);
+        int expect = (rest.size() && rest[0] == '1') ? 1 : 0;
+        string cname = rest.size() > 2 ? rest.substr(2) : "";
+        MTGCardInstance * ac = getCard(cname);
+        if (!ac)
+        {
+            std::cerr << "TESTSUITE " << (wantCast ? "assertcastable" : "assertusable")
+                      << ": no card '" << cname << "' [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        int got;
+        if (wantCast)
+        {
+            std::set<MTGCardInstance*> ok = LegalActionsOracle::castableForDisplay(ac->controller());
+            got = ok.count(ac) ? 1 : 0;
+        }
+        else
+            got = LegalActionsOracle::hasUsableAbility(ac) ? 1 : 0;
+        if (got != expect)
+        {
+            std::cerr << "TESTSUITE " << (wantCast ? "assertcastable" : "assertusable")
+                      << ": '" << cname << "' expected " << expect << " got " << got
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
     else if (action.find(" -momir- ") != string::npos)
     {
         int start = action.find(" -momir- ");
@@ -1307,6 +1342,13 @@ void TestSuiteGame::assertGame()
             }
         }
     }
+    if (commandAssertFailures)
+    {
+        char cafail[256];
+        sprintf(cafail, "<span class=\"error\">==%i scripted assert command(s) failed (assertcastable/assertusable)==</span><br />", commandAssertFailures);
+        Log(cafail);
+        error += commandAssertFailures;
+    }
     handleResults(wasAI, error);
 
     if(!error)
@@ -1669,6 +1711,7 @@ bool TestSuiteGame::load()
     //test — without this reset, any earlier test whose game actually ended leaks
     //its result into later gameover: asserts (order-dependent false failures).
     observedGameOver = 0;
+    commandAssertFailures = 0;
 
     std::string s;
 
@@ -1827,13 +1870,13 @@ TestSuiteGame::~TestSuiteGame()
 
 TestSuiteGame::TestSuiteGame(TestSuite* testsuite)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(0),
-      currentAction(0), observer(0), observedGameOver(0), testsuite(testsuite)
+      currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0), testsuite(testsuite)
 {
 }
 
 TestSuiteGame::TestSuiteGame(TestSuite* testsuite, string _filename)
     : summoningSickness(0), forceAbility(false), mAsserted(false), gameType(GAME_TYPE_CLASSIC), timerLimit(FAST_TEST),
-      currentAction(0), observer(0), observedGameOver(0), testsuite(testsuite)
+      currentAction(0), observer(0), observedGameOver(0), commandAssertFailures(0), testsuite(testsuite)
 {
     filename = _filename;
     observer = new GameObserver();

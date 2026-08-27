@@ -326,6 +326,12 @@ class Delve : public ExtraCost
 {
 public:
     Delve(TargetChooser *_tc = NULL);
+    //W48-DELVE: can the printed cost, reduced by every graveyard card the
+    //controller could exile (one per generic pip), be paid from `floatable`?
+    //The delve ALTERNATIVE is scripted as {0} + this extra cost, so a plain
+    //canAfford on it is trivially true (the Convoke defect, second edition).
+    static bool offerable(MTGCardInstance * source, ManaCost * floatable);
+    static bool alternativeIsDelve(ManaCost * cost);
     virtual int canPay();
     virtual int isPaymentSet();
     virtual int doPay();

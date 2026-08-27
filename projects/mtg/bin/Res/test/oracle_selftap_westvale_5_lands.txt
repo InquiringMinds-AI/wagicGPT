@@ -1,0 +1,18 @@
+# W48 display/oracle pin. Westvale Abbey {5},{T} as one of FIVE untapped lands: NOT usable (its own {T}: Add {1} cannot pay its own tap ability).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Westvale Abbey,Plains,Plains,Plains,Plains
+hand:Grizzly Bears
+
+[PLAYER2]
+life:20
+[DO]
+assertusable 0 westvale abbey
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Westvale Abbey,Plains,Plains,Plains,Plains
+hand:Grizzly Bears
+[PLAYER2]
+[END]

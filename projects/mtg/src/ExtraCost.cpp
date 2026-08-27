@@ -1257,6 +1257,44 @@ static void convokeReduceByCreatures(ManaCost * toReduce,
         convokeApplyOneCreature(toReduce, reverse ? creatures[n - 1 - idx] : creatures[idx]);
 }
 
+//W48-DELVE (owner live-play report, Vita, 2026-08-27: Gurmag Angler {6}{B}
+//showed castable with ANY black mana, graveyard empty or not). `other={delve}`
+//builds the alternative as a {0} mana shell plus this extra cost, and every
+//"is the alternative affordable" check (LegalActionsOracle::payable, the
+//legal-cast list's altOk, MTGAlternativeCostRule's human gate) asked
+//canAfford({0}) - always yes. The real price (printed cost minus one generic
+//per exiled card) was only enforced at payment (Delve::isPaymentSet). Price it
+//up front, exactly as Convoke::offerable does for convoke.
+bool Delve::offerable(MTGCardInstance * source, ManaCost * floatable)
+{
+    if (!source || !floatable || !source->getManaCost())
+        return false;
+    Player * p = source->controller();
+    if (!p || !p->game || !p->game->graveyard)
+        return false;
+    ManaCost * reduced = NEW ManaCost(source->getManaCost());
+    int generic = reduced->getCost(Constants::MTG_COLOR_ARTIFACT);
+    int exilable = p->game->graveyard->nb_cards;
+    if (exilable > generic)
+        exilable = generic;
+    if (exilable > 0)
+        reduced->remove(Constants::MTG_COLOR_ARTIFACT, exilable);
+    bool ok = floatable->canAfford(reduced, source->has(Constants::ANYTYPEOFMANA)) != 0;
+    SAFE_DELETE(reduced);
+    return ok;
+}
+
+bool Delve::alternativeIsDelve(ManaCost * cost)
+{
+    if (!cost || !cost->getAlternative() || !cost->getAlternative()->extraCosts)
+        return false;
+    ExtraCosts * aec = cost->getAlternative()->extraCosts;
+    for (size_t i = 0; i < aec->costs.size(); i++)
+        if (dynamic_cast<Delve *>(aec->costs[i]))
+            return true;
+    return false;
+}
+
 bool Convoke::offerable(MTGCardInstance * source, ManaCost * floatable)
 {
     if (!source || !floatable || !source->getManaCost())

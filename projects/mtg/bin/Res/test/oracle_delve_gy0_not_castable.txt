@@ -1,0 +1,18 @@
+# W48 display/oracle pin. Gurmag Angler {6}{B} delve, one Swamp, EMPTY graveyard: NOT castable (pre-fix: the {0} delve shell read as affordable).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Swamp
+hand:Gurmag Angler
+
+[PLAYER2]
+life:20
+[DO]
+assertcastable 0 gurmag angler
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Swamp
+hand:Gurmag Angler
+[PLAYER2]
+[END]

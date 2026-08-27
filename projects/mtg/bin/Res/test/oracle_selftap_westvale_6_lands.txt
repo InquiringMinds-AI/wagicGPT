@@ -1,0 +1,18 @@
+# W48 display/oracle pin. Westvale Abbey with FIVE OTHER untapped lands: usable.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Westvale Abbey,Plains,Plains,Plains,Plains,Plains
+hand:Grizzly Bears
+
+[PLAYER2]
+life:20
+[DO]
+assertusable 1 westvale abbey
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Westvale Abbey,Plains,Plains,Plains,Plains,Plains
+hand:Grizzly Bears
+[PLAYER2]
+[END]

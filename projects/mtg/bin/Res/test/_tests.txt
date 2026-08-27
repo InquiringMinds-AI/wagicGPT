@@ -1212,3 +1212,8 @@ menace_defender_one_blocker.txt
 menace_defender_ai_control_vanilla.txt
 human_castgate_dual_1WW.txt
 human_castgate_dual_1GW.txt
+oracle_delve_gy0_not_castable.txt
+oracle_delve_gy6_castable.txt
+oracle_delve_gy3_not_castable.txt
+oracle_selftap_westvale_5_lands.txt
+oracle_selftap_westvale_6_lands.txt
