@@ -1854,9 +1854,14 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
 
     pMana->add(this->getManaPool());
 
+    //#W51-D (D5): the {X}-only cost becomes the pool itself, and the receipt
+    //below names the cost - so the pool must outlive the walk (it used to be
+    //deleted before the receipt read it).
+    ManaCost * xCost = NULL;
     if(!cost->getConvertedCost() && cost->hasX())
     {
         cost = pMana;//{x}:effect, set x to max.
+        xCost = pMana;
     }
 
     if(!pMana->canAfford(cost, 0))
@@ -1920,7 +1925,8 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
     {
         diff = pMana->Diff(cost);
     }
-    delete (pMana);
+    if (!xCost)
+        delete (pMana);
     if (spareAttackers)
     {
         for (size_t k = atkNeed; k < attackerProd.size(); k++)
@@ -1962,8 +1968,19 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
         }
     }
     delete (diff);
-    if (!paidWith.empty())
-        notePaymentQueued(cost, target, paidWith);
+    //#W51-D (D5): ONE receipt per committed payment, whatever the walk tapped.
+    //The old `!paidWith.empty()` gate was the hole: it dropped the receipt
+    //exactly when the walk queued no producer click - legitimately when the
+    //pool already covered the cost (Lair of the Hydra {1}{g} over a floating
+    //{g}{g}{w}, corpus 20260827-115759 deck152 vs126 seq 25), and, worse,
+    //when the walk found NOTHING to tap and still returned true (Hive of the
+    //Eye Tyrant {3}{b} in Upkeep, deck146 vs126 seq 32/36: four untapped
+    //sources before AND after, no StackAbility ever added). The receipt is
+    //the instrument for D2; an instrument that goes silent on the failure it
+    //exists to catch is no instrument. The no-source form is deliberately
+    //loud ("with no source tapped") so a corpus grep finds the engine hole.
+    notePaymentQueued(cost, target, paidWith);
+    SAFE_DELETE(xCost);
     return true;
 }
 

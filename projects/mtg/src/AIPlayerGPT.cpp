@@ -1118,6 +1118,62 @@ static string edictClause(int theirCreatures, const string& onlyName, int onlyTo
     return o.str();
 }
 
+//#W51-D (D10): the Soul Shatter class - "each opponent sacrifices a creature
+//or planeswalker with the highest mana value" (Soul Shatter, Flare of Malice,
+//Riveteers Charm's first mode; scripts fixed in 42f2eff2b as
+//`sacrifice notaTarget(*[creature;planeswalker;manacost=convertedcost:highest
+//...]|myBattlefield)!$ opponent`). Lane X's edict emitter keyed on the
+//`notatarget(creature|mybattlefield) ... targetedplayer` shape and this one
+//printed only its card text (deck146 vs162 seq 25; deck146 vs123 seq 20 cast
+//into 0 creatures). The victim is DETERMINED by the board, not chosen, so
+//name it; at a tie the opponent chooses among the tied, so name the count.
+//Pure over (name, MV) pairs so every branch is provable in PARSETEST.
+static string highestMvEdictClause(const vector<std::pair<string, int> >& theirs)
+{
+    if (theirs.empty())
+        return "they control 0 creatures or planeswalkers - at 0 this does nothing";
+    int top = theirs[0].second;
+    for (size_t i = 1; i < theirs.size(); i++)
+        if (theirs[i].second > top)
+            top = theirs[i].second;
+    vector<string> tied;
+    for (size_t i = 0; i < theirs.size(); i++)
+        if (theirs[i].second == top)
+            tied.push_back(theirs[i].first);
+    std::ostringstream o;
+    if (tied.size() == 1)
+    {
+        o << "they sacrifice " << tied[0] << " (MV " << top << ", their highest)";
+        return o.str();
+    }
+    o << tied.size() << " tied at MV " << top << " (their highest): ";
+    for (size_t i = 0; i < tied.size(); i++)
+        o << (i ? "; " : "") << tied[i];
+    o << " - they choose which one";
+    return o.str();
+}
+
+string instanceHandle(MTGCardInstance * card); //defined below (#N-166a)
+//The live board behind the clause: the opponent's creatures and planeswalkers
+//with their mana values, handles included so tied copies stay distinct.
+static bool highestMvEdictBoard(MTGCardInstance * card, vector<std::pair<string, int> >& out)
+{
+    Player * me = card ? card->controller() : NULL;
+    Player * opp = me ? me->opponent() : NULL;
+    if (!me || !opp || !opp->game || !opp->game->inPlay)
+        return false;
+    MTGGameZone * bf = opp->game->inPlay;
+    for (int i = 0; i < bf->nb_cards; i++)
+    {
+        MTGCardInstance * c = bf->cards[i];
+        if (!c || !(c->isCreature() || c->hasType(Subtypes::TYPE_PLANESWALKER)))
+            continue;
+        int mv = c->getManaCost() ? c->getManaCost()->getConvertedCost() : 0;
+        out.push_back(std::make_pair(c->getDisplayName() + instanceHandle(c), mv));
+    }
+    return true;
+}
+
 //#W50-X D13 (wave-49 ledger MED): "(K able to attack)" was canAttack() on the
 //OPPONENT's board during the caster's turn, where tapped and summoning-sick are
 //true of every creature they control - 323 fresh tokens rendered "(0 able to
@@ -1207,6 +1263,16 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
     bool attackPunisher = lowText.find("@each blockers") != string::npos
         && lowText.find("creature[attacking]") != string::npos
         && lowText.find("damage:") != string::npos;
+    //#W51-D (D10): the highest-MV edict (Soul Shatter class).
+    if (!edict && lowText.find("sacrifice") != string::npos
+        && lowText.find("convertedcost:highest") != string::npos
+        && lowText.find("opponent") != string::npos)
+    {
+        vector<std::pair<string, int> > board;
+        if (!highestMvEdictBoard(card, board))
+            return "";
+        return highestMvEdictClause(board);
+    }
     if (!edict && !sweepVerb && !attackPunisher)
         return "";
     bool live = false;
@@ -8746,7 +8812,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         {"reply", reply},
         {"choice", choice},
         {"options", optionCount},
-        {"turn", observer->turn},
+        {"turn", translogTurn(observer->turn)},
         {"phase", observer->getCurrentGamePhaseName()},
         {"my_life", life},
         {"opp_life", opponent() ? opponent()->life : 0},
@@ -8922,7 +8988,7 @@ void AIPlayerGPT::logGameEnd()
         {"model", mModel},
         {"won", iWon},
         {"draw", !iWon && !oppWon},
-        {"turn", observer->turn},
+        {"turn", translogTurn(observer->turn)},
         {"my_life", life},
         {"opp_life", opponent() ? opponent()->life : 0},
         //#W46-7: priority windows this seat auto-passed as mana-only (no
@@ -11970,6 +12036,13 @@ string AIPlayerGPT::stepKey() const
 //adjudicated on). Mana already floating is named as such, so a receipt that
 //taps fewer sources than the cost has pips is not misread as an underpayment.
 //One line per committed plan; a cast that pays twice (D1) writes two.
+//#W51-D (D17): sources are joined with "; " - a card name may itself carry a
+//comma ("Katilda, Dawnhart Prime"), so "A, B, C" did not split back into
+//names (10 receipts in corpus 20260827-115759, deck152 vs123 seq 13). The
+//semicolon is already the prompt's own list separator ("Those sources, one
+//per untapped card: ... ; ...") and no card name contains one.
+//#W51-D (D5): a payment that tapped nothing and floated nothing is still a
+//committed payment - it prints "with no source tapped" rather than vanishing.
 static string paymentReceiptLine(const string& cost, const string& target,
                                  const vector<string>& sources, bool fromPool)
 {
@@ -11981,25 +12054,42 @@ static string paymentReceiptLine(const string& cost, const string& target,
     {
         o << " with ";
         for (size_t i = 0; i < sources.size(); i++)
-            o << (i ? ", " : "") << sources[i];
+            o << (i ? "; " : "") << sources[i];
         if (fromPool)
             o << " and mana already floating";
     }
     else if (fromPool)
         o << " from mana already floating";
+    else
+        o << " with no source tapped";
     return o.str();
 }
 
-void AIPlayerGPT::notePaymentQueued(ManaCost * cost, MTGCardInstance * target, const vector<MTGCardInstance*>& sources)
+string AIPlayerGPT::paymentReceipt(ManaCost * cost, MTGCardInstance * target,
+                                   const vector<MTGCardInstance*>& sources, int poolConvertedCost)
 {
     if (!cost || !cost->getConvertedCost())
-        return;
+        return "";
     vector<string> names;
     for (size_t i = 0; i < sources.size(); i++)
         if (sources[i])
             names.push_back(sources[i]->getDisplayName() + instanceHandle(sources[i]));
-    appendNarration(paymentReceiptLine(cost->toString(), target ? target->getDisplayName() : "",
-                                       names, getManaPool()->getConvertedCost() > 0));
+    return paymentReceiptLine(cost->toString(), target ? target->getDisplayName() : "",
+                              names, poolConvertedCost > 0);
+}
+
+void AIPlayerGPT::notePaymentQueued(ManaCost * cost, MTGCardInstance * target, const vector<MTGCardInstance*>& sources)
+{
+    appendNarration(paymentReceipt(cost, target, sources, getManaPool()->getConvertedCost()));
+}
+
+//#W51-D (D18): the translog's `turn` is the narration's turn. The narration
+//prints observer->turn + 1 ("=== Turn 10"), and every record wrote the raw
+//observer->turn beside it (`turn: 9` under `=== Turn 10`, 28/28 discard
+//records, fourth corpus). One rule, one place: readers add nothing.
+int AIPlayerGPT::translogTurn(int observerTurn)
+{
+    return observerTurn + 1;
 }
 
 //"" for everything below the floor: no annotation, no token cost, no change to
@@ -32975,10 +33065,10 @@ void AIPlayerGPT::runParseSelfTest()
     {
         vector<string> srcs; srcs.push_back("Island #1"); srcs.push_back("Drowned Catacomb #1");
         CHECK(paymentReceiptLine("{1}{u}", "Fog Bank", srcs, false)
-              == "Paid {1}{u} for Fog Bank with Island #1, Drowned Catacomb #1",
+              == "Paid {1}{u} for Fog Bank with Island #1; Drowned Catacomb #1",
               "#W50-Z D18 cost, what it paid for, and the sources in tap order");
         CHECK(paymentReceiptLine("{2}{b}", "Idyllic Tutor", srcs, true)
-              == "Paid {2}{b} for Idyllic Tutor with Island #1, Drowned Catacomb #1 and mana already floating",
+              == "Paid {2}{b} for Idyllic Tutor with Island #1; Drowned Catacomb #1 and mana already floating",
               "#W50-Z D18 a pool contribution is named, so fewer sources than pips is not an underpayment");
         CHECK(paymentReceiptLine("{2}", "Elixir of Immortality", vector<string>(), true)
               == "Paid {2} for Elixir of Immortality from mana already floating",
@@ -32986,7 +33076,7 @@ void AIPlayerGPT::runParseSelfTest()
         {
             string narr, pend; string delta;
             narrationAppend(narr, pend, paymentReceiptLine("{1}{u}", "Fog Bank", srcs, false), "", &delta);
-            CHECK(narr == "- Paid {1}{u} for Fog Bank with Island #1, Drowned Catacomb #1\n",
+            CHECK(narr == "- Paid {1}{u} for Fog Bank with Island #1; Drowned Catacomb #1\n",
                   "#W50-Z D18 the receipt narrates as one dashed GAME LOG line with its braces intact");
         }
         CHECK(paymentReceiptLine("{1}{u}", "Fog Bank", srcs, false).find('[') == string::npos,
@@ -33676,6 +33766,73 @@ static const char * kW50Y_r94 =
         bool sd = false;
         CHECK(parseChoice("CHOICE: 1 (Cast Stone Rain)", 1, &dm, &sd, NULL) == 1 && !sd,
               "#W51-F D16 echo: the marked note on the target clause does not unbind the row");
+    }
+    // ---- #W51-D: D5 receipt on every payment, D17 separator, D18 turn, D10 highest-MV edict ----
+    cout << "\n[#W51-D] D5 / D17 / D18 / D10\n";
+    {
+        //D17: a comma-bearing name splits back out of the receipt unambiguously.
+        vector<string> srcs;
+        srcs.push_back("Katilda, Dawnhart Prime");
+        srcs.push_back("Elite Spellbinder");
+        string line = paymentReceiptLine("{1}{w}", "Intrepid Adversary", srcs, false);
+        CHECK(line == "Paid {1}{w} for Intrepid Adversary with Katilda, Dawnhart Prime; Elite Spellbinder",
+              "#W51-D D17 sources are joined with '; ' so a comma inside a name is not a separator");
+        {
+            string tail = line.substr(line.find(" with ") + 6);
+            vector<string> back;
+            size_t at = 0;
+            while (true)
+            {
+                size_t sep = tail.find("; ", at);
+                back.push_back(tail.substr(at, sep == string::npos ? string::npos : sep - at));
+                if (sep == string::npos)
+                    break;
+                at = sep + 2;
+            }
+            CHECK(back.size() == 2 && back[0] == "Katilda, Dawnhart Prime" && back[1] == "Elite Spellbinder",
+                  "#W51-D D17 splitting the receipt on '; ' recovers both names intact");
+        }
+        CHECK(paymentReceiptLine("{1}{w}", "Intrepid Adversary", srcs, false).find(", Elite") == string::npos,
+              "#W51-D D17 NEGATIVE no ', ' between two sources");
+        //D5: the no-source, no-pool payment is loud, not silent.
+        CHECK(paymentReceiptLine("{3}{b}", "Hive of the Eye Tyrant", vector<string>(), false)
+              == "Paid {3}{b} for Hive of the Eye Tyrant with no source tapped",
+              "#W51-D D5 a payment that tapped nothing and floated nothing still writes a receipt, and says so");
+        CHECK(paymentReceiptLine("{1}{g}", "Lair of the Hydra", vector<string>(), true)
+              == "Paid {1}{g} for Lair of the Hydra from mana already floating",
+              "#W51-D D5 the pool-covered activation (the Lair miss) keeps the floating form");
+        CHECK(paymentReceiptLine("{3}{b}", "Hive of the Eye Tyrant", vector<string>(), false).find('[') == string::npos,
+              "#W51-D D5 NEGATIVE the no-source receipt carries no bracket for an echo to strip");
+        //D18: the translog turn is the narration's turn.
+        CHECK(translogTurn(9) == 10, "#W51-D D18 observer turn 9 is narrated and logged as turn 10");
+        CHECK(translogTurn(0) == 1, "#W51-D D18 the pregame/first-turn record logs turn 1, as '=== Turn 1' narrates");
+        //D10: the highest-MV edict fact.
+        vector<std::pair<string, int> > board;
+        CHECK(highestMvEdictClause(board) == "they control 0 creatures or planeswalkers - at 0 this does nothing",
+              "#W51-D D10 Soul Shatter into an empty board says it does nothing");
+        board.push_back(std::make_pair(string("Vampire"), 0));
+        board.push_back(std::make_pair(string("Sorin, Lord of Innistrad"), 4));
+        board.push_back(std::make_pair(string("Elite Spellbinder"), 3));
+        CHECK(highestMvEdictClause(board) == "they sacrifice Sorin, Lord of Innistrad (MV 4, their highest)",
+              "#W51-D D10 the single highest-MV permanent (a planeswalker counts) is named with its MV");
+        board.push_back(std::make_pair(string("Katilda, Dawnhart Prime"), 4));
+        CHECK(highestMvEdictClause(board)
+              == "2 tied at MV 4 (their highest): Sorin, Lord of Innistrad; Katilda, Dawnhart Prime - they choose which one",
+              "#W51-D D10 at a tie the count and the tied names are given, not a pick the engine does not make");
+        CHECK(highestMvEdictClause(board).find("Elite Spellbinder") == string::npos,
+              "#W51-D D10 NEGATIVE a lower-MV creature is not named as a candidate");
+        {
+            //echo shape: the clause lives inside {right now: ...} on a cast row and the
+            //bare row name still binds when the reply parrots the clause.
+            vector<string> menu;
+            menu.push_back("Cast Soul Shatter {2}{b} {right now: " + highestMvEdictClause(board) + "}");
+            menu.push_back("Cast Vampire {1}{b}");
+            bool stale = false; string src;
+            int pick = parseChoice("CHOICE: 1 (Cast Soul Shatter {2}{b} {right now: 2 tied at MV 4 (their highest): Sorin, Lord of Innistrad; Katilda, Dawnhart Prime - they choose which one})", 1, &menu, &stale, &src);
+            CHECK(pick == 1 && !stale, "#W51-D D10 echo: a reply copying the whole row incl. the clause binds to 1");
+            pick = parseChoice("CHOICE: 1 (Cast Soul Shatter)", 1, &menu, &stale, &src);
+            CHECK(pick == 1 && !stale, "#W51-D D10 echo: the bare row name binds with the clause on the row");
+        }
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

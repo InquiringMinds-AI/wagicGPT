@@ -183,6 +183,10 @@ public:
     MTGCardInstance * mCounteredMark;
     string mCounteredMarkBy;
     virtual int receiveEvent(WEvent * event);
+    //#W51-D (D5): the payment receipt joins the narration register, so a
+    //fixture can pin "paid {3}{b} for hive of the eye tyrant with ..." on the
+    //scripted seat's own payments (AIPlayerBaka::payTheManaCost fires it).
+    virtual void notePaymentQueued(ManaCost * cost, MTGCardInstance * target, const vector<MTGCardInstance*>& sources);
 
     TestSuiteAI(TestSuiteGame *tsGame, int playerId);
     virtual int Act(float dt);

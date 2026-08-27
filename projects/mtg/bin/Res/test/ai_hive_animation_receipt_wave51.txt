@@ -1,0 +1,46 @@
+#Wave-51 lane D (wave-50 engine ledger D5) -- the `- Paid` receipt on a mana-cost
+#ACTIVATION, not only on casts.
+#
+#SYMPTOM (corpus 20260827-115759): 3 of 9 land animations carried no receipt
+#(Hive of the Eye Tyrant x2 in Upkeep, deck146 vs126 seq 32/36; Lair of the
+#Hydra on a TAPPED row over a floating pool, deck152 vs126 seq 25), while all
+#396 casts had one. The receipt is the instrument D2 (auto-tap order) is
+#adjudicated on, so a hole in it hides exactly the payments most worth reading.
+#
+#WITNESS: the scripted seat animates Hive ({3}{B}) in its main phase over four
+#Swamps (FORCEABILITY takes the ranked ability). The seat records the SAME
+#receipt line the live GPT seat narrates (AIPlayerGPT::paymentReceipt via
+#TestSuiteAI::notePaymentQueued), so the fixture pins the line itself.
+#Sources are joined with "; " (D17). The animated 3/3 menace body then attacks
+#past the lone Bears: the opponent ends at 17, which pins that the activation
+#actually resolved (a receipt for an activation that never happened is worse
+#than none).
+FORCEABILITY
+AICALLS 40
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Hive of the Eye Tyrant,Swamp,Swamp,Swamp,Swamp
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Hive of the Eye Tyrant,Swamp,Swamp,Swamp,Swamp
+narration:paid {3}{b} for hive of the eye tyrant with swamp #
+narration:; swamp #
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:17
+[END]
