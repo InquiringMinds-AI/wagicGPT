@@ -1,0 +1,23 @@
+# W48-GATE: HUMAN castability gate with a dual land. Glorious Anthem {1}{W}{W} over Plains+Forest+Guildgate.
+# PRE-FIX: the gate counted only the Guildgate's first colour (G), refused the
+# click, nothing tapped, pool empty. EXPECTED: gate passes, auto-tap pays.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Plains,Forest,Selesnya Guildgate
+hand:Glorious Anthem
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+humancast glorious anthem
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Plains,Forest,Selesnya Guildgate
+hand:Glorious Anthem
+tappedinplay:3
+manapool:{G}{W}{W}
+[PLAYER2]
+[END]

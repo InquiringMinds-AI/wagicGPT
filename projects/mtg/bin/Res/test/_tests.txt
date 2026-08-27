@@ -1210,3 +1210,5 @@ nontrample_vs_protection_blocker.txt
 menace_defender_two_blockers.txt
 menace_defender_one_blocker.txt
 menace_defender_ai_control_vanilla.txt
+human_castgate_dual_1WW.txt
+human_castgate_dual_1GW.txt

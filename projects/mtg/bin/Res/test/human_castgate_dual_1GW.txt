@@ -1,0 +1,23 @@
+# W48-GATE: HUMAN castability gate with a dual land. Ironroot Warlord {1}{G}{W} over Forest+Forest+Guildgate.
+# PRE-FIX: the gate counted only the Guildgate's first colour (G), refused the
+# click, nothing tapped, pool empty. EXPECTED: gate passes, auto-tap pays.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Selesnya Guildgate
+hand:Ironroot Warlord
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+humancast ironroot warlord
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Forest,Forest,Selesnya Guildgate
+hand:Ironroot Warlord
+tappedinplay:3
+manapool:{G}{G}{W}
+[PLAYER2]
+[END]

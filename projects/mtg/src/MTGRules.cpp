@@ -393,16 +393,39 @@ int MTGPutInPlayRule::isReactingToClick(MTGCardInstance * card, ManaCost *)
         //sunburst pool-color adjustment above only runs on the manual path.
         if (!player->isAI())
         {
-            ManaEngine::FreeProducerPolicy freePolicy;
-            ManaCost * potential = ManaEngine::potentialMana(player, freePolicy, card);
-            potential->add(playerMana);
-            bool affordable = potential->canAfford(cost, card->has(Constants::ANYTYPEOFMANA)) != 0;
-            delete potential;
-            if (affordable)
+            if (humanCanAffordWithProducers(player, card))
                 return 1;
         }
     }
     return 0;//dont play if you cant afford it.
+}
+
+//W48-GATE (owner live-play report, Vita, 2026-08-27): the human castability
+//gate used ManaEngine::potentialMana ALONE, and potentialMana is ONE ABILITY
+//PER CARD in layer order - a dual land (Selesnya Guildgate add{G} then add{W},
+//Blossoming Sands, every Guildgate/Gate-like dual) counts only its FIRST
+//colour. Plains + Forest + Guildgate read as {W}{G}{G}, so {1}{W}{W} (Glorious
+//Anthem) and {1}{G}{W} with Forest+Forest+Guildgate (Ironroot Warlord) were
+//judged unaffordable and the click was REFUSED - while the auto-tap planner
+//that would have paid on the click (ManaEngine::planPayment, colour-aware,
+//picks the dual's needed side) was never consulted. The owner's workaround -
+//tap the gate for white first - worked precisely because real pool mana
+//bypasses the under-count. Ask the planner as the last resort, the same way
+//LegalActionsOracle::payable does; the click then taps that exact plan.
+bool MTGPutInPlayRule::humanCanAffordWithProducers(Player * player, MTGCardInstance * card)
+{
+    if (!player || !card || !card->getManaCost())
+        return false;
+    ManaCost * cost = card->getManaCost();
+    int anytype = card->has(Constants::ANYTYPEOFMANA);
+    ManaEngine::FreeProducerPolicy freePolicy;
+    ManaCost * potential = ManaEngine::potentialMana(player, freePolicy, card);
+    potential->add(player->getManaPool());
+    bool affordable = potential->canAfford(cost, anytype) != 0;
+    delete potential;
+    if (affordable)
+        return true;
+    return ManaEngine::planPayment(player, freePolicy, card, cost, anytype).size() > 0;
 }
 
 //N-137b helper: does this cost carry a Convoke extra cost? The X-announce

@@ -723,6 +723,25 @@ int TestSuiteAI::Act(float)
             && !autoTapPayer->getManaPool()->canAfford(autoTapCard->getManaCost(), autoTapAny))
             ManaEngine::autoTapForCost(autoTapPayer, autoTapCard, autoTapCard->getManaCost(), autoTapAny);
     }
+    else if (action.find("humancast ") == 0)
+    {
+        //W48-GATE: the HUMAN castability gate (MTGPutInPlayRule::isReactingToClick's
+        //!isAI branch) followed by the human auto-tap - so a fixture pins the GATE
+        //itself: if the gate refuses (pre-fix: a dual land counted only its first
+        //colour), nothing taps and the pool stays empty.
+        string cname = action.substr(10);
+        MTGCardInstance * hc = getCard(cname);
+        if (!hc || !hc->getManaCost())
+        {
+            std::cerr << "TESTSUITE humancast: no card '" << cname << "' with a mana cost"
+                         " (state unchanged) [" << suite->filename << "]" << std::endl;
+            return 1;
+        }
+        Player * hcPayer = hc->controller();
+        if (hcPayer && MTGPutInPlayRule::humanCanAffordWithProducers(hcPayer, hc)
+            && !hcPayer->getManaPool()->canAfford(hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA)))
+            ManaEngine::autoTapForCost(hcPayer, hc, hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA));
+    }
     else if (action.find(" -momir- ") != string::npos)
     {
         int start = action.find(" -momir- ");

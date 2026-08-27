@@ -76,6 +76,9 @@ class MTGPutInPlayRule: public PermanentAbility
 protected:
     string defaultPlayName;
 public:
+    //W48-GATE: the human castability predicate (pool + potential mana, then the
+    //colour-aware payment planner); shared with the suite's `humancast` command.
+    static bool humanCanAffordWithProducers(Player * player, MTGCardInstance * card);
     int isReactingToClick(MTGCardInstance * card, ManaCost * mana = NULL);
     int reactToClick(MTGCardInstance * card);
     virtual ostream& toString(ostream& out) const;
