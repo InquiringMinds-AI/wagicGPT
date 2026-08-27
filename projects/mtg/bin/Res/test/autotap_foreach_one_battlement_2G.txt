@@ -1,0 +1,29 @@
+# W52-H (wave-51 seat 125-126 engine HIGH #1): a foreach-wrapped VARIABLE producer (Overgrown
+# Battlement, "{T}: Add {G} for each creature with defender you control") over a cost ONE copy
+# covers (corpus 20260827-155545 deck126 vs152 seq18->19: the row forecast "paying this taps:
+# Overgrown Battlement, Overgrown Battlement", the receipt "Paid {2}{b} ... with Overgrown
+# Battlement #1; #2; #3; Woodland Cemetery" - 13 {g} floated, three walls tapped into combat).
+# PRE-FIX: the planner's foreach branch tapped EVERY such source it walked past, never re-checking
+# coverage. EXPECTED: Cultivate {2}{G} over three Battlements (3 defenders -> one tap makes {G}{G}{G})
+# taps exactly ONE; the other two stay untapped. autotap = the human auto-tap (row forecast shares this plan).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Overgrown Battlement,Overgrown Battlement,Overgrown Battlement
+hand:Cultivate
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+asserttaps 1 cultivate
+autotap cultivate
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Overgrown Battlement,Overgrown Battlement,Overgrown Battlement
+hand:Cultivate
+tappedinplay:1
+manapool:{G}{G}{G}
+[PLAYER2]
+[END]

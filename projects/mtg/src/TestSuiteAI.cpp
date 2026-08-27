@@ -802,6 +802,42 @@ int TestSuiteAI::Act(float)
             && !hcPayer->getManaPool()->canAfford(hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA)))
             ManaEngine::autoTapForCost(hcPayer, hc, hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA));
     }
+    else if (action.find("asserttaps ") == 0)
+    {
+        //#W52-H: pin the auto-tap FORECAST - the number of distinct source cards
+        //ManaEngine::selectAutoTapProducers would tap for the card's mana cost.
+        //This is what the AI seat's row text renders (`{paying this taps: ...}`,
+        //`{leaves N of M ...}`) and what the human's blue tap preview shows; the
+        //`autotap`/`aipay` actions pin what actually TAPS, and the two must
+        //agree (a foreach-wrapped producer was credited one mana per tap here
+        //while its tap made six). Syntax: asserttaps <N> <card name>
+        string rest = action.substr(11);
+        size_t sp = rest.find(' ');
+        int expect = atoi(rest.substr(0, sp).c_str());
+        string cname = sp == string::npos ? "" : rest.substr(sp + 1);
+        MTGCardInstance * tc = getCard(cname);
+        if (!tc || !tc->getManaCost())
+        {
+            std::cerr << "TESTSUITE asserttaps: no card '" << cname << "' with a mana cost"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
+            tc->controller(), tc, tc->getManaCost(), tc->has(Constants::ANYTYPEOFMANA));
+        std::set<MTGCardInstance*> sources;
+        for (size_t i = 0; i < picks.size(); i++)
+            if (picks[i] && picks[i]->source)
+                sources.insert(picks[i]->source);
+        if ((int) sources.size() != expect)
+        {
+            std::cerr << "TESTSUITE asserttaps: '" << cname << "' expected " << expect
+                      << " sources got " << sources.size() << " [" << suite->filename << "]" << std::endl;
+            for (std::set<MTGCardInstance*>::iterator it = sources.begin(); it != sources.end(); ++it)
+                std::cerr << "TESTSUITE asserttaps:   " << (*it)->getDisplayName() << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
     else if (action.find("assertcastable ") == 0 || action.find("assertusable ") == 0)
     {
         //W48: pin the DISPLAY/oracle predicates the human borders read
@@ -1417,7 +1453,7 @@ void TestSuiteGame::assertGame()
     if (commandAssertFailures)
     {
         char cafail[256];
-        sprintf(cafail, "<span class=\"error\">==%i scripted assert command(s) failed (assertcastable/assertusable)==</span><br />", commandAssertFailures);
+        sprintf(cafail, "<span class=\"error\">==%i scripted assert command(s) failed (assertcastable/assertusable/asserttaps)==</span><br />", commandAssertFailures);
         Log(cafail);
         error += commandAssertFailures;
     }

@@ -792,6 +792,28 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                         used[fecard];
                         continue;
                     }
+                    //#W52-H: tap a variable source only while it still HELPS. This
+                    //branch used to take every foreach producer it walked past, so a
+                    //{2}{b} over three Overgrown Battlements + Woodland Cemetery (layer
+                    //order: walls first, the black land last) tapped ALL THREE walls -
+                    //each one already making {g}{g}{g}{g}{g}{g} - because the {b} pip
+                    //stayed short until the land came up, and nothing here asked whether
+                    //the wall's output was needed (corpus 20260827-155545 deck126 vs152
+                    //seq18->19: "Paid {2}{b} for Tribute to Hunger with Overgrown
+                    //Battlement #1; #2; #3; Woodland Cemetery", 13 {g} floated; seq26->27
+                    //the same three walls tapped into an 18-life combat). A source helps
+                    //when it makes a coloured pip the plan is still short of, or the
+                    //TOTAL is still short (it is then a generic filler - the first wall
+                    //covers the {2} with mana to spare, the next two do not help). The
+                    //walk is layer-ordered, so the land that pays the pip is still
+                    //reached after the one wall the cost needed.
+                    bool helps = result->getConvertedCost() < cost->getConvertedCost();
+                    for (int k = 1; k < Constants::NB_Colors && !helps; k++)
+                        if (k != Constants::MTG_COLOR_LAND && amp->output->hasColor(k)
+                            && result->getCost(k) < cost->getCost(k))
+                            helps = true;
+                    if (!helps)
+                        continue;
                     if (!used[fecard] && gmp->isReactingToClick(fecard) && amp->output->getConvertedCost() >= 1 && (cost->getConvertedCost() > 1 || cost->hasX()))//wasteful to tap a potential big mana source for a single mana.
                     {
                         int outPut = fmp->checkActivation();
@@ -1063,6 +1085,24 @@ vector<MTGAbility*> ManaEngine::selectAutoTapProducers(Player * p, MTGCardInstan
                 continue;
             }
             AManaProducer * amp = dynamic_cast<AManaProducer *>(plan[i]);
+            //#W52-H: a foreach-wrapped VARIABLE producer (Overgrown Battlement,
+            //Tolarian Academy) is a GenericActivatedAbility around an AForeach
+            //around the AManaProducer; the plain cast above is NULL for it and
+            //the simulation used to credit it ONE colourless mana, so the row
+            //forecast for a {2}{b} over three Battlements named TWO walls while
+            //one tap of one wall made six {g}. Unwrap it and credit what the
+            //tap actually makes (output x the foreach count), so the forecast
+            //(`{paying this taps: ...}`, `{leaves N of M}`) and the executed
+            //plan (planPayment, same fix) name the same sources.
+            int repeat = 1;
+            if (!amp)
+                if (GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility *>(plan[i]))
+                    if (AForeach * fmp = dynamic_cast<AForeach *>(gmp->ability))
+                        if (AManaProducer * inner = dynamic_cast<AManaProducer *>(fmp->ability))
+                        {
+                            amp = inner;
+                            repeat = fmp->checkActivation();
+                        }
             if (pass == 0)
             {
                 int color = 0;
@@ -1075,9 +1115,10 @@ vector<MTGAbility*> ManaEngine::selectAutoTapProducers(Player * p, MTGCardInstan
             }
             picks.push_back(plan[i]);
             if (amp && amp->output)
-                sim->add(amp->output);
+                for (int r = 0; r < repeat; r++)
+                    sim->add(amp->output);
             else
-                sim->add(Constants::MTG_COLOR_ARTIFACT, 1); //wrapped producer: approximate
+                sim->add(Constants::MTG_COLOR_ARTIFACT, 1); //unknown wrapper: approximate
             plan[i] = NULL; //selected; never pick a producer twice
         }
     }
