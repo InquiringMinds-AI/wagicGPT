@@ -5596,3 +5596,8 @@ replacement, loop affordances: real Pass row + repeat-N row + scoped [repeat:] t
 collapse on combat A-rows/target menus/log cycles, attack-count header, priced blocker
 representative, stack keyword tags, card-text clause budget, auto=choice menu headers,
 DRAW PRICE reach, ANNOUNCE_X plan suppression). Suite 1137/0 + 37/0, PARSETEST 1655/0.
+
+## 2026-08-27 — layout: psp-port worktree MOVED to ~/Projects/wagicGPT/worktrees/psp
+Owner reorganised ~/Projects to a single wagic node. Every recipe above that mounts
+`-v /home/magi/Projects/wagicGPT-psp:/build` now reads `-v /home/magi/Projects/wagicGPT/worktrees/psp:/build`;
+deploy-vita.sh default VPK path updated. Lane worktrees go under worktrees/lanes/.
