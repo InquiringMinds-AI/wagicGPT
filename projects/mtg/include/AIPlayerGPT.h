@@ -582,7 +582,8 @@ private:
     //self-retraction with no replacing CHOICE - the answer must route to the
     //heuristic instead of using the retracted digit (deck135 HARNESS-1).
     static bool choiceRetractedNoReplacement(const string& content, int optionCount,
-                                             const std::vector<string> * optionTexts = NULL);
+                                             const std::vector<string> * optionTexts = NULL,
+                                             int * replacement = NULL);
 
     string mEndpoint; //base URL, empty if nothing answered
     string mModel;

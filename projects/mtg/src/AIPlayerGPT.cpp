@@ -11488,8 +11488,11 @@ int AIPlayerGPT::salvageLoopedChoice(const string& content, int optionCount,
 //A false fallback here only routes to the (safe) heuristic; a false take (a used
 //retracted digit) is the harmful case we still catch.
 bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int optionCount,
-                                               const std::vector<string> * optionTexts)
+                                               const std::vector<string> * optionTexts,
+                                               int * replacement)
 {
+    if (replacement)
+        *replacement = -1;
     string text = content;
     size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
@@ -11647,7 +11650,34 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
                 }
                 if (exampleEcho) { scan += 7; continue; }
                 if (n >= 0 && n <= optionCount && n != chosenNum)
+                {
+                    //#W48-E1 (wave-47 engine seat): the model REASONED ITSELF OUT
+                    //of a token loop and ended "So, CHOICE: 0 (pass)." - mid-line,
+                    //so it read as a contradiction with no replacement, the answer
+                    //became -1, the heuristic kept tapping, and the decline was
+                    //never counted (deck123 vs146 seq 34, 221). A contradictory
+                    //index that is the LAST coded CHOICE in the reply is the
+                    //model's final answer, not a retraction: hand it back and let
+                    //the caller take it. Anything coded after it keeps the old
+                    //retracted-no-replacement verdict.
+                    if (replacement)
+                    {
+                        size_t later = e;
+                        bool anyLater = false;
+                        while ((later = low.find("choice:", later)) != string::npos)
+                        {
+                            size_t dd = later + 7;
+                            while (dd < low.size() && (low[dd] == ' ' || low[dd] == '\t')) dd++;
+                            if (dd < low.size() && isdigit((unsigned char) low[dd])
+                                && !(later > 0 && (low[later - 1] == '"' || low[later - 1] == '\'' || low[later - 1] == '`')))
+                            { anyLater = true; break; }
+                            later += 7;
+                        }
+                        if (!anyLater)
+                            *replacement = n;
+                    }
                     return true; //genuine second, contradictory coded index
+                }
             }
             scan += 7;
         }
@@ -12047,12 +12077,21 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //took back (with no replacing CHOICE) is not its decision - defer to
         //the heuristic rather than execute the retracted digit.
         bool retracted = false;
+        int reanswer = -1;
         if (choice >= 0 && !content.empty()
-            && choiceRetractedNoReplacement(content, index, &shownLines))
+            && choiceRetractedNoReplacement(content, index, &shownLines, &reanswer))
         {
-            DebugTrace("AIPlayerGPT: CHOICE " << choice << " retracted with no replacement; deferring");
-            choice = -1;
-            retracted = true;
+            if (reanswer >= 0)
+            {
+                DebugTrace("AIPlayerGPT: CHOICE " << choice << " re-answered in prose as " << reanswer);
+                choice = reanswer; //#W48-E1: the final coded index is the decision
+            }
+            else
+            {
+                DebugTrace("AIPlayerGPT: CHOICE " << choice << " retracted with no replacement; deferring");
+                choice = -1;
+                retracted = true;
+            }
         }
         if (content.empty())
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
@@ -12238,12 +12277,21 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     //Retraction gate (see chooseOrderedAction): a choice the model explicitly
     //took back with no replacement is not its decision.
     bool retracted = false;
+    int reanswer = -1;
     if (choice >= 0 && !content.empty()
-        && choiceRetractedNoReplacement(content, (int) options.size(), &options))
+        && choiceRetractedNoReplacement(content, (int) options.size(), &options, &reanswer))
     {
-        DebugTrace("AIPlayerGPT: ask CHOICE " << choice << " retracted with no replacement; deferring");
-        choice = -1;
-        retracted = true;
+        if (reanswer >= 0)
+        {
+            DebugTrace("AIPlayerGPT: ask CHOICE " << choice << " re-answered in prose as " << reanswer);
+            choice = reanswer; //#W48-E1
+        }
+        else
+        {
+            DebugTrace("AIPlayerGPT: ask CHOICE " << choice << " retracted with no replacement; deferring");
+            choice = -1;
+            retracted = true;
+        }
     }
     if (content.empty())
         noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
@@ -19000,7 +19048,8 @@ void AIPlayerGPT::runParseSelfTest()
     // (parseChoice on consumePlan's single answer line agrees for these.)
     #define RESOLVE(reply, oc, opts) ([&]() -> int { \
         int _c = salvageLoopedChoice((reply), (oc), &(opts)); \
-        if (_c >= 0 && choiceRetractedNoReplacement((reply), (oc), &(opts))) _c = -1; \
+        int _r = -1; \
+        if (_c >= 0 && choiceRetractedNoReplacement((reply), (oc), &(opts), &_r)) _c = _r; \
         return _c; }())
 
     vector<string> opts;
@@ -19181,8 +19230,8 @@ void AIPlayerGPT::runParseSelfTest()
             "So CHOICE: 1.\n"
             "PLAN: Cast Bloodghast to build the board and devotion, then Inquisition.\n";
         int g9 = RESOLVE(genuine, 2, bg);
-        cout << "     deck133 vs140 s9 (line-1 CHOICE 2, prose CHOICE 1) -> " << g9 << " (must be -1: (a) contradictory index)\n";
-        CHECK(g9 == -1, "N9-W23 (a): a prose coded index contradicting the resolved answer retracts (genuine s9)");
+        cout << "     deck133 vs140 s9 (line-1 CHOICE 2, prose CHOICE 1) -> " << g9 << " (must be 1: #W48-E1 the final coded index is the answer; its PLAN casts Bloodghast = option 1)\n";
+        CHECK(g9 == 1, "N9-W23 (a) -> #W48-E1: a trailing prose re-answer REPLACES the resolved answer (was -1 before wave 48)");
 
         // deck133 vs137 s26 (real, ENGINE-CAUSED): branch (b) originally retracted
         // this. Branch (b) is RETIRED (wave-24 corpus: 131 live false positives -
@@ -19814,8 +19863,8 @@ void AIPlayerGPT::runParseSelfTest()
             "On reflection, holding removal for their bomb is the better line. So CHOICE: 2.\n"
             "PLAN: hold up Fatal Push.\n";
         int g = RESOLVE(genuine, 2, fp);
-        cout << "     genuine unquoted 'So CHOICE: 2' -> " << g << " (must be -1: genuine contradiction still fires)\n";
-        CHECK(g == -1, "W25-1 genuine: an unquoted mid-line recode contradicting line 1 still retracts");
+        cout << "     genuine unquoted 'So CHOICE: 2' -> " << g << " (must be 2: #W48-E1 the trailing recode is the answer; its PLAN holds up Fatal Push = option 2)\n";
+        CHECK(g == 2, "W25-1 genuine -> #W48-E1: an unquoted trailing recode contradicting line 1 is taken as the decision (was -1 before wave 48)");
         // ITEM 1b (deck102 vs133 s5): the example's index seeded into an ask whose
         // named card is NOT an option -> must NOT take that index (heuristic).
         vector<string> flip;
@@ -27510,6 +27559,35 @@ void AIPlayerGPT::runParseSelfTest()
             CHECK(stripNarrationDecoration(menu[0]).find("leaves 3") == string::npos,
                   "#W47-R14b echo: the annotation leaves no residue in the narrated record");
         }
+    }
+
+    // ---- #W48-E1: a prose re-answer that ENDS the reply is the decision ----
+    cout << "\n[#W48-E1] 'So, CHOICE: 0 (pass).' after the reasoning replaces the line-1 answer\n";
+    {
+        vector<string> loop; loop.push_back("Create vampire with Lord of Lineage [cost: Tap]");
+        string r34 = "CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: Tap Lord of Lineage to create more tokens.\n\n"
+                     "We are lethal. We should not tap more. We should pass Upkeep to go to Main Phase 1.\n\n"
+                     "So, CHOICE: 0 (pass).\n\nPLAN: Attack with all creatures to win the game.";
+        int rep = -1;
+        bool ret = choiceRetractedNoReplacement(r34, (int) loop.size(), &loop, &rep);
+        CHECK(ret && rep == 0, "#W48-E1 the trailing prose re-answer is handed back as the replacement (0 = pass)");
+        {
+            int c0 = salvageLoopedChoice(r34, (int) loop.size(), &loop);
+            int rr = -1;
+            if (c0 >= 0 && choiceRetractedNoReplacement(r34, (int) loop.size(), &loop, &rr)) c0 = rr;
+            CHECK(c0 == 0, "#W48-E1 the resolver takes the replacement (0), not -1");
+        }
+        string r2 = "CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: keep going.\n"
+                    "So, CHOICE: 0 (pass). Hmm, no - actually CHOICE: 1 (Create vampire with Lord of Lineage) again.";
+        rep = -1;
+        ret = choiceRetractedNoReplacement(r2, (int) loop.size(), &loop, &rep);
+        CHECK(!ret || rep == -1 || rep == 1, "#W48-E1 NEGATIVE a re-answer followed by a further coded index is not the final word");
+        string r3 = "CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: keep going, e.g. \"CHOICE: 0 (pass)\" is not what I want.";
+        rep = -1;
+        ret = choiceRetractedNoReplacement(r3, (int) loop.size(), &loop, &rep);
+        CHECK(!ret && rep == -1, "#W48-E1 NEGATIVE a quoted format string is neither a retraction nor a replacement");
+        CHECK(choiceRetractedNoReplacement(r34, (int) loop.size(), &loop) == true,
+              "#W48-E1 REGRESSION the boolean verdict without an out-param is unchanged");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
