@@ -1754,6 +1754,38 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
             return true;
         //return true if cost does not contain "x" becuase we don't need to do anything with a cost of 0;
     }
+    //#W51-B (wave-50 D-2): NO payment in mind is the COMMON case, not the
+    //exception. FindCardToPlay only asks the planner (canPayMana) when the
+    //pooled potential mana cannot cover the cost, and Act's ability path does
+    //the same (planPaymentForAction) - so whenever the board plainly affords
+    //the cast, gotPayments arrives EMPTY and the payment falls to the
+    //potential-mana walk below. That walk taps producers in LAYER order and
+    //decides what to SKIP by colour alone (`diff`, the surplus of one-ability-
+    //per-card potential over the cost): it skips the earliest sources whose
+    //first-listed colour is surplus and taps whatever comes after, which on a
+    //dual-heavy board is the duals played last - lane T's scarcity-ordered
+    //generic fill (ManaEngine::planPayment, #W49-D4) never ran for these
+    //casts at all. Every one of the 69/386 receipts of the wave-50 corpus
+    //(20260827-115759) is this walk's signature: `Paid {2} for Howling Mine
+    //with Drowned Catacomb #1, Drowned Catacomb #2` with a Swamp untapped
+    //(deck162 vs123 seq5->6); `Paid {2}{w} for Brutal Cathar with Plains #2,
+    //Overgrown Farmland #2, Barkchannel Pathway` with Plains #1 and Branchloft
+    //Pathway untapped (deck152 vs123 seq24 - exactly the skip-by-diff order);
+    //`Paid {w} for Path to Exile with Seachrome Coast` with two Plains
+    //untapped (deck125 vs152 seq35). Ask the planner FIRST: it pays coloured
+    //pips mono-before-dual (deferFlexibleSource) and generic from the least
+    //flexible source (genericFillOrder), and it already spares would-be
+    //attackers the same way this walk does. An {X} cost keeps the walk (the
+    //AI spends everything to maximise X; the planner's X tail is a different
+    //contract), and so does any board the planner cannot plan (foreach /
+    //Coffers sources, producers with mana costs) - the walk stays as the
+    //fallback, unchanged, so nothing that paid before stops paying.
+    bool derivedPlan = false;
+    if (gotPayments.empty() && target && !cost->hasX())
+    {
+        gotPayments = canPayMana(target, cost, anytypeofmana);
+        derivedPlan = !gotPayments.empty();
+    }
     if(gotPayments.size())
     {
         DebugTrace("AIPlayerBaka: Ai had a payment in mind.");
@@ -1803,7 +1835,13 @@ bool AIPlayerBaka::payTheManaCost(ManaCost * cost, int anytypeofmana, MTGCardIns
             SAFE_DELETE(clicks[i]);
         clicks.clear();
         SAFE_DELETE(paid);
-        return false;
+        //A plan the CALLER handed over that cannot cover the cost is a broken
+        //plan: refuse, as before. A plan this function derived itself falls
+        //through to the potential-mana walk instead - the historical answer
+        //for a board with no plan in mind.
+        if (!derivedPlan)
+            return false;
+        gotPayments.clear();
     }
 
     // Didn't have a payment in mind if we reach this point

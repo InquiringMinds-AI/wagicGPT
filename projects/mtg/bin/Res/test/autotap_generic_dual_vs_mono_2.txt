@@ -1,0 +1,25 @@
+# W51-B (wave-50 D-2): Howling Mine {2} over Drowned Catacomb, Drowned Catacomb, Swamp (corpus
+# 20260827 deck162 vs123 seq5->6: "Paid {2} for Howling Mine with Drowned Catacomb #1, Drowned
+# Catacomb #2", Swamp untapped). EXPECTED: the mono Swamp pays first, then ONE Catacomb; the
+# other Catacomb (a blue source) stays untapped; the Catacomb spent on generic adds its abundant
+# colour ({B}: three black sources, two blue), never its scarce one.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Drowned Catacomb,Drowned Catacomb,Swamp
+hand:Howling Mine
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+autotap howling mine
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Drowned Catacomb,Drowned Catacomb,Swamp
+hand:Howling Mine
+tappedinplay:2
+manapool:{B}{B}
+[PLAYER2]
+[END]

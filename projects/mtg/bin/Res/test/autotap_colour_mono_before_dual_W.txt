@@ -1,0 +1,27 @@
+# W51-B (wave-50 D-2, colour-only shape): a lone {W} pip must come from the MONO Plains, not the
+# Glacial Fortress listed before it (corpus 20260827 deck125 vs152 seq35: "Paid {w} for Path to
+# Exile with Seachrome Coast", Plains #1 and #2 untapped). Two auto-taps in a row make the choice
+# observable: Savannah Lions {W} first, then Flying Men {U}. Only the Fortress can make {U}, so if
+# the Lions burned it the second auto-tap has nothing to tap and the pool stays {W}.
+# EXPECTED: Plains pays {W}, Fortress pays {U}: pool {W}{U}, 2 tapped.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Glacial Fortress,Plains
+hand:Savannah Lions,Flying Men
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+autotap savannah lions
+autotap flying men
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Glacial Fortress,Plains
+hand:Savannah Lions,Flying Men
+tappedinplay:2
+manapool:{W}{U}
+[PLAYER2]
+[END]

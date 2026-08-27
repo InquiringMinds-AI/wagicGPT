@@ -187,6 +187,51 @@ namespace
         return false;
     }
 
+    //Does this SOURCE CARD, through any usable mana ability printed on it,
+    //make colour k?
+    bool cardMakesColour(Player * p, ManaEngine::ManaPolicy & policy,
+                         MTGCardInstance * sourceCard, MTGCardInstance * payee, int k)
+    {
+        ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+        for (size_t i = 0; i < al->manaObjects.size(); i++)
+        {
+            AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility*) al->manaObjects[i]);
+            if (!amp || amp->source != sourceCard || !amp->output)
+                continue;
+            if (!policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true, payee, true))
+                continue;
+            if (amp->output->hasColor(k))
+                return true;
+        }
+        return false;
+    }
+
+    //How many distinct colours (colourless excluded) can this SOURCE CARD make
+    //across every usable mana ability printed on it? 1 = a mono source.
+    int cardColourCount(Player * p, ManaEngine::ManaPolicy & policy,
+                        MTGCardInstance * sourceCard, MTGCardInstance * payee)
+    {
+        ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+        int mask = 0;
+        for (size_t i = 0; i < al->manaObjects.size(); i++)
+        {
+            AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility*) al->manaObjects[i]);
+            if (!amp || amp->source != sourceCard || !amp->output)
+                continue;
+            if (!policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true, payee, true))
+                continue;
+            for (int c = 1; c < Constants::NB_Colors && c < 32; c++)
+                if (c != Constants::MTG_COLOR_LAND && c != Constants::MTG_COLOR_WASTE
+                    && amp->output->hasColor(c))
+                    mask |= (1 << c);
+        }
+        int n = 0;
+        for (int c = 0; c < 32; c++)
+            if (mask & (1 << c))
+                n++;
+        return n;
+    }
+
     //Greedy colored-pip assignment defers a FLEXIBLE source. A source that can
     //also pay a DIFFERENT still-needed color must not be spent on color k when
     //another (as-yet-unused) source can cover k instead. Without this, a dual
@@ -206,6 +251,37 @@ namespace
                              MTGCardInstance * payee)
     {
         ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+        //#W51-B (wave-50 D-2, the colour-only shape): a MULTI-colour source
+        //must not pay colour k while an unused MONO source of k can. The
+        //original test below only defers a source that covers another colour
+        //THIS cost still needs, so a lone {w} pip over Glacial Fortress + Plains
+        //took the Fortress whenever it came first in layer order (`Paid {w} for
+        //Path to Exile with Seachrome Coast`, five Plains/Islands untapped -
+        //deck125 vs152 seq35; `Paid {b} for Bloodline Keeper with Underground
+        //Sea`, Plains untapped - deck123 seq44). A mono source of k is
+        //DOMINATED by any multi source that makes k: whatever the rest of the
+        //cost or the rest of the turn needs, the multi source can still supply
+        //it and the mono source cannot, so spending the mono first never costs
+        //an option. Deadlock-free by construction: the source we defer TO is
+        //mono, and a mono source has nothing to defer to. Leaves every earlier
+        //protection intact - on an all-flexible manabase (N-152f) there is no
+        //mono source, so this branch never fires and the N-146a test decides
+        //exactly as before.
+        if (cardColourCount(p, policy, card, payee) > 1)
+        {
+            for (size_t i = 0; i < al->manaObjects.size(); i++)
+            {
+                AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility*) al->manaObjects[i]);
+                if (!amp || amp->source == card || used[amp->source])
+                    continue;
+                if (!policy.canHandle(amp) || !producerUsable(p, amp, amp->source, true, payee, true))
+                    continue;
+                if (amp->output->getConvertedCost() != 1 || !amp->output->hasColor(k))
+                    continue;
+                if (cardColourCount(p, policy, amp->source, payee) == 1)
+                    return true;
+            }
+        }
         //SELF test: this source can also pay a different still-needed color, so
         //spending it on k might be the wrong use of it.
         bool sourceHasOtherNeeded = cardCoversOtherNeededColor(p, policy, cost, result, card, k, payee);
@@ -256,7 +332,7 @@ namespace
     //scarcity DESC (min over the card's colours of how many of the player's
     //source cards make that colour, tapped or not; colourless = unbounded),
     //then colour count ASC, then layer order. Abilities of one card stay
-    //adjacent and in their scripted order.
+    //adjacent, most-abundant colour first (#W51-B).
     std::vector<MTGAbility*> genericFillOrder(Player * p, ManaEngine::ManaPolicy & policy,
                                               MTGCardInstance * payee)
     {
@@ -309,9 +385,30 @@ namespace
                 }
             keyOf[src] = key;
         }
+        //Within one card, the ability whose colour is most ABUNDANT goes
+        //first, so a dual spent on generic floats/produces the colour the
+        //board has most of and never its scarce one (Scrubland paying {1}
+        //over a black-heavy board adds {B}, not {W}). Colourless output
+        //ranks as abundant.
         struct Less
         {
             std::map<MTGCardInstance*, Key> * keys;
+            const int * perColour;
+            int abundance(MTGAbility * a) const
+            {
+                int best = 1 << 20;
+                AManaProducer * amp = (AManaProducer *) a;
+                bool any = false;
+                for (int k = 1; k < Constants::NB_Colors && k < 32; k++)
+                    if (k != Constants::MTG_COLOR_LAND && k != Constants::MTG_COLOR_WASTE
+                        && amp->output->hasColor(k))
+                    {
+                        any = true;
+                        if (perColour[k] < best)
+                            best = perColour[k];
+                    }
+                return any ? best : (1 << 20);
+            }
             bool operator()(MTGAbility * a, MTGAbility * b) const
             {
                 const Key & ka = (*keys)[((AManaProducer *) a)->source];
@@ -320,10 +417,13 @@ namespace
                     return ka.scarcity > kb.scarcity;
                 if (ka.colours != kb.colours)
                     return ka.colours < kb.colours;
-                return ka.layer < kb.layer;
+                if (ka.layer != kb.layer)
+                    return ka.layer < kb.layer;
+                return abundance(a) > abundance(b);
             }
         } less;
         less.keys = &keyOf;
+        less.perColour = perColour;
         std::stable_sort(order.begin(), order.end(), less);
         (void) payee;
         return order;
@@ -626,12 +726,33 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                 {
                     if (offColorFilled >= genericAmount)
                         continue;
+                    //#W51-B: judge on-pip by the SOURCE CARD, not by the one
+                    //ability in hand. A dual scripted as two single-colour
+                    //abilities (Overgrown Farmland: add{G} THEN add{W}) reached
+                    //through its off-colour half read as an off-pip source for a
+                    //{1}{W} cost, so this pass spent the Farmland's {G} on the
+                    //generic while a second Plains sat untapped (corpus 20260827
+                    //deck152 vs123 seq16, `Paid {1}{w} for Intrepid Adversary
+                    //with Plains #2, Overgrown Farmland #2`) - the seat's only
+                    //green source gone for a pip any Plains could pay. A card
+                    //that makes a colour the cost needs is held for pass 2,
+                    //where the scarcity order decides.
                     bool onPip = false;
                     for (int k = 1; k < Constants::NB_Colors && !onPip; k++)
-                        if (k != Constants::MTG_COLOR_ARTIFACT && cost->getCost(k) && amp->output->hasColor(k))
+                        if (k != Constants::MTG_COLOR_ARTIFACT && cost->getCost(k)
+                            && cardMakesColour(p, policy, amp->source, target, k))
                             onPip = true;
                     if (onPip)
-                        continue; //keep it for the colored pips / pass 1
+                        continue; //keep it for the colored pips / pass 2
+                    //...and only a MONO (or colourless) source rides this pass.
+                    //An off-pip DUAL still strands its other colour; whether
+                    //that is cheaper than spending an on-pip source is exactly
+                    //the scarcity question pass 2 answers, so let it. ({2}{W}
+                    //over Underground Sea x2, Swamp, Scrubland x3: the Seas are
+                    //off-pip but the seat's only blue; the generic is Swamp +
+                    //a spare Scrubland, never a Sea.)
+                    if (cardColourCount(p, policy, amp->source, target) > 1)
+                        continue;
                 }
                 if (policy.canHandle(amp))
                 {
