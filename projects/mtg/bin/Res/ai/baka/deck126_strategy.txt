@@ -19,8 +19,8 @@ on two turns, stayed on four lands that made only {W} and {B}, never cast the Ov
 in your hand because you had no green source, and died on turn 14 with five lands in hand.
 
 === RULE #1 - AT YOUR UPKEEP, PASS. THIS IS THE MOST IMPORTANT LINE IN THIS GUIDE ===
-At your Upkeep the engine will offer you a single action: tapping Overgrown Battlement for green
-mana. Answer CHOICE: 0 (pass). Every time. Upkeep, Draw, the opponent's turn - pass all of them.
+Whenever a window's only action row is "Add N green mana with Overgrown Battlement" - at your
+Upkeep, Draw, the opponent's turn, wherever it appears - answer CHOICE: 0 (pass). Every time.
 You never have to tap the Battlement by hand. When you cast a spell in your MAIN PHASE the engine
 taps your sources for you, and the "Mana available:" line already counts the Battlement in with
 your lands - as ONE source. Overgrown Battlement reads "{T}: Add {G} for each creature with

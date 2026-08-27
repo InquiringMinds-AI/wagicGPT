@@ -336,7 +336,8 @@ at 98 life with 17 cards left you are the player who is losing.
 Lightmine Field {2}{W}{W}: "Whenever one or more creatures attack, Lightmine Field deals damage to
 each of those creatures equal to the number of attacking creatures." Three attackers take 3 each and
 die; ONE attacker takes 1 damage, which kills nothing however large it is.
-ITS GATE IS THE SWEEPER SECOND NUMBER, and it is a hard stop: do not cast Lightmine Field while
+ITS GATE IS THE SWEEPER SECOND NUMBER: it costs the turn and deals nothing until they attack, so
+do not cast Lightmine Field while
 "N of them without a restriction against attacking" is below 3. Not at 0, not at 1, not at 2, in
 either main phase, however much spare mana you have. Its row says so itself: "{right now: they
 control 0 creatures able to attack - deals 0 until they have an attacker}" is a "Cast nothing"

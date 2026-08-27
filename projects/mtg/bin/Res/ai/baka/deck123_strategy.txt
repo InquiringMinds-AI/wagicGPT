@@ -81,8 +81,9 @@ Then:
     live through your next attack, and a body past that number wins nothing.
   - THE REPEAT ROW IS HOW YOU TAKE THE LINE. From the second activation of a turn on, the
     screen adds a second row: "Create human with Thraben Doomsayer, repeated N times, then stop
-    [you name N on the CHOICE line, e.g. "CHOICE: 2 (Create human with Thraben Doomsayer x50)";
-    the engine performs it N times ... N is at most 200]". Take THAT row, ONCE, with
+    [you name N on the CHOICE line, e.g. "CHOICE: 2 (Create human with Thraben Doomsayer x<N>)";
+    the engine performs it N times ... N is at most 200]" - the row's own example shows the
+    format; the number is YOURS, from the PLAN line's subtraction. Take THAT row, ONCE, with
         N = (L + C + 3) - M
     and write N the way the row's own example writes it: the short name, a space, then
     "x" and the number, inside the parentheses -
@@ -165,7 +166,7 @@ do not have when six Vampires arrive. So at K of 0, or at N of exactly 1, a Trag
 edict on the same menu that kills the one that matters is the cast and the Damnation stays in
 hand. This deck cast Damnation on a lone 1/1 Vampire token with "Cast Tragic Slip" on the same
 menu, and ten turns later watched ten creatures on their line with no sweeper in hand.
-THE HARD STOP, because this rule was broken at 14 against 6: if YOUR "of which N are creatures"
+THE STOP, and why (this rule was broken at 14 against 6): if YOUR "of which N are creatures"
 number is 4 or more, do not cast Damnation at all, whatever theirs says. Four bodies is a board
 you win with; there is no opposing board this deck needs to trade four of its own creatures to
 answer. Take a token activation, a removal spell or "Cast nothing right now" instead.
@@ -566,7 +567,7 @@ without a creature ever hitting its battlefield.
   "Your hand": do not cast it. It finds only an Alarm; you have one. Your reply says so: "Tutor:
   dead - Alarm <on my battlefield / in my hand>".
 - "Cast Vision Skeins {1}{u}" is listed and "Your hand (N cards)" reads 6 or more: not this
-  window unless you can cast what it draws - the engine discards for you at end of turn.
+  window unless you can cast what it draws - cards above seven leave your hand at end of turn.
 - You are on the blockers prompt: your first blocker is a Human or Vampire TOKEN. Thraben
   Doomsayer and Bloodline Keeper block only after every token is assigned.
 - The row you were about to use on a token-maker reads "(your blocker dies, attacker lives)":

@@ -331,10 +331,11 @@ look on its own header and the land branches above; a carried plan that says "mu
 lands" is about a hand you already threw away.
 WHEN YOU KEEP AFTER A MULLIGAN THE GAME ASKS WHICH CARDS TO BOTTOM. Bottom your most EXPENSIVE
 spell first: Forced Fruition, Peer into the Abyss, Teferi's Puzzle Box, a second copy of a draw
-engine - in that order. Never bottom SHIELD SPHERE - it costs ZERO mana, so it is free defence
-you can deploy on any turn no matter what your lands are doing - and never bottom your only
-punisher.
-LANDS: bottom one ONLY when the hand you keep would still hold FOUR OR MORE lands. A five-land,
+engine - in that order. KEEP in this order, so any N is buildable: Shield Sphere first (it costs
+ZERO mana, free defence on any turn no matter what your lands are doing), then your only
+punisher, then lands up to four, then spells by cost - a Sphere or your last punisher goes under
+only when nothing below it in the order is left.
+LANDS: bottom one when the hand you keep would still hold FOUR OR MORE lands. A five-land,
 two-spell keep has a land to spare and the spell is worth more; a four-land keep does not, and
 below that a land is never the right card to lose.
 
