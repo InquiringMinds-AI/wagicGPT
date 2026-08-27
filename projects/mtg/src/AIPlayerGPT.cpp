@@ -1067,6 +1067,110 @@ static string playerBranchLabel(const string& raw)
     return raw;
 }
 
+//#W49-D10: the edict row and the sweeper row carry the `{right now:}` fact
+//they turn on. Tribute to Hunger resolved at `0 are creatures` with Siege-Gang
+//on the STACK - nothing sacrificed, no life (corpus 20260827 deck123 vs130
+//seq22-23); Supreme Verdict was cast over `0 permanents ... 0 are creatures`
+//(deck125 vs130 seq45), Lightmine Field over no attackers (deck125 vs123
+//seq40) - fourth and fifth corpus for the shape, the guide lane exhausted.
+//The board count is a number the engine has and the pilot re-derives (or
+//does not) from the battlefield line; state it where the cast is decided.
+//Pure over counts so every branch is provable in PARSETEST.
+static string edictClause(int theirCreatures, const string& onlyName, int onlyToughness, bool gainsToughness)
+{
+    std::ostringstream o;
+    if (theirCreatures <= 0)
+        return "they control 0 creatures - at 0 this does nothing";
+    if (theirCreatures == 1)
+    {
+        o << "they control 1 creature - " << onlyName << " is sacrificed";
+        if (gainsToughness)
+            o << ", you gain " << onlyToughness;
+        return o.str();
+    }
+    o << "they control " << theirCreatures << " creatures - they choose which one";
+    return o.str();
+}
+
+static string sweeperClause(const char * verb, int theirs, int theirsAbleToAttack, int mine)
+{
+    std::ostringstream o;
+    o << verb << " " << theirs << " of their creature" << (theirs == 1 ? "" : "s")
+      << " (" << theirsAbleToAttack << " able to attack), " << mine << " of yours";
+    return o.str();
+}
+
+static string attackPunisherClause(int theirsAbleToAttack)
+{
+    std::ostringstream o;
+    o << "they control " << theirsAbleToAttack << " creature" << (theirsAbleToAttack == 1 ? "" : "s")
+      << " able to attack - ";
+    if (theirsAbleToAttack <= 0)
+        o << "deals 0 until they have an attacker";
+    else
+        o << "deals " << theirsAbleToAttack << " to each if all " << theirsAbleToAttack << " attack";
+    return o.str();
+}
+
+//The board counts the three clauses read. Scoped to the plain, unfiltered
+//shapes (`all(creature)`, `notaTarget(creature|mybattlefield)` under a
+//targeted player, `creature[attacking]` under `@each blockers`); a filtered
+//variant is left unpriced rather than mispriced.
+static bool boardCreatureCounts(MTGCardInstance * card, int & theirs, int & theirsAttack, int & mine,
+                                MTGCardInstance ** theirOnly)
+{
+    theirs = theirsAttack = mine = 0;
+    if (theirOnly)
+        *theirOnly = NULL;
+    Player * me = card ? card->controller() : NULL;
+    Player * opp = me ? me->opponent() : NULL;
+    if (!me || !opp || !me->game || !opp->game || !me->game->inPlay || !opp->game->inPlay)
+        return false;
+    for (int i = 0; i < opp->game->inPlay->nb_cards; i++)
+    {
+        MTGCardInstance * c = opp->game->inPlay->cards[i];
+        if (!c || !c->isCreature())
+            continue;
+        theirs++;
+        if (theirOnly)
+            *theirOnly = c;
+        if (c->canAttack())
+            theirsAttack++;
+    }
+    for (int i = 0; i < me->game->inPlay->nb_cards; i++)
+        if (me->game->inPlay->cards[i] && me->game->inPlay->cards[i]->isCreature())
+            mine++;
+    return true;
+}
+
+static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
+{
+    int theirs, theirsAttack, mine;
+    MTGCardInstance * only = NULL;
+    bool edict = lowText.find("sacrifice") != string::npos
+        && lowText.find("notatarget(creature|mybattlefield)") != string::npos
+        && lowText.find("targetedplayer") != string::npos;
+    const char * sweepVerb = NULL;
+    if (lowText.find("destroy all(creature)") != string::npos
+        || lowText.find("bury all(creature)") != string::npos)
+        sweepVerb = "destroys";
+    else if (lowText.find("moveto(exile) all(creature)") != string::npos)
+        sweepVerb = "exiles";
+    bool attackPunisher = lowText.find("@each blockers") != string::npos
+        && lowText.find("creature[attacking]") != string::npos
+        && lowText.find("damage:") != string::npos;
+    if (!edict && !sweepVerb && !attackPunisher)
+        return "";
+    if (!boardCreatureCounts(card, theirs, theirsAttack, mine, &only))
+        return "";
+    if (edict)
+        return edictClause(theirs, only ? only->getDisplayName() : "", only ? only->toughness : 0,
+                           lowText.find("toughnesslifegain") != string::npos);
+    if (sweepVerb)
+        return sweeperClause(sweepVerb, theirs, theirsAttack, mine);
+    return attackPunisherClause(theirsAttack);
+}
+
 string dynamicMagnitudes(MTGCardInstance * card)
 {
     //N-146g (deck146 Lolth, deck152): a planeswalker's magicText bundles EVERY
@@ -1209,6 +1313,15 @@ string dynamicMagnitudes(MTGCardInstance * card)
             out << (count ? ", " : "")
                 << "returns NOTHING - your graveyard has no creature cards, so"
                    " the return part cannot happen at any X";
+            count++;
+        }
+    }
+    //#W49-D10: the board fact an edict / sweeper / attack-punisher turns on.
+    {
+        string turnOn = boardTurnOnClause(card, text);
+        if (!turnOn.empty())
+        {
+            out << (count ? ", " : "") << turnOn;
             count++;
         }
     }
@@ -2838,6 +2951,51 @@ static string leavesUntappedTag(int untappedSources, int sourcesUsed)
         o << " - casting this taps you out";
     o << "}";
     return o.str();
+}
+
+//#W49-D11: the cost of an action includes what paying it TAPS. The mana line
+//lists creature mana sources beside the lands, and the auto-tap plan draws on
+//them like any other producer - so `Cast Briarbridge Tracker ... taps you
+//out` was paid by Intrepid Adversary + Brutal Cathar and 11 lethal power
+//stayed home (corpus 20260827 deck152 vs162 seq24-25); `becomes beholder with
+//Hive #2` was paid by tapping Hive #1, the seat's only {b} source, so the
+//animated land could never attack (deck146 vs125 seq63-65). The plan already
+//knows which sources it will activate; name the ones a pilot would not expect
+//to be spent: creatures, and the row's OWN source card (a land that taps
+//itself to fund its own animation is a tapped creature afterwards). Pure over
+//names so the shape is provable in PARSETEST; the attack consequence is
+//stated only when it is true (the caller has checked the phase and turn).
+static string paymentTapsClause(const std::vector<std::string>& names, bool cannotAttackThisTurn)
+{
+    if (names.empty())
+        return "";
+    std::ostringstream o;
+    o << " {paying this taps: ";
+    for (size_t i = 0; i < names.size(); i++)
+        o << (i ? ", " : "") << names[i];
+    if (cannotAttackThisTurn)
+        o << " - " << (names.size() == 1 ? "it" : "they") << " cannot attack this turn";
+    o << "}";
+    return o.str();
+}
+
+//#W49-D11: a `becomes <creature>` activation offered on a source that is
+//ALREADY tapped animates a creature that cannot attack this turn - stated on
+//the row, restriction first, so the pilot does not pay {3}{b} for a body
+//that stays home (the seat took it twice at seq63/64 above, 8 mana, no
+//attackers record).
+static string tappedSourceAnimateClause()
+{
+    return " [this land is TAPPED: animated, it still cannot attack this turn]";
+}
+
+//#W49-D11: a creature's own {T}-cost activation offered BEFORE attackers are
+//declared on its controller's turn spends the attack (Katilda `put 1/1
+//counters [cost: {4}{g}{w}, Tap]` taken at Upkeep, 8 of 9 mana, the 4/4 then
+//tapped through combat - deck152 vs162 seq22).
+static string tapCostBeforeCombatClause(const string& name)
+{
+    return " {tapping " + name + " now: it cannot attack this turn}";
 }
 
 //#W47 (R10, wave-46 MED, 18 emissions at one seat pair): the clause is called
@@ -10827,7 +10985,10 @@ static string stripNarrationDecoration(const string& in)
             drop = (in.compare(i, 12, "{card text: ") == 0) || (in.compare(i, 12, "{right now: ") == 0)
                 || (in.compare(i, 12, "{X pricing: ") == 0) || (in.compare(i, 14, "{target text: ") == 0)
                 || (in.compare(i, 19, "{if you pass here, ") == 0)
-                || (in.compare(i, 8, "{leaves ") == 0);
+                || (in.compare(i, 8, "{leaves ") == 0)
+                //#W49-D11: what paying taps is decision-time pricing, not history.
+                || (in.compare(i, 19, "{paying this taps: ") == 0)
+                || (in.compare(i, 9, "{tapping ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -11487,6 +11648,47 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         }
         if (any)
             out << " [cost: " << cost.str() << "]";
+        //#W49-D11: what paying THIS row taps. (a) A `becomes` row on a source
+        //that is already tapped animates a body that cannot attack. (b) The
+        //payment plan for the mana part draws on creatures or on the row's own
+        //source - name them. (c) A creature's own {T} cost, offered before
+        //attackers on its controller's turn, spends the attack.
+        MTGCardInstance * src = action.click ? action.click : action.ability->source;
+        bool beforeAttack = observer->currentPlayer == this
+            && observer->getCurrentGamePhase() < MTG_PHASE_COMBATATTACKERS;
+        if (src && src->isTapped() && !src->isCreature()
+            && out.str().find("becomes ") != string::npos)
+            out << tappedSourceAnimateClause();
+        if (src && c->getConvertedCost() > 0 && !c->hasX()
+            && !getManaPool()->canAfford(c, src->has(Constants::ANYTYPEOFMANAABILITY)))
+        {
+            vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
+                this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY));
+            std::set<MTGCardInstance *> seen;
+            std::vector<std::string> taps;
+            bool anyCreature = false;
+            for (size_t pi = 0; pi < picks.size(); pi++)
+            {
+                MTGCardInstance * ps = picks[pi] ? picks[pi]->source : NULL;
+                if (!ps || !seen.insert(ps).second)
+                    continue;
+                if (ps->isCreature() || ps == src)
+                {
+                    taps.push_back(ps->getDisplayName() + (ps == src ? " (this card itself)" : ""));
+                    anyCreature = anyCreature || ps->isCreature();
+                }
+            }
+            out << paymentTapsClause(taps, anyCreature && beforeAttack);
+        }
+        if (src && src->isCreature() && src->canAttack() && beforeAttack && c->extraCosts)
+        {
+            bool tapsSelf = false;
+            for (size_t i = 0; i < c->extraCosts->costs.size(); i++)
+                if (dynamic_cast<TapCost *>(c->extraCosts->costs[i]))
+                    tapsSelf = true;
+            if (tapsSelf)
+                out << tapCostBeforeCombatClause(src->getDisplayName());
+        }
     }
 
     //#W41-6: the repeat-activation countable, next to the cost it is paid with
@@ -14253,6 +14455,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (payCost && (payCost->hasX() || payCost->hasSpecificX()))
                 payCost = NULL; //hasX() alone answers 0 for a {X:colour} cost
             int used = 0;
+            std::vector<std::string> creatureTaps; //#W49-D11
             if (payCost)
             {
                 vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
@@ -14260,11 +14463,23 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 std::set<MTGCardInstance *> tapped;
                 for (size_t pi = 0; pi < picks.size(); pi++)
                     if (picks[pi] && picks[pi]->source)
-                        tapped.insert(picks[pi]->source);
+                    {
+                        if (tapped.insert(picks[pi]->source).second
+                            && picks[pi]->source->isCreature())
+                            creatureTaps.push_back(picks[pi]->source->getDisplayName());
+                    }
                 used = (int) tapped.size();
             }
             if (payCost)
                 o << leavesUntappedTag(untappedSources, used);
+            //#W49-D11: the creatures this payment taps, and whether that costs
+            //the attack (only on the caster's turn, before attackers are declared).
+            if (!creatureTaps.empty())
+            {
+                bool beforeAttack = observer->currentPlayer == this
+                    && observer->getCurrentGamePhase() < MTG_PHASE_COMBATATTACKERS;
+                o << paymentTapsClause(creatureTaps, beforeAttack);
+            }
         }
         //A response option offered because of pending stack objects names what
         //it can hit ("Cast Counterspell {u}{u} - can target on the stack:
@@ -30507,6 +30722,72 @@ void AIPlayerGPT::runParseSelfTest()
             bool stale = false; string src;
             int pick = parseChoice("CHOICE: 1 (Cast Bloodline Keeper // Lord of Lineage (text omitted))", 1, &menu, &stale, &src);
             CHECK(pick == 1 && !stale, "#W49-U D12 echo: a reply that parrots the marked face still binds");
+    }
+    }
+    // ---- #W49-T: D4 (fixtures pin the engine), D10 board facts, D11 payment taps ----
+    cout << "\n[#W49-T] D10 edict/sweeper/attack-punisher facts, D11 what paying taps\n";
+    {
+        CHECK(edictClause(0, "", 0, true) == "they control 0 creatures - at 0 this does nothing",
+              "#W49-T D10 edict at 0 says it does nothing");
+        CHECK(edictClause(1, "Siege-Gang Commander", 2, true)
+              == "they control 1 creature - Siege-Gang Commander is sacrificed, you gain 2",
+              "#W49-T D10 edict at 1 names the creature and the life");
+        CHECK(edictClause(1, "Goblin", 1, false) == "they control 1 creature - Goblin is sacrificed",
+              "#W49-T D10 NEGATIVE no life clause on a plain edict");
+        CHECK(edictClause(4, "Goblin #1", 1, true) == "they control 4 creatures - they choose which one",
+              "#W49-T D10 edict at N>1 says they choose");
+        CHECK(sweeperClause("destroys", 0, 0, 0) == "destroys 0 of their creatures (0 able to attack), 0 of yours",
+              "#W49-T D10 sweeper at 0/0");
+        CHECK(sweeperClause("destroys", 5, 0, 1) == "destroys 5 of their creatures (0 able to attack), 1 of yours",
+              "#W49-T D10 sweeper: five walls, none able to attack, one of mine");
+        CHECK(sweeperClause("exiles", 1, 1, 0) == "exiles 1 of their creature (1 able to attack), 0 of yours",
+              "#W49-T D10 sweeper verb and singular");
+        CHECK(attackPunisherClause(0) == "they control 0 creatures able to attack - deals 0 until they have an attacker",
+              "#W49-T D10 Lightmine at 0");
+        CHECK(attackPunisherClause(3) == "they control 3 creatures able to attack - deals 3 to each if all 3 attack",
+              "#W49-T D10 Lightmine at 3");
+        std::vector<std::string> two; two.push_back("Intrepid Adversary"); two.push_back("Brutal Cathar");
+        CHECK(paymentTapsClause(two, true)
+              == " {paying this taps: Intrepid Adversary, Brutal Cathar - they cannot attack this turn}",
+              "#W49-T D11 the creatures the payment taps, with the attack consequence");
+        std::vector<std::string> one; one.push_back("Hive of the Eye Tyrant #1 (this card itself)");
+        CHECK(paymentTapsClause(one, false) == " {paying this taps: Hive of the Eye Tyrant #1 (this card itself)}",
+              "#W49-T D11 NEGATIVE no attack clause after attackers / off-turn");
+        CHECK(paymentTapsClause(std::vector<std::string>(), true).empty(),
+              "#W49-T D11 NEGATIVE lands-only payment prints nothing");
+        CHECK(tappedSourceAnimateClause() == " [this land is TAPPED: animated, it still cannot attack this turn]",
+              "#W49-T D11 the tapped-source animate marker is restriction-first");
+        CHECK(tapCostBeforeCombatClause("Katilda, Dawnhart Prime")
+              == " {tapping Katilda, Dawnhart Prime now: it cannot attack this turn}",
+              "#W49-T D11 the {T}-before-combat clause");
+        // ECHO SHAPE: the annotations strip and the rows still bind to their index.
+        {
+            vector<string> menu;
+            menu.push_back(string("Cast Briarbridge Tracker {2}{g} (2/3) {leaves 0 of your 3 untapped mana sources"
+                                  " untapped - casting this taps you out}") + paymentTapsClause(two, true));
+            menu.push_back(string("becomes beholder with Hive of the Eye Tyrant #2 [cost: {3}{b}]")
+                           + tappedSourceAnimateClause());
+            menu.push_back(string("put 1/1 counters with Katilda, Dawnhart Prime [cost: {4}{g}{w}, Tap]")
+                           + tapCostBeforeCombatClause("Katilda, Dawnhart Prime"));
+            menu.push_back("Cast Tribute to Hunger {2}{b} {right now: " + edictClause(0, "", 0, true) + "}");
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Cast Briarbridge Tracker)", 4, &menu, &stale, &src) == 1 && !stale,
+                  "#W49-T D11 echo: the creature-tap row binds by name");
+            CHECK(parseChoice(string("CHOICE: 2 (becomes beholder with Hive of the Eye Tyrant #2 [cost: {3}{b}]")
+                              + tappedSourceAnimateClause() + ")", 4, &menu, &stale, &src) == 2 && !stale,
+                  "#W49-T D11 echo: the tapped-animate row echoed whole binds to index 2");
+            CHECK(parseChoice("CHOICE: 3 (put 1/1 counters with Katilda, Dawnhart Prime)", 4, &menu, &stale, &src) == 3,
+                  "#W49-T D11 echo: the {T} row binds by name");
+            CHECK(parseChoice("CHOICE: 4 (Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures - at 0 this does nothing})",
+                              4, &menu, &stale, &src) == 4 && !stale,
+                  "#W49-T D10 echo: the edict row echoed with its fact binds to index 4");
+            CHECK(stripNarrationDecoration(menu[2]) == "put 1/1 counters with Katilda, Dawnhart Prime",
+                  "#W49-T D11 the {T} clause is decision-time only and leaves no residue in history");
+            CHECK(stripNarrationDecoration(menu[1]).find("TAPPED") == string::npos,
+                  "#W49-T D11 the [tapped] marker leaves no residue in history");
+            CHECK(stripNarrationDecoration(menu[0]).find("paying this taps") == string::npos
+                  && stripNarrationDecoration(menu[0]).find("Cast Briarbridge Tracker {2}{g}") == 0,
+                  "#W49-T D11 the paying-taps clause leaves no residue in history");
         }
     }
 

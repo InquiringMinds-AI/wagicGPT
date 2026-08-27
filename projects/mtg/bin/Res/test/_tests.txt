@@ -1217,3 +1217,5 @@ oracle_delve_gy6_castable.txt
 oracle_delve_gy3_not_castable.txt
 oracle_selftap_westvale_5_lands.txt
 oracle_selftap_westvale_6_lands.txt
+autotap_generic_scarce_colour_2W.txt
+autotap_generic_mono_before_dual_2W.txt

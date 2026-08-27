@@ -1,0 +1,25 @@
+# W49-D4: the generic part of a cost must not spend the SCARCE colour. Idyllic Tutor {2}{W}
+# over Underground Sea, Swamp, Underground Sea, Scrubland x3 (the corpus board, in its layer
+# order: deck123 vs162 seq17). PRE-FIX: the generic fill took the first two off-pip sources in
+# layer order = both Underground Seas (the only blue sources) -> pool {W}{U}{U}.
+# EXPECTED: {W} from a Scrubland, {2} from Swamp + the spare Scrubland; both Seas stay untapped.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Underground Sea,Swamp,Underground Sea,Scrubland,Scrubland,Scrubland
+hand:Idyllic Tutor
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+autotap idyllic tutor
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Underground Sea,Swamp,Underground Sea,Scrubland,Scrubland,Scrubland
+hand:Idyllic Tutor
+tappedinplay:3
+manapool:{W}{B}{B}
+[PLAYER2]
+[END]

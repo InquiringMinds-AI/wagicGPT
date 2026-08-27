@@ -250,6 +250,84 @@ namespace
         }
         return sourceHasOtherNeeded && otherUnusedCoversK;
     }
+
+    //#W49-D4: the generic-fill order (see planPayment). Every usable producer
+    //ability of the paying player, stably sorted by its SOURCE CARD's key:
+    //scarcity DESC (min over the card's colours of how many of the player's
+    //source cards make that colour, tapped or not; colourless = unbounded),
+    //then colour count ASC, then layer order. Abilities of one card stay
+    //adjacent and in their scripted order.
+    std::vector<MTGAbility*> genericFillOrder(Player * p, ManaEngine::ManaPolicy & policy,
+                                              MTGCardInstance * payee)
+    {
+        ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+        std::map<MTGCardInstance*, int> colourMask; //per source card, bit k = makes colour k
+        std::vector<MTGAbility*> order;
+        for (size_t i = 0; i < al->manaObjects.size(); i++)
+        {
+            MTGAbility * a = (MTGAbility *) al->manaObjects[i];
+            AManaProducer * amp = dynamic_cast<AManaProducer*>(a);
+            if (!amp || !amp->source || !amp->output || !policy.canHandle(amp))
+                continue;
+            if (amp->source->controller() != p)
+                continue;
+            int & mask = colourMask[amp->source];
+            for (int k = 1; k < Constants::NB_Colors; k++)
+                if (k != Constants::MTG_COLOR_LAND && k != Constants::MTG_COLOR_WASTE
+                    && amp->output->hasColor(k))
+                    mask |= (1 << k);
+            order.push_back(a);
+        }
+        int perColour[32] = { 0 };
+        for (std::map<MTGCardInstance*, int>::iterator it = colourMask.begin(); it != colourMask.end(); ++it)
+            for (int k = 1; k < Constants::NB_Colors && k < 32; k++)
+                if (it->second & (1 << k))
+                    perColour[k]++;
+        struct Key
+        {
+            int scarcity; //higher = safer to tap
+            int colours;  //fewer = less flexible = tap first
+            size_t layer;
+        };
+        std::map<MTGCardInstance*, Key> keyOf;
+        for (size_t i = 0; i < order.size(); i++)
+        {
+            MTGCardInstance * src = ((AManaProducer *) order[i])->source;
+            if (keyOf.find(src) != keyOf.end())
+                continue;
+            Key key;
+            key.scarcity = 1 << 20; //colourless: nothing to strand
+            key.colours = 0;
+            key.layer = i;
+            int mask = colourMask[src];
+            for (int k = 1; k < Constants::NB_Colors && k < 32; k++)
+                if (mask & (1 << k))
+                {
+                    key.colours++;
+                    if (perColour[k] < key.scarcity)
+                        key.scarcity = perColour[k];
+                }
+            keyOf[src] = key;
+        }
+        struct Less
+        {
+            std::map<MTGCardInstance*, Key> * keys;
+            bool operator()(MTGAbility * a, MTGAbility * b) const
+            {
+                const Key & ka = (*keys)[((AManaProducer *) a)->source];
+                const Key & kb = (*keys)[((AManaProducer *) b)->source];
+                if (ka.scarcity != kb.scarcity)
+                    return ka.scarcity > kb.scarcity;
+                if (ka.colours != kb.colours)
+                    return ka.colours < kb.colours;
+                return ka.layer < kb.layer;
+            }
+        } less;
+        less.keys = &keyOf;
+        std::stable_sort(order.begin(), order.end(), less);
+        (void) payee;
+        return order;
+    }
 }
 
 ManaCost * ManaEngine::potentialMana(Player * p, ManaPolicy & policy, MTGCardInstance * target)
@@ -464,11 +542,47 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
             }
         }
     }
-    for (int pass = 0; pass < 2; pass++)
-    {
+    //#W49-D4: the GENERIC fill spends the SCARCE colour. Pass 0 above took
+    //off-pip sources in LAYER order (earliest-played first), so a {2}{w} cost
+    //over Underground Sea, Swamp, Underground Sea, Scrubland x3 paid its {2}
+    //from BOTH Underground Seas - the seat's only two blue sources - when
+    //Swamp + a spare Scrubland paid it just as well; the tutored Intruder
+    //Alarm {2}{u} then sat in hand a full turn cycle and the game was lost by
+    //that turn (corpus 20260827 deck123 vs162 seq17->19: "{U} 0" after the
+    //cast). Traced payment order on that board: the coloured walk pays {w}
+    //with the first Scrubland; the generic fill then takes the first two
+    //off-pip producers in layer order, which are the two Seas because the
+    //Swamp is listed between them and the fill stops the moment the total
+    //is covered - the Swamp was never reached.
+    //The walk is now THREE passes: (0) the coloured walk in layer order,
+    //exactly as before (deferFlexibleSource, wave-32; the hybrid walk above,
+    //wave-36; the foreach/Coffers branch; nothing here changes); (1) the
+    //generic fill from OFF-PIP sources only, capped at the generic amount, in
+    //a SCARCITY order; (2) the generic fill from anything, same order. The
+    //order key, per SOURCE CARD: the colour it makes that the controller has
+    //the FEWEST sources of (tapped or not) - the source whose every colour is
+    //abundant taps first, the source that is one of the last makers of some
+    //colour taps last; ties break mono-colour before dual before tri
+    //(fewer colours = less flexible = tap first), then layer order as before.
+    //A colourless source has no colour to strand and goes first of all. The
+    //key is read from the board, never from the hand: at this cast the hand
+    //held no blue card - the blue need was the tutor TARGET - so a hand-
+    //weighted rule would have tapped the Seas exactly as the old walk did.
+    //Same order for the human seat (selectAutoTapProducers consumes this plan
+    //in plan order for its filler pass) so the human's auto-tap and the AI's
+    //payment agree.
+    std::vector<MTGAbility*> genericOrder = genericFillOrder(p, policy, target);
+    std::vector<MTGAbility*> layerOrder;
     for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
+        layerOrder.push_back((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
+    for (int pass = 0; pass < 3; pass++)
     {
-        MTGAbility * a = ((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
+    const bool colourWalk = (pass == 0);
+    const bool offPipOnly = (pass == 1);
+    const std::vector<MTGAbility*> & walk = colourWalk ? layerOrder : genericOrder;
+    for (size_t i = 0; i < walk.size(); i++)
+    {
+        MTGAbility * a = ((MTGAbility *) walk[i]);
         AManaProducer * amp = dynamic_cast<AManaProducer*> (a);
         if(amp && (amp->getCost() && amp->getCost()->extraCosts && !amp->getCost()->extraCosts->canPay()))
             continue;
@@ -506,7 +620,9 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
             {
                 if(result->canAfford(cost,0))
                     continue;
-                if (pass == 0)
+                if (colourWalk)
+                    continue; //#W49-D4: generic is filled by passes 1-2, in scarcity order
+                if (offPipOnly)
                 {
                     if (offColorFilled >= genericAmount)
                         continue;
@@ -529,7 +645,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
                             payments.push_back(amp);
                             result->add(amp->output);
                             used[card] = true;
-                            if (pass == 0)
+                            if (offPipOnly)
                                 offColorFilled++;
                         }
                     }
@@ -602,7 +718,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
             }
         }
     }
-    //pass 1 only runs when the off-color-first pass left the total short.
+    //the next pass only runs when this one left the total short.
     if (result->canAfford(cost, 0))
         break;
     }

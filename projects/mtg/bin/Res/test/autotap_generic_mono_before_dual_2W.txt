@@ -1,0 +1,24 @@
+# W49-D4 (mono before dual): Idyllic Tutor {2}{W} over Underground Sea, Swamp, Swamp, Plains.
+# The Sea is the only blue source and is listed FIRST in layer order. PRE-FIX: generic fill took
+# the Sea (first off-pip source) + one Swamp -> pool {W}{U}{B}, blue gone.
+# EXPECTED: Plains pays {W}, the two Swamps pay {2}; the Sea stays untapped.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Underground Sea,Swamp,Swamp,Plains
+hand:Idyllic Tutor
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+autotap idyllic tutor
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Underground Sea,Swamp,Swamp,Plains
+hand:Idyllic Tutor
+tappedinplay:3
+manapool:{W}{B}{B}
+[PLAYER2]
+[END]
