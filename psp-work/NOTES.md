@@ -5584,3 +5584,15 @@ restored on multi-blocks (was skipped unless holding an instant), lethal-basis f
 manarestriction, reveal/transform narration, X pricing, removal target text, Day/Night
 line, fizzle logger (still watch for ux0:data/Wagic/fizzlelog.txt existing after games
 with targeted spells — if absent, the define needs another pass).
+
+## 2026-08-27 — Vita VPK for the owner's three live-play reports (owner request: "Make a vpk. I'll turn on ftp")
+psp-port ff'd to 6819183f7. Hermetic vitasdk build (build_vita wiped; vitaGL reused), unit
+vita-vpk5, log ~/.gatelogs/vita_vpk5.log, exit 0. VPK 32,875,073 B -> handheld 10.0.0.227:1337
+ux0:/vpk/wagic.vpk, size-verified. Install manual. Carries since 9f47ce024/60dbf39b4: human
+cast gate fix (dual lands counted first colour only — Selesnya Guildgate/Blossoming Sands,
+19e2b04f7); castability oracle fixes (Delve priced — Gurmag Angler; self-tapping ability
+excludes its own mana — Westvale Abbey; 6819183f7); wave-45..48 engine batches (E1 re-answer
+replacement, loop affordances: real Pass row + repeat-N row + scoped [repeat:] tag, ranged
+collapse on combat A-rows/target menus/log cycles, attack-count header, priced blocker
+representative, stack keyword tags, card-text clause budget, auto=choice menu headers,
+DRAW PRICE reach, ANNOUNCE_X plan suppression). Suite 1137/0 + 37/0, PARSETEST 1655/0.
