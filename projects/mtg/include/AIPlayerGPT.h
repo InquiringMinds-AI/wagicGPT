@@ -720,6 +720,10 @@ private:
     //the model's last stated PLAN line - the ONLY reply text carried
     //forward (the protocol tells it so, and to restate the plan in full)
     string mCurrentPlan;
+    //#W49-U D7: consecutive replies whose PLAN: was byte-identical to the one
+    //already carried; at kPlanEchoLimit the carry is dropped and re-asked.
+    int mPlanEchoCount;
+    static const int kPlanEchoLimit = 5;
     //W38 mutate host-intent carry (wave-37 validation #3, 139v152 s30-31):
     //the over/under placement and the host pick are SEPARATE model calls,
     //and the pilot's host intent did not survive the boundary (chose "over"

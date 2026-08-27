@@ -291,6 +291,58 @@ inline bool planClauseIsFuture(const std::string& plan, size_t pos)
         || win.find("after that") != std::string::npos;
 }
 
+// #W49-U D7: does the carried plan name NO action at all - none of the pilot's
+// own cards and none of the verbs this action menu's rows open with ("Cast",
+// "Activate", "Play" ...)? Decided only on a cast/activation menu (an A-row or
+// B-row list has no verbs to match, and the echo-count rule covers it there).
+// "Passing" is not a row verb: the rows are numbered actions, and pass is the
+// 0 the tail names. True = the plan is not about this game's actions.
+inline bool planNamesNoAction(const std::string& planRaw, const std::string& optsRaw,
+                              const std::vector<std::string>& myCardNames)
+{
+    if (planRaw.empty())
+        return false;
+    std::string plan = toLower(planRaw);
+    std::string opts = toLower(optsRaw);
+    if (!optionsAreActionMenu(opts))
+        return false;
+    std::set<std::string> seen;
+    for (size_t n = 0; n < myCardNames.size(); n++)
+    {
+        std::string full = toLower(myCardNames[n]);
+        if (full.size() < 4)
+            continue;
+        std::string nm = shortName(full);
+        if (nm.size() < 4 || !seen.insert(nm).second)
+            continue;
+        if (plan.find(nm) != std::string::npos || plan.find(full) != std::string::npos)
+            return false;
+    }
+    // Row verbs: the first word after "N. " on each option line.
+    std::string lines = optionLinesOnly(opts);
+    size_t at = 0;
+    while (at < lines.size())
+    {
+        size_t nl = lines.find('\n', at);
+        std::string line = lines.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
+        at = (nl == std::string::npos) ? lines.size() : nl + 1;
+        size_t p = line.find_first_not_of(" \t");
+        if (p == std::string::npos || !isdigit((unsigned char) line[p]))
+            continue;
+        size_t dot = line.find('.', p);
+        if (dot == std::string::npos)
+            continue;
+        size_t vs = line.find_first_not_of(" \t", dot + 1);
+        if (vs == std::string::npos)
+            continue;
+        size_t ve = line.find_first_of(" \t", vs);
+        std::string verb = line.substr(vs, ve == std::string::npos ? std::string::npos : ve - vs);
+        if (verb.size() >= 3 && plan.find(verb) != std::string::npos)
+            return false;
+    }
+    return true;
+}
+
 // planRaw / optsRaw as assembled; myCardNames = display names from the
 // caster's own zones (the vocabulary the plan can name). True when the plan
 // affirmatively commits, FOR THIS WINDOW, to acting on >=1 named card and the
