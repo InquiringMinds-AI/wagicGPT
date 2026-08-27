@@ -935,7 +935,7 @@ private:
     //is, is final for this state. Cleared when the board moves on.
     string mPriorityReaskBoard;
     string mPriorityReaskLine;
-    string mPriorityReaskKind; //"named_row" | "repeat_count" | "plan_choice" (#W51-C D4)
+    string mPriorityReaskKind; //"named_row" | "repeat_count" | "plan_choice" (#W51-C D4) | "plan_missing" | "index_name" (#W52-J)
     //Same mechanism for askModel (cast menus, targets, modes): keyed on the
     //ORIGINAL askKey (state + question), the corrected question is asked once.
     string mAskReaskKey;

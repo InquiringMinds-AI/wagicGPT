@@ -12619,14 +12619,25 @@ static bool nameEchoesRow(const string& nameIn, const vector<string>& rows)
 //the answer-first protocol writes the count before the subtraction, so a
 //CHOICE count on the repeat row under such a PLAN is a contradiction the
 //model is asked to resolve once (deck123 vs126 seq 32: x25 under "This
-//window: pass", M 33 -> 58 past a stop of 30). Prose outside the PLAN line
-//is never read.
-static bool planSaysPassThisWindow(const string& replyIn)
+//window: pass", M 33 -> 58 past a stop of 30).
+//#W52-J (D14): ALSO the prose verdict OPENERS after the coded line - the
+//model writes "CHOICE: 1 (Lolth 0)" and then "We must pass and hope"
+//(deck146 vs125 seq 282, executed at 2 life, 2 -> 1). A sentence that OPENS
+//with the verdict ("We must pass", "We pass", "So we pass", "The answer is
+//pass") anywhere after the CHOICE line is the claim; the same words mid-
+//sentence ("make 17 now, then we pass"), a negated verdict ("we must not
+//pass", "cannot pass"), a bare "Pass." (x0 owns that reply), and a pass
+//deferred to a later window ("we pass the turn", "pass priority after
+//combat", "next window") are NOT. Text before the CHOICE line is never read;
+//with no CHOICE line only the PLAN-line patterns run. matchedOut receives
+//the sentence/line that carried the verdict, for the re-ask to quote.
+static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = NULL)
 {
-    string low = replyIn;
-    size_t thinkEnd = low.rfind("</think>");
+    string text = replyIn;
+    size_t thinkEnd = text.rfind("</think>");
     if (thinkEnd != string::npos)
-        low = low.substr(thinkEnd + 8);
+        text = text.substr(thinkEnd + 8);
+    string low = text;
     for (size_t i = 0; i < low.size(); i++)
         low[i] = (char) tolower((unsigned char) low[i]);
     size_t scan = 0;
@@ -12638,10 +12649,108 @@ static bool planSaysPassThisWindow(const string& replyIn)
             || line.find("this window pass") != string::npos
             || line.find("window: pass") != string::npos
             || line.find("stop reached") != string::npos)
+        {
+            if (matchedOut)
+            {
+                string raw = text.substr(scan, line.size());
+                size_t e = raw.find_last_not_of(" \t\r");
+                *matchedOut = (e == string::npos) ? string() : raw.substr(0, e + 1);
+                if (matchedOut->size() > 160)
+                    *matchedOut = matchedOut->substr(0, 160);
+            }
             return true;
+        }
         scan += 5;
     }
+    //#W52-J (D14): sentence openers after the CHOICE line.
+    size_t choiceAt = low.find("choice:");
+    if (choiceAt == string::npos)
+        return false;
+    size_t region = low.find('\n', choiceAt);
+    if (region == string::npos)
+        return false;
+    static const char * kOpeners[] = {
+        "we must pass", "we should pass", "we will pass", "we have to pass", "we need to pass",
+        "we pass", "i must pass", "i should pass", "i will pass", "i pass", "must pass",
+        "the answer is pass", "the answer is to pass", "answer is pass", "answer: pass",
+        "the correct answer is pass", "the correct choice is pass", "the correct choice is to pass",
+        "the right choice is to pass", "the right play is to pass", "the correct play is to pass",
+        "best to pass", "better to pass", "safer to pass"
+    };
+    static const char * kLeads[] = { "so ", "therefore ", "thus ", "hence ", "so, ", "therefore, ", "thus, " };
+    static const char * kDeferrals[] = {
+        " the turn", " turn", " priority after", " after ", " next window", " next turn", " later", " until ", " once "
+    };
+    size_t pos = region + 1;
+    while (pos < low.size())
+    {
+        //sentence opener: skip whitespace and the PLAN label
+        size_t st = low.find_first_not_of(" \t\r\n", pos);
+        if (st == string::npos)
+            break;
+        if (low.compare(st, 5, "plan:") == 0)
+        {
+            st = low.find_first_not_of(" \t", st + 5);
+            if (st == string::npos)
+                break;
+        }
+        size_t sentEnd = low.find_first_of(".!?;\n", st);
+        size_t sentStop = (sentEnd == string::npos) ? low.size() : sentEnd;
+        string sent = low.substr(st, sentStop - st);
+        string head = sent;
+        for (size_t l = 0; l < sizeof(kLeads) / sizeof(kLeads[0]); l++)
+            if (head.compare(0, strlen(kLeads[l]), kLeads[l]) == 0)
+            {
+                head = head.substr(strlen(kLeads[l]));
+                break;
+            }
+        for (size_t k = 0; k < sizeof(kOpeners) / sizeof(kOpeners[0]); k++)
+        {
+            size_t n = strlen(kOpeners[k]);
+            if (head.compare(0, n, kOpeners[k]) != 0)
+                continue;
+            if (head.size() > n && isalnum((unsigned char) head[n]))
+                continue; //"passes"/"passing" - not the verdict word
+            string rest = head.substr(n);
+            bool deferred = false;
+            //deferral words must follow the verdict closely ("pass the turn",
+            //"pass priority after combat"); "and hope ... next turn" far
+            //down the sentence is not a deferral.
+            string near = rest.substr(0, 30);
+            for (size_t d = 0; d < sizeof(kDeferrals) / sizeof(kDeferrals[0]) && !deferred; d++)
+                deferred = (rest.compare(0, strlen(kDeferrals[d]), kDeferrals[d]) == 0)
+                           || (strlen(kDeferrals[d]) > 5 && near.find(kDeferrals[d]) != string::npos);
+            if (deferred)
+                break;
+            if (matchedOut)
+            {
+                string raw = text.substr(st, sentStop - st);
+                size_t e = raw.find_last_not_of(" \t\r");
+                *matchedOut = (e == string::npos) ? string() : raw.substr(0, e + 1);
+                if (matchedOut->size() > 160)
+                    *matchedOut = matchedOut->substr(0, 160);
+            }
+            return true;
+        }
+        if (sentEnd == string::npos)
+            break;
+        pos = sentEnd + 1;
+    }
     return false;
+}
+
+//#W52-J (D14): does the reply carry a PLAN line at all (post-think)? A
+//repeat-row take with no PLAN line has no stop arithmetic to hold it to
+//(deck123 vs126 seq 47: x17 at M 27 against a stop of 24, nothing to compare).
+static bool replyHasPlanLine(const string& replyIn)
+{
+    string low = replyIn;
+    size_t thinkEnd = low.rfind("</think>");
+    if (thinkEnd != string::npos)
+        low = low.substr(thinkEnd + 8);
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    return low.find("plan:") != string::npos;
 }
 
 //#W51-C (D4b): the first line carrying the label, trimmed, for the re-ask to
@@ -13874,6 +13983,7 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     int echoRemap = -1;
     bool echoConflict = false;
     bool echoNoMatch = false;
+    bool exactNameRemap = false; //#W52-J D6: bound by the exact short name (hoisted for the conflict signatures)
     vector<string> words; //echo's significant words (hoisted for INDEX-WINS)
     string echoLc;        //lowercased echo string (hoisted for INDEX-WINS (a2))
     vector<int> echoMatches; //every option the echo's alpha words match
@@ -13985,6 +14095,53 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             echoLc = echo;
             for (size_t i = 0; i < echoLc.size(); i++)
                 echoLc[i] = (char) tolower((unsigned char) echoLc[i]);
+            //#W52-J (D6): the EXACT short name binds FIRST. The word pass below
+            //drops "right"/"now" as render vocabulary and "cast" as filler, so
+            //"Cast nothing right now" reduced to the single word "nothing" -
+            //which the sibling row's "{right now: ... at 0 this does nothing}"
+            //annotation also carries - and a unique row read as an ambiguous
+            //conflict; the index then executed a dead Idyllic Tutor (deck123
+            //vs125 seq 48). A parenthetical that IS the head of exactly one
+            //row's annotation-stripped core (at a word boundary) names that
+            //row, whatever its words; several rows sharing the head (the
+            //"Plains" of "Plains #2 / #3") fall through to the word pass
+            //unchanged. Decline filler alone ("pass", "none") never binds here.
+            {
+                string e = echoLc;
+                size_t es = e.find_first_not_of(" \t");
+                size_t ee = e.find_last_not_of(" \t.");
+                e = (es == string::npos) ? string() : e.substr(es, ee - es + 1);
+                if (e.size() >= 4 && e != "pass" && e != "none" && e != "hold" && e != "done"
+                    && e != "skip" && e != "decline" && e != "nobody")
+                {
+                    vector<int> exact;
+                    for (size_t o = 0; o < optionTexts->size(); o++)
+                    {
+                        string core = stripRenderAnnotationsLc((*optionTexts)[o]);
+                        for (size_t k = 0; k < core.size(); k++)
+                            core[k] = (char) tolower((unsigned char) core[k]);
+                        size_t cs = core.find_first_not_of(" \t");
+                        if (cs == string::npos)
+                            continue;
+                        core = core.substr(cs);
+                        if (core.compare(0, e.size(), e) != 0)
+                            continue;
+                        //a word-boundary head of ANY row is a candidate: "Cast
+                        //Vampire" heads both "Cast Vampire" and "Cast Vampire
+                        //Nighthawk" (two candidates -> not unique -> the word
+                        //pass and its index-wins pin decide, unchanged); "Cast
+                        //nothing right now" heads only "Cast nothing right now
+                        //(combat comes next this turn)".
+                        if (core.size() == e.size() || !isalnum((unsigned char) core[e.size()]))
+                            exact.push_back((int) o);
+                    }
+                    if (exact.size() == 1)
+                    {
+                        echoRemap = exact[0] + 1;
+                        exactNameRemap = true;
+                    }
+                }
+            }
             //significant words: lowercase, length >= 4
             string w;
             for (size_t i = 0; i <= echo.size(); i++)
@@ -14007,7 +14164,12 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                     w.clear();
                 }
             }
-            if (!words.empty())
+            if (exactNameRemap)
+            {
+                //#W52-J (D6): bound by the exact short name above - the word
+                //pass and its conflict/staleness verdicts do not run.
+            }
+            else if (!words.empty())
             {
                 int match = -1;
                 //#W52-G (D-2): tier 1 - the echo's LABEL words against each
@@ -14159,7 +14321,7 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                 else if (!echoConflict)
                     echoNoMatch = true; //named words matched NO offered option
             }
-            else if (!echoLc.empty())
+            else if (!echoLc.empty()) //(exactNameRemap is false here)
             {
                 //AMOUNT-MENU echo (W36 item 4, deck152 vs139 s19: "CHOICE: 11
                 //(add 5 counters)" executed option 11 = "add 10 counters").
@@ -14378,6 +14540,8 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             if (echoRemap > 0 && !echoConflict && n != 0 && echoRemap != n)
             {
                 appendParseNote(noteOut, "echo_index_conflict");
+                if (exactNameRemap)
+                    appendParseNote(noteOut, "name_over_index"); //#W52-J D6
                 return echoRemap;
             }
             //Ambiguous conflict: the echo matched SEVERAL options and none of
@@ -14544,6 +14708,8 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     if (echoRemap > 0 && !echoConflict && choice > 0 && echoRemap != choice)
     {
         appendParseNote(noteOut, "echo_index_conflict");
+        if (exactNameRemap)
+            appendParseNote(noteOut, "name_over_index"); //#W52-J D6
         return echoRemap;
     }
     if (echoConflict && choice > 0 && !echoMatches.empty())
@@ -15696,13 +15862,31 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         }
         //#W51-C (D4b): a count on the repeat row under a PLAN line that says
         //this window is a pass is a contradiction -> one re-ask quoting both.
-        bool planChoiceConflict = (repeatRowTaken && namedCount >= 1 && planSaysPassThisWindow(content));
+        //#W52-J (D14): the conflict covers EVERY taken row, not only the
+        //repeat row with a count - the single "[cost: Tap]" take under a pass
+        //plan and "CHOICE: 1 (Lolth 0)" over "We must pass" are the same
+        //contradiction. The matched verdict is quoted back; the class is
+        //counted (decision_reversed_in_prose) whether or not the re-ask fires.
+        string passVerdict;
+        bool planChoiceConflict = (choice >= 1 && choice <= index && !content.empty()
+                                   && planSaysPassThisWindow(content, &passVerdict));
+        if (planChoiceConflict)
+            appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
+        //#W52-J (D14b): a counted repeat-row take with no PLAN line at all
+        //has no stop arithmetic to hold it to -> one re-ask for the PLAN line.
+        bool planMissing = (repeatRowTaken && namedCount >= 1 && !replyHasPlanLine(content));
+        //#W52-J (D6): number and name point at different rows and the name is
+        //not unique on the menu (echo_index_conflict_ambiguous) -> one re-ask
+        //quoting both, instead of executing the index.
+        bool indexNameConflict = (choice >= 1 && choice <= index && !content.empty()
+                                  && parseNote.find("echo_index_conflict_ambiguous") != string::npos);
         //#W49-S (D8/D3): ONE re-ask per board state, before the heuristic (D8)
         //or before the single activation (D3). The corrected question is put
         //in flight now and answered on a later tick, exactly like a first ask;
         //the record written here carries the reply that earned the re-ask.
         if (!content.empty() && mPriorityReaskBoard != boardKey
-            && (namedRowFail || (repeatRowTaken && namedCount < 0) || planChoiceConflict))
+            && (namedRowFail || (repeatRowTaken && namedCount < 0) || planChoiceConflict
+                || planMissing || indexNameConflict))
         {
             std::ostringstream corr;
             const char * fb;
@@ -15714,14 +15898,38 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 fb = "named_row_reask";
                 mPriorityReaskKind = "named_row";
             }
+            else if (indexNameConflict)
+            {
+                corr << "[RE-ASK] Your CHOICE line's number " << choice << " and its name \""
+                     << headParenthetical(decisionPart.empty() ? content : decisionPart)
+                     << "\" point at different rows of this list. Answer again with the number of the row"
+                        " you want and that row's own short name, or 0 (pass).";
+                fb = "index_name_conflict";
+                mPriorityReaskKind = "index_name";
+            }
             else if (planChoiceConflict)
             {
-                corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
-                     << firstLabelledLine(content, "choice:") << "\") but your PLAN line says this window is a pass (\""
-                     << firstLabelledLine(content, "plan:") << "\"). Answer again: 0 (pass) if you meant to pass,"
-                        " or the repeat row with the count you want performed now.";
+                if (repeatRowTaken && namedCount >= 1)
+                    corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
+                         << firstLabelledLine(content, "choice:") << "\") but your reply says this window is a pass (\""
+                         << passVerdict << "\"). Answer again: 0 (pass) if you meant to pass,"
+                            " or the repeat row with the count you want performed now.";
+                else
+                    corr << "[RE-ASK] Your CHOICE line takes row " << choice << " (\""
+                         << firstLabelledLine(content, "choice:") << "\") but your reply says this window is a pass (\""
+                         << passVerdict << "\"). Answer again: 0 (pass) if you meant to pass,"
+                            " or the number of the row you want performed now.";
                 fb = "plan_choice_conflict";
                 mPriorityReaskKind = "plan_choice";
+            }
+            else if (planMissing)
+            {
+                corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
+                     << firstLabelledLine(content, "choice:") << "\") but carries no PLAN line. Answer again with"
+                        " the CHOICE line and a PLAN line stating your stop count, the count you are at now, and"
+                        " how many you perform this window; or 0 (pass).";
+                fb = "plan_missing";
+                mPriorityReaskKind = "plan_missing";
             }
             else
             {
@@ -15736,8 +15944,10 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 mLastParseNote = parseNote;
             writeTransLog("priority", userMsg, content, choice, index, "", fb, &shownLines);
             setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
-                      : planChoiceConflict ? "the count contradicts the plan's pass - asking again"
-                                           : "the repeat row was taken without a count - asking again", 5.0f);
+                      : indexNameConflict ? "the number and the name disagree - asking again"
+                      : planChoiceConflict ? "the choice contradicts the reply's pass - asking again"
+                      : planMissing ? "the repeat row was taken with no plan - asking again"
+                                    : "the repeat row was taken without a count - asking again", 5.0f);
             DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
             string corrected;
             pollCompletionRetry(assemblePrompt(tail.str() + "\n" + mPriorityReaskLine), corrected);
@@ -15755,6 +15965,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             else if (mPriorityReaskKind == "plan_choice") //#W51-C D4b: the second answer executes as given
                 appendParseNote(&mLastParseNote, planChoiceConflict ? "plan_choice_conflict_exhausted"
                                                                     : (choice >= 0 ? "plan_choice_conflict_recovered" : "plan_choice_conflict_unanswered"));
+            else if (mPriorityReaskKind == "plan_missing") //#W52-J D14b: executes as given either way
+                appendParseNote(&mLastParseNote, planMissing ? "plan_missing_exhausted"
+                                                             : (choice >= 0 ? "plan_missing_recovered" : "plan_missing_unanswered"));
+            else if (mPriorityReaskKind == "index_name") //#W52-J D6: executes as given either way
+                appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
+                                                                   : (choice >= 0 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
             else if (repeatRowTaken)
                 appendParseNote(&mLastParseNote, namedCount >= 2 ? "repeat_count_reask_recovered"
                                                                  : "repeat_count_reask_exhausted");
@@ -16133,10 +16349,14 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
             appendParseNote(&mLastParseNote, "no_pass_sibling_taken");
         }
     }
+    //#W52-J (D6): number and name disagree and the name is not unique on
+    //this menu -> one re-ask quoting both, never the index executed.
+    bool indexNameConflict = (choice >= 1 && choice <= (int) options.size() && !content.empty()
+                              && parseNote.find("echo_index_conflict_ambiguous") != string::npos);
     //#W49-S (D8): an index past the menu naming no offered row gets ONE re-ask
     //before the heuristic. deck123 vs126 seq 29: "CHOICE: 5 (Attack with all
     //creatures)" over a 4-row Main-1 cast menu.
-    if ((namedRowFail || passOnNoPass) && !reasked)
+    if ((namedRowFail || passOnNoPass || indexNameConflict) && !reasked)
     {
         std::ostringstream corr;
         if (namedRowFail)
@@ -16145,20 +16365,29 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
                  << "\" is not on this list. Answer with a number from 1 to " << options.size() << ".";
             mAskReaskKind = "named_row";
         }
-        else
+        else if (passOnNoPass)
         {
             corr << "[RE-ASK] This ask has no pass - 0 is not an answer here. Answer with a number from 1 to "
                  << options.size() << ".";
             mAskReaskKind = "no_pass";
         }
-        const char * fb = namedRowFail ? "named_row_reask" : "no_pass_reask";
+        else
+        {
+            corr << "[RE-ASK] Your CHOICE line's number " << choice << " and its name \""
+                 << headParenthetical(decisionPart.empty() ? content : decisionPart)
+                 << "\" point at different rows of this list. Answer again with the number of the row"
+                    " you want and that row's own short name.";
+            mAskReaskKind = "index_name";
+        }
+        const char * fb = namedRowFail ? "named_row_reask" : passOnNoPass ? "no_pass_reask" : "index_name_conflict";
         mAskReaskKey = askKey0;
         mAskReaskLine = corr.str();
         if (!parseNote.empty())
             mLastParseNote = parseNote;
         writeTransLog("ask", userMsg, content, choice, (int) options.size(), "", fb, &options);
         setNotice(namedRowFail ? "that answer named nothing on the list - asking again"
-                               : "that answer passed an ask that has no pass - asking again", 5.0f);
+                  : passOnNoPass ? "that answer passed an ask that has no pass - asking again"
+                                 : "the number and the name disagree - asking again", 5.0f);
         DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
         string corrected;
         pollCompletionRetry(assemblePrompt(tailStr + "\n" + mAskReaskLine), corrected);
@@ -16169,6 +16398,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
         if (mAskReaskKind == "no_pass")
             appendParseNote(&mLastParseNote, passOnNoPass ? "no_pass_reask_exhausted"
                                                           : (choice >= 1 ? "no_pass_reask_recovered" : "no_pass_reask_unanswered"));
+        else if (mAskReaskKind == "index_name") //#W52-J D6: the second answer executes as given
+            appendParseNote(&mLastParseNote, indexNameConflict ? "index_name_conflict_exhausted"
+                                                               : (choice >= 1 ? "index_name_conflict_recovered" : "index_name_conflict_unanswered"));
         else
             appendParseNote(&mLastParseNote, namedRowFail ? "named_row_reask_exhausted"
                                                           : (choice >= 0 ? "named_row_reask_recovered" : "named_row_reask_unanswered"));
@@ -34842,6 +35074,106 @@ static const char * kW50Y_r94 =
         }
     }
 
+
+    cout << "\n[#W52-J] D6 exact short name over the index / ambiguous -> index_name re-ask; D14 pass verdicts, plan_missing\n";
+    {
+        //D6: deck123 vs125 seq 48 - the parenthetical IS row 6; the index says 5 (a dead Tutor).
+        vector<string> m48;
+        m48.push_back("Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures - at 0 this does nothing} {leaves 8 of your 11 untapped mana sources untapped} - legal targets right now: the opponent {card text: \"Target opponent sacrifices a creature of their choice. You gain life equal to that creature's toughness.\"}");
+        m48.push_back("Cast Devour Flesh {1}{b} {right now: they control 0 creatures - at 0 this does nothing} {leaves 9 of your 11 untapped mana sources untapped} - legal targets right now: the opponent, you {card text: \"Target player sacrifices a creature, then gains life equal to that creature's toughness.\"}");
+        m48.push_back("Cast Lightning Greaves {2} {leaves 9 of your 11 untapped mana sources untapped} {card text: \"Equipped creature has haste and shroud.\"}");
+        m48.push_back("Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 7 of your 11 untapped mana sources untapped} {card text: \"Destroy all creatures. They can't be regenerated.\"}");
+        m48.push_back("Cast Idyllic Tutor {2}{w} [already owned: Intruder Alarm on your battlefield - this finds only an enchantment card] {leaves 8 of your 11 untapped mana sources untapped} {card text: \"Search your library for an enchantment card, reveal it, and put it into your hand. Then shuffle.\"}");
+        m48.push_back("Cast nothing right now (combat comes next this turn)");
+        bool st = false; string note;
+        int c = parseChoice(" 5 (Cast nothing right now)", 6, &m48, &st, NULL, &note);
+        cout << "     seq 48 ' 5 (Cast nothing right now)' -> " << c << " note=" << note << "\n";
+        CHECK(c == 6 && !st && note.find("name_over_index") != string::npos && note.find("echo_index_conflict_ambiguous") == string::npos,
+              "#W52-J D6 deck123 vs125 seq 48: the exact short name of row 6 wins over the index 5 and is signed name_over_index (label-stripped segment, as the seam hands it over)");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 5 (Cast nothing right now)", 6, &m48, &st, NULL, &note);
+        CHECK(c == 6 && !st, "#W52-J D6 seq 48: the raw labelled line resolves to row 6 on the salvage path too");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 5 (Cast Idyllic Tutor)", 6, &m48, &st, NULL, &note);
+        CHECK(c == 5 && !st && note.empty(), "#W52-J D6 NEGATIVE index and exact name agreeing: row 5, silent");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 6 (Cast nothing right now (combat comes next this turn))", 6, &m48, &st, NULL, &note);
+        CHECK(c == 6 && !st && note.empty(), "#W52-J D6 echo shape: the whole decline row incl. its clause binds to 6, silent");
+        st = false; note.clear();
+        c = parseChoice(" 2 (Cast Damnation)", 6, &m48, &st, NULL, &note);
+        CHECK(c == 4 && !st && note.find("name_over_index") != string::npos,
+              "#W52-J D6 a unique exact name on any row outranks a disagreeing index");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 0 (pass)", 6, &m48, &st, NULL, &note);
+        CHECK(c == 0 && note.empty(), "#W52-J D6 NEGATIVE decline filler alone never binds by exact name");
+        //the seq-295 shape stays: "Plains #3" is the exact head of one row only.
+        vector<string> lands;
+        lands.push_back("Plains #2");
+        lands.push_back("Plains #3");
+        lands.push_back("Plains #4");
+        st = false; note.clear();
+        c = parseChoice("CHOICE: 3 (Plains #3 - \"W\")", 3, &lands, &st, NULL, &note);
+        CHECK(c == 2, "#W52-J D6 deck146 vs125 seq 295: 'Plains #3' under index 3 still executes row 2");
+        //ambiguous: the name is the head of several rows and the index is none of them -> signed for the re-ask lane
+        vector<string> amb;
+        amb.push_back("Plains #2");
+        amb.push_back("Plains #3");
+        amb.push_back("Cast Lightning Bolt");
+        st = false; note.clear();
+        c = parseChoice(" 3 (Plains)", 3, &amb, &st, NULL, &note);
+        CHECK(c == 3 && note.find("echo_index_conflict_ambiguous") != string::npos && note.find("name_over_index") == string::npos,
+              "#W52-J D6 NEGATIVE a name shared by two rows with a foreign index is the ambiguous signature (-> index_name_conflict re-ask), not an exact bind");
+        //a name that is a prefix of one row but NOT at a word boundary is not that row
+        vector<string> pre;
+        pre.push_back("Cast Vampire Nighthawk");
+        pre.push_back("Cast Vampire");
+        st = false; note.clear();
+        c = parseChoice(" 1 (Cast Vampire)", 2, &pre, &st, NULL, &note);
+        CHECK(c == 1 && note.find("name_over_index") == string::npos,
+              "#W52-J D6 NEGATIVE 'Cast Vampire' heads BOTH rows -> not an exact bind; the index stands (the W36-B4 pin)");
+
+        //D14: the prose verdicts after the coded line.
+        string r282 = "CHOICE: 1 (Lolth 0)\nPLAN: At 2 life, Lolth's 0 ability is suicidal (-1 life). We have no creatures to attack with and no legal targets for removal. We must pass and hope to draw a creature or find a way to survive the opponent's next turn. The opponent has no creatures, so they cannot attack immediately, but they have 49 life and many lands. Our only hope is to stabilize or find a win condition. We pass.";
+        string why;
+        CHECK(planSaysPassThisWindow(r282, &why) && why.find("We must pass") == 0,
+              "#W52-J D14 deck146 vs125 seq 282: 'We must pass and hope' after CHOICE: 1 (Lolth 0) is the pass verdict -> plan_choice_conflict re-ask, quoting that sentence");
+        CHECK(planSaysPassThisWindow("CHOICE: 1 (Create vampire with Lord of Lineage)\nPLAN: M is 26, stop is 24. So we pass."),
+              "#W52-J D14 'So we pass.' opener (lead word) is the verdict");
+        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create human x3)\nThe answer is pass."),
+              "#W52-J D14 'The answer is pass' on an unlabelled line after the CHOICE is the verdict");
+        CHECK(planSaysPassThisWindow("CHOICE: 1 (Lolth 0)\nPLAN: I must pass here; nothing safe to do."),
+              "#W52-J D14 'I must pass' opener is the verdict");
+        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire with Lord of Lineage x17)\nPLAN: Stop at M = 30. M is 13 now; make 17 this window, then we pass."),
+              "#W52-J D14 NEGATIVE 'then we pass' mid-sentence is not an opener");
+        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire x5)\nPLAN: We must not pass here; make 5 now."),
+              "#W52-J D14 NEGATIVE the negated verdict does not match");
+        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire x5)\nPLAN: We cannot pass yet. Make 5 now."),
+              "#W52-J D14 NEGATIVE 'cannot pass' does not match");
+        CHECK(!planSaysPassThisWindow("CHOICE: 3 (Cast Damnation)\nPLAN: Wipe the board. We pass the turn after that."),
+              "#W52-J D14 NEGATIVE 'we pass the turn' is a deferred pass, not this window's verdict");
+        CHECK(!planSaysPassThisWindow("CHOICE: 1 (Attack trigger)\nPLAN: We pass priority after combat and hold the Bolt."),
+              "#W52-J D14 NEGATIVE 'pass priority after combat' is deferred");
+        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create vampire x4)\nPLAN: Make 4. We will pass next window once M reaches 20."),
+              "#W52-J D14 NEGATIVE 'pass next window' is deferred");
+        CHECK(!planSaysPassThisWindow("We must pass.\nCHOICE: 1 (Lolth 0)"),
+              "#W52-J D14 NEGATIVE prose BEFORE the CHOICE line is never read");
+        CHECK(!planSaysPassThisWindow("<think>We must pass.</think>\nCHOICE: 1 (Lolth 0)\nPLAN: use the 0 now."),
+              "#W52-J D14 NEGATIVE a think-block verdict is dropped");
+        CHECK(!planSaysPassThisWindow("CHOICE: 2 (Create human with Thraben Doomsayer x0)\nPLAN: Stop at M = 25. M is 26 now. Pass."),
+              "#W52-J D14 NEGATIVE a bare 'Pass.' stays with x0 (the W51-C D4b pin holds)");
+        CHECK(!planSaysPassThisWindow("CHOICE: 1 (Lolth 0)\nPLAN: Lolth's 0 passes the buck; we passed on removal earlier."),
+              "#W52-J D14 NEGATIVE 'passes'/'passed' are not the verdict word");
+        why.clear();
+        CHECK(planSaysPassThisWindow("CHOICE: 2 (Create vampire x25)\nPLAN: Stop at M = 30. M is 33 now. This window: pass.", &why)
+              && why.find("PLAN: Stop at M = 30") == 0,
+              "#W52-J D14 the W51-C PLAN-line form still fires and quotes the PLAN line");
+        //D14b: seq 47 - a counted repeat take with no PLAN line at all -> plan_missing re-ask
+        string r47 = "CHOICE: 29 (Create vampire with Lord of Lineage x17)";
+        CHECK(!replyHasPlanLine(r47) && parseRepeatCount(r47) == 17 && !planSaysPassThisWindow(r47),
+              "#W52-J D14b deck123 vs126 seq 47: x17 with no PLAN line -> plan_missing re-ask (no pass verdict to conflict with)");
+        CHECK(replyHasPlanLine(r282) && !replyHasPlanLine("<think>PLAN: x</think>\nCHOICE: 2 (Create vampire x3)"),
+              "#W52-J D14b NEGATIVE a PLAN line counts only outside the think block");
+    }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
