@@ -16,17 +16,22 @@ STEP 1 - WHAT DOES THE NEXT LOOK COST? Read the ask's "(keeping N)" number. Each
   you one card fewer and the same land odds. Colour is not a reason to ship here: nine of your
   21 lands make both colours (four Snarls and four Pathways, plus the Hives for black), so the
   second colour arrives with the second land. "No white source" was the sentence this seat
-  wrote at (keeping 5) holding a Swamp; it shipped to a three-card hand and lost. Zero lands at
-  (keeping 5) is the one hand where a fresh look is worth the card - even then, weigh it: a
-  four-card seven with one land is what you are buying.
+  wrote at (keeping 5) holding a Swamp; it shipped to a three-card hand and lost. Zero lands,
+  or nothing but lands, at (keeping 5) is the one hand where a fresh look is worth the card -
+  even then, weigh it: a four-card seven with one land is what you are buying.
 STEP 2. On your untouched opening 7, or at (keeping 6), a mulligan is a fair trade only for
   one of these four: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
-  your colors when the header shows every spell needs it; or ONE land when the hand's spells
-  cost 3 or more (you will not cast them on time; a six is usually a two-lander - ship it).
-  ONE land with mostly one- and two-drops is a judgment call on those exact cards: weigh the
-  chance of drawing land two by the turn you need it against a six-card hand, and keep only
-  when the cheap cards themselves win the early turns. The "KEEP a 7 or a 6 with 2-5 lands" line below describes
-  hands that are obviously fine - it is NOT a test, and a hand failing it is not a mulligan.
+  your colors when the header shows every spell needs it; or ONE land under the header line
+  "Playing every land in this hand would not cover any spell in it". That coverage line is
+  the engine's own arithmetic and it is the whole one-land test: one land that covers nothing
+  is a hand that casts nothing, and a six is not worth keeping for its second turn. ONE land
+  under "would cover the cost of:" naming a card is a judgment call on that card: keep when
+  that card wins the early turns by itself, ship when it does not. WHAT THIS COST: a one-land
+  six was kept here under "would not cover any spell in it" (Snarl, two Soul Shatters, a
+  Silencer, Nadaar, Barrowin, Emeria's Call); the seat drew no second land until turn 19,
+  discarded six cards at cleanup on one Snarl, and lost. The "KEEP a 7 or a 6 with 2-5
+  lands" line below describes hands that are obviously fine - it is NOT a test, and a hand
+  failing it is not a mulligan.
 - THE ENGINE COUNTS YOUR HAND FOR YOU. Every mulligan ask opens with lines like "Your hand (7
   cards), counted by the engine: 3 lands, 4 spells", "Mana sources among those lands, counted by
   the engine: {W} 2, {B} 2", "Cheapest spell in this hand: Vanishing Verse {b}{w} (mana value 2)"
@@ -44,11 +49,19 @@ STEP 2. On your untouched opening 7, or at (keeping 6), a mulligan is a fair tra
   Awakening, a second planeswalker, then the priciest card left). A hand of nothing but lands
   draws one card a turn and casts it a turn late every time - at N of 3 that is two lands and
   your cheapest spell, never three lands; at N of 5 or 6 it is three or four lands and the spells
-  they cover. Hive of the Eye Tyrant IS a land for this count. Bottom a land only when the
-  lands left would still cover the spells you are keeping. WHAT THIS COST: from a (keeping 3)
-  look holding three lands, Kaya, Pelakka Predation and two Soul Shatters, this seat's plan said
-  "cast Kaya" and its bottom answer put Kaya and every other spell under the deck; it kept
-  Plains, Pathway, Snarl and lost with sixteen decisions and no cast before turn 10.
+  they cover. Hive of the Eye Tyrant IS a land for this count. A LAND GOES UNDER ONLY FROM A
+  KEEP OF FIVE OR MORE LANDS: with two lands or fewer in front of you the PUT line holds spell
+  numbers only - those lands are the whole reason the keep was priced at all. Write the PUT
+  line as the numbers of the highest-cost spells, most expensive first, and read it against
+  your own plan sentence before you send it: a plan that says "play Snarl and Pathway" with
+  Pathway's number in the PUT line is the plan bottoming itself. WHAT THIS COST, twice: from a
+  (keeping 3) look holding three lands, Kaya, Pelakka Predation and two Soul Shatters, this
+  seat's plan said "cast Kaya" and its bottom answer put Kaya and every other spell under the
+  deck; it kept Plains, Pathway, Snarl and lost with sixteen decisions and no cast before turn
+  10. And from a (keeping 5) look holding Pathway, Snarl, Kaya, Nadaar, Barrowin, Adventurer
+  and Verse, the plan said "play Shineshadow Snarl and Brightclimb Pathway" and the PUT line
+  sent Pathway and Kaya under; the seat sat on two lands from turn 3 to turn 14 with Lolth,
+  Nadaar and Barrowin in hand and lost 0 to 35.
 - KEEP a 7 or a 6 with 2-5 lands including a white source and a black source. Shineshadow Snarl
   alone counts as BOTH colors. Brightclimb Pathway is your white source, Hive and Swamp are black.
 - "Prefer a hand with an early play" is a TIEBREAKER between two keepable hands, NOT a requirement.
@@ -73,8 +86,9 @@ THE WHOLE CAST ORDER, ONE LIST. At every "which card do you cast now" ask on YOU
 your numbered options top to bottom and take the FIRST line that matches. Stop there - do not read
 the rest of the list, and do not weigh a later line against an earlier one.
  1. A removal spell (Vanishing Verse, Soul Shatter) when the opponent's battlefield line shows a
-    creature or planeswalker you can hit - and for Vanishing Verse, only when its target list names
-    one of THEIRS. See #1 RULE.
+    creature you can hit - and for Vanishing Verse, only when its target list names one of THEIRS
+    (a planeswalker or an enchantment of theirs on that list counts too; Soul Shatter needs a
+    CREATURE on their line and does nothing on a board of only a planeswalker). See #1 RULE.
  2. LOLTH or KAYA, if either is on the list. A planeswalker in hand does nothing. The mana you have
     this turn is the only mana you are sure of: "I will cast her next turn" is how a bomb ends the
     game in your hand, and this deck's mana goes DOWN as often as up. Cast her now and start
@@ -123,6 +137,12 @@ attack costs you life.
   not card type: an artifact creature that costs {1}{B} is monocolored black and IS a legal target.
   THE OPTION LINE'S TARGET LIST IS THE ONLY TRUTH ABOUT WHAT IT CAN HIT. Read it and obey it:
   * "legal targets right now: X, Y" -> those are your choices. Fire it at their best one.
+  * That list names "Sanguine Bond" or "Exquisite Blood" -> exile THAT, above any creature on
+    the list. Each is a monocolored black enchantment - Verse's cleanest target in the game -
+    and the two together are the one board this deck cannot come back from (see DECIDING
+    SITUATIONS). Kaya's -3 takes either one the same way. WHAT THIS COST: Verse was spent on a
+    0/4 wall on turn 4; Sanguine Bond landed on turn 16 with no answer left, Exquisite Blood
+    on turn 26, and the first lifelink attack after that ended the game from 11 life.
   * "the only legal targets are YOUR OWN right now" -> DO NOT CAST IT. There is nothing on their
     side you can hit. Do something else this turn and keep the card; do not spend a whole
     deliberation arguing with the list, and do not exile your own permanent to "use" the card.
@@ -437,14 +457,22 @@ no graveyard, and no board that makes it a good cast. Cast a creature or hold re
 DECIDING SITUATIONS (recognize -> do):
 - Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> any damage you
   deal them and any life they gain repeats without limit. ATTACK: none, whatever the tags say,
-  until one is gone; block every "[lifelink]" attacker you are offered a block for.
-- The mulligan ask says "(keeping 5)" or fewer and the hand has a land -> keep it; a fresh
-  seven shaved to four is the same land odds with one card fewer, and a missing colour arrives
-  with the next land (nine of 21 make both).
+  until one is gone. A "[lifelink]" attacker of theirs on that board ends the game whether you
+  block it or not: it deals its damage to your blocker, they gain, and the gain chains - the
+  B-row's "(you kill it, your blocker lives (lifelink: they gain 1 ...))" is that chain's first
+  link, and "there is no loop" is the sentence this seat wrote one window before it lost. So
+  the pair is answered BEFORE it closes: the turn ONE of the two names is on their line or in
+  Verse's target list, Verse or Kaya -3 takes it above every creature.
+- Verse's "legal targets right now:" list, or Kaya's -3 list, names Sanguine Bond or Exquisite
+  Blood -> take it, above any creature.
+- The mulligan ask says "(keeping 5)" or fewer and the hand has a land and a spell -> keep it;
+  a fresh seven shaved to four is the same land odds with one card fewer, and a missing colour
+  arrives with the next land (nine of 21 make both).
 - You kept, and the game asks which cards to bottom -> read "You will be left with an N-card
   hand" and build the best N: the lands that cover your cheapest spells, those spells, and the
   expensive cards under the deck (Emeria's Call, Agadeem's Awakening, spare planeswalkers).
-  Never all lands; Hive of the Eye Tyrant counts as a land.
+  Never all lands; Hive of the Eye Tyrant counts as a land; and never a land from a keep of
+  two lands or fewer - the PUT line there is spell numbers only.
 - The engine's hand header says "2 lands" -> it is a two-land hand. Use its count, not your own.
 - Opponent has a real creature/planeswalker and you can remove it, and you are not ahead ->
   fire Vanishing Verse (read its target list) or Kaya -3 (any nonland) NOW; do not hold it.

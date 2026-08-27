@@ -69,6 +69,18 @@ a priority option beginning "cycling with " and ending "Cycle]", and a cast menu
                      screen, it costs {3}, and the card it draws was the land that game needed.
                      NEVER announce X=0. If the only X you can afford is 0, you are not casting
                      this spell.
+                     THE CAST ROW TELLS YOU BEFORE YOU COMMIT. "{X pricing: your mana affords
+                     only X=0 right now, which deals 0 damage and kills nothing}" and "{X
+                     pricing: max affordable X=N ...; even at X=N NOTHING on the board dies}"
+                     both mean: not this window. This deck read "even at X=2 NOTHING on the
+                     board dies", wrote "Cast Starstorm at X=2 to kill Shield Sphere" (a 0/6),
+                     took "Cast Card Normally", found X=2 and X=1 both reading "kills THEIRS:
+                     none", answered X=1, and spent its only sweeper on nothing on turn 6 of a
+                     game it lost on turn 11. A Shield Sphere has toughness 6; the row had
+                     already done that arithmetic.
+                     AND IF YOU ARE ALREADY ON THE "Choose an option" MENU BY MISTAKE, its
+                     third row reads "Decline - do nothing": that row is the way back. On the
+                     X menu itself there is no way back - every row spends the card.
 
 AND: when the line reads "Phase: Upkeep | It is your turn", answer CHOICE: 0 (pass) unless the option
 in front of you destroys a land or kills a creature. Cycling in your own upkeep spends the mana that
@@ -146,6 +158,16 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
                collapsed run is a mana thrown away for nothing, and this deck did it twice.
        STEP 3. If a row's "YOURS:" names RORIX BLADEWING or SIEGE-GANG COMMANDER, that row and
                every row above it is out - go back to (a) above and do not cast at all.
+               DECIDE (a) AND (b) AT THE CAST ROW, NOT ON THE X MENU. The cast row's own
+               "{X pricing: ... At X=N - kills THEIRS: ...; YOURS: ...}" prints the same two
+               lists; once you have answered "Cast Card Normally" the X menu has no "cast
+               nothing" row and every row spends the card. This deck reached the X menu with
+               the Commander on its line, found every killing X reading "YOURS: Siege-Gang
+               Commander", wrote "without killing Siege-Gang Commander" in its plan and
+               answered X=3 - which killed him for one 0/3 Pride Guardian; two turns later it
+               cast the second Starstorm at X=4 to kill a lone Overgrown Battlement (0/4,
+               defender), (b) to the letter. Both cards were the sweepers that game needed
+               against the Sanguine Bond that arrived on turn 15.
      The cast row one screen earlier leads with "smallest X that kills an OPPONENT creature".
      That is a fact about the cheapest kill, not a recommendation: the same annotation prints
      "At X=N - kills THEIRS: ..." for the bigger number right beside it. Read to the end of it.
@@ -159,6 +181,15 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
   2. An opponent CREATURE whose printed toughness this damage reaches -> aim there. Spark Spray
      kills 1 toughness; Pyrite Spellbomb kills 2; Hammer of Bogardan kills 3. The battlefield line
      prints each creature's CURRENT (P/T) - read it, do not rebuild it from base stats.
+     A SPELL'S target list prints the result - "Goblin (1/1) {right now: takes 3 damage - DIES}",
+     "Rorix Bladewing (6/5) {right now: takes 3 damage - SURVIVES (toughness 5)}" - and you
+     read it. An ABILITY'S rows ("Deal 2 damage with Siege-Gang Commander targeting Fate
+     Unraveler", "Deal 2 damage with Pyrite Spellbomb targeting Ob Nixilis") print NO result:
+     there you do the read yourself, off the (P/T) or the "[counters: Nx loyalty]" on their
+     battlefield line. 2 damage kills toughness 2 and loyalty 2, and nothing bigger. At 4
+     life, under two draw punishers, this deck sacrificed a Goblin for 2 damage at Fate
+     Unraveler (3/4) - the Unraveler lived, the Goblin died, and the draw step killed the
+     deck. The window before, it had sent a Spellbomb's 2 at Ob Nixilis at 3 loyalty.
   3. An opponent creature this will not kill but that is attacking you every turn -> aim there
      anyway rather than bank the card.
   4. Only then "The opponent (player, life" - and only when that number is 6 or less, so the damage
@@ -221,6 +252,13 @@ these entries, never a separate instruction.
     what is left on the land.
  2. A single-target damage spell (Pyrite Spellbomb, Spark Spray, Hammer of Bogardan) aimed by
     rule #2 - a planeswalker first, then a creature whose printed toughness it reaches.
+    A TOKEN-MAKER BESIDE AN INTRUDER ALARM IS THE CREATURE THIS ENTRY EXISTS FOR, and it
+    outranks entry 4. Thraben Doomsayer is a 2/2: Hammer of Bogardan kills it, so does a
+    Spellbomb. With "Thraben Doomsayer" and "Intruder Alarm" on their line, six mana, and
+    "Cast Hammer of Bogardan ... legal targets right now: Thraben Doomsayer" on the menu,
+    this deck cast Siege-Gang Commander and wrote "use Hammer to kill Thraben Doomsayer if
+    needed"; on their next turn the Doomsayer made nineteen Humans, and the game ended at
+    -34. The maker dies THIS window; the body comes after.
  3. STONE RAIN, MOLTEN RAIN or LAY WASTE at one of their lands, while their battlefield shows
     FOUR OR FEWER lands. This is the deck's job; do not hold it for a better target.
  4. RORIX BLADEWING at six lands, or SIEGE-GANG COMMANDER at five - but never into a board where
@@ -241,7 +279,12 @@ Activate him only while the LAND PLAN is still worth a card - the same gate ever
 destruction spell here carries: their battlefield shows FOUR OR FEWER lands. Past that, his
 {2}{R} is three mana spent on nothing, and this deck spent it at 11 life and again at 5 life
 against a seven-land board with a 4/4 flier untapped in front of it, and died on the next swing.
-AND A LIFE FLOOR ON THE WHOLE LAND PLAN: at 8 life or less, stop destroying lands. Land
+AND A LIFE FLOOR ON THE WHOLE LAND PLAN: at 8 life or less, stop destroying lands. At 2
+life this deck cast Molten Rain off two Talismans of Impulse - the "Paid" line read
+"Talisman of Impulse #1, Talisman of Impulse #2" - and went to 1 for a land that changed
+nothing. When the screen prints "CAUTION - some usable mana sources DAMAGE YOU when tapped
+for mana" and your life is 3 or less, a spell that needs the Talisman costs life you do not
+have. Land
 destruction wins a game you are going to be alive to finish; every point below 8 says you are
 not. Spend the mana on a damage spell aimed at the creature that is actually killing you, or on
 a body, and if neither is on the menu, pass and keep the mana for their turn.
@@ -275,7 +318,11 @@ that upkeep screen before you answer it. Siege-Gang Commander or Rorix Bladewing
 lands on your line enough to cast it this turn: answer "CHOICE: 0 (pass)" to the return - the
 five it costs is the body's mana. This deck paid the five at six lands with the Commander in
 hand, twice in one game, and cast nothing that turn but a Hammer at a 4/4 whose target row
-already read "takes 3 damage - SURVIVES".
+already read "takes 3 damage - SURVIVES". The corpus after that one it did it again: five
+sources, the Commander in hand, "CHOICE: 5 (Put a card into hand with Hammer of Bogardan)"
+over a plan that said, in its own words, "wait, I have 5 mana, Siege-Gang is {3}{R}{R}, so
+I can cast it". The upkeep ask comes FIRST; the answer to it is the hand line, not the
+Hammer.
 PYRITE SPELLBOMB: cast it for {1} on any turn with a spare mana and leave it on the battlefield as a
 loaded gun for their first 2-toughness creature. Use its draw mode only when their battlefield line
 reads "of which 0 are creatures".
@@ -310,6 +357,13 @@ formality.
 Only when you WIN the race, or when their untapped creatures total 0 power, or under the carve-out
 above, go on to the floor.
 
+WALL CHECK, BEFORE THE FLOOR: their battlefield line names PERIMETER CAPTAIN or PRIDE
+GUARDIAN. Their tags say what a block costs you - "(neither dies (blocking trigger: they may
+gain 2))" - and every one of your attackers they block is life for them: this deck sent the
+Commander and two Goblins into a Captain and a Guardian and watched 21 become 30 in one
+combat, with Exquisite Blood already on their line. "ATTACK: none" while either name is on
+that line; they die to a Spellbomb, a Goblin sacrifice or a Starstorm first, and THEN the
+floor applies.
 ATTACK FLOOR - read the "Your creatures that can attack:" list, then take the first case that
 applies. FIRST: if Dwarven Blastminer is the ONLY creature on that list, answer "ATTACK: none" -
 always, and stop reading. He is worth {2}{R} of land destruction every turn he stays untapped, and
@@ -349,6 +403,18 @@ BLADEWING: those are cards, they are the only bodies this deck has, and Siege-Ga
 ability needs Siege-Gang alive. Trading either one for a 2/2 token the opponent will replace is
 not an even trade even though the parenthesis says both creatures die. Send a Goblin instead, or
 take the damage while the combat header's "you would be at N" is above 5.
+THE ONE "(both die)" THE COMMANDER DOES TAKE: the attacker is THRABEN DOOMSAYER or BLOODLINE
+KEEPER - a token-MAKER. That creature is their engine and it is attacking into you; the
+Commander for the maker is the trade of the game, and this deck made it, correctly, at 20
+life against a Doomsayer that had already made nineteen Humans.
+A GANG BLOCK THAT KILLS THE ATTACKER IS A DIFFERENT QUESTION FROM DAMAGE. The header prints
+it when it exists: "[GANG BLOCK: your 3 biggest together deal 4, enough to kill this
+attacker; ...]". When that attacker is a DRAW PUNISHER named on the "DRAW PUNISHERS" line,
+or the only creature hitting you, and your life minus its "deals N" is 5 or less, put every
+blocker the clause counts on it - the Goblins you lose are the draw steps you keep. At 7
+life under Fate Unraveler and Ob Nixilis, with "your 3 biggest together deal 4, enough to
+kill this attacker" on the screen, this deck answered "BLOCKS: none", went to 4, and died in
+its next draw step to the Unraveler it could have killed.
 ONE BLOCKER STOPS THE WHOLE OF ONE ATTACKER'S DAMAGE. A second and a third of yours on the same
 attacker stop nothing more - they only die with the first. At 13 life this deck put all three
 Goblins in front of a single 3/4 and lost all three to save 3 life it did not need (the header
@@ -444,7 +510,26 @@ DECIDING SITUATIONS (recognise -> do)
   (pass); cast the body in main phase 1.
 - Their battlefield line names Thraben Doomsayer or Bloodline Keeper beside an Intruder Alarm
   and Starstorm is castable -> Starstorm FIRST this turn, at the X whose THEIRS list names the
-  maker; land destruction after, with what is left.
+  maker; land destruction after, with what is left. No Starstorm: Hammer of Bogardan (3) or a
+  Spellbomb (2) at the Doomsayer (2/2) THIS window, before Siege-Gang, before Rorix.
+- The Starstorm cast row reads "even at X=N NOTHING on the board dies" or "affords only X=0"
+  -> "Cast nothing right now". On a "Choose an option for Starstorm" menu you did not mean
+  to reach -> "Decline - do nothing".
+- The cast row's "At X=N ... YOURS:" names Siege-Gang Commander or Rorix at every X that
+  kills something of theirs -> do not answer "Cast Card Normally" at all; the X menu has no
+  exit.
+- A "Deal N damage with <Siege-Gang Commander / Pyrite Spellbomb> targeting <creature>" row
+  and that creature's line shows toughness above N (or "[counters: Mx loyalty]" above N) ->
+  not that row; ability rows print no DIES/SURVIVES, you read the toughness yourself.
+- The blockers header prints "GANG BLOCK: your N biggest together deal X, enough to kill this
+  attacker" on a creature named on the "DRAW PUNISHERS" line, and your life minus its "deals
+  N" is 5 or less -> all N blockers on it.
+- Their battlefield line names Perimeter Captain or Pride Guardian -> "ATTACK: none"; kill
+  them with a Spellbomb, a Goblin sacrifice or a Starstorm first.
+- The attacker on the blockers screen is Thraben Doomsayer or Bloodline Keeper and the
+  Commander's row reads "(both die)" -> take it; a maker for the Commander is the trade.
+- "CAUTION - some usable mana sources DAMAGE YOU" is on the screen and your life is 3 or
+  less -> nothing that needs a Talisman to pay for it.
 - Every row on a damage or destroy window is tagged "[your battlefield]" -> CHOICE: 0 (pass).
   Never a row that names your own permanent after "targeting".
 - The Starstorm you are about to cast leaves alive creatures whose power still totals your

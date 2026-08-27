@@ -273,9 +273,14 @@ THE ONE ARITHMETIC STEP, EVERY BLOCK WINDOW: read the header's "you would be at 
 if the only one offered is rung 3, take that. N of 10 or more and rung 3 is the only offer means
 "BLOCKS: none". That is the whole decision; a two-line "BLOCKS: none" answer that never mentions
 N is an answer that skipped the ladder.
-Katilda is a mana source, not a
-trading piece: she blocks to save your life, never to swap with a 1/1 mana creature - and she
-joins INFECT blocks only from "8 of 10" poison upward (see the infect rule for the exact test).
+KATILDA'S B-ROW: a Katilda line whose parenthesis reads "(both die)" or "(your blocker dies,
+attacker lives)" is not assigned while the header's "you would be at N" is 10 or more. She is
+your mana engine and every Human's mana ability, and a token is never worth her. At N of 9
+or less she blocks like everything else, and she joins INFECT blocks only from "8 of 10"
+poison upward (see the infect rule for the exact test). WHAT THIS COST: at 17 life this seat
+put Katilda in front of a 1/1 Goblin token on a "(both die)" line, and at 20 life in front of
+a 3/3 Human token on another; both times she died for a token and the Humans stopped making
+mana.
 
 YOUR PLAN IS A MEMO TO YOURSELF, NOT A RULE. Re-derive every decision from the CURRENT
 SITUATION in front of you; when the board has moved on, rewrite the plan - rewriting costs
@@ -317,6 +322,17 @@ YOUR LORDS AND GROWTH:
 - RANGER CLASS ({1}{G}): cast it for the 2/2 Wolf immediately. Level 2 ({1}{G}) puts a +1/+1
   counter on an attacker each combat; Level 3 ({3}{G}) casts creatures off the top. Level with
   SPARE mana only - never instead of casting a creature.
+- LAIR OF THE HYDRA is a land that taps for {G} and, for {1}{G}, becomes a 1/1 Hydra until
+  end of turn (the row reads "becomes a 1/1 hydra with Lair of the Hydra [cost: {1}{g}]"). It
+  is offered in your UPKEEP and again in your main phases. Two forms of that row are a PASS on
+  sight: one printed "[this land is TAPPED: animated, it still cannot attack this turn]" (two
+  mana for a 1/1 that does nothing), and one printed "[repeat: activated this turn N times
+  already]" (you already bought this 1/1 this turn; a second payment adds nothing). Otherwise
+  animate it in MAIN 1 only, only with mana left after the creature you are casting this
+  turn, and only when its A-line would read "[no creature they control can block this
+  attacker]" - a 1/1 into any blocker is two mana for nothing. WHAT THIS COST: this seat
+  animated a [this land is TAPPED] Lair twice and paid the [repeat:] row twice in one corpus
+  - eight mana for no damage.
 
 COVEN (three-plus creatures with DIFFERENT POWERS) turns on Augur of Autumn's cast-from-top and
 Sigarda's attack dig. It happens by itself from playing a mix of bodies - do not count powers,
@@ -513,6 +529,11 @@ DECIDING SITUATIONS (recognize -> do):
 - The "Those sources, one per untapped card:" list names a creature you mean to attack with ->
   do not cast in Main 1; casting taps that creature. Attack first, cast it in Main 2.
 - "put 1/1 counters with Katilda" is offered in Upkeep or Main 1 -> pass; it is a Main-2 action.
+- The Lair of the Hydra row prints "[this land is TAPPED: ...]" or "[repeat: activated this
+  turn ...]" -> pass; an untapped Lair is animated in Main 1 with spare mana only, and only
+  when nothing they control can block a 1/1.
+- Katilda's block line reads "(both die)" or "(your blocker dies, attacker lives)" and "you
+  would be at N" is 10 or more -> she stays out of the block.
 - A "DRAW PUNISHERS" line is printed, a "Draw 1 with Clue" row is offered, and your printed life
   is 10 or less -> pass; the draw costs the N the line prints.
 - The mulligan ask says "(keeping 5)" or fewer and the hand has a land -> keep it (RULE -1): a

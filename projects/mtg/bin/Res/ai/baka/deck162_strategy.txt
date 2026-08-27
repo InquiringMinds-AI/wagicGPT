@@ -61,6 +61,12 @@ Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box, Forced Fruition and Maste
 give the OPPONENT cards - their card text says "each player" or "each opponent". They are damage
 only while a punisher is on the battlefield to convert those cards into damage.
 Look at YOUR battlefield line and count the names Underworld Dreams, Fate Unraveler and Ob Nixilis.
+LILIANA'S CARESS ON YOUR BATTLEFIELD COUNTS AS ONE OF THEM once the "Opponent hand size:" line
+reads 7 or more: every extra card a Mine, a Dictate or a Puzzle Box hands them past seven is a
+card they discard at their cleanup, and Caress makes each discard 2 life - a converter that
+needs no draw trigger. WHAT THIS BOUGHT: with Caress out and no punisher, two Mines, a
+Dictate and a Puzzle Box took a full-handed opponent from 20 to 8 in three turns (2, 2+2,
+2+2+2 at their cleanups) before the first Underworld Dreams landed.
 - ONE OR MORE of them on your battlefield: cast every draw engine you are offered, every turn, as
   fast as you can - each one multiplies the damage. This is where the deck wins. Stack Mines,
   Dictates and Puzzle Boxes without limit, with ONE ordering rule that never lapses: if a second
@@ -189,7 +195,13 @@ UNDERWORLD DREAMS {b}{b}{b} - enchantment, 1 damage to the opponent per card the
 FATE UNRAVELER {3}{b} - 3/4 creature with the same trigger. It is a punisher that also blocks.
 OB NIXILIS, THE HATE-TWISTED {3}{b}{b} - planeswalker, enters with 5 loyalty, same trigger, and
   "-2: Destroy target creature. Its controller draws two cards." The -2 is removal AND two more
-  draws to punish. Aim it FIRST at a creature whose printed text makes more creatures - Thraben
+  draws to punish - a draw step you control: the two cards fire every punisher you have, 2 x P
+  damage the moment it resolves, on any creature of theirs, wall or token. When 2 x P is at or
+  above their printed life, -2 the first creature of theirs on the list and the game ends there
+  (the priority window that offers it comes before combat and before their next draw step, so
+  do not wait for a draw step that may not come). WHAT THIS COST: at their 3 life with four
+  punishers out (2 x 4 = 8), this seat passed the -2 twice with six walls on the list and let
+  the win wait for their draw step. Aim it FIRST at a creature whose printed text makes more creatures - Thraben
   Doomsayer, Bloodline Keeper, Siege-Gang Commander, any row whose text says "create" or "put a
   ... token" - and only then at the biggest body. A 1/1 token is never the target while its maker
   is on the same list: this seat killed a Human token beside a Thraben Doomsayer and faced
@@ -286,7 +298,9 @@ attacker you are sending - then run the lethal check below, swing with everythin
 
 === LETHAL CHECK - RUN IT EVERY TURN ===
 Count the punisher names on your battlefield (Underworld Dreams, Fate Unraveler, Ob Nixilis) - call
-that P. Count your Howling Mines, Dictates and Puzzle Boxes - each Mine or Dictate is 1 extra
+that P. FIRST, THE BURST YOU CONTROL: if Ob Nixilis is on your battlefield with 2 or more loyalty
+and any creature of theirs is on his -2 list, that -2 is 2 x P damage NOW - at or above their
+printed life, take it and stop counting. Then the slow count: your Howling Mines, Dictates and Puzzle Boxes - each Mine or Dictate is 1 extra
 opponent card per turn, a Puzzle Box is their hand size. Multiply the extra cards by P, add 1 x P
 for their normal draw, and add the power of your unblocked attackers. If that total is at or above
 the number printed as the opponent's life, attack with everything including Fate Unraveler and cast
@@ -304,7 +318,8 @@ The question is always: is this seven more likely to win than a fresh six? Weigh
 facts. You run 26 lands, so a third land by turn three and a fourth by turn five are both likely,
 and a six you ship is most often a two-lander again. Your punishers cost three to five, so you
 need to reach four or five mana on time - that is what the land count is for.
-- TWO OR MORE LANDS: KEEP. Not a close call.
+- TWO OR MORE LANDS AND AT LEAST ONE SPELL: KEEP. Not a close call. ALL LANDS: ship - it casts
+  nothing.
 - ONE LAND ON THE UNTOUCHED SEVEN: ship it. Your cheap plays are Shield Sphere {0} and Fog
   Bank/Howling Mine at two, and none of them advances the plan; everything that wins costs three
   or more, so one land means four or five turns of waiting against a deck that is attacking you,
@@ -371,7 +386,11 @@ below that a land is never the right card to lose.
   biggest ones until what still gets through is below your life, and among the assignments that
   survive take the one leaving you the MOST life - then use the numbered rules for what is left.
 - No Underworld Dreams, no Fate Unraveler and no Ob Nixilis on your battlefield, and a Howling Mine
-  is already out: cast a wall or a Liliana's Caress - or "Cast nothing right now".
+  is already out: cast a wall or a Liliana's Caress - or "Cast nothing right now". A Caress
+  already on your line with their hand at 7 or more lifts that brake: the extra cards are
+  discards, and discards are damage.
+- Ob Nixilis's -2 is offered, any creature of theirs is on its list, and 2 x P (your punisher
+  count) is at or above their printed life: take it - they draw two, and the game ends.
 - A punisher IS on your battlefield: cast every Howling Mine, Dictate, Puzzle Box and Forced
   Fruition you are offered, every turn.
 - "Cast Shield Sphere {0}" is in the list: take it.
