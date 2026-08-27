@@ -11,7 +11,7 @@ game dir projects/mtg. READ FIRST, in order:
 3. Your seats' wave-50 file(s) in projects/mtg/strategy-design/wave50/seats/ (rung state,
    open predictions), and the live guides projects/mtg/bin/Res/ai/baka/deckN_strategy.txt.
 
-CORPUS: ~/.Wagic/ai/gpt/selfplay-runs/MATCHUPS_DIR/ — one JSONL per SEAT
+CORPUS: ~/.Wagic/ai/gpt/selfplay-runs/matchups-20260827-155545/ — one JSONL per SEAT
 (filename ...deckA-<ptr>-vs-...deckB = the deckA seat). Records: {seq, kind, prompt, reply,
 choice, chosen_text, options, turn, phase, my_life, opp_life, latency_ms, fallback?}. The
 `prompt` is the full per-decision message (narration + CURRENT SITUATION + plan + legal

@@ -1,0 +1,450 @@
+# wave-51 lategame specimen: 1787864173-ai_baka_deck125-0x55930f89abe0-vs-ai_baka_deck146.jsonl seq 108 turn 80 phase Main phase 1 options 4 prompt 25474 chars
+
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - Essence Scatter x2, Path to Exile; opponent - Triumphant Adventurer x3, Silverquill Silencer x3, Lolth, Spider Queen, Acererak the Archlich, Emeria's Call, Barrowin of Clan Undurr x2, Silverquill Command x4, Shineshadow Snarl, Swamp x2, Brightclimb Pathway, Plains, Soul Shatter, Nadaar, Selfless Paladin, Agadeem's Awakening, Kaya the Inexorable; exiled at trim: you - Cancel, Path to Exile, Staff of Nin, Sphinx's Revelation, Fall of the Gavel, Final Judgment; opponent - Silverquill Silencer, Nadaar, Selfless Paladin, Triumphant Adventurer)
+- Opponent's Plains entered the battlefield from the opponent's library
+=== Turn 41 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Emeria's Call
+- Opponent's Emeria's Call created a 4/4 Angel token
+- Opponent's Emeria's Call created a 4/4 Angel token
+- Opponent's Emeria's Call resolved and went to the opponent's graveyard
+=== Turn 42 - YOUR turn ===
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- Paid {w} for Path to Exile with Plains #1
+- You targeted Angel #1 (4/4) with Path to Exile
+- You cast Path to Exile (that Path to Exile was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Angel was exiled from the battlefield (that Angel was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Angel (token) ceased to exist and left the opponent's exile
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Opponent's Plains entered the battlefield from the opponent's library
+- Paid {w} for Path to Exile with Plains #2
+- You cast Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Angel was exiled from the battlefield
+- Opponent's Angel (token) ceased to exist and left the opponent's exile
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Opponent's Plains entered the battlefield from the opponent's library
+=== Turn 43 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Hive of the Eye Tyrant
+=== Turn 44 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- Phase: Main phase 2
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #2; Island #3
+- You gained 5 life (now 35)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (12 cards) into your library with Elixir of Immortality
+=== Turn 45 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Barrowin of Clan Undurr
+- Paid {1}{u}{u} for Cancel with Island #4; Island #5; Plains #1
+- You cast Cancel
+- Opponent's Barrowin of Clan Undurr was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 46 - YOUR turn ===
+- Phase: Draw
+- You drew Fall of the Gavel
+=== Turn 47 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Shineshadow Snarl
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Blockers
+- Opponent used: exile card with Hive of the Eye Tyrant targeting Cancel
+- Your Cancel was exiled from your graveyard
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 32)
+=== Turn 48 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+=== Turn 49 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent's Kaya the Inexorable got a loyalty counter
+- Opponent used: +1: don't target any creature with Kaya the Inexorable
+- Phase: Main phase 2
+- Opponent cast Silverquill Command
+- Paid {3}{u}{w} for Fall of the Gavel with Island #1; Plains #1; Island #2; Island #3; Island #4
+- You cast Fall of the Gavel
+- Opponent's Silverquill Command was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 37)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 50 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #2; Island #3
+- You gained 5 life (now 42)
+- Your Elixir of Immortality was put into your library from the battlefield
+- Your Fall of the Gavel was put into your library from your graveyard
+=== Turn 51 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+=== Turn 52 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+=== Turn 53 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Silverquill Silencer
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter
+- Opponent's Silverquill Silencer was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 54 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+=== Turn 55 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Shineshadow Snarl
+- Phase: Main phase 2
+- Opponent's Kaya the Inexorable lost 7 loyalty counters (now 0)
+- Opponent's Kaya the Inexorable was put into the opponent's graveyard from the battlefield
+- Opponent used: -7: emblem cast during upkeep with Kaya the Inexorable
+=== Turn 56 - YOUR turn ===
+- Phase: Draw
+- You drew Lightmine Field
+=== Turn 57 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Nadaar, Selfless Paladin
+- Opponent's Nadaar, Selfless Paladin resolved and entered the battlefield
+- Opponent used: choose a new dungeon with Nadaar, Selfless Paladin targeting Lost Mine of Phandelver
+- Opponent's Lost Mine of Phandelver moved from the opponent's zone to the opponent's zone
+- Opponent ventured into Lost Mine of Phandelver: venture step 1 of that run
+- Opponent revealed their Shineshadow Snarl from their library
+- Opponent used: Place on top with Lost Mine of Phandelver
+- Opponent put the revealed Shineshadow Snarl into their library
+=== Turn 58 - YOUR turn ===
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- Paid {w} for Path to Exile with Plains #1
+- You cast Path to Exile (that Path to Exile was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Nadaar, Selfless Paladin was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Swamp
+- Opponent's Swamp entered the battlefield from the opponent's library
+=== Turn 59 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Triumphant Adventurer
+- Opponent's Triumphant Adventurer resolved and entered the battlefield
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Blockers
+- Opponent used: exile card with Hive of the Eye Tyrant targeting Path to Exile
+- Your Path to Exile was exiled from your graveyard
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 39)
+=== Turn 60 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+- Paid {15} for Emrakul, the Aeons Torn with Island #1; Island #2; Island #3; Island #4; Island #5; Island #6; Island #7; Plains #1; Plains #2; Tundra #1; Seachrome Coast #1; Tundra #2; Seachrome Coast #2; Glacial Fortress; Tundra #3
+- You cast Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn resolved and entered the battlefield
+=== Turn 61 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Attackers
+- You declared attackers: Emrakul, the Aeons Torn
+- Phase: Blockers
+- Opponent used: Sacrifice with Emrakul, the Aeons Torn targeting Triumphant Adventurer, Shineshadow Snarl #1, Swamp #1, Brightclimb Pathway, Plains #1, Swamp #2
+- Opponent's Triumphant Adventurer died
+- Opponent's Shineshadow Snarl was put into the opponent's graveyard from the battlefield (that Shineshadow Snarl was 1 of 3 copies on the opponent's battlefield; the other 2 are still there)
+- Opponent's Swamp was put into the opponent's graveyard from the battlefield (that Swamp was 1 of 3 copies on the opponent's battlefield; the other 2 are still there)
+- Opponent's Brightclimb Pathway was put into the opponent's graveyard from the battlefield
+- Opponent's Plains was put into the opponent's graveyard from the battlefield (that Plains was 1 of 6 copies on the opponent's battlefield; the other 5 are still there)
+- Opponent's Swamp was put into the opponent's graveyard from the battlefield (that Swamp was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Phase: Combat damage
+- Your Emrakul, the Aeons Torn dealt 15 damage to the opponent (now 5)
+- Phase: Main phase 2
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Island #1; Tundra #1; Island #2; Seachrome Coast #1; Island #3; Island #4; Tundra #2; Plains #1; Seachrome Coast #2; Plains #2; Island #5; Island #6; Glacial Fortress; Tundra #3; Island #7
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- Opponent cast Soul Shatter
+- Opponent's Soul Shatter resolved and went to the opponent's graveyard
+- You used: sacrifice a creature or planeswalker with Soul Shatter targeting Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn died
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (2 cards) into your library with Emrakul, the Aeons Torn
+- You gained 3 life (now 42)
+- You drew Seachrome Coast
+- You drew Essence Scatter
+- You drew Essence Scatter
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Seachrome Coast
+=== Turn 62 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Kaya the Inexorable from the opponent's graveyard
+- Opponent's Kaya the Inexorable resolved and entered the battlefield
+- Opponent's Kaya the Inexorable got 5 loyalty counters (now 5)
+- Phase: Draw
+- Opponent drew a card
+=== Turn 63 - YOUR turn ===
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 64 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Kaya the Inexorable from the opponent's graveyard
+- Opponent's Kaya the Inexorable resolved and entered the battlefield
+- Opponent's Kaya the Inexorable #2 got 5 loyalty counters (now 5)
+- Opponent used: Put a card into the graveyard with Kaya the Inexorable targeting Kaya the Inexorable #1
+- Opponent's Kaya the Inexorable was put into the opponent's graveyard from the battlefield (that Kaya the Inexorable was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Swamp
+=== Turn 65 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- Paid {6} for Staff of Nin with Island #1; Island #2; Island #3; Island #4; Island #5; Island #6
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 4)
+=== Turn 66 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Kaya the Inexorable from the opponent's graveyard
+- Opponent's Kaya the Inexorable resolved and entered the battlefield
+- Opponent's Kaya the Inexorable #2 got 5 loyalty counters (now 5)
+- Opponent used: Put a card into the graveyard with Kaya the Inexorable targeting Kaya the Inexorable #1
+- Opponent's Kaya the Inexorable was put into the opponent's graveyard from the battlefield (that Kaya the Inexorable was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent's Kaya the Inexorable lost 3 loyalty counters (now 2)
+- Opponent used: -3: exile non-land permanent with Kaya the Inexorable targeting Staff of Nin
+- Your Staff of Nin was exiled from the battlefield
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Blockers
+- Opponent used: exile card with Hive of the Eye Tyrant targeting Sphinx's Revelation
+- Your Sphinx's Revelation was exiled from your graveyard
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 39)
+=== Turn 67 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #2; Island #3
+- You gained 5 life (now 44)
+- Your Elixir of Immortality was put into your library from the battlefield
+=== Turn 68 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Kaya the Inexorable from the opponent's graveyard
+- Opponent's Kaya the Inexorable resolved and entered the battlefield
+- Opponent's Kaya the Inexorable #2 got 5 loyalty counters (now 5)
+- Opponent used: Put a card into the graveyard with Kaya the Inexorable targeting Kaya the Inexorable #2
+- Opponent's Kaya the Inexorable was put into the opponent's graveyard from the battlefield (that Kaya the Inexorable was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Brightclimb Pathway
+- Phase: Main phase 2
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+=== Turn 69 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 70 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Kaya the Inexorable from the opponent's graveyard
+- Opponent's Kaya the Inexorable resolved and entered the battlefield
+- Opponent's Kaya the Inexorable #2 got 5 loyalty counters (now 5)
+- Opponent used: Put a card into the graveyard with Kaya the Inexorable targeting Kaya the Inexorable #2
+- Opponent's Kaya the Inexorable was put into the opponent's graveyard from the battlefield (that Kaya the Inexorable was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Lolth, Spider Queen
+- Opponent's Lolth, Spider Queen resolved and entered the battlefield
+- Opponent's Lolth, Spider Queen got 4 loyalty counters (now 4)
+- Opponent's Lolth, Spider Queen lost 3 loyalty counters (now 1)
+- Opponent used: -3: create spiders with Lolth, Spider Queen
+- Opponent's Lolth, Spider Queen created a 2/1 Spider token
+- Opponent's Lolth, Spider Queen created a 2/1 Spider token
+- Phase: Main phase 2
+- Opponent cast Silverquill Command
+- Opponent's Silverquill Command resolved and went to the opponent's graveyard
+- Opponent used: you draw and sacrifice creature with Silverquill Command
+- Opponent drew a card
+- Opponent lost 1 life (now 3)
+=== Turn 71 - YOUR turn ===
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- Paid {4}{w}{w} for Final Judgment with Plains #1; Plains #2; Island #1; Island #2; Island #3; Island #4
+- You cast Final Judgment (that Final Judgment was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Spider was exiled from the battlefield (that Spider was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Spider (token) ceased to exist and left the opponent's exile
+- Opponent's Spider was exiled from the battlefield
+- Opponent's Spider (token) ceased to exist and left the opponent's exile
+- Your Final Judgment resolved and went to your graveyard
+=== Turn 72 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Kaya the Inexorable from the opponent's graveyard
+- Opponent's Kaya the Inexorable resolved and entered the battlefield
+- Opponent's Kaya the Inexorable #2 got 5 loyalty counters (now 5)
+- Opponent used: Put a card into the graveyard with Kaya the Inexorable targeting Kaya the Inexorable #1
+- Opponent's Kaya the Inexorable was put into the opponent's graveyard from the battlefield (that Kaya the Inexorable was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Barrowin of Clan Undurr
+- Paid {1}{u} for Essence Scatter with Island #5; Island #6
+- You cast Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Barrowin of Clan Undurr was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 73 - YOUR turn ===
+- Phase: Draw
+- You drew Supreme Verdict
+=== Turn 74 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Nadaar, Selfless Paladin from the opponent's graveyard
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter
+- Opponent's Nadaar, Selfless Paladin was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Silverquill Command
+=== Turn 75 - YOUR turn ===
+- Phase: Draw
+- You drew Fall of the Gavel
+=== Turn 76 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Kaya the Inexorable from the opponent's graveyard
+- Paid {3}{u}{w} for Fall of the Gavel with Island #1; Plains #1; Island #2; Island #3; Island #4
+- You cast Fall of the Gavel
+- Opponent's Kaya the Inexorable was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 49)
+- Your Fall of the Gavel resolved and went to your graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Hive of the Eye Tyrant
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #1
+- Phase: Blockers
+- Opponent used: exile card with Hive of the Eye Tyrant #1 targeting Fall of the Gavel
+- Your Fall of the Gavel was exiled from your graveyard
+- Opponent used: exile card with Hive of the Eye Tyrant #1 targeting Final Judgment
+- Your Final Judgment was exiled from your graveyard
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 46)
+- Phase: Main phase 2
+- Opponent used: +0: draw card and lose life with Lolth, Spider Queen
+- Opponent drew a card
+- Opponent lost 1 life (now 2)
+- Phase: Cleanup
+- Opponent discarded Agadeem's Awakening
+=== Turn 77 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 78 - opponent's turn ===
+- Phase: Upkeep
+- Opponent cast Kaya the Inexorable from the opponent's graveyard
+- Opponent's Kaya the Inexorable resolved and entered the battlefield
+- Opponent's Kaya the Inexorable #2 got 5 loyalty counters (now 5)
+- Opponent used: Put a card into the graveyard with Kaya the Inexorable targeting Kaya the Inexorable #1
+- Opponent's Kaya the Inexorable was put into the opponent's graveyard from the battlefield (that Kaya the Inexorable was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Triumphant Adventurer
+- Opponent's Triumphant Adventurer resolved and entered the battlefield
+- Opponent cast Silverquill Command
+- Paid {w} for Path to Exile with Plains #1
+- You cast Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Triumphant Adventurer was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent's Silverquill Command resolved and went to the opponent's graveyard
+- Opponent used: opponent draws and sacrifice creature with Silverquill Command
+- You drew Path to Exile
+- You lost 1 life (now 45)
+- Opponent used: +0: draw card and lose life with Lolth, Spider Queen
+- Opponent drew a card
+- Opponent lost 1 life (now 1)
+- Opponent's Kaya the Inexorable lost 3 loyalty counters (now 2)
+- Opponent used: -3: exile non-land permanent with Kaya the Inexorable targeting Kaya the Inexorable
+- Opponent's Kaya the Inexorable was exiled from the battlefield
+=== Turn 79 - YOUR turn ===
+- Phase: Draw
+- You drew Emrakul, the Aeons Torn
+- Phase: Main phase 1
+- Paid {15} for Emrakul, the Aeons Torn with Island #1; Island #2; Island #3; Island #4; Island #5; Island #6; Island #7; Plains #1; Plains #2; Tundra #1; Seachrome Coast #1; Tundra #2; Seachrome Coast #2; Glacial Fortress #1; Tundra #3
+- You cast Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn resolved and entered the battlefield
+=== Turn 80 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 45 | Opponent life: 1
+Mana available: 19 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{w} (sources that can make each: {W} 12, {U} 17 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Island #1 {u}; Tundra #1 {w} or {u}; Island #2 {u}; Seachrome Coast #1 {w} or {u}; Island #3 {u}; Island #4 {u}; Tundra #2 {w} or {u}; Plains #1 {w}; Seachrome Coast #2 {w} or {u}; Plains #2 {w}; Island #5 {u}; Island #6 {u}; Glacial Fortress #1 {w} or {u}; Tundra #3 {w} or {u}; Island #7 {u}; Seachrome Coast #3 {w} or {u}; Seachrome Coast #4 {w} or {u}; Glacial Fortress #2 {w} or {u}; Glacial Fortress #3 {w} or {u}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (6 cards): Path to Exile (copy 1 of 2 in your hand) {w} [instant]; Lightmine Field {2}{w}{w} [enchantment]; Final Judgment {4}{w}{w} [sorcery]; Supreme Verdict {1}{u}{w}{w} [sorcery]; Path to Exile (copy 2 of 2 in your hand) {w} [instant]; Dream Fracture {1}{u}{u} [instant]
+Your battlefield (20 permanents listed, of which 1 is a creature, 1 of them able to attack right now): Emrakul, the Aeons Torn {15} (15/15) [flying, can't be countered, protection from colored spells] [annihilator 6 - whenever it attacks, the defending player sacrifices 6 permanents]; Glacial Fortress #1-#3 x3; Island #1-#7 x7; Plains #1; Plains #2; Seachrome Coast #1-#4 x4; Tundra #1-#3 x3
+Opponent battlefield (13 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking): Plains #1-#4 [tapped] x4; Plains #5; Hive of the Eye Tyrant #1 [tapped]; Shineshadow Snarl #1; Shineshadow Snarl #2; Swamp #1 [tapped]; Swamp #2; Brightclimb Pathway; Lolth, Spider Queen {3}{b}{b} [planeswalker] [counters: 1x loyalty] {effect: "Whenever a creature you control dies, put a... -- 0: You draw a card and you lose 1 life. -- -3: Create two 2/1 black Spider creature... -- -8: You get an emblem with "Whenever an opponent is dealt combat damage by one or more creatures you control, if that player lost less than..."}; Hive of the Eye Tyrant #2
+Opponent hand size: 7 | Opponent library: 12 cards
+Your library: 25 cards
+
+YOUR PLAN (as you last stated it): Attack with Emrakul, the Aeons Torn for lethal.
+
+Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?
+1. Cast Lightmine Field {2}{w}{w} {right now: they control 0 creatures able to attack - deals 0 until they have an attacker} {leaves 15 of your 19 untapped mana sources untapped} {card text: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}
+2. Cast Final Judgment {4}{w}{w} {right now: exiles 0 of their creatures (0 without a restriction against attacking), 1 of yours} {leaves 13 of your 19 untapped mana sources untapped} {card text: "Exile all creatures."}
+3. Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 1 of yours} {leaves 15 of your 19 untapped mana sources untapped} {card text: "Supreme Verdict can't be countered. -- Destroy all creatures."}
+4. Cast nothing right now (combat comes next this turn)
+
+On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Lightmine Field)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+
+=== REPLY ===
+CHOICE: 4 (Cast nothing right now)
+PLAN: Attack with Emrakul, the Aeons Torn for lethal.
