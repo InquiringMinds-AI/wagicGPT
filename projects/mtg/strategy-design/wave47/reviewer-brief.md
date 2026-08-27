@@ -11,7 +11,7 @@ game dir projects/mtg. READ FIRST, in order:
 3. Your seats' wave-46 file(s) in projects/mtg/strategy-design/wave46/seats/ (rung state,
    open predictions), and the live guides projects/mtg/bin/Res/ai/baka/deckN_strategy.txt.
 
-CORPUS: ~/.Wagic/ai/gpt/selfplay-runs/MATCHUPS_DIR/ — one JSONL per SEAT
+CORPUS: ~/.Wagic/ai/gpt/selfplay-runs/matchups-20260826-182155/ — one JSONL per SEAT
 (filename ...deckA-<ptr>-vs-...deckB = the deckA seat). Records: {seq, kind, prompt, reply,
 choice, chosen_text, options, turn, phase, my_life, opp_life, latency_ms, fallback?}. The
 `prompt` is the full per-decision message (narration + CURRENT SITUATION + plan + legal
@@ -58,3 +58,9 @@ render predictions by the emitter's actual string. This corpus is the FIRST carr
 wave-46 engine-seat fixes, the hand count, and lanes J/K/L/M (wave47/review-carry.md lists
 each falsifiable prediction). Standing owner rulings: X menu largest-first; history lines
 owner-prefixed.
+CORPUS NOTE: 20/21 natural. Game deck123 vs deck162 (seat logs ...deck123-0x55e867ceaa40... /
+...deck162-0x55e8669ce290...) DEAD-LOOPED at turn 10: Thraben Doomsayer + Intruder Alarm, a
+legal infinite token loop the model activated 1,867 times and never passed; killed by the
+orchestrator after ~9h (invariant 00). It has NO gameend record. Exclude it from rates; the
+engine seat owns the loop item (HIGH: unbounded legal loops need a stopping affordance or an
+engine-level repeat-N — the [repeat: N times] tag alone did not stop it).
