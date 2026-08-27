@@ -3502,11 +3502,42 @@ string targetPreviewFacts(MTGCardInstance * c)
 //Pile-aware for the same reason the option/target emitters are.
 //Pure core, so PARSETEST proves the shape (and the textless negative) with no
 //board.
+//#W51-F D16 (wave-50 ledger LOW; 15 bare `// <name>"}` endings on deck130's
+//land-destruction target clauses): the THIRD emitter of a printed face after
+//optionCardTextCore (#W49-U D12) and printedFirstClause (#W50-X D17). Same face
+//rule, same helper, applied to the snippet the target note quotes - the target
+//clause and the STACK note share this core, so both paths close at once.
+static string markBareBackFaces(const string& clause)
+{
+    const string sep = "//";
+    size_t k = clause.find(sep);
+    if (k == string::npos)
+        return clause;
+    std::ostringstream o;
+    o << clause.substr(0, k);
+    size_t at = k;
+    while (at != string::npos)
+    {
+        size_t next = clause.find(sep, at + sep.size());
+        string face = clause.substr(at + sep.size(), next == string::npos ? string::npos : next - at - sep.size());
+        size_t e = face.find_last_not_of(' ');
+        string trimmed = (e == string::npos) ? string() : face.substr(0, e + 1);
+        o << sep << trimmed;
+        if (!trimmed.empty() && trimmed.find_first_not_of(' ') != string::npos
+            && trimmed.find('.') == string::npos && trimmed.find(':') == string::npos
+            && trimmed.find('(') == string::npos)
+            o << " (text omitted)";
+        if (next != string::npos && e != string::npos)
+            o << face.substr(e + 1); //the spacing before the next separator, kept
+        at = next;
+    }
+    return o.str();
+}
 static string stackTargetTextCore(const string& snippet)
 {
     if (snippet.empty())
         return "";
-    return " {target text: \"" + snippet + "\"}";
+    return " {target text: \"" + markBareBackFaces(snippet) + "\"}";
 }
 
 string stackTargetTextNote(MTGCardInstance * c)
@@ -6547,6 +6578,202 @@ static string castDrawPriceRowTag(int perCast, const string& castNames,
         o << ", and their " << punishers << (punishers.find(", ") == string::npos ? " deals" : " deal")
           << " you " << (perCast * perDraw);
     o << "]";
+    return o.str();
+}
+
+//#W51-F D11 (wave-50 ledger MED; carried five corpora as R39/R82): the
+//draw-ENGINE cast row. deck162 cast Master of the Feast / Howling Mine /
+//Dictate of Kruphix with NOTHING of its own on the battlefield to convert the
+//opponent's extra cards into damage (5/9 breaks, opp `0 creatures`) - and the
+//three "breaks" that were in fact correct were correct because Liliana's
+//Caress converts the DISCARDS the extra cards force at cleanup (14 damage that
+//way before any draw punisher landed). So the count the row carries is of
+//CONVERTERS, not draw punishers alone: every permanent of the caster's whose
+//trigger turns an opposing draw OR an opposing discard into life loss. Same
+//truthfulness rails as the DRAW PUNISHERS scan - the extra-draw amount is read
+//off the engine's own script line, a non-numeric amount is named as not fixed
+//rather than guessed, and a gated converter is still NAMED (it converts on
+//some board) but is never given a number here. Pure over scripts and lists.
+//
+//The extra draws a permanent hands the OPPONENT per turn: an `@each ...`
+//trigger whose payload draws for "opponent" (Howling Mine `@each opponent
+//draw sourcenottap:draw:1 opponent`, Master of the Feast `@each my
+//upkeep:draw:1 opponent`, Font of Mythos draw:2). `variable` is set for a
+//non-numeric amount (Teferi's Puzzle Box `draw:countedamount opponent`).
+//Per-CAST draws (Forced Fruition) are the cast-trigger scan's business and
+//ride the same tag through castTriggerDrawCount.
+static int opponentExtraDrawPerTurn(const string& script, bool& variable)
+{
+    variable = false;
+    int total = 0;
+    size_t lp = 0;
+    while (lp <= script.size())
+    {
+        size_t nl = script.find('\n', lp);
+        string line = script.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? script.size() + 1 : nl + 1;
+        if (line.find('@') == string::npos && line.find('_') != string::npos)
+            line = AutoLineMacro::Process(line);
+        string low = line;
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        size_t st = low.find_first_not_of(" \t\r");
+        if (st == string::npos || low.compare(st, 6, "@each ") != 0)
+            continue;
+        size_t colon = low.find(':', st);
+        if (colon == string::npos)
+            continue;
+        string head = low.substr(st, colon - st);
+        string payload = low.substr(colon + 1);
+        if (head.find("restriction{") != string::npos || payload.find("may ") != string::npos)
+            continue;
+        size_t d = payload.find("draw:");
+        if (d == string::npos)
+            continue;
+        size_t ae = payload.find_first_of(" \t\r", d + 5);
+        string amt = payload.substr(d + 5, ae == string::npos ? string::npos : ae - d - 5);
+        string rest = (ae == string::npos) ? string() : payload.substr(ae);
+        size_t rb = rest.find_first_not_of(" \t\r");
+        //The draw must land on the OPPONENT of the permanent's controller.
+        if (rb == string::npos || rest.compare(rb, 8, "opponent") != 0)
+            continue;
+        bool numeric = !amt.empty();
+        for (size_t k = 0; k < amt.size(); k++)
+            if (!isdigit((unsigned char) amt[k]))
+                numeric = false;
+        if (!numeric || atoi(amt.c_str()) <= 0)
+        {
+            variable = true;
+            continue;
+        }
+        total += atoi(amt.c_str());
+    }
+    return total;
+}
+
+//A DISCARD punisher: a permanent whose own trigger line opens with
+//"@discarded(" over the opponent's hand and pays out an unconditional life
+//loss or damage aimed at that "opponent" - Liliana's Caress
+//`@discarded(*|opponenthand):life:-2 opponent`, Megrim `damage:2 opponent`.
+//`conditional` mirrors drawPunisherClause: named, not numbered.
+static bool discardPunisherClause(const string& script, int& perDiscard, bool& conditional)
+{
+    perDiscard = 0;
+    conditional = false;
+    bool found = false;
+    size_t lp = 0;
+    while (lp <= script.size())
+    {
+        size_t nl = script.find('\n', lp);
+        string line = script.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? script.size() + 1 : nl + 1;
+        string low = line;
+        for (size_t i = 0; i < low.size(); i++)
+            low[i] = (char) tolower((unsigned char) low[i]);
+        size_t st = low.find_first_not_of(" \t\r");
+        if (st == string::npos || low.compare(st, 11, "@discarded(") != 0)
+            continue;
+        size_t colon = low.find(':', st); //same split as drawPunisherClause
+        if (colon == string::npos)
+            continue;
+        string head = low.substr(st, colon - st);
+        if (head.find("|opponenthand") == string::npos)
+            continue;
+        string payload = low.substr(colon + 1);
+        size_t pb = payload.find_first_not_of(" \t\r");
+        if (pb == string::npos)
+            continue;
+        payload = payload.substr(pb);
+        bool isDamage = payload.compare(0, 7, "damage:") == 0;
+        bool isLoss = payload.compare(0, 6, "life:-") == 0;
+        if (!isDamage && !isLoss)
+            continue;
+        if (payload.find("opponent") == string::npos)
+            continue;
+        size_t as = isDamage ? 7 : 6;
+        size_t ae = payload.find_first_of(" \t\r", as);
+        string amt = payload.substr(as, ae == string::npos ? string::npos : ae - as);
+        bool numeric = !amt.empty();
+        for (size_t k = 0; k < amt.size(); k++)
+            if (!isdigit((unsigned char) amt[k]))
+                numeric = false;
+        found = true;
+        if (head.find("restriction{") != string::npos || payload.find("may ") != string::npos
+            || payload.find("ability$") != string::npos || payload.find("pay(") != string::npos
+            || !numeric || atoi(amt.c_str()) <= 0)
+        {
+            conditional = true;
+            continue;
+        }
+        perDiscard += atoi(amt.c_str());
+    }
+    return found;
+}
+
+//The board scan: every converter on the CASTER's battlefield, draw punishers
+//first (the DRAW PUNISHERS scan's own `mine` list) then discard punishers,
+//each with its instance handle so the count is checkable against the lines
+//above it. A permanent that is both is named once.
+static void converterScan(Player * me, std::vector<std::string>& names)
+{
+    if (!me || !me->game || !me->game->inPlay)
+        return;
+    MTGGameZone * bf = me->game->inPlay;
+    std::set<MTGCardInstance *> seen;
+    for (int pass = 0; pass < 2; pass++)
+        for (int i = 0; i < bf->nb_cards; i++)
+        {
+            MTGCardInstance * c = bf->cards[i];
+            if (!c || seen.count(c))
+                continue;
+            int per = 0;
+            bool cond = false;
+            bool hit = (pass == 0) ? drawPunisherClause(c->magicText, per, cond)
+                                   : discardPunisherClause(c->magicText, per, cond);
+            if (!hit)
+                continue;
+            seen.insert(c);
+            names.push_back(c->name + instanceHandle(c));
+        }
+}
+
+//The cast-row tag. Empty when the card feeds the opponent nothing (so a
+//creature that merely has a body never carries it). Says what the card hands
+//them and how many of the caster's permanents turn that into damage - the
+//COUNT is the fact the seat had to re-derive and got wrong, so it is printed
+//as a number ahead of the names.
+static string feedsRowTag(int perTurn, bool variable, int perCast,
+                          const std::vector<std::string>& converters)
+{
+    if (perTurn <= 0 && !variable && perCast <= 0)
+        return "";
+    std::ostringstream o;
+    o << " {feeds: the opponent draws ";
+    bool said = false;
+    if (perTurn > 0)
+    {
+        o << perTurn << " extra card" << (perTurn == 1 ? "" : "s") << " per turn";
+        said = true;
+    }
+    if (perCast > 0)
+    {
+        o << (said ? " and " : "") << perCast << " card" << (perCast == 1 ? "" : "s")
+          << " per spell they cast";
+        said = true;
+    }
+    if (variable)
+        o << (said ? ", plus " : "") << "an amount that is not fixed (read the card)";
+    o << "; converters on your battlefield: " << converters.size();
+    if (converters.empty())
+        o << " (nothing of yours punishes their draws or discards yet - the cards you"
+             " hand them are free until a converter is out)";
+    else
+    {
+        o << " - ";
+        for (size_t i = 0; i < converters.size(); i++)
+            o << (i ? ", " : "") << converters[i];
+    }
+    o << "}";
     return o.str();
 }
 
@@ -11515,7 +11742,9 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 19, "{paying this taps: ") == 0)
                 || (in.compare(i, 9, "{tapping ") == 0)
                 //W50-W (D6): the self-target clause is decision-time guidance.
-                || (in.compare(i, 10, "{this hits") == 0);
+                || (in.compare(i, 10, "{this hits") == 0)
+                //#W51-F D11: the feeds count is decision-time pricing, not history.
+                || (in.compare(i, 8, "{feeds: ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -15886,6 +16115,19 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 o << castDrawPriceRowTag(perCast, cn.str(), theirsPer, pn.str());
             }
         }
+        //#W51-F D11: and what casting it FEEDS the opponent, with the count of
+        //the caster's own converters (draw AND discard punishers).
+        {
+            bool variable = false;
+            int perTurn = opponentExtraDrawPerTurn(card->magicText, variable);
+            int perCastFed = castTriggerDrawCount(card->magicText);
+            if (perTurn > 0 || variable || perCastFed > 0)
+            {
+                std::vector<std::string> conv;
+                converterScan(this, conv);
+                o << feedsRowTag(perTurn, variable, perCastFed, conv);
+            }
+        }
         if (mStuckCastLines.count(o.str()))
             continue; //this exact entry no-op'd this turn; do not re-offer
         candidates.push_back(card);
@@ -16613,32 +16855,8 @@ static string printedClauseFor(const string& cardText, const string& label)
 //single clause (Pelakka Predation) has its back face's bare name INSIDE that
 //clause. Same face rule as optionCardTextCore: a face after the `//` with no
 //'.', ':' or '(' is a name, not text, and says so.
-static string markBareBackFaces(const string& clause)
-{
-    const string sep = "//";
-    size_t k = clause.find(sep);
-    if (k == string::npos)
-        return clause;
-    std::ostringstream o;
-    o << clause.substr(0, k);
-    size_t at = k;
-    while (at != string::npos)
-    {
-        size_t next = clause.find(sep, at + sep.size());
-        string face = clause.substr(at + sep.size(), next == string::npos ? string::npos : next - at - sep.size());
-        size_t e = face.find_last_not_of(' ');
-        string trimmed = (e == string::npos) ? string() : face.substr(0, e + 1);
-        o << sep << trimmed;
-        if (!trimmed.empty() && trimmed.find_first_not_of(' ') != string::npos
-            && trimmed.find('.') == string::npos && trimmed.find(':') == string::npos
-            && trimmed.find('(') == string::npos)
-            o << " (text omitted)";
-        if (next != string::npos && e != string::npos)
-            o << face.substr(e + 1); //the spacing before the next separator, kept
-        at = next;
-    }
-    return o.str();
-}
+//(markBareBackFaces now lives beside stackTargetTextCore - #W51-F D16 - so
+//all three face emitters share one definition in one scope.)
 
 static string printedFirstClause(const string& cardText)
 {
@@ -32870,6 +33088,82 @@ static const char * kW50Y_r94 =
               "#W50-W D6 the clause leaves no residue in the narrated record");
         CHECK(string(kSelfOnlyWindowNote).find("0 (pass)") != string::npos,
               "#W50-W D6 the all-self window note names the pass answer");
+    }
+
+    cout << "\n[#W51-F] D11 feeds count incl. discard converters / D16 target-text back faces\n";
+    {
+        //D11: the extra-draw amount off the engine's own lines.
+        bool var = false;
+        CHECK(opponentExtraDrawPerTurn("@each my draw sourcenottap:draw:1 controller\n@each opponent draw sourcenottap:draw:1 opponent", var) == 1 && !var,
+              "#W51-F D11 Howling Mine feeds 1 per turn (the controller's own draw is not counted)");
+        CHECK(opponentExtraDrawPerTurn("@each my upkeep:draw:1 opponent", var) == 1 && !var,
+              "#W51-F D11 Master of the Feast feeds 1 per turn");
+        CHECK(opponentExtraDrawPerTurn("@each my draw:draw:2 controller\n@each opponent draw:draw:2 opponent", var) == 2 && !var,
+              "#W51-F D11 Font of Mythos feeds 2 per turn");
+        CHECK(opponentExtraDrawPerTurn("@each opponent draw:name(recycle draw) count(type:*:opponenthand) && bottomoflibrary all(*|opponenthand) && draw:countedamount opponent", var) == 0 && var,
+              "#W51-F D11 Teferi's Puzzle Box: a non-numeric amount is flagged, never summed");
+        var = false;
+        CHECK(opponentExtraDrawPerTurn("@movedTo(*[-land]|opponentstack):draw:7 opponent", var) == 0 && !var,
+              "#W51-F D11 NEGATIVE Forced Fruition's per-cast draw is not a per-turn draw");
+        CHECK(opponentExtraDrawPerTurn("@each my upkeep:may draw:1 opponent", var) == 0 && !var
+              && opponentExtraDrawPerTurn("@each my upkeep restriction{mylife>5}:draw:1 opponent", var) == 0
+              && opponentExtraDrawPerTurn("draw:1 opponent", var) == 0,
+              "#W51-F D11 NEGATIVE a may, a gated trigger and a one-shot draw are not a per-turn feed");
+        //D11: the discard converter.
+        int per = 0;
+        bool cond = false;
+        CHECK(discardPunisherClause("@discarded(*|opponenthand):life:-2 opponent", per, cond) && per == 2 && !cond,
+              "#W51-F D11 Liliana's Caress is a discard converter at 2");
+        CHECK(discardPunisherClause("@discarded(*|opponenthand):damage:2 opponent", per, cond) && per == 2 && !cond,
+              "#W51-F D11 Megrim is a discard converter at 2");
+        CHECK(!discardPunisherClause("@discarded(*|myhand):life:-2 controller", per, cond),
+              "#W51-F D11 NEGATIVE a trigger on the controller's own discards is not a converter");
+        CHECK(!discardPunisherClause("@drawfoeof(player):damage:1 opponent", per, cond),
+              "#W51-F D11 NEGATIVE a draw punisher is not a discard punisher (it is counted by its own scan)");
+        CHECK(discardPunisherClause("@discarded(*|opponenthand) restriction{mylife>5}:life:-2 opponent", per, cond) && per == 0 && cond,
+              "#W51-F D11 a gated discard converter is named, not numbered");
+        //D11: the row string and its count.
+        std::vector<std::string> none, two;
+        two.push_back("Underworld Dreams #1");
+        two.push_back("Liliana's Caress");
+        string f2 = feedsRowTag(1, false, 0, two);
+        CHECK(f2 == " {feeds: the opponent draws 1 extra card per turn; converters on your battlefield: 2 - Underworld Dreams #1, Liliana's Caress}",
+              "#W51-F D11 the row carries the count ahead of the converter names, Caress included");
+        string f0 = feedsRowTag(1, false, 0, none);
+        CHECK(f0.find("converters on your battlefield: 0") != string::npos && f0.find("free until a converter is out") != string::npos,
+              "#W51-F D11 at zero converters the row says 0 and why it matters");
+        CHECK(feedsRowTag(2, false, 0, none).find("draws 2 extra cards per turn") != string::npos
+              && feedsRowTag(0, false, 7, two).find("draws 7 cards per spell they cast; converters on your battlefield: 2") != string::npos
+              && feedsRowTag(0, true, 0, two).find("an amount that is not fixed (read the card)") != string::npos,
+              "#W51-F D11 plural, per-cast and not-fixed shapes");
+        CHECK(feedsRowTag(0, false, 0, two).empty(),
+              "#W51-F D11 NEGATIVE a card that feeds nothing carries no tag even with converters out");
+        //D11 echo: the tag is an annotation - the bare row binds, the echoed
+        //row binds, the narration keeps no residue.
+        vector<string> fm;
+        fm.push_back("Cast Howling Mine {2} (artifact)" + f2);
+        fm.push_back("Cast Liliana's Caress {1}{b} (enchantment)");
+        bool sf = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Howling Mine)", 2, &fm, &sf, NULL) == 1 && !sf,
+              "#W51-F D11 echo: the bare name binds with the feeds tag on the row");
+        bool sf2 = false;
+        CHECK(parseChoice("CHOICE: 1 (" + fm[0] + ")", 2, &fm, &sf2, NULL) == 1 && !sf2,
+              "#W51-F D11 echo: a reply copying the whole row incl. the tag binds to 1");
+        CHECK(stripNarrationDecoration(fm[0]).find("{feeds:") == string::npos
+              && stripNarrationDecoration(fm[0]).find("Cast Howling Mine {2}") != string::npos,
+              "#W51-F D11 the feeds tag leaves no residue in the narrated record");
+        //D16: the third path.
+        CHECK(stackTargetTextCore("{T}: Add {W}. // Mistgate Pathway") == " {target text: \"{T}: Add {W}. // Mistgate Pathway (text omitted)\"}",
+              "#W51-F D16 a bare back-face name in a target note is marked (text omitted)");
+        CHECK(stackTargetTextCore("Destroy target nonbasic land.") == " {target text: \"Destroy target nonbasic land.\"}"
+              && stackTargetTextCore("A. // Flying -- B gets +1/+1.") == " {target text: \"A. // Flying -- B gets +1/+1.\"}",
+              "#W51-F D16 NEGATIVE single-face text and a real back-face text are byte-identical");
+        CHECK(stackTargetTextCore("").empty(), "#W51-F D16 NEGATIVE an empty snippet still renders nothing");
+        vector<string> dm;
+        dm.push_back("Cast Stone Rain {2}{r} (sorcery) [legal targets right now: Hengegate Pathway (land) {target text: \"{T}: Add {W}. // Mistgate Pathway (text omitted)\"}]");
+        bool sd = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Stone Rain)", 1, &dm, &sd, NULL) == 1 && !sd,
+              "#W51-F D16 echo: the marked note on the target clause does not unbind the row");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
