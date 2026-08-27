@@ -96,6 +96,14 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
      "kills THEIRS: none" in the first sentence does NOT mean Starstorm is blank; keep reading
      to the "At X=" clause. Losing your own Dwarven Blastminer or a Goblin to kill two of
      their creatures is a trade you take.
+     SURVIVAL FIRST, above (a) and (b) below: add the printed power - the first number of each
+     "(P/T)" - of every creature on THEIR battlefield line. If that sum is at or above "Your
+     life:", you do not live through their next attack without the sweep; take the X whose
+     THEIRS list is longest, WHATEVER the YOURS list names. At 8 life against 5/5 + 5/3 + 4/5 +
+     3/3 (17 power) this deck held Starstorm because the X=5 row named its own Siege-Gang
+     Commander, and was dead at -2 on the next swing with the Commander still on the table.
+     Rorix or the Commander on the table beats the annotation only while you are alive to
+     attack with him.
      DO NOT TAKE IT - answer "Cast nothing right now", at ANY X - when either of these is true:
        (a) the YOURS list at that X names RORIX BLADEWING or SIEGE-GANG COMMANDER. Those two
            are the only way this deck ends a game. A sweeper that kills your own clock has
@@ -115,8 +123,12 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
                here with "Cast Starstorm at X=3 to kill both Pride Guardians", answered X=3
                verbatim, and never read the X=4 row above it. An X in a plan is a guess; an X
                on a row comes with the kill list attached.
-       STEP 1. Find the row with the LARGEST "kills THEIRS" list whose "YOURS:" reads "none".
-               That is your X. Bigger is free when YOURS is none - the mana you save buys
+       STEP 1. If a row carries "[<- most kills at any affordable X that costs you nothing]",
+               THAT row is the answer: answer its number and read nothing else - it is already
+               the largest kill list at the lowest X that produces it. This deck answered X=6
+               with that marker on the X=2 row four rows below (same kills, four mana less).
+               With no marker printed: find the row with the LARGEST "kills THEIRS" list whose
+               "YOURS:" reads "none". That is your X. Bigger is free when YOURS is none - the mana you save buys
                nothing if you have nothing else to cast this turn, and a creature you left
                alive because you paid one mana less is a creature that wins their game.
                This deck answered X=1 against Thraben Doomsayer and a Human token when X=2 was
@@ -132,6 +144,12 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
      That is a fact about the cheapest kill, not a recommendation: the same annotation prints
      "At X=N - kills THEIRS: ..." for the bigger number right beside it. Read to the end of it.
   1. An opponent PLANESWALKER on the list -> aim there. A live planeswalker wins their game.
+     This outranks casting a creature. Its line prints "[counters: Nx loyalty]": when that N
+     is at or below the damage of a spell on your menu, the spell kills it, and that cast comes
+     before any body. Ob Nixilis, the Hate-Twisted at "[counters: 3x loyalty]" was on Hammer of
+     Bogardan's "legal targets" list while this deck cast Siege-Gang Commander instead; its -2
+     killed the Commander AND made this deck draw two cards at 2 life each, twice in two turns,
+     and the game ended at 0. Every creature you cast while it lives is a card and four life.
   2. An opponent CREATURE whose printed toughness this damage reaches -> aim there. Spark Spray
      kills 1 toughness; Pyrite Spellbomb kills 2; Hammer of Bogardan kills 3. The battlefield line
      prints each creature's CURRENT (P/T) - read it, do not rebuild it from base stats.
@@ -270,13 +288,20 @@ legally attack, so do not re-check summoning sickness or tapped status yourself.
 "ATTACK: none" only when every listed attacker would die to a blocker and kill nothing - not to
 "hold blockers", and not because their creatures are marked "[tapped - cannot attack or block this
 turn]" (they untap for their turn).
-THE COLLAPSED TAG, INSIDE THE FLOOR. On a wide board an attacker's tag stops listing their
-blockers one by one and reads "they have N untapped creatures that could block this one, biggest
-X (...)", sometimes with "- GANG BLOCK: their 2 biggest together deal 5, enough to kill this
-attacker; each result above is a LONE blocker only". That parenthesis prices ONE blocker only.
-The GANG BLOCK clause prices what actually happens: any number of them may block that attacker
-together, and your creature's toughness is measured against the SUM.
-  - The tag prints a "GANG BLOCK: ... enough to kill this attacker" clause, or N is 2 or more:
+THE BLOCKER TAG, IN EITHER FORM, INSIDE THE FLOOR. On a narrow board an attacker's tag lists
+their blockers one by one - "[their untapped blockers: Briarbridge Tracker (3/4) (your attacker
+dies, their blocker lives); Sigarda ... ; Intrepid Adversary (4/2) (both die (lifelink: they
+gain 4))]"; on a wide board it collapses to "they have N untapped creatures that could block
+this one, biggest X (...)", sometimes with "- GANG BLOCK: their 2 biggest together deal 5,
+enough to kill this attacker; each result above is a LONE blocker only". COUNT THE BLOCKERS THE
+TAG NAMES, in either form - a name-by-name list of three is N = 3. Each parenthesis prices ONE
+blocker only; the GANG BLOCK clause prices what actually happens: any number of them may block
+that attacker together, and your creature's toughness is measured against the SUM. This deck
+sent its Commander into a tag naming THREE blockers, two of them "(your attacker dies)", at 13
+life, and lost it for nothing - a "(both die)" against a lifelink blocker that gains them four
+is not a trade for your only Commander either.
+  - The tag prints a "GANG BLOCK: ... enough to kill this attacker" clause, or names 2 or more
+    blockers:
     that creature stays home. A GOBLIN token goes anyway - it costs you nothing and Siege-Gang
     makes more. RORIX goes anyway ONLY when every blocker the tag names is grounded and Rorix
     flies over all of them; SIEGE-GANG COMMANDER never goes on such a tag, because its sacrifice
@@ -293,8 +318,15 @@ BLADEWING: those are cards, they are the only bodies this deck has, and Siege-Ga
 ability needs Siege-Gang alive. Trading either one for a 2/2 token the opponent will replace is
 not an even trade even though the parenthesis says both creatures die. Send a Goblin instead, or
 take the damage while the combat header's "you would be at N" is above 5.
-Block where only your creature dies when the damage otherwise puts you at 5 life or less. A Goblin
-is worth more as a blocker than as 2 points of face damage.
+ONE BLOCKER STOPS THE WHOLE OF ONE ATTACKER'S DAMAGE. A second and a third of yours on the same
+attacker stop nothing more - they only die with the first. At 13 life this deck put all three
+Goblins in front of a single 3/4 and lost all three to save 3 life it did not need (the header
+read "you would be at 10 - NOT lethal"); those three Goblins were 6 Siege-Gang damage, two
+planeswalker kills. Read the header's "you would be at N" FIRST and write it down:
+  - N above 5 and every row on that attacker reads "(your blocker dies, attacker lives)":
+    "BLOCKS: none". A Goblin is worth more as 2 points of Siege-Gang damage than as 3 life.
+  - N at 5 or below: ONE Goblin on the attacker with the largest "deals N"; a second Goblin only
+    on a DIFFERENT attacker. Never two on one unless the row says "(both die)" for the pair.
 WHEN THE PROMPT SAYS LETHAL, CHUMP THE BIGGEST ATTACKER YOU ARE ALLOWED TO BLOCK. The line
 "Unblocked, these attackers deal up to N - you would be at ... - LETHAL if it all connects" means
 the arithmetic, not the trade, is the whole question. Every attacker row prints "deals N".
@@ -332,6 +364,22 @@ and NEVER bottom a land when the hand you keep would hold fewer than THREE.
 =====================================================================
 DECIDING SITUATIONS (recognise -> do)
 =====================================================================
+- Their battlefield line prints "[planeswalker] [counters: Nx loyalty]" and a damage spell on
+  your menu deals N or more (Hammer of Bogardan 3, Pyrite Spellbomb 2, Spark Spray 1) -> cast it
+  at the planeswalker, before any creature you could cast this turn.
+- "Cast Talisman of Impulse" is listed, nothing above entry 5 of the cast order matched, and
+  Siege-Gang Commander or Rorix Bladewing is in your hand -> cast the Talisman. "Hold mana for
+  their turn" is not a play this deck has: nothing in the sixty but Starstorm is an instant.
+  Two such holds put the Commander down on turn 17 instead of 13, into a board that had become
+  unbeatable in between.
+- A damage spell's target menu lists "Yourself (player, life N)" -> never. The opponent, or a
+  creature or planeswalker of theirs. This deck answered "Yourself" to a Hammer of Bogardan at
+  9 life under a plan that read "the game is lost".
+- There is no "the game is lost". A PLAN line names the NEXT ACTION - a land to destroy, a
+  creature to kill, a body to add - and a plan with no action in it is handed back to you every
+  window until the game ends: this deck carried "The game is lost ... passing is the only legal
+  action" through forty-eight windows, aimed a Hammer at its own face and cast Starstorm at X=12
+  into a board with no creatures under that sentence.
 - ANY draw is on the menu (a "cycling" row, Forgotten Cave, Pyrite Spellbomb's "Draw 1") and
   their battlefield line names TWO OR MORE permanents whose text damages you when you draw
   (Underworld Dreams, Fate Unraveler, Ob Nixilis) -> do not draw. Pass.

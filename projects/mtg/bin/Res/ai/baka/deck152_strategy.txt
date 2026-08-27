@@ -161,6 +161,27 @@ swings: one body, then two, then the whole team. Keep swinging.
   stop-tagged TOKEN with the team - it is free bait. The stop stands for every real card:
   Intrepid Adversary, Briarbridge Tracker, Elite Spellbinder, Sigarda, Katilda, Brutal Cathar.
 
+#2a RULE - BEFORE YOU SPEND ANYTHING IN UPKEEP OR MAIN 1, RUN THE LETHAL COUNT.
+Add the power printed on every creature on YOUR battlefield line that carries neither "[tapped"
+nor "[summoning sick" in its entry. If that sum is at or above the opponent's printed life AND
+their battlefield line reads "of which 0 are creatures", the game ends this combat: cast NOTHING
+and activate NOTHING before it - answer "Cast nothing right now" and "pass" until the attackers
+ask, then send everything. This check outranks #3 RULE for that one turn. Every mana you spend
+before combat can tap an attacker, because:
+- YOUR HUMANS ARE MANA SOURCES. Katilda gives every Human "{T}: add mana", so once your lands are
+  tapped the mana line's "Those sources, one per untapped card:" list names your creatures. A
+  creature named on that list is TAPPED to pay for the next thing you cast and cannot attack this
+  turn. Before any Main-1 cast, read that list: if it names a creature you are about to attack
+  with, do not cast - the row's "casting this taps you out" means it taps THEM.
+- KATILDA'S "{4}{G}{W}, {T}: put a +1/+1 counter on each creature you control" IS A MAIN-2
+  ACTION. Never in Upkeep and never in Main 1: it taps Katilda, it spends six sources before
+  combat, and the sources it leaves you are your Humans. Take it after attackers are declared,
+  when the row comes back, with three or more creatures on your line and spare mana.
+WHAT THIS COST: at 12 life against 14, with 25 power on the line and their line at "0 creatures",
+this seat activated Katilda in Upkeep, cast a Tracker by tapping Intrepid Adversary and Brutal
+Cathar, attacked with the two bodies left for 11, and died on the next draw step at 0 - a game
+it had already won on the screen. The same shape at 13 life against 18 power cost two turns.
+
 #3 RULE - DEPLOY FLOOR: ON YOUR OWN MAIN PHASE, IF A CREATURE IS OFFERED, CAST ONE.
 "Cast nothing right now" on YOUR main phase is correct in exactly TWO situations:
   (a) the only offer is Fateful Absence and you are holding it as an instant for their turn;
@@ -266,7 +287,7 @@ YOUR LORDS AND GROWTH:
 - KATILDA, DAWNHART PRIME ({G}{W}, 1/1): protection from Werewolves, and your HUMANS each tap for
   one mana of their own color - Katilda is herself a Human, so once she is out she is an extra
   mana source and shows up in your "Mana available" total. Her {4}{G}{W},{T} puts a +1/+1
-  counter on EACH of your creatures - worth a whole turn's mana only at three-plus creatures.
+  counter on EACH of your creatures; WHEN it is taken is decided by #2a RULE (Main 2 only).
 - LUMINARCH ASPIRANT ({1}{W}, 1/1): free +1/+1 counter each of your combats. Keep it alive -
   but "keep it alive" is about not ATTACKING it into death, never about declining a block the
   ladder tells you to take. On the block ladder the ladder wins.
@@ -309,6 +330,12 @@ REMOVAL:
   wrong, and a board you emptied yourself is a clock you no longer have.
 - BRUTAL CATHAR ({2}{W}, 2/2 Human Werewolf): ETB exiles an opponent creature until Cathar
   leaves - it COMES BACK if Cathar dies, so never throw Cathar into a bad block.
+- ELITE SPELLBINDER ({2}{W}, 3/1 flier): its hand look is the ONLY answer this deck has to an
+  enchantment, and it works before the card is cast. When the list shows "Exquisite Blood" or
+  "Sanguine Bond", exile THAT - above a planeswalker, above a creature, above anything. The card
+  it leaves in their hand is the one that assembles the loop described under MATCHUP POSTURE.
+  WHAT THIS COST: offered Exquisite Blood and Sorin, this seat took Sorin; the Blood resolved,
+  the Bond was tutored, and the pair killed it from 20 in one combat.
 
 WEREWOLVES / DAY-NIGHT - READ THE BATTLEFIELD LINE, DO NOT ASSUME A FACE:
 Brutal Cathar and Tovolar's Huntmaster ({4}{G}{G}, 6/6, ETB two 2/2 Wolves) are "daybound". The
@@ -423,8 +450,19 @@ MATCHUP POSTURE:
   CONVERTER on the battlefield: theirs - Sanguine Bond", naming the card. YOU CANNOT ANSWER IT.
   This deck has no way to destroy an enchantment - Fateful Absence hits creatures and
   planeswalkers only, and Brutal Cathar exiles a creature. So when that line names a converter of
-  THEIRS, the game has become a race with a deadline you cannot see. Race it with your EVASION,
-  not with your whole board.
+  THEIRS, the game has become a race with a deadline you cannot see.
+  FIRST, READ THEIR BATTLEFIELD LINE FOR THE SECOND NAME. If it shows "Sanguine Bond" AND
+  "Exquisite Blood" together, the two are a LOOP: life they gain drains you (Bond), life you lose
+  gains them (Blood), and that repeats without limit. ONE point of damage you deal them, one
+  lifelink Vampire that connects with you, one wall that gains them 3 - any of it ends the game on
+  the spot. With BOTH names printed: ATTACK: none, every combat, fliers included - "no creature
+  they control can block this attacker" is exactly why it kills you, the damage lands and the loop
+  starts; block every attacker whose A-line prints "[lifelink]" if any block for it is offered;
+  cast the rest of your hand as blockers. You are not racing. WHAT THIS COST: at 20 life, holding
+  every priced ground attacker home correctly for two combats, this seat sent a 7/5 unblockable
+  flier into both names and was at 0 before the combat ended.
+  With ONE of the two names printed, the race is real: race it with your EVASION, not with your
+  whole board.
   RACE MEANS DAMAGE THROUGH, NOT ATTACKERS DECLARED, AND THE CONVERTER LINE NEVER LICENSES A
   SWING THE TAGS PRICE AGAINST YOU. A creature you send into a "(blocking trigger:" wall deals
   ZERO to their life and hands them N, which the converter takes off you as well - it moves the
@@ -450,3 +488,27 @@ MATCHUP POSTURE:
 - vs FLIERS (evasive creatures you cannot block): your only maindeck answer is Fateful Absence.
   Do not spend both copies on ground creatures you could have blocked, and remember your ground
   creatures will not appear as legal blockers for a flier at all.
+
+DECIDING SITUATIONS (recognize -> do):
+- Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> ATTACK: none, every
+  combat, fliers included; block every "[lifelink]" attacker you are offered a block for.
+- Elite Spellbinder's hand look lists "Exquisite Blood" or "Sanguine Bond" -> exile it, above
+  everything else on the list.
+- Your untapped, non-summoning-sick power is at or above their printed life and their line reads
+  "of which 0 are creatures" -> cast nothing and activate nothing before combat; attack with all.
+- The "Those sources, one per untapped card:" list names a creature you mean to attack with ->
+  do not cast in Main 1; casting taps that creature.
+- "put 1/1 counters with Katilda" is offered in Upkeep or Main 1 -> pass; it is a Main-2 action.
+- A "DRAW PUNISHERS" line is printed, a "Draw 1 with Clue" row is offered, and your printed life
+  is 10 or less -> pass; the draw costs the N the line prints.
+- The mulligan ask says "(keeping 5)" or fewer and the hand has a land -> KEEP (RULE -1).
+- A "Land drop:" question offers a land -> play it (#1a RULE).
+- A creature is offered on your own main phase -> cast one (#3 RULE), unless #2a says the game
+  ends this combat.
+- The Fateful Absence row says "the only legal targets are YOUR OWN" -> do not cast it.
+- A block line reads "(neither dies)", "(you kill it, your blocker lives)" or "(both die)" ->
+  take it; "BLOCKS: none" only when every offered block is rung 3 and "you would be at N" is 10
+  or more.
+- An A-line reads "your attacker dies, their blocker lives" anywhere on its tag and the attacker
+  is a CARD -> it stays home unless the lethal check clears; a Wolf token goes anyway.
+- A GANG BLOCK clause says "enough to kill this attacker" -> that creature stays home.

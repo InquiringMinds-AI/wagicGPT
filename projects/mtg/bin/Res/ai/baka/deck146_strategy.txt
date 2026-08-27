@@ -5,14 +5,22 @@ against aggro (deploy blockers early, spend removal ON CURVE to survive, then ta
 opponent: if they are faster than you, your job is to trade and survive to the mid-game where your
 card quality wins. Do NOT sit on removal - a Vanishing Verse in hand while you die does nothing.
 
-MULLIGAN - RUN THE FLOOR FIRST, BEFORE YOU LOOK AT THE CARDS.
-STEP 1. Read the ask's price line for the "(keeping N)" number. If it says (keeping 5) or ANY
-  lower number: KEEP, if the hand holds at least one land. The bar is ONE LAND and nothing
-  else - not a color, not a curve, not a spell you can cast. A 5-card hand with a land beats a
-  4-card hand every time, and there is no hand at 4 or fewer you can win from. If the floor
-  applies, you are DONE - do not read another rule in this section.
-STEP 2. Only at (keeping 6) or on your untouched opening 7 may you mulligan at all, and ONLY
-  for one of these four: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
+MULLIGAN - READ THE PRICE LINE FIRST, THEN WEIGH THE ODDS.
+STEP 1 - WHAT DOES THE NEXT LOOK COST? Read the ask's "(keeping N)" number. Each mulligan is a
+  fresh seven you must shave by one more card, and a fresh seven from a 21-land deck is a
+  two-lander about as often as anything else - shipping rarely fixes lands, it only shrinks the
+  hand. So at "(keeping 5)" or lower the question is no longer "is this hand good" but "is a
+  five-card (or four-card) hand more likely to win than THIS hand shaved at the bottom ask" -
+  and with even ONE land in front of you the answer is keep, because the bottom ask lets you
+  shed the uncastable cards and keep the land plus your cheapest spells, while the ship hands
+  you one card fewer and the same land odds. Colour is not a reason to ship here: nine of your
+  21 lands make both colours (four Snarls and four Pathways, plus the Hives for black), so the
+  second colour arrives with the second land. "No white source" was the sentence this seat
+  wrote at (keeping 5) holding a Swamp; it shipped to a three-card hand and lost. Zero lands at
+  (keeping 5) is the one hand where a fresh look is worth the card - even then, weigh it: a
+  four-card seven with one land is what you are buying.
+STEP 2. On your untouched opening 7, or at (keeping 6), a mulligan is a fair trade only for
+  one of these four: ZERO lands; an all-land hand (6-7 lands); or NO source of one of
   your colors when the header shows every spell needs it; or ONE land when the hand's spells
   cost 3 or more (you will not cast them on time; a six is usually a two-lander - ship it).
   ONE land with mostly one- and two-drops is a judgment call on those exact cards: weigh the
@@ -29,15 +37,18 @@ STEP 2. Only at (keeping 6) or on your untouched opening 7 may you mulligan at a
   you are shown is a fresh 7 cards, so never judge "I am still at 7" from the cards in front of
   you: read the ask's price line ("having already taken 2 mulligans you will bottom 2 cards on a
   keep (keeping 5)") and let that N decide which STEP above applies.
-- WHEN YOU KEEP AFTER MULLIGANS, THE GAME THEN ASKS WHICH CARDS TO PUT ON THE BOTTOM. The keep
-  you just made was priced on the engine's land count - do not undo it at this ask. NEVER bottom
-  a land (Hive of the Eye Tyrant IS a land - bottoming a Hive is bottoming a Swamp) unless the
-  hand you keep would still hold at least 4 lands - AND NEVER bottom your way to a hand with
-  zero spells. Keep AT LEAST ONE castable spell, always: a 4-card hand of four lands does
-  nothing at all and is worse than any hand with a two-drop in it. Bottom your most EXPENSIVE
-  spells first: Emeria's Call, Agadeem's Awakening, a second copy of a planeswalker, then the
-  priciest spell left - but the LAST cheap spell stays. A kept hand of one land plus uncastable
-  spells is a loss you chose at this ask.
+- WHEN YOU KEEP AFTER MULLIGANS, THE GAME THEN ASKS WHICH CARDS TO PUT ON THE BOTTOM, AND THAT
+  ASK IS WHERE THE HAND IS ACTUALLY BUILT. The ask says "You will be left with an N-card hand".
+  Build the best N: the lands you need to cast what you keep, then the cheapest spells those
+  lands cover, and bottom the rest starting with the most expensive (Emeria's Call, Agadeem's
+  Awakening, a second planeswalker, then the priciest card left). A hand of nothing but lands
+  draws one card a turn and casts it a turn late every time - at N of 3 that is two lands and
+  your cheapest spell, never three lands; at N of 5 or 6 it is three or four lands and the spells
+  they cover. Hive of the Eye Tyrant IS a land for this count. Bottom a land only when the
+  lands left would still cover the spells you are keeping. WHAT THIS COST: from a (keeping 3)
+  look holding three lands, Kaya, Pelakka Predation and two Soul Shatters, this seat's plan said
+  "cast Kaya" and its bottom answer put Kaya and every other spell under the deck; it kept
+  Plains, Pathway, Snarl and lost with sixteen decisions and no cast before turn 10.
 - KEEP a 7 or a 6 with 2-5 lands including a white source and a black source. Shineshadow Snarl
   alone counts as BOTH colors. Brightclimb Pathway is your white source, Hive and Swamp are black.
 - "Prefer a hand with an early play" is a TIEBREAKER between two keepable hands, NOT a requirement.
@@ -72,21 +83,28 @@ the rest of the list, and do not weigh a later line against an earlier one.
  3. Nadaar, Barrowin or Triumphant Adventurer - a body that ventures.
  4. SILVERQUILL SILENCER - your other real body. It is not a venture creature and it has no rule
     of its own; it belongs HERE, above the Command, whenever no body from entry 3 is listed.
- 5. Silverquill Command (see its own rule for the modes).
+ 5. Silverquill Command - when at least ONE of these three is true on the screen: their
+    battlefield line shows a creature (the sacrifice mode is live); your battlefield line shows a
+    creature (the pump mode is live); the Command row's own "{right now:" text names a card it
+    would return. Two live modes is a two-for-one and it is not a card to hold. When NONE of the
+    three is true, its only live mode is a card for 1 life and it drops to entry 8b.
  6. EMERIA'S CALL, when the option is actually listed (that means you can pay its seven).
  7. Pelakka Predation, when their hand size is 3 or more.
  8. Acererak the Archlich - only here, near the bottom, and only when nothing above matched.
+ 8b. Silverquill Command with NONE of its three conditions true (a cantrip for one life) - here,
+    below Acererak's free dungeon room, and still above "nothing".
  9. "Cast nothing right now".
 EVERY CARD YOU CAN CAST HAS A LINE ABOVE. If you find yourself casting something the list does
 not name, the list has not been read - go back and take the first line that matches. And "Cast
 nothing right now" is the LAST line, not a tiebreaker: it is correct only when every other line
 above it failed to match, never because a listed card looks situational. AND YOU MUST SHOW THE
 WORK: when you answer "Cast nothing right now", your reply names the highest entry that was on
-this menu and the reason it did not match - "nothing right now: the Command is entry 5, their
-board is empty and I control no creature, so both of its useful mode pairs do nothing". A bare
-"CHOICE: n (Cast nothing right now)" with no such sentence is the list going unread. If you
-cannot write that sentence, the answer is not "nothing" - go back and take the first line that
-matched.
+this menu and the reason it did not match, in the shape "nothing right now: entry <number>
+<card name> was on this menu; it did not match because <a fact printed on this screen>". Fill
+the three blanks from THIS menu and THIS board - a sentence about a card that is not on the menu
+is not the work, it is the list going unread. A bare "CHOICE: n (Cast nothing right now)" with no
+such sentence is the same. If you cannot fill the blanks, the answer is not "nothing" - go back
+and take the first line that matched.
 Then take the ask again if the game offers it - you can cast more than one spell in a turn.
 A CREATURE THAT VENTURES IS NOT A REASON TO SKIP A PLANESWALKER. "Develop the board and advance the
 dungeon" is the argument that loses this deck games: the dungeon is value you collect over many
@@ -124,21 +142,14 @@ attack costs you life.
   value). It does not target, so it answers a hexproof or indestructible bomb, and it answers
   ARTIFACT creatures that Vanishing Verse cannot touch. It does NOTHING if they control no
   creature - do not cast it into a board of only lands, artifacts or planeswalkers.
-- SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only) - entry 5 of THE WHOLE CAST
-  ORDER: CAST IT. THE TEST IS THE OPTION LIST, NOT THE BOARD: if "Cast Silverquill Command" is
-  printed and no removal spell with a live target and no planeswalker is printed above it, that
-  option IS your answer this ask - write it. "The board is not right for it yet" and "I will
-  find a better pair of modes later" are the two sentences that leave it in your hand; there is
-  no board on which its two best modes are worth less than the turn you spent doing nothing. It is a two-for-one
-  and it is not a card to hold: if it is on the list and nothing above it in THE WHOLE CAST ORDER
-  matched, take it. There is always a playable pair of modes - with a creature of theirs on the
-  board, sacrifice plus draw; with a creature of yours attacking this turn, pump plus sacrifice;
-  with neither, draw aimed at yourself plus return a two-drop from your graveyard. "I will wait
-  for a better board" is how two Commands sit in your hand while you lose. It chooses TWO of - a creature
-  gets +3/+3 and flying until end of turn / return a creature card with mana value 2 or less from
-  your graveyard to the battlefield / a player draws a card AND loses 1 life / the opponent
-  sacrifices a creature of their choice. Against aggro, the sacrifice mode plus a defensive mode
-  is a two-for-one blowout. Three rules decide every Command:
+- SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only): WHEN to cast it is decided
+  by entry 5 of THE WHOLE CAST ORDER and nothing here - its three conditions are read straight
+  off the screen, and when one of them is true and nothing above entry 5 matched, the option IS
+  your answer this ask. This section only says HOW to pick the modes. It chooses TWO of - a
+  creature gets +3/+3 and flying until end of turn / return a creature card with mana value 2 or
+  less from your graveyard to the battlefield / a player draws a card AND loses 1 life / the
+  opponent sacrifices a creature of their choice. Against aggro, the sacrifice mode plus a
+  defensive mode is a two-for-one blowout. Three rules decide every Command:
   * TIMING: if you take the pump mode to win a combat, cast Command in your FIRST main phase,
     BEFORE you declare attackers. It is a sorcery and the +3/+3 lasts only UNTIL END OF THIS
     TURN. A MAIN-2 PUMP BUFFS NOBODY: there is no combat left this turn, and the attack such a
@@ -164,6 +175,17 @@ COMBAT - ATTACKING TAPS YOUR BLOCKERS. THIS IS THE OTHER WAY THIS DECK LOSES.
 Every creature you declare as an attacker is TAPPED for the opponent's whole next turn and CANNOT
 BLOCK - the only exception is Nadaar, who has vigilance and attacks for free. Before you send a
 creature, ask what happens on the crack-back with that creature unavailable.
+- TWO NUMBERED CHECKS BEFORE ANY OTHER ATTACK RULE - STOP AT THE FIRST ONE THAT ANSWERS.
+  CHECK A - YOUR LAST BODY. Read your printed life. If it is 8 or less, count the creatures on
+    YOUR battlefield line that carry no "[tapped" and no "[summoning sick" tag. If that count is
+    ONE, that creature does not attack, whatever its tag says and even when its tag is empty: it
+    is the only blocker you will have on their turn, and an attacker is tapped for their whole
+    turn. Nadaar (vigilance) is the one creature this check lets go.
+  CHECK B - ONE ATTACKER, EVERY NAME "(neither dies)". If you are sending exactly ONE creature and
+    every name on its tag reads "(neither dies)", the answer is ATTACK: none. It deals nothing to
+    their life and comes back tapped. Damage on a wall does not carry over - "it deals 3 to the
+    Wall, leaving it at 1 toughness" is false; the Wall is 0/4 again next turn, and this seat
+    swung the same Silencer into the same Wall three times for nothing.
 - NEVER plan to block with a creature you are attacking with in the same turn. If your plan says
   "attack with these, then block with these," the plan is impossible - rewrite it.
 - "(neither dies)" on the ATTACK side is the OPPOSITE of free damage. It means that
@@ -216,20 +238,24 @@ creature, ask what happens on the crack-back with that creature unavailable.
   attack rules apply and a vigilant attacker (Nadaar) can be sent freely, because vigilance means
   it is still untapped to block on their turn.
   A CONVERTER OF THEIRS TURNS EVERY ONE OF THOSE PAYMENTS INTO DAMAGE ON YOU. When the prompt
-  prints "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs", each life they gain comes off
-  YOUR total as well, so a wall that gains them 3 costs you 3. With that line up, every attacker
-  whose tag prints a "(blocking trigger:" or a "(lifelink:" price STAYS HOME no matter how many
-  attackers you have; the only bodies that go are the ones the tag says cannot be blocked at all
-  ("[no creature they control can block this attacker]", or a menace line that says they cannot
-  field two blockers). Your own life total is not a resource to spend on a board like that: you
-  win it with Kaya, Soul Shatter and the dungeon drains.
-  AND THE PRICE YOU CAN SEE IS NOT THE PRICE YOU PAY WHEN THE TAG IS COLLAPSED. A tag reading
-  "they have N untapped creatures that could block this one, biggest <name>" prints the price of
-  their BIGGEST body only, and the biggest body is rarely the expensive one - it is their cheap
-  0/3 and 0/4 walls that carry the large lifegain triggers, and the collapse hides them. Read N,
-  then read their battlefield line for the defenders it did not print. With a converter of theirs
-  up and N of 2 or more, price the swing as paying you out for EVERY defender on that line, not
-  for the one life the tag showed you.
+  prints "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs", every "(blocking trigger:" and
+  "(lifelink:" price on an A-line is paid by YOU - the tag says it in words: "their converter
+  takes N off you". Their life goes UP by N and yours goes DOWN by N. That is not a wash, it is
+  not "net 0", and nothing is "drained from them" - the drain is pointed at you. With that line
+  up, a priced attacker STAYS HOME however many attackers you have and whatever it would kill;
+  the only bodies that go are the ones whose tag reads "[no creature they control can block this
+  attacker]". Your own life total is not a resource to spend on a board like that: you win it
+  with Kaya, Soul Shatter and the dungeon drains.
+  CHECK YOUR OWN PLAN SENTENCE BEFORE YOU WRITE THE ATTACK LINE. If it contains "net 0",
+  "netting us 0", "net zero", "they gain N which Sanguine Bond drains from them", or "the game
+  ends before that damage matters", THE PLAN IS ALREADY WRONG - those are the exact sentences this
+  seat wrote before paying 1, 4, 1 and, from 4 life, 6 into that board and dying on its own
+  attack. Take the priced attacker back out of the ATTACK line.
+  A collapsed tag ("they have N untapped creatures that could block this one, biggest <name>")
+  prints the biggest body's price and, when the priciest defender is a different one, adds
+  "most expensive to attack into: <name> (...)". That clause IS the price of the swing; read it,
+  not the "biggest" parenthesis, and with a converter of theirs up it means the attacker stays
+  home.
 - A "their untapped blockers" tag that contains "your attacker dies, their blocker lives"
   ANYWHERE IN ITS LIST is a per-creature STOP, not a note about the whole attack. Leave THAT
   creature home even when the rest of the team is attacking - "attack with everything that
@@ -382,6 +408,13 @@ you have nothing better to cast; it is a late-game mana sink, not a cheap threat
   controller's untap step, menace (can't be blocked except by two or more creatures)]" - and is
   counted in the "of which N are creatures" number. If it carries ANY (P/T), the answer is PASS;
   an anthem makes that number bigger than the printed 3/3.
+  CHECK 3 - IS THAT HIVE TAPPED, AND WHAT PAYS FOR IT? Find the Hive the row names on your
+  battlefield line. If its entry reads "[tapped]", the answer is PASS: a tapped land animates into
+  a tapped 3/3 that cannot attack this turn - four mana for nothing. Then read the mana line's
+  "Those sources, one per untapped card:" list. If the only "{b}" source on it is a Hive that is
+  ALREADY a (3/3), animating this one taps that one, and you attack with neither. This seat did
+  exactly that: eight mana, two tapped Hives, zero attackers. A second Hive is animated only when
+  a Swamp or a Shineshadow Snarl is still on the sources list to pay its {B}.
   AND THE ROW OFTEN SAYS SO ITSELF. An option printed "[repeat: activated this turn N times
   already]" is the game handing you the receipt for the mana you already spent on it this turn.
   That tag is an unconditional PASS - the cheapest observable on the screen, and it cannot be
@@ -402,10 +435,13 @@ board and then nothing happens - the card stays in your hand and the turn is gon
 no graveyard, and no board that makes it a good cast. Cast a creature or hold removal instead.
 
 DECIDING SITUATIONS (recognize -> do):
-- The mulligan ask says "(keeping 5)" or fewer and the hand has a land -> KEEP. No exceptions -
-  not even a hand missing one of your colors.
-- You kept, and the game asks which cards to bottom -> bottom expensive spells (Emeria's Call,
-  Agadeem's Awakening, spare planeswalkers), NEVER a land - Hive of the Eye Tyrant is a land.
+- The mulligan ask says "(keeping 5)" or fewer and the hand has a land -> keep it; a fresh
+  seven shaved to four is the same land odds with one card fewer, and a missing colour arrives
+  with the next land (nine of 21 make both).
+- You kept, and the game asks which cards to bottom -> read "You will be left with an N-card
+  hand" and build the best N: the lands that cover your cheapest spells, those spells, and the
+  expensive cards under the deck (Emeria's Call, Agadeem's Awakening, spare planeswalkers).
+  Never all lands; Hive of the Eye Tyrant counts as a land.
 - The engine's hand header says "2 lands" -> it is a two-land hand. Use its count, not your own.
 - Opponent has a real creature/planeswalker and you can remove it, and you are not ahead ->
   fire Vanishing Verse (read its target list) or Kaya -3 (any nonland) NOW; do not hold it.
@@ -437,9 +473,10 @@ DECIDING SITUATIONS (recognize -> do):
   through; hold the rest. No such clause on the tag -> their walls are free to attack
   into and the ordinary rules apply.
 - "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs" is printed AND any attacker's tag prints
-  a "(blocking trigger:" or "(lifelink:" price -> that attacker STAYS HOME. Only bodies the tag
-  says cannot be blocked at all go in. A collapsed tag ("they have N untapped creatures ...,
-  biggest <name>") shows you their biggest body's price, never their most expensive one.
+  a "(blocking trigger:" or "(lifelink:" price -> that attacker STAYS HOME; "their converter
+  takes N off you" is N off YOUR life, not theirs. Only bodies the tag says cannot be blocked at
+  all go in. Your plan says "net 0" or "drained from them" -> the plan is wrong; leave it home.
+  A collapsed tag's "most expensive to attack into:" clause is the price of the swing.
 - An attacker's tag lists several blockers and ONE of them reads "your attacker dies, their
   blocker lives" -> that creature stays home if it is a CARD. They pick the blocker, and they
   pick that one. Only a token goes anyway.
@@ -474,8 +511,10 @@ DECIDING SITUATIONS (recognize -> do):
   Nadaar, Acererak) is on the same list and even when that creature would venture. Only a removal
   spell with a live target outranks her. A bomb walker in hand does nothing, and "I will cast her
   next turn" assumes mana you do not have yet.
-- Silverquill Command is on the list and no removal-with-a-target and no planeswalker is ->
-  cast it. There is always a playable pair of modes. Once one is on your battlefield on your turn -> activate an ability (Lolth -3 for
+- Silverquill Command is on the list, no removal-with-a-target and no planeswalker is, and their
+  line shows a creature OR your line shows a creature OR its row names a card it returns -> cast
+  it. None of the three true -> it sits below Acererak (entry 8b), still above "nothing".
+- A planeswalker is on your battlefield on your turn -> activate an ability (Lolth -3 for
   Spiders or 0 to draw; Kaya -3 to exile their threat) - do not pass with an idle planeswalker.
 - You have completed a dungeon and control Nadaar -> your team is +1/+1 (creatures render above
   their printed stats); attack accordingly.

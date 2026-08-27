@@ -74,17 +74,19 @@ Look at YOUR battlefield line and count the names Underworld Dreams, Fate Unrave
   Fruition all wait for the punisher.
 The thought "drawing more cards is the priority, I need to find my win condition" is ALWAYS FALSE
 for this deck - a card you hand the opponent with no punisher out is a card that kills you.
-THE EXACT SHAPE THAT LOSES GAMES: a Howling Mine is already on your battlefield line, no
-punisher is, and the ask offers a SECOND Mine, a Dictate of Kruphix or a Puzzle Box. Every one
-of those is an extra card per turn for a deck that is assembling something. Take the wall, the
-Liliana's Caress or "Cast nothing right now" instead, every single time, until a punisher name
-appears on YOUR battlefield line. Count the names on the line - do not count the ones in hand.
-ONE exception to the brake, and only this one: MASTER OF THE FEAST is a 5/5 flying body as
-well as a gift, and it is the only card behind this brake that defends you. With NO punisher
-out, cast it whenever the opponent's battlefield line shows a creature - the body is worth the
-one card you hand over. It still sits behind Rule 1, behind Shield Sphere and behind Fog Bank.
-Everything else - Dictate, Puzzle Box, Forced Fruition, extra Mines - waits behind the brake at
-every life total, with a creature on their board or without one.
+Count the punisher names on YOUR battlefield line - not the ones in hand, not the one that was
+countered last turn. Zero names and a Mine already there: the wall, the Caress or "Cast nothing".
+ONE exception to the brake, and only this one: MASTER OF THE FEAST is a 5/5 flying body as well
+as a gift. With NO punisher out, cast it ONLY when the opponent's battlefield line reads "of
+which N are creatures" with N of 1 or more - the body is worth the card only when there is
+something for it to block. At "of which 0 are creatures" it is a gift like the others and waits.
+It still sits behind Rule 1, behind Shield Sphere and behind Fog Bank.
+CHECK YOUR OWN PLAN SENTENCE BEFORE YOU ANSWER. If your PLAN says "stack draw engines", "deploy
+draw engines", "cast Master of the Feast for board presence" or "once a punisher is on the
+battlefield" while YOUR battlefield line holds none of the three punisher names, the plan is
+describing a board you do not have and the answer it leads to is wrong - this seat wrote each
+of those sentences while casting a second Mine, a second Master, a Forced Fruition and a Puzzle
+Box into an empty line, and handed a control deck twenty cards. Count the names; then answer.
 
 === RULE 3 - THE WALLS. PUT THEM DOWN THE TURN THEY APPEAR ===
 Shield Sphere and Fog Bank are your entire defence - this deck has no removal except Ob Nixilis's
@@ -187,8 +189,12 @@ UNDERWORLD DREAMS {b}{b}{b} - enchantment, 1 damage to the opponent per card the
 FATE UNRAVELER {3}{b} - 3/4 creature with the same trigger. It is a punisher that also blocks.
 OB NIXILIS, THE HATE-TWISTED {3}{b}{b} - planeswalker, enters with 5 loyalty, same trigger, and
   "-2: Destroy target creature. Its controller draws two cards." The -2 is removal AND two more
-  draws to punish. Use it on the opponent's biggest creature. When the ONLY name offered after
-  "targeting" is one of your own creatures, pass - the offer comes back.
+  draws to punish. Aim it FIRST at a creature whose printed text makes more creatures - Thraben
+  Doomsayer, Bloodline Keeper, Siege-Gang Commander, any row whose text says "create" or "put a
+  ... token" - and only then at the biggest body. A 1/1 token is never the target while its maker
+  is on the same list: this seat killed a Human token beside a Thraben Doomsayer and faced
+  twenty-three creatures two turns later. When the ONLY name offered after "targeting" is one of
+  your own creatures, pass - the offer comes back.
 HOWLING MINE {2} - EACH player draws an extra card each draw step while it is untapped. Gated by
   rule 2.
 DICTATE OF KRUPHIX {1}{u}{u} - EACH player draws an extra card each draw step. Same gate.
@@ -299,18 +305,30 @@ facts. You run 26 lands, so a third land by turn three and a fourth by turn five
 and a six you ship is most often a two-lander again. Your punishers cost three to five, so you
 need to reach four or five mana on time - that is what the land count is for.
 - TWO OR MORE LANDS: KEEP. Not a close call.
-- ONE LAND: ship it. Your cheap plays are Shield Sphere {0} and Fog Bank/Howling Mine at two, and
-  none of them advances the plan; everything that wins costs three or more, so one land means
-  four or five turns of waiting against a deck that is attacking you.
+- ONE LAND ON THE UNTOUCHED SEVEN: ship it. Your cheap plays are Shield Sphere {0} and Fog
+  Bank/Howling Mine at two, and none of them advances the plan; everything that wins costs three
+  or more, so one land means four or five turns of waiting against a deck that is attacking you,
+  and a fresh seven costs you only one card.
+- ONE LAND AT THE SECOND LOOK ("(keeping 6)"): now the ship costs TWO cards for the same land
+  odds, and the bottom ask lets you shave the six yourself. Keep it when the "would cover the
+  cost of:" line names a card or the hand holds a punisher you can reach on the third land
+  (Fate Unraveler at four); ship it when the hand is one land and nothing castable before turn
+  four. This seat shipped a one-land six holding three Underworld Dreams, a Shield Sphere and a
+  Fog Bank, found a three-lander with two punishers at (keeping 5) and won - the ship was a fair
+  bet there because none of the six was castable before the third land.
+- ONE LAND AT "(keeping 5)" OR LOWER: keep. Each further look is a fresh seven shaved by yet
+  another card at the same land odds; the bottom ask builds the hand (lands first, then the
+  cheapest spells they cover, punishers over engines).
 - ZERO LANDS: ship, always.
-Never keep fewer than 5 cards.
 Tiebreakers between hands that already clear the land count, never a reason to ship one that
 does: prefer a hand holding a punisher or a Fog Bank; prefer a hand whose "Playing every land in
 this hand would cover the cost of:" line names at least one card. Colour is a tiebreaker and
 never a gate: 18 of your 26 lands make black, 18 make blue, and ten of them make both. A hand
 with no cheap play is never a reason to mulligan - this deck contains no one-mana card.
-If the prompt says "having already taken 1 mulligan", this is your LAST look: answer "Keep this
-hand". "I will keep whatever I draw next" is how you end up with a 4-card hand - keep THIS one.
+"I will keep whatever I draw next" is the sentence that runs a chain to four cards - the next
+seven is no likelier to have lands than this one, and it will be one card smaller. Decide each
+look on its own header and the land branches above; a carried plan that says "mulligan for
+lands" is about a hand you already threw away.
 WHEN YOU KEEP AFTER A MULLIGAN THE GAME ASKS WHICH CARDS TO BOTTOM. Bottom your most EXPENSIVE
 spell first: Forced Fruition, Peer into the Abyss, Teferi's Puzzle Box, a second copy of a draw
 engine - in that order. Never bottom SHIELD SPHERE - it costs ZERO mana, so it is free defence
@@ -358,4 +376,8 @@ below that a land is never the right card to lose.
 - Peer into the Abyss resolves and asks target opponent or target controller: answer "target
   opponent".
 - Ob Nixilis's -2 offers only your own creature as a target: pass.
+- Ob Nixilis's -2 lists a token AND a creature whose text makes tokens: destroy the maker.
+- No punisher name on YOUR battlefield line and your plan says "stack draw engines" or "for
+  board presence": the plan is wrong - cast the wall or nothing. Master of the Feast goes only at
+  "of which 1" or more creatures on THEIR line.
 - The lethal check clears: attack with everything, Fate Unraveler included.

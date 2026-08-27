@@ -27,7 +27,8 @@ then the spell that killed you resolved four turns later with nothing in hand to
 Emrakul, the Aeons Torn costs {15} - fifteen mana. Your mana is 26 lands and nothing else: this deck
 has no ramp, no mana rock and no cost reduction, so one land per turn is all the mana you will ever
 have. Your plan is therefore this, and you can write it as your PLAN line word for word:
-   "Answer their threats, resolve Staff of Nin, ping their face every turn."
+   "Answer their threats, resolve Staff of Nin from a row reading leaves 5 or more, ping their
+   face every turn."
 The thought "ramp to 15 mana and cast Emrakul", the thought "I just need to survive until I can cast
 Emrakul", and the thought "attack when board presence allows" are ALWAYS FALSE in this deck. There is
 no ramp to do, and you have no creature to attack with. When one of them shows up in the plan you
@@ -54,7 +55,9 @@ Staff of Nin {6} artifact, two copies. Its line reads: "At the beginning of your
 -- {T}: Staff of Nin deals 1 damage to any target." It is the only damage and the only extra card
 this deck has.
 THE TAP-OUT GATE, and it covers EVERY mana you spend on your own turn - a Sphinx's Revelation, a
-Staff of Nin, an Elixir of Immortality cast OR activated, a Lightmine Field. Look at your hand for
+Staff of Nin, an Elixir of Immortality ACTIVATION, a Lightmine Field. The one spend it does NOT
+cover is the Elixir CAST: {1} for a card that then waits on your battlefield is always paid, at any
+N, the turn it is listed; the gate governs its {2} activation. Look at your hand for
 ANY of Essence Scatter, Cancel, Dream Fracture or Fall of the Gavel - all four, not the three
 cheap ones. THE OPTION ROW PRINTS THE ANSWER: every "Cast ..." line ends with "{leaves N of your M
 untapped mana sources untapped}", or "casting this taps you out" which is N = 0. N is what is left
@@ -70,9 +73,11 @@ Underworld Dreams costs you the game; three extra cards do not win it.
   available:" total, not a subtraction: the row already did it. The only exception is a hand with NO
   counterspell in it at all. At "leaves 4" or less, and at every row saying "casting this taps you
   out", pass and cast it next turn with a land to spare. This rule outranks "cast it the first turn
-  it appears"; nothing else does. SIX OF SEVEN Staff casts this corpus broke it - at leaves 2, 1, 1,
-  0, 0 and 0, with a counterspell in hand every time. It has failed four waves running while it
-  asked you to compute a number; it now asks you to copy one.
+  it appears"; nothing else does. Two of six Staff casts this corpus broke it, at "leaves 2" and
+  "leaves 0", a counterspell in hand both times - and the "leaves 2" one was followed, on the very
+  next turn, by an Underworld Dreams resolving with no window offered to you, because you could
+  not pay for one. That was the turn that lost the game. The plan line now carries this number so
+  it is in front of you at every cast ask.
 - Keep taking the "Deal 1 Damage with Staff of Nin ... targeting a player" option in every window it
   is offered, including upkeep, and with EVERY Staff you control. That damage is how the game ends.
 - Point it at a creature or a planeswalker only when 1 damage finishes it: printed toughness 1, or a
@@ -88,11 +93,10 @@ The stack line and the counter option both print the target's TYPE, MANA COST an
 from the numbers, not from the name:
   - (creature P/T) with printed POWER 2 or more: COUNTER IT.
   - a WALL, at ANY printed power: LET IT RESOLVE. A defender cannot attack, so it can never take a
-    point off you, and you have no creature for it to block. RECOGNISE ONE BY WHAT THE ROW DOES
-    CARRY: a spell whose {target text: ...} BEGINS with "Defender", or whose printed power is 0,
-    is a wall. You spent a Cancel on "Perimeter Captain {w} (creature 0/4) {target text:
-    "Defender -- ..."}" while that row was already telling you. When the stack row starts
-    printing [defender], key this rule to the tag instead.
+    point off you, and you have no creature for it to block. RECOGNISE ONE BY ITS TAG: the stack
+    line and the counter row print it - "Perimeter Captain {w} (creature 0/4) [defender]". A stack
+    row tagged [defender], or printing power 0, is a wall. Five such rows this corpus, zero
+    counters spent on them - keep it that way.
     Pride Guardian (0/3), Wall of Omens (0/4), Perimeter Captain (0/4), Fog Bank (0/2) and Shield
     Sphere (0/6) are this shape. This line has no exception: a counter spent on a wall is a counter you do not have
     for the enchantment that kills you. In a game you lost you spent Dream Fracture on a Pride
@@ -147,7 +151,9 @@ Only when NO candidate has such a line do you use the power rule:
 Then: cast Path to Exile at the creature with the HIGHEST printed power. If EVERY candidate on that
 clause reads printed power 0 or 1, or is tagged [defender], answer "Cast
 nothing right now" and keep the Path - at any life total above 12, whatever else is on the board
-and however many turns you have been holding it. A 0/4 wall is never a Path target.
+and however many turns you have been holding it. A 0/4 wall is never a Path target, and neither is
+a token with no {target text:} at all - "Goblin (creature 1/1)", a Human, a Wolf: you Pathed a lone
+Goblin token twice at 20 life with ten lands open.
 YOUR LIFE IS 12 OR LESS AND ANY CANDIDATE READS PRINTED POWER 2 OR MORE: CAST THE PATH AT THE
 BIGGEST OF THEM, IN THAT WINDOW. Not next turn, not after you find a sweeper, not once you have
 seen it attack. Thirteen windows this corpus offered a real target at 12 life or less and you took
@@ -175,7 +181,13 @@ IF THAT SECOND NUMBER IS 0, SUPREME VERDICT AND FINAL JUDGMENT ARE NOT CASTABLE 
 in your FIRST main phase and in your SECOND main phase alike. The header does not change
 between them, and neither does this answer. Answer
 "Cast nothing right now" and keep them. This line outranks every other reason to cast a sweeper -
-being ahead, having spare mana, wanting to use the turn, the plan naming a wipe. A wipe with nothing
+being ahead, having spare mana, wanting to use the turn, the plan naming a wipe. It outranks the
+turn count too: the tenth window that offers the sweeper at 0 has the same answer as the first,
+main phase 2 has the same answer as main phase 1, and a menu whose only cast row is the sweeper
+still answers "Cast nothing right now" - one castable card on the menu is not a reason to cast it.
+Four sweepers this corpus went into a 0, and every one took one of those shapes: two into an
+opposing board with NO creature on it at all, one into five walls, one in main phase 2 of a turn
+whose main phase 1 you had passed correctly. A wipe with nothing
 to kill is a card you threw away AND a turn you spent tapped out, and the turn you spend tapped out
 is the turn their engine lands uncountered. Only when that SECOND number is 1 or more do you read
 on, and every count in the branches below means that second number:
@@ -208,7 +220,9 @@ Sphinx's Revelation {X}{W}{U}{U} instant: "You gain X life and draw X cards." At
 nothing and draws nothing; at X = 3 it costs six mana and draws you three cards, and three is the
 answer every time you cast it. The whole section below is about WHEN to cast it, not how big.
 THE TAP-OUT GATE, and it covers EVERY mana you spend on your own turn - a Sphinx's Revelation, a
-Staff of Nin, an Elixir of Immortality cast OR activated, a Lightmine Field. Look at your hand for
+Staff of Nin, an Elixir of Immortality ACTIVATION, a Lightmine Field. The one spend it does NOT
+cover is the Elixir CAST: {1} for a card that then waits on your battlefield is always paid, at any
+N, the turn it is listed; the gate governs its {2} activation. Look at your hand for
 ANY of Essence Scatter, Cancel, Dream Fracture or Fall of the Gavel - all four, not the three
 cheap ones. THE OPTION ROW PRINTS THE ANSWER: every "Cast ..." line ends with "{leaves N of your M
 untapped mana sources untapped}", or "casting this taps you out" which is N = 0. N is what is left
@@ -269,6 +283,27 @@ which is not below 3, so X = 3 - not the 13 the menu topped out at. Library 20, 
 to 13: 20-2-2 = 16, still not below 3, so X = 3 - the 8 you announced discarded five cards at end
 of turn.
 
+=== FORCED FRUITION - EVERY SPELL YOU CAST DRAWS YOU SEVEN ===
+Forced Fruition {4}{U}{U} enchantment (deck162 runs it): "Whenever an opponent casts a spell, that
+player draws seven cards." Once it is on the opponent battlefield line, every spell YOU cast draws
+you seven before it does anything - a counter, an Elixir, a Staff, a sweeper, all of them - and two
+copies ("Forced Fruition #1-#2 x2") draw fourteen. Only CASTING triggers it: activating an Elixir
+already on your battlefield does not, and a land drop does not.
+Read the opponent battlefield line for it at every cast ask, then:
+ - Forced Fruition there AND any "Whenever an opponent draws" permanent there (Underworld Dreams,
+   Fate Unraveler, Ob Nixilis): every spell you cast costs you 7 life per Fruition per punisher.
+   Cast NOTHING on your own turn - no Elixir cast, no Staff, no sweeper, no Revelation - and on
+   their turn cast a counter ONLY when that price is below your life minus 1. Read the price off
+   the line before the CHOICE: one Fruition and one Dreams is 7; two Fruitions and one Dreams is
+   14. At 15 life you cast an Elixir under one of each, drew seven and finished at 13 for the five
+   life it gained; at 11 life you cast Cancel under two Fruitions and a Dreams, drew fourteen, and
+   died on the spot.
+ - Forced Fruition there and NO punisher: each spell still draws you seven. Read "Your library: N
+   cards": cast nothing when N is 14 or less, and use the Elixir ACTIVATION (an ability, not a
+   spell - Fruition does not see it) to refill the library first.
+ - The answer to Forced Fruition is the counter you cast at it while it is ON THE STACK: it is on
+   the counter-on-sight list above. Once it has resolved you do not cast your way out of it.
+
 === ELIXIR OF IMMORTALITY - THE RECYCLER ===
 Elixir of Immortality {1} artifact, two copies: "{2},{T}: You gain 5 life. Shuffle Elixir of
 Immortality and your graveyard into library." Every counterspell and every Path you have already
@@ -323,19 +358,10 @@ a Lightmine Field. Ending your turn with all your mana unspent is right only whe
 nothing but counterspells.
 
 === MULLIGAN ===
-STEP 1 - READ THE PRICE LINE FIRST, AND STOP THERE IF IT ANSWERS. The ask prints the number:
-"having already taken 2 mulligans you will bottom 2 cards on a keep (keeping 5)". If it says
-(keeping 5) or ANY lower number: KEEP, if the hand holds at least one land - you are DONE, do
-not read another rule in this section. The bar is ONE LAND and nothing else: not a colour, not
-a counterspell, not a curve.
-The London mulligan already shaves a seven to six for one card, so a third look buys a fresh
-seven at the price of TWO. Two seats in one corpus went to four cards and both lost.
-STEP 2 - only on your untouched opening seven, or at "(keeping 6)", is the comparison below the
-question at all.
-
-The question is never "does this hand meet a number". It is: what are the odds THIS hand does
-something in time, against the odds a six-card hand does something in time? Two facts about this
-deck set that comparison, and the prompt gives you the rest:
+The question at every look is the same one, and it is about ODDS, never about a number the hand
+has to meet: what are the odds THIS hand does something in time, against the odds the NEXT hand -
+one card smaller - does? Two facts about this deck set the comparison, and the prompt gives you
+the rest:
   - 26 of your 60 cards are lands, so a two-land seven sees its third land inside two or three
     draws and its fourth by about turn five. Waiting for lands is a bet you usually win.
   - Your job is REACTIVE. Nothing here has to happen on turn two; the cost of a slow start is only
@@ -346,43 +372,65 @@ the hand yourself:
   "Mana sources among those lands, counted by the engine: {W} n, {U} n."
   "Playing every land in this hand would cover the cost of: ..." - or "would not cover any spell
   in it."
-KEEP any hand with 2 to 5 lands whose coverage line names at least one card. That hand can already
-act on their first threat, and the odds of improving it by shipping a card are against you.
-THINK AGAIN when the coverage line reads "would not cover any spell in it". That sentence means
-this hand does nothing until you draw both a land and a colour, and it is the one shape where
-seven cards can be worse than six - most sharply when the spells left in the hand are your
-expensive ones (Final Judgment {4}{W}{W}, Staff of Nin {6}, Emrakul {15}) rather than a Path to
-Exile {W} or an Elixir {1}. Weigh: how many draws until this hand casts ANYTHING, and can you
-afford those turns against the deck across the table? Ship it when the answer is "four or more
-turns and they have a creature on turn two"; keep it when one land makes it live.
-A one-land seven ships. A hand of 2 to 5 lands with a Path or an Elixir in it never does.
+And the mulligan row prices the next look for you: "Mulligan (a keep after this one would keep 5
+cards)". Every look costs a card; the London mulligan gives you a fresh seven and takes the cost
+at the keep. A six-card hand that does something beats a seven that does nothing; a five-card hand
+that does something beats a six that does nothing; but a hand of five or fewer that already does
+something is almost never beaten by the next look, because a smaller hand loses answers faster
+than it fixes lands.
+So, at each look:
+  - A hand of 2 to 5 lands whose coverage line names at least one card can already act on their
+    first threat, and the odds of improving it by shipping a card are against you: KEEP. At any
+    price. You shipped a four-land hand whose coverage line named Dream Fracture AND Supreme
+    Verdict at the "would keep 5 cards" row, then shipped a two-land hand at the "would keep 4
+    cards" row, kept four, and lost a game you never got to play.
+  - The coverage line reads "would not cover any spell in it": this hand does nothing until you
+    draw both a land and a colour, and it is the one shape where a smaller hand can be better.
+    Weigh how many draws until it casts ANYTHING - sharpest when the spells left are Final
+    Judgment {4}{W}{W}, Staff of Nin {6} or Emrakul {15} rather than a Path to Exile {W} or an
+    Elixir {1} - against what the next look costs. On a fresh seven or a six, ship it when the
+    answer is "four or more turns and they have a creature on turn two". At a row reading "would
+    keep 5 cards" or smaller, the next look costs more than that wait does: keep it if it holds a
+    land and a spell you can cast within two draws, and ship it only when it holds no land at all
+    or no spell at all.
+  - Seven lands and no spell, or seven spells and no land, ships at any price - those hands do
+    nothing however long you wait, and the odds of the next look beating "nothing" are as good as
+    odds get.
 Tiebreakers between keepable hands, never a reason to ship on their own: prefer the hand with a
 land that makes both colours (Tundra, Glacial Fortress, Seachrome Coast), and prefer the hand with
 at least one counterspell. Colour alone is not a reason to mulligan - 18 of your lands make {W} and
 20 make {U}, so a one-colour opener is usually two draws from the other.
 
-When a keep makes you bottom cards the ask prints your hand as a NUMBERED list. Walk that list from
-the top and send the FIRST card that matches, in this order:
+When a keep makes you bottom cards the ask prints your hand as a NUMBERED list and tells you how
+many to send. What you are choosing is the hand you KEEP, and the hand you keep needs two things:
+lands to cast with and answers to cast. Read the numbered list once, decide which cards those are,
+and bottom the rest - in this order of preference, taking as many as the ask demands:
   1. Emrakul, the Aeons Torn.
   2. Any card whose line says "(copy 2 of 2 in your hand)" - a duplicate of anything, a duplicate
      LAND included. Two Islands in a seven is a duplicate and it is the answer; you bottomed a
      Sphinx's Revelation past two Islands instead.
-  3. A land beyond the fifth.
-  4. Only if none of those exist: your most expensive spell.
-NEVER bottom a land when the hand you keep would hold fewer than THREE. NEVER bottom your last
-counterspell and never bottom your last Path to Exile - this deck answers threats or it loses,
-and a hand with no answer in it is a loss you chose at this ask, not one you were dealt.
+  3. A land beyond the fifth, or beyond the third when the ask makes you send three.
+  4. Your most expensive spell, then the next most expensive.
+  5. Only when the list is exhausted: the cheapest card that is neither a land nor an answer
+     (an Elixir before a Path, a Path before a counterspell).
+The hand you keep should hold at least as many lands as it can play in its first two or three
+turns and at least one card that answers a threat - a counterspell or a Path. When the ask makes
+you send more cards than that leaves room for, keep the LANDS and ONE answer and let the rest go:
+a counterspell you cannot pay for is not an answer, and a land with nothing to cast is not a hand.
+You once sent an Island, a Fall of the Gavel and an Essence Scatter from a three-land four-spell
+hand and kept two lands with a Path and an Elixir - three cards had to go, and the three that
+should have gone were the Gavel, the Elixir and the Path, leaving three lands and a Scatter.
 
 === DECIDING SITUATIONS ===
 - The prompt lists "Play <land>" options: play one. Every turn, no exceptions.
 - The plan you were given talks about ramping to Emrakul or about attacking: write the plan "answer
-  their threats, resolve Staff of Nin, ping their face every turn" instead.
+  their threats, resolve Staff of Nin from a row reading leaves 5 or more, ping their face every
+  turn" instead.
 - "Deal 1 Damage with Staff of Nin ... targeting a player" is in your list: take it, every window,
   with every Staff.
 - "Cast Staff of Nin" is in your list and no answer is needed this turn: take it.
-- Their spell on the stack prints (creature P/T) whose {target text:} begins with "Defender", or
-  prints printed power 0: let it resolve. Walls never get a counter - and the stack row does not
-  carry the [defender] tag, so the text is where you read it.
+- Their spell on the stack is tagged [defender], or prints printed power 0: let it resolve. Walls
+  never get a counter.
 - Their spell on the stack prints (creature P/T) with printed power 0 or 1, or prints no P/T at
   all: let it resolve and keep the counter - unless its {target text:} contains "{T}:",
   "Whenever ... attacks", "At the beginning of" or "venture": then counter it now.
@@ -395,8 +443,10 @@ and a hand with no answer in it is a loss you chose at this ask, not one you wer
   of them able to attack right now") reads 2 or more: cast Supreme Verdict, or Final Judgment
   against anything that comes back from a graveyard. Read that number, never the creature count.
 - That second number reads 0: cast NOTHING - no Supreme Verdict, no Final Judgment, no Lightmine
-  Field, at any life total and with any spare mana. "3 creatures, 0 of them without a restriction
-  against attacking" is a board of walls and no card of yours is worth spending on it.
+  Field, at any life total, with any spare mana, in either main phase, however many turns it has
+  been offered, and when it is the only cast row on the menu. "3 creatures, 0 of them without a
+  restriction against attacking" is a board of walls; "0 creatures" is an empty board; no card of
+  yours is worth spending on either.
 - That second number reads exactly 1: Path to Exile it and keep the sweeper.
 - That second number reads 3 or more and Lightmine Field is in your list: cast it. Below 3, never.
 - Your life is 12 or less and any Path candidate reads printed power 2 or more: cast Path to Exile
@@ -421,6 +471,10 @@ and a hand with no answer in it is a loss you chose at this ask, not one you wer
 - Nothing in your list answers anything and you have mana above your counterspell's cost: spend it on
   Staff of Nin, on Elixir, or on Sphinx's Revelation rather than passing the turn with it unused -
   the tap-out gate (the row must read "leaves 5" or more) still binds, and so does the draw-is-damage
-  stop.
+  stop. NEVER on Supreme Verdict, Final Judgment or Lightmine Field: those three are spent only by
+  the header number, and a turn that ends with mana unused is the right turn when that number is 0.
 - Their spell on the stack prints (artifact) whose text only says "Add" - Chromatic Lantern,
   Talisman of Impulse: let it resolve. A mana rock has never killed you.
+- "Forced Fruition" is on the opponent battlefield line beside Underworld Dreams, Fate Unraveler or
+  Ob Nixilis: cast nothing on your turn, and cast a counter only when 7 x (Fruitions) x (punishers)
+  is below your life minus 1. Activating an Elixir already on your battlefield is still free.
