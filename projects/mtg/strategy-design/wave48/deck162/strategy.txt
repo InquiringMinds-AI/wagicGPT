@@ -1,0 +1,383 @@
+DRAW AND DIE - UB FORCED-DRAW PUNISH
+
+The opponent's own draw step is your kill. Underworld Dreams, Fate Unraveler and Ob Nixilis each
+deal the opponent 1 damage EVERY time that opponent draws a card - and they stack, so three of them
+out means 3 damage per card. Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box and Forced
+Fruition make the opponent draw MORE cards. Put the damage on the battlefield FIRST, then hand them
+cards. Every turn you do one of three things: land a punisher, put a wall in front of their
+creatures, or - once a punisher is out - stack another draw engine on top. You are never idle and
+you never wait to stabilize.
+
+=== RULE 0 - PLAY A LAND EVERY TURN YOU ARE OFFERED ONE. NOTHING OUTRANKS THIS ===
+When a "Land drop:" question is put to you and one of its options plays a land, PLAY THE LAND.
+The land drop is its OWN decision - the prompt says so on its own line. It costs no mana, it is
+not part of your casting decision, and taking it does not spend anything you were going to cast
+this turn: you play the land AND cast the spell, on the same turn, in that order. "I am casting
+Underworld Dreams this turn, so I will hold the land" and "I will play it next turn when I know
+what I need" are the two sentences that lose this deck games before turn six - both are false.
+Your punishers cost three to five mana and every land you skip is a turn they arrive late.
+Never answer "Play no land right now" or "Hold ..." while any land is playable, and when several
+are offered take the one whose colour your hand needs (black for the punishers first).
+
+=== RULE 0b - TRUST THE "Mana available" LINE. DO NOT RE-DERIVE YOUR MANA ===
+"Mana available: N total (... colours you can make: {u}{b})" gives you two facts and both are
+correct: N is what you can spend this window, and the colour list names which COLOURED pips you
+can pay. GENERIC IS NOT A COLOUR - Underworld Dreams {B}{B}{B} needs three black sources, but
+Howling Mine {2} and Fog Bank {1}{U} take any source for their generic. Never spend a decision
+asking "do I have generic mana"; there is no such thing as not having it. And if a spell is
+printed as a numbered "Cast ..." option, it IS payable - the game has already checked. Pick it.
+
+=== RULE 1 - THE PUNISHER GOES FIRST. ALWAYS. READ YOUR CAST LIST TOP TO BOTTOM ===
+Your three punishers are UNDERWORLD DREAMS {b}{b}{b}, FATE UNRAVELER {3}{b}, OB NIXILIS, THE
+HATE-TWISTED {3}{b}{b}. Every time you are asked "which card do you cast now", scan the numbered
+options for those three names FIRST.
+If ANY of the three is in the list, CAST IT THIS ASK. Not after the Howling Mine, not after the
+Master of the Feast, not in a moment - THIS ask, this reply. It goes ahead of every other card in
+your deck, at every life total, on every board.
+An option that is printed is an option you can pay for; the game has already checked.
+Mana runs out mid-turn: cast the punisher while you can still afford it, then spend what is left.
+The thought "it doesn't strictly matter which order I cast these in" is ALWAYS FALSE for this deck.
+The order is the single most important thing you decide.
+ONE named exception: when your life is 8 or less AND the opponent's battlefield shows a creature,
+"Cast Fog Bank {1}{u}" goes ahead of the punisher for that one ask - then cast the punisher with
+what is left, or on your next turn.
+WHICH PUNISHER, WHEN TWO ARE OFFERED: TAKE THE ONE THAT IS ALSO A BODY. Fate Unraveler (3/4) is
+the only PUNISHER of the three that is also a body - it punishes AND it blocks.
+Underworld Dreams and Ob Nixilis are not creatures and will never stop a single point of damage.
+Master of the Feast (5/5 flying) is not a punisher at all: its own text makes the OPPONENT draw,
+so it is a draw ENGINE with a body, it is entry 5 on the cast list, and RULE 2's brake still
+governs it. It never goes ahead of a punisher.
+Read your own battlefield line's "of which N are creatures" number and their battlefield line's
+"of which M are creatures, M of them without a restriction against attacking". When your N is 0
+and their M is 1 or more, the punisher with a body goes first, every time - the damage race is
+the same either way and only one of the two answers also holds the board.
+WHAT THIS COST: at 16 life with zero creatures against three attackers, this seat was offered
+Underworld Dreams and Fate Unraveler in the same ask and took Underworld Dreams. It never blocked
+once, cast Fate Unraveler four turns later at 3 life, and lost at turn 12 - the only game it
+lost this corpus.
+
+=== RULE 2 - HOW MANY DRAW ENGINES YOU MAY HAVE OUT ===
+Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box, Forced Fruition and Master of the Feast all
+give the OPPONENT cards - their card text says "each player" or "each opponent". They are damage
+only while a punisher is on the battlefield to convert those cards into damage.
+Look at YOUR battlefield line and count the names Underworld Dreams, Fate Unraveler and Ob Nixilis.
+- ONE OR MORE of them on your battlefield: cast every draw engine you are offered, every turn, as
+  fast as you can - each one multiplies the damage. This is where the deck wins. Stack Mines,
+  Dictates and Puzzle Boxes without limit, with ONE ordering rule that never lapses: if a second
+  punisher (Underworld Dreams, Fate Unraveler, Ob Nixilis) is ALSO in this ask's list, cast the
+  punisher FIRST and the engines with whatever mana is left. Rule 1 outranks this rule at every
+  life total and on every board, whether or not a punisher is already out. A punisher you priced
+  out of your own turn is a punisher that never resolves.
+- ZERO of them on your battlefield: one Howling Mine is enough. With a Howling Mine already on your
+  battlefield line, take a wall, a punisher, a Liliana's Caress, or "Cast nothing right now" instead
+  of a second draw engine; Master of the Feast, Dictate of Kruphix, Teferi's Puzzle Box and Forced
+  Fruition all wait for the punisher.
+The thought "drawing more cards is the priority, I need to find my win condition" is ALWAYS FALSE
+for this deck - a card you hand the opponent with no punisher out is a card that kills you.
+Count the punisher names on YOUR battlefield line - not the ones in hand, not the one that was
+countered last turn. Zero names and a Mine already there: the wall, the Caress or "Cast nothing".
+ONE exception to the brake, and only this one: MASTER OF THE FEAST is a 5/5 flying body as well
+as a gift. With NO punisher out, cast it ONLY when the opponent's battlefield line reads "of
+which N are creatures" with N of 1 or more - the body is worth the card only when there is
+something for it to block. At "of which 0 are creatures" it is a gift like the others and waits.
+It still sits behind Rule 1, behind Shield Sphere and behind Fog Bank.
+CHECK YOUR OWN PLAN SENTENCE BEFORE YOU ANSWER. If your PLAN says "stack draw engines", "deploy
+draw engines", "cast Master of the Feast for board presence" or "once a punisher is on the
+battlefield" while YOUR battlefield line holds none of the three punisher names, the plan is
+describing a board you do not have and the answer it leads to is wrong - this seat wrote each
+of those sentences while casting a second Mine, a second Master, a Forced Fruition and a Puzzle
+Box into an empty line, and handed a control deck twenty cards. Count the names; then answer.
+
+=== RULE 3 - THE WALLS. PUT THEM DOWN THE TURN THEY APPEAR ===
+Shield Sphere and Fog Bank are your entire defence - this deck has no removal except Ob Nixilis's
+-2 and it gains no life. Both walls are cheap permanents with no downside.
+- "Cast Shield Sphere {0}" costs ZERO mana. Take it every single time it is listed, whatever else
+  you are doing, including with a full board and no other play. A 0/6 that blocks anything.
+- "Cast Fog Bank {1}{u}": if the opponent's battlefield line shows ANY creature, cast Fog Bank the
+  first ask it is offered. Fog Bank prevents ALL combat damage dealt to it and by it, so it blocks
+  the same attacker every combat and takes no damage from it. It is your answer to a big ground
+  creature. Removal still answers it, so a Fog Bank in your hand blocks nothing - put it on the
+  battlefield.
+
+THE WHOLE CAST ORDER, ONE LIST. At every "which card do you cast now" ask, read your numbered
+options top to bottom and take the FIRST line that matches:
+1a. Fate Unraveler - whenever your own battlefield line reads "of which 0 are creatures" and
+   theirs shows 1 or more "of them without a restriction against attacking".
+1b. Underworld Dreams or Ob Nixilis - otherwise, or when 1a's condition does not hold.
+2. Peer into the Abyss, when a punisher is already on your battlefield.
+3. Shield Sphere (it is free).
+4. Fog Bank, when the opponent controls a creature.
+5. Any Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box, Forced Fruition or Master of the
+   Feast - if rule 2 says the brake is OFF, or it is your first Howling Mine.
+6. Liliana's Caress, when a Howling Mine, Dictate or Puzzle Box is on your battlefield.
+7. "Cast nothing right now".
+Then take the ask again if the game offers it - you can cast more than one spell in a turn.
+
+=== RULE 4 - BLOCKING. YOUR WALLS BLOCK; THAT IS WHAT THEY ARE FOR ===
+The combat prompt prints a general hint about trades and about taking damage while ahead on
+life. It also says your strategy guide overrides it. THIS SECTION IS THAT OVERRIDE: run the
+numbered rules below and nothing the hint says.
+Every blocker line tells you what its block does: a "STOPS all ..." clause naming the damage
+that block erases, and a parenthesis naming who dies. Both are true. Read both and act on them.
+
+SURVIVAL COMES FIRST, AND IT IS ARITHMETIC - RUN IT BEFORE THE NUMBERED RULES BELOW.
+Look at the header. If it says the attack IS LETHAL ("you would be at -2 - LETHAL"), the first
+question is not which block is free, it is which assignment leaves you alive.
+ STEP 1. Each attacker prints its own "deals N". Add them all up - call that TOTAL.
+ STEP 2. Your printed life is L. You must block enough that TOTAL minus what you stop is LESS
+   than L. At 0 you lose; 0 is not survival.
+ STEP 3. With FEWER blockers than attackers you do not get to pick the pretty block. Assign each
+   blocker to the biggest "deals N" it is allowed to stop, whatever its parenthesis says, and
+   then check step 2 again.
+ STEP 4. If more than one assignment survives, take the one that leaves you at the HIGHEST life.
+   Surviving at 4 and surviving at 1 are not the same answer: at 1 their next attacker of any
+   size kills you. A free kill on a 3-power lifelinker while a 6/6 Wolf walks past you is a
+   LOSS you chose, even though the free kill is real.
+ STEP 5. If NO assignment survives, block the biggest "deals N" you can and play on.
+Only when the header does NOT say LETHAL, or once you have already secured the largest surviving
+margin, do the numbered rules below decide anything.
+
+Run this over the offered block lines, every combat, in this order:
+0. HOW MUCH GETS THROUGH IF I TAKE THIS BLOCK? Before rung 1, read the header's "you would be at
+   N" and read every attacker's "deals N". When ONE blocker is offered several attackers, the
+   free kill is only free if what walks past you is survivable. Subtract the damage you would
+   stop from the total: if the number left would put your printed life at 8 OR LESS, block the
+   BIGGEST "deals N" you are allowed to block instead, even when that line kills your blocker
+   and even when a free kill on a small attacker is sitting right there. A free kill on a 2/2
+   while a 4/4 walks past and drops you to 4 is a loss you chose two turns early. Only when the
+   damage getting past you leaves your life ABOVE 8 does rung 1 below decide anything.
+1. A line ending "(you kill it, your blocker lives)" - take that block. Free kill, every time.
+2. A line ending "(neither dies)" - take that block. One wall per attacker, spending your walls
+   on the attackers with the biggest "deals N" numbers first. A second wall added to an attacker
+   that is already blocked stops nothing extra and wears your walls out - never stack two walls
+   on one attacker while another attacker is going unblocked.
+3. When ONE blocker is offered several attackers, prefer an attacker whose parenthesis lets
+   your blocker LIVE over one that kills it, even when the dying line stops a bigger number -
+   a wall that survives erases damage again next combat. Take a dying line instead only when
+   leaving that attacker unblocked would put your printed life at 8 or below; then block the
+   biggest "STOPS all" number you are offered.
+4. A line ending "your blocker dies, attacker lives" - take it when the header says the attack
+   IS lethal, when your life is 8 or less, or when it is the only line that blocker has.
+5. A wall you leave home erases nothing and is being saved for no one. "BLOCKS: none" is right
+   only when every blocker you control is already assigned, or every line offered is rule 4 at
+   a healthy life total.
+Fate Unraveler (3/4) and Master of the Feast (5/5) block well - use them on a "you kill it,
+your blocker lives" line when they are not needed untapped for a lethal swing.
+
+=== HOW THE KILL ACTUALLY HAPPENS ===
+1. Punisher on the battlefield.
+2. Draw engines on top of it. Howling Mine and Dictate of Kruphix each add ONE opponent card per
+   draw step, so each adds 1 damage per punisher per turn. Two punishers plus two Mines is 4 damage
+   a turn before you attack.
+3. TEFERI'S PUZZLE BOX {4} is your best multiplier: each draw step the opponent bottoms their whole
+   hand and redraws that many cards, so their hand size becomes damage every single turn. Read the
+   number on the "Opponent hand size:" line - with one punisher out, Puzzle Box turns that number
+   into that much damage every turn.
+4. FORCED FRUITION {4}{u}{u}: whenever the opponent casts a spell, they draw SEVEN cards. With one
+   punisher out that is 7 damage per spell they cast; with two it is 14. Cast it the turn you can,
+   once a punisher is out. If it is not in your hand, nothing above changes.
+5. PEER INTO THE ABYSS {4}{b}{b}{b} finishes. It makes the target draw half their library and lose
+   half their life. Cast it when a punisher is on your battlefield - the draws convert into damage
+   at 1 per punisher per card, and it draws them more than half their library. It then asks a SECOND
+   question with
+   two options: "target opponent" and "target controller". Answer "target opponent". NEVER answer
+   "target controller" - that one points the spell at YOU; the opponent is always the answer.
+
+=== KEY CARDS ===
+UNDERWORLD DREAMS {b}{b}{b} - enchantment, 1 damage to the opponent per card they draw. Three black
+  pips; when it is listed you can pay it. Rule 1 card.
+FATE UNRAVELER {3}{b} - 3/4 creature with the same trigger. It is a punisher that also blocks.
+OB NIXILIS, THE HATE-TWISTED {3}{b}{b} - planeswalker, enters with 5 loyalty, same trigger, and
+  "-2: Destroy target creature. Its controller draws two cards." The -2 is removal AND two more
+  draws to punish. Aim it FIRST at a creature whose printed text makes more creatures - Thraben
+  Doomsayer, Bloodline Keeper, Siege-Gang Commander, any row whose text says "create" or "put a
+  ... token" - and only then at the biggest body. A 1/1 token is never the target while its maker
+  is on the same list: this seat killed a Human token beside a Thraben Doomsayer and faced
+  twenty-three creatures two turns later. When the ONLY name offered after "targeting" is one of
+  your own creatures, pass - the offer comes back.
+HOWLING MINE {2} - EACH player draws an extra card each draw step while it is untapped. Gated by
+  rule 2.
+DICTATE OF KRUPHIX {1}{u}{u} - EACH player draws an extra card each draw step. Same gate.
+MASTER OF THE FEAST {1}{b}{b} - 5/5 flier, and at the beginning of YOUR upkeep each opponent draws
+  a card. It is your fastest clock and a free draw trigger, but the free card is a gift until a
+  punisher is out, so it sits behind rule 1 and inside rule 2's gate.
+LILIANA'S CARESS {1}{b} - the opponent loses 2 life for each card THEY discard. Your Howling Mines
+  and Puzzle Box make them overdraw and discard at cleanup, so cast Caress once a Mine, Dictate or
+  Puzzle Box is on your battlefield. Before that it does nothing; take a wall instead.
+SHIELD SPHERE {0} - 0/6 defender, free. Gets a -0/-1 counter each time it blocks, so a fresh one
+  blocks six times. It never attacks.
+FOG BANK {1}{u} - 0/2 flying defender that prevents all combat damage to and from itself. Rule 3.
+
+=== ATTACKING ===
+Read each attacker's own "their untapped blockers" tag and answer from it. The tag is the
+engine's computed result - do not argue with it, and do not answer ATTACK: none out of a
+general wish to keep your board.
+NO "their untapped blockers" TAG AT ALL ON A LINE MEANS NOTHING THEY CONTROL CAN BLOCK IT.
+That is free, unopposed damage and the answer is SEND, every time, at every life total - it is
+the one attack in this deck that has no downside to weigh. "I will keep it back as a blocker"
+is not a reason here: they have no creature that can be blocked, or none that can block this
+one, which is exactly why the tag is empty. Only the low-life rule at the bottom of this
+section overrides it, and only for your LAST untapped body.
+SEND IT when every outcome on that creature's tag reads "(you kill it, your attacker lives)".
+That line says your creature SURVIVES and theirs does not: there is no trade to fear and no
+punisher to lose. Either they decline the block and take the damage, or they block and hand
+you a free kill. "I might trade them away" is FALSE against that tag - the tag already told
+you the attacker lives. This is the commonest way this deck throws away free damage, and it
+costs you the turns your punishers are buying.
+DO NOT SEND Fate Unraveler into a tag that CONTAINS "your attacker dies, their blocker lives"
+anywhere in its list, and do not send it into "(both die)" either: Fate Unraveler is a punisher
+first, and dead it stops the draw damage that wins you the game, for a creature they simply
+replace. The tag also does not tell you what the BLOCKER gains - a lifelink blocker hands them
+life on top of the trade. Below the lethal check, both of those lines mean ATTACK: none for
+Fate Unraveler.
+A "(blocking trigger:" CLAUSE OR A "(lifelink:" TAIL IS ALSO A PRICE, AND SOMETIMES IT IS THE
+WHOLE GAME. This deck gains no life and has no removal for enchantments, so life THEY gain is
+progress you cannot undo. Two tags carry that price:
+  "(neither dies (blocking trigger: they may gain 2))" - the block costs you nothing and pays
+  them; a tag containing one is NOT an all-free tag, and the send rung above does not fire.
+  "(you kill it, your attacker lives (lifelink: they gain 1))" - you get the kill and they get
+  the life. Against 1/1 lifelink tokens their controller remakes every turn, that trade is
+  theirs, not yours.
+AND WHEN THE PROMPT ALSO PRINTS "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs", EVERY
+ONE OF THOSE NUMBERS IS DOUBLE AND POINTED AT YOU. That line means life THEY gain also comes
+off YOUR total. Three 1/1 lifelink blockers eating one attacker is 3 life to them and 3 life
+off you, and their controller may hold a second enchantment that turns that loop into your
+death in a single combat. So: with that converter line on the screen, send ONLY creatures whose
+A-line prints no "(blocking trigger:" and no "(lifelink:" anywhere in it. If no attacker
+qualifies, the answer is ATTACK: none and you win on the draw step instead - your punishers
+deal their damage whether or not you attacked, and that is the whole point of this deck.
+ONE FATAL NAME IN THE LIST IS A STOP, HOWEVER MANY FRIENDLY NAMES SIT BESIDE IT. A tag reading
+"Tovolar's Huntmaster (6/6) (your attacker dies, their blocker lives); Wolf #2 (2/2) (you kill
+it, your attacker lives); Wolf #3 (2/2) (you kill it, your attacker lives)" is a STOP. Two of
+those three are good for you and it does not matter: THEY choose which one blocks, and they
+choose the Huntmaster. Price the WORST name on the list, always. SEND requires that EVERY name
+on the tag reads "(you kill it, your attacker lives)".
+AND A LOW LIFE TOTAL IS A REASON TO KEEP IT HOME, NOT A REASON TO SWING - AND THIS APPLIES TO
+WHICHEVER CREATURE IS YOUR LAST UNTAPPED BODY, NOT ONLY TO FATE UNRAVELER. Count the creatures
+on YOUR battlefield line that are untapped and not summoning sick. If that count is ONE and
+your printed life is 8 or less, that creature does not attack, whatever its tag says and even
+when its tag is empty - it is the only thing standing between you and the next combat, and an
+attacker is tapped for their whole turn. Master of the Feast is the card this rule is usually
+about: a 5/5 flier is your best blocker exactly when you are low, and swinging it for 5 while
+they hold three ground creatures is trading your life for damage you did not need. The punisher
+damage arrives on THEIR draw step whether or not you attacked; that is what buys the turns.
+"I have to do something" is not a rule. The rule is the tag and the count.
+MASTER OF THE FEAST AND THE COLLAPSED TAG. When a creature's tag does NOT list their blockers
+one by one but instead reads "they have N untapped creatures that could block this one, biggest
+X (you kill it, your attacker lives)", that parenthesis prices ONE blocker only - the biggest -
+and the footnote under it says the numbers are computed "before gang-blocks". N is how many
+creatures can block that attacker, and any two of them may block it TOGETHER. So read N, not
+the parenthesis:
+  N = 1  -> the parenthesis is the whole story; use it.
+  N >= 2 -> a gang block is available and your attacker's toughness is measured against the
+            SUM of their bodies, not against the biggest one. Unless the lethal check has
+            cleared, the answer for that creature is ATTACK: none.
+  THE ENGINE OFTEN PRICES THE GANG FOR YOU, IN THE SAME TAG: "- GANG BLOCK: their 2 biggest
+  together deal 5, enough to kill this attacker; each result above is a LONE blocker only".
+  When you see that clause, it is the answer - ATTACK: none for that creature below the lethal
+  check - and the friendly parenthesis in front of it is the LONE-blocker case only. Do not
+  argue with it because they might block with just the big one; they might not, and the clause
+  told you what happens when they do not.
+Master of the Feast is a 5/5 flier and your fastest clock, but it does not untap while Intruder
+Alarm or a similar effect is out (its battlefield line will say so), and three 2/2 tokens gang
+it to death for nothing. Do not swing it into an N >= 2 board.
+The one time everything goes: the printed opponent life is at or below the total power of every
+attacker you are sending - then run the lethal check below, swing with everything, and end it.
+
+=== LETHAL CHECK - RUN IT EVERY TURN ===
+Count the punisher names on your battlefield (Underworld Dreams, Fate Unraveler, Ob Nixilis) - call
+that P. Count your Howling Mines, Dictates and Puzzle Boxes - each Mine or Dictate is 1 extra
+opponent card per turn, a Puzzle Box is their hand size. Multiply the extra cards by P, add 1 x P
+for their normal draw, and add the power of your unblocked attackers. If that total is at or above
+the number printed as the opponent's life, attack with everything including Fate Unraveler and cast
+every draw engine in your list this turn. You do not need to survive another turn - they take the
+damage on their own draw step.
+Worked example: P = 2 (Underworld Dreams and one Fate Unraveler). You control two Howling Mines and
+a Dictate of Kruphix, so 3 extra cards. 3 extra + 1 normal = 4 cards; 4 x P = 8 damage on their
+draw step. An unblocked Master of the Feast adds 5, for 13. If the opponent's printed life is 13 or
+less, swing with everything and hold nothing back.
+
+=== MULLIGAN - AN ODDS COMPARISON, NOT A CHECKLIST ===
+The prompt counts the hand for you on its own line - "Your hand (7 cards), counted by the engine:
+3 lands, 4 spells" - read that number, never count the hand yourself.
+The question is always: is this seven more likely to win than a fresh six? Weigh it on the deck
+facts. You run 26 lands, so a third land by turn three and a fourth by turn five are both likely,
+and a six you ship is most often a two-lander again. Your punishers cost three to five, so you
+need to reach four or five mana on time - that is what the land count is for.
+- TWO OR MORE LANDS: KEEP. Not a close call.
+- ONE LAND ON THE UNTOUCHED SEVEN: ship it. Your cheap plays are Shield Sphere {0} and Fog
+  Bank/Howling Mine at two, and none of them advances the plan; everything that wins costs three
+  or more, so one land means four or five turns of waiting against a deck that is attacking you,
+  and a fresh seven costs you only one card.
+- ONE LAND AT THE SECOND LOOK ("(keeping 6)"): now the ship costs TWO cards for the same land
+  odds, and the bottom ask lets you shave the six yourself. Keep it when the "would cover the
+  cost of:" line names a card or the hand holds a punisher you can reach on the third land
+  (Fate Unraveler at four); ship it when the hand is one land and nothing castable before turn
+  four. This seat shipped a one-land six holding three Underworld Dreams, a Shield Sphere and a
+  Fog Bank, found a three-lander with two punishers at (keeping 5) and won - the ship was a fair
+  bet there because none of the six was castable before the third land.
+- ONE LAND AT "(keeping 5)" OR LOWER: keep. Each further look is a fresh seven shaved by yet
+  another card at the same land odds; the bottom ask builds the hand (lands first, then the
+  cheapest spells they cover, punishers over engines).
+- ZERO LANDS: ship, always.
+Tiebreakers between hands that already clear the land count, never a reason to ship one that
+does: prefer a hand holding a punisher or a Fog Bank; prefer a hand whose "Playing every land in
+this hand would cover the cost of:" line names at least one card. Colour is a tiebreaker and
+never a gate: 18 of your 26 lands make black, 18 make blue, and ten of them make both. A hand
+with no cheap play is never a reason to mulligan - this deck contains no one-mana card.
+"I will keep whatever I draw next" is the sentence that runs a chain to four cards - the next
+seven is no likelier to have lands than this one, and it will be one card smaller. Decide each
+look on its own header and the land branches above; a carried plan that says "mulligan for
+lands" is about a hand you already threw away.
+WHEN YOU KEEP AFTER A MULLIGAN THE GAME ASKS WHICH CARDS TO BOTTOM. Bottom your most EXPENSIVE
+spell first: Forced Fruition, Peer into the Abyss, Teferi's Puzzle Box, a second copy of a draw
+engine - in that order. Never bottom SHIELD SPHERE - it costs ZERO mana, so it is free defence
+you can deploy on any turn no matter what your lands are doing - and never bottom your only
+punisher.
+LANDS: bottom one ONLY when the hand you keep would still hold FOUR OR MORE lands. A five-land,
+two-spell keep has a land to spare and the spell is worth more; a four-land keep does not, and
+below that a land is never the right card to lose.
+
+=== DECIDING SITUATIONS ===
+- Underworld Dreams, Fate Unraveler or Ob Nixilis is anywhere in your cast list: cast it this ask,
+  ahead of everything else. TWO of the three offered in the same ask, and your own battlefield
+  line reads "of which 0 are creatures": take Fate Unraveler, the one with a body.
+- Two spells are both payable and one is a punisher: the punisher goes first, then spend the rest.
+- Teferi's Puzzle Box, Forced Fruition or a Dictate is in the SAME list as a punisher: the
+  punisher is number 1 in the cast order and the Box is number 5. Cast the punisher this ask.
+  A Puzzle Box with nothing to convert its cards is a gift, however big the number looks.
+- A "Land drop:" question offers a land: play it. Every turn, no exceptions, whatever you plan
+  to cast afterwards.
+- An attacker's A-line prints NO "their untapped blockers" tag at all: send it - nothing they
+  control can block it.
+- An attacker's tag reads only "(you kill it, your attacker lives)" - EVERY name on it, with no
+  "(blocking trigger:" and no "(lifelink:" anywhere in it: send that attacker.
+- The prompt prints "LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs": send only attackers
+  whose tag prints no "(blocking trigger:" and no "(lifelink:". If none qualifies, ATTACK: none
+  - the punishers still fire on their draw step.
+- You control exactly ONE untapped creature and your life is 8 or less: it stays home.
+- ONE blocker, several attackers, and taking the free kill would leave your life at 8 or less:
+  block the biggest "deals N" instead, whatever its parenthesis says.
+- An attacker's tag lists several blockers and ONE of them reads "your attacker dies, their
+  blocker lives": ATTACK: none for that creature. They pick the blocker and they pick that one.
+- An attacker's tag reads "they have N untapped creatures that could block this one" with N of
+  2 or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause: ATTACK: none for
+  that creature unless the lethal check has cleared.
+- The block header says the attack IS LETHAL: add up every "deals N", assign your blockers to the
+  biggest ones until what still gets through is below your life, and among the assignments that
+  survive take the one leaving you the MOST life - then use the numbered rules for what is left.
+- No Underworld Dreams, no Fate Unraveler and no Ob Nixilis on your battlefield, and a Howling Mine
+  is already out: cast a wall or a Liliana's Caress - or "Cast nothing right now".
+- A punisher IS on your battlefield: cast every Howling Mine, Dictate, Puzzle Box and Forced
+  Fruition you are offered, every turn.
+- "Cast Shield Sphere {0}" is in the list: take it.
+- The opponent controls any creature and "Cast Fog Bank" is in the list: take it.
+- A block line reads "(you kill it, your blocker lives)" or "(neither dies)": take that block.
+- Peer into the Abyss resolves and asks target opponent or target controller: answer "target
+  opponent".
+- Ob Nixilis's -2 offers only your own creature as a target: pass.
+- Ob Nixilis's -2 lists a token AND a creature whose text makes tokens: destroy the maker.
+- No punisher name on YOUR battlefield line and your plan says "stack draw engines" or "for
+  board presence": the plan is wrong - cast the wall or nothing. Master of the Feast goes only at
+  "of which 1" or more creatures on THEIR line.
+- The lethal check clears: attack with everything, Fate Unraveler included.
