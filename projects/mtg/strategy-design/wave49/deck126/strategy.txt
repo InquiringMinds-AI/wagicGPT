@@ -1,0 +1,441 @@
+SANGUINE BLOOD - WGB WALL PRISON WITH A TWO-CARD KILL
+
+You win by getting Exquisite Blood AND Sanguine Bond onto the battlefield at the same time. The
+moment both are there, the very next life you gain - or the very next life the opponent loses -
+loops between them and drains the opponent from whatever they are at down to 0. That is the whole
+game. Sixteen walls buy the turns. Every turn you do the same three things: play a land if one is
+offered, put a wall or a combo piece onto the battlefield, and pass with your Battlement UNTAPPED.
+
+=== RULE #0 - PLAY THE LAND. EVERY TURN. ===
+When the prompt asks "Land drop:" and lists "Play <land>" options, TAKE ONE. Every turn, at any
+life total, with any board. "Play no land right now" is never your answer while a land is listed,
+and "I will hold it to preserve mana" is not a thought that means anything - playing a land costs
+nothing and taps nothing.
+Which land: take the one whose colour your hand needs and your battlefield does not already have.
+The hand line prints it for you ("Forest (land: taps for {G})"), and the mana line prints, one per
+untapped card, what each source you already control can make.
+You lost a game to this. Holding a Forest and a Woodland Cemetery in hand, you passed the land drop
+on two turns, stayed on four lands that made only {W} and {B}, never cast the Overgrown Battlement
+in your hand because you had no green source, and died on turn 14 with five lands in hand.
+
+=== RULE #1 - AT YOUR UPKEEP, PASS. THIS IS THE MOST IMPORTANT LINE IN THIS GUIDE ===
+At your Upkeep the engine will offer you a single action: tapping Overgrown Battlement for green
+mana. Answer CHOICE: 0 (pass). Every time. Upkeep, Draw, the opponent's turn - pass all of them.
+You never have to tap the Battlement by hand. When you cast a spell in your MAIN PHASE the engine
+taps your sources for you, and the "Mana available:" line already counts the Battlement in with
+your lands - as ONE source. Overgrown Battlement reads "{T}: Add {G} for each creature with
+defender you control", and the engine says so on its own line in the sources list ("VARIABLE
+output: ... the total above counts it as one source, not as its mana"). So the "Mana available:"
+number is a FLOOR for the GENERIC part of a cost: your real generic mana
+is that number plus one for every defender past the first. Take the cast when the plain-number
+part of the cost (the {3} in {3}{B}{B}, the {2} in {2}{W}) is at most your "Mana available:"
+number plus one for every defender past the first on your battlefield line; below that, do not.
+Inside that number, take it and let the engine tap for you.
+THE COLOURED PIPS ARE A DIFFERENT COUNT, AND THE BATTLEMENT PAYS NONE OF THEM. Overgrown
+Battlement makes {G} and only {G}. It cannot pay the {B} in Sanguine Bond {3}{B}{B}, the {B} in
+Exquisite Blood {4}{B}, the {B} in Tribute to Hunger {2}{B} or the {W} in Idyllic Tutor {2}{W}.
+Those come from your LANDS, and from Chromatic Lantern.
+Before you plan any spell with a coloured pip, read the sub-list under the mana line - "Those
+sources, one per untapped card: Bayou {b} or {g}; Scrubland {w} or {b}; Overgrown Battlement {g}
+(VARIABLE output ...)" - and COUNT the untapped cards whose colour list contains the pip you need.
+Sanguine Bond needs TWO of them to say {b}. One Scrubland is one, not two.
+This is not theory. In a game you lost you tutored up Sanguine Bond, tapped two Battlements for ten
+floating green mana with one black source on the board, could not cast it, passed - and the two
+walls you tapped could not block on their turn. You went from 6 life to 1 that turn.
+Taking that upkeep option instead does two bad things at once: the green mana is gone
+before your main phase ever starts, and a tapped Battlement is a 0/4 wall that cannot block on the
+opponent's next turn - a wall you needed.
+The thought "I should ramp first so I can afford Sanguine Bond" is ALWAYS FALSE in the upkeep
+window: mana made there does not survive to the main phase where the enchantment is cast.
+The same is true in EVERY window, your main phase included: tapping the Battlement by hand is
+right only when the very next thing you do in that same decision is cast a spell with that mana.
+If your answer to the following ask would be "Cast nothing right now", the tap was wasted and the
+wall is now a 0/4 that cannot block on their turn.
+The ONE time you take it: you are casting Tribute to Hunger in that same window and need the mana
+to pay for it right now.
+Before you take a "Add N green mana with Overgrown Battlement" option in ANY window, answer these
+two out loud, and pass unless BOTH are yes:
+  1. Can you NAME the spell you are about to cast with it, in this same decision?
+  2. Are that spell's COLOURED pips covered by your untapped LANDS (Rule #1's pip count) without
+     the Battlement's green?
+If either answer is no, the green is wasted and you have turned a 0/4 blocker into a tapped card.
+The engine now passes these windows for you when tapping is the ONLY thing offered, so a
+"Add N green mana with Overgrown Battlement" line you actually SEE means something else was on the
+menu too - which means the answer to question 1 is a real card, or the answer is pass.
+
+=== RULE #2 - THE WIN BUTTON ===
+Check your battlefield line at every decision. If it lists BOTH "Exquisite Blood" and "Sanguine
+Bond", you are one life-gain away from winning outright. Take the first of these the list offers,
+immediately, and the game ends:
+ - "Cast Tribute to Hunger" with its row reading "{right now: they control N creatures ...}" and N
+   1 or more: CAST IT. They sacrifice one, you gain its toughness, the loop takes the rest. This is
+   the win you press on your OWN turn with no creature of yours anywhere - the blocks and Vampires
+   below need a combat first. You had both enchantments out and this row at "they control 7
+   creatures" in three windows across two turns, cast a Wall of Omens and an Overgrown Battlement
+   and passed once "waiting for the opponent to attack"; in the fourth window you cast it and won
+   on the spot.
+ - Declare a block with ANY wall, if Perimeter Captain is on your battlefield (2 life).
+ - Declare a block with Pride Guardian (3 life, Captain or no Captain).
+ - Deal 1 Damage with Staff of Nin targeting a player - pick the OPPONENT.
+ - Attack with a lifelink Vampire and connect.
+Any one of these wins from any life total, yours or theirs. You do not need a big number - 1 life is
+enough, because the loop runs itself until the opponent is at 0. Do not wait for a better turn, do
+not wait for their attack, and do not build a bigger board first: a wall cast with the win on the
+menu is a turn given away.
+
+=== RULE #3 - ASSEMBLING THE PAIR (your fastest win condition) ===
+Exquisite Blood {4}{B}: whenever an opponent loses life, you gain that much life.
+Sanguine Bond {3}{B}{B}: whenever you gain life, the opponent loses that much life.
+Both together end the game the moment any life changes. THE PAIR IS TWO DIFFERENT NAMES: one
+Sanguine Bond AND one Exquisite Blood on your battlefield line. "Exquisite Blood #1-#2 x2" is one
+half twice, not the pair, and a second copy of either enchantment does nothing at all. Read both
+names off your battlefield line before you write "both enchantments": you cast a second Exquisite
+Blood with the first already there, wrote "Both enchantments are now on the battlefield", and
+Sanguine Bond was still in your library. And the two halves are NOT the same card:
+ - SANGUINE BOND ALONE IS ALREADY A CLOCK. Every point of life you gain takes a point off the
+   opponent, and this deck gains life constantly: 2 per defender that blocks with a Perimeter
+   Captain out, 3 whenever Pride Guardian blocks, the toughness of whatever Tribute to Hunger eats,
+   1 for every point a lifelink Vampire connects with. With a Bond down and three walls blocking
+   under a Captain you take 6 off them in one combat, and a SECOND Bond doubles it. Games of yours
+   have been won from 20 with a Bond and walls and no Exquisite Blood anywhere. So once Sanguine
+   Bond has resolved, keep blocking with everything and keep pinging - you are already killing
+   them, and finding Exquisite Blood only makes it instant.
+ - EXQUISITE BLOOD ALONE DOES NOTHING you can start yourself: it only pays you when the opponent
+   is ALREADY losing life. Against an opponent with no creatures and no burn it is a blank.
+So when you have NEITHER piece, Sanguine Bond is the one to look for first.
+ 1. The turn either one appears in your casting list, CAST IT. Not later, not after a wall, not
+    once you can afford both.
+ 2. If one is already on your battlefield and the other is not in your hand, "Cast Idyllic Tutor
+    {2}{w}" is your best play in that list - ahead of every wall and every other card.
+ 3. Idyllic Tutor puts the enchantment into your HAND, not onto the battlefield. You still have to
+    cast it for 5, and Tutor plus enchantment in one turn costs 8 mana. So cast the Tutor the FIRST
+    turn it is listed - the turn you spend tutoring is a turn you are not casting the enchantment.
+ 4. The Tutor then shows you your whole library as a long numbered list. Pick the one of the two you
+    do NOT already have; if you have NEITHER, pick SANGUINE BOND - it is the half that wins on its
+    own (Rule #3).
+ 5. You run four Idyllic Tutors and two copies of each enchantment. If a piece is countered or
+    exiled, tutor for the next copy and cast it again. There is no other way to win this game.
+
+=== RULE #4 - TRIBUTE TO HUNGER IS AN EDICT, NOT A KILL SPELL ===
+"Cast Tribute to Hunger {2}{b}" - the OPPONENT picks which of their creatures dies, and they will
+pick their worst one. You gain life equal to THAT creature's toughness.
+The thought "cast Tribute to Hunger on their best creature" is ALWAYS FALSE - you never choose the
+victim, and naming one in your plan makes you expect a kill and a life total you will not get.
+Cast it when any of these is true:
+ - Both enchantments are on your battlefield and the opponent has a creature. This WINS the game.
+ - THE OPPONENT CONTROLS EXACTLY ONE CREATURE. Their choice is your choice, so the edict is a
+   removal spell with no downside, and this is the one condition that does not wait. You do not
+   read this off the names: the opponent battlefield header prints it - "Opponent battlefield (6
+   permanents listed, of which 1 is a creature, ...)". When that creature count reads exactly 1
+   and "Cast Tribute to Hunger" is in the menu, CAST IT IN THAT WINDOW, ahead of Sanguine Bond,
+   ahead of Exquisite Blood, ahead of Idyllic Tutor and ahead of every wall. READ "1" AS "ONLY":
+   "of which 1 is a creature" means the creature printed on that line IS their only creature, right
+   now. It does not have to "become" their only creature - it already is, and this rule fires in
+   this window, not in a later one. Twice this corpus you wrote "keep Tribute to remove it if it
+   becomes their only creature" about a creature the header had just counted as their only one,
+   and cast an Overgrown Battlement and a Sanguine Bond instead. The Battlement game: their one
+   creature was a Thraben Doomsayer ("{T}: Put a 1/1 white Human creature token onto the
+   battlefield") on turn 6; by turn 11 it and an Intruder Alarm had made 255 Humans and you were
+   dead at -226. A creature whose text says "{T}: Put a ... token" or "{T}: Create" is the sharpest
+   case of this rule - it IS the engine, and the edict is the only card you own that removes it.
+   Earlier corpora: three turns running against a lone Silverquill Silencer (3/2) that then took
+   you from 20 to 10, and a lone Fate Unraveler (3/4) - half of the draw lock that killed you on
+   turn 12 - where you cast Sanguine Bond instead and the Bond gained you nothing for the rest of
+   the game. The enchantment is still in your hand next turn; the creature is not still on their
+   board.
+ - THE OPPONENT'S ONLY CREATURE IS ONE YOUR BOARD CANNOT BLOCK. None of your sixteen defenders
+   and none of your Vampire tokens has FLYING or REACH, so a creature tagged [flying] on the
+   opponent battlefield line connects for its full power every single turn no matter how many
+   walls you have. Your walls do not answer it; Tribute to Hunger is the only card in this deck
+   that does. When it is their ONLY creature, Tribute takes it - at ANY life total, in the first
+   window Tribute is offered, ahead of Exquisite Blood and ahead of Sanguine Bond.
+   The thought "I will block it with all my walls" is ALWAYS FALSE against a [flying] attacker.
+   You lost a game on turn 10 to exactly this: their only creature was Master of the Feast (5/5
+   [flying]), you were at 13 life, you had six mana and both Tribute to Hunger and Sanguine Bond
+   in hand, and you cast the Bond. Tribute would have eaten the Master - their only creature, so
+   no choice for them - and gained you 5.
+ - You need the life right now to survive the turn.
+Otherwise hold it. It is an instant, it stays castable on their turn, and it will be offered again.
+THE ZERO STOP: the engine lists Tribute even when they have NO creature. Read the header - "of
+which 0 are creatures" - and never cast it there. It sacrifices nothing, gains nothing and taps you
+out for {2}{B}. You did exactly that on turn 7 of a game, for your whole three mana.
+
+=== RULE #5 - BLOCKING IS HOW THIS DECK DEALS DAMAGE ===
+The combat prompt prints a general hint about trades and about taking damage while ahead on
+life. It also says your strategy guide overrides it. THIS SECTION IS THAT OVERRIDE: run the
+rules below and nothing the hint says. Your walls have 0 power, so no block of yours ever wins
+a trade - blocks are how you gain life, and life is how you win.
+STEP 1 - READ THE PARENTHESIS ON EVERY LINE YOU ARE ABOUT TO USE, BEFORE YOU ASSIGN ANYTHING.
+The B-line prints, for each attacker that blocker may block, whether your blocker LIVES ("neither
+dies", "you kill it") or DIES ("your blocker dies, attacker lives"). That parenthesis outranks the
+"[deals 0 - this block kills nothing, but it STOPS all N damage from reaching you]" tag beside it,
+and it outranks everything below in this section. The STOPS-N tag is the pull that has cost you
+this deck's games: it is a true statement about ONE combat, and a wall that survives stops that
+much damage in EVERY combat after it.
+ - If a B-line offers you a "dies" attacker and a "lives" attacker, take the LIVES one, even when
+   the dies one has the bigger "deals N". You put Pride Guardian on Nadaar (3/3, "your blocker
+   dies") when the same line offered a Goblin at "neither dies"; you stopped 3 instead of 1 and
+   lost the wall, and two turns later you had no blockers at all and took 10.
+ - A B-row whose EVERY parenthesis reads "your blocker dies, attacker lives" stays OUT of your
+   BLOCKS line - "BLOCKS: none" when it is your only blocker - unless one of three things is
+   printed: an enchantment of yours on your battlefield line, the combat header's "you would be
+   at N" at 8 or less, or the blocker is a lifelink Vampire. Read the header's N before you bench
+   anything: at 8 or less the carve-out is OFF and everything blocks. Three corpora running you
+   have put Pride Guardian on a "your blocker dies" attacker at 18 to 21 life with no enchantment
+   out - this time on Nadaar, Selfless Paladin at "you would be at 18": you gained 3, the wall
+   died, and with no blocker left the next two combats took you from 24 to 9. A wall that lives
+   gains that 3 in every combat after; a wall that dies gains it once. You have also answered
+   "BLOCKS: none" to a header reading "you would be at 7" with a lifelink Vampire offered - a
+   body you had no other use for, three damage you did not have to take, and a life gain thrown
+   away.
+STEP 2 - assign every blocker that STEP 1 did not rule out, in every combat:
+ - Give each attacker one blocker first, then put the leftovers on the biggest attacker. Several of
+   your blockers may gang up on one attacker; each triggers its own life gain.
+ - MENACE NEEDS TWO OR IT NEEDS NONE. An A-line reading "[menace - only a block by TWO OR MORE of
+   your creatures counts; one creature alone does not block it at all]" cannot be blocked by one
+   body: a single blocker on it stops NOTHING and the attacker deals its full damage anyway. So
+   either put TWO blockers on that attacker or put none there. Two 0/4 walls on a menace attacker
+   is the cheapest block in this deck - neither of them can die to it in a way that costs you
+   anything, and both still trigger their life gain. TWO menace attackers and TWO blockers: both
+   blockers on ONE of them, never one each - one each is two illegal blocks, the engine rejects
+   the whole answer and Baka blocks for you. You answered two menace Spiders with one Wall each
+   and lost the decision.
+ - AND DO NOT STACK YOUR WHOLE BOARD ON ONE ATTACKER while another blockable one goes through.
+   Twice in one game you answered a five-attacker window with all five blockers on the SAME 3/2,
+   stopping 3 of 16 damage while a menace Spider walked in unblocked because you never gave it the
+   pair it needed. One blocker per blockable attacker first - menace attackers take two - and only
+   then the leftovers.
+ - Perimeter Captain gains you 2 life for EACH defender you control that blocks. Three walls
+   blocking with the Captain out is 6 life on top of what those walls gain themselves.
+ - Pride Guardian gains you 3 life whenever it blocks.
+ - The life arrives when blockers are DECLARED, before damage. A wall that dies in combat has
+   already gained you the life.
+Which attacker each blocker takes: STEP 1 already decided the LIVES-before-dies half of this. The
+life gain is identical either way - a wall that survives gains it again next combat, and a wall
+that dies gains it once. When two or more attackers all let that blocker live, READ THE "deals N" NUMBER OFF EACH OF THEIR
+A-LINES AND TAKE THE BIGGEST - not the one whose name sounds smaller, not the one you blocked last
+turn. One blocker per attacker first, as above; this tiebreak only chooses among attackers still
+unblocked. You have got this wrong: offered "A1. Luminarch Aspirant (3/3) deals 3" and
+"A3. Wolf (2/2) deals 2", both reading "(neither dies)", you blocked the Wolf and took 3. The life gain is the same either way, so the only thing
+left to decide is how much damage you stop - stop the bigger number.
+When every attacker offered to that blocker kills it, STEP 1 has already benched that blocker -
+UNLESS an enchantment of yours is out or the header's "you would be at N" is 8 or less, and in
+that one case it blocks and you put it on the attacker with the biggest "deals N" number on its
+A-line. Read the number off the line, do not judge by name, by size in words, or by which one you
+blocked last turn. An attacker tagged [deathtouch] kills your wall whatever its toughness; its
+line will already say so.
+The blocker you leave out is STEP 1's: neither enchantment on your battlefield AND that blocker's
+line reads "your blocker dies, attacker lives" on EVERY attacker it is offered. A line reading
+"both die" is not that line - take it; a body of theirs for a body of yours is a trade you want,
+and a lifelink blocker gains you life on the way. Once either enchantment is on your battlefield,
+every blocker blocks, on any line at all, and so it does whenever the header's "you would be at N"
+number is 8 or less - at that life total the damage a body stops is worth more than the body.
+"BLOCKS: none" is right only when EVERY blocker the list offers you falls under STEP 1.
+
+=== RULE #6 - ATTACKING ===
+All sixteen of your creatures are Defenders and can never attack; the attacker list already leaves
+them out, so never re-derive who is eligible. An empty attacker list means ATTACK: none, and that
+costs you nothing.
+When the list DOES offer a Vampire token, it has lifelink: attack with every Vampire offered, every
+turn. Each point that connects is life gained, and with Sanguine Bond out that is the win.
+THE COLLAPSED TAG. On a wide board the Vampire's attack tag stops listing their blockers one by
+one and reads "they have N untapped creatures that could block this one, biggest X (...)",
+sometimes with "- GANG BLOCK: their 3 biggest together deal 4, enough to kill this attacker;
+each result above is a LONE blocker only". That parenthesis prices ONE blocker; the GANG BLOCK
+clause prices what actually happens, because any number of them may block the same Vampire
+together. Your Vampires are 1/1s, so any two bodies eat one.
+  - The tag prints a "GANG BLOCK: ... enough to kill this attacker" clause, or N is 2 or more:
+    ATTACK: none for that Vampire. Keep it home as a LIFELINK BLOCKER - with both enchantments
+    out one block wins the game outright, and a lifelink blocker with Sanguine Bond out is
+    already draining them.
+  - N is 1 and no GANG BLOCK clause: COUNT YOUR OWN A-LINES FIRST. One blocker can only block one
+    attacker, so if the list offers you MORE Vampires than the N on the tag, the surplus connects
+    whatever the parenthesis says - send them ALL. Four Vampires into their one Siege-Gang
+    Commander is three points of lifelink damage and one dead Vampire; you sent them, the opponent
+    was at 6, and it ended the game. Only when your Vampire count is 1 and N is 1 does the
+    parenthesis decide it on its own.
+  - The tag lists no blockers at all - no "their untapped blockers:" clause on the A-line: they
+    have nothing to block with. Send every Vampire. You answered ATTACK: none to a bare A-line and
+    threw away a free point of lifelink.
+The exception is the win button, and it outranks every stop above and below: with BOTH enchantments
+on your battlefield, send EVERY Vampire whatever the tag says. Lifelink gains you the life for
+damage dealt to a BLOCKER too, so a blocked Vampire still starts the loop, and the loop ends the
+game. You sent one into four untapped Goblins and a Siege-Gang Commander and won on the spot.
+ONE stop, and read it off your own narration: if the last time you attacked it says your attacker
+took damage and died before combat damage - "<something> dealt N damage to Vampire" then "Your
+Vampire died" - the opponent controls a permanent that kills anything you send, and the next
+Vampire dies to it exactly the same way. Answer ATTACK: none and keep the Vampire on your
+battlefield instead: it is a lifelink blocker, and with both enchantments out one block wins the
+game outright. Attack again only once that permanent is gone from their battlefield line.
+
+=== RULE #7 - WHAT TO CAST WHEN SEVERAL THINGS ARE LISTED ===
+Take the highest entry on this list that appears in your casting menu:
+ 1. Exquisite Blood or Sanguine Bond - whichever NAME is missing from your battlefield line, at any
+    "leaves N", including "casting this taps you out". A copy of a name already on that line is
+    not this entry; skip it. You cast a Wall of Omens over an Exquisite Blood at five mana to
+    "ramp for Sorin"; the Blood was the card that mattered and it waited two turns.
+ 2. Idyllic Tutor, when either enchantment is missing from both your hand and your battlefield.
+ 3. Perimeter Captain - it turns every future block by every wall into 2 more life.
+ 4. Any other wall: Wall of Omens (it replaces itself), Overgrown Battlement, Pride Guardian.
+ 5. Staff of Nin.
+ 6. Sorin, Lord of Innistrad.
+ 7. Chromatic Lantern - when nothing from entries 1-6 is on the menu AND no Chromatic Lantern is
+    on your battlefield line. It is a mana rock: every land of yours then makes any colour and it
+    adds a mana of its own, so a Lantern cast on a turn with nothing else to cast is a turn spent
+    well, not a wasted one - three times this corpus it was the only real row beside "Cast nothing
+    right now", you cast it, and two of those games you won. Do NOT count black sources by name to
+    decide this; the entry above it on this list decides it - you cast a Lantern over a Wall of Omens
+    and another over a Pride Guardian this corpus, both walls one entry higher. A SECOND Lantern
+    does nothing at any time - once "Chromatic Lantern" is on your battlefield line this entry is
+    finished for the rest of the game, so take a wall or a combo piece instead, or cast nothing.
+    You cast four second Lanterns this corpus with the first still in play.
+7a. If BOTH enchantments are already on your battlefield, STAFF OF NIN and SORIN move to the
+    TOP of this list, above walls and above everything else. With both out the game ends the
+    moment any life changes, and Staff's ping and Sorin's lifelink Vampires are the only two
+    triggers you can make without help from the opponent - blocks need them to attack, Tribute
+    to Hunger needs them to have a creature. Against an opponent whose battlefield line shows
+    no creature, those two are your ONLY win.
+7b. THE SURVIVAL FLOOR, and it outranks entries 1 and 2 of this list. When the opponent battlefield
+    HEADER reads "of which 1 is a creature" and "Cast Tribute to Hunger" is in this menu, cast
+    TRIBUTE TO HUNGER first, even over Exquisite Blood or Sanguine Bond - at any life total,
+    whatever that creature is, and whether or not you could also pay for the enchantment. The
+    header reading 1 IS the "only creature" test: it is met NOW, in this window, not "if it
+    becomes" their only creature. One creature means THEIR choice is YOUR choice, so the edict is
+    clean removal, and it is the only removal this deck has. It went 0 for 5 one corpus and 0 for
+    2 the next while you cast enchantments, tutors and walls over it. The three shapes below are
+    the same rule at its sharpest and are kept because each already cost you a game -
+      (a) your life is 10 or less, or
+      (b) that one creature is tagged [flying] (or anything else your walls cannot block - none of
+          them has flying or reach), whatever your life total is, or
+      (c) that one creature's text says "{T}: Put a ... token" or "{T}: Create" - Thraben
+          Doomsayer, Bloodline Keeper: a token engine that your walls can block today and cannot
+          block next week. A combo piece you never get to use because you died two turns later bought you
+    nothing; the edict removes the creature that is killing you AND gains you its toughness. Cast
+    the enchantment next turn - it will still be in your hand.
+ 8. Tribute to Hunger when the header shows TWO OR MORE of their creatures and nothing above it
+    matched - at one creature it is 7b and it goes first, and at ZERO creatures it is never cast at
+    all (Rule #4's zero stop: it sacrifices nothing and taps you out).
+ 9. "Cast nothing right now" - the LAST entry, and correct only when no entry above appeared.
+EVERY CARD YOU CAN CAST HAS A LINE ABOVE: Exquisite Blood, Sanguine Bond, Idyllic Tutor, the four
+walls (Perimeter Captain, Wall of Omens, Overgrown Battlement, Pride Guardian), Staff of Nin,
+Sorin, Chromatic Lantern, Tribute to Hunger. If a "Cast ..." option is in your menu it is matched
+by an entry here - do not go outside this list. Keep casting while the list keeps offering.
+
+=== STAFF OF NIN AND SORIN ===
+Staff of Nin {6}: draws you an extra card at each of your upkeeps, and offers "Deal 1 Damage with
+Staff of Nin targeting a player" every turn. Always aim it at the OPPONENT, every upkeep - this is
+the one upkeep option you always TAKE. With Exquisite Blood down that damage is life for you; with
+both enchantments down it wins the game on the spot. With Sanguine Bond ALONE it is still ONE
+DAMAGE - a point off their total every upkeep, which is the whole game when they are at 7. It is
+damage, not a trigger, so "the ping does nothing without Exquisite Blood" is a false thought: you
+reasoned exactly that with the opponent at 7 and passed the window with the ping on the menu.
+Sorin, Lord of Innistrad {2}{W}{B}: cast him when offered, then take "+1: create a 1/1 vampire with
+Sorin, Lord of Innistrad" every turn. The Vampires have lifelink, so they block for life, attack for
+life, and win the game once both enchantments are out.
+If neither is in your hand, nothing above changes.
+
+=== MULLIGAN ===
+The question at every look is about ODDS, never about a number the hand has to meet: what are the
+odds THIS hand does something in time, against the odds the NEXT hand - one card smaller - does?
+Three facts about this deck set the comparison:
+  - 24 of your 60 cards are lands, and most of them make two colours (Bayou, Scrubland, Savannah,
+    Isolated Chapel, Sunpetal Grove, Woodland Cemetery), so a two-land seven sees its third land
+    inside two or three draws and a one-colour opener is usually one draw from the other.
+  - Your cheapest spells cost ONE mana (Perimeter Captain, Pride Guardian) and sixteen of your
+    cards are walls, so almost any hand with two lands does something on turn one or two. "No
+    early play" and "no combo piece" are not reasons to ship: the walls buy the turns you need to
+    draw one, and Idyllic Tutor finds it.
+  - An enchantment costs five with two black pips that the Battlement cannot pay, so a hand of
+    lands that make no {B} is slower to the win, not dead - it still walls.
+The prompt gives you the three numbers the comparison needs; read them rather than counting the
+hand yourself: "Your hand (7 cards), counted by the engine: N lands, M spells", "Mana sources among
+those lands, counted by the engine: ...", and "Playing every land in this hand would cover the cost
+of: ..." or "would not cover any spell in it". The mulligan row prices the next look: "Mulligan (a
+keep after this one would keep 5 cards)". Every look costs a card at the keep; the London mulligan
+gives you a fresh seven each time, so shipping rarely fixes lands - it only shrinks the hand.
+So, at each look:
+  - Two or more lands and a coverage line that names even one card: KEEP, at any price. That line
+    already checked your mana against your hand and it is right. Three keeps of this shape this
+    corpus, at 3, 3 and 5 lands, and all three games were won.
+  - Zero lands, or one land: the hand casts nothing until it draws lands, and a fresh seven at
+    24-in-60 beats waiting - ship it on a seven and on a six. You shipped a zero-land seven and two
+    one-land sevens this corpus, kept the sixes that followed at 3, 3 and 5 lands, and lost none of
+    them to the mulligan. At a row reading "would keep 5 cards" or smaller the next look costs more
+    than the wait does: keep a one-land hand there if the coverage line names a card, and ship only
+    a hand with no land at all.
+  - Seven lands and no spell ships at any price; six lands and one spell is a keep if the spell
+    is a wall or the Tutor.
+The thought "I will keep whatever I draw next" is how you end up with a four-card hand - weigh the
+hand in front of you.
+WHEN A KEEP MAKES YOU BOTTOM CARDS the ask prints your hand as a NUMBERED list, each land marked
+"(land: taps for ...)", and tells you how many to send. What you are choosing is the hand you KEEP;
+build it in this PREFERENCE ORDER, which works at any size: the lands that cover the cheapest
+spells you keep (a land that makes {B} ahead of one that does not), then one of Sanguine Bond /
+Exquisite Blood / Idyllic Tutor (the only cards here that win a game; the Tutor finds the other
+two), then your cheapest wall, then a second combo piece, then the rest by cost. Send the rest, in
+this order: a duplicate wall first (you run sixteen; the second copy is the cheapest card in any
+hand), then a Chromatic Lantern or a Staff of Nin, then your most expensive remaining spell, then
+a land only when the hand still holds more lands than the spells you kept can use. A combo piece
+goes under only when nothing else is left to send. You once bottomed a Woodland Cemetery from a
+three-land hand that also held a Chromatic Lantern - the Lantern was the card to send, and the
+Cemetery was one of only two black sources in the hand.
+
+=== SITUATIONS THAT DECIDE YOUR GAMES ===
+ - Both Exquisite Blood and Sanguine Bond on your battlefield: take the first of these the list
+   offers - "Cast Tribute to Hunger" at "they control 1" or more creatures, a block, a Staff ping,
+   a lifelink attack. You win this turn; a wall cast instead is a turn given away.
+ - The prompt lists "Play <land>" options: play one. Every turn, no exceptions.
+ - Your Upkeep, and the only offered action taps Overgrown Battlement for mana: answer CHOICE: 0 (pass)
+   and keep the wall untapped for their turn.
+ - ANY window whose only offered actions are "Add N green mana with Overgrown Battlement": pass,
+   unless you can name the spell you are casting with it in this same decision AND its coloured
+   pips come from your untapped lands.
+ - The opponent battlefield header reads "of which 1 is a creature" and Tribute to Hunger is
+   listed: CAST TRIBUTE, in this window, at any life total, ahead of Sanguine Bond, Exquisite
+   Blood, Idyllic Tutor and every wall. One creature means their choice is your choice, and "1"
+   means it is their only creature NOW - not "if it becomes" the only one. This is the line you
+   missed five times in one corpus and twice in the next, once against the Thraben Doomsayer that
+   made 255 Humans.
+ - That header reads "of which 0 are creatures": never cast Tribute to Hunger. It does nothing and
+   taps you out.
+ - One enchantment down, the other not in hand, "Cast Idyllic Tutor {2}{w}" listed: cast the Tutor
+   and take the missing one.
+ - Sanguine Bond on your battlefield and no Exquisite Blood: you are ALREADY killing them. Block
+   with everything, ping with Staff, attack with every Vampire - each point of life you gain comes
+   straight off their total.
+ - An enchantment in hand and castable: cast it this turn, ahead of anything else - EXCEPT when the
+   opponent header reads exactly one creature and Tribute to Hunger is listed: then cast Tribute
+   first (Rule 7b), at any life total and whether or not you could pay for both.
+ - The opponent attacks: read each blocker's parenthesis FIRST. Leave out any blocker whose every
+   offered attacker says "your blocker dies" (unless an enchantment is out, or the header's "you
+   would be at N" is 8 or less, or it is a lifelink Vampire); for the rest, prefer an attacker whose
+   parenthesis says your blocker LIVES over a bigger "deals N" that kills it; then assign every
+   blocker that is left.
+ - An attacker's A-line carries the "[menace - only a block by TWO OR MORE ...]" tag: give it TWO
+   blockers or none. One alone stops nothing at all. And never pile every blocker onto one attacker
+   while another blockable attacker is unblocked.
+ - Your Vampires on the attackers list outnumber the "they have N untapped creatures" on the tag:
+   attack with all of them - the surplus connects. But THEY pick which attacker each blocker
+   stops, and they pick the one their block wins: the surplus is a count of bodies that get
+   through, never a promise about WHICH Vampire survives. Send them anyway - the damage is real
+   and a 1/1 Vampire is the cheapest thing you own - and never write a plan in which one of your
+   ATTACKERS blocks for another; an attacking creature does not block.
+ - An A-line offers a Vampire with no "their untapped blockers:" clause at all: attack.
+ - A Vampire's attack tag reads "they have N untapped creatures that could block this one" with
+   N of 2 or more, or prints a "GANG BLOCK: ... enough to kill this attacker" clause: ATTACK:
+   none for that Vampire - it is worth more as a lifelink blocker. UNLESS both enchantments are on
+   your battlefield: then send every Vampire, blocked or not - lifelink damage to a blocker starts
+   the loop.
+ - The mulligan ask: two or more lands and a coverage line naming a card is a keep at any price;
+   zero or one land ships on a seven or a six; at "would keep 5 cards" or smaller, keep one land
+   with a named card and ship only a hand with no land.
+ - You kept and the game asks which cards to bottom: build the best N in order - lands that
+   cover your cheapest spells, a combo piece or the Tutor, the cheapest wall, then the rest by
+   cost; send duplicate walls, then Lantern or Staff, then the most expensive spell. A combo
+   piece goes under only when nothing else is left.
+ - "Cast Chromatic Lantern" is in your menu, nothing from entries 1-6 of Rule #7 is beside it, and
+   no Chromatic Lantern is on your battlefield line: cast it. A wall or a combo piece on the same
+   menu, or a Lantern already out: take that instead.
+ - The opponent has exactly one creature: cast Tribute to Hunger. You do not need to need the life.
+ - You are about to plan a spell with a {b} or {w} in its cost: count the untapped LANDS whose
+   colour list on the mana line contains that symbol. The Battlements' green pays none of it.
