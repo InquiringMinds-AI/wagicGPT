@@ -1,0 +1,514 @@
+# Wave-47 lategame specimen (owner prompt review, invariant 0)
+# file=1787786522-ai_baka_deck126-0x5555ee4653a0-vs-ai_baka_deck125.jsonl seq=81 kind=ask turn=53 phase=Blockers prompt_chars=22623 latency_ms=22462
+# Binary 5b1bf9668. USER message verbatim:
+
+GAME LOG (everything that has happened so far):
+=== Turn 1 - opponent's turn ===
+- Your opening hand (7 cards): Scrubland; Idyllic Tutor; Wall of Omens; Isolated Chapel; Forest; Bayou; Exquisite Blood
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- Opponent played Plains
+=== Turn 2 - YOUR turn ===
+- Phase: Draw
+- You drew Swamp
+- Phase: Main phase 1
+- You played Forest
+=== Turn 3 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 4 - YOUR turn ===
+- Phase: Draw
+- You drew Chromatic Lantern
+- Phase: Main phase 1
+- You played Bayou
+=== Turn 5 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+=== Turn 6 - YOUR turn ===
+- Phase: Draw
+- You drew Sunpetal Grove
+- Phase: Main phase 1
+- You played Scrubland
+- You cast Idyllic Tutor
+- Your Idyllic Tutor resolved and went to your graveyard
+- You searched your library with Idyllic Tutor
+- You used: choose card with Idyllic Tutor targeting Sanguine Bond
+- Your revealed Sanguine Bond went to your hand
+=== Turn 7 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 25)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+=== Turn 8 - YOUR turn ===
+- Phase: Draw
+- You drew Overgrown Battlement
+- Phase: Main phase 1
+- You played Isolated Chapel
+- You cast Overgrown Battlement
+- Your Overgrown Battlement resolved and entered the battlefield
+- You cast Wall of Omens
+- Your Wall of Omens resolved and entered the battlefield
+- You drew Sunpetal Grove
+=== Turn 9 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 10 - YOUR turn ===
+- Phase: Draw
+- You drew Scrubland
+- Phase: Main phase 1
+- You played Scrubland
+- You cast Sanguine Bond
+- Opponent cast Cancel
+- Your Sanguine Bond was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+=== Turn 11 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 12 - YOUR turn ===
+- Phase: Draw
+- You drew Pride Guardian
+- Phase: Main phase 1
+- You played Sunpetal Grove
+- You cast Exquisite Blood
+- Opponent cast Dream Fracture
+- Your Exquisite Blood was COUNTERED by Dream Fracture and went to your graveyard
+- Opponent drew a card
+- You drew Sunpetal Grove
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+- Phase: Main phase 2
+- You cast Pride Guardian
+- Your Pride Guardian resolved and entered the battlefield
+=== Turn 13 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Seachrome Coast
+=== Turn 14 - YOUR turn ===
+- Phase: Draw
+- You drew Sunpetal Grove
+- Phase: Main phase 1
+- You played Sunpetal Grove
+- You cast Chromatic Lantern
+- Your Chromatic Lantern resolved and entered the battlefield
+=== Turn 15 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Supreme Verdict
+- Your Overgrown Battlement died
+- Your Wall of Omens died
+- Your Pride Guardian died
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+=== Turn 16 - YOUR turn ===
+- Phase: Draw
+- You drew Chromatic Lantern
+- Phase: Main phase 1
+- You played Sunpetal Grove
+=== Turn 17 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Sphinx's Revelation
+- Opponent gained 2 life (now 27)
+- Opponent drew a card
+- Opponent drew a card
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Opponent played Tundra
+=== Turn 18 - YOUR turn ===
+- Phase: Draw
+- You drew Perimeter Captain
+- Phase: Main phase 1
+- You played Swamp
+- You cast Perimeter Captain
+- Your Perimeter Captain resolved and entered the battlefield
+=== Turn 19 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Staff of Nin
+- Opponent's Staff of Nin resolved and entered the battlefield
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 19)
+=== Turn 20 - YOUR turn ===
+- Phase: Draw
+- You drew Perimeter Captain
+- Phase: Main phase 1
+- You played Sunpetal Grove
+- You cast Perimeter Captain
+- Your Perimeter Captain resolved and entered the battlefield
+=== Turn 21 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 18)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+=== Turn 22 - YOUR turn ===
+- Phase: Draw
+- You drew Idyllic Tutor
+- Phase: Main phase 1
+- You cast Idyllic Tutor
+- Opponent cast Dream Fracture
+- Your Idyllic Tutor was COUNTERED by Dream Fracture and went to your graveyard
+- Opponent drew a card
+- You drew Bayou
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+- You played Bayou
+=== Turn 23 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 17)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+- Phase: ---
+- Opponent discarded Essence Scatter
+=== Turn 24 - YOUR turn ===
+- Phase: Draw
+- You drew Bayou
+- Phase: Main phase 1
+- You played Bayou
+=== Turn 25 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 16)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+- Opponent cast Supreme Verdict
+- Your Perimeter Captain died (that Perimeter Captain was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Perimeter Captain died
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+- Opponent cast Elixir of Immortality
+- Opponent's Elixir of Immortality resolved and entered the battlefield
+=== Turn 26 - YOUR turn ===
+- Phase: Draw
+- You drew Urborg, Tomb of Yawgmoth
+- Phase: Main phase 1
+- You played Urborg, Tomb of Yawgmoth
+=== Turn 27 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 15)
+- Opponent used: Life with Elixir of Immortality
+- Opponent gained 5 life (now 32)
+- Opponent's Elixir of Immortality was put into the opponent's library from the battlefield
+- Opponent shuffled their graveyard (7 cards) into their library with Elixir of Immortality
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 28 - YOUR turn ===
+- Phase: Draw
+- You drew Chromatic Lantern
+=== Turn 29 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 14)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Sphinx's Revelation
+- Opponent gained 3 life (now 35)
+- Opponent drew 3 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Phase: ---
+- Opponent discarded Essence Scatter
+- Opponent discarded Lightmine Field
+- Opponent discarded Emrakul, the Aeons Torn
+=== Turn 30 - YOUR turn ===
+- Phase: Untap
+- Opponent used: Put a card into the library with Emrakul, the Aeons Torn
+- Opponent shuffled their graveyard (4 cards) into their library with Emrakul, the Aeons Torn
+- Phase: Draw
+- You drew Bayou
+- Phase: Main phase 1
+- You played Bayou
+=== Turn 31 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 13)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Glacial Fortress
+- Opponent cast Lightmine Field
+- Opponent's Lightmine Field resolved and entered the battlefield
+=== Turn 32 - YOUR turn ===
+- Phase: Draw
+- You drew Wall of Omens
+- Phase: Main phase 1
+- You cast Wall of Omens
+- Your Wall of Omens resolved and entered the battlefield
+- You drew Sanguine Bond
+- You cast Sanguine Bond
+- Opponent cast Cancel
+- Your Sanguine Bond was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+=== Turn 33 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 12)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Seachrome Coast
+=== Turn 34 - YOUR turn ===
+- Phase: Draw
+- You drew Wall of Omens
+- Phase: Main phase 1
+- You cast Wall of Omens
+- Your Wall of Omens resolved and entered the battlefield
+- You drew Perimeter Captain
+- You cast Perimeter Captain
+- Opponent cast Cancel
+- Your Perimeter Captain was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+=== Turn 35 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 11)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+=== Turn 36 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- You cast Staff of Nin
+- Opponent cast Cancel
+- Your Staff of Nin was COUNTERED by Cancel and went to your graveyard
+- Opponent's Cancel resolved and went to the opponent's graveyard
+=== Turn 37 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 10)
+- Phase: Draw
+- Opponent drew a card
+- Phase: ---
+- Opponent discarded Essence Scatter
+=== Turn 38 - YOUR turn ===
+- Phase: Draw
+- You drew Sorin, Lord of Innistrad
+- Phase: Main phase 1
+- You cast Sorin, Lord of Innistrad
+- Opponent cast Dream Fracture
+- Your Sorin, Lord of Innistrad was COUNTERED by Dream Fracture and went to your graveyard
+- Opponent drew a card
+- You drew Savannah
+- Opponent's Dream Fracture resolved and went to the opponent's graveyard
+- You played Savannah
+=== Turn 39 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 9)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Supreme Verdict
+- Your Wall of Omens died (that Wall of Omens was 1 of 2 copies on your battlefield; the other 1 is still there)
+- Your Wall of Omens died
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+- Phase: Main phase 2
+- Opponent cast Sphinx's Revelation
+- Opponent gained 3 life (now 38)
+- Opponent drew 3 cards
+- Opponent's Sphinx's Revelation resolved and went to the opponent's graveyard
+- Phase: ---
+- Opponent discarded Path to Exile
+- Opponent discarded Path to Exile
+- Opponent discarded Elixir of Immortality
+=== Turn 40 - YOUR turn ===
+- Phase: Draw
+- You drew Pride Guardian
+- Phase: Main phase 1
+- You cast Pride Guardian
+- Your Pride Guardian resolved and entered the battlefield
+=== Turn 41 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 8)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Opponent cast Supreme Verdict
+- Your Pride Guardian died
+- Opponent's Supreme Verdict resolved and went to the opponent's graveyard
+=== Turn 42 - YOUR turn ===
+- Phase: Draw
+- You drew Chromatic Lantern
+=== Turn 43 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 7)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Island
+- Phase: ---
+- Opponent discarded Path to Exile
+=== Turn 44 - YOUR turn ===
+- Phase: Draw
+- You drew Savannah
+- Phase: Main phase 1
+- You played Savannah
+=== Turn 45 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 6)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Seachrome Coast
+- Phase: ---
+- Opponent discarded Supreme Verdict
+=== Turn 46 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- You cast Staff of Nin
+- Opponent cast Fall of the Gavel
+- Your Staff of Nin was COUNTERED by Fall of the Gavel and went to your graveyard
+- Opponent gained 5 life (now 43)
+- Opponent's Fall of the Gavel resolved and went to the opponent's graveyard
+=== Turn 47 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 5)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+=== Turn 48 - YOUR turn ===
+- Phase: Draw
+- You drew Woodland Cemetery
+- Phase: Main phase 1
+- You played Woodland Cemetery
+=== Turn 49 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 4)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+- Phase: ---
+- Opponent discarded Dream Fracture
+=== Turn 50 - YOUR turn ===
+- Phase: Draw
+- You drew Overgrown Battlement
+- Phase: Main phase 1
+- You cast Overgrown Battlement
+- Your Overgrown Battlement resolved and entered the battlefield
+=== Turn 51 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 3)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Phase: ---
+- Opponent discarded Essence Scatter
+=== Turn 52 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+=== Turn 53 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 2)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Emrakul, the Aeons Torn
+- Opponent's Emrakul, the Aeons Torn resolved and entered the battlefield
+=== Turn 54 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 1)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Phase: Blockers
+- Opponent's Lightmine Field dealt 1 damage to Emrakul, the Aeons Torn
+- You targeted Bayou #1 with Emrakul, the Aeons Torn's ability (Sacrifice)
+- You targeted Forest with Emrakul, the Aeons Torn's ability (Sacrifice)
+
+--- CURRENT SITUATION ---
+Phase: Blockers | It is the opponent's turn.
+Your life: 1 | Opponent life: 43
+Mana available: 20 total (untapped sources, tapped automatically when you cast; colours you can make: {g}{u}{r}{b}{w} (sources that can make each: {W} 19, {U} 19, {B} 19, {R} 19, {G} 20 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Forest {g} or {r} or {u} or {b} or {w}; Bayou #1 {b} or {g} or {r} or {u} or {w}; Scrubland #1 {w} or {b} or {g} or {r} or {u}; Isolated Chapel {w} or {b} or {g} or {r} or {u}; Scrubland #2 {w} or {b} or {g} or {r} or {u}; Sunpetal Grove #1 {g} or {w} or {r} or {u} or {b}; Sunpetal Grove #2 {g} or {w} or {r} or {u} or {b}; Chromatic Lantern {g} or {r} or {u} or {b} or {w}; Sunpetal Grove #3 {g} or {w} or {r} or {u} or {b}; Swamp {b} or {g} or {r} or {u} or {w}; Sunpetal Grove #4 {g} or {w} or {r} or {u} or {b}; Bayou #2 {b} or {g} or {r} or {u} or {w}; Bayou #3 {b} or {g} or {r} or {u} or {w}; Urborg, Tomb of Yawgmoth {g} or {r} or {u} or {b} or {w}; Bayou #4 {b} or {g} or {r} or {u} or {w}; Savannah #1 {w} or {g} or {r} or {u} or {b}; Savannah #2 {w} or {g} or {r} or {u} or {b}; Woodland Cemetery {b} or {g} or {r} or {u} or {w}; Overgrown Battlement {g} (VARIABLE output: this ONE source adds more than one mana - its amount is a count, read its own rules text; the total above counts it as one source, not as its mana); Plains {w} or {g} or {r} or {u} or {b}
+Your hand (3 cards): Chromatic Lantern (copy 1 of 3 in your hand) {3} [artifact]; Chromatic Lantern (copy 2 of 3 in your hand) {3} [artifact]; Chromatic Lantern (copy 3 of 3 in your hand) {3} [artifact]
+Your battlefield (20 permanents listed, of which 1 is a creature, 0 of them without a restriction against attacking): Forest; Bayou #1; Scrubland #1; Isolated Chapel; Scrubland #2; Sunpetal Grove #1; Sunpetal Grove #2; Chromatic Lantern {3} [artifact]; Sunpetal Grove #3; Swamp; Sunpetal Grove #4; Bayou #2; Bayou #3; Urborg, Tomb of Yawgmoth; Bayou #4; Savannah #1; Savannah #2; Woodland Cemetery; Overgrown Battlement {1}{g} (0/4) [defender]; Plains
+Opponent battlefield (26 permanents listed, of which 1 is a creature, 0 of them able to attack right now): Plains #1; Island #1; Plains #2; Island #2; Seachrome Coast #1; Tundra #1; Island #3; Staff of Nin {6} [artifact] [tapped] {effect: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Glacial Fortress #1-#3 x3; Island #4; Island #5; Glacial Fortress #4; Lightmine Field {2}{w}{w} [enchantment] {effect: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}; Seachrome Coast #2; Island #6-#8 x3; Seachrome Coast #3; Tundra #2; Tundra #3; Plains #3; Plains #4; Emrakul, the Aeons Torn {15} (15/15) [flying, can't be countered, protection from colored spells] [tapped - attacking] [annihilator 6 - whenever it attacks, the defending player sacrifices 6 permanents]; Plains #5
+Opponent hand size: 8 | Opponent library: 10 cards
+Artifacts in play: you 1 | opponent 1
+Your library: 20 cards
+
+YOUR PLAN (as you last stated it): I have no creatures to block Emrakul, and I have no way to remove it or counter it. My life total is 1, and Emrakul's Annihilator 6 forces me to sacrifice 6 permanents. I must sacrifice the least valuable permanents to survive this turn and hope to draw a win condition next turn. I will sacrifice 6 lands, prioritizing those that are less critical for mana base consistency or are redundant. I have many lands that produce multiple colors due to Urborg and Chromatic Lantern, so sacrificing any land is roughly equivalent in terms of raw color fixing, but I should try to keep the basic lands if possible for simplicity, or sacrifice the ones that entered tapped if any (none are currently tapped). Actually, all my lands are untapped. I will sacrifice 6 lands from the list. I have 20 permanents on the battlefield. I need to sacrifice 6. I will sacrifice 6 lands. I have 3 Chromatic Lanterns in hand, but I only control one. I will keep the one on the battlefield. I will sacrifice 6 lands. Let's pick 6 lands to sacrifice. I'll sacrifice Bayou #1, Bayou #2, Bayou #3, Bayou #4, Scrubland #1, and Scrubland #2. These are all dual lands. I have many other lands. This leaves me with Forest, Isolated Chapel, Sunpetal Groves, Swamp, Urborg, Savannahs, Woodland Cemetery, Overgrown Battlement, and Plains. This seems reasonable. I have no other options. I must survive.
+
+SACRIFICE ONE OF YOUR OWN CARDS: your own effect (Emrakul, the Aeons Torn) makes you sacrifice a card from the list below - each option is a card YOU will LOSE, NOT a target you attack or affect. Pick the card you can best AFFORD TO LOSE (usually your LEAST valuable: a spare land or a redundant/dead card; KEEP your best spells, answers, and threats). Choose card 3 of exactly 6 from the list below, and answer with the chosen card's name.
+1. Scrubland #1 [land] [your battlefield]
+2. Isolated Chapel [land] [your battlefield] - "Isolated Chapel enters tapped unless you control a Plains or Swamp. -- {T}: Add {W} or {B}."
+3. Scrubland #2 [land] [your battlefield]
+4. Sunpetal Grove #1 [land] [your battlefield] - "Sunpetal Grove enters tapped unless you control a Forest or a Plains. -- {T}: Add {G} or {W}."
+5. Sunpetal Grove #2 [land] [your battlefield] - "Sunpetal Grove enters tapped unless you control a Forest or a Plains. -- {T}: Add {G} or {W}."
+6. Chromatic Lantern [artifact] [your battlefield] - "Lands you control have "{T}: Add one mana of any color." -- {T}: Add one mana of any color."
+7. Sunpetal Grove #3 [land] [your battlefield] - "Sunpetal Grove enters tapped unless you control a Forest or a Plains. -- {T}: Add {G} or {W}."
+8. Swamp [land] [your battlefield] - "B"
+9. Sunpetal Grove #4 [land] [your battlefield] - "Sunpetal Grove enters tapped unless you control a Forest or a Plains. -- {T}: Add {G} or {W}."
+10. Bayou #2 [land] [your battlefield]
+11. Bayou #3 [land] [your battlefield]
+12. Urborg, Tomb of Yawgmoth [land] [your battlefield] - "Each land is a Swamp in addition to its other land types."
+13. Bayou #4 [land] [your battlefield]
+14. Savannah #1 [land] [your battlefield]
+15. Savannah #2 [land] [your battlefield]
+16. Woodland Cemetery [land] [your battlefield] - "Woodland Cemetery enters tapped unless you control an Swamp or Forest. -- {T}: Add {B} or {G}."
+17. Overgrown Battlement (0/4) [defender] [your battlefield] - "Defender -- {T}: Add {G} for each creature with defender you control."
+18. Plains [land] [your battlefield] - "W"
+
+On the FIRST line write CHOICE: followed by the number of your choice and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Scrubland #1)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+
+# ---- MODEL REPLY ----
+CHOICE: 10 (Bayou #2)
+PLAN: Emrakul's Annihilator 6 is forcing me to sacrifice 6 permanents. I have no creatures to block or remove it, and I am at 1 life. I must sacrifice 6 lands to survive. I will sacrifice the following 6 lands: Bayou #2, Bayou #3, Bayou #4, Scrubland #1, Scrubland #2, and Sunpetal Grove #1. This preserves my basic lands, Urborg, Overgrown Battlement, and Chromatic Lantern, which are crucial for my mana base and win condition. I will hope to draw a win condition or answer next turn, although Emrakul's presence makes this highly unlikely.
