@@ -83,8 +83,9 @@ row, do not compute it. Take the row only when N is AT LEAST the cost of the che
 your hand THAT CAN HIT WHAT THIS OPPONENT CASTS:
   - Cancel, Dream Fracture and Fall of the Gavel counter anything. If any of them is in your
     hand, N must cover the cheapest of them - 3, or 5 when the Gavel is the only one.
-  - Essence Scatter counters CREATURE SPELLS ONLY. It counts - N must cover its 2 - when the
-    opponent's battlefield line or the game log shows they cast creatures. Against an opponent
+  - Essence Scatter counters CREATURE SPELLS ONLY - a spell whose stack line prints "(creature
+    P/T)"; a spell printing any other type is out of its reach. It counts - N must cover its 2 -
+    when the opponent's battlefield line or the game log shows they cast creatures. Against an opponent
     whose line and log show only enchantments, artifacts and sorceries (Underworld Dreams, Howling
     Mine, Dictate of Kruphix, Forced Fruition, Peer into the Abyss) a Scatter in hand is not a
     reason to hold mana: it stops nothing they cast. You held two open for a Staff at "leaves 0"

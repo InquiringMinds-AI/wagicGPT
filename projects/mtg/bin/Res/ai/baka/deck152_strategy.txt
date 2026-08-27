@@ -462,6 +462,17 @@ that is three or four lands and the two-drops they cover; at N of 4 or fewer it 
 and your two cheapest spells, and lands are the right cards to lose to get there - a four-card
 hand of four lands is not a hand at all.
 
+CLEANUP DISCARD IS THE SAME ORDER, READ FROM THE END. When your hand is above seven at end of turn
+the ask prints your hand as a NUMBERED list ("your hand has N cards and your maximum hand size is
+7"; the log calls it "Cleanup discard (hand N, limit 7)") and you answer "PUT: n, m" - the numbers
+of the cards you SEND, most expensive first: the most expensive spell your lands cannot reach in
+the next two turns, then a duplicate of a spell already in hand, then a land beyond the fourth in
+hand when your battlefield line already prints four or more lands. Never your only two-drop, and
+never Luminarch Aspirant, Intrepid Adversary, Ranger Class or Briarbridge Tracker while a cheaper
+card is left to send. Read the PUT line back against your own plan sentence before you send it: a
+plan that says "cast the Tracker next turn" with the Tracker's number in the PUT line is the plan
+discarding itself.
+
 MATCHUP POSTURE:
 - vs REMOVAL/GRIND: keep deploying anyway. Their removal answers one creature at a time and your
   board is what wins the game; a creature you held in hand blocks nothing and deals nothing. Cast

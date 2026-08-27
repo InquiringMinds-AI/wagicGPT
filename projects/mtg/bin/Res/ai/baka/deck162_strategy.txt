@@ -353,6 +353,15 @@ only when nothing below it in the order is left.
 LANDS: bottom one when the hand you keep would still hold FOUR OR MORE lands. A five-land,
 two-spell keep has a land to spare and the spell is worth more; a four-land keep does not, and
 below that a land is never the right card to lose.
+CLEANUP DISCARD IS THE SAME ORDER, READ FROM THE END. When your hand is above seven at end of turn
+the ask prints your hand as a NUMBERED list ("your hand has N cards and your maximum hand size is
+7"; the log calls it "Cleanup discard (hand N, limit 7)") and you answer "PUT: n, m" - the numbers
+of the cards you SEND, most expensive first: Forced Fruition, Peer into the Abyss, Teferi's Puzzle
+Box, a second copy of a draw engine already on your battlefield line, then a land when that line
+already prints six or more lands. Never Shield Sphere and never your only punisher - they go only
+when nothing else is left to send. Read the PUT line back against your own plan sentence before
+you send it: a plan that says "cast Underworld Dreams next turn" with its number in the PUT line
+is the plan discarding itself.
 
 === DECIDING SITUATIONS ===
 - Their battlefield line shows BOTH "Sanguine Bond" and "Exquisite Blood" -> any damage you

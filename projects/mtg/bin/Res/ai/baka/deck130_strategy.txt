@@ -468,6 +468,17 @@ board; then your cheapest spells; then the rest by cost. What is left over goes 
 fifth Mountain before a Molten Rain, a second Rorix before a first Stone Rain. Whichever card
 is last in that order is the one that goes, even when it is a land or the Starstorm.
 
+CLEANUP DISCARD - THE SAME ORDER, READ FROM THE END. When your hand is above seven at end of turn
+the ask prints your hand as a NUMBERED list ("your hand has N cards and your maximum hand size is
+7"; the log calls it "Cleanup discard (hand N, limit 7)") and you answer "PUT: n, m" - the numbers
+of the cards you SEND, most expensive first. Send, as many as the ask demands: the most expensive
+spell your lands cannot cast in the next two turns (Rorix or a second Siege-Gang Commander from
+four lands), then a duplicate of a spell already in hand, then a land beyond the third in hand.
+Never the only Starstorm - it is the one card here that answers a board - and never the last land
+that covers the spell your plan names. Read the PUT line back against your own plan sentence
+before you send it: a plan that says "cast the Commander next turn" with the Commander's number
+in the PUT line is the plan discarding itself.
+
 =====================================================================
 DECIDING SITUATIONS (recognise -> do)
 =====================================================================

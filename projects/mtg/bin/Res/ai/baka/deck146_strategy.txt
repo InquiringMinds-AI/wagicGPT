@@ -62,6 +62,18 @@ STEP 2. On your untouched opening 7, or at (keeping 6), a mulligan is a fair tra
   and Verse, the plan said "play Shineshadow Snarl and Brightclimb Pathway" and the PUT line
   sent Pathway and Kaya under; the seat sat on two lands from turn 3 to turn 14 with Lolth,
   Nadaar and Barrowin in hand and lost 0 to 35.
+- CLEANUP DISCARD IS THE SAME ORDER, READ FROM THE END. When your hand is above seven at end of
+  turn the ask prints your hand as a NUMBERED list ("your hand has N cards and your maximum hand
+  size is 7"; the log calls it "Cleanup discard (hand N, limit 7)") and you answer "PUT: n, m" -
+  the numbers of the cards you SEND, most expensive first: Emeria's Call, Agadeem's Awakening, a
+  second planeswalker, then the priciest spell your battlefield's lands do not cover, then a
+  duplicate of a spell already in hand. A land goes ONLY when your battlefield line already
+  prints four or more lands; from fewer, the PUT line holds spell numbers only (six discards on
+  one land at `vs125` were sent from a hand the lands could not cast anyway). Never your only
+  removal spell (Soul Shatter, Vanishing Verse) while their line shows a creature or a
+  planeswalker. Read the PUT line back against your own plan sentence before you send it: a
+  plan that says "cast Kaya next turn" with Kaya's number in the PUT line is the plan discarding
+  itself.
 - KEEP a 7 or a 6 with 2-5 lands including a white source and a black source. Shineshadow Snarl
   alone counts as BOTH colors. Brightclimb Pathway is your white source, Hive and Swamp are black.
 - "Prefer a hand with an early play" is a TIEBREAKER between two keepable hands, NOT a requirement.
@@ -87,8 +99,9 @@ your numbered options top to bottom and take the FIRST line that matches. Stop t
 the rest of the list, and do not weigh a later line against an earlier one.
  1. A removal spell (Vanishing Verse, Soul Shatter) when the opponent's battlefield line shows a
     creature you can hit - and for Vanishing Verse, only when its target list names one of THEIRS
-    (a planeswalker or an enchantment of theirs on that list counts too; Soul Shatter needs a
-    CREATURE on their line and does nothing on a board of only a planeswalker). See #1 RULE.
+    (a planeswalker or an enchantment of theirs on that list counts too; Soul Shatter takes the
+    highest-mana-value CREATURE OR PLANESWALKER on their line - a planeswalker that outranks
+    their creatures is the card it takes - and does nothing on a board of neither). See #1 RULE.
  2. LOLTH or KAYA, if either is on the list. A planeswalker in hand does nothing. The mana you have
     this turn is the only mana you are sure of: "I will cast her next turn" is how a bomb ends the
     game in your hand, and this deck's mana goes DOWN as often as up. Cast her now and start
@@ -158,10 +171,12 @@ attack costs you life.
   answer to the boards Verse cannot fight. Land her and immediately -3 their best threat when you
   are behind; she drops to 2 and survives. Use +1 (ghostform on one of your own nontoken creatures)
   only when you are ahead and have nothing worth exiling.
-- SOUL SHATTER ({2}{B}, instant): the opponent SACRIFICES their biggest creature (highest mana
-  value). It does not target, so it answers a hexproof or indestructible bomb, and it answers
-  ARTIFACT creatures that Vanishing Verse cannot touch. It does NOTHING if they control no
-  creature - do not cast it into a board of only lands, artifacts or planeswalkers.
+- SOUL SHATTER ({2}{B}, instant): the opponent SACRIFICES their creature or planeswalker with the
+  highest mana value among the creatures and planeswalkers they control - so Ob Nixilis at 5
+  goes before a 4-drop creature, and a 5/5 at 6 goes before Ob Nixilis. It does not target, so
+  it answers a hexproof or indestructible bomb, and it answers ARTIFACT creatures that Vanishing
+  Verse cannot touch. It does NOTHING if they control neither a creature nor a planeswalker - do
+  not cast it into a board of only lands, noncreature artifacts and enchantments.
 - SILVERQUILL COMMAND ({2}{W}{B}, SORCERY - your main phases only): WHEN to cast it is decided
   by entry 5 of THE WHOLE CAST ORDER and nothing here - its three conditions are read straight
   off the screen, and when one of them is true and nothing above entry 5 matched, the option IS
@@ -530,7 +545,8 @@ DECIDING SITUATIONS (recognize -> do):
   printed life and your own attackers' summed power -> the answer is PASS.
 - Triumphant Adventurer is castable and you are under pressure -> cast it; the deathtouch 1/1
   blocks or trades with anything.
-- Soul Shatter is offered but the opponent controls no creature -> do not cast it.
+- Soul Shatter is offered but the opponent controls no creature and no planeswalker -> do not
+  cast it.
 - Lolth is on your battlefield and your printed life is 6 or less -> do NOT take her 0. Pass or
   take -3. The 1 life she costs is life you will be killed by.
 - An attacker's tag says your attacker dies, and a DIFFERENT A-line's tag says that same blocker
