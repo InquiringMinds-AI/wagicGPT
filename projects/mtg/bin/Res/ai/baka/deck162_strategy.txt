@@ -60,28 +60,41 @@ lost this corpus.
 Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box, Forced Fruition and Master of the Feast all
 give the OPPONENT cards - their card text says "each player" or "each opponent". They are damage
 only while a punisher is on the battlefield to convert those cards into damage.
-Look at YOUR battlefield line and count the names Underworld Dreams, Fate Unraveler and Ob Nixilis.
-LILIANA'S CARESS ON YOUR BATTLEFIELD COUNTS AS ONE OF THEM once the "Opponent hand size:" line
-reads 7 or more: every extra card a Mine, a Dictate or a Puzzle Box hands them past seven is a
-card they discard at their cleanup, and Caress makes each discard 2 life - a converter that
-needs no draw trigger. WHAT THIS BOUGHT: with Caress out and no punisher, two Mines, a
+EVERY draw-engine row prints its own count: "{feeds: the opponent draws N extra card(s) per turn;
+converters on your battlefield: K - <names>}", or "converters on your battlefield: 0 (nothing of
+yours punishes their draws or discards yet - the cards you hand them are free until a converter
+is out)". Read K off the row you are about to take. It counts Underworld Dreams, Fate Unraveler,
+Ob Nixilis AND Liliana's Caress for you, and it is the whole arithmetic of this rule - not the
+punishers in your hand, not the one that was countered last turn. ONE qualifier is yours to add:
+when the only name after K is Liliana's Caress, K counts only while the "Opponent hand size:"
+line reads 7 or more - every extra card a Mine, a Dictate or a Puzzle Box hands them past seven
+is a card they discard at their cleanup, and Caress makes each discard 2 life, a converter that
+needs no draw trigger; at a hand of 6 or less a lone Caress converts nothing yet, and the row's
+K is read as 0. WHAT THIS BOUGHT: with Caress out and no punisher, two Mines, a
 Dictate and a Puzzle Box took a full-handed opponent from 20 to 8 in three turns (2, 2+2,
 2+2+2 at their cleanups) before the first Underworld Dreams landed.
-- ONE OR MORE of them on your battlefield: cast every draw engine you are offered, every turn, as
-  fast as you can - each one multiplies the damage. This is where the deck wins. Stack Mines,
+- K OF 1 OR MORE (the Caress qualifier passed): cast every draw engine you are offered, every
+  turn, as fast as you can - each one multiplies the damage. This is where the deck wins. Stack Mines,
   Dictates and Puzzle Boxes without limit, with ONE ordering rule that never lapses: if a second
   punisher (Underworld Dreams, Fate Unraveler, Ob Nixilis) is ALSO in this ask's list, cast the
   punisher FIRST and the engines with whatever mana is left. Rule 1 outranks this rule at every
   life total and on every board, whether or not a punisher is already out. A punisher you priced
   out of your own turn is a punisher that never resolves.
-- ZERO of them on your battlefield: one Howling Mine is enough. With a Howling Mine already on your
-  battlefield line, take a wall, a punisher, a Liliana's Caress, or "Cast nothing right now" instead
-  of a second draw engine; Master of the Feast, Dictate of Kruphix, Teferi's Puzzle Box and Forced
-  Fruition all wait for the punisher.
+- K OF 0: one Howling Mine is enough, and the FIRST Howling Mine is cast at K of 0 - its row
+  reads "converters on your battlefield: 0" too, and that is fine for that one card: it draws
+  you into the punisher and is the engine you convert later. With a Howling Mine already on your
+  battlefield line, a second row reading "converters on your battlefield: 0" is the brake: take
+  a wall, a punisher, a Liliana's Caress, or "Cast nothing right now" instead; Master of the
+  Feast, Dictate of Kruphix, Teferi's Puzzle Box and Forced Fruition all wait for the punisher.
+  WHAT THIS COST, both ways: a second Mine went down on turn 6 under "converters on your
+  battlefield: 0" - the opponent drew into two Vanishing Verses and a Soul Shatter, stripped
+  every punisher as it landed, and won from 20 life; and in another game the FIRST Mine sat in
+  hand for four windows at K of 0 while the plan said "stack engines once a punisher is out" -
+  the first Mine is not what that sentence is about.
 The thought "drawing more cards is the priority, I need to find my win condition" is ALWAYS FALSE
 for this deck - a card you hand the opponent with no punisher out is a card that kills you.
-Count the punisher names on YOUR battlefield line - not the ones in hand, not the one that was
-countered last turn. Zero names and a Mine already there: the wall, the Caress or "Cast nothing".
+Read K off the row - not the punishers in hand, not the one that was countered last turn. K of 0
+and a Mine already there: the wall, the Caress or "Cast nothing".
 ONE exception to the brake, and only this one: MASTER OF THE FEAST is a 5/5 flying body as well
 as a gift. With NO punisher out, cast it ONLY when the opponent's battlefield line reads "of
 which N are creatures" with N of 1 or more - the body is worth the card only when there is
@@ -89,7 +102,7 @@ something for it to block. At "of which 0 are creatures" it is a gift like the o
 It still sits behind Rule 1, behind Shield Sphere and behind Fog Bank.
 CHECK YOUR OWN PLAN SENTENCE BEFORE YOU ANSWER. If your PLAN says "stack draw engines", "deploy
 draw engines", "cast Master of the Feast for board presence" or "once a punisher is on the
-battlefield" while YOUR battlefield line holds none of the three punisher names, the plan is
+battlefield" while the row you are taking prints "converters on your battlefield: 0", the plan is
 describing a board you do not have and the answer it leads to is wrong - this seat wrote each
 of those sentences while casting a second Mine, a second Master, a Forced Fruition and a Puzzle
 Box into an empty line, and handed a control deck twenty cards. Count the names; then answer.
@@ -114,7 +127,8 @@ options top to bottom and take the FIRST line that matches:
 3. Shield Sphere (it is free).
 4. Fog Bank, when the opponent controls a creature.
 5. Any Howling Mine, Dictate of Kruphix, Teferi's Puzzle Box, Forced Fruition or Master of the
-   Feast - if rule 2 says the brake is OFF, or it is your first Howling Mine.
+   Feast - when the row's "converters on your battlefield:" number is 1 or more, or it is your
+   first Howling Mine (K of 0 and no Howling Mine on your line yet).
 6. Liliana's Caress, when a Howling Mine, Dictate or Puzzle Box is on your battlefield.
 7. "Cast nothing right now".
 Then take the ask again if the game offers it - you can cast more than one spell in a turn.
@@ -356,7 +370,8 @@ below that a land is never the right card to lose.
 CLEANUP DISCARD IS THE SAME ORDER, READ FROM THE END. When your hand is above seven at end of turn
 the ask prints your hand as a NUMBERED list ("your hand has N cards and your maximum hand size is
 7"; the log calls it "Cleanup discard (hand N, limit 7)") and you answer "PUT: n, m" - the numbers
-of the cards you SEND, most expensive first: Forced Fruition, Peer into the Abyss, Teferi's Puzzle
+ONLY, nothing in brackets after them - of the cards you SEND, most expensive first: Forced
+Fruition, Peer into the Abyss, Teferi's Puzzle
 Box, a second copy of a draw engine already on your battlefield line, then a land when that line
 already prints six or more lands. Never Shield Sphere and never your only punisher - they go only
 when nothing else is left to send. Read the PUT line back against your own plan sentence before
@@ -394,14 +409,15 @@ is the plan discarding itself.
 - The block header says the attack IS LETHAL: add up every "deals N", assign your blockers to the
   biggest ones until what still gets through is below your life, and among the assignments that
   survive take the one leaving you the MOST life - then use the numbered rules for what is left.
-- No Underworld Dreams, no Fate Unraveler and no Ob Nixilis on your battlefield, and a Howling Mine
-  is already out: cast a wall or a Liliana's Caress - or "Cast nothing right now". A Caress
-  already on your line with their hand at 7 or more lifts that brake: the extra cards are
-  discards, and discards are damage.
+- The engine row prints "converters on your battlefield: 0" and a Howling Mine is already on
+  your line: cast a wall or a Liliana's Caress - or "Cast nothing right now". No Mine on your
+  line yet: the first Mine is cast at 0. A row whose K names only Liliana's Caress counts with
+  their hand at 7 or more: the extra cards are discards, and discards are damage.
 - Ob Nixilis's -2 is offered, any creature of theirs is on its list, and 2 x P (your punisher
   count) is at or above their printed life: take it - they draw two, and the game ends.
-- A punisher IS on your battlefield: cast every Howling Mine, Dictate, Puzzle Box and Forced
-  Fruition you are offered, every turn.
+- The engine row prints "converters on your battlefield:" 1 or more (a lone Caress only with
+  their hand at 7 or more): cast every Howling Mine, Dictate, Puzzle Box and Forced Fruition
+  you are offered, every turn.
 - "Cast Shield Sphere {0}" is in the list: take it.
 - The opponent controls any creature and "Cast Fog Bank" is in the list: take it.
 - A block line reads "(you kill it, your blocker lives)" or "(neither dies)": take that block.
@@ -409,7 +425,7 @@ is the plan discarding itself.
   opponent".
 - Ob Nixilis's -2 offers only your own creature as a target: pass.
 - Ob Nixilis's -2 lists a token AND a creature whose text makes tokens: destroy the maker.
-- No punisher name on YOUR battlefield line and your plan says "stack draw engines" or "for
-  board presence": the plan is wrong - cast the wall or nothing. Master of the Feast goes only at
+- The row prints "converters on your battlefield: 0", a Mine is already out, and your plan says
+  "stack draw engines" or "for board presence": the plan is wrong - cast the wall or nothing. Master of the Feast goes only at
   "of which 1" or more creatures on THEIR line.
 - The lethal check clears: attack with everything, Fate Unraveler included.

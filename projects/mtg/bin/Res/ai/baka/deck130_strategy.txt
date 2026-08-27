@@ -45,7 +45,11 @@ a priority option beginning "cycling with " and ending "Cycle]", and a cast menu
                      upkeep. It is a land, and you own twenty-four of them.
   Spark Spray     -> cycle it when its cast option's "legal targets right now:" list shows no
                      opponent creature. If it shows one, cast it instead (rule #2).
-  Lay Waste       -> CAST IT at a land. Cycle Lay Waste only once you control 8 or more lands.
+  Lay Waste       -> CAST IT at a land. Cycle Lay Waste once you control 8 or more lands - or
+                     below THREE lands with a Stone Rain or Molten Rain already in hand: then
+                     Lay Waste is the land-kill you cannot cast for two turns and the card it
+                     draws is the third land (it was, once - Molten Rain on turn 6 followed).
+                     At four to seven lands it is castable and it is cast, never cycled.
   Starstorm       -> do not cycle Starstorm while the "Opponent battlefield" line names ANY
                      creature. That line's own count is the release: when it reads "of which 0 are
                      creatures" and you hold no Forgotten Cave, CYCLE THE STARSTORM. Against a board
@@ -124,13 +128,21 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
      ended at -2. A 1/1 in front of the 6/6 was the extra turn. Keep the blocker.
      DO NOT TAKE IT - answer "Cast nothing right now", at ANY X - when either of these is true:
        (a) the YOURS list at that X names RORIX BLADEWING or SIEGE-GANG COMMANDER. Those two
-           are the only way this deck ends a game. A sweeper that kills your own clock has
-           handed them the match: at 1 life against an opponent on 9, this deck cast Starstorm
-           at X=5, killed its own Rorix, its Blastminer and both Goblins to kill one 0/5 wall,
-           and died with an empty board. Rorix on the table beats any number on the annotation.
+           are the only way this deck ends a game; Rorix on the table beats any number on the
+           annotation.
        (b) the THEIRS list at that X names only creatures whose battlefield line reads
            "[defender]". A defender never attacks you. It is not worth one card, and it is
            never worth a creature of yours.
+       WRITE THE TWO LISTS BEFORE YOU WRITE THE CHOICE. On every window that lists "Cast
+       Starstorm", the PLAN line carries this, filled from the "{X pricing:" text:
+           PLAN: Starstorm: THEIRS non-defenders <n>; YOURS names Rorix/Commander <yes/no>;
+           <cast / not this window>
+       "0" in the first blank or "yes" in the second is "not this window", and the row you
+       take is "Cast nothing right now" - never "Cast Card Normally", whose next screen has no
+       way back but "X = 0". This deck, at 3 life, swept five DEFENDERS with its own Commander
+       and Goblin on the YOURS list, then swept two more defenders alone two turns later, and
+           lost with no creature ever attacking again; the game before, it reached the X menu
+       on a row reading "NOTHING the OPPONENT controls dies" and answered "X = 0".
      AND WHEN YOU DO CAST IT, PICK THE X OFF THE MENU'S OWN ROWS, IN THIS ORDER.
      The "Announce the value of X" list says "option 1 is the LARGEST X (X = N)", so option 1 is
      that N, never X=1. Every row now carries its own "{X pricing: kills THEIRS: ...; YOURS:
@@ -181,15 +193,15 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
   2. An opponent CREATURE whose printed toughness this damage reaches -> aim there. Spark Spray
      kills 1 toughness; Pyrite Spellbomb kills 2; Hammer of Bogardan kills 3. The battlefield line
      prints each creature's CURRENT (P/T) - read it, do not rebuild it from base stats.
-     A SPELL'S target list prints the result - "Goblin (1/1) {right now: takes 3 damage - DIES}",
-     "Rorix Bladewing (6/5) {right now: takes 3 damage - SURVIVES (toughness 5)}" - and you
-     read it. An ABILITY'S rows ("Deal 2 damage with Siege-Gang Commander targeting Fate
-     Unraveler", "Deal 2 damage with Pyrite Spellbomb targeting Ob Nixilis") print NO result:
-     there you do the read yourself, off the (P/T) or the "[counters: Nx loyalty]" on their
-     battlefield line. 2 damage kills toughness 2 and loyalty 2, and nothing bigger. At 4
-     life, under two draw punishers, this deck sacrificed a Goblin for 2 damage at Fate
-     Unraveler (3/4) - the Unraveler lived, the Goblin died, and the draw step killed the
-     deck. The window before, it had sent a Spellbomb's 2 at Ob Nixilis at 3 loyalty.
+     EVERY damage row prints its result - a spell's target list ("Goblin (1/1) {right now:
+     takes 3 damage - DIES}", "Rorix Bladewing (6/5) {right now: takes 3 damage - SURVIVES
+     (toughness 5)}") and an ability's rows alike ("Deal 2 damage with Pyrite Spellbomb
+     targeting Overgrown Battlement {right now: takes 2 damage - SURVIVES (toughness 4)}").
+     "SURVIVES" is the answer "not this row": at 3 life this deck fired a Spellbomb at a row
+     reading "SURVIVES (toughness 4)", paid the {r} with a Talisman, and went to 2 for
+     nothing. After combat damage the same row can read "DIES" or "SURVIVES (toughness 4, 3
+     more kills it)" - that is the window a 2-damage ability kills a 4-toughness wall, and
+     this deck took it correctly once (Perimeter Captain, after a 2/2 had hit it).
   3. An opponent creature this will not kill but that is attacking you every turn -> aim there
      anyway rather than bank the card.
   4. Only then "The opponent (player, life" - and only when that number is 6 or less, so the damage
@@ -204,6 +216,12 @@ target, with the face row reading "targeting a player". Procedure, top down, eve
   total is at or above the "Opponent life:" number, start the chain now and spend every piece.
   Nine life to a Siege-Gang Commander with three Goblins and a loaded Spellbomb is lethal, not
   a face-burn mistake.
+HAMMER OF BOGARDAN, PYRITE SPELLBOMB AND SPARK SPRAY NEVER TOUCH A LAND. Their target menus
+list players and creatures and nothing else; a plan reading "Hammer targeting Underground Sea"
+or "kill Blastminer with Hammer to destroy Plains" is wrong before the menu opens - this deck
+wrote both, and the first one put the Hammer into its own Siege-Gang Commander. With no
+opposing creature or planeswalker on that menu the answer is "The opponent (player, life N)",
+never a row tagged [your battlefield].
 A ROW THAT NAMES YOUR OWN PERMANENT IS NEVER THE ANSWER. Damage and destroy rows print their
 target after "targeting" with its owner in brackets - "[opponent's battlefield]" or "[your
 battlefield]". A row tagged [your battlefield] on Pyrite Spellbomb, Hammer of Bogardan,
@@ -288,6 +306,14 @@ have. Land
 destruction wins a game you are going to be alive to finish; every point below 8 says you are
 not. Spend the mana on a damage spell aimed at the creature that is actually killing you, or on
 a body, and if neither is on the menu, pass and keep the mana for their turn.
+THE TALISMAN CAN BE THE LAST POINT. Its coloured mana costs 1 life ("Talisman of Impulse dealt
+1 damage to you" in the log); its {1} mode costs nothing. When the cast row reads "{leaves 0
+of your 1 untapped mana source untapped}" or "{leaves 0 of your 2 ...}" and the sources left
+on "Those sources, one per untapped card" are Talismans, a spell with a {r} pip is paid in
+life. At 2 life this deck cast Spark Spray off a Talisman and went to 1; at 1 life it cast the
+second Spark Spray off the other Talisman and the game ended 0 to 24 - the opponent had not
+attacked. Before any cast at 3 life or less, write "Talisman pays: life <L> -> <L-1>" in your
+PLAN; if that number is 0, the row is "Cast nothing right now", whatever the spell does.
 His ability's target row now names the owner: "Destroy with Dwarven Blastminer targeting
 <land> [opponent's battlefield]". Take rows tagged [opponent's battlefield]; never a row
 tagged [your battlefield].
@@ -357,18 +383,27 @@ formality.
 Only when you WIN the race, or when their untapped creatures total 0 power, or under the carve-out
 above, go on to the floor.
 
-WALL CHECK, BEFORE THE FLOOR: their battlefield line names PERIMETER CAPTAIN or PRIDE
-GUARDIAN. Their tags say what a block costs you - "(neither dies (blocking trigger: they may
-gain 2))" - and every one of your attackers they block is life for them: this deck sent the
-Commander and two Goblins into a Captain and a Guardian and watched 21 become 30 in one
-combat, with Exquisite Blood already on their line. "ATTACK: none" while either name is on
-that line; they die to a Spellbomb, a Goblin sacrifice or a Starstorm first, and THEN the
-floor applies.
+WALL CHECK, BEFORE THE FLOOR - THE TAG PRICES IT IN YOUR LIFE NOW. An attacker's tag reading
+"(neither dies (blocking trigger: they may gain 2, and if they do their converter takes 2 off
+you))" means Perimeter Captain plus Sanguine Bond: EVERY attacker you send is 2 life off you
+and 2 on them, and they block every one. Count the attackers you were about to send and
+double it - that is the life you are paying for zero damage. Write it: "Wall: <n> attackers x
+2 = <2n> life; ATTACK: none". This deck read that tag on all four of its attackers at 19 life,
+wrote "they have no attackers, so attacking is safe" and sent them - 19 became 11 and 16
+became 24; two turns later it sent three Goblins into the same tag and 10 became 4; the game
+ended 0 to 24 with the opponent never attacking. Without the converter clause the tag reads
+"(neither dies (blocking trigger: they may gain 2))" and the price is theirs alone - still
+"ATTACK: none" while Perimeter Captain or Pride Guardian is on their line: they die to a
+Spellbomb, a Goblin sacrifice or a Starstorm first, and THEN the floor applies.
 ATTACK FLOOR - read the "Your creatures that can attack:" list, then take the first case that
-applies. FIRST: if Dwarven Blastminer is the ONLY creature on that list, answer "ATTACK: none" -
-always, and stop reading. He is worth {2}{R} of land destruction every turn he stays untapped, and
-one point of chip damage is worth nothing to this deck. SECOND: with any other creature listed, send
-EVERY creature listed except Dwarven Blastminer. That list has already dropped everything that cannot
+applies. FIRST: the WALL CHECK above - a "blocking trigger" tag on your attackers is "ATTACK:
+none" before anything below is read. SECOND: Dwarven Blastminer alone on the list stays home
+while his {2}{R} has a job this turn - a "[opponent's battlefield]" nonbasic land on his
+target rows - or their line shows an untapped creature; with NEITHER (their lands all
+basic or gone, no creature to block), send him: one damage a turn is the only clock you have,
+and this deck answered "ATTACK: none" with him through ten turns of an opponent on zero lands
+and no creatures at 18 life, then needed twenty more turns to win. THIRD: with any other
+creature listed, send EVERY creature listed except Dwarven Blastminer. That list has already dropped everything that cannot
 legally attack, so do not re-check summoning sickness or tapped status yourself. Otherwise answer
 "ATTACK: none" only when every listed attacker would die to a blocker and kill nothing - not to
 "hold blockers", and not because their creatures are marked "[tapped - cannot attack or block this
@@ -529,14 +564,27 @@ DECIDING SITUATIONS (recognise -> do)
 - The cast row's "At X=N ... YOURS:" names Siege-Gang Commander or Rorix at every X that
   kills something of theirs -> do not answer "Cast Card Normally" at all; the X menu has no
   exit.
-- A "Deal N damage with <Siege-Gang Commander / Pyrite Spellbomb> targeting <creature>" row
-  and that creature's line shows toughness above N (or "[counters: Mx loyalty]" above N) ->
-  not that row; ability rows print no DIES/SURVIVES, you read the toughness yourself.
+- A damage row - spell target or ability - reads "{right now: takes N damage - SURVIVES ...}"
+  -> not that row this window; "- DIES" is the row. "(toughness 4, 3 more kills it)" after
+  combat damage is the window a 2-damage ability kills a wall.
+- Any attacker's tag reads "blocking trigger: they may gain 2, and if they do their converter
+  takes 2 off you" -> write "Wall: <n> x 2 = <2n> life" and "ATTACK: none".
+- "{leaves 0 of your 1 untapped mana source}" (or "0 of your 2") on a cast row, the sources
+  left are Talismans, and your life is 3 or less -> "Cast nothing right now"; write "Talisman
+  pays: life <L> -> <L-1>" first.
+- "Cast Starstorm" is listed -> write "Starstorm: THEIRS non-defenders <n>; YOURS names
+  Rorix/Commander <yes/no>" in the PLAN; 0 or yes -> "Cast nothing right now".
+- A Hammer of Bogardan / Pyrite Spellbomb / Spark Spray target menu with no opposing creature
+  or planeswalker on it -> "The opponent (player, life N)". A plan that named a land for it
+  was wrong; the menu never lists one.
+- "Your creatures that can attack:" holds only Dwarven Blastminer, their line shows no untapped
+  creature, and his target rows show no "[opponent's battlefield]" land -> send him.
 - The blockers header prints "GANG BLOCK: your N biggest together deal X, enough to kill this
   attacker" on a creature named on the "DRAW PUNISHERS" line, and your life minus its "deals
   N" is 5 or less -> all N blockers on it.
 - Their battlefield line names Perimeter Captain or Pride Guardian -> "ATTACK: none"; kill
-  them with a Spellbomb, a Goblin sacrifice or a Starstorm first.
+  them with a Spellbomb, a Goblin sacrifice or a Starstorm first - and with Sanguine Bond
+  beside them the Starstorm's (b) still holds: walls are not worth the Commander.
 - The attacker on the blockers screen is Thraben Doomsayer or Bloodline Keeper and the
   Commander's row reads "(both die)" -> take it; a maker for the Commander is the trade.
 - "CAUTION - some usable mana sources DAMAGE YOU" is on the screen and your life is 3 or

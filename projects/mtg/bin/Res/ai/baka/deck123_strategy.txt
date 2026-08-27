@@ -48,6 +48,10 @@ lands in hand, re-stating "cast Intruder Alarm using Tundra and Underground Sea"
 every window, and lost that game 42 to 0 without ever making a token.
 If your plan names a spell you cannot afford this window, the fix is the land drop, not
 another pass.
+A CHOICE NAMES A NUMBERED ROW ON THIS WINDOW. A card on your hand line with no "Cast" row is
+there because a pip cannot be paid - read the mana line's per-colour count ("{W} 1" cannot
+pay {1}{w}{w}). This deck answered "CHOICE: 2 (Cast Thraben Doomsayer)" on a menu with no
+Doomsayer row and one white source, and spent a re-ask on it.
 WHICH LAND: when a spell in your hand is castable THIS turn off the land you play, play the
 land that enters UNTAPPED - Underground Sea, Tundra, Scrubland, Plains, Swamp. Arcane Sanctum
 "enters tapped" (its own text says so) and Isolated Chapel enters tapped unless you control a
@@ -59,6 +63,12 @@ This applies hardest in COMBAT. On a blockers screen at 9 life this deck worked 
 that Tribute to Hunger after blockers would let it survive - with "Mana available: 1 total" on
 the same screen and Tribute costing {2}{b}, three mana. A spell you cannot pay for is not a
 survival plan; check "Mana available: N total" BEFORE you build a line around a card in hand.
+A CARD ELITE SPELLBINDER EXILED FROM YOUR HAND IS STILL YOURS TO CAST. Its row comes back as
+"Cast Intruder Alarm {4}{u} [from exile]" - the same card, two mana more - and it sits on the
+cast list at the same entry as the card in hand. This deck read that row for four windows
+while writing "Intruder Alarm is exiled, I cannot cast it", cast a Damnation that killed two
+of its own creatures instead, and cast the Alarm from exile two turns later onto an empty
+board. "[from exile]" means castable; the number in front of it is the price.
 
 === RULE 1 - THE TOKEN LINES, AND WHEN TO STOP TAKING THEM ===
 These are the three lines, exactly as you will see them. A second copy of the same card adds a
@@ -128,11 +138,13 @@ the Alarm in the main phase after it, and then went through the opponent's entir
 with no "Create human" line on any screen - the Doomsayer sat tapped, Brutal Cathar exiled
 it, and the game ended two turns later at -10. Land, Alarm, THEN the first tap - or, with
 the Alarm not castable this turn, tap freely: a maker with no Alarm untaps on its own.
-YOUR OWN UPKEEP IS THE WORST WINDOW OF ALL. The 323 Vampires this deck made in its own turn-9
-upkeep attacked with ONE creature that turn - every token's line read "[summoning sick]" - and
-the opponent's turn 10 cleared all of them before a single token had attacked; the game ended
-0 to 62 forty turns later without another maker. The line is offered in your upkeep; the answer
-there is "CHOICE: 0 (pass)" and the chain fires in THEIR turn.
+YOUR OWN UPKEEP IS THE WORST WINDOW AGAINST A SWEEPER. Tokens made in your own upkeep sit
+through their whole turn before they attack: the 323 Vampires this deck made in its own turn-9
+upkeep were swept on turn 10 and the game ended 0 to 62. Against a deck whose log shows
+Starstorm, Supreme Verdict or Damnation (deck130, deck125, this deck's mirror), the answer in
+your upkeep is "CHOICE: 0 (pass)" and the chain fires in THEIR turn. Against a deck with no
+sweeper in its log the own-turn chain has won three games running at the L + C + 3 stop; the
+stop, not the phase, is what those games were decided by.
 A token you make this turn CANNOT ATTACK this turn. Its battlefield line says so:
 "[summoning sick - cannot attack this turn, but CAN block]". It can block right away, and it
 attacks on your NEXT turn.
@@ -141,20 +153,30 @@ says "attack with all 12 for lethal" is wrong on the turn you made those 12 - th
 will offer you one creature. Make the tokens anyway; they block this turn and they swing next
 turn.
 
-=== RULE 2 - MARSH FLATS TAKES A DUAL, NOT A BASIC ===
-When lines beginning "Put a card onto the battlefield with Marsh Flats targeting" appear, read
-the colour counts on the mana line - "sources that can make each: {W} n, {U} n, {B} n" - and
-take the DUAL that raises the colour you have the least of, a colour at 0 first:
+=== RULE 2 - MARSH FLATS IS NOT MANA UNTIL YOU CRACK IT; CRACK IT THE FIRST WINDOW IT IS LISTED ===
+A Marsh Flats on your battlefield makes NO mana: the "Mana available" line does not count it,
+and it never will until you take its line. So the first window that lists "Put a card onto the
+battlefield with Marsh Flats targeting ..." is the window - on either player's turn, in any
+phase. This deck played a Flats on turn 5 beside two Scrublands with Thraben Doomsayer
+{1}{w}{w} in hand, answered "CHOICE: 0 (pass)" to that line in SIX windows across four turns
+while its plan said "cast Thraben Doomsayer next turn when I have 3 mana", and was still on two
+sources on turn 11 when Molten Rain and Stone Rain took both Scrublands; the game ended at -2
+without a token made. The third mana was on the screen the whole time.
+WHICH LAND: read "Your hand" for the pips your spells need TWICE - Thraben Doomsayer needs
+{w}{w}, Bloodline Keeper {b}{b}, Damnation {b}{b} - and take the dual that supplies both of
+them with what is already on your battlefield:
   "targeting Underground Sea"  - makes {U} and {B}
   "targeting Tundra"           - makes {W} and {U}
   "targeting Scrubland"        - makes {W} and {B}
-Ties go to Underground Sea, then Tundra, then Scrubland. With an Underground Sea already on
-your battlefield and Idyllic Tutor {2}{w} in hand, Tundra is the right fetch - it was, once, in
-this corpus. Never a basic while a dual is listed: Underground Sea does everything a Swamp does
-AND makes blue; Tundra does everything a Plains does AND makes blue. Both come in untapped.
-Why this decides games: Intruder Alarm costs {2}{u} and Vision Skeins costs {1}{u}, and only
-10 of your 24 lands make blue. Fetch a basic and your combo piece sits in your hand for the
-rest of the game.
+A colour at 0 on the mana line comes first (Intruder Alarm {2}{u} and Vision Skeins {1}{u} are
+the reason: only 10 of 24 lands make blue). After that, the hand decides: with Tundra and
+Underground Sea out and a Doomsayer plus a Keeper in hand, Scrubland is the fetch - it is the
+second W AND the second B. This deck fetched a second Sea there; the Doomsayer sat in hand
+from turn 1 to turn 14 with "{W} 1" on the mana line, and the game was lost at 0.
+A basic only against a deck whose log shows Molten Rain, Lay Waste or Dwarven Blastminer
+(deck130): those three hit NONBASIC lands only, so a Plains or Swamp fetched for the colour you
+are short of is the land they cannot take - keep the Sea for the Alarm's blue. Against every
+other deck, never a basic while a dual is listed; the duals enter untapped and make two colours.
 
 === RULE 3 - COUNT BOTH BOARDS BEFORE DAMNATION ===
 DAMNATION DESTROYS CREATURES AND NOTHING ELSE. Its own row prints the whole card: "Destroy all
@@ -172,11 +194,18 @@ When YOUR number is the bigger one, spend the window on a creature, a token acti
 removal spell instead, and keep the Damnation - your creatures are how you win, and a wipe that
 kills two of yours to kill one of theirs has handed them the game.
 Your number is 0 and theirs is 2 or more: that is the best Damnation there is. Take it, and take
-it BEFORE a token-maker and before Vision Skeins - it is entry 0 of the cast list below. At 0
-against 4 this deck cast Vision Skeins "to dig for a maker" with Damnation castable and was dead
-two turns later to those same four bodies; at 4 life against 4 it cast a Thraben Doomsayer into
-them and died on the next attack. A maker cast into four attackers does not live to make a
-token; the Damnation that clears them buys the turns the maker needs.
+it BEFORE a token-maker and before Vision Skeins - it is entry 0 of the cast list below. A maker
+cast into attackers does not live to make a token; the Damnation that clears them buys the
+turns the maker needs.
+WRITE THE THREE NUMBERS BEFORE YOU WRITE THE CHOICE. Whenever "Cast Damnation" is on the menu,
+your PLAN line carries this, blanks filled from the row:
+    PLAN: Damnation: N <their number>, K <able to attack>, M <mine>; <cast / hold>
+M 0 and K 2 or more is "cast" and it is the first line of your reply, above a maker. Two
+windows this corpus read "destroys 2 of their creatures ... 0 of yours" at 14 life and
+"destroys 5 ... 0 of yours" at 1 life and cast a Thraben Doomsayer over the Damnation both
+times; both makers died the next turn and both games were lost. M above N is "hold": this deck
+cast a Damnation reading "destroys 1 of their creature ... 2 of yours" under a plan that said
+"board is clear" - it cleared its own Doomsayer and Human for one Elite Spellbinder.
 THE ROW COUNTS FOR YOU. "Cast Damnation" prints "{right now: destroys N of their creatures (K
 without a restriction against attacking), M of yours}" on your turn and "(K able to attack
 right now)" on theirs; when every one of theirs is a wall it prints "(all of them carry a
@@ -207,7 +236,12 @@ answer. Take a token activation, a removal spell or "Cast nothing right now" ins
 Tragic Slip gives -1/-1. That kills a creature whose battlefield line shows toughness 1 - a
 (2/1), a (1/1), a (0/1). Against anything with toughness 2 or more it shrinks the creature and
 it lives.
-Pick the target with toughness 1. If several are listed, take the one with the biggest power.
+Pick the target with toughness 1 - the SECOND number in the "(P/T)" on the target row. The
+Slip's target rows print no "DIES / SURVIVES"; you read the number. A "(4/2)" and a "(2/2)" both
+have toughness 2 and both live: this deck wrote "it is 3/1, -1/-1 kills it" at a row reading
+"Elite Spellbinder (4/2)", and Slipped a "Siege-Gang Commander #2 (2/2)" the game after; both
+Slips were spent and both creatures attacked the next turn.
+If several toughness-1 targets are listed, take the one with the biggest power.
 The one upgrade: under the CURRENT turn header in the GAME LOG, a line ending in "died" means
 Tragic Slip gives -13/-13 instead and kills anything on the list -
 then take the target with the biggest printed power on the battlefield line.
@@ -331,19 +365,13 @@ creature entering - theirs or yours - untaps everything. With a token-maker in p
 pure profit. With no token-maker in play, a creature of yours that attacks stays tapped, so get
 Thraben Doomsayer or Bloodline Keeper down before you rely on attacking.
 "Cast Idyllic Tutor {2}{w}" searches for an ENCHANTMENT, and the only enchantment in this sixty
-is Intruder Alarm. The answer on the reveal list is Intruder Alarm, every time; every other row
-there reads "[does NOT qualify]". IT CANNOT FIND A CREATURE. "Cast Idyllic Tutor to find a
-creature" is a sentence this deck wrote at 3 life with an Alarm on the battlefield and a second
-in hand; the Tutor found a third Alarm and the game ended without a creature cast. With an
-Intruder Alarm on your battlefield OR in your hand, the Tutor is a dead card: never cast it -
-Vision Skeins is the card that digs for a maker.
-"Cast Idyllic Tutor to find Bloodline Keeper" and "the Tutor is the best available play to dig
-for a creature" are sentences this deck wrote with TWO Intruder Alarms on its battlefield line,
-and it cast the Tutor after each one; the reveal list marked Bloodline Keeper "[does NOT
-qualify]" both times. The reveal list cannot be argued with. When "Cast Idyllic Tutor" is
-listed and "Intruder Alarm" is on your battlefield line or in "Your hand", write this in your
-reply, blanks filled from the screen, and take another row:
-    Tutor: dead - Alarm <on my battlefield / in my hand>; it finds only an Alarm.
+is Intruder Alarm; every other row on the reveal list reads "[does NOT qualify]". IT CANNOT
+FIND A CREATURE. The row itself now says when it is dead: "[already owned: Intruder Alarm on
+your battlefield - this finds only an enchantment card]". That tag on the row, or an Alarm in
+"Your hand", is "Cast nothing" over the Tutor - Vision Skeins is the card that digs for a maker.
+THE ONE TIME A DEAD TUTOR IS A PLAY: against a deck that counters (deck125 - Cancel, Essence
+Scatter, Fall of the Gavel, Dream Fracture in its log), see the counter paragraph under KEY
+CARDS - it is cast FIRST in the same main phase as a maker, to eat the counter.
 THE ALARM YOU TUTOR MAY NOT BE CASTABLE THIS TURN. The engine taps your mana for you, and it
 paid a Tutor's {2}{w} with BOTH Underground Seas when a Swamp and two Scrublands would have done
 it; the tutored Alarm then sat in hand for a whole turn cycle with "{U} 0" on the mana line.
@@ -384,6 +412,13 @@ Vision Skeins {1}{u} - EACH player draws two cards, you and them.
   When the opponent's battlefield holds a permanent that damages or drains a player for drawing
   cards, take a different action - that permanent turns your own draw spell against you.
 Lightning Greaves {2} - see Rule 6.
+AGAINST A DECK THAT COUNTERS (their log shows Cancel, Essence Scatter, Fall of the Gavel, Dream
+Fracture - deck125): they counter the FIRST spell you cast that they can. Nine of this deck's
+spells were countered in one game, cast one per turn: three Keepers, a Doomsayer, an Alarm, two
+Skeins, two Tutors. With the mana for two spells, cast the SPARE first - a Tutor with an Alarm
+owned, a second Alarm, a Skeins - and the maker SECOND, in the same main phase. The counter is
+spent on the card you did not need; at 10 lands that is a Tutor {2}{w} and then a Keeper
+{2}{b}{b}. One spell a turn into open blue mana is a maker a turn into the graveyard.
 
 === COMBAT ===
 ATTACK - five checks, in this order. Stop at the first one that answers and do what it says.
@@ -483,7 +518,10 @@ can block and kill it - the maker is the engine, the tokens are the attack. Its 
 when: "[their untapped blockers: ... (both die)]" or "(your attacker dies)" on the maker's
 line means "ATTACK: none". This deck sent a lone Doomsayer into "(both die)" with twenty
 Humans summoning sick behind it and traded the engine for a Siege-Gang Commander. Send it
-once tokens are attacking beside it.
+once tokens are attacking beside it. The same tag on your ONLY creature of any kind is the
+same answer: at 4 life this deck sent a lone Human wearing the Greaves into "(your attacker
+dies, their blocker lives)" under a plan that said its death would "untap all creatures" -
+nothing untaps for a creature LEAVING - and had no creature left for the turn that killed it.
 
 Blocking, in this order. Step 0 decides whether you HAVE a blocker; steps 1 and 2 pick WHICH
 creature blocks; the rest decide whether to block at all.
@@ -528,6 +566,12 @@ creature blocks; the rest decide whether to block at all.
    still stops that attacker's whole damage - "I only have one, so it does not matter" is how you
    go from 10 life to 2 in one combat step. Assign blockers until you run out of blockers or run
    out of unblocked attackers, whichever comes first.
+ - A "GANG BLOCK: any 2 of yours together deal N, enough to kill this attacker" clause on an
+   attacker with "deals 4" or more, while the header's "you would be at" is 6 or less: put the
+   counted blockers on it, token first, then a Keeper. At 10 life this deck read that clause
+   on Nadaar (4/4), answered "BLOCKS: none" with a Keeper and a Vampire on the screen, went to
+   4, and the next turn's Damnation had to kill two Keepers to clear the board it could have
+   thinned for one token.
  - Otherwise your token-makers do NOT block. Take the damage. A blocker line reading "(both
    die)" on Thraben Doomsayer or Bloodline Keeper is a trade you decline while the combat
    header's "you would be at N" is above 5 - the maker is worth more than any one attacker.
@@ -617,14 +661,18 @@ without a creature ever hitting its battlefield.
   {1}{u}" is listed: cast it, this window. Twelve consecutive "Cast nothing right now" answers
   with eight to eleven mana open and a Skeins in hand were twelve turns of not looking for the
   maker, in a game that ended 0 to 43 without one.
-- "Cast Idyllic Tutor {2}{w}" is listed and "Intruder Alarm" is on your battlefield line or in
-  "Your hand": do not cast it. It finds only an Alarm; you have one. Your reply says so: "Tutor:
-  dead - Alarm <on my battlefield / in my hand>".
-- "Cast Vision Skeins {1}{u}" is listed and "Your hand (N cards)" reads 6 or more: not this
-  window unless you can cast what it draws - cards above seven leave your hand at end of turn.
+- "Cast Idyllic Tutor {2}{w} [already owned: Intruder Alarm ...]" or an Alarm in "Your hand":
+  not the Tutor - unless it is the bait cast before a maker against a counter deck (deck125).
+- A "Cast <card> ... [from exile]" row (Elite Spellbinder took it): a real cast, two mana more,
+  at the card's own cast-list entry.
 - The "Cleanup step" ask is on the screen ("your hand has N cards and your maximum hand size
-  is 7"): PUT the spare - a "copy 2 of 2", a Devour Flesh at 0 opposing creatures, a second
-  Damnation - never your only maker, never your only Intruder Alarm.
+  is 7"): answer "PUT: n" with the number of the spare - a "copy 2 of 2", a Devour Flesh at 0
+  opposing creatures, a second Damnation - never your only maker, never your only Intruder
+  Alarm; read the number back against the card your PLAN names next.
+- A sacrifice ask that lists YOUR permanents one row each ("Sacrifice with Emrakul, the Aeons
+  Torn" - annihilator, six picks): send LANDS, tapped ones first; Intruder Alarm and any
+  creature go last, after every land. With eleven lands and one Alarm on the screen this deck
+  sent the Alarm second, twice in one game.
 - An edict row reads "they control 1 creature - <name> is sacrificed" and that creature's
   "{card text:}" gives their other creatures mana, counters or +X/+X: cast the edict, whatever
   its power. Only "[defender]" and power 0 are the creatures an edict is wasted on.
@@ -661,9 +709,10 @@ without a creature ever hitting its battlefield.
   turn, unless your attackers for this turn are already on the board.
 - A token-maker is on your battlefield line and "Cast Intruder Alarm {2}{u}" is listed: cast
   the Alarm, before a second maker and before Lightning Greaves.
-- "Put a card onto the battlefield with Marsh Flats targeting ..." is listed: take the dual
-  that raises the colour your mana line counts lowest ({W} n, {U} n, {B} n); ties Underground
-  Sea, then Tundra, then Scrubland. Never a basic while a dual is listed.
+- "Put a card onto the battlefield with Marsh Flats targeting ..." is listed: take it THIS
+  window - the Flats makes no mana until you do. The dual: a colour at 0 first, then the one
+  that makes the pip your hand needs twice ({w}{w} Doomsayer, {b}{b} Keeper). A basic only
+  against Molten Rain / Lay Waste / Blastminer (deck130).
 - Several casts are listed at once: answer with the highest entry on the cast list above that
   appears in your menu.
 - "Cast Idyllic Tutor {2}{w}" is taken: choose Intruder Alarm on the reveal list.
@@ -671,13 +720,14 @@ without a creature ever hitting its battlefield.
 - "Cast Damnation {2}{b}{b}" is listed: read its row, "{right now: destroys N of their
   creatures (K without a restriction against attacking), M of yours}" - "(K able to attack
   right now)" on their turn, "(all of them carry a restriction against attacking)" = K of 0.
-  M at 0 and K at 2 or more - cast it, above everything else on the menu, the Tutor and the
-  Alarm included. N bigger than M and K at 1 or more - cast it. K at 0 on Perimeter Captain or
+  Write "Damnation: N <>, K <>, M <>" in your PLAN first. M at 0 and K at 2 or more - cast it,
+  above everything else on the menu, a maker, the Tutor and the Alarm included. N bigger than M and K at 1 or more - cast it. K at 0 on Perimeter Captain or
   Pride Guardian - cast it, they are CHECK 1's wall. Any other K at 0, or N exactly 1 with a
   Tragic Slip or an edict on the menu that kills it - the one-for-one, and keep the Damnation.
   M bigger than N - take another action and keep it. N at 0 - never, whatever the plan says.
-- "Cast Tragic Slip {b}" is listed: take a target whose line shows toughness 1, or any target if
-  a "died" line sits under this turn's header. Otherwise "Cast nothing right now".
+- "Cast Tragic Slip {b}" is listed: a target whose "(P/T)" second number is 1, or any target if
+  a "died" line sits under this turn's header. A second number of 2 or more and no "died"
+  line: "Cast nothing right now" - the target rows print no DIES/SURVIVES for the Slip.
 - An edict row reads "{right now: they control 1 creature - <name> is sacrificed ...}": cast it
   this window - Tribute to Hunger at the opponent first, Devour Flesh at "The opponent" only if
   Tribute is not listed - before a Tragic Slip on a toughness-2 creature. "they choose which

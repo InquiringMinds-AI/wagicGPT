@@ -108,14 +108,20 @@ next copy; you did, and won.) And the two halves are NOT the same card:
 So when you have NEITHER piece, Sanguine Bond is the one to look for first.
  1. The turn either one appears in your casting list, CAST IT. Not later, not after a wall, not
     once you can afford both.
- 2. If one is already on your battlefield and the other is not in your hand, "Cast Idyllic Tutor
-    {2}{w}" is your best play in that list - ahead of every wall and every other card.
+ 2. If one is already on your battlefield and the other is on NEITHER your hand line nor your
+    battlefield line, "Cast Idyllic Tutor {2}{w}" is your best play in that list - ahead of every
+    wall and every other card. If the other IS on your hand line with a "Cast" row, that row is
+    the play and the Tutor is not: you tutored with Sanguine Bond on the battlefield and "Cast
+    Exquisite Blood" printed on the same menu, fetched a second Bond, and the win waited two more
+    turns.
  3. Idyllic Tutor puts the enchantment into your HAND, not onto the battlefield. You still have to
     cast it for 5, and Tutor plus enchantment in one turn costs 8 mana. So cast the Tutor the FIRST
     turn it is listed - the turn you spend tutoring is a turn you are not casting the enchantment.
- 4. The Tutor then shows you your whole library as a long numbered list. Pick the one of the two you
-    do NOT already have; if you have NEITHER, pick SANGUINE BOND - it is the half that wins on its
-    own (Rule #3).
+ 4. The Tutor then shows you your whole library as a long numbered list. Before the PUT line, read
+    your battlefield line AND your hand line: the name printed on either is the one you already
+    have. Pick the OTHER one; if you have NEITHER, pick SANGUINE BOND - it is the half that wins on
+    its own (Rule #3). You picked a Sanguine Bond with a Sanguine Bond on your battlefield and an
+    Exquisite Blood in your hand.
  5. You run four Idyllic Tutors and two copies of each enchantment. If a piece is countered or
     exiled, tutor for the next copy and cast it again. There is no other way to win this game.
 
@@ -137,8 +143,9 @@ Cast it when any of these is true:
    row is in the menu, CAST IT IN THAT WINDOW, ahead of Sanguine Bond, ahead of Exquisite Blood,
    ahead of Idyllic Tutor and ahead of every wall. The row already did the counting: "is
    sacrificed" means it IS their only creature, right now. It does not have to "become" their only
-   creature and this rule fires in this window, not in a later one. Three of four such rows this
-   corpus were taken in their first window - "Thraben Doomsayer is sacrificed" on turn 6 (the
+   creature and this rule fires in this window, not in a later one. Three of four such rows one
+   corpus and one of one the next ("Nadaar, Selfless Paladin is sacrificed, you gain 3", turn 8,
+   over two walls) were taken in their first window - "Thraben Doomsayer is sacrificed" on turn 6 (the
    turn before, in another game, that card and an Intruder Alarm made 255 Humans), "Bloodline
    Keeper is sacrificed", "Fate Unraveler is sacrificed" - and each was the game's best play. The
    fourth you declined for an Overgrown Battlement while your own plan said "only if the opponent
@@ -151,7 +158,13 @@ Cast it when any of these is true:
    #7, not 7b, unless your life is 10 or less or both enchantments are out (then it wins). You
    spent one on a Shield Sphere for 6 life on turn 6 and the other on a Fate Unraveler on turn 8;
    on turn 14 both enchantments were out against two Fog Banks, you were at 3, and a Tribute in
-   hand would have ended the game - you had none.
+   hand would have ended the game - you had none. The next corpus you spent one on a Fog Bank at
+   13 life with "Cast Sanguine Bond" printed one row below it, and your plan said "remove the only
+   blocker". IF YOUR PLAN SAYS "remove their blocker", THE PLAN IS ALREADY WRONG: nothing of yours
+   attacks except a Vampire, so a wall of theirs blocks nothing you care about. And a row that is
+   PRINTED is a row you can PAY - "we still lack the two black mana for Sanguine Bond" beside a
+   printed "Cast Sanguine Bond {3}{b}{b}" row is a false sentence; the engine prints only casts it
+   can pay for.
  - THE OPPONENT'S ONLY CREATURE IS ONE YOUR BOARD CANNOT BLOCK. None of your sixteen defenders
    and none of your Vampire tokens has FLYING or REACH, so a creature tagged [flying] on the
    opponent battlefield line connects for its full power every single turn no matter how many
@@ -283,24 +296,26 @@ Take the highest entry on this list that appears in your casting menu:
  1. Exquisite Blood or Sanguine Bond - whichever NAME is missing from your battlefield line, at any
     "leaves N", including "casting this taps you out". A copy of a name already on that line is
     not this entry; skip it. Nine of nine this corpus - the turn the row appeared, it was cast.
- 2. Idyllic Tutor, when either enchantment is missing from both your hand and your battlefield.
-    You cast an Overgrown Battlement over a Tutor with neither piece in hand; the Tutor came two
-    turns later and the Bond it found four.
+ 2. Idyllic Tutor, when either enchantment is missing from both your hand line and your
+    battlefield line. A missing name that is on your HAND line with a "Cast" row is entry 1, not
+    this. You cast an Overgrown Battlement over a Tutor with neither piece in hand; the Tutor came
+    two turns later and the Bond it found four.
  3. Perimeter Captain - it turns every future block by every wall into 2 more life.
  4. Any other wall: Wall of Omens (it replaces itself), Overgrown Battlement, Pride Guardian.
  5. Staff of Nin.
  6. Sorin, Lord of Innistrad.
  7. Chromatic Lantern - when nothing from entries 1-6 is on the menu AND no Chromatic Lantern is
     on your battlefield line. It is a mana rock: every land of yours then makes any colour and it
-    adds a mana of its own, so a Lantern cast on a turn with nothing else to cast is a turn spent
-    well, not a wasted one - as the only real row beside "Cast nothing right now" it has been the
-    right cast in game after game. Do NOT count black sources by name to decide this; the entry
-    above it on this list decides it - you cast a Lantern over a Pride Guardian this corpus, the
-    wall one entry higher. A SECOND Lantern does nothing at any time - once "Chromatic Lantern" is
-    on your battlefield line this entry is finished for the rest of the game, so take a wall or a
-    combo piece instead, or cast nothing. You cast a second Lantern this corpus after writing "I
-    do not have a CL on the battlefield" under a battlefield line that printed one; read the line,
-    not the memory of it.
+    adds a mana of its own. IT MOVES ABOVE ENTRY 4 (the walls) in exactly one shape: Sanguine
+    Bond, Exquisite Blood or Idyllic Tutor is on your hand line AND your "Mana available:" line
+    reads 4 or less. Then the Lantern is the fifth mana the enchantment needs, a turn earlier than
+    the land drop brings it - you cast it over a Wall of Omens at 4 sources with Exquisite Blood in
+    hand and the Blood came down the next turn; over two walls at 3 sources with Sanguine Bond in
+    hand and the Bond came down the turn after; both games were won. With no combo piece in hand,
+    or at 5 or more sources, the wall comes first. A SECOND Lantern does nothing at any time - once
+    "Chromatic Lantern" is on your battlefield line this entry is finished for the rest of the
+    game; the row now prints "[already owned: Chromatic Lantern on your battlefield]" - nine such
+    rows this corpus, nine declined. Read the line, not the memory of it.
 7a. If BOTH enchantments are already on your battlefield, STAFF OF NIN and SORIN move to the
     TOP of this list, above walls and above everything else. With both out the game ends the
     moment any life changes, and Staff's ping and Sorin's lifelink Vampires are the only two
@@ -341,9 +356,11 @@ AND A CARD IN YOUR HAND WITH NO "Cast" ROW IS NOT CASTABLE THIS WINDOW. The engi
 for every spell you can pay for right now; when Sanguine Bond is on your hand line and no "Cast
 Sanguine Bond" row is in the menu, its {b}{b} is not there (count the {B} sources on the mana
 line - one Bayou is one). Your CHOICE names a numbered row, never a card from the hand line.
-Three times this corpus you answered "CHOICE: 1 (Cast Sanguine Bond)" or "(Cast Exquisite
-Blood)" to a menu whose row 1 was a Battlement, a Lantern or a Tribute at 0; the engine threw the
-reply away and the fallback player cast for you.
+Three times one corpus you answered "CHOICE: 1 (Cast Sanguine Bond)" or "(Cast Exquisite
+Blood)" to a menu whose row 1 was a Battlement, a Lantern or a Tribute at 0, and the fallback
+player cast for you; once the next corpus ("Cast Exquisite Blood" at 3 mana with {4}{b} in hand),
+and the engine asked again. When the window prints "[RE-ASK] ... is not on this list", the name
+you wrote is a hand card: answer the printed rows.
 
 === STAFF OF NIN AND SORIN ===
 Staff of Nin {6}: draws you an extra card at each of your upkeeps, and offers "Deal 1 Damage with
@@ -398,8 +415,16 @@ So, at each look:
   - Two or more lands and a coverage line that names even one card: KEEP, at any price. That line
     already checked your mana against your hand and it is right. Five keeps of this shape this
     corpus, at 2, 2, 3, 4 and 4 lands; the two-landers drew their third land by turn four.
+  - Two lands and a coverage line reading "would not cover any spell in it" (two lands that make
+    no {W} under a hand of {W} walls): on a seven, KEEP - 12 of your 24 lands make {W}, the odds
+    that one of your next three draws is one of them are about even, and a six-card hand that
+    covers a wall is not better than that often enough to pay a card for it. You kept exactly this
+    hand (Bayou, Forest, three {W} walls, Tribute, Bond), drew the Scrubland on turn 4 and won. On a
+    six or smaller the same hand ships only when it also holds no one-mana spell.
   - Zero lands, or one land: the hand casts nothing until it draws lands, and a fresh seven at
-    24-in-60 beats waiting - ship it on a seven and on a six. You shipped a one-land seven this
+    24-in-60 beats waiting - ship it on a seven and on a six. You kept a one-land seven whose
+    coverage line named two Perimeter Captains and won on Battlement mana: the keep was outside
+    this line and the win does not move it - one land is one draw from nothing. You shipped a one-land seven this
     corpus, kept the two-land six behind it, and won. At a row reading "would keep 5 cards" or
     smaller the next look costs more than the wait does: keep a one-land hand there if the
     coverage line names a card, and ship only a hand with no land at all.
@@ -475,8 +500,9 @@ from a two-land six: right.
    your battlefield: then send every Vampire, blocked or not - lifelink damage to a blocker starts
    the loop.
  - The mulligan ask: two or more lands and a coverage line naming a card is a keep at any price;
-   zero or one land ships on a seven or a six; at "would keep 5 cards" or smaller, keep one land
-   with a named card and ship only a hand with no land.
+   two lands and "would not cover any spell" keeps on a seven; zero or one land ships on a seven
+   or a six; at "would keep 5 cards" or smaller, keep one land with a named card and ship only a
+   hand with no land.
  - You kept and the game asks which cards to bottom: build the best N in order - lands that
    cover your cheapest spells, a combo piece or the Tutor, the cheapest wall, then the rest by
    cost; send duplicate walls, then Lantern or Staff, then the most expensive spell. A combo
@@ -484,8 +510,10 @@ from a two-land six: right.
  - The cleanup ask ("PUT: n, m"): send Lantern, Staff, a duplicate wall, a land beyond the sixth,
    Sorin, a single wall - a Tribute to Hunger last of all, and never while a "{T}: Create" /
    "{T}: Put a ... token" creature is on their side.
- - "Cast Chromatic Lantern" is in your menu, nothing from entries 1-6 of Rule #7 is beside it, and
-   no Chromatic Lantern is on your battlefield line: cast it. A wall or a combo piece on the same
-   menu, or a Lantern already out: take that instead.
+ - "Cast Chromatic Lantern" is in your menu and no Chromatic Lantern is on your battlefield line:
+   cast it when nothing from entries 1-6 of Rule #7 is beside it - or when a wall is beside it but
+   Sanguine Bond, Exquisite Blood or Idyllic Tutor is on your hand line and "Mana available:" reads
+   4 or less. A combo piece castable on the same menu, or a Lantern already out ("[already owned:"
+   on its row): take the piece, or the wall.
  - You are about to plan a spell with a {b} or {w} in its cost: count the untapped LANDS whose
    colour list on the mana line contains that symbol. The Battlements' green pays none of it.

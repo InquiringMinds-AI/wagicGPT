@@ -280,7 +280,11 @@ or less she blocks like everything else, and she joins INFECT blocks only from "
 poison upward (see the infect rule for the exact test). WHAT THIS COST: at 17 life this seat
 put Katilda in front of a 1/1 Goblin token on a "(both die)" line, and at 20 life in front of
 a 3/3 Human token on another; both times she died for a token and the Humans stopped making
-mana.
+mana. HER A-ROW IS THE SAME RULE: a Katilda whose tag names a blocker that kills her - "(your
+attacker dies, their blocker lives)" - does not attack; one damage is never worth every Human's
+mana. WHAT THIS COST: on turn 6 this seat sent a 1/1 Katilda into a Silverquill Silencer printed
+exactly that way; she died, the second Katilda was edicted away, and a game at 20 life was at 3
+by turn 10.
 
 YOUR PLAN IS A MEMO TO YOURSELF, NOT A RULE. Re-derive every decision from the CURRENT
 SITUATION in front of you; when the board has moved on, rewrite the plan - rewriting costs
@@ -324,15 +328,20 @@ YOUR LORDS AND GROWTH:
   SPARE mana only - never instead of casting a creature.
 - LAIR OF THE HYDRA is a land that taps for {G} and, for {1}{G}, becomes a 1/1 Hydra until
   end of turn (the row reads "becomes a 1/1 hydra with Lair of the Hydra [cost: {1}{g}]"). It
-  is offered in your UPKEEP and again in your main phases. Two forms of that row are a PASS on
-  sight: one printed "[this land is TAPPED: animated, it still cannot attack this turn]" (two
-  mana for a 1/1 that does nothing), and one printed "[repeat: activated this turn N times
-  already]" (you already bought this 1/1 this turn; a second payment adds nothing). Otherwise
+  is offered in your UPKEEP and again in your main phases. Three forms of that row are a PASS on
+  sight: one printed "[Upkeep offer: this animation lasts only until end of turn, and the same
+  row is offered again in your main phase ...]" (the engine's own note that the main-phase offer
+  is coming - pass it here), one printed "[this land is TAPPED: animated, it still cannot attack
+  this turn]" (two mana for a 1/1 that does nothing), and one printed "[repeat: activated this
+  turn N times already]" (you already bought this 1/1 this turn; a second payment adds nothing).
+  Otherwise
   animate it in MAIN 1 only, only with mana left after the creature you are casting this
   turn, and only when its A-line would read "[no creature they control can block this
   attacker]" - a 1/1 into any blocker is two mana for nothing. WHAT THIS COST: this seat
   animated a [this land is TAPPED] Lair twice and paid the [repeat:] row twice in one corpus
-  - eight mana for no damage.
+  - eight mana for no damage; a corpus later it took the "[Upkeep offer" row and then tapped that
+  Hydra to pay for a Spellbinder in Main 1 - the cast row said "{paying this taps: Lair of the
+  Hydra - it cannot attack this turn}" - two more mana for a Hydra that never attacked.
 
 COVEN (three-plus creatures with DIFFERENT POWERS) turns on Augur of Autumn's cast-from-top and
 Sigarda's attack dig. It happens by itself from playing a mix of bodies - do not count powers,
@@ -350,12 +359,18 @@ REMOVAL:
   wrong, and a board you emptied yourself is a clock you no longer have.
 - BRUTAL CATHAR ({2}{W}, 2/2 Human Werewolf): ETB exiles an opponent creature until Cathar
   leaves - it COMES BACK if Cathar dies, so never throw Cathar into a bad block.
-- ELITE SPELLBINDER ({2}{W}, 3/1 flier): its hand look is the ONLY answer this deck has to an
-  enchantment, and it works before the card is cast. When the list shows "Exquisite Blood" or
-  "Sanguine Bond", exile THAT - above a planeswalker, above a creature, above anything. The card
-  it leaves in their hand is the one that assembles the loop described under MATCHUP POSTURE.
-  WHAT THIS COST: offered Exquisite Blood and Sorin, this seat took Sorin; the Blood resolved,
-  the Bond was tutored, and the pair killed it from 20 in one combat.
+- ELITE SPELLBINDER ({2}{W}, 3/1 flier): its hand look is the only way this deck touches an
+  enchantment before it lands - and it is a TAX, not an answer: the card text says its owner may
+  still cast the exiled card, for {2} more, so the exile buys turns, never safety. When the list
+  shows "Exquisite Blood" or "Sanguine Bond", exile THAT - above a planeswalker, above a creature,
+  above anything; the card it leaves in their hand is the one that assembles the loop described
+  under MATCHUP POSTURE. When NEITHER name is on the list, IDYLLIC TUTOR is the name - its text
+  is "Search your library for an enchantment card", it is how the pair gets found - above a
+  Staff, a Lantern or a wall. WHAT THIS COST: offered Exquisite Blood and Sorin, this seat took
+  Sorin; the Blood resolved, the Bond was tutored, and the pair killed it from 20 in one combat.
+  A corpus later, offered Staff of Nin and two Idyllic Tutors on turn 7, it took the Staff; the
+  Tutor found the Bond, the Blood followed, and eleven creatures at 37 life could not attack and
+  lost 0 to 51 to the loop.
 
 WEREWOLVES / DAY-NIGHT - READ THE BATTLEFIELD LINE, DO NOT ASSUME A FACE:
 Brutal Cathar and Tovolar's Huntmaster ({4}{G}{G}, 6/6, ETB two 2/2 Wolves) are "daybound". The
@@ -540,9 +555,13 @@ DECIDING SITUATIONS (recognize -> do):
 - The "Those sources, one per untapped card:" list names a creature you mean to attack with ->
   do not cast in Main 1; casting taps that creature. Attack first, cast it in Main 2.
 - "put 1/1 counters with Katilda" is offered in Upkeep or Main 1 -> pass; it is a Main-2 action.
-- The Lair of the Hydra row prints "[this land is TAPPED: ...]" or "[repeat: activated this
-  turn ...]" -> pass; an untapped Lair is animated in Main 1 with spare mana only, and only
-  when nothing they control can block a 1/1.
+- The Lair of the Hydra row prints "[Upkeep offer: ...]", "[this land is TAPPED: ...]" or
+  "[repeat: activated this turn ...]" -> pass; an untapped Lair is animated in Main 1 with spare
+  mana only, and only when nothing they control can block a 1/1.
+- Katilda's A-line tag names a blocker printed "(your attacker dies, their blocker lives)" ->
+  she stays home; her mana is worth more than one damage.
+- Elite Spellbinder's list shows neither "Exquisite Blood" nor "Sanguine Bond" but shows
+  "Idyllic Tutor" -> exile the Tutor; it is the card that finds them.
 - Katilda's block line reads "(both die)" or "(your blocker dies, attacker lives)" and "you
   would be at N" is 10 or more -> she stays out of the block.
 - A "DRAW PUNISHERS" line is printed, a "Draw 1 with Clue" row is offered, and your printed life
