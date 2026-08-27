@@ -2194,15 +2194,33 @@ static bool boardCreatureCanAttackNow(MTGCardInstance * c, bool live)
 //creatures with no restriction against attacking - and claims nothing about
 //their next turn. `ableToAttack` < 0 omits the clause entirely (a count the
 //caller could not compute is not guessed at).
+//#W48-D3 (wave-47 ledger, HIGH - the corpus's only render falsehood). The
+//clause above is canAttack() and true to that predicate, and in a window where
+//attackers are ALREADY DECLARED it reads as a lie: 146-vs-123 seq 26 printed
+//"215 are creatures, 0 of them able to attack right now" over 197 rows carrying
+//"[tapped - attacking]", because an attacker is tapped by attacking (CR 508.1f)
+//and canAttack() answers 0 for every one of them. Trust doctrine: a true
+//statement in the WRONG SCOPE is a lie, and the fix is never to delete the
+//token - it is to state the fact the scope actually holds. So the declared
+//attack is stated FIRST (it is the dominant fact of that board), and the
+//able-to-attack count that follows becomes "N MORE", which is exactly what it
+//counts: every attacking creature fails canAttack(), so the number is a count
+//of the ones NOT already in the attack. `attacking` == 0 renders byte-identical
+//to the pre-fix form, so every non-combat window and its PARSETEST cases are
+//untouched.
 static string battlefieldHeaderText(bool mine, int permanents, int creatures,
-                                    int ableToAttack = -1, bool liveScope = true)
+                                    int ableToAttack = -1, bool liveScope = true,
+                                    int attacking = 0)
 {
     std::ostringstream o;
     o << (mine ? "Your" : "Opponent") << " battlefield (" << permanents
       << " permanent" << (permanents == 1 ? "" : "s") << " listed, of which "
       << creatures << (creatures == 1 ? " is a creature" : " are creatures");
+    if (attacking > 0)
+        o << ", " << attacking << " of them "
+          << (attacking == 1 ? "is" : "are") << " attacking right now";
     if (ableToAttack >= 0)
-        o << ", " << ableToAttack << " of them "
+        o << ", " << ableToAttack << (attacking > 0 ? " more " : " of them ")
           << (liveScope ? "able to attack right now"
                         : "without a restriction against attacking");
     o << "): ";
@@ -2381,18 +2399,37 @@ static string heldBackBlockTag(const vector<string>& cannotBlock, int totalOppos
 //candidates' powers are in hand).
 static const size_t kPotentialBlockersEnumerateMax = 4;
 
+//#W48-D4 (wave-47 ledger, HIGH; cost deck146 a game). The collapsed form picks
+//its ONE representative by BODY SIZE, and since lane K folded the life price
+//into these outcomes the decision this tag serves is about PRICE. 146-vs-126
+//seq 50: every A-row read "5 untapped creatures that could block this one,
+//biggest Vampire (1/1) (you kill it, your attacker lives (lifelink: they gain
+//1, and their converter takes 1 off you))" - the smallest price on a board that
+//also held Perimeter Captain (0/4) (2 life for EVERY defender it blocks with)
+//and Pride Guardian (0/3) (3). The seat priced the swing at 1, paid 11, and
+//died at -1 two turns later. So the priciest candidate is printed BESIDE the
+//biggest one - nothing deleted, the biggest-body representative and every
+//existing PARSETEST expectation for it intact - and it is the caller (where the
+//life arithmetic lives) that selects it. Silent when the priciest IS the
+//biggest, when nothing on the board costs life, and in the enumerated form,
+//which already shows every candidate.
 static string potentialBlockersTag(const vector<string>& entries, const string& biggest,
                                    const string& extraNote = string(),
-                                   const string& gangNote = string())
+                                   const string& gangNote = string(),
+                                   const string& priciest = string())
 {
     if (entries.empty())
         return "";
     std::ostringstream o;
     o << " [their untapped blockers: ";
     if (entries.size() > kPotentialBlockersEnumerateMax)
+    {
+        const string& big = biggest.empty() ? entries[0] : biggest;
         o << "they have " << entries.size()
-          << " untapped creatures that could block this one, biggest "
-          << (biggest.empty() ? entries[0] : biggest);
+          << " untapped creatures that could block this one, biggest " << big;
+        if (!priciest.empty() && priciest != big)
+            o << "; most expensive to attack into: " << priciest;
+    }
     else
         for (size_t i = 0; i < entries.size(); i++)
             o << (i ? "; " : "") << entries[i];
@@ -9309,7 +9346,17 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
             else
                 //W39-STACKFACTS: type, mana cost and P/T at the object the
                 //response window is ABOUT (see stackCardFacts).
-                line << it->getDisplayName() << stackCardFacts(it->source) << " [spell]";
+                //#W48-D7 (wave-47 ledger, MED): plus the LIVE KEYWORD SET, via
+                //the helper the target previews already use. The battlefield
+                //line for the same card reads "Perimeter Captain #1 {w} (0/4)
+                //[defender]"; this line read "(creature 0/4) [spell]" and the
+                //counter row beneath it the same, so every pool rule keyed to a
+                //keyword ("do not counter a wall", "kill the flier") was
+                //unsatisfiable exactly where the decision is made - deck125 spent
+                //a Cancel on a Perimeter Captain accordingly (125-vs-126 seq 66).
+                //Same helper as the battlefield render, so the two surfaces
+                //cannot disagree about what the card is.
+                line << it->getDisplayName() << targetPreviewFacts(it->source) << " [spell]";
             if (it->type == ACTION_SPELL)
             {
                 Spell * sp = (Spell *) it;
@@ -9484,6 +9531,10 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
     //Live predicate on the active player's board, static restrictions on the
     //other one - see battlefieldHeaderText for why the two differ.
     int myCanAttack = 0, oppCanAttack = 0;
+    //#W48-D3: and how many are ALREADY attacking, from the engine's own
+    //isAttacker() - the same predicate the "[tapped - attacking]" row tag reads,
+    //so the header cannot contradict the rows beneath it.
+    int myAttacking = 0, oppAttacking = 0;
     Player * activeSeat = observer ? observer->currentPlayer : NULL;
     for (int i = 0; i < game->inPlay->nb_cards; i++)
     {
@@ -9501,6 +9552,8 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
             myCreatures++;
             if (boardCreatureCanAttackNow(c, activeSeat == this))
                 myCanAttack++;
+            if (c->isAttacker()) //#W48-D3
+                myAttacking++;
         }
     }
     if (opp)
@@ -9517,6 +9570,8 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
                 oppCreatures++;
                 if (boardCreatureCanAttackNow(c, activeSeat == opp))
                     oppCanAttack++;
+                if (c->isAttacker()) //#W48-D3
+                    oppAttacking++;
             }
         }
     //#W47 (R7, wave-46 HIGH): `{effect:}` reached exactly one battlefield - the
@@ -9541,12 +9596,12 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
                 ownEffectSkip.insert(nm);
         }
     out << "\n" << battlefieldHeaderText(true, myPermanents, myCreatures, myCanAttack,
-                                         activeSeat == this);
+                                         activeSeat == this, myAttacking);
     describeZoneCards(out, game->inPlay, true, "your hand", true, &ownEffectSkip);
     if (opp)
     {
         out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures, oppCanAttack,
-                                             activeSeat == opp);
+                                             activeSeat == opp, oppAttacking);
         //#W46-3: the opponent's non-creature permanents carry what they DO.
         describeZoneCards(out, opp->game->inPlay, true, "your hand", true);
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
@@ -12755,8 +12810,10 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             //the OFFER side of the same absent-field audit -
                             //annotate the hit with what it is worth countering
                             //for (type, cost, P/T).
+                            //#W48-D7: keywords ride here too - this clause is
+                            //the one the counter DECISION is read off.
                             hits << (firstHit ? "" : ", ") << sz->cards[zi]->getDisplayName()
-                                 << stackCardFacts(sz->cards[zi])
+                                 << targetPreviewFacts(sz->cards[zi])
                                  << stackTargetTextNote(sz->cards[zi]);
                             firstHit = false;
                         }
@@ -16762,6 +16819,19 @@ int AIPlayerGPT::chooseAttackers()
             vector<string> entries;
             string biggest;
             int biggestPower = -1, biggestToughness = -1;
+            //#W48-D4: the PRICE half of the collapsed representative. Life this
+            //pairing hands the BLOCKING side - the blocking-declaration triggers
+            //(Perimeter Captain, Pride Guardian; the same blockLife/blockLifeMay
+            //the printed outcome quotes) plus lifelink on the blocker's own
+            //damage. The lifelink half is dropped when that damage is prevented,
+            //so the selector never ranks by a gain the forecast itself says
+            //never happens; the "may" half counts, because a price the seat
+            //cannot decline is exactly what this clause is for. The converter
+            //doubling is deliberately NOT applied - it multiplies every
+            //candidate on the same board equally and cannot change the ordering,
+            //and the printed outcome states it where it belongs.
+            string priciest;
+            int priciestPrice = 0;
             int bbP = 0, bbT = 0;
             int bbKind = becomesBlockedSelfPump(attackers[j]->text, bbP, bbT);
             //#W45-2: the gang price, computed HERE because this is the only
@@ -16840,6 +16910,19 @@ int AIPlayerGPT::chooseAttackers()
                         biggestToughness = c->toughness;
                         biggest = e.str();
                     }
+                    //#W48-D4: and the most expensive one, by the life it gives.
+                    {
+                        CombatTradeStat bstat = combatStatOf(c);
+                        int price = bstat.blockLife + bstat.blockLifeMay;
+                        if (bstat.lifelink && c->power > 0
+                            && combatPreventionKind(c, attackers[j]) == kPreventNone)
+                            price += c->power;
+                        if (price > priciestPrice)
+                        {
+                            priciestPrice = price;
+                            priciest = e.str();
+                        }
+                    }
                 }
             }
             string bbNote;
@@ -16898,7 +16981,8 @@ int AIPlayerGPT::chooseAttackers()
                     gangNote = gangBlockPriceTag(need, anyOfThem ? lowSum : dmg, anyOfThem);
                 }
             }
-            string pb = potentialBlockersTag(entries, biggest, bbNote, gangNote);
+            string pb = potentialBlockersTag(entries, biggest, bbNote, gangNote,
+                                             priciest); //#W48-D4
             if (!pb.empty())
                 anyPotentialBlockers = true;
             ln << pb;
@@ -27588,6 +27672,131 @@ void AIPlayerGPT::runParseSelfTest()
         CHECK(!ret && rep == -1, "#W48-E1 NEGATIVE a quoted format string is neither a retraction nor a replacement");
         CHECK(choiceRetractedNoReplacement(r34, (int) loop.size(), &loop) == true,
               "#W48-E1 REGRESSION the boolean verdict without an out-param is unchanged");
+    }
+
+    // ---- #W48-D3: the battlefield header states the DECLARED attack ----
+    cout << "\n[#W48-D3] a post-declaration board says how many are attacking, not just canAttack()\n";
+    {
+        // THE REPRO (146-vs-123 seq 26): 215 creatures, 197 of them declared
+        // attackers, canAttack() therefore 0. The old header printed only the 0.
+        string combat = battlefieldHeaderText(false, 220, 215, 0, true, 197);
+        cout << "     " << combat << "\n";
+        CHECK(combat == "Opponent battlefield (220 permanents listed, of which 215 are"
+                        " creatures, 197 of them are attacking right now, 0 more able to"
+                        " attack right now): ",
+              "#W48-D3 the declared attack leads, and the canAttack() count becomes 'N more'");
+        // NEGATIVE: the exact falsehood the ledger caught must not be renderable
+        // any more on a board with declared attackers.
+        CHECK(combat.find("215 are creatures, 0 of them able to attack") == string::npos,
+              "#W48-D3 NEGATIVE the wrong-scope clause cannot follow the creature count in combat");
+        // Nothing was deleted: the canAttack() token is still on the line.
+        CHECK(combat.find("able to attack right now") != string::npos
+              && combat.find(", 0 more ") != string::npos,
+              "#W48-D3 the true canAttack() token is kept, re-scoped rather than dropped");
+        CHECK(battlefieldHeaderText(true, 3, 2, 1, true, 1)
+              == "Your battlefield (3 permanents listed, of which 2 are creatures, 1 of them"
+                 " is attacking right now, 1 more able to attack right now): ",
+              "#W48-D3 a single attacker takes the singular verb");
+        // REGRESSION: every non-combat window renders byte-identical to before.
+        CHECK(battlefieldHeaderText(false, 6, 2, 0, true)
+              == battlefieldHeaderText(false, 6, 2, 0, true, 0)
+              && battlefieldHeaderText(false, 6, 2, 0, true)
+                 == "Opponent battlefield (6 permanents listed, of which 2 are creatures,"
+                    " 0 of them able to attack right now): ",
+              "#W48-D3 REGRESSION attacking=0 is the pre-fix string, byte for byte");
+        CHECK(battlefieldHeaderText(false, 6, 2, -1, false, 4)
+              == "Opponent battlefield (6 permanents listed, of which 2 are creatures, 4 of"
+                 " them are attacking right now): ",
+              "#W48-D3 an uncomputed canAttack() count still omits its clause entirely");
+        // ECHO: the header is prompt prose; its digits must not forge a declaration.
+        vector<string> hnames;
+        hnames.push_back("Silverquill Silencer");
+        hnames.push_back("Colossal Dreadmaw");
+        vector<bool> hsel;
+        int rh = parseAttackerSet("ATTACK: A1 " + combat, 2, hsel, &hnames);
+        CHECK(rh == 1 && hsel[0] && !hsel[1],
+              "#W48-D3 echo: the header's 197/220/215 digits declare nothing");
+    }
+
+    // ---- #W48-D4: the collapsed blocker tag names the PRICIEST body too ----
+    cout << "\n[#W48-D4] collapsed blockers: biggest body AND most expensive to attack into\n";
+    {
+        vector<string> five;
+        for (int i = 0; i < 4; i++)
+            five.push_back("Vampire (1/1) (you kill it, your attacker lives (lifelink:"
+                           " they gain 1, and their converter takes 1 off you))");
+        five.push_back("Colossal Dreadmaw (6/6) (both die)");
+        string pricey = "Perimeter Captain (0/4) (neither dies (blocking trigger: they may"
+                        " gain 2, and their converter takes that much off you))";
+        string t = potentialBlockersTag(five, five[4], string(), string(), pricey);
+        cout << "     " << t << "\n";
+        CHECK(t == " [their untapped blockers: they have 5 untapped creatures that could block"
+                   " this one, biggest Colossal Dreadmaw (6/6) (both die); most expensive to"
+                   " attack into: Perimeter Captain (0/4) (neither dies (blocking trigger:"
+                   " they may gain 2, and their converter takes that much off you))]",
+              "#W48-D4 the price representative rides beside the body representative");
+        // NEGATIVE: nothing is said twice when the same body is both.
+        CHECK(potentialBlockersTag(five, five[4], string(), string(), five[4])
+                  .find("most expensive") == string::npos,
+              "#W48-D4 NEGATIVE the priciest IS the biggest -> one clause, not two");
+        // NEGATIVE: the enumerated form already shows everything.
+        vector<string> four(five.begin(), five.begin() + 4);
+        CHECK(potentialBlockersTag(four, four[0], string(), string(), pricey)
+                  .find("most expensive") == string::npos,
+              "#W48-D4 NEGATIVE at or below the collapse threshold nothing is added");
+        CHECK(potentialBlockersTag(five, five[4], string(), string(), string())
+              == potentialBlockersTag(five, five[4]),
+              "#W48-D4 REGRESSION an unpriceable board renders exactly as before");
+        // The gang price and the becomes-blocked note still follow it, in order.
+        string full = potentialBlockersTag(five, five[4], "each outcome above OMITS its"
+                                           " becomes-blocked trigger: read its text",
+                                           "GANG BLOCK: any 2 of them together deal 4,"
+                                           " enough to kill this attacker; each result"
+                                           " above is a LONE blocker only", pricey);
+        CHECK(full.find("most expensive to attack into:") < full.find("GANG BLOCK:")
+              && full.find("GANG BLOCK:") < full.find("OMITS its becomes-blocked")
+              && full[full.size() - 1] == ']',
+              "#W48-D4 order inside the one bracket: bodies, price, gang, becomes-blocked");
+        // ECHO: a reply copying the whole A-line still declares A1 only, and the
+        // blocker named inside the new clause is not an attacker.
+        vector<string> names;
+        names.push_back("Silverquill Silencer");
+        names.push_back("Perimeter Captain");
+        vector<bool> sel;
+        int r1 = parseAttackerSet("ATTACK: A1" + t, 2, sel, &names);
+        CHECK(r1 == 1 && sel[0] && !sel[1],
+              "#W48-D4 echo: the priciest blocker's name inside the tag declares nothing");
+        CHECK(stripNarrationDecoration("A1. Silverquill Silencer (3/2)" + t)
+              == "A1. Silverquill Silencer (3/2)",
+              "#W48-D4 echo: the whole bracket still never reaches the narration");
+    }
+
+    // ---- #W48-D7: keywords on the stack line and the counter-target clause ----
+    cout << "\n[#W48-D7] the stack object carries the battlefield line's keyword set\n";
+    {
+        CHECK(targetPreviewFacts(NULL).empty(),
+              "#W48-D7 no card -> no facts (the emitters' NULL guard is unchanged)");
+        // The shape both emitters now build (targetPreviewFacts = stackCardFacts
+        // + the live keyword set), asserted as the string the model reads.
+        string stackLine = "opponent's Perimeter Captain {w} (creature 0/4) [defender] [spell]";
+        CHECK(stackLine.find("[defender]") < stackLine.find("[spell]"),
+              "#W48-D7 the keyword set sits on the object, ahead of the [spell] tag");
+        string opt = "Cast Cancel {1}{u}{u} - can target on the stack: Perimeter Captain"
+                     " {w} (creature 0/4) [defender] {target text: \"Defender (This creature"
+                     " cannot attack.)\"}";
+        vector<string> opts;
+        opts.push_back(opt);
+        opts.push_back("Cast nothing");
+        bool stale = false;
+        int c = parseChoice("1 (" + opt + ")", 2, &opts, &stale, NULL);
+        CHECK(c == 1 && !stale,
+              "#W48-D7 echo: a counter row echoed WITH its keyword tag still binds to index 1");
+        CHECK(stripNarrationDecoration("1. " + opt).find("[defender]") == string::npos,
+              "#W48-D7 echo: the keyword bracket never reaches the narration");
+        // NEGATIVE: a keywordless object gains no empty bracket.
+        string vanilla = "opponent's Grizzly Bears {1}{g} (creature 2/2) [spell]";
+        CHECK(vanilla.find("[]") == string::npos,
+              "#W48-D7 NEGATIVE a vanilla spell renders no empty keyword bracket");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
