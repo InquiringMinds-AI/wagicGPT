@@ -11515,7 +11515,9 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 19, "{paying this taps: ") == 0)
                 || (in.compare(i, 9, "{tapping ") == 0)
                 //W50-W (D6): the self-target clause is decision-time guidance.
-                || (in.compare(i, 10, "{this hits") == 0);
+                || (in.compare(i, 10, "{this hits") == 0)
+                //#W51-E D9: the strand clause is decision-time pricing too.
+                || (in.compare(i, 8, "{spends ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -12186,6 +12188,112 @@ static string castDeclineRow(bool combatNext)
 //only rows were its own Forgotten Caves at every window (130v126 seq 34-48,
 //one taken). Legality is untouched: the rows stay, the fact rides them.
 const char * kSelfTargetClause = " {this hits YOUR permanent}";
+
+//#W51-E D6 (wave-50 seat-123-130 H2): the SAME verdict the spell target menu
+//prints, on the activated-ability target row - "Deal 2 damage with Siege-Gang
+//Commander targeting Fate Unraveler" was taken at a 3/4 (a Goblin for nothing)
+//and "... Pyrite Spellbomb targeting Ob Nixilis" at 3 loyalty; 0/49 ability
+//damage rows carried the outcome the spell rows beside them carried. Creature
+//targets reuse damageTargetVerdict byte-for-byte; a planeswalker's answer is
+//its loyalty, so it gets its own pure table (provable in PARSETEST).
+string damagePlaneswalkerVerdict(int dmg, int loyalty)
+{
+    std::ostringstream o;
+    o << " {right now: takes " << dmg << " damage - ";
+    if (dmg >= loyalty)
+        o << "DIES (loyalty " << loyalty << ")}";
+    else
+        o << "SURVIVES (loyalty " << loyalty << ", " << (loyalty - dmg) << " left)}";
+    return o.str();
+}
+static AADamager * unwrapDamagerAbility(MTGAbility * a, int depth);
+static string toLowerCopy(const string & s);
+
+//#W51-E D7 (wave-50 E-4, 11/11 Hive animations taken in UPKEEP, 0 in a main
+//phase): the Upkeep row is NOT deferred (that removes a legal window - the
+//owner rejected the defer form); it is ANNOTATED with the two facts the pilot
+//was missing: the animation lasts only until end of turn, and the same row
+//returns in the main phase. The companion finding: the Hive is never offered
+//in main because the per-turn two-decline allowance is spent by the two
+//Upkeep windows - that is the cap doing its job, so the clause says so. The
+//clause rides the RENDERED row only (like lastOfferClause), never the decline
+//key or the narration, so the allowance itself is untouched.
+static string upkeepAnimationClause(bool lastOffer)
+{
+    if (lastOffer)
+        return " [Upkeep offer: this animation lasts only until end of turn - declining here"
+               " spends this row's LAST offer this turn, so it does not return in your main phase]";
+    return " [Upkeep offer: this animation lasts only until end of turn, and the same row is"
+           " offered again in your main phase - declining here counts toward this turn's two declines]";
+}
+//An animation row: the engine's `becomes(...)` label, as renderAbilityLabel
+//emits it ("becomes beholder with Hive ...", "Becomes a 3/3 hydra with Lair ...").
+static bool isAnimationRow(const string& line)
+{
+    return line.size() > 8 && (line.compare(0, 8, "becomes ") == 0 || line.compare(0, 8, "Becomes ") == 0);
+}
+
+//#W51-E D8 (wave-50 seat-123-130 M2, third corpus): the cast row says what is
+//ALREADY OWNED. (a) A second copy of a non-stacking permanent (a non-creature,
+//non-land permanent, or anything legendary) names the copy on the battlefield.
+//(b) A library tutor names the owned permanents of the type it can find, and
+//states that type - "Cast Idyllic Tutor" was taken with an Intruder Alarm out
+//"to dig for Bloodline Keeper" (a creature; the Tutor finds only enchantments).
+//The search type is read off the script's own reveal-target filter.
+static string tutorSearchType(const string& magicText)
+{
+    string mt = toLowerCopy(magicText);
+    if (mt.find("mylibrary") == string::npos || mt.find("reveal") == string::npos)
+        return "";
+    size_t t = mt.find("target(<");
+    if (t == string::npos)
+        return "";
+    size_t gt = mt.find('>', t);
+    size_t bar = (gt == string::npos) ? string::npos : mt.find('|', gt);
+    if (gt == string::npos || bar == string::npos || mt.compare(bar, 8, "|reveal)") != 0)
+        return "";
+    string type = mt.substr(gt + 1, bar - gt - 1);
+    for (size_t i = 0; i < type.size(); i++)
+        if (!isalpha((unsigned char) type[i]))
+            return ""; //a compound filter ("*", "creature[flying]") is not one type
+    return type;
+}
+static string alreadyOwnedTag(const vector<string>& names, const string& findsOnly)
+{
+    if (names.empty())
+        return "";
+    std::ostringstream o;
+    o << " [already owned: ";
+    for (size_t i = 0; i < names.size() && i < 4; i++)
+        o << (i ? ", " : "") << names[i];
+    if (names.size() > 4)
+        o << " +" << (names.size() - 4) << " more";
+    o << " on your battlefield";
+    if (!findsOnly.empty())
+        o << " - this finds only " << (strchr("aeiou", findsOnly[0]) ? "an " : "a ") << findsOnly << " card";
+    o << "]";
+    return o.str();
+}
+
+//#W51-E D9 (wave-50 seat-123-130 M3, third corpus): an activated ability
+//priced against the HAND. "Put a card into hand with Hammer of Bogardan [cost:
+//{2}{r}{r}{r}]" was taken at 5 sources with Siege-Gang Commander {3}{r}{r} in
+//hand under "I have 5 mana, so I can cast it" - the row never said the
+//activation spends the mana the Commander needs. Same counting rule as the
+//cast rows' {leaves N of your M} (per SOURCE, the engine's own auto-tap plan);
+//names the most expensive castable-by-count hand card the payment strands.
+static string strandsHandCardTag(int used, int untapped, const string& name, const string& cost, int need)
+{
+    if (used <= 0 || untapped <= 0 || name.empty())
+        return "";
+    std::ostringstream o;
+    o << " {spends " << used << " of your " << untapped << " untapped mana source"
+      << (untapped == 1 ? "" : "s") << " this turn; " << name;
+    if (!cost.empty())
+        o << " " << cost;
+    o << " in your hand needs " << need << "}";
+    return o.str();
+}
 const char * kSelfOnlyWindowNote =
     "Every action here targets your own permanent; 0 (pass) is the usual answer.\n";
 static bool isHarmToTargetAbility(MTGAbility * a)
@@ -12362,6 +12470,25 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         out << " targeting " << targetReference(this, action.target);
         if (action.target->controller() == this && isHarmToTargetAbility(action.ability))
             out << kSelfTargetClause;
+        //#W51-E D6: the kill verdict, from the ability's own damage rider.
+        if (action.ability)
+            if (AADamager * ad = unwrapDamagerAbility(action.ability, 0))
+                if (ad->d.find("rand") == string::npos)
+                {
+                    int dmg = ad->getDamage();
+                    MTGCardInstance * dtc = action.target;
+                    if (dmg > 0 && dtc->controller() && dtc->controller()->game
+                        && dtc->currentZone == dtc->controller()->game->inPlay)
+                    {
+                        if (dtc->isCreature())
+                            out << damageTargetVerdict(dmg, dtc->toughness, dtc->life,
+                                                       dtc->basicAbilities[Constants::INDESTRUCTIBLE],
+                                                       ad->source && ad->source->has(Constants::DEATHTOUCH));
+                        else if (dtc->hasType(Subtypes::TYPE_PLANESWALKER) && dtc->counters
+                                 && dtc->counters->hasCounter("loyalty", 0, 0))
+                            out << damagePlaneswalkerVerdict(dmg, dtc->counters->hasCounter("loyalty", 0, 0)->nb);
+                    }
+                }
         //Re-attaching to the current host is rules-legal but changes nothing.
         //The board line's cue (two power numbers / {attached:}) proved
         //insufficient at range - the pilot read it and re-equipped anyway
@@ -12490,6 +12617,46 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     tapsSelf = true;
             if (tapsSelf)
                 out << tapCostBeforeCombatClause(src->getDisplayName());
+        }
+        //#W51-E D9: what this payment strands in the hand.
+        if (src && c->getConvertedCost() > 0 && !c->hasX() && !c->hasSpecificX()
+            && game && game->hand)
+        {
+            ManaEngine::FreeProducerPolicy reachPolicy;
+            int untapped = ManaEngine::potentialColorReach(this, reachPolicy, NULL);
+            if (untapped > 0)
+            {
+                vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
+                    this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY));
+                std::set<MTGCardInstance *> tapped;
+                for (size_t pi = 0; pi < picks.size(); pi++)
+                    if (picks[pi] && picks[pi]->source)
+                        tapped.insert(picks[pi]->source);
+                int used = (int) tapped.size();
+                int left = untapped - used;
+                if (left < 0)
+                    left = 0;
+                MTGCardInstance * best = NULL;
+                int bestNeed = 0;
+                for (int hi = 0; hi < game->hand->nb_cards; hi++)
+                {
+                    MTGCardInstance * hc = game->hand->cards[hi];
+                    if (!hc || hc->hasType(Subtypes::TYPE_LAND) || !hc->getManaCost())
+                        continue;
+                    int need = hc->getManaCost()->getConvertedCost();
+                    //castable by count today, and NOT castable from what this leaves
+                    if (need <= 0 || need > untapped || need <= left)
+                        continue;
+                    if (!best || need > bestNeed)
+                    {
+                        best = hc;
+                        bestNeed = need;
+                    }
+                }
+                if (best)
+                    out << strandsHandCardTag(used, untapped, best->getDisplayName(),
+                                              best->getManaCost()->toString(), bestNeed);
+            }
         }
     }
 
@@ -14374,7 +14541,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //instance ordinal. The NUMBERING is untouched (a collapsed row prints the
         //label range it covers), and shownLines stays uncollapsed, so the reply
         //parser reads exactly the option list it read before.
-        renderRows.push_back(line + lastOfferClause(declines + 1 >= declineCap));
+        //#W51-E D7: the Upkeep animation clause rides the rendered row only.
+        bool upkeepAnim = observer->currentPlayer == this
+            && observer->getCurrentGamePhase() == MTG_PHASE_UPKEEP && isAnimationRow(line);
+        renderRows.push_back(line + (upkeepAnim ? upkeepAnimationClause(declines + 1 >= declineCap) : string())
+                             + lastOfferClause(declines + 1 >= declineCap));
     }
     {
         //#W48 (D2): gather repeated rows before collapsing, permuting the action
@@ -15618,6 +15789,28 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             //W43-7: {X} spells are unpriceable by dynamicMagnitudes (it skips
             //the amount "x" - X is announced AFTER this pick). Price them here.
             o << xSpellPricing(card, this);
+            //#W51-E D8: what is already owned - the twin of a non-stacking
+            //permanent, or the owned permanents a tutor's search type covers.
+            {
+                bool twinClass = card->hasType(Subtypes::TYPE_LEGENDARY)
+                    || (!card->isCreature() && !card->hasType(Subtypes::TYPE_LAND)
+                        && !card->hasType(Subtypes::TYPE_INSTANT) && !card->hasType(Subtypes::TYPE_SORCERY));
+                string want = tutorSearchType(card->magicText);
+                vector<string> owned;
+                std::set<string> seenOwned;
+                MTGGameZone * bf = game ? game->inPlay : NULL;
+                for (int bi = 0; bf && bi < bf->nb_cards; bi++)
+                {
+                    MTGCardInstance * bc = bf->cards[bi];
+                    if (!bc || bc->isToken)
+                        continue;
+                    bool hit = (twinClass && bc->name == card->name)
+                        || (!want.empty() && bc->hasType(want));
+                    if (hit && seenOwned.insert(bc->getDisplayName()).second)
+                        owned.push_back(bc->getDisplayName());
+                }
+                o << alreadyOwnedTag(owned, want);
+            }
         }
         else
         {
@@ -33091,6 +33284,105 @@ static const char * kW50Y_r94 =
               && firstLabelledLine(r32, "choice:") == "CHOICE: 2 (Create vampire with Lord of Lineage x25)"
               && firstLabelledLine("no labels", "plan:").empty(),
               "#W51-C D4b the re-ask quotes both lines verbatim; absent label -> empty");
+    }
+    cout << "\n[#W51-E] D6 ability damage verdicts / D7 Upkeep animation clause / D8 already-owned / D9 strands-hand\n";
+    {
+        //D6: the planeswalker table; the creature table is damageTargetVerdict (W36 #4 cases above).
+        CHECK(damagePlaneswalkerVerdict(2, 3) == " {right now: takes 2 damage - SURVIVES (loyalty 3, 1 left)}",
+              "#W51-E D6 Pyrite Spellbomb at Ob Nixilis on 3 loyalty: SURVIVES (loyalty 3, 1 left)");
+        CHECK(damagePlaneswalkerVerdict(3, 3) == " {right now: takes 3 damage - DIES (loyalty 3)}",
+              "#W51-E D6 damage equal to loyalty DIES");
+        CHECK(damagePlaneswalkerVerdict(5, 2) == " {right now: takes 5 damage - DIES (loyalty 2)}",
+              "#W51-E D6 damage over loyalty DIES");
+        CHECK(damagePlaneswalkerVerdict(2, 3).find("toughness") == string::npos,
+              "#W51-E D6 NEGATIVE a walker's verdict never says toughness");
+        vector<string> d6; 
+        d6.push_back("Deal 2 damage with Siege-Gang Commander targeting Fate Unraveler [opponent's battlefield]"
+                     + damageTargetVerdict(2, 4, 4, false, false) + " [cost: {1}{r}, Sacrifice]");
+        d6.push_back("Deal 2 damage with Siege-Gang Commander targeting the opponent [cost: {1}{r}, Sacrifice]");
+        bool st6 = false;
+        CHECK(parseChoice("CHOICE: 1 (Deal 2 damage with Siege-Gang Commander targeting Fate Unraveler)", 2, &d6, &st6, NULL) == 1 && !st6,
+              "#W51-E D6 echo: the row minus the verdict binds");
+        bool st6b = false;
+        CHECK(parseChoice("CHOICE: 1 (" + d6[0] + ")", 2, &d6, &st6b, NULL) == 1 && !st6b,
+              "#W51-E D6 echo: the whole row incl. {right now: ...} binds");
+        CHECK(stripNarrationDecoration(d6[0]) == "Deal 2 damage with Siege-Gang Commander targeting Fate Unraveler",
+              "#W51-E D6 the verdict and the cost leave no residue in the narrated record");
+        CHECK(d6[0].find("SURVIVES (toughness 4)") != string::npos, "#W51-E D6 the 3/4 says SURVIVES (toughness 4)");
+
+        //D7: the annotation form, never the defer form.
+        string up = upkeepAnimationClause(false), upLast = upkeepAnimationClause(true);
+        CHECK(up.find("lasts only until end of turn") != string::npos && up.find("offered again in your main phase") != string::npos
+              && up.find("counts toward this turn's two declines") != string::npos,
+              "#W51-E D7 the Upkeep clause states duration, the main-phase return, and the decline count");
+        CHECK(upLast.find("LAST offer this turn") != string::npos && upLast.find("offered again") == string::npos,
+              "#W51-E D7 the last-offer form does not promise a main-phase return");
+        CHECK(up[0] == ' ' && up[1] == '[' && up[up.size() - 1] == ']', "#W51-E D7 the clause is one bracket annotation");
+        CHECK(isAnimationRow("becomes beholder with Hive of the Eye Tyrant #1 [cost: {3}{b}]"),
+              "#W51-E D7 the Hive row is an animation row");
+        CHECK(isAnimationRow("Becomes a 3/3 hydra with Lair of the Hydra [cost: {3}{g}]"),
+              "#W51-E D7 the Lair row is an animation row (capitalised label)");
+        CHECK(!isAnimationRow("Put in Play with Windswept Heath [cost: {1}, Sacrifice]")
+              && !isAnimationRow("Create human with Thraben Doomsayer [cost: Tap]") && !isAnimationRow(""),
+              "#W51-E D7 NEGATIVE fetch / token rows are not animation rows");
+        vector<string> d7; d7.push_back("becomes beholder with Hive of the Eye Tyrant #1 [cost: {3}{b}]");
+        bool st7 = false;
+        CHECK(parseChoice("CHOICE: 1 (" + d7[0] + up + ")", 1, &d7, &st7, NULL) == 1 && !st7,
+              "#W51-E D7 echo: the row with the clause echoed binds to the pure row");
+        CHECK(stripRepeatAnnotation(d7[0] + up) != d7[0],
+              "#W51-E D7 the clause is NOT stripped by the decline key - which is why it rides the render, not the line");
+        CHECK(stripNarrationDecoration(d7[0] + up) == "becomes beholder with Hive of the Eye Tyrant #1",
+              "#W51-E D7 the clause leaves no residue in a narrated record");
+
+        //D8: the tutor's search type from its script; the tag's shapes.
+        CHECK(tutorSearchType("name(search card) Reveal:type:*:mylibrary revealzone(mylibrary) optionone name(choose card)"
+                              " target(<1>enchantment|reveal) transforms((,newability[all(other *|reveal) moveto(mylibrary)"
+                              " and!(shuffle)!],newability[moveto(hand)])) optiononeend") == "enchantment",
+              "#W51-E D8 Idyllic Tutor's script reads as an enchantment tutor");
+        CHECK(tutorSearchType("target(<1>creature|reveal) revealzone(mylibrary)") == "creature",
+              "#W51-E D8 a creature reveal filter reads as a creature tutor");
+        CHECK(tutorSearchType("target(<1>*|reveal) revealzone(mylibrary)").empty(),
+              "#W51-E D8 NEGATIVE a wildcard reveal filter names no type");
+        CHECK(tutorSearchType("damage:3 target(<1>creature|mybattlefield)").empty()
+              && tutorSearchType("").empty(),
+              "#W51-E D8 NEGATIVE a battlefield target is not a library search");
+        vector<string> own1; own1.push_back("Intruder Alarm");
+        CHECK(alreadyOwnedTag(own1, "enchantment") == " [already owned: Intruder Alarm on your battlefield - this finds only an enchantment card]",
+              "#W51-E D8 the Tutor row with an Alarm out");
+        CHECK(alreadyOwnedTag(own1, "") == " [already owned: Intruder Alarm on your battlefield]",
+              "#W51-E D8 the second-copy row");
+        vector<string> own0;
+        CHECK(alreadyOwnedTag(own0, "enchantment").empty(), "#W51-E D8 NEGATIVE nothing owned, no tag");
+        vector<string> own2; own2.push_back("Chromatic Lantern"); own2.push_back("Lightning Greaves");
+        CHECK(alreadyOwnedTag(own2, "artifact").find("Chromatic Lantern, Lightning Greaves on your battlefield - this finds only an artifact card") != string::npos,
+              "#W51-E D8 two names join with a comma");
+        vector<string> d8; d8.push_back("Cast Idyllic Tutor {2}{w}" + alreadyOwnedTag(own1, "enchantment")); d8.push_back("Cast nothing this window");
+        bool st8 = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Idyllic Tutor)", 2, &d8, &st8, NULL) == 1 && !st8, "#W51-E D8 echo: the bare short name binds");
+        bool st8b = false;
+        CHECK(parseChoice("CHOICE: 1 (" + d8[0] + ")", 2, &d8, &st8b, NULL) == 1 && !st8b, "#W51-E D8 echo: the tagged row binds");
+        CHECK(stripNarrationDecoration(d8[0]) == "Cast Idyllic Tutor {2}{w}", "#W51-E D8 the tag leaves no residue");
+
+        //D9: the strand clause.
+        CHECK(strandsHandCardTag(5, 5, "Siege-Gang Commander", "{3}{R}{R}", 5)
+              == " {spends 5 of your 5 untapped mana sources this turn; Siege-Gang Commander {3}{R}{R} in your hand needs 5}",
+              "#W51-E D9 the Hammer return at 5 sources with the Commander in hand");
+        CHECK(strandsHandCardTag(1, 1, "Goblin Guide", "{R}", 1)
+              == " {spends 1 of your 1 untapped mana source this turn; Goblin Guide {R} in your hand needs 1}",
+              "#W51-E D9 singular source");
+        CHECK(strandsHandCardTag(0, 5, "Siege-Gang Commander", "{3}{R}{R}", 5).empty()
+              && strandsHandCardTag(2, 0, "x", "", 1).empty() && strandsHandCardTag(2, 4, "", "", 1).empty(),
+              "#W51-E D9 NEGATIVE nothing spent, nothing untapped, or no card: no clause");
+        vector<string> d9; d9.push_back("Put a card into hand with Hammer of Bogardan [cost: {2}{r}{r}{r}]"
+                                        + strandsHandCardTag(5, 5, "Siege-Gang Commander", "{3}{R}{R}", 5));
+        bool st9 = false;
+        CHECK(parseChoice("CHOICE: 1 (Put a card into hand with Hammer of Bogardan)", 1, &d9, &st9, NULL) == 1 && !st9,
+              "#W51-E D9 echo: the short name binds beside the clause");
+        bool st9b = false;
+        CHECK(parseChoice("CHOICE: 1 (" + d9[0] + ")", 1, &d9, &st9b, NULL) == 1 && !st9b,
+              "#W51-E D9 echo: the whole row incl. the clause binds");
+        CHECK(stripNarrationDecoration(d9[0]) == "Put a card into hand with Hammer of Bogardan",
+              "#W51-E D9 the clause leaves no residue in the narrated record");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
