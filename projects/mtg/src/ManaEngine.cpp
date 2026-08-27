@@ -470,6 +470,12 @@ ManaCost * ManaEngine::potentialMana(Player * p, ManaPolicy & policy, MTGCardIns
     return result;
 }
 
+bool ManaEngine::isAnimatedLand(MTGCardInstance * c)
+{
+    return c && c->isLand() && c->isCreature() && c->model && c->model->data
+        && !c->model->data->isCreature();
+}
+
 vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTGCardInstance * target, ManaCost * cost, int anytypeofmana)
 {
     if(!cost || (cost && !cost->getConvertedCost()) || !target)
@@ -555,8 +561,17 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
         }
         //Tap the WEAKEST would-be attackers first, so the strongest swingers are
         //the ones held back for combat.
+        //#W52-L (D13): an animated land sorts LAST - it is tapped only when
+        //every other attacker-source and the neutral pool cannot cover the
+        //bill (see isAnimatedLand; pinned by aipay_animated_land_last_resort).
         std::sort(attackerProd.begin(), attackerProd.end(),
-            [](AManaProducer * a, AManaProducer * b) { return a->source->power < b->source->power; });
+            [](AManaProducer * a, AManaProducer * b)
+            {
+                bool aa = ManaEngine::isAnimatedLand(a->source), ba = ManaEngine::isAnimatedLand(b->source);
+                if (aa != ba)
+                    return !aa;
+                return a->source->power < b->source->power;
+            });
         size_t atkNeed = 0;
         while (!neutral->canAfford(cost, anytypeofmana) && atkNeed < attackerProd.size())
         {

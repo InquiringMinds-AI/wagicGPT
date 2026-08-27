@@ -3098,6 +3098,13 @@ static string leavesUntappedTag(int untappedSources, int sourcesUsed)
 //itself to fund its own animation is a tapped creature afterwards). Pure over
 //names so the shape is provable in PARSETEST; the attack consequence is
 //stated only when it is true (the caller has checked the phase and turn).
+//#W52-L (D13 b): the name of a tapped source that is a land animated THIS
+//turn says so - the seat paid to animate Lair of the Hydra at Upkeep and the
+//Main-1 cast row named it as a plain tap (deck152 vs125 seq 36->39).
+static string animatedThisTurnNote(MTGCardInstance * c)
+{
+    return ManaEngine::isAnimatedLand(c) ? " (animated this turn)" : "";
+}
 static string paymentTapsClause(const std::vector<std::string>& names, bool cannotAttackThisTurn)
 {
     if (names.empty())
@@ -4119,24 +4126,82 @@ bool headerCountsAsMoreAbleToAttack(bool canAttackNow, bool attacking)
 //only when everything either side of that token is byte-identical and the ranks
 //are consecutive, which is the same three tests joinZoneEntries applies.
 //Returns false (and leaves the outputs untouched) for a row with no handle.
+//#W52-L (D8): two shapes the wave-48 collapse missed, both live in the fourth
+//corpus. (a) "Deal 2 damage with Siege-Gang Commander #1 targeting Goblin #3":
+//the FIRST handle on the row is the SOURCE's, identical on every row, so the
+//target's rank never varied and 20 rows stayed 20 rows - the handle that
+//identifies the row is the one after " targeting " when there is one. (b)
+//"Equip with Lightning Greaves targeting Vampire #10 [...] (... this MOVES it
+//to Vampire #10, ...)": the same handle is printed TWICE, so the tails differed
+//by their second copy and 26 rows of one equip stayed 26 rows (29,469-char
+//prompt, 600-s replies). Every later " #<rank>" token of the SAME rank in the
+//tail is folded to a placeholder so the tails compare equal; joinNumberedRows
+//expands the placeholder into the printed range.
+const char kRowHandleFold = '\x02';
+static bool rowHandleAt(const string& row, size_t i, size_t& end, int& rank)
+{
+    if (i + 2 >= row.size() || row[i] != ' ' || row[i + 1] != '#' || !isdigit((unsigned char) row[i + 2]))
+        return false;
+    size_t j = i + 2;
+    while (j < row.size() && isdigit((unsigned char) row[j]))
+        j++;
+    //the token has to END there: "#12abc" is not an instance ordinal
+    if (j < row.size() && (isalnum((unsigned char) row[j]) || row[j] == '/'))
+        return false;
+    end = j;
+    rank = atoi(row.c_str() + i + 2);
+    return rank > 0;
+}
 bool splitRowHandle(const string& row, string& head, string& tail, int& rank)
 {
-    for (size_t i = 0; i + 2 < row.size(); i++)
+    size_t from = 0;
+    size_t tg = row.find(" targeting ");
+    if (tg != string::npos)
+        from = tg + 11; //strlen(" targeting ")
+    for (int attempt = 0; attempt < 2; attempt++)
     {
-        if (row[i] != ' ' || row[i + 1] != '#' || !isdigit((unsigned char) row[i + 2]))
-            continue;
-        size_t j = i + 2;
-        while (j < row.size() && isdigit((unsigned char) row[j]))
-            j++;
-        //the token has to END there: "#12abc" is not an instance ordinal
-        if (j < row.size() && (isalnum((unsigned char) row[j]) || row[j] == '/'))
-            continue;
-        head = row.substr(0, i);
-        tail = row.substr(j);
-        rank = atoi(row.c_str() + i + 2);
-        return rank > 0;
+        for (size_t i = from; i + 2 < row.size(); i++)
+        {
+            size_t j = 0;
+            int r = 0;
+            if (!rowHandleAt(row, i, j, r))
+                continue;
+            head = row.substr(0, i);
+            tail = row.substr(j);
+            rank = r;
+            //fold every later copy of the same handle
+            for (size_t k = 0; k + 2 < tail.size(); k++)
+            {
+                size_t e = 0;
+                int r2 = 0;
+                if (rowHandleAt(tail, k, e, r2) && r2 == rank)
+                {
+                    tail.replace(k, e - k, string(" #") + kRowHandleFold);
+                    k += 2;
+                }
+            }
+            return true;
+        }
+        if (!from)
+            break;
+        from = 0; //no handle after the target clause: fall back to the first one
     }
     return false;
+}
+//#W52-L (D8): the printed form of a folded tail - the placeholder becomes the
+//same "#a-#b" range the head is followed by.
+static string expandRowHandleFold(const string& tail, int first, int last)
+{
+    std::ostringstream r;
+    r << "#" << first << "-#" << last;
+    string out = tail;
+    const string fold = string("#") + kRowHandleFold;
+    for (size_t k = out.find(fold); k != string::npos; k = out.find(fold, k))
+    {
+        out.replace(k, fold.size(), r.str());
+        k += r.str().size();
+    }
+    return out;
 }
 
 //#W48 (D2): the option list, rows numbered from 1, collapsed the same way. The
@@ -4236,7 +4301,7 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
         {
             o << (i + 1) << "-" << j << ". " << head[i]
               << " #" << rank[i] << "-#" << (rank[i] + (int) run - 1)
-              << tail[i] << " x" << run << "\n";
+              << expandRowHandleFold(tail[i], rank[i], rank[i] + (int) run - 1) << " x" << run << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
             i = j;
@@ -5798,6 +5863,69 @@ string perTargetLifeCostNote(Targetable * t)
 //toughness (Damageable::life - damage already marked counts); deathtouch makes
 //any amount lethal; indestructible survives damage outright. Pure, so the
 //verdict table is provable in PARSETEST.
+//#W52-L (D15): the same verdict for a -N/-N shrink (Tragic Slip's live branch,
+//a -1/-1 pump ability). Toughness 0 or less is a state-based death that
+//indestructible does not stop; `remaining` is toughness minus damage marked, so
+//a damaged body dies to a smaller shrink.
+string ptDropTargetVerdict(int n, int toughness, int remaining)
+{
+    std::ostringstream o;
+    o << " {right now: -" << n << "/-" << n << " - ";
+    if (n >= remaining)
+        o << "DIES}";
+    else
+    {
+        o << "SURVIVES (toughness " << toughness;
+        if (remaining != toughness)
+            o << ", " << (remaining - n) << " more kills it";
+        else
+            o << ", -" << (toughness - n) << "/-" << (toughness - n) << " more kills it";
+        o << ")}";
+    }
+    return o.str();
+}
+//#W52-L (D15): the live shrink amount of a spell or waiting ability - 0 when
+//none is knowable. The pump unwrap (ptPumpModifierDelta) covers a waiting
+//activated/triggered modifier; the spell path reads the script: the live
+//morbid branch through the engine's own morbid check, else the script's single
+//plain "-N/-N" token. X and rand are never evaluated.
+static int plainPTDrop(const string& mod)
+{
+    //"-N/-N" exactly: both halves the same negative number
+    if (mod.size() < 5 || mod[0] != '-')
+        return 0;
+    size_t slash = mod.find('/');
+    if (slash == string::npos || slash + 1 >= mod.size() || mod[slash + 1] != '-')
+        return 0;
+    string a = mod.substr(1, slash - 1), b = mod.substr(slash + 2);
+    if (a.empty() || a != b)
+        return 0;
+    for (size_t i = 0; i < a.size(); i++)
+        if (!isdigit((unsigned char) a[i]))
+            return 0;
+    return atoi(a.c_str());
+}
+int scriptPTDrop(const string& lowText)
+{
+    size_t i = 0;
+    int found = 0;
+    while (i < lowText.size())
+    {
+        size_t e = lowText.find_first_of(" \t\r\n", i);
+        string tok = lowText.substr(i, e == string::npos ? string::npos : e - i);
+        int d = plainPTDrop(tok);
+        if (d > 0)
+        {
+            if (found)
+                return 0; //two shrinks in one script: which applies is not readable here
+            found = d;
+        }
+        if (e == string::npos)
+            break;
+        i = e + 1;
+    }
+    return found;
+}
 string damageTargetVerdict(int dmg, int toughness, int remaining, bool indestructible, bool deathtouch)
 {
     std::ostringstream o;
@@ -11812,7 +11940,9 @@ static string stripNarrationDecoration(const string& in)
                 //#W51-E D9: the strand clause is decision-time pricing too.
                 || (in.compare(i, 8, "{spends ") == 0)
                 //#W51-F D11: the feeds count is decision-time pricing, not history.
-                || (in.compare(i, 8, "{feeds: ") == 0);
+                || (in.compare(i, 8, "{feeds: ") == 0)
+                //#W52-L D16: the fetch pricing is decision-time too.
+                || (in.compare(i, 24, "{this land makes no mana") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -12627,6 +12757,8 @@ static bool isHarmToTargetAbility(MTGAbility * a)
     return false;
 }
 
+static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped);
+static bool isFetchCrackLine(const string& line);
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 {
     std::ostringstream out;
@@ -12922,7 +13054,8 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                     continue;
                 if (ps->isCreature() || ps == src)
                 {
-                    taps.push_back(ps->getDisplayName() + (ps == src ? " (this card itself)" : ""));
+                    taps.push_back(ps->getDisplayName() + (ps == src ? " (this card itself)" : "")
+                                   + animatedThisTurnNote(ps));
                     anyCreature = anyCreature || ps->isCreature();
                 }
             }
@@ -12979,6 +13112,23 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         }
     }
 
+    //#W52-L (D16): a fetch row says the fetchland itself makes no mana - the
+    //seat passed six windows on "when I have 3 mana" at "Mana available: 2"
+    //with a Marsh Flats on the table (deck123 vs130 seq 6-13). The count is the
+    //same untapped-source count the mana line prints; the fetched land's tap
+    //state is read off the script (Evolving Wilds' `tap(noevent)`).
+    if (action.ability && isFetchCrackLine(out.str()))
+    {
+        MTGCardInstance * fsrc = action.click ? action.click : action.ability->source;
+        if (fsrc && fsrc->isLand())
+        {
+            ManaEngine::FreeProducerPolicy reachPolicy;
+            int untapped = ManaEngine::potentialColorReach(this, reachPolicy, NULL);
+            string low = toLowerCopy(fsrc->magicText);
+            bool entersTapped = low.find("tap(noevent)") != string::npos || low.find("tapped") != string::npos;
+            out << fetchMakesNoManaClause(untapped, entersTapped);
+        }
+    }
     //#W41-6: the repeat-activation countable, next to the cost it is paid with
     //and ahead of the static card text, so the loop state reads as part of the
     //price of this activation rather than as a footnote to the rules blurb.
@@ -14598,6 +14748,18 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
 //scripts render ("Put in Play with Misty Rainforest targeting...", "search
 //basic land with Prismatic Vista") - 664 offers in the wave-9 corpus, the
 //top decision-count driver on control decks.
+//#W52-L (D16): pure, so the shape is provable in PARSETEST.
+static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped)
+{
+    std::ostringstream o;
+    o << " {this land makes no mana - crack it for a land";
+    if (fetchedEntersTapped)
+        o << " (the land it finds enters tapped)";
+    else if (untapped >= 0)
+        o << ": your untapped mana sources go from " << untapped << " to " << (untapped + 1);
+    o << "}";
+    return o.str();
+}
 static bool isFetchCrackLine(const string& line)
 {
     //W42-D4 renamed the rendered head ("Put in Play" -> "Put a card onto the
@@ -14826,6 +14988,24 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 continue;
         }
         const string& line = renderOrder[c].first;
+        //#W52-L (D12): a `becomes` animation whose source is ALREADY the
+        //creature it makes (a land animated this turn, the activation counted
+        //this turn) is offered again in the same window - `[repeat: activated
+        //this turn 1 times already]` - and the seat took it 3 of 12 times,
+        //twelve mana for three 3/3s that already existed (deck146 vs125 seq
+        //89->91, 110->112, 260->262). A fixed-size animation re-activated on
+        //its own animated body changes nothing until the turn ends, so the row
+        //is withheld for the rest of the turn. An {X} animation (Lair of the
+        //Hydra) can grow the body and stays offered.
+        if (isAnimationRow(line))
+        {
+            MTGCardInstance * asrc = cand->click ? cand->click : (cand->ability ? cand->ability->source : NULL);
+            ActivatedAbility * aaa = asActivatedForCount(cand->ability);
+            ManaCost * acost = aaa ? aaa->getCost() : NULL;
+            if (asrc && aaa && aaa->counters >= 1 && ManaEngine::isAnimatedLand(asrc)
+                && !(acost && (acost->hasX() || acost->hasSpecificX())))
+                continue;
+        }
         if (!seenLines.insert(line).second)
             continue;
         //Pass-declined this turn: the model has said "hold" enough - stop
@@ -16208,12 +16388,46 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     {
                         if (tapped.insert(picks[pi]->source).second
                             && picks[pi]->source->isCreature())
-                            creatureTaps.push_back(picks[pi]->source->getDisplayName());
+                            creatureTaps.push_back(picks[pi]->source->getDisplayName()
+                                                   + animatedThisTurnNote(picks[pi]->source));
                     }
                 used = (int) tapped.size();
             }
             if (payCost)
                 o << leavesUntappedTag(untappedSources, used);
+            //#W52-L (D17): what this cast strands in the hand at INSTANT speed -
+            //"Cast Staff of Nin {6} {leaves 1 of your 7}" was taken with Cancel
+            //in hand and the next opponent turn resolved three threats with no
+            //window (deck125 vs152 seq 24). The cheapest instant-speed card the
+            //remainder cannot pay, same per-source count as the ability rows'
+            //clause (lane E, D9).
+            if (payCost && untappedSources > 0 && game && game->hand)
+            {
+                int left = untappedSources - used;
+                if (left < 0)
+                    left = 0;
+                MTGCardInstance * best = NULL;
+                int bestNeed = 0;
+                for (int hi = 0; hi < game->hand->nb_cards; hi++)
+                {
+                    MTGCardInstance * hc = game->hand->cards[hi];
+                    if (!hc || hc == card || hc->hasType(Subtypes::TYPE_LAND) || !hc->getManaCost())
+                        continue;
+                    if (!(hc->hasType(Subtypes::TYPE_INSTANT) || hc->has(Constants::FLASH)))
+                        continue;
+                    int need = hc->getManaCost()->getConvertedCost();
+                    if (need <= 0 || need > untappedSources || need <= left)
+                        continue;
+                    if (!best || need < bestNeed)
+                    {
+                        best = hc;
+                        bestNeed = need;
+                    }
+                }
+                if (best)
+                    o << strandsHandCardTag(used, untappedSources, best->getDisplayName(),
+                                            best->getManaCost()->toString(), bestNeed);
+            }
             //#W49-D11: the creatures this payment taps, and whether that costs
             //the attack (only on the caster's turn, before attackers are declared).
             if (!creatureTaps.empty())
@@ -18303,6 +18517,33 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
     //all: derive the amount from the spell's own single damage: rider instead.
     int dmgAmount = 0;
     bool dmgDeathtouch = false;
+    //#W52-L (D15): the -N/-N shrink amount, when knowable (deck123 vs152 seq 11
+    //"Elite Spellbinder (4/2)" read as "it is 3/1" and Slip'd a survivor).
+    int ptDrop = 0;
+    {
+        MTGAbility * waiting = dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer());
+        int dp = 0, dt = 0; bool ueot = false; MTGCardInstance * mt = NULL;
+        if (waiting && ptPumpModifierDelta(waiting, dp, dt, ueot, mt) && dt < 0 && dp == dt)
+            ptDrop = -dt;
+        else if (!waiting && tc->source
+                 && (tc->source->hasType(Subtypes::TYPE_INSTANT) || tc->source->hasType(Subtypes::TYPE_SORCERY)))
+        {
+            string low = toLowerCopy(tc->source->magicText);
+            string ifM, ifN;
+            if (morbidPTBranches(low, ifM, ifN))
+            {
+                bool morbidLive = false;
+                if (tc->source->controller())
+                {
+                    AbilityFactory af(observer);
+                    morbidLive = af.parseCastRestrictions(tc->source, tc->source->controller(), "morbid") != 0;
+                }
+                ptDrop = plainPTDrop(morbidLive ? ifM : ifN);
+            }
+            else
+                ptDrop = scriptPTDrop(low);
+        }
+    }
     {
         AADamager * ad = unwrapDamagerAbility(
             dynamic_cast<MTGAbility *>(observer->mLayers->actionLayer()->isWaitingForAnswer()), 0);
@@ -18378,6 +18619,12 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
                             tdesc += damageTargetVerdict(dmgAmount, dtc->toughness, dtc->life,
                                                          dtc->basicAbilities[Constants::INDESTRUCTIBLE],
                                                          dmgDeathtouch);
+                //#W52-L (D15): the shrink verdict rides the creature target line.
+                if (ptDrop > 0 && !dmgAmount)
+                    if (MTGCardInstance * dtc = dynamic_cast<MTGCardInstance *>(t))
+                        if (dtc->isCreature() && dtc->controller() && dtc->controller()->game
+                            && dtc->currentZone == dtc->controller()->game->inPlay)
+                            tdesc += ptDropTargetVerdict(ptDrop, dtc->toughness, dtc->life);
                 opts.push_back(tdesc);
             }
             req = round;
@@ -33832,6 +34079,123 @@ static const char * kW50Y_r94 =
             CHECK(pick == 1 && !stale, "#W51-D D10 echo: a reply copying the whole row incl. the clause binds to 1");
             pick = parseChoice("CHOICE: 1 (Cast Soul Shatter)", 1, &menu, &stale, &src);
             CHECK(pick == 1 && !stale, "#W51-D D10 echo: the bare row name binds with the clause on the row");
+        }
+    }
+
+    cout << "\n[#W52-L] D8 target-handle collapse / D12 / D13b / D15 shrink verdict / D16 fetch clause / D17\n";
+    {
+        //D8 (a): the SOURCE handle sits before the target's - the target's rank is the one that varies.
+        string head, tail; int rank = -1;
+        CHECK(splitRowHandle("Deal 2 damage with Siege-Gang Commander #1 targeting Goblin #3 [your battlefield]", head, tail, rank)
+              && rank == 3 && head == "Deal 2 damage with Siege-Gang Commander #1 targeting Goblin"
+              && tail == " [your battlefield]",
+              "#W52-L D8 the handle after ' targeting ' identifies the row, not the source's own");
+        vector<string> sg;
+        sg.push_back("Cast Lightning Bolt {r}");
+        for (int i = 1; i <= 4; i++)
+        {
+            std::ostringstream o;
+            o << "Deal 2 damage with Siege-Gang Commander #1 targeting Goblin #" << i << " [your battlefield] {this hits YOUR permanent} [cost: {1}{r}, Sacrifice]";
+            sg.push_back(o.str());
+        }
+        bool rg = false;
+        string rows = joinNumberedRows(sg, &rg);
+        cout << "     " << rows;
+        CHECK(rg && rows.find("2-5. Deal 2 damage with Siege-Gang Commander #1 targeting Goblin #1-#4 [your battlefield] {this hits YOUR permanent} [cost: {1}{r}, Sacrifice] x4") != string::npos,
+              "#W52-L D8 four sacrifice rows over one source collapse to one ranged row");
+        //D8 (b): the handle printed twice on the row (the equip MOVES clause).
+        vector<string> eq;
+        eq.push_back("Create vampire with Lord of Lineage [cost: Tap]");
+        for (int i = 1; i <= 3; i++)
+        {
+            std::ostringstream o;
+            o << "Equip with Lightning Greaves targeting Vampire #" << i << " [your battlefield] (Lightning Greaves is ALREADY attached to Lord of Lineage - this MOVES it to Vampire #" << i << ", and Lord of Lineage loses what it grants) [repeat: activated this turn 1 times already.]";
+            eq.push_back(o.str());
+        }
+        CHECK(splitRowHandle(eq[1], head, tail, rank) && rank == 1
+              && tail.find("MOVES it to Vampire #\x02,") != string::npos && tail.find("#1") == string::npos,
+              "#W52-L D8 a second copy of the row's own handle is folded out of the fact tail");
+        bool rg2 = false;
+        string rows2 = joinNumberedRows(eq, &rg2);
+        cout << "     " << rows2;
+        CHECK(rg2 && rows2.find("2-4. Equip with Lightning Greaves targeting Vampire #1-#3 [your battlefield] (Lightning Greaves is ALREADY attached to Lord of Lineage - this MOVES it to Vampire #1-#3, and Lord of Lineage loses what it grants) [repeat: activated this turn 1 times already.] x3") != string::npos,
+              "#W52-L D8 the equip rows collapse; the folded copy prints the same range");
+        CHECK(rows2.find('\x02') == string::npos, "#W52-L D8 no fold byte reaches the prompt");
+        //NEGATIVE: a row whose repeated handle carries a DIFFERENT rank is a different fact.
+        vector<string> eqx(eq);
+        eqx[2] = "Equip with Lightning Greaves targeting Vampire #2 [your battlefield] (Lightning Greaves is ALREADY attached to Lord of Lineage - this MOVES it to Vampire #7, and Lord of Lineage loses what it grants) [repeat: activated this turn 1 times already.]";
+        bool rg3 = false;
+        string rows3 = joinNumberedRows(eqx, &rg3);
+        CHECK(!rg3 && rows3.find("#1-#3") == string::npos,
+              "#W52-L D8 NEGATIVE a tail naming another instance refuses the merge");
+        //NEGATIVE: no handle after ' targeting ' falls back to the first handle.
+        CHECK(splitRowHandle("Deal 1 damage with Staff of Nin #2 targeting the opponent", head, tail, rank)
+              && rank == 2 && head == "Deal 1 damage with Staff of Nin",
+              "#W52-L D8 NEGATIVE an unhandled target leaves the source handle as the row's handle");
+        //REGRESSION: the wave-48 shape is unchanged.
+        CHECK(splitRowHandle("Deal 1 damage with Staff of Nin targeting Vampire #98 [opponent's battlefield]", head, tail, rank)
+              && rank == 98 && tail == " [opponent's battlefield]",
+              "#W52-L D8 REGRESSION the single-handle row splits as before");
+        //echo: a reply naming one instance inside a collapsed range binds by name.
+        {
+            bool stale = false; string src;
+            int c = parseChoice("CHOICE: 3 (Equip with Lightning Greaves targeting Vampire #2)", 4, &eq, &stale, &src);
+            CHECK(c == 3 && !stale, "#W52-L D8 echo: an instance handle inside the range still binds to its own option number");
+        }
+        //D13 (b): the animated-land note on a tap name.
+        vector<string> taps;
+        taps.push_back("Lair of the Hydra (animated this turn)");
+        CHECK(paymentTapsClause(taps, true) == " {paying this taps: Lair of the Hydra (animated this turn) - it cannot attack this turn}",
+              "#W52-L D13b the tap clause carries the animated-this-turn note in the name");
+        //D15: the shrink verdict.
+        CHECK(ptDropTargetVerdict(1, 2, 2) == " {right now: -1/-1 - SURVIVES (toughness 2, -1/-1 more kills it)}",
+              "#W52-L D15 -1/-1 on a 4/2 survives, one more kills it");
+        CHECK(ptDropTargetVerdict(1, 1, 1) == " {right now: -1/-1 - DIES}",
+              "#W52-L D15 -1/-1 on toughness 1 dies");
+        CHECK(ptDropTargetVerdict(13, 4, 4) == " {right now: -13/-13 - DIES}",
+              "#W52-L D15 the morbid -13/-13 kills");
+        CHECK(ptDropTargetVerdict(1, 4, 2) == " {right now: -1/-1 - SURVIVES (toughness 4, 1 more kills it)}",
+              "#W52-L D15 a damaged body counts its remaining toughness");
+        CHECK(scriptPTDrop("target(creature) -1/-1 ueot") == 1 && scriptPTDrop("-2/-2 ueot") == 2,
+              "#W52-L D15 the script's single -N/-N token is read");
+        CHECK(scriptPTDrop("-1/-1 ueot -3/-3") == 0 && scriptPTDrop("+2/+2 ueot") == 0
+              && scriptPTDrop("-x/-x ueot") == 0 && scriptPTDrop("-1/-2 ueot") == 0,
+              "#W52-L D15 NEGATIVE two shrinks, a pump, X, and an uneven modifier read nothing");
+        {
+            //echo shape: the clause on a target row strips to the bare target.
+            string row = "Elite Spellbinder (4/2)" + ptDropTargetVerdict(1, 2, 2);
+            CHECK(stripNarrationDecoration(row) == "Elite Spellbinder (4/2)",
+                  "#W52-L D15 echo: the verdict leaves no residue in the narrated record");
+        }
+        //D16: the fetch clause.
+        CHECK(fetchMakesNoManaClause(2, false) == " {this land makes no mana - crack it for a land: your untapped mana sources go from 2 to 3}",
+              "#W52-L D16 the fetch row prices the crack in untapped sources");
+        CHECK(fetchMakesNoManaClause(2, true) == " {this land makes no mana - crack it for a land (the land it finds enters tapped)}",
+              "#W52-L D16 an enters-tapped fetch says so instead of promising a source");
+        {
+            string row = "Put a card onto the battlefield with Marsh Flats #2 targeting Plains [your library] [cost: Tap, Life, Sacrifice]"
+                         + fetchMakesNoManaClause(2, false);
+            CHECK(isFetchCrackLine(row) && fetchLineKey(row) == "Put a card onto the battlefield with Marsh Flats #2",
+                  "#W52-L D16 the clause leaves the fetch decline key untouched");
+            CHECK(stripNarrationDecoration(row).find("makes no mana") == string::npos,
+                  "#W52-L D16 echo: the clause leaves no residue in the narrated record");
+            vector<string> menu; menu.push_back(row);
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Put a card onto the battlefield with Marsh Flats #2 targeting Plains)", 1, &menu, &stale, &src) == 1 && !stale,
+                  "#W52-L D16 echo: the bare row still binds with the clause on the row");
+        }
+        //D17: the cast-row strand clause reuses the ability-row form.
+        CHECK(strandsHandCardTag(6, 7, "Cancel", "{1}{U}{U}", 3)
+              == " {spends 6 of your 7 untapped mana sources this turn; Cancel {1}{U}{U} in your hand needs 3}",
+              "#W52-L D17 the Staff of Nin cast names the Cancel it strands");
+        {
+            vector<string> menu;
+            menu.push_back("Cast Staff of Nin {6}" + leavesUntappedTag(7, 6) + strandsHandCardTag(6, 7, "Cancel", "{1}{U}{U}", 3));
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Cast Staff of Nin {6} {leaves 1 of your 7 untapped mana sources untapped} {spends 6 of your 7 untapped mana sources this turn; Cancel {1}{U}{U} in your hand needs 3})", 1, &menu, &stale, &src) == 1 && !stale,
+                  "#W52-L D17 echo: a reply parroting both clauses binds");
+            CHECK(stripNarrationDecoration(menu[0]) == "Cast Staff of Nin {6}",
+                  "#W52-L D17 echo: both clauses leave no residue in the narrated record");
         }
     }
 

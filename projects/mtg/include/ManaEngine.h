@@ -64,6 +64,17 @@ public:
     //ability list in activation order; empty when the cost cannot be met.
     //Mirrors the historical AIPlayerBaka::canPayMana semantics (color-first
     //fill, hybrid handling, kicker lookahead, X = go all out).
+    //#W52-L (D13, planner half): a LAND that is a creature right now but was
+    //not printed one - a `becomes` animation (Mutavault, Lair of the Hydra,
+    //Hive of the Eye Tyrant) paid for THIS turn. The attacker-sparing walk
+    //draws would-be attackers into a mana bill weakest first; an animated
+    //land is the last of them whatever its power, because its body is the
+    //thing the seat just paid mana for (corpus 20260827 deck152 vs125
+    //seq36->39: Lair animated at Upkeep, tapped for the Main-1 cast). A
+    //printed land creature (Dryad Arbor) is NOT animated and keeps its
+    //power-ordered place.
+    static bool isAnimatedLand(MTGCardInstance * c);
+
     static std::vector<MTGAbility*> planPayment(Player * p, ManaPolicy & policy, MTGCardInstance * target,
                                                 ManaCost * cost, int anytypeofmana);
     static std::vector<MTGAbility*> planPayment(Player * p, ManaPolicy & policy, MTGCardInstance * target,
