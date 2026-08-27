@@ -1,0 +1,39 @@
+# W50-W D2 companion: the same Pelakka Predation reveal with the driver itself
+# making the option-one pick (stub decides after the default 2 in-flight
+# ticks). Proves the per-observer `revealasync` directive drives the real
+# interactive-AI path (driveInteractiveReveal) and that the put-back still
+# resolves at the reveal when nothing raced it.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Pelakka Predation
+manapool:{2}{B}
+[PLAYER2]
+hand:Staff of Nin,Savannah,Savannah
+[DO]
+interactivereveal
+revealasync Staff of Nin
+Pelakka Predation
+choice 0
+p2
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Pelakka Predation
+manapool:{0}
+[PLAYER2]
+hand:Savannah,Savannah
+graveyard:Staff of Nin
+[END]

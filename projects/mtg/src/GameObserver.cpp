@@ -1991,7 +1991,9 @@ int GameObserver::cardClick(MTGCardInstance * card, Targetable * object, bool lo
         if (currentPlayer->game->hand->hasCard(card) && mCurrentGamePhase == MTG_PHASE_CLEANUP
                     && currentPlayer->game->hand->nb_cards > handmodified && currentPlayer->nomaxhandsize == false)
         {
-            WEvent * e = NEW WEventCardDiscard(currentPlayer->game->hand->cards[0]);
+            //W50-W (D4): the event names the card actually discarded (it was
+            //hand->cards[0], so a chosen discard narrated as the OLDEST card).
+            WEvent * e = NEW WEventCardDiscard(card);
             receiveEvent(e);
             currentPlayer->game->putInGraveyard(card);
         }

@@ -11513,7 +11513,9 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 8, "{leaves ") == 0)
                 //#W49-D11: what paying taps is decision-time pricing, not history.
                 || (in.compare(i, 19, "{paying this taps: ") == 0)
-                || (in.compare(i, 9, "{tapping ") == 0);
+                || (in.compare(i, 9, "{tapping ") == 0)
+                //W50-W (D6): the self-target clause is decision-time guidance.
+                || (in.compare(i, 10, "{this hits") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -12093,6 +12095,29 @@ static string castDeclineRow(bool combatNext)
                       : "Cast nothing right now";
 }
 
+//W50-W (D6): a damage/destroy activation aimed at the acting seat's OWN
+//permanent carries this clause, and a priority window whose EVERY action row
+//carries it gets kSelfOnlyWindowNote above the rows. Two-decline retirement
+//left seat 130 a window whose only row was "Deal 2 damage with Pyrite Spellbomb
+//targeting Dwarven Blastminer [your battlefield]" - and option-1 bias took it
+//(corpus 20260827 130v146 seq 16); with no opposing nonbasic, Blastminer's
+//only rows were its own Forgotten Caves at every window (130v126 seq 34-48,
+//one taken). Legality is untouched: the rows stay, the fact rides them.
+const char * kSelfTargetClause = " {this hits YOUR permanent}";
+const char * kSelfOnlyWindowNote =
+    "Every action here targets your own permanent; 0 (pass) is the usual answer.\n";
+static bool isHarmToTargetAbility(MTGAbility * a)
+{
+    if (!a)
+        return false;
+    if (dynamic_cast<AADamager *>(a) || dynamic_cast<AADestroyCard *>(a))
+        return true;
+    if (NestedAbility * na = dynamic_cast<NestedAbility *>(a))
+        return na->ability && (dynamic_cast<AADamager *>(na->ability)
+                               || dynamic_cast<AADestroyCard *>(na->ability));
+    return false;
+}
+
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 {
     std::ostringstream out;
@@ -12253,6 +12278,8 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
         //reference the spell-target rows already carried. A bare name here read
         //as "some Forgotten Cave" and the pilot destroyed its own.
         out << " targeting " << targetReference(this, action.target);
+        if (action.target->controller() == this && isHarmToTargetAbility(action.ability))
+            out << kSelfTargetClause;
         //Re-attaching to the current host is rules-legal but changes nothing.
         //The board line's cue (two power numbers / {attached:}) proved
         //insufficient at range - the pilot read it and re-equipped anyway
@@ -14284,6 +14311,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                 shown[k] = sh[order[k]];
             }
         }
+        //W50-W (D6): every offered action hits the seat's own permanent.
+        bool allSelf = !shownLines.empty();
+        for (size_t s0 = 0; s0 < shownLines.size() && allSelf; s0++)
+            allSelf = shownLines[s0].find(kSelfTargetClause) != string::npos;
+        if (allSelf)
+            tail << kSelfOnlyWindowNote;
         bool anyOptionRangeRow = false;
         tail << joinNumberedRows(renderRows, &anyOptionRangeRow);
         if (anyOptionRangeRow)
@@ -21925,6 +21958,138 @@ MTGCardInstance * AIPlayerGPT::pregameChooseBottomInner(int need, int chosenSoFa
             return c;
     }
     return AIPlayerBaka::pregameChooseBottom(need, chosenSoFar, status);
+}
+
+//W50-W (D4): the cleanup discard ask. Header is a free function so PARSETEST
+//can pin its numbers without a game.
+string cleanupDiscardHeaderText(int handN, int limit, int over)
+{
+    std::ostringstream o;
+    o << "Cleanup step (CR 514.1): your hand has " << handN << " card" << (handN == 1 ? "" : "s")
+      << " and your maximum hand size is " << limit << ", so you must discard exactly "
+      << over << " card" << (over == 1 ? "" : "s") << " now. Name EXACTLY " << over
+      << " card number" << (over == 1 ? "" : "s") << " - this is the ONLY ask for them;"
+         " keep the cards your plan needs and discard what you can spare.\n";
+    return o.str();
+}
+
+string AIPlayerGPT::buildCleanupDiscardAskText(const vector<MTGCardInstance*>& hand, int limit, int over)
+{
+    std::ostringstream tail;
+    tail << cleanupDiscardHeaderText((int) hand.size(), limit, over);
+    for (size_t j = 0; j < hand.size(); j++)
+    {
+        int copies = 0;
+        int rank = listCopyRank(hand, j, copies);
+        tail << (j + 1) << ". " << hand[j]->name << copyOfTag(rank, copies, "your hand");
+        if (hand[j]->getManaCost())
+        {
+            string mc = hand[j]->getManaCost()->toString();
+            if (!mc.empty())
+                tail << " " << mc;
+        }
+        if (hand[j]->isCreature())
+            tail << " (" << hand[j]->power << "/" << hand[j]->toughness << " creature)";
+        else
+        {
+            string tt = typeTag(hand[j]);
+            if (!tt.empty())
+                tail << " (" << tt << ")";
+        }
+        string txt = cardTextSnippet(hand[j], 140);
+        if (!txt.empty())
+            tail << " {card text: " << txt << "}";
+        tail << "\n";
+    }
+    tail << "On the FIRST line write PUT: followed by the " << over << " card number"
+         << (over == 1 ? "" : "s") << " you discard"
+         << (over == 1 ? " (e.g. \"PUT: 2\")" : ", comma-separated (e.g. \"PUT: 2, 5\")")
+         << "; then a PLAN: line only if the reply rules call for one (no plan shown yet,"
+            " or part of yours is now done or false). Write nothing else.";
+    return tail.str();
+}
+
+int AIPlayerGPT::cleanupDiscard(int over)
+{
+    if (over <= 0)
+        return 0;
+    vector<MTGCardInstance*> hand;
+    for (int i = 0; i < game->hand->nb_cards; i++)
+        hand.push_back(game->hand->cards[i]);
+    if ((int) hand.size() < over)
+        over = (int) hand.size();
+    int limit = handsize + handmodifier;
+    if (limit < 0)
+        limit = 0;
+    string userMsg, content;
+    int result = -1;
+    vector<bool> send;
+    vector<string> names;
+    for (size_t j = 0; j < hand.size(); j++)
+        names.push_back(hand[j]->name);
+    if (!mEndpoint.empty())
+    {
+        if (mSystemPrompt.empty())
+            buildSystemPrompt();
+        userMsg = assemblePrompt(buildCleanupDiscardAskText(hand, limit, over));
+        if (pollCompletionRetry(userMsg, content) == kChoicePending)
+            return 1; //call in flight; the base Act neither acts nor passes
+        string decisionPart = consumePlan(content);
+        result = content.empty() ? -1
+                 : parseAttackerSet(decisionPart, hand.size(), send, &names);
+        if (result < 0 && !content.empty())
+        {
+            int sal = salvageLoopedSubset(content, "PUT:", hand.size(), names, send);
+            if (sal >= 1)
+                result = sal;
+        }
+    }
+    vector<MTGCardInstance*> chosen;
+    string chosenText;
+    if (result >= 0)
+        for (size_t j = 0; j < hand.size() && (int) chosen.size() < over; j++)
+            if (j < send.size() && send[j])
+            {
+                chosen.push_back(hand[j]);
+                chosenText += (chosenText.empty() ? "" : ", ") + hand[j]->name;
+            }
+    bool heuristic = (result < 0 || (int) chosen.size() < over);
+    //Exactly `over` cards: under-picks/failures fill from the base policy
+    //(highest mana value first), announced like every other fallback.
+    while ((int) chosen.size() < over)
+    {
+        MTGCardInstance * fill = NULL;
+        int fc = -1;
+        for (size_t i = 0; i < hand.size(); i++)
+        {
+            MTGCardInstance * c = hand[i];
+            bool already = false;
+            for (size_t k = 0; k < chosen.size(); k++)
+                if (chosen[k] == c) { already = true; break; }
+            if (already)
+                continue;
+            int cost = c->getManaCost() ? c->getManaCost()->getConvertedCost() : 0;
+            if (cost > fc) { fc = cost; fill = c; }
+        }
+        if (!fill)
+            break;
+        chosen.push_back(fill);
+        chosenText += (chosenText.empty() ? "" : ", ") + fill->name;
+    }
+    if (!mEndpoint.empty())
+    {
+        if (heuristic)
+            noticeFallback("model reply failed - the heuristic discards to hand size", 5.0f);
+        writeTransLog("discard", userMsg, content, result, (int) hand.size(), chosenText,
+                      heuristic ? (content.empty() ? noAnswerClass() : "unparsed_reply") : NULL,
+                      &names);
+    }
+    std::ostringstream narr;
+    narr << "Cleanup discard (hand " << hand.size() << ", limit " << limit << "): "
+         << (heuristic ? "the heuristic chose " : "you chose ") << chosenText;
+    narrateDecision(narr.str());
+    cleanupDiscardCards(chosen);
+    return 1;
 }
 
 //Env-gated (WAGIC_GPT_PARSETEST) self-test: drives the wave-19 failing replies
@@ -32672,6 +32837,39 @@ static const char * kW50Y_r94 =
               "#W50-Y D19 a looping token over a short reply is a degenerate decode");
         CHECK(!AIPlayerGPT::isDecodeGarbage("I attack, then I attack again next turn, and I keep attacking until they block."),
               "#W50-Y D19 NEGATIVE repeated English words in a sentence are not a token loop");
+    }
+    cout << "\n[W50-W] D4 cleanup-discard ask header / D6 self-target clause\n";
+    {
+        //#W50-W D4: the header's numbers are the numbers they claim to be.
+        string h = cleanupDiscardHeaderText(9, 7, 2);
+        CHECK(h.find("hand has 9 cards") != string::npos && h.find("maximum hand size is 7") != string::npos
+              && h.find("discard exactly 2 cards") != string::npos && h.find("Name EXACTLY 2 card numbers") != string::npos,
+              "#W50-W D4 header: hand 9 / limit 7 / discard exactly 2");
+        string h1 = cleanupDiscardHeaderText(8, 7, 1);
+        CHECK(h1.find("discard exactly 1 card now") != string::npos && h1.find("1 cards") == string::npos,
+              "#W50-W D4 header: singular for one card");
+        CHECK(h.find("discard exactly 0") == string::npos && h1.find("exactly 2") == string::npos,
+              "#W50-W D4 NEGATIVE header never states a count it was not given");
+        //#W50-W D6: the self-target clause is an annotation - the short name
+        //binds, the echoed clause binds, the narration keeps no residue.
+        vector<string> pri;
+        pri.push_back(string("Deal 2 damage with Pyrite Spellbomb targeting Dwarven Blastminer"
+                             " [your battlefield] [cost: {r}, Sacrifice]") + kSelfTargetClause);
+        pri.push_back("Deal 2 damage with Pyrite Spellbomb targeting the opponent [cost: {r}, Sacrifice]");
+        bool st6 = false;
+        CHECK(parseChoice("CHOICE: 1 (Deal 2 damage with Pyrite Spellbomb)", 2, &pri, &st6, NULL) == 1 && !st6,
+              "#W50-W D6 echo: the bare short name binds with the clause on the row");
+        bool st6b = false;
+        CHECK(parseChoice("CHOICE: 1 (" + pri[0] + ")", 2, &pri, &st6b, NULL) == 1 && !st6b,
+              "#W50-W D6 echo: a reply copying the whole row incl. the clause binds to 1");
+        bool st6c = false;
+        CHECK(parseChoice("CHOICE: 2 (Deal 2 damage with Pyrite Spellbomb targeting the opponent)", 2, &pri, &st6c, NULL) == 2,
+              "#W50-W D6 NEGATIVE the clause-free sibling row still binds to its own index");
+        CHECK(stripNarrationDecoration(pri[0]).find("this hits") == string::npos
+              && stripNarrationDecoration(pri[0]).find("Pyrite Spellbomb targeting Dwarven Blastminer") != string::npos,
+              "#W50-W D6 the clause leaves no residue in the narrated record");
+        CHECK(string(kSelfOnlyWindowNote).find("0 (pass)") != string::npos,
+              "#W50-W D6 the all-self window note names the pass answer");
     }
 
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";

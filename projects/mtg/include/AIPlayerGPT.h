@@ -227,6 +227,13 @@ protected:
     //#W42-D9: the real body; the override above only arms the bottoming flag.
     MTGCardInstance * pregameChooseBottomInner(int need, int chosenSoFar, int & status);
     virtual int pregameLeylineDecision(MTGCardInstance * card);
+    //W50-W (D4): the cleanup-step hand-size discard, put to the model as ONE
+    //bundled "name exactly N cards" ask over the hand (the bottoming ask's
+    //shape, "discard" translog kind); a failed/absent reply takes the base
+    //highest-mana-value policy, announced. Called from the base computeActions
+    //before the phase advance would discard hand->cards[0] silently.
+    virtual int cleanupDiscard(int over);
+    string buildCleanupDiscardAskText(const vector<MTGCardInstance*>& hand, int limit, int over);
     //State for the single bundled BOTTOM-N ask per keep.
     std::vector<MTGCardInstance*> mPregameBottomQueue;
     bool mPregameBottomAsked;

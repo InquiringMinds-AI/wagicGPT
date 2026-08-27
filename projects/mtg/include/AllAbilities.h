@@ -89,11 +89,14 @@ public:
                                            //LATER; wait for the zone to shrink
                                            //before arming option two)
     bool mAIDriveDone;                     //nothing more for the driver to do
+    int mAIGraceTicks;                     //W50-W: ticks to wait for a foreign-fired
+                                           //option one's deferred move (phase 3)
     int mAITestTicks;                      //TESTSUITE-only: in-flight tick counter
                                            //for the forced-async reveal repro hook
     vector<MTGCardInstance*> mAIGraveSel;  //model's option-one picks (pointers)
     vector<MTGCardInstance*> mAIRemainder; //option-two cards (captured at arm)
     void driveInteractiveReveal();
+    TargetChooser * ownChooser();          //the current chooser iff it is THIS reveal's
     //Input arming. False from the moment the display opens until it has been
     //through one full Render, so no button can answer a display the player has
     //not been shown yet. See flushInputForNewDisplay() in AllAbilities.cpp.

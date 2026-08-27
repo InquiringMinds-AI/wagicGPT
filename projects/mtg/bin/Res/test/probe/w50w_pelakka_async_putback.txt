@@ -1,0 +1,49 @@
+# W50-W D2 pin (async reveal driver): Pelakka Predation's option two (put back)
+# must run at the REVEAL's own resolution even when option one was consumed by
+# a path other than the driver. Corpus 20260827 146v126: the seat's target seam
+# (AIPlayerBaka::computeActions -> chooseTarget, one legal target) took Staff
+# of Nin before driveInteractiveReveal saw its chooser armed; the driver then
+# waited in phase 0 for a chooser that never came, the two Savannahs sat in the
+# reveal zone for a whole turn, and the NEXT chooser to appear - the opponent's
+# Tribute to Hunger edict against this seat - was taken as option one's:
+# "revealed 2 cards but none was a legal target", the edict cancelled (no
+# sacrifice, no life gain), the Savannahs put back only then.
+# Here the stub model stays "in flight" for 120 ticks while the script clicks
+# Staff of Nin itself (option one consumed elsewhere). PRE-FIX: both Savannahs
+# stay in the reveal zone (hand 0). POST-FIX: option two returns them to hand.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Pelakka Predation
+manapool:{2}{B}
+[PLAYER2]
+hand:Staff of Nin,Savannah,Savannah
+[DO]
+interactivereveal
+revealasync Staff of Nin
+revealasyncticks 120
+Pelakka Predation
+choice 0
+p2
+Staff of Nin
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Pelakka Predation
+manapool:{0}
+[PLAYER2]
+hand:Savannah,Savannah
+graveyard:Staff of Nin
+[END]

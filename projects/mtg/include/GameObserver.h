@@ -106,6 +106,13 @@ class GameObserver{
   //fixture that must test the interactive selection (surveil binning) opts in.
   //In-class initialized so real games and unopted fixtures never see it true.
   bool mForceInteractiveReveal = false;
+  //W50-W (D2) test-suite hook, per observer (safe under the threaded suite):
+  //`revealasync <names>` makes the scripted seat present as an interactive AI
+  //to the reveal driver and stands in for the model's decideReveal (picks = the
+  //named cards); `revealasyncticks N` sets how many driver ticks the stub
+  //reports "in flight" before deciding (default 2). Empty/-1 = off.
+  std::string mRevealTestAsyncPicks;
+  int mRevealTestAsyncTicks = -1;
   //The CR pre-game phase (opening hands + London mulligan + 103.6 actions),
   //run before turn 1 of real/selfplay/demo games. NULL in suite games and
   //once the phase has completed. While non-NULL, Update runs the phase and
