@@ -1,0 +1,25 @@
+# W53 autotap: a generic cost spends the ABUNDANT colour. {2} (Mind Stone) over Forest,
+# Forest, Forest, Plains taps two Forests and leaves the lone Plains - the seat's only white
+# source - for the Savannah Lions auto-tap that follows.
+# EXPECTED: Forest+Forest, then Plains: pool {G}{G}{W}, 3 tapped.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Forest,Plains
+hand:Mind Stone,Savannah Lions
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+autotap mind stone
+autotap savannah lions
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Forest,Forest,Forest,Plains
+hand:Mind Stone,Savannah Lions
+tappedinplay:3
+manapool:{G}{G}{W}
+[PLAYER2]
+[END]

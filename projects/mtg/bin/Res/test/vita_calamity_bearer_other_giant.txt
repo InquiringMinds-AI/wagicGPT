@@ -1,0 +1,27 @@
+#Calamity Bearer doubles OTHER Giants' damage at NORMAL timing: Hill Giant 3/3
+#blocked by Earth Elemental 4/5 - 6 kills the Elemental, 4 kills the Giant.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Calamity Bearer,Hill Giant
+life:20
+[PLAYER2]
+inplay:Earth Elemental
+life:20
+[DO]
+goto attackers
+Hill Giant
+next
+Earth Elemental
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Calamity Bearer
+graveyard:Hill Giant
+life:20
+[PLAYER2]
+graveyard:Earth Elemental
+life:20
+[END]

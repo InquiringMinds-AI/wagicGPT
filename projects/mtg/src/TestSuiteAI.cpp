@@ -746,7 +746,16 @@ int TestSuiteAI::Act(float)
         int autoTapAny = autoTapCard->has(Constants::ANYTYPEOFMANA);
         if (autoTapPayer
             && !autoTapPayer->getManaPool()->canAfford(autoTapCard->getManaCost(), autoTapAny))
+        {
+            //W53: name the picks so an autotap fixture's failure says WHICH sources tapped
+            vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(autoTapPayer, autoTapCard, autoTapCard->getManaCost(), autoTapAny);
+            std::cerr << "TESTSUITE autotap " << cname << " picks:";
+            for (size_t i = 0; i < picks.size(); i++)
+                if (picks[i] && picks[i]->source)
+                    std::cerr << " " << picks[i]->source->getName();
+            std::cerr << " [" << suite->filename << "]" << std::endl;
             ManaEngine::autoTapForCost(autoTapPayer, autoTapCard, autoTapCard->getManaCost(), autoTapAny);
+        }
     }
     else if (action.find("aipay ") == 0)
     {
@@ -800,7 +809,16 @@ int TestSuiteAI::Act(float)
         Player * hcPayer = hc->controller();
         if (hcPayer && MTGPutInPlayRule::humanCanAffordWithProducers(hcPayer, hc)
             && !hcPayer->getManaPool()->canAfford(hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA)))
+        {
+            //W53: name the picks so an autotap fixture's failure says WHICH sources tapped
+            vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(hcPayer, hc, hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA));
+            std::cerr << "TESTSUITE autotap " << cname << " picks:";
+            for (size_t i = 0; i < picks.size(); i++)
+                if (picks[i] && picks[i]->source)
+                    std::cerr << " " << picks[i]->source->getName();
+            std::cerr << " [" << suite->filename << "]" << std::endl;
             ManaEngine::autoTapForCost(hcPayer, hc, hc->getManaCost(), hc->has(Constants::ANYTYPEOFMANA));
+        }
     }
     else if (action.find("asserttaps ") == 0)
     {
@@ -877,9 +895,31 @@ int TestSuiteAI::Act(float)
                 {
                     ActivatedAbility * aa = dynamic_cast<ActivatedAbility *>((MTGAbility *) al->mObjects[i]);
                     if (aa && aa->source == ac)
+                    {
                         std::cerr << "TESTSUITE assertusable:   ability '" << aa->getMenuText()
                                   << "' cost " << (aa->getCost() ? aa->getCost()->toString() : string("(none)"))
-                                  << " needsTapping=" << aa->needsTapping << std::endl;
+                                  << " needsTapping=" << aa->needsTapping;
+                        AAMorph * am = dynamic_cast<AAMorph *>(aa);
+                        if (!am)
+                            if (GenericActivatedAbility * gw = dynamic_cast<GenericActivatedAbility *>(aa))
+                                am = dynamic_cast<AAMorph *>(gw->ability);
+                        if (am)
+                        {
+                            MTGCardInstance * tg = (MTGCardInstance *) am->target;
+                            std::cerr << " [morph faceDown=" << am->sourceIsFaceDown()
+                                      << " target==source=" << (tg == ac)
+                                      << " src(isMorphed=" << ac->isMorphed << " morphed=" << ac->morphed
+                                      << " next=" << (ac->next ? 1 : 0) << " turningOver=" << ac->turningOver << ")";
+                            for (MTGCardInstance * pv = ac->previous; pv; pv = pv->previous)
+                                std::cerr << " prev(isMorphed=" << pv->isMorphed << " morphed=" << pv->morphed
+                                          << " turningOver=" << pv->turningOver << ")";
+                            if (tg && tg != ac)
+                                std::cerr << " tgt(isMorphed=" << tg->isMorphed << " morphed=" << tg->morphed
+                                          << " next=" << (tg->next ? 1 : 0) << ")";
+                            std::cerr << "]";
+                        }
+                        std::cerr << std::endl;
+                    }
                 }
             }
             suite->commandAssertFailures++;
@@ -2233,6 +2273,7 @@ int runCardScriptValidation()
 
     long cardCount = 0;
 
+    long warnCount = 0; //W53 keyword-vs-oracle lint
     vector<int> & ids = MTGCollection()->ids;
     for (size_t i = 0; i < ids.size(); ++i)
     {
@@ -2278,6 +2319,41 @@ int runCardScriptValidation()
         }
         SAFE_DELETE(sp);
 
+        //W53 keyword-vs-oracle lint (owner, 2026-08-28, from the Calamity Bearer
+        //incident: the script granted DOUBLE STRIKE to model "deals double
+        //damage", and the timing change killed a 17/5 with no trade). A script
+        //that grants a combat-timing keyword the card's Oracle text never
+        //mentions deserves a look. Checked: the keyword flags from abilities=
+        //and every authored magicText line, against the lowercased text=.
+        {
+            static const struct { const char * kw; int flag; } kws[] = {
+                { "first strike",  Constants::FIRSTSTRIKE },
+                { "double strike", Constants::DOUBLESTRIKE } };
+            string oracle = mc->data->text;
+            std::transform(oracle.begin(), oracle.end(), oracle.begin(), ::tolower);
+            for (size_t w = 0; w < sizeof(kws)/sizeof(kws[0]); ++w)
+            {
+                bool scripted = inst->basicAbilities[kws[w].flag] != 0;
+                string mt = inst->magicText;
+                std::transform(mt.begin(), mt.end(), mt.begin(), ::tolower);
+                if (mt.find(kws[w].kw) != string::npos)
+                    scripted = true;
+                for (map<string,string>::iterator it = inst->magicTexts.begin(); !scripted && it != inst->magicTexts.end(); ++it)
+                {
+                    string z = it->second;
+                    std::transform(z.begin(), z.end(), z.begin(), ::tolower);
+                    if (z.find(kws[w].kw) != string::npos)
+                        scripted = true;
+                }
+                if (scripted && oracle.find(kws[w].kw) == string::npos)
+                {
+                    fprintf(out, "VALIDATE-WARN\tkeyword-not-in-oracle\t%s\t%d\t%s\n",
+                            mc->data->name.c_str(), mc->getId(), kws[w].kw);
+                    warnCount++;
+                }
+            }
+        }
+
         for (size_t u = 0; u < sizeof(stateOnlyKeys)/sizeof(stateOnlyKeys[0]); ++u)
         {
             map<string,string>::iterator it = inst->magicTexts.find(stateOnlyKeys[u]);
@@ -2301,8 +2377,8 @@ int runCardScriptValidation()
     for (map<string,int>::iterator it = skips.begin(); it != skips.end(); ++it)
         fprintf(stderr, "VALIDATE-SKIP\t%s\tcount=%d\n", it->first.c_str(), it->second);
 
-    fprintf(out, "VALIDATE-SUMMARY\tcards=%ld\tlines=%ld\tfailures=%zu\n",
-            cardCount, gAbilityParseLineCount, failures.size());
+    fprintf(out, "VALIDATE-SUMMARY\tcards=%ld\tlines=%ld\tfailures=%zu\twarnings=%ld\n",
+            cardCount, gAbilityParseLineCount, failures.size(), warnCount);
     fflush(out);
     if (closeOut) fclose(out);
 

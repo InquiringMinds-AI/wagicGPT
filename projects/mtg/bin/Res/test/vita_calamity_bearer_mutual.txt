@@ -1,0 +1,29 @@
+#Two Calamity Bearers double EACH OTHER (each is a Giant source the other
+#sees; the old script's from(*[-Calamity Bearer&giant]) excluded every card by
+#that name). Bearer A attacks into Hexplate Golem 5/7: 3 x2 x2 = 12 kills the
+#Golem; the Golem's 5 kills the Bearer - a trade.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Calamity Bearer,Calamity Bearer
+life:20
+[PLAYER2]
+inplay:Hexplate Golem
+life:20
+[DO]
+goto attackers
+Calamity Bearer
+next
+Hexplate Golem
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Calamity Bearer
+graveyard:Calamity Bearer
+life:20
+[PLAYER2]
+graveyard:Hexplate Golem
+life:20
+[END]

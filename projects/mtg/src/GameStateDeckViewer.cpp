@@ -216,6 +216,7 @@ void GameStateDeckViewer::buildEditorMenu()
     deckMenu->Add(MENU_ITEM_SAVE_RENAME, _("Rename Deck"), _("Change the name of the deck"));
     deckMenu->Add(MENU_ITEM_SAVE_RETURN_MAIN_MENU, _("Save & Quit Editor"), _("Save changes. Return to the main menu"));
     deckMenu->Add(MENU_ITEM_SAVE_AS_AI_DECK, _("Save As AI Deck"), _("All changes are final."));
+    deckMenu->Add(MENU_ITEM_DELETE_DECK, _("Delete Deck"), _("Remove this deck permanently."));
     deckMenu->Add(MENU_ITEM_MAIN_MENU, _("Quit Editor"), _("No changes. Return to the main menu."));
     deckMenu->Add(MENU_ITEM_TOGGLE_VIEW, _("Toggle View"), _("Toggle view grid/carousel."));
     deckMenu->Add(MENU_ITEM_EDITOR_CANCEL, _("Cancel"), _("Close menu."));
@@ -2043,6 +2044,23 @@ void GameStateDeckViewer::ButtonPressed(int controllerId, int controlId)
             mStage = STAGE_WELCOME;
             mSwitching = true;
             break;
+        case MENU_ITEM_DELETE_DECK:
+            //W53 (owner request 2026-08-28): the editor had no way to delete a
+            //deck. Confirm first (the sellCard yes/no idiom), then unlink the
+            //deck file and return to the deck-selection screen.
+            if (myDeck && myDeck->parent)
+            {
+                last_user_activity = 0;
+                SAFE_DELETE(subMenu);
+                char buffer[512];
+                sprintf(buffer, "%s: %s?", _("Delete deck").c_str(), myDeck->parent->meta_name.c_str());
+                const float menuXOffset = SCREEN_WIDTH_F - 300;
+                const float menuYOffset = SCREEN_HEIGHT_F / 2;
+                subMenu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(), MENU_DECK_DELETE, this, Fonts::MAIN_FONT, menuXOffset, menuYOffset, buffer);
+                subMenu->Add(MENU_ITEM_YES, "Yes");
+                subMenu->Add(MENU_ITEM_NO, "No", "", true);
+            }
+            break;
         case MENU_ITEM_MAIN_MENU:
             mParent->DoTransition(TRANSITION_FADE, GAME_STATE_MENU);
             break;
@@ -2058,6 +2076,27 @@ void GameStateDeckViewer::ButtonPressed(int controllerId, int controlId)
             mStage = STAGE_WAITING;
             last_user_activity = 0;
             toggleView();
+            break;
+        }
+        break;
+
+    case MENU_DECK_DELETE: // Yes/ No sub menu (Delete Deck).
+        switch (controlId)
+        {
+        case MENU_ITEM_YES:
+            if (myDeck && myDeck->parent && myDeck->parent->getFilename().size())
+            {
+                std::remove(myDeck->parent->getFilename().c_str());
+                DebugTrace("DeckViewer: deleted deck " << myDeck->parent->getFilename());
+                subMenu->Close();
+                updateDecks();
+                mStage = STAGE_WELCOME;
+                mSwitching = true;
+                break;
+            }
+            //fallthrough: nothing to delete
+        case MENU_ITEM_NO:
+            subMenu->Close();
             break;
         }
         break;

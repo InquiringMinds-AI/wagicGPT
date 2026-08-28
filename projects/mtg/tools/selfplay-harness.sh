@@ -99,7 +99,7 @@ done
 [ "$JOBS" -lt 1 ] && JOBS=1
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"   # projects/mtg
-BIN="$HERE/bin/wagic"
+BIN="${WAGIC_BIN:-$HERE/bin/wagic}"   # W53: WAGIC_BIN overrides (ASAN corpus: bin-asan/wagic)
 LOGDIR="$HOME/.Wagic/ai/gpt/logs"
 [ -x "$BIN" ] || { echo "no binary at $BIN (build first)" >&2; exit 1; }
 mkdir -p "$LOGDIR"
@@ -111,7 +111,12 @@ printf "deck0\tdeck1\twinner\tlife0\tlife1\tturn\tstart_epoch\n" > "$RESULTS"
 # Endpoint reachability (fail HARD rather than burn a corpus of silent
 # Baka-fallback games - that already happened once). Latency matters too: the
 # in-game probe allows 20s, but a slow /v1/models means a struggling server.
+if [ "${WAGIC_AI:-}" = "baka" ]; then
+  echo "WAGIC_AI=baka: heuristic-vs-heuristic corpus, skipping the endpoint probe" >&2
+  PROBE_OUT="$MODEL"$'\n'"0.0"
+else
 PROBE_OUT="$(curl -s -m 20 -w '\n%{time_total}' "$URL/v1/models")"
+fi
 PROBE_TIME="${PROBE_OUT##*$'\n'}"
 if ! printf '%s' "$PROBE_OUT" | grep -q "$MODEL"; then
     echo "FATAL: $MODEL not reachable at $URL/v1/models - every game would fall back to the heuristic AI. Aborting." >&2

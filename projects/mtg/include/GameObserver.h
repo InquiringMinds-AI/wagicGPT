@@ -160,6 +160,10 @@ class GameObserver{
   };
   CombatDecision pendingCombatDecision(Player * p);
   void userRequestNextGamePhase(bool allowInterrupt = true, bool log = true);
+  //W53-DELVER: a reveal/look/scry display owned by the HUMAN seat is open or
+  //about to open (its ability resolved, the display not yet built). Phase
+  //automation and phase-advance requests hold while it is.
+  bool humanDisplayOpen();
   void cleanupPhase();
   void nextPlayer();
 

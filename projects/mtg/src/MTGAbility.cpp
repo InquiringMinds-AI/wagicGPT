@@ -4632,6 +4632,9 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         Targetable * t = spell ? spell->getNextTarget() : NULL;
         MTGAbility * a = NEW AADamager(observer, id, card, t, splitDamage[1], NULL, who);
         a->oneShot = 1;
+        //W53-NOTRG: `notrg` (the counter( idiom) - this damage is a doubler's
+        //output and must not re-enter the @damaged trigger family.
+        ((AADamager*)a)->noTrigger = (s.find("notrg") != string::npos);
         if(storedAndAbility.size())
         {
             string stored = storedAndAbility;

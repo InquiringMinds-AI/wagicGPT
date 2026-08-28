@@ -3,6 +3,8 @@
 #include "CardSelector.h"
 #include "MTGRules.h"
 #include "ManaEngine.h"
+
+static bool humanCanPayAlternative(GameObserver * game, MTGCardInstance * card, ManaCost * cost); //W53-ALTCOST, defined with the morph rule
 #include "ExtraCost.h"
 #include "Translate.h"
 #include "Subtypes.h"
@@ -1173,6 +1175,8 @@ int MTGAlternativeCostRule::isReactingToClick(MTGCardInstance * card, ManaCost *
         {
             return 1;
         }
+        if (humanCanPayAlternative(game, card, alternateManaCost)) //W53-ALTCOST
+            return 1;
     }
     return 0;//dont play if you cant afford it.
 }
@@ -1318,7 +1322,6 @@ int MTGAlternativeCostRule::reactToClick(MTGCardInstance * card, ManaCost *alter
         return 0;
     }
     //------------------------------------------------------------------------
-    ManaCost * previousManaPool = NEW ManaCost(playerMana);
     bool hasOffering = card->basicAbilities[Constants::OFFERING]; //Fix a hang when try to pay emerge cost.
     if(alternateCost->extraCosts){
         for(unsigned int i = 0; i < alternateCost->extraCosts->costs.size(); i++){
@@ -1326,6 +1329,13 @@ int MTGAlternativeCostRule::reactToClick(MTGCardInstance * card, ManaCost *alter
                 hasOffering = true;
         }
     }
+    //W53-ALTCOST: the human picked the alternative from the cast-mode menu
+    //with an empty pool (evoke, and every other={...} cost) - tap for it here,
+    //BEFORE the pool snapshot so the mana-used-to-cast diff stays correct.
+    if (!hasOffering && !player->isAI()
+        && !playerMana->canAfford(alternateCost, card->has(Constants::ANYTYPEOFMANA)))
+        ManaEngine::autoTapForCost(player, card, alternateCost, card->has(Constants::ANYTYPEOFMANA));
+    ManaCost * previousManaPool = NEW ManaCost(playerMana);
     if(!hasOffering)
         playerMana->pay(alternateCost);
     alternateCost->doPayExtra();
@@ -1767,6 +1777,30 @@ MTGMorphCostRule::MTGMorphCostRule(GameObserver* observer, int _id) :
 {
     aType = MTGAbility::MORPH_COST;
 }
+//W53-ALTCOST (owner Vita report 2026-08-28: "casting a card with an alternate
+//casting cost when more than one method is affordable should offer a menu -
+//morph, evoke"). The menu already exists (GameObserver::cardClick builds it
+//when more than one rule reacts), but the morph and alternative-cost rules
+//priced their cost against the MANA POOL only, and with auto-tap the pool is
+//empty at click time - so they never reacted for a human and no menu ever
+//appeared. Price the human seat the way the cast rule does (W48/W50): strict
+//potential + pool, then the colour-aware payment planner. The AI seats keep
+//the pool test (they float mana before clicking).
+static bool humanCanPayAlternative(GameObserver * game, MTGCardInstance * card, ManaCost * cost)
+{
+    Player * player = game->currentlyActing();
+    if (!player || player->isAI() || !cost)
+        return false;
+    ManaEngine::FreeProducerPolicy freePolicy;
+    ManaCost * potential = ManaEngine::potentialMana(player, freePolicy, card);
+    potential->add(player->getManaPool());
+    bool ok = potential->canAfford(cost, card->has(Constants::ANYTYPEOFMANA)) != 0;
+    delete potential;
+    if (!ok)
+        ok = ManaEngine::planPayment(player, freePolicy, card, cost, card->has(Constants::ANYTYPEOFMANA)).size() > 0;
+    return ok;
+}
+
 int MTGMorphCostRule::isReactingToClick(MTGCardInstance * card, ManaCost *)
 {
 
@@ -1805,6 +1839,8 @@ int MTGMorphCostRule::isReactingToClick(MTGCardInstance * card, ManaCost *)
         {
             return 1;
         }
+        if (humanCanPayAlternative(game, card, morph)) //W53-ALTCOST
+            return 1;
     }
     return 0;//dont play if you cant afford it.
 }
@@ -1823,6 +1859,10 @@ int MTGMorphCostRule::reactToClick(MTGCardInstance * card)
         for(unsigned int i = 0; i < morph->extraCosts->costs.size();i++)
             morph->extraCosts->costs[i]->setSource(card);
     }
+    //W53-ALTCOST: the human chose "Morph" from the cast-mode menu with an
+    //empty pool - tap for the morph cost exactly as the cast rule does.
+    if (!player->isAI() && !playerMana->canAfford(morph,card->has(Constants::ANYTYPEOFMANA)))
+        ManaEngine::autoTapForCost(player, card, morph, card->has(Constants::ANYTYPEOFMANA));
     //this handles extra cost payments at the moment a card is played.
     if (playerMana->canAfford(morph,card->has(Constants::ANYTYPEOFMANA)))
     {

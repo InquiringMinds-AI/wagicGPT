@@ -1,4 +1,5 @@
 #include "PrecompiledHeader.h"
+#include "AllAbilities.h" //W53-DELVER: MTGRevealingCards for humanDisplayOpen()
 
 #include "GameObserver.h"
 #include "PreGamePhase.h"
@@ -445,8 +446,39 @@ GameObserver::CombatDecision GameObserver::pendingCombatDecision(Player * p)
     return COMBAT_DECISION_NONE;
 }
 
+bool GameObserver::humanDisplayOpen()
+{
+    if (!mLayers || !mLayers->actionLayer())
+        return false;
+    ActionLayer * al = mLayers->actionLayer();
+    for (size_t i = 0; i < al->mObjects.size(); i++)
+    {
+        MTGRevealingCards * rev = dynamic_cast<MTGRevealingCards *>((ActionElement *) al->mObjects[i]);
+        if (!rev || !rev->source)
+            continue;
+        Player * owner = rev->source->controller();
+        if (!owner)
+            continue;
+        bool human = mSuiteHumanSeat ? (owner == mSuiteHumanSeat) : !owner->isAI();
+        if (!human)
+            continue;
+        //open (its display is THE open display) or pending (resolved, display
+        //not built yet - the ability is reaped only after it closes)
+        if ((OpenedDisplay && rev->revealDisplay == OpenedDisplay) || !rev->revealDisplay)
+            return true;
+    }
+    return false;
+}
+
 void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
 {
+    //W53-DELVER (owner Vita report 2026-08-28; generalised per his note to every
+    //step trigger - end of turn, the opponent's upkeep, ...): no phase advance
+    //while the human seat has a reveal display open or about to open. Applies
+    //to the AI's own pass on ITS turn too, so a "beginning of each upkeep"
+    //display of the human's is not stepped over by the opponent's advance.
+    if (allowInterrupt && humanDisplayOpen())
+        return;
     if(log) {
         stringstream stream;
         stream << "next " << allowInterrupt << " " <<mCurrentGamePhase;
@@ -1387,7 +1419,7 @@ void GameObserver::gameStateBasedEffects()
 
     if (skipLevel == Constants::ASKIP_FULL)
     {
-        if ((opponent()->isAI() && !(isInterrupting)) && (mCurrentGamePhase == MTG_PHASE_UPKEEP
+        if ((opponent()->isAI() && !(isInterrupting)) && !humanDisplayOpen() && (mCurrentGamePhase == MTG_PHASE_UPKEEP
             || mCurrentGamePhase == MTG_PHASE_COMBATDAMAGE))
             userRequestNextGamePhase();
     }
@@ -1431,9 +1463,16 @@ void GameObserver::gameStateBasedEffects()
     //the OTHER seat has a combat declaration due; pendingCombatDecision is the
     //engine's existing authority on exactly that question.
     Player * otherSeat = humanSeat ? ((humanSeat == players[0]) ? players[1] : players[0]) : NULL;
+    //W53-DELVER (owner Vita report 2026-08-28: Delver "not checking top deck
+    //multiple turns... works only once I have an instant castable at upkeep").
+    //An upkeep trigger's reveal/look display (MTGRevealingCards -> OpenedDisplay)
+    //opens AFTER its StackAbility has resolved, so the settled-stack guard is
+    //already satisfied and this rule advanced the phase under the open display
+    //whenever the hand held no instant. A display awaiting the player IS a
+    //legal action pending: hold while any display is open.
     if (automationAllowed && humanSeat && currentPlayer == humanSeat && !isInterrupting
         && !mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
-        && !mLayers->actionLayer()->menuObject && !targetChooser
+        && !mLayers->actionLayer()->menuObject && !targetChooser && !humanDisplayOpen()
         && (!otherSeat || pendingCombatDecision(otherSeat) == COMBAT_DECISION_NONE))
     {
         if (mNoActionTurn != turn || mNoActionPhase != mCurrentGamePhase

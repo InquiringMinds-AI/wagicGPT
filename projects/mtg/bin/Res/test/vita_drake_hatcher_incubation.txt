@@ -1,0 +1,35 @@
+#Owner Vita report (2026-08-28): "Drake hatcher isn't getting incubation
+#counters when dealing combat damage, or alternatively can't use them to pay
+#for activated plus has no indicator for counters." The script asked for
+#counter(0/0,thatmany,...) - `thatmany` is not an engine keyword (`thatmuch`
+#is). Discriminating: ONE swing pumped by Giant Growth (+3/+3, prowess +1/+1)
+#deals 6 (prowess fires twice: cast + resolve? measured), so counters land at once
+#and the remove-three ability becomes usable (assertusable 0 -> 1).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Drake Hatcher,Forest
+hand:Giant Growth
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertusable 0 drake hatcher
+Forest
+Giant Growth
+Drake Hatcher
+goto attackers
+Drake Hatcher
+next
+next
+goto secondmain
+assertusable 1 drake hatcher
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Drake Hatcher,Forest
+graveyard:Giant Growth
+life:20
+[PLAYER2]
+life:14
+[END]

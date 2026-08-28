@@ -1472,6 +1472,7 @@ public:
     {
         WEventDamage * e = dynamic_cast<WEventDamage *> (event);
         if (!e) return 0;
+        if (e->damage->noTrigger) return 0; //W53-NOTRG: doubler output, not an event
         if (limitOnceATurn && triggeredTurn == game->turn)
             return 0;
         if (sourceUntapped  && source->isTapped() == 1)
@@ -5015,6 +5016,7 @@ public:
     MTGAbility * andAbility;
     string d;
     bool redirected;
+    bool noTrigger; //W53-NOTRG: `damage:N notrg` - see Damage::noTrigger
 
     AADamager(GameObserver* observer, int _id, MTGCardInstance * _source, Targetable * _target, string d, ManaCost * _cost = NULL,
              int who = TargetChooser::UNSET);

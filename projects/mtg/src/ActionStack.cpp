@@ -861,9 +861,10 @@ int ActionStack::addLife(Damageable * _target, int amount)
     return 1;
 }
 
-int ActionStack::addDamage(MTGCardInstance * _source, Damageable * _target, int _damage)
+int ActionStack::addDamage(MTGCardInstance * _source, Damageable * _target, int _damage, bool noTrigger)
 {
     Damage * damage = NEW Damage(observer, _source, _target, _damage);
+    damage->noTrigger = noTrigger;
     addAction(damage);
     _source->thatmuch = _damage;
     _target->thatmuch = _damage;

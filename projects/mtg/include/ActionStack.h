@@ -258,7 +258,7 @@ public:
     int addPutInGraveyard(MTGCardInstance * card);
     int addDraw(Player * player, int nbcards = 1);
     int addLife(Damageable * _target,int amount = 0);
-    int addDamage(MTGCardInstance * _source, Damageable * target, int _damage);
+    int addDamage(MTGCardInstance * _source, Damageable * target, int _damage, bool noTrigger = false);
     int addAbility(MTGAbility * ability);
     void Update(float dt);
     bool CheckUserInput(JButton key);

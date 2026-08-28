@@ -1,0 +1,32 @@
+#Owner Vita report (2026-08-28): "Calamity bearer appears to be doing damage
+#as if it has first strike" - a 17/5 Ironroot Warlord blocked two Bearers and
+#a Daredevil and died with no trades. The script gave Bearer DOUBLE STRIKE to
+#model its own doubling, so a Bearer doubled by a second Bearer dealt 6 in the
+#first-strike step. Oracle: doubled damage, NORMAL timing. One of two Bearers
+#attacks into Borderland Minotaur 4/3: 6 kills the Minotaur, 4 kills the Bearer -
+#a trade. (Double strike: the Minotaur dies in the first-strike step, the Bearer lives.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Calamity Bearer,Calamity Bearer
+life:20
+[PLAYER2]
+inplay:Borderland Minotaur
+life:20
+[DO]
+goto attackers
+Calamity Bearer
+next
+Borderland Minotaur
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:Calamity Bearer
+graveyard:Calamity Bearer
+life:20
+[PLAYER2]
+graveyard:Borderland Minotaur
+life:20
+[END]

@@ -1,0 +1,26 @@
+#Owner Vita report (2026-08-28): Coral Trickster "showing that it has a usable
+#ability when it is face up, the only ability for this is morph." Cast face
+#down (Morph#4 pattern), turn face up for {U}, decline the may-tap; once face
+#up nothing on it is activatable, so the ability border must be OFF.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Coral Trickster
+inplay:Island,Island,Island
+manapool:{3}
+[PLAYER2]
+life:20
+[DO]
+Coral Trickster
+choice 1
+Island
+Coral Trickster
+no
+assertusable 0 coral trickster
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Island,Island,Island,Coral Trickster
+[PLAYER2]
+life:20
+[END]

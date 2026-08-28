@@ -1,0 +1,33 @@
+#Owner Vita report (2026-08-28): "Phyrexian metamorph copy of Graveborn muse
+#not triggering its effect to draw cards at upkeep." Two Muses (X=2 Zombies
+#each) at the next upkeep: draw 4, lose 4. Top of library = last listed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Graveborn Muse,Island,Island,Island,Island
+manapool:{3}{U}
+hand:Phyrexian Metamorph
+library:Hill Giant,Juggernaut,Lightning Bolt,Grizzly Bears,Llanowar Elves,Forest
+life:20
+[PLAYER2]
+life:20
+[DO]
+Phyrexian Metamorph
+next
+choice 0
+Graveborn Muse
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto upkeep
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:Graveborn Muse,Island,Island,Island,Island,Graveborn Muse
+hand:Forest,Llanowar Elves,Grizzly Bears,Lightning Bolt
+library:Hill Giant,Juggernaut
+life:16
+[PLAYER2]
+life:20
+[END]

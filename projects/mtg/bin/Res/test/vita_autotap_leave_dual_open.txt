@@ -1,0 +1,28 @@
+# W53 (owner Vita report 2026-08-28: "autotapping mana seems to be deliberately picking the
+# worst combinations... needs to leave the largest number of options open"). {1}{G} over
+# Forest, Plains, Selesnya Guildgate: the Forest pays {G} and the PLAINS pays the generic,
+# leaving the dual (G or W) open. The second auto-tap ({G}, Llanowar Elves) is covered by the
+# floating {G} and taps NOTHING. If the Guildgate had been burned on the generic, the pool
+# would read {G}{G} and the dual would be gone.
+# EXPECTED: Forest+Plains only: pool {G}{W}, 2 tapped (pinned 2026-08-28: picks Forest Plains).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Forest,Plains,Selesnya Guildgate
+hand:Grizzly Bears,Llanowar Elves
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+autotap grizzly bears
+autotap llanowar elves
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Forest,Plains,Selesnya Guildgate
+hand:Grizzly Bears,Llanowar Elves
+tappedinplay:2
+manapool:{G}{W}
+[PLAYER2]
+[END]

@@ -1,0 +1,28 @@
+# W53 autotap: a coloured pip comes from the MONO source when a dual could also pay it.
+# {W} (Savannah Lions) over Selesnya Guildgate, Plains, Forest: the Plains pays. Llanowar Elves
+# {G} then taps the Forest; Elvish Mystic {G} is covered by the floating {G} and taps nothing.
+# If the Lions had burned the Guildgate the Elves would still find the Forest - so the pin is
+# the pool: {W}{G} with the Guildgate untapped.
+# EXPECTED: Plains, Forest: pool {W}{G}, 2 tapped (pinned 2026-08-28: picks Plains / Forest).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Selesnya Guildgate,Plains,Forest
+hand:Savannah Lions,Llanowar Elves,Elvish Mystic
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+autotap savannah lions
+autotap llanowar elves
+autotap elvish mystic
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Selesnya Guildgate,Plains,Forest
+hand:Savannah Lions,Llanowar Elves,Elvish Mystic
+tappedinplay:2
+manapool:{W}{G}
+[PLAYER2]
+[END]

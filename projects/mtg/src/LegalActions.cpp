@@ -351,9 +351,17 @@ namespace
             //usable while its permanent is face-down.
             if (aa->source->next)
                 continue;
-            if (AAMorph * am = dynamic_cast<AAMorph *>(aa))
-                if (!am->sourceIsFaceDown())
+            //W53-TRICKSTER: `{U}:morph` parses as a GenericActivatedAbility
+            //WRAPPING the AAMorph (cost + inner), so the bare cast missed the
+            //very ability the border was showing (Coral Trickster, face up).
+            {
+                AAMorph * am = dynamic_cast<AAMorph *>(aa);
+                if (!am)
+                    if (GenericActivatedAbility * gw = dynamic_cast<GenericActivatedAbility *>(aa))
+                        am = dynamic_cast<AAMorph *>(gw->ability);
+                if (am && !am->sourceIsFaceDown())
                     continue;
+            }
             if (isWrappedManaProducer(aa))
                 continue; //making mana is not a response
             //turn-scoped activations are wrong-turn regardless of speed

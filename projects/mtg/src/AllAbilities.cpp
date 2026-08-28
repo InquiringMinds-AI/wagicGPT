@@ -2236,6 +2236,7 @@ AADamager::AADamager(GameObserver* observer, int _id, MTGCardInstance * _source,
 {
     aType = MTGAbility::DAMAGER;
     redirected = false;
+    noTrigger = false;
     andAbility = NULL;
 }
 
@@ -2247,7 +2248,7 @@ int AADamager::resolve()
         WParsedInt damage(d, NULL, (MTGCardInstance *)source);
         // CR 306.7: planeswalker damage-redirection removed (pre-2018 rule). Player-aimed
         // damage hits the player; planeswalkers are damaged only by directly targeting them.
-        game->mLayers->stackLayer()->addDamage(source, _target, damage.getValue());
+        game->mLayers->stackLayer()->addDamage(source, _target, damage.getValue(), noTrigger);
         game->mLayers->stackLayer()->resolve();
         if(andAbility)
         {
@@ -5437,15 +5438,38 @@ int AAMorph::resolve()
         _target->morphed = false;
         _target->isMorphed = false;
         _target->turningOver = true;
+        //W53-TRICKSTER (owner Vita report 2026-08-28): GameObserver's per-tick
+        //"reset morph hiding" re-flags a card as morphed from its PREVIOUS
+        //instance (`card->previous->morphed`), and only the chain's last
+        //instance was cleared here - so a face-up Coral Trickster read
+        //isMorphed again a tick later and bordered its (gone) morph ability
+        //usable. Clear the whole chain the flip walked past.
+        for (MTGCardInstance * pv = _target->previous; pv; pv = pv->previous)
+        {
+            pv->morphed = false;
+            pv->isMorphed = false;
+            pv->turningOver = true;
+        }
         af.getAbilities(&currentAbilities, NULL, _target, 0);
         for (size_t i = 0; i < currentAbilities.size(); ++i)
         {
             MTGAbility * a = currentAbilities[i];
             a->source = (MTGCardInstance *) _target;
-            if( a && dynamic_cast<AAMorph *> (a))
+            //W53-TRICKSTER (owner Vita report 2026-08-28: Coral Trickster
+            //bordered usable while face up, its only ability being morph).
+            //The re-parse of the face-up card yields a fresh Morph ability;
+            //the old code removed it and then fell through into the add
+            //branch below, re-registering a live {U}:morph on the face-up
+            //permanent. A face-up card has no morph ability: drop it here.
+            bool isMorphAbility = a && dynamic_cast<AAMorph *> (a);
+            if (a && !isMorphAbility)
+                if (GenericActivatedAbility * gw = dynamic_cast<GenericActivatedAbility *> (a))
+                    isMorphAbility = dynamic_cast<AAMorph *> (gw->ability) != NULL;
+            if (isMorphAbility)
             {
                 a->removeFromGame();
                 game->removeObserver(a);
+                continue;
             }
             if (a)
             {

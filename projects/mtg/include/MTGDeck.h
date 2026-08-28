@@ -235,6 +235,9 @@ private:
     void printDetailedDeckText(std::ofstream& file );
 protected:
     string filename;
+public:
+    const string& getFilename() const { return filename; } //W53: Delete Deck needs the path
+protected:
     int total_cards;
 
 public:

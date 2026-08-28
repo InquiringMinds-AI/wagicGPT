@@ -1,0 +1,30 @@
+#Owner Vita report (2026-08-28): Delver of Secrets "not checking top deck
+#multiple turns when played, eventually does ... appears to work only once I
+#have an instant speed action castable at upkeep." REAL-PLAY automation on
+#(realgame), EMPTY hand: GameObserver's no-legal-action phase skip ran at the
+#upkeep after the Delver trigger had resolved and its reveal display had
+#opened (OpenedDisplay), advancing the phase under the display - the
+#settled-stack guard could not see it. Expectation: the reveal presents,
+#Lightning Bolt on top transforms Delver. Sibling *_holds_instant is the
+#it-works half (an instant in hand = a legal action = no skip).
+#Top of library = last listed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:island,delver of secrets
+library:Juggernaut,Hill Giant,Lightning Bolt
+[PLAYER2]
+[DO]
+interactivereveal
+realgame
+goto end
+goto upkeep
+lightning bolt
+revealok
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:island,insectile aberration
+library:Juggernaut,Hill Giant,Lightning Bolt
+[PLAYER2]
+[END]

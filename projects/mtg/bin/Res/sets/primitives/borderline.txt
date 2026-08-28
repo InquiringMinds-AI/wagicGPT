@@ -15477,10 +15477,9 @@ type=Sorcery
 [/card]
 [card]
 name=Calamity Bearer
-auto=transforms((,double strike)) forever
-auto=@damaged(*|battlefield) from(*[-Calamity Bearer&giant]|myzones):name(Deals double damage) all(trigger[to]) name(Deals double damage) damage:thatmuch
-auto=@damageof(player) from(*[-Calamity Bearer&giant]|myzones):name(Deals double damage) damage:thatmuch controller
-auto=@damagefoeof(player) from(*[-Calamity Bearer&giant]|myzones):name(Deals double damage) damage:thatmuch opponent
+auto=@damaged(*|battlefield) from(*[giant]|myzones):name(Deals double damage) all(trigger[to]) name(Deals double damage) damage:thatmuch notrg
+auto=@damageof(player) from(*[giant]|myzones):name(Deals double damage) damage:thatmuch notrg controller
+auto=@damagefoeof(player) from(*[giant]|myzones):name(Deals double damage) damage:thatmuch notrg opponent
 text=If a Giant source you control would deal damage to a permanent or player, it deals double that damage to that permanent or player instead.
 mana={2}{R}{R}
 type=Creature
@@ -30169,7 +30168,7 @@ subtype=Equipment
 name=Drake Hatcher
 abilities=vigilance
 auto=@movedto(*[-creature]|mystack):1/1 ueot
-auto=@combatdamaged(player) from(this):counter(0/0,thatmany,incubation)
+auto=@combatdamaged(player) from(this):counter(0/0,thatmuch,incubation)
 auto={C(0/0,-3,incubation)}:create(drake:creature drake:2/2:blue:flying)
 text=Vigilance, prowess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.) -- Whenever this creature deals combat damage to a player, put that many incubation counters on it. -- Remove three incubation counters from this creature: Create a 2/2 blue Drake creature token with flying.
 mana={1}{U}

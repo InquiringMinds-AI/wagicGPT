@@ -396,16 +396,23 @@ WSrcUnlockedCards::WSrcUnlockedCards(float delay) :
         unlocked[i] = options[Options::optionSet(i)].number;
     }
 
+    const int nbSets = (int) setlist.size();
     for (size_t i = 0; i < ac->printingsCount(); i++)
     {
         MTGCard * c = ac->printingAt(i);
+        //W53-ASAN: a printing with no set (setId -1, or one past the list)
+        //indexed one byte BEFORE the calloc'd block - heap-buffer-overflow
+        //read caught by the sanitized suite in the shop's booster test. Such a
+        //printing belongs to no unlockable set: skip it.
+        if (!c || c->setId < 0 || c->setId >= nbSets)
+            continue;
         if(!options[Options::SHOWTOKENS].number)
         {//dont show tokens & negative id's
-            if (c && unlocked[c->setId] && (c->getId() > 0) && (c->getRarity() != Constants::RARITY_T)) cards.push_back(c);
+            if (unlocked[c->setId] && (c->getId() > 0) && (c->getRarity() != Constants::RARITY_T)) cards.push_back(c);
         }
         else
         {//show but you cant add
-            if (c && unlocked[c->setId]) cards.push_back(c);
+            if (unlocked[c->setId]) cards.push_back(c);
         }
     }
     if (unlocked)

@@ -60,6 +60,12 @@ class Damage: public Interruptible
   Damageable * target;
   DamageType typeOfDamage;
   int damage;
+  //W53-NOTRG: damage dealt by a damage-doubling trigger (Calamity Bearer's
+  //"deals double damage" lines) must not re-enter the @damaged/@damageof
+  //trigger family, or a doubler whose own source matches its from() filter
+  //loops until the target is dead. Script option `notrg` on damage: (the
+  //counter( idiom) sets it; TrDamaged skips such events.
+  bool noTrigger;
   void Render();
   Damage(GameObserver* observer, MTGCardInstance* source, Damageable * target);
   Damage(GameObserver* observer, MTGCardInstance* source, Damageable * target, int damage, DamageType typeOfDamage = DAMAGE_OTHER);

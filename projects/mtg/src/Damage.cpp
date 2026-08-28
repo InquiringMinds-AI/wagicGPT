@@ -24,6 +24,7 @@ Damage::Damage(GameObserver* observer, MTGCardInstance * source, Damageable * ta
 void Damage::init(MTGCardInstance * _source, Damageable * _target, int _damage, DamageType _typeOfDamage)
 {
     typeOfDamage = _typeOfDamage;
+    noTrigger = false;
     target = _target;
     if(_source  && _source->name.empty() && _source->storedSourceCard) // Fix for damage dealt inside ability$!!$ keyword.
         source = _source->storedSourceCard;
