@@ -95,3 +95,8 @@ Viashino Runner	menace	APPLIED	Viashino Runner can't be blocked except by two or
 Vine Kami	menace	APPLIED	Vine Kami can't be blocked except by two or more creatures.  -> Menace (This creature can't be blocked except by two or more creatures.) -- Soul
 Wind Spirit	menace	APPLIED	Flying -- Wind Spirit can't be blocked except by two or more -> Flying -- Menace (This creature can't be blocked except by two or more creatures
 Zuo Ci, the Mocking Sage	hexproof	APPLIED	Zuo Ci, the Mocking Sage can't be blocked by creatures with  -> Hexproof (This creature can't be the target of spells or abilities your opponent
+#REVIEW-NOTES (owner question 2026-08-28: keyword flash vs "as though it had flash")
+#	The engine has a distinct `asflash` flag (used 48x, borderline.txt only). Cards printed "you may cast this as though it had flash [if ...]" (Ghitu Fire class) are scripted `abilities=flash` = the KEYWORD - imprecise: any effect keyed on the flash keyword (ability-strip, keyword count, this lint) treats them wrongly. Candidate sweep: retag those to asflash (and the conditional-cost rider is NOT modelled either).
+#	Split/MDFC cards with an INSTANT half (Discovery//Dispersal, Said//Done, Incubation//Incongruity, Flamescroll Celebrant//Revel in Silence) carry `abilities=flash` on the whole primitive so the instant half is castable at instant speed - which also lets the SORCERY half be cast at instant speed. Modelling defect class; needs per-half timing.
+#	Circling Vultures: `flash` models instant-speed DISCARD ("you may discard ... any time you could cast an instant"), not a cast - wrong flag.
+#	Voice of the Blessed: mis-keyed abilities=flash removed (a9dfe70dc follow-up).

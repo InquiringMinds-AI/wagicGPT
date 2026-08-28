@@ -125902,7 +125902,6 @@ toughness=3
 [/card]
 [card]
 name=Voice of the Blessed
-abilities=flash
 auto=@lifeof(player) from(*[-lifefaker]|*):name(Put 1/1 counter) counter(1/1)
 auto=this(counter{1/1}>=4) flying
 auto=this(counter{1/1}>=4) vigilance

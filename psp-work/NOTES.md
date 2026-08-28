@@ -5662,3 +5662,8 @@ What matters for the console build:
   size-verified (deploy-vita.sh's pre-check false-negatived again; plain curl -T worked).
   Install manual (VitaShell -> Cross). Carries: Delver settle gate, Bearer/notrg, morph-evoke
   cast menu, Delete Deck, ASAN setId fix, lint. NOT in it: e8425fb34/a9dfe70dc text= fixes.
+- Owner rules point (flash keyword vs "as though it had flash"): the engine distinguishes
+  `asflash` from `flash`, but the Ghitu-Fire class is scripted with plain `flash`; split cards
+  with an instant half carry `flash` on the whole primitive (lets the sorcery half go at instant
+  speed); Circling Vultures uses `flash` for instant-speed discard. All docketed in
+  oracle-sweep/wave3-keyword-text.tsv #REVIEW-NOTES. Voice of the Blessed's mis-keyed flash removed.
