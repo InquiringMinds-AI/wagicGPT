@@ -5700,3 +5700,8 @@ What matters for the console build:
 - VPK vita-vpk8 from psp-port = bd515aad7 (per-half timing + keyword fixes + every 2026-08-28 fix),
   hermetic build exit 0, 33,137,888 B -> 10.0.0.227:1337 ux0:/vpk/wagic.vpk, size-verified.
   Install manual (VitaShell -> Cross). Supersedes vpk7.
+- DELIBERATE deletions 2026-08-28 (owner approved the recommendations): archives/ trimmed to the
+  anchored binaries + newest six; snapshots/WTH-fork (superseded by worktrees/psp), the
+  re-downloadable WagicPSP-0255.zip / minpspw.tar.lzma / opt/pspsdk, and the ASAN build products
+  (objs-asan, bin-asan, build-asan - rebuild with Makefile.sdl-asan when needed). KEPT:
+  snapshots/stick-archive-20260731 (pre-wipe PSP stick image). Don't restore any of the above.
