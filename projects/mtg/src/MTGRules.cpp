@@ -1094,7 +1094,8 @@ int MTGAlternativeCostRule::isReactingToClick(MTGCardInstance * card, ManaCost *
         else
             return 0;
     }
-    else if ((card->hasType(Subtypes::TYPE_INSTANT)) || card->has(Constants::FLASH) || card->has(Constants::ASFLASH) || card->has(Constants::SPELLMASTERY) || card->has(Constants::OFFERING) || (card->StackIsEmptyandSorcerySpeed()))
+    else if ((card->hasType(Subtypes::TYPE_INSTANT)) || card->has(Constants::FLASH) || card->has(Constants::ASFLASH) || card->has(Constants::SPELLMASTERY) || card->has(Constants::OFFERING)
+        || alternateManaCost->instantSpeed /*W53-SPLIT: this half is an instant*/ || (card->StackIsEmptyandSorcerySpeed()))
     {
         if(card->controller()->epic)
             return 0;

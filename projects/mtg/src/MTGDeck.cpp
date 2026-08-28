@@ -197,7 +197,6 @@ int MTGAllCards::processConfLine(string &s, MTGCard *card, CardPrimitive * primi
                 {
                     string value = val;
                     std::transform(value.begin(), value.end(), value.begin(), ::tolower);
-                    cost->setFlashback(ManaCost::parseManaCost(value));
                     size_t name = value.find("name(");
                     string theName = "";
                     if(name != string::npos)
@@ -206,8 +205,19 @@ int MTGAllCards::processConfLine(string &s, MTGCard *card, CardPrimitive * primi
                         theName = value.substr(name + 5,endName - name - 5);
                         value.erase(name, endName - name + 1);
                     }
+                    //W53-SPLIT: `flashback={...} name(X) instant` - the aftermath half
+                    //is an instant (Spring // Mind). Same flag as other= halves.
+                    bool fbInstant = false;
+                    size_t inst = value.find(" instant");
+                    if (inst != string::npos)
+                    {
+                        fbInstant = true;
+                        value.erase(inst, 8);
+                    }
+                    cost->setFlashback(ManaCost::parseManaCost(value));
                     if(theName.size())
                         cost->getFlashback()->alternativeName.append(theName);
+                    cost->getFlashback()->instantSpeed = fbInstant;
                 }
             }
             break;
@@ -293,9 +303,19 @@ int MTGAllCards::processConfLine(string &s, MTGCard *card, CardPrimitive * primi
                         theName = value.substr(name + 5,endName - name - 5);
                         value.erase(name, endName - name + 1);
                     }
+                    //W53-SPLIT: a trailing ` instant` token marks this half as
+                    //castable at instant speed (see ManaCost::instantSpeed).
+                    bool altInstant = false;
+                    size_t inst = value.find(" instant");
+                    if (inst != string::npos)
+                    {
+                        altInstant = true;
+                        value.erase(inst, 8);
+                    }
                     cost->setAlternative(ManaCost::parseManaCost(value));
                     if(theName.size())
                         cost->getAlternative()->alternativeName.append(theName);
+                    cost->getAlternative()->instantSpeed = altInstant;
             }
         }
         break;

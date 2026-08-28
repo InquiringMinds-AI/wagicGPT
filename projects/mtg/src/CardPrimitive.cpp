@@ -108,7 +108,10 @@ CardPrimitive::CardPrimitive(CardPrimitive * source)
     //reducedCost.copy(source->getReducedManaCost());
     //increasedCost.copy(source->getIncreasedManaCost());
     if(source->getManaCost()->getAlternative())
+    {
         manaCost.getAlternative()->alternativeName = source->getManaCost()->getAlternative()->alternativeName;
+        manaCost.getAlternative()->instantSpeed = source->getManaCost()->getAlternative()->instantSpeed; //W53-SPLIT
+    }
     if(source->getManaCost()->getKicker())
         manaCost.getKicker()->alternativeName = source->getManaCost()->getKicker()->alternativeName;
     if(source->getManaCost()->getRetrace())

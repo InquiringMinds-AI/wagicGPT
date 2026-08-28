@@ -466,6 +466,8 @@ ManaCost::ManaCost(ManaCost * manaCost)
     Retrace = NEW ManaCost( manaCost->Retrace );
     BuyBack = NEW ManaCost( manaCost->BuyBack );
     alternative = NEW ManaCost( manaCost->alternative );
+    instantSpeed = manaCost->instantSpeed; //W53-SPLIT (this cost's own flag; the alternative's rides its copy ctor)
+    alternativeName = manaCost->alternativeName;
     FlashBack = NEW ManaCost( manaCost->FlashBack );
     morph = NEW ManaCost( manaCost->morph );
     suspend = NEW ManaCost( manaCost->suspend );
@@ -633,6 +635,7 @@ void ManaCost::init()
     Bestow = NULL;
     manaUsedToCast = NULL;
     isMulti = false;
+    instantSpeed = false; //W53-SPLIT
     xColor = -1;
 }
 
@@ -662,6 +665,8 @@ void ManaCost::copy(ManaCost * _manaCost)
 {
     if (!_manaCost)
         return;
+    instantSpeed = _manaCost->instantSpeed; //W53-SPLIT
+    alternativeName = _manaCost->alternativeName;
 
     cost.erase(cost.begin() ,cost.end());
 

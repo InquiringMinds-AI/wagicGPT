@@ -110771,7 +110771,7 @@ toughness=3
 [/card]
 [card]
 name=Sphinx of Jwar Isle
-abilities=flying,hexproof
+abilities=flying,shroud
 auto={0} restriction{compare(ishuman)~morethan~0}:name(Look) reveal:1 optionone name(look) target(<1>*|reveal) moveto(mylibrary) optiononeend optiontwo name(put it back) all(*|reveal) moveto(mylibrary) optiontwoend revealend
 text=Flying, shroud -- You may look at the top card of your library. (You may do this at any time.)
 mana={4}{U}{U}

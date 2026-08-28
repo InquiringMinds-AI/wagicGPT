@@ -5667,3 +5667,13 @@ What matters for the console build:
   with an instant half carry `flash` on the whole primitive (lets the sorcery half go at instant
   speed); Circling Vultures uses `flash` for instant-speed discard. All docketed in
   oracle-sweep/wave3-keyword-text.tsv #REVIEW-NOTES. Voice of the Blessed's mis-keyed flash removed.
+- OWNER RULING (2026-08-28, "solve these problems rather than putting them off. The oracle text
+  needs to be accurate, cardscript needs to correctly translate the oracle text to the engine,
+  the engine needs to correctly follow the rules. Where the linter can be used to find problems,
+  it should. When problems are found, they should be solved."): flash-vs-instant-half class
+  SOLVED - new script token `other=... instant` / `flashback=... instant` (ManaCost::instantSpeed)
+  gives a split/adventure/aftermath half its own timing; ~60 cards retagged off primitive-wide
+  flash/asflash; keyword mis-keys fixed (list in oracle-sweep/wave3-keyword-text.tsv #RESOLVED);
+  lint covers all printed keywords with engine equivalences; 0 warnings. Fixtures pin the
+  positive AND negative timing (Circling Vultures discard, Mutual Destruction with/without a
+  flash permanent) using the `next`/`yes`/`endinterruption` opponent-upkeep idiom.

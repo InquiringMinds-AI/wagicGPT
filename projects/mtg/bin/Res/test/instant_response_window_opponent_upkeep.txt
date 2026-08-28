@@ -1,0 +1,26 @@
+#Harness idiom pin: the scripted seat casts an instant in the OPPONENT's upkeep by opening the
+#window with `next` and taking it with `yes` (endinterruption closes it; assert one step later).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Lightning Bolt
+inplay:Mountain
+[PLAYER2]
+life:20
+[DO]
+goto end
+goto upkeep
+next
+yes
+Mountain
+Lightning Bolt
+p2
+endinterruption
+[ASSERT]
+DRAW
+[PLAYER1]
+graveyard:Lightning Bolt
+inplay:Mountain
+[PLAYER2]
+life:17
+[END]

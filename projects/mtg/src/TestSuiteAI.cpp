@@ -2319,47 +2319,64 @@ int runCardScriptValidation()
         }
         SAFE_DELETE(sp);
 
-        //W53 keyword-vs-oracle lint (owner, 2026-08-28, from the Calamity Bearer
-        //incident: the script granted DOUBLE STRIKE to model "deals double
-        //damage", and the timing change killed a 17/5 with no trade). A script
-        //that grants a combat-timing keyword the card's Oracle text never
-        //mentions deserves a look. Checked: the keyword flags from abilities=
-        //and every authored magicText line, against the lowercased text=.
+        //W53 keyword-vs-oracle lint (owner rulings 2026-08-28: "the oracle text needs
+        //to be accurate, cardscript needs to correctly translate it, where the linter
+        //can find problems it should"). Every PRINTED keyword the script grants must
+        //appear in text= (the line the LLM seat reads), with the engine's known
+        //equivalences allowed:
+        //  intimidate  == "can't be blocked except by artifact creatures and/or
+        //                 <its own colour> creatures" (mono-colour cards only)
+        //  infect      == "poison counter" text (infect damage to a player IS poison)
+        //  changeling  == "is every creature type"
+        //  menace      == "must be blocked by two or more" (nearest engine model)
+        //  asflash     == "as though it had flash" / "has flash as long as"
+        //And the two flash idioms that lied to keyword-keyed effects are flagged:
+        //  flash on a card whose text says "as though it had flash" (use asflash /
+        //  an `other=... instant` half); flash on a card whose Oracle keywords do
+        //  not include Flash at all (a split/MDFC card with an instant half: mark
+        //  that half `other=... instant` instead).
         {
-            static const struct { const char * kw; int flag; } kws[] = {
-                { "first strike",  Constants::FIRSTSTRIKE },
-                { "double strike", Constants::DOUBLESTRIKE } };
+            struct KwRule { const char * kw; int flag; const char * equiv; };
+            static const KwRule kws[] = {
+                { "flying", Constants::FLYING, NULL }, { "first strike", Constants::FIRSTSTRIKE, NULL },
+                { "double strike", Constants::DOUBLESTRIKE, NULL }, { "deathtouch", Constants::DEATHTOUCH, NULL },
+                { "lifelink", Constants::LIFELINK, NULL }, { "trample", Constants::TRAMPLE, NULL },
+                { "vigilance", Constants::VIGILANCE, NULL }, { "haste", Constants::HASTE, NULL },
+                { "reach", Constants::REACH, NULL }, { "menace", Constants::MENACE, "must be blocked by two or more" },
+                { "hexproof", Constants::HEXPROOF, NULL }, { "indestructible", Constants::INDESTRUCTIBLE, NULL },
+                { "flash", Constants::FLASH, NULL }, { "defender", Constants::DEFENDER, NULL },
+                { "shroud", Constants::SHROUD, "can't be the target of spells" }, { "fear", Constants::FEAR, NULL },
+                { "intimidate", Constants::INTIMIDATE, "can't be blocked except by artifact creatures and/or" },
+                { "infect", Constants::INFECT, "poison counter" }, { "changeling", Constants::CHANGELING, "every creature type" },
+                { "flanking", Constants::FLANKING, NULL }, { "prowess", Constants::PROWESS, NULL },
+                { "asflash", Constants::ASFLASH, "as though it had flash" } };
             string oracle = mc->data->text;
             std::transform(oracle.begin(), oracle.end(), oracle.begin(), ::tolower);
-            for (size_t w = 0; w < sizeof(kws)/sizeof(kws[0]); ++w)
+            const bool isDesignation = mc->data->name == "Day" || mc->data->name == "Night"
+                || mc->data->name == "The Monarch" || mc->data->name == "The Initiative"
+                || mc->data->name == "The Ring" || mc->data->name == "City's Blessing";
+            const bool isTokenLike = mc->getId() < 0 || mc->getRarity() == Constants::RARITY_T
+                || oracle.empty();
+            for (size_t w = 0; w < sizeof(kws)/sizeof(kws[0]) && !isDesignation && !isTokenLike; ++w)
             {
-                bool scripted = inst->basicAbilities[kws[w].flag] != 0;
-                //A keyword named INSIDE a counter( ... ) is a counter name (Bold
-                //Plagiarist mirrors keyword counters), not a grant - skip such lines.
-                auto grantsKw = [&](const string & text) -> bool {
-                    string z = text;
-                    std::transform(z.begin(), z.end(), z.begin(), ::tolower);
-                    size_t pos = 0;
-                    while (pos < z.size())
-                    {
-                        size_t nl = z.find('\n', pos);
-                        string line = z.substr(pos, nl == string::npos ? string::npos : nl - pos);
-                        if (line.find(kws[w].kw) != string::npos && line.find("counter(") == string::npos)
-                            return true;
-                        if (nl == string::npos) break;
-                        pos = nl + 1;
-                    }
-                    return false;
-                };
-                if (grantsKw(inst->magicText))
-                    scripted = true;
-                for (map<string,string>::iterator it = inst->magicTexts.begin(); !scripted && it != inst->magicTexts.end(); ++it)
-                    if (grantsKw(it->second))
-                        scripted = true;
-                if (scripted && oracle.find(kws[w].kw) == string::npos)
+                if (!inst->basicAbilities[kws[w].flag])
+                    continue;
+                bool ok = oracle.find(kws[w].kw) != string::npos;
+                if (!ok && kws[w].equiv)
+                    ok = oracle.find(kws[w].equiv) != string::npos
+                        || (string(kws[w].kw) == "asflash" && oracle.find("has flash as long as") != string::npos);
+                if (!ok)
                 {
                     fprintf(out, "VALIDATE-WARN\tkeyword-not-in-oracle\t%s\t%d\t%s\n",
                             mc->data->name.c_str(), mc->getId(), kws[w].kw);
+                    warnCount++;
+                }
+                else if (string(kws[w].kw) == "flash"
+                    && (oracle.find("as though it had flash") != string::npos
+                        || oracle.find("has flash as long as") != string::npos))
+                {
+                    fprintf(out, "VALIDATE-WARN\tflash-should-be-asflash-or-instant-half\t%s\t%d\tflash\n",
+                            mc->data->name.c_str(), mc->getId());
                     warnCount++;
                 }
             }

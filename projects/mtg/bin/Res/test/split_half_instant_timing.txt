@@ -1,0 +1,26 @@
+#W53-SPLIT (owner oracle-fidelity ruling 2026-08-28): a split/MDFC card whose OTHER half is
+#an instant used to carry the FLASH keyword on the whole primitive - which also let the
+#sorcery half go at instant speed and lied to every keyword-keyed effect. The half is now
+#marked `other=... instant`. Circling Vultures models "You may discard this card any time
+#you could cast an instant" the same way: in the response window at the opponent's upkeep
+#(`next` opens it, `yes` takes it) the discard is available.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Circling Vultures
+inplay:Swamp
+[PLAYER2]
+[DO]
+goto end
+goto upkeep
+next
+yes
+Circling Vultures
+endinterruption
+[ASSERT]
+DRAW
+[PLAYER1]
+graveyard:Circling Vultures
+inplay:Swamp
+[PLAYER2]
+[END]

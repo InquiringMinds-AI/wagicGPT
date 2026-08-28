@@ -4931,9 +4931,9 @@ toughness=5
 [/card]
 [card]
 name=Ardenvale Tactician // Dizzying Swoop
-abilities=flying,adventure,asflash
+abilities=flying,adventure
 restriction=can play creature
-other={1}{W} name(Adventure)
+other={1}{W} name(Adventure) instant
 auto=alternative if type(creature|battlefield)~morethan~1 then choice name(Tap 2 creatures) name(Tap 2 creatures) name(Tap 2 creatures) target(<2>creature|battlefield) tap(noevent)
 auto=alternative if type(creature|battlefield)~morethan~0 then choice name(Tap 1 creature) name(Tap 1 creature) name(Tap 1 creature) target(creature|battlefield) tap(noevent)
 auto=alternative choice name(Don't tap any creature) name(Don't tap any creature) donothing
@@ -5190,8 +5190,7 @@ type=Instant
 [/card]
 [card]
 name=Armor of Thorns
-abilities=asflash
-other={1}{G} name(Cast with flash)
+other={1}{G} name(Cast with flash) instant
 restriction=can play enchantment
 auto=alternative all(this) transforms((,newability[phaseaction[cleanup sourceinplay once] sacrifice all(this)]))
 target=creature[-black]
@@ -6558,9 +6557,8 @@ toughness=5
 [/card]
 [card]
 name=Autumn Willow
-abilities=hexproof,shroud
-auto={G}:name(Can be target of your spells) transforms((,newability[-shroud])) ueot
-auto={G}:name(Can be target of opponent spells) transforms((,newability[-hexproof])) ueot
+abilities=shroud
+auto={G}:name(Can be targeted this turn) transforms((,newability[-shroud])) ueot
 text=Shroud -- {G}: Until end of turn, Autumn Willow can be the target of spells and abilities controlled by target player as though it didn't have shroud.
 mana={4}{G}{G}
 type=Legendary Creature
@@ -10833,10 +10831,10 @@ type=Instant
 [/card]
 [card]
 name=Blessed Hippogriff // Tyr's Blessing
-abilities=adventure,asflash,flying
+abilities=adventure,flying
 restriction=can play creature
 otherrestriction=type(creature|battlefield)~morethan~0
-other={W} name(Adventure)
+other={W} name(Adventure) instant
 auto=alternative name(Gains indestructible) name(Gains indestructible) target(creature) transforms((,indestructible)) ueot
 auto=alternative _ADVENTURE_
 auto=_ATTACKING_name(Another creature gains flying) target(creature[attacking;-flying]) flying ueot
@@ -12668,9 +12666,9 @@ toughness=3
 [/card]
 [card]
 name=Bonecrusher Giant // Stomp
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play creature
-other={1}{R} name(Adventure)
+other={1}{R} name(Adventure) instant
 #MISSING: damage can't be prevented
 auto=alternative name(Deals 2 damage) name(Deals 2 damage) damage:2 target(anytarget)
 auto=alternative _ADVENTURE_
@@ -13638,8 +13636,8 @@ toughness=3
 [/card]
 [card]
 name=Brazen Borrower // Petty Theft
-abilities=flying,cloud,flash,adventure,asflash
-other={1}{U} name(Adventure)
+abilities=flying,cloud,flash,adventure
+other={1}{U} name(Adventure) instant
 auto=alternative name(Return to hand) name(Return to hand) target(*[-land]|opponentbattlefield) moveTo(hand)
 auto=alternative _ADVENTURE_
 text=Flash -- Flying -- Brazen Borrower can block only creatures with flying. // Return target nonland permanent an opponent controls to its owner's hand.
@@ -13802,8 +13800,7 @@ type=Sorcery
 [/card]
 [card]
 name=Breaking Wave
-abilities=asflash
-other={4}{U}{U} name(Cast as instant)
+other={4}{U}{U} name(Cast as instant) instant
 restriction=can play sorcery
 autostack=all(creature[-tapped]|battlefield) transforms((,newability[@counteradded(0/0.1.Untapped) from(this):tap],newability[@counteradded(0/0.1.Untapped) from(this):removeallcounters(0/0.1.Untapped)])) ueot
 autostack=all(creature[tapped]|battlefield) transforms((,newability[@counteradded(0/0.1.Tapped) from(this):untap],newability[@counteradded(0/0.1.Tapped) from(this):removeallcounters(0/0.1.Tapped)])) ueot
@@ -16479,7 +16476,6 @@ toughness=1
 [/card]
 [card]
 name=Cartographer's Survey
-abilities=flying
 aicode=activate target(*[zpos=1]|mylibrary) transforms((,newability[if type(land[zpos<=7]|mylibrary)~equalto~0 then all(*[zpos<=7]|mylibrary) moveto(myreveal) and!( bottomoflibrary )!],newability[if type(land[zpos<=6]|mylibrary)~morethan~0 then target(<upto:2>land[zpos<=6]|mylibrary) moveto(mybattlefield) and!( transforms((,newability[tap(noevent)],newability[all(*[zpos<=6]|mylibrary) moveto(myreveal) and!( bottomoflibrary )!])) oneshot )! ])) oneshot
 auto=name(Look top 7 cards) reveal:7 optionone name(Put onto the battlefield) target(<upto:2>land|reveal) moveto(mybattlefield) and!( tap(noevent) )! optiononeend optiontwo name(Put on bottom) target(*|reveal) bottomoflibrary and!( all(*|reveal) bottomoflibrary )! optiontwoend revealend
 text=Look at the top seven cards of your library. Put up to two land cards from among them onto the battlefield tapped. Put the rest on the bottom of your library in a random order.
@@ -19294,8 +19290,8 @@ toughness=4
 [/card]
 [card]
 name=Circling Vultures
-abilities=flying,flash
-other={D} name(Discard)
+abilities=flying
+other={D} name(Discard) instant
 auto=upcost[{E(creature|mygraveyard)}] sacrifice
 text=Flying -- You may discard Circling Vultures any time you could cast an instant. -- At the beginning of your upkeep, sacrifice Circling Vultures unless you exile the top creature card of your graveyard.
 mana={B}
@@ -28471,10 +28467,10 @@ toughness=3
 [/card]
 [card]
 name=Dirgur Island Dragon // Skimming Strike
-abilities=flying,asflash
+abilities=flying
 restriction=can play creature
 auto=_WARD2_
-other={1}{U} name(Omen:Skimming Strike)
+other={1}{U} name(Omen:Skimming Strike) instant
 auto=alternative may tap target(creature)
 auto=alternative draw:1
 auto=alternative moveTo(library) && shuffle
@@ -28649,8 +28645,7 @@ type=Instant
 [/card]
 [card]
 name=Discovery // Dispersal
-abilities=flash
-other={3}{U}{B} name(Dispersal)
+other={3}{U}{B} name(Dispersal) instant
 restriction=can play sorcery
 aicode=activate transforms((,newability[surveil],newability[draw:1 controller])) oneshot
 auto=ifnot paid(alternative) then name(Surveil 2) reveal:psurveiloffsetplus2plusend optionone name(put in graveyard) target(<upto:psurveiloffsetplus2plusend>*|reveal) moveto(ownergraveyard) optiononeend optiontwo name(put in library) target(<psurveiloffsetplus2plusend>*|reveal) moveto(ownerlibrary) optiontwoend afterrevealed all(*[zpos=1]|mylibrary) transforms((,newability[draw:1])) oneshot afterrevealedend revealend
@@ -28860,7 +28855,7 @@ type=Sorcery
 [card]
 name=Distracting Geist
 backside=Clever Distraction
-abilities=hasdisturb,flying
+abilities=hasdisturb
 restriction=compare(isflipped)~equalto~0
 retrace={4}{W} name(Cast with disturb)
 autostack=if paid(retrace) then flip(backside) forcetype(Enchantment Aura) and!( transforms((,newability[name(Attach to creature) retargetfromplay target(creature)],newability[teach(creature) transforms((,newability[_ATTACKING_name(Tap a creature) target(creature|opponentbattlefield) tap]))])) forever )!
@@ -30389,10 +30384,10 @@ type=Sorcery
 [/card]
 [card]
 name=Dread Linnorm // Scale Deflection
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play creature
 otherrestriction=type(creature|battlefield)~morethan~0
-other={3}{G} name(Adventure)
+other={3}{G} name(Adventure) instant
 auto=alternative name(Choose creature) name(Choose creature) target(creature|battlefield) transforms((,newability[counter(1/1.2)],hexproof,newability[untap])) ueot
 auto=alternative _ADVENTURE_
 auto=cantbeblockedby(creature[power<=3])
@@ -33883,11 +33878,11 @@ toughness=4
 [card]
 name=Emerald Dragon // Dissonant Wave
 #Counter target activated or triggered ability not implemented ATM
-abilities=flying,trample,adventure,asflash
+abilities=flying,trample,adventure
 restriction=can play creature
 otherrestriction=never
 auto=alternative _ADVENTURE_
-other={2}{G} name(Adventure)
+other={2}{G} name(Adventure) instant
 text=Flying, trample // Counter target activated or triggered ability from a noncreature source. (Then exile this card. You may cast the creature later from exile.)
 mana={4}{G}{G}
 type=Creature
@@ -35739,10 +35734,10 @@ toughness=5
 [/card]
 [card]
 name=Ettercap // Web Shot
-abilities=adventure,asflash,reach
+abilities=adventure,reach
 restriction=can play creature
 otherrestriction=type(creature[flying]|battlefield)~morethan~0
-other={2}{G} name(Adventure)
+other={2}{G} name(Adventure) instant
 auto=alternative name(Destroy flying creature) name(Destroy flying creature) target(creature[flying]|battlefield) destroy
 auto=alternative _ADVENTURE_
 text=Reach // Destroy target creature with flying. (Then exile this card. You may cast the creature later from exile.)
@@ -40546,8 +40541,7 @@ type=Instant
 [card]
 name=Flamescroll Celebrant
 #MISSING:opponent activates an ability
-abilities=flash
-other={W}{W} name(Revel in Silence)
+other={W}{W} name(Revel in Silence) instant
 otherrestriction=compare(isflipped)~equalto~1
 restriction=can play creature,compare(isflipped)~equalto~0
 anyzone={0}:doubleside(Revel in Silence)
@@ -41894,9 +41888,9 @@ toughness=2
 [/card]
 [card]
 name=Foulmire Knight // Profane Insight
-abilities=deathtouch,adventure,asflash
+abilities=deathtouch,adventure
 restriction=can play creature
-other={2}{B} name(Adventure)
+other={2}{B} name(Adventure) instant
 auto=alternative name(Draw 1 and opponent loses 1 life) name(Draw 1 and opponent loses 1 life) draw:1 controller && life:-1 controller
 auto=alternative _ADVENTURE_
 text=Deathtouch // You draw a card and you lose 1 life. (Then exile this card. You may cast the creature later from exile.)
@@ -43570,9 +43564,9 @@ type=Land
 [/card]
 [card]
 name=Garenbrig Carver // Shield's Might
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play creature
-other={1}{G} name(Adventure)
+other={1}{G} name(Adventure) instant
 auto=alternative name(Creature gets 2/2) name(Creature gets 2/2) target(creature|battlefield) 2/2 ueot
 auto=alternative _ADVENTURE_
 text=Target creature gets +2/+2 until end of turn. (Then exile this card. You may cast the creature later from exile.)
@@ -44612,9 +44606,8 @@ toughness=3
 [card]
 name=Ghitu Fire
 target=anytarget
-abilities=flash
 restriction=can play sorcery
-other={X}{2}{R} name(Cast as Instant)
+other={X}{2}{R} name(Cast as Instant) instant
 auto=paidmana damage:X
 auto=alternative damage:X
 text=You may cast this spell as though it had flash if you pay {2} more to cast it. (You may cast it any time you could cast an instant.) -- Ghitu Fire deals X damage to any target.
@@ -44656,8 +44649,8 @@ toughness=2
 [/card]
 [card]
 name=Ghost Lantern // Bind Spirit
-abilities=adventure,asflash
-other={1}{B} name(Adventure)
+abilities=adventure
+other={1}{B} name(Adventure) instant
 restriction=can play creature
 otherrestriction=type(creature|mygraveyard)~morethan~0
 auto=alternative name(Return creature) name(Return creature) target(creature|mygraveyard) moveto(hand)
@@ -44822,9 +44815,9 @@ toughness=3
 [/card]
 [card]
 name=Giant Killer // Chop Down
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play creature
-other={2}{W} name(Adventure)
+other={2}{W} name(Adventure) instant
 auto=alternative name(Destroy creature) name(Destroy creature) target(creature[power>=4]|battlefield) destroy
 auto=alternative _ADVENTURE_
 auto={1}{W}{T}:target(creature) tap(noevent)
@@ -48376,8 +48369,7 @@ type=Instant
 [/card]
 [card]
 name=Grave Servitude
-abilities=asflash
-other={1}{B} name(Cast with flash)
+other={1}{B} name(Cast with flash) instant
 restriction=can play enchantment
 auto=alternative all(this) transforms((,newability[phaseaction[cleanup sourceinplay once] sacrifice all(this)]))
 target=creature
@@ -49579,10 +49571,10 @@ toughness=3
 [/card]
 [card]
 name=Guardian Naga // Banishing Coils
-abilities=vigilance,adventure,asflash
+abilities=vigilance,adventure
 restriction=can play creature
 otherrestriction=type(*[artifact;enchantment]|battlefield)~morethan~0
-other={2}{W} name(Adventure)
+other={2}{W} name(Adventure) instant
 auto=alternative name(Exile artifact or enchantment) name(Exile artifact or enchantment) target(*[artifact;enchantment]|battlefield) moveto(exile)
 auto=alternative _ADVENTURE_
 auto=this(variable{controllerturn}>0) transforms((,newability[preventalldamage to(this)]))
@@ -50982,8 +50974,7 @@ toughness=2
 [/card]
 [card]
 name=Harbinger of the Tides
-abilities=asflash
-other={2}{U}{U} name(Cast with flash)
+other={2}{U}{U} name(Cast with flash) instant
 restriction=can play creature
 auto=may name(Return tapped creature) target(creature[tapped]|opponentbattlefield) moveto(hand)
 text=You may cast Harbinger of the Tides as though it had flash if you pay {2} more to cast it. (You may cast it any time you could cast an instant.) -- When Harbinger of the Tides enters, you may return target tapped creature an opponent controls to its owner's hand.
@@ -52932,8 +52923,8 @@ subtype=Equipment
 [/card]
 [card]
 name=Hezrou // Demonic Stench
-abilities=adventure,asflash
-other={B} name(Adventure)
+abilities=adventure
+other={B} name(Adventure) instant
 restriction=can play creature
 auto=alternative name(Blocking creatures get -1/-1) name(Blocking creatures get -1/-1) all(creature[blocking]|battlefield) -1/-1 ueot
 auto=alternative _ADVENTURE_
@@ -54754,8 +54745,7 @@ toughness=0
 [/card]
 [card]
 name=Hungering Yeti
-abilities=flash
-other={4}{R} name(cast as it has flash)
+other={4}{R} name(cast as it has flash) instant
 restriction=myturnonly
 otherrestriction=type(*[blue;green]|mybattlefield)~morethan~0
 text=As long as you control a green or blue permanent, you may cast Hungering Yeti as though it had flash. (You may cast it any time you could cast an instant.)
@@ -55171,9 +55161,9 @@ toughness=2
 [/card]
 [card]
 name=Hypnotic Sprite // Mesmeric Glare
-abilities=flying,adventure,asflash
+abilities=flying,adventure
 restriction=can play creature
-other={2}{U} name(Adventure)
+other={2}{U} name(Adventure) instant
 auto=alternative name(Counter spell) name(Counter spell) target(*[manacost<=3]|stack) fizzle
 auto=alternative _ADVENTURE_
 text=Flying // Counter target spell with mana value 3 or less. (Then exile this card. You may cast the creature later from exile.)
@@ -56488,8 +56478,7 @@ subtype=Aura
 [/card]
 [card]
 name=Incubation // Incongruity
-abilities=flash
-other={1}{G}{U} name(Incongruity)
+other={1}{G}{U} name(Incongruity) instant
 restriction=myturnonly
 aicode=activate moveto(hand) target(creature[zpos<=5]|mylibrary)
 auto=ifnot paid(alternative) then name(Look 5 cards) reveal:5 optionone name(Get a creature) target(<1>creature|reveal) moveto(hand) optiononeend optiontwo name(bottom of library) all(*|reveal) bottomoflibrary optiontwoend revealend
@@ -66086,8 +66075,7 @@ toughness=2
 [/card]
 [card]
 name=Lightning Reflexes
-abilities=asflash
-other={1}{R} name(Cast with flash)
+other={1}{R} name(Cast with flash) instant
 restriction=can play enchantment
 auto=alternative all(this) transforms((,newability[phaseaction[cleanup sourceinplay once] sacrifice all(this)]))
 target=creature
@@ -69160,7 +69148,7 @@ toughness=4
 [card]
 name=Malevolent Hermit
 backside=Benevolent Geist
-abilities=lifelink,hasdisturb
+abilities=hasdisturb
 restriction=compare(isflipped)~equalto~0
 retrace={2}{U} name(Cast with disturb)
 auto=if paid(retrace) then flip(backside)
@@ -69567,10 +69555,10 @@ toughness=3
 [/card]
 [card]
 name=Marang River Regent // Coil and Catch
-abilities=flying,asflash
+abilities=flying
 restriction=can play creature
 auto=ifnot paid(alternative) then may target(<upto:2>other *[-land]) moveTo(hand)
-other={3}{U} name(Omen:Coil and Catch)
+other={3}{U} name(Omen:Coil and Catch) instant
 auto=alternative draw:3 && transforms((,newability[reject target(*|myhand)])) oneshot
 auto=alternative moveTo(library) && shuffle
 text=Flying -- When this creature enters, return up to two other target nonland permanents to their owners' hands. -- Coil and Catch {3}{U} -- Instant - Omen -- Draw three cards, then discard a card. (Then shuffle this card into its owner's library.)
@@ -71049,9 +71037,9 @@ toughness=5
 [/card]
 [card]
 name=Merchant of the Vale // Haggle
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play creature
-other={R} name(Adventure)
+other={R} name(Adventure) instant
 auto=alternative may name(Discard and draw) reject notaTarget(*|myhand) and!( draw:1 controller )
 auto=alternative _ADVENTURE_
 auto={2}{R}{D(*|myhand)}:name(Draw a card) draw:1
@@ -73618,9 +73606,8 @@ type=Enchantment
 [/card]
 [card]
 name=Molten Exhale
-abilities=asflash
 restriction=can play Sorcery
-other={1}{R} name(Behold a Dragon)
+other={1}{R} name(Behold a Dragon) instant
 otherrestriction=type(Dragon|mybattlefieldhand)~morethan~0
 target=creature,planeswalker
 auto=damage:4
@@ -74041,9 +74028,9 @@ toughness=3
 [/card]
 [card]
 name=Moonshae Pixie // Pixie Dust
-abilities=flying,adventure,asflash
+abilities=flying,adventure
 restriction=can play creature
-other={1}{U} name(Adventure)
+other={1}{U} name(Adventure) instant
 auto=alternative may name(Creatures gain flying) name(Creatures gain flying) target(<upto:3>creature|battlefield) flying ueot
 auto=alternative _ADVENTURE_
 auto=ifnot paid(alternative) then if opponentdamagedbycombat then name(Draw a card) name(Draw a card) name(Draw a card) draw:1 controller
@@ -74791,9 +74778,9 @@ type=Enchantment
 [/card]
 [card]
 name=Murderous Rider // Swift End
-abilities=lifelink,adventure,asflash
+abilities=lifelink,adventure
 restriction=can play creature
-other={1}{B}{B} name(Adventure)
+other={1}{B}{B} name(Adventure) instant
 auto=alternative name(Destroy creature or planeswalker) name(Destroy creature or planeswalker) target(creature,planeswalker) destroy
 auto=alternative name(You lose 2 life) name(You lose 2 life) life:-2 controller
 auto=alternative _ADVENTURE_
@@ -74926,9 +74913,8 @@ type=Sorcery
 [/card]
 [card]
 name=Mutual Destruction
-abilities=flash
 target=creature
-other={B}{S(creature|myBattlefield)} name(Play as Instant)
+other={B}{S(creature|myBattlefield)} name(Play as Instant) instant
 auto=ifnot paid(alternative) then destroy myturnonly
 auto=alternative destroy
 otherrestriction=type(*[flash]|mybattlefield)~morethan~0
@@ -75334,8 +75320,7 @@ subtype=Aura
 [/card]
 [card]
 name=Mystic Veil
-abilities=asflash
-other={1}{U} name(Cast with flash)
+other={1}{U} name(Cast with flash) instant
 restriction=can play enchantment
 auto=alternative all(this) transforms((,newability[phaseaction[cleanup sourceinplay once] sacrifice all(this)]))
 target=creature
@@ -76084,8 +76069,7 @@ toughness=1
 [/card]
 [card]
 name=Necromancy
-abilities=asflash
-other={2}{B} name(Cast with flash)
+other={2}{B} name(Cast with flash) instant
 restriction=can play enchantment
 auto=alternative all(this) transforms((,newability[phaseaction[cleanup sourceinplay once] sacrifice all(this)]))
 target=creature|graveyard
@@ -76495,7 +76479,6 @@ toughness=3
 [/card]
 [card]
 name=Nessian Wilds Ravager
-abilities=flying
 auto=ability$!choice name(Tribute 6) all(mysource) counter(1/1,6) _ choice name(May fight another target creature) may transforms((,newability[target(creature) dynamicability<!powerstrike eachother!>])) ueot opponent !$ opponent
 text=Tribute 6 (As this creature enters, an opponent of your choice may put six +1/+1 counters on it.) -- When Nessian Wilds Ravager enters, if tribute wasn't paid, you may have Nessian Wilds Ravager fight another target creature. (Each deals damage equal to its power to the other.)
 mana={4}{G}{G}
@@ -78303,9 +78286,9 @@ toughness=2
 [/card]
 [card]
 name=Oakshade Stalker
-abilities=daybound,asflash
+abilities=daybound
 backside=Moonlit Ambusher
-other={4}{G} name(Play as flash)
+other={4}{G} name(Play as flash) instant
 restriction=compare(isflipped)~equalto~0,can play creature
 otherrestriction=compare(isflipped)~equalto~0
 auto=if type(*[day;night]|battlefield)~equalto~0 then name(It becomes day) activate castcard(noevent named!:Day:!)
@@ -81983,8 +81966,7 @@ toughness=2
 [/card]
 [card]
 name=Parapet
-abilities=asflash
-other={1}{W} name(Cast with flash)
+other={1}{W} name(Cast with flash) instant
 restriction=can play enchantment
 auto=alternative all(this) transforms((,newability[phaseaction[cleanup sourceinplay once] sacrifice all(this)]))
 auto=lord(other creature|myBattlefield) +0/+1
@@ -82640,10 +82622,10 @@ toughness=3
 [/card]
 [card]
 name=Pegasus Guardian // Rescue the Foal
-abilities=flying,adventure,asflash
+abilities=flying,adventure
 restriction=can play creature
 otherrestriction=type(creature|mybattlefield)~morethan~0
-other={1}{W} name(Adventure)
+other={1}{W} name(Adventure) instant
 auto=alternative name(Exile creature) name(Exile creature) target(creature|myBattlefield) moveto(exile) and!( moveto(ownerbattlefield) )!
 auto=alternative _ADVENTURE_
 auto=@each my end restriction{revolt}:name(Create Pegasus) token(Pegasus,Creature Pegasus,1/1,white,flying)
@@ -84259,7 +84241,7 @@ toughness=5
 [/card]
 [card]
 name=Plague Wight
-abilities=flanking
+auto=@combat(blocked) source(this) from(creature):all(trigger[from]) -1/-1 ueot
 text=Whenever Plague Wight becomes blocked, each creature blocking it gets -1/-1 until end of turn.
 mana={1}{B}
 type=Creature
@@ -87046,11 +87028,11 @@ type=Enchantment
 [/card]
 [card]
 name=Purging Stormbrood // Absorb Essence
-abilities=flying,asflash
+abilities=flying
 restriction=can play creature
 auto=@targeted(this) from(*|opponentzones):choice name(Pay 2 life) name(Pay 2 life) target(*|opponentzones) transforms((,newability[pay[[{L:2}]] name(Pay 2 life) donothing?fizzle])) oneshot
 auto=may removeallcounters(all) target(*|battlefield)
-other={1}{W} name(Omen:Absorb Essence)
+other={1}{W} name(Omen:Absorb Essence) instant
 auto=alternative target(creature) transforms((,newability[2/2],newability[lifelink],newability[hexproof])) ueot
 auto=alternative moveTo(library) && shuffle
 text=Flying -- Ward-Pay 2 life. -- When this creature enters, remove all counters from up to one target creature. -- Absorb Essence {1}{W} -- Instant - Omen -- Target creature gets +2/+2 and gains lifelink and hexproof until end of turn. (Then shuffle this card into its owner's library.)
@@ -90620,7 +90602,7 @@ toughness=1
 [/card]
 [card]
 name=Refuse // Cooperate
-abilities=hasaftermath,asflash
+abilities=hasaftermath
 flashback={2}{U} name(Cooperate)
 restriction=type(*|stack)~morethan~0
 otherrestriction=type(*[instant;sorcery]|stack)~morethan~0
@@ -91043,8 +91025,7 @@ type=Artifact
 [/card]
 [card]
 name=Relic Ward
-abilities=asflash
-other={1}{W} name(Cast with flash)
+other={1}{W} name(Cast with flash) instant
 restriction=can play enchantment
 auto=alternative all(this) transforms((,newability[phaseaction[cleanup sourceinplay once] sacrifice all(this)]))
 target=artifact
@@ -92695,9 +92676,9 @@ subtype=Forest Island
 [/card]
 [card]
 name=Rimrock Knight // Boulder Rush
-abilities=cantblock,adventure,asflash
+abilities=cantblock,adventure
 restriction=can play creature
-other={R} name(Adventure)
+other={R} name(Adventure) instant
 auto=alternative name(Creature gets 2/0) target(creature|battlefield) 2/0 ueot
 auto=alternative _ADVENTURE_
 text=Rimrock Knight can't block. // Target creature gets +2/+0 until end of turn. (Then exile this card. You may cast the creature later from exile.)
@@ -94505,9 +94486,8 @@ type=Sorcery
 [/card]
 [card]
 name=Rout
-abilities=flash
 restriction=can play sorcery
-other={5}{W}{W} name(Cast as instant)
+other={5}{W}{W} name(Cast as instant) instant
 auto=bury all(creature)
 text=You may cast this spell as though it had flash if you pay {2} more to cast it. (You may cast it any time you could cast an instant.) -- Destroy all creatures. They can't be regenerated.
 mana={3}{W}{W}
@@ -95258,11 +95238,11 @@ toughness=3
 [/card]
 [card]
 name=Runescale Stormbrood // Chilling Screech
-abilities=flying,asflash
+abilities=flying
 restriction=can play creature
 auto=@movedTo(*[-creature]|mystack):2/0 ueot
 auto=@movedTo(dragon|mystack):2/0 ueot
-other={1}{U} name(Omen:Chilling Screech)
+other={1}{U} name(Omen:Chilling Screech) instant
 auto=alternative fizzle target(*[manacost<=2]|stack) restriction{type(*[manacost<=2]|stack)~morethan~0}
 auto=alternative moveTo(library) && shuffle
 text=Flying -- Whenever you cast a noncreature spell or a Dragon spell, this creature gets +2/+0 until end of turn. -- Chilling Screech {1}{U} -- Instant - Omen -- Counter target spell with mana value 2 or less. (Then shuffle this card into its owner's library.)
@@ -95944,8 +95924,7 @@ toughness=5
 [/card]
 [card]
 name=Said // Done
-abilities=flash
-other={3}{U} name(Done)
+other={3}{U} name(Done) instant
 restriction=can play sorcery
 auto=ifnot paid(alternative) then target(other *[instant;sorcery]|mygraveyard) moveto(hand)
 auto=alternative may target(<upto:2>creature|battlefield) freeze
@@ -96643,10 +96622,10 @@ type=Instant
 [/card]
 [card]
 name=Sapphire Dragon // Psionic Pulse
-abilities=flying,adventure,asflash
+abilities=flying,adventure
 restriction=can play creature
 otherrestriction=type(*[-creature]|stack)~morethan~0
-other={2}{U} name(Adventure)
+other={2}{U} name(Adventure) instant
 auto=alternative name(Counter noncreature spell) name(Counter noncreature spell) target(*[-creature]|stack) fizzle
 auto=alternative _ADVENTURE_
 auto=_ATTACKING_name(Scry 2) _SCRY2_
@@ -96721,9 +96700,8 @@ type=Sorcery
 [/card]
 [card]
 name=Saproling Symbiosis
-abilities=flash
 restriction=myturnonly
-other={5}{G} name(Cast as instant)
+other={5}{G} name(Cast as instant) instant
 auto=foreach(creature|mybattlefield) token(Saproling,Creature Saproling,1/1,green)
 text=You may cast this spell as though it had flash if you pay {2} more to cast it. (You may cast it any time you could cast an instant.) -- Create a 1/1 green Saproling creature token for each creature you control.
 mana={3}{G}
@@ -98657,9 +98635,9 @@ type=Sorcery
 [/card]
 [card]
 name=Sea Hag // Aquatic Ingress
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play creature
-other={2}{U} name(Adventure)
+other={2}{U} name(Adventure) instant
 auto=alternative may target(<upto:2>creature|battlefield) transforms((,newability[1/0],unblockable)) ueot
 auto=alternative _ADVENTURE_
 auto=ifnot paid(alternative) then all(creature|opponentBattlefield) -4/-0 ueot
@@ -101091,9 +101069,9 @@ toughness=3
 [/card]
 [card]
 name=Shepherd of the Flock // Usher to Safety
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play creature
-other={W} name(Adventure)
+other={W} name(Adventure) instant
 auto=alternative name(Return permanent to hand) name(Return permanent to hand) target(*|myBattlefield) moveTo(hand)
 auto=alternative _ADVENTURE_
 text=Return target permanent you control to its owner's hand. (Then exile this card. You may cast the creature later from exile.)
@@ -102713,9 +102691,9 @@ type=Sorcery
 [/card]
 [card]
 name=Silverflame Squire // On Alert
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play creature
-other={2}{W} name(Adventure)
+other={2}{W} name(Adventure) instant
 auto=alternative name(Creature gets 2/2 and untap) name(Creature gets 2/2 and untap) target(creature|battlefield) transforms((,newability[2/2],newability[untap])) ueot
 auto=alternative _ADVENTURE_
 text=Target creature gets +2/+2 until end of turn. Untap it. (Then exile this card. You may cast the creature later from exile.)
@@ -105308,8 +105286,7 @@ subtype=Aura
 [/card]
 [card]
 name=Soar
-abilities=asflash
-other={1}{U} name(Cast with flash)
+other={1}{U} name(Cast with flash) instant
 restriction=can play enchantment
 auto=alternative all(this) transforms((,newability[phaseaction[cleanup sourceinplay once] sacrifice all(this)]))
 target=creature
@@ -107358,8 +107335,7 @@ type=Instant
 [/card]
 [card]
 name=Spider Climb
-abilities=asflash
-other={G} name(Cast with flash)
+other={G} name(Cast with flash) instant
 restriction=can play enchantment
 auto=alternative all(this) transforms((,newability[phaseaction[cleanup sourceinplay once] sacrifice all(this)]))
 target=creature
@@ -108120,8 +108096,8 @@ type=Sorcery
 [/card]
 [card]
 name=Spring // Mind
-abilities=hasaftermath,asflash
-flashback={4}{U}{U} name(Mind)
+abilities=hasaftermath
+flashback={4}{U}{U} name(Mind) instant
 restriction=can play sorcery
 auto=ifnot paid(flashback) then name(Search basic land) target(land[basic]|myLibrary) moveTo(myBattlefield) and!( transforms((,newability[tap(noevent)],newability[shuffle])) oneshot )!
 auto=if paid(flashback) then draw:2 controller
@@ -112322,9 +112298,9 @@ subtype=Background
 [/card]
 [card]
 name=Sword Coast Serpent // Capsizing Wave
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play creature
-other={1}{U} name(Adventure)
+other={1}{U} name(Adventure) instant
 auto=alternative may name(Return creature) name(Return creature) target(creature|battlefield) moveto(hand)
 auto=alternative _ADVENTURE_
 auto=ifnot paid(alternative) then if thisturn(*[-creature]|mystack)~morethan~0 then transforms((,unblockable)) ueot
@@ -117589,7 +117565,7 @@ toughness=5
 [/card]
 [card]
 name=Thundering Chariot
-abilities=first strike,vigilance,trample
+abilities=first strike,trample,haste
 auto=_CREW1_
 text=First strike, trample, haste -- Crew 1 (Tap any number of creatures you control with total power 1 or more: This Vehicle becomes an artifact creature until end of turn.)
 mana={4}
@@ -118104,10 +118080,9 @@ type=Instant
 [/card]
 [card]
 name=Timely Ward
-abilities=flash
 target=creature
 auto=teach(creature) indestructible
-other={2}{W} name(Cast as it has flash)
+other={2}{W} name(Cast as it has flash) instant
 restriction=myturnonly
 otherrestriction=type(*[iscommander]|mybattlefield)~morethan~0,opponentTurnOnly
 text=You may cast this spell as though it had flash if it targets a commander. -- Enchant creature -- Enchanted creature has indestructible.
@@ -118965,9 +118940,9 @@ toughness=1
 [/card]
 [card]
 name=Topaz Dragon // Entropic Cloud
-abilities=deathtouch,flying,adventure,asflash
+abilities=deathtouch,flying,adventure
 restriction=can play creature
-other={1}{B} name(Adventure)
+other={1}{B} name(Adventure) instant
 auto=alternative name(Creatures gain deathtouch) name(Creatures gain deathtouch) all(creature|myBattlefield) deathtouch ueot
 auto=alternative _ADVENTURE_
 text=Flying, deathtouch // Creatures you control gain deathtouch until end of turn. (Then exile this card. You may cast the creature later from exile.)
@@ -120955,9 +120930,8 @@ toughness=4
 [/card]
 [card]
 name=Twilight's Call
-abilities=asflash
 restriction=can play sorcery
-other={6}{B}{B} name(Cast as instant)
+other={6}{B}{B} name(Cast as instant) instant
 auto=all(creature|mygraveyard) moveto(mybattlefield)
 auto=all(creature|opponentgraveyard) moveto(opponentbattlefield)
 text=You may cast Twilight's Call any time you could cast an instant if you pay {2} more to cast it. -- Each player returns all creature cards from their graveyard to the battlefield.
@@ -121170,10 +121144,10 @@ toughness=2
 [/card]
 [card]
 name=Two-Handed Axe // Sweeping Cleave
-abilities=adventure,asflash
+abilities=adventure
 restriction=can play equipment
 otherrestriction=type(creature|mybattlefield)~morethan~0
-other={1}{R} name(Adventure)
+other={1}{R} name(Adventure) instant
 auto=alternative name(Creature gains double strike) name(Creature gains double strike) target(creature|myBattlefield) transforms((,double strike)) ueot
 auto=alternative _ADVENTURE_
 auto=@combat(attacking) source(mytgt):dynamicability<!mytgt powerpumppow!>
@@ -131057,9 +131031,9 @@ toughness=3
 [/card]
 [card]
 name=Young Red Dragon // Bathe in Gold
-abilities=flying,cantblock,adventure,asflash
+abilities=flying,cantblock,adventure
 restriction=can play creature
-other={1}{R} name(Adventure)
+other={1}{R} name(Adventure) instant
 auto=alternative name(Create Treasure) name(Create Treasure) _TREASURE_
 auto=alternative _ADVENTURE_
 text=Flying -- Young Red Dragon can't block. // Create a Treasure token. (Then exile this card. You may cast the creature later from exile.)

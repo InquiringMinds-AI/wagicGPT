@@ -83,6 +83,12 @@ public:
     void setManaUsedToCast(ManaCost * aMana){ SAFE_DELETE(manaUsedToCast); manaUsedToCast = aMana;};
 
     string alternativeName;
+    //W53-SPLIT: `other={...} name(X) instant` - THIS half may be cast at instant
+    //speed (the other half of a split/MDFC card is an instant, or the alternative
+    //is an instant-speed action like Circling Vultures' discard). Replaces the old
+    //idiom of putting the FLASH keyword on the whole primitive, which also let the
+    //sorcery half go at instant speed and lied to every keyword-keyed effect.
+    bool instantSpeed;
     bool isMulti;
     static ManaCost * parseManaCost(string value, ManaCost * _manacost = NULL, MTGCardInstance * c = NULL);
     static int parseManaSymbol(char symbol);

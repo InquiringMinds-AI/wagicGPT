@@ -60,7 +60,9 @@ vector<LegalActionsOracle::Cast> LegalActionsOracle::legalCasts(Player * p, Mana
                 continue; //the land rung handles those
             if (instantSpeedOnly
                 && !card->hasType(Subtypes::TYPE_INSTANT) && !card->has(Constants::FLASH)
-                && !card->has(Constants::ASFLASH))
+                && !card->has(Constants::ASFLASH)
+                && !(card->getManaCost() && card->getManaCost()->getAlternative()
+                     && card->getManaCost()->getAlternative()->instantSpeed)) //W53-SPLIT
                 continue;
             if (zone == p->game->graveyard
                 && !card->has(Constants::CANPLAYFROMGRAVEYARD) && !card->has(Constants::TEMPFLASHBACK)

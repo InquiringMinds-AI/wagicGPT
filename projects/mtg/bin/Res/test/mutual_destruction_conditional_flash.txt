@@ -1,0 +1,31 @@
+#Mutual Destruction: "This spell has flash as long as you control a permanent with flash. As
+#an additional cost to cast this spell, sacrifice a creature. Destroy target creature." The
+#primitive-wide FLASH keyword let it be cast at instant speed unconditionally; the
+#otherrestriction-gated "Play as Instant" half now carries the timing (`other=... instant`).
+#With Ambush Viper (flash) on the board it is castable in the opponent's upkeep window:
+#sacrifice the Viper, destroy Grizzly Bears.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Mutual Destruction
+inplay:Ambush Viper,Swamp
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+goto end
+goto upkeep
+next
+yes
+Swamp
+Mutual Destruction
+Ambush Viper
+Grizzly Bears
+endinterruption
+[ASSERT]
+DRAW
+[PLAYER1]
+graveyard:Mutual Destruction,Ambush Viper
+inplay:Swamp
+[PLAYER2]
+graveyard:Grizzly Bears
+[END]

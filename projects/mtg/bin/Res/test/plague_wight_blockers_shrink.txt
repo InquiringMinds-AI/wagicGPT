@@ -1,0 +1,24 @@
+#Plague Wight (owner oracle-fidelity ruling 2026-08-28): "Whenever this creature becomes
+#blocked, each creature blocking it gets -1/-1 until end of turn." Was scripted as FLANKING
+#(only non-flanking blockers shrink, and it is a keyword the card does not have). Now
+#@combat(blocked): Grizzly Bears 2/2 blocking the 1/1 Wight becomes 1/1 and both die.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Plague Wight
+[PLAYER2]
+inplay:Grizzly Bears
+[DO]
+goto attackers
+Plague Wight
+next
+Grizzly Bears
+next
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+graveyard:Plague Wight
+[PLAYER2]
+graveyard:Grizzly Bears
+[END]

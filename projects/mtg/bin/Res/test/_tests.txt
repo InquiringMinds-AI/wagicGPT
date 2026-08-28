@@ -1257,3 +1257,8 @@ vita_delver_realgame_no_instant.txt
 vita_drake_hatcher_incubation.txt
 vita_metamorph_copies_graveborn_muse.txt
 vita_metamorph_muse_realgame.txt
+plague_wight_blockers_shrink.txt
+instant_response_window_opponent_upkeep.txt
+split_half_instant_timing.txt
+mutual_destruction_conditional_flash.txt
+mutual_destruction_no_flash_permanent.txt

@@ -1,0 +1,28 @@
+#Control for mutual_destruction_conditional_flash: with NO flash permanent on the board the
+#instant-speed half is not available in the opponent's upkeep window - the card stays in hand and
+#the sacrifice fodder survives.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Mutual Destruction
+inplay:Grizzly Bears,Swamp
+[PLAYER2]
+inplay:Hill Giant
+[DO]
+goto end
+goto upkeep
+next
+yes
+Swamp
+Mutual Destruction
+Grizzly Bears
+Hill Giant
+endinterruption
+[ASSERT]
+DRAW
+[PLAYER1]
+hand:Mutual Destruction
+inplay:Grizzly Bears,Swamp
+[PLAYER2]
+inplay:Hill Giant
+[END]
