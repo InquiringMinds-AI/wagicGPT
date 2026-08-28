@@ -5613,3 +5613,52 @@ Way), Soul Shatter/Flare/Riveteers card scripts (highest-MV creature OR planeswa
 casts routed through the payment planner (dual-vs-mono tap order), Battlement one-tap,
 instants offered on the opponent's turn, countered-cast double-pay fix, cleanup discard as a
 model decision, and the wave-49..52 LLM-UX batches. Docker stopped after the build.
+
+## 2026-08-28 — owner Vita play-report batch + Delver ROOT CAUSE (GUI-reproduced) + VPK from 4abcf5dd0
+
+Ten play-report items came in; two commits on master (c15106f4d, 4abcf5dd0), psp-port ff'd.
+What matters for the console build:
+- DELVER (and every "@each my upkeep"-class trigger): phase triggers POLL the phase once per
+  tick; the no-legal-action/ASPhases skips AND a HELD phase-advance key (JGE repeats it - the
+  Vita trigger) left the upkeep in the tick it was entered, so nothing ever polled it. Fix =
+  GameObserver::mPhaseTicks settle gate (automation + userRequestNextGamePhase; suite seats
+  exempt). Reproduced RED in the desktop GUI on b2ce13e89 with HIS profile (ASPhases=Safe,
+  closed_hand=visible, no instant): 3 upkeeps, no trigger. GREEN on the fix. Not pinnable in
+  the headless suite (the pump masks the race) - the GUI is the test for phase-timing bugs.
+- Calamity Bearer: DOUBLE STRIKE hack removed; doubling via triggers + new `damage:N notrg`
+  (Damage::noTrigger) so a doubler can't re-trigger on its own output.
+- Morph/evoke cast-mode menu for the human: alt-cost rules priced the POOL only -> now
+  planner-priced + auto-tap (humanCanPayAlternative). RED live on old (Coral cast face-up,
+  no menu at 3 lands), GREEN on new.
+- Delete Deck menu item (yes/no confirm). WSrcUnlockedCards setId -1 heap-overflow READ
+  (ASAN) fixed. Keyword-vs-oracle lint (VALIDATE-WARN) in the validator.
+- Vita crash dump psp2core-1787894891 (Aug 28 05:28): data abort in newlib _malloc_r = heap
+  corruption, victim MTGCardInstance::computeNewCost/ManaCost::init. Parser tooling now
+  persistent: psp-work/tools/vita-parse-core (py3-patched) + psp-work/tools/venv (pyelftools);
+  run inside vitasdk docker with PYTHONPATH=/pw/tools/venv/lib/python3.14/site-packages
+  (mount psp-work as /pw, worktrees/psp as /build; ELF build_vita/wagic has debug_info).
+  Dumps + parsed output in psp-work/vita-dumps/. Desktop ASAN sweeps (15 Baka games + full
+  suite) found nothing beyond the setId read -> the Vita corrupter needs on-device evidence.
+  Frame-lag report: no mechanism found.
+- NOT reproduced on desktop (need his concrete board): Metamorph-copies-Muse upkeep, Drake
+  Hatcher counters/indicator (counters accrue on desktop; suspect Vita counter rendering),
+  autotap "worst combination" (three probes pick correctly).
+- Keyword-vs-oracle lint follow-up (e8425fb34): corpus sweep = 3 cards; Bold Plagiarist was a
+  false positive (keyword COUNTER names - lint now skips counter( lines), Steeple Roc had NO
+  text= at all, Efreet Weaponmaster's text= lacked "First strike" - both text= fixed (the LLM
+  seat reads text=). Lint: 0 warnings on 68,020 printings. Not in the vpk7 VPK (built from
+  4abcf5dd0; text-only).
+- Oracle sweep wave 3 (a9dfe70dc): the owner asked how missing-keyword text= survived the July
+  sweep. Answer: the sweep's no_text.tsv (354 rows) was never applied, and its LLM judge
+  mis-read its own prompt on keyword-only diffs (ruled Efreet Weaponmaster SAME "because the
+  prompt says to ignore added abilities" - it says the opposite). Deterministic audit
+  (abilities= printed keyword vs text=): 81 + 24 no-text; 45 text= replaced from the Scryfall
+  bulk JSON; 51 skips for review in strategy-design/oracle-sweep/wave3-keyword-text.tsv
+  (tokens/back faces; scripts granting keywords the Oracle doesn't print). LESSON: an LLM
+  judge over 5k diffs needs a deterministic cross-check for every rule it is told to apply.
+- VPK (owner: "Build it. Then push to vita"): psp-port at 4abcf5dd0, hermetic vitasdk build from a
+  wiped build_vita (the .sh stagers are CMake-generated - safe to wipe), unit vita-vpk7, log
+  ~/.gatelogs/vita_vpk7.log, exit 0. VPK 33,137,575 B -> 10.0.0.227:1337 ux0:/vpk/wagic.vpk,
+  size-verified (deploy-vita.sh's pre-check false-negatived again; plain curl -T worked).
+  Install manual (VitaShell -> Cross). Carries: Delver settle gate, Bearer/notrg, morph-evoke
+  cast menu, Delete Deck, ASAN setId fix, lint. NOT in it: e8425fb34/a9dfe70dc text= fixes.
