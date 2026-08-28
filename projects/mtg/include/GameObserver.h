@@ -164,6 +164,15 @@ class GameObserver{
   //about to open (its ability resolved, the display not yet built). Phase
   //automation and phase-advance requests hold while it is.
   bool humanDisplayOpen();
+  //W53-DELVER root cause: phase triggers (GenericTriggeredAbility::Update)
+  //POLL getCurrentGamePhase once per tick; a phase entered and left inside one
+  //Update is never seen by any "@each my upkeep" trigger. The automation skips
+  //in gameStateBasedEffects therefore act only on a phase that has already
+  //survived a full tick (mSettledPhase/Turn/Step = what the previous tick saw).
+  int mSettledPhase;
+  int mSettledTurn;
+  int mSettledStep;
+  int mPhaseTicks; //full ticks the current phase/step has survived (see gameStateBasedEffects)
   void cleanupPhase();
   void nextPlayer();
 

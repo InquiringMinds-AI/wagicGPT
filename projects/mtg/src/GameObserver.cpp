@@ -61,6 +61,7 @@ void GameObserver::cleanup()
     actionsList.clear();
     gameTurn.clear();
     OpenedDisplay = NULL;
+    mSettledPhase = -1; mSettledTurn = -1; mSettledStep = -1; mPhaseTicks = 0; //W53-DELVER
     AffinityNeedsUpdate = false;
 }
 
@@ -108,6 +109,7 @@ GameObserver::GameObserver(WResourceManager *output, JGE* input)
     cardWaitingForTargets = NULL;
     mExtraPayment = NULL;
     OpenedDisplay = NULL;
+    mSettledPhase = -1; mSettledTurn = -1; mSettledStep = -1; mPhaseTicks = 0; //W53-DELVER
     guiOpenDisplay = NULL;
     gameOver = NULL;
     phaseRing = NULL;
@@ -478,6 +480,28 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
     //to the AI's own pass on ITS turn too, so a "beginning of each upkeep"
     //display of the human's is not stepped over by the opponent's advance.
     if (allowInterrupt && humanDisplayOpen())
+        return;
+    //W53-DELVER, the REQUEST side (reproduced on build 9 in the desktop GUI:
+    //the phase-advance key is HELD across ticks by JGE - a right-click here, the
+    //trigger on the Vita - so the request that pushed the turn along landed in
+    //the very tick the upkeep was entered, and the upkeep was never polled by a
+    //single trigger). A request may only leave a phase that has survived a full
+    //Update in which the layers (and every phase trigger) saw it: the counter is
+    //advanced at the end of the tick, so >= 2 means one complete tick has run on
+    //this phase since it was entered. Suite-driven games step phases on their
+    //own pump cadence and are unaffected; the AI simply re-requests next tick.
+    //The settled record is written at the END of a tick, so inside the tick the
+    //phase changed it still names the previous phase - that mismatch is the
+    //"not yet polled" signal; once it matches, one completed tick (>= 1) is
+    //enough, because every layer (triggers included) ran on this phase in it.
+    //Suite-driven seats are exempt: the harness pump is not a held key, and its
+    //back-to-back `next` commands must land on the tick they are issued (an
+    //end-of-script assert follows immediately - a one-tick refusal under CPU
+    //contention read as "phase one step short", lexicon/basic_legendarylandwalk).
+    const bool scriptedSeat = mSuiteGame || mLoading
+        || (currentPlayer && currentPlayer->playMode == Player::MODE_TEST_SUITE);
+    if (allowInterrupt && !scriptedSeat && !(mSettledPhase == mCurrentGamePhase && mSettledTurn == turn
+        && mSettledStep == (int) combatStep && mPhaseTicks >= 1))
         return;
     if(log) {
         stringstream stream;
@@ -1387,7 +1411,26 @@ void GameObserver::gameStateBasedEffects()
     }
 
     //Auto skip Phases
-    int skipLevel = (currentPlayer->playMode == Player::MODE_TEST_SUITE || mSuiteGame || mLoading) ? Constants::ASKIP_NONE
+    //W53-DELVER (owner Vita report 2026-08-28, reproduced live in the desktop
+    //GUI on b2ce13e89: Delver of Secrets never triggered at upkeep unless an
+    //instant sat in hand). Phase triggers POLL the current phase once per tick
+    //(GenericTriggeredAbility::Update), and the skips below used to fire in the
+    //SAME tick the phase was entered (the stack resolves NextGamePhase into
+    //Upkeep in mLayers->Update, this function then advanced to Draw) - so no
+    //trigger ever saw the upkeep. An instant in hand merely kept the
+    //no-legal-action skip from firing, which is why it "worked" then. Every
+    //automation skip now waits for a phase that the PREVIOUS tick already saw.
+    //mPhaseTicks counts the ticks this phase/step has been stable at the END of
+    //a full Update: 0 = entered during this tick (no trigger has polled it yet).
+    if (mSettledPhase == mCurrentGamePhase && mSettledTurn == turn && mSettledStep == (int) combatStep)
+        mPhaseTicks++;
+    else
+        mPhaseTicks = 0;
+    const bool phaseSettled = mPhaseTicks >= 1;
+    mSettledPhase = mCurrentGamePhase;
+    mSettledTurn = turn;
+    mSettledStep = (int) combatStep;
+    int skipLevel = (!phaseSettled || currentPlayer->playMode == Player::MODE_TEST_SUITE || mSuiteGame || mLoading) ? Constants::ASKIP_NONE
         : options[Options::ASPHASES].number;
     bool noattackers = currentPlayer->noPossibleAttackers();
     bool nodiaochan = (currentPlayer->game->battlefield->countByAlias(10544)<1)?true:false;
@@ -1443,9 +1486,9 @@ void GameObserver::gameStateBasedEffects()
     //mSuiteHumanSeat (the `realgame` fixture directive) deliberately
     //re-enables the automation for a scripted seat - that is the whole
     //point of the directive; it is NULL in every ordinary game.
-    const bool automationAllowed = mSuiteHumanSeat
+    const bool automationAllowed = phaseSettled && (mSuiteHumanSeat
         || !(currentPlayer->playMode == Player::MODE_TEST_SUITE
-             || mSuiteGame || mLoading);
+             || mSuiteGame || mLoading));
     Player * humanSeat = mSuiteHumanSeat ? mSuiteHumanSeat
         : (!players[0]->isAI() ? players[0] : (!players[1]->isAI() ? players[1] : NULL));
     //Only the human's OWN turn. userRequestNextGamePhase advances the phase
