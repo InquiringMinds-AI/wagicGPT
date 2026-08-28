@@ -7,7 +7,7 @@ KEEP="10E 4ED 5DN 6ED 7ED 8ED 9ED A25 AKH ALA ARB AVR CFX CHK CSP DDF DKA DPA EV
 
 WAGIC=$(find /mnt/pspstick /run/media/magi -maxdepth 4 -type d -ipath "*/PSP/GAME/WAGIC" 2>/dev/null | head -1 || true)
 [ -z "$WAGIC" ] && { echo "WAGIC dir not found — is the stick mounted?"; exit 1; }
-FILTERED=~/Projects/wagicGPT/psp-work/WTH-39/Res/sets/primitives
+FILTERED=~/Projects/wagicGPT/psp-work/snapshots/WTH-39/Res/sets/primitives
 echo "stick WAGIC: $WAGIC"
 
 # sanity: clean EBOOT still deployed

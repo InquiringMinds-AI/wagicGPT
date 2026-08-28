@@ -12,7 +12,7 @@
 # therefore verified by remote SIZE after upload, and a re-run skips any set
 # whose remote size already matches local.  A death costs one set, not the run.
 #
-# Usage:  ./psp-work/upload-vita-cards.sh [HOST] [PORT]
+# Usage:  ./psp-work/scripts/upload-vita-cards.sh [HOST] [PORT]
 set -uo pipefail
 
 HOST="${1:-10.0.0.227}"

@@ -4,6 +4,26 @@
 in discord-mining/). Fix target: crash scales with set-data volume (proven by solo_mag's
 set-swap experiment); 0.18.6-from-2012 workaround is dying with wololo.net.
 
+## LAYOUT MAP (2026-08-28 reorganisation — READ BEFORE FOLLOWING ANY PATH BELOW)
+
+psp-work/ was reorganised into a table of contents; every older section below still names the
+OLD flat paths. Translate:
+  *.sh, *.py (deploy-vita.sh, run-suite.sh, make-*-cards.sh, oai-*.py, gen-cardtext-sidecar.py)
+                                        -> psp-work/scripts/
+  *.patch                               -> psp-work/patches/
+  *.log, lang-sweep-flags*, sweep-filelist.txt, memprobe-*, crashlog-*, run*.log
+                                        -> psp-work/logs/
+  crash-2026-08-02, psp-crash-20260818, vita-crash-20260824, vita-crashes, vita-dumps,
+  vita-elfs, evidence-wedge-2026-08-10  -> psp-work/crashes/
+  stick-archive-20260731, tablet-user-backup-20260818, save-merge-20260807, decks-20260806,
+  generic-cards-orig-20260803, graphics-orig-20260803(-audit), WagicPSP-0255.zip,
+  minpspw.tar.lzma, WTH*, opt           -> psp-work/snapshots/
+  openai-subscription-research.md, todo-audit-report.md, deferred-backlog.md, weakmodel-data,
+  ring-probe-deck.txt                   -> psp-work/research/
+  unchanged: artpack/, card-packs/, sidecar/, deploy/, tools/, vita-translogs/, NOTES.md
+Top level: android-alpha/ and projects/mtg/win-stage/ -> ports/android-alpha, ports/win-stage;
+HANDOFF_CARD_SCRIPT_LEXICON_TESTS.md -> projects/mtg/strategy-design/lexicon-triage/.
+
 ## Layout
 - `~/Projects/wagicGPT-psp` — git worktree, branch `psp-rescue`, based on `upstream/master`
   (fork master is C++11+ now; GCC 4.3.5 can't build it, and the PSP build doesn't want the GPT layer).
@@ -5677,3 +5697,6 @@ What matters for the console build:
   lint covers all printed keywords with engine equivalences; 0 warnings. Fixtures pin the
   positive AND negative timing (Circling Vultures discard, Mutual Destruction with/without a
   flash permanent) using the `next`/`yes`/`endinterruption` opponent-upkeep idiom.
+- VPK vita-vpk8 from psp-port = bd515aad7 (per-half timing + keyword fixes + every 2026-08-28 fix),
+  hermetic build exit 0, 33,137,888 B -> 10.0.0.227:1337 ux0:/vpk/wagic.vpk, size-verified.
+  Install manual (VitaShell -> Cross). Supersedes vpk7.
