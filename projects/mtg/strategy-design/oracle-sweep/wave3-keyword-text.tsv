@@ -1,0 +1,97 @@
+name	missing	verdict	detail
+Angel Ang	flying	SKIP: no Scryfall entry	(no text=)
+Angel Dec	flying	SKIP: no Scryfall entry	(no text=)
+Autumn Willow	hexproof	SKIP: Oracle lacks keyword	Shroud -- {G}: Until end of turn, Autumn Willow can be the target of spells and 
+Avacyn	flying,indestructible,vigilance	SKIP: no Scryfall entry	(no text=)
+Ballistic Boulder	flying	SKIP: no Scryfall entry	(no text=)
+Cartographer's Survey	flying	SKIP: Oracle lacks keyword	Look at the top seven cards of your library. Put up to two land cards from among
+Cat	lifelink	SKIP: no Scryfall entry	(no text=)
+Cat Bird Sky	flying	SKIP: no Scryfall entry	(no text=)
+Cat Cub	lifelink	SKIP: no Scryfall entry	(no text=)
+Circling Vultures	flash	SKIP: Oracle lacks keyword	Flying -- You may discard Circling Vultures any time you could cast an instant. 
+City's Blessing	shroud,indestructible	SKIP: no Scryfall entry	(no text=)
+Day	shroud,indestructible	SKIP: Oracle lacks keyword	(If it becomes day or night or if a daybound permanent enters, track day/night f
+Demon Arc	flying	SKIP: no Scryfall entry	(no text=)
+Dinosaur For	haste	SKIP: no Scryfall entry	(no text=)
+Discovery // Dispersal	flash	SKIP: Oracle lacks keyword	Surveil 2, then draw a card. -- (To surveil 2, look at the top two cards of your
+Distracting Geist	flying	SKIP: Oracle lacks keyword	Whenever Distracting Geist attacks, tap target creature defending player control
+Drake Tal	flying	SKIP: no Scryfall entry	(no text=)
+Drone	deathtouch	SKIP: no Scryfall entry	(no text=)
+Elemental Hoo	flying	SKIP: no Scryfall entry	(no text=)
+Flamescroll Celebrant	flash	SKIP: Oracle lacks keyword	Whenever an opponent activates an ability that isn't a mana ability, Flamescroll
+Ghitu Fire	flash	APPLIED	You may cast Ghitu Fire any time you could cast an instant i -> You may cast this spell as though it had flash if you pay {2} more to cast it. (
+Goblin Wiz	prowess	SKIP: no Scryfall entry	Whenever you cast a noncreature spell, this get +1/+1 until end of turn.
+Gorm the Great	menace	SKIP: Oracle lacks keyword	Partner with Virtus the Veiled (When this creature enters, target player may put
+Griffin Gri	flying	SKIP: no Scryfall entry	(no text=)
+Incubation // Incongruity	flash	SKIP: Oracle lacks keyword	Look at the top five cards of your library. You may reveal a creature card from 
+Insect Hor	flying,deathtouch	SKIP: no Scryfall entry	(no text=)
+Malevolent Hermit	lifelink	SKIP: Oracle lacks keyword	{U}, Sacrifice Malevolent Hermit: Counter target noncreature spell unless its co
+Mechtitan	flying,vigilance,trample,lifelink,haste	SKIP: no Scryfall entry	(no text=)
+Nessian Wilds Ravager	flying	SKIP: Oracle lacks keyword	Tribute 6 (As this creature enters, an opponent of your choice may put six +1/+1
+Night	shroud,indestructible	SKIP: Oracle lacks keyword	As it becomes night, transform all daybound permanents. -- Permanents enter the 
+Nimble Pilferer	flash	APPLIED	(no text=) -> Flash
+Plague Wight	flanking	SKIP: Oracle lacks keyword	Whenever Plague Wight becomes blocked, each creature blocking it gets -1/-1 unti
+Rout	flash	APPLIED	You may cast Rout any time you could cast an instant if you  -> You may cast this spell as though it had flash if you pay {2} more to cast it. (
+Said // Done	flash	SKIP: Oracle lacks keyword	Return target instant or sorcery card from your graveyard to your hand. -- Tap u
+Saproling Symbiosis	flash	APPLIED	You may cast Saproling Symbiosis any time you could cast an  -> You may cast this spell as though it had flash if you pay {2} more to cast it. (
+Smaug	flying,haste	SKIP: no Scryfall entry	When this creature dies, create fourteen Treasure tokens.
+Spirit Cai	flying	SKIP: no Scryfall entry	(no text=)
+The Initiative	shroud,indestructible	SKIP: no Scryfall entry	Whenever one or more creatures a player controls deal combat damage to you, that
+The Monarch	shroud,indestructible	SKIP: no Scryfall entry	At the beginning of your end step, draw a card. -- Whenever a creature deals com
+The Ring	shroud,indestructible	SKIP: no Scryfall entry	Your Ring-bearer is legendary and can't be blocked by creatures with greater pow
+Thundering Chariot	vigilance	SKIP: Oracle lacks keyword	First strike, trample, haste -- Crew 1 (Tap any number of creatures you control 
+Two-Headed Dragon	menace	APPLIED	Flying -- {1}{R}: Two-Headed Dragon gets +2/+0 until end of  -> Flying -- Menace (This creature can't be blocked except by two or more creatures
+Vecna	indestructible	SKIP: no Scryfall entry	At the beginning of your end step, if you lost 2 or more life this turn, create 
+Voice of the Blessed	flash	SKIP: Oracle lacks keyword	Whenever you gain life, put a +1/+1 counter on Voice of the Blessed. -- As long 
+Wall,Bir	defender	SKIP: no Scryfall entry	(no text=)
+Amrou Seekers	intimidate	SKIP: Oracle lacks keyword	Amrou Seekers can't be blocked except by artifact creatures and/or white creatur
+Charging Griffin	flying	APPLIED	Whenever Charging Griffin attacks, it gets +1/+1 until end o -> Flying (This creature can't be blocked except by creatures with flying or reach.
+Deceiver Exarch	flash	APPLIED	When Deceiver Exarch enters, choose one - Untap target perma -> Flash (You may cast this spell any time you could cast an instant.) -- When this
+Drove of Elves	hexproof	APPLIED	Drove of Elves's power and toughness are each equal to the n -> Hexproof -- Drove of Elves's power and toughness are each equal to the number of
+Fluxcharger	flying	APPLIED	Whenever you cast an instant or a sorcery spell, you may swi -> Flying -- Whenever you cast an instant or sorcery spell, you may switch this cre
+Forlorn Pseudamma	intimidate	APPLIED	Inspired -- Whenever Forlorn Pseudamma becomes untapped, you -> Intimidate (This creature can't be blocked except by artifact creatures and/or c
+High Sentinels of Arashin	flying	APPLIED	High Sentinels of Arashin gets +1/+1 for each other creature -> Flying -- This creature gets +1/+1 for each other creature you control with a +1
+Horde of Boggarts	menace	APPLIED	Horde of Boggarts's power and toughness are each equal to th -> Menace (This creature can't be blocked except by two or more creatures.) -- Hord
+Icefeather Aven	flying	APPLIED	Morph {1}{G}{U} (You may cast this card face down as a 2/2 c -> Flying -- Morph {1}{G}{U} (You may cast this card face down as a 2/2 creature fo
+Insectile Aberration	flying	APPLIED	(no text=) -> Flying
+Kederekt Creeper	menace	APPLIED	Deathtouch (Creatures dealt damage by this creature are dest -> Menace (This creature can't be blocked except by two or more creatures.) -- Deat
+Kheru Dreadmaw	defender	APPLIED	{1}{G}, Sacrifice another creature: You gain life equal to t -> Defender -- {1}{G}, Sacrifice another creature: You gain life equal to the sacri
+Korozda Gorgon	deathtouch	APPLIED	{2}, remove a +1/+1 counter from a creature you control: tar -> Deathtouch -- {2}, Remove a +1/+1 counter from a creature you control: Target cr
+Ludevic's Test Subject	defender	APPLIED	{1}{U}: Put a hatchling counter on Ludevic's Test Subject. T -> Defender -- {1}{U}: Put a hatchling counter on this creature. Then if there are 
+Lurker	shroud	SKIP: Oracle lacks keyword	Lurker can't be the target of spells unless it attacked or blocked this turn.
+Mistform Ultimus	changeling	SKIP: Oracle lacks keyword	Mistform Ultimus is every creature type (even if this card isn't on the battlefi
+Moltensteel Dragon	flying	APPLIED	({p(R)} may be paid for with either {R} or 2 life.) -- {p(R) -> ({R/P} can be paid with either {R} or 2 life.) -- Flying -- {R/P}: This creature
+Monastery Swiftspear	haste	APPLIED	Prowess (Whenever you cast a noncreature spell, this creatur -> Haste -- Prowess (Whenever you cast a noncreature spell, this creature gets +1/+
+Oblivion Crown	flash	APPLIED	Enchant creature -- Enchanted creature has "Discard a card:  -> Flash (You may cast this spell any time you could cast an instant.) -- Enchant c
+Plated Slagwurm	hexproof	APPLIED	Plated Slagwurm can't be the target of spells or abilities y -> Hexproof (This creature can't be the target of spells or abilities your opponent
+Purphoros's Emissary	menace	APPLIED	Bestow {6}{R} (If you cast this card for its bestow cost, it -> Bestow {6}{R} (If you cast this card for its bestow cost, it's an Aura spell wit
+Ravager of the Fells	trample	APPLIED	Whenever this creature transforms into Ravager of the Fells, -> Trample -- Whenever this creature transforms into Ravager of the Fells, it deals
+Ravenous Leucrocota	vigilance	APPLIED	{6}{G}: Monstrosity 3. (If this creature isn't monstrous, pu -> Vigilance -- {6}{G}: Monstrosity 3. (If this creature isn't monstrous, put three
+Relic Putrescence	infect	SKIP: Oracle lacks keyword	Enchant artifact -- Whenever enchanted artifact becomes tapped, its controller g
+Ripscale Predator	menace	APPLIED	Ripscale Predator can't be blocked except by two or more cre -> Menace (This creature can't be blocked except by two or more creatures.)
+Ruric Thar, the Unbowed	vigilance,reach	APPLIED	Ruric Thar, the Unbowed attacks each combat if able. -- When -> Vigilance, reach -- Ruric Thar attacks each combat if able. -- Whenever a player
+Sacred Wolf	hexproof	APPLIED	Sacred Wolf can't be the target of spells or abilities your  -> Hexproof (This creature can't be the target of spells or abilities your opponent
+Sandsteppe Mastodon	reach	APPLIED	When Sandsteppe Mastodon enters Bolster 5 (Choose a creature -> Reach -- When this creature enters, bolster 5. (Choose a creature with the least
+Sentry of the Underworld	flying,vigilance	APPLIED	{W}{B}, Pay 3 life: Regenerate Sentry of the Underworld. -> Flying, vigilance -- {W}{B}, Pay 3 life: Regenerate this creature.
+Silhana Ledgewalker	hexproof	APPLIED	Silhana Ledgewalker can't be blocked except by creatures wit -> Hexproof (This creature can't be the target of spells or abilities your opponent
+Skirk Shaman	intimidate	SKIP: Oracle lacks keyword	Skirk Shaman can't be blocked except by artifact creatures and/or red creatures.
+Slippery Bogle	hexproof	APPLIED	Slippery Bogle can't be the target of spells or abilities yo -> Hexproof (This creature can't be the target of spells or abilities your opponent
+Sphinx of Jwar Isle	hexproof	SKIP: Oracle lacks keyword	Flying, shroud -- You may look at the top card of your library. (You may do this
+Spiked Jester	haste	SKIP: no Scryfall entry	(no text=)
+Stormblood Berserker	menace	APPLIED	Bloodthirst 2 (If an opponent was dealt damage this turn, th -> Bloodthirst 2 (If an opponent was dealt damage this turn, this creature enters w
+Stormbreath Dragon	flying,haste	APPLIED	{5}{R}{R}: Monstrosity 3. (If this creature isn't monstrous, -> Flying, haste, protection from white -- {5}{R}{R}: Monstrosity 3. (If this creat
+Tajic, Blade of the Legion	indestructible	APPLIED	Battalion -- Whenever Tajic attacks with at least two other  -> Indestructible -- Battalion - Whenever Tajic and at least two other creatures at
+Taoist Hermit	hexproof	APPLIED	Taoist Hermit can't be the target of spells or abilities you -> Hexproof (This creature can't be the target of spells or abilities your opponent
+Tetravite	flying	SKIP: no Scryfall entry	(no text=)
+Thallid Shell-Dweller	defender	APPLIED	At the beginning of your upkeep, put a spore counter on Thal -> Defender -- At the beginning of your upkeep, put a spore counter on this creatur
+Thousand Winds	flying	APPLIED	Morph {5}{U}{U} (You may cast this card face down as a 2/2 c -> Flying -- Morph {5}{U}{U} (You may cast this card face down as a 2/2 creature fo
+Thrun, the Last Troll	hexproof	APPLIED	Thrun, the Last Troll can't be countered. -- Thrun can't be  -> This spell can't be countered. -- Hexproof (This creature can't be the target of
+Triskelavite Token	flying	SKIP: no Scryfall entry	Sacrifice this creature: This creature deals 1 damage to any target.
+Troll Ascetic	hexproof	APPLIED	Troll Ascetic can't be the target of spells or abilities you -> Hexproof (This creature can't be the target of spells or abilities your opponent
+Trostani Knight	vigilance	SKIP: no Scryfall entry	(no text=)
+Trostani Rhino	trample	SKIP: no Scryfall entry	(no text=)
+Uril, the Miststalker	hexproof	APPLIED	Uril, the Miststalker can't be the target of spells or abili -> Hexproof (This creature can't be the target of spells or abilities your opponent
+Viashino Runner	menace	APPLIED	Viashino Runner can't be blocked except by two or more creat -> Menace (This creature can't be blocked except by two or more creatures.)
+Vine Kami	menace	APPLIED	Vine Kami can't be blocked except by two or more creatures.  -> Menace (This creature can't be blocked except by two or more creatures.) -- Soul
+Wind Spirit	menace	APPLIED	Flying -- Wind Spirit can't be blocked except by two or more -> Flying -- Menace (This creature can't be blocked except by two or more creatures
+Zuo Ci, the Mocking Sage	hexproof	APPLIED	Zuo Ci, the Mocking Sage can't be blocked by creatures with  -> Hexproof (This creature can't be the target of spells or abilities your opponent
