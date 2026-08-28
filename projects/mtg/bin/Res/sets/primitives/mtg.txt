@@ -34059,7 +34059,7 @@ auto=target(other creature|mybattlefield) 3/0 ueot
 facedown={3}
 autofacedown={2}{U}{R}{W}:morph
 autofaceup=target(other creature|mybattlefield) 3/0
-text=Morph {2}{U}{R}{W} (You may cast this face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.) -- When Efreet Weaponmaster enters or is turned face up, another target creature you control gets +3/+0 until end of turn.
+text=First strike -- Morph {2}{U}{R}{W} (You may cast this face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.) -- When Efreet Weaponmaster enters or is turned face up, another target creature you control gets +3/+0 until end of turn.
 mana={3}{U}{R}{W}
 type=Creature
 subtype=Efreet Monk
@@ -113221,6 +113221,7 @@ type=Enchantment
 [card]
 name=Steeple Roc
 abilities=flying,first strike
+text=Flying, first strike
 mana={4}{W}
 type=Creature
 subtype=Bird

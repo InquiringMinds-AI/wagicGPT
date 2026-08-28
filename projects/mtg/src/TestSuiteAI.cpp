@@ -2334,17 +2334,28 @@ int runCardScriptValidation()
             for (size_t w = 0; w < sizeof(kws)/sizeof(kws[0]); ++w)
             {
                 bool scripted = inst->basicAbilities[kws[w].flag] != 0;
-                string mt = inst->magicText;
-                std::transform(mt.begin(), mt.end(), mt.begin(), ::tolower);
-                if (mt.find(kws[w].kw) != string::npos)
+                //A keyword named INSIDE a counter( ... ) is a counter name (Bold
+                //Plagiarist mirrors keyword counters), not a grant - skip such lines.
+                auto grantsKw = [&](const string & text) -> bool {
+                    string z = text;
+                    std::transform(z.begin(), z.end(), z.begin(), ::tolower);
+                    size_t pos = 0;
+                    while (pos < z.size())
+                    {
+                        size_t nl = z.find('\n', pos);
+                        string line = z.substr(pos, nl == string::npos ? string::npos : nl - pos);
+                        if (line.find(kws[w].kw) != string::npos && line.find("counter(") == string::npos)
+                            return true;
+                        if (nl == string::npos) break;
+                        pos = nl + 1;
+                    }
+                    return false;
+                };
+                if (grantsKw(inst->magicText))
                     scripted = true;
                 for (map<string,string>::iterator it = inst->magicTexts.begin(); !scripted && it != inst->magicTexts.end(); ++it)
-                {
-                    string z = it->second;
-                    std::transform(z.begin(), z.end(), z.begin(), ::tolower);
-                    if (z.find(kws[w].kw) != string::npos)
+                    if (grantsKw(it->second))
                         scripted = true;
-                }
                 if (scripted && oracle.find(kws[w].kw) == string::npos)
                 {
                     fprintf(out, "VALIDATE-WARN\tkeyword-not-in-oracle\t%s\t%d\t%s\n",
