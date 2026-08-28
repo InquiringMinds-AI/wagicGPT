@@ -5601,3 +5601,15 @@ DRAW PRICE reach, ANNOUNCE_X plan suppression). Suite 1137/0 + 37/0, PARSETEST 1
 Owner reorganised ~/Projects to a single wagic node. Every recipe above that mounts
 `-v /home/magi/Projects/wagicGPT-psp:/build` now reads `-v /home/magi/Projects/wagicGPT/worktrees/psp:/build`;
 deploy-vita.sh default VPK path updated. Lane worktrees go under worktrees/lanes/.
+
+## 2026-08-27 — session-close Vita VPK (owner request: "after the merges... build a vpk, and deploy it")
+psp-port ff'd to b2ce13e89 (= master at the wave-52 step-1 merge; gate 1158/0 + 43 AI/0 on a
+`make -B` full rebuild, PARSETEST 2121/0). Hermetic vitasdk build from a wiped build_vita
+(root-owned after docker — `sudo rm -rf`), unit vita-vpk6, log ~/.gatelogs/vita_vpk6.log,
+exit 0. VPK 33,136,250 B -> handheld 10.0.0.227:1337 ux0:/vpk/wagic.vpk, size-verified.
+Install manual (VitaShell -> Cross). Carries since the morning VPK (6819183f7): ability-border
+permissive double-count fix (Ironroot Warlord), morph Face-Up liveness (Mystic of the Hidden
+Way), Soul Shatter/Flare/Riveteers card scripts (highest-MV creature OR planeswalker), AI
+casts routed through the payment planner (dual-vs-mono tap order), Battlement one-tap,
+instants offered on the opponent's turn, countered-cast double-pay fix, cleanup discard as a
+model decision, and the wave-49..52 LLM-UX batches. Docker stopped after the build.
