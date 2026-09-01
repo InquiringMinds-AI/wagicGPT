@@ -1,0 +1,28 @@
+# W54-F (c), the negative that keeps the preference a PREFERENCE: holding a utility land back must
+# never make a payable cost unpayable. One Forest, Squirrel Nest on it, {G} to pay (Llanowar Elves):
+# the enchanted Forest is the ONLY source, so it taps and the squirrel ability goes with it.
+# EXPECTED: pool {G}, 1 tapped, assertusable 0 (the tapped land offers nothing).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Forest
+hand:Squirrel Nest,Llanowar Elves
+manapool:{1}{G}{G}
+life:20
+[PLAYER2]
+life:20
+[DO]
+squirrel nest
+forest
+assertusable 1 forest
+autotap llanowar elves
+assertusable 0 forest
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Forest,Squirrel Nest
+hand:Llanowar Elves
+tappedinplay:1
+manapool:{G}
+[PLAYER2]
+[END]
