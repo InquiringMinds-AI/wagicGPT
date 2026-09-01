@@ -1,0 +1,35 @@
+#Negative control for the evolve/enters-with-counters fix: the SAME card and
+#the SAME script as experiment_one_bloodthirst_evolve, minus the ping. With no
+#damage dealt to an opponent this turn, bloodthirst adds nothing and Scab-Clan
+#Mauler enters as its printed 1/1. Evolve wants GREATER power or toughness, so
+#a 1/1 next to a 1/1 Experiment One must NOT evolve.
+#Life math: 20 - 1 (un-evolved 1/1 Experiment One) = 19. 18 = evolve fired
+#when it must not.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Experiment One,Vulshok Sorcerer
+hand:Scab-Clan Mauler
+manapool:{R}{G}
+[PLAYER2]
+life:20
+[DO]
+scab-clan mauler
+next
+#begin
+next
+#attackers
+experiment one
+next
+#blockers
+next
+#damage
+next
+#end combat
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Experiment One,Vulshok Sorcerer,Scab-Clan Mauler
+[PLAYER2]
+life:19
+[END]

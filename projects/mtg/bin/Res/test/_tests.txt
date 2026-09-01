@@ -1262,3 +1262,6 @@ instant_response_window_opponent_upkeep.txt
 split_half_instant_timing.txt
 mutual_destruction_conditional_flash.txt
 mutual_destruction_no_flash_permanent.txt
+experiment_one_bloodthirst_evolve.txt
+experiment_one_etb_counters_evolve.txt
+experiment_one_no_evolve_equal_pt.txt

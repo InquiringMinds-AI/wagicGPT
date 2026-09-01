@@ -5189,19 +5189,15 @@ MTGAbility * AbilityFactory::parseMagicLine(string s, int id, Spell * spell, MTG
         return NEW ARampageAbility(observer, id, card, power, toughness, MaxOpponent);
     }
 
-    //evolve - a real triggered ability: TrEvolve fires on a qualifying
-    //creature entering, and the +1/+1 counter is an AACounter that rides the
-    //stack (so it resolves after the entering spell's abilities register and
-    //emits the batch counter event plus-riders consume).
+    //evolve - a real triggered ability: AEvolve fires on a qualifying creature
+    //entering, rides the stack, and makes the power/toughness comparison when
+    //it RESOLVES rather than inside the zone-change dispatch, so it sees
+    //enters-with counters (bloodthirst, counter(1/1[,N|,X]), graft, unleash,
+    //devour). Its +1/+1 counter is still an AACounter, so the batch counter
+    //event plus-riders consume is unchanged. See AEvolve in AllAbilities.h.
     if (s.find("evolve") != string::npos)
     {
-        TriggeredAbility * evolveTrigger = NEW TrEvolve(observer, id, card);
-        MTGAbility * evolveCounter = NEW AACounter(observer, id, card, card, "1/1", "", 1, 1, 1);
-        //oneShot, like every parsed trigger payload: GenericTriggeredAbility::
-        //resolve() RESOLVES a oneShot payload but merely addToGame()s a
-        //persistent one - a non-oneShot AACounter would sit inert forever.
-        evolveCounter->oneShot = 1;
-        return NEW GenericTriggeredAbility(observer, id, card, evolveTrigger, evolveCounter);
+        return NEW AEvolve(observer, id, card);
     }
 
     //produce additional mana when tapped for mana

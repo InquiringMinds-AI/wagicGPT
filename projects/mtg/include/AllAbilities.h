@@ -7369,7 +7369,7 @@ public:
     }
 };
 
-//Evole ability
+//Evolve ability
 //Evolve is a TRIGGERED ability (rules 702.100): "Whenever a creature you
 //control enters, if it has greater power or toughness than this creature,
 //put a +1/+1 counter on this creature." Until 2026-08-06 it was modeled as an
@@ -7377,19 +7377,67 @@ public:
 //dispatch - before the entering spell's own abilities were registered
 //(Spell::resolve calls addAbilities only after putInZone), so a Winding
 //Constrictor entering and triggering evolve could never apply its own rider.
-//As a Trigger wrapped in GenericTriggeredAbility (see the "evolve" branch in
-//AbilityFactory), the counter rides the stack and resolves after
-//registration, like the paper card.
-class TrEvolve: public Trigger
+//It then became TrEvolve + AACounter inside a GenericTriggeredAbility, which
+//put the COUNTER on the stack but still made the power/toughness comparison
+//inside the zone-change dispatch.
+//
+//That leftover is the bug this class fixes (owner Vita report 2026-09-01:
+//"experiment one does not evolve" when a bloodthirsted Scab-Clan Mauler
+//enters as a 3/3). EVERY "enters with counters" mechanism - bloodthirst
+//(CR 702.54), the `counter(1/1)` / `counter(1/1,N)` / `counter(1/1,X)` ETB
+//riders, graft, unleash, devour - applies its counters in that later
+//addAbilities step, so a comparison made during the zone-change dispatch sees
+//the PRINTED power/toughness (Scab-Clan Mauler's 1/1), never the creature
+//that actually entered (3/3).
+//
+//So AEvolve records WHICH creature entered and re-makes the CR 603.4
+//intervening-if comparison when the triggered ability RESOLVES, by which time
+//all enters-with counters are on the creature. The counter itself is still an
+//AACounter, so Solemnity/COUNTERSHROUD, `next`-chasing and the batched
+//WEventTotalCounters that plus-riders (Winding Constrictor, Wildwood Scourge)
+//consume all behave exactly as before.
+//
+//Two deliberate, documented divergences from paper, both strictly rarer than
+//the bug they replace:
+// - a creature that entered SMALLER and is pumped in response to this trigger
+//   evolves here, where paper would never have triggered (the intervening-if
+//   is checked only at resolution, not also at trigger time);
+// - if the entering creature has left the battlefield by resolution, this does
+//   nothing rather than using last-known information.
+class AEvolve: public TriggeredAbility
 {
 public:
-    TrEvolve(GameObserver* observer, int id, MTGCardInstance * source) :
-        Trigger(observer, id, source, false)
+    //One entry per pending trigger: fireAbility() can stack this ability more
+    //than once before the first copy resolves (two creatures entering during
+    //one resolution), exactly like GenericTriggeredAbility's target queue.
+    std::queue<MTGCardInstance *> entering;
+    AACounter * counterPayload;
+
+    AEvolve(GameObserver* observer, int id, MTGCardInstance * _source) :
+        TriggeredAbility(observer, id, _source)
     {
+        target = _source;
+        counterPayload = NEW AACounter(observer, id, _source, _source, "1/1", "", 1, 1, 1);
+        counterPayload->oneShot = 1;
     }
 
-    int triggerOnEventImpl(WEvent * event)
+    AEvolve(const AEvolve& other) :
+        TriggeredAbility(other), entering(other.entering)
     {
+        counterPayload = other.counterPayload ? other.counterPayload->clone() : NULL;
+    }
+
+    ~AEvolve()
+    {
+        SAFE_DELETE(counterPayload);
+    }
+
+    int triggerOnEvent(WEvent * event)
+    {
+        //Abilities don't work if the card is phased (Trigger::triggerOnEvent
+        //used to do this for us).
+        if (!source || source->isPhased)
+            return 0;
         WEventZoneChange * enters = dynamic_cast<WEventZoneChange *> (event);
         if (!enters || !enters->card)
             return 0;
@@ -7402,14 +7450,40 @@ public:
             return 0;
         if (enters->card == source)
             return 0;
-        if (enters->card->power > source->power || enters->card->toughness > source->toughness)
-            return 1;
-        return 0;
+        entering.push(enters->card);
+        return 1;
     }
 
-    TrEvolve * clone() const
+    int resolve()
     {
-        return NEW TrEvolve(*this);
+        if (!entering.size())
+            return 0;
+        MTGCardInstance * entered = entering.front();
+        entering.pop();
+        if (!entered || !source || source->isPhased)
+            return 0;
+        if (!game->isInPlay(source) || !game->isInPlay(entered))
+            return 0;
+        //CR 603.4 intervening-if, re-checked at resolution. This is the whole
+        //point of the class: by now the entering creature carries the counters
+        //it entered with.
+        if (entered->power <= source->power && entered->toughness <= source->toughness)
+            return 0;
+        if (!counterPayload)
+            return 0;
+        counterPayload->source = source;
+        counterPayload->target = source;
+        return counterPayload->resolve();
+    }
+
+    const string getMenuText()
+    {
+        return "Evolve";
+    }
+
+    AEvolve * clone() const
+    {
+        return NEW AEvolve(*this);
     }
 };
 

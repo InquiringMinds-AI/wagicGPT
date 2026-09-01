@@ -1,0 +1,39 @@
+#Owner Vita play report 2026-09-01: "Experiment one 1/1 and vulshock sorceror
+#in play, tap sorceror to ping opponent for 1 damage, cast scab-clan mauler
+#which comes in with bloodthirst 2 making it a 3/3 as it enters, and the bug is
+#experiment one does not evolve".
+#Evolve (CR 702.100) compares the entering creature's power/toughness AS IT
+#ENTERS; bloodthirst (CR 702.54) is an enters-with-counters replacement, so the
+#Mauler enters as a 3/3 and 3 > 1 must evolve Experiment One to 2/2.
+#Life math: 20 - 1 (Vulshok ping) - 2 (evolved Experiment One) = 17.
+#18 = evolve missed (the reported bug).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Experiment One,Vulshok Sorcerer
+hand:Scab-Clan Mauler
+manapool:{R}{G}
+[PLAYER2]
+life:20
+[DO]
+vulshok sorcerer
+p2
+scab-clan mauler
+next
+#begin
+next
+#attackers
+experiment one
+next
+#blockers
+next
+#damage
+next
+#end combat
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Experiment One,Vulshok Sorcerer,Scab-Clan Mauler
+[PLAYER2]
+life:17
+[END]
