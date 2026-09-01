@@ -1,0 +1,20 @@
+# W54-E control: same board WITHOUT Transcendent Envoy. The bestow cost stays
+# the printed {3}{G}, which three Forests cannot pay, so the human gate must
+# NOT offer the bestow mode. A fourth Forest would (see the four-mana fixture).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest,Forest,Grizzly Bears
+hand:Leafcrown Dryad
+[PLAYER2]
+life:20
+[DO]
+assertaltpayable 0 leafcrown dryad
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest,Forest,Grizzly Bears
+hand:Leafcrown Dryad
+[PLAYER2]
+life:20
+[END]

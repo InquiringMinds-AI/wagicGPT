@@ -1,0 +1,30 @@
+# W54-E control (c): NO Transcendent Envoy, FOUR mana. The printed bestow
+# cost {3}{G} is affordable, so the cast-mode menu offers bestow (choice 1)
+# and the bestowed Dryad makes the bears 4/4 (life 20 -> 16).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Leafcrown Dryad
+manapool:{3}{G}
+[PLAYER2]
+life:20
+[DO]
+Leafcrown Dryad
+choice 1
+Grizzly Bears
+next
+next
+Grizzly Bears
+next
+next
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Leafcrown Dryad
+manapool:{0}
+[PLAYER2]
+life:16
+[END]

@@ -1,0 +1,24 @@
+# W54-E (owner Vita report, the LANDS seat): with three untapped Forests and an
+# EMPTY pool, the human cast-mode gate must price Leafcrown Dryad's bestow cost
+# through potential mana + the payment planner, not the pool. With Transcendent
+# Envoy in play the aura reduction makes that cost {2}{G}, so the bestow mode is
+# offerable off three lands; drop the Envoy and the printed {3}{G} is not.
+# assertaltpayable calls the same pricing function the gate calls (a fixture
+# seat is AIPlayer-derived and can never reach the human branch by clicking).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest,Forest,Transcendent Envoy,Grizzly Bears
+hand:Leafcrown Dryad
+[PLAYER2]
+life:20
+[DO]
+assertaltpayable 1 leafcrown dryad
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest,Forest,Transcendent Envoy,Grizzly Bears
+hand:Leafcrown Dryad
+[PLAYER2]
+life:20
+[END]

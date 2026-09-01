@@ -1787,10 +1787,15 @@ MTGMorphCostRule::MTGMorphCostRule(GameObserver* observer, int _id) :
 //appeared. Price the human seat the way the cast rule does (W48/W50): strict
 //potential + pool, then the colour-aware payment planner. The AI seats keep
 //the pool test (they float mana before clicking).
-static bool humanCanPayAlternative(GameObserver * game, MTGCardInstance * card, ManaCost * cost)
+//W54-E: the pricing half, callable without the isAI() seat test so the test
+//harness can pin it (see MTGRules.h). Bestow rides this same path: MTGBestowRule
+//delegates to MTGAlternativeCostRule::isReactingToClick with the (possibly
+//cost-reduced) bestow cost, so an aura cost reduction and auto-tap must both
+//be visible here.
+bool MTGAlternativeCostRule::alternativeCostPayable(GameObserver * game, MTGCardInstance * card, ManaCost * cost)
 {
     Player * player = game->currentlyActing();
-    if (!player || player->isAI() || !cost)
+    if (!player || !card || !cost)
         return false;
     ManaEngine::FreeProducerPolicy freePolicy;
     ManaCost * potential = ManaEngine::potentialMana(player, freePolicy, card);
@@ -1800,6 +1805,14 @@ static bool humanCanPayAlternative(GameObserver * game, MTGCardInstance * card, 
     if (!ok)
         ok = ManaEngine::planPayment(player, freePolicy, card, cost, card->has(Constants::ANYTYPEOFMANA)).size() > 0;
     return ok;
+}
+
+static bool humanCanPayAlternative(GameObserver * game, MTGCardInstance * card, ManaCost * cost)
+{
+    Player * player = game->currentlyActing();
+    if (!player || player->isAI() || !cost)
+        return false;
+    return MTGAlternativeCostRule::alternativeCostPayable(game, card, cost);
 }
 
 int MTGMorphCostRule::isReactingToClick(MTGCardInstance * card, ManaCost *)

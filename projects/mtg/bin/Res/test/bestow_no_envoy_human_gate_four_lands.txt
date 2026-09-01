@@ -1,0 +1,20 @@
+# W54-E control: four Forests, no Transcendent Envoy - the printed bestow cost
+# {3}{G} is payable off untapped lands with an empty pool, so the human gate
+# offers the bestow mode.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest,Forest,Forest,Grizzly Bears
+hand:Leafcrown Dryad
+[PLAYER2]
+life:20
+[DO]
+assertaltpayable 1 leafcrown dryad
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Forest,Forest,Forest,Forest,Grizzly Bears
+hand:Leafcrown Dryad
+[PLAYER2]
+life:20
+[END]

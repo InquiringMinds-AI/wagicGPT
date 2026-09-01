@@ -119697,6 +119697,7 @@ type=Land
 name=Transcendent Envoy
 abilities=flying
 auto=lord(enchantment[aura]|mycastingzone) altercost(colorless,-1)
+auto=modbenchant(colorless:-1) controller
 text=Flying -- Aura spells you cast cost {1} less to cast.
 mana={1}{W}
 type=Enchantment Creature

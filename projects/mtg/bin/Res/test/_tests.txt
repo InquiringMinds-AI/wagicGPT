@@ -1262,3 +1262,9 @@ instant_response_window_opponent_upkeep.txt
 split_half_instant_timing.txt
 mutual_destruction_conditional_flash.txt
 mutual_destruction_no_flash_permanent.txt
+bestow_envoy_reduced_offered.txt
+bestow_no_envoy_three_mana_normal.txt
+bestow_four_mana_offered.txt
+bestow_envoy_human_gate_lands.txt
+bestow_no_envoy_human_gate_lands.txt
+bestow_no_envoy_human_gate_four_lands.txt
