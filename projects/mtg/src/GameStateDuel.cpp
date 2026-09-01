@@ -1149,6 +1149,18 @@ void GameStateDuel::Update(float dt)
             for (int gi = 0; gi < 2; gi++)
                 if (game->players[gi])
                     game->players[gi]->gameEnded();
+#if defined(VITA) && defined(WAGIC_VITAMEMLOG)
+            //This frame can repeat; one memlog line per game end.
+            {
+                static GameObserver* memlogged = NULL;
+                if (memlogged != game)
+                {
+                    memlogged = game;
+                    extern "C" void vitaMemProbe(const char*, int);
+                    vitaMemProbe("gameend", game->turn);
+                }
+            }
+#endif
             //One-shot self-play: the harness runs ONE game per process, so on
             //game-over emit the winner (for win-rate) and exit cleanly. The
             //translog is durable per-decision (AIPlayerGPT opens/append/closes

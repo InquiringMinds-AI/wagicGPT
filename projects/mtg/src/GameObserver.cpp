@@ -329,6 +329,9 @@ void GameObserver::nextGamePhase()
     {
     case MTG_PHASE_UNTAP:
         DebugTrace("Untap Phase -------------   Turn " << turn );
+#if defined(VITA) && defined(WAGIC_VITAMEMLOG)
+        { extern "C" void vitaMemProbe(const char*, int); vitaMemProbe("untap", turn); }
+#endif
         phasingPhase();
         untapPhase();
         break;
@@ -654,6 +657,9 @@ void GameObserver::startGame(GameType gtype, Rules * rules)
 {
     sgMark("begin");
     mGameType = gtype;
+#if defined(VITA) && defined(WAGIC_VITAMEMLOG)
+    { extern "C" void vitaMemProbe(const char*, int); vitaMemProbe("gamestart", 0); }
+#endif
     turn = 0;
     mRules = rules;
     if (rules) 

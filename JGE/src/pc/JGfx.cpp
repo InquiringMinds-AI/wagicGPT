@@ -47,6 +47,7 @@ extern "C" {
 #endif
 
 #include <cstdlib>
+#include <new>
 
 // WAGIC_HEADLESS: run the full game loop with no window and no GL context
 // (test suite / self-play on a machine with no display). CPU-side work --
@@ -2035,7 +2036,7 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename,
 
     rawsize = fileSystem->GetFileSize();
 
-    rawdata = new BYTE[rawsize];
+    rawdata = new (std::nothrow) BYTE[rawsize];
 
     if (!rawdata)
     {
@@ -2074,9 +2075,9 @@ void JRenderer::LoadJPG(TextureInfo &textureInfo, const char *filename,
     // Allocate Memory for decompressed image
 #if defined(VITA)
     int pixelSize = (TextureFormat == GU_PSM_5551) ? 2 : 4;
-    rgbadata = new BYTE[tw * th * pixelSize];
+    rgbadata = new (std::nothrow) BYTE[tw * th * pixelSize];
 #else
-    rgbadata = new BYTE[tw * th * 4];
+    rgbadata = new (std::nothrow) BYTE[tw * th * 4];
 #endif
     if(!rgbadata)
     {
@@ -2276,7 +2277,7 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
     if (!fileSystem->OpenFile(filename))
         return JGE_ERR_CANT_OPEN_FILE;
     int rawsize = fileSystem->GetFileSize();
-    BYTE* rawdata = new BYTE[rawsize];
+    BYTE* rawdata = new (std::nothrow) BYTE[rawsize];
     if (!rawdata)
     {
         fileSystem->CloseFile();
@@ -2338,7 +2339,7 @@ int JRenderer::LoadPNG(TextureInfo &textureInfo, const char *filename, int mode 
 
     int size = tw * th * 4;			// RGBA
 
-    BYTE* buffer = new BYTE[size];
+    BYTE* buffer = new (std::nothrow) BYTE[size];
 
     if (buffer)
     {
@@ -2622,7 +2623,7 @@ JTexture* JRenderer::LoadTexture(const char* filename, int mode, int TextureForm
             break;
 
         rawsize = fileSystem->GetFileSize();
-        rawdata = new BYTE[rawsize];
+        rawdata = new (std::nothrow) BYTE[rawsize];
 
         if (!rawdata)
         {
@@ -2715,7 +2716,7 @@ JTexture* JRenderer::LoadTexture(const char* filename, int, int)
             break;
 
         rawsize = fileSystem->GetFileSize();
-        rawdata = new BYTE[rawsize];
+        rawdata = new (std::nothrow) BYTE[rawsize];
 
         if (!rawdata)
         {
@@ -2846,7 +2847,7 @@ JTexture* JRenderer::CreateTexture(int width, int height, int mode __attribute__
             return tex;
         }
         int size = width * height * sizeof(PIXEL_TYPE);			// RGBA
-        BYTE* buffer = new BYTE[size];
+        BYTE* buffer = new (std::nothrow) BYTE[size];
         if (buffer)
         {
             tex->mFilter = TEX_FILTER_LINEAR;

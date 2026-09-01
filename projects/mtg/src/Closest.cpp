@@ -6,6 +6,10 @@
 template<typename T, typename Target>
 static inline Target* closest(vector<Target*>& cards, Limitor* limitor, Target* ref)
 {
+    //A NULL cursor has no position to compare against (GuiCombatLeft/Right
+    //read ref->x/y). Vita dump 2026-08-31: data abort here from shiftRight.
+    if (!ref)
+        return NULL;
     Target* card = ref;
     float curdist = 1000000.0f; // This is bigger than any possible distance
     for (typename vector<Target*>::iterator it = cards.begin(); it != cards.end(); ++it)

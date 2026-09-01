@@ -292,6 +292,10 @@ set(MTG_SOURCES
 # inert for this generator), and a GLOBAL WAGIC_DEVLOGS would switch on JGfx's
 # per-quad thinlog. WAGIC_FIZZLELOG is referenced only by MTGAbility.cpp's gates.
 add_definitions(-DWAGIC_FIZZLELOG)
+# Per-turn heap + vitaGL pool probe -> ux0:data/Wagic/memlog.txt (Vitamain.cpp
+# vitaMemProbe; hooks in GameObserver/GameStateDuel). Chasing the 2026-08-30..09-01
+# bad_alloc-in-LoadPNG crash cluster. ALPHA-ONLY - REMOVE FOR RELEASE.
+add_definitions(-DWAGIC_VITAMEMLOG)
 
 add_executable(${PROJECT_NAME}
   ${JGE_SOURCES}

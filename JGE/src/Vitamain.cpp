@@ -52,6 +52,37 @@ static void debugLog(const char* msg) {
     }
 }
 
+#ifdef WAGIC_VITAMEMLOG
+// --- Memory probe (ux0:data/Wagic/memlog.txt, APPEND - survives relaunches) ---
+// Five crash dumps 2026-08-30..09-01 were std::bad_alloc in LoadPNG's decode
+// buffer, each after ~10 games of a session; desktop self-play holds flat, so
+// the growth is Vita-side. newlib's heap is a fixed 128MB memblock (weak
+// _newlib_heap_size_user unset) and vitaGL maps that SAME heap as its
+// VGL_MEM_EXTERNAL pool - textures spill into it once VRAM/RAM pools fill, so
+// a duel's art can fragment the heap the decode buffers need. One line per
+// game start / untap / game end: heap (mallinfo) + every vitaGL pool.
+// ALPHA-ONLY diagnostic - compiled out unless WAGIC_VITAMEMLOG (CMakeLists).
+#include <malloc.h>
+extern "C" void vitaMemProbe(const char* tag, int turn)
+{
+    struct mallinfo mi = mallinfo();
+    char buf[320];
+    snprintf(buf, sizeof buf,
+             "t=%llu %s turn=%d heap_used=%u heap_free=%u heap_arena=%u "
+             "vram_free=%u ram_free=%u slow_free=%u ext_free=%u\n",
+             (unsigned long long) (sceKernelGetProcessTimeWide() / 1000000ULL), tag, turn,
+             (unsigned) mi.uordblks, (unsigned) mi.fordblks, (unsigned) mi.arena,
+             (unsigned) vglMemFree(VGL_MEM_VRAM), (unsigned) vglMemFree(VGL_MEM_RAM),
+             (unsigned) vglMemFree(VGL_MEM_SLOW), (unsigned) vglMemFree(VGL_MEM_EXTERNAL));
+    SceUID fd = sceIoOpen("ux0:data/Wagic/memlog.txt", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0666);
+    if (fd >= 0)
+    {
+        sceIoWrite(fd, buf, strlen(buf));
+        sceIoClose(fd);
+    }
+}
+#endif // WAGIC_VITAMEMLOG
+
 static void debugLogClose() {
     if (g_debugFd >= 0) {
         sceIoClose(g_debugFd);

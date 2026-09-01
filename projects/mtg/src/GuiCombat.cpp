@@ -229,8 +229,53 @@ bool GuiCombat::clickOK()
 }
 
 
+//The cursor pointers can be NULLed underneath a live cursor_pos: a creature
+//leaving combat (receiveEventMinus/unsetCursorIfOwnedBy) clears `active` and
+//`activeAtk` but leaves cursor_pos at ATK/BLK, and the next LEFT/RIGHT/UP/DOWN
+//dereferenced NULL (Vita data abort in shiftRight, 2026-08-31). Re-seat the
+//cursor on the first shown attacker, or fall back to the OK button.
+void GuiCombat::reseatCursor()
+{
+    if (NONE == cursor_pos || OK == cursor_pos)
+        return;
+    if (BLK == cursor_pos)
+    {
+        if (activeAtk && active)
+            return;
+        if (activeAtk && !activeAtk->blockers.empty())
+        {
+            active = activeAtk->blockers.front();
+            active->zoom = kZoom_level3;
+            return;
+        }
+        cursor_pos = ATK;
+    }
+    if (ATK == cursor_pos && active)
+    {
+        activeAtk = static_cast<AttackerDamaged*> (active);
+        return;
+    }
+    active = activeAtk = NULL;
+    for (inner_iterator it = attackers.begin(); it != attackers.end(); ++it)
+        if ((*it)->show)
+        {
+            active = *it;
+            break;
+        }
+    if (active)
+    {
+        active->zoom = kZoom_level3;
+        activeAtk = static_cast<AttackerDamaged*> (active);
+        remaskBlkViews(NULL, activeAtk);
+        cursor_pos = ATK;
+    }
+    else
+        cursor_pos = OK;
+}
+
 void GuiCombat::shiftLeft()
 {
+    reseatCursor();
     switch (cursor_pos)
     {
         case NONE:
@@ -278,6 +323,7 @@ void GuiCombat::shiftLeft()
 
 void GuiCombat::shiftRight( DamagerDamaged* oldActive )
 {
+    reseatCursor();
     switch (cursor_pos)
     {
         case NONE:
@@ -336,6 +382,7 @@ bool GuiCombat::CheckUserInput(JButton key)
 {
     if (NONE == cursor_pos)
         return false;
+    reseatCursor();
     DamagerDamaged* oldActive = active;
     
     int x,y;
