@@ -7978,7 +7978,15 @@ struct AIPlayerGPT::AsyncState
     string prompt;   //the userMsg the in-flight/done request was built for
     string response; //raw HTTP body once status == 2
     std::chrono::steady_clock::time_point started; //request launch time
-    AsyncState() : status(0) {}
+    //#W53-Q (D10): this round trip came back EMPTY at the wall. The transports
+    //(curl / the Android JNI bridge / the Codex SSE reader) all report a
+    //failure the same way - an empty body - so the deadline is told from a
+    //refused connection by the only fact that separates them and that every
+    //platform has: how long it took. A timeout consumes the whole window; a
+    //refusal returns in milliseconds. Written by the worker under the mutex
+    //alongside the body, read once on consume.
+    bool timedOut;
+    AsyncState() : status(0), timedOut(false) {}
 };
 
 //Heap-allocated capture set for the HTTP worker. The worker owns and frees
@@ -8061,6 +8069,13 @@ void AIPlayerGPT::WorkerMain(void * p)
     }
     {
         std::lock_guard<GptMutex> g(ctx->state->mtx);
+        //#W53-Q (D10): the deadline test, on the 95% mark so a wall hit is not
+        //missed by scheduling jitter between the client's clock and curl's.
+        //An empty body under that mark is a refusal/error, not a timeout.
+        long elapsedMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - ctx->state->started).count();
+        ctx->state->timedOut = body.empty() && ctx->timeoutMs > 0
+                               && elapsedMs * 100 >= ctx->timeoutMs * 95;
         ctx->state->response = body;
         ctx->state->status = 2;
     }
@@ -8095,6 +8110,14 @@ void AIPlayerGPT::WorkerMain(void * p)
 //buildRequestBody recognises it, strips it, and rebuilds the SAME user
 //message with the assistant prefill appended.
 static const char * kForceCloseTag = "\x01wagic-force-close\x01";
+//#W53-Q (D10): the slot key for the ONE deadline retry. Like the force-close
+//tag it is a KEY, not prompt text: the request builder strips it, so the retry
+//re-sends a BYTE-IDENTICAL ask (same body, same max_tokens, same deadline) -
+//the model never learns it is being re-asked and no reply shape changes. What
+//the tag buys is a distinct async slot, which is what keeps the staleness gate
+//(prompt equality) in front of the retry and stops a late first answer being
+//consumed as the retry's.
+static const char * kTimeoutRetryTag = "\x01wagic-timeout-retry\x01";
 //Consecutive stale-answer drops (no consume between) before an ask gives its
 //decision to the heuristic fallback. Legitimate drops are isolated (~2%); a
 //run of them is a prompt-stability bug looping at one round trip per cycle.
@@ -8292,11 +8315,27 @@ bool AIPlayerGPT::reasoningRequested() const
     return mThinking;
 }
 
+//#W53-Q (D10). A 900 s non-answer used to arrive at seat review as
+//"empty_reply" - the same word an unreachable endpoint writes - so three
+//decisions lost at the wall in the wave-52 corpus (126v146 seq 1 and 123v130
+//seq 3, both OPENING-HAND keeps decided by the heuristic; 130v162 seq 18) were
+//indistinguishable from a dead server, and nothing in stderr said a deadline
+//had passed. "timeout" is its own class: the request was accepted, the model
+//was thinking or queued, and the CLOCK ran out. Pure over the three facts, so
+//the whole table is pinned in PARSETEST.
+const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
+                                           bool hasReasoning)
+{
+    if (staleLivelock)
+        return "stale_livelock";
+    if (timedOut)
+        return "timeout";
+    return hasReasoning ? "reasoning_only" : "empty_reply";
+}
+
 const char * AIPlayerGPT::noAnswerClass() const
 {
-    if (mLastStaleLivelock)
-        return "stale_livelock";
-    return mLastReasoning.empty() ? "empty_reply" : "reasoning_only";
+    return noAnswerClassFor(mLastStaleLivelock, mLastTimeout, !mLastReasoning.empty());
 }
 
 int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
@@ -8314,6 +8353,11 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                     std::chrono::steady_clock::now() - mAsyncState->started).count();
                 mAsyncState->status = 0;
                 mAsyncState->response.clear();
+                //#W53-Q (D10): consumed with the body. A reply that CARRIED
+                //text can never be a timeout, so the flag is cleared again
+                //below once `content` is known.
+                mLastTimeout = mAsyncState->timedOut;
+                mAsyncState->timedOut = false;
                 content.clear();
                 mLastReasoningOnly = false;
                 mLastFinishLength = false;
@@ -8443,6 +8487,12 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 //Surface it when it moves - a player burning their ChatGPT plan
                 //on a card game deserves to see the meter, and a static gauge
                 //re-noticed every decision would be wallpaper.
+                //#W53-Q (D10): anything the server actually sent - even an
+                //unparseable body or a reasoning-only reply - is not a
+                //deadline miss. Only a genuinely empty round trip at the wall
+                //keeps the stamp.
+                if (!body.empty())
+                    mLastTimeout = false;
                 GPTASYNCLOG("gpt consume body=%zu content=%zu latency=%ldms\n",
                             body.size(), content.size(), mLastLatencyMs);
                 if (gptCodexEndpoint(mEndpoint))
@@ -8490,6 +8540,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                            << " consecutive stale drops - giving this decision to the heuristic");
                 mStaleDropStreak = 0;
                 mLastStaleLivelock = true;
+                mLastTimeout = false; //#W53-Q (D10): a give-up, not a deadline
                 content.clear();
                 return 0; //no answer: the caller's parse fails -> Baka fallback
             }
@@ -8508,6 +8559,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         state->status = 1;
         state->prompt = userMsg;
         state->response.clear();
+        state->timedOut = false; //#W53-Q (D10): the worker decides this one
         state->started = std::chrono::steady_clock::now();
     }
     GPTASYNCLOG("gpt spawn ask prompt=%zu endpoint=%s\n", userMsg.size(), mEndpoint.c_str());
@@ -8550,8 +8602,10 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             state->status = 0;
             state->response.clear();
             state->prompt.clear();
+            state->timedOut = false;
         }
         content.clear();
+        mLastTimeout = false; //#W53-Q (D10): a refused thread, not a deadline
         DebugTrace("AIPlayerGPT: could not start the worker thread; falling back to the heuristic AI");
         //Log this ONCE. A platform that refuses one thread refuses all of them,
         //so the message is identical every time and repeats once per decision -
@@ -8792,6 +8846,12 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
             mForceClosePrefill.clear();
             mRetryFirstLatencyMs = -1;
             mLastRetry = true;
+            //#W53-Q (D10): the retry ALSO came back empty at the wall. This is
+            //the handoff the seat review needs named - the retry below can no
+            //longer fire for this base, so the line has to be printed here.
+            if (content.empty() && mLastTimeout)
+                DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
+                           << "s - heuristic");
             return 0;
         }
         //Decision changed under a pending retry: drop it, poll the new decision.
@@ -8847,6 +8907,31 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         DebugTrace("AIPlayerGPT: unclosed <think> (budget/truncation); forcing the answer");
         return kChoicePending; //next tick polls the forced-close request
     }
+    //DEADLINE RETRY (#W53-Q, D10). The wall hit with nothing back: the ask was
+    //never answered, so there is no answer to double-consume and re-sending it
+    //is not a re-ask on a drifted board - the staleness gate above still owns
+    //that question (a decision that moved while this was in flight abandons the
+    //retry at the top of this function, exactly as the other two retries do).
+    //ONE, gated by mRetryDoneBase like every other retry here, and only when
+    //the reply is EMPTY: a reply that came back and merely failed to parse has
+    //its own classes and must not be spent on a second round trip.
+    if (content.empty() && mLastTimeout && userMsg != mRetryDoneBase)
+    {
+        mRetryFirstLatencyMs = mLastLatencyMs;
+        mRetryBase = userMsg;
+        mRetryActivePrompt = string(kTimeoutRetryTag) + userMsg;
+        setNotice("no reply from the model - asking once more", 3.0f);
+        DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
+                   << "s - one retry");
+        return kChoicePending; //next tick polls the retry
+    }
+    //The retry was already spent (or could not run) and the wall was reached
+    //again: the decision goes to the heuristic, and SAYS SO. Before this line
+    //stderr showed only "-> chose -1 of N" and a seat review could not tell a
+    //15-minute deadline from a refusal.
+    if (content.empty() && mLastTimeout)
+        DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
+                   << "s - heuristic");
     //Fire ONE answer-locked retry iff the reply is decode-garbage AND this
     //decision's retry has not already been spent. isDecodeGarbage is
     //conservative - ordinary unparsed replies (real prose, no coded line) are
@@ -8874,6 +8959,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
       mStaleDropStreak(0), mLastStaleLivelock(false),
+      mLastTimeout(false), mRecoverySeq(-1),
       mInPregameAsk(false),
       mInAnnounceXAsk(false),
       mPlanEchoCount(0),
@@ -9164,6 +9250,55 @@ static bool commitRetracted(const char * fallback, const string& reply)
     return hasCodedAnswerLine(reply);
 }
 
+//#W53-Q (D24). A record with `choice: -1`, `chosen_text` absent and a fallback
+//class says the model did not answer - and then says NOTHING about what did.
+//146v125 seq 282 (`reply: 'method4 * is_ k ind  *'`, a two-row cast menu at 14
+//life) is the shape: the game continued, the heuristic decided, and the corpus
+//holds no trace of the decision that was actually taken. The recovery record
+//closes that: it names the record it recovers and its class, and carries the
+//narration the game produced next - whose HEAD is the heuristic's own action,
+//because the narration delta is append-only and this seat had priority. The
+//lines are COPIED, never consumed: the following record's `events` field is
+//byte-unchanged, so nothing downstream that reads deltas is disturbed.
+void AIPlayerGPT::flushRecoveryRecord()
+{
+    if (mRecoverySeq < 0 || mTransLogPath.empty())
+        return;
+    int recovers = mRecoverySeq;
+    string cls = mRecoveryClass, kind = mRecoveryKind;
+    mRecoverySeq = -1;              //cleared BEFORE the write, per the flush idiom
+    mRecoveryClass.clear();
+    mRecoveryKind.clear();
+    json rec = {
+        {"seq", mTransSeq++},
+        {"kind", "recovery"},
+        {"recovers_seq", recovers},
+        {"recovers_kind", kind},
+        {"recovers_fallback", cls},
+        {"turn", translogTurn(observer->turn)},
+        {"phase", observer->getCurrentGamePhaseName()},
+        {"my_life", life},
+        {"opp_life", opponent() ? opponent()->life : 0},
+    };
+    //Absent, not empty, when the heuristic's answer produced no narration at
+    //all (a pass, or a choice the log does not voice) - which is itself the
+    //finding, and must not be dressed up as an action.
+    if (!mNarrationPending.empty())
+        rec["recovered_by"] = mNarrationPending;
+    std::ofstream f(mTransLogPath.c_str(), std::ios::app);
+    if (f)
+        f << rec.dump() << "\n";
+}
+
+//#W53-Q (D24): does this record hand its decision to the heuristic? TRUE only
+//when nothing from the reply executed (choice < 0) AND a fallback class was
+//stamped - so an executed answer, and a note-only record, never latch one.
+//Pure, so the gate is pinned in PARSETEST.
+bool AIPlayerGPT::handedToHeuristic(int choice, const char * fallback)
+{
+    return choice < 0 && fallback != NULL && *fallback != '\0';
+}
+
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                                 const string& chosenText, const char * fallback, const vector<string> * optionTexts,
                                 const char * choiceSource)
@@ -9174,6 +9309,9 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         return;
     }
     ensureGameStartRecord();
+    //#W53-Q (D24): the PREVIOUS handoff's recovery lands before this record, so
+    //the file reads unanswered -> recovery -> next decision in order.
+    flushRecoveryRecord();
     json rec = {
         {"seq", mTransSeq++},
         {"kind", kind},
@@ -9343,6 +9481,14 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     std::ofstream f(mTransLogPath.c_str(), std::ios::app);
     if (f)
         f << rec.dump() << "\n";
+    //#W53-Q (D24): this decision was handed off - the next record (or the
+    //game-end record) will say what answered.
+    if (handedToHeuristic(choice, fallback))
+    {
+        mRecoverySeq = rec["seq"].get<int>();
+        mRecoveryClass = fallback;
+        mRecoveryKind = kind;
+    }
 }
 
 void AIPlayerGPT::gameEnded()
@@ -9360,6 +9506,10 @@ void AIPlayerGPT::logGameEnd()
     //the closing record's delta is the only place they can still land.
     flushEventRun();
     ensureGameStartRecord();
+    //#W53-Q (D24): a handoff on the LAST decision of the game still gets its
+    //recovery record - that is exactly the decision a lost game is read back
+    //from.
+    flushRecoveryRecord();
     mGameEndLogged = true;
     bool iWon = observer->didWin(this);
     bool oppWon = opponent() ? observer->didWin(opponent()) : false;
@@ -13996,7 +14146,13 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //the next tokens it decodes MUST be the answer. The slot key carries the
     //tag; the request carries the base prompt.
     bool forceClose = (userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0);
-    const string baseMsg = forceClose ? userMsg.substr(strlen(kForceCloseTag)) : userMsg;
+    //#W53-Q (D10): the deadline retry's key is stripped the same way, and
+    //NOTHING else about the request changes - the re-ask must be the identical
+    //question or it is a different decision, not a retry.
+    bool timeoutRetry = (userMsg.compare(0, strlen(kTimeoutRetryTag), kTimeoutRetryTag) == 0);
+    const string baseMsg = forceClose ? userMsg.substr(strlen(kForceCloseTag))
+                         : timeoutRetry ? userMsg.substr(strlen(kTimeoutRetryTag))
+                         : userMsg;
 
     //ChatGPT-subscription preset: the Codex backend speaks the Responses
     //shape, not chat completions - system prompt rides "instructions", the
@@ -14017,7 +14173,7 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
             {"instructions", mSystemPrompt},
             {"input", json::array({
                 {{"type", "message"}, {"role", "user"},
-                 {"content", json::array({{{"type", "input_text"}, {"text", userMsg}}})}},
+                 {"content", json::array({{{"type", "input_text"}, {"text", baseMsg}}})}},
             })},
             {"reasoning", {{"effort", effort}}},
             {"store", false},
@@ -14070,7 +14226,10 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     //Answer-locked retry: the re-ask needs only the coded line, so cap it tight
     //to fail fast to the heuristic instead of burning another long spiral. This
     //wins over any larger configured/env default for the retry request only.
-    if (!mRetryActivePrompt.empty() && userMsg == mRetryActivePrompt)
+    //#W53-Q (D10): the deadline retry is excluded - it re-sends the SAME ask
+    //and needs the same room; the tight cap belongs to the two retries whose
+    //re-ask is answer-locked.
+    if (!mRetryActivePrompt.empty() && userMsg == mRetryActivePrompt && !timeoutRetry)
         maxTokens = forceClose ? kAnswerReserveTokens : 512;
 
     json request = {
@@ -36382,6 +36541,35 @@ static const char * kW50Y_r94 =
         }
     }
 
+    // ---- #W53-Q: D10 the timeout class, D24 the recovery latch ----
+    cout << "\n[#W53-Q] D10 / D24\n";
+    {
+        //D10: the wall is its own class, and outranks the transport/model split.
+        CHECK(string(noAnswerClassFor(false, true, false)) == "timeout",
+              "#W53-Q D10 an empty reply at the deadline is 'timeout', not 'empty_reply'");
+        CHECK(string(noAnswerClassFor(false, true, true)) == "timeout",
+              "#W53-Q D10 the deadline outranks a stale reasoning trace (an empty body carries none)");
+        //NEGATIVES: nothing else moves. The three shipped classes are byte-identical.
+        CHECK(string(noAnswerClassFor(false, false, false)) == "empty_reply",
+              "#W53-Q D10 NEGATIVE a fast empty reply is still 'empty_reply' (transport)");
+        CHECK(string(noAnswerClassFor(false, false, true)) == "reasoning_only",
+              "#W53-Q D10 NEGATIVE a reply whose whole generation was thinking is still 'reasoning_only'");
+        CHECK(string(noAnswerClassFor(true, false, false)) == "stale_livelock"
+              && string(noAnswerClassFor(true, true, true)) == "stale_livelock",
+              "#W53-Q D10 NEGATIVE the livelock give-up outranks the deadline (the engine stopped asking)");
+        //The 900 s corpus shape (126v146 seq 1 / 123v130 seq 3 / 130v162 seq 18)
+        //no longer reads as an endpoint fault.
+        CHECK(strcmp(noAnswerClassFor(false, true, false), "empty_reply") != 0,
+              "#W53-Q D10 126v146 seq 1: the 900,018 ms non-answer is no longer filed as empty_reply");
+        //D24: only a decision that NOTHING from the reply answered latches a recovery.
+        CHECK(handedToHeuristic(-1, "unparsed_reply") && handedToHeuristic(-1, "timeout")
+              && handedToHeuristic(-1, "degenerate_decode"),
+              "#W53-Q D24 146v125 seq 282: an unparsed reply with choice -1 latches a recovery record");
+        CHECK(!handedToHeuristic(0, "unparsed_reply") && !handedToHeuristic(3, "unparsed_reply"),
+              "#W53-Q D24 NEGATIVE an executed answer (incl. a deliberate pass) never latches one");
+        CHECK(!handedToHeuristic(-1, NULL) && !handedToHeuristic(-1, ""),
+              "#W53-Q D24 NEGATIVE no fallback class means no handoff to record");
+    }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
