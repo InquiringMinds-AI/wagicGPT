@@ -95,6 +95,15 @@ protected:
 
 extern MTGSets setlist;
 
+//Pure sibling-pick used by getOtherFaceCard: given every id in one set that
+//carries the wanted face's name, choose the one belonging to refId's printing.
+//A DFC's two faces are ADJACENT entries in _cards.dat, so that is the NEAREST
+//id in either direction (forward on a tie) - forward when flipping front->back,
+//backward when flipping back->front.
+//Pure over (ids, refId) so PARSETEST proves it without a card database.
+//Returns -1 for an empty list.
+int wagicPickFaceSiblingId(const std::vector<int>& ids, int refId);
+
 class MTGAllCards
 {
 private:
@@ -146,6 +155,18 @@ public:
 #endif
 
     MTGCard * getCardByName(string name, int forcedSetId = -1);
+
+    //W53-V (owner's Vita, transformed Heliod showed the OTHER printing's front
+    //art): a transform DFC's two faces are CONSECUTIVE entries in _cards.dat,
+    //and one set can carry several printings of the same DFC - MOM holds
+    //607029/607030 (regular frame) and 610513/610514 (borderless). Resolving a
+    //face by NAME collapses all of them onto ONE printing (getCardByName
+    //returns the lowest matching id), so flipping the borderless Heliod adopted
+    //607030 and rendered the regular printing's art. This picks the face that
+    //belongs to the SAME printing as refId, and falls back to getCardByName
+    //when the set has no candidate. Printing choice never affects RULES (both
+    //printings share one primitive) - only which image file is asked for.
+    MTGCard * getOtherFaceCard(const string& name, int setId, int refId);
     void loadFolder(const string& folder, const string& filename="" );
 
     int load(const string& config_file);

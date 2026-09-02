@@ -5735,9 +5735,17 @@ int AATurnSide::resolve()
         // flag and the displayed face coherent for AI and human alike.)
         if(_target->isFlipped == 0 && _SideName == "") return 0; // No need to turn front if card has not been flipped before.
         if(_target->isFlipped == 0){
+            //W53-V: a face lookup must land on THIS printing's other face, not
+            //on whichever same-named printing sorts lowest (see
+            //MTGAllCards::getOtherFaceCard).
+            bool faceLookup = false;
             if(_SideName == "backside" && _target->backSide != "") 
+            {
                 _SideName = _target->backSide; // Added to allow to turn a card on its backside.
-            fcard = MTGCollection()->getCardByName(_SideName, _target->setId);
+                faceLookup = true;
+            }
+            fcard = faceLookup ? MTGCollection()->getOtherFaceCard(_SideName, _target->setId, _target->getMTGId())
+                               : MTGCollection()->getCardByName(_SideName, _target->setId);
             if(!fcard) return 0;
             sideCard = NEW MTGCardInstance(fcard, _target->controller()->game);
             _target->nameOrig = _target->name; 
@@ -5764,7 +5772,8 @@ int AATurnSide::resolve()
                 }
             }
         } else {
-            fcard = MTGCollection()->getCardByName(_target->nameOrig, _target->setId);
+            //W53-V: same-printing front face (see getOtherFaceCard).
+            fcard = MTGCollection()->getOtherFaceCard(_target->nameOrig, _target->setId, _target->getMTGId());
             if(!fcard) return 0;
             _target->name = _target->nameOrig;
             _target->setName(_target->nameOrig);
@@ -5867,13 +5876,27 @@ int AAFlip::resolve()
         GameObserver * game = _target->getObserver();
         if(flipStats.size())
         {
+            //W53-V: a FACE swap (backside / back to my own original name) must
+            //stay inside this card's printing - MOM carries two printings of
+            //Heliod, the Radiant Dawn, and a name-only lookup gave the flipped
+            //borderless copy the REGULAR printing's back-face id, hence the
+            //wrong art on the owner's Vita. A "chosenname" copy is not a face
+            //swap and keeps the plain lookup.
+            bool faceLookup = false;
             if(flipStats == "myorigname" && _target->nameOrig != "") 
+            {
                 flipStats = _target->nameOrig; // Added to undo the copy effect at end of turn for a generic card (e.g. Shapeshifter transformations).
+                faceLookup = true;
+            }
             else if(flipStats == "chosenname" && _target->chooseaname != "") 
                 flipStats = _target->chooseaname; // Added to allow the transformation of a card in a choosen name.
             else if(flipStats == "backside" && _target->backSide != "") 
+            {
                 flipStats = _target->backSide; // Added to allow the transformation of a card in its backside (e.g. Werewolves transformations).
-            MTGCard * fcard = MTGCollection()->getCardByName(flipStats, _target->setId);
+                faceLookup = true;
+            }
+            MTGCard * fcard = faceLookup ? MTGCollection()->getOtherFaceCard(flipStats, _target->setId, _target->getMTGId())
+                                         : MTGCollection()->getCardByName(flipStats, _target->setId);
             if(!fcard) return 0;
             MTGCardInstance * myFlip = NEW MTGCardInstance(fcard, _target->controller()->game);
             MTGCardInstance * myParent = NULL;

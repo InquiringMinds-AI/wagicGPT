@@ -227,10 +227,27 @@ def download_bulk_data(size, cache_dir=None):
     image_map = {}
     for card in bulk_cards:
         multiverse_ids = card.get("multiverse_ids", [])
+        if not multiverse_ids:
+            continue
         image_uris = card.get("image_uris")
+        faces = card.get("card_faces", [])
 
-        if not image_uris or not multiverse_ids:
-            faces = card.get("card_faces", [])
+        # A transform DFC has ONE image_uris per FACE and one multiverse id per
+        # face, in the same order.  Mapping every id onto faces[0] gave every
+        # BACK face the FRONT's art -- that is how the owner's Vita ended up
+        # showing an untransformed Heliod after he transformed it (230 of the
+        # 775 back faces in Res/sets were front-art duplicates).  Pair them up.
+        if faces and len(faces) == len(multiverse_ids) and all(
+                f.get("image_uris") for f in faces):
+            for mid, face in zip(multiverse_ids, faces):
+                url = face["image_uris"].get(version) or face["image_uris"].get("normal")
+                if url:
+                    image_map[mid] = url
+            continue
+
+        if not image_uris:
+            # Single shared image (meld backs, split/adventure cards): every id
+            # legitimately points at the same picture.
             if faces and faces[0].get("image_uris"):
                 image_uris = faces[0]["image_uris"]
             else:

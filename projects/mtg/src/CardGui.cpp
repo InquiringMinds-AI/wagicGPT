@@ -162,8 +162,20 @@ void CardGui::Render()
     JQuadPtr quad = game? game->getResourceManager()->RetrieveCard(card, CACHE_THUMB):WResourceManager::Instance()->RetrieveCard(card, CACHE_THUMB);
     if(card && !card->isToken && card->name != card->model->data->name)
     {
-        MTGCard * fcard = MTGCollection()->getCardByName(card->name);
-        quad = game->getResourceManager()->RetrieveCard(fcard, CACHE_THUMB);
+        //W53-V (owner's Vita: a transformed Heliod showed the OTHER printing's
+        //front art): the instance's OWN id is authoritative when it already
+        //names this face - a flip rewrote it (AAFlip/AATurnSide setMTGId) and it
+        //carries the right PRINTING. Re-resolving by NAME threw the printing
+        //away and took whichever same-named printing sorts lowest. Keep the
+        //name path only for copy/clone effects, where the id genuinely still
+        //points at the original card.
+        MTGCard * self = MTGCollection()->getCardById(card->getMTGId());
+        if (!(self && self->data && self->data->name == card->name))
+        {
+            MTGCard * fcard = MTGCollection()->getCardByName(card->name);
+            quad = game? game->getResourceManager()->RetrieveCard(fcard, CACHE_THUMB)
+                       : WResourceManager::Instance()->RetrieveCard(fcard, CACHE_THUMB);
+        }
     }
     if (game && card->hasCopiedToken && !quad.get())
     {
@@ -1436,8 +1448,20 @@ void CardGui::RenderBig(MTGCard* card, const Pos& pos, bool thumb, bool noborder
     }
     if(kcard && !kcard->isToken && kcard->name != kcard->model->data->name)
     {
-        MTGCard * fcard = MTGCollection()->getCardByName(kcard->name);
-        quad = WResourceManager::Instance()->RetrieveCard(fcard);
+        //W53-V (owner's Vita: a transformed Heliod showed the OTHER printing's
+        //front art): the instance's OWN id is authoritative when it already
+        //names this face - a flip rewrote it (AAFlip/AATurnSide setMTGId) and it
+        //carries the right PRINTING. Re-resolving by NAME threw the printing
+        //away and took whichever same-named printing sorts lowest. Keep the
+        //name path only for copy/clone effects, where the id genuinely still
+        //points at the original card.
+        MTGCard * self = MTGCollection()->getCardById(kcard->getMTGId());
+        if (!(self && self->data && self->data->name == kcard->name))
+        {
+            MTGCard * fcard = MTGCollection()->getCardByName(kcard->name);
+            quad = thumb ? WResourceManager::Instance()->RetrieveCard(fcard, RETRIEVE_THUMB)
+                         : WResourceManager::Instance()->RetrieveCard(fcard);
+        }
     }
     if (kcard && kcard->hasCopiedToken && !quad.get())
     {
