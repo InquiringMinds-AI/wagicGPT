@@ -97,6 +97,9 @@ struct WagicScopeMs
 
 #include "DeckMenu.h"
 #include "GameStateDuel.h"
+#if defined(VITA) && defined(WAGIC_VITAMEMLOG)
+extern "C" void vitaMemProbe(const char*, int); //file scope: no linkage spec inside a body
+#endif
 #include "utils.h"
 #include "AIPlayer.h"
 #include "AIMomirPlayer.h"
@@ -1193,7 +1196,6 @@ void GameStateDuel::Update(float dt)
                 if (memlogged != game)
                 {
                     memlogged = game;
-                    extern "C" void vitaMemProbe(const char*, int);
                     vitaMemProbe("gameend", game->turn);
                 }
             }

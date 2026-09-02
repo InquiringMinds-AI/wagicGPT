@@ -2,6 +2,11 @@
 #include "AllAbilities.h" //W53-DELVER: MTGRevealingCards for humanDisplayOpen()
 
 #include "GameObserver.h"
+#if defined(VITA) && defined(WAGIC_VITAMEMLOG)
+//Vita heap/vitaGL probe (JGE/src/Vitamain.cpp). Declared at file scope: a linkage
+//specification is not allowed inside a function body (vpk9 build, 2026-09-01).
+extern "C" void vitaMemProbe(const char*, int);
+#endif
 #include "PreGamePhase.h"
 #include "LegalActions.h"
 #ifdef WITH_GPT_AI
@@ -338,7 +343,7 @@ void GameObserver::nextGamePhase()
     case MTG_PHASE_UNTAP:
         DebugTrace("Untap Phase -------------   Turn " << turn );
 #if defined(VITA) && defined(WAGIC_VITAMEMLOG)
-        { extern "C" void vitaMemProbe(const char*, int); vitaMemProbe("untap", turn); }
+        vitaMemProbe("untap", turn);
 #endif
 #ifdef WAGIC_TRANSCRIPT_ON
         writeTranscript("turn");
@@ -741,7 +746,7 @@ void GameObserver::startGame(GameType gtype, Rules * rules)
     sgMark("begin");
     mGameType = gtype;
 #if defined(VITA) && defined(WAGIC_VITAMEMLOG)
-    { extern "C" void vitaMemProbe(const char*, int); vitaMemProbe("gamestart", 0); }
+    vitaMemProbe("gamestart", 0);
 #endif
     turn = 0;
     mRules = rules;
