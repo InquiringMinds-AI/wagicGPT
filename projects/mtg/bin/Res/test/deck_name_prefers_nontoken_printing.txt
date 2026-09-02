@@ -1,0 +1,19 @@
+# Name-only card lines must resolve to a REAL printing, not a same-named TOKEN
+# entry (rarity T, negative id, art = creator's "<id>t.jpg"). Ajani, Strength of
+# the Pride (J22) creates a token named "Ajani's Pridemate"; printings sort by id
+# so the token (-591418) came first and a bare "Ajani's Pridemate" wore Ajani's
+# art on the owner's Vita (2026-09-01). Lowest positive printing = 205065.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Ajani's Pridemate
+[PLAYER2]
+life:20
+[DO]
+assertimage 205065.jpg ajani's pridemate
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:205065
+[PLAYER2]
+[END]

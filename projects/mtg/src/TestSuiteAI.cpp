@@ -856,6 +856,33 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
     }
+    else if (action.find("assertimage ") == 0)
+    {
+        //Pin WHICH PRINTING a name resolved to. The [ASSERT] zone compare
+        //falls back to name-level counting when printing ids differ, so it
+        //cannot see a same-named TOKEN printing (negative id, creator's art)
+        //being picked for a real card. Syntax:
+        //  assertimage <image file> <card name>     e.g. assertimage 292998.jpg Ajani's Pridemate
+        string rest = action.substr(12);
+        size_t sp = rest.find(' ');
+        string want = sp == string::npos ? rest : rest.substr(0, sp);
+        string cname = sp == string::npos ? "" : rest.substr(sp + 1);
+        MTGCardInstance * ac = getCard(cname);
+        if (!ac)
+        {
+            std::cerr << "TESTSUITE assertimage: no card '" << cname << "' [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        string got = ac->getImageName();
+        if (got != want)
+        {
+            std::cerr << "TESTSUITE assertimage: '" << cname << "' expected " << want << " got " << got
+                      << " (id " << ac->getId() << ") [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
+    }
     else if (action.find("assertcastable ") == 0 || action.find("assertusable ") == 0)
     {
         //W48: pin the DISPLAY/oracle predicates the human borders read

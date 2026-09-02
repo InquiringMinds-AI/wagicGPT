@@ -3704,10 +3704,13 @@ int AIPlayerBaka::computeActions()
     }
 
 #ifndef AI_CHANGE_TESTING
-    static bool findingCard = false;
     //this guard is put in place to prevent Ai from
     //ever running computeActions() function WHILE its already doing so.
     // Break if this happens in debug mode. If this happens, it's actually a bug
+    //`findingCard` is a per-instance member: it used to be a function-level
+    //static shared by EVERY Baka across the suite's worker threads, and two
+    //threads inside computeActions at once tripped this assert (master gate
+    //abort at THREADS=8, 2026-09-01) - the "concurrency-only" failure class.
     assert(!findingCard);
     if (findingCard)
     {//is already looking kick me out of this function!

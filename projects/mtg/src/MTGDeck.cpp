@@ -1052,10 +1052,20 @@ void MTGAllCards::prefetchCardNameCache()
     {
         MTGCard * c = printings[i].second;
 
-        //Name only
+        //Name only. printings is id-ascending and this walk used to OVERWRITE,
+        //so the bare name resolved to the HIGHEST-id printing here and to the
+        //LOWEST in getCardByName's scan - and to a same-named TOKEN entry
+        //(negative id) whenever a game had not yet warmed the cache. Both
+        //paths now agree: the lowest-id NON-TOKEN printing; a token only when
+        //nothing else carries the name.
         string cardName = c->data->name;
         std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
-        mtgCardByNameCache[cardName] = c;
+        bool cIsToken = c->getRarity() == Constants::RARITY_T;
+        map<string, MTGCard *>::iterator have = mtgCardByNameCache.find(cardName);
+        if (have == mtgCardByNameCache.end())
+            mtgCardByNameCache[cardName] = c;
+        else if (!cIsToken && have->second && have->second->getRarity() == Constants::RARITY_T)
+            have->second = c;
 
         //Name + set
         int setId = c->setId;
@@ -1065,7 +1075,11 @@ void MTGAllCards::prefetchCardNameCache()
             string setName = setInfo->getName();
             std::transform(setName.begin(), setName.end(), setName.begin(), ::tolower);
             cardName = cardName + " (" + setName +  ")";
-            mtgCardByNameCache[cardName] = c;
+            have = mtgCardByNameCache.find(cardName);
+            if (have == mtgCardByNameCache.end())
+                mtgCardByNameCache[cardName] = c;
+            else if (!cIsToken && have->second && have->second->getRarity() == Constants::RARITY_T)
+                have->second = c;
         }
 
         // id
@@ -1084,7 +1098,18 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
 
     std::transform(nameDescriptor.begin(), nameDescriptor.end(), nameDescriptor.begin(), ::tolower);
 
-    map<string, MTGCard * >::iterator cached = mtgCardByNameCache.find(nameDescriptor);
+    //A set-forced lookup caches under its OWN key. It used to store under the
+    //bare name, so whichever set asked first poisoned every later name-only
+    //lookup (a fixture resolved "ajani's pridemate" to a different printing
+    //depending on which tests ran before it, 2026-09-01).
+    string cacheKey = nameDescriptor;
+    if (forcedSetId >= 0)
+    {
+        std::stringstream k;
+        k << nameDescriptor << "\x01" << forcedSetId;
+        cacheKey = k.str();
+    }
+    map<string, MTGCard * >::iterator cached = mtgCardByNameCache.find(cacheKey);
     
     if (cached!= mtgCardByNameCache.end())
     {
@@ -1102,6 +1127,13 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
     }
 
     ensurePrintingsSorted();
+    //Token entries (rarity T, negative id = -(creator's id), art = creator's
+    //"<id>t.jpg") share names with real cards - Ajani, Strength of the Pride
+    //creates a token NAMED "Ajani's Pridemate". printings is sorted by id, so
+    //negatives come first and a name-only deck line resolved to the TOKEN
+    //printing (owner's Vita: Pridemate wearing Ajani's art, 2026-09-01). A
+    //token printing is the answer only when no non-token printing matches.
+    MTGCard * tokenFallback = NULL;
     if(forcedSetId != -1){
         for (size_t i = 0; i < printings.size(); i++)
         {
@@ -1110,9 +1142,19 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
             string cardName = c->data->name;
             std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
             if (cardName.compare(nameDescriptor) == 0) {
-                mtgCardByNameCache[nameDescriptor] = c;
+                if (c->getRarity() == Constants::RARITY_T)
+                {
+                    if (!tokenFallback) tokenFallback = c;
+                    continue;
+                }
+                mtgCardByNameCache[cacheKey] = c;
                 return c;
             }
+        }
+        if (tokenFallback)
+        {
+            mtgCardByNameCache[cacheKey] = tokenFallback;
+            return tokenFallback;
         }
     }
 
@@ -1148,9 +1190,19 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
             continue;
         }
         if (cardName.compare(name) == 0) {
+            if (c->getRarity() == Constants::RARITY_T)
+            {
+                if (!tokenFallback) tokenFallback = c;
+                continue;
+            }
             mtgCardByNameCache[nameDescriptor] = c;
             return c;
         }
+    }
+    if (tokenFallback)
+    {
+        mtgCardByNameCache[nameDescriptor] = tokenFallback;
+        return tokenFallback;
     }
 
     if (nameMatchedButSetDropped)

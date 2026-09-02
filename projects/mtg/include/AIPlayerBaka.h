@@ -195,6 +195,7 @@ class AIPlayerBaka: public AIPlayer{
     virtual bool decisionPending(float dt) { (void) dt; return false; }
     void initTimer();
     virtual int computeActions();
+    bool findingCard = false; //computeActions re-entrancy guard, per instance (see the .cpp)
     //W50-W (D4): the cleanup-step hand-size discard as an AI DECISION. Before
     //this the engine discarded hand->cards[0] (the oldest card) for every AI
     //seat when the phase advanced - a combo deck lost its only Intruder Alarm
