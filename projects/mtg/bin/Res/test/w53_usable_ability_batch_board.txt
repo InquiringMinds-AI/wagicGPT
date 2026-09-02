@@ -1,0 +1,30 @@
+# W53-S: the battlefield ability border on a BOARD, not one card at a time.
+# GuiHandSelf::Update now asks LegalActionsOracle::usableAbilityCards(player) once per
+# refresh instead of hasUsableAbility() per permanent; `assertusable` cross-checks the two
+# on every card it touches, so this fixture pins the batch over a mixed board:
+#   Westvale Abbey  {5},{T}: sacrifice-fodder ability - AFFORDABLE over five other lands
+#   Karn's Bastion  {4},{T}: proliferate           - affordable over five other lands
+#   Hill Giant      no activated ability            - NOT usable
+#   Plains          mana only                      - making mana is not "an ability"
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Westvale Abbey,Karn's Bastion,Plains,Plains,Plains,Plains,Plains,Hill Giant
+hand:Grizzly Bears
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertusable 1 westvale abbey
+assertusable 1 karn's bastion
+assertusable 0 hill giant
+assertusable 0 plains
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Westvale Abbey,Karn's Bastion,Plains,Plains,Plains,Plains,Plains,Hill Giant
+hand:Grizzly Bears
+life:20
+[PLAYER2]
+life:20
+[END]

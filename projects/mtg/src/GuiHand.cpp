@@ -255,6 +255,13 @@ void GuiHandSelf::Update(float dt)
         //battlefield cards, cleared every refresh).
         Player * p = hand->owner;
         MTGGameZone * bf = p->game->inPlay;
+        //#W53-S perf (owner Vita report, vpk11: "it became almost frozen when
+        //attempting to select cards in my hand"). The usable-ability verdict is
+        //the expensive one - it prices every activation against the board's
+        //potential mana - and asking it PER CARD rebuilt that potential and
+        //re-walked every ability object once per permanent. One batch pass
+        //answers it for the whole battlefield with identical semantics.
+        std::set<MTGCardInstance*> usable = LegalActionsOracle::usableAbilityCards(p);
         for (int i = 0; i < bf->nb_cards; i++)
         {
             bf->cards[i]->willPayForFocused = 0;
@@ -264,8 +271,7 @@ void GuiHandSelf::Update(float dt)
             //engine still decides what is legal when the button is pressed.
             bf->cards[i]->canAttackNow =
                 LegalActionsOracle::canDeclareAttacker(bf->cards[i]) ? 1 : 0;
-            bf->cards[i]->hasUsableAbilityNow =
-                LegalActionsOracle::hasUsableAbility(bf->cards[i]) ? 1 : 0;
+            bf->cards[i]->hasUsableAbilityNow = usable.count(bf->cards[i]) ? 1 : 0;
             bf->cards[i]->canBlockNow =
                 LegalActionsOracle::canDeclareBlocker(bf->cards[i]) ? 1 : 0;
         }
