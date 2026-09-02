@@ -1281,3 +1281,4 @@ w54_aura_rehook_ethereal_armor.txt
 w54_aura_retarget_detainment_spell.txt
 discard_to_play_lord.txt
 discard_to_play_etb.txt
+vita_hurkyl_reveal_end_step_softlock.txt
