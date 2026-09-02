@@ -5793,3 +5793,19 @@ same way — worth a corpus look.
 Rootcast 2-of-4 stays OPEN (owner: still a problem) — needs a board; first Vita transcript.
 Gate after both: 1210 (lifeline/merrow) + 44 AI / 0, PARSETEST 2121/0. Binary
 archives/wagic-5ca11d6e2. NEXT VPK: from 5ca11d6e2.
+
+## 2026-09-01 — VPK vita-vpk9 (owner: "build and push the vpk")
+psp-port = fe681f00a (master; = d09764b68 + one Vita compile fix). The first hermetic build
+(unit vita-vpk9, ~/.gatelogs/vita_vpk9.log) FAILED in GameObserver.cpp: the vitaMemProbe
+hooks declared `extern "C"` INSIDE function bodies — a linkage specification is not allowed
+there (GCC: "expected unqualified-id before string constant"); the desktop never compiles
+that path (gate is VITA && WAGIC_VITAMEMLOG). Fix fe681f00a: file-scope declarations in
+GameObserver.cpp + GameStateDuel.cpp. Rebuilt (unit vita-vpk9b, log vita_vpk9b.log, exit 0;
+AIPlayerGPT.cpp alone takes ~20 min on the cross-compiler — a lone cc1plus at 98% on that
+file is NOT a hang). VPK 33,164,899 B -> 10.0.0.227:1337 ux0:/vpk/wagic.vpk, size-verified
+against the console listing (first curl -T timed out on connect; the retry with
+--connect-timeout 40 went through). Install manual (VitaShell -> Cross). Supersedes vpk8.
+Carries: every 2026-09-01 fix (crash cluster nothrow + memlog probe, GuiCombat cursor,
+transcripts + classification menu, all nine lane fixes, Pridemate/PSAL, option-preserving
+autotap, Show of Confidence targeting). FIRST THING after his next play session: fetch
+ux0:/data/Wagic/memlog.txt + ux0:/data/Wagic/transcripts/, replay any game he classified.
