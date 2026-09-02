@@ -5861,3 +5861,9 @@ size-verified. (The Vita FTP refused the first connect both times tonight; the r
 with --connect-timeout 60 went through.) Install manual. Supersedes vpk9. Carries the NULL
 guards + the memoised tap preview; the crash source and the perf verdict are decided by the
 owner's next session (fetch memlog.txt + transcripts first).
+
+2026-09-02 (later) vpk10 VERDICT: owner "completed a match with no issues" (player_deck3 vs
+ai_baka_deck43, 10 turns, human won 20/-11, classified "other" - his words: no apparent bugs).
+Victory-screen menu worked end to end on the console (#classification written); the vpk9
+game-end crash site did not recur; memlog flat (heap_free ~12MB, vram ~35-37MB). Perf: not
+mentioned = the memoised preview answered it for now. Logs in psp-work/logs/20260902/.
