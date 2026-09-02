@@ -1543,18 +1543,26 @@ void GameStateDuel::Update(float dt)
         {
             menuSelfTestTicks = 0;
             transcriptMenu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(), DUEL_MENU_TRANSCRIPT_TAG, this, Fonts::MENU_FONT, SCREEN_WIDTH / 2 - 100, 25, "How was this match?");
-            transcriptMenu->Add(0, "No problems");
-            transcriptMenu->Add(1, "Bug");
-            transcriptMenu->Add(2, "Bad blocking");
-            transcriptMenu->Add(3, "Bad targeting");
-            transcriptMenu->Add(4, "Bad mana selection");
-            transcriptMenu->Add(5, "Other");
+            //Ids start at 1 ON PURPOSE: `Add(0, "No problems")` resolved to the
+            //BASE JGuiController::Add(JGuiObject*, bool) - the literal 0 is a
+            //null pointer, the string literal a true - so the first entry was
+            //a NULL BUTTON, not a menu item: no "No problems" row on the
+            //console (owner, 2026-09-02) and vpk9's game-end data abort in
+            //JGuiController::Update (psp2core-1788315925).
+            transcriptMenu->Add(1, "No problems");
+            transcriptMenu->Add(2, "Bug");
+            transcriptMenu->Add(3, "Bad blocking");
+            transcriptMenu->Add(4, "Bad targeting");
+            transcriptMenu->Add(5, "Bad mana selection");
+            transcriptMenu->Add(6, "Other");
         }
         if (transcriptMenu)
         {
             transcriptMenu->Update(dt);
-            if (menuSelfTest && !mTranscriptMenuDone && ++menuSelfTestTicks > 5)
-                ButtonPressed(DUEL_MENU_TRANSCRIPT_TAG, 1);
+            //value "hold" leaves the menu open (for a windowed screenshot)
+            if (menuSelfTest && !mTranscriptMenuDone && ++menuSelfTestTicks > 5
+                && strcmp(getenv("WAGIC_TRANSCRIPT_MENU_SELFTEST"), "hold") != 0)
+                ButtonPressed(DUEL_MENU_TRANSCRIPT_TAG, 2);
             break;
         }
         }
@@ -1831,8 +1839,8 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
         case DUEL_MENU_TRANSCRIPT_TAG:
         {
             static const char * labels[] = { "no problems", "bug", "bad blocking", "bad targeting", "bad mana selection", "other" };
-            if (game && controlId >= 0 && controlId < 6)
-                game->appendTranscriptNote(string("classification=") + labels[controlId]);
+            if (game && controlId >= 1 && controlId <= 6)
+                game->appendTranscriptNote(string("classification=") + labels[controlId - 1]);
             if (transcriptMenu) transcriptMenu->Close();
             mTranscriptMenuDone = true;
             break;

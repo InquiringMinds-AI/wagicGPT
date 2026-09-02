@@ -5867,3 +5867,15 @@ ai_baka_deck43, 10 turns, human won 20/-11, classified "other" - his words: no a
 Victory-screen menu worked end to end on the console (#classification written); the vpk9
 game-end crash site did not recur; memlog flat (heap_free ~12MB, vram ~35-37MB). Perf: not
 mentioned = the memoised preview answered it for now. Logs in psp-work/logs/20260902/.
+
+## 2026-09-02 (later) — vpk9 crash ROOT CAUSE FOUND: overload resolution, not heap damage
+Owner: "no problem wasnt offered" (the classification menu showed Bug..Other only). Desktop
+windowed self-play with WAGIC_TRANSCRIPT_MENU_SELFTEST=hold + a grim screenshot reproduced it.
+Cause: SimpleMenu has `using JGuiController::Add;`, so `transcriptMenu->Add(0, "No problems")`
+resolved to JGuiController::Add(JGuiObject*, bool) - literal 0 = null pointer, the string
+literal = true - i.e. it pushed a NULL BUTTON instead of adding the first item. That is
+EXACTLY the vpk9 dump (mButtons = one NULL, first Update of the menu -> data abort), so the
+"heap damage of unknown origin" verdict above is RETRACTED. Fix: ids 1..6 (never a literal 0
+as a SimpleMenu item id), callback maps controlId-1. The NULL guards in JGuiController stay.
+Lesson: a SimpleMenu item id of literal 0 silently becomes a NULL button - grep for `->Add(0,`
+whenever a SimpleMenu is added.
