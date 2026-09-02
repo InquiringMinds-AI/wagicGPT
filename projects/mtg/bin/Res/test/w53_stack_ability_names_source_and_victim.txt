@@ -1,0 +1,61 @@
+#NAME: Stack line names the granted ability's source and victim (W53-P D4)
+#DESC: Wave-52 ledger D4 (HIGH; cost deck146 6 mana and 2 cards at 9 life).
+#DESC: Soul Shatter puts a GRANTED sacrifice ability on the opponent's stack.
+#DESC: StackAbility never sets Interruptible::source, and an ability granted to
+#DESC: a player is parsed onto a NAMELESS dummy card (its granter reachable
+#DESC: only through storedSourceCard), so the stack block's ability line fell
+#DESC: to the anonymous menu-text branch: "ability: sacrifice a creature or
+#DESC: planeswalker", identical, sourceless and victimless for each of three
+#DESC: copies. In 146v125 seq 327-330 the pilot cast copies #2 and #3 into a
+#DESC: board where the FIRST ability was already aimed at Emrakul and was
+#DESC: simply waiting to resolve - the opponent's battlefield line truthfully
+#DESC: still listed it. The victim is a second trap: MTGAbility::target is
+#DESC: initialised to the ability's own source and is written only at RESOLVE
+#DESC: time, so the pick has to be read off the ability's target CHOOSER -
+#DESC: the same place activateAbility reads it to announce the activation.
+#DESC: No zone assertion can see any of this: the whole defect is in the words
+#DESC: over a stack the suite does not otherwise read. TestSuiteAI::Act runs
+#DESC: the PRODUCTION emitter (stackAbilityRegister -> stackAbilityBody) over
+#DESC: the live stack, so a red here is a red render, not a red copy of it.
+#DESC: The seat that OBSERVES the unresolved ability is P2 (it holds priority
+#DESC: while it is on the stack), so P2's chair is where the line is pinned;
+#DESC: the caster's "[from your Soul Shatter]" wording is pinned in PARSETEST.
+#DESC: PRE-FIX the line reads "ability: sacrifice a creature or planeswalker";
+#DESC: the nonarration: line holds that shape out as the negative.
+FORCEABILITY
+AICALLS 40
+[INIT]
+firstmain
+[PLAYER1]
+hand:Soul Shatter
+library:Swamp
+manapool:{B}{B}{B}
+[PLAYER2]
+inplay:Serra Angel
+library:Forest
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+end
+[PLAYER1]
+library:Swamp
+graveyard:Soul Shatter
+[PLAYER2]
+library:Forest
+graveyard:Serra Angel
+narration:on the stack: ability: Soul Shatter's
+narration:(aimed at Serra Angel)
+narration:[from their Soul Shatter]
+nonarration:ability: sacrifice a creature or planeswalker [
+nonarration:StackAbility
+[END]

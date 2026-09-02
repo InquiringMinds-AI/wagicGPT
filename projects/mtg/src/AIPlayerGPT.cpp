@@ -1118,6 +1118,20 @@ static string edictClause(int theirCreatures, const string& onlyName, int onlyTo
     return o.str();
 }
 
+//#W53-P (D4b): the edict forecast is computed off the BATTLEFIELD, and a
+//sacrifice already on the stack aimed at the same permanent has not taken it
+//off the battlefield yet - so the `{right now: they sacrifice Emrakul (MV 15,
+//their highest)}` clause was true of the board and false of the outcome, and
+//was re-offered unchanged for each of the three copies. No window is removed
+//and no cast is capped: the row gains the fact the forecast is missing.
+static string edictAlreadyOnStackClause(bool alreadyAimed)
+{
+    if (!alreadyAimed)
+        return "";
+    return " - a sacrifice is already on the stack aimed at this permanent;"
+           " this one would find their next-highest";
+}
+
 //#W51-D (D10): the Soul Shatter class - "each opponent sacrifices a creature
 //or planeswalker with the highest mana value" (Soul Shatter, Flare of Malice,
 //Riveteers Charm's first mode; scripts fixed in 42f2eff2b as
@@ -1156,7 +1170,8 @@ static string highestMvEdictClause(const vector<std::pair<string, int> >& theirs
 string instanceHandle(MTGCardInstance * card); //defined below (#N-166a)
 //The live board behind the clause: the opponent's creatures and planeswalkers
 //with their mana values, handles included so tied copies stay distinct.
-static bool highestMvEdictBoard(MTGCardInstance * card, vector<std::pair<string, int> >& out)
+static bool highestMvEdictBoard(MTGCardInstance * card, vector<std::pair<string, int> >& out,
+                                vector<MTGCardInstance *> * outCards = NULL)
 {
     Player * me = card ? card->controller() : NULL;
     Player * opp = me ? me->opponent() : NULL;
@@ -1170,8 +1185,66 @@ static bool highestMvEdictBoard(MTGCardInstance * card, vector<std::pair<string,
             continue;
         int mv = c->getManaCost() ? c->getManaCost()->getConvertedCost() : 0;
         out.push_back(std::make_pair(c->getDisplayName() + instanceHandle(c), mv));
+        if (outCards)
+            outCards->push_back(c);
     }
     return true;
+}
+
+//#W53-P (D4): WHICH permanent an unresolved ability on the stack is aimed at.
+//Two traps live here, both proven on this seam. (1) `MTGAbility::target` is
+//initialised to the ability's own SOURCE and is only overwritten at RESOLVE
+//time (TargetAbility::resolve), so on an unresolved object it names the wrong
+//card - and for an ability GRANTED to a player it names the nameless dummy the
+//grant is parsed onto. (2) The real choice is already in the ability's own
+//target CHOOSER, which is exactly where ActivatedAbility::activateAbility
+//reads it to announce the activation. So: the chooser first, `target` only as
+//the fallback, and a nameless instance is never returned.
+static MTGCardInstance * stackAbilityPick(Interruptible * it)
+{
+    StackAbility * sa = dynamic_cast<StackAbility *>(it);
+    if (!sa || !sa->ability)
+        return NULL;
+    MTGCardInstance * vic = NULL;
+    if (sa->ability->getActionTc())
+        vic = dynamic_cast<MTGCardInstance *>(sa->ability->getActionTc()->getNextTarget());
+    if (!vic)
+        vic = dynamic_cast<MTGCardInstance *>(sa->ability->target);
+    if (!vic || vic == sa->ability->source || vic->getDisplayName().empty())
+        return NULL;
+    return vic;
+}
+
+//#W53-P (D4b): is one of the permanents this edict would find ALREADY the pick
+//of an unresolved ability on the stack? The forecast reads the battlefield, and
+//a sacrifice that has been put on the stack has not moved its victim yet, so
+//the board truthfully still lists it and the same cast row is offered again.
+//`tops` are the permanents tied at the highest mana value - the only ones the
+//clause names - and the test is pointer identity against each unresolved
+//StackAbility's own target, not a name match, so a second copy of the same
+//creature cannot be mistaken for the one already aimed at.
+static bool edictVictimAlreadyOnStack(MTGCardInstance * card, const vector<MTGCardInstance *>& tops)
+{
+    if (!card || tops.empty())
+        return false;
+    Player * me = card->controller();
+    GameObserver * obs = me ? me->getObserver() : NULL;
+    ActionStack * stack = (obs && obs->mLayers) ? obs->mLayers->stackLayer() : NULL;
+    if (!stack)
+        return false;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED || it->type != ACTION_ABILITY)
+            continue;
+        MTGCardInstance * vic = stackAbilityPick(it);
+        if (!vic)
+            continue;
+        for (size_t t = 0; t < tops.size(); t++)
+            if (tops[t] == vic)
+                return true;
+    }
+    return false;
 }
 
 //#W50-X D13 (wave-49 ledger MED): "(K able to attack)" was canAttack() on the
@@ -1269,9 +1342,25 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
         && lowText.find("opponent") != string::npos)
     {
         vector<std::pair<string, int> > board;
-        if (!highestMvEdictBoard(card, board))
+        vector<MTGCardInstance *> boardCards;
+        if (!highestMvEdictBoard(card, board, &boardCards))
             return "";
-        return highestMvEdictClause(board);
+        //#W53-P (D4b): the permanents tied at the top mana value are exactly the
+        //ones the clause names; ask the stack whether one of them is already
+        //spoken for.
+        vector<MTGCardInstance *> tops;
+        if (board.size() == boardCards.size())
+        {
+            int top = 0;
+            for (size_t i = 0; i < board.size(); i++)
+                if (!i || board[i].second > top)
+                    top = board[i].second;
+            for (size_t i = 0; i < board.size(); i++)
+                if (board[i].second == top)
+                    tops.push_back(boardCards[i]);
+        }
+        return highestMvEdictClause(board)
+             + edictAlreadyOnStackClause(edictVictimAlreadyOnStack(card, tops));
     }
     if (!edict && !sweepVerb && !attackPunisher)
         return "";
@@ -2504,6 +2593,73 @@ static string stackAbilityName(const string& sourceName, const string& menuText)
     return "an ability whose source the engine can no longer name";
 }
 
+//#W53-P (D4, wave-52 ledger HIGH; cost deck146 6 mana and 2 cards at 9 life).
+//StackAbility never sets Interruptible::source (only MTGAbility::source is
+//set), so every ability line in the stack block fell to the anonymous
+//menu-text branch: three Soul Shatters in one window each read
+//`ability: sacrifice a creature or planeswalker [triggered/activated ability]`,
+//identical, sourceless and victimless, and the pilot cast copies #2 and #3
+//into a board where the FIRST one had already found Emrakul and was simply
+//waiting to resolve. The emitter has both facts on the ability itself - its
+//`source` card and its `notaTarget` pick - so the line states them:
+//`ability: Soul Shatter's sacrifice (aimed at Emrakul, the Aeons Torn)
+//[from your Soul Shatter]`. Pure over the four strings so every branch is
+//provable in PARSETEST; an empty grantor falls back byte-identically to the
+//pre-fix forms above, so no other stack line moves.
+static string stackAbilityLine(const string& grantorName, const string& menuText,
+                               const string& victimName, bool grantorMine)
+{
+    if (grantorName.empty())
+        return stackAbilityName(string(), menuText);
+    std::ostringstream o;
+    o << "ability: " << grantorName << "'s ";
+    o << (menuText.empty() ? string("ability") : renderAbilityLabel(menuText));
+    if (!victimName.empty())
+        o << " (aimed at " << victimName << ")";
+    o << " [from " << (grantorMine ? "your " : "their ") << grantorName << "]";
+    return o.str();
+}
+
+//#W53-P (D4): the ability half of one stack line, read off the LIVE object.
+//The emitter and the test-suite register share it, so a fixture that goes red
+//points at the shipped render rather than at a re-implementation of it.
+//StackAbility never sets Interruptible::source (only MTGAbility::source is set),
+//which is why every ability line used to fall to the anonymous menu-text branch.
+static string stackAbilityBody(Interruptible * it, Player * seat)
+{
+    if (!it)
+        return "";
+    StackAbility * sa = dynamic_cast<StackAbility *>(it);
+    string srcName = it->source ? it->source->getDisplayName() : string("");
+    string menu = (sa && sa->ability) ? sa->ability->getMenuText() : string("");
+    string grantor, victim;
+    bool grantorMine = false;
+    if (sa && sa->ability)
+    {
+        //An ability GRANTED to a player (`ability$!...!$ opponent`, the Soul
+        //Shatter shape) is parsed onto a nameless dummy card whose
+        //`storedSourceCard` is the real granting card - the same indirection
+        //MTGAbility.cpp already applies to token creation and mana production
+        //inside that keyword. Without it the grantor reads empty and the line
+        //falls back to the anonymous menu text, which is the whole defect.
+        MTGCardInstance * grantCard = sa->ability->source;
+        if (grantCard && grantCard->getDisplayName().empty() && grantCard->storedSourceCard)
+            grantCard = grantCard->storedSourceCard;
+        if (grantCard)
+        {
+            grantor = grantCard->getDisplayName();
+            grantorMine = (grantCard->controller() == seat);
+        }
+        //The pick - see stackAbilityPick for the two traps this seam holds.
+        if (MTGCardInstance * vic = stackAbilityPick(it))
+            victim = vic->getDisplayName() + instanceHandle(vic);
+    }
+    if (srcName.empty() && !grantor.empty())
+        return stackAbilityLine(grantor, menu, victim, grantorMine);
+    return stackAbilityName(srcName, menu);
+}
+
+
 //#W47 (R14a): whether this creature carries a STATIC restriction against
 //attacking - the subset of MTGCardInstance::canAttack()'s refusals that does
 //not depend on the moment (tapped, summoning-sick and "is it in play" are
@@ -2558,21 +2714,42 @@ static bool boardCreatureCanAttackNow(MTGCardInstance * c, bool live)
 //of the ones NOT already in the attack. `attacking` == 0 renders byte-identical
 //to the pre-fix form, so every non-combat window and its PARSETEST cases are
 //untouched.
+//#W53-P (D14, wave-52 ledger MED): the header counted creatures and stopped
+//there, so a board whose land half is COLLAPSED into four printed rows
+//("Island #1-#5 x5; Plains #1-#5 x5; ...") gave the pilot no number for it -
+//deck130 pushed eight land-destruction casts past its own four-land gate over
+//one corpus (130v125 seq 61 and five more). The land count is exactly as
+//computable as the creature count at this call site, and the collapse is
+//precisely what makes it uncountable by eye, so state it. `lands` < 0 omits
+//the clause entirely and renders byte-identical to the pre-fix header, so
+//every existing window and its PARSETEST cases are untouched.
 static string battlefieldHeaderText(bool mine, int permanents, int creatures,
                                     int ableToAttack = -1, bool liveScope = true,
-                                    int attacking = 0)
+                                    int attacking = 0, int lands = -1)
 {
     std::ostringstream o;
     o << (mine ? "Your" : "Opponent") << " battlefield (" << permanents
       << " permanent" << (permanents == 1 ? "" : "s") << " listed, of which "
       << creatures << (creatures == 1 ? " is a creature" : " are creatures");
+    bool creatureClause = false;
     if (attacking > 0)
+    {
         o << ", " << attacking << " of them "
           << (attacking == 1 ? "is" : "are") << " attacking right now";
+        creatureClause = true;
+    }
     if (ableToAttack >= 0)
+    {
         o << ", " << ableToAttack << (attacking > 0 ? " more " : " of them ")
           << (liveScope ? "able to attack right now"
                         : "without a restriction against attacking");
+        creatureClause = true;
+    }
+    //The land clause closes the sentence: the "of them" clauses above are ABOUT
+    //the creatures, so a land count wedged between them would re-scope them.
+    if (lands >= 0)
+        o << (creatureClause ? ", and " : " and ") << lands
+          << (lands == 1 ? " is a land" : " are lands");
     o << "): ";
     return o.str();
 }
@@ -11421,10 +11598,7 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
                 //is not a game object the model can reason about, and it spent
                 //a whole window deciding whether the stack entry was real.
                 //Build the label from what we know here instead.
-                StackAbility * sa = dynamic_cast<StackAbility *>(it);
-                string srcName = it->source ? it->source->getDisplayName() : string("");
-                string menu = (sa && sa->ability) ? sa->ability->getMenuText() : string("");
-                line << stackAbilityName(srcName, menu) << " [triggered/activated ability]";
+                line << stackAbilityBody(it, this) << " [triggered/activated ability]";
             }
             else
                 //W39-STACKFACTS: type, mana cost and P/T at the object the
@@ -11618,6 +11792,7 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
     //isAttacker() - the same predicate the "[tapped - attacking]" row tag reads,
     //so the header cannot contradict the rows beneath it.
     int myAttacking = 0, oppAttacking = 0;
+    int myLands = 0, oppLands = 0; //#W53-P (D14)
     Player * activeSeat = observer ? observer->currentPlayer : NULL;
     for (int i = 0; i < game->inPlay->nb_cards; i++)
     {
@@ -11630,6 +11805,8 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
         if (!boardEntryIsPermanent(c->hasType(Subtypes::TYPE_EMBLEM)))
             continue;
         myPermanents++;
+        if (c->hasType(Subtypes::TYPE_LAND)) //#W53-P (D14)
+            myLands++;
         if (c->isCreature())
         {
             myCreatures++;
@@ -11652,6 +11829,8 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
             if (!boardEntryIsPermanent(c->hasType(Subtypes::TYPE_EMBLEM))) //#W43-11
                 continue;
             oppPermanents++;
+            if (c->hasType(Subtypes::TYPE_LAND)) //#W53-P (D14)
+                oppLands++;
             if (c->isCreature())
             {
                 oppCreatures++;
@@ -11684,12 +11863,12 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
                 ownEffectSkip.insert(nm);
         }
     out << "\n" << battlefieldHeaderText(true, myPermanents, myCreatures, myCanAttack,
-                                         activeSeat == this, myAttacking);
+                                         activeSeat == this, myAttacking, myLands);
     describeZoneCards(out, game->inPlay, true, "your hand", true, &ownEffectSkip);
     if (opp)
     {
         out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures, oppCanAttack,
-                                             activeSeat == opp, oppAttacking);
+                                             activeSeat == opp, oppAttacking, oppLands);
         //#W46-3: the opponent's non-creature permanents carry what they DO.
         describeZoneCards(out, opp->game->inPlay, true, "your hand", true);
         out << "\n" << opponentZoneCountsLine(opp->game->hand->nb_cards, oppHandInReveal,
@@ -12888,10 +13067,93 @@ static string legendTwinTag(const string& name)
     return " [legendary: you already control " + name
            + " - legend rule: casting this sends one copy to your graveyard (you choose which)]";
 }
-static string secondCopyTag(const string& name)
+//#W53-P (D11, wave-52 ledger MED): the wave-52 clause answered a LEGALITY
+//question ("both stay - no legend rule") where the wave-51 tag it replaced had
+//answered a USEFULNESS one, and the dead class it was meant to retire came
+//back: four Intruder Alarms taken in 14 rows. The distinguishing test is the
+//SCRIPT, never the card type - Intruder Alarm's whole script is one `lord(...)`
+//static plus two idempotent mass untaps, so a second copy adds nothing, while
+//Talisman of Impulse's three `{T}:Add` abilities genuinely stack and Chromatic
+//Lantern is BOTH (a non-stacking `lord(land|mybattlefield)` grant AND five own
+//`{T}:Add` abilities - a second Lantern IS a mana source and is NOT a dead
+//cast). Three verdicts, decided by autoLineStacks over the card's own lines.
+//
+//A line STACKS when a second copy of the card gives the pilot a second use of
+//it: an activated ability (its cost is paid again), or a trigger/static whose
+//payload is a COUNTABLE amount (draw, damage, life, counters, tokens, mill).
+//A `lord(...)` line never stacks - it is one continuous effect over a set, and
+//a second identical grant changes nothing - and neither does a mass state
+//change that is idempotent (untap all, tap all, "doesnotuntap").
+//`lord(` is tested FIRST because a lord's payload can carry a nested
+//`newability[{t}:add{G}]` whose cost is the GRANTEE's, not this card's.
+static bool autoLineStacks(const string& lineLower)
 {
-    return " [second copy: you already control " + name
-           + "; both stay on the battlefield - no legend rule]";
+    const string& s = lineLower;
+    if (s.compare(0, 5, "lord(") == 0)
+        return false;
+    if (s.find("}:") != string::npos) //an activation cost: {T}:, {1}{G}:, ...
+        return true;
+    static const char * countable[] = {
+        "draw:", "damage:", "life:", "deplete:", "counter(", "token", "lifeleech",
+        "poison:", "energize:", "transforms((", "putinplay", "moveto(", NULL };
+    for (int i = 0; countable[i]; i++)
+        if (s.find(countable[i]) != string::npos)
+            return true;
+    return false;
+}
+//Splits the card's own script into its `auto=`-derived lines. magicText joins
+//them with newlines; the caller lower-cases nothing, so do it here.
+void splitAutoLines(const string& magicText, vector<string>& out)
+{
+    string cur;
+    for (size_t i = 0; i <= magicText.size(); i++)
+    {
+        char ch = (i < magicText.size()) ? magicText[i] : '\n';
+        if (ch == '\n' || ch == '\r')
+        {
+            size_t b = cur.find_first_not_of(" \t");
+            size_t e = cur.find_last_not_of(" \t");
+            if (b != string::npos)
+                out.push_back(toLowerCopy(cur.substr(b, e - b + 1)));
+            cur.clear();
+        }
+        else
+            cur += ch;
+    }
+}
+//The verdict: 0 = every line stacks (say nothing more), 1 = NO line stacks (the
+//copy is dead), 2 = a `lord(...)` grant is already on but the card's own
+//abilities stack (deck126 G7's partial-redundancy form).
+int secondCopyVerdict(const string& magicText)
+{
+    vector<string> lines;
+    splitAutoLines(magicText, lines);
+    if (lines.empty())
+        return 1; //no script at all: a second copy of nothing is nothing
+    bool anyStacks = false, anyLord = false;
+    for (size_t i = 0; i < lines.size(); i++)
+    {
+        if (lines[i].compare(0, 5, "lord(") == 0)
+            anyLord = true;
+        if (autoLineStacks(lines[i]))
+            anyStacks = true;
+    }
+    if (!anyStacks)
+        return 1;
+    return anyLord ? 2 : 0;
+}
+static string secondCopyTag(const string& name, const string& magicText = string())
+{
+    string head = " [second copy: you already control " + name
+                  + "; both stay on the battlefield - no legend rule";
+    int verdict = magicText.empty() ? 0 : secondCopyVerdict(magicText);
+    if (verdict == 1)
+        return head + ", but its effect is already on the battlefield and a second copy"
+                      " changes nothing]";
+    if (verdict == 2)
+        return head + ", but the effect it gives your OTHER permanents is already on -"
+                      " this copy adds only its own abilities]";
+    return head + "]";
 }
 static void appendCappedNames(std::ostringstream& o, const vector<string>& names, size_t cap)
 {
@@ -12964,6 +13226,20 @@ static string exileCastNote(Player * me, MTGCardInstance * card, const string& z
         return "";
     string causeName;
     bool causeTheirs = false;
+    //#W53-P (D8, wave-52 ledger MED): the STAMPED cause first. The battlefield
+    //scan below can only name a granter that is still in play, and the grant
+    //outlives it - deck146 vs152 seq 32 named Elite Spellbinder, seq 36 through
+    //104 (same card, same exile) read causeless because the Spellbinder had
+    //left. The stamp is written where the grant is applied (ATransformer::
+    //addToGame) and carried across zone-move instance rebuilds, so the clause
+    //no longer depends on the granting permanent's survival. The scan is kept
+    //as the fallback for grants that reach the card by another path.
+    if (!card->exileCastGrantName.empty())
+    {
+        causeName = card->exileCastGrantName;
+        causeTheirs = (card->exileCastGrantControllerId >= 0
+                       && card->exileCastGrantControllerId != me->getId());
+    }
     for (int pass = 0; pass < 2 && causeName.empty(); pass++) //opponent first, then own
     {
         Player * p = (pass == 0) ? me->opponent() : me;
@@ -12985,6 +13261,68 @@ static string exileCastNote(Player * me, MTGCardInstance * card, const string& z
     if (card->getManaCost() && card->model && card->model->data && card->model->data->getManaCost())
         tax = card->getManaCost()->getConvertedCost() - card->model->data->getManaCost()->getConvertedCost();
     return fromExileClause(card->owner == me, card->has(Constants::ADVENTURE) > 0, causeName, causeTheirs, tax);
+}
+
+//#W53-P (D4/D8): the two test-suite register hooks. Declared in AIPlayerGPT.h;
+//both run the PRODUCTION emitters (stackAbilityBody, exileCastNote) over the
+//live game state, so a fixture that goes red points at the shipped render.
+string stackAbilityRegister(GameObserver * observer, Player * seat)
+{
+    if (!observer || !observer->mLayers || !seat)
+        return "";
+    ActionStack * stack = observer->mLayers->stackLayer();
+    if (!stack)
+        return "";
+    std::ostringstream o;
+    bool any = false;
+    for (size_t i = 0; i < stack->mObjects.size(); i++)
+    {
+        Interruptible * it = (Interruptible *) stack->mObjects[i];
+        if (!it || it->state != NOT_RESOLVED || it->type != ACTION_ABILITY)
+            continue;
+        o << (any ? " | " : "") << stackAbilityBody(it, seat);
+        any = true;
+    }
+    return any ? "on the stack: " + o.str() : string("");
+}
+
+string exileCastRegister(Player * seat)
+{
+    if (!seat || !seat->game || !seat->game->exile)
+        return "";
+    MTGGameZone * ex = seat->game->exile;
+    std::ostringstream o;
+    bool any = false;
+    for (int i = 0; i < ex->nb_cards; i++)
+    {
+        MTGCardInstance * c = ex->cards[i];
+        if (!c || c->exileCastGrantName.empty())
+            continue;
+        o << (any ? " | " : "") << c->getDisplayName() << exileCastNote(seat, c, " [from exile]");
+        any = true;
+    }
+    if (!any)
+        return "";
+    //Whether a granter is still standing is the WHOLE question this register
+    //exists to answer: the pre-fix cause was derived by exactly this scan, so
+    //a fixture that asserts the cause is named while this reads "no" is
+    //asserting the defect's absence and nothing weaker. Stated here so the
+    //flag and the clause come from one observation of one game state.
+    bool granterInPlay = false;
+    for (int pass = 0; pass < 2 && !granterInPlay; pass++)
+    {
+        Player * p = (pass == 0) ? seat : seat->opponent();
+        if (!p || !p->game || !p->game->inPlay)
+            continue;
+        for (int i = 0; i < p->game->inPlay->nb_cards && !granterInPlay; i++)
+        {
+            MTGCardInstance * c = p->game->inPlay->cards[i];
+            if (c && !c->isToken
+                && toLowerCopy(c->magicText).find("canplayfromexile") != string::npos)
+                granterInPlay = true;
+        }
+    }
+    return string("in exile [granter in play: ") + (granterInPlay ? "yes" : "no") + "]: " + o.str();
 }
 
 //#W51-E D9 (wave-50 seat-123-130 M3, third corpus): an activated ability
@@ -16193,7 +16531,7 @@ static string askExemplar(const vector<string>& options)
     return "CHOICE: 1 (" + core + ")";
 }
 
-int AIPlayerGPT::askModel(const string& decision, const vector<string>& options, bool narrateChoice,
+int AIPlayerGPT::askModel(const string& decision, const vector<string>& optionsIn, bool narrateChoice,
                           const string& pendingSourceName, bool askEvenIfSingle,
                           bool suppressPlanRequest)
 {
@@ -16202,16 +16540,51 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     vector<string> askNarration;
     askNarration.swap(mNextAskNarration);
     //"Only one valid action": no decision to make, no model call.
-    if (options.empty())
+    if (optionsIn.empty())
         return -1;
     //One option = no decision, so no model call - EXCEPT where the caller says
     //the question itself is owed (see askEvenIfSingle in the header: the X
     //announcement). A zero-slack {X} cast has exactly one announceable value,
     //and taking it silently is the very silence #W41-1 forbids.
-    if (options.size() == 1 && !askEvenIfSingle)
+    if (optionsIn.size() == 1 && !askEvenIfSingle)
         return 0;
     if (mEndpoint.empty())
         return -1; //no endpoint: caller falls back to the heuristic
+
+    //#W53-P (D7, wave-52 ledger MED): the ABILITY/target menus reached
+    //joinNumberedRows but never groupNumberedRows, so the collapse here was
+    //ADJACENCY-ONLY - and the engine orders these lists lexicographically on
+    //the target name ("Human #1, #10, #100, #11 ..."), which is precisely the
+    //order in which consecutive ranks almost never sit together. The priority
+    //menu has gathered repeated rows before collapsing since wave 48; this is
+    //the same gather, one seam later. Nothing is deleted and no option is
+    //merged away: the permutation is applied to the rows the MODEL reads and to
+    //the caller-supplied per-option narration, and the chosen number is mapped
+    //straight back to the caller's own index before it is returned or cached,
+    //so every caller's index -> action mapping is byte-identical to before.
+    vector<size_t> askOrder;
+    groupNumberedRows(optionsIn, askOrder);
+    bool askReordered = false;
+    for (size_t k = 0; k < askOrder.size() && !askReordered; k++)
+        askReordered = (askOrder[k] != k);
+    if (askReordered && askOrder.size() != optionsIn.size())
+        askReordered = false; //defensive: a non-permutation is not applied
+    vector<string> askRows;
+    if (askReordered)
+    {
+        askRows.reserve(optionsIn.size());
+        for (size_t k = 0; k < askOrder.size(); k++)
+            askRows.push_back(optionsIn[askOrder[k]]);
+        if (askNarration.size() == optionsIn.size())
+        {
+            vector<string> permuted;
+            permuted.reserve(askNarration.size());
+            for (size_t k = 0; k < askOrder.size(); k++)
+                permuted.push_back(askNarration[askOrder[k]]);
+            askNarration.swap(permuted);
+        }
+    }
+    const vector<string>& options = askReordered ? askRows : optionsIn;
 
     if (mSystemPrompt.empty())
         buildSystemPrompt();
@@ -16424,7 +16797,14 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
                                 stripNarrationDecoration(options[choice - 1])));
     }
 
-    mAskCache[askKey] = choice;
+    //#W53-P (D7): back to the CALLER's index before anything outside this
+    //function sees the number - the cache is keyed on the state+question and is
+    //read by the early-return above, which hands its value straight to the
+    //caller.
+    int callerChoice = choice;
+    if (askReordered && choice >= 1 && choice <= (int) askOrder.size())
+        callerChoice = (int) askOrder[choice - 1] + 1;
+    mAskCache[askKey] = callerChoice;
     {
         bool valid = choice >= 1 && choice <= (int) options.size();
         const char * fb = valid ? NULL : (content.empty() ? noAnswerClass() : (retracted ? "retracted_choice" : (staleEcho ? "stale_echo" : (namedRowFail ? "named_row_not_offered" : unparsedReplyClass(content)))));
@@ -16436,7 +16816,7 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     }
     DebugTrace("AIPlayerGPT: " << decision << " -> chose " << choice << " of " << options.size());
 
-    return (choice >= 1) ? choice - 1 : -1; //0 or parse-fail: defer to caller
+    return (callerChoice >= 1) ? callerChoice - 1 : -1; //0 or parse-fail: defer to caller
 }
 
 namespace
@@ -16809,7 +17189,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 }
                 if (twin)
                     o << (legendary ? legendTwinTag(twin->getDisplayName())
-                                    : secondCopyTag(twin->getDisplayName()));
+                                    : secondCopyTag(twin->getDisplayName(), card->magicText));
                 if (!want.empty() && game && game->library)
                 {
                     for (int hi = 0; game->hand && hi < game->hand->nb_cards; hi++)
@@ -35173,6 +35553,184 @@ static const char * kW50Y_r94 =
               "#W52-J D14b deck123 vs126 seq 47: x17 with no PLAN line -> plan_missing re-ask (no pass verdict to conflict with)");
         CHECK(replyHasPlanLine(r282) && !replyHasPlanLine("<think>PLAN: x</think>\nCHOICE: 2 (Create vampire x3)"),
               "#W52-J D14b NEGATIVE a PLAN line counts only outside the think block");
+    }
+    // ---- #W53-P: D4 stack naming + edict-on-stack, D7 ability-menu grouping,
+    // D8 stamped exile cause, D11 second-copy verdict, D14 header land count ----
+    cout << "\n[#W53-P] D4 / D7 / D8 / D11 / D14\n";
+    {
+        //D4a: the stack line names the ability's SOURCE and its victim. The
+        //deck146 vs125 seq 328 shape - three Soul Shatters, one Emrakul.
+        string sac = renderAbilityLabel("Sacrifice a creature or planeswalker");
+        string line4 = stackAbilityLine("Soul Shatter", "Sacrifice a creature or planeswalker",
+                                        "Emrakul, the Aeons Torn", true);
+        cout << "     D4 stack line: " << line4 << "\n";
+        CHECK(line4 == "ability: Soul Shatter's " + sac
+                       + " (aimed at Emrakul, the Aeons Torn) [from your Soul Shatter]",
+              "#W53-P D4a the granted sacrifice names its source, its victim and whose card it came from");
+        CHECK(stackAbilityLine("Soul Shatter", "Sacrifice a creature or planeswalker",
+                               "Emrakul, the Aeons Torn", false).find("[from their Soul Shatter]") != string::npos,
+              "#W53-P D4a the other chair's copy says 'their'");
+        CHECK(stackAbilityLine("Soul Shatter", "Sacrifice a creature or planeswalker", "", true)
+              == "ability: Soul Shatter's " + sac + " [from your Soul Shatter]",
+              "#W53-P D4a no pick yet: the source is still named, the aimed-at clause is not invented");
+        CHECK(stackAbilityLine("", "Sacrifice a creature or planeswalker", "Emrakul", true)
+              == stackAbilityName("", "Sacrifice a creature or planeswalker"),
+              "#W53-P D4a NEGATIVE with no grantor the line is byte-identical to the pre-fix form");
+        CHECK(stackAbilityLine("", "", "", true) == "an ability whose source the engine can no longer name",
+              "#W53-P D4a NEGATIVE the nameless fallback is untouched");
+        CHECK(line4.find("StackAbility") == string::npos && line4.find("(Source: )") == string::npos,
+              "#W53-P D4a NEGATIVE no engine identifier reaches the surface");
+        //D4b: the such-clause on the edict forecast.
+        vector<std::pair<string, int> > eb;
+        eb.push_back(std::make_pair("Emrakul, the Aeons Torn", 15));
+        eb.push_back(std::make_pair("Sorin, Lord of Innistrad", 4));
+        string right = highestMvEdictClause(eb) + edictAlreadyOnStackClause(true);
+        cout << "     D4 edict clause: {right now: " << right << "}\n";
+        CHECK(right == "they sacrifice Emrakul, the Aeons Torn (MV 15, their highest)"
+                       " - a sacrifice is already on the stack aimed at this permanent;"
+                       " this one would find their next-highest",
+              "#W53-P D4b the second Soul Shatter's row says the first one already has the Emrakul");
+        CHECK(highestMvEdictClause(eb) + edictAlreadyOnStackClause(false) == highestMvEdictClause(eb),
+              "#W53-P D4b NEGATIVE with an empty stack the clause is byte-identical to the wave-51 form");
+        CHECK(edictAlreadyOnStackClause(true).find("cannot") == string::npos
+              && edictAlreadyOnStackClause(true).find("do not cast") == string::npos,
+              "#W53-P D4b NEGATIVE the clause states a fact; it never forbids the cast (no window removed)");
+    }
+    {
+        //D7: an ability target menu in the engine's own lexicographic order -
+        //the deck123 vs162 seq 41 Lightning Greaves shape, 14 identical equips
+        //over #1..#14 plus one distinct row. Adjacency alone collapses none of
+        //them; grouping first collapses all 14 into one printed range row.
+        vector<string> eq;
+        vector<int> ranks;
+        int lex[14] = { 1, 10, 11, 12, 13, 14, 2, 3, 4, 5, 6, 7, 8, 9 };
+        for (int i = 0; i < 14; i++)
+        {
+            std::ostringstream r;
+            r << "Equip with Lightning Greaves targeting Human #" << lex[i]
+              << " [your battlefield] (this MOVES it to Human #" << lex[i] << ")";
+            eq.push_back(r.str());
+            ranks.push_back(lex[i]);
+        }
+        eq.push_back("Equip with Lightning Greaves targeting Thraben Doomsayer [your battlefield]");
+        bool rgA = false;
+        string flat = joinNumberedRows(eq, &rgA);
+        size_t flatRows = 0;
+        for (size_t k = 0; k < flat.size(); k++)
+            if (flat[k] == '\n') flatRows++;
+        cout << "     D7 adjacency-only: " << flatRows << " printed rows\n" << flat;
+        CHECK(flat.find("#1-#14") == string::npos && flatRows > 2,
+              "#W53-P D7 the defect: adjacency-only collapse cannot gather the lexicographic menu into one row");
+        vector<size_t> ord;
+        groupNumberedRows(eq, ord);
+        vector<string> permuted;
+        for (size_t k = 0; k < ord.size(); k++)
+            permuted.push_back(eq[ord[k]]);
+        bool rgB = false;
+        string grouped = joinNumberedRows(permuted, &rgB);
+        cout << "     D7 grouped menu:\n" << grouped;
+        CHECK(rgB && grouped.find("1-14. Equip with Lightning Greaves targeting Human #1-#14") == 0,
+              "#W53-P D7 grouped first, the 14 equips print as ONE range row");
+        CHECK(grouped.find("this MOVES it to Human #1-#14") != string::npos,
+              "#W53-P D7 the folded second copy of the row's own handle expands to the same range");
+        CHECK(grouped.find(" x14\n") != string::npos,
+              "#W53-P D7 the range row carries its count");
+        CHECK(grouped.find("15. Equip with Lightning Greaves targeting Thraben Doomsayer") != string::npos,
+              "#W53-P D7 the one distinct row keeps its own number and never merges");
+        //the parser must accept ANY handle inside the printed range, and the
+        //number the model answers with must map back to the CALLER's index.
+        bool st7 = false;
+        int c7 = parseChoice("CHOICE: 7 (Equip with Lightning Greaves)", (int) permuted.size(), &permuted, &st7);
+        CHECK(c7 == 7 && !st7, "#W53-P D7 a number from inside the printed range parses as that row");
+        CHECK(ord.size() == eq.size() && ranks[ord[6]] == 7,
+              "#W53-P D7 permuted row 7 is the equip at Human #7 - ascending rank inside the group");
+        CHECK((int) ord[c7 - 1] + 1 == 12,
+              "#W53-P D7 the chosen number maps back to the caller's own index (Human #7 sat at 12 lexicographically)");
+        bool st7b = false;
+        int c14 = parseChoice("CHOICE: 14 (Equip with Lightning Greaves)", (int) permuted.size(), &permuted, &st7b);
+        CHECK(c14 == 14 && !st7b && ranks[ord[13]] == 14,
+              "#W53-P D7 the LAST handle in the range is accepted too");
+        //NEGATIVE: a menu with nothing repeated is not permuted at all.
+        vector<string> distinct;
+        distinct.push_back("Island #1 [land] [opponent's battlefield]");
+        distinct.push_back("Underground Sea #1 [land] [opponent's battlefield]");
+        distinct.push_back("Swamp #1 [land] [opponent's battlefield]");
+        vector<size_t> ord2;
+        groupNumberedRows(distinct, ord2);
+        bool same = true;
+        for (size_t k = 0; k < ord2.size(); k++)
+            same = same && (ord2[k] == k);
+        CHECK(same, "#W53-P D7 NEGATIVE a menu of distinct rows is the identity permutation");
+    }
+    {
+        //D8: the exile-cast clause keeps its cause after the granter has left.
+        string withCause = fromExileClause(true, false, "Elite Spellbinder", true, 2);
+        cout << "     D8 clause: " << withCause << "\n";
+        CHECK(withCause == " {castable from exile - your card, exiled by their Elite Spellbinder,"
+                           " which lets you cast it from there; it costs {2} more than printed,"
+                           " already counted in the cost shown}",
+              "#W53-P D8 the seq-32 wording is what every one of those 17 rows must read");
+        CHECK(fromExileClause(true, false, "", false, 2).find("exiled by") == string::npos,
+              "#W53-P D8 NEGATIVE with no cause the clause never invents one");
+        CHECK(withCause.find("{castable from exile") == 1 && withCause[withCause.size() - 1] == '}',
+              "#W53-P D8 echo shape: one braced annotation, opened and closed");
+    }
+    {
+        //D11: the usefulness verdict, decided by the card's own SCRIPT.
+        const char * alarm = "lord(creature) doesnotuntap\n"
+                             "@movedTo(creature|myBattlefield):untap all(creature)\n"
+                             "@movedTo(creature|opponentBattlefield):untap all(creature)";
+        const char * lantern = "lord(land|mybattlefield) transforms((,newability[{t}:add{G}],newability[{t}:add{R}]))\n"
+                               "{T}:Add{G}\n{T}:Add{R}\n{T}:Add{U}\n{T}:Add{B}\n{T}:Add{W}";
+        const char * talisman = "{T}:Add{1}\n{T}:Add{R} and!( damage:1 controller )!\n"
+                                "{T}:Add{G} and!( damage:1 controller )!";
+        const char * mine9 = "@each my draw sourcenottap:draw:1 controller\n"
+                             "@each opponent draw sourcenottap:draw:1 opponent";
+        const char * staff = "@each my upkeep:draw:1\n{T}:damage:1 target(anytarget)";
+        CHECK(secondCopyVerdict(alarm) == 1, "#W53-P D11 Intruder Alarm's script carries no stacking term");
+        CHECK(secondCopyVerdict(lantern) == 2, "#W53-P D11 Chromatic Lantern is PARTLY redundant, not dead");
+        CHECK(secondCopyVerdict(talisman) == 0, "#W53-P D11 Talisman of Impulse genuinely stacks");
+        CHECK(secondCopyVerdict(mine9) == 0, "#W53-P D11 Howling Mine stacks");
+        CHECK(secondCopyVerdict(staff) == 0, "#W53-P D11 Staff of Nin stacks");
+        string dead = secondCopyTag("Intruder Alarm", alarm);
+        cout << "     D11 dead: " << dead << "\n";
+        CHECK(dead == " [second copy: you already control Intruder Alarm; both stay on the"
+                      " battlefield - no legend rule, but its effect is already on the battlefield"
+                      " and a second copy changes nothing]",
+              "#W53-P D11 the legality clause is KEPT and the usefulness verdict appended");
+        string part = secondCopyTag("Chromatic Lantern", lantern);
+        cout << "     D11 partial: " << part << "\n";
+        CHECK(part.find("the effect it gives your OTHER permanents is already on -"
+                        " this copy adds only its own abilities]") != string::npos,
+              "#W53-P D11 the partial-redundancy form for a lord-plus-own-abilities card");
+        CHECK(part.find("changes nothing") == string::npos,
+              "#W53-P D11 NEGATIVE a second Chromatic Lantern is a mana source and is never called dead");
+        CHECK(secondCopyTag("Howling Mine", mine9)
+              == " [second copy: you already control Howling Mine; both stay on the battlefield - no legend rule]",
+              "#W53-P D11 NEGATIVE a stacking card's tag is byte-identical to the wave-52 form");
+        CHECK(secondCopyTag("Howling Mine") == secondCopyTag("Howling Mine", mine9),
+              "#W53-P D11 NEGATIVE no script supplied: the wave-52 wording, unchanged");
+        CHECK(dead.find(" [second copy: ") == 0 && dead[dead.size() - 1] == ']',
+              "#W53-P D11 echo shape: one bracketed annotation, opened and closed");
+    }
+    {
+        //D14: the header counts lands as well as creatures.
+        string h = battlefieldHeaderText(false, 19, 1, -1, false, 0, 12);
+        cout << "     D14 header: " << h << "\n";
+        CHECK(h == "Opponent battlefield (19 permanents listed, of which 1 is a creature and 12 are lands): ",
+              "#W53-P D14 the deck130 seq 61 header states the land count the collapsed rows hide");
+        CHECK(battlefieldHeaderText(true, 3, 2, 1, true, 1, 1)
+              == "Your battlefield (3 permanents listed, of which 2 are creatures, 1 of them is"
+                 " attacking right now, 1 more able to attack right now, and 1 is a land): ",
+              "#W53-P D14 with the combat clauses present the land count closes the sentence");
+        CHECK(battlefieldHeaderText(false, 6, 2, 0, true)
+              == battlefieldHeaderText(false, 6, 2, 0, true, 0, -1),
+              "#W53-P D14 NEGATIVE lands < 0 renders byte-identical to the pre-fix header");
+        CHECK(battlefieldHeaderText(true, 12, 3).find("are lands") == string::npos,
+              "#W53-P D14 NEGATIVE the default call is unchanged");
+        CHECK(battlefieldHeaderText(false, 19, 1, -1, false, 0, 0)
+              .find("and 0 are lands") != string::npos,
+              "#W53-P D14 a landless board says zero rather than dropping the clause");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();

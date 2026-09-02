@@ -121,6 +121,16 @@ public:
     //and masks those bits when basicAbilities are rebuilt from data
     //(upstream issue #1145).
     bool exileRiderSuppressed;
+    //#W53-P (D8, wave-52 ledger MED): WHO granted this card its
+    //`canplayfromexile`. The render used to derive the cause by scanning both
+    //battlefields for a live permanent whose script carries the keyword, so the
+    //clause named Elite Spellbinder for exactly as long as the Spellbinder was
+    //alive - the grant lives on the exiled card and outlives its granter, and
+    //4 of 17 corpus rows named the cause while 13 read causeless. Stamped at
+    //the grant instead, and carried across zone-move instance rebuilds (clone).
+    //Empty name = never stamped; controller id -1 = unknown.
+    string exileCastGrantName;
+    int exileCastGrantControllerId;
     int origpower;
     int basepower;//to keep origpower intact
     int pbonus;

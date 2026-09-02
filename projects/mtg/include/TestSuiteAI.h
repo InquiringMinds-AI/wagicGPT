@@ -180,6 +180,10 @@ public:
     //zoneChangeNarration from AIPlayerGPT.cpp) rather than a copy, so a
     //fixture failure points at the shipped gate.
     vector<string> mNarrationLog;
+    //#W53-P (D4/D8): last value pushed by each per-tick register scan, so a
+    //stack line that survives twenty ticks is recorded once.
+    string mLastStackRegister;
+    string mLastExileRegister;
     MTGCardInstance * mCounteredMark;
     string mCounteredMarkBy;
     virtual int receiveEvent(WEvent * event);

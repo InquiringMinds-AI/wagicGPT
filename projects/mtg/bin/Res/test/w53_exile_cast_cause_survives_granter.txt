@@ -1,0 +1,51 @@
+#NAME: The castable-from-exile cause survives its granter (W53-P D8)
+#DESC: Wave-52 ledger D8 (MED). Elite Spellbinder exiles a nonland card from
+#DESC: the opponent's hand and grants it canplayfromexile FOREVER. The render
+#DESC: used to recover the CAUSE of that grant by scanning both battlefields
+#DESC: for a live permanent whose script carries the keyword - so the clause
+#DESC: named the Spellbinder for exactly as long as the Spellbinder was alive.
+#DESC: 146v152: seq 32 read "exiled by their Elite Spellbinder, which lets you
+#DESC: cast it from there"; seq 36, 56, 68, 75, 81, 87, 98, 104 - same card,
+#DESC: same exile - read the causeless form, and the one take (seq 56) had no
+#DESC: cause. 4 of 17. The grant lives on the CARD, so its cause is stamped on
+#DESC: the card at the moment of the grant (ATransformer::addToGame) and
+#DESC: carried across zone-move instance rebuilds.
+#DESC: WITNESS: P1 casts Elite Spellbinder and exiles P2's Shock; P2 then
+#DESC: Terrors the Spellbinder. The register records the PRODUCTION clause
+#DESC: (exileCastNote) together with whether ANY granter is still in play -
+#DESC: the pre-fix derivation itself - so the asserted line is the cause named
+#DESC: while that scan reads "no", which is exactly the state the defect
+#DESC: could not survive. PRE-FIX that line reads the causeless
+#DESC: "a legal cast, not a dead row"; the nonarration: line holds it out.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Elite Spellbinder
+library:Plains
+manapool:{W}{W}{W}
+[PLAYER2]
+hand:Shock,Terror
+library:Swamp
+manapool:{B}{B}
+[DO]
+Elite Spellbinder
+Shock
+yes
+no
+no
+Terror
+Elite Spellbinder
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+library:Plains
+graveyard:Elite Spellbinder
+[PLAYER2]
+library:Swamp
+exile:Shock
+graveyard:Terror
+narration:in exile [granter in play: no]: Shock {castable from exile - your card, exiled by their Elite Spellbinder, which lets you cast it from there
+nonarration:granter in play: no]: Shock {castable from exile - a legal cast, not a dead row
+[END]

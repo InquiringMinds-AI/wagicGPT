@@ -1297,3 +1297,5 @@ light_paws_bestow_fetch.txt
 light_paws_bestow_mv_bound.txt
 w54_reconfigure_menu_growth.txt
 w54_equip_ability_not_duplicated.txt
+w53_stack_ability_names_source_and_victim.txt
+w53_exile_cast_cause_survives_granter.txt

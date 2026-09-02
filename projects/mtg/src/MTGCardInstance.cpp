@@ -168,6 +168,8 @@ void MTGCardInstance::copy(MTGCardInstance * card, bool nolegend)
             basicAbilities[j] = data->basicAbilities[j];
     }
     exileRiderSuppressed = card->exileRiderSuppressed;
+    exileCastGrantName = card->exileCastGrantName; //#W53-P (D8)
+    exileCastGrantControllerId = card->exileCastGrantControllerId;
     //the X chosen at cast must survive zone-move recreation: resolution
     //abilities on the recreated instance (prex choosers, Rats' Feast) read
     //setX and fell back to the leftover-pool heuristic (issue #1085)
@@ -351,6 +353,8 @@ void MTGCardInstance::initMTGCI()
     model = NULL;
     isToken = false;
     exileRiderSuppressed = false;
+    exileCastGrantName = ""; //#W53-P (D8)
+    exileCastGrantControllerId = -1;
     lifeOrig = 0;
     doDamageTest = 1;
     skipDamageTestOnce = false;
@@ -2350,6 +2354,11 @@ MTGCardInstance* MTGCardInstance::clone()
     //zone moves rebuild instances from the model; the rider-suppression
     //flag of copies (populate, Clone...) must survive (issue #1145)
     c->exileRiderSuppressed = exileRiderSuppressed;
+    //#W53-P (D8): the exile-cast grant is a property of the CARD, not of the
+    //permanent that granted it, so it must survive the zone-move rebuild the
+    //same way the rider flag and setX do.
+    c->exileCastGrantName = exileCastGrantName;
+    c->exileCastGrantControllerId = exileCastGrantControllerId;
     c->setX = setX;
     //how the card was cast must survive the move too: cardsSeenThisTurn
     //filters (seenThisTurn(CAST_ALL) behind 'first spell this turn'

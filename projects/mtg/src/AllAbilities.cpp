@@ -9039,6 +9039,36 @@ int ATransformer::addToGame()
     while (_target->next)
         _target = _target->next;
 
+    //#W53-P (D8, wave-52 ledger MED): stamp WHO granted a `canplayfromexile`
+    //at the moment of the grant. The GPT render's `{castable from exile - ...
+    //exiled by their Elite Spellbinder ...}` clause used to recover the cause by
+    //scanning both battlefields for a live permanent whose script carries the
+    //keyword, and Elite Spellbinder's whole point is that it exiles the card and
+    //then leaves: 13 of 17 corpus rows read causeless. The grant itself rides
+    //the card (`newability[canplayfromexile forever]`), so its cause rides the
+    //card too. Both spellings are checked - the keyword as a plain basic-ability
+    //grant, and the `newability[...]` payload Elite Spellbinder actually uses.
+    if (source && source != _target)
+    {
+        bool grantsExileCast = false;
+        for (list<int>::iterator ge = abilities.begin(); ge != abilities.end() && !grantsExileCast; ge++)
+            if (*ge == Constants::CANPLAYFROMEXILE)
+                grantsExileCast = true;
+        for (size_t ge = 0; ge < newAbilitiesList.size() && !grantsExileCast; ge++)
+        {
+            string low = newAbilitiesList[ge];
+            std::transform(low.begin(), low.end(), low.begin(), ::tolower);
+            if (low.find("canplayfromexile") != string::npos)
+                grantsExileCast = true;
+        }
+        if (grantsExileCast)
+        {
+            _target->exileCastGrantName = source->getDisplayName();
+            _target->exileCastGrantControllerId =
+                source->controller() ? source->controller()->getId() : -1;
+        }
+    }
+
     for (int j = 0; j < Constants::NB_Colors; j++)
     {
         if (_target->hasColor(j))
