@@ -1,0 +1,37 @@
+#NAME: -1/-1 kills toughness 1 and leaves toughness 2 alive (the fact the cast row's kill summary asserts)
+#DESC: Wave-53 lane O, D5. The CAST row now prints "{kills 0 of the N legal
+#DESC: targets at -1/-1}" / "{kills: <name>}" for a targeted spell, computed
+#DESC: from the same predicate the target-ask verdicts print. The magnitude is
+#DESC: read off the script (Tragic Slip mtg.txt:123128, auto=ifnot morbid then
+#DESC: -1/-1 / auto=if morbid then -13/-13); the kill line is the engine's
+#DESC: state-based death. This pins the ENGINE half: with no creature dead yet
+#DESC: (morbid off) a -1/-1 leaves Gray Ogre (2/2) at 1/1 on the battlefield
+#DESC: and puts Goblin Piker (2/1) in the graveyard. If either flips, the
+#DESC: printed summary becomes a lie.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Tragic Slip,Tragic Slip
+manapool:{B}{B}
+life:20
+[PLAYER2]
+inplay:Gray Ogre,Goblin Piker
+life:20
+[DO]
+Tragic Slip
+Gray Ogre
+assertpt 1/1 gray ogre
+Tragic Slip
+Goblin Piker
+assertpt 1/1 gray ogre
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+graveyard:Tragic Slip,Tragic Slip
+manapool:{0}
+life:20
+[PLAYER2]
+inplay:Gray Ogre
+graveyard:Goblin Piker
+life:20
+[END]
