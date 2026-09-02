@@ -982,6 +982,32 @@ private:
     //outcome - the heuristic answers - but a seat review must not read a model
     //behaviour as an endpoint fault.
     const char * noAnswerClass() const;
+    //#W53-Q (D10): the same table as a PURE function of the three facts that
+    //decide it, so the classification is provable in PARSETEST without a game
+    //or an endpoint. `timedOut` is the HTTP deadline expiring with nothing
+    //back - a 900 s non-answer that used to be filed as "empty_reply" and read
+    //as an endpoint fault. Precedence: a livelock give-up first (the engine
+    //stopped asking), then the deadline (an empty body cannot be reasoning),
+    //then the transport/model split the wave-34 A/B is scored on.
+    static const char * noAnswerClassFor(bool staleLivelock, bool timedOut,
+                                         bool hasReasoning);
+    //#W53-Q (D10): the last consumed reply came back EMPTY at the wall - the
+    //worker's round trip reached the configured timeout. Set on consume,
+    //cleared by any reply that carried a body, and read by noAnswerClass and
+    //by the one-retry gate. A retry is fired ONCE per decision; a second wall
+    //hit hands the decision to the heuristic with the stderr line printed.
+    bool mLastTimeout;
+    //#W53-Q (D24): the seq/class of the last record that handed its decision
+    //to the heuristic (choice < 0 with a fallback class). The NEXT record - or
+    //the game-end record - flushes a `recovery` record naming it and the
+    //narration the heuristic produced, so "nothing says what answered" cannot
+    //stand. -1 = nothing pending.
+    int mRecoverySeq;
+    string mRecoveryClass;
+    string mRecoveryKind;
+    void flushRecoveryRecord();
+    //#W53-Q (D24): the latch's gate, pure so PARSETEST can pin it.
+    static bool handedToHeuristic(int choice, const char * fallback);
     //Was reasoning asked for on this endpoint (thinking flag, or the Codex
     //effort tier)? Only ever used to tell a WITHHELD trace from a reply that
     //never reasoned - parsing and fallback never consult it.

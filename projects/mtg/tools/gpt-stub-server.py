@@ -16,13 +16,23 @@ was actually ASKED (the arrival trace), not only on what the board did.
                   makes a multi-step commitment (cast -> alternative-cost menu
                   -> X announcement) deterministic instead of "always 1".
   --log PATH      JSONL of {ts, headers, body} per chat request
+  --hang-ms MS    #W53-Q (D10): accept the chat request and NEVER answer it -
+                  sleep MS milliseconds before replying (default 0 = off). This
+                  is the deterministic TIMEOUT fixture: the request is accepted
+                  and the CLOCK runs out, which is the one no-answer shape a
+                  reachable-but-slow endpoint produces and an unreachable one
+                  does not. Set it above WAGIC_GPT_TIMEOUT and every decision
+                  reaches the wall, with no model and no inference call.
+  --hang-every N  hang only every Nth chat request (1 = every one, the default
+                  when --hang-ms is set); use 2 to prove the ONE retry fires and
+                  the second attempt is answered normally.
 """
 import argparse
 import json
 import re
 import sys
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
 ARGS = None
 
@@ -59,6 +69,7 @@ def pick_answer(body):
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    seen = 0
 
     def _send(self, obj, code=200):
         payload = json.dumps(obj).encode("utf-8")
@@ -78,6 +89,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get("Content-Length", 0) or 0)
         raw = self.rfile.read(n) if n else b""
+        if ARGS.hang_ms > 0:
+            Handler.seen += 1
+            if ARGS.hang_every <= 1 or (Handler.seen % ARGS.hang_every) == 1:
+                time.sleep(ARGS.hang_ms / 1000.0)
         if ARGS.log:
             try:
                 body = json.loads(raw.decode("utf-8", "replace"))
@@ -110,8 +125,14 @@ def main():
     ap.add_argument("--answer", default="CHOICE: 1")
     ap.add_argument("--prefer", action="append", default=[])
     ap.add_argument("--log", default="")
+    ap.add_argument("--hang-ms", type=int, default=0)
+    ap.add_argument("--hang-every", type=int, default=1)
     ARGS = ap.parse_args()
-    srv = HTTPServer(("127.0.0.1", ARGS.port), Handler)
+    #Threading, because the hang fixture holds a connection open for the whole
+    #deadline and BOTH selfplay seats have a request in flight at once - a
+    #single-threaded server would serialise them and the second seat's wall
+    #clock would start when the first one's ended.
+    srv = ThreadingHTTPServer(("127.0.0.1", ARGS.port), Handler)
     sys.stderr.write("gpt-stub-server on 127.0.0.1:%d\n" % ARGS.port)
     sys.stderr.flush()
     srv.serve_forever()
