@@ -148,6 +148,13 @@ public:
     //drops the back-pointers, so neither side can be left holding the other.
     MTGCardInstance * mRegistryCard;
     bool canBeInterrupted;
+    //#W54-I: set by AbilityFactory::getAbilities when the auto= line this
+    //ability was parsed from mentions `mytgt` - i.e. the parse BOUND the
+    //equipment's currently equipped creature and is only valid for that
+    //attachment. AEquip::equip() re-registers exactly these on each attach;
+    //every other line of an Equipment was already registered when the card
+    //entered the battlefield and must NOT be registered a second time.
+    bool boundToMyTgt;
     //a trigger-granted interaction (e.g. the phasedoutbonus discard chooser)
     //may be answered while its source is phased out - it is not an activation
     bool clickableWhilePhased;

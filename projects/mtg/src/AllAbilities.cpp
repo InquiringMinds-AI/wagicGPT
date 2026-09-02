@@ -11117,11 +11117,34 @@ int AEquip::equip(MTGCardInstance * equipped)
     source->target->equipment += 1;
     source->parentCards.push_back(equipped);
     source->target->childrenCards.push_back((MTGCardInstance*)source);
+    //#W54-I: re-register ONLY the lines that bind the equipped creature.
+    //A permanent entering the battlefield already registers every one of its
+    //auto= lines (AbilityFactory::magicText), and this parse passes the same
+    //arguments (NULL spell, same source), so for a line that does NOT mention
+    //`mytgt` it produces an exact DUPLICATE, not a target-aware instance -
+    //every activated ability of an Equipment appeared TWICE in its menu while
+    //attached (measured on a synthetic Equipment carrying one {1}:draw:1 line).
+    //For reconfigure, where attach/unattach cycles repeatedly, the duplicate
+    //also LEAKED: unequip() dropped the AThis wrapper it had added here while
+    //the clone that wrapper had installed in the action layer stayed behind,
+    //so the menu GREW by one "Reconfigure unattach" per cycle (owner's Lizard
+    //Blades photo, 2026-09-01: Attach once, unattach four times).
+    //A `mytgt` line is different: its parse binds source->target, so the copy
+    //made when the card entered play (target NULL) is inert and the fresh one
+    //is the only working instance - those must still be added here, and
+    //unequip() removes them again.
     AbilityFactory af(game);
-    af.getAbilities(&currentAbilities, NULL, source);
-    for (size_t i = 0; i < currentAbilities.size(); ++i)
+    vector<MTGAbility *> parsedAbilities;
+    af.getAbilities(&parsedAbilities, NULL, source);
+    for (size_t i = 0; i < parsedAbilities.size(); ++i)
     {
-        MTGAbility * a = currentAbilities[i];
+        MTGAbility * a = parsedAbilities[i];
+        if (!a->boundToMyTgt)
+        {
+            SAFE_DELETE(a); //already live from the card's own registration
+            continue;
+        }
+        currentAbilities.push_back(a);
         if (dynamic_cast<AEquip *> (a)) continue;
         if (dynamic_cast<ATeach *> (a)) continue;
         if (dynamic_cast<AAConnect *> (a)) continue;

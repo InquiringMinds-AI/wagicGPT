@@ -6765,6 +6765,8 @@ int AbilityFactory::getAbilities(vector<MTGAbility *> * v, Spell * spell, MTGCar
         MTGAbility * a = parseMagicLine(line, result, spell, card, false, false, dest);
         if (a)
         {
+            //#W54-I: remember whether THIS line bound the equipped creature.
+            a->boundToMyTgt = (line.find("mytgt") != string::npos);
             v->push_back(a);
             result++;
         }
@@ -7712,6 +7714,7 @@ MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * card) :
     forcedAlive = 0;
     oneShot = 0;
     canBeInterrupted = true;
+    boundToMyTgt = false;
 }
 
 MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * _source, Targetable * _target) :
@@ -7728,6 +7731,7 @@ MTGAbility::MTGAbility(GameObserver* observer, int id, MTGCardInstance * _source
     forcedAlive = 0;
     oneShot = 0;
     canBeInterrupted = true;
+    boundToMyTgt = false;
 }
 
 void MTGAbility::setCost(ManaCost * cost, bool forceDelete)
