@@ -637,8 +637,9 @@ number. Each look is a fresh seven you must shave by one more card at the SAME l
 mulligan buys a look, never a fix. At (keeping 5) or lower, ONE land in front of you is a keep:
 the bottom ask sheds the uncastable cards and leaves you the land plus your cheapest spells.
 Colour is not a reason to ship at any N. Zero lands is the one hand a fresh look is worth the
-card for. WHAT THIS COST: three mulligans in one game, a four-card keep, both ways to find a
-token-maker bottomed, no creature ever on the battlefield, lost 42 to 0.
+card for; a hand of nothing but lands is the other. WHAT THIS COST: three mulligans in one
+game, a four-card keep, both ways to find a token-maker bottomed, no creature ever on the
+battlefield, lost 42 to 0.
 STEP 2 - on your untouched opening seven, or at "(keeping 6)", a mulligan is a fair trade only
 by the comparison below.
 
@@ -649,10 +650,10 @@ one", it is "will this hand have three or four lands by the turn it needs them, 
 something when they arrive".
 The comparison to make, on the header line "Your hand (7 cards), counted by the engine: N
 lands, M spells" (read that number, never recount):
- - TWO OR MORE LANDS: keep. Full stop, at every "(keeping N)". With twenty-four lands the third
-   arrives in the first few draws and the fourth by about turn five, and a six-card hand after
-   shipping a two-lander is most often a two-lander again with one fewer card. NEITHER COLOUR
-   NOR THE COVERAGE LINE IS A REASON TO SHIP A TWO-LANDER. "Playing every land in this hand
+ - TWO OR MORE LANDS AND AT LEAST ONE SPELL: keep. Full stop, at every "(keeping N)". With
+   twenty-four lands the third arrives in the first few draws and the fourth by about turn
+   five, and a six-card hand after shipping a two-lander is most often a two-lander again
+   with one fewer card. NEITHER COLOUR NOR THE COVERAGE LINE IS A REASON TO SHIP A TWO-LANDER. "Playing every land in this hand
    would not cover any spell in it" is a KEEP at two lands - it says your hand is a turn-three
    hand, not a dead one, and the third land fixes it. This deck shipped a seven of two
    Underground Seas, two Thraben Doomsayers, Intruder Alarm, Damnation and Bloodline Keeper on
@@ -668,8 +669,8 @@ lands, M spells" (read that number, never recount):
  - SIX OR MORE LANDS with one spell: this is a keepable hand, not a mulligan. You bottom the
    extra lands on the keep and you are a four-land hand with your removal spell, which is a
    functioning hand. Shipping it costs you a card and gives you a fresh seven that may be worse.
- - AT FIVE CARDS OR FEWER: STEP 1's odds apply - a hand with a land in it is a keep, spell or
-   no spell, because the ship buys the same land odds with one card fewer.
+ - AT FIVE CARDS OR FEWER: STEP 1's odds apply - a hand with a land and a spell in it is a keep,
+   whatever that spell costs, because the ship buys the same land odds with one card fewer.
 
 BOTTOMING - the same decision, second ask. After you keep, the prompt says "you took N
 mulligans and kept, so you must put N cards from your hand on the BOTTOM" and lists your hand.

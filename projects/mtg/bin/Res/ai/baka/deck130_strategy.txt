@@ -522,15 +522,17 @@ land count - never recount. The line "Playing every land in this hand would cove
 of: ..." is the engine's own check of your mana against your spells: if it names even one
 card, this hand ACTS - this deck kept a one-land seven whose coverage line named exactly one
 card and won that game. If it reads "would not cover any spell in it", nothing in the hand
-happens until you draw, and that is the shape where a smaller hand can be the better one: a
+happens until you draw, and at ONE land that is the shape where a smaller hand can be the
+better one - at two or more lands that line is not a ship, it is a turn-three hand: a
 one-land seven of Starstorm, Starstorm, Stone Rain, Stone Rain, Lay Waste, Rorix and a
 Mountain was shipped this corpus, and the six it bought was four Mountains and two spells - a
 hand that acted on turn three.
-AT EACH LOOK, price it: the ask prints "(keeping N)". A hand with two or more lands is a keep
-at every N. A one-lander is a keep when the coverage line names a card, and a ship when it
-does not - at (keeping 6) or (keeping 5) the odds of two lands in the next look are the same
-six-in-seven, and at (keeping 4) or lower even a one-lander that acts by turn three beats the
-look you would buy. Zero lands, or all lands, ships at any N above 4.
+AT EACH LOOK, price it: the ask prints "(keeping N)". A hand with two or more lands and at least
+one spell is a keep at every N. A one-lander is a keep when the coverage line names a card,
+and a ship when it does not - at (keeping 6) or (keeping 5) the odds of two lands in the next
+look are the same six-in-seven, and at (keeping 4) or lower even a one-lander that acts by
+turn three beats the look you would buy. Zero lands ships at any N; a hand of nothing but lands ships at any N
+above 4.
 THE BOTTOMING ASK IS WHERE THE HAND IS BUILT. Read "You will be left with an N-card hand" and
 keep, in this PREFERENCE ORDER, which is satisfiable at any N because it is an order and not a
 set of floors: the lands that cover the cheapest spells you keep (three if N allows it, two at

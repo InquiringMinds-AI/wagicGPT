@@ -471,8 +471,7 @@ So, at each look:
   - THREE OR MORE lands and a coverage line reading "would not cover any spell in it" (five-drop
     enchantments and a Staff of Nin over lands that are still one short): KEEP on a seven, at any
     price. The lands are there, the hand casts its first spell the turn the fourth or fifth land
-    lands, and no smaller hand fixes that faster. This shape reached you once this corpus and the
-    engine answered it for you.
+    lands, and no smaller hand fixes that faster.
   - Two lands and a coverage line reading "would not cover any spell in it" (two lands that make
     no {W} under a hand of {W} walls): on a seven, KEEP - 12 of your 24 lands make {W}, the odds
     that one of your next three draws is one of them are about even, and a six-card hand that
