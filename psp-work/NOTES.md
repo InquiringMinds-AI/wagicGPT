@@ -5705,3 +5705,91 @@ What matters for the console build:
   re-downloadable WagicPSP-0255.zip / minpspw.tar.lzma / opt/pspsdk, and the ASAN build products
   (objs-asan, bin-asan, build-asan - rebuild with Makefile.sdl-asan when needed). KEPT:
   snapshots/stick-archive-20260731 (pre-wipe PSP stick image). Don't restore any of the above.
+
+## 2026-09-01 — owner Vita notes batch (five crash dumps + 21 notes + 5 photos)
+
+Master 9385f6f6a (pushed; psp-port ff'd + pushed). Gate 1207/2 (lifeline +
+merrow_reejerey, the known concurrency pair, solo-green) + 43 AI/0, 0 timeouts,
+PARSETEST 2121/0. Binary archives/wagic-9385f6f6a. NO VPK built (owner-initiated).
+
+CRASH DUMPS (psp-work/crashes/vita-dumps/core-17881*.parsed.txt, parser recipe unchanged):
+- 4x "Undefined instruction" R2=6 = abort() from __verbose_terminate_handler: std::bad_alloc
+  in JRenderer::LoadPNG `new BYTE[tw*th*4]` reached from DuelLayers::Render -> WCache::Get ->
+  WCachedTexture::Attempt -> LoadTexture. Vita newlib heap = fixed 128MB (_init_vita_heap
+  default 0x8000000, weak _newlib_heap_size_user unset) and vitaGL maps that same heap as
+  VGL_MEM_EXTERNAL (mem_utils.c) - textures spill into it once VRAM/RAM pools fill. fizzlelog
+  showed 56 games since vpk7, ~10 per crash; desktop endless Baka self-play (92 games) holds
+  RSS flat, so the growth is Vita-side. Fixes: nothrow image buffers (degrade to text frame),
+  and vitaMemProbe -> ux0:data/Wagic/memlog.txt (mallinfo + vglMemFree per pool, at game
+  start/untap/end; gate WAGIC_VITAMEMLOG). The corrupter still needs that on-device log.
+- 1x data abort GuiCombat::shiftRight case ATK with active==NULL (creature left combat,
+  cursor_pos stayed ATK). GuiCombat::reseatCursor() + closest() NULL guard.
+- The Aug-28 dump (_malloc_r heap corruption) remains unexplained; memlog is the instrument.
+
+ENGINE/CARD FIXES (lanes A-I, each RED->GREEN with fixtures; see commit messages):
+Hapatra/All Will Be One/Generous Patron/Stocking the Pantry `bycontroller`; Wildwood Scourge
+`[-sub_hydra]` (`hydra` is a keyword ability - `[-hydra]` never meant the subtype); Moss-Pit
+Skeleton `source()`->`from()`; evolve compares at resolution (enters-with counters count);
+Light-Paws `srcmanacost` + `diffname!aura!` (bare manacost read the ENCHANTED creature's
+MV); Wilt-Leaf Liege discard-to-play now resolves a Spell (abilities registered; also
+Obstinate Baloth/Loxodon Smiter/Dodecapod - Dodecapod's counters still revert, CS-026);
+Transcendent Envoy `modbenchant` (bestow reducer); autotap ranks non-mana-tap lands last
+(Squirrel Nest forest untouched); aura rehook/newhook re-binds static effects to the new
+host (Ajani's Chosen); Hurkyl end-step soft lock = invented `tobecast` token -> forced
+library chooser (script rewritten, CS-027); Lizard Blades menu growth = AEquip::equip
+re-registering every ability line + AThis leaking its clone (16 reconfigure cards);
+Ajani's Pridemate art = J22 TOKEN printing (-591418, art 591418t.jpg) winning name-only
+lookup (getCardByName + prefetchCardNameCache now agree: lowest-id non-token printing);
+PSAL collapsed to one entry per name (434 duplicates, one image each); Baka
+computeActions `findingCard` was a function static shared across suite threads.
+NOT reproducible without a board (owner: "I dont remember"): Rootcast 2-of-4 (likely
+correct legality filtering), Coralhelm indicator, Giant Killer tap prompt, Lantern
+Flare/Gatekeeper interrupt; Show of Confidence on the human's creature is Oracle-legal
+(any target) = AI quality, not rules. Photos in strategy-design/play-reports/2026-09-01-photos/.
+
+TRANSCRIPTS (owner ask, shipped 1245b7d68): replayable dump per game + post-match
+classification menu + desktop WAGIC_REPLAY. Details + the record/replay rules in the
+/wagicgpt skill. Vita transcripts land in ux0:data/Wagic/transcripts/. FIRST THING next
+Vita session: fetch memlog.txt + transcripts, replay any classified-as-bug game.
+
+NEXT VPK: from 9385f6f6a (carries every fix above + memlog + transcripts; CMake defines
+WAGIC_VITAMEMLOG + WAGIC_TRANSCRIPT, alpha-only). Vita compile NOT yet exercised for the
+new Vitamain.cpp/GameObserver/GameStateDuel code - build will tell.
+
+## 2026-09-01 (later) — owner follow-ups: option-preserving autotap + AI pump targeting
+
+OPTION-PRESERVING AUTOTAP (c1a0bf814). Owner spec, verbatim: "tapping should be done in a
+way that leaves the most options open to the player... consider activated abilities to be
+options. then, if there are ties, you look to maximize unrevealed options, preserving color
+availability and then cards with unaffordable activated abilities whose cost includes tapping
+them" — and the W54-F utility-land rule "should generally only count for lands that can
+afford to cast that ability". `ManaEngine::refineForOptions` (called at the end of
+`selectAutoTapProducers`, default on): same-size source sets over the baseline plan,
+class-prefix enumeration (<=14 candidate sources, single-mana bare producers, no X),
+scored lexicographically by (castable-now hand cards still payable + non-mana activations
+still payable + creature sources that could still attack, distinct colours left, held
+sources with an UNAFFORDABLE tap ability); baseline stands unless beaten strictly. The
+W54-F ordering flag is now affordable-only (`sourceHasNonManaTapAbility(p, card, true)`,
+priced by pool + strict potential minus the source — no planner recursion). Human autotap,
+tap preview and the suite's `autotap` ride it; AIPlayerGPT's `{paying this taps}` forecasts
+pass preserveOptions=false (the AI seat still pays via planPayment). Fixtures RED on
+9385f6f6a: autotap_options_keeps_castable_card, autotap_options_keeps_ability,
+autotap_options_unaffordable_utility_spends (Kher Keep; colourless pool asserts as `{C}`).
+
+SHOW OF CONFIDENCE (5ca11d6e2). Owner: "you have correctly identified the problem. its still
+a problem." Root cause was two gaps: `abilityEfficiency` had no verdict for
+ATransformerInstant (every `transforms((...))` pump/grant -> DONTKNOW -> chooseTarget aims at
+the opponent's field), AND chooseTarget judged the chooser by re-parsing
+`tc->belongsToAbility`, which is the ability TEXT after the parser hoists nested payloads
+out — the grant arrives as `transforms(()) ueot` and parses to NULL. Fix: content verdict
+for ATransformerInstant (P/T set-value vs target body; newability lines by core efficiency;
+keywords by the bad table) + chooseTarget judges the LIVE waiting ability
+(`actionLayer()->isWaitingForAnswer()` whose tc == this chooser) when the text re-parse
+says DONTKNOW. Fixture ai_show_of_confidence_targets_own_creature (asserts at
+`combatbegins` — the pumped Lions trade with the Bears otherwise). Any other card whose
+effect is a `transforms((,newability[...]))` grant on `target(creature)` was mis-aimed the
+same way — worth a corpus look.
+
+Rootcast 2-of-4 stays OPEN (owner: still a problem) — needs a board; first Vita transcript.
+Gate after both: 1210 (lifeline/merrow) + 44 AI / 0, PARSETEST 2121/0. Binary
+archives/wagic-5ca11d6e2. NEXT VPK: from 5ca11d6e2.
