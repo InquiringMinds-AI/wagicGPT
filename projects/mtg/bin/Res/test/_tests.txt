@@ -1262,3 +1262,5 @@ instant_response_window_opponent_upkeep.txt
 split_half_instant_timing.txt
 mutual_destruction_conditional_flash.txt
 mutual_destruction_no_flash_permanent.txt
+discard_to_play_lord.txt
+discard_to_play_etb.txt

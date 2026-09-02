@@ -9,6 +9,7 @@
 
 #include "Rules.h"
 #include "Token.h"
+#include "ActionStack.h"
 
 #if defined (WIN32) || defined (LINUX)
 #include <time.h>
@@ -479,6 +480,7 @@ MTGCardInstance * MTGPlayerCards::putInZone(MTGCardInstance * card, MTGGameZone 
     bool bottomoflibrary = false;
     bool inplaytoinplay = false;
     bool ripToken = false;
+    bool discardToPlay = false;
     if (card->discarderOwner)
         discarderOwner = card->discarderOwner;
     if (g->players[0]->game->battlefield->hasName("Rest in Peace")||g->players[1]->game->battlefield->hasName("Rest in Peace"))
@@ -628,18 +630,34 @@ MTGCardInstance * MTGPlayerCards::putInZone(MTGCardInstance * card, MTGGameZone 
     {
         copy->discarderOwner = discarderOwner;
         //change to
+        //Discard-to-play replacement (Wilt-Leaf Liege, Obstinate Baloth,
+        //Loxodon Smiter, Dodecapod): "if a spell or ability an opponent
+        //controls causes you to discard this card, put it onto the battlefield
+        //instead of putting it into your graveyard."
+        //The destination is the TEMP zone, not the battlefield directly: a
+        //permanent only acquires its scripted abilities when a Spell resolves
+        //onto it (Spell::resolve -> AbilityFactory::addAbilities). Dropping the
+        //instance straight onto the battlefield here produced a permanent with
+        //NO lords, NO triggers and NO activated abilities - the owner's Vita
+        //report (2026-09-01): a discarded Wilt-Leaf Liege sat in play while
+        //every green creature kept its printed P/T. The temp hop + Spell below
+        //(in the temp branch) is the same idiom every other "put onto the
+        //battlefield" path uses: AAnimateDead, ANinja, and the test suite's own
+        //[INIT] inplay: loader.
         if(to == g->players[0]->game->graveyard)
         {
             if(card->has(Constants::DISCARDTOPLAYBYOPPONENT) && discarderOwner == card->controller()->opponent())
             {
-                to = g->players[0]->game->battlefield;
+                to = g->players[0]->game->temp;
+                discardToPlay = true;
             }
         }
         else if(to == g->players[1]->game->graveyard)
         {
             if(card->has(Constants::DISCARDTOPLAYBYOPPONENT) && discarderOwner == card->controller()->opponent())
             {
-                to = g->players[1]->game->battlefield;
+                to = g->players[1]->game->temp;
+                discardToPlay = true;
             }
         }
     }
@@ -736,6 +754,19 @@ MTGCardInstance * MTGPlayerCards::putInZone(MTGCardInstance * card, MTGGameZone 
     {
         if (to == g->players[0]->game->temp || to == g->players[1]->game->temp)
         {
+            //Finish the discard-to-play replacement: resolve a Spell on the
+            //parked instance so it reaches the battlefield WITH its abilities
+            //registered. Spell::resolve does the temp -> battlefield move
+            //itself (and the temp collapse above rewrites `from` to the card's
+            //pre-temp zone, so the zone-change event still reads hand ->
+            //battlefield).
+            if (discardToPlay)
+            {
+                Spell * spell = NEW Spell(g, copy);
+                spell->resolve();
+                ret = spell->source;
+                SAFE_DELETE(spell);
+            }
             //don't send event when moving to temp
             return ret;
         }
