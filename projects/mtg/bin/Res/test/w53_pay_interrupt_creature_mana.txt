@@ -1,0 +1,53 @@
+#W53-R report 2 (owner Vita build vpk11, 2026-09-02, verbatim): "i tried to pay
+#for the legend shrine's ability to put counters on shrines, but it didn't allow
+#me an opportunity to tap my creature for mana after it asked me if i wanted to
+#use it."
+#
+#Go-Shintai of Boundless Vigor: `auto=@each my end:may name(Pay 1 and put
+#counters) pay({1}) ... target(shrine|myBattlefield) counter(...)`. Answering
+#"pay" arms game->mExtraPayment and MenuAbility::Update holds the window open
+#until the pool covers {1}.
+#
+#MECHANISM: that hold has an escape hatch - the "unpayable commitment release"
+#in MenuAbility::Update, which declines for the player when NO sequence of
+#clicks could ever cover the mana leg. It asks ManaEngine::potentialMana. That
+#walk reads ActionLayer::manaObjects with a plain dynamic_cast<AManaProducer*>,
+#but the index is BUILT through AbilityFactory::getCoreAbility (GuiLayer::Add),
+#so every producer wrapped by a `&&` side effect - Twitching Doll's
+#"{T}: Add one mana of any color. Put a nest counter on Twitching Doll." - was
+#in the index and invisible to the reader. With only such a creature untapped
+#the player's capacity read ZERO, the release fired on the same tick the window
+#opened, and the prompt vanished before any click could reach the creature.
+#
+#WITNESS: the human seat holds Twitching Doll (untapped, its ability the ONLY
+#mana source) and Go-Shintai. At the end step it answers the may, then clicks
+#the Doll and picks a mana ability. PRE-FIX the pay window is already gone when
+#the click lands, the mana floats unspent and Go-Shintai stays 1/1. POST-FIX the
+#window survives, the {1} is paid and the +1/+1 counter lands (2/2).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Twitching Doll,Go-Shintai of Boundless Vigor
+life:20
+[PLAYER2]
+life:20
+[DO]
+next
+next
+next
+next
+next
+choice 0
+Twitching Doll
+choice 0
+Go-Shintai of Boundless Vigor
+assertpt 2/2 Go-Shintai of Boundless Vigor
+[ASSERT]
+end
+[PLAYER1]
+inplay:Twitching Doll,Go-Shintai of Boundless Vigor
+tappedinplay:1
+life:20
+[PLAYER2]
+life:20
+[END]

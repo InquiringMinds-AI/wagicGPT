@@ -8362,11 +8362,49 @@ void MenuAbility::Update(float dt)
                 //judge "could possibly pay" permissively (ANY producer, even
                 //ones with extra activation costs) so the release only fires
                 //when the payment is truly hopeless
-                struct AnyProducerPolicy : ManaEngine::ManaPolicy
+                //#W53-R2 (owner Vita report 2026-09-02): read the mana index the
+                //way it was WRITTEN. ActionLayer::manaObjects is filled through
+                //AbilityFactory::getCoreAbility (GuiLayer::Add), so a producer
+                //wrapped by a `&&` side effect - Twitching Doll's "{T}: Add one
+                //mana of any color. Put a nest counter on Twitching Doll." - sits
+                //in the index yet is invisible to the plain dynamic_cast that
+                //ManaEngine::potentialMana does. With such a creature as the only
+                //untapped source the capacity read ZERO and this release fired on
+                //the same tick the window opened: the owner answered "yes" to
+                //Go-Shintai of Boundless Vigor's "you may pay {1}" and never got
+                //the chance to tap his Doll. The walk below is deliberately LOCAL
+                //to this hopelessness test and maximally permissive - it counts
+                //every distinct untapped source on the payer's battlefield whose
+                //CORE ability makes mana, so any doubt keeps the window OPEN.
+                //(potentialMana itself is left alone: its one-ability-per-card,
+                //cost-checked semantics are pinned by the oracle/gate fixtures.)
+                //Sources are matched by POINTER against the battlefield array:
+                //manaObjects also holds parse-time template producers whose
+                //source is a card with id 0, and those answer hasCard() by id.
+                ActionLayer * al = game->mLayers->actionLayer();
+                MTGGameZone * payerBoard = source->controller()->game->inPlay;
+                ManaCost * pMana = NEW ManaCost();
+                std::set<MTGCardInstance *> counted;
+                for (size_t mo = 0; mo < al->manaObjects.size(); mo++)
                 {
-                    int canHandle(MTGAbility *) { return 1; }
-                } anyPolicy;
-                ManaCost * pMana = ManaEngine::potentialMana(source->controller(), anyPolicy, NULL);
+                    MTGAbility * ma = (MTGAbility *) al->manaObjects[mo];
+                    if (!ma)
+                        continue;
+                    AManaProducer * amp = dynamic_cast<AManaProducer *>(AbilityFactory::getCoreAbility(ma));
+                    if (!amp || !amp->output || !amp->source || !amp->output->getConvertedCost())
+                        continue;
+                    MTGCardInstance * src = amp->source;
+                    if (src->isTapped() || src->isPhased || counted.count(src))
+                        continue;
+                    bool onBoard = false;
+                    for (int bc = 0; bc < payerBoard->nb_cards && !onBoard; bc++)
+                        if (payerBoard->cards[bc] == src)
+                            onBoard = true;
+                    if (!onBoard)
+                        continue;
+                    counted.insert(src);
+                    pMana->add(amp->output);
+                }
                 pMana->add(source->controller()->getManaPool());
                 bool coverable = pMana->canAfford(manaLeg, source->has(Constants::ANYTYPEOFMANAABILITY));
                 delete pMana;
@@ -8547,6 +8585,26 @@ int MenuAbility::reactToChoiceClick(Targetable * object,int choice,int control)
             toPay->addExtraCost(NEW ExtraManaCost(NEW ManaCost(optionalCosts[i])));
             toPay->setExtraCostsAction(this, source);
             game->mExtraPayment = toPay->extraCosts;
+            //#W53-R2 (owner Vita report 2026-09-02: Go-Shintai of Boundless
+            //Vigor's "you may pay {1}" gave no opportunity to tap Twitching
+            //Doll for the mana). Choosing to PAY is the same commitment a cast
+            //makes, so it pays the same way: auto-tap the human's free
+            //untapped producers. The X-announcement branch below already did
+            //this; the ordinary (no-X) pay branch did not, so a human whose
+            //mana was not ALREADY floating had to guess that producers must be
+            //clicked before answering the prompt. Auto-tap covers what
+            //ManaEngine::planPayment can see; a producer wrapped by a `&&`
+            //side effect is still invisible to the PLANNER and must be clicked
+            //by hand (the release fix above is what keeps that window open).
+            //AI seats keep running their own payment planner.
+            if (!source->controller()->isAI())
+            {
+                ManaCost * autoCost = NEW ManaCost(optionalCosts[i]);
+                SAFE_DELETE(autoCost->extraCosts); //mana leg only; the extra costs are paid by their own clicks
+                ManaEngine::autoTapForCost(source->controller(), source, autoCost,
+                                           source->has(Constants::ANYTYPEOFMANAABILITY));
+                delete autoCost;
+            }
             return 0;
         }
     }
