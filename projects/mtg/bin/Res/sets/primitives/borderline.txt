@@ -66010,7 +66010,7 @@ type=Instant
 [/card]
 [card]
 name=Light-Paws, Emperor's Voice
-auto=@movedto(aura|mybattlefield) from(mystack):may name(Search aura) all(trigger[to]) name(Search aura) transforms((,newability[name(Search aura) target(aura[manacost<=manacost]|mylibrary) moveto(mybattlefield) and!( transforms((,newability[shuffle],newability[name(Attach aura) retarget target(Light-Paws^ Emperor's Voice|mybattlefield)])) oneshot )!])) oneshot
+auto=@movedto(aura|mybattlefield) from(mystack):may name(Search aura) all(trigger[to]) name(Search aura) transforms((,newability[name(Search aura) target(aura[manacost<=srcmanacost&diffname!aura!]|mylibrary) moveto(mybattlefield) and!( transforms((,newability[shuffle],newability[name(Attach aura) retarget target(Light-Paws^ Emperor's Voice|mybattlefield)])) oneshot )!])) oneshot
 text=Whenever an Aura enters under your control, if you cast it, you may search your library for an Aura card with mana value less than or equal to that Aura and with a different name than each Aura you control, put that card onto the battlefield attached to Light-Paws, Emperor's Voice, then shuffle.
 mana={1}{W}
 type=Legendary Creature

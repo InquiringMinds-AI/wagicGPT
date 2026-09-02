@@ -1,0 +1,29 @@
+#Light-Paws, Emperor's Voice with a BESTOWED creature. A creature cast for its
+#bestow cost is an Aura spell, so Light-Paws triggers; per CR 702.103 bestow does
+#not change the card's mana value, so the bound is Leafcrown Dryad's PRINTED
+#{1}{G} = 2, not its {3}{G} bestow cost.
+#Here Spirit Mantle (MV 2) is exactly at the bound and must be fetchable.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice
+hand:Leafcrown Dryad
+library:Spirit Mantle,Snake Umbra
+manapool:{3}{G}
+[PLAYER2]
+[DO]
+Leafcrown Dryad
+choice 1
+Light-Paws, Emperor's Voice
+choice 0
+choice 0
+Spirit Mantle
+Light-Paws, Emperor's Voice
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Leafcrown Dryad,Spirit Mantle
+library:Snake Umbra
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,27 @@
+#Light-Paws, Emperor's Voice - positive control: a LEGAL search must still work.
+#Ancestral Mask (MV 3) enters on Light-Paws; Holy Strength (MV 1, a different name
+#from every Aura in play) is a legal choice and enters attached to Light-Paws.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice
+hand:Ancestral Mask,Ethereal Armor
+library:Holy Strength,Snake Umbra
+manapool:{2}{G}{W}
+[PLAYER2]
+[DO]
+Ancestral Mask
+Light-Paws, Emperor's Voice
+choice 0
+choice 0
+Holy Strength
+Light-Paws, Emperor's Voice
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Ancestral Mask,Holy Strength
+hand:Ethereal Armor
+library:Snake Umbra
+manapool:{W}
+[PLAYER2]
+[END]

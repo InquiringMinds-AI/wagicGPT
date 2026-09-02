@@ -1,0 +1,28 @@
+#Light-Paws, Emperor's Voice with a BESTOWED creature - the upper half of the same
+#rule. Leafcrown Dryad's mana value stays {1}{G} = 2 while bestowed (CR 702.103),
+#so Snake Umbra (MV 3) is out of range and must stay in the library. If the search
+#were bounded by the {3}{G} bestow cost (MV 4) it would be wrongly fetchable.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice
+hand:Leafcrown Dryad
+library:Snake Umbra
+manapool:{3}{G}
+[PLAYER2]
+[DO]
+Leafcrown Dryad
+choice 1
+Light-Paws, Emperor's Voice
+choice 0
+choice 0
+Snake Umbra
+Light-Paws, Emperor's Voice
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Leafcrown Dryad
+library:Snake Umbra
+manapool:{0}
+[PLAYER2]
+[END]
