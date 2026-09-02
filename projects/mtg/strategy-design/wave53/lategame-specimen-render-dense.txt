@@ -1,0 +1,202 @@
+# wave-53 render-dense companion specimen: 1788334424-ai_baka_deck125-0x55c56d4af610-vs-ai_baka_deck126.jsonl seq 66 turn 22 phase Draw options 4 prompt 10412 chars
+# life 27 vs 20. Exercises 10 annotation families: HOLD row, declined-list note, PLAN age stamp,
+# X pricing, {spends K of M}, LIFE-TO-DAMAGE CONVERTER, #a-#b collapse, {card text:}, {target text:}, '- Paid' receipt.
+
+GAME LOG (everything that has happened so far):
+=== Turn 1 - YOUR turn ===
+- Your opening hand (7 cards): Dream Fracture; Fall of the Gavel; Elixir of Immortality; Glacial Fortress; Essence Scatter; Supreme Verdict; Emrakul, the Aeons Torn
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 2 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Urborg, Tomb of Yawgmoth
+=== Turn 3 - YOUR turn ===
+- Phase: Draw
+- You drew Fall of the Gavel
+- Phase: Main phase 1
+- Paid {1} for Elixir of Immortality with Glacial Fortress
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+=== Turn 4 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 5 - YOUR turn ===
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 6 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+- Opponent cast Idyllic Tutor
+- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
+- Opponent searched their library with Idyllic Tutor
+- Opponent used: choose card with Idyllic Tutor targeting Sanguine Bond
+- Opponent put the revealed Sanguine Bond into their hand
+=== Turn 7 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+- Phase: Main phase 1
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Glacial Fortress; Tundra
+- You gained 5 life (now 25)
+- Your Elixir of Immortality was put into your library from the battlefield
+=== Turn 8 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+- Opponent cast Pride Guardian
+- Opponent's Pride Guardian resolved and entered the battlefield
+=== Turn 9 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict
+=== Turn 10 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+- Opponent cast Idyllic Tutor
+- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
+- Opponent searched their library with Idyllic Tutor
+- Opponent used: choose card with Idyllic Tutor targeting Sanguine Bond
+- Opponent put the revealed Sanguine Bond into their hand
+=== Turn 11 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Emrakul, the Aeons Torn
+- You discarded Emrakul, the Aeons Torn
+=== Turn 12 - opponent's turn ===
+- Phase: Untap
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (2 cards) into your library with Emrakul, the Aeons Torn
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Forest
+- Opponent cast Sanguine Bond
+- Opponent's Sanguine Bond resolved and entered the battlefield
+=== Turn 13 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Opponent cast Exquisite Blood
+- Paid {1}{u}{u} for Dream Fracture with Glacial Fortress; Tundra; Island
+- You cast Dream Fracture
+- Opponent's Exquisite Blood was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Tundra
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+=== Turn 15 - YOUR turn ===
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Sanguine Bond
+- Paid {1}{u}{u} for Cancel with Glacial Fortress; Tundra #1; Island
+- You cast Cancel
+- Opponent's Sanguine Bond was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 18 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 19 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Glacial Fortress #1; Tundra #1; Island; Tundra #2; Glacial Fortress #2
+- You announced X = 2 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 2 life (now 27)
+- You drew Supreme Verdict
+- You drew Sphinx's Revelation
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Essence Scatter
+- You discarded Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+=== Turn 21 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict
+=== Turn 22 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+
+--- CURRENT SITUATION ---
+Phase: Draw | It is the opponent's turn.
+Your life: 27 | Opponent life: 20
+Mana available: 5 total (five untapped sources, tapped automatically when you cast; colours you can make: {u}{b}{w} (sources that can make each: {W} 4, {U} 5, {B} 5 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Glacial Fortress #1 {w} or {u} or {b}; Tundra #1 {w} or {u} or {b}; Island {u} or {b}; Tundra #2 {w} or {u} or {b}; Glacial Fortress #2 {w} or {u} or {b}
+Your hand (7 cards): Fall of the Gavel (copy 1 of 2 in your hand) {3}{u}{w} [instant]; Fall of the Gavel (copy 2 of 2 in your hand) {3}{u}{w} [instant]; Essence Scatter {1}{u} [instant]; Staff of Nin {6} [artifact]; Path to Exile {w} [instant]; Sphinx's Revelation {u}{u}{w}{x} [instant]; Elixir of Immortality {1} [artifact]
+Your battlefield (5 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 5 are lands): Glacial Fortress #1; Tundra #1; Island; Tundra #2; Glacial Fortress #2
+Opponent battlefield (17 permanents listed, of which 7 are creatures, 0 of them able to attack right now, and 9 are lands): Bayou #1; Bayou #2; Forest; Isolated Chapel #1; Isolated Chapel #2; Overgrown Battlement #1 {1}{g} (0/4) [defender]; Overgrown Battlement #2 {1}{g} (0/4) [defender]; Perimeter Captain #1-#3 {w} (0/4) [defender] x3; Pride Guardian {w} (0/3) [defender]; Sanguine Bond {3}{b}{b} [enchantment] {effect: "Whenever you gain life, target opponent loses that much life."}; Sunpetal Grove #1-#3 x3; Urborg, Tomb of Yawgmoth; Wall of Omens {1}{w} (0/4) [defender]
+Opponent hand size: 1 | Opponent library: 38 cards
+LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs - Sanguine Bond. While it is in play, life ITS CONTROLLER gains also makes the other player lose that much life. A converter of THEIRS turns every life THEY gain - lifelink, blocking triggers, drains, any of it - into that much life off YOUR total as well; a converter of YOURS does the same to life YOU gain, and leaves their gains alone. This is not a trade: when they gain N, their total goes UP by N and yours goes DOWN by N in the same event.
+Your library: 43 cards
+
+YOUR PLAN (as you last stated it, 1 window ago on turn 22): Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn.
+
+Casting decision (Draw, opponent's turn): which card do you cast now, if any?
+1. Cast Path to Exile {w} {leaves 4 of your 5 untapped mana sources untapped} {spends 1 of your 5 untapped mana sources this turn; Fall of the Gavel {3}{u}{w} in your hand needs 5} - legal targets right now: Overgrown Battlement #1 {1}{g} (creature 0/4) [defender] {target text: "Defender -- {T}: Add {G} for each creature with defender you control."}, Overgrown Battlement #2 {1}{g} (creature 0/4) [defender], Perimeter Captain #1-#3 {w} (creature 0/4) [defender] x3 {target text: "Defender -- Whenever a creature you control with defender blocks, you may gain 2 life."}, Pride Guardian {w} (creature 0/3) [defender] {target text: "Defender -- Whenever Pride Guardian blocks, you gain 3 life."}, Wall of Omens {1}{w} (creature 0/4) [defender] {target text: "Defender (This creature can't attack.) -- When Wall of Omens enters, draw a card."} {card text: "Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle their library."}
+2. Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=2 (5 mana total); each point of X gains you 1 life and draws you 1 card} {card text: "You gain X life and draw X cards."}
+3. Cast nothing right now
+4. Hold priority - do not ask me again this turn unless the board changes
+
+[you declined this exact list 1 time already this turn]
+On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Path to Exile)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+
+--- REPLY ---
+CHOICE: 3 (Cast nothing right now)
+PLAN: Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn.
+
+--- EXECUTED ---
+choice 3: Cast nothing right now

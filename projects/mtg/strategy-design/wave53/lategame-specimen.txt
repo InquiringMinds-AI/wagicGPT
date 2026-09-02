@@ -1,0 +1,578 @@
+# wave-53 lategame specimen: 1788334427-ai_baka_deck125-0x55be9ff4b380-vs-ai_baka_deck146.jsonl seq 357 turn 84 phase Main phase 1 options 6 prompt 28481 chars
+
+GAME LOG (everything that has happened so far):
+(...earlier events trimmed - graveyards at trim: you - empty; opponent - Nadaar, Selfless Paladin x3, Lolth, Spider Queen x3, Triumphant Adventurer x2, Vanishing Verse, Emeria's Call, Acererak the Archlich x3, Pelakka Predation, Silverquill Command x3, Kaya the Inexorable x2, Soul Shatter x3, Barrowin of Clan Undurr, Silverquill Silencer; exiled at trim: you - Lightmine Field, Cancel x2, Dream Fracture, Final Judgment, Essence Scatter; opponent - Silverquill Silencer x3, Triumphant Adventurer x2, Nadaar, Selfless Paladin, Barrowin of Clan Undurr, Hive of the Eye Tyrant)
+- Opponent's Silverquill Silencer resolved and entered the battlefield
+- Opponent used: Choose a name with Silverquill Silencer
+- Opponent's Silverquill Silencer named Sphinx's Revelation
+=== Turn 30 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 31 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Silverquill Command
+- Paid {3}{u}{w} for Fall of the Gavel with Island #1; Plains #1; Island #2; Island #3; Plains #2
+- You cast Fall of the Gavel
+- Opponent's Silverquill Command was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 48)
+- Your Fall of the Gavel resolved and went to your graveyard
+- Phase: Combat damage
+- Opponent's Silverquill Silencer dealt 3 damage to you (now 45)
+=== Turn 32 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 33 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Combat damage
+- Opponent's Silverquill Silencer dealt 3 damage to you (now 42)
+=== Turn 34 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+=== Turn 35 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Hive of the Eye Tyrant
+- Phase: Combat damage
+- Opponent's Silverquill Silencer dealt 3 damage to you (now 39)
+=== Turn 36 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+=== Turn 37 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Triumphant Adventurer
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter
+- Opponent's Triumphant Adventurer was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+- Phase: Combat damage
+- Opponent's Silverquill Silencer dealt 3 damage to you (now 36)
+=== Turn 38 - YOUR turn ===
+- Phase: Draw
+- You drew Fall of the Gavel
+=== Turn 39 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Shineshadow Snarl
+- Phase: Combat damage
+- Opponent's Silverquill Silencer dealt 3 damage to you (now 33)
+=== Turn 40 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- Paid {w} for Path to Exile with Plains #1
+- You cast Path to Exile
+- Opponent's Silverquill Silencer was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Plains
+- Opponent's Plains entered the battlefield from the opponent's library
+=== Turn 41 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Kaya the Inexorable
+- Paid {3}{u}{w} for Fall of the Gavel with Island #1; Plains #2; Island #2; Island #3; Island #4
+- You cast Fall of the Gavel
+- Opponent's Kaya the Inexorable was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 38)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 42 - YOUR turn ===
+- Phase: Draw
+- You drew Lightmine Field
+=== Turn 43 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Shineshadow Snarl
+=== Turn 44 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Island #1; Tundra #1; Seachrome Coast; Tundra #2; Plains #1; Plains #2; Glacial Fortress #1; Glacial Fortress #2; Tundra #3; Island #2; Island #3; Tundra #4; Island #4; Plains #3
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 3 life (now 41)
+- You drew Glacial Fortress
+- You drew Island
+- You drew Island
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Supreme Verdict, Supreme Verdict
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Supreme Verdict
+=== Turn 45 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Nadaar, Selfless Paladin
+- Opponent's Nadaar, Selfless Paladin resolved and entered the battlefield
+- Opponent ventured into Lost Mine of Phandelver: venture step 3 of that run
+- Opponent used: dark pool with Lost Mine of Phandelver
+- Opponent gained 1 life (now 22)
+- You lost 1 life (now 40)
+=== Turn 46 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Paid {w} for Path to Exile with Plains #1
+- You cast Path to Exile
+- Opponent's Nadaar, Selfless Paladin was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: Put a card onto the battlefield with Path to Exile targeting Swamp
+- Opponent's Swamp entered the battlefield from the opponent's library
+=== Turn 47 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 48 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- You played Island
+=== Turn 49 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Kaya the Inexorable
+- Paid {1}{u}{u} for Cancel with Island #1; Island #2; Plains #1
+- You cast Cancel
+- Opponent's Kaya the Inexorable was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+- Opponent cast Silverquill Command
+- Paid {1}{u}{u} for Dream Fracture with Island #3; Island #4; Plains #2
+- You cast Dream Fracture
+- Opponent's Silverquill Command was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Supreme Verdict
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Triumphant Adventurer
+- Opponent's Triumphant Adventurer resolved and entered the battlefield
+- Paid {w} for Path to Exile with Plains #3
+- You cast Path to Exile
+- Opponent's Triumphant Adventurer was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+=== Turn 50 - YOUR turn ===
+- Phase: Draw
+- You drew Emrakul, the Aeons Torn
+- Phase: Main phase 1
+- You played Island
+- Paid {15} for Emrakul, the Aeons Torn with Island #1; Island #2; Island #3; Island #4; Island #5; Island #6; Plains #1; Plains #2; Plains #3; Tundra #1; Seachrome Coast; Tundra #2; Glacial Fortress #1; Glacial Fortress #2; Tundra #3
+- You cast Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn resolved and entered the battlefield
+- Opponent cast Soul Shatter
+- Opponent's Soul Shatter resolved and went to the opponent's graveyard
+- You used: sacrifice a creature or planeswalker with Soul Shatter targeting Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn died
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (12 cards) into your library with Emrakul, the Aeons Torn
+=== Turn 51 - YOUR turn ===
+- Phase: Draw
+- You drew Cancel
+=== Turn 52 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Opponent cast Silverquill Command
+- Paid {1}{u}{u} for Cancel with Island #1; Island #2; Plains #1
+- You cast Cancel
+- Opponent's Silverquill Command was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+- Phase: Blockers
+- Opponent used: exile card with Hive of the Eye Tyrant targeting Cancel
+- Your Cancel was exiled from your graveyard
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 37)
+=== Turn 53 - YOUR turn ===
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 54 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Brightclimb Pathway
+- Phase: Main phase 2
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+=== Turn 55 - YOUR turn ===
+- Phase: Upkeep
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Dream Fracture
+=== Turn 56 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Nadaar, Selfless Paladin
+- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Plains #1
+- You cast Dream Fracture
+- Opponent's Nadaar, Selfless Paladin was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Supreme Verdict
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Barrowin of Clan Undurr
+- Opponent's Barrowin of Clan Undurr resolved and entered the battlefield
+- Opponent ventured into Lost Mine of Phandelver: venture step 4 of that run
+- Opponent drew a card
+- Opponent used: dungeon completed with Lost Mine of Phandelver
+- Opponent's Lost Mine of Phandelver moved from the opponent's command zone to the opponent's zone
+- Phase: Blockers
+- Opponent used: exile card with Hive of the Eye Tyrant targeting Dream Fracture
+- Your Dream Fracture was exiled from your graveyard
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 34)
+=== Turn 57 - YOUR turn ===
+- Phase: Draw
+- You drew Final Judgment
+- Phase: Main phase 1
+- Paid {4}{w}{w} for Final Judgment with Plains #1; Plains #2; Island #1; Island #2; Island #3; Island #4
+- You cast Final Judgment (that Final Judgment was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Barrowin of Clan Undurr was exiled from the battlefield
+- Your Final Judgment resolved and went to your graveyard
+=== Turn 58 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Shineshadow Snarl
+- Phase: Blockers
+- Opponent used: exile card with Hive of the Eye Tyrant targeting Final Judgment
+- Your Final Judgment was exiled from your graveyard
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 31)
+=== Turn 59 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Island #1; Tundra #1; Seachrome Coast #1; Tundra #2; Plains #1; Plains #2; Glacial Fortress #1; Glacial Fortress #2; Tundra #3; Island #2; Island #3; Tundra #4; Island #4; Plains #3; Glacial Fortress #3; Island #5; Island #6; Seachrome Coast #2
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 3 life (now 34)
+- You drew Plains
+- You drew Path to Exile
+- You drew Cancel
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Plains
+=== Turn 60 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Paid {w} for Path to Exile with Plains #4
+- You cast Path to Exile
+- Opponent's Hive of the Eye Tyrant was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Hive of the Eye Tyrant
+=== Turn 61 - YOUR turn ===
+- Phase: Draw
+- You drew Fall of the Gavel
+=== Turn 62 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Brightclimb Pathway
+- Phase: Main phase 2
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+=== Turn 63 - YOUR turn ===
+- Phase: Draw
+- You drew Emrakul, the Aeons Torn
+- Phase: Main phase 1
+- Paid {15} for Emrakul, the Aeons Torn with Island #1; Island #2; Island #3; Island #4; Island #5; Island #6; Plains #1; Plains #2; Plains #3; Plains #4; Tundra #1; Seachrome Coast #1; Tundra #2; Glacial Fortress #1; Glacial Fortress #2
+- You cast Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn resolved and entered the battlefield
+- Opponent cast Soul Shatter
+- Paid {1}{u}{u} for Cancel with Tundra #3; Tundra #4; Glacial Fortress #3
+- You cast Cancel
+- Opponent cast Soul Shatter
+- Opponent's Soul Shatter resolved and went to the opponent's graveyard
+- You used: sacrifice a creature or planeswalker with Soul Shatter targeting Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn died
+- You used: Put a card into the library with Emrakul, the Aeons Torn
+- You shuffled your graveyard (3 cards) into your library with Emrakul, the Aeons Torn
+- Opponent's Soul Shatter was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 64 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+=== Turn 65 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Barrowin of Clan Undurr
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter
+- Opponent's Barrowin of Clan Undurr was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+- Phase: Blockers
+- Opponent used: exile card with Hive of the Eye Tyrant targeting Cancel
+- Your Cancel was exiled from your graveyard
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 31)
+=== Turn 66 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+=== Turn 67 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- Opponent drew a card
+- Phase: Blockers
+- Opponent used: exile card with Hive of the Eye Tyrant targeting Essence Scatter
+- Your Essence Scatter was exiled from your graveyard
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 28)
+=== Turn 68 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+=== Turn 69 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Lolth, Spider Queen
+- Paid {3}{u}{w} for Fall of the Gavel with Island #1; Plains #1; Island #2; Island #3; Island #4
+- You cast Fall of the Gavel
+- Opponent's Lolth, Spider Queen was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 33)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 70 - YOUR turn ===
+- Phase: Upkeep
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #2; Island #3
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Tundra #1; Seachrome Coast #1; Tundra #2; Plains #1; Plains #2; Glacial Fortress #1; Glacial Fortress #2; Tundra #3; Tundra #4; Island #4; Plains #3; Glacial Fortress #3; Island #5; Island #6; Seachrome Coast #2; Plains #4; Plains #5
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 3 life (now 36)
+- You drew Sphinx's Revelation
+- You drew Plains
+- You drew Dream Fracture
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You gained 5 life (now 41)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (2 cards) into your library with Elixir of Immortality
+- You played Plains
+=== Turn 71 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Hive of the Eye Tyrant
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #2
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 38)
+=== Turn 72 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 73 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #2
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 35)
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 32)
+=== Turn 74 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 75 - opponent's turn ===
+- Phase: Upkeep
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #2
+- Phase: Draw
+- Opponent drew a card
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 29)
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 26)
+=== Turn 76 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+=== Turn 77 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Silverquill Silencer
+- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Plains #1
+- You cast Dream Fracture
+- Opponent's Silverquill Silencer was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Elixir of Immortality
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Silverquill Silencer
+- Opponent's Silverquill Silencer resolved and entered the battlefield
+- Opponent used: Choose a name with Silverquill Silencer
+- Opponent's Silverquill Silencer named Cancel
+=== Turn 78 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- Paid {w} for Path to Exile with Plains #1
+- You cast Path to Exile
+- Opponent's Silverquill Silencer was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Island #1; Tundra #1; Seachrome Coast #1; Tundra #2; Plains #2; Glacial Fortress #1; Glacial Fortress #2; Tundra #3; Island #2; Island #3; Tundra #4; Island #4; Plains #3; Glacial Fortress #3; Island #5; Island #6; Seachrome Coast #2; Plains #4; Plains #5; Plains #6; Island #7; Glacial Fortress #4
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation (that Sphinx's Revelation was 1 of 2 copies in your hand; the other 1 is still there)
+- You gained 3 life (now 29)
+- You drew Staff of Nin
+- You drew Island
+- You drew Staff of Nin
+- Your Sphinx's Revelation resolved and went to your graveyard
+- You played Island
+- Paid {6} for Staff of Nin with Island #8 and mana already floating
+- You cast Staff of Nin (that Staff of Nin was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Staff of Nin resolved and entered the battlefield
+- Paid {6} for Staff of Nin from mana already floating
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 21)
+- Paid {1} for Elixir of Immortality from mana already floating
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 20)
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality from mana already floating
+- You gained 5 life (now 34)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (3 cards) into your library with Elixir of Immortality
+=== Turn 79 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #2
+- Phase: Combat damage
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 31)
+- Opponent's Hive of the Eye Tyrant dealt 3 damage to you (now 28)
+=== Turn 80 - YOUR turn ===
+- Phase: Upkeep
+- You drew Path to Exile
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 19)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 18)
+- You drew Dream Fracture
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 81 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent used: becomes beholder with Hive of the Eye Tyrant #1
+- Paid {w} for Path to Exile with Plains #1
+- You cast Path to Exile (that Path to Exile was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Hive of the Eye Tyrant was exiled from the battlefield (that Hive of the Eye Tyrant was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Your Path to Exile resolved and went to your graveyard
+- Opponent used: becomes beholder with Hive of the Eye Tyrant
+- Paid {w} for Path to Exile with Plains #2
+- You cast Path to Exile
+- Opponent's Hive of the Eye Tyrant was exiled from the battlefield
+- Your Path to Exile resolved and went to your graveyard
+=== Turn 82 - YOUR turn ===
+- Phase: Upkeep
+- You drew Supreme Verdict
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 17)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 16)
+- You drew Essence Scatter
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 83 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Pelakka Predation
+- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Plains #1
+- You cast Dream Fracture
+- Opponent's Pelakka Predation was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Fall of the Gavel
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Emeria's Call
+- Paid {3}{u}{w} for Fall of the Gavel with Plains #2; Island #3; Island #4; Island #5; Island #6
+- You cast Fall of the Gavel
+- Opponent's Emeria's Call was COUNTERED by Fall of the Gavel and went to the opponent's graveyard
+- You gained 5 life (now 33)
+- Your Fall of the Gavel resolved and went to your graveyard
+=== Turn 84 - YOUR turn ===
+- Phase: Upkeep
+- You drew Sphinx's Revelation
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 15)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 14)
+- You drew Sphinx's Revelation
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Seachrome Coast
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 33 | Opponent life: 14
+Dungeons completed (opponent): 2
+Mana available: 24 total (untapped sources, tapped automatically when you cast; colours you can make: {u}{w} (sources that can make each: {W} 16, {U} 18 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Island #1 {u}; Tundra #1 {w} or {u}; Seachrome Coast #1 {w} or {u}; Tundra #2 {w} or {u}; Plains #1 {w}; Plains #2 {w}; Glacial Fortress #1 {w} or {u}; Glacial Fortress #2 {w} or {u}; Tundra #3 {w} or {u}; Island #2 {u}; Island #3 {u}; Tundra #4 {w} or {u}; Island #4 {u}; Plains #3 {w}; Glacial Fortress #3 {w} or {u}; Island #5 {u}; Island #6 {u}; Seachrome Coast #2 {w} or {u}; Plains #4 {w}; Plains #5 {w}; Plains #6 {w}; Island #7 {u}; Glacial Fortress #4 {w} or {u}; Island #8 {u}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (8 cards): Lightmine Field {2}{w}{w} [enchantment]; Final Judgment {4}{w}{w} [sorcery]; Sphinx's Revelation (copy 1 of 3 in your hand) {u}{u}{w}{x} [instant]; Supreme Verdict {1}{u}{w}{w} [sorcery]; Essence Scatter {1}{u} [instant]; Elixir of Immortality {1} [artifact]; Sphinx's Revelation (copy 2 of 3 in your hand) {u}{u}{w}{x} [instant]; Sphinx's Revelation (copy 3 of 3 in your hand) {u}{u}{w}{x} [instant]
+Your battlefield (27 permanents listed, of which 0 are creatures, 0 of them able to attack right now, and 25 are lands): Glacial Fortress #1-#4 x4; Island #1-#8 x8; Plains #1-#6 x6; Seachrome Coast #1; Seachrome Coast #2; Seachrome Coast #3 [tapped]; Staff of Nin #2 {6} [artifact] [tapped]; Staff of Nin #1 {6} [artifact] [tapped] {effect (each copy of this card does this): "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra #1-#4 x4
+Opponent battlefield (18 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 18 are lands): Brightclimb Pathway #3; Brightclimb Pathway #4; Brightclimb Pathway #1 [tapped]; Brightclimb Pathway #2 [tapped]; Plains #5; Plains #6; Plains #1-#4 [tapped] x4; Shineshadow Snarl #1-#4 x4; Swamp #1-#4 [tapped] x4
+Opponent hand size: 6 | Opponent library: 0 cards
+Artifacts in play: you 2 | opponent 0
+Your library: 13 cards
+
+YOUR PLAN (as you last stated it, 2 windows ago on turn 84): Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn.
+
+Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?
+1. Cast Lightmine Field {2}{w}{w} {right now: they control 0 creatures able to attack - deals 0 until they have an attacker} {leaves 20 of your 24 untapped mana sources untapped} {card text: "Whenever one or more creatures attack, Lightmine Field deals damage to each of those creatures equal to the number of attacking creatures."}
+2. Cast Final Judgment {4}{w}{w} {right now: exiles 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 18 of your 24 untapped mana sources untapped} {card text: "Exile all creatures."}
+3. Cast Sphinx's Revelation {u}{u}{w}{x} {X pricing: max affordable X=20 (23 mana total); each point of X gains you 1 life and draws you 1 card} {card text: "You gain X life and draw X cards."}
+4. Cast Supreme Verdict {1}{u}{w}{w} {right now: destroys 0 of their creatures (0 without a restriction against attacking), 0 of yours} {leaves 20 of your 24 untapped mana sources untapped} {card text: "Supreme Verdict can't be countered. -- Destroy all creatures."}
+5. Cast Elixir of Immortality {1} {leaves 23 of your 24 untapped mana sources untapped} {card text: "{2},{T}: You gain 5 life. Shuffle Elixir of Immortality and your graveyard into library."}
+6. Cast nothing right now (combat comes next this turn)
+
+On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Lightmine Field)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+
+--- REPLY ---
+CHOICE: 3 (Cast Sphinx's Revelation)
+PLAN: Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn. Win by Staff of Nin pings.
