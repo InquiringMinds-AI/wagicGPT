@@ -207,6 +207,11 @@ const char * kReplyProtocol =
     "  (c) Otherwise - you are simply carrying on with the plan shown, at whatever step of it you "
     "have reached: OMIT the PLAN line. Executing a plan is NOT changing it. Your last stated plan "
     "carries forward automatically and will be shown to you again.\n"
+    "Write the PLAN as INTENT - what you mean to do next, and why - not as a description of the "
+    "board. The line you write is stored and re-served to you VERBATIM at later decisions, "
+    "unchanged and unchecked, so any board fact you put in it (\"both combo pieces are on the "
+    "battlefield\") will still read as true after that has stopped being true. The board you act "
+    "on is the CURRENT SITUATION block, never your own plan.\n"
     "Your PLAN is a private note to your future self. It is not an instruction to the game, it is "
     "not a second answer, and it is NOT checked against this decision's option list: it may name "
     "any card in your deck or hand and any future turn, whether or not that card is among today's "
@@ -8675,7 +8680,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mListDeclineTurn(-1), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -9110,6 +9115,17 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     rec["answer_replaced"] = mAnswerReplacedFalse ? false : answerReplaced(reply);
     mAnswerReplacedFalse = false;
     rec["coded_answers"] = codedAnswerCount(reply);
+    //#W53-N (D12b): on a multi-answer reply, WHICH coded CHOICE line the
+    //engine latched. The five wave-52 plan_choice_conflict records held the
+    //first answer in `reply` and the latched row in `choice` with nothing
+    //tying them together; three of them carried answer_replaced + 2 coded
+    //answers, so the field is exactly the missing link.
+    if (choice >= 0 && optionTexts && codedAnswerCount(reply) >= 2)
+    {
+        int ord = codedChoiceOrdinal(reply, choice, optionCount, optionTexts);
+        if (ord >= 1)
+            rec["latched_coded_line"] = ord;
+    }
     //Assignments the combat validator pruned as illegal on this record.
     if (!mLastPrunedPairs.empty())
     {
@@ -9172,6 +9188,9 @@ void AIPlayerGPT::logGameEnd()
         //record of their own). Without it a corpus reading the translog cannot
         //tell a window that was never offered from one the gate skipped.
         {"mana_only_windows_skipped", mManaOnlyWindowsSkipped},
+        //#W53-N (D2): windows the model's own HOLD row closed. Not a window
+        //removed - a window the model answered once and did not want re-put.
+        {"hold_windows_skipped", mHoldWindowsSkipped},
     };
     std::ofstream f(mTransLogPath.c_str(), std::ios::app);
     if (f)
@@ -9439,11 +9458,15 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
         {
             mCurrentPlan.clear();
             mPlanEchoCount = 0;
+            mPlanSetSeq = -1; //#W53-N (D12a): expired, so it has no age
         }
     }
     if (!pregame && !mInAnnounceXAsk && !mCurrentPlan.empty())
     {
-        u << "\nYOUR PLAN (as you last stated it): " << mCurrentPlan << "\n";
+        //#W53-N (D12a): the age. 146v125 seq 177-227 re-served ONE plan across
+        //five turns while the opponent went 27 -> 35 life, with nothing on the
+        //block to say the model had not restated it since turn 32.
+        u << "\nYOUR PLAN (as you last stated it" << planAgeClause() << "): " << mCurrentPlan << "\n";
         //#W50-Y D10 (ii): on a TARGET window, a carried plan whose named
         //target (a permanent on either battlefield, under a targeting verb)
         //matches no row gets the one-line note - deck130 G4's two self-hits
@@ -10172,6 +10195,10 @@ string AIPlayerGPT::consumePlan(const string& content, const char * expectedLabe
         }
         //#W49-U D7: count verbatim echoes of the plan already carried.
         mPlanEchoCount = (plan == mCurrentPlan) ? mPlanEchoCount + 1 : 0;
+        //#W53-N (D12a): the model WROTE a plan line here, whatever it says -
+        //that, not its content, is what the age stamp reports.
+        mPlanSetSeq = mTransSeq;
+        mPlanSetTurn = observer ? observer->turn : 0;
         mCurrentPlan = plan;
     }
     //Labeled answer (the contract): the decision is the label line's
@@ -12332,6 +12359,210 @@ static string stripRepeatAnnotation(const string& line)
 //be chosen the same way. Scoped to single-option windows: that is where the
 //absence was measured and where the row is the whole menu's other half.
 static const char * kPassPriorityRowText = "Pass priority (take no action this window)";
+//#W53-N (D2): the model-takeable HOLD row. The wave-52 window economy is 966
+//opponent-turn windows for 85 acts (8.8%), 286 of them at six phases that
+//produced ZERO casts for 3,124 s, and 143.2 min spent re-asking byte-identical
+//menus inside single turns. Every cadence remedy is refuted ON THE RECORDS: a
+//blind "identical list already declined this turn" cache would have suppressed
+//30 real actions corpus-wide, and 130v152 seq 12 -> 13 is two BYTE-IDENTICAL
+//Spark Spray menus one phase apart, declined at Main 1 and CAST at Combat
+//begins - the model reads phase progression as information the menu does not
+//carry. So the only constraint-safe form is a row the MODEL may take: no
+//window is removed, nothing is cached blind, and the engine replays only an
+//answer the model itself gave, only while the board it gave it on stands.
+static const char * kHoldPriorityRowText =
+    "Hold priority - do not ask me again this turn unless the board changes";
+
+//#W53-N (D2): the hold's board key is the situation block WITHOUT its leading
+//phase line. Phase progression is NOT a board change - it is exactly the
+//information 130v152's pilot acted on - but the hold is an answer about the
+//TURN, so a phase step must not silently retire it. Everything else the block
+//carries does re-open it: life, poison, both battlefields, both hands, and
+//the STACK top-first, so a new stack object changes this string.
+static string holdBoardKeyOf(const string& situation)
+{
+    size_t nl = situation.find('\n');
+    return (nl == string::npos) ? string() : situation.substr(nl + 1);
+}
+
+//#W53-N (D2): does a hold taken on <heldBoard> with <heldRows> still stand at
+//a window whose board is <nowBoard> and whose menu is <nowRows>? Two
+//re-openers here (the third, the turn ending, is the caller's): the board
+//changed - which covers a new stack object - or a row is offered that was not
+//offered when the hold was taken, i.e. a newly affordable play. A row
+//DISAPPEARING is not a re-opener: the model already declined it. whyOut names
+//the re-opener for stderr.
+static bool holdStillStands(const string& heldBoard, const string& nowBoard,
+                            const std::set<string>& heldRows,
+                            const std::vector<string>& nowRows,
+                            const char ** whyOut)
+{
+    if (whyOut) *whyOut = "";
+    if (heldBoard != nowBoard)
+    {
+        if (whyOut) *whyOut = "the board changed";
+        return false;
+    }
+    for (size_t i = 0; i < nowRows.size(); i++)
+        if (heldRows.find(nowRows[i]) == heldRows.end())
+        {
+            if (whyOut) *whyOut = "a row is newly available";
+            return false;
+        }
+    return true;
+}
+
+//#W53-N (D2, the ledger's cheaper half - shipped ALONGSIDE the row, not
+//instead of it): how many times THIS EXACT list was declined this turn. It is
+//a PROMPT-ONLY annotation and is deliberately kept OUT of every ask key: a
+//number that rises with each answer would mint a fresh question at every AI
+//tick, turning the state-plus-question cache (and the deadlock breaker that
+//rides it) into an HTTP call per tick - the exact opposite of D2.
+//#W53-N (D12a): the age clause's exact wording, pure so the regression corpus
+//can hold it to its contract without a game.
+static string planAgeClauseText(int windows, int turn)
+{
+    if (windows < 1)
+        return string();
+    std::ostringstream o;
+    o << ", " << windows << (windows == 1 ? " window" : " windows") << " ago on turn " << turn;
+    return o.str();
+}
+
+static string declinedListNote(int n)
+{
+    if (n < 1)
+        return string();
+    std::ostringstream o;
+    o << "\n[you declined this exact list " << n << (n == 1 ? " time" : " times")
+      << " already this turn]";
+    return o.str();
+}
+
+//#W53-N (D9): the reserved echoes that NAME the pass row. "Pass" is the label
+//of row 0 wherever row 0 exists, so a parenthetical that is exactly one of
+//these is not an off-menu name and must not let the index win. Exact match on
+//the trimmed, lowercased echo - never a substring, so a card whose name merely
+//contains "pass" cannot be swallowed.
+static bool isReservedPassEcho(const string& echoLc)
+{
+    size_t s = echoLc.find_first_not_of(" \t");
+    size_t e = echoLc.find_last_not_of(" \t.!");
+    if (s == string::npos || e < s)
+        return false;
+    string t = echoLc.substr(s, e - s + 1);
+    string lowRow = kPassPriorityRowText;
+    for (size_t i = 0; i < lowRow.size(); i++)
+        lowRow[i] = (char) tolower((unsigned char) lowRow[i]);
+    return t == "pass" || t == "0" || t == "pass priority" || t == "pass (0)"
+        || t == "0 (pass)" || t == "pass this window" || t == "no action" || t == lowRow;
+}
+
+//#W53-N (D2): honour the model's own hold. Returns true only when the model
+//took the HOLD row this turn, at this seam, and the board it took it on is
+//still the board in front of it with no row it has not already seen. Every
+//other outcome CLEARS the latch, so the default is always to ask.
+bool AIPlayerGPT::holdHonoured(const char * seam, const string& situation,
+                               const std::vector<string>& rows)
+{
+    if (mHoldTurn != observer->turn)
+    {
+        if (mHoldTurn >= 0) //a turn boundary retires the hold silently
+        {
+            mHoldTurn = -1;
+            mHoldBoard.clear();
+            mHoldRows.clear();
+        }
+        return false;
+    }
+    std::map<string, std::set<string> >::iterator it = mHoldRows.find(seam);
+    if (it == mHoldRows.end())
+        return false; //held elsewhere, never at this seam: this question is owed
+    const char * why = "";
+    if (!holdStillStands(mHoldBoard, holdBoardKeyOf(situation), it->second, rows, &why))
+    {
+        DebugTrace("AIPlayerGPT: hold re-opened at the " << seam << " seam - " << why);
+        mHoldTurn = -1;
+        mHoldBoard.clear();
+        mHoldRows.clear();
+        return false;
+    }
+    mHoldWindowsSkipped++;
+    DebugTrace("AIPlayerGPT: holding priority at the " << seam << " seam (the model's own"
+               " hold row, turn " << observer->turn << "; " << mHoldWindowsSkipped
+               << " windows held this game)");
+    return true;
+}
+
+//#W53-N (D2): record the hold. A hold taken at a second seam on the same
+//board ADDS that seam's rows rather than replacing the latch, so one turn can
+//be held at both the priority and the casting seam.
+void AIPlayerGPT::takeHold(const char * seam, const string& situation,
+                           const std::vector<string>& rows)
+{
+    string key = holdBoardKeyOf(situation);
+    if (mHoldTurn != observer->turn || mHoldBoard != key)
+    {
+        mHoldRows.clear();
+        mHoldTurn = observer->turn;
+        mHoldBoard = key;
+    }
+    std::set<string>& s = mHoldRows[seam];
+    for (size_t i = 0; i < rows.size(); i++)
+        s.insert(rows[i]);
+    DebugTrace("AIPlayerGPT: the model took the hold row at the " << seam << " seam on turn "
+               << observer->turn << " - this turn's remaining " << seam
+               << " windows are held until the board changes");
+}
+
+//#W53-N (D12a): the carried plan's age. mTransSeq is the seq the record now
+//being assembled will carry, and mPlanSetSeq is the seq of the record whose
+//reply wrote the plan, so the difference is the number of decision windows
+//that have gone by - the same arithmetic a corpus reader does on the seqs.
+string AIPlayerGPT::planAgeClause() const
+{
+    if (mPlanSetSeq < 0)
+        return string();
+    return planAgeClauseText(mTransSeq - mPlanSetSeq, AIPlayerGPT::translogTurn(mPlanSetTurn));
+}
+
+//#W53-N (D12b): which of the reply's coded CHOICE lines the engine latched.
+int AIPlayerGPT::codedChoiceOrdinal(const string& content, int choice, int optionCount,
+                                    const std::vector<string> * optionTexts)
+{
+    if (choice < 0)
+        return -1;
+    int ordinal = 0;
+    size_t lineStart = 0;
+    while (lineStart <= content.size())
+    {
+        size_t lineEnd = content.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? content.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (content[s] == ' ' || content[s] == '\t'
+                           || content[s] == '*' || content[s] == '#' || content[s] == '-'))
+            s++;
+        if (end - s >= 7)
+        {
+            static const char * kLabel = "CHOICE:";
+            bool m = true;
+            for (int k = 0; k < 7 && m; k++)
+                m = (toupper((unsigned char) content[s + k]) == kLabel[k]);
+            if (m)
+            {
+                ordinal++;
+                string line = content.substr(s + 7, end - (s + 7));
+                bool st = false;
+                if (parseChoice(line, optionCount, optionTexts, &st) == choice)
+                    return ordinal;
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    return -1;
+}
 
 //#W48-F1 - THE REPEAT-N ROW: MTG 720/721's announced shortcut as an option row.
 //
@@ -13947,7 +14178,8 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                              const std::vector<string> * optionTexts,
                              bool * staleEcho,
                              const std::string * pendingSource,
-                             std::string * noteOut)
+                             std::string * noteOut,
+                             bool passRowOffered)
 {
     if (staleEcho) *staleEcho = false;
     //Drop any inline think block first.
@@ -13983,6 +14215,7 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     int echoRemap = -1;
     bool echoConflict = false;
     bool echoNoMatch = false;
+    bool passEchoNamed = false; //#W53-N (D9): the parenthetical names row 0
     bool exactNameRemap = false; //#W52-J D6: bound by the exact short name (hoisted for the conflict signatures)
     vector<string> words; //echo's significant words (hoisted for INDEX-WINS)
     string echoLc;        //lowercased echo string (hoisted for INDEX-WINS (a2))
@@ -14095,6 +14328,14 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             echoLc = echo;
             for (size_t i = 0; i < echoLc.size(); i++)
                 echoLc[i] = (char) tolower((unsigned char) echoLc[i]);
+            //#W53-N (D9): "Pass" IS the short name of row 0 wherever row 0 is
+            //on the menu, so the same short-label rule lane G applied to "Cast
+            //nothing right now" applies here - the NAME resolves the answer and
+            //the index does not get to win. deck146 vs152 seq 91 answered
+            //"CHOICE: 1 (Pass)" on a Kaya menu and the engine used the +1: the
+            //only mis-execution in 3,063 CHOICE: n (name) parentheticals.
+            if (passRowOffered && isReservedPassEcho(echoLc))
+                passEchoNamed = true;
             //#W52-J (D6): the EXACT short name binds FIRST. The word pass below
             //drops "right"/"now" as render vocabulary and "cast" as filler, so
             //"Cast nothing right now" reduced to the single word "nothing" -
@@ -14393,6 +14634,31 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                 }
             }
         }
+    }
+
+    //#W53-N (D9): the parenthetical NAMES row 0. This binds ahead of every
+    //index and staleness verdict below, for the same reason lane G's exact
+    //short name binds ahead of the word pass: "Pass" is not an off-menu name
+    //where a pass row exists, it is that row's own label, and the word-pass
+    //below reads its only significant word ("priority") as matching no option
+    //and fails the whole reply to the heuristic. deck146 vs152 seq 91 executed
+    //Kaya's +1 on "CHOICE: 1 (Pass)" - the sole mis-execution in 3,063
+    //parentheticals. A coded 0 already IS this row, so it earns no note.
+    if (passEchoNamed)
+    {
+        int firstNum = -1;
+        for (size_t pn = 0; pn < text.size(); pn++)
+            if (isdigit((unsigned char) text[pn]))
+            {
+                size_t pe = pn;
+                while (pe < text.size() && isdigit((unsigned char) text[pe]))
+                    pe++;
+                firstNum = atoi(text.substr(pn, pe - pn).c_str());
+                break;
+            }
+        if (firstNum != 0)
+            appendParseNote(noteOut, "pass_row_named");
+        return 0;
     }
 
     //INDEX-WINS (wave-23 ITEM A). A well-formed, in-range POSITIVE index is
@@ -15529,12 +15795,32 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         tail << index << ". " << rline << "\n";
     }
 
+    //#W53-N (D2): the HOLD row, offered on the OPPONENT'S turn only. It sits
+    //LAST among the numbered rows, with the other declines, and it is a row
+    //like any other - the model may take it or ignore it. Taking it removes
+    //no window and hides no legal play: the engine simply stops re-putting
+    //THIS question until the board moves (see holdHonoured). It is scoped to
+    //the opponent's turn because that is where the defect lives (966 windows
+    //for 85 acts, 286 of them at phases that produced none) and because on the
+    //seat's OWN turn the board changes with every land drop and cast, so a
+    //hold there would be taken and retired in the same breath.
+    int holdRow = 0;
+    if (observer->currentPlayer != this)
+    {
+        holdRow = ++index;
+        shownLines.push_back(kHoldPriorityRowText);
+        tail << holdRow << ". " << kHoldPriorityRowText << "\n";
+    }
     //#W48-F3: on a single-option window the decline becomes a real, numbered
     //LAST row instead of a clause buried in the reply-format sentence. The
     //index is 0, which the parser has always accepted, so nothing about the
     //answer grammar changes - only the model's ability to see the choice.
     if (baseIndex == 1)
         tail << "0. " << kPassPriorityRowText << "\n";
+    //#W53-N (D2): where the option list ends and the per-ask facts begin. The
+    //prompt-only decline annotation is spliced in here, so it reads with the
+    //list it is about and still never enters the ask key.
+    const size_t optionsEnd = tail.str().size();
 
     //#W48-F1: a repeat-N plan the model already answered consumes THIS window
     //with no model call and no prompt assembly. Two exits, both taken here
@@ -15712,6 +15998,25 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //prompt: consuming an answer appends to the narration and updates the
     //plan, and a full-prompt key would read that as a state change.
     string boardKey = serializeGameState();
+    //#W53-N (D2): the model's own hold, honoured. No model call, no window
+    //removed from the record - the row the model took said this.
+    if (holdRow > 0 && holdHonoured("priority", boardKey, shownLines))
+    {
+        mLastChoice = 0; //a hold is a pass for this window
+        return NULL;
+    }
+    //#W53-N (D2, second half): how many times this EXACT list was already
+    //declined this turn. Prompt-only (declinedListNote says why).
+    if (mListDeclineTurn != observer->turn)
+    {
+        mListDeclineCount.clear();
+        mListDeclineTurn = observer->turn;
+    }
+    string listKey;
+    for (size_t lk = 0; lk < shownLines.size(); lk++)
+        listKey += shownLines[lk] + "\n";
+    string declinedNote = declinedListNote(mListDeclineCount.count(listKey)
+                                           ? mListDeclineCount[listKey] : 0);
     //#W49-S (D8/D3): the one re-ask for this board state. Appending the
     //correction makes this a DIFFERENT question (its own askKey, a fresh
     //call); the board moving on retires it. It is deliberately NOT cleared on
@@ -15727,7 +16032,13 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     if (!mPriorityReaskBoard.empty())
         tail << "\n" << mPriorityReaskLine;
     string askKey = boardKey + tail.str();
-    string userMsg = assemblePrompt(tail.str());
+    //#W53-N (D2): the decline annotation goes into the PROMPT only - askKey is
+    //built from tail.str() alone, so a count that rises with every answer can
+    //never mint a fresh question and turn the cache into a call per tick.
+    string userTail = tail.str();
+    if (!declinedNote.empty() && optionsEnd <= userTail.size())
+        userTail = userTail.substr(0, optionsEnd) + declinedNote + userTail.substr(optionsEnd);
+    string userMsg = assemblePrompt(userTail);
     bool unchanged = (askKey == mLastAskKey);
 
     //Deadlock breaker: priority is decided every AI tick. If the game state
@@ -15771,7 +16082,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         string decisionPart = consumePlan(content, "CHOICE:", &choiceRunLen, &rejectedLines);
         bool staleEcho = false;
         string parseNote;
-        choice = parseChoice(decisionPart, index, &shownLines, &staleEcho, NULL, &parseNote);
+        choice = parseChoice(decisionPart, index, &shownLines, &staleEcho, NULL, &parseNote,
+                             true); //#W53-N (D9): row 0 = pass priority exists here
         //A consecutive block of CHOICE lines answered a single-pick ask: the
         //run head was taken (findAnswerLabelLine) - stamp the overrun.
         if (choiceRunLen >= 2)
@@ -15950,7 +16262,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                     : "the repeat row was taken without a count - asking again", 5.0f);
             DebugTrace("AIPlayerGPT: " << fb << " -> re-asking once");
             string corrected;
-            pollCompletionRetry(assemblePrompt(tail.str() + "\n" + mPriorityReaskLine), corrected);
+            pollCompletionRetry(assemblePrompt(userTail + "\n" + mPriorityReaskLine), corrected);
             //mLastAskKey is left as it was: the corrected question's own key
             //differs from it, so the next tick polls (and eventually consumes)
             //the corrected call rather than replaying this failed answer.
@@ -15979,6 +16291,13 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         mPrevWindowRows = shownLines; //#W51-C D3: this window is now the prior one
         if (content.empty())
             noticeFallback("model reply failed or timed out - the heuristic decides", 5.0f);
+        else if (holdRow > 0 && choice == holdRow)
+        {
+            //#W53-N (D2): the model held. Nothing is narrated (a non-action
+            //leaves no trace) and nothing is capped - the latch lives exactly
+            //as long as the board it was taken on.
+            takeHold("priority", boardKey, shownLines);
+        }
         else if (choice >= 1 && choice <= index)
         {
             //#W48-F1: resolve a repeat row to the action it repeats. The rows
@@ -16081,6 +16400,14 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
 
         mLastAskKey = askKey;
         mLastChoice = choice;
+        //#W53-N (D2): a hold is this window's pass, never a no-progress
+        //action - the deadlock breaker must not read it as one.
+        if (holdRow > 0 && choice == holdRow)
+            mLastChoice = 0;
+        //#W53-N (D2, second half): a decline of this EXACT list, counted once
+        //per real answer (this branch does not run on a cached replay).
+        if (choice == 0 || (holdRow > 0 && choice == holdRow))
+            mListDeclineCount[listKey]++;
         //A fresh deliberate pass declines every offered line (cached
         //replays of the same window don't re-count - one look, one vote).
         if (choice == 0)
@@ -16093,7 +16420,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
                                   : stripRepeatAnnotation(shownLines[s])]++;
         //#W48-D13: a pass, or a decision handed to the heuristic, is the loop
         //being broken - the consecutive count starts again from nothing.
-        if (choice <= 0)
+        if (choice <= 0 || (holdRow > 0 && choice == holdRow))
         {
             mLoopAbility = NULL;
             mLoopClick = NULL;
@@ -16104,7 +16431,8 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //#W49-S (D2): what executed IS the first coded line -> not replaced
             if (choice >= 0 && firstCodedChoice(content, index, &shownLines) == choice)
                 mAnswerReplacedFalse = true;
-            string chosen = (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
+            string chosen = (holdRow > 0 && choice == holdRow) ? string(kHoldPriorityRowText)
+                          : (choice >= 1 && choice <= index) ? describeAction(*shown[choice - 1])
                           : (choice == 0 ? string("pass") : string());
             //#W48-F1: ONE record carries the whole repeat - the action and the
             //N the model named for it.
@@ -16132,6 +16460,11 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         return NULL;
     }
 
+    if (holdRow > 0 && choice == holdRow)
+    {
+        DebugTrace("AIPlayerGPT[ph" << phase << "]: hold priority taken (cached=" << unchanged << ")");
+        return NULL;
+    }
     DebugTrace("AIPlayerGPT[ph" << phase << "]: take action " << choice << "/" << index << " (cached=" << unchanged << ")");
     return shown[choice - 1];
 }
@@ -16201,6 +16534,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     //path, so a set of lines can never leak onto a later, unrelated ask.
     vector<string> askNarration;
     askNarration.swap(mNextAskNarration);
+    //#W53-N (D2): the caller's prompt-only note, consumed on EVERY exit path
+    //so it can never leak onto a later, unrelated ask.
+    string promptOnlyNote;
+    promptOnlyNote.swap(mNextAskPromptNote);
     //"Only one valid action": no decision to make, no model call.
     if (options.empty())
         return -1;
@@ -16229,6 +16566,9 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
         if (anyOptionRangeRow)
             tail << kOptionRangeNote;
     }
+    //#W53-N (D2): where the option list ends - the prompt-only decline note is
+    //spliced in here, after the list it is about and out of the ask key.
+    const size_t askOptionsEnd = tail.str().size();
     //#W47 (wave-46 E-2): the worked example names THIS window's option 1, not a
     //hard-coded "Cast Example Card" - on cast-free screens (damage order, mode
     //menus) that placeholder was the only affirmative "Cast ..." substring and
@@ -16259,7 +16599,10 @@ int AIPlayerGPT::askModel(const string& decision, const vector<string>& options,
     if (cached != mAskCache.end())
         return (cached->second >= 1 && cached->second <= (int) options.size()) ? cached->second - 1 : -1;
 
-    string userMsg = assemblePrompt(tailStr);
+    string userTail = tailStr;
+    if (!promptOnlyNote.empty() && askOptionsEnd <= userTail.size())
+        userTail = userTail.substr(0, askOptionsEnd) + promptOnlyNote + userTail.substr(askOptionsEnd);
+    string userMsg = assemblePrompt(userTail);
     string content;
     if (pollCompletionRetry(userMsg, content) == kChoicePending)
         return kChoicePending; //callers unwind this tick and re-poll
@@ -17346,6 +17689,29 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         vector<string> menu(opts);
         menu.push_back(castDeclineRow(observer->currentPlayer == this
                                       && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN)); //the decline goes LAST
+        //#W53-N (D2): the HOLD row, last of all, on the OPPONENT'S turn only -
+        //884 of the corpus's 966 dead opponent-turn windows were THIS ask.
+        //The row is offered on the re-ask menus too: a window the model is
+        //still being asked about is a window it may still choose to close.
+        int holdRow = -1;
+        if (observer->currentPlayer != this)
+        {
+            holdRow = (int) menu.size();
+            menu.push_back(kHoldPriorityRowText);
+        }
+        //The model's own hold, honoured: no model call, no row withheld.
+        if (attempt == 0 && holdRow >= 0 && holdHonoured("cast", boardNow, menu))
+            return NULL;
+        if (mListDeclineTurn != observer->turn)
+        {
+            mListDeclineCount.clear();
+            mListDeclineTurn = observer->turn;
+        }
+        string listKey;
+        for (size_t lk = 0; lk < menu.size(); lk++)
+            listKey += menu[lk] + "\n";
+        mNextAskPromptNote = declinedListNote(mListDeclineCount.count(listKey)
+                                              ? mListDeclineCount[listKey] : 0);
 
         std::ostringstream q;
         q << "Casting decision (" << observer->getCurrentGamePhaseName()
@@ -17368,6 +17734,14 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         if (pick == (int) candidates.size()) //"cast nothing": hold everything this window
         {
             DebugTrace("AIPlayerGPT: chose to cast nothing");
+            mListDeclineCount[listKey]++; //#W53-N (D2, second half)
+            return NULL;
+        }
+        //#W53-N (D2): the model closed this turn's casting question itself.
+        if (holdRow >= 0 && pick == holdRow)
+        {
+            takeHold("cast", boardNow, menu);
+            mListDeclineCount[listKey]++;
             return NULL;
         }
 
@@ -35174,6 +35548,192 @@ static const char * kW50Y_r94 =
         CHECK(replyHasPlanLine(r282) && !replyHasPlanLine("<think>PLAN: x</think>\nCHOICE: 2 (Create vampire x3)"),
               "#W52-J D14b NEGATIVE a PLAN line counts only outside the think block");
     }
+
+    // ---- #W53-N (docket D2 / D9 / D12): the priority window economy, the pass
+    // row's own name, and the plan's age ----
+    cout << "\n[#W53-N D2] the HOLD row: a model-takeable answer, not a cadence\n";
+    {
+        string row = kHoldPriorityRowText;
+        CHECK(row == "Hold priority - do not ask me again this turn unless the board changes",
+              "#W53-N D2 the hold row renders the docket's literal");
+        string lc = row;
+        for (size_t i = 0; i < lc.size(); i++) lc[i] = (char) tolower((unsigned char) lc[i]);
+        // NEGATIVE: it states an act the model may take; it never advises it and
+        // never claims a window was removed.
+        CHECK(lc.find("you should") == string::npos && lc.find("recommend") == string::npos
+              && lc.find("instead") == string::npos && lc.find("skip") == string::npos
+              && lc.find("nothing worth") == string::npos,
+              "#W53-N D2 NEGATIVE the hold row states the act, never advises it");
+        // the row is a decline: it must promise re-opening, in its own words
+        CHECK(lc.find("unless the board changes") != string::npos,
+              "#W53-N D2 the row states its own re-opener");
+        // ECHO: the row echoed back in full resolves to its own index.
+        {
+            vector<string> menu;
+            menu.push_back("+1: target creature gets ghostform with Kaya the Inexorable");
+            menu.push_back("Cast Tribute to Hunger {1}{b}");
+            menu.push_back(kHoldPriorityRowText);
+            bool stale = false;
+            int c = parseChoice(string("CHOICE: 3 (") + kHoldPriorityRowText + ")",
+                                (int) menu.size(), &menu, &stale, NULL, NULL, true);
+            CHECK(c == 3 && !stale, "#W53-N D2 echo: the whole hold row answers as its own row");
+            bool stale2 = false;
+            int c2 = parseChoice("CHOICE: 3 (Hold priority)", (int) menu.size(), &menu, &stale2, NULL, NULL, true);
+            CHECK(c2 == 3 && !stale2, "#W53-N D2 echo: the short name 'Hold priority' binds the row");
+            // NEGATIVE: a hold echo must not steal a window from a real play.
+            bool stale3 = false;
+            int c3 = parseChoice("CHOICE: 2 (Cast Tribute to Hunger)", (int) menu.size(), &menu, &stale3, NULL, NULL, true);
+            CHECK(c3 == 2 && !stale3, "#W53-N D2 NEGATIVE a real cast on a hold-bearing menu still executes");
+        }
+    }
+
+    cout << "\n[#W53-N D2] the hold's re-openers: board change, new stack object, newly affordable row\n";
+    {
+        // holdBoardKeyOf drops the leading phase line and nothing else - phase
+        // progression is NOT a board change (130v152 seq 12 -> 13 declined at
+        // Main 1 and CAST at Combat begins, and that pilot never held).
+        string sitA = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: empty\n";
+        string sitB = "Phase: Combat begins | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: empty\n";
+        string sitC = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 17 | Opponent life: 20\nStack: empty\n";
+        string sitD = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: 1 (top): opponent's Lightning Bolt [instant]\n";
+        CHECK(holdBoardKeyOf(sitA) == holdBoardKeyOf(sitB),
+              "#W53-N D2 a phase step alone is not a board change");
+        CHECK(holdBoardKeyOf(sitA) != holdBoardKeyOf(sitC),
+              "#W53-N D2 a life total change IS a board change");
+        CHECK(holdBoardKeyOf(sitA) != holdBoardKeyOf(sitD),
+              "#W53-N D2 a new stack object IS a board change");
+
+        std::set<string> held;
+        held.insert("Cast Dictate of Kruphix {3}{u}");
+        held.insert("Cast nothing right now");
+        held.insert(kHoldPriorityRowText);
+        vector<string> same;
+        same.push_back("Cast Dictate of Kruphix {3}{u}");
+        same.push_back("Cast nothing right now");
+        same.push_back(kHoldPriorityRowText);
+        const char * why = "x";
+        CHECK(holdStillStands(holdBoardKeyOf(sitA), holdBoardKeyOf(sitB), held, same, &why)
+              && string(why).empty(),
+              "#W53-N D2 the hold stands across a phase step with the same board and the same rows");
+        CHECK(!holdStillStands(holdBoardKeyOf(sitA), holdBoardKeyOf(sitD), held, same, &why)
+              && string(why) == "the board changed",
+              "#W53-N D2 a new stack object RE-OPENS the window, and says so");
+        vector<string> grown(same);
+        grown.push_back("Cast Spark Spray {r}");
+        CHECK(!holdStillStands(holdBoardKeyOf(sitA), holdBoardKeyOf(sitA), held, grown, &why)
+              && string(why) == "a row is newly available",
+              "#W53-N D2 a NEWLY AFFORDABLE row re-opens the window even on an unchanged board");
+        vector<string> shrunk;
+        shrunk.push_back("Cast nothing right now");
+        shrunk.push_back(kHoldPriorityRowText);
+        CHECK(holdStillStands(holdBoardKeyOf(sitA), holdBoardKeyOf(sitA), held, shrunk, &why),
+              "#W53-N D2 NEGATIVE a row DISAPPEARING is not a re-opener - the model already declined it");
+    }
+
+    cout << "\n[#W53-N D2] the declined-list annotation (prompt-only, echo shape)\n";
+    {
+        CHECK(declinedListNote(0).empty(),
+              "#W53-N D2 NEGATIVE a list declined zero times carries no annotation");
+        CHECK(declinedListNote(1) == "\n[you declined this exact list 1 time already this turn]",
+              "#W53-N D2 the annotation's singular shape");
+        CHECK(declinedListNote(11) == "\n[you declined this exact list 11 times already this turn]",
+              "#W53-N D2 the annotation's plural shape (162v126 seq 7-18 was twelve asks)");
+        // ECHO: the annotation is engine furniture; a reply that copies it must
+        // not resolve to anything (it names no row).
+        {
+            vector<string> menu;
+            menu.push_back("Cast Dictate of Kruphix {3}{u}");
+            menu.push_back("Cast nothing right now");
+            bool stale = false;
+            int c = parseChoice("CHOICE: 1 (you declined this exact list 11 times already this turn)",
+                                (int) menu.size(), &menu, &stale, NULL, NULL, false);
+            CHECK(c < 0, "#W53-N D2 NEGATIVE the annotation echoed as a name resolves to no row");
+        }
+    }
+
+    cout << "\n[#W53-N D9] deck146 vs152 seq 91: 'CHOICE: 1 (Pass)' on a menu carrying row 0\n";
+    {
+        vector<string> kaya;
+        kaya.push_back("+1: don't target any creature with Kaya the Inexorable");
+        kaya.push_back("+1: target creature gets ghostform with Kaya the Inexorable");
+        kaya.push_back("Flip Side with Tovolar's Packleader");
+        kaya.push_back("Flip Side with Bloodline Keeper");
+        bool stale = false; string note;
+        int c = parseChoice("CHOICE: 1 (Pass)", (int) kaya.size(), &kaya, &stale, NULL, &note, true);
+        CHECK(c == 0 && note.find("pass_row_named") != string::npos,
+              "#W53-N D9 the repro: the name 'Pass' resolves to row 0, not the index");
+        // every reserved spelling
+        const char * forms[] = { "CHOICE: 1 (Pass)", "CHOICE: 2 (pass)", "CHOICE: 3 (Pass priority)",
+                                 "CHOICE: 4 (pass priority)", "CHOICE: 2 (0)", "CHOICE: 3 (Pass.)",
+                                 "CHOICE: 1 (Pass priority (take no action this window))" };
+        bool allPass = true;
+        for (size_t f = 0; f < sizeof(forms) / sizeof(forms[0]); f++)
+        {
+            bool st = false;
+            if (parseChoice(forms[f], (int) kaya.size(), &kaya, &st, NULL, NULL, true) != 0)
+                allPass = false;
+        }
+        CHECK(allPass, "#W53-N D9 every reserved pass spelling resolves to row 0");
+        // NEGATIVE 1: the same reply on a seam with NO pass row is untouched.
+        bool st2 = false;
+        CHECK(parseChoice("CHOICE: 1 (Pass)", (int) kaya.size(), &kaya, &st2, NULL, NULL, false) == 1,
+              "#W53-N D9 NEGATIVE with no pass row offered the index still stands (askModel is mandatory)");
+        // NEGATIVE 2: a real row whose name merely CONTAINS 'pass' is not a pass.
+        vector<string> pw;
+        pw.push_back("Cast Passwall Adept {2}{u}");
+        pw.push_back("Cast nothing right now");
+        bool st3 = false;
+        CHECK(parseChoice("CHOICE: 1 (Cast Passwall Adept)", (int) pw.size(), &pw, &st3, NULL, NULL, true) == 1,
+              "#W53-N D9 NEGATIVE a card name containing 'pass' is not the pass row");
+        // NEGATIVE 3: an explicit 0 is unchanged and unstamped.
+        string note0;
+        bool st4 = false;
+        CHECK(parseChoice("CHOICE: 0 (pass)", (int) kaya.size(), &kaya, &st4, NULL, &note0, true) == 0
+              && note0.find("pass_row_named") == string::npos,
+              "#W53-N D9 NEGATIVE a coded 0 is already the pass row - no remap note");
+        // a numberless pass names the row too
+        bool st5 = false;
+        CHECK(parseChoice("CHOICE: (Pass)", (int) kaya.size(), &kaya, &st5, NULL, NULL, true) == 0,
+              "#W53-N D9 a numberless '(Pass)' resolves to row 0");
+    }
+
+    cout << "\n[#W53-N D12] the plan's age, the latched coded line, and the protocol's intent rule\n";
+    {
+        CHECK(planAgeClauseText(0, 32).empty(),
+              "#W53-N D12a NEGATIVE a plan stated at THIS window carries no age clause");
+        CHECK(planAgeClauseText(1, 32) == ", 1 window ago on turn 32",
+              "#W53-N D12a the singular age clause");
+        CHECK(planAgeClauseText(14, 32) == ", 14 windows ago on turn 32",
+              "#W53-N D12a 146v125 seq 163 -> 177: the docket's literal shape");
+        string block = string("YOUR PLAN (as you last stated it") + planAgeClauseText(45, 32) + "): nothing right now";
+        CHECK(block == "YOUR PLAN (as you last stated it, 45 windows ago on turn 32): nothing right now",
+              "#W53-N D12a the whole header line, at the repro's own age");
+        // D12b: which coded line the engine latched
+        {
+            vector<string> menu;
+            menu.push_back("Cast Exquisite Blood {4}{b}");
+            menu.push_back("Cast Tribute to Hunger {1}{b}");
+            menu.push_back("Cast nothing right now");
+            string two = "CHOICE: 3 (Cast nothing right now)\nPLAN: hold.\nCHOICE: 1 (Cast Exquisite Blood)";
+            CHECK(AIPlayerGPT::codedChoiceOrdinal(two, 1, (int) menu.size(), &menu) == 2,
+                  "#W53-N D12b the latched row came from the SECOND coded line");
+            CHECK(AIPlayerGPT::codedChoiceOrdinal(two, 3, (int) menu.size(), &menu) == 1,
+                  "#W53-N D12b the first coded line is ordinal 1");
+            CHECK(AIPlayerGPT::codedChoiceOrdinal(two, 2, (int) menu.size(), &menu) == -1,
+                  "#W53-N D12b NEGATIVE a row no coded line names has no ordinal");
+        }
+        // D12c: the protocol tells the model its board claims are re-served verbatim
+        {
+            string proto = kReplyProtocol;
+            CHECK(proto.find("re-served to you VERBATIM at later decisions") != string::npos
+                  && proto.find("Write the PLAN as INTENT") != string::npos,
+                  "#W53-N D12c the reply protocol states the verbatim re-serve and asks for intent");
+            CHECK(proto.find("The board you act on is the CURRENT SITUATION block, never your own plan.")
+                  != string::npos,
+                  "#W53-N D12c and names the block the board is read from (126v146 seq 11-13)");
+        }
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
