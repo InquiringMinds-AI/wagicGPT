@@ -64,9 +64,35 @@ def http_get(url, accept="*/*", timeout=60):
         _last_req[0] = time.monotonic()
     return data
 
-def img_url(card):
-    """Best image URL for a Scryfall card object (front face for DFCs)."""
-    uris = card.get("image_uris") or (card.get("card_faces") or [{}])[0].get("image_uris") or {}
+def img_url(card, mid=None, name=None):
+    """Best image URL for a Scryfall card object, for the FACE that `mid`/`name`
+    names.
+
+    A transform DFC carries one image_uris per face and one multiverse id per
+    face, in the same order, and a single-image card carries image_uris at the
+    top level.  Always taking faces[0] gave every BACK face the FRONT's art
+    (the 2026-09-02 Heliod report: 207 of 740 back faces in Res/sets were
+    front-art duplicates).  Resolution: the face at `mid`'s index in
+    multiverse_ids; else the face whose name equals `name` (the name-borrow
+    ladder asks by the back face's own name); else the front face."""
+    faces = card.get("card_faces") or []
+    uris = card.get("image_uris") or {}
+    if not uris and faces:
+        face = None
+        mids = card.get("multiverse_ids") or []
+        if mid is not None and len(faces) == len(mids):
+            try:
+                face = faces[mids.index(int(mid))]
+            except (ValueError, TypeError):
+                face = None
+        if face is None and name:
+            for f in faces:
+                if (f.get("name") or "").lower() == name.lower():
+                    face = f
+                    break
+        if face is None:
+            face = faces[0]
+        uris = face.get("image_uris") or {}
     for k in ("large", "normal", "png"):
         if uris.get(k):
             return uris[k]
@@ -143,11 +169,10 @@ def rebuild_map(map_path, keep_bulk=False):
         n += 1
         if card.get("lang") != "en":
             continue  # foreign-only ids must fall through to the English-borrow ladder
-        url = img_url(card)
-        if not url:
-            continue
         for mid in card.get("multiverse_ids") or []:
-            mapping[str(mid)] = url
+            url = img_url(card, mid)  # per-face for DFCs, shared image otherwise
+            if url:
+                mapping[str(mid)] = url
     with open(map_path, "w") as f:
         json.dump(mapping, f)
     if not keep_bulk:
@@ -176,7 +201,7 @@ def api_lookup(mid, name, misses):
         except Exception as e:
             misses.append((mid, "no English printing of %r (%s)" % (name, e)))
             return None
-    url = img_url(card)
+    url = img_url(card, mid, name)
     if not url:
         misses.append((mid, "card has no image_uris"))
     return url
