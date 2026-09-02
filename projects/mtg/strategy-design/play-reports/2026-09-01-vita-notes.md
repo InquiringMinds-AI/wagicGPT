@@ -87,3 +87,10 @@ Wildwood scourge is triggering its ability when mossborn hydra gets a counter fr
 Coredump
 
 all the psal basic lands of a type have only one cared art, its very obnoxious,
+
+## Photos (owner, 2026-09-01, in 2026-09-01-photos/; his captions were not given - readings below are Claude's)
+- 87b9e6de: Giant Killer face-up on the right, "Choose Cards To Tap" prompt over the human's lands during (opponent's turn) Combat damage.
+- 1a833441: Coralhelm Guide with the green usable-ability border, (your turn) Attackers, 7 lands in the human's bottom row, 20 life.
+- 63bbc214: Lantern Flare (Cleave) with an "Interrupt?" dialog listing "Lantern Flare" and Cemetery Gatekeeper's "exile a card".
+- a949b88a: Cemetery Gatekeeper board, "(opponent's turn - you play) Main phase 1".
+- 8ecbe185: Lizard Blades menu titled "Reconfigure Attach" listing "reconfigure unattach" FOUR times + Cancel (tablet).
