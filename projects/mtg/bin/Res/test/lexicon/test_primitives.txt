@@ -6309,3 +6309,15 @@ type=Sorcery
 auto=reject notaTarget(land|myhand)
 text=Test-only: its caster discards a land card from their own hand. Fires an opponent's land-discard trigger.
 [/card]
+[card]
+id=2100000986
+name=Lexicon Hurkyl Wizard
+rarity=R
+auto=@each my end restriction{thisturn(*[-creature]|mystack)~morethan~0}:name(Look top 5) reveal:5 optionone name(Put noncreature cards in hand) target(<upto:5>*[-land&-creature]|reveal) moveto(hand) optiononeend optiontwo name(Put on bottom) target(*|reveal) bottomoflibrary and!( all(*|reveal) bottomoflibrary )! optiontwoend revealend
+mana={1}{U}{U}
+type=Legendary Creature
+subtype=Human Wizard Advisor
+power=2
+toughness=4
+text=Test-only clone of Hurkyl, Master Wizard (comma-free name so suite zone lists can place it).
+[/card]

@@ -1,0 +1,60 @@
+#Owner Vita report (2026-09-01): "Hurkyl, master wizard, after selecting a card,
+#and put on bottom, the card selector section refused to close, across all vita
+#buttons, the game refused to continue, forced to exit to main menu. Worked every
+#subsequent time."
+#
+#ROOT CAUSE (card script, not engine). The primitive's `afterrevealed` leg fired
+#the moment option two emptied the reveal zone and granted the source five
+#conditional abilities of the shape
+#   if type(<TYPE>[tobecast]|mylibrary)~morethan~0 then ability$! ...
+#      target(<TYPE>[tobecast]|mylibrary) moveto(hand) !$ controller
+#`tobecast` does not exist anywhere in the engine (grep src/ include/: zero hits),
+#so `becomes(tobecast)` marked nothing and `[tobecast]` was ignored by the target
+#chooser - the guard therefore counted EVERY matching card in the library and
+#stayed true forever, re-arming a forced, non-cancelable "put <type> in hand" menu
+#whose target chooser points at LIBRARY cards the player cannot click. Answering it
+#re-armed it; the phase could never advance (menuObject + targetChooser hold every
+#advance path, incl. userRequestNextGamePhase). "Worked every subsequent time" =
+#any run in which no revealed card of a cast type was selected leaves the guard at
+#zero and the leg never arms.
+#
+#Fix: express the Oracle with constructs the player can answer - the "put into
+#hand" happens from the REVEAL display (where the cards are visible/clickable),
+#not by fishing them back out of the library afterwards; the afterrevealed leg and
+#the identically-broken aicode= substitute are dropped.
+#
+#The fixture drives a comma-free clone of the real card (suite zone lists split on
+#",", so "Hurkyl, Master Wizard" cannot be placed by name): Lexicon Hurkyl Wizard,
+#id 2100000986 in test/lexicon/test_primitives.txt, carrying the same auto= line.
+#realgame = real-play automation, so a wedged phase shows up as a phase mismatch.
+#Top of library = last listed. Mind Stone is the noncreature spell that arms the
+#end-step restriction; Sol Ring is taken to hand, the other four go to the bottom.
+#RED on the pre-fix script: "phase problem. Expected [Cleanup](12), got [End](11)"
+#plus Sol Ring still in the library - the exact soft lock the owner hit.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Hurkyl Wizard,island,swamp
+hand:Mind Stone
+library:Hill Giant,Juggernaut,Millstone,Howling Mine,Icy Manipulator,Ornithopter,Sol Ring
+[PLAYER2]
+[DO]
+interactivereveal
+realgame
+island
+swamp
+Mind Stone
+goto end
+Sol Ring
+revealnext
+revealnext
+Ornithopter
+next
+[ASSERT]
+CLEANUP
+[PLAYER1]
+inplay:Lexicon Hurkyl Wizard,island,swamp,Mind Stone
+hand:Sol Ring
+library:Hill Giant,Juggernaut,Millstone,Howling Mine,Icy Manipulator,Ornithopter
+[PLAYER2]
+[END]
