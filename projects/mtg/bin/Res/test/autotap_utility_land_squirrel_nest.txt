@@ -1,0 +1,35 @@
+# W54-F (owner Vita report 2026-09-01, verbatim): "With 1 plains, 3 forests, and a squirrel nest
+# enchanted to a forest, autotap doesn't give a fuck, and all tap that squirrel nest forest to cast
+# a yavimaya enchantress, leaving me a useless forest that cannot tap to make a squirrel".
+# Yavimaya Enchantress {2}{G} over Plains + 3 Forests, Squirrel Nest ("Enchanted land has
+# '{T}: Create a 1/1 green Squirrel creature token.'") on Forest #1. Three of the four lands must
+# tap; the one held back must be the land whose tap is worth MORE than a mana - the enchanted
+# Forest. EXPECTED: Plains + Forest #2 + Forest #3 -> pool {W}{G}{G}, and the enchanted Forest
+# still carries a usable ability (assertusable reads the same predicate as the human's ability
+# border, and a tapped source has none). PRE-FIX: the colour walk takes the first Forest in layer
+# order - the enchanted one - and the generic fill takes the two other Forests: pool {G}{G}{G},
+# assertusable 0, the squirrel gone and the Plains stranded.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Forest,Plains
+hand:Squirrel Nest,Yavimaya Enchantress
+manapool:{1}{G}{G}
+life:20
+[PLAYER2]
+life:20
+[DO]
+squirrel nest
+forest
+assertusable 1 forest
+autotap yavimaya enchantress
+assertusable 1 forest
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Forest,Plains,Squirrel Nest
+hand:Yavimaya Enchantress
+tappedinplay:3
+manapool:{W}{G}{G}
+[PLAYER2]
+[END]

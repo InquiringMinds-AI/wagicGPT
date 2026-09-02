@@ -327,12 +327,73 @@ namespace
         return sourceHasOtherNeeded && otherUnusedCoversK;
     }
 
+    //#W54-F: does this permanent have a tap ability that is NOT mana production?
+    //Tapping such a card for mana costs its controller the OTHER ability too, so
+    //a payment plan that can pay with a plain source must not spend it (owner
+    //Vita report 2026-09-01: "With 1 plains, 3 forests, and a squirrel nest
+    //enchanted to a forest, autotap doesn't give a fuck, and all tap that
+    //squirrel nest forest to cast a yavimaya enchantress, leaving me a useless
+    //forest that cannot tap to make a squirrel").
+    //
+    //The abilities counted are the ones the CLICK layer would offer: any
+    //ActivatedAbility whose source is this card, is not a mana producer in any
+    //of its three wrapper shapes, and whose cost taps the source. The tap test
+    //reads BOTH needsTapping and a TapCost in extraCosts - a taught ability
+    //(`teach(land) {T}:_SQUIRRELTOKEN_`) arrives as needsTapping=0 with a
+    //zero-converted cost carrying a TapCost, so needsTapping alone misses
+    //exactly the case the owner reported.
+    //
+    //Only a TAP ability counts: an ability the card can still use while tapped
+    //loses nothing when the card is tapped for mana, so it must not bias the
+    //plan.
+    bool sourceHasNonManaTapAbility(Player * p, MTGCardInstance * card)
+    {
+        if (!p || !card)
+            return false;
+        ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+        for (size_t i = 0; i < al->mObjects.size(); i++)
+        {
+            ActivatedAbility * aa = dynamic_cast<ActivatedAbility*>((MTGAbility *) al->mObjects[i]);
+            if (!aa || aa->source != card)
+                continue;
+            if (aa->source->next) //superseded instance (flipped / re-entered)
+                continue;
+            //mana production in each of the three wrapper shapes the engine
+            //builds (bare, GenericActivatedAbility, foreach-wrapped) - the same
+            //set LegalActionsOracle::isWrappedManaProducer skips.
+            if (dynamic_cast<AManaProducer*>((MTGAbility *) aa))
+                continue;
+            bool mana = false;
+            if (GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(aa))
+            {
+                if (dynamic_cast<AManaProducer*>(gmp->ability))
+                    mana = true;
+                else if (AForeach * fmp = dynamic_cast<AForeach*>(gmp->ability))
+                    if (dynamic_cast<AManaProducer*>(fmp->ability))
+                        mana = true;
+            }
+            if (mana)
+                continue;
+            bool taps = aa->needsTapping != 0;
+            ManaCost * acost = aa->getCost();
+            if (!taps && acost && acost->extraCosts)
+                for (size_t k = 0; k < acost->extraCosts->costs.size() && !taps; k++)
+                    if (dynamic_cast<TapCost*>(acost->extraCosts->costs[k]))
+                        taps = true;
+            if (taps)
+                return true;
+        }
+        return false;
+    }
+
     //#W49-D4: the generic-fill order (see planPayment). Every usable producer
     //ability of the paying player, stably sorted by its SOURCE CARD's key:
-    //scarcity DESC (min over the card's colours of how many of the player's
-    //source cards make that colour, tapped or not; colourless = unbounded),
-    //then colour count ASC, then layer order. Abilities of one card stay
-    //adjacent, most-abundant colour first (#W51-B).
+    //UTILITY ASC (#W54-F: a source whose only tap ability is mana production
+    //taps before one that also has a non-mana tap ability), then scarcity DESC
+    //(min over the card's colours of how many of the player's source cards make
+    //that colour, tapped or not; colourless = unbounded), then colour count ASC,
+    //then layer order. Abilities of one card stay adjacent, most-abundant
+    //colour first (#W51-B).
     std::vector<MTGAbility*> genericFillOrder(Player * p, ManaEngine::ManaPolicy & policy,
                                               MTGCardInstance * payee)
     {
@@ -361,6 +422,7 @@ namespace
                     perColour[k]++;
         struct Key
         {
+            int utility;  //#W54-F: 1 = the card has a non-mana tap ability; tap it LAST
             int scarcity; //higher = safer to tap
             int colours;  //fewer = less flexible = tap first
             size_t layer;
@@ -372,6 +434,7 @@ namespace
             if (keyOf.find(src) != keyOf.end())
                 continue;
             Key key;
+            key.utility = sourceHasNonManaTapAbility(p, src) ? 1 : 0;
             key.scarcity = 1 << 20; //colourless: nothing to strand
             key.colours = 0;
             key.layer = i;
@@ -413,6 +476,10 @@ namespace
             {
                 const Key & ka = (*keys)[((AManaProducer *) a)->source];
                 const Key & kb = (*keys)[((AManaProducer *) b)->source];
+                //#W54-F: outranks scarcity - a utility land's tap is worth more
+                //than a mana, so hold it back even when its colour is abundant.
+                if (ka.utility != kb.utility)
+                    return ka.utility < kb.utility;
                 if (ka.scarcity != kb.scarcity)
                     return ka.scarcity > kb.scarcity;
                 if (ka.colours != kb.colours)
@@ -690,6 +757,42 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
     std::vector<MTGAbility*> layerOrder;
     for (size_t i = 0; i < p->getObserver()->mLayers->actionLayer()->manaObjects.size(); i++)
         layerOrder.push_back((MTGAbility *) p->getObserver()->mLayers->actionLayer()->manaObjects[i]);
+    //#W54-F: the COLOURED walk gets the same utility preference, stably - a
+    //source with a non-mana tap ability sinks to the end of the layer order,
+    //everything else keeps the order this walk has always used. Without it the
+    //owner's board pays its {G} pip with the FIRST Forest in layer order, and
+    //that is the Squirrel Nest one; the generic fill's preference below can no
+    //longer save it. This is ordering ONLY: the same producers are considered,
+    //the plan's final result->canAfford(cost) arbitration is untouched, so a
+    //cost payable only by the utility source is still paid by it.
+    {
+        std::map<MTGCardInstance*, bool> utilityOf;
+        for (size_t i = 0; i < layerOrder.size(); i++)
+        {
+            AManaProducer * amp = dynamic_cast<AManaProducer*>(layerOrder[i]);
+            MTGCardInstance * src = amp ? amp->source : NULL;
+            if (src && utilityOf.find(src) == utilityOf.end())
+                utilityOf[src] = sourceHasNonManaTapAbility(p, src);
+        }
+        struct UtilityLast
+        {
+            std::map<MTGCardInstance*, bool> * u;
+            bool rank(MTGAbility * a) const
+            {
+                AManaProducer * amp = dynamic_cast<AManaProducer*>(a);
+                if (!amp || !amp->source)
+                    return false; //wrappers keep their place
+                std::map<MTGCardInstance*, bool>::iterator it = u->find(amp->source);
+                return it != u->end() && it->second;
+            }
+            bool operator()(MTGAbility * a, MTGAbility * b) const
+            {
+                return rank(a) < rank(b);
+            }
+        } utilityLast;
+        utilityLast.u = &utilityOf;
+        std::stable_sort(layerOrder.begin(), layerOrder.end(), utilityLast);
+    }
     for (int pass = 0; pass < 3; pass++)
     {
     const bool colourWalk = (pass == 0);

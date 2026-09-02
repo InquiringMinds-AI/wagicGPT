@@ -1272,3 +1272,6 @@ bestow_four_mana_offered.txt
 bestow_envoy_human_gate_lands.txt
 bestow_no_envoy_human_gate_lands.txt
 bestow_no_envoy_human_gate_four_lands.txt
+autotap_utility_land_squirrel_nest.txt
+autotap_basic_before_dual_G.txt
+autotap_utility_land_last_resort.txt

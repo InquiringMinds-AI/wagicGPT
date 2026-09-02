@@ -1,0 +1,27 @@
+# W54-F (b): the flexibility half of the same preference - among producers that can pay a need,
+# a source with FEWER mana options is spent before a more flexible one. {G} (Llanowar Elves) over
+# Selesnya Guildgate ({T}: Add {G} or {W}) listed FIRST in layer order and a plain Forest: the
+# Forest pays, the Gate stays open. The second auto-tap makes the choice observable - only the
+# Gate can make {W}, so if the Elves had burned it Savannah Lions taps nothing and the pool reads
+# {G} alone. EXPECTED: pool {G}{W}, 2 tapped.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Selesnya Guildgate,Forest
+hand:Llanowar Elves,Savannah Lions
+[PLAYER2]
+life:20
+[DO]
+eot
+eot
+autotap llanowar elves
+autotap savannah lions
+[ASSERT]
+untap
+[PLAYER1]
+inplay:Selesnya Guildgate,Forest
+hand:Llanowar Elves,Savannah Lions
+tappedinplay:2
+manapool:{G}{W}
+[PLAYER2]
+[END]
