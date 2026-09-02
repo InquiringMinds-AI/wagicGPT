@@ -2633,6 +2633,32 @@ bool GameObserver::load(const string& ss, bool undo, int controlledPlayerIndex
     return true;
 }
 
+//A transcript records a click as zone + INDEX + result + card name. The
+//index is only valid for the exact zone ordering the live game had: a
+//library shuffle whose rand draw the dump did not capture reorders a hand
+//and every later index drifts, ending the replay on a card that is merely
+//in a different slot (the 2026-09-02 Vita dump died at turn 6 that way).
+//The NAME is the stable identity, so under WAGIC_REPLAY the index is a
+//hint: resolve the recorded name inside the recorded zone (nearest slot to
+//the recorded one wins) and compare accepted actions on zone+result+name.
+static string transcriptActionName(const string& s)
+{
+    size_t close = s.find("] ");
+    if (close == string::npos) return "";
+    size_t p = close + 2;
+    if (p < s.size() && s[p] == '-') p++;
+    while (p < s.size() && s[p] >= '0' && s[p] <= '9') p++;
+    return s.substr(p);
+}
+
+static string transcriptActionKey(const string& s)
+{
+    size_t open = s.find("[");
+    size_t close = s.find("] ");
+    if (open == string::npos || close == string::npos) return s;
+    return s.substr(0, open) + s.substr(close + 1);
+}
+
 bool GameObserver::processAction(const string& s)
 {
     Player* p = players[1];
@@ -2653,6 +2679,28 @@ bool GameObserver::processAction(const string& s)
         size_t begin = s.find("[")+1;
         size_t size = s.find("]")-begin;
         size_t index = atoi(s.substr(begin, size).c_str());
+        if (getenv("WAGIC_REPLAY"))
+        {
+            const string wanted = transcriptActionName(s);
+            const bool drifted = !wanted.empty()
+                && (index >= zone->cards.size() || zone->cards[index]->getLCName() != wanted);
+            if (drifted)
+            {
+                size_t found = zone->cards.size();
+                for (size_t i = 0; i < zone->cards.size(); i++)
+                {
+                    if (zone->cards[i]->getLCName() != wanted) continue;
+                    const size_t di = (i > index) ? i - index : index - i;
+                    const size_t df = (found > index) ? found - index : index - found;
+                    if (found == zone->cards.size() || di < df) found = i;
+                }
+                if (found < zone->cards.size())
+                {
+                    DebugTrace("REPLAY: index drift on '" << s << "' - '" << wanted << "' resolved at slot " << found);
+                    index = found;
+                }
+            }
+        }
         if (index >= zone->cards.size())
         {
             {
@@ -2775,7 +2823,9 @@ bool GameObserver::processActions(bool undo
                 GameObserver::Update(counter);
                 counter += 1.000f;
             }
-            if (nb > before && actionsList.back() == *loadingite && nb == actionsList.size())
+            if (nb > before && nb == actionsList.size()
+                && (actionsList.back() == *loadingite
+                    || (lenient && transcriptActionKey(actionsList.back()) == transcriptActionKey(*loadingite))))
                 accepted = true;
             else if (lenient && loadingite->find("next ") != string::npos && mSnapshotPostPregame
                      && atoi(loadingite->substr(loadingite->rfind(' ') + 1).c_str()) < mCurrentGamePhase)
@@ -2861,7 +2911,7 @@ void GameObserver::logAction(const string& s)
     if(mLoading)
     {
         string toCheck = *loadingite;
-        if (toCheck != s)
+        if (toCheck != s && !(getenv("WAGIC_REPLAY") && transcriptActionKey(toCheck) == transcriptActionKey(s)))
         {
             //Replay drift: the load loop re-issues the intent or reports the
             //divergence; a transcript replay (WAGIC_REPLAY) must not abort.

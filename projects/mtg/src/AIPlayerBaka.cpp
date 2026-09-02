@@ -4382,6 +4382,39 @@ int AIPlayerBaka::canFirstStrikeKill(MTGCardInstance * card, MTGCardInstance *en
     return 1;
 }
 
+//W53-T: the damage that actually reaches the defending player, given the
+//declaration as it stands. Without trample ANY blocker stops an attacker's
+//whole swing, so what kills me is the sum of the power of the attackers
+//nobody is blocking; a trampler still gets through whatever its blockers
+//cannot absorb. This is the number every "am I about to die" question in a
+//blocking decision is really asking, and until wave 53 nothing in
+//chooseBlockers computed it.
+static int unblockedDamageTo(Player * me)
+{
+    if (!me || !me->opponent())
+        return 0;
+    int total = 0;
+    MTGCardInstance * atk = NULL;
+    while ((atk = me->opponent()->game->inPlay->getNextAttacker(atk)))
+    {
+        if (atk->power <= 0)
+            continue;
+        int absorbed = 0;
+        bool blocked = false;
+        for (list<MTGCardInstance*>::iterator it = atk->blockers.begin(); it != atk->blockers.end(); ++it)
+        {
+            if (!*it) continue;
+            blocked = true;
+            absorbed += (*it)->toughness;
+        }
+        if (!blocked)
+            total += atk->power;
+        else if (atk->has(Constants::TRAMPLE) && atk->power > absorbed)
+            total += atk->power - absorbed;
+    }
+    return total;
+}
+
 int AIPlayerBaka::chooseBlockers()
 {
     //Should not block during my own turn...
@@ -4637,6 +4670,73 @@ int AIPlayerBaka::chooseBlockers()
         }
     }
 
+    //W53-T, the SURVIVAL sweep. Passes 1-3 each reason about one attacker at a
+    //time; pass 3's only "I am about to die" branch asks
+    //attacker->power >= life, a PER-ATTACKER lethality test that no member of a
+    //set which is lethal only in AGGREGATE can ever satisfy. Owner Vita play
+    //report 2026-09-02 (transcript-1788329701, his tag "bad blocking"): "one was
+    //a game losing block by the heuristic ai, where it could have blocked
+    //differently, and likely won" - three attackers, five untapped bodies, every
+    //per-attacker test read "not worth it", and the seat took the whole swing on
+    //the chin. So compute the number that decides the game (unblockedDamageTo)
+    //AFTER the value passes have taken every block they liked, and buy survival
+    //with the cheapest bodies: chump the biggest unblocked attacker first, spend
+    //the free creature that survives it - or failing that the lowest-power one -
+    //and STOP the moment the incoming total is survivable, so the crack-back
+    //keeps every creature survival did not cost.
+    {
+        int guard = 0;
+        while (life > 0 && guard++ < 32 && unblockedDamageTo(this) >= life)
+        {
+            MTGCardInstance * target = NULL;
+            MTGCardInstance * atk = NULL;
+            while ((atk = opponent()->game->inPlay->getNextAttacker(atk)))
+            {
+                if (atk->power <= 0 || atk->blockers.size())
+                    continue;
+                //menace / "three or more" sets are pass 3's job; a partial
+                //declaration here would only be deleted by the rules layer.
+                if (atk->minBlockersRequired() > 1 || !atk->blockRequirementSatisfiable())
+                    continue;
+                if (!target || atk->power > target->power)
+                    target = atk;
+            }
+            if (!target)
+                break;
+
+            MTGCardInstance * chump = NULL;
+            int bestRank = 0;
+            CardDescriptor cdS;
+            cdS.init();
+            cdS.setType("Creature");
+            cdS.unsecureSetTapped(-1);
+            MTGCardInstance * c = NULL;
+            while ((c = cdS.nextmatch(game->inPlay, c)))
+            {
+                if (c->defenser || c->blockCost)
+                    continue;
+                if (hints && hints->HintSaysDontBlock(observer, c))
+                    continue;
+                if (!c->canBlock() || !c->canBlockPairwise(target))
+                    continue;
+                //a blocker that lives through the swing costs nothing at all,
+                //so it outranks every chump however cheap the chump is.
+                const int rank = ((c->toughness > target->power) ? 0 : 1000000)
+                                 + c->power * 1000 + c->toughness;
+                if (!chump || rank < bestRank)
+                {
+                    chump = c;
+                    bestRank = rank;
+                }
+            }
+            if (!chump)
+                break;
+            chump->toggleDefenser(target);
+            if (chump->defenser != target)
+                break; //refused: do not spin on it
+        }
+    }
+
     //W43-1 (CR 509.1c), the heuristic's end-of-declaration sweep. Pass 3 already
     //understood menace, but passes 1 and 2 did not: pass 1 cycles a blocker onto
     //the first attacker its kill test likes, and pass 2 can unassign one half of
@@ -4680,6 +4780,7 @@ int AIPlayerBaka::chooseBlockers()
             }
         }
     }
+
 
     return 1;
 }

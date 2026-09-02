@@ -1299,3 +1299,4 @@ light_paws_bestow_mv_bound.txt
 w54_reconfigure_menu_growth.txt
 w54_equip_ability_not_duplicated.txt
 w53o_tragic_slip_kill_verdict.txt
+ai_block_lethal_set_wave53.txt
