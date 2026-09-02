@@ -856,6 +856,64 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
     }
+    else if (action.find("assertabilitycount ") == 0)
+    {
+        //#W54-I: pin HOW MANY entries a click on this card puts in its ability
+        //menu - the exact set ActionLayer::setMenuObject builds (an mObjects
+        //entry that reacts to a click on the card AND carries a cost or is a
+        //PermanentAbility). No zone/P-T assertion can see a DUPLICATED or
+        //LEAKED activated ability: the board is identical, only the menu grows.
+        //Syntax: assertabilitycount <N> <card name>
+        string rest = action.substr(19);
+        size_t sp = rest.find(' ');
+        int expect = atoi(rest.substr(0, sp).c_str());
+        string cname = sp == string::npos ? "" : rest.substr(sp + 1);
+        //resolve against the LIVE battlefield instance (see assertpt): getCard()
+        //can hand back a stale previous-zone object whose abilities are gone.
+        string lcac = cname;
+        std::transform(lcac.begin(), lcac.end(), lcac.begin(), ::tolower);
+        MTGCardInstance * acc = NULL;
+        for (int pi = 0; pi < 2 && !acc; pi++)
+        {
+            MTGGameZone * pz = observer->players[pi]->game->inPlay;
+            for (int k = 0; k < pz->nb_cards; k++)
+                if (pz->cards[k] && pz->cards[k]->getLCName() == lcac)
+                {
+                    acc = pz->cards[k];
+                    break;
+                }
+        }
+        if (!acc)
+        {
+            std::cerr << "TESTSUITE assertabilitycount: no card '" << cname << "' in play"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        ActionLayer * acl = observer->mLayers->actionLayer();
+        int gotCount = 0;
+        vector<string> gotTexts;
+        for (size_t i = 0; i < acl->mObjects.size(); i++)
+        {
+            ActionElement * ae = (ActionElement *) acl->mObjects[i];
+            if (!ae || !ae->isReactingToTargetClick(acc))
+                continue;
+            MTGAbility * ma = dynamic_cast<MTGAbility *>(ae);
+            if (!(ma && ma->getCost()) && !dynamic_cast<PermanentAbility *>(ae))
+                continue;
+            gotCount++;
+            gotTexts.push_back(ae->getMenuText());
+        }
+        if (gotCount != expect)
+        {
+            std::cerr << "TESTSUITE assertabilitycount: '" << cname << "' expected " << expect
+                      << " menu entries got " << gotCount << " [" << suite->filename << "]" << std::endl;
+            for (size_t i = 0; i < gotTexts.size(); i++)
+                std::cerr << "TESTSUITE assertabilitycount:   '" << gotTexts[i] << "'" << std::endl;
+            suite->commandAssertFailures++;
+        }
+        return 1;
+    }
     else if (action.find("assertpt ") == 0)
     {
         //#W54-D: pin the P/T a player actually READS off the battlefield -

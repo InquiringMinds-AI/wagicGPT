@@ -1,0 +1,39 @@
+# W54-I: Lizard Blades' ability menu must not GROW across reconfigure cycles.
+# Owner's tablet photo (2026-09-01): clicking Lizard Blades listed
+# "Reconfigure Attach" once and "Reconfigure unattach" FOUR times.
+# Unattached the card offers exactly 1 entry (Reconfigure Attach);
+# attached it offers exactly 2 (Attach + one unattach), every cycle.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lizard Blades,Grizzly Bears
+manapool:{12}
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertabilitycount 1 Lizard Blades
+Lizard Blades
+Grizzly Bears
+assertabilitycount 2 Lizard Blades
+Lizard Blades
+choice 1
+assertabilitycount 1 Lizard Blades
+Lizard Blades
+Grizzly Bears
+assertabilitycount 2 Lizard Blades
+Lizard Blades
+choice 1
+assertabilitycount 1 Lizard Blades
+Lizard Blades
+Grizzly Bears
+assertabilitycount 2 Lizard Blades
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lizard Blades,Grizzly Bears
+manapool:{2}
+life:20
+[PLAYER2]
+life:20
+[END]

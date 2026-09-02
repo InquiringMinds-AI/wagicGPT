@@ -1,0 +1,28 @@
+# W54-I: an Equipment's OWN activated abilities must appear exactly once in its
+# menu while attached. AEquip::equip() used to re-parse and re-register every
+# auto= line of the equipment, but the card already registered all of them when
+# it entered the battlefield - so each non-teach/non-equip ability showed twice.
+# Sword of the Paruns: Equip {3} + "{3}: tap" + "{3}: untap" = 3 entries, always.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Sword of the Paruns,Grizzly Bears
+manapool:{9}
+life:20
+[PLAYER2]
+life:20
+[DO]
+assertabilitycount 3 Sword of the Paruns
+Sword of the Paruns
+choice 0
+Grizzly Bears
+assertabilitycount 3 Sword of the Paruns
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Sword of the Paruns,Grizzly Bears
+manapool:{6}
+life:20
+[PLAYER2]
+life:20
+[END]

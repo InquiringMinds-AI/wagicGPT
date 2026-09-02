@@ -4781,6 +4781,17 @@ public:
         return removeAbilityFromGame();
     }
 
+    //#W54-I: the ActionLayer removal path (GameObserver::removeObserver ->
+    //moveToGarbage -> removeFromGame(e) -> e->destroy()) never calls
+    //MTGAbility::removeFromGame, so without this override an AThis taken out of
+    //the game left the CLONE it had installed in the action layer behind - a
+    //live, clickable orphan whose owner was gone. Every this(...)-conditional
+    //activated ability leaked one such orphan per removal.
+    int destroy()
+    {
+        return removeAbilityFromGame();
+    }
+
     int addToGame()
     {
         return MTGAbility::addToGame();
