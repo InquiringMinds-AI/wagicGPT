@@ -7,6 +7,9 @@
 #include "ManaCostHybrid.h"
 #include "ExtraCost.h"
 #include "TargetChooser.h"
+#include "LegalActions.h"
+#include <set>
+#include <algorithm>
 #include <sstream>
 
 int ManaEngine::FreeProducerPolicy::canHandle(MTGAbility * producer)
@@ -346,10 +349,47 @@ namespace
     //Only a TAP ability counts: an ability the card can still use while tapped
     //loses nothing when the card is tapped for mana, so it must not bias the
     //plan.
-    bool sourceHasNonManaTapAbility(Player * p, MTGCardInstance * card)
+    //Is this activated ability mana production in any of the three wrapper
+    //shapes the engine builds (bare, GenericActivatedAbility, foreach-wrapped)
+    //- the same set LegalActionsOracle::isWrappedManaProducer skips?
+    bool isManaActivation(ActivatedAbility * aa)
     {
+        if (dynamic_cast<AManaProducer*>((MTGAbility *) aa))
+            return true;
+        if (GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(aa))
+        {
+            if (dynamic_cast<AManaProducer*>(gmp->ability))
+                return true;
+            if (AForeach * fmp = dynamic_cast<AForeach*>(gmp->ability))
+                if (dynamic_cast<AManaProducer*>(fmp->ability))
+                    return true;
+        }
+        return false;
+    }
+
+    //Does activating this ability tap its source? Reads BOTH needsTapping and
+    //a TapCost in extraCosts - a taught ability (`teach(land) {T}:_SQUIRREL
+    //TOKEN_`) arrives as needsTapping=0 with a zero-converted cost carrying a
+    //TapCost, so needsTapping alone misses exactly the case the owner reported.
+    bool activationTapsSource(ActivatedAbility * aa)
+    {
+        if (aa->needsTapping)
+            return true;
+        ManaCost * acost = aa->getCost();
+        if (acost && acost->extraCosts)
+            for (size_t k = 0; k < acost->extraCosts->costs.size(); k++)
+                if (dynamic_cast<TapCost*>(acost->extraCosts->costs[k]))
+                    return true;
+        return false;
+    }
+
+    //Every non-mana activated ability of this card that taps the card - the
+    //abilities the CLICK layer would offer, live instances only.
+    std::vector<ActivatedAbility*> nonManaTapAbilities(Player * p, MTGCardInstance * card)
+    {
+        std::vector<ActivatedAbility*> out;
         if (!p || !card)
-            return false;
+            return out;
         ActionLayer * al = p->getObserver()->mLayers->actionLayer();
         for (size_t i = 0; i < al->mObjects.size(); i++)
         {
@@ -358,31 +398,51 @@ namespace
                 continue;
             if (aa->source->next) //superseded instance (flipped / re-entered)
                 continue;
-            //mana production in each of the three wrapper shapes the engine
-            //builds (bare, GenericActivatedAbility, foreach-wrapped) - the same
-            //set LegalActionsOracle::isWrappedManaProducer skips.
-            if (dynamic_cast<AManaProducer*>((MTGAbility *) aa))
+            if (isManaActivation(aa))
                 continue;
-            bool mana = false;
-            if (GenericActivatedAbility * gmp = dynamic_cast<GenericActivatedAbility*>(aa))
-            {
-                if (dynamic_cast<AManaProducer*>(gmp->ability))
-                    mana = true;
-                else if (AForeach * fmp = dynamic_cast<AForeach*>(gmp->ability))
-                    if (dynamic_cast<AManaProducer*>(fmp->ability))
-                        mana = true;
-            }
-            if (mana)
-                continue;
-            bool taps = aa->needsTapping != 0;
-            ManaCost * acost = aa->getCost();
-            if (!taps && acost && acost->extraCosts)
-                for (size_t k = 0; k < acost->extraCosts->costs.size() && !taps; k++)
-                    if (dynamic_cast<TapCost*>(acost->extraCosts->costs[k]))
-                        taps = true;
-            if (taps)
-                return true;
+            if (activationTapsSource(aa))
+                out.push_back(aa);
         }
+        return out;
+    }
+
+    //Could the player pay this ability's cost right now WITHOUT tapping its
+    //source for mana (pool + strict one-ability-per-card potential of every
+    //OTHER free producer, plus every extra cost payable)? Mana-only pricing,
+    //no planner call: this runs INSIDE planPayment's ordering, and the planner
+    //must not recurse into itself.
+    bool activationAffordableWithoutSource(Player * p, ActivatedAbility * aa)
+    {
+        ManaCost * acost = aa->getCost();
+        if (acost && acost->extraCosts)
+            for (size_t k = 0; k < acost->extraCosts->costs.size(); k++)
+            {
+                ExtraCost * ec = acost->extraCosts->costs[k];
+                ec->setSource(aa->source);
+                if (!ec->canPay())
+                    return false;
+            }
+        if (!acost || !acost->getConvertedCost())
+            return true;
+        ManaEngine::FreeProducerPolicy freePolicy;
+        ManaCost * strict = ManaEngine::potentialMana(p, freePolicy, aa->source);
+        strict->add(p->getManaPool());
+        bool ok = strict->canAfford(acost, aa->source->has(Constants::ANYTYPEOFMANAABILITY)) != 0;
+        SAFE_DELETE(strict);
+        return ok;
+    }
+
+    //#W55-OPT (owner, 2026-09-01): "this should generally only count for
+    //lands that can afford to cast that ability" - an ability the player could
+    //not activate anyway is not an option the tap would take away, so it must
+    //not bias the plan. affordableOnly=false is the old W54-F predicate (any
+    //non-mana tap ability), kept for the optimizer's LAST tie-break.
+    bool sourceHasNonManaTapAbility(Player * p, MTGCardInstance * card, bool affordableOnly)
+    {
+        std::vector<ActivatedAbility*> abs = nonManaTapAbilities(p, card);
+        for (size_t i = 0; i < abs.size(); i++)
+            if (!affordableOnly || activationAffordableWithoutSource(p, abs[i]))
+                return true;
         return false;
     }
 
@@ -434,7 +494,7 @@ namespace
             if (keyOf.find(src) != keyOf.end())
                 continue;
             Key key;
-            key.utility = sourceHasNonManaTapAbility(p, src) ? 1 : 0;
+            key.utility = sourceHasNonManaTapAbility(p, src, true) ? 1 : 0;
             key.scarcity = 1 << 20; //colourless: nothing to strand
             key.colours = 0;
             key.layer = i;
@@ -772,7 +832,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
             AManaProducer * amp = dynamic_cast<AManaProducer*>(layerOrder[i]);
             MTGCardInstance * src = amp ? amp->source : NULL;
             if (src && utilityOf.find(src) == utilityOf.end())
-                utilityOf[src] = sourceHasNonManaTapAbility(p, src);
+                utilityOf[src] = sourceHasNonManaTapAbility(p, src, true);
         }
         struct UtilityLast
         {
@@ -1172,7 +1232,459 @@ int ManaEngine::potentialColorReach(Player * p, ManaPolicy & policy, ManaCost * 
     return (int) sources.size();
 }
 
-vector<MTGAbility*> ManaEngine::selectAutoTapProducers(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana)
+namespace
+{
+    //#W55-OPT: OPTION-PRESERVING auto-tap. Owner spec (2026-09-01, verbatim):
+    //"tapping should be done in a way that leaves the most options open to
+    //the player. if one configuration leaves only 2 cards cast-able, and
+    //another would leave 3 castable, then the latter configuration should be
+    //chosen. and consider activated abilities to be options. then, if there
+    //are ties, you look to maximize unrevealed options, preserving color
+    //availability and then cards with unaffordable activated abilities whose
+    //cost includes tapping them".
+    //
+    //The search: every FREE, usable, single-mana, un-wrapped producer of the
+    //paying player is a candidate source (one ability per source). Every
+    //way of choosing as many sources as the baseline plan taps is a
+    //configuration; a configuration is priced on the board it LEAVES:
+    //  1. options: castable hand cards (the oracle's castable-now set, minus
+    //     the card being paid for and land drops, one per name) whose cost the
+    //     leftover pool + the untapped remainder can still pay, plus non-mana
+    //     activated abilities of the player's permanents still payable (an
+    //     ability that taps its source is gone when its source was tapped for
+    //     mana), plus creature sources that could still attack this turn;
+    //  2. colours: distinct colours the remainder can still produce;
+    //  3. utility held: remainder sources carrying a non-mana tap ability the
+    //     player can NOT afford right now (it might become affordable later).
+    //Lexicographic max; the baseline plan (planPayment's order - scarcity,
+    //attacker sparing, dual deferral) stands unless a configuration beats it
+    //STRICTLY, so every existing ordering rule survives as the final tie-break.
+    //Sources of one equivalence class (same producible colours, same option
+    //flags) are interchangeable; only the class-prefix configurations are
+    //enumerated, which keeps the search tiny on real boards. Boards the search
+    //cannot model (wrapped/variable producers in the plan, more than kMaxOptSources
+    //candidates, X costs) keep the baseline untouched - this is a PREFERENCE
+    //layer, never a payability change.
+    const size_t kMaxOptSources = 14;
+    const size_t kMaxAssignments = 64;
+
+    struct OptSource
+    {
+        MTGCardInstance * card;
+        std::vector<AManaProducer*> abilities;
+        int colourMask;          //bit c = some ability makes colour c (1..5)
+        bool attackOption;       //a creature that could still attack this turn
+        bool anyUtility;         //has a non-mana tap ability (affordable or not)
+        std::string classKey;
+        size_t pref;             //preference order: baseline picks first, then layer order
+        OptSource() : card(NULL), colourMask(0), attackOption(false), anyUtility(false), pref(0) {}
+    };
+
+    struct OptScore
+    {
+        int options, colours, utilityHeld;
+        OptScore() : options(0), colours(0), utilityHeld(0) {}
+        bool operator>(const OptScore & o) const
+        {
+            if (options != o.options) return options > o.options;
+            if (colours != o.colours) return colours > o.colours;
+            return utilityHeld > o.utilityHeld;
+        }
+    };
+
+    //Can `cost` be paid from `leftover` plus ONE ability of each source in
+    //`rem`? Dual sources are tried in every combination up to kMaxAssignments;
+    //past that the permissive sum (every ability of every source) is used -
+    //an over-estimate, and only on absurd boards.
+    bool payableFrom(ManaCost * cost, int anytype, ManaCost * leftover,
+                     const std::vector<const OptSource*> & rem, MTGCardInstance * payee)
+    {
+        if (!cost || !cost->getConvertedCost())
+            return true;
+        std::vector<std::vector<AManaProducer*> > choices;
+        size_t combos = 1;
+        for (size_t i = 0; i < rem.size(); i++)
+        {
+            std::vector<AManaProducer*> usable;
+            for (size_t k = 0; k < rem[i]->abilities.size(); k++)
+                if (ManaEngine::spendAllowed(rem[i]->abilities[k], payee))
+                    usable.push_back(rem[i]->abilities[k]);
+            if (usable.empty())
+                continue;
+            choices.push_back(usable);
+            combos *= usable.size();
+            if (combos > kMaxAssignments)
+                break;
+        }
+        if (combos > kMaxAssignments)
+        {
+            ManaCost total(leftover);
+            for (size_t i = 0; i < choices.size(); i++)
+                for (size_t k = 0; k < choices[i].size(); k++)
+                    total.add(choices[i][k]->output);
+            return total.canAfford(cost, anytype) != 0;
+        }
+        std::vector<size_t> idx(choices.size(), 0);
+        for (;;)
+        {
+            ManaCost total(leftover);
+            for (size_t i = 0; i < choices.size(); i++)
+                total.add(choices[i][idx[i]]->output);
+            if (total.canAfford(cost, anytype))
+                return true;
+            size_t i = 0;
+            while (i < choices.size() && ++idx[i] == choices[i].size())
+                idx[i++] = 0;
+            if (i == choices.size())
+                return false;
+        }
+    }
+
+    struct OptContext
+    {
+        Player * p;
+        MTGCardInstance * target;
+        std::vector<OptSource> sources;
+        std::vector<MTGCardInstance*> handOptions;       //castable-now hand cards, one per name
+        std::vector<ActivatedAbility*> abilityOptions;   //non-mana activations the player controls
+    };
+
+    OptScore scoreConfig(OptContext & ctx, const std::vector<bool> & chosen, ManaCost * leftover)
+    {
+        OptScore sc;
+        std::vector<const OptSource*> rem;
+        std::set<MTGCardInstance*> chosenCards;
+        for (size_t i = 0; i < ctx.sources.size(); i++)
+        {
+            if (chosen[i])
+                chosenCards.insert(ctx.sources[i].card);
+            else
+                rem.push_back(&ctx.sources[i]);
+        }
+        int mask = 0;
+        for (size_t i = 0; i < rem.size(); i++)
+        {
+            mask |= rem[i]->colourMask;
+            if (rem[i]->attackOption)
+                sc.options++;
+        }
+        for (int c = 0; c < 32; c++)
+            if (mask & (1 << c))
+                sc.colours++;
+        for (size_t i = 0; i < ctx.handOptions.size(); i++)
+        {
+            MTGCardInstance * card = ctx.handOptions[i];
+            if (payableFrom(card->getManaCost(), card->has(Constants::ANYTYPEOFMANA), leftover, rem, card))
+                sc.options++;
+        }
+        for (size_t i = 0; i < ctx.abilityOptions.size(); i++)
+        {
+            ActivatedAbility * aa = ctx.abilityOptions[i];
+            bool taps = activationTapsSource(aa);
+            if (taps && chosenCards.count(aa->source))
+                continue; //tapped for mana: this activation is gone
+            std::vector<const OptSource*> remLess;
+            const std::vector<const OptSource*> * use = &rem;
+            if (taps)
+            {
+                for (size_t k = 0; k < rem.size(); k++)
+                    if (rem[k]->card != aa->source)
+                        remLess.push_back(rem[k]);
+                use = &remLess;
+            }
+            bool payable = payableFrom(aa->getCost(), aa->source->has(Constants::ANYTYPEOFMANAABILITY),
+                                       leftover, *use, aa->source);
+            if (payable)
+                sc.options++;
+            else if (taps && !chosenCards.count(aa->source))
+                sc.utilityHeld++;
+        }
+        return sc;
+    }
+
+    //The pool left floating after `total` pays `cost` (anytype costs pay as
+    //generic, as the planner prices them).
+    ManaCost * leftoverAfter(ManaCost & total, ManaCost * cost, int anytype)
+    {
+        ManaCost * left = NEW ManaCost(&total);
+        if (anytype)
+        {
+            ManaCost generic;
+            generic.add(Constants::MTG_COLOR_ARTIFACT, cost->getConvertedCost());
+            left->pay(&generic);
+        }
+        else
+            left->pay(cost);
+        return left;
+    }
+}
+
+std::vector<MTGAbility*> ManaEngine::refineForOptions(Player * p, MTGCardInstance * target, ManaCost * cost,
+                                                      int anytypeofmana, const std::vector<MTGAbility*> & baseline)
+{
+    if (!p || !cost || baseline.empty() || cost->hasX())
+        return baseline;
+    GameObserver * g = p->getObserver();
+    FreeProducerPolicy freePolicy;
+    ActionLayer * al = g->mLayers->actionLayer();
+
+    //Candidate sources: free, usable, single-mana, bare producers; one entry
+    //per card with every such ability of the card.
+    std::map<MTGCardInstance*, size_t> indexOf;
+    std::vector<OptSource> sources;
+    for (size_t i = 0; i < al->manaObjects.size(); i++)
+    {
+        AManaProducer * amp = dynamic_cast<AManaProducer*>((MTGAbility *) al->manaObjects[i]);
+        if (!amp || !amp->source || !amp->output || amp->source->controller() != p)
+            continue;
+        if (!freePolicy.canHandle(amp) || !producerUsable(p, amp, amp->source, true, target, true))
+            continue;
+        if (amp->output->getConvertedCost() != 1)
+            continue;
+        std::map<MTGCardInstance*, size_t>::iterator it = indexOf.find(amp->source);
+        if (it == indexOf.end())
+        {
+            OptSource os;
+            os.card = amp->source;
+            indexOf[amp->source] = sources.size();
+            sources.push_back(os);
+            it = indexOf.find(amp->source);
+        }
+        OptSource & os = sources[it->second];
+        os.abilities.push_back(amp);
+        for (int c = 1; c < Constants::NB_Colors && c < 32; c++)
+            if (c != Constants::MTG_COLOR_LAND && c != Constants::MTG_COLOR_WASTE && amp->output->hasColor(c))
+                os.colourMask |= (1 << c);
+    }
+    if (sources.size() > kMaxOptSources)
+        return baseline;
+
+    //The baseline must be expressible in this model: every pick a candidate
+    //source, no source twice.
+    std::set<MTGCardInstance*> baseCards;
+    for (size_t i = 0; i < baseline.size(); i++)
+    {
+        AManaProducer * amp = baseline[i] ? dynamic_cast<AManaProducer*>(baseline[i]) : NULL;
+        if (!amp || !amp->source || indexOf.find(amp->source) == indexOf.end())
+            return baseline;
+        if (!baseCards.insert(amp->source).second)
+            return baseline;
+    }
+    const size_t k = baseCards.size();
+    if (k == 0 || k >= sources.size())
+        return baseline; //nothing to choose between
+
+    bool beforeCombat = g->currentPlayer == p && g->getCurrentGamePhase() < MTG_PHASE_COMBATATTACKERS;
+    for (size_t i = 0; i < sources.size(); i++)
+    {
+        OptSource & os = sources[i];
+        os.attackOption = beforeCombat && os.card->isCreature() && !os.card->hasSummoningSickness()
+            && !os.card->isTapped() && os.card->canAttack();
+        os.anyUtility = sourceHasNonManaTapAbility(p, os.card, false);
+        std::ostringstream key;
+        key << os.colourMask << '|' << (os.attackOption ? 1 : 0) << '|' << (os.anyUtility ? 1 : 0);
+        //a card with a non-mana ability is only interchangeable with a card
+        //carrying the SAME abilities; key on the card's model
+        if (os.anyUtility)
+            key << '|' << os.card->getMTGId();
+        os.classKey = key.str();
+        os.pref = sources.size() + i;
+    }
+    for (size_t i = 0; i < baseline.size(); i++)
+        sources[indexOf[((AManaProducer*) baseline[i])->source]].pref = i;
+
+    //Class members in preference order; a configuration is canonical when it
+    //takes a PREFIX of every class.
+    std::map<std::string, std::vector<size_t> > classMembers;
+    {
+        std::vector<size_t> byPref(sources.size());
+        for (size_t i = 0; i < sources.size(); i++)
+            byPref[i] = i;
+        struct PrefLess
+        {
+            const std::vector<OptSource> * s;
+            bool operator()(size_t a, size_t b) const { return (*s)[a].pref < (*s)[b].pref; }
+        } prefLess;
+        prefLess.s = &sources;
+        std::sort(byPref.begin(), byPref.end(), prefLess);
+        for (size_t i = 0; i < byPref.size(); i++)
+            classMembers[sources[byPref[i]].classKey].push_back(byPref[i]);
+    }
+
+    OptContext ctx;
+    ctx.p = p;
+    ctx.target = target;
+    ctx.sources = sources;
+    {
+        std::set<MTGCardInstance*> castable = LegalActionsOracle::castableForDisplay(p);
+        std::set<std::string> seen;
+        for (int i = 0; i < p->game->hand->nb_cards; i++)
+        {
+            MTGCardInstance * c = p->game->hand->cards[i];
+            if (!c || c == target || c->isLand() || !castable.count(c) || !c->getManaCost())
+                continue;
+            if (!seen.insert(c->getName()).second)
+                continue;
+            ctx.handOptions.push_back(c);
+        }
+        for (size_t i = 0; i < al->mObjects.size(); i++)
+        {
+            ActivatedAbility * aa = dynamic_cast<ActivatedAbility*>((MTGAbility *) al->mObjects[i]);
+            if (!aa || !aa->source || aa->source->controller() != p || aa->source->next)
+                continue;
+            if (!p->game->inPlay->hasCard(aa->source) || aa->source->isPhased)
+                continue;
+            if (isManaActivation(aa))
+                continue;
+            if (activationTapsSource(aa) && (aa->source->isTapped() || aa->source->hasSummoningSickness()))
+                continue;
+            ManaCost * acost = aa->getCost();
+            bool extrasOk = true;
+            if (acost && acost->extraCosts)
+                for (size_t e = 0; e < acost->extraCosts->costs.size() && extrasOk; e++)
+                {
+                    ExtraCost * ec = acost->extraCosts->costs[e];
+                    ec->setSource(aa->source);
+                    if (!ec->canPay())
+                        extrasOk = false;
+                }
+            if (!extrasOk)
+                continue;
+            ctx.abilityOptions.push_back(aa);
+        }
+    }
+
+    //Evaluate one chosen set: every ability assignment (dual outputs) that
+    //affords the cost, best leftover wins. Returns false when none affords.
+    struct Eval
+    {
+        OptContext * ctx;
+        ManaCost * cost;
+        int anytype;
+        bool run(const std::vector<bool> & chosen, OptScore & best, std::vector<AManaProducer*> & bestPicks)
+        {
+            std::vector<size_t> ids;
+            size_t combos = 1;
+            for (size_t i = 0; i < chosen.size(); i++)
+                if (chosen[i])
+                {
+                    ids.push_back(i);
+                    combos *= ctx->sources[i].abilities.size();
+                }
+            if (combos > kMaxAssignments)
+                combos = 1; //first ability per source only
+            std::vector<size_t> idx(ids.size(), 0);
+            bool found = false;
+            for (size_t n = 0; n < combos; n++)
+            {
+                ManaCost total(ctx->p->getManaPool());
+                std::vector<AManaProducer*> picks;
+                for (size_t i = 0; i < ids.size(); i++)
+                {
+                    AManaProducer * amp = ctx->sources[ids[i]].abilities[idx[i]];
+                    picks.push_back(amp);
+                    total.add(amp->output);
+                }
+                if (total.canAfford(cost, anytype))
+                {
+                    ManaCost * left = leftoverAfter(total, cost, anytype);
+                    OptScore sc = scoreConfig(*ctx, chosen, left);
+                    delete left;
+                    if (!found || sc > best)
+                    {
+                        best = sc;
+                        bestPicks = picks;
+                        found = true;
+                    }
+                }
+                size_t i = 0;
+                while (i < ids.size() && ++idx[i] == ctx->sources[ids[i]].abilities.size())
+                    idx[i++] = 0;
+            }
+            return found;
+        }
+    } eval;
+    eval.ctx = &ctx;
+    eval.cost = cost;
+    eval.anytype = anytypeofmana;
+
+    std::vector<bool> baseChosen(sources.size(), false);
+    for (std::set<MTGCardInstance*>::iterator it = baseCards.begin(); it != baseCards.end(); ++it)
+        baseChosen[indexOf[*it]] = true;
+    OptScore bestScore;
+    std::vector<AManaProducer*> bestPicks;
+    if (!eval.run(baseChosen, bestScore, bestPicks))
+        return baseline; //the baseline pays through something this model cannot price
+    bool improved = false;
+
+    //Enumerate canonical configurations: for each class, take 0..size
+    //members (a prefix); total = k.
+    std::vector<std::vector<size_t>*> classes;
+    for (std::map<std::string, std::vector<size_t> >::iterator it = classMembers.begin(); it != classMembers.end(); ++it)
+        classes.push_back(&it->second);
+    std::vector<size_t> take(classes.size(), 0);
+    size_t evaluated = 0;
+    for (;;)
+    {
+        size_t sum = 0;
+        for (size_t i = 0; i < take.size(); i++)
+            sum += take[i];
+        if (sum == k)
+        {
+            std::vector<bool> chosen(sources.size(), false);
+            for (size_t i = 0; i < take.size(); i++)
+                for (size_t m = 0; m < take[i]; m++)
+                    chosen[(*classes[i])[m]] = true;
+            if (chosen != baseChosen)
+            {
+                OptScore sc;
+                std::vector<AManaProducer*> picks;
+                if (eval.run(chosen, sc, picks) && sc > bestScore)
+                {
+                    bestScore = sc;
+                    bestPicks = picks;
+                    improved = true;
+                }
+                if (++evaluated > 512)
+                    break;
+            }
+        }
+        size_t i = 0;
+        while (i < take.size() && ++take[i] > classes[i]->size())
+            take[i++] = 0;
+        if (i == take.size())
+            break;
+    }
+    if (!improved)
+        return baseline;
+
+    //Order the picks as selectAutoTapProducers does: a pick paying a still-
+    //uncovered coloured pip first, generic fillers after.
+    std::vector<MTGAbility*> out;
+    ManaCost sim(p->getManaPool());
+    std::vector<bool> taken(bestPicks.size(), false);
+    for (int pass = 0; pass < 2; pass++)
+        for (size_t i = 0; i < bestPicks.size(); i++)
+        {
+            if (taken[i])
+                continue;
+            if (pass == 0)
+            {
+                int color = 0;
+                for (int c = 1; c < Constants::NB_Colors && !color; c++)
+                    if (bestPicks[i]->output->getCost(c))
+                        color = c;
+                if (!color || anytypeofmana || sim.getCost(color) >= cost->getCost(color))
+                    continue;
+            }
+            taken[i] = true;
+            out.push_back(bestPicks[i]);
+            sim.add(bestPicks[i]->output);
+        }
+    return out;
+}
+
+vector<MTGAbility*> ManaEngine::selectAutoTapProducers(Player * p, MTGCardInstance * target, ManaCost * cost, int anytypeofmana, bool preserveOptions)
 {
     vector<MTGAbility*> picks;
     if (!cost || !cost->getConvertedCost())
@@ -1240,7 +1752,15 @@ vector<MTGAbility*> ManaEngine::selectAutoTapProducers(Player * p, MTGCardInstan
             plan[i] = NULL; //selected; never pick a producer twice
         }
     }
+    //`covered` is only raised at the top of an iteration; a plan whose last
+    //pick completes the payment ends the loop without it, so re-check.
+    if (!covered && sim->canAfford(cost, anytypeofmana))
+        covered = true;
     delete sim;
+    //#W55-OPT: the plan above is the BASELINE; leave the player the most
+    //options when a different set of sources can.
+    if (preserveOptions && covered)
+        picks = refineForOptions(p, target, cost, anytypeofmana, picks);
     return picks;
 }
 

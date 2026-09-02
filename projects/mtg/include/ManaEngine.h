@@ -106,8 +106,23 @@ public:
     //layer-ordered and can front-load wrong-color fillers, which overpaid
     //(a {1}{G} cost tapping two Mountains before the Forest). Pure: no
     //clicks. Empty when the pool already covers the cost.
+    //`preserveOptions` (#W55-OPT, default on): after the plan is built, swap
+    //it for a same-size set of sources that leaves the player MORE options
+    //(castable cards, payable activations, attackers, colours, held utility
+    //lands) - see refineForOptions. The AI seat's own payment runs planPayment
+    //and does not refine, so its forecasts pass false to stay honest.
     static std::vector<MTGAbility*> selectAutoTapProducers(Player * p, MTGCardInstance * target,
-                                                           ManaCost * cost, int anytypeofmana);
+                                                           ManaCost * cost, int anytypeofmana,
+                                                           bool preserveOptions = true);
+
+    //#W55-OPT: the option-preserving tap search. `baseline` is a payment plan
+    //(one bare single-mana producer per source, as selectAutoTapProducers
+    //yields); the result taps the same NUMBER of sources and pays the same
+    //cost, chosen to leave the most options open, or `baseline` unchanged
+    //when nothing beats it strictly or the board is outside the search's
+    //model (variable producers, X, >14 candidate sources). Pure: no clicks.
+    static std::vector<MTGAbility*> refineForOptions(Player * p, MTGCardInstance * target, ManaCost * cost,
+                                                     int anytypeofmana, const std::vector<MTGAbility*> & baseline);
 
     //Auto-tap on a human's behalf: activate selectAutoTapProducers' picks
     //until the player's POOL covers `cost`, and no further. Clicks route

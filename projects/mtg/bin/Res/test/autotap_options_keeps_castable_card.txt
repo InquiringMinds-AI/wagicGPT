@@ -1,0 +1,28 @@
+# W55-OPT (owner spec, 2026-09-01): "tapping should be done in a way that leaves the most options
+# open to the player. if one configuration leaves only 2 cards cast-able, and another would leave 3
+# castable, then the latter configuration should be chosen."
+# Forest, Forest, Plains, Plains; hand: Grizzly Bears {1}{G} + White Knight {W}{W}. Paying the Bears
+# taps two lands. Forest+Forest leaves Plains+Plains -> White Knight still castable (1 option);
+# Forest+Plains leaves Forest+Plains -> nothing castable (0 options).
+# EXPECTED: pool {G}{G} (both Forests tapped), 2 tapped.
+# PRE-FIX: the colour walk takes Forest #1 for {G} and the generic fill takes an OFF-PIP source
+# first (a Plains): pool {G}{W}, the Knight stranded.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Plains,Plains
+hand:Grizzly Bears,White Knight
+life:20
+[PLAYER2]
+life:20
+[DO]
+autotap grizzly bears
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Plains,Plains
+hand:Grizzly Bears,White Knight
+tappedinplay:2
+manapool:{G}{G}
+[PLAYER2]
+[END]

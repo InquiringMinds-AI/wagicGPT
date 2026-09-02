@@ -1,0 +1,26 @@
+# W55-OPT (owner spec, 2026-09-01): "consider activated abilities to be options."
+# Forest, Forest, Plains, Plains + Order of Leitbur ({W}: first strike; {W}{W}: +1/+0) on the board;
+# hand: Grizzly Bears {1}{G} only. Paying the Bears taps two lands. Forest+Forest leaves Plains+Plains
+# -> BOTH Order abilities payable (2 options); Forest+Plains leaves Forest+Plains -> only the {W} one
+# (1 option).
+# EXPECTED: pool {G}{G}, 2 tapped.
+# PRE-FIX: pool {G}{W} (generic fill spends an off-pip Plains first).
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Plains,Plains,Order of Leitbur
+hand:Grizzly Bears
+life:20
+[PLAYER2]
+life:20
+[DO]
+autotap grizzly bears
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Forest,Forest,Plains,Plains,Order of Leitbur
+hand:Grizzly Bears
+tappedinplay:2
+manapool:{G}{G}
+[PLAYER2]
+[END]

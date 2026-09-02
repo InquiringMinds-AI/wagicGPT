@@ -1,0 +1,29 @@
+# W55-OPT (owner, 2026-09-01, on the W54-F "utility land taps last" rule): "this should generally
+# only count for lands that can afford to cast that ability."
+# Forest, Plains, Kher Keep ({T}: Add {1}; {1}{R},{T}: Kobold token - UNAFFORDABLE here, no red);
+# hand: Grizzly Bears {1}{G} + Savannah Lions {W}. Paying the Bears: {G} from the Forest, the generic
+# from EITHER the Plains or the Keep. Spending the Keep leaves the Plains -> Lions castable (1 option);
+# spending the Plains leaves the Keep -> nothing castable, and the kobold ability the hold-back was
+# protecting could never be activated anyway.
+# EXPECTED: pool {C}{G} (Forest + Keep), 2 tapped.
+# PRE-FIX: the W54-F rule sank the Keep to the end of the generic fill for an ability it cannot pay:
+# pool {G}{W}, Lions stranded.
+[INIT]
+firstmain
+[PLAYER1]
+inplay:Forest,Plains,Kher Keep
+hand:Grizzly Bears,Savannah Lions
+life:20
+[PLAYER2]
+life:20
+[DO]
+autotap grizzly bears
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Forest,Plains,Kher Keep
+hand:Grizzly Bears,Savannah Lions
+tappedinplay:2
+manapool:{C}{G}
+[PLAYER2]
+[END]

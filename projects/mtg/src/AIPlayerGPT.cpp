@@ -13331,7 +13331,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             && !getManaPool()->canAfford(c, src->has(Constants::ANYTYPEOFMANAABILITY)))
         {
             vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
-                this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY));
+                this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY), false);
             std::set<MTGCardInstance *> seen;
             std::vector<std::string> taps;
             bool anyCreature = false;
@@ -13367,7 +13367,7 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             if (untapped > 0)
             {
                 vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
-                    this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY));
+                    this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY), false);
                 std::set<MTGCardInstance *> tapped;
                 std::vector<std::string> painNames; //#W52-K D7
                 std::vector<int> painDamage;
@@ -16902,7 +16902,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             if (payCost)
             {
                 vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(
-                    this, card, payCost, card->has(Constants::ANYTYPEOFMANA));
+                    this, card, payCost, card->has(Constants::ANYTYPEOFMANA), false);
                 std::set<MTGCardInstance *> tapped;
                 for (size_t pi = 0; pi < picks.size(); pi++)
                     if (picks[pi] && picks[pi]->source)
