@@ -20379,7 +20379,8 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                                  const vector<string> * attackerNames = NULL,
                                  const vector<vector<int> > * legalPerBlocker = NULL,
                                  int * dropped = NULL,
-                                 bool * gangConflict = NULL);
+                                 bool * gangConflict = NULL,
+                                 bool * blockerInAttackerSlot = NULL);
 
 //Every line of a reply whose FIRST token (after markdown decoration) is the
 //given answer label, as the text AFTER the label to end of line, in reply
@@ -21843,6 +21844,33 @@ int AIPlayerGPT::chooseAttackers()
     return 1;
 }
 
+//#W53-M (D1): how many of a parsed block assignment's pairings the ENGINE
+//already said this seat may make - counted against the same legal set the B#
+//lines were rendered from (DecisionRequest::legalPerBlocker, indexed here).
+//The blockers seam uses it to answer one question: does an illegal
+//one-blocker-many-attackers reply still contain an assignment worth
+//declaring? When it does, the duplicate costs the duplicate and the reply is
+//declared; only a reply with NOTHING left is worth re-asking. canBlock()
+//remains the gate on the declaration itself further down - this counts, it
+//does not admit.
+static int countLegalAssignments(const vector<int>& pick, size_t nAttackers,
+                                 const vector<vector<int> >& legalPerBlocker)
+{
+    int n = 0;
+    for (size_t i = 0; i < pick.size() && i < legalPerBlocker.size(); i++)
+    {
+        if (pick[i] < 1 || pick[i] > (int) nAttackers)
+            continue;
+        for (size_t k = 0; k < legalPerBlocker[i].size(); k++)
+            if (legalPerBlocker[i][k] == pick[i] - 1)
+            {
+                n++;
+                break;
+            }
+    }
+    return n;
+}
+
 //Scan a bundled-blocking reply for "B<i>:A<j>" / "B<i>:none" pairs (any of
 //": - > =" or spaces as separator). Unmentioned or malformed blockers stay
 //out of combat. Returns how many well-formed pairs were found - zero means
@@ -21860,6 +21888,11 @@ int AIPlayerGPT::chooseAttackers()
 //UNIQUE matching name (attacker restricted to that blocker's legal set when
 //given). Ambiguous/no-match drops THAT assignment only; already-coded
 //assignments and the first-wins rule are respected.
+//blockerInAttackerSlot (out, optional; #W53-M D19): set true when a well-formed
+//"B<n>:" names ANOTHER B-handle where an attacker belongs ("B3:B1" - `126v162`
+//seq 21 sent five, three of them this shape). Those pairs were already counted
+//as dropped; nothing said WHY, so the record read as a clean parse that quietly
+//discarded three lifelink Vampires. Representation only: the pair still drops.
 //gangConflict (out, optional; W36 item 1): set true when ONE blocker is
 //assigned to SEVERAL DIFFERENT attackers - the illegal shape whose first pair
 //used to be taken silently (116-fp8 vs105 seq25: "B1:A1, B1:A2, B1:A3" left
@@ -21870,7 +21903,8 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
                                  const vector<string> * attackerNames,
                                  const vector<vector<int> > * legalPerBlocker,
                                  int * dropped,
-                                 bool * gangConflict)
+                                 bool * gangConflict,
+                                 bool * blockerInAttackerSlot)
 {
     out.assign(nBlockers, 0); //0 = no block; else attacker number
     int pairs = 0;
@@ -21924,6 +21958,12 @@ static int parseBlockAssignments(const string& content, size_t nBlockers, size_t
             //asked for something and got nothing - count it (wave-34 #1b(B)).
             if (dropped && b >= 1)
                 (*dropped)++;
+            //#W53-M (D19): name the shape when the attacker slot holds another
+            //B-handle. The range form ("B4-B9:A2") consumed its second B above
+            //and never reaches here, so this cannot fire on it.
+            if (blockerInAttackerSlot && a < 0 && b >= 1 && j + 1 < content.size()
+                && (content[j] == 'B' || content[j] == 'b') && isdigit(content[j + 1]))
+                *blockerInAttackerSlot = true;
             continue;
         }
         if (bHi > (int) nBlockers)
@@ -22519,7 +22559,9 @@ int AIPlayerGPT::chooseBlockers()
             " two attackers), but several DIFFERENT blockers may gang-block the same"
             " attacker. Blockers you do not mention stay out of combat.\nOn the"
             " FIRST line write BLOCKS: followed by the assignments, comma-separated,"
-            " e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\", or exactly \"BLOCKS: none\" to"
+            " e.g. \"BLOCKS: B1:A2, B3:A1, B2:none\" - each B-number at most ONCE,"
+            " and several B-numbers may share one A-number - or exactly"
+            " \"BLOCKS: none\" to"
             " block with nobody this turn; then a PLAN: line only if the reply rules"
             " call for one. Write nothing else.";
     //W36 item 1, the one-per-combat RE-ASK: the previous reply assigned one
@@ -22602,9 +22644,14 @@ int AIPlayerGPT::chooseBlockers()
     mLastPrunedPairs.clear();
     mLastDroppedAssignments = 0;
     bool gangConflict = false;
+    bool blockerInAttackerSlot = false;
     int pairs = content.empty() ? 0 : parseBlockAssignments(decisionPart, blockers.size(), attackers.size(), pick,
                                                              &blockerNames, &attackerNames, &legalIdx,
-                                                             &mLastDroppedAssignments, &gangConflict);
+                                                             &mLastDroppedAssignments, &gangConflict,
+                                                             &blockerInAttackerSlot);
+    //#W53-M (D19): the drop is right, the silence was not.
+    if (blockerInAttackerSlot)
+        appendParseNote(&mLastParseNote, "blocker_handle_in_attacker_slot");
     if (blocksFirstLine && !content.empty())
         mAnswerReplacedFalse = true; //#W49-S (D2): what executes is the first coded line
 
@@ -22613,6 +22660,31 @@ int AIPlayerGPT::chooseBlockers()
     //keeping its first pair; the conflicted attempt is logged as its own
     //record so the corpus can count every re-ask. A second conflicted reply
     //falls through to the shipped first-wins behavior, marked in the note.
+    //#W53-M (D1). That re-ask DISCARDED the whole reply, and a re-ask that
+    //never came back cost the whole combat, silently: `152v162` seq 26 (turn
+    //14) logged `multiblock_reask` with `chosen_text` null and then NO
+    //follower record of any kind - no second model call, no declaration, no
+    //stderr confirmation - and the two attackers the reply had asked to block
+    //took the seat from 24 to 18. The legal half of that reply (`B2:A1`, a 6/4
+    //eating a 3/4 for free) went out with the illegal duplicate.
+    //The duplicate now costs the DUPLICATE only. When the first-wins reading
+    //still holds an assignment this seat can legally execute, it is declared
+    //on THIS tick, through the validator below - there is no longer a window
+    //in which the declaration can go missing. The re-ask survives for the one
+    //case with nothing to lose (a conflicted reply whose every pairing is
+    //illegal or absent), and every exit below writes its record, empty result
+    //included. Prevention moved to the prompt: the BLOCKS format line now
+    //carries the one-per-blocker constraint (D23).
+    const int conflictLegalPairs = gangConflict
+        ? countLegalAssignments(pick, attackers.size(), legalIdx) : 0;
+    if (gangConflict && conflictLegalPairs > 0)
+    {
+        appendParseNote(&mLastParseNote, "multiblock_first_wins");
+        setNotice("a creature was assigned to several attackers - the extra assignment is dropped", 5.0f);
+        DebugTrace("AIPlayerGPT: one-blocker-many-attackers reply -> duplicate dropped, "
+                   << conflictLegalPairs << " legal assignment(s) kept");
+        gangConflict = false; //handled here: the reply is not thrown away
+    }
     if (gangConflict && mBlockReaskTurn != observer->turn)
     {
         mBlockReaskTurn = observer->turn;
@@ -22623,8 +22695,8 @@ int AIPlayerGPT::chooseBlockers()
         return 1; //next tick rebuilds the prompt WITH the correction line
     }
     if (reasking)
-        mLastParseNote = gangConflict ? "multiblock_reask_exhausted"
-                       : (pairs > 0 ? "multiblock_reask_recovered" : "multiblock_reask_unanswered");
+        appendParseNote(&mLastParseNote, gangConflict ? "multiblock_reask_exhausted"
+                        : (pairs > 0 ? "multiblock_reask_recovered" : "multiblock_reask_unanswered"));
 
     //WAVE-29 N-18e: the reply committed a block in an early coded line, then
     //reasoned itself OUT of blocking but was cut off by the token ceiling before
@@ -22655,8 +22727,11 @@ int AIPlayerGPT::chooseBlockers()
                           "", "truncated_abandoned_heuristic", &shownLines);
             noticeFallback("model reply cut off mid-reversal - the heuristic blocks", 5.0f);
             mBlocksDoneTurn = observer->turn;
-            DebugTrace("AIPlayerGPT: truncated-abandoned commit with no legal assignment"
-                       " -> heuristic declares blockers");
+            //#W53-M (D1): every settled blockers exit prints one line carrying
+            //"declared blocks from N assignment(s)", so a corpus can pair each
+            //blockers ask with exactly one settlement and a missing one is loud.
+            DebugTrace("AIPlayerGPT: declared blocks from 0 assignment(s)"
+                       " - truncated-abandoned commit with no legal assignment, heuristic declares");
             return AIPlayerBaka::chooseBlockers();
         }
         DecisionAction none;
@@ -22666,7 +22741,8 @@ int AIPlayerGPT::chooseBlockers()
         noticeFallback("model reply cut off mid-reversal - no blocks (safe default)", 5.0f);
         narrateDecision("You declared no blockers");
         mBlocksDoneTurn = observer->turn;
-        DebugTrace("AIPlayerGPT: truncated-abandoned block commit -> safe no-blocks default");
+        DebugTrace("AIPlayerGPT: declared blocks from 0 assignment(s)"
+                   " - truncated-abandoned block commit, safe no-blocks default");
         return 1;
     }
 
@@ -22689,7 +22765,8 @@ int AIPlayerGPT::chooseBlockers()
                           "no blockers", NULL, &shownLines);
             narrateDecision("You declared no blockers");
             mBlocksDoneTurn = observer->turn;
-            DebugTrace("AIPlayerGPT: explicit all-decline (no blockers) in one reply");
+            DebugTrace("AIPlayerGPT: declared blocks from 0 assignment(s)"
+                       " - explicit all-decline (no blockers) in one reply");
             return 1;
         }
     }
@@ -22733,6 +22810,8 @@ int AIPlayerGPT::chooseBlockers()
                       "", content.empty() ? noAnswerClass() : unparsedReplyClass(content), &shownLines);
         noticeFallback("model reply failed - the heuristic blocks", 5.0f);
         mBlocksDoneTurn = observer->turn;
+        DebugTrace("AIPlayerGPT: declared blocks from 0 assignment(s)"
+                   " - unusable reply, heuristic declares");
         return AIPlayerBaka::chooseBlockers();
     }
 
@@ -22818,7 +22897,8 @@ int AIPlayerGPT::chooseBlockers()
                       "", "all_assignments_illegal", &shownLines, blockSource);
         noticeFallback("every block the model asked for was illegal - the heuristic blocks", 5.0f);
         mBlocksDoneTurn = observer->turn;
-        DebugTrace("AIPlayerGPT: all " << intended << " assignment(s) illegal -> heuristic declares blockers");
+        DebugTrace("AIPlayerGPT: declared blocks from 0 assignment(s) - all "
+                   << intended << " assignment(s) illegal, heuristic declares");
         return AIPlayerBaka::chooseBlockers();
     }
     DecisionManager::applyDeclareBlockers(req, act);
@@ -35173,6 +35253,104 @@ static const char * kW50Y_r94 =
               "#W52-J D14b deck123 vs126 seq 47: x17 with no PLAN line -> plan_missing re-ask (no pass verdict to conflict with)");
         CHECK(replyHasPlanLine(r282) && !replyHasPlanLine("<think>PLAN: x</think>\nCHOICE: 2 (Create vampire x3)"),
               "#W52-J D14b NEGATIVE a PLAN line counts only outside the think block");
+    }
+
+    // ---- #W53-M (D1 / D19 / D23): the blockers seam's duplicate accounting ----
+    cout << "\n[W53-M] one-blocker-many-attackers: the duplicate costs the duplicate\n";
+    {
+        // D1 REPRO, `152v162` seq 26: five blockers, two attackers, reply
+        // "BLOCKS: B2:A1, B2:A2". The first pairing (B2 on A1) is the answer;
+        // exactly one assignment is dropped, and the conflict is still FLAGGED
+        // so the seam can say so - what changed is that the flag no longer
+        // costs the reply (chooseBlockers declares this pairing on the tick it
+        // parses, instead of discarding it for a re-ask that may never land).
+        vector<int> out; int dropped = 0; bool gc = false; bool bslot = false;
+        int pairs = parseBlockAssignments("BLOCKS: B2:A1, B2:A2", 5, 2, out,
+                                          NULL, NULL, NULL, &dropped, &gc, &bslot);
+        cout << "     'B2:A1, B2:A2': pairs=" << pairs << " B2->A" << out[1]
+             << " dropped=" << dropped << " conflict=" << gc << "\n";
+        CHECK(pairs == 1 && out[1] == 1 && dropped == 1 && gc && !bslot,
+              "#W53-M D1 POSITIVE seq-26 shape: B2 blocks A1, exactly one assignment dropped, conflict flagged");
+        CHECK(out[0] == 0 && out[2] == 0 && out[3] == 0 && out[4] == 0,
+              "#W53-M D1 the duplicate costs only itself - no other blocker is touched");
+        // NEGATIVE (must NOT match): a legal gang block is not a duplicate and
+        // loses nothing.
+        out.clear(); dropped = 0; gc = false; bslot = false;
+        pairs = parseBlockAssignments("BLOCKS: B1:A1, B2:A1, B3:A1", 3, 2, out,
+                                      NULL, NULL, NULL, &dropped, &gc, &bslot);
+        CHECK(pairs == 3 && dropped == 0 && !gc && !bslot,
+              "#W53-M D1 NEGATIVE three DIFFERENT blockers on one attacker is a legal gang block, nothing dropped");
+
+        // D19, `126v162` seq 21: a blocker handle in the ATTACKER slot. The
+        // pair still drops (it names no attacker); what is new is that the
+        // record can SAY so instead of reading as a clean parse.
+        out.clear(); dropped = 0; gc = false; bslot = false;
+        pairs = parseBlockAssignments("BLOCKS: B1:A1, B2:A1, B3:B1, B4:B1, B5:B1", 5, 1, out,
+                                      NULL, NULL, NULL, &dropped, &gc, &bslot);
+        cout << "     seq-21 shape: pairs=" << pairs << " dropped=" << dropped
+             << " blockerInAttackerSlot=" << bslot << "\n";
+        //(dropped is 6, not 3: the scanner re-reads each "B<n>" that sat in the
+        //attacker slot as a token of its own and counts it too - exactly the
+        //`dropped_assignments: 6` the seq-21 record carries.)
+        CHECK(pairs == 2 && out[0] == 1 && out[1] == 1 && dropped == 6 && bslot && !gc,
+              "#W53-M D19 POSITIVE the two legal walls stand and the three B-in-attacker-slot pairs are NAMED");
+        // NEGATIVE: the B-RANGE form ("B4-B9:A2") is not a blocker in the
+        // attacker slot - it consumed its second B as a range bound.
+        out.clear(); dropped = 0; bslot = false;
+        pairs = parseBlockAssignments("BLOCKS: B4-B6:A2", 8, 3, out, NULL, NULL, NULL, &dropped, NULL, &bslot);
+        CHECK(pairs == 3 && out[3] == 2 && out[4] == 2 && out[5] == 2 && !bslot,
+              "#W53-M D19 NEGATIVE a B-range assignment is not a blocker-handle-in-attacker-slot");
+        // NEGATIVE: an ordinary decline names no B in the attacker slot.
+        out.clear(); dropped = 0; bslot = false;
+        pairs = parseBlockAssignments("BLOCKS: B1:none, B2:none", 2, 2, out, NULL, NULL, NULL, &dropped, NULL, &bslot);
+        cout << "     per-blocker decline: pairs=" << pairs << " blockerInAttackerSlot=" << bslot << "\n";
+        //(pairs counts the two explicit "none" answers - a decline IS an
+        //answer here; what this pin is about is the flag staying false.)
+        CHECK(out[0] == 0 && out[1] == 0 && !bslot,
+              "#W53-M D19 NEGATIVE a per-blocker decline is not a blocker-handle-in-attacker-slot");
+
+        // D23 ECHO SHAPE: the new one-per-blocker clause on the BLOCKS format
+        // line carries no B<digit>/A<digit> code of its own, so a model that
+        // echoes it back cannot feed the assignment parser a phantom pair.
+        const char * d23 = " - each B-number at most ONCE, and several B-numbers"
+                           " may share one A-number - or exactly \"BLOCKS: none\"";
+        out.clear(); dropped = 0; gc = false; bslot = false;
+        pairs = parseBlockAssignments(d23, 3, 2, out, NULL, NULL, NULL, &dropped, &gc, &bslot);
+        cout << "     D23 clause echoed alone: pairs=" << pairs << " dropped=" << dropped << "\n";
+        CHECK(pairs == 0 && dropped == 0 && !gc && !bslot,
+              "#W53-M D23 ECHO-SHAPE the one-per-blocker clause parses to nothing on its own");
+        out.clear(); dropped = 0; gc = false; bslot = false;
+        pairs = parseBlockAssignments(string(d23) + "\nBLOCKS: B1:A2", 3, 2, out,
+                                      NULL, NULL, NULL, &dropped, &gc, &bslot);
+        CHECK(pairs == 1 && out[0] == 2 && dropped == 0 && !gc && !bslot,
+              "#W53-M D23 ECHO-SHAPE the clause echoed around a real answer leaves the answer intact");
+
+        // The DECISION the seq-26 record turned on: does the conflicted reply
+        // still hold an assignment the engine already offered? On base the
+        // answer was never asked - the reply was discarded whole and the
+        // re-ask never came back. countLegalAssignments is what asks it.
+        // seq-26 board: five blockers, two attackers, only B2 (index 1) may
+        // block either. Reply "B2:A1, B2:A2" parses to B2->A1.
+        vector<vector<int> > legalSeq26(5);
+        legalSeq26[1].push_back(0);
+        legalSeq26[1].push_back(1);
+        vector<int> pickSeq26(5, 0);
+        pickSeq26[1] = 1;
+        cout << "     seq-26 legal assignments kept: "
+             << countLegalAssignments(pickSeq26, 2, legalSeq26) << "\n";
+        CHECK(countLegalAssignments(pickSeq26, 2, legalSeq26) == 1,
+              "#W53-M D1 the conflicted seq-26 reply still holds ONE legal assignment - it is declared, not discarded");
+        // NEGATIVE: a conflicted reply whose only pairing was never offered
+        // holds nothing, so the re-ask (which risks nothing) is the right exit.
+        vector<int> pickNone(5, 0);
+        pickNone[3] = 2; //B4 on A2, a pairing its legal set does not contain
+        CHECK(countLegalAssignments(pickNone, 2, legalSeq26) == 0,
+              "#W53-M D1 NEGATIVE a conflicted reply with no offered pairing keeps nothing - that one re-asks");
+        // NEGATIVE: an out-of-range attacker number is never counted legal.
+        vector<int> pickOob(5, 0);
+        pickOob[1] = 9;
+        CHECK(countLegalAssignments(pickOob, 2, legalSeq26) == 0,
+              "#W53-M D1 NEGATIVE an out-of-range attacker number counts as nothing");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();

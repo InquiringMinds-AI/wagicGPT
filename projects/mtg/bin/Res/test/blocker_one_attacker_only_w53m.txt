@@ -1,0 +1,51 @@
+#NAME: One creature blocks at most ONE attacker -- the second assignment reassigns, never stacks
+#DESC: #W53-M (wave-53 D1). The blockers seam's whole duplicate accounting rests on one
+#DESC: rules truth: a creature can be assigned to AT MOST ONE attacker. AIPlayerGPT's
+#DESC: reply parser enforces it first-wins and, as of this wave, charges an illegal
+#DESC: duplicate to the DUPLICATE alone instead of discarding the reply. That is only
+#DESC: correct if the engine underneath agrees, and nothing in the suite had ever said
+#DESC: so from the defending chair: menace_defender_two_blockers.txt pins the OPPOSITE
+#DESC: direction (several blockers on one attacker) and no fixture pinned this one.
+#DESC:
+#DESC: HONEST STATUS: this fixture is GREEN ON BASE (measured 2026-09-02 against
+#DESC: master 3dfd77d65 with src/AIPlayerGPT.cpp reverted). It is a REGRESSION
+#DESC: GUARD on the rules truth the wave-53 D1 change leans on, not a red-to-green
+#DESC: pin of that change: D1 lives in AIPlayerGPT::chooseBlockers, which the suite
+#DESC: cannot reach (no scripted-model-reply harness exists), so its own pins are
+#DESC: in PARSETEST under [W53-M].
+#DESC:
+#DESC: SCENARIO: Hill Giant 3/3 and Grizzly Bears 2/2 both attack. The defender has a
+#DESC: single Wall of Stone 0/8. It is assigned to the Giant, then assigned again to
+#DESC: the Bears. The second assignment MOVES the wall; it does not add a second block.
+#DESC: So exactly ONE attacker is blocked and the other connects. The wall survives
+#DESC: either way (0/8 against 3 or 2 damage) and deals 0 back, so the ONLY thing the
+#DESC: life totals can be reporting is which single attacker got through:
+#DESC:   - engine correct (one block): defender takes the Giant's 3 -> life 17.
+#DESC:   - engine stacking both blocks: defender takes 0 -> life 20 (this fixture red).
+#DESC: Wall of Stone has defender and cannot attack back, so no other damage exists.
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Hill Giant,Grizzly Bears
+[PLAYER2]
+inplay:Wall of Stone
+life:20
+[DO]
+Hill Giant
+Grizzly Bears
+next
+Wall of Stone
+Hill Giant
+Wall of Stone
+Grizzly Bears
+next
+next
+[ASSERT]
+combatend
+[PLAYER1]
+inplay:Hill Giant,Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Wall of Stone
+life:17
+[END]

@@ -1212,6 +1212,7 @@ nontrample_vs_protection_blocker.txt
 #(life 20), one does not block at all (life 17). The AI fixture is the positive
 #control for its unregistered twin menace_defender_ai_gang_block.txt, which is a
 #known red: the heuristic defender cannot assemble a legal menace block.
+blocker_one_attacker_only_w53m.txt
 menace_defender_two_blockers.txt
 menace_defender_one_blocker.txt
 menace_defender_ai_control_vanilla.txt
