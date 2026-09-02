@@ -1060,7 +1060,23 @@ int TestSuiteAI::Act(float)
             got = ok.count(ac) ? 1 : 0;
         }
         else
+        {
             got = LegalActionsOracle::hasUsableAbility(ac) ? 1 : 0;
+            //#W53-S: the display refresh reads the BATCH form of this predicate
+            //(usableAbilityCards, one action-layer walk for the whole board).
+            //Every assertusable fixture pins the two against each other, so a
+            //future edit that makes the batch pass drift from the per-card one
+            //is a RED test rather than a silently wrong border on the console.
+            int batch = LegalActionsOracle::usableAbilityCards(ac->controller()).count(ac) ? 1 : 0;
+            if (batch != got)
+            {
+                std::cerr << "TESTSUITE assertusable: '" << cname
+                          << "' per-card oracle says " << got << " but the batch"
+                          << " usableAbilityCards says " << batch
+                          << " [" << suite->filename << "]" << std::endl;
+                suite->commandAssertFailures++;
+            }
+        }
         if (got != expect)
         {
             std::cerr << "TESTSUITE " << (wantCast ? "assertcastable" : "assertusable")

@@ -383,6 +383,34 @@ namespace
         return false;
     }
 
+    //#W53-S perf: the whole board's non-mana TAP abilities, indexed by source
+    //card, in ONE walk of the action layer. genericFillOrder used to ask this
+    //question once per producer source, so a 16-source board re-walked every
+    //ability object 16 times INSIDE EVERY planPayment - and planPayment runs
+    //per hand card (castability) and per battlefield card (usable-ability
+    //border) on the display refresh. Measured: 54% of planPayment on the
+    //owner's vpk11 board.
+    typedef std::map<MTGCardInstance*, std::vector<ActivatedAbility*> > NonManaTapIndex;
+
+    void buildNonManaTapIndex(Player * p, NonManaTapIndex & out)
+    {
+        if (!p)
+            return;
+        ActionLayer * al = p->getObserver()->mLayers->actionLayer();
+        for (size_t i = 0; i < al->mObjects.size(); i++)
+        {
+            ActivatedAbility * aa = dynamic_cast<ActivatedAbility*>((MTGAbility *) al->mObjects[i]);
+            if (!aa || !aa->source)
+                continue;
+            if (aa->source->next) //superseded instance (flipped / re-entered)
+                continue;
+            if (isManaActivation(aa))
+                continue;
+            if (activationTapsSource(aa))
+                out[aa->source].push_back(aa);
+        }
+    }
+
     //Every non-mana activated ability of this card that taps the card - the
     //abilities the CLICK layer would offer, live instances only.
     std::vector<ActivatedAbility*> nonManaTapAbilities(Player * p, MTGCardInstance * card)
@@ -446,6 +474,21 @@ namespace
         return false;
     }
 
+    //#W53-S: same verdict, reading a pre-built index instead of re-walking the
+    //action layer per source. Callers that ask about SEVERAL sources in one
+    //breath (genericFillOrder, refineForOptions) build the index once.
+    bool sourceHasNonManaTapAbility(Player * p, MTGCardInstance * card, bool affordableOnly,
+                                    NonManaTapIndex & idx)
+    {
+        NonManaTapIndex::iterator it = idx.find(card);
+        if (it == idx.end())
+            return false;
+        for (size_t i = 0; i < it->second.size(); i++)
+            if (!affordableOnly || activationAffordableWithoutSource(p, it->second[i]))
+                return true;
+        return false;
+    }
+
     //#W49-D4: the generic-fill order (see planPayment). Every usable producer
     //ability of the paying player, stably sorted by its SOURCE CARD's key:
     //UTILITY ASC (#W54-F: a source whose only tap ability is mana production
@@ -488,13 +531,17 @@ namespace
             size_t layer;
         };
         std::map<MTGCardInstance*, Key> keyOf;
+        //#W53-S: one action-layer walk for the whole board, not one per source.
+        NonManaTapIndex utilityIndex;
+        if (!order.empty())
+            buildNonManaTapIndex(p, utilityIndex);
         for (size_t i = 0; i < order.size(); i++)
         {
             MTGCardInstance * src = ((AManaProducer *) order[i])->source;
             if (keyOf.find(src) != keyOf.end())
                 continue;
             Key key;
-            key.utility = sourceHasNonManaTapAbility(p, src, true) ? 1 : 0;
+            key.utility = sourceHasNonManaTapAbility(p, src, true, utilityIndex) ? 1 : 0;
             key.scarcity = 1 << 20; //colourless: nothing to strand
             key.colours = 0;
             key.layer = i;
@@ -1475,12 +1522,14 @@ std::vector<MTGAbility*> ManaEngine::refineForOptions(Player * p, MTGCardInstanc
         return baseline; //nothing to choose between
 
     bool beforeCombat = g->currentPlayer == p && g->getCurrentGamePhase() < MTG_PHASE_COMBATATTACKERS;
+    NonManaTapIndex utilityIndex; //#W53-S: one walk, not one per candidate source
+    buildNonManaTapIndex(p, utilityIndex);
     for (size_t i = 0; i < sources.size(); i++)
     {
         OptSource & os = sources[i];
         os.attackOption = beforeCombat && os.card->isCreature() && !os.card->hasSummoningSickness()
             && !os.card->isTapped() && os.card->canAttack();
-        os.anyUtility = sourceHasNonManaTapAbility(p, os.card, false);
+        os.anyUtility = sourceHasNonManaTapAbility(p, os.card, false, utilityIndex);
         std::ostringstream key;
         key << os.colourMask << '|' << (os.attackOption ? 1 : 0) << '|' << (os.anyUtility ? 1 : 0);
         //a card with a non-mana ability is only interchangeable with a card

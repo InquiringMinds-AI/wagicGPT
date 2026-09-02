@@ -123,6 +123,11 @@ public:
     //could legally use AND afford right now. Making mana does not count - a
     //land is not "doing something" in the sense a player cares to be shown.
     static bool hasUsableAbility(MTGCardInstance * card);
+    //#W53-S: the same verdict for EVERY permanent the player controls, in one
+    //pass - identical semantics to calling hasUsableAbility per card, at O(1)
+    //action-layer walks instead of O(cards). GuiHandSelf::Update's per-tick
+    //battlefield refresh is the consumer.
+    static std::set<MTGCardInstance*> usableAbilityCards(Player * p);
     //canDeclareBlocker: defending player's creature that can block AND has
     //at least one attacker it could legally block, in the declare-blockers
     //window. Mirrors MTGBlockRule::isReactingToClick plus the has-a-target

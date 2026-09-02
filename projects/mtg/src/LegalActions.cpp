@@ -328,8 +328,17 @@ namespace
     //hasInstantResponse and hasAnyLegalAction so there is ONE definition of
     //"this ability is usable"; sorcerySpeedOk relaxes only the instant-speed
     //restriction filter, and every other test is identical either way.
+    //#W53-S perf: `collect` turns the same single definition into a BATCH pass -
+    //every source with a usable ability, in ONE walk of the action layer and ONE
+    //potential-mana computation. GuiHandSelf::Update used to ask this predicate
+    //once per battlefield permanent, so a 19-permanent board re-walked every
+    //ability object 19 times and rebuilt the permissive potential 19 times, four
+    //times a second (measured 1.57 ms/refresh on desktop = ~30 ms on the Vita's
+    //444 MHz ARM). Collecting does not change ANY verdict: it is the same loop,
+    //with `return true` replaced by "record this source and keep going".
     bool hasUsableActivatedAbility(Player * p, ManaCost * pMana, bool sorcerySpeedOk,
-                                   MTGCardInstance * only = NULL)
+                                   MTGCardInstance * only = NULL,
+                                   std::set<MTGCardInstance*> * collect = NULL)
     {
         GameObserver * g = p->getObserver();
         for (size_t i = 1; i < g->mLayers->actionLayer()->mObjects.size(); i++)
@@ -442,6 +451,11 @@ namespace
                 }
                 if (!extrasPayable)
                     continue;
+            }
+            if (collect)
+            {
+                collect->insert(aa->source);
+                continue;
             }
             return true;
         }
@@ -712,4 +726,22 @@ bool LegalActionsOracle::hasUsableAbility(MTGCardInstance * card)
     bool any = hasUsableActivatedAbility(p, pMana, sorcerySpeedOk, card);
     delete pMana;
     return any;
+}
+
+std::set<MTGCardInstance*> LegalActionsOracle::usableAbilityCards(Player * p)
+{
+    std::set<MTGCardInstance*> out;
+    if (!p)
+        return out;
+    ManaEngine::FreeProducerPolicy freePolicy;
+    ManaCost * pMana = ManaEngine::potentialManaPermissive(p, freePolicy);
+    pMana->add(p->getManaPool());
+    GameObserver * g = p->getObserver();
+    const bool sorcerySpeedOk = g && g->currentPlayer == p
+        && !g->mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED)
+        && (g->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN
+            || g->getCurrentGamePhase() == MTG_PHASE_SECONDMAIN);
+    hasUsableActivatedAbility(p, pMana, sorcerySpeedOk, NULL, &out);
+    delete pMana;
+    return out;
 }
