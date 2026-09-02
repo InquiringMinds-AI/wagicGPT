@@ -1,0 +1,39 @@
+# Owner Vita play report 2026-09-01: the AI cast Show of Confidence ("Put a +1/+1 counter on target
+# creature. It gains vigilance until end of turn.") on the HUMAN's creature. Oracle allows any
+# creature, so this is AI targeting quality: the spell grants its controller an activatable
+# `ability$!... target(creature) transforms((,newability[counter(1/1)],vigilance)) ueot!$`, and
+# AbilityFactory::abilityEfficiency had no verdict for ATransformerInstant (the transforms((...))
+# effect) - BAKA_EFFECT_DONTKNOW makes AIPlayerBaka::chooseTarget aim at the OPPONENT's field.
+# Baka: Savannah Lions + 2 Plains, Show of Confidence in hand. Opponent: Grizzly Bears.
+# EXPECTED (asserted at the beginning of combat, before the pumped Lions trade with the Bears):
+# the Lions carry the counter (3/2), the Bears stay 2/2, the spell is in the graveyard.
+FORCEABILITY
+AICALLS 40
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Savannah Lions,Plains,Plains
+hand:Show of Confidence
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+assertpt 3/2 savannah lions
+assertpt 2/2 grizzly bears
+[ASSERT]
+combatbegins
+[PLAYER1]
+inplay:Savannah Lions,Plains,Plains
+graveyard:Show of Confidence
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+[END]

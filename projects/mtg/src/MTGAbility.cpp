@@ -6598,6 +6598,65 @@ int AbilityFactory::abilityEfficiency(MTGAbility * a, Player * p, int mode, Targ
     badAbilities[(int)Constants::TREASON] = true;
     badAbilities[(int)Constants::SHACKLER] = true;
 
+    //#W55-SOC (owner Vita report 2026-09-01: the AI cast Show of Confidence,
+    //"put a +1/+1 counter on target creature, it gains vigilance", on the
+    //HUMAN's creature). A `transforms((...))` effect is an ATransformerInstant
+    //- an InstantAbility, not the ATransformer it wraps - and it had no verdict
+    //here, so every transforms-based pump/grant answered DONTKNOW and
+    //AIPlayerBaka::chooseTarget aimed it at the opponent's field. Judge it by
+    //its content: a P/T set-value against the target's current body (lower is
+    //bad; with no target known a set-value reads as a shrink, which keeps the
+    //old opponent-aiming for "becomes a 1/1"), then the granted `newability`
+    //lines by their own core efficiency (counter(1/1) is good, counter(-1/-1)
+    //is bad), then the granted keywords by the table above; types/colours
+    //alone keep ATransformer's GOOD.
+    if (ATransformerInstant * abi = dynamic_cast<ATransformerInstant *>(a))
+    {
+        if (abi->newpowerfound || abi->newtoughnessfound)
+        {
+            MTGCardInstance * tgt = dynamic_cast<MTGCardInstance*>(target);
+            if (!tgt)
+                tgt = dynamic_cast<MTGCardInstance*>(abi->target);
+            if (!tgt)
+                return BAKA_EFFECT_BAD;
+            int np = abi->newpowerfound ? WParsedInt(abi->newpower, NULL, abi->source).getValue() : tgt->power;
+            int nt = abi->newtoughnessfound ? WParsedInt(abi->newtoughness, NULL, abi->source).getValue() : tgt->toughness;
+            if (np < tgt->power || nt < tgt->toughness)
+                return BAKA_EFFECT_BAD;
+            return BAKA_EFFECT_GOOD;
+        }
+        if (abi->newAbilityFound && abi->newAbilitiesList.size())
+        {
+            int verdict = BAKA_EFFECT_DONTKNOW;
+            for (size_t i = 0; i < abi->newAbilitiesList.size(); i++)
+            {
+                MTGAbility * na = parseMagicLine(abi->newAbilitiesList[i], -1, NULL, abi->source);
+                if (!na)
+                    continue;
+                int e = abilityEfficiency(getCoreAbility(na), p, mode, tc, target);
+                SAFE_DELETE(na);
+                if (e == BAKA_EFFECT_BAD)
+                    return BAKA_EFFECT_BAD;
+                if (e == BAKA_EFFECT_GOOD)
+                    verdict = BAKA_EFFECT_GOOD;
+            }
+            if (verdict != BAKA_EFFECT_DONTKNOW)
+                return verdict;
+        }
+        if (abi->ability)
+        {
+            bool anyGood = false;
+            for (list<int>::iterator it = abi->ability->abilities.begin(); it != abi->ability->abilities.end(); ++it)
+            {
+                if (*it >= 0 && *it < Constants::NB_BASIC_ABILITIES && badAbilities[*it])
+                    return BAKA_EFFECT_BAD;
+                anyGood = true;
+            }
+            if (anyGood)
+                return BAKA_EFFECT_GOOD;
+        }
+        return BAKA_EFFECT_GOOD;
+    }
     if (AInstantBasicAbilityModifierUntilEOT * abi = dynamic_cast<AInstantBasicAbilityModifierUntilEOT *>(a))
     {
         int result = badAbilities[abi->ability] ? BAKA_EFFECT_BAD : BAKA_EFFECT_GOOD;

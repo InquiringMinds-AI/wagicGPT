@@ -2829,6 +2829,27 @@ int AIPlayerBaka::chooseTarget(TargetChooser * _tc, Player * forceTarget,MTGCard
             cardEffect = af.abilityEfficiency(withoutGuessing,this,MODE_TARGET,tc,NULL);
             delete withoutGuessing;
         }
+        //#W55-SOC (owner Vita report 2026-09-01: Show of Confidence's +1/+1
+        //counter put on the HUMAN's creature). `belongsToAbility` is the
+        //ability's TEXT as it survived parsing, and the parser hoists nested
+        //payloads out of it - a `transforms((,newability[...]))` grant reaches
+        //here as `transforms(()) ueot`, which parses to NULL, so the verdict
+        //above was DONTKNOW and the target went to the opponent's field. When
+        //the chooser belongs to the LIVE waiting action, judge that ability
+        //itself (its ATransformerInstant still holds the grant) and let the
+        //text re-parse stand only where the live one has no opinion either.
+        if (cardEffect == BAKA_EFFECT_DONTKNOW)
+        {
+            ActionElement * waiting = observer->mLayers->actionLayer()->isWaitingForAnswer();
+            MTGAbility * live = waiting ? dynamic_cast<MTGAbility*>(waiting) : NULL;
+            if (live && waiting->getActionTc() == tc)
+            {
+                AbilityFactory af(observer);
+                int liveEffect = af.abilityEfficiency(AbilityFactory::getCoreAbility(live), this, MODE_TARGET, tc, NULL);
+                if (liveEffect != BAKA_EFFECT_DONTKNOW)
+                    cardEffect = liveEffect;
+            }
+        }
         // Don't really like it but green mana producing auras targeting the player is one of the most reported bugs
         if(cardEffect == BAKA_EFFECT_DONTKNOW && tc->source->hasSubtype(Subtypes::TYPE_AURA) && tc->source->hasColor(Constants::MTG_COLOR_GREEN))
             cardEffect = BAKA_EFFECT_GOOD;
