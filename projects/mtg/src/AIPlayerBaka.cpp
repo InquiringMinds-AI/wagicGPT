@@ -4912,6 +4912,24 @@ int AIPlayerBaka::Act(float dt)
     if (decisionPending(dt))
         return 0;
 
+    //A transcript/undo replay (GameObserver::load) re-issues this seat's
+    //recorded clicks itself; acting on top of them would double every
+    //decision and trip the replay's dumpAssert.
+    if (observer->isLoading())
+    {
+        //An interrupt window the record never answers (the live game did not
+        //open it: wouldOfferWindow read a different instant-response state)
+        //would hold the stack forever; decline it UNLOGGED so the replay can
+        //continue, and say so - it marks a state divergence worth reading.
+        ActionStack * stack = observer->mLayers ? observer->mLayers->stackLayer() : NULL;
+        if (stack && stack->askIfWishesToInterrupt == this)
+        {
+            DebugTrace("REPLAY: unrecorded interrupt window offered to " << getDisplayName() << " - declining");
+            stack->cancelInterruptOffer(ActionStack::DONT_INTERRUPT, false);
+        }
+        return 0;
+    }
+
     if (!(observer->currentlyActing() == this))
     {
         return 0;

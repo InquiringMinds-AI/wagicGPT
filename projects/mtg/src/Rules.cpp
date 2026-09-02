@@ -246,6 +246,17 @@ void Rules::addExtraRules(GameObserver* g)
             else if (a->aType == MTGAbility::STANDARD_DRAW)
                 difficultyRating = g->getDeckManager()->getDifficultyRating(g->players[0], g->players[1]);
 
+            if (a && a->oneShot && g->mSnapshotPostPregame)
+            {
+                //Replaying a post-pre-game dump: hands are already dealt and
+                //libraries already shuffled in the snapshot (shuffle, draw:7).
+                //The draw rule still defines the maximum hand size the cleanup
+                //step discards down to - keep that, skip the draw itself.
+                if (a->aType == MTGAbility::STANDARD_DRAW)
+                    p->handsize = ((AADrawer *)a)->getNumCards();
+                SAFE_DELETE(a);
+                continue;
+            }
             if (a)
             {
                 //We make those non interruptible, so that they don't appear on the player's stack
@@ -954,7 +965,9 @@ void Rules::initGame(GameObserver *g, bool currentPlayerSet)
     //Set the current player/phase
     if (g->currentPlayer->playMode!= Player::MODE_TEST_SUITE &&  g->mRules->gamemode!= GAME_TYPE_STORY)
     {
-        if(OptionWhosFirst::WHO_R == options[Options::FIRSTPLAYER].number)
+        //A post-pre-game replay baseline already fixed the first player and
+        //must not consume a recorded random value here.
+        if(OptionWhosFirst::WHO_R == options[Options::FIRSTPLAYER].number && !g->mSnapshotPostPregame)
             initState.player = g->getRandomGenerator()->random() % 2;
         if(OptionWhosFirst::WHO_O == options[Options::FIRSTPLAYER].number)
             initState.player = 1;

@@ -328,11 +328,15 @@ bool ActionLayer::getMenuIdFromCardAbility(MTGCardInstance *card, MTGAbility *ab
         ActionElement * currentAction = (ActionElement *) mObjects[i];
         if (currentAction->isReactingToClick(card))
         {
-            if(currentAction == ability) {
-                // code corresponding to that is in setMenuObject
+            //Position of `ability` among EVERY ability reacting to this card -
+            //the index setMenuObject's menu would give it. The counter used to
+            //advance only on the matching ability, so it never passed 1 and
+            //an AI click choosing one of several reacting abilities was
+            //recorded without its "choice N" (a transcript replay then armed
+            //the menu and had no answer for it - Living Lands forests, 2026-09-01).
+            if(currentAction == ability)
                 menuId = ctr;
-                ctr++;
-            }
+            ctr++;
         }
     }
 
@@ -417,6 +421,10 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
             if(dynamic_cast<MTGAbility*>(currentAction)->getCost()||dynamic_cast<PermanentAbility*>(currentAction))
             {
                 abilitiesMenu->Add(i, currentAction->getMenuText());
+#ifdef WAGIC_TRANSCRIPT_ON
+                if (observer->isLoading() && getenv("WAGIC_TRANSCRIPT_TRACE"))
+                    DebugTrace("[transcript-trace] menu " << menuObjectName << " + " << currentAction->getMenuText());
+#endif
             }
             else
             {
@@ -428,6 +436,10 @@ void ActionLayer::setMenuObject(Targetable * object, bool must)
                 //a triggered or may ability as it leads to exploits.
                 //only exception is perminent abilities such as "cast card normally" which can share the menu with autohand=
                 abilitiesTriggered->Add(i, currentAction->getMenuText());
+#ifdef WAGIC_TRANSCRIPT_ON
+                if (observer->isLoading() && getenv("WAGIC_TRANSCRIPT_TRACE"))
+                    DebugTrace("[transcript-trace] menu(triggered) " << menuObjectName << " + " << currentAction->getMenuText());
+#endif
             }
         }
     }

@@ -296,6 +296,10 @@ add_definitions(-DWAGIC_FIZZLELOG)
 # vitaMemProbe; hooks in GameObserver/GameStateDuel). Chasing the 2026-08-30..09-01
 # bad_alloc-in-LoadPNG crash cluster. ALPHA-ONLY - REMOVE FOR RELEASE.
 add_definitions(-DWAGIC_VITAMEMLOG)
+# Match transcripts -> ux0:data/Wagic/transcripts/<time>-<deck>-vs-<deck>.txt
+# (replayable on desktop with WAGIC_REPLAY=<file>) + the post-match
+# classification menu. ALPHA-ONLY - REMOVE FOR RELEASE.
+add_definitions(-DWAGIC_TRANSCRIPT)
 
 add_executable(${PROJECT_NAME}
   ${JGE_SOURCES}

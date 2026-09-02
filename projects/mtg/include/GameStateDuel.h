@@ -190,6 +190,8 @@ private:
     DeckMenu * deckmenu;
     DeckMenu * opponentMenu;
     SimpleMenu * menu;
+    SimpleMenu * transcriptMenu;   //post-match classification (dev builds)
+    bool mTranscriptMenuDone;
     //The player whose slow model call raised the patience prompt, so the
     //answer goes back to the one that asked. Borrowed, never owned.
     Player * mPatiencePlayer;

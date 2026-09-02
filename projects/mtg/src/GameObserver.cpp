@@ -22,6 +22,13 @@
 #include "DeckManager.h"
 #include "GuiCombat.h"
 #include <algorithm>
+#ifdef WAGIC_TRANSCRIPT_ON
+#ifdef VITA
+#include <psp2/io/stat.h>
+#else
+#include <sys/stat.h>
+#endif
+#endif
 #ifdef TESTSUITE
 #include "TestSuiteAI.h"
 #endif
@@ -118,6 +125,7 @@ GameObserver::GameObserver(WResourceManager *output, JGE* input)
     mRules = NULL;
     connectRule = false;
     LPWeffect = false;
+    mSnapshotPostPregame = false;
     mLoading = false;
     mSuiteGame = false;
     mSuiteHumanSeat = NULL;
@@ -332,6 +340,9 @@ void GameObserver::nextGamePhase()
 #if defined(VITA) && defined(WAGIC_VITAMEMLOG)
         { extern "C" void vitaMemProbe(const char*, int); vitaMemProbe("untap", turn); }
 #endif
+#ifdef WAGIC_TRANSCRIPT_ON
+        writeTranscript("turn");
+#endif
         phasingPhase();
         untapPhase();
         break;
@@ -506,11 +517,6 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
     if (allowInterrupt && !scriptedSeat && !(mSettledPhase == mCurrentGamePhase && mSettledTurn == turn
         && mSettledStep == (int) combatStep && mPhaseTicks >= 1))
         return;
-    if(log) {
-        stringstream stream;
-        stream << "next " << allowInterrupt << " " <<mCurrentGamePhase;
-        logAction(currentPlayer, stream.str());
-    }
 
     if(getCurrentTargetChooser() && getCurrentTargetChooser()->maxtargets == 1000)
     {
@@ -562,6 +568,16 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
     //and the phase advances directly - no window, no wasted decision.
     //(Replaces the old blanket opponent()->isAI() window.)
     Player * phaseResponder = (currentlyActing() == players[0]) ? players[1] : players[0];
+    //Record the request only once every refusal gate above has passed: a
+    //request the engine did not act on (stack busy, chooser open, illegal
+    //blockers) used to be logged too, and a replay could not tell "refused,
+    //then repeated" from "advanced" - the recorded intents must be exactly
+    //the effective ones for a transcript to replay.
+    if(log) {
+        stringstream stream;
+        stream << "next " << allowInterrupt << " " <<mCurrentGamePhase;
+        logAction(currentPlayer, stream.str());
+    }
     if (allowInterrupt && ((cPhaseOld->id == MTG_PHASE_COMBATBLOCKERS && combatStep == ORDER)
         || (cPhaseOld->id == MTG_PHASE_COMBATBLOCKERS && combatStep == TRIGGERS)
         || (cPhaseOld->id == MTG_PHASE_COMBATDAMAGE)
@@ -627,8 +643,75 @@ void GameObserver::resetStartupGame()
     startupGameSerialized = "";
     stream << *this;
     startupGameSerialized = stream.str();
+#ifdef WAGIC_TRANSCRIPT_ON
+    if (mTranscriptPath.size())
+    {
+        writeTranscript("rebaseline");
+        return;
+    }
+    mTranscriptNotes = "";
+    if (!mSuiteGame && !mLoading && !getenv("WAGIC_REPLAY") && players.size() == 2 && players[0] && players[1])
+    {
+        string names[2];
+        for (int i = 0; i < 2; i++)
+        {
+            string f = players[i]->deckFile;
+            size_t dot = f.rfind(".txt");
+            if (dot != string::npos) f = f.substr(0, dot);
+            for (size_t k = 0; k < f.size(); k++)
+                if (f[k] == '/' || f[k] == '\\' || f[k] == ':' || f[k] == ' ') f[k] = '_';
+            if (f.empty()) f = players[i]->isAI() ? "ai" : "human";
+            names[i] = f;
+        }
+        std::stringstream p;
+#ifdef VITA
+        sceIoMkdir("ux0:data/Wagic/transcripts", 0777);
+        p << "ux0:data/Wagic/transcripts/";
+#else
+        mkdir("User/transcripts", 0755);
+        p << "User/transcripts/";
+#endif
+        p << time(0) << "-" << names[0] << "-vs-" << names[1] << ".txt";
+        mTranscriptPath = p.str();
+        writeTranscript("start");
+    }
+#endif // WAGIC_TRANSCRIPT_ON
 //    DebugTrace("startGame\n");
 //    DebugTrace(startupGameSerialized);
+}
+
+//The whole game as a replayable dump (operator<<: seed, rand values, the
+//startup snapshot, every recorded action) rewritten in place - a crash
+//mid-game still leaves the previous untap's record. Notes (#result,
+//#classification) ride after [end] as comments load() skips.
+void GameObserver::writeTranscript(const char * tag)
+{
+#ifdef WAGIC_TRANSCRIPT_ON
+    if (mTranscriptPath.empty() || mLoading) return;
+    std::stringstream ss;
+    ss << "#transcript " << tag << " turn=" << turn
+       << " life=" << (players[0] ? players[0]->life : 0) << "/" << (players[1] ? players[1]->life : 0) << "\n";
+    ss << *this;
+    ss << mTranscriptNotes;
+    FILE * fp = fopen(mTranscriptPath.c_str(), "wb");
+    if (!fp) return;
+    const string & out = ss.str();
+    fwrite(out.data(), 1, out.size(), fp);
+    fclose(fp);
+#else
+    (void) tag;
+#endif
+}
+
+void GameObserver::appendTranscriptNote(const string & note)
+{
+#ifdef WAGIC_TRANSCRIPT_ON
+    if (mTranscriptPath.empty()) return;
+    mTranscriptNotes += "#" + note + "\n";
+    writeTranscript("note");
+#else
+    (void) note;
+#endif
 }
 
 #if defined(WAGIC_MEMPROBE) && defined(PSP)
@@ -877,6 +960,17 @@ void GameObserver::Update(float dt)
         {
             SAFE_DELETE(mPregame);
             mPregameDone = true;
+            //Re-baseline the replay record here: the pre-game (opening
+            //hands, mulligans, leylines) is UI/AI-driven and unrecorded, so
+            //a replay from the pre-shuffle snapshot cannot reproduce it.
+            //From this point the dump = dealt state + rand values + clicks.
+            if (!mLoading)
+            {
+                mSnapshotPostPregame = true;
+                actionsList.clear();
+                randomGenerator.loadRandValues("");
+                resetStartupGame();
+            }
         }
         return;
     }
@@ -1436,7 +1530,10 @@ void GameObserver::gameStateBasedEffects()
     mSettledPhase = mCurrentGamePhase;
     mSettledTurn = turn;
     mSettledStep = (int) combatStep;
-    int skipLevel = (!phaseSettled || currentPlayer->playMode == Player::MODE_TEST_SUITE || mSuiteGame || mLoading) ? Constants::ASKIP_NONE
+    //A live-game transcript replay (post-pre-game dump) keeps the automation
+    //the live game had; only suite/undo loads run with it off.
+    const bool loadingScripted = mLoading && !mSnapshotPostPregame;
+    int skipLevel = (!phaseSettled || currentPlayer->playMode == Player::MODE_TEST_SUITE || mSuiteGame || loadingScripted) ? Constants::ASKIP_NONE
         : options[Options::ASPHASES].number;
     bool noattackers = currentPlayer->noPossibleAttackers();
     bool nodiaochan = (currentPlayer->game->battlefield->countByAlias(10544)<1)?true:false;
@@ -1494,7 +1591,7 @@ void GameObserver::gameStateBasedEffects()
     //point of the directive; it is NULL in every ordinary game.
     const bool automationAllowed = phaseSettled && (mSuiteHumanSeat
         || !(currentPlayer->playMode == Player::MODE_TEST_SUITE
-             || mSuiteGame || mLoading));
+             || mSuiteGame || (mLoading && !mSnapshotPostPregame)));
     Player * humanSeat = mSuiteHumanSeat ? mSuiteHumanSeat
         : (!players[0]->isAI() ? players[0] : (!players[1]->isAI() ? players[1] : NULL));
     //Only the human's OWN turn. userRequestNextGamePhase advances the phase
@@ -1894,6 +1991,15 @@ int GameObserver::cardClick(MTGCardInstance * card, MTGAbility *ability)
     bool logChoice = mLayers->actionLayer()->getMenuIdFromCardAbility(card, ability, choice);
     int result = ability->reactToClick(card);
     logAction(card, zone, index, result);
+#ifdef WAGIC_TRANSCRIPT_ON
+    if (getenv("WAGIC_TRANSCRIPT_TRACE") && zone)
+    {
+        std::stringstream tr;
+        tr << "[transcript-trace] click " << (card->controller() == players[0] ? "p1." : "p2.") << zone->getName() << "[" << index << "] -> " << result << " " << card->getLCName() << " | zone now:";
+        for (int i = 0; i < zone->nb_cards; i++) tr << " " << zone->cards[i]->getLCName();
+        DebugTrace(tr.str());
+    }
+#endif
 
     if(logChoice) {
         stringstream stream;
@@ -1925,6 +2031,15 @@ int GameObserver::cardClickLog(bool log, Player* clickedPlayer, MTGGameZone* zon
             this->logAction(clickedPlayer);
         } else if(zone)  {
             this->logAction(backup, zone, index, toReturn);
+#ifdef WAGIC_TRANSCRIPT_ON
+            if (getenv("WAGIC_TRANSCRIPT_TRACE"))
+            {
+                std::stringstream tr;
+                tr << "[transcript-trace] click " << (backup->controller() == players[0] ? "p1." : "p2.") << zone->getName() << "[" << index << "] -> " << toReturn << " " << backup->getLCName() << " | zone now:";
+                for (int i = 0; i < zone->nb_cards; i++) tr << " " << zone->cards[i]->getLCName();
+                DebugTrace(tr.str());
+            }
+#endif
         }
     }
     return toReturn;
@@ -2330,6 +2445,8 @@ ostream& operator<<(ostream& out, const GameObserver& g)
         out << "rvalues:";
         g.randomGenerator.saveUsedRandValues(out);
         out << endl;
+        if (g.mSnapshotPostPregame)
+            out << "snapshot:postpregame" << endl;
         out << g.startupGameSerialized;
     }
 
@@ -2382,6 +2499,7 @@ bool GameObserver::load(const string& ss, bool undo, int controlledPlayerIndex
     randomGenerator.loadRandValues("");
 
     cleanup();
+    mSnapshotPostPregame = false;
 
     while (std::getline(stream, s))
     {
@@ -2394,6 +2512,11 @@ bool GameObserver::load(const string& ss, bool undo, int controlledPlayerIndex
         {
             mSeed = atoi(s.substr(5).c_str());
             randomGenerator.setSeed(mSeed);
+            continue;
+        }
+        if (s.find("snapshot:postpregame") == 0)
+        {
+            mSnapshotPostPregame = true;
             continue;
         }
         if (s.find("rvalues:") == 0)
@@ -2517,7 +2640,19 @@ bool GameObserver::processAction(const string& s)
         size_t begin = s.find("[")+1;
         size_t size = s.find("]")-begin;
         size_t index = atoi(s.substr(begin, size).c_str());
-        dumpAssert(index < zone->cards.size());
+        if (index >= zone->cards.size())
+        {
+            {
+                std::stringstream z;
+                z << "REPLAY MISMATCH zone index out of range: " << s << " | zone has " << zone->nb_cards << ":";
+                for (int i = 0; i < zone->nb_cards; i++) z << " " << zone->cards[i]->getLCName();
+                z << " | other hand " << p->opponent()->game->hand->nb_cards << " library " << p->game->library->nb_cards << " current player " << (currentPlayer == players[0] ? "p1" : "p2");
+                DebugTrace(z.str());
+            }
+            if (!getenv("WAGIC_REPLAY"))
+                dumpAssert(false);
+            return false;
+        }
         cardClick(zone->cards[index], zone->cards[index]);
     } else if (s.find("stack") != string::npos) {
         size_t begin = s.find("[")+1;
@@ -2592,18 +2727,78 @@ bool GameObserver::processActions(bool undo
 
     for(loadingite = loadingList.begin(); loadingite != loadingList.end(); loadingite++, cmdIndex++)
     {
-        processAction(*loadingite);
-
-        size_t nb = actionsList.size();
-
-        for (int i = 0; i<6; i++)
+        //A recorded action is an intent; the live game accepted it on some
+        //tick, so re-issue it until the engine logs the same effective
+        //action (a refused click logs "0<name>", a gated request logs
+        //nothing) - bounded, then it is a real divergence.
+        const bool lenient = getenv("WAGIC_REPLAY") != NULL;
+        size_t nb = 0;
+        bool accepted = false;
+        //A recorded phase request for a phase this replay has already left
+        //(the live game's automation ran between two recorded requests) is
+        //already satisfied; a request for a later phase is driven there by
+        //the retry loop one phase at a time.
         {
-            // let's fake an update
-            GameObserver::Update(counter);
-            counter += 1.000f;
+            size_t nx = loadingite->find("next ");
+            if (nx != string::npos && mSnapshotPostPregame)
+            {
+                int recordedPhase = atoi(loadingite->substr(loadingite->rfind(' ') + 1).c_str());
+                if (recordedPhase < mCurrentGamePhase)
+                {
+                    DebugTrace("REPLAY: already past '" << *loadingite << "' (phase " << mCurrentGamePhase << ")");
+                    actionsList.push_back(*loadingite);
+                    continue;
+                }
+            }
         }
-        dumpAssert(actionsList.back() == *loadingite);
-        dumpAssert(nb == actionsList.size());
+        for (int attempt = 0; attempt < 60 && !accepted; attempt++)
+        {
+            size_t before = actionsList.size();
+            processAction(*loadingite);
+            nb = actionsList.size();
+            for (int i = 0; i<6; i++)
+            {
+                // let's fake an update
+                GameObserver::Update(counter);
+                counter += 1.000f;
+            }
+            if (nb > before && actionsList.back() == *loadingite && nb == actionsList.size())
+                accepted = true;
+            else if (nb > before)
+                actionsList.resize(before); //drop the refused/extra record and retry
+        }
+        if (!accepted)
+        {
+            std::stringstream why;
+            why << "REPLAY DIVERGED at action " << cmdIndex << " expected '" << *loadingite << "' got '"
+                << (actionsList.size() ? actionsList.back() : string("(nothing)")) << "' turn " << turn << " phase " << mCurrentGamePhase
+                << " | chooser=" << (getCurrentTargetChooser() ? (getCurrentTargetChooser()->source ? getCurrentTargetChooser()->source->getLCName() : string("(no source)")) : string("none"))
+                << " menu=" << (mLayers && mLayers->actionLayer()->menuObject ? mLayers->actionLayer()->menuObjectName : string("none"))
+                << " menuCard=" << (mLayers && mLayers->actionLayer()->currentActionCard ? mLayers->actionLayer()->currentActionCard->getLCName() : string("none"))
+            ;
+            if (mLayers && mLayers->actionLayer()->currentActionCard)
+            {
+                MTGCardInstance * mc = mLayers->actionLayer()->currentActionCard;
+                why << " reacting:";
+                ActionLayer * al = mLayers->actionLayer();
+                for (size_t i = 1; i < al->mObjects.size(); i++)
+                {
+                    MTGAbility * ab = dynamic_cast<MTGAbility *>(al->mObjects[i]);
+                    if (ab && ab->isReactingToClick(mc, NULL))
+                        why << " [" << ab->getMenuText() << "]";
+                }
+            }
+            why                << " extraPayment=" << (mExtraPayment ? "yes" : "no")
+                << " stackUnresolved=" << (mLayers ? mLayers->stackLayer()->count(0, NOT_RESOLVED) : -1)
+                << " isInterrupting=" << (isInterrupting ? (isInterrupting == players[0] ? "p1" : "p2") : "none");
+            DebugTrace(why.str());
+            if (lenient)
+            {
+                fprintf(stderr, "WAGIC_REPLAY: %s\n", why.str().c_str());
+                break;
+            }
+            dumpAssert(false);
+        }
         dumpAssert(cmdIndex == (actionsList.size()-1));
     }
 
@@ -2639,7 +2834,14 @@ void GameObserver::logAction(const string& s)
     if(mLoading)
     {
         string toCheck = *loadingite;
-        dumpAssert(toCheck == s);
+        if (toCheck != s)
+        {
+            //Replay drift: the load loop re-issues the intent or reports the
+            //divergence; a transcript replay (WAGIC_REPLAY) must not abort.
+            DebugTrace("REPLAY MISMATCH expected '" << toCheck << "' got '" << s << "'");
+            if (!getenv("WAGIC_REPLAY"))
+                dumpAssert(false);
+        }
     }
     actionsList.push_back(s);
 };

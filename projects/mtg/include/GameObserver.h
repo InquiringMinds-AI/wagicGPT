@@ -29,6 +29,15 @@ class DeckManager;
 class PreGamePhase;
 using namespace std;
 
+//Match transcript (development builds): every game rewrites a replayable
+//dump of itself - the suite's own [init]/[player]/[do] format plus seed and
+//rand values - at each untap and at game end, and the owner can classify the
+//match from the victory screen. Desktop replays a dump with WAGIC_REPLAY=<file>
+//(GameStateDuel selfplay boot). Compiled out of release builds.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS) || defined(WAGIC_TRANSCRIPT)
+#define WAGIC_TRANSCRIPT_ON 1
+#endif
+
 class GameObserver{
  protected:
   unsigned int mSeed;
@@ -84,6 +93,15 @@ class GameObserver{
   //even after the `ai` command flips both players to MODE_AI (the old
   //playMode==MODE_TEST_SUITE check stops seeing them at that point).
   bool mSuiteGame;
+  //Transcript/undo baseline moved past the pre-game: the dump was taken
+  //AFTER opening hands and mulligans, so load() must not re-run the rules'
+  //[PLAYERS] init actions (shuffle, draw:7) nor the first-player roll.
+  bool mSnapshotPostPregame;
+  string mTranscriptPath;   //"" = no transcript for this game (suite, replay)
+  string mTranscriptNotes;  //#result / #classification lines appended after [end]
+  void writeTranscript(const char * tag);
+  void setReplayRules(Rules * rules) { mRules = rules; }
+  void appendTranscriptNote(const string & note);
   //`realgame` fixture directive only: names the seat the engine should treat
   //as the human one for the no-legal-action phase automation, so a fixture
   //can exercise the real-play skip path. NULL in every ordinary game.

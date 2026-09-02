@@ -1310,6 +1310,12 @@ void ActionStack::Update(float dt)
                     && !wouldOfferWindow(observer->players[otherPlayerId], currentSpell))
                     interruptDecision[otherPlayerId] = DONT_INTERRUPT;
 
+#ifdef WAGIC_TRANSCRIPT_ON
+                if (observer->isLoading() && getenv("WAGIC_TRANSCRIPT_TRACE"))
+                    DebugTrace("[transcript-trace] stack " << currentSpell->getDisplayName() << " decisions p1=" << interruptDecision[0] << " p2=" << interruptDecision[1]
+                               << " current=" << currentPlayerId << " isInterrupting=" << (observer->isInterrupting ? (observer->isInterrupting == observer->players[0] ? "p1" : "p2") : "none")
+                               << " ask=" << (askIfWishesToInterrupt ? "set" : "none") << " modal=" << modal);
+#endif
                 if (interruptDecision[currentPlayerId] == NOT_DECIDED)
                 {
                     askIfWishesToInterrupt = observer->players[currentPlayerId];

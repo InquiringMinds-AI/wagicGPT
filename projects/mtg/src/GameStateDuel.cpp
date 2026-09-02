@@ -171,6 +171,7 @@ enum ENUM_DUEL_MENUS
     DUEL_MENU_DETAILED_DECK2_INFO,
     //"the opponent is taking a long time" - keep waiting, or finish the
     //duel against the built-in AI
+    DUEL_MENU_TRANSCRIPT_TAG,
     DUEL_MENU_LLM_PATIENCE
 };
 
@@ -320,6 +321,8 @@ void GameStateDuel::Start()
 
     setGamePhase(DUEL_STATE_CHOOSE_DECK1);
     credits = NEW Credits();
+    transcriptMenu = NULL;
+    mTranscriptMenuDone = false;
     mEndExitPending = false;
 
     // match mode is available in classic and demo mode.
@@ -347,6 +350,39 @@ void GameStateDuel::Start()
             int selfplayD1 = d1env ? atoi(d1env) : tournament->getDeckNumber(1);
             if (d0env || d1env)
                 fprintf(stderr, "WAGIC_SELFPLAY: matchup deck%d vs deck%d\n", selfplayD0, selfplayD1);
+#ifdef WAGIC_TRANSCRIPT_ON
+            if (const char * replay = getenv("WAGIC_REPLAY"))
+            {
+                //Replay a match transcript headless: load() recreates both
+                //seats from the dump's mode= lines, restores zones, seed and
+                //rand values, then processAction re-issues every recorded
+                //click (AI seats stay passive while mLoading - their clicks
+                //are in the record). The engine's DebugTrace of the replay IS
+                //the readable transcript; exits when the record is exhausted.
+                std::string text;
+                FILE * fp = fopen(replay, "rb");
+                if (fp)
+                {
+                    char buf[4096];
+                    size_t n;
+                    while ((n = fread(buf, 1, sizeof buf, fp)) > 0) text.append(buf, n);
+                    fclose(fp);
+                }
+                if (text.empty())
+                {
+                    fprintf(stderr, "WAGIC_REPLAY: cannot read %s\n", replay);
+                    exit(2);
+                }
+                //startGame() is skipped, so install the rules load() expects.
+                game->setReplayRules(mParent->rules);
+                game->load(text);
+                fprintf(stderr, "WAGIC_REPLAY: replayed %s -> turn %d phase %d life %d/%d\n", replay, game->turn,
+                        (int) game->getCurrentGamePhase(), game->players[0] ? game->players[0]->life : 0,
+                        game->players[1] ? game->players[1]->life : 0);
+                fflush(stderr);
+                exit(0);
+            }
+#endif
             game->loadPlayer(0, mParent->players[0], selfplayD0, premadeDeck);
             game->loadPlayer(1, mParent->players[1], selfplayD1, premadeDeck);
             setAISpeed();
@@ -519,6 +555,7 @@ void GameStateDuel::End()
     SAFE_DELETE(game);
     premadeDeck = false;
     SAFE_DELETE(credits);
+    SAFE_DELETE(transcriptMenu);
 
     SAFE_DELETE(menu);
     SAFE_DELETE(opponentMenu);
@@ -1161,6 +1198,19 @@ void GameStateDuel::Update(float dt)
                 }
             }
 #endif
+#ifdef WAGIC_TRANSCRIPT_ON
+            {
+                static GameObserver * transcribed = NULL;
+                if (transcribed != game)
+                {
+                    transcribed = game;
+                    std::stringstream r;
+                    r << "result winner=" << (game->didWin(game->players[0]) ? "p1" : (game->didWin(game->players[1]) ? "p2" : "draw"))
+                      << " turn=" << game->turn << " life=" << game->players[0]->life << "/" << game->players[1]->life;
+                    game->appendTranscriptNote(r.str());
+                }
+            }
+#endif
             //One-shot self-play: the harness runs ONE game per process, so on
             //game-over emit the winner (for win-rate) and exit cleanly. The
             //translog is durable per-decision (AIPlayerGPT opens/append/closes
@@ -1461,6 +1511,31 @@ void GameStateDuel::Update(float dt)
 
         break;
     case DUEL_STATE_END:
+#ifdef WAGIC_TRANSCRIPT_ON
+        //Owner classification of the match, asked once on the victory screen
+        //when a human seat played; the answer lands in the transcript as
+        //#classification=... . The menu is freed a tick after it closes,
+        //never from its own callback.
+        if (transcriptMenu && mTranscriptMenuDone)
+            SAFE_DELETE(transcriptMenu);
+        if (!transcriptMenu && !mTranscriptMenuDone && game && !game->mTranscriptPath.empty()
+            && game->players[0] && game->players[1]
+            && (!game->players[0]->isAI() || !game->players[1]->isAI()))
+        {
+            transcriptMenu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(), DUEL_MENU_TRANSCRIPT_TAG, this, Fonts::MENU_FONT, SCREEN_WIDTH / 2 - 100, 25, "How was this match?");
+            transcriptMenu->Add(0, "No problems");
+            transcriptMenu->Add(1, "Bug");
+            transcriptMenu->Add(2, "Bad blocking");
+            transcriptMenu->Add(3, "Bad targeting");
+            transcriptMenu->Add(4, "Bad mana selection");
+            transcriptMenu->Add(5, "Other");
+        }
+        if (transcriptMenu)
+        {
+            transcriptMenu->Update(dt);
+            break;
+        }
+#endif
         //Kick the end-of-match saves compute() deferred onto a worker thread
         //once the victory screen has been presented for two frames. The main
         //loop keeps rendering and polling input during the write, so a confirm
@@ -1588,6 +1663,9 @@ void GameStateDuel::Render()
         {
             r->FillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ARGB(200,0,0,0));
             credits->Render();
+#ifdef WAGIC_TRANSCRIPT_ON
+            if (transcriptMenu) transcriptMenu->Render();
+#endif
 #ifdef TESTSUITE
             if (mParent->players[1] == PLAYER_TYPE_TESTSUITE)
             {
@@ -1726,6 +1804,17 @@ void GameStateDuel::ButtonPressed(int controllerId, int controlId)
     switch (controllerId)
     {
 
+#ifdef WAGIC_TRANSCRIPT_ON
+        case DUEL_MENU_TRANSCRIPT_TAG:
+        {
+            static const char * labels[] = { "no problems", "bug", "bad blocking", "bad targeting", "bad mana selection", "other" };
+            if (game && controlId >= 0 && controlId < 6)
+                game->appendTranscriptNote(string("classification=") + labels[controlId]);
+            if (transcriptMenu) transcriptMenu->Close();
+            mTranscriptMenuDone = true;
+            break;
+        }
+#endif
         case DUEL_MENU_LLM_PATIENCE:
         {
             //Either answer resumes play; the difference is whether the remote
