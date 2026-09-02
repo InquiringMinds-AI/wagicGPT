@@ -276,6 +276,31 @@ int TestSuiteAI::Act(float)
     }
     observer->setLoser(NULL); // Prevent draw rule from losing the game
 
+#ifdef WITH_GPT_AI
+    //#W53-P (D4/D8): two register hooks the wave-53 fixtures pin. The stack
+    //block's ability line and the exile-cast clause are RENDER surfaces the
+    //suite could not otherwise see - the suite asserts zones, and both defects
+    //lived entirely in the words over an unchanged zone layout (a sacrifice
+    //waiting on the stack; a grant whose granter has died). Recorded through
+    //the production emitters, deduped against the last value so a per-tick scan
+    //cannot grow the log, and skipped entirely when there is nothing to say -
+    //so every fixture that does not exercise them pays two empty scans.
+    {
+        string sl = stackAbilityRegister(observer, this);
+        if (!sl.empty() && sl != mLastStackRegister)
+        {
+            mNarrationLog.push_back(sl);
+            mLastStackRegister = sl;
+        }
+        string el = exileCastRegister(this);
+        if (!el.empty() && el != mLastExileRegister)
+        {
+            mNarrationLog.push_back(el);
+            mLastExileRegister = el;
+        }
+    }
+#endif
+
     //Last bits of initialization require to be done here, after the first "update" call of the game
 
     if (suite->currentAction == 0)

@@ -67,6 +67,18 @@ class ActivatedAbility;
 //measurement that exposed it, are on the definition.
 bool counterMarkerMatches(const MTGCardInstance * moved, const MTGCardInstance * marker);
 
+//#W53-P (D4/D8): the two register hooks the wave-53 suite fixtures pin. Both
+//run the PRODUCTION emitters over the LIVE game state - the same functions the
+//prompt renders from - so a red fixture points at the shipped render, never at
+//a copy of it. `seat` is the reading chair (whose "your"/"their" the lines use).
+//stackAbilityRegister: one line per UNRESOLVED ability on the stack, in the
+//stack block's own wording. exileCastRegister: one line per card in `seat`'s
+//exile that carries a stamped canplayfromexile grant. Both return "" when
+//there is nothing to say, so a fixture that does not exercise them pays only
+//the two empty scans.
+string stackAbilityRegister(GameObserver * observer, Player * seat);
+string exileCastRegister(Player * seat);
+
 //The register form of one zone change (pure; PARSETEST-covered).
 string zoneChangeNarration(bool mine, const string& cardName, const string& from,
                            const string& to, bool isCreature, bool isLand,
