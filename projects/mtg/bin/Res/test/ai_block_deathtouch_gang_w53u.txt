@@ -1,0 +1,62 @@
+#NAME: Blockers -- no GANG block on a DEATHTOUCH attacker (and no free "I survive it")
+#DESC: Owner Vita play report 2026-09-02 (vpk12, transcript-1788381069, his tag
+#DESC: "bad blocking"): "opponent double blocked for no good reason". The human seat
+#DESC: was a B/G deathtouch deck (Hapatra, Gifted Aetherborn, Vampire Nighthawk, Fynn
+#DESC: the Fangbearer - every attacker deathtouch) and the AI seat's blockers were
+#DESC: 1/3 Daybreak Chaplains.
+#DESC:
+#DESC: SCENARIO, the same shape with vanilla stats: a 2/2 DEATHTOUCH attacker
+#DESC: (Pitiless Gorgon, primitives: abilities=deathtouch, no auto=) swings into a
+#DESC: defender at 20 holding two 1/3 vanilla bodies (Maritime Guard). Neither guard
+#DESC: kills the Gorgon alone (1 < 2); TOGETHER they do (1+1 >= 2); and each has
+#DESC: toughness 3 against power 2, so a power/toughness reading says both LIVE.
+#DESC: Deathtouch makes that reading false (CR 702.2b): the Gorgon's 2 damage, split
+#DESC: 1 and 1, destroys BOTH. The gang block is a 2-for-1 against the defender, and
+#DESC: a single block is a 1-for-0 - the correct line here is to take the 2.
+#DESC:
+#DESC: RED on base (859186536): AIPlayerBaka::chooseBlockers pass 1 keeps assigning
+#DESC: blockers while the attacker's tracked toughness is still positive, so both
+#DESC: guards are declared; pass 2 then keeps them (tracked toughness hit 0), the
+#DESC: Gorgon dies and both guards die - defender at 20 with an EMPTY board.
+#DESC: GREEN after: pass 1 refuses the second blocker on a deathtouch attacker, pass 2
+#DESC: unassigns the lone one (it does not kill), pass 3's "survives" is no longer
+#DESC: true against deathtouch, and the survival sweep does not fire (2 is not lethal
+#DESC: at 20) - defender at 18 with both guards and the Gorgon alive.
+AICALLS 80
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Pitiless Gorgon
+life:20
+[PLAYER2]
+inplay:Maritime Guard,Maritime Guard
+life:20
+[DO]
+Pitiless Gorgon
+next
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Pitiless Gorgon
+life:20
+[PLAYER2]
+inplay:Maritime Guard,Maritime Guard
+life:18
+[END]
