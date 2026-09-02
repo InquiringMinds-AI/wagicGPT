@@ -221,6 +221,21 @@ void GuiGameZone::Render()
     float mody = 0;
 
     bool replaced = false;
+    //#W53-W perf (owner Vita report, vpk12: "really bad frame rate" on two wide
+    //boards). Ten of these zone widgets sit under the two avatars, and all ten
+    //are fully transparent for the whole game unless the cursor moves onto the
+    //avatar row - yet each one re-ran texture-cache lookups, a quad and two font
+    //strings every frame to draw nothing (measured: 0.24 ms of a 1.0 ms desktop
+    //render frame, board-size-independent). Every drawing statement below is either
+    //coloured with actA (invisible at 0), gated on mHasFocus, gated on showCards,
+    //or a loop over `cards` - and every colour it sets is ARGB((int)(actA),..),
+    //which truncates to a fully transparent 0 below actA 1.0 (the blend is
+    //SRC_ALPHA/ONE_MINUS_SRC_ALPHA, so alpha 0 writes nothing). When all four
+    //are absent the whole body is a no-op and skipping it changes no pixel.
+    //PlayGuiObject::Render() is empty. actA decays asymptotically towards
+    //alpha, so the test is "below one alpha step", never "exactly zero".
+    if (actA < 1.0f && !mHasFocus && !showCards && cards.empty())
+        return;
     bool showtop = (zone && zone->owner->game->battlefield->nb_cards && zone->owner->game->battlefield->hasAbility(Constants::SHOWFROMTOPLIBRARY))?true:false;
     bool showopponenttop = (zone && zone->owner->opponent()->game->battlefield->nb_cards && zone->owner->opponent()->game->battlefield->hasAbility(Constants::SHOWOPPONENTTOPLIBRARY))?true:false;
 
@@ -231,12 +246,20 @@ void GuiGameZone::Render()
     }
     
     //overlay
-    JQuadPtr iconcard = WResourceManager::Instance()->RetrieveTempQuad("iconcard.png");
-    JQuadPtr iconhand = WResourceManager::Instance()->RetrieveTempQuad("iconhand.png");
-    JQuadPtr iconlibrary = WResourceManager::Instance()->RetrieveTempQuad("iconlibrary.png");
-    JQuadPtr iconexile = WResourceManager::Instance()->RetrieveTempQuad("iconexile.png");
-    JQuadPtr iconcommandzone = WResourceManager::Instance()->RetrieveTempQuad("iconcommandzone.png");
-    JQuadPtr iconsideboard = WResourceManager::Instance()->RetrieveTempQuad("iconsideboard.png");
+    //A zone wears exactly ONE of these icons, but all six were fetched every
+    //frame - each fetch builds two std::strings and hashes a cache key. Fetch
+    //the one this zone's type will actually use.
+    JQuadPtr iconcard, iconhand, iconlibrary, iconexile, iconcommandzone, iconsideboard;
+    switch (type)
+    {
+    case GUI_LIBRARY:     iconlibrary     = WResourceManager::Instance()->RetrieveTempQuad("iconlibrary.png"); break;
+    case GUI_OPPONENTHAND:iconhand        = WResourceManager::Instance()->RetrieveTempQuad("iconhand.png"); break;
+    case GUI_GRAVEYARD:   iconcard        = WResourceManager::Instance()->RetrieveTempQuad("iconcard.png"); break;
+    case GUI_EXILE:       iconexile       = WResourceManager::Instance()->RetrieveTempQuad("iconexile.png"); break;
+    case GUI_COMMANDZONE: iconcommandzone = WResourceManager::Instance()->RetrieveTempQuad("iconcommandzone.png"); break;
+    case GUI_SIDEBOARD:   iconsideboard   = WResourceManager::Instance()->RetrieveTempQuad("iconsideboard.png"); break;
+    default: break;
+    }
 
     if(iconlibrary && type == GUI_LIBRARY)
     {

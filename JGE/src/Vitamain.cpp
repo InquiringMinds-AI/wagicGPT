@@ -81,6 +81,96 @@ extern "C" void vitaMemProbe(const char* tag, int turn)
         sceIoClose(fd);
     }
 }
+
+// --- Frame-time telemetry (same file, same gate, same one-line ASCII shape) ---
+// The console has no profiler we can run, and the owner's vpk12 report was
+// "really bad frame rate" on two WIDE boards with a flat heap - so the log has
+// to say WHERE the frame goes, not just how much memory is left. The main loop
+// samples Update / Render / SwapBuffers separately (sceKernelGetProcessTimeWide
+// is microseconds); one `frames` line per turn carries the turn's average and
+// worst frame with the counts that scale them, and any SINGLE frame over 100 ms
+// writes its own `frame` line naming the phase that owned it (capped at 5 per
+// turn so a slow turn cannot flood the log). Costs three clock reads and some
+// integer adds per frame, and is compiled out entirely without WAGIC_VITAMEMLOG.
+static unsigned int gFrN = 0;
+static unsigned long long gFrUpd = 0, gFrRnd = 0, gFrSwp = 0;
+static unsigned int gFrUpdMax = 0, gFrRndMax = 0, gFrSwpMax = 0, gFrMax = 0;
+static unsigned int gFrSlowLines = 0;
+// Board counts, republished every tick by GameObserver::Update (cheap: four
+// container sizes). They describe the frame the numbers came from.
+static int gFrTurn = 0, gFrP1 = 0, gFrP2 = 0, gFrHand = 0, gFrAbil = 0;
+
+static void memlogAppend(const char* line)
+{
+    SceUID fd = sceIoOpen("ux0:data/Wagic/memlog.txt", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0666);
+    if (fd >= 0)
+    {
+        sceIoWrite(fd, line, strlen(line));
+        sceIoClose(fd);
+    }
+}
+
+// Microseconds -> "M.T" milliseconds without pulling in float formatting.
+#define VMS_WHOLE(us) ((unsigned)((us) / 1000))
+#define VMS_TENTH(us) ((unsigned)(((us) % 1000) / 100))
+
+extern "C" void vitaFrameCounts(int turn, int p1perm, int p2perm, int hand, int abilities)
+{
+    gFrTurn = turn; gFrP1 = p1perm; gFrP2 = p2perm; gFrHand = hand; gFrAbil = abilities;
+}
+
+extern "C" void vitaFrameSample(unsigned int updUs, unsigned int rndUs, unsigned int swpUs)
+{
+    unsigned int total = updUs + rndUs + swpUs;
+    ++gFrN;
+    gFrUpd += updUs; gFrRnd += rndUs; gFrSwp += swpUs;
+    if (updUs > gFrUpdMax) gFrUpdMax = updUs;
+    if (rndUs > gFrRndMax) gFrRndMax = rndUs;
+    if (swpUs > gFrSwpMax) gFrSwpMax = swpUs;
+    if (total > gFrMax) gFrMax = total;
+
+    if (total > 100000 && gFrSlowLines < 5)
+    {
+        ++gFrSlowLines;
+        const char* phase = "update";
+        if (rndUs >= updUs && rndUs >= swpUs) phase = "render";
+        else if (swpUs >= updUs && swpUs >= rndUs) phase = "swap";
+        char buf[320];
+        snprintf(buf, sizeof buf,
+                 "t=%llu frame turn=%d phase=%s ms=%u.%u upd=%u.%u rnd=%u.%u swp=%u.%u "
+                 "p1perm=%d p2perm=%d hand=%d abil=%d\n",
+                 (unsigned long long) (sceKernelGetProcessTimeWide() / 1000000ULL), gFrTurn, phase,
+                 VMS_WHOLE(total), VMS_TENTH(total), VMS_WHOLE(updUs), VMS_TENTH(updUs),
+                 VMS_WHOLE(rndUs), VMS_TENTH(rndUs), VMS_WHOLE(swpUs), VMS_TENTH(swpUs),
+                 gFrP1, gFrP2, gFrHand, gFrAbil);
+        memlogAppend(buf);
+    }
+}
+
+// One line per turn, written next to the untap memory probe, then reset.
+extern "C" void vitaFrameTurnLog(int turn)
+{
+    if (!gFrN) return;
+    unsigned int aU = (unsigned int) (gFrUpd / gFrN);
+    unsigned int aR = (unsigned int) (gFrRnd / gFrN);
+    unsigned int aS = (unsigned int) (gFrSwp / gFrN);
+    unsigned int aT = aU + aR + aS;
+    char buf[320];
+    snprintf(buf, sizeof buf,
+             "t=%llu frames turn=%d n=%u avg=%u.%u max=%u.%u avg_upd=%u.%u max_upd=%u.%u "
+             "avg_rnd=%u.%u max_rnd=%u.%u avg_swp=%u.%u max_swp=%u.%u "
+             "p1perm=%d p2perm=%d hand=%d abil=%d\n",
+             (unsigned long long) (sceKernelGetProcessTimeWide() / 1000000ULL), turn, gFrN,
+             VMS_WHOLE(aT), VMS_TENTH(aT), VMS_WHOLE(gFrMax), VMS_TENTH(gFrMax),
+             VMS_WHOLE(aU), VMS_TENTH(aU), VMS_WHOLE(gFrUpdMax), VMS_TENTH(gFrUpdMax),
+             VMS_WHOLE(aR), VMS_TENTH(aR), VMS_WHOLE(gFrRndMax), VMS_TENTH(gFrRndMax),
+             VMS_WHOLE(aS), VMS_TENTH(aS), VMS_WHOLE(gFrSwpMax), VMS_TENTH(gFrSwpMax),
+             gFrP1, gFrP2, gFrHand, gFrAbil);
+    memlogAppend(buf);
+    gFrN = 0; gFrUpd = gFrRnd = gFrSwp = 0;
+    gFrUpdMax = gFrRndMax = gFrSwpMax = gFrMax = 0;
+    gFrSlowLines = 0;
+}
 #endif // WAGIC_VITAMEMLOG
 
 static void debugLogClose() {
@@ -515,13 +605,27 @@ static void MainLoop()
 
             // Update game
             g_engine->SetDelta((float)dt / 1000.0f);
+#ifdef WAGIC_VITAMEMLOG
+            uint64_t frT0 = sceKernelGetProcessTimeWide();
+#endif
             g_engine->Update((float)dt / 1000.0f);
+#ifdef WAGIC_VITAMEMLOG
+            uint64_t frT1 = sceKernelGetProcessTimeWide();
+#endif
 
             // Render
             if (g_engine)
                 g_engine->Render();
+#ifdef WAGIC_VITAMEMLOG
+            uint64_t frT2 = sceKernelGetProcessTimeWide();
+#endif
 
             vglSwapBuffers(GL_TRUE);
+#ifdef WAGIC_VITAMEMLOG
+            uint64_t frT3 = sceKernelGetProcessTimeWide();
+            vitaFrameSample((unsigned int)(frT1 - frT0), (unsigned int)(frT2 - frT1),
+                            (unsigned int)(frT3 - frT2));
+#endif
         }
 
         // Cap to 30fps — sleep if frame finished early

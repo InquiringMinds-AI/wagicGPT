@@ -6,6 +6,10 @@
 //Vita heap/vitaGL probe (JGE/src/Vitamain.cpp). Declared at file scope: a linkage
 //specification is not allowed inside a function body (vpk9 build, 2026-09-01).
 extern "C" void vitaMemProbe(const char*, int);
+//Frame-time telemetry (same gate, same memlog file): counts published per
+//tick, one aggregate line per turn written beside the untap memory probe.
+extern "C" void vitaFrameCounts(int, int, int, int, int);
+extern "C" void vitaFrameTurnLog(int);
 #endif
 #include "PreGamePhase.h"
 #include "LegalActions.h"
@@ -344,6 +348,7 @@ void GameObserver::nextGamePhase()
         DebugTrace("Untap Phase -------------   Turn " << turn );
 #if defined(VITA) && defined(WAGIC_VITAMEMLOG)
         vitaMemProbe("untap", turn);
+        vitaFrameTurnLog(turn);
 #endif
 #ifdef WAGIC_TRANSCRIPT_ON
         writeTranscript("turn");
@@ -999,6 +1004,15 @@ void GameObserver::Update(float dt)
     currentActionPlayer = player;
     if (isInterrupting) 
         player = isInterrupting;
+#if defined(VITA) && defined(WAGIC_VITAMEMLOG)
+    //Publish the counts that scale a frame, for the telemetry lines the main
+    //loop writes. Four container sizes - no walk, no allocation.
+    vitaFrameCounts(turn,
+                    (players[0] && players[0]->game) ? players[0]->game->inPlay->nb_cards : 0,
+                    (players[1] && players[1]->game) ? players[1]->game->inPlay->nb_cards : 0,
+                    (players[0] && players[0]->game) ? players[0]->game->hand->nb_cards : 0,
+                    mLayers ? (int) mLayers->actionLayer()->mObjects.size() : 0);
+#endif
     if(mLayers)
     {
         mLayers->Update(dt, player);
