@@ -1,0 +1,57 @@
+#NAME: Blockers -- a lethal ATTACK SET the defender can survive by chumping
+#DESC: Owner Vita play report 2026-09-02 (transcript-1788329701, tag "bad blocking"):
+#DESC: "one was a game losing block by the heuristic ai, where it could have blocked
+#DESC: differently, and likely won." Three attackers, five untapped defenders, and the
+#DESC: heuristic seat died with blockers to spare.
+#DESC:
+#DESC: SCENARIO: three Plated Wurms (4/5) attack a defender at 5 holding three Hill
+#DESC: Giants (3/3) and two Balduvian Bears (2/2). 12 power is coming; 5 kills. No
+#DESC: single Wurm kills the defender by itself, no defender kills a Wurm alone, and
+#DESC: no defender survives a Wurm. The only line that lives is chump-blocking: two
+#DESC: blocks put 8 of the 12 on the board instead of on the face and the defender
+#DESC: ends at 1 with its three Hill Giants still up - and it spends the two CHEAPEST
+#DESC: bodies to do it, and stops the moment 4 unblocked damage is survivable.
+#DESC:
+#DESC: AIPlayerBaka::chooseBlockers pass 3 asks "attacker->power >= life" - a
+#DESC: PER-ATTACKER lethality test. A set that is lethal only in aggregate passes it
+#DESC: on every member, so the seat declines every chump it has.
+#DESC:
+#DESC: RED on base (dddb6f62b/3dfd77d65): zero blockers declared, the defender takes
+#DESC: all 12 and dies. GREEN with the wave-53 survival sweep.
+AICALLS 120
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Plated Wurm,Plated Wurm,Plated Wurm
+life:20
+[PLAYER2]
+inplay:Hill Giant,Hill Giant,Hill Giant,Balduvian Bears,Balduvian Bears
+life:5
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Plated Wurm,Plated Wurm,Plated Wurm
+life:20
+[PLAYER2]
+inplay:Hill Giant,Hill Giant,Hill Giant
+graveyard:Balduvian Bears,Balduvian Bears
+life:1
+[END]
