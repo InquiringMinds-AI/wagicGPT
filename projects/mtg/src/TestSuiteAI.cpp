@@ -920,6 +920,54 @@ int TestSuiteAI::Act(float)
         {
             std::cerr << "TESTSUITE assertaltpayable: '" << cname << "' cost "
                       << altCost->toString() << " expected " << expect << " got " << got
+    else if (action.find("assertpt ") == 0)
+    {
+        //#W54-D: pin the P/T a player actually READS off the battlefield -
+        //CardGui renders `card->power`/`card->life`, so those are the two
+        //fields asserted here. The zone assertions cannot see a missing
+        //continuous effect: a lord that never registered leaves its creatures
+        //in exactly the same zone with exactly the same names.
+        //Syntax: assertpt <P>/<T> <card name>
+        string rest = action.substr(9);
+        size_t sp = rest.find(' ');
+        string pt = rest.substr(0, sp);
+        string cname = sp == string::npos ? "" : rest.substr(sp + 1);
+        size_t slash = pt.find('/');
+        int expectP = atoi(pt.c_str());
+        int expectT = slash == string::npos ? 0 : atoi(pt.c_str() + slash + 1);
+        //Resolve the card by scanning the LIVE zones, battlefield first.
+        //getCard() resolves by collector id and can hand back a STALE instance
+        //from the card's previous-zone chain (every zone move makes a new
+        //object, and the stale one's ->next is not always the live one), which
+        //would assert a moved card at its PRINTED P/T - reading as a failure
+        //when the effect worked and as a pass when it did not.
+        string lcname = cname;
+        std::transform(lcname.begin(), lcname.end(), lcname.begin(), ::tolower);
+        MTGCardInstance * pc = NULL;
+        for (int pi = 0; pi < 2 && !pc; pi++)
+        {
+            MTGPlayerCards * pz = observer->players[pi]->game;
+            MTGGameZone * ptZones[] = { pz->inPlay, pz->stack, pz->graveyard,
+                                        pz->hand, pz->removedFromGame, pz->library };
+            for (size_t z = 0; z < sizeof(ptZones) / sizeof(ptZones[0]) && !pc; z++)
+                for (int k = 0; k < ptZones[z]->nb_cards; k++)
+                    if (ptZones[z]->cards[k] && ptZones[z]->cards[k]->getLCName() == lcname)
+                    {
+                        pc = ptZones[z]->cards[k];
+                        break;
+                    }
+        }
+        if (!pc || slash == string::npos)
+        {
+            std::cerr << "TESTSUITE assertpt: no card '" << cname << "' (or malformed P/T '"
+                      << pt << "') [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        if (pc->power != expectP || pc->life != expectT)
+        {
+            std::cerr << "TESTSUITE assertpt: '" << pc->getDisplayName() << "' expected "
+                      << expectP << "/" << expectT << " got " << pc->power << "/" << pc->life
                       << " [" << suite->filename << "]" << std::endl;
             suite->commandAssertFailures++;
         }

@@ -42,3 +42,5 @@ lexicon/target_sideboard_commandzone_matrix.txt
 lexicon/field_text_gameplay.txt
 # Parked: initiative marker mechanics blocked on unimplemented takesinitiative/venture (deferred pile)
 lexicon/macro_initiative_markers.txt
+# Dodecapod discard-to-play: the two +1/+1 counters are applied on arrival but the P/T reverts (CS-026)
+lexicon/discard_to_play_dodecapod.txt

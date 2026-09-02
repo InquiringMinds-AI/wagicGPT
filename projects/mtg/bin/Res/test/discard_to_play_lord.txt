@@ -1,0 +1,44 @@
+#NAME: Wilt-Leaf Liege discarded by an opponent enters as a FUNCTIONAL permanent
+#DESC: Owner's Vita report (2026-09-01): a Liege put onto the battlefield by
+#DESC: its own discard-to-play replacement gave no lord bonus - creatures
+#DESC: already out kept their old P/T and later creatures gained nothing.
+#DESC: Oracle (Scryfall): "Other green creatures you control get +1/+1.
+#DESC: Other white creatures you control get +1/+1. If a spell or ability an
+#DESC: opponent controls causes you to discard this card, put it onto the
+#DESC: battlefield instead of putting it into your graveyard."
+#DESC: p2 casts Mind Rot at p1; p1 discards the Liege (replaced -> battlefield)
+#DESC: and Ornithopter (a real discard). Grizzly Bears must read 3/3.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Wilt-Leaf Liege,Ornithopter
+inplay:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Swamp,Forest,Island
+hand:Mind Rot
+life:20
+[DO]
+eot
+goto firstmain
+Swamp
+Forest
+Island
+Mind Rot
+p1
+Wilt-Leaf Liege
+Ornithopter
+goto secondmain
+assertpt 3/3 grizzly bears
+assertpt 4/4 wilt-leaf liege
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Wilt-Leaf Liege
+graveyard:Ornithopter
+life:20
+[PLAYER2]
+inplay:Swamp,Forest,Island
+graveyard:Mind Rot
+life:20
+[END]

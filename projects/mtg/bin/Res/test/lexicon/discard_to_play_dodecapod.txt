@@ -1,0 +1,41 @@
+#NAME: Dodecapod discarded by an opponent still enters with two +1/+1 counters
+#DESC: Regression guard for the discard-to-play rework: the alias-109736
+#DESC: counter hack lives in the battlefield-arrival branch of putInZone, and
+#DESC: the replacement now reaches the battlefield through a temp hop + Spell
+#DESC: rather than by rewriting the destination. Oracle (Scryfall): "If a
+#DESC: spell or ability an opponent controls causes you to discard this card,
+#DESC: put it onto the battlefield with two +1/+1 counters on it instead of
+#DESC: putting it into your graveyard." 3/3 printed -> 5/5 in play.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Dodecapod,Ornithopter
+inplay:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Swamp,Forest,Island
+hand:Mind Rot
+life:20
+[DO]
+eot
+goto firstmain
+Swamp
+Forest
+Island
+Mind Rot
+p1
+Dodecapod
+Ornithopter
+goto secondmain
+assertpt 5/5 dodecapod
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Dodecapod
+graveyard:Ornithopter
+life:20
+[PLAYER2]
+inplay:Swamp,Forest,Island
+graveyard:Mind Rot
+life:20
+[END]
