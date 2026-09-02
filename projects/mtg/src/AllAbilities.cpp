@@ -5244,6 +5244,77 @@ ActivatedAbility(observer, id, card, _cost, 0), retarget(retarget), reequip(reeq
     target = _target;
 }
 
+//W54-G (owner Vita report 2026-09-01: Ajani's Chosen / Banishing Light /
+//Ancestral Mask, and the same with Ethereal Armor). An Aura's abilities are
+//parsed ONCE, when the Aura resolves, and every leaf line binds to the host
+//that was card->target at that moment (AbilityFactory::parseMagicLine:
+//"MTGCardInstance * target = card->target"). Re-attaching in place - the
+//rehook/newhook branch below - only repointed the Aura's ->target pointer, so
+//the pump, the per-enchantment count and the granted keywords all kept
+//applying to the OLD creature and never reached the new one.
+//Equipment does not have this problem because AEquip owns its granted
+//abilities and unequip()/equip() tears them down and re-parses them against
+//the new bearer; retarget/newtarget do not have it either because they push
+//the Aura through a zone change and a fresh Spell resolution re-parses it.
+//This is the same teardown+re-parse for an Aura that never left the
+//battlefield: drop what the card registered, re-parse against the new
+//card->target, re-register.
+//Two things are deliberately NOT touched:
+// - abilities whose core is an AANewTarget/AEquip: the rehook currently
+//   RESOLVING can itself be one of them (a card scripting "{1}{W}: rehook ..."
+//   in its own text), and deleting the ability mid-resolve is a use-after-free.
+//   Leaving the live one in place is also correct - it does not depend on the
+//   host.
+// - oneShot lines: those are the Aura's resolution effects (ETB draws, counter
+//   placement...). Moving an Aura is not a new resolution, so they must not
+//   fire a second time.
+static void rebindAuraAbilitiesToHost(GameObserver * game, MTGCardInstance * aura)
+{
+    if (!game || !aura || !aura->hasSubtype(Subtypes::TYPE_AURA))
+        return;
+
+    AbilityFactory af(game);
+
+    //snapshot first: removing an observer can re-enter the registry
+    vector<MTGAbility *> registered = aura->cardsAbilities;
+    vector<MTGAbility *> kept;
+    aura->clearAbilityRegistry();
+    for (size_t i = 0; i < registered.size(); ++i)
+    {
+        MTGAbility * a = registered[i];
+        if (!a)
+            continue;
+        MTGAbility * core = af.getCoreAbility(a);
+        if (dynamic_cast<AANewTarget *> (core) || dynamic_cast<AEquip *> (core))
+        {
+            kept.push_back(a);
+            continue;
+        }
+        game->removeObserver(a);
+    }
+    for (size_t i = 0; i < kept.size(); ++i)
+        aura->registerAbility(kept[i]);
+
+    vector<MTGAbility *> fresh;
+    af.getAbilities(&fresh, NULL, aura);
+    for (size_t i = 0; i < fresh.size(); ++i)
+    {
+        MTGAbility * a = fresh[i];
+        if (!a)
+            continue;
+        a->source = aura;
+        MTGAbility * core = af.getCoreAbility(a);
+        if (a->oneShot || dynamic_cast<AANewTarget *> (core) || dynamic_cast<AEquip *> (core))
+        {
+            SAFE_DELETE(a);
+            continue;
+        }
+        a->addToGame();
+        if (!dynamic_cast<MayAbility *> (a))
+            aura->registerAbility(a);
+    }
+}
+
 int AANewTarget::resolve()
 {
     MTGCardInstance * _target = (MTGCardInstance *) target;
@@ -5306,6 +5377,8 @@ int AANewTarget::resolve()
         if(_target->hasSubtype(Subtypes::TYPE_AURA))
         {
             _target->target = source;
+            //the pointer move alone leaves every static effect on the old host
+            rebindAuraAbilitiesToHost(game, _target);
         }
         if(_target->hasSubtype(Subtypes::TYPE_EQUIPMENT))
         {

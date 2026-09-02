@@ -1,0 +1,31 @@
+# W54-G companion: the OTHER aura-move path, `retarget` (Detainment Spell:
+# "{1}{W}: Attach Detainment Spell to target creature"). Unlike rehook, retarget
+# pushes the Aura through a fresh Spell resolution, so its static effect is
+# re-parsed against the new host. This fixture pins that: while the Spell is on
+# Prodigal Sorcerer the Sorcerer's activated ability is off; after moving the
+# Spell to the Grizzly Bears the Sorcerer can ping again (P2 to 19).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Prodigal Sorcerer,Grizzly Bears
+hand:Detainment Spell
+manapool:{2}{W}{W}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Detainment Spell
+Prodigal Sorcerer
+Detainment Spell
+Grizzly Bears
+Prodigal Sorcerer
+p2
+goto secondmain
+[ASSERT]
+secondmain
+[PLAYER1]
+inplay:Prodigal Sorcerer,Grizzly Bears,Detainment Spell
+life:20
+[PLAYER2]
+life:19
+[END]

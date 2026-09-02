@@ -1,0 +1,34 @@
+# W54-G: the same Aura move must carry a GRANTED KEYWORD, not just P/T.
+# Ethereal Armor: "+1/+1 for each enchantment you control and has first strike".
+# Cast on Grizzly Bears, moved by Ajani's Chosen to the fresh Cat token: the Cat
+# must be 3/3 (2/2 + the Armor itself) WITH first strike -> P2 goes to 17.
+# The bug leaves both the pump and the first strike on the Grizzly Bears.
+# Madrush Cyclops (3/4, stays home) gives the token haste.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ajani's Chosen,Grizzly Bears,Madrush Cyclops
+hand:Ethereal Armor
+manapool:{W}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Ethereal Armor
+Grizzly Bears
+choice 0
+Cat
+goto attackers
+Cat
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Ajani's Chosen,Grizzly Bears,Madrush Cyclops,Ethereal Armor,Cat
+ability:cat|first strike
+life:20
+[PLAYER2]
+life:17
+[END]
