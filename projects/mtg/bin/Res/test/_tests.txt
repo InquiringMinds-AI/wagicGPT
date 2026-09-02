@@ -1262,3 +1262,7 @@ instant_response_window_opponent_upkeep.txt
 split_half_instant_timing.txt
 mutual_destruction_conditional_flash.txt
 mutual_destruction_no_flash_permanent.txt
+hapatra_opponent_counter_no_snake.txt
+hapatra_own_counter_makes_snake.txt
+wildwood_scourge_hydra_exempt.txt
+wildwood_scourge_nonhydra_triggers.txt

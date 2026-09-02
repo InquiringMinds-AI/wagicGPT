@@ -2073,7 +2073,7 @@ subtype=Aura
 [/card]
 [card]
 name=All Will Be One
-auto=@totalcounteradded(any) from(*|mybattlefield):name(Deal damage) ability$!name(Choose one) choice name(Damage opponent) damage:storedthatmuch opponent _ choice name(Damage creature or planeswalker) target(*[creature;planeswalker]|opponentbattlefield) damage:storedthatmuch!$ controller
+auto=@totalcounteradded(any) from(*|battlefield) bycontroller:name(Deal damage) ability$!name(Choose one) choice name(Damage opponent) damage:storedthatmuch opponent _ choice name(Damage creature or planeswalker) target(*[creature;planeswalker]|opponentbattlefield) damage:storedthatmuch!$ controller
 auto=@energizedof(player):name(Deal damage) ability$!name(Choose one) choice name(Damage opponent) damage:storedthatmuch opponent _ choice name(Damage creature or planeswalker) target(*[creature;planeswalker]|opponentbattlefield) damage:storedthatmuch!$ controller
 auto=@experiencedof(player):name(Deal damage) ability$!name(Choose one) choice name(Damage opponent) damage:storedthatmuch opponent _ choice name(Damage creature or planeswalker) target(*[creature;planeswalker]|opponentbattlefield) damage:storedthatmuch!$ controller
 auto=@poisonedfoeof(player):name(Deal damage) ability$!name(Choose one) choice name(Damage opponent) damage:storedthatmuch opponent _ choice name(Damage creature or planeswalker) target(*[creature;planeswalker]|opponentbattlefield) damage:storedthatmuch!$ controller
@@ -44192,7 +44192,7 @@ type=Instant
 [card]
 name=Generous Patron
 auto=may name(Put 1/1 counters) target(<upto:2>creature) counter(1/1)
-auto=@totalcounteradded(any) from(creature|opponentbattlefield):may name(Draw a card) draw:1 controller
+auto=@totalcounteradded(any) from(creature|opponentbattlefield) bycontroller:may name(Draw a card) draw:1 controller
 text=When Generous Patron enters, support 2. (Put a +1/+1 counter on each of up to two other target creatures.) -- Whenever you put one or more counters on a creature you don't control, draw a card.
 mana={2}{G}
 type=Creature
@@ -50884,7 +50884,7 @@ type=Instant
 [card]
 name=Hapatra, Vizier of Poisons
 auto=@combatdamaged(player) from(this):may name(Put -1/-1 counter) counter(-1/-1) target(creature|battlefield)
-auto=@totalcounteradded(-1/-1) from(creature|battlefield):name(Create snake) token(Snake,creature Snake,1/1,green,deathtouch)
+auto=@totalcounteradded(-1/-1) from(creature|battlefield) bycontroller:name(Create snake) token(Snake,creature Snake,1/1,green,deathtouch)
 text=Whenever Hapatra, Vizier of Poisons deals combat damage to a player, you may put a -1/-1 counter on target creature. -- Whenever you put one or more -1/-1 counters on a creature, create a 1/1 green Snake creature token with deathtouch.
 mana={B}{G}
 type=Legendary Creature
@@ -74310,7 +74310,7 @@ toughness=1
 name=Moss-Pit Skeleton
 kicker={3}
 auto=if paid(kicker) then counter(1/1,3)
-autograveyard=@totalcounteradded(1/1) source(creature|myBattlefield):may moveTo(myLibrary)
+autograveyard=@totalcounteradded(1/1) from(creature|myBattlefield):may moveTo(myLibrary)
 text=Kicker {3} (You may pay an additional {3} as you cast this spell.) -- If Moss-Pit Skeleton was kicked, it enters with three +1/+1 counters on it. -- Whenever one or more +1/+1 counters are put on a creature you control, if Moss-Pit Skeleton is in your graveyard, you may put Moss-Pit Skeleton on top of your library.
 mana={B}{G}
 type=Creature
@@ -109636,7 +109636,7 @@ type=Sorcery
 [/card]
 [card]
 name=Stocking the Pantry
-auto=@totalcounteradded(1/1) from(creature|mybattlefield):counter(0/0,1,supply)
+auto=@totalcounteradded(1/1) from(creature|mybattlefield) bycontroller:counter(0/0,1,supply)
 auto={2}{C(0/0,-1,supply)}:draw:1
 text=Whenever you put one or more +1/+1 counters on a creature you control, put a supply counter on Stocking the Pantry. -- {2}, Remove a supply counter from Stocking the Pantry: Draw a card.
 mana={G}
@@ -128785,7 +128785,7 @@ toughness=2
 [card]
 name=Wildwood Scourge
 auto=counter(1/1,X)
-auto=@totalcounteradded(1/1) from(other creature|mybattlefield) except(hydra):may counter(1/1) all(this)
+auto=@totalcounteradded(1/1) from(other creature[-sub_hydra]|mybattlefield):counter(1/1) all(this)
 text=Wildwood Scourge enters with X +1/+1 counters on it. -- Whenever one or more +1/+1 counters are put on another non-Hydra creature you control, put a +1/+1 counter on Wildwood Scourge.
 mana={X}{G}
 type=Creature

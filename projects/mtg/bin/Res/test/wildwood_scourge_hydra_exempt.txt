@@ -1,0 +1,42 @@
+#Wildwood Scourge - "Whenever one or more +1/+1 counters are put on another
+#NON-HYDRA creature you control, put a +1/+1 counter on this creature."
+#(Oracle verified against Scryfall 2026-09-01.)
+#Mossborn Hydra is "Creature - Elemental Hydra" (same Scryfall check), so a
+#+1/+1 counter put on it must NOT trigger Wildwood Scourge.
+#Owner Vita report (wave 54 bug 2): it triggered.  (The report's path was
+#proliferate from Karn's Bastion; the restriction is path-independent -
+#Battlegrowth is used here because the proliferate chooser swallows every
+#later click in the suite driver.)
+#
+#Observable: Wildwood Scourge is cast for X=2 (2/2, two +1/+1 counters);
+#Battlegrowth puts a +1/+1 counter on Mossborn Hydra; Shock then deals exactly
+#2 damage to the Scourge.
+#  correct : Scourge is still 2/2 -> dies
+#  bug     : Scourge is 3/3       -> survives
+#The `choice 0` answers the (unfaithful) may-menu the pre-fix script raised;
+#with the fix there is no trigger and no menu, and it is an inert no-op.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Wildwood Scourge,Battlegrowth,Shock
+inplay:Mossborn Hydra
+manapool:{2}{G}{G}{R}
+library:Forest,Forest
+[PLAYER2]
+[DO]
+Wildwood Scourge
+choice 2
+Battlegrowth
+Mossborn Hydra
+choice 0
+Shock
+Wildwood Scourge
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mossborn Hydra
+graveyard:Battlegrowth,Shock,Wildwood Scourge
+hand:
+library:Forest,Forest
+[PLAYER2]
+[END]
