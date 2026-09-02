@@ -93,6 +93,8 @@ public:
                                            //option one's deferred move (phase 3)
     int mAITestTicks;                      //TESTSUITE-only: in-flight tick counter
                                            //for the forced-async reveal repro hook
+    bool mAISecondRebuilt;                 //W54-X: option two has been rebuilt once
+                                           //after its window was consumed early
     vector<MTGCardInstance*> mAIGraveSel;  //model's option-one picks (pointers)
     vector<MTGCardInstance*> mAIRemainder; //option-two cards (captured at arm)
     void driveInteractiveReveal();

@@ -1,0 +1,56 @@
+#W54-X: the interactive-AI (LLM) reveal driver hung the whole game - no tick,
+#no stderr - whenever a reveal's OPTION ONE had no legal target among the
+#revealed cards. Corpus 20260902-023342, game 152v125: Sigarda, Champion of
+#Light attacked with coven met, its "look at the top five, you may put a Human
+#creature card into your hand" reveal fired, none of the five was a Human, and
+#the game sat for ~13 hours at the Blockers step. The seat log's last record is
+#a kind=reveal ask over 5 options answered "none (no legal target)" with no
+#model call.
+#
+#MECHANISM. MTGRevealingCards::toResolve() picks the branch UP FRONT using
+#option one's own predicate: countValidTargets() == 0 leaves abilityFirst NULL
+#and arms option TWO instead. driveInteractiveReveal's phase 0 nevertheless
+#assumed the armed chooser was option one's, and after the (self-declining) ask
+#issued its finalize BTN_NEXT against it. CheckUserInput's decline branch is
+#gated on `!abilitySecond`, so with option two already built the press could not
+#take it - option two's window was spent on zero targets. Phase 3 then waited
+#for an option-two chooser that had already come and gone, forever: the reveal
+#display never closes, and a held display blocks every phase advance.
+#
+#FIXTURE. Lexicon Hurkyl Wizard (test/lexicon/test_primitives.txt) carries the
+#same reveal shape as Sigarda - a gated option one plus
+#`optiontwo target(*|reveal) bottomoflibrary and!( all(*|reveal) bottomoflibrary )!`.
+#Its option one takes noncreature nonland cards; the top five here are all
+#creatures, so option one has no legal target and the engine arms option two up
+#front - the exact live shape, with no model in the loop (`revealasync` names a
+#card that matches nothing, so the stub decides with an empty pick set, the same
+#downstream state as the live -1).
+#Top of library = last listed; Mind Stone is the noncreature spell that arms the
+#end-step restriction. Hill Giant is the sixth card, below the revealed five.
+#RED on base: "phase problem. Expected [Cleanup](12), got [End](11)" plus the
+#five revealed cards stranded in the reveal zone (library 1, not 6) - the engine
+#stopped ticking exactly as it did in the corpus.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Hurkyl Wizard,island,swamp
+hand:Mind Stone
+library:Hill Giant,Grizzly Bears,Gray Ogre,Ornithopter,Juggernaut,Craw Wurm
+[PLAYER2]
+[DO]
+interactivereveal
+revealasync zzznosuchcardzzz
+realgame
+island
+swamp
+Mind Stone
+goto end
+next
+[ASSERT]
+CLEANUP
+[PLAYER1]
+inplay:Lexicon Hurkyl Wizard,island,swamp,Mind Stone
+hand:
+library:Hill Giant,Craw Wurm,Juggernaut,Ornithopter,Gray Ogre,Grizzly Bears
+[PLAYER2]
+[END]
