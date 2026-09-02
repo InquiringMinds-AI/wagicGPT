@@ -655,7 +655,11 @@ void GameObserver::resetStartupGame()
         return;
     }
     mTranscriptNotes = "";
-    if (!mSuiteGame && !mLoading && !getenv("WAGIC_REPLAY") && players.size() == 2 && players[0] && players[1])
+    //Suite / PARSETEST processes never keep a transcript: mSuiteGame is set
+    //AFTER the first baseline on the main-thread path, and 51 junk
+    //"testsuite-vs-testsuite" files had piled up in User/transcripts.
+    if (!mSuiteGame && !mLoading && !getenv("WAGIC_REPLAY") && !getenv("WAGIC_TESTSUITE") && !getenv("WAGIC_GPT_PARSETEST")
+        && players.size() == 2 && players[0] && players[1])
     {
         string names[2];
         for (int i = 0; i < 2; i++)
@@ -1537,7 +1541,11 @@ void GameObserver::gameStateBasedEffects()
     mSettledStep = (int) combatStep;
     //A live-game transcript replay (post-pre-game dump) keeps the automation
     //the live game had; only suite/undo loads run with it off.
-    const bool loadingScripted = mLoading && !mSnapshotPostPregame;
+    //#W55-REPLAY: a WAGIC_REPLAY of a HUMAN game must not auto-advance either -
+    //the live human seat advanced only by its own `next` presses, every one of
+    //which is recorded; automation here skipped phases the record then could
+    //not re-enter (the 2026-09-02 Vita transcript diverged at action 0).
+    const bool loadingScripted = mLoading && (!mSnapshotPostPregame || getenv("WAGIC_REPLAY") != NULL);
     int skipLevel = (!phaseSettled || currentPlayer->playMode == Player::MODE_TEST_SUITE || mSuiteGame || loadingScripted) ? Constants::ASKIP_NONE
         : options[Options::ASPHASES].number;
     bool noattackers = currentPlayer->noPossibleAttackers();
@@ -1596,7 +1604,7 @@ void GameObserver::gameStateBasedEffects()
     //point of the directive; it is NULL in every ordinary game.
     const bool automationAllowed = phaseSettled && (mSuiteHumanSeat
         || !(currentPlayer->playMode == Player::MODE_TEST_SUITE
-             || mSuiteGame || (mLoading && !mSnapshotPostPregame)));
+             || mSuiteGame || (mLoading && (!mSnapshotPostPregame || getenv("WAGIC_REPLAY") != NULL))));
     Player * humanSeat = mSuiteHumanSeat ? mSuiteHumanSeat
         : (!players[0]->isAI() ? players[0] : (!players[1]->isAI() ? players[1] : NULL));
     //Only the human's OWN turn. userRequestNextGamePhase advances the phase
@@ -2769,6 +2777,14 @@ bool GameObserver::processActions(bool undo
             }
             if (nb > before && actionsList.back() == *loadingite && nb == actionsList.size())
                 accepted = true;
+            else if (lenient && loadingite->find("next ") != string::npos && mSnapshotPostPregame
+                     && atoi(loadingite->substr(loadingite->rfind(' ') + 1).c_str()) < mCurrentGamePhase)
+            {
+                //the retries' own updates carried the game past this phase
+                actionsList.resize(before);
+                actionsList.push_back(*loadingite);
+                accepted = true;
+            }
             else if (nb > before)
                 actionsList.resize(before); //drop the refused/extra record and retry
         }
@@ -2777,11 +2793,17 @@ bool GameObserver::processActions(bool undo
             std::stringstream why;
             why << "REPLAY DIVERGED at action " << cmdIndex << " expected '" << *loadingite << "' got '"
                 << (actionsList.size() ? actionsList.back() : string("(nothing)")) << "' turn " << turn << " phase " << mCurrentGamePhase
-                << " | chooser=" << (getCurrentTargetChooser() ? (getCurrentTargetChooser()->source ? getCurrentTargetChooser()->source->getLCName() : string("(no source)")) : string("none"))
-                << " menu=" << (mLayers && mLayers->actionLayer()->menuObject ? mLayers->actionLayer()->menuObjectName : string("none"))
-                << " menuCard=" << (mLayers && mLayers->actionLayer()->currentActionCard ? mLayers->actionLayer()->currentActionCard->getLCName() : string("none"))
+                ;
+            //currentActionCard / the chooser's source are known dangle classes
+            //once the layer is no longer waiting (the 2026-09-02 desktop replay
+            //SEGV'd reporting a divergence through a freed card): name them only
+            //while the layer is waiting for an answer.
+            const bool layerWaiting = mLayers && mLayers->actionLayer()->isWaitingForAnswer();
+            why << " | chooser=" << (layerWaiting && getCurrentTargetChooser() ? (getCurrentTargetChooser()->source ? getCurrentTargetChooser()->source->getLCName() : string("(no source)")) : string("none"))
+                << " menu=" << (layerWaiting && mLayers->actionLayer()->menuObject ? mLayers->actionLayer()->menuObjectName : string("none"))
+                << " menuCard=" << (layerWaiting && mLayers->actionLayer()->currentActionCard ? mLayers->actionLayer()->currentActionCard->getLCName() : string("none"))
             ;
-            if (mLayers && mLayers->actionLayer()->currentActionCard)
+            if (layerWaiting && mLayers->actionLayer()->currentActionCard)
             {
                 MTGCardInstance * mc = mLayers->actionLayer()->currentActionCard;
                 why << " reacting:";

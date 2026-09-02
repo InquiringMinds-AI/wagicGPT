@@ -5,6 +5,7 @@
 #include "GameApp.h"
 #include "Trash.h"
 #include "GuiHand.h"
+#include <sstream>
 #include "OptionItem.h"
 #include "LegalActions.h"
 #include "ManaEngine.h"
@@ -271,12 +272,33 @@ void GuiHandSelf::Update(float dt)
         if (focused && focused->castableNow == 1 && focused->getManaCost()
             && !p->getManaPool()->canAfford(focused->getManaCost(), focused->has(Constants::ANYTYPEOFMANA)))
         {
-            vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(p, focused,
-                focused->getManaCost(), focused->has(Constants::ANYTYPEOFMANA));
-            for (size_t i = 0; i < picks.size(); i++)
-                if (picks[i]->source)
-                    picks[i]->source->willPayForFocused = 1;
+            //#W55-OPT perf: the option-preserving plan (refineForOptions) is
+            //the costly part of this refresh - re-plan only when something it
+            //reads changed (focused card, pool, hand, battlefield tap state);
+            //the console re-ran it four times a second on a static board.
+            std::ostringstream sig;
+            sig << (const void *) focused << '|' << p->getManaPool()->toString() << '|';
+            for (int i = 0; i < p->game->hand->nb_cards; i++)
+                sig << (const void *) p->game->hand->cards[i] << ',';
+            sig << '|';
+            for (int i = 0; i < bf->nb_cards; i++)
+                sig << (const void *) bf->cards[i] << (bf->cards[i]->isTapped() ? 't' : 'u');
+            if (sig.str() != mPreviewSig)
+            {
+                mPreviewSig = sig.str();
+                mPreviewSources.clear();
+                vector<MTGAbility*> picks = ManaEngine::selectAutoTapProducers(p, focused,
+                    focused->getManaCost(), focused->has(Constants::ANYTYPEOFMANA));
+                for (size_t i = 0; i < picks.size(); i++)
+                    if (picks[i]->source)
+                        mPreviewSources.push_back(picks[i]->source);
+            }
+            for (size_t i = 0; i < mPreviewSources.size(); i++)
+                if (bf->hasCard(mPreviewSources[i]))
+                    mPreviewSources[i]->willPayForFocused = 1;
         }
+        else
+            mPreviewSig.clear();
     }
 }
 

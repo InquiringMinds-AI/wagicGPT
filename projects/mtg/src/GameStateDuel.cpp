@@ -1231,7 +1231,14 @@ void GameStateDuel::Update(float dt)
                 exit(0);
             }
             //the following section will be called only in a classic or demo gamemode and if a tournament or match with more than one game is activ
-            if ( (mParent->gameType == GAME_TYPE_COMMANDER || mParent->gameType == GAME_TYPE_CLASSIC || mParent->gameType == GAME_TYPE_DEMO) && mParent->players[1] == PLAYER_TYPE_CPU && (tournament->isTournament() || tournament->getGamesToPlay()>1 ))
+            //WAGIC_TRANSCRIPT_MENU_SELFTEST (desktop dev builds) takes the HUMAN
+            //route below - the victory screen + classification menu - instead
+            //of the CPU tournament's straight-to-next-game path.
+            bool tournamentRoute = (mParent->gameType == GAME_TYPE_COMMANDER || mParent->gameType == GAME_TYPE_CLASSIC || mParent->gameType == GAME_TYPE_DEMO) && mParent->players[1] == PLAYER_TYPE_CPU && (tournament->isTournament() || tournament->getGamesToPlay()>1 );
+#if !defined(VITA) && !defined(PSP)
+            if (getenv("WAGIC_TRANSCRIPT_MENU_SELFTEST")) tournamentRoute = false;
+#endif
+            if (tournamentRoute)
             {
                 setGamePhase(DUEL_STATE_SHOW_SCORE);
                 /* Determine the winner of this game.
@@ -1514,16 +1521,27 @@ void GameStateDuel::Update(float dt)
         break;
     case DUEL_STATE_END:
 #ifdef WAGIC_TRANSCRIPT_ON
+        { //scoped: declarations inside a case label
         //Owner classification of the match, asked once on the victory screen
         //when a human seat played; the answer lands in the transcript as
         //#classification=... . The menu is freed a tick after it closes,
         //never from its own callback.
         if (transcriptMenu && mTranscriptMenuDone)
             SAFE_DELETE(transcriptMenu);
+        //WAGIC_TRANSCRIPT_MENU_SELFTEST=1 (desktop dev builds): show the menu
+        //for AI-vs-AI too and answer it after a few ticks, so the path a human
+        //reaches on the console runs under the desktop's ASAN self-play.
+#if !defined(VITA) && !defined(PSP)
+        const bool menuSelfTest = getenv("WAGIC_TRANSCRIPT_MENU_SELFTEST") != NULL;
+#else
+        const bool menuSelfTest = false;
+#endif
+        static int menuSelfTestTicks = 0;
         if (!transcriptMenu && !mTranscriptMenuDone && game && !game->mTranscriptPath.empty()
             && game->players[0] && game->players[1]
-            && (!game->players[0]->isAI() || !game->players[1]->isAI()))
+            && (menuSelfTest || !game->players[0]->isAI() || !game->players[1]->isAI()))
         {
+            menuSelfTestTicks = 0;
             transcriptMenu = NEW SimpleMenu(JGE::GetInstance(), WResourceManager::Instance(), DUEL_MENU_TRANSCRIPT_TAG, this, Fonts::MENU_FONT, SCREEN_WIDTH / 2 - 100, 25, "How was this match?");
             transcriptMenu->Add(0, "No problems");
             transcriptMenu->Add(1, "Bug");
@@ -1535,7 +1553,10 @@ void GameStateDuel::Update(float dt)
         if (transcriptMenu)
         {
             transcriptMenu->Update(dt);
+            if (menuSelfTest && !mTranscriptMenuDone && ++menuSelfTestTicks > 5)
+                ButtonPressed(DUEL_MENU_TRANSCRIPT_TAG, 1);
             break;
+        }
         }
 #endif
         //Kick the end-of-match saves compute() deferred onto a worker thread

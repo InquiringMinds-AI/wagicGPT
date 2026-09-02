@@ -161,7 +161,7 @@ bool JGuiController::CheckUserInput(JButton key)
             // first scan the buttons on the screen and then process the other gui elements
             for (size_t i = 0; i < mButtons.size(); i++)
             {
-                if (mButtons[i]->ButtonPressed())
+                if (mButtons[i] != NULL && mButtons[i]->ButtonPressed())
                 {
                     mEngine->LeftClickedProcessed();
                     return true;
@@ -212,8 +212,13 @@ void JGuiController::Update(float dt)
         if (mObjects[i] != NULL)
             mObjects[i]->Update(dt);
     
+    //NULL-tolerant like the objects loop above: a Vita dump (2026-09-02,
+    //psp2core-1788315925) died here on a SimpleMenu whose button list held a
+    //single NULL - heap damage of unknown origin; the guard turns that into a
+    //skipped entry instead of a data abort at the end of a won game.
     for (size_t i = 0; i < mButtons.size(); i++ )
-        mButtons[i]->Update(dt);
+        if (mButtons[i] != NULL)
+            mButtons[i]->Update(dt);
 
     if(mEngine)
     {
