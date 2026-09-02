@@ -1879,12 +1879,15 @@ TriggeredAbility * AbilityFactory::parseTrigger(string s, string, int id, Spell 
             counter = parseCounter(splitCounter[1],card,NULL);
         if(s.find("nocost") != string::npos)
             nocost = true;
+        //W54: "Whenever YOU put one or more ... counters" - the counter must have been
+        //placed by a spell/ability this card's controller controls (Hapatra & co).
+        bool byController = (s.find("bycontroller") != string::npos);
         TargetChooser * tc = parseSimpleTC(s, "from", card);
         TargetChooser *exception = parseSimpleTC(s, "except", card); // Added a new keyword except to specify a counter add/remove exception in order to avoid counter loop.
         if(exception)
-            return NEW TrTotalCounter(observer, id, card, counter, tc, 1, once, duplicate, half, plus, nocost, limitOnceATurn, exception);
+            return NEW TrTotalCounter(observer, id, card, counter, tc, 1, once, duplicate, half, plus, nocost, limitOnceATurn, exception, byController);
         else
-            return NEW TrTotalCounter(observer, id, card, counter, tc, 1, once, duplicate, half, plus, nocost, limitOnceATurn);
+            return NEW TrTotalCounter(observer, id, card, counter, tc, 1, once, duplicate, half, plus, nocost, limitOnceATurn, NULL, byController);
     }
 
     if (s.find("totalcounterremoved(") != string::npos)
@@ -1913,12 +1916,15 @@ TriggeredAbility * AbilityFactory::parseTrigger(string s, string, int id, Spell 
             counter = parseCounter(splitCounter[1],card,NULL);
         if(s.find("nocost") != string::npos)
             nocost = true;
+        //W54: "Whenever YOU put one or more ... counters" - the counter must have been
+        //placed by a spell/ability this card's controller controls (Hapatra & co).
+        bool byController = (s.find("bycontroller") != string::npos);
         TargetChooser * tc = parseSimpleTC(s, "from", card);
         TargetChooser *exception = parseSimpleTC(s, "except", card); // Added a new keyword except to specify a counter add/remove exception in order to avoid counter loop.
         if(exception)
-            return NEW TrTotalCounter(observer, id, card, counter, tc, 0, once, duplicate, half, plus, nocost, limitOnceATurn, exception);
+            return NEW TrTotalCounter(observer, id, card, counter, tc, 0, once, duplicate, half, plus, nocost, limitOnceATurn, exception, byController);
         else
-            return NEW TrTotalCounter(observer, id, card, counter, tc, 0, once, duplicate, half, plus, nocost, limitOnceATurn);
+            return NEW TrTotalCounter(observer, id, card, counter, tc, 0, once, duplicate, half, plus, nocost, limitOnceATurn, NULL, byController);
     }
 
     if (s.find("counteradded(") != string::npos)
@@ -1930,12 +1936,13 @@ TriggeredAbility * AbilityFactory::parseTrigger(string s, string, int id, Spell 
             duplicate = true;
         if(s.find("(any)") == string::npos)
             counter = parseCounter(splitCounter[1],card,NULL);
+        bool byController = (s.find("bycontroller") != string::npos); //W54: see totalcounteradded
         TargetChooser * tc = parseSimpleTC(s, "from", card);
         TargetChooser *exception = parseSimpleTC(s, "except", card); // Added a new keyword except to specify a counter add/remove exception in order to avoid counter loop.
         if(exception)
-            return NEW TrCounter(observer, id, card, counter, tc, 1, once, duplicate, limitOnceATurn, exception);
+            return NEW TrCounter(observer, id, card, counter, tc, 1, once, duplicate, limitOnceATurn, exception, byController);
         else
-            return NEW TrCounter(observer, id, card, counter, tc, 1, once, duplicate, limitOnceATurn);
+            return NEW TrCounter(observer, id, card, counter, tc, 1, once, duplicate, limitOnceATurn, NULL, byController);
     }
 
     if (s.find("counterremoved(") != string::npos)
@@ -1947,12 +1954,13 @@ TriggeredAbility * AbilityFactory::parseTrigger(string s, string, int id, Spell 
             duplicate = true;
         if(s.find("(any)") == string::npos)
             counter = parseCounter(splitCounter[1],card,NULL);
+        bool byController = (s.find("bycontroller") != string::npos); //W54: see totalcounteradded
         TargetChooser * tc = parseSimpleTC(s, "from", card);
         TargetChooser *exception = parseSimpleTC(s, "except", card); // Added a new keyword except to specify a counter add/remove exception in order to avoid counter loop.
         if(exception)
-            return NEW TrCounter(observer, id, card, counter, tc, 0, once, duplicate, limitOnceATurn, exception);
+            return NEW TrCounter(observer, id, card, counter, tc, 0, once, duplicate, limitOnceATurn, exception, byController);
         else
-            return NEW TrCounter(observer, id, card, counter, tc, 0, once, duplicate, limitOnceATurn);
+            return NEW TrCounter(observer, id, card, counter, tc, 0, once, duplicate, limitOnceATurn, NULL, byController);
     }
 
     if (s.find("countermod(") != string::npos)

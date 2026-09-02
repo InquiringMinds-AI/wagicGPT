@@ -1,0 +1,33 @@
+#POSITIVE control for wildwood_scourge_hydra_exempt.
+#Wildwood Scourge - "Whenever one or more +1/+1 counters are put on another
+#NON-HYDRA creature you control, put a +1/+1 counter on this creature."
+#(Oracle verified against Scryfall 2026-09-01.)
+#Grizzly Bears is not a Hydra, so the trigger DOES fire: the Scourge, cast for
+#X=2, becomes a 3/3 and survives Shock's 2 damage.
+#(`choice 0` answers the may-menu the pre-fix script raised; the fixed script
+#is mandatory per Oracle and raises no menu, so the line is an inert no-op.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Wildwood Scourge,Battlegrowth,Shock
+inplay:Grizzly Bears
+manapool:{2}{G}{G}{R}
+library:Forest,Forest
+[PLAYER2]
+[DO]
+Wildwood Scourge
+choice 2
+Battlegrowth
+Grizzly Bears
+choice 0
+Shock
+Wildwood Scourge
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Wildwood Scourge
+graveyard:Battlegrowth,Shock
+hand:
+library:Forest,Forest
+[PLAYER2]
+[END]

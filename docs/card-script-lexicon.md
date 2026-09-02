@@ -685,6 +685,8 @@ Color/name: bare color words `white/blue/black/red/green/artifact` (`:1238–124
 
 Fallthrough: unmatched tokens are tried as basic-ability names (`:1359–1369`), then as subtypes (`:1372–1383`).
 
+⚠ **Ability/creature-type name collisions.** That fallthrough order means a creature TYPE whose name is also a basic ability is read as the ABILITY and never as the type. `hydra` is exactly that (`Constants::HYDRA`, `MTGDefinitions.cpp:126`), so `creature[-hydra]` silently meant "without the hydra ability", not "not a Hydra" — which is what made Wildwood Scourge trigger off Mossborn Hydra. Prefix the token with **`sub_`** to force the subtype reading and skip every keyword scan: `from(other creature[-sub_hydra]|mybattlefield)` (`TargetChooser.cpp`, in the `[` attribute loop, right after the `-` strip). The separator is `_` deliberately: `:` ends the trigger text in `parseMagicLine` and `=` is this parser's comparison operator.
+
 Examples: `destroy target(creature[-black;-artifact])` (Terror pattern) — `mtg.txt:13585`; `target=creature[-black;-artifact]` — **Expunge**, `mtg.txt:37967`; `destroy target(creature[flying]|opponentbattlefield)` — `mtg.txt:4812`.
 
 ---
@@ -903,7 +905,9 @@ All of these bind a `TargetChooser` via `parseSimpleTC` and listen for a specifi
 | `@totalcounteradded(<counter>) [plus(N)] [duplicate(all)] [half(all)] [nocost]` | `TrTotalCounter` (1665) → `WEventTotalCounters` (72) | mode 1, counts N counters in one event (1848) |
 | `@totalcounterremoved(...)` | `TrTotalCounter` | mode 0 (1882) |
 
-`(any)` matches any counter kind (skips `parseCounter`). `except(...)` is a loop-guard added to break proliferate/counter feedback loops. **Example:** `@counteradded(0/0.1.ExchangeEffect) from(this):...` — `planeswalkers.txt:183`.
+`(any)` matches any counter kind (skips `parseCounter`). `except(...)` is a loop-guard added to break proliferate/counter feedback loops — note it tests the counter's **source** (the card that placed it), NOT the card that received it; the receiving card is what `from(...)` describes. **Example:** `@counteradded(0/0.1.ExchangeEffect) from(this):...` — `planeswalkers.txt:183`.
+
+`bycontroller` (W54, `MTGAbility.cpp` totalcounteradded/removed + counteradded/removed blocks; `TrTotalCounter::byController` / `TrCounter::byController`, AllAbilities.h) restricts the trigger to counters placed by a spell/ability **this card's controller controls** — i.e. Oracle "Whenever **you** put one or more … counters on …" (Hapatra, Vizier of Poisons; All Will Be One; Generous Patron; Stocking the Pantry). Without it the trigger fires on ANY player's counter placement. An engine path that raises the event with no causing card (`e->source == NULL`: evolve, wither, persist…) is unattributable and does not fire. Cards worded passively ("whenever one or more counters **are put** on a creature you control" — Shalai and Hallar, Enduring Scalelord, Animation Module, Cloaked Cadet, Moss-Pit Skeleton) must NOT carry it.
 
 ### Targeting
 `@targeted($tc) [from($tc)] [turnlimited]` → `TrTargeted` (AllAbilities.h:1578) → `WEventTarget` (WEvent.h:134). Fires when a matching card becomes the target of a spell/ability; `from(...)` restricts what did the targeting (line 1842). **Examples:** `@targeted(this) from(*[instant;sorcery;aura]|myCastingzone):` — `_macros.txt:43` (`_HEROIC_`); `@targeted(this) from(...) turnlimited:` — `_macros.txt:46` (`_VALIANT_`).
@@ -969,7 +973,8 @@ Appended anywhere in the trigger text (space-separated). **Not every trigger hon
 | `opponentpoisoned` | `opponentPoisoned` | Combat/damage triggers fire only if opponent is poisoned. |
 | `foelost(N)` | `lifelost` + `lifeamount=N` | Phase trigger fires only if opponent lost ≥ N life this turn. |
 | `dontremove` | `neverRemove` | `movedto` trigger sets `forcedAlive=1; forceDestroy=-1` (never garbage-collected). |
-| `except($tc)` | — | Loop-guard target exclusion on counter / life / proliferate triggers. |
+| `except($tc)` | — | Loop-guard exclusion on counter / life / proliferate triggers. Tests the event's **source** card, not the affected one. |
+| `bycontroller` | `byController` | Counter triggers only: the counter must have been placed by a source **this card's controller controls** (Oracle "whenever **you** put … counters"). |
 
 **Note on precedence:** wiki (`CardCode.md:705`) documents the flag as `sourcenottap`; the parser matches the substring `"sourcenottap"`, so both `sourcenottap` and the real-card spelling `sourcenottapped` work (the latter is what primitives use — `mtg.txt:11810`).
 

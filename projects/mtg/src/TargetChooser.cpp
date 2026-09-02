@@ -597,6 +597,22 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
                     nbminuses++;
                     attribute = attribute.substr(1);
                 }
+                //W54: a creature TYPE can collide with a basic-ability name -
+                //Constants::MTGBasicAbilities holds "hydra" (MTGDefinitions.cpp:126) -
+                //and the ability scan below wins, so `creature[-hydra]` silently meant
+                //"without the hydra ABILITY", never "not a Hydra". The `sub_` prefix
+                //forces the subtype reading and skips every keyword scan.
+                //(':' cannot be the separator - parseMagicLine ends the trigger text at
+                //the first ':' - and '=' is this parser's comparison operator.)
+                if (attribute.compare(0, 4, "sub_") == 0)
+                {
+                    attribute = attribute.substr(4);
+                    if (minus)
+                        cd->setNegativeSubtype(attribute);
+                    else
+                        cd->setSubtype(attribute);
+                    continue;
+                }
                 int comparisonMode = COMPARISON_NONE;
                 int comparisonCriterion = 0;
                 string comparisonExpression = "";

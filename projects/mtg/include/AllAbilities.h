@@ -1660,8 +1660,9 @@ public:
     bool limitOnceATurn;
     int triggeredTurn;
     TargetChooser * counterException; //added exception to avid a counter loop (eg. Doubling Season)
-    TrCounter(GameObserver* observer, int id, MTGCardInstance * source, Counter * counter, TargetChooser * tc, int type = 0, bool once = false, bool duplicate = false, bool limitOnceATurn = false, TargetChooser * counterException = NULL) :
-    Trigger(observer, id, source, once, tc), counter(counter), type(type), duplicate(duplicate), limitOnceATurn(limitOnceATurn), counterException(counterException)
+    bool byController; //see TrTotalCounter::byController
+    TrCounter(GameObserver* observer, int id, MTGCardInstance * source, Counter * counter, TargetChooser * tc, int type = 0, bool once = false, bool duplicate = false, bool limitOnceATurn = false, TargetChooser * counterException = NULL, bool byController = false) :
+    Trigger(observer, id, source, once, tc), counter(counter), type(type), duplicate(duplicate), limitOnceATurn(limitOnceATurn), counterException(counterException), byController(byController)
     {
         triggeredTurn = -1;
     }
@@ -1674,6 +1675,7 @@ public:
             return 0;
         if (type == 0 && !e->removed) return 0;
         if (type == 1 && !e->added) return 0;
+        if (byController && (!e->source || !this->source || e->source->controller() != this->source->controller())) return 0; //W54: "whenever YOU put" - see TrTotalCounter
         if (counterException && counterException->canTarget(e->source)) return 0; //If the source of counter gain/loss belongs to exception it doesn't have effect (loop avoidance);   
         if (counter && !(e->power == counter->power && e->toughness == counter->toughness && e->name == counter->name)) return 0;
         if (tc && !tc->canTarget(e->targetCard)) return 0;
@@ -1713,8 +1715,9 @@ public:
     bool limitOnceATurn;
     int triggeredTurn;
     TargetChooser * counterException; //added exception to avid a counter loop.
-    TrTotalCounter(GameObserver* observer, int id, MTGCardInstance * source, Counter * counter, TargetChooser * tc, int type = 0, bool once = false, bool duplicate = false, bool half = false, int plus = 0, bool nocost = false, bool limitOnceATurn = false, TargetChooser * counterException = NULL) :
-    Trigger(observer, id, source, once, tc), counter(counter), type(type), duplicate(duplicate), half(half), plus(plus), nocost(nocost), limitOnceATurn(limitOnceATurn), counterException(counterException)
+    bool byController; //"Whenever YOU put ...": only counters placed by a source this card's controller controls
+    TrTotalCounter(GameObserver* observer, int id, MTGCardInstance * source, Counter * counter, TargetChooser * tc, int type = 0, bool once = false, bool duplicate = false, bool half = false, int plus = 0, bool nocost = false, bool limitOnceATurn = false, TargetChooser * counterException = NULL, bool byController = false) :
+    Trigger(observer, id, source, once, tc), counter(counter), type(type), duplicate(duplicate), half(half), plus(plus), nocost(nocost), limitOnceATurn(limitOnceATurn), counterException(counterException), byController(byController)
     {
         triggeredTurn = -1;
     }
@@ -1728,6 +1731,14 @@ public:
         if (type == 0 && !e->removed) return 0;
         if (type == 1 && !e->added) return 0;
         if (nocost && e->iscost) return 0;
+        //W54: "Whenever YOU put one or more ... counters on X" (Hapatra, All Will
+        //Be One, Generous Patron, Stocking the Pantry) is scoped to counters placed
+        //by a spell/ability ITS controller controls - the from() TC only describes
+        //the creature that RECEIVED them. Without this, an opponent's own -1/-1
+        //counter handed Hapatra's controller a Snake. An engine path with no causing
+        //card (e->source NULL: evolve, wither, persist...) cannot be attributed to a
+        //player, so it does not fire either.
+        if (byController && (!e->source || !this->source || e->source->controller() != this->source->controller())) return 0;
         if (counterException && counterException->canTarget(e->source)) return 0; //If the source of counter gain/loss belongs to exception it doesn't have effect (loop avoidance);        
         if (counter && !(e->power == counter->power && e->toughness == counter->toughness && e->name == counter->name)) return 0;
         if (tc && !tc->canTarget(e->targetCard)) return 0;

@@ -1,0 +1,30 @@
+#Hapatra, Vizier of Poisons - "Whenever YOU put one or more -1/-1 counters on a
+#creature, create a 1/1 green Snake creature token with deathtouch."
+#(Oracle verified against Scryfall 2026-09-01.)
+#
+#NEGATIVE: the OPPONENT puts the -1/-1 counter (Scarscale Ritual, cast by
+#PLAYER1, putting a -1/-1 counter on PLAYER1's own Grizzly Bears). PLAYER2
+#controls Hapatra and must NOT get a Snake - the counter was not put by
+#Hapatra's controller. Owner Vita report (wave 54 bug 1): a Snake appeared.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:Scarscale Ritual
+inplay:Grizzly Bears
+manapool:{1}{B}
+library:Forest,Forest,Forest
+[PLAYER2]
+inplay:426901
+[DO]
+Scarscale Ritual
+Grizzly Bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+graveyard:Scarscale Ritual
+hand:Forest,Forest
+library:Forest
+[PLAYER2]
+inplay:426901
+[END]

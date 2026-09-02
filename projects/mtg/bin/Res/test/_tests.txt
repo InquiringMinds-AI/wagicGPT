@@ -1282,3 +1282,7 @@ w54_aura_retarget_detainment_spell.txt
 discard_to_play_lord.txt
 discard_to_play_etb.txt
 vita_hurkyl_reveal_end_step_softlock.txt
+hapatra_opponent_counter_no_snake.txt
+hapatra_own_counter_makes_snake.txt
+wildwood_scourge_hydra_exempt.txt
+wildwood_scourge_nonhydra_triggers.txt
