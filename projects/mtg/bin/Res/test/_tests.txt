@@ -1263,3 +1263,6 @@ split_half_instant_timing.txt
 mutual_destruction_conditional_flash.txt
 mutual_destruction_no_flash_permanent.txt
 deck_name_prefers_nontoken_printing.txt
+experiment_one_bloodthirst_evolve.txt
+experiment_one_etb_counters_evolve.txt
+experiment_one_no_evolve_equal_pt.txt

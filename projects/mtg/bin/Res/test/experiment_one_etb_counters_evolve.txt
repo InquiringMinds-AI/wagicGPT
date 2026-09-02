@@ -1,0 +1,35 @@
+#Same defect shape as the bloodthirst report, through the plain
+#"auto=counter(1/1,N)" enters-with-counters rider: Clockwork Beetle is a
+#printed 0/0 that enters with two +1/+1 counters, i.e. as a 2/2.
+#Evolve must see the 2/2, not the 0/0, and put a counter on Experiment One.
+#Life math: 20 - 2 (evolved Experiment One) = 18. 19 = evolve missed.
+#Clockwork Beetle only sheds a counter if IT attacks or blocks; it does neither
+#here (it is summoning sick anyway), so its counters are untouched.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Experiment One
+hand:Clockwork Beetle
+manapool:{1}
+[PLAYER2]
+life:20
+[DO]
+clockwork beetle
+next
+#begin
+next
+#attackers
+experiment one
+next
+#blockers
+next
+#damage
+next
+#end combat
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Experiment One,Clockwork Beetle
+[PLAYER2]
+life:18
+[END]
