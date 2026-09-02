@@ -5879,3 +5879,5 @@ EXACTLY the vpk9 dump (mButtons = one NULL, first Update of the menu -> data abo
 as a SimpleMenu item id), callback maps controlId-1. The NULL guards in JGuiController stay.
 Lesson: a SimpleMenu item id of literal 0 silently becomes a NULL button - grep for `->Add(0,`
 whenever a SimpleMenu is added.
+
+VPK vita-vpk11 from psp-port = c9dc6b75c (the real menu fix): 33,166,613 B -> 10.0.0.227:1337 ux0:/vpk/wagic.vpk, size-verified. Install manual. Supersedes vpk10.
