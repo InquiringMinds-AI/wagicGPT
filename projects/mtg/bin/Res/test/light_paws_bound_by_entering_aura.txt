@@ -1,0 +1,32 @@
+#Light-Paws, Emperor's Voice: "Whenever an Aura you control enters, if you cast it,
+#you may search your library for an Aura card with mana value less than or equal to
+#THAT AURA and with a different name than each Aura you control, put that card onto
+#the battlefield attached to Light-Paws, then shuffle."
+#The bound is the ENTERING AURA's mana value - not the mana value of whatever
+#creature the aura happens to be attached to. Ethereal Armor (MV 1) enchants Aura
+#Gnarlid (MV 3); the search must stay at MV<=1, so Snake Umbra (MV 3) is not a
+#legal choice and stays in the library.
+#(Owner's Vita report: an MV-1 Ethereal Armor fetched MV-3 Snake Umbra.)
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Aura Gnarlid
+hand:Ethereal Armor
+library:Snake Umbra
+manapool:{W}
+[PLAYER2]
+[DO]
+Ethereal Armor
+Aura Gnarlid
+choice 0
+choice 0
+Snake Umbra
+Light-Paws, Emperor's Voice
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Aura Gnarlid,Ethereal Armor
+library:Snake Umbra
+manapool:{0}
+[PLAYER2]
+[END]

@@ -1,0 +1,34 @@
+#Light-Paws, Emperor's Voice - "with a different name than each Aura you control".
+#Ancestral Mask (MV 3) enters first and fetches one Holy Strength (MV 1). A second
+#Holy Strength is still in the library. Then Ethereal Armor (MV 1) is cast: the
+#library's Holy Strength is legal on mana value (1 <= 1) but shares its name with an
+#Aura already on the battlefield, so it must NOT be fetchable and stays in the library.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice
+hand:Ancestral Mask,Ethereal Armor
+library:Holy Strength,Holy Strength
+manapool:{2}{G}{W}
+[PLAYER2]
+[DO]
+Ancestral Mask
+Light-Paws, Emperor's Voice
+choice 0
+choice 0
+Holy Strength
+Light-Paws, Emperor's Voice
+Ethereal Armor
+Light-Paws, Emperor's Voice
+choice 0
+choice 0
+Holy Strength
+Light-Paws, Emperor's Voice
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Ancestral Mask,Holy Strength,Ethereal Armor
+library:Holy Strength
+manapool:{0}
+[PLAYER2]
+[END]

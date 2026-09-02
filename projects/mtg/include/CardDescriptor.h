@@ -50,6 +50,12 @@ class CardDescriptor: public MTGCardInstance
   string dynamicManacostExpression;
   MTGCardInstance * dynamicManacostSource;
   int currentManacostCriterion();
+  //"diffname!<type>!": the candidate's name must differ from the name of EVERY
+  //<type> permanent its controller controls ("with a different name than each
+  //Aura you control" - Light-Paws, Emperor's Voice).
+  string differentNameType;
+  MTGCardInstance * differentNameSource;
+  bool nameDiffersFromControlled(MTGCardInstance * card);
   //Same treatment for toughness ("toughness=toughness:lowest:creature:
   //battlefield", Purging Scythe): board-dependent selectors must be
   //re-evaluated at match time, not frozen at parse.

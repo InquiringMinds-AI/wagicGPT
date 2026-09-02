@@ -648,8 +648,26 @@ TargetChooser * TargetChooserFactory::createTargetChooser(string s, MTGCardInsta
                     }
                 }
 
+                //"diffname!<type>!": the candidate's name must differ from the
+                //name of every <type> permanent the source's controller controls
+                //("with a different name than each Aura you control").
+                //Delimited with '!' like share!/notshare!, NOT parentheses: the
+                //enclosing target(...) is cut at its first ')', so a nested pair
+                //of parens inside [...] truncates the whole target string.
+                //Checked FIRST so the argument can never collide with a later
+                //substring-dispatched attribute keyword.
+                size_t diffNamePos = attribute.find("diffname!");
+                if (diffNamePos != string::npos)
+                {
+                    size_t argEnd = attribute.find("!", diffNamePos + 9);
+                    if (argEnd != string::npos)
+                    {
+                        cd->differentNameType = attribute.substr(diffNamePos + 9, argEnd - diffNamePos - 9);
+                        cd->differentNameSource = card;
+                    }
+                }
                 //Attacker
-                if (attribute.find("attacking") != string::npos)
+                else if (attribute.find("attacking") != string::npos)
                 {
                     if (minus)
                     {

@@ -1262,3 +1262,8 @@ instant_response_window_opponent_upkeep.txt
 split_half_instant_timing.txt
 mutual_destruction_conditional_flash.txt
 mutual_destruction_no_flash_permanent.txt
+light_paws_bound_by_entering_aura.txt
+light_paws_fetch_positive.txt
+light_paws_different_name.txt
+light_paws_bestow_fetch.txt
+light_paws_bestow_mv_bound.txt

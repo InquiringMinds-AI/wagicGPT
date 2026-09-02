@@ -26,6 +26,8 @@ CardDescriptor::CardDescriptor()
     dynamicManacostSource = NULL;
     dynamicToughnessExpression = "";
     dynamicToughnessSource = NULL;
+    differentNameType = "";
+    differentNameSource = NULL;
     numofColorsComparisonMode = COMPARISON_NONE;
     numofColors = -1;
     zposComparisonMode = COMPARISON_NONE;
@@ -165,6 +167,38 @@ int CardDescriptor::currentToughnessCriterion()
         return val.getValue();
     }
     return toughness;
+}
+
+//"diffname!<type>!": true when NO <type> permanent controlled by the descriptor's
+//source card's controller shares this candidate's name. Models MTG's recurring
+//"with a different name than each <X> you control" clause (Light-Paws,
+//Emperor's Voice). An empty <type> means "any permanent you control".
+bool CardDescriptor::nameDiffersFromControlled(MTGCardInstance * card)
+{
+    if (!differentNameType.size() || !differentNameSource || !card)
+        return true;
+    Player * p = differentNameSource->controller();
+    if (!p || !p->game)
+        return true;
+    int typeId = -1;
+    if (differentNameType != "*")
+    {
+        typeId = MTGAllCards::findType(differentNameType, false);
+        if (typeId < 0)
+            return true; //unknown type: do not silently filter everything out
+    }
+    MTGGameZone * zone = p->game->inPlay;
+    for (int i = 0; i < zone->nb_cards; i++)
+    {
+        MTGCardInstance * inplay = zone->cards[i];
+        if (!inplay)
+            continue;
+        if (typeId >= 0 && !inplay->hasSubtype(typeId))
+            continue;
+        if (inplay->getLCName() == card->getLCName())
+            return false;
+    }
+    return true;
 }
 
 bool CardDescriptor::valueInRange(int comparisonMode, int value, int criterion)
@@ -644,6 +678,11 @@ MTGCardInstance * CardDescriptor::match(MTGCardInstance * card)
         {
             // we don't care about the attack/blocker state
         }
+    }
+
+    if (differentNameType.size() && !nameDiffersFromControlled(card))
+    {
+        match = NULL;
     }
 
     //Counters
