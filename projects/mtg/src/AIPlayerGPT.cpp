@@ -1099,17 +1099,72 @@ static string playerBranchLabel(const string& raw)
 //the opponent went 20 -> 25 (deck123 vs162 seq 8; 10 rows, believed twice).
 //Tribute to Hunger (`targetopponent`) and Consuming Vapors (`abilitycontroller`)
 //keep "you gain": their recipient is the caster.
+//#W53-O (D13, wave-52 ledger MED): the LIFE-TO-DAMAGE CONVERTER block sits in
+//the frame and the row it prices sits twenty lines below it. `123v126` seq 66
+//(14 life, opponent 26) printed "they gain 4" beside a printed Sanguine Bond and
+//the consequence - 4 off the pilot - appeared nowhere; 14 -> 10 and 26 -> 30 in
+//one window. The gain amount is already on the row, the converter is already
+//scanned, so the row states the whole trade. Same construction lane K uses for
+//pain-source payments (a life number, then the lethal case named outright).
+//How much a converter of THEIRS takes off the seat when its controller gains
+//`gain` life: `:life:-thatmuch` mirrors the gain, `:life:-N` is that fixed N,
+//anything else is not knowable here (0 - print nothing rather than a guess).
+static int lifeToDamageConverterTake(const string& magicText, int gain)
+{
+    size_t lp = 0;
+    while (lp <= magicText.size())
+    {
+        size_t nl = magicText.find('\n', lp);
+        string line = magicText.substr(lp, nl == string::npos ? string::npos : nl - lp);
+        lp = (nl == string::npos) ? magicText.size() + 1 : nl + 1;
+        size_t s = line.find_first_not_of(" \t");
+        if (s == string::npos || line.compare(s, 8, "@lifeof(") != 0)
+            continue;
+        size_t colon = line.find(":life:-", s);
+        if (colon == string::npos)
+            continue;
+        if (line.find("opponent", colon) == string::npos)
+            continue;
+        size_t start = colon + 7;
+        size_t end = line.find_first_of(" \t\r", start);
+        string amount = line.substr(start, end == string::npos ? string::npos : end - start);
+        if (amount == "thatmuch")
+            return gain > 0 ? gain : 0;
+        bool digits = !amount.empty();
+        for (size_t i = 0; i < amount.size(); i++)
+            if (!isdigit((unsigned char) amount[i]))
+                digits = false;
+        return digits ? atoi(amount.c_str()) : 0;
+    }
+    return 0;
+}
+//The clause itself. Pure over (name, amount, life), so PARSETEST proves it.
+static string lifeLoopDrainClause(const string& converterName, int takes, int life)
+{
+    if (converterName.empty() || takes <= 0 || life < 0)
+        return "";
+    std::ostringstream o;
+    o << " - and their " << converterName << " takes " << takes << " off YOU: life "
+      << life << " -> " << (life - takes);
+    if (life - takes <= 0)
+        o << "; this KILLS you";
+    return o.str();
+}
 static string edictClause(int theirCreatures, const string& onlyName, int onlyToughness, bool gainsToughness,
-                          bool targetGains = false)
+                          bool targetGains = false, const string& onlyFacts = "",
+                          const string& converterName = "", int converterTakes = 0, int myLife = -1)
 {
     std::ostringstream o;
     if (theirCreatures <= 0)
         return "they control 0 creatures - at 0 this does nothing";
     if (theirCreatures == 1)
     {
-        o << "they control 1 creature - " << onlyName << " is sacrificed";
+        //#W53-O (D13, companion): at N=1 the victim is DETERMINED, so the row
+        //names it with the facts every other target surface prints.
+        o << "they control 1 creature - " << onlyName << onlyFacts << " is sacrificed";
         if (gainsToughness && targetGains)
-            o << ", they gain " << onlyToughness << " - the sacrificing player gains, not you";
+            o << ", they gain " << onlyToughness << " - the sacrificing player gains, not you"
+              << lifeLoopDrainClause(converterName, converterTakes, myLife);
         else if (gainsToughness)
             o << ", you gain " << onlyToughness;
         return o.str();
@@ -1154,6 +1209,7 @@ static string highestMvEdictClause(const vector<std::pair<string, int> >& theirs
 }
 
 string instanceHandle(MTGCardInstance * card); //defined below (#N-166a)
+string keywordList(MTGCardInstance * card); //defined below - #W53-O (D13) victim facts
 //The live board behind the clause: the opponent's creatures and planeswalkers
 //with their mana values, handles included so tied copies stay distinct.
 static bool highestMvEdictBoard(MTGCardInstance * card, vector<std::pair<string, int> >& out)
@@ -1279,9 +1335,43 @@ static string boardTurnOnClause(MTGCardInstance * card, const string& lowText)
     if (!boardCreatureCounts(card, theirs, theirsAttack, mine, &only, &live))
         return "";
     if (edict)
+    {
+        bool targetGains = lowText.find("toughnesslifegain targetcontroller") != string::npos;
+        //#W53-O (D13): the determined victim's own facts, and - when the gain
+        //goes to THEM - what their life-to-damage converter turns it into.
+        string facts, convName;
+        int convTakes = 0, myLife = -1;
+        if (only)
+        {
+            std::ostringstream f;
+            f << " (" << only->getPower() << "/" << only->toughness << ")";
+            string kw = keywordList(only);
+            if (!kw.empty())
+                f << " [" << kw << "]";
+            facts = f.str();
+        }
+        if (targetGains && only && card && card->controller() && card->controller()->opponent())
+        {
+            Player * them = card->controller()->opponent();
+            myLife = card->controller()->life;
+            MTGGameZone * tbf = them->game ? them->game->inPlay : NULL;
+            for (int ci = 0; tbf && ci < tbf->nb_cards && !convTakes; ci++)
+            {
+                MTGCardInstance * cc = tbf->cards[ci];
+                if (!cc)
+                    continue;
+                int t = lifeToDamageConverterTake(cc->magicText, only->toughness);
+                if (t > 0)
+                {
+                    convName = cc->name + instanceHandle(cc);
+                    convTakes = t;
+                }
+            }
+        }
         return edictClause(theirs, only ? only->getDisplayName() : "", only ? only->toughness : 0,
                            lowText.find("toughnesslifegain") != string::npos,
-                           lowText.find("toughnesslifegain targetcontroller") != string::npos);
+                           targetGains, facts, convName, convTakes, myLife);
+    }
     if (sweepVerb)
         return sweeperClause(sweepVerb, theirs, theirsAttack, mine, live);
     return attackPunisherClause(theirsAttack);
@@ -3105,18 +3195,87 @@ static string animatedThisTurnNote(MTGCardInstance * c)
 {
     return ManaEngine::isAnimatedLand(c) ? " (animated this turn)" : "";
 }
-static string paymentTapsClause(const std::vector<std::string>& names, bool cannotAttackThisTurn)
+//#W53-O (D6, wave-52 ledger MED): "it cannot attack this turn" prices the tap
+//of a DEFENDER at zero - a wall was never going to attack - and hides the only
+//cost that exists: tapped, it cannot BLOCK on the opponent's turn. deck126 vs130
+//seq 13 tapped Overgrown Battlement (abilities=defender, mtg.txt:83596) to pay
+//for its own cast with Rorix Bladewing 6/5 flying across the table and went
+//14 -> 8 on the next combat; deck126 vs125 seq 86 is the same shape. 101
+//`{paying this taps:` rows corpus-wide, 91 naming a defender.
+//The restriction is per SOURCE, never per row: a row that taps several sources
+//with different restrictions names each with its own consequence, in the
+//restriction-first register (no affirmative substring to latch onto). Pure, so
+//every branch is provable in PARSETEST.
+enum PaymentTapRestriction
+{
+    TAP_RESTRICT_NONE = 0,
+    TAP_RESTRICT_NO_ATTACK = 1,
+    TAP_RESTRICT_NO_BLOCK = 2
+};
+static const char * paymentTapRestrictionWords(int r, bool plural)
+{
+    if (r == TAP_RESTRICT_NO_ATTACK)
+        return plural ? "they cannot attack this turn" : "it cannot attack this turn";
+    if (r == TAP_RESTRICT_NO_BLOCK)
+        return plural ? "they cannot block on their turn" : "it cannot block on their turn";
+    return "";
+}
+static string paymentTapsClause(const std::vector<std::string>& names,
+                                const std::vector<int>& restrictions)
 {
     if (names.empty())
         return "";
+    int first = restrictions.empty() ? (int) TAP_RESTRICT_NONE : restrictions[0];
+    bool uniform = true;
+    for (size_t i = 0; i < names.size(); i++)
+    {
+        int r = i < restrictions.size() ? restrictions[i] : (int) TAP_RESTRICT_NONE;
+        if (r != first)
+            uniform = false;
+    }
     std::ostringstream o;
     o << " {paying this taps: ";
-    for (size_t i = 0; i < names.size(); i++)
-        o << (i ? ", " : "") << names[i];
-    if (cannotAttackThisTurn)
-        o << " - " << (names.size() == 1 ? "it" : "they") << " cannot attack this turn";
+    if (uniform)
+    {
+        for (size_t i = 0; i < names.size(); i++)
+            o << (i ? ", " : "") << names[i];
+        if (first != TAP_RESTRICT_NONE)
+            o << " - " << paymentTapRestrictionWords(first, names.size() != 1);
+    }
+    else
+    {
+        for (size_t i = 0; i < names.size(); i++)
+        {
+            int r = i < restrictions.size() ? restrictions[i] : (int) TAP_RESTRICT_NONE;
+            o << (i ? "; " : "") << names[i];
+            if (r != TAP_RESTRICT_NONE)
+                o << " - " << paymentTapRestrictionWords(r, false);
+        }
+    }
     o << "}";
     return o.str();
+}
+//The wave-49 row-wide shape, kept for the callers (and the pins) that price one
+//restriction for every source on the row.
+static string paymentTapsClause(const std::vector<std::string>& names, bool cannotAttackThisTurn)
+{
+    return paymentTapsClause(names,
+                             std::vector<int>(names.size(),
+                                              cannotAttackThisTurn ? (int) TAP_RESTRICT_NO_ATTACK
+                                                                   : (int) TAP_RESTRICT_NONE));
+}
+//The restriction ONE tapped source actually carries. A non-creature source
+//loses nothing by tapping; a defender loses the block (and never had the
+//attack); anything else loses the attack, and only while the attack is still
+//ahead of it. `blockStillMatters` is false once the opponent's blockers are
+//already declared - the tap costs nothing that is still in front of the board.
+static int paymentTapRestrictionOf(MTGCardInstance * ps, bool beforeAttack, bool blockStillMatters)
+{
+    if (!ps || !ps->isCreature())
+        return TAP_RESTRICT_NONE;
+    if (ps->basicAbilities[Constants::DEFENDER])
+        return blockStillMatters ? TAP_RESTRICT_NO_BLOCK : TAP_RESTRICT_NONE;
+    return beforeAttack ? TAP_RESTRICT_NO_ATTACK : TAP_RESTRICT_NONE;
 }
 
 //#W52-K D7 (wave-51 seat-123-130 H3, deck130 vs126 seq 85, the LAST life
@@ -5901,11 +6060,24 @@ string perTargetLifeCostNote(Targetable * t)
 //a -1/-1 pump ability). Toughness 0 or less is a state-based death that
 //indestructible does not stop; `remaining` is toughness minus damage marked, so
 //a damaged body dies to a smaller shrink.
+//#W53-O (D5): the kill test each verdict below prints, exposed so the CAST row
+//can summarise the same answers WITHOUT re-deriving them - the cast preview and
+//the target ask cannot disagree if they call the same predicate.
+bool ptDropKillsTarget(int n, int remaining)
+{
+    return n >= remaining;
+}
+bool damageKillsTarget(int dmg, int remaining, bool indestructible, bool deathtouch)
+{
+    if (indestructible)
+        return false;
+    return deathtouch || dmg >= remaining;
+}
 string ptDropTargetVerdict(int n, int toughness, int remaining)
 {
     std::ostringstream o;
     o << " {right now: -" << n << "/-" << n << " - ";
-    if (n >= remaining)
+    if (ptDropKillsTarget(n, remaining))
         o << "DIES}";
     else
     {
@@ -5966,7 +6138,7 @@ string damageTargetVerdict(int dmg, int toughness, int remaining, bool indestruc
     o << " {right now: takes " << dmg << " damage - ";
     if (indestructible)
         o << "INDESTRUCTIBLE, survives}";
-    else if (deathtouch || dmg >= remaining)
+    else if (damageKillsTarget(dmg, remaining, indestructible, deathtouch))
         o << "DIES" << (deathtouch && dmg < remaining ? " (deathtouch)" : "") << "}";
     else
     {
@@ -6794,8 +6966,15 @@ static void castTriggerDrawScan(Player * opp, std::vector<std::string>& names, i
 
 //The CAST-row tag for it. Says WHO draws (the caster - the reading that was
 //inverted) and, when draw punishers stand, what those draws cost. Pure.
+//#W53-O (D3, wave-52 ledger HIGH): the tag stated a damage total and stopped
+//there. deck125 vs162 turns 18-20 carried 41 rows across 22 windows reading
+//"deals you 7" at 7 life or less; seq 97 (3 life) took row 1 and the seat was
+//dead two records later. Lane K's mana-cost path already prints the same
+//arithmetic's consequence ("- you would be at K - this KILLS you") - so the
+//draw-price total gets the same tail, with the seat's life as the only new
+//input. life < 0 means "not supplied" and prints nothing.
 static string castDrawPriceRowTag(int perCast, const string& castNames,
-                                  int perDraw, const string& punishers)
+                                  int perDraw, const string& punishers, int life = -1)
 {
     if (perCast <= 0 || castNames.empty())
         return "";
@@ -6803,8 +6982,17 @@ static string castDrawPriceRowTag(int perCast, const string& castNames,
     o << " [DRAW PRICE: casting this draws YOU " << perCast << " card" << (perCast == 1 ? "" : "s")
       << " (their " << castNames << ")";
     if (perDraw > 0 && !punishers.empty())
+    {
+        int dealt = perCast * perDraw;
         o << ", and their " << punishers << (punishers.find(", ") == string::npos ? " deals" : " deal")
-          << " you " << (perCast * perDraw);
+          << " you " << dealt;
+        if (life >= 0)
+        {
+            o << " - you would be at " << (life - dealt);
+            if (life - dealt <= 0)
+                o << "; this KILLS you";
+        }
+    }
     o << "]";
     return o.str();
 }
@@ -11994,7 +12182,12 @@ static string stripNarrationDecoration(const string& in)
                 || (in.compare(i, 23, "{paying this costs you ") == 0)
                 || (in.compare(i, 20, "{castable from exile") == 0)
                 //#W52-L D16: the fetch pricing is decision-time too.
-                || (in.compare(i, 24, "{this land makes no mana") == 0);
+                || (in.compare(i, 24, "{this land makes no mana") == 0)
+                //#W53-O D5: the cast row's kill summary is decision-time
+                //pricing - true of the board while the window is open, false
+                //the moment the spell resolves.
+                || (in.compare(i, 8, "{kills: ") == 0)
+                || (in.compare(i, 7, "{kills ") == 0);
         else if (openCh == '[')
             //W35: EVERY bracket, not only [cost: ...]. The ETB pay-or-tap menu
             //appends "[this permanent then enters the battlefield UNTAPPED -
@@ -12819,6 +13012,80 @@ string damagePlaneswalkerVerdict(int dmg, int loyalty)
 static AADamager * unwrapDamagerAbility(MTGAbility * a, int depth);
 static string toLowerCopy(const string & s);
 
+//#W53-O (D5, wave-52 ledger HIGH): a targeted spell's CAST row - the REFUSABLE
+//window - carried less information than the forced target ask that follows it.
+//`123v146` seq 18 (turn 10, 6 life) offered "Cast Tragic Slip {b} {right now:
+//-1/-1 ...} - legal targets right now: Nadaar, Selfless Paladin, Triumphant
+//Adventurer, Goblin", was taken, and seq 19's target ask then printed
+//"SURVIVES" on all three rows above the sentence "this ask has no pass row".
+//Corpus-wide: 85 `Cast Tragic Slip` rows with no verdict, 9 target rows with
+//one. So the cast row carries the SUMMARY of the verdicts the target rows
+//compute: which of the legal targets this magnitude actually kills, or the
+//count that survive it. Pure over (killed names, target count, magnitude).
+static string castKillSummaryTag(const std::vector<std::string>& killed, int creatureTargets,
+                                 const string& magnitude)
+{
+    if (creatureTargets <= 0 || magnitude.empty())
+        return "";
+    std::ostringstream o;
+    if (killed.empty())
+        o << " {kills 0 of the " << creatureTargets << " legal target"
+          << (creatureTargets == 1 ? "" : "s") << " at " << magnitude << "}";
+    else
+    {
+        o << " {kills: ";
+        for (size_t i = 0; i < killed.size(); i++)
+            o << (i ? ", " : "") << killed[i];
+        o << "}";
+    }
+    return o.str();
+}
+//The SPELL halves of the target ask's magnitude derivation, lifted so the cast
+//row reads the same numbers off the same scripts (the ask's other halves read a
+//waiting ability, which does not exist yet at cast time). Scoping is unchanged
+//from the ask: exactly ONE `damage:` rider and no inline target(...); x and rand
+//are never evaluated; a non-creature source's own power/toughness is not read.
+static int spellSingleDamageAmount(MTGCardInstance * src, bool& deathtouch)
+{
+    deathtouch = false;
+    if (!src || !(src->hasType(Subtypes::TYPE_INSTANT) || src->hasType(Subtypes::TYPE_SORCERY)))
+        return 0;
+    string mt = toLowerCopy(src->magicText);
+    size_t dp = mt.find("damage:");
+    if (dp == string::npos || mt.find("damage:", dp + 7) != string::npos
+        || mt.find("target(") != string::npos)
+        return 0;
+    size_t start = dp + 7;
+    size_t end = mt.find_first_of(" \t\r\n", start);
+    string expr = mt.substr(start, end == string::npos ? string::npos : end - start);
+    if (expr.empty() || expr == "x" || expr == "-x" || expr.find("rand") != string::npos)
+        return 0;
+    if ((expr.find("power") != string::npos || expr.find("toughness") != string::npos)
+        && !src->isCreature())
+        return 0;
+    WParsedInt val(expr, NULL, src);
+    deathtouch = src->has(Constants::DEATHTOUCH);
+    return abs(val.getValue());
+}
+static int spellPTDropAmount(GameObserver * observer, MTGCardInstance * src)
+{
+    if (!src || !(src->hasType(Subtypes::TYPE_INSTANT) || src->hasType(Subtypes::TYPE_SORCERY)))
+        return 0;
+    string low = toLowerCopy(src->magicText);
+    string ifM, ifN;
+    if (morbidPTBranches(low, ifM, ifN))
+    {
+        bool morbidLive = false;
+        if (src->controller() && observer)
+        {
+            AbilityFactory af(observer);
+            morbidLive = af.parseCastRestrictions(src, src->controller(), "morbid") != 0;
+        }
+        return plainPTDrop(morbidLive ? ifM : ifN);
+    }
+    return scriptPTDrop(low);
+}
+
 //#W51-E D7 (wave-50 E-4, 11/11 Hive animations taken in UPKEEP, 0 in a main
 //phase): the Upkeep row is NOT deferred (that removes a legal window - the
 //owner rejected the defer form); it is ANNOTATED with the two facts the pilot
@@ -13334,7 +13601,9 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 this, src, c, src->has(Constants::ANYTYPEOFMANAABILITY), false);
             std::set<MTGCardInstance *> seen;
             std::vector<std::string> taps;
-            bool anyCreature = false;
+            std::vector<int> tapRestrict; //#W53-O (D6): per source, not per row
+            bool blockStillMatters = observer->currentPlayer == this
+                || observer->getCurrentGamePhase() < MTG_PHASE_COMBATBLOCKERS;
             for (size_t pi = 0; pi < picks.size(); pi++)
             {
                 MTGCardInstance * ps = picks[pi] ? picks[pi]->source : NULL;
@@ -13344,10 +13613,10 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
                 {
                     taps.push_back(ps->getDisplayName() + (ps == src ? " (this card itself)" : "")
                                    + animatedThisTurnNote(ps));
-                    anyCreature = anyCreature || ps->isCreature();
+                    tapRestrict.push_back(paymentTapRestrictionOf(ps, beforeAttack, blockStillMatters));
                 }
             }
-            out << paymentTapsClause(taps, anyCreature && beforeAttack);
+            out << paymentTapsClause(taps, tapRestrict);
         }
         if (src && src->isCreature() && src->canAttack() && beforeAttack && c->extraCosts)
         {
@@ -16897,6 +17166,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                 payCost = NULL; //hasX() alone answers 0 for a {X:colour} cost
             int used = 0;
             std::vector<std::string> creatureTaps; //#W49-D11
+            std::vector<int> creatureTapDefender; //#W53-O (D6)
             std::vector<std::string> painNames; //#W52-K D7
             std::vector<int> painDamage;
             if (payCost)
@@ -16910,8 +17180,12 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                         if (tapped.insert(picks[pi]->source).second)
                         {
                             if (picks[pi]->source->isCreature())
+                            {
                                 creatureTaps.push_back(picks[pi]->source->getDisplayName()
                                                        + animatedThisTurnNote(picks[pi]->source));
+                                creatureTapDefender.push_back(
+                                    picks[pi]->source->basicAbilities[Constants::DEFENDER] ? 1 : 0);
+                            }
                             int selfDmg = ManaEngine::producerSelfDamageOf(picks[pi]);
                             if (selfDmg > 0)
                             {
@@ -16964,7 +17238,18 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
             {
                 bool beforeAttack = observer->currentPlayer == this
                     && observer->getCurrentGamePhase() < MTG_PHASE_COMBATATTACKERS;
-                o << paymentTapsClause(creatureTaps, beforeAttack);
+                //#W53-O (D6): a defender's tap costs the BLOCK, not the attack.
+                bool blockStillMatters = observer->currentPlayer == this
+                    || observer->getCurrentGamePhase() < MTG_PHASE_COMBATBLOCKERS;
+                std::vector<int> tapRestrict;
+                for (size_t ri = 0; ri < creatureTaps.size(); ri++)
+                {
+                    bool def = ri < creatureTapDefender.size() && creatureTapDefender[ri];
+                    tapRestrict.push_back(def
+                        ? (blockStillMatters ? (int) TAP_RESTRICT_NO_BLOCK : (int) TAP_RESTRICT_NONE)
+                        : (beforeAttack ? (int) TAP_RESTRICT_NO_ATTACK : (int) TAP_RESTRICT_NONE));
+                }
+                o << paymentTapsClause(creatureTaps, tapRestrict);
             }
             //#W52-K D7: the life this payment plan spends, and where it leaves you.
             o << paymentLifeCostClause(painNames, painDamage, life);
@@ -17065,6 +17350,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     //text note, joined by joinTargetEntries (ranged collapse).
                     std::vector<string> tgtNames, tgtHandles, tgtTails;
                     std::map<string, string> tgtNotes;
+                    std::vector<MTGCardInstance *> tgtCards; //#W53-O (D5)
                     Player * ordered[2] = { this->opponent(), this };
                     for (int oi = 0; oi < 2; oi++)
                     {
@@ -17095,6 +17381,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                                         tgtNames.push_back(tgt->getDisplayName());
                                         tgtHandles.push_back(instanceHandle(tgt));
                                         tgtTails.push_back(tail);
+                                        tgtCards.push_back(tgt); //#W53-O (D5)
                                         //#W44-3: what the target DOES, quoted
                                         //once per distinct card (see above).
                                         if (tgtNotes.find(tgt->getDisplayName()) == tgtNotes.end())
@@ -17107,9 +17394,45 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                             tgtNames.push_back(pp == this ? "you" : "the opponent");
                             tgtHandles.push_back("");
                             tgtTails.push_back("");
+                            tgtCards.push_back(NULL); //#W53-O (D5): a player target
                         }
                     }
                     tNames << joinTargetEntries(tgtNames, tgtHandles, tgtTails, tgtNotes);
+                    //#W53-O (D5): what this magnitude does to the set just
+                    //enumerated - the same predicate the target ask's verdicts
+                    //print, summarised on the refusable window.
+                    {
+                        bool castDeathtouch = false;
+                        int castDmg = spellSingleDamageAmount(card, castDeathtouch);
+                        int castDrop = castDmg ? 0 : spellPTDropAmount(observer, card);
+                        if (castDmg > 0 || castDrop > 0)
+                        {
+                            std::vector<std::string> killed;
+                            int creatureTargets = 0;
+                            for (size_t ki = 0; ki < tgtCards.size(); ki++)
+                            {
+                                MTGCardInstance * kc = tgtCards[ki];
+                                if (!kc || !kc->isCreature() || !kc->controller()
+                                    || !kc->controller()->game
+                                    || kc->currentZone != kc->controller()->game->inPlay)
+                                    continue;
+                                creatureTargets++;
+                                bool dies = castDmg > 0
+                                    ? damageKillsTarget(castDmg, kc->life,
+                                                        kc->basicAbilities[Constants::INDESTRUCTIBLE] != 0,
+                                                        castDeathtouch)
+                                    : ptDropKillsTarget(castDrop, kc->life);
+                                if (dies)
+                                    killed.push_back(kc->getDisplayName() + instanceHandle(kc));
+                            }
+                            std::ostringstream mag;
+                            if (castDmg > 0)
+                                mag << castDmg << " damage";
+                            else
+                                mag << "-" << castDrop << "/-" << castDrop;
+                            o << castKillSummaryTag(killed, creatureTargets, mag.str());
+                        }
+                    }
                     if (ownT && !oppT && firstHit)
                     {
                         //W42-D5 (trust doctrine): this branch used to name
@@ -17279,7 +17602,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
                     cn << (ni ? ", " : "") << castNames[ni];
                 for (size_t ni = 0; ni < theirsP.size(); ni++)
                     pn << (ni ? ", " : "") << theirsP[ni];
-                o << castDrawPriceRowTag(perCast, cn.str(), theirsPer, pn.str());
+                o << castDrawPriceRowTag(perCast, cn.str(), theirsPer, pn.str(), life);
             }
         }
         //#W51-F D11: and what casting it FEEDS the opponent, with the count of
@@ -19057,24 +19380,10 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
         int dp = 0, dt = 0; bool ueot = false; MTGCardInstance * mt = NULL;
         if (waiting && ptPumpModifierDelta(waiting, dp, dt, ueot, mt) && dt < 0 && dp == dt)
             ptDrop = -dt;
-        else if (!waiting && tc->source
-                 && (tc->source->hasType(Subtypes::TYPE_INSTANT) || tc->source->hasType(Subtypes::TYPE_SORCERY)))
-        {
-            string low = toLowerCopy(tc->source->magicText);
-            string ifM, ifN;
-            if (morbidPTBranches(low, ifM, ifN))
-            {
-                bool morbidLive = false;
-                if (tc->source->controller())
-                {
-                    AbilityFactory af(observer);
-                    morbidLive = af.parseCastRestrictions(tc->source, tc->source->controller(), "morbid") != 0;
-                }
-                ptDrop = plainPTDrop(morbidLive ? ifM : ifN);
-            }
-            else
-                ptDrop = scriptPTDrop(low);
-        }
+        //#W53-O (D5): the spell half now lives in one helper, shared with the
+        //CAST row's kill summary so the two surfaces read the same script.
+        else if (!waiting)
+            ptDrop = spellPTDropAmount(observer, tc->source);
     }
     {
         AADamager * ad = unwrapDamagerAbility(
@@ -19084,38 +19393,10 @@ int AIPlayerGPT::chooseTarget(TargetChooser * _tc, Player * forceTarget, MTGCard
             dmgAmount = ad->getDamage();
             dmgDeathtouch = ad->source && ad->source->has(Constants::DEATHTOUCH);
         }
-        else if (!ad && tc->source
-                 && (tc->source->hasType(Subtypes::TYPE_INSTANT)
-                     || tc->source->hasType(Subtypes::TYPE_SORCERY)))
-        {
-            //Spell path, conservatively scoped so the number cannot be
-            //mis-attributed: exactly ONE damage: rider in the spell's script,
-            //and no inline target(...) (an inline rider aims its own chooser,
-            //not this cast-time one - Lightning Bolt's separate target= line is
-            //the covered shape). x is unknown at target time; rand draws the
-            //game RNG - both skipped (render nothing rather than a guess).
-            string mt = toLowerCopy(tc->source->magicText);
-            size_t dp = mt.find("damage:");
-            if (dp != string::npos && mt.find("damage:", dp + 7) == string::npos
-                && mt.find("target(") == string::npos)
-            {
-                size_t start = dp + 7;
-                size_t end = mt.find_first_of(" \t\r\n", start);
-                string expr = mt.substr(start, end == string::npos ? string::npos : end - start);
-                if (!expr.empty() && expr != "x" && expr != "-x"
-                    && expr.find("rand") == string::npos
-                    //the sorcery-power lesson: a non-creature source's own
-                    //power/toughness evaluates to 0 with false authority
-                    && !((expr.find("power") != string::npos
-                          || expr.find("toughness") != string::npos)
-                         && !tc->source->isCreature()))
-                {
-                    WParsedInt val(expr, NULL, tc->source);
-                    dmgAmount = abs(val.getValue());
-                    dmgDeathtouch = tc->source->has(Constants::DEATHTOUCH);
-                }
-            }
-        }
+        //#W53-O (D5): same helper as the CAST row's kill summary (the spell
+        //path's scoping comment lives with the helper).
+        else if (!ad)
+            dmgAmount = spellSingleDamageAmount(tc->source, dmgDeathtouch);
     }
     for (;;)
     {
@@ -35173,6 +35454,197 @@ static const char * kW50Y_r94 =
               "#W52-J D14b deck123 vs126 seq 47: x17 with no PLAN line -> plan_missing re-ask (no pass verdict to conflict with)");
         CHECK(replyHasPlanLine(r282) && !replyHasPlanLine("<think>PLAN: x</think>\nCHOICE: 2 (Create vampire x3)"),
               "#W52-J D14b NEGATIVE a PLAN line counts only outside the think block");
+    }
+
+    cout << "\n[#W53-O] D3 the DRAW PRICE lethal tail; D5 the cast row's kill summary;"
+            " D6 a defender's tap costs the block; D13 the converter drain on the gain row\n";
+    {
+        // ---- D3: lane K's tail on the draw-price total ----
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams", 3)
+              == " [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their"
+                 " Underworld Dreams deals you 7 - you would be at -4; this KILLS you]",
+              "#W53-O D3 deck125 vs162 seq 97 at 3 life: the 7-damage draw price names the death");
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams", 7)
+                  .find("you would be at 0; this KILLS you") != string::npos,
+              "#W53-O D3 exactly lethal (life 7, deals 7) is lethal");
+        {
+            string at20 = castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams", 20);
+            CHECK(at20.find("- you would be at 13]") != string::npos
+                  && at20.find("KILLS") == string::npos,
+                  "#W53-O D3 NEGATIVE the same row at 20 life states the number and carries NO lethal tail");
+        }
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 0, "", 3)
+              == " [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition)]",
+              "#W53-O D3 NEGATIVE no punisher on the board: no damage total, so no life tail either");
+        CHECK(castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams")
+              == " [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their"
+                 " Underworld Dreams deals you 7]",
+              "#W53-O D3 REGRESSION the wave-49 four-argument shape is byte-identical (life not supplied)");
+        {
+            vector<string> menu;
+            menu.push_back("Cast Essence Scatter {1}{u}"
+                           + castDrawPriceRowTag(7, "Forced Fruition", 1, "Underworld Dreams", 3));
+            menu.push_back("Cast nothing right now");
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Cast Essence Scatter {1}{u} [DRAW PRICE: casting this draws YOU 7"
+                              " cards (their Forced Fruition), and their Underworld Dreams deals you 7 -"
+                              " you would be at -4; this KILLS you])", 2, &menu, &stale, &src) == 1 && !stale,
+                  "#W53-O D3 echo: a reply parroting the whole tagged row still binds to row 1");
+            CHECK(stripNarrationDecoration(menu[0]) == "Cast Essence Scatter {1}{u}",
+                  "#W53-O D3 echo: the tail leaves no residue in the narrated record");
+        }
+
+        // ---- D5: the kill summary the target rows already compute ----
+        CHECK(ptDropKillsTarget(1, 1) && !ptDropKillsTarget(1, 2),
+              "#W53-O D5 the shrink predicate is the verdict's own test");
+        CHECK(damageKillsTarget(2, 2, false, false) && !damageKillsTarget(2, 3, false, false)
+              && damageKillsTarget(1, 5, false, true) && !damageKillsTarget(9, 4, true, false),
+              "#W53-O D5 the damage predicate is the verdict's own test (deathtouch, indestructible included)");
+        {
+            //The agreement itself, over the whole small table: the CAST row's
+            //summary and the TARGET row's verdict answer the same question, so
+            //"DIES" on the verdict and membership of the kill list must never
+            //disagree. This is the pin the ledger asks for - a computed verdict
+            //that is engine-derived may not drift between its two surfaces.
+            bool agree = true;
+            for (int n = 1; n <= 6 && agree; n++)
+                for (int rem = 1; rem <= 6 && agree; rem++)
+                {
+                    bool verdictDies = ptDropTargetVerdict(n, rem, rem).find("DIES") != string::npos;
+                    if (verdictDies != ptDropKillsTarget(n, rem))
+                        agree = false;
+                    for (int ind = 0; ind < 2 && agree; ind++)
+                        for (int dt = 0; dt < 2 && agree; dt++)
+                        {
+                            bool dv = damageTargetVerdict(n, rem, rem, ind != 0, dt != 0)
+                                          .find("DIES") != string::npos;
+                            if (dv != damageKillsTarget(n, rem, ind != 0, dt != 0))
+                                agree = false;
+                        }
+                }
+            CHECK(agree, "#W53-O D5 the cast row's kill test and the target row's printed verdict agree"
+                         " on every (magnitude, remaining toughness, indestructible, deathtouch) case");
+        }
+        {
+            std::vector<std::string> none;
+            CHECK(castKillSummaryTag(none, 3, "-1/-1") == " {kills 0 of the 3 legal targets at -1/-1}",
+                  "#W53-O D5 deck123 vs146 seq 18: Tragic Slip's cast row prices its three survivors");
+            CHECK(castKillSummaryTag(none, 1, "-1/-1") == " {kills 0 of the 1 legal target at -1/-1}",
+                  "#W53-O D5 one target reads singular");
+            CHECK(castKillSummaryTag(none, 2, "2 damage") == " {kills 0 of the 2 legal targets at 2 damage}",
+                  "#W53-O D5 the damage rows carry the same summary in their own magnitude");
+            std::vector<std::string> one;
+            one.push_back("Elite Spellbinder");
+            CHECK(castKillSummaryTag(one, 3, "-1/-1") == " {kills: Elite Spellbinder}",
+                  "#W53-O D5 a killable target is NAMED, not counted");
+            std::vector<std::string> two;
+            two.push_back("Goblin #1");
+            two.push_back("Goblin #2");
+            CHECK(castKillSummaryTag(two, 2, "2 damage") == " {kills: Goblin #1, Goblin #2}",
+                  "#W53-O D5 several victims are named in order");
+            CHECK(castKillSummaryTag(none, 0, "-1/-1").empty(),
+                  "#W53-O D5 NEGATIVE no creature target on the list: no summary");
+            CHECK(castKillSummaryTag(none, 3, "").empty(),
+                  "#W53-O D5 NEGATIVE an unknowable magnitude (X, rand) states nothing");
+            vector<string> menu;
+            menu.push_back("Cast Tragic Slip {b}" + castKillSummaryTag(none, 3, "-1/-1")
+                           + " - legal targets right now: Nadaar, Selfless Paladin, Triumphant Adventurer, Goblin");
+            menu.push_back("Cast nothing right now");
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Cast Tragic Slip {b} {kills 0 of the 3 legal targets at -1/-1})",
+                              2, &menu, &stale, &src) == 1 && !stale,
+                  "#W53-O D5 echo: a reply parroting the new clause binds to row 1");
+            CHECK(stripNarrationDecoration(menu[0]).find("kills 0 of the 3") == string::npos,
+                  "#W53-O D5 echo: the summary leaves no residue in the narrated record");
+        }
+
+        // ---- D6: a defender's tap costs the BLOCK, never the attack ----
+        {
+            std::vector<std::string> wall;
+            wall.push_back("Overgrown Battlement (this card itself)");
+            std::vector<int> noBlock(1, (int) TAP_RESTRICT_NO_BLOCK);
+            string s = paymentTapsClause(wall, noBlock);
+            CHECK(s == " {paying this taps: Overgrown Battlement (this card itself) - it cannot block on their turn}",
+                  "#W53-O D6 deck126 vs130 seq 13: the wall's tap is priced as the block it loses");
+            CHECK(s.find("cannot attack this turn") == string::npos,
+                  "#W53-O D6 NEGATIVE the defender row never claims an attack it never had");
+            std::vector<std::string> walls;
+            walls.push_back("Overgrown Battlement #1");
+            walls.push_back("Overgrown Battlement #2");
+            std::vector<int> bothBlock(2, (int) TAP_RESTRICT_NO_BLOCK);
+            CHECK(paymentTapsClause(walls, bothBlock)
+                  == " {paying this taps: Overgrown Battlement #1, Overgrown Battlement #2 -"
+                     " they cannot block on their turn}",
+                  "#W53-O D6 one shared restriction stays one tail, pluralised");
+            std::vector<std::string> mixed;
+            mixed.push_back("Overgrown Battlement");
+            mixed.push_back("Llanowar Elves");
+            mixed.push_back("Forest");
+            std::vector<int> rest;
+            rest.push_back((int) TAP_RESTRICT_NO_BLOCK);
+            rest.push_back((int) TAP_RESTRICT_NO_ATTACK);
+            rest.push_back((int) TAP_RESTRICT_NONE);
+            CHECK(paymentTapsClause(mixed, rest)
+                  == " {paying this taps: Overgrown Battlement - it cannot block on their turn;"
+                     " Llanowar Elves - it cannot attack this turn; Forest}",
+                  "#W53-O D6 several sources with different restrictions each name their own consequence");
+            std::vector<int> noneAtAll(1, (int) TAP_RESTRICT_NONE);
+            CHECK(paymentTapsClause(wall, noneAtAll)
+                  == " {paying this taps: Overgrown Battlement (this card itself)}",
+                  "#W53-O D6 NEGATIVE with no restriction in front of it the row states none");
+            CHECK(paymentTapsClause(std::vector<std::string>(), noBlock).empty(),
+                  "#W53-O D6 NEGATIVE no tapped source, no clause");
+            std::vector<std::string> two2;
+            two2.push_back("Llanowar Elves #1");
+            two2.push_back("Llanowar Elves #2");
+            CHECK(paymentTapsClause(two2, true) == paymentTapsClause(two2, std::vector<int>(2, (int) TAP_RESTRICT_NO_ATTACK)),
+                  "#W53-O D6 REGRESSION the row-wide bool overload is the uniform no-attack vector");
+            vector<string> menu;
+            menu.push_back("Cast Overgrown Battlement {1}{g}" + paymentTapsClause(wall, noBlock));
+            menu.push_back("Cast nothing right now");
+            bool stale = false; string src;
+            CHECK(parseChoice("CHOICE: 1 (Cast Overgrown Battlement {1}{g} {paying this taps: Overgrown"
+                              " Battlement (this card itself) - it cannot block on their turn})",
+                              2, &menu, &stale, &src) == 1 && !stale,
+                  "#W53-O D6 echo: the reworded clause echoed whole still binds");
+            CHECK(stripNarrationDecoration(menu[0]) == "Cast Overgrown Battlement {1}{g}",
+                  "#W53-O D6 echo: the clause leaves no residue in the narrated record");
+        }
+
+        // ---- D13: the converter drain, folded into the row that causes it ----
+        CHECK(lifeToDamageConverterTake("@lifeof(player) from(*[-lifefaker]|*):life:-thatmuch opponent", 4) == 4,
+              "#W53-O D13 Sanguine Bond's `thatmuch` mirrors the gain");
+        CHECK(lifeToDamageConverterTake("@lifeof(player) from(*[-lifefaker]|*):life:-1 opponent", 4) == 1,
+              "#W53-O D13 a fixed drain is that fixed number, not the gain");
+        CHECK(lifeToDamageConverterTake("@lifelostfoeof(player):life:thatmuch controller", 4) == 0
+              && lifeToDamageConverterTake("@lifeof(player) from(*[-lifefaker]|*):life:1 controller", 4) == 0
+              && lifeToDamageConverterTake("@lifeof(player) from(*|*):life:-countedamount opponent", 4) == 0,
+              "#W53-O D13 NEGATIVE the mirror half, a self-gain and an unreadable amount claim nothing");
+        CHECK(lifeLoopDrainClause("Sanguine Bond", 4, 14)
+              == " - and their Sanguine Bond takes 4 off YOU: life 14 -> 10",
+              "#W53-O D13 123v126 seq 66: the 4 they gain is 4 off the pilot, stated where it is caused");
+        CHECK(lifeLoopDrainClause("Sanguine Bond", 4, 4)
+              == " - and their Sanguine Bond takes 4 off YOU: life 4 -> 0; this KILLS you",
+              "#W53-O D13 the lethal case is named outright (lane K's register)");
+        CHECK(lifeLoopDrainClause("", 4, 14).empty() && lifeLoopDrainClause("Sanguine Bond", 0, 14).empty()
+              && lifeLoopDrainClause("Sanguine Bond", 4, -1).empty(),
+              "#W53-O D13 NEGATIVE no converter, no amount or no life: no clause");
+        CHECK(edictClause(1, "Overgrown Battlement", 4, true, true, " (0/4) [defender]", "Sanguine Bond", 4, 14)
+              == "they control 1 creature - Overgrown Battlement (0/4) [defender] is sacrificed, they gain 4"
+                 " - the sacrificing player gains, not you - and their Sanguine Bond takes 4 off YOU: life 14 -> 10",
+              "#W53-O D13 the edict row names the victim's P/T and defender tag AND the drain it feeds");
+        CHECK(edictClause(1, "Overgrown Battlement", 4, true, true, " (0/4) [defender]")
+              == "they control 1 creature - Overgrown Battlement (0/4) [defender] is sacrificed, they gain 4"
+                 " - the sacrificing player gains, not you",
+              "#W53-O D13 NEGATIVE no converter on their battlefield: the victim facts stand alone");
+        CHECK(edictClause(1, "Siege-Gang Commander", 2, true, false, " (2/2)", "Sanguine Bond", 2, 14)
+              == "they control 1 creature - Siege-Gang Commander (2/2) is sacrificed, you gain 2",
+              "#W53-O D13 NEGATIVE when the CASTER gains, their converter takes nothing off the pilot");
+        CHECK(edictClause(1, "Siege-Gang Commander", 2, true)
+              == "they control 1 creature - Siege-Gang Commander is sacrificed, you gain 2"
+              && edictClause(0, "", 0, true) == "they control 0 creatures - at 0 this does nothing"
+              && edictClause(4, "Goblin #1", 1, true) == "they control 4 creatures - they choose which one",
+              "#W53-O D13 REGRESSION the wave-49/50 shapes are byte-identical without the new arguments");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
