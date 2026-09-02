@@ -99,6 +99,15 @@ class GameObserver{
   bool mSnapshotPostPregame;
   string mTranscriptPath;   //"" = no transcript for this game (suite, replay)
   string mTranscriptNotes;  //#result / #classification lines appended after [end]
+  //W53-U: the game-over hooks below used to be guarded by file-static
+  //`GameObserver *` pointers in GameStateDuel::Update ("have I already noted
+  //THIS game?"). A GameObserver is deleted at End() and a new one allocated at
+  //Start(), and the allocator hands back the SAME address more often than not -
+  //so on the console the guard read "already done" for a brand new game and the
+  //#result line (and the Vita memlog's gameend mark) went missing for 9 of the
+  //16 vpk12 matches. Identity has to live on the object, not in a static.
+  bool mGameEndNoted;      //#result written for this game
+  bool mGameEndMemlogged;  //VITA memlog "gameend" mark written for this game
   void writeTranscript(const char * tag);
   void setReplayRules(Rules * rules) { mRules = rules; }
   void appendTranscriptNote(const string & note);

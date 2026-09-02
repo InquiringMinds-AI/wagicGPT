@@ -4415,6 +4415,31 @@ static int unblockedDamageTo(Player * me)
     return total;
 }
 
+//W53-U: does the attacker's combat damage DESTROY this blocker whatever its
+//toughness? Deathtouch makes any nonzero amount lethal (CR 702.2b), so every
+//power/toughness comparison in a blocking decision is wrong against a
+//deathtouch attacker: no blocker "survives" it, and every extra body in a gang
+//block is an extra corpse. Indestructible and protection from the attacker are
+//the two outs the rules give the blocker. Owner Vita play report 2026-09-02
+//(transcript-1788381069, his tag "bad blocking"): "opponent double blocked for
+//no good reason" - a B/G deathtouch board (Hapatra / Gifted Aetherborn /
+//Vampire Nighthawk / Fynn, every attacker deathtouch) against 1/3 Daybreak
+//Chaplains, which pass 1's arithmetic read as a free gang kill.
+static bool blockerDiesToAttackerRegardless(MTGCardInstance * attacker, MTGCardInstance * blocker)
+{
+    if (!attacker || !blocker)
+        return false;
+    if (attacker->power < 1)
+        return false; //no damage, no destruction
+    if (!(attacker->has(Constants::DEATHTOUCH) || attacker->has(Constants::PERPETUALDEATHTOUCH)))
+        return false;
+    if (blocker->has(Constants::INDESTRUCTIBLE))
+        return false;
+    if (blocker->protectedAgainst(attacker))
+        return false;
+    return true;
+}
+
 int AIPlayerBaka::chooseBlockers()
 {
     //Should not block during my own turn...
@@ -4477,7 +4502,18 @@ int AIPlayerBaka::chooseBlockers()
                     opponentsToughness[attacker] = attacker->toughness;
                     it = opponentsToughness.find(attacker);
                 }
-                if (opponentsToughness[attacker] > 0 && getStats() && getStats()->isInTop(attacker, 3, false))
+                //W53-U: pass 1 has no per-attacker blocker cap - it keeps piling
+                //bodies on while the attacker's tracked toughness is still
+                //positive, which is how a 2/2 collects two 1/3 blockers. That
+                //gang is only ever worth it because the extra blockers were
+                //expected to LIVE; against a deathtouch attacker they are all
+                //dead the moment damage is assigned, so a second blocker buys
+                //the attacker's death at the price of a second creature. Refuse
+                //it here; the lone blocker that remains is then handed to pass 2,
+                //which already unassigns a block that does not kill.
+                const bool deathtouchGang = (attacker->blockers.size() > 1)
+                    && blockerDiesToAttackerRegardless(attacker, card);
+                if (!deathtouchGang && opponentsToughness[attacker] > 0 && getStats() && getStats()->isInTop(attacker, 3, false))
                 {
                     opponentsToughness[attacker] -= card->power;
                     set = 1;
@@ -4549,7 +4585,12 @@ int AIPlayerBaka::chooseBlockers()
                 continue;
 
             bool canKill = (card->power >= attacker->toughness);
-            bool survives = (card->toughness > attacker->power);
+            //W53-U: "I survive it" is a lie against a deathtouch attacker. Left
+            //raw, the branch below ("block even if can't kill, but we survive
+            //and reduce damage") feeds a creature to a deathtouch attacker for
+            //nothing every combat.
+            bool survives = (card->toughness > attacker->power)
+                && !blockerDiesToAttackerRegardless(attacker, card);
 
             // Always block if can kill, regardless of survivability or damage
             if (canKill)

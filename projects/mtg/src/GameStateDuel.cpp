@@ -1192,20 +1192,26 @@ void GameStateDuel::Update(float dt)
 #if defined(VITA) && defined(WAGIC_VITAMEMLOG)
             //This frame can repeat; one memlog line per game end.
             {
-                static GameObserver* memlogged = NULL;
-                if (memlogged != game)
+                //W53-U: per-OBSERVER flag, not a file-static pointer - see
+                //GameObserver.h. A recycled heap address made the old guard
+                //swallow later games' marks.
+                if (!game->mGameEndMemlogged)
                 {
-                    memlogged = game;
+                    game->mGameEndMemlogged = true;
                     vitaMemProbe("gameend", game->turn);
                 }
             }
 #endif
 #ifdef WAGIC_TRANSCRIPT_ON
             {
-                static GameObserver * transcribed = NULL;
-                if (transcribed != game)
+                //W53-U: this one-shot used to be `static GameObserver *
+                //transcribed`, which is only an identity if the allocator never
+                //reuses an address. It does: 9 of the 16 vpk12 transcripts got a
+                //#classification and no #result because the new game landed where
+                //the previous one had been freed. The flag lives on the observer.
+                if (!game->mGameEndNoted)
                 {
-                    transcribed = game;
+                    game->mGameEndNoted = true;
                     std::stringstream r;
                     r << "result winner=" << (game->didWin(game->players[0]) ? "p1" : (game->didWin(game->players[1]) ? "p2" : "draw"))
                       << " turn=" << game->turn << " life=" << game->players[0]->life << "/" << game->players[1]->life;

@@ -1300,6 +1300,7 @@ w54_reconfigure_menu_growth.txt
 w54_equip_ability_not_duplicated.txt
 w53o_tragic_slip_kill_verdict.txt
 ai_block_lethal_set_wave53.txt
+ai_block_deathtouch_gang_w53u.txt
 w53_usable_ability_batch_board.txt
 w53_stack_ability_names_source_and_victim.txt
 w53_exile_cast_cause_survives_granter.txt

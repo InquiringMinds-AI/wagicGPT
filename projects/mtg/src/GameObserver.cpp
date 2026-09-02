@@ -133,6 +133,8 @@ GameObserver::GameObserver(WResourceManager *output, JGE* input)
     mSnapshotPostPregame = false;
     mLoading = false;
     mSuiteGame = false;
+    mGameEndNoted = false;
+    mGameEndMemlogged = false;
     mSuiteHumanSeat = NULL;
     mLayers = NULL;
     mTrash = new Trash();
@@ -655,6 +657,8 @@ void GameObserver::resetStartupGame()
         return;
     }
     mTranscriptNotes = "";
+    mGameEndNoted = false;
+    mGameEndMemlogged = false;
     //Suite / PARSETEST processes never keep a transcript: mSuiteGame is set
     //AFTER the first baseline on the main-thread path, and 51 junk
     //"testsuite-vs-testsuite" files had piled up in User/transcripts.
