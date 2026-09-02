@@ -1275,3 +1275,7 @@ bestow_no_envoy_human_gate_four_lands.txt
 autotap_utility_land_squirrel_nest.txt
 autotap_basic_before_dual_G.txt
 autotap_utility_land_last_resort.txt
+w54_aura_rehook_mask_old_host.txt
+w54_aura_rehook_mask_new_host.txt
+w54_aura_rehook_ethereal_armor.txt
+w54_aura_retarget_detainment_spell.txt

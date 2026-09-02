@@ -1,0 +1,36 @@
+# W54-G (owner Vita report): Ajani's Chosen re-attaches an Aura to the new Cat
+# token, but the Aura's static effects stayed on the ORIGINAL host.
+# Ancestral Mask is cast on Grizzly Bears; Ajani's Chosen makes a Cat token and
+# the Mask is attached to it -> the Bears must be a plain 2/2 again and deal
+# only 2 combat damage (the bug leaves it +2/+2 and it deals 4).
+# P2's Ivory Mask is the "other enchantment on the battlefield" Ancestral Mask
+# counts (an enchantment under P1 would fire Ajani's Chosen a second time).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Ajani's Chosen,Grizzly Bears
+hand:Ancestral Mask
+manapool:{2}{G}
+life:20
+[PLAYER2]
+inplay:Ivory Mask
+life:20
+[DO]
+Ancestral Mask
+Grizzly Bears
+choice 0
+Cat
+goto attackers
+Grizzly Bears
+next
+next
+next
+[ASSERT]
+COMBATEND
+[PLAYER1]
+inplay:Ajani's Chosen,Grizzly Bears,Ancestral Mask,Cat
+life:20
+[PLAYER2]
+inplay:Ivory Mask
+life:18
+[END]
