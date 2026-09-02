@@ -695,11 +695,18 @@ private:
     //stood because the echo matched several options, none of them the
     //index's own). Silent divergence between what the model said and what
     //executed was the W36 lane-B items 2-4 instrument gap.
+    //#W53-N (D9): passRowOffered says this seam carries a row 0 = pass
+    //priority. Where it does, the reserved echoes "pass" / "pass priority" /
+    //the pass row's own full text / "0" NAME row 0 and resolve there, whatever
+    //index the line carries (deck146 vs152 seq 91: "CHOICE: 1 (Pass)" executed
+    //Kaya's +1). Where it does NOT (every askModel menu - kNoPassRowFact says
+    //so on the format line), the flag stays false and nothing changes.
     static int parseChoice(const string& content, int optionCount,
                            const std::vector<string> * optionTexts = NULL,
                            bool * staleEcho = NULL,
                            const std::string * pendingSource = NULL,
-                           std::string * noteOut = NULL);
+                           std::string * noteOut = NULL,
+                           bool passRowOffered = false);
 
     //Salvage a decode-time repeat-loop reply: when the normal parse fails,
     //scan the raw reply for the LAST well-formed "CHOICE: N (name)" line
@@ -946,6 +953,15 @@ private:
     //echo only when the name echoes one of these rows; otherwise it is an
     //off-menu name and earns the one named_row re-ask, never Baka.
     std::vector<string> mPrevWindowRows;
+    //#W53-N (D12b): the 1-based ordinal, among the reply's line-leading
+    //CHOICE: lines, of the first that resolves to <choice>. On a record with
+    //coded_answers >= 2 it is the only way to tell WHICH of the model's coded
+    //lines the engine latched - the five wave-52 plan_choice_conflict records
+    //carried the FIRST answer in `reply` and the LATCHED row in `choice` with
+    //nothing tying the two together. -1 when no line resolves to it.
+    static int codedChoiceOrdinal(const string& content, int choice, int optionCount,
+                                  const std::vector<string> * optionTexts);
+
     //#W49-S (D2): answer_replaced is FALSE whenever the answer that EXECUTED
     //is the reply's first coded line - the seams set this right before their
     //translog write; writeTransLog consumes and clears it.
@@ -956,6 +972,41 @@ private:
     //already answered (the off-menu "CHOICE: 8 (Cast Acererak)" shape).
     int mCastAskTurn;
     int mCastAskPhase;
+    //#W53-N (D2): the model-owned HOLD. mHoldTurn/mHoldBoard are the turn and
+    //the phase-stripped situation the hold was taken on; mHoldRows records,
+    //per seam, the rows that were on the menu when it was taken, so a NEWLY
+    //AFFORDABLE row re-opens the window even on an unchanged board. Nothing
+    //here is a cache of an ANSWER: the engine only replays a hold the model
+    //itself chose, and only while the board it was chosen on still stands.
+    int mHoldTurn;
+    string mHoldBoard;
+    std::map<string, std::set<string> > mHoldRows;
+    int mHoldWindowsSkipped; //gameend report field
+    //#W53-N (D2, second half): per-turn declines of an EXACT option list,
+    //keyed by the joined rows. Rendered as a PROMPT-ONLY annotation (never
+    //part of an ask key - see declinedListNote).
+    std::map<string, int> mListDeclineCount;
+    int mListDeclineTurn;
+    //#W53-N (D12a): when the carried plan was last WRITTEN by the model -
+    //the translog seq (= window) and the turn. mPlanSetSeq < 0 = no plan.
+    int mPlanSetSeq;
+    int mPlanSetTurn;
+    //#W53-N (D2): a prompt-only note for the NEXT askModel call, spliced in
+    //after its option list and deliberately kept out of its cache key.
+    string mNextAskPromptNote;
+
+    //#W53-N (D2): honour a hold the model took, at seam <seam>, for a window
+    //whose situation is <situation> and whose rows are <rows>. Returns true
+    //when the hold still stands (the caller passes without a model call);
+    //clears the latch and returns false on any re-opener.
+    bool holdHonoured(const char * seam, const string& situation,
+                      const std::vector<string>& rows);
+    //#W53-N (D2): record the model's hold answer at this seam.
+    void takeHold(const char * seam, const string& situation,
+                  const std::vector<string>& rows);
+    //#W53-N (D12a): ", N windows ago on turn T" for the carried plan, empty
+    //when the model stated it at the window now being rendered.
+    string planAgeClause() const;
     //Answer-locked decode-garbage retry (ITEM: decode-collapse mitigation).
     //mRetryActivePrompt: the retry userMsg (prefix + base) currently in flight;
     //empty when no retry is pending. mRetryBase: the base userMsg that active
