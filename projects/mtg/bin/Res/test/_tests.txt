@@ -1266,3 +1266,9 @@ deck_name_prefers_nontoken_printing.txt
 experiment_one_bloodthirst_evolve.txt
 experiment_one_etb_counters_evolve.txt
 experiment_one_no_evolve_equal_pt.txt
+bestow_envoy_reduced_offered.txt
+bestow_no_envoy_three_mana_normal.txt
+bestow_four_mana_offered.txt
+bestow_envoy_human_gate_lands.txt
+bestow_no_envoy_human_gate_lands.txt
+bestow_no_envoy_human_gate_four_lands.txt

@@ -1,0 +1,29 @@
+# W54-E control (b): NO Transcendent Envoy. Leafcrown Dryad's bestow is the
+# printed {3}{G} = 4 mana, so a three-mana pool must NOT offer the bestow
+# mode - the plain click casts the Dryad normally for {1}{G}, leaving one mana
+# floating (the pool drains at the phase change) and the Dryad on the battlefield as a creature (the bears
+# stay 2/2 and hit for 2: life 20 -> 18).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Grizzly Bears
+hand:Leafcrown Dryad
+manapool:{2}{G}
+[PLAYER2]
+life:20
+[DO]
+Leafcrown Dryad
+next
+next
+Grizzly Bears
+next
+next
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Grizzly Bears,Leafcrown Dryad
+[PLAYER2]
+life:18
+[END]

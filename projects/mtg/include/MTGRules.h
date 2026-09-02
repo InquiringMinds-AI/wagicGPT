@@ -118,6 +118,12 @@ protected:
 public:
     int isReactingToClick(MTGCardInstance * card, ManaCost * mana = NULL);
     int reactToClick(MTGCardInstance * card);
+    //W54-E: the human seat's pricing of an alternative cost (pool + strict
+    //potential mana, then the colour-aware payment planner) - the half of
+    //humanCanPayAlternative that is not the isAI() seat test, exposed so the
+    //test harness can pin it (both suite seats are AIPlayer-derived, so a
+    //fixture can never reach the human branch through a card click).
+    static bool alternativeCostPayable(GameObserver * game, MTGCardInstance * card, ManaCost * cost);
     virtual ostream& toString(ostream& out) const;
     MTGAlternativeCostRule(GameObserver* observer, int _id);
     const string getMenuText()

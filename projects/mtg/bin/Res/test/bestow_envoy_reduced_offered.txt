@@ -1,0 +1,39 @@
+# W54-E (owner Vita report): "With 3 mana, and trancendant envoy in play,
+# leafcrown dryad doesn't let me cast it for its bestow, it just casts
+# normally and leaves me the one floating mana".
+# Transcendent Envoy: "Aura spells you cast cost {1} less to cast" - a bestow
+# cast IS an Aura spell, so Leafcrown Dryad's bestow {3}{G} costs {2}{G} here
+# and a three-mana pool must offer (and pay) the bestow mode.
+# choice 1 = the bestow entry of the cast-mode menu; the bestowed Dryad grants
+# Grizzly Bears +2/+2, so the 4/4 bears deal 4 (life 20 -> 16).
+# PRE-FIX: Transcendent Envoy carried only the lord(aura) line and not the
+# modbenchant controller line, so the bestow cost was never reduced, the
+# bestow mode was not offered at three mana, the click cast the Dryad
+# normally for {1}{G} and left one mana floating (bears hit for 2, life 18).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Transcendent Envoy,Grizzly Bears
+hand:Leafcrown Dryad
+manapool:{2}{G}
+[PLAYER2]
+life:20
+[DO]
+Leafcrown Dryad
+choice 1
+Grizzly Bears
+next
+next
+Grizzly Bears
+next
+next
+next
+next
+[ASSERT]
+SECONDMAIN
+[PLAYER1]
+inplay:Transcendent Envoy,Grizzly Bears,Leafcrown Dryad
+manapool:{0}
+[PLAYER2]
+life:16
+[END]

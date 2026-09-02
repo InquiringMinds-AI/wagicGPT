@@ -882,6 +882,47 @@ int TestSuiteAI::Act(float)
             suite->commandAssertFailures++;
         }
         return 1;
+    else if (action.find("assertaltpayable ") == 0)
+    {
+        //W54-E: pin the HUMAN seat's pricing of a card's ALTERNATIVE cost -
+        //the bestow cost when the card has one, else the alternative cost.
+        //This is the gate that decides whether the cast-mode menu offers the
+        //alternative mode at all (MTGAlternativeCostRule::isReactingToClick,
+        //via humanCanPayAlternative). Both suite seats are AIPlayer-derived,
+        //so a scripted card click can never reach that branch; this calls the
+        //same pricing function the rule calls (pool + strict potential mana,
+        //then the payment planner), so a fixture can pin it with the pool
+        //EMPTY and untapped lands on the battlefield - the owner's seat.
+        //Syntax: assertaltpayable <0|1> <card name>
+        string rest = action.substr(17);
+        int expect = (rest.size() && rest[0] == '1') ? 1 : 0;
+        string cname = rest.size() > 2 ? rest.substr(2) : "";
+        MTGCardInstance * apc = getCard(cname);
+        if (!apc || !apc->getManaCost())
+        {
+            std::cerr << "TESTSUITE assertaltpayable: no card '" << cname << "' with a mana cost"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        ManaCost * altCost = apc->getManaCost()->getBestow();
+        if (!altCost)
+            altCost = apc->getManaCost()->getAlternative();
+        if (!altCost)
+        {
+            std::cerr << "TESTSUITE assertaltpayable: '" << cname << "' has no bestow/alternative cost"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        int got = MTGAlternativeCostRule::alternativeCostPayable(observer, apc, altCost) ? 1 : 0;
+        if (got != expect)
+        {
+            std::cerr << "TESTSUITE assertaltpayable: '" << cname << "' cost "
+                      << altCost->toString() << " expected " << expect << " got " << got
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+        }
     }
     else if (action.find("assertcastable ") == 0 || action.find("assertusable ") == 0)
     {
