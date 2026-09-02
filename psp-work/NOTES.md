@@ -5881,3 +5881,26 @@ Lesson: a SimpleMenu item id of literal 0 silently becomes a NULL button - grep 
 whenever a SimpleMenu is added.
 
 VPK vita-vpk11 from psp-port = c9dc6b75c (the real menu fix): 33,166,613 B -> 10.0.0.227:1337 ux0:/vpk/wagic.vpk, size-verified. Install manual. Supersedes vpk10.
+
+## 2026-09-02 (vpk11 play session) — four owner reports, logs at psp-work/logs/20260902-vpk11/
+Owner played 24 matches on vpk11 (transcripts 1788326631..1788330366, tags: 18 `no problems`,
+1 `other`, 1 `bad blocking`, 1 `bug`, 3 abandoned with no result line). memlog flat (~38 MB
+heap free, turn 16 of the last game) — no leak; no new core dumps in ux0:/data. The
+"How was this match?" menu works (ids 1..6 fix confirmed by 21 classified transcripts).
+1. "heuristic ai got stuck targeting a spell, cycled through the targets endlessly" =
+   1788327409 deck7 vs deck154, turn 6: p2 clicks its own Dominating Vampire / Odric ten
+   times then never acts; human nexts to turn 12 and quits. Screenshots show the red target
+   border cycling over the HUMAN's creatures on the AI's Main 1. Dominating Vampire ETB
+   `target(creature[manacost<=type:vampire:mybattlefield])`. -> lane R.
+2. "legend shrine's ability to put counters ... didn't allow me to tap my creature for mana
+   after it asked if i wanted to use it" = Go-Shintai of Boundless Vigor `@each my end:may
+   ... pay({1})`; 1788327632 l.259-264 and 1788327030 l.349-353 (yes -> land click ->
+   shrine click -> endinterruption). Mana creature = Twitching Doll. -> lane R.
+3. "almost frozen when attempting to select cards in my hand" = 1788330366 deck6 vs deck109
+   (tag `bug`), late board: Karn's Bastion + Meteorite tokens + Draconic Disciple + Roxanne
+   lord + 9-card hand — the option-preserving autotap / tap-preview worst case (the vpk9
+   perf suspects). -> lane S (measure on desktop, bound the work).
+4. "game losing block by the heuristic ai, could have blocked differently and likely won" =
+   1788329701 deck7 vs deck72 (tag `bad blocking`), turn 14, life 2/-2: Ooze + Hydra +
+   Greensleeves attack, Baka cycles Liege/Worm/Trow/Hag blocks and takes lethal. -> lane T.
+Lanes R/S/T = worktrees/lanes/w53-{R,S,T} from master 2d83e169f; merge after M,Q,O,P,N.
