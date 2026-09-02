@@ -175,6 +175,7 @@ MTGRevealingCards::MTGRevealingCards(GameObserver* observer, int _id, MTGCardIns
     mAIDriveDone = false;
     mAITestTicks = 0;
     mAIGraceTicks = 0;
+    mAISecondRebuilt = false;
     mInputArmed = false;
 
     afterReveal = "";
@@ -829,6 +830,36 @@ void MTGRevealingCards::driveInteractiveReveal()
         REVEAL_DBG("phase0 decided r=" << r << " picks=" << sel.size()
                    << " zone=" << zone->nb_cards << " tc=" << (void*) tc
                    << " nbTargets=" << (tc ? (int) tc->getNbTargets() : -1));
+        //W54-X (corpus 20260902 152v125, ~13 h with no tick and no stderr):
+        //option ONE was never built. toResolve() picks the branch UP FRONT with
+        //option one's own predicate - countValidTargets() == 0 arms option TWO
+        //and leaves abilityFirst NULL - so on a reveal whose option one has no
+        //legal target among the revealed cards (Sigarda's Coven look at 5 with
+        //no Human among them; option one target(<upto:1>human|reveal)) the
+        //chooser standing here is option TWO's, not option one's.
+        //The finalize below would then spend option two's chooser on ZERO
+        //targets: CheckUserInput's decline branch is gated on `!abilitySecond`
+        //and cannot fire, so the BTN_NEXT either no-ops or closes option two -
+        //and phase 3 then waits forever for an option-two chooser that had
+        //already come and gone. The reveal display never closes, the phase
+        //never advances, and every seat sits in a game that cannot tick.
+        //There is no option-one decision to commit here. The ask above already
+        //self-declined ("none (no legal target)") without a model call, which
+        //is the truth of this board; take NO picks (a pick would land on option
+        //two and bottom the card the model asked to keep) and press NOTHING -
+        //hand straight to phase 3, which finds option two armed and clicks the
+        //remainder into it.
+        if (!abilityFirst && abilitySecond)
+        {
+            DebugTrace("MTGRevealingCards: option one has no legal target in the "
+                       "revealed set - the engine armed option two up front; the "
+                       "reveal driver takes no picks and sweeps the remainder");
+            REVEAL_DBG("phase0: option one never built (no legal target) -> option two");
+            mAIGraveSel.clear();
+            mAIZoneAtFinalize = zone->nb_cards;
+            mAIPhase = 3;
+            return;
+        }
         mAIGraveSel.clear();
         if (r == 1) //r == -1 (defer/fail): empty selection -> all to option two
             for (size_t k = 0; k < sel.size(); k++)
@@ -983,7 +1014,31 @@ void MTGRevealingCards::driveInteractiveReveal()
             return;
         }
         if (!tc)
+        {
+            //W54-X: option two exists but has no chooser. Normally it has
+            //simply not armed yet - wait. But an option two that has already
+            //been REAPED from the action layer (forceDestroy, one tick after it
+            //fires) while the reveal zone is STILL FULL has spent its window on
+            //nothing, and this wait would never end - the same no-tick hang the
+            //phase-0 branch above removes at its source. Rebuild it ONCE so no
+            //reveal can leave the game without a tick that advances it, and say
+            //so on stderr: reaching here at all means some path still consumed
+            //option two early, and the log is how that path gets found.
+            if (!mAISecondRebuilt && zone->cards.size() && abilitySecond
+                && observer->mLayers->actionLayer()->getIndexOf(abilitySecond) == -1)
+            {
+                mAISecondRebuilt = true;
+                DebugTrace("MTGRevealingCards: option two's window was consumed with "
+                           "the reveal zone still full - rebuilding it so the reveal "
+                           "can finish");
+                REVEAL_DBG("phase3: option two consumed early -> rebuild");
+                repeat = false;
+                abilitySecond = contructAbility(abilityTwo);
+                game->addObserver(abilitySecond);
+                fireOneShot(abilitySecond);
+            }
             return; //option two built but its chooser has not armed yet - wait
+        }
         mAIRemainder.clear();
         for (int i = 0; i < zone->nb_cards; i++)
             if (zone->cards[i])
