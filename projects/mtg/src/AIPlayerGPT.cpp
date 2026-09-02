@@ -37128,6 +37128,53 @@ static const char * kW50Y_r94 =
               .find("and 0 are lands") != string::npos,
               "#W53-P D14 a landless board says zero rather than dropping the clause");
     }
+    {
+        //#W53-V: DFC face lookup must stay inside ITS OWN PRINTING.
+        //Owner's Vita report: "when transformed, the heliod the radiant dawn in
+        //my 'aura farming' deck displays a different untransformed card art."
+        //MOM carries TWO printings of the card - 607029/607030 (regular frame)
+        //and 610513/610514 (borderless, the one in his deck) - and each pair is
+        //consecutive in _cards.dat. Resolving the back face by NAME collapses
+        //both pairs onto the lowest matching id, so his borderless Heliod
+        //flipped into 607030 and asked for the REGULAR printing's image.
+        //wagicPickFaceSiblingId is the pure core of the fix; the ids below are
+        //the real MOM ids read off bin/Res/sets/MOM/_cards.dat.
+        std::vector<int> warped;   // "Heliod, the Warped Eclipse" printings in MOM
+        warped.push_back(607030); warped.push_back(610514);
+        std::vector<int> radiant;  // "Heliod, the Radiant Dawn" printings in MOM
+        radiant.push_back(607029); radiant.push_back(610513);
+
+        cout << "\n[W53-V] DFC face sibling pick (MOM Heliod, two printings)\n";
+        cout << "     borderless front 610513 -> back " << wagicPickFaceSiblingId(warped, 610513) << "\n";
+        CHECK(wagicPickFaceSiblingId(warped, 610513) == 610514,
+              "#W53-V the borderless front flips to the BORDERLESS back face");
+        CHECK(wagicPickFaceSiblingId(warped, 610513) != 607030,
+              "#W53-V NEGATIVE it must NOT take the lowest-id printing (the pre-fix answer)");
+        CHECK(wagicPickFaceSiblingId(warped, 607029) == 607030,
+              "#W53-V the regular front still flips to the regular back");
+        CHECK(wagicPickFaceSiblingId(radiant, 610514) == 610513,
+              "#W53-V flipping BACK walks backwards to the same printing's front");
+        CHECK(wagicPickFaceSiblingId(radiant, 607030) == 607029,
+              "#W53-V flipping back from the regular back face reaches 607029");
+
+        //Degenerate shapes: the overwhelming case is ONE printing, and the
+        //helper must answer it identically no matter which way refId points.
+        std::vector<int> single; single.push_back(500001);
+        CHECK(wagicPickFaceSiblingId(single, 500000) == 500001
+              && wagicPickFaceSiblingId(single, 500002) == 500001
+              && wagicPickFaceSiblingId(single, 500001) == 500001,
+              "#W53-V a single printing is returned whatever the reference id");
+        CHECK(wagicPickFaceSiblingId(std::vector<int>(), 610513) == -1,
+              "#W53-V NEGATIVE no candidate in this set -> -1, caller keeps the name-only fallback");
+
+        //Three printings: the pick is the NEAREST forward id, not the largest.
+        std::vector<int> three;
+        three.push_back(100002); three.push_back(200002); three.push_back(300002);
+        CHECK(wagicPickFaceSiblingId(three, 200001) == 200002,
+              "#W53-V with three printings the nearest FORWARD id wins, not the last one");
+        CHECK(wagicPickFaceSiblingId(three, 400000) == 300002,
+              "#W53-V past every candidate it falls back to the nearest one behind");
+    }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

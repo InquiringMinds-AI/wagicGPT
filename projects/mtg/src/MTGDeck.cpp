@@ -1090,6 +1090,74 @@ void MTGAllCards::prefetchCardNameCache()
 }
 #endif
 
+int wagicPickFaceSiblingId(const std::vector<int>& ids, int refId)
+{
+    if (ids.empty()) return -1;
+    //NEAREST id in EITHER direction, forward on a tie. A DFC's two faces are
+    //ADJACENT entries in _cards.dat, so the sibling of refId is the id one step
+    //away: forward when flipping front->back, backward when flipping back->
+    //front. A forward-only rule looked right on the front->back case and got
+    //back->front wrong the moment a second printing existed further up the
+    //file (MOM 607030 -> it jumped to 610513 instead of 607029; PARSETEST
+    //caught it).
+    bool have = false; int best = 0; long bestDist = 0;
+    for (size_t i = 0; i < ids.size(); ++i)
+    {
+        long dist = (long)ids[i] - (long)refId;
+        if (dist < 0) dist = -dist;
+        if (!have || dist < bestDist || (dist == bestDist && ids[i] > best))
+        {
+            best = ids[i]; bestDist = dist; have = true;
+        }
+    }
+    return best;
+}
+
+MTGCard * MTGAllCards::getOtherFaceCard(const string& name, int setId, int refId)
+{
+    //Name-only resolution is the fallback and also the answer whenever the set
+    //carries a single printing of this face - which is the overwhelming case.
+    MTGCard * fallback = getCardByName(name, setId);
+    if (!fallback || setId < 0 || !name.size()) return fallback;
+
+    string lower = name;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    std::stringstream k;
+    k << "\x02" << lower << "\x01" << setId << "\x01" << refId;
+    const string cacheKey = k.str();
+
+    {
+        boost::mutex::scoped_lock lock(instance->mMutex);
+        map<string, MTGCard * >::iterator cached = mtgCardByNameCache.find(cacheKey);
+        if (cached != mtgCardByNameCache.end() && cached->second) return cached->second;
+    }
+
+    ensurePrintingsSorted();
+
+    boost::mutex::scoped_lock lock(instance->mMutex);
+    std::vector<int> ids;
+    for (size_t i = 0; i < printings.size(); i++)
+    {
+        MTGCard * c = printings[i].second;
+        if (!c || c->setId != setId || !c->data) continue;
+        string cardName = c->data->name;
+        std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
+        if (cardName.compare(lower) == 0) ids.push_back(c->getMTGId());
+    }
+    int pick = wagicPickFaceSiblingId(ids, refId);
+    if (pick < 0) return fallback;
+    for (size_t i = 0; i < printings.size(); i++)
+    {
+        MTGCard * c = printings[i].second;
+        if (c && c->setId == setId && c->getMTGId() == pick)
+        {
+            mtgCardByNameCache[cacheKey] = c;
+            return c;
+        }
+    }
+    return fallback;
+}
+
 MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
 {
     boost::mutex::scoped_lock lock(instance->mMutex);
