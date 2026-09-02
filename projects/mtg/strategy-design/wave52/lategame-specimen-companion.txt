@@ -1,0 +1,268 @@
+# wave-52 render-dense companion specimen: 1788320091-ai_baka_deck123-0x55b67b2f87a0-vs-ai_baka_deck126.jsonl seq 88 turn 26 phase Main phase 1 options 6 prompt 15761 chars (engine seat + synthesis pick; primary = lategame-specimen.txt)
+
+GAME LOG (everything that has happened so far):
+=== Turn 1 - opponent's turn ===
+- Your opening hand (7 cards): Tragic Slip; Intruder Alarm; Vision Skeins; Devour Flesh; Arcane Sanctum; Idyllic Tutor; Tragic Slip
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- Opponent played Scrubland
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+=== Turn 2 - YOUR turn ===
+- Phase: Draw
+- You drew Devour Flesh
+- Phase: Main phase 1
+- You played Arcane Sanctum
+=== Turn 3 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+=== Turn 4 - YOUR turn ===
+- Phase: Draw
+- You drew Tragic Slip
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Vision Skeins
+- You discarded Vision Skeins
+=== Turn 5 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 6 - YOUR turn ===
+- Phase: Draw
+- You drew Isolated Chapel
+- Phase: Main phase 1
+- You played Isolated Chapel
+=== Turn 7 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+- Opponent cast Idyllic Tutor
+- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
+- Opponent searched their library with Idyllic Tutor
+- Opponent used: choose card with Idyllic Tutor targeting Sanguine Bond
+- Opponent put the revealed Sanguine Bond into their hand
+=== Turn 8 - YOUR turn ===
+- Phase: Draw
+- You drew Idyllic Tutor
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Tragic Slip
+- You discarded Tragic Slip (that Tragic Slip was 1 of 3 copies in your hand; the other 2 are still there)
+=== Turn 9 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Opponent cast Sanguine Bond
+- Opponent's Sanguine Bond resolved and entered the battlefield
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 10 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+- Paid {2}{u} for Intruder Alarm with Arcane Sanctum; Plains; Isolated Chapel
+- You cast Intruder Alarm
+- Your Intruder Alarm resolved and entered the battlefield
+=== Turn 11 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Chromatic Lantern
+- Opponent's Chromatic Lantern resolved and entered the battlefield
+- Opponent cast Perimeter Captain
+- Opponent's Perimeter Captain resolved and entered the battlefield
+=== Turn 12 - YOUR turn ===
+- Phase: Draw
+- You drew Lightning Greaves
+- Phase: Main phase 1
+- Paid {2}{w} for Idyllic Tutor with Plains; Isolated Chapel; Arcane Sanctum
+- You cast Idyllic Tutor (that Idyllic Tutor was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Idyllic Tutor resolved and went to your graveyard
+- You searched your library with Idyllic Tutor
+- You used: choose card with Idyllic Tutor targeting Intruder Alarm
+- Your revealed Intruder Alarm went to your hand
+=== Turn 13 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 14 - YOUR turn ===
+- Phase: Draw
+- You drew Bloodline Keeper
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Devour Flesh
+- You discarded Devour Flesh (that Devour Flesh was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 15 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Wall of Omens
+- Opponent's Wall of Omens resolved and entered the battlefield
+- Opponent drew a card
+- Opponent cast Chromatic Lantern
+- Opponent's Chromatic Lantern resolved and entered the battlefield
+=== Turn 16 - YOUR turn ===
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+- Paid {2}{b}{b} for Bloodline Keeper with Arcane Sanctum; Isolated Chapel; Plains; Tundra
+- You cast Bloodline Keeper
+- Your Bloodline Keeper resolved and entered the battlefield
+- Opponent cast Tribute to Hunger
+- Opponent's Tribute to Hunger resolved and went to the opponent's graveyard
+- You used: Gain life equal to its toughness with Tribute to Hunger targeting Bloodline Keeper
+- Opponent cast Tribute to Hunger
+- Opponent's Tribute to Hunger resolved and went to the opponent's graveyard
+- You used: Gain life equal to its toughness with Tribute to Hunger targeting Bloodline Keeper
+- Your Bloodline Keeper died
+- Opponent gained 3 life (now 23)
+- You lost 3 life (now 17)
+- Opponent gained 3 life (now 26)
+- You lost 3 life (now 14)
+=== Turn 17 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+=== Turn 18 - YOUR turn ===
+- Phase: Draw
+- You drew Damnation
+- Phase: Main phase 1
+- Paid {2}{b}{b} for Damnation with Arcane Sanctum; Isolated Chapel; Plains; Tundra
+- You cast Damnation
+- Opponent's Overgrown Battlement died (that Overgrown Battlement was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Perimeter Captain died (that Perimeter Captain was 1 of 2 copies on the opponent's battlefield; the other 1 is still there)
+- Opponent's Wall of Omens died
+- Opponent's Overgrown Battlement died
+- Opponent's Perimeter Captain died
+- Your Damnation resolved and went to your graveyard
+=== Turn 19 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Overgrown Battlement
+- Opponent's Overgrown Battlement resolved and entered the battlefield
+=== Turn 20 - YOUR turn ===
+- Phase: Draw
+- You drew Lightning Greaves
+- Phase: Main phase 1
+- Paid {1}{b} for Devour Flesh with Arcane Sanctum; Plains
+- You targeted The opponent (player, life 26) with Devour Flesh
+- You cast Devour Flesh
+- Your Devour Flesh resolved and went to your graveyard
+- Opponent used: Gain life equal to its toughness with Devour Flesh targeting Overgrown Battlement
+- Opponent's Overgrown Battlement died
+- Opponent gained 4 life (now 30)
+- You lost 4 life (now 10)
+=== Turn 21 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Staff of Nin
+- Opponent's Staff of Nin resolved and entered the battlefield
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 9)
+=== Turn 22 - YOUR turn ===
+- Phase: Draw
+- You drew Bloodline Keeper
+- Phase: Main phase 1
+- Paid {2}{b}{b} for Bloodline Keeper with Arcane Sanctum; Isolated Chapel; Plains; Tundra
+- You cast Bloodline Keeper
+- Your Bloodline Keeper resolved and entered the battlefield
+=== Turn 23 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 8)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Bayou
+- Opponent cast Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad resolved and entered the battlefield
+- Opponent's Sorin, Lord of Innistrad got 4 loyalty counters (now 4)
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+=== Turn 24 - YOUR turn ===
+- Phase: Draw
+- You drew Intruder Alarm
+- Phase: Main phase 1
+- Paid {2}{u} for Intruder Alarm with Arcane Sanctum; Plains; Isolated Chapel
+- You cast Intruder Alarm (that Intruder Alarm was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Intruder Alarm resolved and entered the battlefield
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- Phase: Attackers
+- You declared attackers: Bloodline Keeper
+- Phase: Combat damage
+- Your Bloodline Keeper dealt 3 damage to the opponent (now 27)
+=== Turn 25 - opponent's turn ===
+- Phase: Upkeep
+- Opponent drew a card
+- Opponent used: Deal 1 damage with Staff of Nin targeting you
+- Opponent's Staff of Nin dealt 1 damage to you (now 7)
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Sunpetal Grove
+- Opponent's Sorin, Lord of Innistrad got a loyalty counter
+- Opponent used: +1: create a 1/1 vampire with Sorin, Lord of Innistrad
+- Opponent cast Tribute to Hunger
+- Opponent's Tribute to Hunger resolved and went to the opponent's graveyard
+- You targeted Vampire (2/2) with Tribute to Hunger's ability (gain life equal to its toughness)
+- You used: Gain life equal to its toughness with Tribute to Hunger targeting Vampire
+- Your Vampire died
+- Your Vampire (token) ceased to exist and left your graveyard
+- Opponent gained 2 life (now 29)
+- You lost 2 life (now 5)
+- Opponent's Sorin, Lord of Innistrad created a 1/1 Vampire token
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- You used: Create vampire with Bloodline Keeper
+- Your Bloodline Keeper created a 2/2 Vampire token
+- You used: Create vampire with Bloodline Keeper (you named 20 repeats of it)
+- Your Bloodline Keeper created 20 2/2 Vampire tokens
+- Your repeated activation ran 20 of the 20 times you named
+- You used: Create vampire with Bloodline Keeper (you named 11 repeats of it)
+- Your Bloodline Keeper created 11 2/2 Vampire tokens
+- Your repeated activation ran 11 of the 11 times you named
+=== Turn 26 - YOUR turn ===
+- Phase: Upkeep
+- You used: Transform:backside with Bloodline Keeper
+- Paid {b} for Bloodline Keeper with Arcane Sanctum
+- Your Bloodline Keeper transformed into Lord of Lineage (now 5/5 flying)
+- Phase: Draw
+- You drew Vision Skeins
+
+--- CURRENT SITUATION ---
+Phase: Main phase 1 | It is your turn.
+Your life: 5 | Opponent life: 29
+Mana available: 3 total (three untapped sources, tapped automatically when you cast; colours you can make: {u}{b}{w} (sources that can make each: {W} 3, {U} 1, {B} 1 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Isolated Chapel {w} or {b}; Plains {w}; Tundra {w} or {u}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (7 cards): Tragic Slip (copy 1 of 2 in your hand) {b} [instant]; Tragic Slip (copy 2 of 2 in your hand) {b} [instant]; Idyllic Tutor {2}{w} [sorcery]; Lightning Greaves (copy 1 of 2 in your hand) {2} [artifact]; Lightning Greaves (copy 2 of 2 in your hand) {2} [artifact]; Intruder Alarm {2}{u} [enchantment]; Vision Skeins {1}{u} [instant]
+Your battlefield (40 permanents listed, of which 34 are creatures, 34 of them able to attack right now): Arcane Sanctum [tapped]; Intruder Alarm #1 {2}{u} [enchantment]; Intruder Alarm #2 {2}{u} [enchantment]; Isolated Chapel; Lord of Lineage (5/5) [flying, doesn't untap during its controller's untap step]; Plains; Tundra; Vampire #1-#33 (4/4) (printed 2/2) [flying, doesn't untap during its controller's untap step] x33
+Opponent battlefield (15 permanents listed, of which 2 are creatures, 2 of them without a restriction against attacking): Bayou #1-#3 x3; Chromatic Lantern #2 {3} [artifact]; Chromatic Lantern #1 {3} [artifact] {effect (each copy of this card does this): "Lands you control have "{T}: Add one mana of any color." -- {T}: Add one mana of any color."}; Isolated Chapel [tapped]; Sanguine Bond {3}{b}{b} [enchantment] {effect: "Whenever you gain life, target opponent loses that much life."}; Scrubland #2; Scrubland #1 [tapped]; Sorin, Lord of Innistrad {2}{b}{w} [planeswalker] [counters: 5x loyalty] {effect: "+1: Put a 1/1 black Vampire creature token... -- [1 more clause of this card's text not shown] -- -6: Destroy up to three target creatures and/or other planeswalkers. Return each card put..."}; Staff of Nin {6} [artifact] [tapped] {effect: "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Sunpetal Grove #2; Sunpetal Grove #1 [tapped]; Vampire #1 (1/1) [lifelink, doesn't untap during its controller's untap step]; Vampire #2 (1/1) [lifelink, doesn't untap during its controller's untap step]
+Opponent hand size: 0 | Opponent library: 37 cards
+Artifacts in play: you 0 | opponent 3
+LIFE-TO-DAMAGE CONVERTER on the battlefield: theirs - Sanguine Bond. While it is in play, life ITS CONTROLLER gains also makes the other player lose that much life. A converter of THEIRS turns every life THEY gain - lifelink, blocking triggers, drains, any of it - into that much life off YOUR total as well; a converter of YOURS does the same to life YOU gain, and leaves their gains alone. This is not a trade: when they gain N, their total goes UP by N and yours goes DOWN by N in the same event.
+Your library: 39 cards
+
+Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?
+1. Cast Tragic Slip {b} {right now: -1/-1 (no creature has died this turn, so Morbid does NOT apply)} {leaves 2 of your 3 untapped mana sources untapped} - legal targets right now: Vampire #1 (creature 1/1) [lifelink, doesn't untap during its controller's untap step], Vampire #2 (creature 1/1) [lifelink, doesn't untap during its controller's untap step], Lord of Lineage (creature 5/5) [flying, doesn't untap during its controller's untap step] {target text: "Flying -- Other Vampire creatures you control get +2/+2. -- {T}: Put a 2/2 black Vampire creature token with flying onto the battlefield. //..."}, Vampire #1-#33 (creature 4/4) [flying, doesn't untap during its controller's untap step] x33 {card text: "Target creature gets -1/-1 until end of turn. -- Morbid - that creature gets -13/-13 instead if a creature died this turn."}
+2. Cast Idyllic Tutor {2}{w} [finds only an enchantment card - every enchantment left in your library is a copy of one you already control or hold: Intruder Alarm] {leaves 0 of your 3 untapped mana sources untapped - casting this taps you out} {spends 3 of your 3 untapped mana sources this turn; Tragic Slip {b} in your hand needs 1} {card text: "Search your library for an enchantment card, reveal it, and put it into your hand. Then shuffle."}
+3. Cast Lightning Greaves {2} {leaves 1 of your 3 untapped mana sources untapped} {spends 2 of your 3 untapped mana sources this turn; Vision Skeins {1}{u} in your hand needs 2} {card text: "Equipped creature has haste and shroud. (It can't be the target of spells or abilities.) -- Equip {0} ({0}: Attach to target creature you control. Equip only as a sorcery. This card enters unattached and stays on the battlefield if the creature leaves.)"}
+4. Cast Intruder Alarm {2}{u} [second copy: you already control Intruder Alarm; both stay on the battlefield - no legend rule] {leaves 0 of your 3 untapped mana sources untapped - casting this taps you out} {spends 3 of your 3 untapped mana sources this turn; Tragic Slip {b} in your hand needs 1} {card text: "Creatures don't untap during their controllers' untap steps. -- Whenever a creature enters, untap all creatures."}
+5. Cast Vision Skeins {1}{u} {leaves 1 of your 3 untapped mana sources untapped} {card text: "Each player draws two cards."}
+6. Cast nothing right now (combat comes next this turn)
+
+On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Tragic Slip)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+
+--- REPLY ---
+CHOICE: 6 (Cast nothing right now)
