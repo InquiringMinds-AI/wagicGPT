@@ -5809,3 +5809,55 @@ Carries: every 2026-09-01 fix (crash cluster nothrow + memlog probe, GuiCombat c
 transcripts + classification menu, all nine lane fixes, Pridemate/PSAL, option-preserving
 autotap, Show of Confidence targeting). FIRST THING after his next play session: fetch
 ux0:/data/Wagic/memlog.txt + ux0:/data/Wagic/transcripts/, replay any game he classified.
+
+## 2026-09-02 — vpk9 play report: "severe performance issues" + crash at the last combat's damage
+Owner played ONE game on vpk9 (player_deck2 vs ai_baka_deck121, 42 turns, human won 19/-3;
+memlog: heap_free ~10MB flat across the game, vram_free 33-35MB - NO memory growth in one
+game) and reported severe performance issues + a crash "on the damage phase of what would have
+been the last round of combat". Fetched: psp2core-1788315925 (crashes/vita-dumps/core-1788315925.*),
+logs/20260902/{memlog,transcript-1788315466,fizzlelog,debug,wagic-ziplog}.txt.
+
+CRASH (vpk9): thread WAGC00042 data abort at JGuiController::Update (JGE/src/JGui.cpp
+`mButtons[i]->Update(dt)`), R0=0: a SimpleMenu whose mButtons vector held exactly ONE NULL
+(start 0x822d4088, finish 0x822d408c). Chain: GameStateDuel::Update -> SimpleMenu::Update:323 ->
+JGuiController::Update; stale SimpleMenu::Add / JGuiController::Add frames still on the stack
+=> the FIRST Update of the freshly built "How was this match?" transcript menu, i.e. the crash
+IS at game end (the "damage phase" = the lethal combat). SimpleMenu never adds buttons, so a
+fresh menu with a button entry means heap damage of unknown origin (the core carries no heap;
+0x82934620 unreadable). Ruled out: class-layout/ODR mismatch (members unconditional), the
+vitaMemProbe buffer (320B, fixed format), desktop menu path (ASAN self-play through the
+victory screen via the new WAGIC_TRANSCRIPT_MENU_SELFTEST hook: clean, #classification
+written). SHIPPED (aaa68c888): NULL guards in JGuiController::Update + CheckUserInput button
+loops (mitigation - the data abort cannot recur at that site; the corruption source stays
+OPEN). Still on the docket with the Aug-28 _malloc_r heap-corruption dump.
+
+PERFORMANCE (vpk9): the option-preserving autotap preview (ManaEngine::refineForOptions via
+GuiHandSelf::Update) re-ran every 0.25s while a hand card was focused - castableForDisplay
+twice + the configuration search on a 444MHz ARM. Now memoised on (focused card, pool, hand,
+battlefield tap state) so a static board plans once. NOT MEASURED on device - the owner's next
+session is the test; if still slow, the next suspects are (1) sourceHasNonManaTapAbility's
+affordable-only pricing (a potentialMana walk per utility source inside every planPayment,
+and planPayment runs per hand card + per battlefield card every 0.25s through the oracle) and
+(2) GuiCombat::reseatCursor at every CheckUserInput.
+
+REPLAY of the Vita human game (desktop `WAGIC_REPLAY=<transcript>`): first attempt diverged at
+action 0 and SEGV'd in the divergence REPORTER (currentActionCard freed). Fixes: replay runs
+SKIP-FREE (loadingScripted also when WAGIC_REPLAY - the human seat only ever advanced by
+recorded `next` presses), a `next` for a phase the retries already passed counts as
+satisfied, the reporter names cards only while the action layer is waiting. Result: 22/42
+turns faithful, then DIVERGED at action 323: `p1.battlefield[3] 1westvale abbey` then
+`p1.choice 1` - on the console the Abbey click opened an ability menu (choice 1 = {5}{T}{L:1}
+cleric), in the replay the click resolved with NO menu (chooser=none menu=none). Open: either
+the menu gate (affordability of the {5} ability) sees a different mana state in replay
+(autotap re-derivation vs recorded taps?) or the console's click layer offers unaffordable
+abilities. NEXT replay item. Also: suite/PARSETEST games leaked "testsuite-vs-testsuite"
+transcripts (51 files) - gated on WAGIC_TESTSUITE/WAGIC_GPT_PARSETEST env.
+
+Rootcast 2-of-4: still needs a transcript that contains it.
+
+VPK vita-vpk10 from psp-port = aaa68c888: incremental vitasdk build (unit vita-vpk10, log
+~/.gatelogs/vita_vpk10.log, exit 0), 33,166,309 B -> 10.0.0.227:1337 ux0:/vpk/wagic.vpk,
+size-verified. (The Vita FTP refused the first connect both times tonight; the retry loop
+with --connect-timeout 60 went through.) Install manual. Supersedes vpk9. Carries the NULL
+guards + the memoised tap preview; the crash source and the perf verdict are decided by the
+owner's next session (fetch memlog.txt + transcripts first).
