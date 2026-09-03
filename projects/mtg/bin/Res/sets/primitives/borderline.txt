@@ -13553,7 +13553,7 @@ type=Instant
 [/card]
 [card]
 name=Branching Evolution
-auto=@counteradded(1/1) from(creature|mybattlefield):target(creature[counter{1/1}]|Battlefield) counter(1/1) notrg
+auto=@totalcounteradded(1/1) from(creature|myBattlefield) duplicate(all):ability$!name(Double the counters) donothing!$ controller
 text=If one or more +1/+1 counters would be put on a creature you control, twice that many +1/+1 counters are put on that creature instead.
 mana={2}{G}
 type=Enchantment

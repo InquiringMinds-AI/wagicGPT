@@ -1,0 +1,28 @@
+#NAME: Branching Evolution does NOT double counters on a creature you do not control
+#DESC: Negative pin for the owner's Vita report. Oracle (Scryfall) scopes the
+#DESC: replacement to "a creature you control"; the from(creature|myBattlefield) filter
+#DESC: must reject an opponent's creature. The old script's target ask ranged over the
+#DESC: WHOLE battlefield, so it could add a counter to a creature the Oracle never
+#DESC: mentions. One counter placed on the opponent's 2/2 must leave it a 3/3.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Branching Evolution,Lexicon Any Counter Witness,Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Runeclaw Bear
+life:20
+[DO]
+Lexicon Any Counter Witness
+Runeclaw Bear
+assertpt 3/3 runeclaw bear
+assertpt 2/2 grizzly bears
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Branching Evolution,Lexicon Any Counter Witness,Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Runeclaw Bear
+life:20
+[END]

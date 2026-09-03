@@ -1,0 +1,32 @@
+#NAME: Branching Evolution doubles a single +1/+1 counter as a replacement effect
+#DESC: Owner Vita report (2026-09-01): "one of my enchantments working wrong, letting me
+#DESC: add counters to a target instead of doubling as a replacement effect."
+#DESC: Oracle (Scryfall): "If one or more +1/+1 counters would be put on a creature you
+#DESC: control, twice that many +1/+1 counters are put on that creature instead."
+#DESC: The old script was `@counteradded(1/1) from(creature|mybattlefield):
+#DESC: target(creature[counter{1/1}]|Battlefield) counter(1/1) notrg` - a TRIGGER that
+#DESC: opened a target ask over the WHOLE battlefield and added exactly one counter.
+#DESC: One counter on a 2/2 you control must yield 2 counters (4/4), and the opponent's
+#DESC: creature must be untouched.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Branching Evolution,Lexicon Any Counter Witness,Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Runeclaw Bear
+life:20
+[DO]
+Lexicon Any Counter Witness
+Grizzly Bears
+assertpt 4/4 grizzly bears
+assertpt 2/2 runeclaw bear
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Branching Evolution,Lexicon Any Counter Witness,Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Runeclaw Bear
+life:20
+[END]
