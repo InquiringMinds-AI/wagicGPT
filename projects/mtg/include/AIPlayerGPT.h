@@ -151,6 +151,12 @@ public:
     //stall floor. An endpoint-less seat is never in flight (all its seams
     //fall through to the heuristic).
     virtual bool aiDecisionInFlight() const { return !mEndpoint.empty() && asyncBusy(); }
+    //#W57-T: the seat's async/pending state as one line for the softlock
+    //diagnostics dump - per arm: status (idle/in-flight/done-unconsumed),
+    //seconds in flight, the slot key the request was built for, the HTTP
+    //status of the last round trip - plus the standing notice and fallback
+    //count. Takes each arm's mutex briefly, exactly as asyncBusy does.
+    virtual std::string softlockDiagnostic() const;
     virtual void Render();
 
     //The patience prompt. A call still in flight after mPatienceLimit

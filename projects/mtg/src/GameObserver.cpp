@@ -327,6 +327,7 @@ void GameObserver::nextGamePhase()
             handmodified = 0;
         while (currentPlayer->game->hand->nb_cards > handmodified && currentPlayer->nomaxhandsize == false)
         {
+            hangCheck("GameObserver::nextGamePhase/discardToHandSize"); //#W57-T
             WEvent * e = NEW WEventCardDiscard(currentPlayer->game->hand->cards[0]);
             receiveEvent(e);
             currentPlayer->game->putInGraveyard(currentPlayer->game->hand->cards[0]);
@@ -969,6 +970,9 @@ void GameObserver::dumpAssert(bool val)
 
 void GameObserver::Update(float dt)
 {
+    //#W57-T (half A): re-arm the per-tick hang budget. No-op unless
+    //WAGIC_HANG_GUARD=1 - see GameObserver::hangTickBegin.
+    hangTickBegin();
     //Pre-game phase gate: while it runs, the normal game loop is
     //suppressed (the board still renders via GameObserver::Render). On
     //completion the phase is torn down and mPregameDone latches, which
@@ -1026,6 +1030,7 @@ void GameObserver::Update(float dt)
         mLayers->Update(dt, player);
         while (mLayers->actionLayer()->stuffHappened)
         {
+            hangCheck("GameObserver::Update/stuffHappened"); //#W57-T
             mLayers->actionLayer()->Update(0);
         }
         gameStateBasedEffects();
@@ -1443,6 +1448,7 @@ void GameObserver::gameStateBasedEffects()
                 if(!c)break;
                 while (c->flanked)
                 {
+                    hangCheck("GameObserver::gameStateBasedEffects/flanked"); //#W57-T
                     /////////////////////////////////
                     //undoes the flanking on a card//
                     /////////////////////////////////
@@ -2421,6 +2427,7 @@ int GameObserver::receiveEvent(WEvent * e)
     int result = 0;
     while (eventsQueue.size())
     {
+        hangCheck("GameObserver::receiveEvent/eventsQueue"); //#W57-T
         WEvent * ev = eventsQueue.front();
         result += mLayers->receiveEvent(ev);
         for (int i = 0; i < 2; ++i)

@@ -119,6 +119,43 @@ class GameObserver{
   bool mGameEndNoted;      //#result written for this game
   bool mGameEndMemlogged;  //VITA memlog "gameend" mark written for this game
   void writeTranscript(const char * tag);
+  //#W57-T: the softlock diagnostics dump written for THIS game (empty = none).
+  //Kept on the observer, not in a static: a GameObserver is deleted at End()
+  //and the allocator hands the same address back for the next game (the W53-U
+  //lesson), so identity has to live on the object. Read by the post-match
+  //classification menu so a "bug" verdict names the file that was captured.
+  string mSoftlockDumpPath;
+  //#W57-T half A - the in-thread hang guard. DEFAULT OFF, and off in the test
+  //suite and the selfplay harness even when the env var is set for the shell,
+  //unless WAGIC_HANG_GUARD=1 names it explicitly: a suite tick under load can
+  //legitimately take seconds, and a guard that fires on a slow machine is a
+  //flaky red, not a bug report. hangTickBegin re-arms the budget once per game
+  //tick; hangCheck is the cheap per-iteration probe the loop sites call. NOTE
+  //the budget is per TICK, not per decision: an AI seat waiting on a model
+  //round trip is not inside this tick at all (the seam returns kChoicePending
+  //and the frame completes), so a slow endpoint can never trip it.
+  bool mHangGuardOn = false;
+  bool mHangGuardResolved = false; //env consulted once per observer
+  long mHangBudgetMs = 5000;
+  long long mHangTickStartMs = 0;
+  unsigned long mHangIterations = 0;
+  void hangTickBegin();
+  void hangCheck(const char * site);
+  //Test-suite hook: the programmatic twin of WAGIC_HANG_GUARD=1 +
+  //WAGIC_HANG_GUARD_MS=<budget>, so a fixture can arm the guard without an
+  //environment variable (a registered fixture runs under the threaded suite
+  //and must not depend on process-wide state). Never called outside a fixture.
+  void hangGuardForTest(long budgetMs)
+  {
+      mHangGuardResolved = true;
+      mHangGuardOn = true;
+      mHangBudgetMs = budgetMs;
+      mHangTickStartMs = 0;
+      mHangIterations = 0;
+  }
+  //#W57-T: the last recorded actions, for the dump's transcript tail. The
+  //list IS the transcript body (operator<< writes it), so no second buffer.
+  const list<string> & getActionsList() const { return actionsList; }
   void setReplayRules(Rules * rules) { mRules = rules; }
   void appendTranscriptNote(const string & note);
   //`realgame` fixture directive only: names the seat the engine should treat
@@ -349,6 +386,39 @@ class GameObserver{
   DuelLayers *getView() { return mLayers; };
 
 };
+
+//#W57-T (softlock escape), half A: the in-thread hang guard's unwind signal.
+//Thrown by GameObserver::hangCheck when one game tick has burned its whole
+//wall-clock budget inside a loop, and caught at the duel screen's per-frame
+//game->Update call - the outermost per-frame call that can unwind without
+//leaving a half-updated frame behind. C++ exceptions are on everywhere this
+//builds (the Vita toolchain compiles with -fexceptions).
+struct SoftlockAbort
+{
+    const char * site;
+    unsigned long iterations;
+    long budgetMs;
+    SoftlockAbort(const char * s, unsigned long it, long ms) : site(s), iterations(it), budgetMs(ms) {}
+};
+
+//#W57-T (softlock escape). Writes a diagnostics snapshot of the live game to
+//ux0:data/Wagic/softlock-<epoch>.txt (Vita) / User/softlock-<epoch>.txt
+//(desktop, next to User/transcripts) and returns the path it wrote, or "" on
+//failure. `trigger` names what asked for it ("menu", "testsuite", a hang-guard
+//site). Also stamps the game's transcript `#classification=softlock` and
+//`#softlock file=...`. Reads only live state - no game mutation - so it is
+//safe to call from a menu callback, from a fixture, or from a hang-guard
+//unwind. Defined in GameStateDuel.cpp (the duel screen owns this feature);
+//it is not its own translation unit on purpose - a new source would mean
+//regenerating Makefile.sdl and editing the Vita CMakeLists and Android.mk
+//mid-wave, for a function with exactly one owner.
+class GameObserver;
+std::string wagicSoftlockDump(GameObserver * game, const char * trigger);
+//#W57-T: per-frame heartbeat, published by the duel screen's Update (see
+//GameStateDuel::Update). Two clock reads a frame; the dump renders it as a
+//memlog-style `frames` line so a capture says what the frame rate was doing.
+void wagicSoftlockFrameTick(float dt);
+void wagicSoftlockFrameReset();
 
 #ifdef NETWORK_SUPPORT
 class NetworkGameObserver : public GameObserver

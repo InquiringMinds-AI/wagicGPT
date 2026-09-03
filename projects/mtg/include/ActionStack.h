@@ -313,6 +313,14 @@ public:
     void setCurrentTutorial(ATutorialMessage* message) {currentTutorial = message;};
     ATutorialMessage* getCurrentTutorial() {return currentTutorial;};
     bool isCalm() {return interruptDecision[0] == NOT_DECIDED && interruptDecision[1] == NOT_DECIDED;};
+    //#W57-T: read-only view of the per-seat interrupt verdict + the offer
+    //timer, for the softlock diagnostics dump. `isCalm` only says "neither
+    //seat has decided"; a capture needs to know WHICH verdict each seat holds
+    //(the owner's frozen-selector report is exactly a disagreement between
+    //what the layers think the acting seat is and what these say).
+    InterruptDecision getInterruptDecision(int i) const { return (i == 0 || i == 1) ? interruptDecision[i] : NOT_DECIDED; }
+    float getInterruptTimer() const { return timer; }
+    int getCurrentState() const { return currentState; }
 };
 
 #endif

@@ -152,6 +152,16 @@ public:
         return 0;
     }
 
+    //#W57-T: one line of seat-private state for the softlock diagnostics dump.
+    //A virtual, not a dynamic_cast in the dump: the async slots, the seam key
+    //and the in-flight clock belong to AIPlayerGPT and nothing outside it may
+    //touch them (they are shared with a worker thread under a mutex). Empty
+    //for every seat that has nothing private to say.
+    virtual std::string softlockDiagnostic() const
+    {
+        return std::string();
+    }
+
     //An AI that can answer interactive prompts (menus, target choosers)
     //like a human. Card data gates decisions on "ishuman" to route AI
     //players onto dice-roll heuristic lines instead of interactive ones -

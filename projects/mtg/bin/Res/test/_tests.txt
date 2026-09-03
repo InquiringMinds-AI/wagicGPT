@@ -922,6 +922,7 @@ slate_of_ancestry.txt
 sleeper_agent.txt
 slith_bloodletter.txt
 sneak_attack.txt
+softlock_dump.txt
 solfatara.txt
 soulblast.txt
 souls_attendant_i489.txt

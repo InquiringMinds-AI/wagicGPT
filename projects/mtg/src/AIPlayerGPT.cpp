@@ -9689,6 +9689,66 @@ bool AIPlayerGPT::asyncBusy() const
     return mAsyncLandState->status == 1;
 }
 
+//#W57-T (softlock escape): the seat's async/pending state, for the diagnostics
+//dump. In the owner's vpk16 report the game loop was ALIVE and the selector
+//frozen because the layers did not name his seat as the acting one; whether an
+//AI seat had a round trip out at that moment is one of the facts that would
+//separate the candidate causes, and nothing in the game recorded it. Hence:
+//per arm, does it have a request out, for how long, and for which question.
+//One line per arm; the mutexes are taken and released exactly the way
+//asyncBusy takes them (no allocation while held).
+std::string AIPlayerGPT::softlockDiagnostic() const
+{
+    std::ostringstream o;
+    const char * armName[2] = { "main", "land" };
+    const std::shared_ptr<AsyncState> arms[2] = { mAsyncState, mAsyncLandState };
+    for (int i = 0; i < 2; ++i)
+    {
+        int status = -1; long http = 0; bool timedOut = false;
+        std::string slot; size_t promptLen = 0, respLen = 0; long long inflightMs = -1;
+        if (arms[i])
+        {
+            std::lock_guard<GptMutex> g(arms[i]->mtx);
+            status = arms[i]->status;
+            http = arms[i]->httpStatus;
+            timedOut = arms[i]->timedOut;
+            slot = arms[i]->slotKey;
+            promptLen = arms[i]->prompt.size();
+            respLen = arms[i]->response.size();
+            if (status == 1)
+                inflightMs = (long long) std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - arms[i]->started).count();
+        }
+        //The slot key is the seam: question + options tail + turn/phase/board.
+        //Newlines in it would break the one-line-per-field shape of the dump.
+        for (size_t k = 0; k < slot.size(); ++k)
+            if (slot[k] == '\n' || slot[k] == '\r') slot[k] = '|';
+        if (slot.size() > 300) slot = slot.substr(0, 300) + "...";
+        o << "  arm=" << armName[i]
+          << " status=" << status
+          << (status == 0 ? "(idle)" : status == 1 ? "(in-flight)" : status == 2 ? "(done-unconsumed)" : "(none)")
+          << " inflight_ms=" << inflightMs
+          << " http=" << http
+          << " timedout=" << (timedOut ? 1 : 0)
+          << " prompt_bytes=" << (unsigned) promptLen
+          << " response_bytes=" << (unsigned) respLen
+          << " seam='" << slot << "'\n";
+    }
+    std::string notice = mNotice;
+    for (size_t k = 0; k < notice.size(); ++k)
+        if (notice[k] == '\n' || notice[k] == '\r') notice[k] = '|';
+    o << "  endpoint_set=" << (mEndpoint.empty() ? 0 : 1)
+      << " in_flight=" << (aiDecisionInFlight() ? 1 : 0)
+      << " think_s=" << mThinkTime
+      << " timeout_ms=" << mTimeoutMs
+      << " patience_s=" << mPatienceLimit
+      << " last_latency_ms=" << mLastLatencyMs
+      << " fallbacks=" << mFallbackCount
+      << " degraded_ticks=" << mDegradedTicks
+      << " notice='" << notice << "'";
+    return o.str();
+}
+
 //THE NO-ANSWER CLASSES ARE NOT ALL THE SAME FAILURE. "empty_reply" has always
 //meant TRANSPORT: nothing came back, or the endpoint is down - the reply body
 //was empty. With a server-side reasoning parser, a reply can arrive complete,

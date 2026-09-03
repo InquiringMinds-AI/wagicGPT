@@ -1,0 +1,37 @@
+#W57-T (softlock escape). Pins the diagnostics capture the in-game
+#"Softlock: dump diagnostics and quit to menu" item writes: the fixture runs
+#the SAME function (`softlockdump`) at the two moments a real softlock report
+#comes from - a target chooser armed and waiting for an answer, and again once
+#the spell has gone through the stack - and the command reads the file back and
+#asserts every section a capture must carry. `hangspin` then pins half A: the
+#in-thread hang guard armed with a 20 ms budget, spun deliberately, tripping and
+#writing the same capture with the tripping site named. RED on base (no such
+#commands - the fixture cannot even parse there).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:shock
+inplay:mountain
+[PLAYER2]
+inplay:grizzly bears
+[DO]
+mountain
+shock
+softlockdump
+grizzly bears
+softlockdump
+hangspin 20
+next
+next
+next
+next
+next
+next
+[ASSERT]
+CLEANUP
+[PLAYER1]
+graveyard:shock
+inplay:mountain
+[PLAYER2]
+graveyard:grizzly bears
+[END]

@@ -199,6 +199,7 @@ int AIPlayer::clickMultiTarget(TargetChooser * tc, vector<Targetable*>& potentia
         clickstream.push(NEW AIAction(this, NULL,tc->source,potentialTargets));
     while(clickstream.size())
     {
+        observer->hangCheck("AIPlayer::Act/clickstream"); //#W57-T
         AIAction * action = clickstream.front();
         action->Act();
         SAFE_DELETE(action);
