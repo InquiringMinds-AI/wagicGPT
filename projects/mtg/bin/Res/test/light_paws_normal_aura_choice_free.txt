@@ -1,0 +1,33 @@
+#NAME: Light-Paws negative control - an Aura the player CASTS still goes where the player aims it
+#DESC: Guard for the w56-X fix (the tutored Aura is forced onto Light-Paws). The forcing must
+#DESC: apply ONLY to the Aura Light-Paws puts onto the battlefield, never to an Aura the player
+#DESC: casts himself - "Enchant creature" is still the caster's free choice, and Light-Paws'
+#DESC: trigger is a "may" the player can decline.
+#DESC: Holy Strength (+1/+2) is CAST on Grizzly Bears with Light-Paws on the battlefield; the
+#DESC: search is DECLINED. Grizzly Bears must be 3/4 and Light-Paws must stay 2/2.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Grizzly Bears
+hand:Holy Strength
+library:Pacifism
+manapool:{W}
+life:20
+[PLAYER2]
+life:20
+[DO]
+Holy Strength
+Grizzly Bears
+choice 1
+assertpt 3/4 grizzly bears
+assertpt 2/2 light-paws, emperor's voice
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Light-Paws^ Emperor's Voice,Grizzly Bears,Holy Strength
+library:Pacifism
+manapool:{0}
+life:20
+[PLAYER2]
+life:20
+[END]
