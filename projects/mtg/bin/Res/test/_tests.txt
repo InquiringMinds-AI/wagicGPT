@@ -1345,3 +1345,7 @@ w57S_human_seat_cast_countered_advances.txt
 w57S_human_seat_cast_dissipated_advances.txt
 w57d_display_toggle_seat_scope.txt
 w57U_ai_inflight_call_abandoned.txt
+w57V_block_first_strike_trade.txt
+w57V_block_double_strike_trade.txt
+w57V_block_deathtouch_blocker_kills.txt
+w57V_block_profitable_trade_control.txt

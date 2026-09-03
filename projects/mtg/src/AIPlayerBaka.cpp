@@ -4408,29 +4408,225 @@ static int unblockedDamageTo(Player * me)
     return total;
 }
 
-//W53-U: does the attacker's combat damage DESTROY this blocker whatever its
-//toughness? Deathtouch makes any nonzero amount lethal (CR 702.2b), so every
-//power/toughness comparison in a blocking decision is wrong against a
-//deathtouch attacker: no blocker "survives" it, and every extra body in a gang
-//block is an extra corpse. Indestructible and protection from the attacker are
-//the two outs the rules give the blocker. Owner Vita play report 2026-09-02
-//(transcript-1788381069, his tag "bad blocking"): "opponent double blocked for
-//no good reason" - a B/G deathtouch board (Hapatra / Gifted Aetherborn /
-//Vampire Nighthawk / Fynn, every attacker deathtouch) against 1/3 Daybreak
-//Chaplains, which pass 1's arithmetic read as a free gang kill.
-static bool blockerDiesToAttackerRegardless(MTGCardInstance * attacker, MTGCardInstance * blocker)
+//W53-U (superseded by #W57-V): "does the attacker destroy this blocker
+//whatever its toughness" used to live in its own helper. Deathtouch makes any
+//nonzero amount lethal (CR 702.2b), with indestructible and protection the two
+//outs; that rule now lives inside damageDestroys() below, where the first-strike
+//arithmetic can use it too. Origin: owner Vita play report 2026-09-02
+//(transcript-1788381069, his tag "bad blocking") - a B/G deathtouch board against
+//1/3 Daybreak Chaplains, which pass 1's arithmetic read as a free gang kill.
+
+//#W57-V (D-blocking): the combat arithmetic a blocking decision actually needs.
+//Every kill/survive test in chooseBlockers compared power to toughness RAW,
+//which is false the moment either side strikes first: a 1/1 blocker "kills" a
+//1/1 double striker on paper and in fact dies before it ever deals damage, and
+//the seat makes that same block every single combat. Owner Vita play reports
+//2026-09-03 (his tag "bad blocking", his framing "legal, but deterministically
+//bad") - his player deck2 is a first-strike/double-strike deck (Fencing Ace 1/1
+//double strike, Youthful Knight 2/1 first strike, Danitha Capashen 2/2 first
+//strike, Kwende) and the seat blocked into it for nothing in
+//transcript-1788471208 and transcript-1788469781.
+static bool strikesFirst(MTGCardInstance * c)
 {
-    if (!attacker || !blocker)
+    return c && (c->has(Constants::FIRSTSTRIKE) || c->has(Constants::DOUBLESTRIKE));
+}
+
+//#W57-V: how much damage `src` must ASSIGN to destroy `dst`, or -1 when it
+//cannot be destroyed by that source at all. Deathtouch makes 1 enough
+//(CR 702.2b); indestructible and protection from the source are the two outs.
+static int lethalNeededFrom(MTGCardInstance * src, MTGCardInstance * dst)
+{
+    if (!src || !dst)
+        return -1;
+    if (dst->has(Constants::INDESTRUCTIBLE))
+        return -1;
+    if (dst->protectedAgainst(src))
+        return -1;
+    if (src->has(Constants::DEATHTOUCH) || src->has(Constants::PERPETUALDEATHTOUCH))
+        return 1;
+    return (dst->toughness > 0) ? dst->toughness : 1;
+}
+
+//#W57-V: the seat's rough PRICE of a creature - the same raw score
+//MTGCardInstance::DangerRanking() buckets, used unbucketed so a 6/6 is not
+//"equal" to a 3/3. A declaration that spends more value than it kills is the
+//shape the owner saw: transcript-1788468785 turn 13, an Ironroot Warlord (*/5)
+//collected all FIVE untapped blockers the seat owned while three 2/2 Squirrels
+//walked in unblocked.
+static int creatureValue(MTGCardInstance * c)
+{
+    if (!c)
+        return 0;
+    int v = c->power + c->toughness;
+    if (c->getManaCost())
+        v += c->getManaCost()->getConvertedCost();
+    for (int j = 0; j < Constants::NB_BASIC_ABILITIES; j++)
+        if (c->basicAbilities[j])
+            v += 1;
+    return v;
+}
+
+//#W57-V: resolve a WHOLE block declaration on one attacker over both damage
+//steps. This is the arithmetic every kill/survive question in chooseBlockers
+//was missing:
+//  * FIRST STRIKE / DOUBLE STRIKE decide WHEN damage lands, so a blocker
+//    destroyed in the first-strike step deals nothing at all - the reason a 1/1
+//    "kills" a 1/1 double striker on paper and never does in play;
+//  * the attacker DIVIDES its damage among its blockers (CR 510.1c), so a gang
+//    does not lose every member - counting each blocker as dead independently
+//    both over-prices good gangs and under-prices bad ones. The allocation
+//    modelled here is the attacker's best play (kill as many as the damage
+//    allows, cheapest lethal first), i.e. the defender's WORST case;
+//  * deathtouch, indestructible and protection ride in lethalNeededFrom.
+//`candidate` (may be NULL) is a body being considered ON TOP of the blockers
+//already declared. Fills whether the attacker dies, whether the candidate dies,
+//and the total VALUE the declaration spends (every blocker in it that dies).
+static void evaluateDeclaration(MTGCardInstance * attacker, MTGCardInstance * candidate,
+                                bool & attackerDies, bool & candidateDies, int & valueSpent)
+{
+    attackerDies = false;
+    candidateDies = false;
+    valueSpent = 0;
+    if (!attacker)
+        return;
+
+    vector<MTGCardInstance *> set;
+    for (list<MTGCardInstance*>::iterator it = attacker->blockers.begin();
+         it != attacker->blockers.end(); ++it)
+        if (*it)
+            set.push_back(*it);
+    //`candidate` may already be declared on this attacker (the diagnostic asks
+    //about a member of the standing set); only ADD it when it is not.
+    bool alreadyIn = false;
+    for (size_t i = 0; i < set.size(); ++i)
+        if (candidate && set[i] == candidate)
+            alreadyIn = true;
+    if (candidate && !alreadyIn)
+        set.push_back(candidate);
+    if (set.empty())
+        return;
+
+    vector<bool> dead(set.size(), false);
+    vector<int> marked(set.size(), 0);
+    int attackerMarked = 0;
+    bool attackerDeathtouched = false;
+    bool attackerDead = false;
+
+    for (int step = 0; step < 2 && !attackerDead; ++step)
+    {
+        const bool fsStep = (step == 0);
+        int atkDmg = 0;
+        if (strikesFirst(attacker))
+            atkDmg = fsStep ? attacker->power
+                            : (attacker->has(Constants::DOUBLESTRIKE) ? attacker->power : 0);
+        else
+            atkDmg = fsStep ? 0 : attacker->power;
+
+        int blkDmg = 0;
+        bool blkDeathtouch = false;
+        for (size_t i = 0; i < set.size(); ++i)
+        {
+            if (dead[i])
+                continue;
+            MTGCardInstance * b = set[i];
+            int d = 0;
+            if (strikesFirst(b))
+                d = fsStep ? b->power : (b->has(Constants::DOUBLESTRIKE) ? b->power : 0);
+            else
+                d = fsStep ? 0 : b->power;
+            if (d <= 0 || attacker->protectedAgainst(b))
+                continue;
+            blkDmg += d;
+            if (b->has(Constants::DEATHTOUCH) || b->has(Constants::PERPETUALDEATHTOUCH))
+                blkDeathtouch = true;
+        }
+
+        //damage is simultaneous inside a step: the attacker assigns first in
+        //this model, but only creatures ALIVE at the start of the step were
+        //counted into blkDmg above.
+        if (atkDmg > 0)
+        {
+            int budget = atkDmg;
+            while (budget > 0)
+            {
+                int pick = -1, need = 0;
+                for (size_t i = 0; i < set.size(); ++i)
+                {
+                    if (dead[i])
+                        continue;
+                    const int total = lethalNeededFrom(attacker, set[i]);
+                    if (total <= 0)
+                        continue;
+                    const int n = total - marked[i];
+                    if (n <= 0 || n > budget)
+                        continue;
+                    if (pick < 0 || n < need)
+                    {
+                        pick = (int) i;
+                        need = n;
+                    }
+                }
+                if (pick < 0)
+                    break;
+                dead[pick] = true;
+                budget -= need;
+            }
+            if (budget > 0)
+            {
+                //leftover damage still marks a survivor, and can finish it in
+                //the regular step.
+                for (size_t i = 0; i < set.size(); ++i)
+                    if (!dead[i])
+                    {
+                        marked[i] += budget;
+                        break;
+                    }
+            }
+        }
+
+        attackerMarked += blkDmg;
+        if (blkDeathtouch && blkDmg > 0)
+            attackerDeathtouched = true;
+        if (!attacker->has(Constants::INDESTRUCTIBLE)
+            && (attackerDeathtouched
+                || (attackerMarked > 0 && attackerMarked >= attacker->toughness)))
+            attackerDead = true;
+    }
+
+    attackerDies = attackerDead;
+    for (size_t i = 0; i < set.size(); ++i)
+    {
+        if (!dead[i])
+            continue;
+        valueSpent += creatureValue(set[i]);
+        if (candidate && set[i] == candidate)
+            candidateDies = true;
+    }
+}
+
+//#W57-V: is this attacker ALREADY dead to the blockers standing in front of it?
+//"Total blocker power >= toughness" misses a deathtouch or first-strike kill and
+//over-counts a blocker that dies before it swings.
+static bool attackerDiesToCurrentBlock(MTGCardInstance * attacker)
+{
+    if (!attacker || attacker->blockers.empty())
         return false;
-    if (attacker->power < 1)
-        return false; //no damage, no destruction
-    if (!(attacker->has(Constants::DEATHTOUCH) || attacker->has(Constants::PERPETUALDEATHTOUCH)))
-        return false;
-    if (blocker->has(Constants::INDESTRUCTIBLE))
-        return false;
-    if (blocker->protectedAgainst(attacker))
-        return false;
-    return true;
+    bool ad = false, cd = false;
+    int spent = 0;
+    evaluateDeclaration(attacker, NULL, ad, cd, spent);
+    return ad;
+}
+
+//#W57-V: how many bodies may legally stand in front of this attacker.
+static int blockerCapOf(MTGCardInstance * attacker)
+{
+    if (!attacker)
+        return 1;
+    if (attacker->basicAbilities[Constants::THREEBLOCKERS])
+        return 3;
+    if (attacker->basicAbilities[Constants::MENACE])
+        return 2;
+    return 1;
 }
 
 //W53-Z: a MTG_BLOCK_RULE click does not CHOOSE an attacker - it CYCLES the
@@ -4500,7 +4696,37 @@ int AIPlayerBaka::chooseBlockers()
     cd.unsecureSetTapped(-1);
     card = NULL;
 
-    // First pass: auto-block top 3 threats if can be killed
+    // First pass (#W57-V): take every block whose TRADE is sound, AIMED at the
+    // attacker that was actually scored.
+    //
+    // What it replaced, and why: the old pass 1 committed with ONE BLIND click
+    // (MTGBlockRule::reactToClick CYCLES, it does not choose - see W53-Z below)
+    // and then accepted whatever attacker #1 turned out to be, on a test that
+    // asked only "is this attacker a top-3 damage source and is its tracked
+    // toughness still positive". That test contains no trade arithmetic, no
+    // per-attacker cap and no aim, so the seat funnelled EVERY untapped body it
+    // owned onto the first attacker in the attacking player's battlefield order
+    // until raw power covered the toughness - and left the rest of the attack
+    // unblocked. Owner Vita play report 2026-09-03, his tag "bad blocking", his
+    // framing "legal, but deterministically bad":
+    //   transcript-1788468785 turn 13 - Ironroot Warlord (*/5) + three 2/2
+    //     Squirrels attack; ALL FIVE untapped blockers land on the Warlord (one
+    //     click each, the pass-1 signature) and all three Squirrels connect.
+    //   transcript-1788469781 turn 11 - Youthful Knight (2/1 FIRST STRIKE),
+    //     Court Street Denizen and Fencing Ace attack; two bodies pile onto the
+    //     Knight (attacker #1) and the other two attackers are unblocked.
+    // The replacement scores every attacker this body may legally block, keeps
+    // the one whose trade is sound, and AIMS at it. Three rules do the work and
+    // all three generalise past these transcripts:
+    //   (1) pass 1 only makes blocks that KILL - absorbing damage and chumping
+    //       are pass 3's and the survival sweep's jobs, and they still run;
+    //   (2) the kill test is the real combat arithmetic (evaluateDeclaration), so
+    //       first strike, double strike, deathtouch, indestructible and
+    //       protection are all in it - a blocker that dies before it swings
+    //       never counts as a killer again;
+    //   (3) a declaration may not SPEND more creature value than it kills, which
+    //       is what caps the gang: the second and third body on one attacker
+    //       have to earn their place, and the fifth never can.
     while ((card = cd.nextmatch(game->inPlay, card)))
     {
         if (hints && hints->HintSaysDontBlock(observer, card))
@@ -4516,53 +4742,62 @@ int AIPlayerBaka::chooseBlockers()
         //a lone 0-power chump to survive lethal is still reached in pass 3.
         if (card->power == 0)
             continue;
+        if (card->defenser)
+            continue;
 
-        observer->cardClick(card, MTGAbility::MTG_BLOCK_RULE);
-        int set = 0;
-        while (!set)
+        MTGCardInstance * bestKill = NULL;
+        int bestKillScore = -1;
+
+        for (map<MTGCardInstance*, int>::iterator it = opponentsToughness.begin();
+             it != opponentsToughness.end(); ++it)
         {
-            observer->hangCheck("AIPlayerBaka::declareBlocker/setDefenser"); //#W57-T
-            if (!card->defenser)
+            MTGCardInstance * attacker = it->first;
+            if (!attacker || !attacker->isAttacker())
+                continue;
+            if (!card->canBlock(attacker))
+                continue;
+            if ((int) attacker->blockers.size() >= blockerCapOf(attacker))
+                continue;
+            if (attackerDiesToCurrentBlock(attacker))
+                continue; //already dead: another body only feeds it
+
+            bool attackerDies = false, blockerDies = false;
+            int spend = 0;
+            evaluateDeclaration(attacker, card, attackerDies, blockerDies, spend);
+            if (!attackerDies)
+                continue;
+            if (spend > creatureValue(attacker))
+                continue; //the block costs more than it kills
+
+            //prefer a block the body LIVES through, then an attacker nobody is
+            //on yet (spreading beats piling), then the biggest threat killed.
+            int score = (blockerDies ? 0 : 400)
+                        + (attacker->blockers.size() ? 0 : 200)
+                        + attacker->power * 2 + attacker->toughness;
+            if (getStats() && getStats()->isInTop(attacker, 3, false))
+                score += 100;
+            if (score > bestKillScore)
             {
-                set = 1;
-            }
-            else
-            {
-                MTGCardInstance* attacker = card->defenser;
-                map<MTGCardInstance*, int>::iterator it = opponentsToughness.find(attacker);
-                if (it == opponentsToughness.end())
-                {
-                    opponentsToughness[attacker] = attacker->toughness;
-                    it = opponentsToughness.find(attacker);
-                }
-                //W53-U: pass 1 has no per-attacker blocker cap - it keeps piling
-                //bodies on while the attacker's tracked toughness is still
-                //positive, which is how a 2/2 collects two 1/3 blockers. That
-                //gang is only ever worth it because the extra blockers were
-                //expected to LIVE; against a deathtouch attacker they are all
-                //dead the moment damage is assigned, so a second blocker buys
-                //the attacker's death at the price of a second creature. Refuse
-                //it here; the lone blocker that remains is then handed to pass 2,
-                //which already unassigns a block that does not kill.
-                const bool deathtouchGang = (attacker->blockers.size() > 1)
-                    && blockerDiesToAttackerRegardless(attacker, card);
-                if (!deathtouchGang && opponentsToughness[attacker] > 0 && getStats() && getStats()->isInTop(attacker, 3, false))
-                {
-                    opponentsToughness[attacker] -= card->power;
-                    set = 1;
-                }
-                else
-                {
-                    if (card->blockCost)
-                    {
-                        MTGAbility* a = observer->mLayers->actionLayer()->getAbility(MTGAbility::BLOCK_COST);
-                        doAbility(a, card);
-                        observer->cardClick(card, MTGAbility::BLOCK_COST);
-                    }
-                    observer->cardClick(card, MTGAbility::MTG_BLOCK_RULE);
-                }
+                bestKillScore = score;
+                bestKill = attacker;
             }
         }
+
+        if (!bestKill)
+            continue;
+
+        if (card->blockCost)
+        {
+            MTGAbility* a = observer->mLayers->actionLayer()->getAbility(MTGAbility::BLOCK_COST);
+            doAbility(a, card);
+            observer->cardClick(card, MTGAbility::BLOCK_COST);
+        }
+        if (!aimBlockerAt(observer, card, bestKill))
+            continue; //W53-Z: never leave a body on an attacker nobody scored
+        //This attacker is dead in the declaration as it now stands. Pass 2 only
+        //counts raw power, so record the kill as "covered" or it would rip up a
+        //deathtouch or first-strike kill it cannot see.
+        opponentsToughness[bestKill] = 0;
     }
 
     // Second pass: unassign if attacker is not expected to die
@@ -4608,35 +4843,42 @@ int AIPlayerBaka::chooseBlockers()
                 continue;
 
             int currentBlockers = (int)attacker->blockers.size();
-            int totalAssignedDamage = 0;
 
-            std::list<MTGCardInstance*>::iterator itb;
-            for (itb = attacker->blockers.begin(); itb != attacker->blockers.end(); ++itb)
-            {
-                MTGCardInstance* blocker = *itb;
-                if (blocker)
-                    totalAssignedDamage += blocker->power;
-            }
+            const int maxBlockers = blockerCapOf(attacker); //#W57-V
 
-            int maxBlockers = 1;
-            if (attacker->basicAbilities[Constants::MENACE]) maxBlockers = 2;
-            if (attacker->basicAbilities[Constants::THREEBLOCKERS]) maxBlockers = 3;
-
-            if (totalAssignedDamage >= attacker->toughness || currentBlockers >= maxBlockers)
+            //#W57-V: "already covered" is a KILL question, not a power sum - a
+            //deathtouch or first-strike blocker kills with less power than the
+            //attacker's toughness, and a blocker that dies before it swings
+            //adds none of its power at all.
+            if (attackerDiesToCurrentBlock(attacker) || currentBlockers >= maxBlockers)
                 continue;
 
-            bool canKill = (card->power >= attacker->toughness);
+            //#W57-V: the real arithmetic, first strike and double strike
+            //included. `card->power >= attacker->toughness` said a 1/1 kills a
+            //1/1 double striker; it does not, it dies to the first-strike step
+            //and deals nothing - and the seat re-made that block every combat
+            //against the owner's deck2 (transcript-1788471208).
+            bool canKill = false, blockerDies = false;
+            int spend = 0;
+            evaluateDeclaration(attacker, card, canKill, blockerDies, spend);
             //W53-U: "I survive it" is a lie against a deathtouch attacker. Left
             //raw, the branch below ("block even if can't kill, but we survive
             //and reduce damage") feeds a creature to a deathtouch attacker for
             //nothing every combat.
-            bool survives = (card->toughness > attacker->power)
-                && !blockerDiesToAttackerRegardless(attacker, card);
+            bool survives = !blockerDies;
 
             // Always block if can kill, regardless of survivability or damage
             if (canKill)
             {
+                //#W57-V: ...as long as the seat does not spend more than it
+                //kills. A body that dies to kill a cheaper attacker is a block
+                //the owner would not make, and the seat made it every combat.
+                if (spend > creatureValue(attacker))
+                    continue;
+
                 int score = attacker->power * 2 + attacker->toughness;
+                if (!blockerDies)
+                    score += 400; //#W57-V: a free kill outranks a trade
                 if (getStats() && getStats()->isInTop(attacker, 3, false))
                     score += 100;
 
@@ -4676,22 +4918,14 @@ int AIPlayerBaka::chooseBlockers()
 
         if (bestAttacker)
         {
-            int requiredBlockers = 1;
-            if (bestAttacker->basicAbilities[Constants::MENACE]) requiredBlockers = 2;
-            if (bestAttacker->basicAbilities[Constants::THREEBLOCKERS]) requiredBlockers = 3;
+            const int requiredBlockers = blockerCapOf(bestAttacker); //#W57-V
 
             int currentBlockers = (int)bestAttacker->blockers.size();
-            int currentBlockPower = 0;
 
-            std::list<MTGCardInstance*>::iterator itb;
-            for (itb = bestAttacker->blockers.begin(); itb != bestAttacker->blockers.end(); ++itb)
-            {
-                MTGCardInstance* blocker = *itb;
-                if (blocker)
-                    currentBlockPower += blocker->power;
-            }
-
-            if (currentBlockers >= requiredBlockers || currentBlockPower >= bestAttacker->toughness)
+            //#W57-V: was `currentBlockPower >= toughness`, a raw power sum that
+            //both missed deathtouch/first-strike kills and over-counted a
+            //blocker that dies before it swings.
+            if (currentBlockers >= requiredBlockers || attackerDiesToCurrentBlock(bestAttacker))
                 continue;
 
             //Deprioritize a 0-power creature as a SECOND+ blocker: if the
@@ -4755,6 +4989,22 @@ int AIPlayerBaka::chooseBlockers()
             }
         }
     }
+
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //#W57-V: remember which bodies the VALUE passes (1-3) declared, so the
+    //diagnostic below can tell a policy block from a survival chump. A chump
+    //that dies without killing is CORRECT when the swing is lethal; a value
+    //block that does the same never is, and only the split makes that countable.
+    std::set<MTGCardInstance*> w57vValueStage;
+    {
+        MTGCardInstance * vs = NULL;
+        while ((vs = opponent()->game->inPlay->getNextAttacker(vs)))
+            for (list<MTGCardInstance*>::iterator it = vs->blockers.begin();
+                 it != vs->blockers.end(); ++it)
+                if (*it)
+                    w57vValueStage.insert(*it);
+    }
+#endif
 
     //W53-T, the SURVIVAL sweep. Passes 1-3 each reason about one attacker at a
     //time; pass 3's only "I am about to die" branch asks
@@ -4896,6 +5146,39 @@ int AIPlayerBaka::chooseBlockers()
         }
     }
 
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //#W57-V: one stderr line per DECLARED block, with the trade it makes, so an
+    //AI-vs-AI corpus can be counted for the shapes the owner reported rather
+    //than eyeballed. Development builds only, and off unless WAGIC_BLOCKLOG is
+    //set - a corpus opts in, ordinary runs and the suite stay quiet.
+    if (getenv("WAGIC_BLOCKLOG"))
+    {
+        MTGCardInstance * dbg = NULL;
+        while ((dbg = opponent()->game->inPlay->getNextAttacker(dbg)))
+        {
+            for (list<MTGCardInstance*>::iterator it = dbg->blockers.begin();
+                 it != dbg->blockers.end(); ++it)
+            {
+                if (!*it)
+                    continue;
+                bool ad = false, bd = false;
+                int spent = 0;
+                evaluateDeclaration(dbg, *it, ad, bd, spent);
+                std::cerr << "W57V_BLOCK atk=" << dbg->getLCName()
+                          << " blk=" << (*it)->getLCName()
+                          << " gang=" << dbg->blockers.size()
+                          << " atkdies=" << (ad ? 1 : 0)
+                          << " blkdies=" << (bd ? 1 : 0)
+                          << " stage=" << (w57vValueStage.count(*it) ? "value" : "survival")
+                          << " spent=" << spent
+                          << " worth=" << creatureValue(dbg)
+                          << " life=" << life
+                          << " incoming=" << unblockedDamageTo(this)
+                          << std::endl;
+            }
+        }
+    }
+#endif
 
     return 1;
 }
