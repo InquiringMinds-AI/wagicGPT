@@ -1,3 +1,6 @@
+#ifdef VITA
+#include <psp2/io/stat.h> //#W57-T: sceIoMkdir for the softlock dump directory
+#endif
 #include "PrecompiledHeader.h"
 
 #include <chrono>  //#W57-T: the hang guard's wall clock
