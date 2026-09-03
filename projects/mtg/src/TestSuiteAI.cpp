@@ -425,6 +425,7 @@ int TestSuiteAI::Act(float)
                              || action.compare(0, 8, "holdkey ") == 0
                              || action.compare(0, 11, "releasekey ") == 0
                              || action.compare(0, 10, "aipending ") == 0          //#W54-R
+                             || action.compare(0, 7, "aiseat ") == 0                       //#W57-S
                              || action.compare(0, 19, "assertinterrupting ") == 0);//#W54-R
         //checkCantCancel() is the engine's own mandatory flag: ActionLayer sets
         //it when a must-menu arms and clears it when the waiting action ends.
@@ -496,6 +497,7 @@ int TestSuiteAI::Act(float)
                 || action == "interactivereveal" || action == "realgame"
                 || action.compare(0, 8, "holdkey ") == 0 || action.compare(0, 11, "releasekey ") == 0
                 || action.compare(0, 10, "aipending ") == 0 //#W54-R
+                || action.compare(0, 7, "aiseat ") == 0 //#W57-S
                 || action.compare(0, 19, "assertinterrupting ") == 0 //#W54-R
                 || action.find("goto") != string::npos || action.find("reveal") != string::npos
                 || action.find("p1") != string::npos || action.find("p2") != string::npos;
@@ -600,6 +602,23 @@ int TestSuiteAI::Act(float)
         //GameObserver::gameStateBasedEffects).
         observer->mSuiteGame = false;
         observer->mSuiteHumanSeat = this;
+        return 1;
+    }
+    else if (action.compare(0, 7, "aiseat ") == 0)
+    {
+        //#W57-S: ONE seat goes AI, the other keeps reading the script. The
+        //blanket `ai` command cannot express the shape the owner's softlock
+        //report has - a HUMAN seat responding inside an AI seat's window -
+        //because it hands both seats to the heuristic. The scripted seat here
+        //stands in for the human: MODE_TEST_SUITE is the mode lane Z's
+        //endOfInterruption net treats as non-AI, which is the branch under
+        //test. Argument is the 1-based seat number.
+        int seat = atoi(action.substr(7).c_str());
+        if (seat == 1 || seat == 2)
+        {
+            observer->players[seat - 1]->playMode = MODE_AI;
+            DebugTrace("TESTSUITE aiseat " << seat);
+        }
         return 1;
     }
     else if (action.compare("ai") == 0)

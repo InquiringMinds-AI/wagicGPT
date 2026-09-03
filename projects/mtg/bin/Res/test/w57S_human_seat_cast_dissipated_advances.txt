@@ -1,0 +1,39 @@
+#W57-S, same shape as w57S_human_seat_cast_countered_advances but with the
+#EXILING counter (Dissipate, one of deck131's answers in the owner's softlocked
+#match): the countered spell leaves the stack to a different zone. The game
+#must still advance to the end of the AI seat's turn.
+FORCEABILITY
+AICALLS 200
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Island,Island,Island
+hand:Dissipate
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+hand:Giant Growth
+manapool:{G}
+life:20
+[DO]
+aiseat 1
+yes
+Giant Growth
+Grizzly Bears
+endinterruption
+endinterruption
+endinterruption
+endinterruption
+endinterruption
+endinterruption
+[ASSERT]
+end
+[PLAYER1]
+inplay:Island,Island,Island
+graveyard:Dissipate
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+exile:Giant Growth
+life:20
+[END]

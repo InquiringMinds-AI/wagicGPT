@@ -1239,6 +1239,36 @@ void ActionStack::Update(float dt)
     //one extra iteration past the killing blow (life -1 / an extra drain).
     if (observer->didWin())
         return;
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    //#W57-S: the stall probe. Prints the whole priority/choice state vector
+    //every tick under WAGIC_STALLPROBE so a game that stops advancing names
+    //the flag that is stuck. Compile-time gated (never in a release build),
+    //env-gated inside that.
+    {
+        static bool probeOn = (getenv("WAGIC_STALLPROBE") != NULL);
+        if (probeOn)
+        {
+            ActionLayer * pal = observer->mLayers ? observer->mLayers->actionLayer() : NULL;
+            TargetChooser * ptc = observer->getCurrentTargetChooser();
+            fprintf(stderr, "[stallprobe] t=%d ph=%d cur=%s act=%s intr=%s ask=%s dec=%d/%d mode=%d modal=%d"
+                            " stackNR=%d wait=%p menu=%p gtc=%p gtcOwner=%s hold=%d\n",
+                    observer->turn, (int) observer->getCurrentGamePhase(),
+                    observer->currentPlayer == observer->players[0] ? "p1" : "p2",
+                    observer->currentActionPlayer ? (observer->currentActionPlayer == observer->players[0] ? "p1" : "p2") : "-",
+                    observer->isInterrupting ? (observer->isInterrupting == observer->players[0] ? "p1" : "p2") : "-",
+                    askIfWishesToInterrupt ? (askIfWishesToInterrupt == observer->players[0] ? "p1" : "p2") : "-",
+                    (int) interruptDecision[0], (int) interruptDecision[1], (int) mode, modal,
+                    count(0, NOT_RESOLVED, 0),
+                    (void *) (pal ? pal->isWaitingForAnswer() : NULL),
+                    (void *) (pal ? pal->menuObject : NULL),
+                    (void *) observer->targetChooser,
+                    (observer->targetChooser && observer->targetChooser->Owner)
+                        ? (observer->targetChooser->Owner == observer->players[0] ? "p1" : "p2") : "-",
+                    mHoldTicks);
+            fflush(stderr);
+        }
+    }
+#endif
 
     //This is a hack to avoid updating the stack while tuto messages are being shown
     //Ideally, the tuto messages should be moved to a layer above this one
