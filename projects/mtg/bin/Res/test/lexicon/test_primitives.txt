@@ -6321,3 +6321,21 @@ power=2
 toughness=4
 text=Test-only clone of Hurkyl, Master Wizard (comma-free name so suite zone lists can place it).
 [/card]
+[card]
+id=2100000335
+name=Lexicon Any Counter Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:counter(1/1) target(creature|battlefield)
+text=Test-only: put a +1/+1 counter on target creature on either battlefield.
+[/card]
+[card]
+id=2100000551
+name=Lexicon Two Counter Witness
+rarity=C
+mana={0}
+type=Artifact
+auto={0}:counter(1/1,2) target(creature|battlefield)
+text=Test-only: put two +1/+1 counters on target creature on either battlefield as ONE event.
+[/card]

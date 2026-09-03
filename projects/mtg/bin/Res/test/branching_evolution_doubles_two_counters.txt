@@ -1,0 +1,28 @@
+#NAME: Branching Evolution doubles a TWO-counter event to four
+#DESC: Oracle (Scryfall): "If one or more +1/+1 counters would be put on a creature you
+#DESC: control, twice that many +1/+1 counters are put on that creature instead."
+#DESC: "Twice that many" is the whole event, not one extra counter: a single event that
+#DESC: puts two +1/+1 counters on a 2/2 you control must yield four counters (6/6).
+#DESC: The old trigger script added exactly ONE counter regardless of the event size.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Branching Evolution,Lexicon Two Counter Witness,Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Runeclaw Bear
+life:20
+[DO]
+Lexicon Two Counter Witness
+Grizzly Bears
+assertpt 6/6 grizzly bears
+assertpt 2/2 runeclaw bear
+[ASSERT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Branching Evolution,Lexicon Two Counter Witness,Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Runeclaw Bear
+life:20
+[END]
