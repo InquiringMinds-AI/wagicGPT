@@ -3479,6 +3479,102 @@ static string menaceBlockPairingTag(int minBlockers)
            " creatures counts; this one alone does not block it at all)";
 }
 
+//#W55-B (D13 = R205). The BLOCKERS window's twin of D17's attackers header.
+//At `152v146` s58 the menace rule was stated three times per blocker - on both
+//A-lines and on every B-row pairing - and the seat still spread its two blockers
+//one apiece across two menace attackers, so the CR 509.1c pass pruned BOTH, it
+//declared nothing at a lethal window, took 6 at 6 life and lost the game. Every
+//per-attacker tag states the RULE; none of them is the ARITHMETIC over the whole
+//window, and the arithmetic is what that answer turned on. One header above the
+//B-rows, in the seat's own reading order, visible BEFORE the answer is written
+//rather than after it is discarded.
+//TRUST DOCTRINE: `maxSimul` is an UPPER bound - it spends the CHEAPEST minimums
+//first and ignores per-blocker legality, which can only ever reduce the true
+//maximum, so "at most N" cannot over-claim. Silent when no attacker carries a
+//declaration minimum (a count with no decision value is pure token cost).
+//Pure, so PARSETEST proves every branch.
+static string menaceBlockerBudgetLine(const vector<int>& needs, int totalAttackers,
+                                      int blockersAvailable)
+{
+    vector<int> mins;
+    for (size_t i = 0; i < needs.size(); i++)
+        if (needs[i] > 1)
+            mins.push_back(needs[i]);
+    if (mins.empty())
+        return "";
+    std::sort(mins.begin(), mins.end());
+    int budget = blockersAvailable > 0 ? blockersAvailable : 0;
+    int maxSimul = 0;
+    for (size_t i = 0; i < mins.size() && budget >= mins[i]; i++)
+    {
+        budget -= mins[i];
+        maxSimul++;
+    }
+    std::ostringstream o;
+    o << (int) mins.size() << " of the " << totalAttackers << " attackers need TWO"
+         " or more blockers each; you have " << (blockersAvailable > 0 ? blockersAvailable : 0)
+      << " blocker" << (blockersAvailable == 1 ? "" : "s") << ", enough to complete ";
+    if (maxSimul <= 0)
+        o << "none of those blocks";
+    else
+        o << "at most " << maxSimul << " of those blocks";
+    o << ". A lone blocker assigned to one of them does not block it at all and is"
+         " wasted.\n";
+    return o.str();
+}
+
+//#W55-B (D3 = R195). `all_assignments_illegal` fired for the FIRST time in the
+//wave-54 corpus and lost the game (`152v146` s58, turn 19, life 6 vs 7): both
+//intended pairings under-filled a menace attacker, the CR 509.1c pass pruned
+//both, the seat declared NO blocks, and there was no follower record of any kind
+//- no re-ask, no recovery. `named_row_reask` already re-asks once when the model
+//names an off-menu row and `rejectedSoFar` already exists on the cast path;
+//the blockers seam had no equivalent arm, so legality was enforced by discarding
+//the whole answer, which is a constraint on choice by omission.
+//This is the prompt half: ONE re-ask carrying the pruned pairs back as text.
+//Lane M's rule is kept - the clause carries no B<digit>/A<digit> code and not
+//the word "blocks", and the engine's own " -> " is rewritten to " assigned to "
+//so a model echoing the correction onto its BLOCKS: line cannot hand the
+//name-form parser a ready-made phantom pair. Pure, so PARSETEST proves it.
+static string prunedPairsReaskClause(const string& prunedPairs)
+{
+    if (prunedPairs.empty())
+        return "";
+    string readable;
+    size_t at = 0;
+    for (;;)
+    {
+        size_t p = prunedPairs.find(" -> ", at);
+        if (p == string::npos)
+        {
+            readable += prunedPairs.substr(at);
+            break;
+        }
+        readable += prunedPairs.substr(at, p - at) + " assigned to ";
+        at = p + 4;
+    }
+    return "\n[RE-ASK] EVERY assignment in your previous reply was illegal, so none"
+           " of them was made and you are still stopping nothing: " + readable
+           + ". Answer the whole assignment again, using only pairings the lines"
+             " above allow - an attacker that needs two or more of your creatures"
+             " is not stopped at all unless you name that many of them for it.";
+}
+
+//#W55-B (D14 = R206). The record half. `pruned_pairs` was already ON the record
+//and the reviewer still had to re-derive the menace rule from the prompt,
+//because the FALLBACK CLASS - the field the ledger reads first - said only that
+//something was illegal. Carry the pairs and the reason with the class, the way
+//wave 53 made `plan_choice_conflict` readable. One field; no new computation.
+//The class NAME is still the leading token, so every existing grep still hits.
+static string allAssignmentsIllegalClass(const string& prunedPairs, bool exhausted)
+{
+    string cls = exhausted ? "all_assignments_illegal_exhausted"
+                           : "all_assignments_illegal";
+    if (prunedPairs.empty())
+        return cls;
+    return cls + ": " + prunedPairs;
+}
+
 //The ATTACKER's A-line: whether the defender can even field a legal block, and
 //the honest count of bodies that could join one. `eligibleUntapped` is the
 //number of their untapped creatures that could legally take part - the same
@@ -9659,7 +9755,7 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 }
 
 AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfileSmall, string avatarFile, MTGDeck * deck)
-    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mListDeclineTurn(-1), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
+    : AIPlayerBaka(observer, deckFile, deckfileSmall, avatarFile, deck), mAsyncState(std::make_shared<AsyncState>()), mThinkTime(0), mNoticeTicks(0), mFallbackCount(0), mDegradedTicks(0), mBlocksDoneTurn(-1), mBlockReaskTurn(-1), mBlockIllegalReaskTurn(-1), mAttacksDoneTurn(-1), mPassDeclineTurn(-1), mLoopAbility(NULL), mLoopClick(NULL), mLoopCount(0), mRepeatAbility(NULL), mRepeatClick(NULL), mRepeatRemaining(0), mRepeatTotal(0), mRepeatDone(0), mRepeatNoProgress(0), mRepeatAbsent(0), mManaOnlyWindowsSkipped(0), mIdenticalOptionAsksResolved(0), mStuckCastTurn(-1), mAnswerReplacedFalse(false), mCastAskTurn(-1), mCastAskPhase(-1), mHoldTurn(-1), mHoldWindowsSkipped(0), mListDeclineTurn(-1), mPlanSetSeq(-1), mPlanSetTurn(0), mTransSeq(0), mLastLatencyMs(-1), mGameEndLogged(false), mGameStartLogged(false), mNarratedTurnOwner(NULL), mNarratedTurnNumber(-1), mDealDone(false), mCounteredSpell(NULL), mLastChoice(-1), mRetryFirstLatencyMs(-1), mLastRetry(false),
       mPregameBottomAsked(false), mPregameBottomForMulls(-1), mPregameMullsSeen(0),
       mLastReasoningOnly(false), mLastFinishLength(false), mLastBudgetHit(false),
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
@@ -25760,6 +25856,17 @@ int AIPlayerGPT::chooseBlockers()
     vector<int> bbKind(attackers.size(), 0), bbP(attackers.size(), 0), bbT(attackers.size(), 0);
     for (size_t j = 0; j < attackers.size(); j++)
         bbKind[j] = becomesBlockedSelfPump(attackers[j]->text, bbP[j], bbT[j]);
+    //#W55-B (D13): the window's declaration-minimum arithmetic, once, directly
+    //above the rows it constrains. Built from the engine's own
+    //minBlockersRequired() - the same source both A-line tags read - so the
+    //header and the per-attacker tags can never disagree.
+    {
+        vector<int> minNeeds;
+        for (size_t j = 0; j < attackers.size(); j++)
+            minNeeds.push_back(attackers[j]->minBlockersRequired());
+        tail << menaceBlockerBudgetLine(minNeeds, (int) attackers.size(),
+                                        (int) blockers.size());
+    }
     tail << "Your available blockers (with, for each attacker it may block, the"
             " naive 1-on-1 trade - before other blockers, pump or combat tricks):\n";
     //#W47 (R8, wave-46 HIGH): the B-rows are built into three parts - name,
@@ -25953,6 +26060,14 @@ int AIPlayerGPT::chooseBlockers()
                 " different attackers, which is illegal - each creature can"
                 " block only ONE attacker. Re-answer the whole assignment now,"
                 " naming each of your creatures at most once.";
+    //#W55-B (D3): the ALL-ILLEGAL re-ask's own correction, quoting back the
+    //pairs the CR 509.1c / canBlock passes pruned. Its own latch, because a
+    //gang-conflict re-ask and an all-illegal re-ask are different failures and
+    //one firing must not spend the other's arm. Changing the text is also what
+    //makes this a DIFFERENT prompt, so the async machinery issues a fresh call
+    //instead of replaying the rejected answer.
+    if (mBlockIllegalReaskTurn == observer->turn && mBlocksDoneTurn != observer->turn)
+        tail << prunedPairsReaskClause(mBlockIllegalReaskPairs);
     string userMsg = assemblePrompt(tail.str());
 
     string content;
@@ -26269,12 +26384,36 @@ int AIPlayerGPT::chooseBlockers()
     //the next corpus can count it separately from unparsed_reply.
     if (intended > 0 && act.blocks.empty())
     {
+        //#W55-B (D3 = R195): ONE re-ask, carrying the pruned pairs as text. The
+        //answer is not discarded silently any more - the rejection goes back to
+        //the model in the same window, exactly as the cast path's rejectedSoFar
+        //and the priority path's plan_choice_conflict already do. A SECOND
+        //all-illegal reply is not re-asked again: it settles here, stamped
+        //`all_assignments_illegal_exhausted`, and (as every other failure exit
+        //does) hands this combat to the heuristic rather than declaring a
+        //blanket no-blocks, which is the worst combat default there is
+        //(wave-32 ledger #15). Bounded by construction: one arm per turn.
+        //#W55-B (D14 = R206): both records now name the pairs and the reason
+        //with the class.
+        const bool illegalExhausted = (mBlockIllegalReaskTurn == observer->turn);
+        const string illegalClass = allAssignmentsIllegalClass(pruned, illegalExhausted);
+        if (!illegalExhausted)
+        {
+            mBlockIllegalReaskTurn = observer->turn;
+            mBlockIllegalReaskPairs = pruned;
+            writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
+                          "", illegalClass.c_str(), &shownLines, blockSource);
+            setNotice("every block the model asked for was illegal - asking again", 5.0f);
+            DebugTrace("AIPlayerGPT: every assignment illegal (" << pruned
+                       << ") -> re-asking once with the pruned pairs");
+            return 1; //next tick rebuilds the prompt WITH the correction
+        }
         writeTransLog("blockers", userMsg, content, pairs, (int) blockers.size(),
-                      "", "all_assignments_illegal", &shownLines, blockSource);
+                      "", illegalClass.c_str(), &shownLines, blockSource);
         noticeFallback("every block the model asked for was illegal - the heuristic blocks", 5.0f);
         mBlocksDoneTurn = observer->turn;
         DebugTrace("AIPlayerGPT: declared blocks from 0 assignment(s) - all "
-                   << intended << " assignment(s) illegal, heuristic declares");
+                   << intended << " assignment(s) illegal after a re-ask, heuristic declares");
         return AIPlayerBaka::chooseBlockers();
     }
     DecisionManager::applyDeclareBlockers(req, act);
@@ -40429,6 +40568,108 @@ static const char * kW50Y_r94 =
         CHECK(trims < 900 / 50,
               "audit-L L10a the trim fires once per ~4 KB of lines, not once per line");
     }
+
+    // ---- #W55-B: D13 the blockers count header, D3 the all-illegal re-ask, D14 the class ----
+    cout << "\n[#W55-B] D13/D3/D14 the blockers window's menace arithmetic, re-ask and record\n";
+    {
+        //D13: the 152v146 s58 board - 4 attackers, 2 of them menace, 2 blockers.
+        vector<int> needs;
+        needs.push_back(1); needs.push_back(1); needs.push_back(2); needs.push_back(2);
+        string hdr = menaceBlockerBudgetLine(needs, 4, 2);
+        cout << "     D13: " << hdr;
+        CHECK(hdr == "2 of the 4 attackers need TWO or more blockers each; you have 2"
+                     " blockers, enough to complete at most 1 of those blocks. A lone"
+                     " blocker assigned to one of them does not block it at all and is"
+                     " wasted.\n",
+              "#W55-B D13 152v146 s58: two blockers spread over two menace attackers complete AT MOST one");
+        CHECK(menaceBlockerBudgetLine(needs, 4, 4).find("at most 2 of those blocks") != string::npos,
+              "#W55-B D13 four blockers complete both");
+        CHECK(menaceBlockerBudgetLine(needs, 4, 1)
+                  .find("you have 1 blocker, enough to complete none of those blocks") != string::npos,
+              "#W55-B D13 one blocker completes none of them, and says 'blocker' singular");
+        CHECK(menaceBlockerBudgetLine(needs, 4, 0).find("you have 0 blockers") != string::npos
+              && menaceBlockerBudgetLine(needs, 4, -1).find("you have 0 blockers") != string::npos,
+              "#W55-B D13 an empty or nonsense blocker count renders 0, never a negative");
+        {
+            //the upper bound spends the CHEAPEST minimum first, so a 2 and a 3
+            //against 3 blockers is one block, not none and not two.
+            vector<int> mixed;
+            mixed.push_back(2); mixed.push_back(3);
+            CHECK(menaceBlockerBudgetLine(mixed, 2, 3).find("at most 1 of those blocks") != string::npos,
+                  "#W55-B D13 the bound spends the cheapest minimum first");
+            CHECK(menaceBlockerBudgetLine(mixed, 2, 5).find("at most 2 of those blocks") != string::npos,
+                  "#W55-B D13 five blockers afford both the 2 and the 3");
+        }
+        vector<int> plain;
+        plain.push_back(1); plain.push_back(1);
+        CHECK(menaceBlockerBudgetLine(plain, 2, 2).empty(),
+              "#W55-B D13 NEGATIVE a window with no declaration minimum prints NOTHING");
+        CHECK(menaceBlockerBudgetLine(vector<int>(), 0, 3).empty(),
+              "#W55-B D13 NEGATIVE no attackers at all prints nothing");
+        CHECK(hdr.find("can block") == string::npos && hdr.find("you kill") == string::npos,
+              "#W55-B D13 NEGATIVE the header carries no affirmative permission substring to latch");
+
+        //D3: the re-ask clause quotes the engine's own pruned pairs.
+        const string pruned = "Elite Spellbinder -> Spider (needs 2 blockers, only 1 assigned);"
+                              " Intrepid Adversary -> Spider (needs 2 blockers, only 1 assigned)";
+        string clause = prunedPairsReaskClause(pruned);
+        cout << "     D3:" << clause << "\n";
+        CHECK(clause.find("Elite Spellbinder assigned to Spider (needs 2 blockers, only 1 assigned)")
+              != string::npos
+              && clause.find("Intrepid Adversary assigned to Spider") != string::npos,
+              "#W55-B D3 152v146 s58: BOTH pruned pairs come back to the model as text");
+        CHECK(clause.find(" -> ") == string::npos,
+              "#W55-B D3 the engine's arrow form never reaches the prompt");
+        CHECK(clause.find("[RE-ASK]") != string::npos && clause[0] == '\n',
+              "#W55-B D3 the clause is a RE-ASK block on its own line, like the gang-conflict twin");
+        CHECK(prunedPairsReaskClause("").empty(),
+              "#W55-B D3 NEGATIVE nothing pruned = no clause at all (the arm never arms itself)");
+        {
+            //ECHO SHAPE: a model parroting the whole correction back on its
+            //BLOCKS: line must not mint a phantom pair - lane M's rule, proved.
+            vector<int> out;
+            int pairs = parseBlockAssignments("BLOCKS:" + clause, 3, 4, out);
+            CHECK(pairs == 0,
+                  "#W55-B D3 echo: parroting the RE-ASK clause declares NO block");
+            CHECK(clause.find("B1") == string::npos && clause.find("A1") == string::npos
+                  && clause.find("B2") == string::npos && clause.find("A3") == string::npos,
+                  "#W55-B D3 echo: the clause carries no B<digit>/A<digit> code to echo");
+            CHECK(clause.find("blocks") == string::npos,
+                  "#W55-B D3 echo: nor the word the assignment grammar keys on");
+        }
+        {
+            //name-form echo: the clause's own names are the ILLEGAL pairing, so
+            //even a name-form parse of the echo can only re-offer what the
+            //validator already prunes - it can never invent a new legal pair.
+            vector<string> bN, aN;
+            bN.push_back("Elite Spellbinder"); bN.push_back("Intrepid Adversary");
+            aN.push_back("Spider"); aN.push_back("Spider");
+            vector<vector<int> > legalIdx(2);
+            legalIdx[0].push_back(0); legalIdx[0].push_back(1);
+            legalIdx[1].push_back(0); legalIdx[1].push_back(1);
+            vector<int> out;
+            parseBlockAssignments("BLOCKS:" + clause, 2, 2, out, &bN, &aN, &legalIdx);
+            for (size_t i = 0; i < out.size(); i++)
+                CHECK(out[i] < 1 || (out[i] >= 1 && out[i] <= 2),
+                      "#W55-B D3 echo: a name-form read of the echo stays inside the offered set");
+        }
+
+        //D14: the class names the pairs and the reason, and keeps its leading token.
+        string cls = allAssignmentsIllegalClass(pruned, false);
+        cout << "     D14: " << cls << "\n";
+        CHECK(cls.find("all_assignments_illegal") == 0,
+              "#W55-B D14 the class NAME is still the leading token - every existing grep still hits");
+        CHECK(cls == "all_assignments_illegal: " + pruned,
+              "#W55-B D14 152v146 s58: the ledger's own field now names both pairs and the reason");
+        CHECK(allAssignmentsIllegalClass(pruned, true).find("all_assignments_illegal_exhausted: ") == 0,
+              "#W55-B D14 the second, exhausted firing is its own class and carries the pairs too");
+        CHECK(string(allAssignmentsIllegalClass("", false)) == "all_assignments_illegal"
+              && string(allAssignmentsIllegalClass("", true)) == "all_assignments_illegal_exhausted",
+              "#W55-B D14 NEGATIVE with nothing pruned the class is byte-identical to the shipped one");
+        CHECK(allAssignmentsIllegalClass(pruned, false).find("_exhausted") == string::npos,
+              "#W55-B D14 NEGATIVE a first firing is never stamped exhausted");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
