@@ -1041,6 +1041,13 @@ private:
     static int codedChoiceOrdinal(const string& content, int choice, int optionCount,
                                   const std::vector<string> * optionTexts);
 
+    //#W56-C (D3): the same walk, reporting the LATCHED line's TEXT and where it
+    //starts in the post-think reply, so a re-ask can quote what the engine ran
+    //and read its prose evidence from that line's own region.
+    static bool latchedCodedChoiceLine(const string& replyIn, int choice, int optionCount,
+                                       const std::vector<string> * optionTexts,
+                                       string * lineOut, size_t * fromOut);
+
     //#W49-S (D2): answer_replaced is FALSE whenever the answer that EXECUTED
     //is the reply's first coded line - the seams set this right before their
     //translog write; writeTransLog consumes and clears it.
@@ -1181,7 +1188,7 @@ public:
     //the tick about to run. Consumed by the next `reveal` record as
     //reveal_stall / reveal_stall_secs / reveal_stall_phase - a REPORT, nothing
     //in the engine reads it.
-    virtual void noteRevealStall(int ticks, long secs, int driverPhase);
+    virtual void noteRevealStall(int ticks, long secs, int driverPhase, bool parked);
     //#W55-E (D5a): the deadline the reveal stall guard sizes its wall floor on.
     virtual long decisionDeadlineMs() { return mTimeoutMs; }
 private:
@@ -1215,6 +1222,7 @@ private:
     int mRevealStallTicks;
     long mRevealStallSecs;
     int mRevealStallPhase;
+    bool mRevealStallParked; //#W56-C (D12): the driver's own threshold verdict
     //#W55-E (D23): a WALL MISS - the deadline reached with an empty reply - is
     //an event the seat review counts, and wave 54 had one that produced no
     //record at all (the decision was abandoned when the window auto-passed, so

@@ -4595,6 +4595,10 @@ bool isDayNightMarkerName(const string& name)
 //the model must still be able to locate one on the board; reply parsing reads
 //the OPTION list, never this line, so a collapsed range cannot affect it.
 const size_t kBattlefieldCollapseFloor = 3;
+//#W56-C (D7 c): the monotone X run needs FOUR members before it is worth a
+//range row - a three-row X menu is short enough to read whole, and the
+//collapse's whole value is the 11-row middle of a 13-row one.
+const size_t kMonotoneXCollapseFloor = 4;
 
 //The numeric rank inside an instanceHandle (" #7" -> 7), or -1 when the handle
 //is absent or not of that shape (a singleton name, or the hand's copyOfTag).
@@ -5238,6 +5242,11 @@ const char * kOptionRangeNote =
     " the first number of that range, its second the same as the second, and so"
     " on - the only difference is which copy of the source does it. Nothing is"
     " hidden: read the option you want off the range it names."
+    //#W56-C (D7 c): the monotone X form's own decode.
+    " A row reading \"X = 12 down to X = 2\" is one option per X in that range,"
+    " largest X first: its first number is X = 12, the next X = 11, and so on to"
+    " X = 2. The two options it quotes in full are the two ENDS of that run, and"
+    " every option between them reads the same line with its own X."
     " Answer with ONE number from inside the range"
     " exactly as you would any other option number.\n";
 
@@ -5335,6 +5344,62 @@ void groupNumberedRows(const vector<string>& rows, vector<size_t>& order)
         order.swap(out);
 }
 
+//#W56-C (D7 c): the MONOTONE X row. An ANNOUNCE_X menu of the strictly
+//increasing class prints one row per X whose text differs from its neighbour's
+//in NOTHING but the numbers ("X = 7 {X pricing: X=7 - you gain 7 life and draw
+//7 cards} {leaves 2 of your 9 ...}"), so a 13-row Sphinx's Revelation menu spent
+//eleven rows restating one sentence. `#N` runs collapse on exactly this basis;
+//this is the same test with the DIGITS as the varying part instead of an
+//ordinal. Recognises the row by its own two anchors - a leading "X = <n> " and
+//a "{X pricing: X=<n>" naming the SAME n - so nothing else in the corpus can
+//match it; `erased` is the row with every digit run replaced by '#', which is
+//what makes "differs only in its numbers" a byte test. Pure.
+static bool splitMonotoneXRow(const string& row, string& erased, int& xval)
+{
+    erased.clear();
+    xval = -1;
+    if (row.compare(0, 4, "X = ") != 0)
+        return false;
+    size_t p = 4;
+    if (p >= row.size() || !isdigit((unsigned char) row[p]))
+        return false;
+    int v = 0;
+    while (p < row.size() && isdigit((unsigned char) row[p]))
+        v = v * 10 + (row[p++] - '0');
+    std::ostringstream tag;
+    tag << "{X pricing: X=" << v;
+    if (row.find(tag.str()) == string::npos)
+        return false;
+    xval = v;
+    for (size_t i = 0; i < row.size(); i++)
+    {
+        if (isdigit((unsigned char) row[i]))
+        {
+            erased += '#';
+            while (i + 1 < row.size() && isdigit((unsigned char) row[i + 1]))
+                i++;
+        }
+        else
+            erased += row[i];
+    }
+    return true;
+}
+
+//#W56-C (D7 c): the printed form. Both ENDS of the run are printed VERBATIM and
+//the decode is stated, so the collapse deletes no fact and no option: every
+//number in the range is still separately choosable and its X is arithmetic the
+//row states. Pure, so the shape is provable in PARSETEST.
+static string monotoneXRangeRow(size_t firstLabel, size_t lastLabel, int xHigh, int xLow,
+                                const string& highRow, const string& lowRow)
+{
+    std::ostringstream o;
+    o << firstLabel << "-" << lastLabel << ". X = " << xHigh << " down to X = " << xLow
+      << " - one option per X in that range, largest X first, each reading the same line with"
+         " its own number: option " << firstLabel << " is \"" << highRow << "\" and option "
+      << lastLabel << " is \"" << lowRow << "\" x" << (lastLabel - firstLabel + 1);
+    return o.str();
+}
+
 string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
 {
     if (rangeUsed)
@@ -5351,6 +5416,10 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
         //"#N" collapse changes.
         else if (splitCopyRowHandle(rows[i], head[i], tail[i], rank[i], total[i], scope[i]))
             form[i] = 2;
+        //#W56-C (D7 c): tried LAST, so nothing about the two ordinal forms
+        //above changes; the anchors are unique to the ANNOUNCE_X menu.
+        else if (splitMonotoneXRow(rows[i], head[i], rank[i]))
+            form[i] = 3;
         else
         {
             form[i] = 0;
@@ -5449,6 +5518,13 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
                    && head[j] == head[i] && tail[j] == tail[i]
                    && total[j] == total[i] && scope[j] == scope[i])
                 j++;
+        else if (form[i] == 3)
+            //#W56-C (D7 c): X falls by exactly one each row (the menu's own
+            //order) and the digit-erased text is identical.
+            while (j < n && blockRef[j] < 0 && form[j] == 3
+                   && rank[j] == rank[i] - (int) (j - i)
+                   && head[j] == head[i])
+                j++;
         else
             //#W54-D (D8a): a run of BYTE-IDENTICAL rows carrying no instance
             //ordinal. The 17 library Mountains had nothing to collapse on and
@@ -5470,6 +5546,13 @@ string joinNumberedRows(const vector<string>& rows, bool * rangeUsed)
             o << (i + 1) << "-" << j << ". " << head[i]
               << " #" << rank[i] << "-#" << (rank[i] + (int) run - 1)
               << expandRowHandleFold(tail[i], rank[i], rank[i] + (int) run - 1) << " x" << run << "\n";
+            if (rangeUsed)
+                *rangeUsed = true;
+            i = j;
+        }
+        else if (form[i] == 3 && run >= kMonotoneXCollapseFloor)
+        {
+            o << monotoneXRangeRow(i + 1, j, rank[i], rank[j - 1], rows[i], rows[j - 1]) << "\n";
             if (rangeUsed)
                 *rangeUsed = true;
             i = j;
@@ -8725,6 +8808,33 @@ static string xLifeDrawRowCore(int x, int lifePerX, int drawPerX,
     return o.str();
 }
 
+//#W56-C (D7 b): the FOURTH marker family. The other three rank a KILL
+//dimension, and 11 of the wave-55 corpus's 14 X menus were Sphinx's Revelation
+//(`auto=life:X && draw:X`) - strictly increasing in X, no kill dimension at all
+//- so every one of them carried no marker of any form while the three
+//kill markers rendered on the other 3. This one states a FACT about the whole
+//menu rather than a recommendation: the largest affordable X is on top, this is
+//what it does, and nothing listed does more. It is deliberately NOT an
+//instruction to take it - holding mana up is exactly the trade the fit clause
+//(D7 a) now prices, and the pilot's own guide rung answers X on this card. Pure.
+static string xMonotoneMarker(int capX, int lifePerX, int drawPerX)
+{
+    if (capX < 1 || (lifePerX <= 0 && drawPerX <= 0))
+        return "";
+    std::ostringstream o;
+    o << " [<- largest affordable X - X=" << capX << " ";
+    if (lifePerX > 0)
+    {
+        o << "gains " << (capX * lifePerX) << " life";
+        if (drawPerX > 0)
+            o << " and ";
+    }
+    if (drawPerX > 0)
+        o << "draws " << (capX * drawPerX) << " card" << ((capX * drawPerX) == 1 ? "" : "s");
+    o << "; no listed X does more]";
+    return o.str();
+}
+
 //One annotation per offered X, LARGEST FIRST (the order the menu is shown in).
 //No run-collapse here: every row of this class states a DIFFERENT pair of
 //totals, so there is never an identical neighbour to collapse into. Pure.
@@ -9060,6 +9170,17 @@ static bool xAnnounceRowKills(MTGCardInstance * card, Player * me, int capX,
         for (size_t ni = 0; ni < theirsP.size(); ni++)
             names << (ni ? ", " : "") << theirsP[ni];
         xLifeDrawRowAnnotations(capX, lifePerX, drawPerX, theirsPer, names.str(), out);
+        //#W56-C (D7 b): the monotone menu's own marker, on the largest X, via
+        //the same one-row-marked plumbing the kill families use.
+        if (markX && markerText)
+        {
+            string mm = xMonotoneMarker(capX, lifePerX, drawPerX);
+            if (!mm.empty())
+            {
+                *markX = capX;
+                *markerText = mm;
+            }
+        }
         return true;
     }
     xKillRowAnnotations(sv.victims, capX, sv.sweep, sv.hitsMe, sv.hitsOpp,
@@ -10279,7 +10400,7 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
       mStaleDropStreak(0), mLastStaleLivelock(false),
-      mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1),
+      mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1), mRevealStallParked(false),
       mWallMissPending(false), mWallMissEvents(0), mWallMissUnrecorded(0),
       mLastTimeout(false), mRecoverySeq(-1),
       mInPregameAsk(false),
@@ -10872,17 +10993,32 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //driver had been sitting in phase 0 re-asking the whole time; this is that
     //missing half, and it makes a poll-churn park a NUMBER rather than an
     //archaeology pass over the stderr. Present only when the driver was parked.
+    //#W56-C (D12): the wave-55 triple was stamped on 12 of 12 reveal records
+    //with `reveal_stall_secs` equal to `latency_ms / 1000` on all twelve and
+    //`reveal_stall_phase` constant 0 - a duration duplicating one the record
+    //already carried, under a name that claimed a park nothing had selected.
+    //Split it. The WAIT is what every reveal has (ticks the driver spent with
+    //no structural progress while the model was answering) and is named as a
+    //wait; `reveal_stall` is now a BOOLEAN present only when the driver's own
+    //structural threshold - the same numbers its force-close uses, evaluated by
+    //the driver - had actually been crossed, and the phase rides that case
+    //alone, where it is the diagnostic it was built to be.
     if (strcmp(kind, "reveal") == 0 && mRevealStallTicks > 0)
     {
-        rec["reveal_stall"] = mRevealStallTicks;
-        rec["reveal_stall_secs"] = mRevealStallSecs;
-        rec["reveal_stall_phase"] = mRevealStallPhase;
+        rec["reveal_wait_ticks"] = mRevealStallTicks;
+        rec["reveal_wait_secs"] = mRevealStallSecs;
+        if (mRevealStallParked)
+        {
+            rec["reveal_stall"] = true;
+            rec["reveal_stall_phase"] = mRevealStallPhase;
+        }
     }
     if (strcmp(kind, "reveal") == 0)
     {
         mRevealStallTicks = 0; //consumed: never leaks onto a later reveal
         mRevealStallSecs = 0;
         mRevealStallPhase = -1;
+        mRevealStallParked = false;
     }
     //#W55-E (D23): this record answers a prompt that had already missed the wall.
     if (mWallMissPending && !userMsg.empty() && userMsg == mWallMissBase)
@@ -10937,11 +11073,12 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
 //budget is the only thing that acts on a stall. Last writer wins: the driver
 //calls this every tick it is parked, so the figures a record carries are the
 //figures at the tick that wrote it.
-void AIPlayerGPT::noteRevealStall(int ticks, long secs, int driverPhase)
+void AIPlayerGPT::noteRevealStall(int ticks, long secs, int driverPhase, bool parked)
 {
     mRevealStallTicks = ticks;
     mRevealStallSecs = secs;
     mRevealStallPhase = driverPhase;
+    mRevealStallParked = parked;
 }
 
 void AIPlayerGPT::logEngineResolution(const char * kind, const string& what,
@@ -15172,7 +15309,17 @@ static bool nameEchoesRow(const string& nameIn, const vector<string>& rows)
 //combat", "next window") are NOT. Text before the CHOICE line is never read;
 //with no CHOICE line only the PLAN-line patterns run. matchedOut receives
 //the sentence/line that carried the verdict, for the re-ask to quote.
-static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = NULL)
+//#W56-C (D3): `fromStripped` is an offset into the POST-THINK text, and it is
+//the whole of this item's engine half: the pass evidence must come from the
+//SAME REGION of the reply as the coded line the engine latched. `130v123` seq
+//109 carried `CHOICE: 0 (pass)` with "I will pass" beside it, then 400 words
+//later reasoned to `CHOICE: 5 (cycling with Starstorm)`; the engine latched and
+//executed row 5 - correctly - and then read the FIRST line's pass prose as a
+//contradiction of it, re-asked, and the second reply passed. A verdict written
+//before the answer the engine took is evidence about a line the engine did not
+//run. 0 = the whole reply (the shape every other caller wants).
+static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = NULL,
+                                   size_t fromStripped = 0)
 {
     string text = replyIn;
     size_t thinkEnd = text.rfind("</think>");
@@ -15181,7 +15328,9 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
     string low = text;
     for (size_t i = 0; i < low.size(); i++)
         low[i] = (char) tolower((unsigned char) low[i]);
-    size_t scan = 0;
+    if (fromStripped > low.size())
+        fromStripped = low.size();
+    size_t scan = fromStripped;
     while ((scan = low.find("plan:", scan)) != string::npos)
     {
         size_t eol = low.find('\n', scan);
@@ -15204,7 +15353,8 @@ static bool planSaysPassThisWindow(const string& replyIn, string * matchedOut = 
         scan += 5;
     }
     //#W52-J (D14): sentence openers after the CHOICE line.
-    size_t choiceAt = low.find("choice:");
+    //#W56-C (D3): from the latched line's region when one was named.
+    size_t choiceAt = low.find("choice:", fromStripped);
     if (choiceAt == string::npos)
         return false;
     size_t region = low.find('\n', choiceAt);
@@ -15315,6 +15465,73 @@ static string firstLabelledLine(const string& replyIn, const char * labelLc)
     if (line.size() > 160)
         line = line.substr(0, 160);
     return line;
+}
+
+//#W56-C (D3): the coded CHOICE line the engine ACTUALLY LATCHED, and where it
+//starts in the post-think reply. Same walk and same predicate as
+//AIPlayerGPT::codedChoiceOrdinal (which reports only the ordinal, for the
+//record) - the line whose payload re-parses to the executed `choice`. On a
+//single-answer reply that is the only CHOICE line, so the offset is where the
+//reply's answer begins and nothing about a one-line reply changes. Returns
+//false when no line re-parses to `choice` (a salvaged or name-resolved answer):
+//the caller then quotes the first line and scans the whole reply, exactly as
+//before this item.
+bool AIPlayerGPT::latchedCodedChoiceLine(const string& replyIn, int choice, int optionCount,
+                                        const std::vector<string> * optionTexts,
+                                        string * lineOut, size_t * fromOut)
+{
+    if (lineOut)
+        lineOut->clear();
+    if (fromOut)
+        *fromOut = 0;
+    if (choice < 0)
+        return false;
+    string text = replyIn;
+    size_t thinkEnd = text.rfind("</think>");
+    if (thinkEnd != string::npos)
+        text = text.substr(thinkEnd + 8);
+    size_t lineStart = 0;
+    while (lineStart <= text.size())
+    {
+        size_t lineEnd = text.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? text.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (text[s] == ' ' || text[s] == '\t'
+                           || text[s] == '*' || text[s] == '#' || text[s] == '-'))
+            s++;
+        if (end - s >= 7)
+        {
+            static const char * kLabel = "CHOICE:";
+            bool m = true;
+            for (int k = 0; k < 7 && m; k++)
+                m = (toupper((unsigned char) text[s + k]) == kLabel[k]);
+            if (m)
+            {
+                string payload = text.substr(s + 7, end - (s + 7));
+                bool st = false;
+                if (parseChoice(payload, optionCount, optionTexts, &st, NULL, NULL,
+                                true) == choice)
+                {
+                    if (fromOut)
+                        *fromOut = s;
+                    if (lineOut)
+                    {
+                        string line = text.substr(s, end - s);
+                        size_t e = line.find_last_not_of(" \t\r");
+                        line = (e == string::npos) ? string() : line.substr(0, e + 1);
+                        if (line.size() > 160)
+                            line = line.substr(0, 160);
+                        *lineOut = line;
+                    }
+                    return true;
+                }
+            }
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    return false;
 }
 
 //#W49-S (D8): the cast menu's exit row. On the model's own first main phase
@@ -19675,10 +19892,18 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //model call each. A pass verdict CONFIRMS a hold. This narrows the
         //detector for NO other shape - the wave-52 rejection of a general
         //narrowing stands (general-strategy.md, the R118 reconciliation).
+        //#W56-C (D3): the notice quotes the LATCHED coded line and takes its
+        //prose evidence from that line's region of the reply - see
+        //latchedCodedChoiceLine and planSaysPassThisWindow's `fromStripped`.
+        string latchedChoiceLine;
+        size_t latchedFrom = 0;
+        const bool haveLatchedLine = latchedCodedChoiceLine(content, choice, index, &shownLines,
+                                                            &latchedChoiceLine, &latchedFrom);
         string passVerdict;
         bool planChoiceConflict = (choice >= 1 && choice <= index && !content.empty()
                                    && !(holdRow > 0 && choice == holdRow)
-                                   && planSaysPassThisWindow(content, &passVerdict));
+                                   && planSaysPassThisWindow(content, &passVerdict,
+                                                             haveLatchedLine ? latchedFrom : 0));
         if (planChoiceConflict)
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
         //#W52-J (D14b): a counted repeat-row take with no PLAN line at all
@@ -19699,6 +19924,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         {
             std::ostringstream corr;
             const char * fb;
+            //#W56-C (D3): quote what the engine ran, not the reply's first try.
+            const string quotedChoiceLine = haveLatchedLine ? latchedChoiceLine
+                                                            : firstLabelledLine(content, "choice:");
             if (namedRowFail)
             {
                 corr << "[RE-ASK] \"" << headParenthetical(decisionPart.empty() ? content : decisionPart)
@@ -19720,12 +19948,12 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             {
                 if (repeatRowTaken && namedCount >= 1)
                     corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
-                         << firstLabelledLine(content, "choice:") << "\") but your reply says this window is a pass (\""
+                         << quotedChoiceLine << "\") but your reply says this window is a pass (\""
                          << passVerdict << "\"). Answer again: 0 (pass) if you meant to pass,"
                             " or the repeat row with the count you want performed now.";
                 else
                     corr << "[RE-ASK] Your CHOICE line takes row " << choice << " (\""
-                         << firstLabelledLine(content, "choice:") << "\") but your reply says this window is a pass (\""
+                         << quotedChoiceLine << "\") but your reply says this window is a pass (\""
                          << passVerdict << "\"). Answer again: 0 (pass) if you meant to pass,"
                             " or the number of the row you want performed now.";
                 fb = "plan_choice_conflict";
@@ -19734,7 +19962,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             else if (planMissing)
             {
                 corr << "[RE-ASK] Your CHOICE line names " << namedCount << " repeats (\""
-                     << firstLabelledLine(content, "choice:") << "\") but carries no PLAN line. Answer again with"
+                     << quotedChoiceLine << "\") but carries no PLAN line. Answer again with"
                         " the CHOICE line and a PLAN line stating your stop count, the count you are at now, and"
                         " how many you perform this window; or 0 (pass).";
                 fb = "plan_missing";
@@ -22303,6 +22531,45 @@ int AIPlayerGPT::chooseMenuAction(const DecisionRequest & req, DecisionAction & 
             {
                 for (size_t ki = 0; ki < shown.size(); ki++)
                     shown[ki] += xKills[ki];
+                //#W56-C (D7 a): the mana-fit clause EVERY other priced cast row
+                //carries. The cast row deliberately prints none (its comment
+                //says why: "an {X} cost has no remainder yet - X is announced
+                //AFTER this pick"), and this is the window where X is known, so
+                //until now the single real trade-off on a monotone X menu -
+                //what taking the big X leaves up - was on no screen at all.
+                //Computed the same way as the cast row's: resolve the cost for
+                //THIS row's X exactly as MTGPutInPlayRule does (copy, add the
+                //announced total as generic - or as the X colour for a coloured
+                //X - then clear the X flag) and ask the engine's own auto-tap
+                //planner which sources it would spend. Counted per SOURCE CARD,
+                //so it reads against the same total the mana line prints.
+                {
+                    ManaCost * xBase = ctx ? ctx->getManaCost() : NULL;
+                    if (xBase && (xBase->hasX() || xBase->hasSpecificX()) && capX >= 0)
+                    {
+                        GptManaPolicy fitPolicy(this);
+                        int xUntapped = ManaEngine::potentialColorReach(this, fitPolicy, NULL);
+                        for (size_t fi = 0; xUntapped > 0 && fi < shown.size(); fi++)
+                        {
+                            int xv = capX - (int) fi;
+                            ManaCost * resolved = NEW ManaCost();
+                            resolved->copy(xBase);
+                            if (xBase->xColor > 0)
+                                resolved->add(xBase->xColor, xv);
+                            else
+                                resolved->add(Constants::MTG_COLOR_ARTIFACT, xv);
+                            resolved->remove(7, 1); //clear the X flag
+                            vector<MTGAbility*> fitPicks = ManaEngine::selectAutoTapProducers(
+                                this, ctx, resolved, ctx->has(Constants::ANYTYPEOFMANA), false);
+                            std::set<MTGCardInstance *> fitTapped;
+                            for (size_t pi = 0; pi < fitPicks.size(); pi++)
+                                if (fitPicks[pi] && fitPicks[pi]->source)
+                                    fitTapped.insert(fitPicks[pi]->source);
+                            shown[fi] += leavesUntappedTag(xUntapped, (int) fitTapped.size());
+                            SAFE_DELETE(resolved);
+                        }
+                    }
+                }
                 //#W48 D9 / #W55-C (D6): mark exactly ONE row. shown is
                 //largest-X-first, so the row for X is at index capX - X; the
                 //guard is the same contract rail the annotations ride (nothing
@@ -42491,6 +42758,174 @@ static const char * kW50Y_r94 =
                   "#W55-C D17 REGRESSION lane E's clause still renders exactly as the corpus shows it");
         }
     }
+
+    // ================= WAVE 56 LANE C =================
+    cout << "\n[W56-C] D3 the RE-ASK quotes the LATCHED coded line, and reads its prose there\n";
+    {
+        // 130v123 seq 109's shape: a first coded line that passes, 400 words of
+        // reasoning, and a SECOND coded line the engine latched and executed.
+        vector<string> menu;
+        menu.push_back("Cast Wrath of God {2}{w}{w}");   //row 1
+        menu.push_back("Activate Jace {1}{u}");          //row 2
+        menu.push_back("Cast Counterspell {u}{u}");      //row 3
+        menu.push_back("Attack with everything");        //row 4
+        menu.push_back("Cycle Starstorm {2}");           //row 5
+        const string twoAnswers =
+            "CHOICE: 0 (pass)\n"
+            "PLAN: nothing is worth mana here. This window: pass.\n"
+            "Wait - Starstorm can be cycled at instant speed and I am holding it dead.\n"
+            "CHOICE: 5 (Cycle Starstorm {2})\n"
+            "PLAN: cycle Starstorm now and keep the counterspell up.";
+        string line;
+        size_t from = 0;
+        CHECK(AIPlayerGPT::latchedCodedChoiceLine(twoAnswers, 5, (int) menu.size(), &menu,
+                                                  &line, &from)
+              && line == "CHOICE: 5 (Cycle Starstorm {2})",
+              "#W56-C D3 the latched line is the SECOND coded line, quoted verbatim");
+        CHECK(from > twoAnswers.find("CHOICE: 0"),
+              "#W56-C D3 the region starts at the latched line, not at the reply's head");
+        string why;
+        CHECK(planSaysPassThisWindow(twoAnswers, &why)
+              && !planSaysPassThisWindow(twoAnswers, &why, from),
+              "#W56-C D3 the pass verdict is BEFORE the latched line, so the region test clears it"
+              " (this is the Starstorm cycle the wave-55 notice destroyed)");
+        // NEGATIVE: a pass verdict written AFTER the latched line is still a
+        // real contradiction and must still fire.
+        const string realConflict =
+            "CHOICE: 5 (Cycle Starstorm {2})\n"
+            "PLAN: on reflection there is nothing to cycle for. This window: pass.";
+        string line2;
+        size_t from2 = 0;
+        CHECK(AIPlayerGPT::latchedCodedChoiceLine(realConflict, 5, (int) menu.size(), &menu,
+                                                  &line2, &from2)
+              && planSaysPassThisWindow(realConflict, &why, from2)
+              && why.find("This window: pass") != string::npos,
+              "#W56-C D3 NEGATIVE a verdict after the latched line still contradicts it");
+        // A single-answer reply is unchanged: the latched line IS the first line
+        // and the region is the whole answer.
+        const string oneAnswer =
+            "CHOICE: 2 (Activate Jace {1}{u})\nPLAN: tick Jace up. This window: pass.";
+        string line3;
+        size_t from3 = 0;
+        CHECK(AIPlayerGPT::latchedCodedChoiceLine(oneAnswer, 2, (int) menu.size(), &menu,
+                                                  &line3, &from3)
+              && line3 == "CHOICE: 2 (Activate Jace {1}{u})" && from3 == 0
+              && planSaysPassThisWindow(oneAnswer, &why, from3),
+              "#W56-C D3 REGRESSION a one-answer reply behaves exactly as before");
+        // No line resolves to the executed choice (a salvaged or name-resolved
+        // answer): the caller falls back to the first line and the whole reply.
+        string line4;
+        size_t from4 = 0;
+        CHECK(!AIPlayerGPT::latchedCodedChoiceLine(oneAnswer, 4, (int) menu.size(), &menu,
+                                                   &line4, &from4)
+              && line4.empty() && from4 == 0,
+              "#W56-C D3 NEGATIVE nothing latches -> no quote, no region, caller keeps wave-55 behaviour");
+    }
+
+    cout << "\n[W56-C] D7 the X menu's fit clause, monotone marker and monotone run\n";
+    {
+        CHECK(xMonotoneMarker(12, 1, 1)
+              == " [<- largest affordable X - X=12 gains 12 life and draws 12 cards;"
+                 " no listed X does more]",
+              "#W56-C D7b the Sphinx's Revelation menu's marker, on the largest X");
+        CHECK(xMonotoneMarker(1, 0, 2) == " [<- largest affordable X - X=1 draws 2 cards;"
+                                          " no listed X does more]",
+              "#W56-C D7b a draw-only monotone spell states only what it does");
+        CHECK(xMonotoneMarker(0, 1, 1).empty() && xMonotoneMarker(5, 0, 0).empty(),
+              "#W56-C D7b NEGATIVE a one-value menu and a spell with no per-X effect get no marker");
+        CHECK(xMonotoneMarker(12, 1, 1).find("take") == string::npos
+              && xMonotoneMarker(12, 1, 1).find("should") == string::npos,
+              "#W56-C D7b the marker states a fact and never instructs");
+        CHECK(stripNarrationDecoration("X = 12" + xMonotoneMarker(12, 1, 1)) == "X = 12",
+              "#W56-C D7b echo: the marker is bracketed guidance and never enters history");
+        // (a) the fit clause is the CAST row's own emitter, now reaching the one
+        // menu that never carried it.
+        CHECK(leavesUntappedTag(9, 7) == " {leaves 2 of your 9 untapped mana sources untapped}",
+              "#W56-C D7a the X row's fit clause is byte-identical to every cast row's");
+        // (c) the monotone run.
+        {
+            string er; int xv = 0;
+            CHECK(splitMonotoneXRow("X = 7 {X pricing: X=7 - you gain 7 life and draw 7 cards}", er, xv)
+                  && xv == 7 && er == "X = # {X pricing: X=# - you gain # life and draw # cards}",
+                  "#W56-C D7c the monotone row splits into its X and its digit-erased text");
+            CHECK(!splitMonotoneXRow("X = 7 {X pricing: X=3 - ...}", er, xv),
+                  "#W56-C D7c NEGATIVE the two X's must agree - a mismatched row is not this form");
+            CHECK(!splitMonotoneXRow("Cast Starstorm {X}{r}{r} {X pricing: X=3 - kills ...}", er, xv),
+                  "#W56-C D7c NEGATIVE a CAST row is not an announce row");
+            CHECK(!splitMonotoneXRow("X = 7 - you gain 7 life", er, xv),
+                  "#W56-C D7c NEGATIVE a row with no {X pricing: X=n} anchor is not this form");
+        }
+        {
+            vector<string> xm;
+            for (int x = 6; x >= 1; x--)
+            {
+                std::ostringstream r;
+                r << "X = " << x << " {X pricing: X=" << x << " - you gain " << x
+                  << " life and draw " << x << " cards}";
+                xm.push_back(r.str());
+            }
+            bool ranged = false;
+            string joined = joinNumberedRows(xm, &ranged);
+            CHECK(ranged && joined ==
+                  "1-6. X = 6 down to X = 1 - one option per X in that range, largest X first,"
+                  " each reading the same line with its own number: option 1 is"
+                  " \"X = 6 {X pricing: X=6 - you gain 6 life and draw 6 cards}\" and option 6 is"
+                  " \"X = 1 {X pricing: X=1 - you gain 1 life and draw 1 cards}\" x6\n",
+                  "#W56-C D7c the run collapses to ONE range row that prints both ends verbatim");
+            // The marker and the X=0 special row break the run, so the collapse
+            // takes the MIDDLE and leaves the ends spelled out - the shape a real
+            // Sphinx's Revelation menu has.
+            vector<string> live;
+            live.push_back(xm[0] + xMonotoneMarker(6, 1, 1));
+            for (size_t k = 1; k < xm.size(); k++)
+                live.push_back(xm[k]);
+            live.push_back("X = 0 {X pricing: X=0 - this cast does NOTHING: you gain 0 life"
+                           " and draw 0 cards, and the spell is spent}");
+            bool ranged2 = false;
+            string joined2 = joinNumberedRows(live, &ranged2);
+            CHECK(ranged2
+                  && joined2.compare(0, 3, "1. ") == 0
+                  && joined2.find("\n2-6. X = 5 down to X = 1") != string::npos
+                  && joined2.find("\n7. X = 0 {X pricing: X=0 -") != string::npos,
+                  "#W56-C D7c the marked top row and the X=0 row stay whole; the middle collapses");
+            CHECK(joined2.find("X = 5 down to X = 1") != string::npos
+                  && joined2.find("X = 4") == string::npos
+                  && joined2.find("X = 2") == string::npos,
+                  "#W56-C D7c the range names its two ends and prints no row for the middle - the"
+                  " decode note is what makes every number in it answerable");
+            // Three rows is under the floor: byte-identical to wave 55.
+            vector<string> few3(xm.begin(), xm.begin() + 3);
+            bool ranged3 = false;
+            CHECK(joinNumberedRows(few3, &ranged3)
+                  == "1. " + few3[0] + "\n2. " + few3[1] + "\n3. " + few3[2] + "\n" && !ranged3,
+                  "#W56-C D7c NEGATIVE a run under the floor is printed exactly as before");
+        }
+        CHECK(string(kOptionRangeNote).find("X = 12 down to X = 2") != string::npos,
+              "#W56-C D7c the range note decodes the monotone form the same way it decodes #N runs");
+    }
+
+    cout << "\n[W56-C] D12 the reveal wait is a wait; reveal_stall is the guarded case\n";
+    {
+        // The wave-55 stamp fired on every reveal that waited for an answer:
+        // mAIStallStructTicks > 0 is true the moment the model is thinking.
+        // The threshold predicate is what the force-close acts on, so the record
+        // and the guard now answer the same question.
+        CHECK(!revealStructParked(1405, 4, 0, 120000)
+              && !revealStructParked(87917, 474, 0, 120000),
+              "#W56-C D12 the two wave-55 repro records (4 s and 474 s) are NOT parks");
+        CHECK(revealStructParked(20000, 2700, 0, 0)
+              && revealStructParked(20000, 3000, 0, 900000),
+              "#W56-C D12 the structural floor (ticks AND the deadline-sized wall) is a park");
+        CHECK(!revealStructParked(19999, 999999, 0, 0)
+              && !revealStructParked(999999, 1799, 0, 0),
+              "#W56-C D12 NEGATIVE both halves are required - neither alone is a park");
+        CHECK(revealStructParked(5, 0, 5, 120000) && !revealStructParked(4, 0, 5, 120000),
+              "#W56-C D12 the fixture override shortens the ticks and drops the wall, as the guard reads it");
+        CHECK(revealStallStructSecsFor(120000) == 1800
+              && revealStallStructSecsFor(900000) == 2700,
+              "#W56-C D12 REGRESSION the wall floor itself is unchanged");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK

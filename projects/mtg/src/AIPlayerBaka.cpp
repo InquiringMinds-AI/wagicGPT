@@ -15,6 +15,69 @@
 //#W54-K (A3): WAGIC_BAKA_LEGACY_SCAN=1 restores the every-pair activation scan (defined with rankActivations).
 static bool bakaLegacyScan();
 
+//#W56-C (D17) - THE SEGFAULT. `MTGAbility::target` is a raw `Targetable *` with
+//no clearing contract: nothing nulls it when the object it names is freed. Dead
+//tokens and copies reach MTGPlayerCards::garbage and the zone that was `garbage`
+//two turns ago is SAFE_DELETEd (MTGGameZones.cpp:230-241), which deletes its
+//cards - while abilities that named them are still in ActionLayer::mObjects, and
+//AIPlayerBaka::rankActivations walks EVERY one of those objects each time it
+//ranks. `dynamic_cast<MTGCardInstance*>(a->target)` then reads a vtable pointer
+//out of freed memory: SIGSEGV inside __dynamic_cast, frame 1
+//AIPlayerBaka::rankActivations (backtrace 2026-09-03, deck146 vs deck152 stub
+//selfplay, turn 8). It is NOT the board index - `WAGIC_GPT_BOARDINDEX=1` crashes
+//the same matchup 2 of 5 games and `=0` 4 of 5, so the flag correlates with
+//nothing but the number of decisions taken before the dead pointer is met.
+//
+//The dynamic TYPE is never the question at any of these sites: each one asks
+//"is this pointer one of the cards in play right now". That is answerable by
+//POINTER IDENTITY against the live zones, which dereferences nothing. The
+//upcast `(Targetable *) card` is a compile-time adjustment (MTGCardInstance
+//derives from Targetable once, through Damageable, non-virtually), so the
+//comparison is exact and the answer is identical to the dynamic_cast's for
+//every pointer that is still alive - and NULL, rather than a fault, for one
+//that is not. The zone list mirrors what dynamic_cast could resolve: every
+//zone a card can be sitting in, both players, garbage included.
+static MTGCardInstance * liveCardTarget(GameObserver * g, Targetable * t)
+{
+    if (!g || !t)
+        return NULL;
+    for (int p = 0; p < 2; p++)
+    {
+        Player * pl = g->players[p];
+        MTGPlayerCards * pz = pl ? pl->game : NULL;
+        if (!pz)
+            continue;
+        MTGGameZone * zones[] = { pz->inPlay, pz->hand, pz->graveyard, pz->library,
+                                  pz->exile, pz->commandzone, pz->stack, pz->reveal,
+                                  pz->temp, pz->sideboard, pz->garbage, pz->garbageLastTurn };
+        const int nb = (int)(sizeof(zones) / sizeof(zones[0]));
+        for (int z = 0; z < nb; z++)
+        {
+            MTGGameZone * zone = zones[z];
+            if (!zone)
+                continue;
+            for (int j = 0; j < zone->nb_cards; j++)
+                if (zone->cards[j] && (Targetable *) zone->cards[j] == t)
+                    return zone->cards[j];
+        }
+    }
+    return NULL;
+}
+
+//#W56-C (D17): the same question for the other Targetable the AI resolves. The
+//two Players outlive every ability, so this one can never have been the fault -
+//it is here so the pair reads as one rule and neither site dereferences a raw
+//target pointer to learn its type.
+static Player * livePlayerTarget(GameObserver * g, Targetable * t)
+{
+    if (!g || !t)
+        return NULL;
+    for (int p = 0; p < 2; p++)
+        if (g->players[p] && (Targetable *) g->players[p] == t)
+            return g->players[p];
+    return NULL;
+}
+
 //
 // AIAction
 //
@@ -200,7 +263,7 @@ static bool regenerationPendingFor(GameObserver * observer, MTGCardInstance * ca
             continue;
         MTGAbility * core = AbilityFactory::getCoreAbility(stacked->ability);
         if (core && core->aType == MTGAbility::STANDARD_REGENERATE
-            && dynamic_cast<MTGCardInstance *>(core->target) == card)
+            && liveCardTarget(observer, core->target) == card) //#W56-C (D17)
             return true;
     }
     return false;
@@ -245,7 +308,7 @@ int OrderedAIAction::getEfficiency()
         SAFE_DELETE(transAbility);
         return 0;
     }
-    MTGCardInstance * coreAbilityCardTarget = dynamic_cast<MTGCardInstance *>(a->target);
+    MTGCardInstance * coreAbilityCardTarget = liveCardTarget(g, a->target); //#W56-C (D17)
 
     //CoreAbility shouldn't return a Lord, but it does.
     //When we don't have a target for a lord action, we assume it's the lord itself
@@ -962,7 +1025,7 @@ int OrderedAIAction::getRevealedEfficiency(MTGAbility * ability2)
         SAFE_DELETE(transAbility);
         return 0;
     }
-    MTGCardInstance * coreAbilityCardTarget = dynamic_cast<MTGCardInstance *>(a->target);
+    MTGCardInstance * coreAbilityCardTarget = liveCardTarget(g, a->target); //#W56-C (D17)
 
     //CoreAbility shouldn't return a Lord, but it does.
     //When we don't have a target for a lord action, we assume it's the lord itself
@@ -2539,7 +2602,10 @@ bool AIPlayerBaka::abilityCanReactTo(MTGAbility * a, MTGCardInstance * card)
         return true; //rules-layer object: reacts to any card
     if (a->source == card)
         return true;
-    return dynamic_cast<MTGCardInstance*>(a->target) == card;
+    //#W56-C (D17): pointer identity - see liveCardTarget. `card` is live by
+    //construction here (it came off a zone), so the upcast comparison answers
+    //exactly what the dynamic_cast answered, without touching a->target.
+    return a->target && a->target == (Targetable *) card;
 }
 
 void AIPlayerBaka::rankPair(MTGAbility * a, MTGCardInstance * card, ManaCost * totalPotentialMana,
@@ -2646,7 +2712,7 @@ void AIPlayerBaka::rankActivations(RankingContainer & ranking, ManaCost * totalP
             }
             continue;
         }
-        MTGCardInstance * cands[2] = { a->source, dynamic_cast<MTGCardInstance*>(a->target) };
+        MTGCardInstance * cands[2] = { a->source, liveCardTarget(observer, a->target) }; //#W56-C (D17)
         if (cands[1] == cands[0])
             cands[1] = NULL;
         for (int z = 0; z < nbZones; z++)
@@ -2893,9 +2959,9 @@ int AIPlayerBaka::getEfficiency(MTGAbility * ability)
 
     OrderedAIAction * check = NULL;
 
-    if(MTGCardInstance * cTarget = dynamic_cast<MTGCardInstance *>(ability->target))
+    if(MTGCardInstance * cTarget = liveCardTarget(observer, ability->target)) //#W56-C (D17)
         check = NEW OrderedAIAction(this, ability, ability->source, cTarget);
-    else if(Player * pTarget = dynamic_cast<Player *>(ability->target))
+    else if(Player * pTarget = livePlayerTarget(observer, ability->target)) //#W56-C (D17)
         check = NEW OrderedAIAction(this, ability, pTarget, ability->source);
     else
         check = NEW OrderedAIAction(this, ability, ability->source);

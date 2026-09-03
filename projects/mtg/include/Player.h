@@ -247,9 +247,12 @@ public:
     //figures every tick it is parked, BEFORE the step that may write a record,
     //so a reveal decision written while the driver was stuck carries how long
     //it had been stuck. A seat that keeps no decision log ignores it.
-    virtual void noteRevealStall(int ticks, long secs, int driverPhase)
+    //#W56-C (D12): `parked` is the driver's OWN structural threshold, evaluated
+    //by the driver with the same numbers its force-close uses. Without it the
+    //seat had to guess, and stamped every wait as a stall.
+    virtual void noteRevealStall(int ticks, long secs, int driverPhase, bool parked)
     {
-        (void) ticks; (void) secs; (void) driverPhase;
+        (void) ticks; (void) secs; (void) driverPhase; (void) parked;
     }
 
     //#W55-E (D5a): this seat's per-decision deadline in milliseconds (0 = the
