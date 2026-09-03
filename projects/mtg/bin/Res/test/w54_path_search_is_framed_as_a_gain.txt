@@ -1,0 +1,55 @@
+#NAME: Path to Exile's basic-land search is framed as a GAIN (W54-D D3)
+#DESC: Wave-53 ledger D3 (HIGH, = R163): 8 of 8 renders. The compensation
+#DESC: search Path to Exile grants its VICTIM ("Its controller may search their
+#DESC: library for a basic land card, put that card onto the battlefield
+#DESC: tapped") reached the beneficiary as "EXILE ONE OF YOUR OWN CARDS: your
+#DESC: own effect (Path to Exile) makes you exile a card ... Pick the card you
+#DESC: can best AFFORD TO LOSE" - the exact inverse of the right value ordering.
+#DESC: Cause: handRemovalVerb matched the lowercased CHOOSER SOURCE NAME first,
+#DESC: and "path to exile" contains "exile", so the verb was decided by the
+#DESC: source card's name before anything read moveTo(mybattlefield).
+#DESC: The fix reads the DESTINATION off the waiting AAMover and gates the verb
+#DESC: table on it; a battlefield/hand destination is a gain, not a removal.
+#DESC: No zone assertion can see this - the land arrives in play either way -
+#DESC: so TestSuiteAI::Act runs the PRODUCTION builder over the live chooser
+#DESC: (ownCardChooserRegister -> buildHandGainAsk / buildHandRemovalAsk).
+#DESC: PRE-FIX P2's register reads "EXILE ONE OF YOUR OWN CARDS"; the
+#DESC: nonarration: line holds that string out as the negative.
+FORCEABILITY
+AICALLS 40
+[INIT]
+firstmain
+[PLAYER1]
+hand:Path to Exile
+library:Plains
+manapool:{W}
+[PLAYER2]
+inplay:Serra Angel
+library:Forest,Forest,Forest
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+end
+[PLAYER1]
+library:Plains
+graveyard:Path to Exile
+[PLAYER2]
+library:Forest,Forest
+inplay:Forest
+exile:Serra Angel
+narration:CHOOSE A CARD TO PUT ONTO THE BATTLEFIELD
+narration:Path to Exile's effect puts a card you choose from the list below onto YOUR battlefield
+narration:Pick the card you MOST NEED right now
+nonarration:EXILE ONE OF YOUR OWN CARDS
+nonarration:AFFORD TO LOSE
+[END]

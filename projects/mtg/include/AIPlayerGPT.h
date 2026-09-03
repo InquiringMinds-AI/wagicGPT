@@ -78,6 +78,9 @@ bool counterMarkerMatches(const MTGCardInstance * moved, const MTGCardInstance *
 //the two empty scans.
 string stackAbilityRegister(GameObserver * observer, Player * seat);
 string exileCastRegister(Player * seat);
+//#W54-D (D3/D6): the framing header the own-card chooser would print, built by
+//the production emitters over the live chooser ("" when this window is not one).
+string ownCardChooserRegister(GameObserver * observer, Player * seat);
 
 //The register form of one zone change (pure; PARSETEST-covered).
 string zoneChangeNarration(bool mine, const string& cardName, const string& from,
@@ -594,6 +597,9 @@ private:
     //carries the count - a corpus can still see how many windows the seat was
     //offered and how many of them never reached the model.
     int mManaOnlyWindowsSkipped;
+    //#W54-D (D8b): asks whose entire option list rendered as one
+    //interchangeable, ordinal-free row and were answered without a model call.
+    int mIdenticalOptionAsksResolved;
     //#W50-Z (D12): the "turn:phase" step in which THIS seat last took a mana
     //activation of its own choosing. Floating mana keeps a mana-only window
     //open only in that step (the seat is mid-float by its own decision); mana
