@@ -1,0 +1,54 @@
+#NAME: Blockers -- a DEATHTOUCH blocker kills anything, so take the block
+#DESC: The other half of #W57-V's trade arithmetic, and the reason the change is not
+#DESC: simply "block less". `canKill = (card->power >= attacker->toughness)` is wrong
+#DESC: in BOTH directions: it invents kills that first strike prevents, and it misses
+#DESC: kills that deathtouch guarantees (CR 702.2b). A 2/2 deathtouch body in front of
+#DESC: a 6/4 is a 1-for-1 against a creature worth twice as much, and the seat used to
+#DESC: decline it and take 6 to the face instead. The owner's opponent decks are full
+#DESC: of this shape (Vampire Nighthawk, Pitiless Gorgon, Gifted Aetherborn).
+#DESC:
+#DESC: SCENARIO: Craw Wurm (6/4) attacks a defender at 20 holding one Pitiless Gorgon
+#DESC: (2/2 deathtouch, primitives: abilities=deathtouch).
+#DESC:
+#DESC: RED on base (753c8d488): 2 < 4 so "canKill" is false, 2 toughness does not
+#DESC: survive 6 so "survives" is false, and 6 is not lethal at 20 - no block at all,
+#DESC: defender at 14 with both creatures alive.
+#DESC: GREEN after (#W57-V): the Gorgon blocks, both die, defender stays at 20.
+AICALLS 80
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Craw Wurm
+life:20
+[PLAYER2]
+inplay:Pitiless Gorgon
+life:20
+[DO]
+Craw Wurm
+next
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+graveyard:Craw Wurm
+life:20
+[PLAYER2]
+graveyard:Pitiless Gorgon
+life:20
+[END]

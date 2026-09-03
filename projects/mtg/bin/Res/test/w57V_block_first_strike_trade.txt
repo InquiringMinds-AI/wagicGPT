@@ -1,0 +1,62 @@
+#NAME: Blockers -- do NOT block a FIRST STRIKER a body cannot outlive
+#DESC: Owner Vita play report 2026-09-03 (vpk15/16 session, his tag "bad blocking"):
+#DESC: "i think it was mostly good, aside from some bad blocks from the ai, legal, but
+#DESC: deterministically bad." His player deck2 ("Skills Paid the Bills") is a
+#DESC: first-strike / double-strike deck, and the AI seat blocked into it every combat.
+#DESC: transcript-1788469781 turn 5: a lone Youthful Knight (2/1 FIRST STRIKE) attacks
+#DESC: and the seat puts a body in front of it; turn 11 two bodies pile onto the same
+#DESC: Knight while Court Street Denizen and Fencing Ace walk in unblocked.
+#DESC:
+#DESC: MECHANISM: every kill test in AIPlayerBaka::chooseBlockers compared power to
+#DESC: toughness RAW - pass 3's `canKill = (card->power >= attacker->toughness)` and
+#DESC: pass 1's tracked-toughness subtraction. A 2/2 "kills" a 2/1 on paper. It does
+#DESC: not: first strike kills the 2/2 in the first-strike damage step and the blocker
+#DESC: deals nothing at all (CR 510.4). The block is a clean 1-for-0 against the seat,
+#DESC: and because nothing in the heuristic could see it, the seat made it EVERY time
+#DESC: the same board came up - the owner's "deterministically bad".
+#DESC:
+#DESC: SCENARIO: Youthful Knight (2/1 first strike) attacks a defender at 20 holding
+#DESC: one Grizzly Bears (2/2). Blocking loses the Bears and kills nothing; 2 damage
+#DESC: at 20 life is not worth a creature.
+#DESC:
+#DESC: RED on base (753c8d488): the Bears block, die to first strike, the Knight lives,
+#DESC: defender at 20 with an empty board.
+#DESC: GREEN after (#W57-V): no block, defender at 18 with its Bears.
+AICALLS 80
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Youthful Knight
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:20
+[DO]
+Youthful Knight
+next
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Youthful Knight
+life:20
+[PLAYER2]
+inplay:Grizzly Bears
+life:18
+[END]

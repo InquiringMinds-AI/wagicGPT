@@ -1,0 +1,50 @@
+#NAME: Blockers -- NEGATIVE CONTROL: a profitable block is still taken
+#DESC: #W57-V tightens what counts as a sound block. This fixture is the control that
+#DESC: says the tightening did not make the seat passive: the plainest good block in
+#DESC: Magic - a bigger body eating a smaller attacker and living - must still happen,
+#DESC: on the base binary and after.
+#DESC:
+#DESC: SCENARIO: Grizzly Bears (2/2) attacks a defender at 20 holding one Hill Giant
+#DESC: (3/3). The Giant kills the Bears and survives, so the block costs nothing.
+#DESC:
+#DESC: GREEN on base AND after: the Bears die, the Giant lives, the defender stays at
+#DESC: 20. (The "lethal is still blocked" control is ai_block_lethal_set_wave53.txt
+#DESC: and ai_block_trample_topup_w53z.txt, which #W57-V also keeps green.)
+AICALLS 80
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[DO]
+Grizzly Bears
+next
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+graveyard:Grizzly Bears
+life:20
+[PLAYER2]
+inplay:Hill Giant
+life:20
+[END]

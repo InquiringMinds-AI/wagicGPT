@@ -1,0 +1,53 @@
+#NAME: Blockers -- a 1/1 does not "trade" with a 1/1 DOUBLE STRIKER
+#DESC: The owner's own card, from the deck he was piloting on the Vita: Fencing Ace
+#DESC: (1/1 double strike), player deck2. transcript-1788471208 - the Ace attacks
+#DESC: ALONE on turns 11, 15, 17 and 19 and the AI seat answers with bodies every
+#DESC: time. On paper a 1/1 blocker "kills" a 1/1; in play the Ace's first-strike
+#DESC: damage destroys the blocker before it deals any, and then the Ace lives to
+#DESC: deal its regular damage too. The same wrong block, every combat.
+#DESC:
+#DESC: SCENARIO: Fencing Ace (1/1 double strike) attacks a defender at 20 holding one
+#DESC: Mons's Goblin Raiders (1/1).
+#DESC:
+#DESC: RED on base (753c8d488): pass 3's `canKill` (1 >= 1) blocks, the Raiders die in
+#DESC: the first-strike step, the Ace survives - defender at 20 with an empty board.
+#DESC: GREEN after (#W57-V): evaluateDeclaration resolves BOTH damage steps, sees the
+#DESC: blocker dealing nothing, and declines - defender at 19 with its Raiders.
+AICALLS 80
+[INIT]
+combatattackers
+[PLAYER1]
+inplay:Fencing Ace
+life:20
+[PLAYER2]
+inplay:Mons's Goblin Raiders
+life:20
+[DO]
+Fencing Ace
+next
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+inplay:Fencing Ace
+life:20
+[PLAYER2]
+inplay:Mons's Goblin Raiders
+life:18
+[END]
