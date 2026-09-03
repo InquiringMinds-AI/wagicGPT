@@ -1,0 +1,41 @@
+#W54-F (D38): pin the MTG ID a transformed double-faced card carries.
+#Wagic card ids are Gatherer multiverse ids and a transform DFC gets ONE PER
+#FACE, in the same printing. The id is what WResourceManager::RetrieveCard asks
+#art for, so the wrong one is a visibly different card on the console - which is
+#exactly the owner's wave-53 Vita report (a transformed Heliod showing another
+#printing's UNtransformed art). Lane V fixed the resolution
+#(MTGAllCards::getOtherFaceCard) but could pin only its pure core in PARSETEST:
+#PARSETEST runs before the card database loads, and the suite SKIPPED setMTGId
+#on flip (playMode != MODE_TEST_SUITE), so no harness could see a post-flip
+#printing at all. #W54-F lifts that skip and adds `assertmtgid`.
+#Delver of Secrets (ISD 226749) transforms on its first upkeep after entering,
+#when the revealed top card is an instant - Insectile Aberration is ISD 226755,
+#the SAME printing's back face.
+#Top of library = last listed.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:delver of secrets
+inplay:island
+library:Hill Giant,Juggernaut,Lightning Bolt
+[PLAYER2]
+[DO]
+interactivereveal
+assertmtgid 226749 delver of secrets
+island
+delver of secrets
+goto end
+goto upkeep
+goto end
+goto upkeep
+goto upkeep
+lightning bolt
+revealok
+assertmtgid 226755 insectile aberration
+[ASSERT]
+UPKEEP
+[PLAYER1]
+inplay:island,insectile aberration
+library:Hill Giant,Juggernaut,Lightning Bolt
+[PLAYER2]
+[END]

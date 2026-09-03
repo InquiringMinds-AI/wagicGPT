@@ -1311,3 +1311,5 @@ w53_reveal_no_eligible_option_one.txt
 branching_evolution_doubles_one_counter.txt
 branching_evolution_doubles_two_counters.txt
 branching_evolution_opponent_creature_not_doubled.txt
+w54_assertmtgid_transform.txt
+w54_reveal_stall_forceclose.txt

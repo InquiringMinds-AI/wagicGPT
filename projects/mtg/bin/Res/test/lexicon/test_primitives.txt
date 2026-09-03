@@ -6310,6 +6310,18 @@ auto=reject notaTarget(land|myhand)
 text=Test-only: its caster discards a land card from their own hand. Fires an opponent's land-discard trigger.
 [/card]
 [card]
+id=2100000987
+name=Lexicon Deadend Wizard
+rarity=R
+auto=@each my end restriction{thisturn(*[-creature]|mystack)~morethan~0}:name(Look top 5) reveal:5 optionone name(Put noncreature cards in hand) target(<upto:5>*[-land&-creature]|reveal) moveto(hand) optiononeend revealend
+mana={1}{U}{U}
+type=Legendary Creature
+subtype=Human Wizard Advisor
+power=2
+toughness=4
+text=Test-only (#W54-F, D7a): the Hurkyl reveal with NO option two. When option one is predicate-gated to zero legal targets among the revealed cards, toResolve builds NEITHER option, no chooser ever arms, and the interactive-AI reveal driver waits in phase 0 forever - an open reveal display blocks every phase advance, so the whole game stops. The stall guard is what ends it.
+[/card]
+[card]
 id=2100000986
 name=Lexicon Hurkyl Wizard
 rarity=R

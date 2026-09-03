@@ -228,6 +228,32 @@ MTGCardInstance * TestSuiteAI::getCard(string action)
             }
         }
     }
+    //#W54-F (D38): last pass - the card's name BEFORE it transformed. A [DO]
+    //click names the PHYSICAL card the player is pointing at, and a script
+    //written before a creature flips goes on naming it by the face it was played
+    //as. That used to resolve by id: the test-suite skip kept a flipped DFC on
+    //its FRONT id, so `Rules::getCardByMTGId` still found it. With the skip
+    //lifted (so a post-flip printing can be asserted at all) the id tracks the
+    //face, and the click had nowhere left to land - trigger_transformed_equipment
+    //silently stopped declaring its attacker. nameOrig is the instance's own
+    //pre-flip name, set by AAFlip/AATurnSide, so this restores exactly the
+    //permissive resolution the [DO] section always had - and only ever after an
+    //exact id AND exact current-name match have both failed, so a fixture holding
+    //both faces still binds the one it named.
+    for (int i = 0; i < 2; i++)
+    {
+        Player * p = observer->players[i];
+        MTGGameZone * zones[] = { p->game->library, p->game->hand, p->game->inPlay, p->game->graveyard, p->game->commandzone, p->game->sideboard, p->game->removedFromGame, p->game->reveal };
+        for (int j = 0; j < 8; j++)
+            for (int k = 0; k < zones[j]->nb_cards; k++)
+            {
+                MTGCardInstance * card = zones[j]->cards[k];
+                if (!card || card->nameOrig.empty()) continue;
+                string orig = card->nameOrig;
+                std::transform(orig.begin(), orig.end(), orig.begin(), ::tolower);
+                if (orig.compare(action) == 0) return card;
+            }
+    }
     DebugTrace("TESTUISTEAI: Can't find card:" << action.c_str());
     //Dump what IS there: a failed lookup is usually a typo'd name or a
     //zone that never got populated, and seeing the actual board answers
@@ -636,6 +662,13 @@ int TestSuiteAI::Act(float)
     {
         observer->mRevealTestAsyncTicks = atoi(action.substr(17).c_str());
     }
+    else if (action.compare(0, 18, "revealstallbudget ") == 0)
+    {
+        //#W54-F (D7a): shrink the reveal driver's no-progress budget for this
+        //fixture. The stall itself must be REAL - this only removes the wait.
+        observer->mRevealStallTicks = atoi(action.substr(18).c_str());
+        DebugTrace("TESTSUITE revealstallbudget: " << observer->mRevealStallTicks);
+    }
     else if (action.find("revealok") != string::npos || action.find("revealnext") != string::npos)
     {
         //Drive an open reveal display (MTGRevealingCards). The engine's AI
@@ -878,6 +911,36 @@ int TestSuiteAI::Act(float)
                       << " sources got " << sources.size() << " [" << suite->filename << "]" << std::endl;
             for (std::set<MTGCardInstance*>::iterator it = sources.begin(); it != sources.end(); ++it)
                 std::cerr << "TESTSUITE asserttaps:   " << (*it)->getDisplayName() << std::endl;
+            suite->commandAssertFailures++;
+        }
+    }
+    else if (action.find("assertmtgid ") == 0)
+    {
+        //#W54-F (D38): pin the card instance's CURRENT MTG id - the printing the
+        //renderer asks art for. Nothing else in either harness can see it:
+        //PARSETEST runs before the card database loads (so lane V could pin only
+        //the pure sibling-picker, not the assembled MTGAllCards::getOtherFaceCard),
+        //and a zone [ASSERT] matches by name once the face has changed. A DFC's
+        //two faces are two DIFFERENT multiverse ids in the SAME printing, and the
+        //wrong one is a visibly different card on the console.
+        //Syntax: assertmtgid <id> <card name>   (name = the CURRENT face's name)
+        string rest = action.substr(12);
+        size_t sp = rest.find(' ');
+        int expect = atoi(rest.substr(0, sp).c_str());
+        string cname = sp == string::npos ? "" : rest.substr(sp + 1);
+        MTGCardInstance * mc = getCard(cname);
+        if (!mc)
+        {
+            std::cerr << "TESTSUITE assertmtgid: no card '" << cname << "'"
+                      << " [" << suite->filename << "]" << std::endl;
+            suite->commandAssertFailures++;
+            return 1;
+        }
+        if (mc->getMTGId() != expect)
+        {
+            std::cerr << "TESTSUITE assertmtgid: '" << cname << "' expected id " << expect
+                      << " got " << mc->getMTGId() << " (set " << mc->setId << ")"
+                      << " [" << suite->filename << "]" << std::endl;
             suite->commandAssertFailures++;
         }
     }
@@ -1510,8 +1573,9 @@ void TestSuiteGame::assertGame()
                             continue;
                         // Face-aware id match for transformed DOUBLE-FACED cards. A DFC
                         // keeps its FRONT MTGId after flipping in test-suite mode
-                        // (AAFlip::resolve skips setMTGId under MODE_TEST_SUITE,
-                        // AllAbilities.cpp:5308) while its name IS updated to the current
+                        // (#W54-F/D38 lifted that skip, so the id now tracks the face and
+                        // the strict id match falls through to the name-level count below)
+                        // while its name IS updated to the current
                         // face (_target->setName(myFlip->name)). An id-only match would
                         // let an expected pre-flip face name silently pass against a card
                         // that has transformed to its other face - so no fixture could
@@ -1713,7 +1777,7 @@ void TestSuiteGame::assertGame()
     if (commandAssertFailures)
     {
         char cafail[256];
-        sprintf(cafail, "<span class=\"error\">==%i scripted assert command(s) failed (assertcastable/assertusable/asserttaps)==</span><br />", commandAssertFailures);
+        sprintf(cafail, "<span class=\"error\">==%i scripted assert command(s) failed (assertcastable/assertusable/asserttaps/assertmtgid)==</span><br />", commandAssertFailures);
         Log(cafail);
         error += commandAssertFailures;
     }

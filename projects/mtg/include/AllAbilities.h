@@ -95,9 +95,26 @@ public:
                                            //for the forced-async reveal repro hook
     bool mAISecondRebuilt;                 //W54-X: option two has been rebuilt once
                                            //after its window was consumed early
+    //#W54-F (D7a): STALL GUARD. An open reveal display holds every phase-advance
+    //path, so a driver phase that can never make progress freezes the whole game
+    //with no tick and no log (the wave-53 corpus lost a game to 13 hours of it).
+    //Each tick compares a PROGRESS SIGNATURE - the driver's own cursors, the
+    //reveal zone, whether a chooser is armed, the model-poll counter, and the
+    //game's turn/phase/stack - against the previous tick's. A changed signature
+    //is progress and resets the budget; a model call in flight bumps mAIPollTicks
+    //and so counts as progress (its deadline belongs to the async layer). Only a
+    //reveal where NOTHING moves, anywhere, for both budgets is force-closed.
+    int mAIStallTicks;                     //consecutive no-progress ticks
+    size_t mAIStallSig;                    //last progress signature
+    long mAIStallSince;                    //wall-clock (s) the stall started
+    int mAIPollTicks;                      //model-poll count (progress, not a stall)
+    bool mAIForceClosed;                   //this reveal was force-closed
     vector<MTGCardInstance*> mAIGraveSel;  //model's option-one picks (pointers)
     vector<MTGCardInstance*> mAIRemainder; //option-two cards (captured at arm)
-    void driveInteractiveReveal();
+    void driveInteractiveReveal();         //stall-guard wrapper
+    void driveInteractiveRevealStep();     //the state machine itself
+    size_t revealProgressSignature();      //what "progress" means, in one value
+    void forceCloseStalledReveal();
     TargetChooser * ownChooser();          //the current chooser iff it is THIS reveal's
     //Input arming. False from the moment the display opens until it has been
     //through one full Render, so no button can answer a display the player has

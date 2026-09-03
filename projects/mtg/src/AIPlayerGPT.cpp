@@ -9471,6 +9471,18 @@ void AIPlayerGPT::flushRecoveryRecord()
 //when nothing from the reply executed (choice < 0) AND a fallback class was
 //stamped - so an executed answer, and a note-only record, never latch one.
 //Pure, so the gate is pinned in PARSETEST.
+//#W54-F (D7b): did the ENGINE answer this decision with no model call at all?
+//True only when nothing from a reply executed (choice < 0), no class was already
+//stamped, and BOTH the prompt and the reply are empty - the signature of a seam
+//that self-declined (a predicate-gated reveal with nothing eligible) rather than
+//of a model that failed. A record that carries a prompt was asked; a record that
+//carries a reply was answered. Pure, so the gate is pinned in PARSETEST.
+bool AIPlayerGPT::engineAnsweredNoModel(int choice, const char * fallback,
+                                        bool emptyPrompt, bool emptyReply)
+{
+    return choice < 0 && (fallback == NULL || *fallback == '\0') && emptyPrompt && emptyReply;
+}
+
 bool AIPlayerGPT::handedToHeuristic(int choice, const char * fallback)
 {
     return choice < 0 && fallback != NULL && *fallback != '\0';
@@ -9486,6 +9498,17 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         return;
     }
     ensureGameStartRecord();
+    //#W54-F (D7b): ANY engine-answered decision earns a fallback class. The
+    //wave-53 corpus's ONE lost game left `152v125` seq 28 - kind reveal,
+    //choice -1, prompt 0, reply "", latency_ms -1, and NO fallback field - so
+    //lane Q's recovery contract (which latches on choice<0 AND a class) could
+    //not see it, and the single record that marked a 13-hour park read exactly
+    //like an ordinary cache hit. The shape is structural, not site-specific:
+    //no prompt and no reply means no model call was made, and choice<0 means
+    //nothing from a reply executed, so the ENGINE answered. Stamping it here
+    //rather than at each call site covers every present and future such seam.
+    if (engineAnsweredNoModel(choice, fallback, userMsg.empty(), reply.empty()))
+        fallback = "engine_answered";
     //#W53-Q (D24): the PREVIOUS handoff's recovery lands before this record, so
     //the file reads unanswered -> recovery -> next decision in order.
     flushRecoveryRecord();
@@ -9666,6 +9689,18 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         mRecoveryClass = fallback;
         mRecoveryKind = kind;
     }
+}
+
+//#W54-F (D7a): the engine force-closed a decision this seat was parked on.
+//It gets a full record - kind, what the engine did instead, and its own class -
+//so the recovery contract names it and a corpus can COUNT force-closes instead
+//of inferring them from a game that simply stopped.
+void AIPlayerGPT::logEngineResolution(const char * kind, const string& what,
+                                      int optionCount, const char * fallbackClass)
+{
+    writeTransLog(kind, "", "", -1, optionCount, what,
+                  (fallbackClass && *fallbackClass) ? fallbackClass : "engine_answered", NULL);
+    narrateDecision(what);
 }
 
 void AIPlayerGPT::gameEnded()
@@ -37174,6 +37209,40 @@ static const char * kW50Y_r94 =
               "#W53-V with three printings the nearest FORWARD id wins, not the last one");
         CHECK(wagicPickFaceSiblingId(three, 400000) == 300002,
               "#W53-V past every candidate it falls back to the nearest one behind");
+    }
+    // ---- #W54-F: D7b the engine-answered class ----
+    cout << "\n[#W54-F] D7b the engine-answered class\n";
+    {
+        //THE SHAPE. Wave-53 corpus 152v125 seq 28 - the only record in the whole
+        //corpus with latency_ms < 0 - was kind reveal, prompt "", reply "",
+        //choice -1, and NO fallback field. It marked a 13-hour park and read
+        //exactly like a cache hit. No prompt and no reply means no model call was
+        //made; choice < 0 means nothing from a reply executed; so the ENGINE
+        //answered, and that is a class.
+        CHECK(AIPlayerGPT::engineAnsweredNoModel(-1, NULL, true, true),
+              "#W54-F D7b 152v125 seq 28: no prompt, no reply, nothing executed = engine-answered");
+        CHECK(AIPlayerGPT::engineAnsweredNoModel(-1, "", true, true),
+              "#W54-F D7b an EMPTY class string is no class at all, same as NULL");
+        //NEGATIVES. Each one is a shape that already has its own true account,
+        //and none of them may be relabelled.
+        CHECK(!AIPlayerGPT::engineAnsweredNoModel(-1, "empty_reply", true, true),
+              "#W54-F D7b NEGATIVE a stamped class is never overwritten");
+        CHECK(!AIPlayerGPT::engineAnsweredNoModel(-1, "deferred_to_heuristic", true, true),
+              "#W54-F D7b NEGATIVE the defer records keep their own class");
+        CHECK(!AIPlayerGPT::engineAnsweredNoModel(-1, NULL, false, true),
+              "#W54-F D7b NEGATIVE a record carrying a PROMPT was asked - that is a model failure");
+        CHECK(!AIPlayerGPT::engineAnsweredNoModel(-1, NULL, true, false),
+              "#W54-F D7b NEGATIVE a record carrying a REPLY was answered - unparsed, not engine-answered");
+        CHECK(!AIPlayerGPT::engineAnsweredNoModel(0, NULL, true, true)
+              && !AIPlayerGPT::engineAnsweredNoModel(3, NULL, true, true),
+              "#W54-F D7b NEGATIVE an EXECUTED choice is not a handoff, whatever else is empty");
+        //THE POINT OF THE CLASS: it is what makes lane Q's recovery contract see
+        //the record. Before the stamp the same decision latched nothing.
+        CHECK(!AIPlayerGPT::handedToHeuristic(-1, NULL),
+              "#W54-F D7b the 152v125 shape latched NO recovery record before the stamp");
+        CHECK(AIPlayerGPT::handedToHeuristic(-1, "engine_answered")
+              && AIPlayerGPT::handedToHeuristic(-1, "reveal_stall_forced"),
+              "#W54-F D7b with a class stamped it earns one - both engine-answered classes");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
