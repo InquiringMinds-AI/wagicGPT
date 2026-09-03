@@ -183,7 +183,23 @@ GuiPlay::GuiPlay(DuelLayers* view) :
     GuiLayer(view)
 {
     wave = 0;
+    mLayoutDirty = true;
     end_spells = cards.end();
+}
+
+//#W54-J (A25): one layout pass per frame instead of one per event. A mana
+//payment or an untap step is an event STORM (every symbol, every permanent),
+//and each event re-ran the four-pass Replace() over the whole battlefield -
+//1.1 calls per event, 4.2 per frame in fast-clock self-play. Every event
+//still marks the layout dirty (the catch-all the trailing Replace() was), the
+//zone-change path still lays out synchronously before CardSelector::Add (the
+//card's position is that selector's zone cue), and the disable switch
+//(wagicRenderCacheOff) restores the eager call so a suspected layout defect
+//is one env var to rule in or out.
+void GuiPlay::relayoutIfDirty()
+{
+    if (mLayoutDirty)
+        Replace();
 }
 
 GuiPlay::~GuiPlay()
@@ -200,6 +216,7 @@ bool isSpell(CardView* c)
 }
 void GuiPlay::Replace()
 {
+    mLayoutDirty = false;
     unsigned opponentSpellsN = 0, selfSpellsN = 0, opponentLandsN = 0, opponentCreaturesN = 0, 
             battleFieldAttackersN = 0, battleFieldBlockersN = 0, selfCreaturesN = 0, selfLandsN = 0;
 
@@ -299,6 +316,7 @@ void GuiPlay::Replace()
 
 void GuiPlay::Render()
 {
+    relayoutIfDirty(); //#W54-J (A25)
     battleField.Render();
 
     for (iterator it = cards.begin(); it != cards.end(); ++it)
@@ -355,6 +373,7 @@ void GuiPlay::Render()
 }
 void GuiPlay::Update(float dt)
 {
+    relayoutIfDirty(); //#W54-J (A25)
     battleField.Update(dt);
     for (iterator it = cards.begin(); it != cards.end(); ++it)
     {
@@ -403,11 +422,11 @@ int GuiPlay::receiveEventPlus(WEvent * e)
             battleField.addAttacker(event->card);
         else if (NULL != event->before)
             battleField.removeAttacker(event->card);
-        Replace();
+        mLayoutDirty = true; //#W54-J (A25)
     }
     else if (dynamic_cast<WEventCreatureBlocker*> (e))
     {
-        Replace();
+        mLayoutDirty = true; //#W54-J (A25)
     }
     else if (WEventCardTap* event = dynamic_cast<WEventCardTap*>(e))
     {
@@ -440,20 +459,25 @@ int GuiPlay::receiveEventPlus(WEvent * e)
             battleField.colorFlow = -1;
     }
     else if (dynamic_cast<WEventCardChangeType*> (e))
-        Replace();
+        mLayoutDirty = true;
     else if (dynamic_cast<WEventCardUnattached*> (e))
-        Replace();
+        mLayoutDirty = true;
     else if (dynamic_cast<WEventCardEquipped*> (e))
-        Replace();
+        mLayoutDirty = true;
     else if (dynamic_cast<WEventCardControllerChange*> (e))
-        Replace();
+        mLayoutDirty = true;
     /*else if (dynamic_cast<WEventCardTransforms*> (e))
         Replace();
     else if (dynamic_cast<WEventCardCopiedACard*> (e))
         Replace();
     else if (dynamic_cast<WEventCardFaceUp*> (e))
         Replace();*/
-    Replace();
+    //#W54-J (A25): the catch-all. Every event that reaches the layer still
+    //forces a relayout - it just happens once, on the next Update/Render,
+    //instead of here for each of the frame's N events.
+    mLayoutDirty = true;
+    if (wagicRenderCacheOff())
+        Replace();
     return 0;
 }
 
@@ -473,7 +497,9 @@ int GuiPlay::receiveEventMinus(WEvent * e)
                     observer->getCardSelector()->Remove(cv);
                     cards.erase(it);
                     observer->mTrash->trash(cv);
-                    Replace();
+                    mLayoutDirty = true; //#W54-J (A25)
+                    if (wagicRenderCacheOff())
+                        Replace();
                     return 1;
                 }
     }

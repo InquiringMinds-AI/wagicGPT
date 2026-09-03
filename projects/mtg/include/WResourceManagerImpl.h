@@ -89,6 +89,11 @@ protected:
     {
         if (cacheItems > MAX_CACHE_OBJECTS || cacheItems > maxCached || cacheSize > maxCacheSize)
         {
+            //#W54-J (A41): LOG() is `{}` unless DOLOG/PSP, yet this stream was
+            //built on every cache miss and every eviction (a permanently
+            //over-limit cache pays it on each new art). Build it only where
+            //LOG consumes it.
+#if defined(DOLOG) || defined(PSP)
             std::ostringstream stream;
             if (cacheItems > MAX_CACHE_OBJECTS)
             {
@@ -104,6 +109,7 @@ protected:
             }
 
             LOG(stream.str().c_str());
+#endif
             return true;
         }
 
@@ -150,7 +156,7 @@ public:
     JQuadPtr RetrieveCardToken(MTGCard * card, int style = RETRIEVE_NORMAL,int submode = CACHE_NORMAL, int tId = 0);
     JSample * RetrieveSample(const string& filename, int style = RETRIEVE_NORMAL, int submode = CACHE_NORMAL);
     JTexture * RetrieveTexture(const string& filename, int style = RETRIEVE_NORMAL, int submode = CACHE_NORMAL);
-    JQuadPtr RetrieveQuad(const string& filename, float offX=0.0f, float offY=0.0f, float width=0.0f, float height=0.0f,  string resname="",  int style = RETRIEVE_LOCK, int submode = CACHE_NORMAL, int id = 0);
+    JQuadPtr RetrieveQuad(const string& filename, float offX=0.0f, float offY=0.0f, float width=0.0f, float height=0.0f,  const string& resname="",  int style = RETRIEVE_LOCK, int submode = CACHE_NORMAL, int id = 0);
     JQuadPtr RetrieveTempQuad(const string& filename, int submode = CACHE_NORMAL);
     hgeParticleSystemInfo * RetrievePSI(const string& filename, JQuad * texture, int style = RETRIEVE_NORMAL, int submode = CACHE_NORMAL);
     int RetrieveError();

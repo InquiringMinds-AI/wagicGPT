@@ -43,6 +43,7 @@ GameStateDeckViewer::GameStateDeckViewer(GameApp* parent) :
     myCommandZone = NULL;
     myDungeonZone = NULL;
     filterMenu = NULL;
+    playerdata = NULL; //#W54-J (L24): the destructor now frees it; it was never initialised when Start() had not run
     source = NULL;
     hudAlpha = 0;
     subMenu = NULL;
@@ -99,11 +100,15 @@ GameStateDeckViewer::~GameStateDeckViewer()
         SAFE_DELETE(myDungeonZone->parent);
         SAFE_DELETE(myDungeonZone);
     }
+    //#W54-J (L24): myCollection->parent IS playerdata->collection, which
+    //PlayerData's destructor also deletes - free the wrapper, then the owner
+    //(End() normally does both; this is the exit-from-the-editor path).
     if (myCollection)
     {
-        SAFE_DELETE(myCollection->parent);
         SAFE_DELETE(myCollection);
     }
+    SAFE_DELETE(playerdata);
+    SAFE_DELETE(menuButton); //#W54-J (L24): was never deleted
     SAFE_DELETE(filterMenu);
     kBgFile = ""; //Reset the chosen background.
 }

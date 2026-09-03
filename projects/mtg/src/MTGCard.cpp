@@ -72,17 +72,15 @@ void MTGCard::setRarity(char _rarity)
 
 const string MTGCard::getImageName()
 {
-    std::stringstream out;
+    //#W54-J (A5): this runs once per visible card per frame (RetrieveCard);
+    //a stack snprintf instead of a std::stringstream (locale + heap buffer).
+    //Tokens (negative id) name their image "<abs id>t.jpg".
+    char buf[32];
     if (mtgid < 0)
-    {
-        //tokens that have negative id have an image name that is the absolute value of their id + letter "t"
-        out << -mtgid << "t.jpg";
-    }
+        snprintf(buf, sizeof(buf), "%dt.jpg", -mtgid);
     else
-    {
-        out << mtgid << ".jpg";
-    }
-    return out.str();
+        snprintf(buf, sizeof(buf), "%d.jpg", mtgid);
+    return buf;
 }
 
 void MTGCard::setPrimitive(CardPrimitive * cp)

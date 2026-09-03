@@ -355,6 +355,7 @@ void MTGCardInstance::initMTGCI()
     X = 0;
     setX = -1;
     sample = "";
+    sampleResolved = false;
     model = NULL;
     isToken = false;
     exileRiderSuppressed = false;
@@ -2267,6 +2268,13 @@ const string& MTGCardInstance::getSample()
 {
     if (sample.size())
         return sample;
+    //#W54-J (A42): a miss was never remembered - every cast of a card with
+    //no sound re-probed <subtype>.wav, <ability>.wav, <type>.wav through the
+    //resource cache (synchronous filesystem calls on the render thread on the
+    //console). Probe once per instance; "" is the memoised miss.
+    if (sampleResolved)
+        return sample;
+    sampleResolved = true;
 
     for (int i = types.size() - 1; i > 0; i--)
     {

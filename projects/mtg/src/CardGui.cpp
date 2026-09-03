@@ -128,6 +128,83 @@ void CardGui::Update(float dt)
     PlayGuiObject::Update(dt);
 }
 
+//==== audit-J (W54-J, A5) ====
+//Per-frame render-path caches. CONTRACT for every JQuadPtr held here across
+//frames: only MANAGED quads (GetQuad(name) -> the deadbolted managed map) are
+//kept. A managed texture is never evicted (deadbolt), and a theme/profile
+//Refresh repoints its tracked quads' texture IN PLACE (WCachedTexture::
+//Refresh), so the pointer stays valid for the life of the resource manager;
+//the cache is keyed on the manager pointer so a different manager re-resolves
+//(the singleton is only ever torn down at GameApp exit). Evictable
+//(RETRIEVE_NORMAL / RetrieveTempQuad) quads are NEVER cached here: WCache::
+//isLocked() ignores tracked quads, so a held JQuadPtr would outlive its
+//texture after RemoveOldest/ClearUnlocked. Card art goes through RetrieveCard
+//every frame for the same reason (and because that call is what keeps the
+//on-screen textures' LRU stamp fresh); it was made cheap instead.
+bool wagicRenderCacheOff()
+{
+#if defined(WAGIC_RENDER_NOCACHE)
+    return true;
+#elif defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    static int state = -1;
+    if (state < 0) state = getenv("WAGIC_RENDER_NOCACHE") ? 1 : 0;
+    return state == 1;
+#else
+    return false;
+#endif
+}
+
+namespace
+{
+enum HudSlot { HUD_WHITE, HUD_SHADOW, HUD_EXTRACOSTSHADOW, HUD_C_WHITE, HUD_C_BLACK, HUD_C_GREEN, HUD_C_RED, HUD_C_BLUE, HUD_SLOTS };
+const char* const kHudNames[HUD_SLOTS] = { "white", "shadow", "extracostshadow", "c_white", "c_black", "c_green", "c_red", "c_blue" };
+struct HudQuad
+{
+    WResourceManager* owner;
+    JQuadPtr quad;
+    HudQuad() : owner(NULL) {}
+};
+
+//The managed HUD quads CardGui::Render draws with ("white" up to 7x per card
+//per frame before this), resolved once per resource manager.
+JQuadPtr hudQuad(WResourceManager* rm, int slot)
+{
+    if (!rm) return JQuadPtr();
+    if (wagicRenderCacheOff()) return rm->GetQuad(kHudNames[slot]);
+    static HudQuad cache[HUD_SLOTS];
+    HudQuad& h = cache[slot];
+    if (h.owner != rm || !h.quad.get())
+    {
+        h.quad = rm->GetQuad(kHudNames[slot]);
+        h.owner = rm;
+    }
+    return h.quad;
+}
+
+//String-keyed type lookups take the subtype-list mutex per call
+//(MTGAllCards::findType). Resolve the handful CardGui::Render tests to ids
+//once; the list is append-only so an id never changes meaning.
+struct RenderTypeIds
+{
+    int eldrazi, plains, swamp, forest, mountain, island;
+    RenderTypeIds()
+    {
+        eldrazi  = MTGAllCards::findType("eldrazi");
+        plains   = MTGAllCards::findType("plains");
+        swamp    = MTGAllCards::findType("swamp");
+        forest   = MTGAllCards::findType("forest");
+        mountain = MTGAllCards::findType("mountain");
+        island   = MTGAllCards::findType("island");
+    }
+};
+const RenderTypeIds& renderTypeIds()
+{
+    static RenderTypeIds ids;
+    return ids;
+}
+}
+//==== end audit-J ====
+
 void CardGui::DrawCard(const Pos& inPosition, int inMode, bool thumb, bool noborder, bool gdv)
 {
     DrawCard(card, inPosition, inMode, thumb, noborder, gdv);
@@ -151,7 +228,10 @@ void CardGui::DrawCard(MTGCard* inCard, const Pos& inPosition, int inMode, bool 
 void CardGui::Render()
 {
     GameObserver * game = card->getObserver();
-    WFont * mFont = game?game->getResourceManager()->GetWFont(Fonts::MAIN_FONT):WResourceManager::Instance()->GetWFont(Fonts::MAIN_FONT);
+    //#W54-J (A5): one resource-manager pointer for the whole render; every
+    //managed HUD quad below comes from hudQuad() (see the audit-J block).
+    WResourceManager * rm = game ? game->getResourceManager() : WResourceManager::Instance();
+    WFont * mFont = rm->GetWFont(Fonts::MAIN_FONT);
     JRenderer * renderer = JRenderer::GetInstance();
     TargetChooser * tc = NULL;
 
@@ -198,7 +278,7 @@ void CardGui::Render()
     JQuadPtr shadow;
     if (actZ > 1)
     {
-        shadow = game? game->getResourceManager()->GetQuad("shadow"):WResourceManager::Instance()->GetQuad("shadow");
+        shadow = hudQuad(rm, HUD_SHADOW);
         if (shadow) 
         {
             shadow->SetColor(ARGB(static_cast<unsigned char>(actA)/2,255,255,255));
@@ -209,7 +289,7 @@ void CardGui::Render()
     JQuadPtr extracostshadow;
     if (card->isExtraCostTarget)
     {
-        extracostshadow = card->getObserver()->getResourceManager()->GetQuad("extracostshadow");
+        extracostshadow = hudQuad(rm, HUD_EXTRACOSTSHADOW);
         if (extracostshadow) 
         {
             extracostshadow->SetColor(ARGB(static_cast<unsigned char>(actA)/2,100,0,0));
@@ -238,7 +318,7 @@ void CardGui::Render()
         }
         if (isActiveConnectedParent)
         {
-            JQuadPtr white = card->getObserver()->getResourceManager()->GetQuad("white");
+            JQuadPtr white = hudQuad(rm, HUD_WHITE);
             if(white)
             {
                 white->SetColor(ARGB(255,230,50,50));
@@ -266,7 +346,7 @@ void CardGui::Render()
         }
         if (isActiveConnectedChild)
         {
-            JQuadPtr white = card->getObserver()->getResourceManager()->GetQuad("white");
+            JQuadPtr white = hudQuad(rm, HUD_WHITE);
             if(white)
             {
                 white->SetColor(ARGB(255,0,0,255));
@@ -286,10 +366,8 @@ void CardGui::Render()
             renderA = actA * 0.45f;
         quad->SetColor(ARGB(static_cast<unsigned char>(renderA),255,255,255));
         //fake border...
-        JQuadPtr fakeborder;
-        JQuadPtr highlightborder;
-        fakeborder = game? game->getResourceManager()->GetQuad("white"):WResourceManager::Instance()->GetQuad("white");
-        highlightborder = game? game->getResourceManager()->GetQuad("white"):WResourceManager::Instance()->GetQuad("white");
+        JQuadPtr fakeborder = hudQuad(rm, HUD_WHITE);
+        JQuadPtr highlightborder = fakeborder; //the same managed "white" quad
         if(fakeborder)
         {
             if(game)
@@ -466,16 +544,17 @@ void CardGui::Render()
         mFont->SetScale(DEFAULT_MAIN_FONT_SCALE);
 
         JQuadPtr icon;
-        if (card->hasSubtype("plains"))
-            icon = game?game->getResourceManager()->GetQuad("c_white"):WResourceManager::Instance()->GetQuad("c_white");
-        else if (card->hasSubtype("swamp"))
-            icon = game?game->getResourceManager()->GetQuad("c_black"):WResourceManager::Instance()->GetQuad("c_black");
-        else if (card->hasSubtype("forest"))
-            icon = game?game->getResourceManager()->GetQuad("c_green"):WResourceManager::Instance()->GetQuad("c_green");
-        else if (card->hasSubtype("mountain"))
-            icon = game?game->getResourceManager()->GetQuad("c_red"):WResourceManager::Instance()->GetQuad("c_red");
-        else if (card->hasSubtype("island"))
-            icon = game?game->getResourceManager()->GetQuad("c_blue"):WResourceManager::Instance()->GetQuad("c_blue");
+        const RenderTypeIds& tid = renderTypeIds();
+        if (card->hasSubtype(tid.plains))
+            icon = hudQuad(rm, HUD_C_WHITE);
+        else if (card->hasSubtype(tid.swamp))
+            icon = hudQuad(rm, HUD_C_BLACK);
+        else if (card->hasSubtype(tid.forest))
+            icon = hudQuad(rm, HUD_C_GREEN);
+        else if (card->hasSubtype(tid.mountain))
+            icon = hudQuad(rm, HUD_C_RED);
+        else if (card->hasSubtype(tid.island))
+            icon = hudQuad(rm, HUD_C_BLUE);
         if (icon.get())
         {
             icon->SetColor(ARGB(static_cast<unsigned char>(actA),255,255,255));
@@ -498,24 +577,27 @@ void CardGui::Render()
     //draw line
     if (game)
     {
-        JQuadPtr ssMask = card->getObserver()->getResourceManager()->GetQuad("white");
-
-        //choose attacker mask
-        if(game->currentPlayer->hasPossibleAttackers())
+        //choose attacker mask. #W54-J (A5): the same predicates, cheapest
+        //first - Player::hasPossibleAttackers() is a whole-battlefield scan
+        //(canAttack x2 per permanent) and ran for EVERY card EVERY frame; it
+        //now runs only for a creature of the acting human inside its combat
+        //window, after every per-card test has already passed. All of these
+        //are pure reads, so the reorder cannot change what is drawn.
         {
-            if(card->isInPlay(game) && card->isCreature() 
+            const int phase = game->getCurrentGamePhase();
+            if(phase > MTG_PHASE_FIRSTMAIN && phase < MTG_PHASE_SECONDMAIN
+                && card->controller() == game->currentPlayer
+                && card->controller()->isHuman()
+                && card->isInPlay(game) && card->isCreature()
+                && !card->isPhased && !card->didattacked
                 && ((!card->canAttack() || (card->attackCost > 0)) && (!card->canAttack(true) || (card->attackPlaneswalkerCost > 0)))
-                && !card->isPhased && !card->didattacked )
+                && game->currentPlayer->hasPossibleAttackers())
             {
-                if(game->getCurrentGamePhase() > MTG_PHASE_FIRSTMAIN 
-                    && game->getCurrentGamePhase() < MTG_PHASE_SECONDMAIN 
-                    && card->controller() == game->currentPlayer )
+                JQuadPtr ssMask = hudQuad(rm, HUD_WHITE);
+                if(ssMask)
                 {
-                    if(card->controller()->isHuman() && ssMask)
-                    {
-                        ssMask->SetColor(ARGB(170,64,64,64));
-                        renderer->RenderQuad(ssMask.get(), actX, actY, actT, (27 * actZ + 1) / 16, 40 * actZ / 16);
-                    }
+                    ssMask->SetColor(ARGB(170,64,64,64));
+                    renderer->RenderQuad(ssMask.get(), actX, actY, actT, (27 * actZ + 1) / 16, 40 * actZ / 16);
                 }
             }
         }
@@ -552,7 +634,7 @@ void CardGui::Render()
 
     if ((tc && tc->alreadyHasTarget(card)) || (game && card == game->mLayers->actionLayer()->currentActionCard))//paint targets red.
     {
-        JQuadPtr rMask = card->getObserver()->getResourceManager()->GetQuad("white");
+        JQuadPtr rMask = hudQuad(rm, HUD_WHITE);
         rMask->SetColor(ARGB(128,255,0,0));//red
         renderer->RenderQuad(rMask.get(), actX, actY, actT, (27 * actZ + 1) / 16, 40 * actZ / 16);
         rMask->SetColor(ARGB(255,255,255,255));//"white" is ONE shared cached JQuad (GameApp.cpp registers it
@@ -562,7 +644,7 @@ void CardGui::Render()
     }
     if(tc && tc->source && tc->source->view && tc->source->view->actZ >= 1.3 && card == tc->source)//paint the source green while infocus.
     {
-        JQuadPtr gMask = card->getObserver()->getResourceManager()->GetQuad("white");
+        JQuadPtr gMask = hudQuad(rm, HUD_WHITE);
         gMask->SetColor(ARGB(128,0,255,0));//green
         renderer->RenderQuad(gMask.get(), actX, actY, actT, (27 * actZ + 1) / 16, 40 * actZ / 16);
         gMask->SetColor(ARGB(255,255,255,255));//see the red mask above: shared quad, restore the tint.
@@ -587,7 +669,7 @@ void CardGui::Render()
             mFont->SetColor(ARGB(static_cast<unsigned char>(actA),216,191,216));//thistle powered down
         else if(card->wasDealtDamage == 0 && card->pbonus >= 3)
             mFont->SetColor(ARGB(static_cast<unsigned char>(actA),255,255,0));//yellow buff
-        else if(card->hasType("legendary") && card->hasType("eldrazi") && !card->has(Constants::CHANGELING))
+        else if(card->hasType(Subtypes::TYPE_LEGENDARY) && card->hasType(renderTypeIds().eldrazi) && !card->has(Constants::CHANGELING)) //#W54-J (A5): ids, not strings
             mFont->SetColor(ARGB(static_cast<unsigned char>(actA),238,130,238));//violet legendary eldrazi
         else
             mFont->SetColor(ARGB(static_cast<unsigned char>(actA),255,255,255));//white default
@@ -598,17 +680,13 @@ void CardGui::Render()
         mFont->SetScale(1);
     }
 
-    string buff = "";
-    string starMark = "";
-    if(card->exerted)
-        starMark += "exerted";
-    if(card->isToken && !card->isACopier)
-        buff = "T";
-    if(card->isToken && card->isACopier)
-        buff = "CT";
-    if(!card->isToken && card->isACopier)
-        buff = "C";
-    buff = starMark + buff;
+    //#W54-J (A5): the token/copy/exerted tag, built without std::string
+    //temporaries (three per card per frame for a usually-empty mark).
+    char buff[16];
+    {
+        const char* tag = card->isToken ? (card->isACopier ? "CT" : "T") : (card->isACopier ? "C" : "");
+        snprintf(buff, sizeof(buff), "%s%s", card->exerted ? "exerted" : "", tag);
+    }
     //if(card->has(Constants::PAYZERO))
         //buff += "Z";
     if(card->chooseacolor >= 1)
@@ -659,14 +737,12 @@ void CardGui::Render()
         mFont->DrawString(buffer, actX - 10 * actZ, actY - (25.3f * actZ));
         mFont->SetScale(1);
     }
-    if(!alternate && buff != "" && game)
+    if(!alternate && buff[0] && game)
     {
         mFont->SetScale(DEFAULT_MAIN_FONT_SCALE);
-        char buffer[200];
-        sprintf(buffer, "%s", buff.c_str());
         mFont->SetColor(ARGB(static_cast<unsigned char>(actA),255,215,0));//Gold indicator
         mFont->SetScale(actZ);
-        mFont->DrawString(buffer, actX - 10 * actZ, actY - (18.3f * actZ));
+        mFont->DrawString(buff, actX - 10 * actZ, actY - (18.3f * actZ));
         mFont->SetScale(1);
     }
 #if !defined (PSP)
@@ -718,7 +794,7 @@ void CardGui::Render()
     if (tc && !tc->canTarget(card))
     {
         if (!shadow)
-            shadow = card->getObserver()->getResourceManager()->GetQuad("shadow");
+            shadow = hudQuad(rm, HUD_SHADOW);
         if (shadow)
         {
             shadow->SetColor(ARGB(190,255,255,255));
@@ -730,7 +806,7 @@ void CardGui::Render()
     if(game)
     {
         if (!shadow)
-            shadow = card->getObserver()->getResourceManager()->GetQuad("shadow");
+            shadow = hudQuad(rm, HUD_SHADOW);
         if (shadow)
         {
             int myA = 0;
@@ -817,7 +893,7 @@ void CardGui::AlternateRender(MTGCard * card, const Pos& pos)
     int zpos = 0;
     float x = pos.actX;
    
-    vector<ModRulesBackGroundCardGuiItem *>items = gModRules.cardgui.background;
+    const vector<ModRulesBackGroundCardGuiItem *>& items = gModRules.cardgui.background; //#W54-J (A43): in place, per frame
     ModRulesBackGroundCardGuiItem * item;
     int numItems = (int)items.size();
     if (card->data->countColors() > 1)
@@ -831,7 +907,6 @@ void CardGui::AlternateRender(MTGCard * card, const Pos& pos)
     
     q = WResourceManager::Instance()->RetrieveTempQuad(item->mDisplayImg,TEXTURE_SUB_5551);
 
-    items.clear();
     if (q.get() && q->mTex)
     {
         if(thiscard && thiscard->getObserver())
@@ -850,7 +925,7 @@ void CardGui::AlternateRender(MTGCard * card, const Pos& pos)
         renderer->RenderQuad(q.get(), x, pos.actY, pos.actT, scale, scale);
     }
 
-    vector<ModRulesRenderCardGuiItem *>Carditems = gModRules.cardgui.renderbig;
+    const vector<ModRulesRenderCardGuiItem *>& Carditems = gModRules.cardgui.renderbig; //#W54-J (A43)
     
     WFont * font = WResourceManager::Instance()->GetWFont(Fonts::MAGIC_FONT);
     float backup_scale = font->GetScale();
@@ -879,7 +954,7 @@ void CardGui::AlternateRender(MTGCard * card, const Pos& pos)
             if (Carditem->mName == "description")
             {
 
-                std::vector<string> txt = card->data->getFormattedText();
+                const std::vector<string>& txt = card->data->getFormattedText(); //#W54-J (A43)
 
                 unsigned i = 0;
                 unsigned h = neofont ? 14 : 11;
@@ -1121,7 +1196,7 @@ void CardGui::TinyCropRender(MTGCard * card, const Pos& pos, JQuad * quad)
     float x = pos.actX;
     float displayScale = 250 / BigHeight;
    
-    vector<ModRulesBackGroundCardGuiItem *>items = gModRules.cardgui.background;
+    const vector<ModRulesBackGroundCardGuiItem *>& items = gModRules.cardgui.background; //#W54-J (A43): in place, per frame
     ModRulesBackGroundCardGuiItem * item;
     int numItems = (int)items.size();
     if (card->data->countColors() > 1)
@@ -1134,7 +1209,6 @@ void CardGui::TinyCropRender(MTGCard * card, const Pos& pos, JQuad * quad)
     }
     
     q = WResourceManager::Instance()->RetrieveTempQuad(item->mDisplayImg,TEXTURE_SUB_5551);
-    items.clear();
     if (q.get() && q->mTex)
     {
         q->SetHotSpot(static_cast<float> (q->mTex->mWidth / 2), static_cast<float> (q->mTex->mHeight / 2));
@@ -1160,7 +1234,7 @@ void CardGui::TinyCropRender(MTGCard * card, const Pos& pos, JQuad * quad)
 
 
 
-    vector<ModRulesRenderCardGuiItem *>Carditems = gModRules.cardgui.rendertinycrop;
+    const vector<ModRulesRenderCardGuiItem *>& Carditems = gModRules.cardgui.rendertinycrop; //#W54-J (A43)
     
     WFont * font = WResourceManager::Instance()->GetWFont(Fonts::MAGIC_FONT);
     float backup_scale = font->GetScale();
@@ -1187,7 +1261,7 @@ void CardGui::TinyCropRender(MTGCard * card, const Pos& pos, JQuad * quad)
             if (Carditem->mName == "description")
             {
 
-                std::vector<string> txt = card->data->getFormattedText();
+                const std::vector<string>& txt = card->data->getFormattedText(); //#W54-J (A43)
                 float imgBottom = imgY + (imgScale * quad->mHeight / 2);
 
                 unsigned i = 0;
@@ -1563,7 +1637,16 @@ string CardGui::FormattedData(string data, string replace, string value)
 bool CardGui::FilterCard(MTGCard * _card,string filter)
 {
     CardDescriptor  cd;
-    MTGCardInstance * card = (MTGCardInstance*) _card->data;
+    //#W54-J (A43): `_card->data` is a CardPrimitive*, and CardDescriptor::
+    //match reads MTGCardInstance fields past it (foretellTurn, kicked,
+    //counters, zpos, name...). Match the REAL instance when we were handed
+    //one (every duel-time render); a bare MTGCard (deck viewer, shop) only
+    //carries a primitive, so its match is restricted to the primitive-safe
+    //comparisons (types/colors) below.
+    MTGCardInstance * card = dynamic_cast<MTGCardInstance*>(_card);
+    const bool primitiveOnly = (card == NULL);
+    if (primitiveOnly)
+        card = (MTGCardInstance*) _card->data;
     cd.init();
     cd.mode = CardDescriptor::CD_OR;
     while (filter.size())
@@ -2110,10 +2193,17 @@ bool CardGui::FilterCard(MTGCard * _card,string filter)
 
         
      } 
-     if(cd.match(card)) 
+     //#W54-J (A43): see above - a primitive cannot answer these, so a
+     //filter that needs them does not match a bare MTGCard rather than read
+     //past the object.
+     if (primitiveOnly && (cd.powerComparisonMode || cd.toughnessComparisonMode || cd.manacostComparisonMode
+                           || cd.zposComparisonMode || cd.nameComparisonMode || cd.foretoldComparisonMode
+                           || cd.kickedComparisonMode || cd.counterComparisonMode))
+         return false;
+     if(cd.match(card))
          return true;
     return false;
-    
+
 }
 
 void CardGui::RenderCountersBig(MTGCard * mtgcard, const Pos& pos, int drawMode)

@@ -341,7 +341,8 @@ bool GameStateAwards::enterStats(int option)
                 many = c;
                 dupes = count;
             }
-            counts[c->setId] += count;
+            if (c->setId >= 0 && c->setId < (int) setlist.size()) //#W54-J (L25): setId is -1 for a setless card
+                counts[c->setId] += count;
             if (costly == NULL || c->data->getManaCost()->getConvertedCost() > costly->data->getManaCost()->getConvertedCost())
                 costly = c;
 
@@ -386,12 +387,12 @@ bool GameStateAwards::enterStats(int option)
         }
         if (strong)
         {
-            sprintf(buf, _("Most Powerful: %i (%s)").c_str(), strong->data->getPower(), strong->data->getName().c_str());
+            snprintf(buf, sizeof(buf), _("Most Powerful: %i (%s)").c_str(), strong->data->getPower(), strong->data->getName().c_str()); //#W54-J (L25)
             detailview->Add(NEW WGuiItem(buf, WGuiItem::NO_TRANSLATE));
         }
         if (tough)
         {
-            sprintf(buf, _("Toughest: %i (%s)").c_str(), tough->data->getToughness(), strong->data->getName().c_str());
+            snprintf(buf, sizeof(buf), _("Toughest: %i (%s)").c_str(), tough->data->getToughness(), tough->data->getName().c_str()); //#W54-J (L25): named the wrong card
             detailview->Add(NEW WGuiItem(buf, WGuiItem::NO_TRANSLATE));
         }
     }

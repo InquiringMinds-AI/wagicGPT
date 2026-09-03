@@ -37,6 +37,7 @@ protected:
     int untapping;
     int nb_damages;
     string sample;
+    bool sampleResolved; //#W54-J (A42): getSample() already probed every candidate file
     int tapped;
     int lifeOrig;
     MTGPlayerCards * belongs_to;
