@@ -37,6 +37,8 @@ static bool bakaLegacyScan();
 //every pointer that is still alive - and NULL, rather than a fault, for one
 //that is not. The zone list mirrors what dynamic_cast could resolve: every
 //zone a card can be sitting in, both players, garbage included.
+extern bool wagicDeadRefSweepDisabled(); //#W57-F (D25), defined in GameObserver.cpp
+
 static MTGCardInstance * liveCardTarget(GameObserver * g, Targetable * t)
 {
     if (!g || !t)
@@ -2713,7 +2715,18 @@ void AIPlayerBaka::rankActivations(RankingContainer & ranking, ManaCost * totalP
             }
             continue;
         }
-        MTGCardInstance * cands[2] = { a->source, liveCardTarget(observer, a->target) }; //#W56-C (D17)
+        //#W57-F (D25): `a->source` is the OTHER raw back-pointer in this loop and
+        //it was read unguarded - `zones[z]->hasCard(cands[0])` dereferences it
+        //(MTGGameZone::hasCard reads `card->currentZone`), so a source freed with
+        //its garbage zone is a use-after-free here even after wave 56 made the
+        //TARGET deref safe. Same pointer-identity question, same answer: NULL for
+        //a card that no longer exists, which the `!cands[c]` guard below already
+        //handles. The ownership sweep (ActionLayer::purgeDeadReferences) evicts
+        //such abilities at the zone delete; this is the reader-side net for any
+        //route that outruns it.
+        MTGCardInstance * cands[2] = { wagicDeadRefSweepDisabled() ? a->source //#W57-F (D25) disable flag
+                                           : liveCardTarget(observer, (Targetable *) a->source),
+                                       liveCardTarget(observer, a->target) }; //#W56-C (D17)
         if (cands[1] == cands[0])
             cands[1] = NULL;
         for (int z = 0; z < nbZones; z++)

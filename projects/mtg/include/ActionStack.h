@@ -232,13 +232,22 @@ public:
     int getNextIndex(Interruptible * previous, int type = 0, int state = 0 , int display = -1);
     void Fizzle(Interruptible * action, MTGCardInstance* fizzler = NULL, FizzleMode fizzleMode = PUT_IN_GRAVEARD);
     Interruptible * getAt(int id);
-    void cancelInterruptOffer(InterruptDecision cancelMode = DONT_INTERRUPT, bool log = true);
+    //#W57-F (D34): `forcedRelease` marks the STALL-WATCHDOG route (Update's
+    //floor), where the window is taken away from a seat that never answered
+    //rather than declined by a seat that chose to. Only that route releases a
+    //pending chooser, and only the one the RELEASED SEAT OWNS - see
+    //cancelInterruptOffer.
+    void cancelInterruptOffer(InterruptDecision cancelMode = DONT_INTERRUPT, bool log = true, bool forcedRelease = false);
     void endOfInterruption(bool log = true);
     //#W56-Z: an armed target/cost chooser must never outlive the interrupt
     //window it was armed in. Cancels a pending choice held by a NON-AI seat
     //(human, or a scripted test-suite seat); returns 1 if one was cancelled,
     //0 if there was nothing pending or the choice is mandatory (cantCancel).
     int cancelPendingChoice();
+
+    //#W57-F (D36): a replay just consumed a recorded action, so the interrupt
+    //window the record is still using has made progress. See ActionStack.cpp.
+    void noteReplayProgress();
     //Keep an open interrupt offer to `who` from timing out: an asynchronous
     //decision maker (the LLM player) can need longer than the configured
     //interrupt seconds to answer.

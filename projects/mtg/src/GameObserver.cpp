@@ -78,6 +78,7 @@ void GameObserver::cleanup()
     gameTurn.clear();
     OpenedDisplay = NULL;
     mSettledPhase = -1; mSettledTurn = -1; mSettledStep = -1; mPhaseTicks = 0; //W53-DELVER
+    mChooserBlockPtr = NULL; mChooserBlockRefusals = 0; //#W57-F (D38)
     AffinityNeedsUpdate = false;
     mAbilityEpoch = 1; //#W54-H (A6b): never equals a fresh ability's 0
 }
@@ -127,6 +128,7 @@ GameObserver::GameObserver(WResourceManager *output, JGE* input)
     mExtraPayment = NULL;
     OpenedDisplay = NULL;
     mSettledPhase = -1; mSettledTurn = -1; mSettledStep = -1; mPhaseTicks = 0; //W53-DELVER
+    mChooserBlockPtr = NULL; mChooserBlockRefusals = 0; //#W57-F (D38)
     guiOpenDisplay = NULL;
     gameOver = NULL;
     phaseRing = NULL;
@@ -500,6 +502,69 @@ bool GameObserver::humanDisplayOpen()
     return false;
 }
 
+//#W57-F (D25) DISABLE FLAG: WAGIC_NO_DEADREF_SWEEP=1 restores the pre-wave-57
+//behaviour exactly - no ownership sweep at the zone delete, and
+//AIPlayerBaka::rankActivations reads `a->source` raw again. It exists so "was
+//it the sweep?" is one environment variable rather than a build swap, and so
+//one binary can be run under ASAN in BOTH arms.
+bool wagicDeadRefSweepDisabled()
+{
+    static int off = -1;
+    if (off < 0)
+    {
+        const char * env = getenv("WAGIC_NO_DEADREF_SWEEP");
+        off = (env && env[0] == '1') ? 1 : 0;
+    }
+    return off != 0;
+}
+
+//#W57-F (D25): the observer's own back-pointers into a dying zone. The action
+//layer's abilities are the volume (see ActionLayer::purgeDeadReferences); these
+//are the ones the observer itself would dereference on the next click.
+void GameObserver::releaseTargetChooser()
+{
+    cardWaitingForTargets = NULL;
+    SAFE_DELETE(targetChooser);
+}
+
+void GameObserver::purgeDeadReferences(MTGGameZone * zone)
+{
+    if (!zone || wagicDeadRefSweepDisabled())
+        return;
+    for (int j = 0; j < zone->nb_cards; j++)
+    {
+        MTGCardInstance * doomed = zone->cards[j];
+        if (!doomed)
+            continue;
+        if (cardWaitingForTargets == doomed)
+        {
+            //The cast this chooser belongs to can no longer be completed; the
+            //chooser is the observer's to free (targetListIsSet allocated it).
+            cardWaitingForTargets = NULL;
+            SAFE_DELETE(targetChooser);
+        }
+        if (targetChooser && targetChooser->source == doomed)
+            SAFE_DELETE(targetChooser);
+        if (mExtraPayment && mExtraPayment->source == doomed)
+            mExtraPayment = NULL;
+    }
+    if (mLayers && mLayers->actionLayer())
+        mLayers->actionLayer()->purgeDeadReferences(zone);
+}
+
+//#W57-F (D38): consecutive refusals a single armed chooser may cost the game
+//before the breaker below releases it. 300 mirrors ActionStack's interrupt
+//stall floor, which is the same shape of problem (a window no seat will close);
+//a phase request is issued at most once per seat Act, so 300 is far beyond any
+//real multi-target declaration. A SUITE game gets 12 (ActionStack's loading
+//floor) because a fixture cannot pump 300 ticks inside one script, and a
+//scripted seat never leaves a chooser armed across a dozen `next` commands -
+//it declares its targets in the very next command.
+static int chooserStallFloor(bool suiteGame)
+{
+    return suiteGame ? 12 : 300;
+}
+
 void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
 {
     //W53-DELVER (owner Vita report 2026-08-28; generalised per his note to every
@@ -541,8 +606,61 @@ void GameObserver::userRequestNextGamePhase(bool allowInterrupt, bool log)
     }
     if (allowInterrupt && mLayers->stackLayer()->getNext(NULL, 0, NOT_RESOLVED))
         return;
-    if (getCurrentTargetChooser())
-        return;
+    //#W57-F (D38): the chooser gate, with a LIVELOCK BREAKER behind it. The
+    //refusal itself is right - a seat about to click a target must not have the
+    //phase pulled out from under it - but it is UNCONDITIONAL, and nothing in
+    //the engine clears a chooser that no seat will ever answer. Lane C's stub
+    //repro sat in phase 7 for ever, both seats auto-passing a display-only
+    //window, 65 MB of one line: every seat had nothing to do, every seat's
+    //request landed here, and the armed chooser outlived them all. The
+    //display-only row was the SYMPTOM (removing the row from the option list
+    //hides this instance and no other); the phase-advance failure is that a
+    //refusal has no floor.
+    //The floor is the codebase's own interrupt-window idiom (ActionStack's
+    //stall watchdog): count CONSECUTIVE refusals of the SAME chooser, and act
+    //only when the seat that owns it demonstrably cannot answer - an AI seat
+    //with no decision in flight. A human seat is never touched (they are
+    //thinking, and the window is theirs to hold), and a chooser being answered
+    //is never touched (the pointer or the refusal streak changes).
+    if (TargetChooser * blocking = getCurrentTargetChooser())
+    {
+        if (blocking != mChooserBlockPtr)
+        {
+            mChooserBlockPtr = blocking;
+            mChooserBlockRefusals = 0;
+        }
+        mChooserBlockRefusals++;
+        //TargetChooser::Owner is stamped from source->controller() at
+        //construction - the per-seat fact this global pointer never carried
+        //(#W57-F D34). cardWaitingForTargets is the fallback for a chooser
+        //built without a source.
+        Player * chooserSeat = blocking->Owner;
+        if (!chooserSeat && cardWaitingForTargets)
+            chooserSeat = cardWaitingForTargets->controller();
+        const bool answerable = !chooserSeat || !chooserSeat->isAI()
+            || chooserSeat->aiDecisionInFlight();
+        if (answerable || mChooserBlockRefusals < chooserStallFloor(mSuiteGame))
+            return;
+        DebugTrace("GameObserver: target chooser armed by " << chooserSeat->getDisplayName()
+                   << " has refused " << mChooserBlockRefusals
+                   << " consecutive phase advances with no seat able to answer it - releasing");
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+        fprintf(stderr, "wagic: orphaned target chooser (owner %s, source '%s') blocked %d phase"
+                        " advances at turn %d phase %d - releasing so the game advances\n",
+                chooserSeat->getDisplayName().c_str(),
+                blocking->source ? blocking->source->getLCName().c_str() : "(none)",
+                mChooserBlockRefusals, turn, (int) mCurrentGamePhase);
+        fflush(stderr);
+#endif
+        releaseTargetChooser();
+        mChooserBlockPtr = NULL;
+        mChooserBlockRefusals = 0;
+    }
+    else
+    {
+        mChooserBlockPtr = NULL;
+        mChooserBlockRefusals = 0;
+    }
     //if (mLayers->actionLayer()->isWaitingForAnswer())
     //    return;
     // Wil 12/5/10: additional check, not quite understanding why TargetChooser doesn't seem active at this point.
@@ -2831,6 +2949,14 @@ bool GameObserver::processActions(bool undo
         //action (a refused click logs "0<name>", a gated request logs
         //nothing) - bounded, then it is a real divergence.
         const bool lenient = getenv("WAGIC_REPLAY") != NULL;
+        //#W57-F (D36): the loader reaching a new recorded action is progress, and
+        //the interrupt-window stall floor must be told - see
+        //ActionStack::noteReplayProgress. Without it the floor's LOADING arm
+        //(12 ticks, "no seat can answer") releases a window the record is still
+        //using, and every recorded click inside that window is then refused
+        //`0<name>` for all 60 retries.
+        if (lenient && mLayers)
+            mLayers->stackLayer()->noteReplayProgress();
         size_t nb = 0;
         bool accepted = false;
         //#W56-E: the engine already made this click itself (auto-tap for an

@@ -227,15 +227,30 @@ void MTGPlayerCards::beforeBeginPhase()
     //comments name (validateCardPointer cores 3266478 / 3151670). Now the
     //zone that was `garbage` becomes `garbageLastTurn` and lives one more
     //turn; the destructor frees both when they differ.
+    //#W57-F (D25): the cards in the zone about to be freed are still named by
+    //abilities in ActionLayer::mObjects (MTGAbility::target and ::source are raw
+    //back-pointers with no clearing contract) and by the observer's own
+    //cardWaitingForTargets / targetChooser. Sweep them WHILE THE CARDS ARE
+    //ALIVE - after the delete there is nothing left to compare against, and the
+    //next AIPlayerBaka::rankActivations pass reads a->source through
+    //MTGGameZone::hasCard (`card->currentZone`), which is a use-after-free the
+    //wave-56 deref fix does not cover.
+    GameObserver * obs = owner ? owner->getObserver() : NULL;
     if (garbageOneTurn())
     {
+        if (obs && garbageLastTurn)
+            obs->purgeDeadReferences(garbageLastTurn);
         SAFE_DELETE(garbageLastTurn);
         garbageLastTurn = garbage = NEW MTGGameZone();
     }
     else
     {
         if (garbageLastTurn != garbage)
+        {
+            if (obs && garbageLastTurn)
+                obs->purgeDeadReferences(garbageLastTurn);
             SAFE_DELETE(garbageLastTurn);
+        }
         garbageLastTurn = garbage;
         garbage = NEW MTGGameZone();
     }

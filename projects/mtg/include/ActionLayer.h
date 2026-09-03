@@ -94,6 +94,18 @@ public:
 
     void cleanGarbage();
 
+    //#W57-F (D25): the OWNERSHIP half of the dangling-target class. Cards in a
+    //zone that is about to be freed (MTGPlayerCards::beforeBeginPhase deletes
+    //last turn's garbage zone, MTGGameZone::~MTGGameZone deletes its cards) are
+    //still named by abilities sitting in mObjects: MTGAbility::target is a raw
+    //Targetable* with no clearing contract and MTGAbility::source is a raw
+    //MTGCardInstance*. Wave 56 lane C made the AI's five DEREFS safe
+    //(liveCardTarget); nothing made the POINTERS safe, and a->source is read by
+    //MTGGameZone::hasCard (`card->currentZone`) on the very next ranking pass.
+    //Called with the doomed cards still ALIVE, so an evicted ability's
+    //destroy() contract runs exactly as it would have at any other time.
+    int purgeDeadReferences(MTGGameZone * zone);
+
 protected:
     ActionElement * currentWaitingAction;
     int cantCancel;
