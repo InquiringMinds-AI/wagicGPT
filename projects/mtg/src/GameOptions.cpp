@@ -59,6 +59,7 @@ const string Options::optionNames[] = {
   "interruptMySpells",
   "interruptMyAbilities",
   "saveDetailedDeckInfo",
+  "board_grouping",
 //General interrupts
   "interruptBeforeBegin",
   "interruptUntap",
@@ -556,6 +557,13 @@ GameOption * GameOptions::get(int optionID)
             goEnum = NEW GameOptionEnum();
             goEnum->def = OptionEconDifficulty::getInstance();
             go = goEnum;
+            break;
+        //#W57-G (D42): board grouping is ON for the human seat by default.
+        //An unset option reads 0 whatever the menu advertises, so the default
+        //has to be minted here or the feature would ship dead for every
+        //profile that never opened the options screen.
+        case Options::BOARDGROUPING:
+            go = NEW GameOption(1);
             break;
         // First-launch defaults; without these the audio gate stays at 0.
         case Options::MUSICVOLUME:

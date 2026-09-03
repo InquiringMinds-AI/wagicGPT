@@ -72,6 +72,7 @@ public:
         INTERRUPTMYSPELLS,
         INTERRUPTMYABILITIES,
         SAVEDETAILEDDECKINFO,
+        BOARDGROUPING, //#W57-G (D42): stack state-identical battlefield permanents
         //Other interrupts
         INTERRUPT_BEFOREBEGIN,
         INTERRUPT_UNTAP,

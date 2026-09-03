@@ -34,6 +34,20 @@ namespace DrawMode
 bool wagicRenderCacheOff();
 //==== end audit-J ====
 
+//==== #W57-G (D42): Arena-style board stacking ====
+//Owner ruling 2026-09-03: "it should seperate out any unique copies, for
+//instance if they have summoning sickness, or if an equipment is attached, or
+//if some are tapped. only items with identical names and states should stack."
+//wagicBoardStackKey is that "identical name and state" predicate, expressed as
+//a string: two battlefield permanents stack IFF their keys are byte-equal.
+//The key is deliberately over-inclusive - any field that the board render, the
+//rules or the click surface can distinguish is in it, because a false stack is
+//a lie about the board and the trust doctrine forbids that. It is render-side
+//only; no engine code reads it.
+bool wagicBoardGroupingEnabled();
+std::string wagicBoardStackKey(MTGCardInstance * card);
+//==== end #W57-G ====
+
 struct CardGui: public PlayGuiObject
 {
 protected:
@@ -58,6 +72,24 @@ public:
     static const float BigHeight;
 
     PIXEL_TYPE mMask;
+
+    //#W57-G (D42): stacking state, owned by GuiPlay's layout pass.
+    //mStackCount > 1 on the one member that DRAWS for a group (it carries the
+    //xN badge); mStackHidden on the members it stands in for - those are not
+    //drawn and share the drawn member's slot, so the cursor cannot reach them
+    //until the group expands. Both are 1/false for an ungrouped card, which is
+    //exactly what the pre-D42 board is.
+    int mStackCount;
+    bool mStackHidden;
+    //Fan offset of an expanded group's member: 0 = this card owns a layout
+    //slot, >0 = it is drawn at the group's slot plus mStackFanIndex pitches.
+    //Fanning IN PLACE is deliberate - focusing a pile must not shove the rest
+    //of the row sideways while the player is reading it.
+    int mStackFanIndex;
+    //Set by CardSelector when a click lands on a collapsed group while a
+    //chooser is live: that press EXPANDS the group instead of targeting,
+    //because the player must see what they are choosing among.
+    bool mStackForceExpand;
 
     MTGCardInstance* card;
     CardGui(MTGCardInstance* card, float x, float y);

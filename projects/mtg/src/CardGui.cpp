@@ -60,11 +60,13 @@ namespace
 }
 
 CardGui::CardGui(MTGCardInstance* card, float x, float y)
-    : PlayGuiObject(Height, x, y, 0, false), card(card)
+    : PlayGuiObject(Height, x, y, 0, false), mStackCount(1), mStackHidden(false), mStackFanIndex(0),
+      mStackForceExpand(false), card(card) //#W57-G (D42)
 {
 }
 CardGui::CardGui(MTGCardInstance* card, const Pos& ref)
-    : PlayGuiObject(Height, ref, 0, false), card(card)
+    : PlayGuiObject(Height, ref, 0, false), mStackCount(1), mStackHidden(false), mStackFanIndex(0),
+      mStackForceExpand(false), card(card) //#W57-G (D42)
 {
 }
 
@@ -153,6 +155,160 @@ bool wagicRenderCacheOff()
     return false;
 #endif
 }
+
+//==== #W57-G (D42): Arena-style board stacking ====
+//The stack predicate. Two battlefield permanents draw as one pile IFF this
+//string matches byte-for-byte, so EVERY observable difference has to be in it:
+//the owner's ruling names tapped / summoning-sick / equipped explicitly and
+//then generalises - "only items with identical names and states should stack."
+//An over-inclusive key costs one un-merged pile; an under-inclusive one tells
+//the player a lie about the board, so when in doubt a field goes IN.
+bool wagicBoardGroupingEnabled()
+{
+    //Env override first, and only in a development build - the shipping switch
+    //is the profile option, which defaults ON (GameOptions.cpp mints the 1;
+    //an unset option would otherwise read 0 and ship the feature dead).
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    static int state = -1;
+    if (state < 0)
+    {
+        const char * e = getenv("WAGIC_BOARD_GROUPING");
+        state = e ? (atoi(e) ? 1 : 0) : -2;
+    }
+    if (state >= 0)
+        return state == 1;
+#endif
+    return options[Options::BOARDGROUPING].number != 0;
+}
+
+static void appendStackAttachments(std::ostringstream& k, MTGCardInstance * card)
+{
+    //Auras, equipment and anything else that points its `target` at this
+    //permanent. Sorted so two identically-outfitted creatures whose attachments
+    //arrived in a different order still stack, and stamped with the attachment's
+    //own visible state (a tapped Equipment reads differently on the board).
+    GameObserver * g = card->getObserver();
+    if (!g)
+        return;
+    std::vector<std::string> att;
+    for (int p = 0; p < 2; ++p)
+    {
+        if (!g->players[p] || !g->players[p]->game)
+            continue;
+        MTGGameZone * z = g->players[p]->game->inPlay;
+        if (!z)
+            continue;
+        for (int i = 0; i < z->nb_cards; ++i)
+        {
+            MTGCardInstance * a = z->cards[i];
+            if (!a || a == card)
+                continue;
+            if (a->target != card && a->auraParent != card)
+                continue;
+            std::ostringstream one;
+            one << a->getName() << ':' << a->isTapped() << ':'
+                << (a->counters ? a->counters->mCount : 0) << ':'
+                << (const void *) a->controller();
+            att.push_back(one.str());
+        }
+    }
+    std::sort(att.begin(), att.end());
+    for (size_t i = 0; i < att.size(); ++i)
+        k << att[i] << ';';
+}
+
+std::string wagicBoardStackKey(MTGCardInstance * card)
+{
+    if (!card)
+        return "";
+    std::ostringstream k;
+    //printed identity
+    k << card->getName() << '|' << card->getMTGId() << '|'
+      << (card->model && card->model->data ? card->model->data->name : card->getName()) << '|';
+    //who controls it, and who owns it
+    k << (const void *) card->controller() << '|' << (const void *) card->owner << '|';
+    //tap / untap / sickness / phasing / freeze / exert
+    k << card->isTapped() << ',' << card->isUntapping() << ','
+      << card->hasSummoningSickness() << ',' << (card->isPhased ? 1 : 0) << ','
+      << card->phasedTurn << ',' << card->frozen << ',' << (card->exerted ? 1 : 0) << '|';
+    //printed and live P/T, every bonus channel, and the marked-damage residue
+    //(the small card renders power/life, so both have to be in the key)
+    k << card->power << '/' << card->life << '/' << card->toughness << '/'
+      << card->getCurrentPower() << '/' << card->getCurrentToughness() << '/'
+      << card->origpower << '/' << card->origtoughness << '/'
+      << card->basepower << '/' << card->basetoughness << '/'
+      << card->pbonus << '/' << card->tbonus << '/'
+      << (card->isSwitchedPT ? 1 : 0) << '/'
+      //swapP/swapT are only ever written by MTGCardInstance::switchPT - nothing
+      //initialises them - so on a card that never switched they hold stack
+      //garbage that differs per instance. Reading them unconditionally made
+      //EVERY pair of otherwise-identical permanents look different and the
+      //whole feature never fired once (found live, 2026-09-03). They are only
+      //observable while the switch is active, so only read them there. The
+      //uninitialised members themselves are an engine finding for the ledger,
+      //not something a render lane should be quietly patching around.
+      << (card->isSwitchedPT ? card->swapP : 0) << '/'
+      << (card->isSwitchedPT ? card->swapT : 0) << '/'
+      << card->wasDealtDamage << '|';
+    //combat assignment: role, WHICH attacker/defender, damage order rank
+    k << card->isAttacker() << ',' << (card->isDefenser() ? 1 : 0) << ','
+      << (card->isBlocked() ? 1 : 0) << ',' << card->didattacked << ','
+      << card->didblocked << ',' << card->notblocked << ','
+      << card->willattackplayer << ',' << card->willattackpw << ','
+      << (const void *) card->defenser << ',' << (const void *) card->isAttacking << ','
+      << (const void *) card->banding << ',' << card->blockers.size() << ','
+      << (card->defenser ? card->defenser->getDefenserRank(card) : 0) << '|';
+    //face / flip / morph / transform state
+    k << (card->isFacedown ? 1 : 0) << ',' << (card->morphed ? 1 : 0) << ','
+      << (card->isMorphed ? 1 : 0) << ',' << (card->turningOver ? 1 : 0) << ','
+      << card->isFlipped << ',' << (card->hasCopiedToken ? 1 : 0) << ','
+      << card->copiedID << ',' << card->copiedSetID << ',' << (card->blinked ? 1 : 0) << ','
+      << (card->isACopier ? 1 : 0) << ',' << card->MeldedFrom << '|';
+    //counters, by kind and count
+    if (card->counters)
+        for (int i = 0; i < card->counters->mCount; ++i)
+        {
+            Counter * c = card->counters->counters[i];
+            if (c)
+                k << c->name << ',' << c->nb << ',' << c->power << ',' << c->toughness << ';';
+        }
+    k << '|';
+    //the LIVE keyword set (until-EOT grants included) and the live type list
+    k << card->basicAbilities.to_string() << '|';
+    for (size_t i = 0; i < card->types.size(); ++i)
+        k << card->types[i] << ',';
+    k << '|' << (int) card->colors << '|';
+    //every display flag the render turns into a border or a dim - two cards
+    //wearing different borders are not the same board object to the player
+    k << card->castableNow << ',' << card->willPayForFocused << ','
+      << card->canAttackNow << ',' << card->hasUsableAbilityNow << ','
+      << card->canBlockNow << ',' << card->forcedBorderA << ',' << card->forcedBorderB << ','
+      << (card->isExtraCostTarget ? 1 : 0) << ',' << (card->has(Constants::NECROED) ? 1 : 0) << '|';
+    //identity riders and pending-value state
+    k << (card->isToken ? 1 : 0) << ',' << card->isCommander << ',' << card->isRingBearer << ','
+      << (card->isBestowed ? 1 : 0) << ',' << (card->suspended ? 1 : 0) << ','
+      << (card->miracle ? 1 : 0) << ',' << (card->isDefeated ? 1 : 0) << ','
+      << (card->isCascaded ? 1 : 0) << ',' << (card->isDualWielding ? 1 : 0) << '|';
+    k << card->X << ',' << card->castX << ',' << card->setX << ',' << card->kicked << ','
+      << card->sunburst << ',' << card->mutation << ',' << card->auras << ','
+      << card->equipment << ',' << card->regenerateTokens << ',' << card->flanked << ','
+      //MaxLevelUp: same story - assigned only by the leveler parser, so it is
+      //garbage on every non-leveler.
+      << (card->isLeveler ? card->MaxLevelUp : 0) << ','
+      << card->chooseacolor << ',' << card->chooseasubtype << ','
+      << card->chooseaname << '|';
+    //linked permanents: a paired / shackled / imprinted card is unique
+    k << (const void *) card->myPair << ',' << (const void *) card->shackled << ','
+      << (const void *) card->seized << ',' << (const void *) card->storedCard << ','
+      << card->parentCards.size() << ',' << card->childrenCards.size() << ','
+      << card->imprintedCards.size() << ',' << (const void *) card->hauntedCard << '|';
+    //granted-ability population: two otherwise identical creatures with a
+    //different number of live abilities attached are different objects
+    k << card->cardsAbilities.size() << '|';
+    appendStackAttachments(k, card);
+    return k.str();
+}
+//==== end #W57-G ====
 
 namespace
 {
@@ -819,6 +975,31 @@ void CardGui::Render()
             if(myA > 0)
                 renderer->RenderQuad(shadow.get(), actX, actY, actT, (28 * actZ + 1) / 16, 40 * actZ / 16);
         }
+    }
+
+    //#W57-G (D42): the pile badge. Drawn last so nothing overpaints it, and
+    //only on the one member that stands in for a group - a lone card never
+    //shows it, so the badge itself means "there are more of these here".
+    if (mStackCount > 1)
+    {
+        char sbuf[32];
+        sprintf(sbuf, "x%i", mStackCount);
+        //dark plate first: at 480x272 white glyphs over card art are unreadable
+        //on half the printings.
+        //In the GUTTER off the card's top-right corner, not on the face. A
+        //28x40 card at 480x272 has no free corner: the top-left is the printed
+        //name, the bottom the P/T box - a badge over either HIDES information
+        //(the first placement clipped the toughness digit, which is worse than
+        //no badge at all). Slots are 31 apart, so this lands in the ~3px gap
+        //plus the neighbouring pile's left rim, next to the offset plates that
+        //already read as "there is more than one here".
+        JRenderer::GetInstance()->FillRect(actX + 12.0f * actZ, actY - 21.0f * actZ,
+                                           13.0f * actZ, 9.0f * actZ, ARGB(225, 10, 10, 10));
+        mFont->SetColor(ARGB(255, 255, 235, 140));
+        mFont->SetScale(actZ);
+        mFont->DrawString(sbuf, actX + 13.0f * actZ, actY - (20.6f * actZ));
+        mFont->SetScale(1);
+        mFont->SetColor(ARGB(255, 255, 255, 255));
     }
 
     PlayGuiObject::Render();

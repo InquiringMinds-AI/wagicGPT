@@ -84,6 +84,30 @@ protected:
     bool mLayoutDirty;
     void relayoutIfDirty();
 
+    //#W57-G (D42): Arena-style stacking of state-identical permanents.
+    //computeStacks() runs at the head of every Replace() and decides, for each
+    //battlefield CardView, whether it draws (and with what xN badge), whether
+    //it is a follower another card stands in for, or whether it is fanned out
+    //of an expanded pile. Layout then allocates slots ONLY to the drawing
+    //cards, so a board of 8 identical tokens costs one slot and one
+    //CardGui::Render instead of eight.
+    //Two hard rules from the owner's rulings live here:
+    //  - only identical NAME AND STATE stack (wagicBoardStackKey is the
+    //    predicate; any difference splits the pile);
+    //  - while a chooser is live or anything on the stack is still unresolved,
+    //    the whole battlefield expands to its ungrouped layout and STAYS
+    //    there, because "the user remembers what they have targeted" by
+    //    position and nothing may move under them mid-decision.
+    static const float STACKFANPITCH;
+    bool mStacksPinned;
+    const void * mStackSig;
+    vector<pair<CardView*, CardView*> > mStackFollowers; //follower, drawn card
+    void computeStacks();
+    bool stacksPinnedNow();
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+    void stackProbe(double ms);
+#endif
+
 public:
     int wave;
     GuiPlay(DuelLayers*);

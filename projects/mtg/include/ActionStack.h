@@ -77,7 +77,11 @@ public:
     }
     
     virtual const string getDisplayName() const;
-    void Render(MTGCardInstance * source, JQuad * targetQuad, string alt1, string alt2, string action, bool bigQuad = false, int aType = 0, vector<JQuadPtr> targetIcons = vector<JQuadPtr>());
+    //#W57-G (D42): targetCounts is parallel to targetIcons. When several of a
+    //stack entry's targets are state-identical members of one board pile the
+    //caller collapses them to ONE icon carrying their count - identical members
+    //are interchangeable, so only the count is information. Empty = one each.
+    void Render(MTGCardInstance * source, JQuad * targetQuad, string alt1, string alt2, string action, bool bigQuad = false, int aType = 0, vector<JQuadPtr> targetIcons = vector<JQuadPtr>(), vector<int> targetCounts = vector<int>());
     
     virtual int receiveEvent(WEvent *)
     {
