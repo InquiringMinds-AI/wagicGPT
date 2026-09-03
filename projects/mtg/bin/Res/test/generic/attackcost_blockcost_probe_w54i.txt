@@ -1,0 +1,29 @@
+#W54-I (A12): attack-cost + block-cost rules on the board. Ghostly Prison
+#(opponent) grants Grizzly Bears attackcost:2 and Archangel of Tithes
+#(attacking) grants the opponent's creatures blockcost:1, so every click
+#walk through combat runs MTGAttackCostRule/MTGBlockCostRule::
+#isReactingToClick - the sites that leaked a parsed "{0}" ManaCost per
+#probe. The game observable is unchanged (nothing attacks); the gate is
+#LeakSanitizer on this fixture: no ManaCost::parseManaCost frames under
+#MTGRules.cpp. The bears click at attackers runs the attack-cost probe
+#(the pool is empty by then, so the cost cannot be paid and nothing
+#attacks - the probe site fires before the affordability check).
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:grizzly bears,archangel of tithes
+manapool:{3}
+[PLAYER2]
+inplay:ghostly prison,grizzly bears
+[DO]
+goto attackers
+grizzly bears
+goto end
+goto end
+[ASSERT]
+ENDOFTURN
+[PLAYER1]
+inplay:grizzly bears,archangel of tithes
+[PLAYER2]
+inplay:ghostly prison,grizzly bears
+[END]

@@ -67,6 +67,15 @@ void MTGPlayerCards::initDeck(MTGDeck * deck)
             }
         }
     }
+    //#W54-I (A13): the colour-identity check below built a fresh
+    //MTGCardInstance of every commander for EVERY deck card and never freed
+    //it (~99 x 2.8 KB per player per commander game). Build each commander's
+    //instance once here and free it after the loop.
+    vector<MTGCardInstance *> commanderInstances;
+    for(unsigned int i = 0; i < deck->CommandZone.size(); i++){
+        MTGCard * cmdcard = MTGCollection()->getCardById(atoi(deck->CommandZone[i].c_str()));
+        commanderInstances.push_back(cmdcard ? NEW MTGCardInstance(cmdcard, this) : NULL);
+    }
     map<int, int>::iterator it;
     for (it = deck->cards.begin(); it != deck->cards.end(); it++)
     {
@@ -85,9 +94,8 @@ void MTGPlayerCards::initDeck(MTGDeck * deck)
                         bool colorFound = false; // All the cards have to share at least one color with commander identity color (any symbol in manacost or magic text).
                         bool colorless = false; // Colorless card can be always added to deck.
                         for(unsigned int i = 0; i < deck->CommandZone.size() && !colorFound; i++){
-                            MTGCard * cmdcard = MTGCollection()->getCardById(atoi(deck->CommandZone[i].c_str()));
-                            if(cmdcard){
-                                MTGCardInstance * commander = NEW MTGCardInstance(cmdcard, this);
+                            MTGCardInstance * commander = commanderInstances[i]; //#W54-I (A13)
+                            if(commander){
                                 if((newCard->hasColor(Constants::MTG_COLOR_WHITE) && commander->hasColor(Constants::MTG_COLOR_WHITE)) ||
                                     (newCard->hasColor(Constants::MTG_COLOR_BLACK) && commander->hasColor(Constants::MTG_COLOR_BLACK)) ||
                                     (newCard->hasColor(Constants::MTG_COLOR_RED) && commander->hasColor(Constants::MTG_COLOR_RED)) ||
@@ -117,6 +125,7 @@ void MTGPlayerCards::initDeck(MTGDeck * deck)
                             newCard->magicText.find("{r}") == std::string::npos && newCard->magicText.find("{u}") == std::string::npos && !newCard->hasColor(Constants::MTG_COLOR_BLUE) && 
                             !newCard->hasColor(Constants::MTG_COLOR_RED) &&  !newCard->hasColor(Constants::MTG_COLOR_WHITE) && !newCard->hasColor(Constants::MTG_COLOR_GREEN) && 
                             !newCard->hasColor(Constants::MTG_COLOR_BLACK));
+                        bool added = false;
                         if(colorFound || colorless){
                             bool onlyInstance = true; // In commander format only single cards are allowed if they are not basic lands.
                             for(unsigned int k = 0; k < library->cards.size() && onlyInstance; k++){
@@ -124,13 +133,23 @@ void MTGPlayerCards::initDeck(MTGDeck * deck)
                                     onlyInstance = false;
                             }
                             if(onlyInstance)
+                            {
                                 library->addCard(newCard);
+                                added = true;
+                            }
                         }
+                        //#W54-I (A13): a deck card rejected by the colour-identity or
+                        //singleton rule was never freed (LSan: 28 instances on a 60-card
+                        //deck with doubles). Nothing else holds it - free it.
+                        if(!added)
+                            SAFE_DELETE(newCard);
                     }
                 }
             }
         }
     }
+    for(size_t i = 0; i < commanderInstances.size(); i++) //#W54-I (A13)
+        SAFE_DELETE(commanderInstances[i]);
     //sb init
     if(deck->Sideboard.size())
     {
@@ -178,6 +197,9 @@ MTGPlayerCards::~MTGPlayerCards()
     SAFE_DELETE(inPlay);
     SAFE_DELETE(stack);
     SAFE_DELETE(removedFromGame);
+    if (garbageLastTurn != garbage) //#W54-I (A11): distinct zones since the first turn boundary
+        SAFE_DELETE(garbageLastTurn);
+    garbageLastTurn = NULL;
     SAFE_DELETE(garbage);
     SAFE_DELETE(reveal);
     SAFE_DELETE(sideboard);
@@ -186,10 +208,37 @@ MTGPlayerCards::~MTGPlayerCards()
     SAFE_DELETE(playRestrictions);
 }
 
+//#W54-I (A11) disable flag: WAGIC_GARBAGE_ONE_TURN=1 restores the pre-A11
+//one-turn deferral (garbageLastTurn aliasing garbage) for forensics.
+static bool garbageOneTurn()
+{
+    static const bool one = (getenv("WAGIC_GARBAGE_ONE_TURN") != NULL
+                             && getenv("WAGIC_GARBAGE_ONE_TURN")[0] == '1');
+    return one;
+}
+
 void MTGPlayerCards::beforeBeginPhase()
 {
-    SAFE_DELETE(garbageLastTurn);
-    garbageLastTurn = garbage = NEW MTGGameZone();
+    //#W54-I (A11): the pair is named for a TWO-turn deferral (garbage = this
+    //turn's dead tokens, garbageLastTurn = last turn's, freed one turn later),
+    //but the old `garbageLastTurn = garbage = NEW` kept both pointers on the
+    //same zone, so every token that died in the turn just ended was freed
+    //HERE, one turn early - the root of the dead-token dangle class the engine
+    //comments name (validateCardPointer cores 3266478 / 3151670). Now the
+    //zone that was `garbage` becomes `garbageLastTurn` and lives one more
+    //turn; the destructor frees both when they differ.
+    if (garbageOneTurn())
+    {
+        SAFE_DELETE(garbageLastTurn);
+        garbageLastTurn = garbage = NEW MTGGameZone();
+    }
+    else
+    {
+        if (garbageLastTurn != garbage)
+            SAFE_DELETE(garbageLastTurn);
+        garbageLastTurn = garbage;
+        garbage = NEW MTGGameZone();
+    }
     garbage->setOwner(this->owner);
 
     library->beforeBeginPhase();
@@ -1949,7 +1998,7 @@ ostream& operator<<(ostream& out, const MTGPlayerCards& z)
     }
     if(z.removedFromGame->cards.size()) {
         out << "exile=";
-        out << *(z.hand) << endl;
+        out << *(z.removedFromGame) << endl; //#W54-I (A27): was *(z.hand) - the hand serialised under exile=
     }
 
     return out;

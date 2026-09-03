@@ -1,0 +1,32 @@
+#W54-I (A11): dead tokens must survive TWO turn boundaries, not one.
+#Raise the Alarm makes two Soldier tokens; Pyroclasm kills them the same
+#turn (MTGTokensCleanup moves them graveyard -> garbage). Two `eot`s then
+#cross two BEFORE_BEGIN boundaries. Before A11 `garbageLastTurn` aliased
+#`garbage`, so the first boundary freed the tokens while every raw pointer
+#taken during the turn (aura/equipment targets, imprints, AI-remembered
+#cards, LKI) still named them; now the zone that was `garbage` lives on as
+#`garbageLastTurn` for one more turn. The plain suite sees identical zones
+#either way (the garbage zones are not asserted); the discriminating run is
+#the ASAN suite, where any read through such a pointer is a use-after-free
+#on the old binary.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+hand:raise the alarm,pyroclasm
+manapool:{1}{W}{1}{R}
+[PLAYER2]
+[DO]
+raise the alarm
+goto firstmain
+goto firstmain
+pyroclasm
+goto firstmain
+goto firstmain
+eot
+eot
+[ASSERT]
+UNTAP
+[PLAYER1]
+graveyard:raise the alarm,pyroclasm
+[PLAYER2]
+[END]

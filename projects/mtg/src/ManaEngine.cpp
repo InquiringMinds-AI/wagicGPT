@@ -676,7 +676,7 @@ vector<MTGAbility*> ManaEngine::planPayment(Player * p, ManaPolicy & policy, MTG
 
     if(anytypeofmana){
         int convertedC = cost->getConvertedCost();
-        cost = NEW ManaCost(ManaCost::parseManaCost("{0}", NULL, target));
+        cost = NEW ManaCost(); //#W54-I (A12): was NEW ManaCost(parseManaCost("{0}")) - leaked the parsed temporary per probe
         for (int jj = 0; jj < convertedC; jj++)
             cost->add(Constants::MTG_COLOR_ARTIFACT, 1);
     }

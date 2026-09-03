@@ -115,7 +115,9 @@ namespace
     //multiple-choice menu belongs to (mirrors the AI's historical lookup).
     MenuAbility * currentMenuAbility(ActionLayer * object)
     {
-        for (size_t m = object->mObjects.size() - 1; m > 0; m--)
+        //#W54-I (L18): `size()-1` underflowed on an empty layer; same walk
+        //(indices size-1 .. 1, index 0 skipped as before), no underflow.
+        for (size_t m = object->mObjects.size(); m-- > 1;)
         {
             MenuAbility * ability = dynamic_cast<MenuAbility *>(object->mObjects[m]);
             if (ability && ability->triggered)

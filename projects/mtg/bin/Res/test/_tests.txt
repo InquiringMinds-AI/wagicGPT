@@ -144,6 +144,8 @@ generic/chalice_of_the_void_i1085.txt
 generic/chaos_wand_i1085.txt
 generic/charm_peddler_i1085.txt
 generic/chatterfang_i1085.txt
+generic/token_dies_two_turns_w54i.txt
+generic/attackcost_blockcost_probe_w54i.txt
 generic/chisei_i1085.txt
 generic/corpse_augur_i1085.txt
 generic/descendants_path_i1085.txt
