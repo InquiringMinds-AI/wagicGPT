@@ -1,0 +1,40 @@
+#W56-W (E-2) -- the OTHER direction of the same quota: the back-face land play
+#is a land drop, so after it NOTHING else may take one -- not a basic land
+#(lane D's mdfc_land_drop_consumed_w56d pins that half) and not a SECOND modal
+#double-faced card's back face. This fixture pins the second half, which is the
+#one the new check could have broken: canPlayLandNow must read the quota AFTER
+#the first back face reached the battlefield.
+#
+#Turn 1 first main, no drop used. Click 1 plays Emeria's Call as Emeria,
+#Shattered Skyclave (menu option 1; its ETB pays 3 life, harness default).
+#Click 2 on Agadeem's Awakening now finds only the display toggle -- no menu,
+#nothing enters, and the second card stays in hand showing its back face. The
+#Plains after it is refused too.
+#
+#PRE-FIX this fixture is RED: all three land plays resolved in one turn
+#(Emeria + Agadeem + Plains), because no route counted the drop on the way IN.
+[INIT]
+firstmain
+[PLAYER1]
+hand:Emeria's Call,Agadeem's Awakening,Plains
+inplay:Mind Stone
+life:20
+[PLAYER2]
+life:20
+[DO]
+Emeria's Call
+choice 1
+Agadeem's Awakening
+choice 1
+Plains
+no
+no
+[ASSERT]
+firstmain
+[PLAYER1]
+hand:Agadeem^ the Undercrypt,Plains
+inplay:Mind Stone,Emeria^ Shattered Skyclave
+life:17
+[PLAYER2]
+life:20
+[END]

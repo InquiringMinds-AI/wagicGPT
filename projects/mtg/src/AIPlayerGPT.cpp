@@ -9295,6 +9295,12 @@ string describeTarget(Player * me, Targetable * t, bool decisionSurface = true)
 
 } //namespace
 
+//#W56-W (E-3): forward - defined with the other modal-DFC helpers, next to
+//asMdfcLandPlay, whose definition of "this is a land row" it shares. Declared
+//HERE, outside the anonymous namespace above, so it has the same linkage as the
+//definition (a copy inside that namespace linked to nothing).
+static void mdfcBackFaceLandStatus(Player * p, bool& playable, bool& haveLand);
+
 //State shared between the game thread and the HTTP worker. The worker owns
 //a shared_ptr copy: if the game (and this player) is destroyed while a
 //request is still running, the worker finishes writing into memory that
@@ -13945,6 +13951,15 @@ string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::
             for (int i = 0; i < game->hand->nb_cards && !haveLand; i++)
                 if (game->hand->cards[i] && game->hand->cards[i]->isLand())
                     haveLand = true;
+            //#W56-W (E-3): a modal-DFC's LAND back face is a land play that
+            //legalLandPlays cannot see - the hand card is a Sorcery and the land
+            //arrives through AAFlip, never through MTGPutInPlayRule - so the
+            //summary said "you have no land you could play right now" on 17
+            //wave-56 prompts that carried a live PLAY THIS AS A LAND row three
+            //lines below it, one of which the seat took and the land entered
+            //(seat 146/152/162 E-3, repro 146v125 seq 13). Derive the summary
+            //from the same union that produces the rows.
+            mdfcBackFaceLandStatus(this, playable, haveLand);
         }
         out << landDropStatusLine(myTurn, playable, haveLand);
     }
@@ -14249,6 +14264,41 @@ static AAFlip * asMdfcLandPlay(MTGAbility * a)
     if (f && f->forcetype == "land")
         return f;
     return NULL;
+}
+
+//#W56-W (E-3). See the call site. OR-s the modal-DFC back-face land plays into
+//the two flags landDropStatusLine reads:
+//  playable - a back-face row is LEGAL right now (the ability reacts, which is
+//             the same test that puts the row in the option list, so the
+//             sentence and the rows cannot contradict each other);
+//  haveLand - a back-face land is merely HELD, which is what separates
+//             "the drop is already spent" from "there is nothing to play".
+//Only AAFlip-wrapped abilities are polled, so nothing here mutates (the warning
+//on LegalActionsOracle::castableForDisplay is about MTGPutInPlayRule's Leyline
+//auto-resolve, which this never touches).
+static void mdfcBackFaceLandStatus(Player * p, bool& playable, bool& haveLand)
+{
+    if (!p || !p->game || !p->game->hand)
+        return;
+    GameObserver * g = p->getObserver();
+    if (!g || !g->mLayers || !g->mLayers->actionLayer())
+        return;
+    ActionLayer * al = g->mLayers->actionLayer();
+    for (int i = 0; i < p->game->hand->nb_cards; i++)
+    {
+        MTGCardInstance * c = p->game->hand->cards[i];
+        if (!c)
+            continue;
+        for (size_t k = 0; k < al->mObjects.size(); k++)
+        {
+            MTGAbility * ma = dynamic_cast<MTGAbility *>((ActionElement *) al->mObjects[k]);
+            if (!ma || ma->source != c || !asMdfcLandPlay(ma))
+                continue;
+            haveLand = true;
+            if (ma->isReactingToClick(c, NULL))
+                playable = true;
+        }
+    }
 }
 
 //#W56-D (D8): what that row DOES, in one place for both emitters (the priority

@@ -1,0 +1,74 @@
+#W56-W (E-2) NEGATIVE -- the modal-DFC back-face LAND may not be played on the
+#OPPONENT's turn. CR 305.1: a land is played only during your own main phase,
+#with an empty stack, and only if you have a land drop left.
+#
+#SYMPTOM (wave-56 corpus, seat 146/152/162 finding E-2): 62 windows carried a
+#`PLAY THIS AS A LAND` row and only 21 were legal -- 18 on the OPPONENT's turn
+#(17 Upkeep, 1 Draw), 13 in the seat's own Blockers step, 6 after the land drop
+#was already spent. One RESOLVED: 152v162 seq 3 played Boulderloft Pathway in
+#the opponent's UPKEEP of turn 2, then played a Plains on its own turn 3 -- two
+#land drops in consecutive turn halves.
+#
+#MECHANISM: `restriction{can play land}` was a NO-OP string.
+#AbilityFactory::parseRestriction knew only myturnonly / opponentturnonly /
+#assorcery / <my|opponent><phase>only, so the token returned NO_RESTRICTION and
+#parseCastRestrictions gated nothing. The `{0}` hand entry does not go through
+#MTGPutInPlayRule (the hand card is a Sorcery; the land arrives via AAFlip's
+#forcetype(land) branch), so NOTHING checked whose turn it was.
+#
+#POST-FIX the token is real (ActivatedAbility::CAN_PLAY_LAND) and resolves to
+#LegalActionsOracle::canPlayLandNow, which reuses MTGPutInPlayRule's own gate
+#(MTGCardInstance::StackIsEmptyandSorcerySpeed) plus the maxPlay(land) quota.
+#
+#WITNESS (both seats AI; the corpus's illegal play was an AI seat taking its
+#OWN priority window on the opponent's turn, which is the only seat that can
+#reach this ability while another player is active -- a scripted click routes
+#through GameObserver::currentlyActing and never gets there). P2 holds an
+#Emeria's Call and controls a Mind Stone; P1 is active with an empty hand and
+#never gives P2 a sorcery-speed window of its own within the scripted turn.
+#FORCEABILITY makes the seat take any ability it can.
+#
+#PRE-FIX this fixture is RED: P2 put Emeria, Shattered Skyclave onto the
+#battlefield during P1's turn and paid its 3-life ETB (inplay 2 cards,
+#life 17). POST-FIX the row does not exist for it: battlefield unchanged,
+#life 20.
+FORCEABILITY
+AICALLS 60
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Mind Stone
+hand:
+life:20
+[PLAYER2]
+inplay:Mind Stone
+hand:Emeria's Call
+life:20
+[DO]
+ai
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+no
+[ASSERT]
+end
+[PLAYER1]
+inplay:Mind Stone
+life:20
+[PLAYER2]
+inplay:Mind Stone
+hand:Emeria's Call
+life:20
+[END]

@@ -21,6 +21,16 @@ MaxPerTurnRestriction::MaxPerTurnRestriction(TargetChooser * tc, int maxPerTurn,
     PlayRestriction(tc), maxPerTurn(maxPerTurn), zone(zone)
     {}
 
+//#W56-W (E-2): the quota test, alone. ONE definition, two callers -
+//canPutIntoZone (a card is being put somewhere) and landDropAvailable (no card
+//of the right type exists to ask about).
+bool MaxPerTurnRestriction::quotaLeft()
+{
+    if (maxPerTurn == NO_MAX) return true;
+    if (!zone) return true;
+    return zone->seenThisTurn(tc, Constants::CAST_ALL) < maxPerTurn;
+}
+
 int  MaxPerTurnRestriction::canPutIntoZone(MTGCardInstance * card, MTGGameZone * destZone)
 {
     if (destZone != zone)
@@ -29,9 +39,7 @@ int  MaxPerTurnRestriction::canPutIntoZone(MTGCardInstance * card, MTGGameZone *
     if (!tc->canTarget(card))
         return PlayRestriction::NO_OPINION;
 
-    if (maxPerTurn == NO_MAX) return PlayRestriction::CAN_PLAY;
-
-    if (zone->seenThisTurn(tc, Constants::CAST_ALL) >= maxPerTurn)
+    if (!quotaLeft())
         return PlayRestriction::CANT_PLAY;
 
     return PlayRestriction::CAN_PLAY;
@@ -55,6 +63,25 @@ MaxPerTurnRestriction * PlayRestrictions::getMaxPerTurnRestrictionByTargetChoose
 
     delete _tc;
     return NULL;
+}
+
+//#W56-W (E-2). See the header: the land-drop counter, asked by TYPE. The probe
+//TargetChooser is built from the same "land" spec the rules card's
+//maxPlay(land)1 registered, so getMaxPerTurnRestrictionByTargetChooser finds
+//exactly the restriction MTGPutInPlayRule consults for a normal land drop.
+bool PlayRestrictions::landDropAvailable(GameObserver * observer, MTGCardInstance * contextCard)
+{
+    if (!observer)
+        return true;
+    TargetChooserFactory tcf(observer);
+    TargetChooser * probe = tcf.createTargetChooser("land", contextCard);
+    if (!probe)
+        return true;
+    MaxPerTurnRestriction * r = getMaxPerTurnRestrictionByTargetChooser(probe);
+    delete probe;
+    if (!r)
+        return true;
+    return r->quotaLeft();
 }
 
 void PlayRestrictions::addRestriction(PlayRestriction * restriction)
