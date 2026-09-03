@@ -1,0 +1,55 @@
+#W55-E (D5a): the reveal stall guard's SECOND budget - the poll-churn shape the
+#wave-54 guard has no window on.
+#
+#Corpus 20260903 game 146v123 seq 15 (Pelakka Predation, turn 9 Main 1): SIX
+#`dropping stale async answer` lines back to back with no release line, no phase
+#step and no stack action between them, then the async layer's own livelock
+#breaker handed a real decision to the heuristic. The reveal driver had been
+#sitting in phase 0 the whole time, asking and asking - and lane F's stall guard
+#could not see it, because a model poll bumps mAIPollTicks and mAIPollTicks is
+#IN the progress signature, so the budget reset on every single tick.
+#
+#The structural signature is that same value with the poll counter left out. It
+#does not move while the driver only polls, so a driver that does nothing but
+#re-ask is now a countable stall with its own force-close and its own name
+#(`poll-churn`) in the trace.
+#
+#Lexicon Hurkyl Wizard is the reveal WITH an option two, and Icy Manipulator in
+#the top five is a legal option-one target - so option one is built, its chooser
+#arms, and the driver reaches phase 0 with a real decision to make. Then
+#`revealasyncticks 100000` makes the test stub answer NEVER: the driver polls
+#forever, exactly as it did against a prompt that would not stay still.
+#`revealstallbudget 5` shrinks ONLY the budget; the churn itself is entirely real.
+#
+#RED on base (master 8a1768d1c, which carries lane F's guard AND lane X's fix):
+#the five revealed cards stay stranded and the library is 1 of 6 - the full
+#signature changes on every tick, so no budget is ever reached and the reveal
+#display holds every phase-advance path open for the rest of the game.
+#GREEN after: the structural budget force-closes it and the five cards go back.
+[INIT]
+FIRSTMAIN
+[PLAYER1]
+inplay:Lexicon Hurkyl Wizard,island,swamp
+hand:Mind Stone
+library:Hill Giant,Grizzly Bears,Gray Ogre,Ornithopter,Icy Manipulator,Craw Wurm
+[PLAYER2]
+[DO]
+interactivereveal
+revealasync Icy Manipulator
+revealasyncticks 100000
+revealstallbudget 5
+island
+swamp
+Mind Stone
+goto end
+no
+no
+no
+[ASSERT]
+END
+[PLAYER1]
+inplay:Lexicon Hurkyl Wizard,island,swamp,Mind Stone
+hand:
+library:Hill Giant,Craw Wurm,Icy Manipulator,Ornithopter,Gray Ogre,Grizzly Bears
+[PLAYER2]
+[END]

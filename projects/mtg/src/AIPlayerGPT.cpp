@@ -2064,9 +2064,22 @@ static string mulliganNoCoverCause(int lands, const int sources[5], int cheapest
     for (int k = 0; k < 5; k++)
         if (sources[k])
             made += kSym[k];
+    //#W55-E (D12, wave-54 ledger MED = R204). The two families call for OPPOSITE
+    //decisions and shipped in one grammar. The COUNT family is a hand-level
+    //verdict: too few lands is a reason to mulligan. The COLOUR family is not -
+    //it is a statement about the lands IN THIS HAND, before a single draw, and
+    //`152v146` s1 mulliganed a three-land seven under it, naming the colour as
+    //its reason, for the fourth corpus running. Every word of it was true; what
+    //was missing was its SCOPE, which the clause already implies and never said.
+    //So the scope is appended (nothing is deleted, nothing is hedged, and the
+    //count family is untouched): on a one-land hand the honest bound is turn
+    //one; above that it is "even with every land in this hand in play", which is
+    //what the union of colours above actually assumes.
     o << " (you have " << lands << " land" << (lands == 1 ? "" : "s") << "; no spell in it"
       << " is castable off "
-      << (made.empty() ? string("colourless mana") : made) << " alone)";
+      << (made.empty() ? string("colourless mana") : made) << " alone"
+      << (lands == 1 ? " on turn one" : " even with every land in this hand in play")
+      << ")";
     return o.str();
 }
 
@@ -9013,6 +9026,29 @@ const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
     return noAnswerClassFor(staleLivelock, timedOut, hasReasoning);
 }
 
+//#W55-E (D5b): stale-drop prompt-drift localiser. Prints the first byte at which
+//the rebuilt prompt diverges from the one in flight, both neighbourhoods, and
+//both lengths - which is enough to name the SECTION (narration / situation
+//prefill / option list) without diffing two 40 KB strings by hand.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+static void gptTracePromptDrift(const string& inflight, const string& rebuilt)
+{
+    if (!getenv("WAGIC_GPT_DRIFT"))
+        return;
+    size_t n = inflight.size() < rebuilt.size() ? inflight.size() : rebuilt.size();
+    size_t i = 0;
+    while (i < n && inflight[i] == rebuilt[i]) i++;
+    size_t from = i > 60 ? i - 60 : 0;
+    std::cerr << "[DRIFT] first diff at " << i << " of " << inflight.size()
+              << " -> " << rebuilt.size() << "\n[DRIFT] inflight: |"
+              << inflight.substr(from, 200) << "|\n[DRIFT] rebuilt : |"
+              << rebuilt.substr(from, 200) << "|" << std::endl;
+}
+#define GPT_DRIFT_TRACE(a, b) gptTracePromptDrift((a), (b))
+#else
+#define GPT_DRIFT_TRACE(a, b) do { } while (0)
+#endif
+
 const char * AIPlayerGPT::noAnswerClass() const
 {
     return noAnswerClassFor(mLastStaleLivelock, mLastTimeout, !mLastReasoning.empty(),
@@ -9212,6 +9248,14 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             //An answer for a prompt the game state has moved past (should
             //not happen while the AI neither acts nor passes; drop safely).
             DebugTrace("AIPlayerGPT: dropping stale async answer");
+            //#W55-E (D5b): WHERE the prompt moved. A stale drop says only that
+            //the rebuilt prompt differs from the one in flight; the wave-54
+            //reveal livelock (146v123 s15) then needed an archaeology pass over
+            //two 40 KB strings to find out which section was unstable. This
+            //names the first divergence and its neighbourhood. Development
+            //builds only (owner rule: diagnostics are compiled out of release);
+            //WAGIC_GPT_DRIFT=1 arms it, so a dev build is silent by default.
+            GPT_DRIFT_TRACE(mAsyncState->prompt, userMsg);
             GPTASYNCLOG("gpt stale drop (prompt moved) resp=%zu\n", mAsyncState->response.size());
             mAsyncState->status = 0;
             mAsyncState->response.clear();
@@ -9529,11 +9573,41 @@ bool AIPlayerGPT::isDecodeGarbage(const string& content)
     return lowProse || markupHeavy || repetition;
 }
 
+//#W55-E (D23). A WALL MISS - the deadline reached with an empty reply - is an
+//event a seat review counts, and wave 54 had one that produced no record at all:
+//`146v123` missed the wall, the one retry was launched, and before it could be
+//consumed the window auto-passed as display-toggle-only, so the decision was
+//abandoned and NOTHING wrote it down. Two `no reply after 900s` events, one
+//record. Pure: a wall-missed ask is abandoned once the seat is polling a
+//DIFFERENT decision than the one that missed.
+static bool wallMissAbandoned(bool pending, const string& missedBase, const string& nowBase)
+{
+    return pending && !missedBase.empty() && nowBase != missedBase;
+}
+
+//The abandoned ask gets its own zero-choice record, carrying the prompt the
+//model never answered. Additive: no window is removed, no retry is spent, and
+//nothing in the engine reads it.
+void AIPlayerGPT::flushWallMissRecord()
+{
+    if (!mWallMissPending)
+        return;
+    string base = mWallMissBase;
+    mWallMissPending = false;
+    mWallMissBase.clear();
+    mWallMissUnrecorded++;
+    writeTransLog("wall_miss", base, "", -1, 0, "", "wall_miss_unrecorded", NULL);
+}
+
 int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
 {
     //Mid-retry: poll the retry prompt (buildRequestBody sees mRetryActivePrompt
     //and uses the tight retry max_tokens). If the decision drifted, abandon the
     //pending retry and fall through to a fresh poll of the new decision.
+    //#W55-E (D23): the seat has moved to a different decision and the ask that
+    //missed the wall will never be consumed - write it down before it is lost.
+    if (wallMissAbandoned(mWallMissPending, mWallMissBase, userMsg))
+        flushWallMissRecord();
     if (!mRetryActivePrompt.empty())
     {
         if (userMsg == mRetryBase)
@@ -9626,6 +9700,12 @@ int AIPlayerGPT::pollCompletionRetry(const string& userMsg, string& content)
         mRetryFirstLatencyMs = mLastLatencyMs;
         mRetryBase = userMsg;
         mRetryActivePrompt = string(kTimeoutRetryTag) + userMsg;
+        //#W55-E (D23): arm the wall-miss account on THIS prompt. Whichever comes
+        //first closes it: the record that consumes this prompt stamps wall_miss,
+        //or the decision is abandoned and flushWallMissRecord writes it down.
+        mWallMissPending = true;
+        mWallMissBase = userMsg;
+        mWallMissEvents++;
         setNotice("no reply from the model - asking once more", 3.0f);
         DebugTrace("AIPlayerGPT: no reply after " << (mTimeoutMs / 1000)
                    << "s - one retry");
@@ -9665,6 +9745,8 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
       mLastForcedClose(false), mLastReasoningDegenerate(-1.0), mReasoningBudget(0),
       mLastReasoningTokens(-1), mLastDroppedAssignments(-1), mLastReasoningHidden(false),
       mStaleDropStreak(0), mLastStaleLivelock(false),
+      mRevealStallTicks(0), mRevealStallSecs(0), mRevealStallPhase(-1),
+      mWallMissPending(false), mWallMissEvents(0), mWallMissUnrecorded(0),
       mLastTimeout(false), mRecoverySeq(-1),
       mInPregameAsk(false),
       mInAnnounceXAsk(false),
@@ -10250,6 +10332,31 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         if (ord >= 1)
             rec["latched_coded_line"] = ord;
     }
+    //#W55-E (D5a): how long the reveal DRIVER had been parked with no structural
+    //progress when this record was written. The wave-54 livelock (146v123 s15)
+    //wrote a `reveal` record classed stale_livelock and nothing anywhere said the
+    //driver had been sitting in phase 0 re-asking the whole time; this is that
+    //missing half, and it makes a poll-churn park a NUMBER rather than an
+    //archaeology pass over the stderr. Present only when the driver was parked.
+    if (strcmp(kind, "reveal") == 0 && mRevealStallTicks > 0)
+    {
+        rec["reveal_stall"] = mRevealStallTicks;
+        rec["reveal_stall_secs"] = mRevealStallSecs;
+        rec["reveal_stall_phase"] = mRevealStallPhase;
+    }
+    if (strcmp(kind, "reveal") == 0)
+    {
+        mRevealStallTicks = 0; //consumed: never leaks onto a later reveal
+        mRevealStallSecs = 0;
+        mRevealStallPhase = -1;
+    }
+    //#W55-E (D23): this record answers a prompt that had already missed the wall.
+    if (mWallMissPending && !userMsg.empty() && userMsg == mWallMissBase)
+    {
+        rec["wall_miss"] = 1;
+        mWallMissPending = false;
+        mWallMissBase.clear();
+    }
     //Assignments the combat validator pruned as illegal on this record.
     if (!mLastPrunedPairs.empty())
     {
@@ -10291,6 +10398,18 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
 //It gets a full record - kind, what the engine did instead, and its own class -
 //so the recovery contract names it and a corpus can COUNT force-closes instead
 //of inferring them from a game that simply stopped.
+//#W55-E (D5a): the reveal driver parked on this seat, and says for how long.
+//Report only - nothing in the engine reads these, and the driver's own force-close
+//budget is the only thing that acts on a stall. Last writer wins: the driver
+//calls this every tick it is parked, so the figures a record carries are the
+//figures at the tick that wrote it.
+void AIPlayerGPT::noteRevealStall(int ticks, long secs, int driverPhase)
+{
+    mRevealStallTicks = ticks;
+    mRevealStallSecs = secs;
+    mRevealStallPhase = driverPhase;
+}
+
 void AIPlayerGPT::logEngineResolution(const char * kind, const string& what,
                                       int optionCount, const char * fallbackClass)
 {
@@ -10317,6 +10436,11 @@ void AIPlayerGPT::logGameEnd()
     //#W53-Q (D24): a handoff on the LAST decision of the game still gets its
     //recovery record - that is exactly the decision a lost game is read back
     //from.
+    //#W55-E (D23): a wall miss still open when the game ends is an abandoned ask
+    //too - the last decision of a game is exactly the one a lost game is read
+    //back from. Written BEFORE the recovery flush so its own handoff earns the
+    //recovery record that names what answered instead.
+    flushWallMissRecord();
     flushRecoveryRecord();
     mGameEndLogged = true;
     bool iWon = observer->didWin(this);
@@ -10340,6 +10464,12 @@ void AIPlayerGPT::logGameEnd()
         //#W54-D (D8b): asks whose whole option list rendered as one
         //interchangeable row and were resolved without a model call.
         {"identical_option_asks_resolved", mIdenticalOptionAsksResolved},
+        //#W55-E (D23): deadline misses that spent this seat's one retry, and how
+        //many of them were abandoned before any decision record could consume
+        //them. Written always, present or zero, so a seat review divides rather
+        //than infers - the wave-54 answer to "2 events, 1 record" was silence.
+        {"wall_miss_events", mWallMissEvents},
+        {"wall_miss_unrecorded", mWallMissUnrecorded},
     };
     transLogWrite(rec.dump()); //audit-L (L4)
     if (mTransLog.is_open())
@@ -39419,8 +39549,10 @@ static const char * kW50Y_r94 =
         string colourCase = pregameHandHeaderText(7, 2, 5, gg, "Wall of Omens {1}{w}", 2, none);
         cout << "     D16 colour: " << colourCase.substr(colourCase.find("Playing every land"));
         CHECK(colourCase.find("would not cover any spell in it (you have 2 lands; no spell in it"
-                              " is castable off {G} alone).") != string::npos,
-              "#W54-E D16 enough lands, wrong colour: the cause names the colours the lands make");
+                              " is castable off {G} alone even with every land in this hand"
+                              " in play).") != string::npos,
+              "#W54-E D16 / #W55-E D12 enough lands, wrong colour: the cause names the colours"
+              " the lands make AND the scope it was always bounded to");
         int one[5] = { 1, 0, 0, 0, 0 };           //one Plains
         string countCase = pregameHandHeaderText(7, 1, 6, one, "Wall of Omens {1}{w}", 2, none);
         cout << "     D16 count: " << countCase.substr(countCase.find("Playing every land"));
@@ -39431,6 +39563,55 @@ static const char * kW50Y_r94 =
               "#W54-E D16 NEGATIVE the count case never claims a colour is the problem");
         CHECK(colourCase.find("not enough for your cheapest spell") == string::npos,
               "#W54-E D16 NEGATIVE the colour case never claims the count is the problem");
+
+        //#W55-E (D12): the colour family is a statement about the lands in THIS
+        //HAND, and it shipped in the grammar of a hand-level verdict directly
+        //above a Keep/Mulligan ask (`152v146` s1 mulliganed a three-land seven
+        //under it, naming the colour as its reason). The scope it always implied
+        //is now said. Two branches, because on a one-land hand the honest bound
+        //is literally turn one and above that it is every land in the hand.
+        int oneG[5] = { 0, 0, 0, 0, 1 };          //a single Forest
+        string oneLandColour = pregameHandHeaderText(7, 1, 6, oneG, "Wall of Omens {1}{w}", 1, none);
+        cout << "     D12 one land: " << oneLandColour.substr(oneLandColour.find("Playing every land"));
+        CHECK(oneLandColour.find("(you have 1 land; no spell in it is castable off {G} alone"
+                                 " on turn one)") != string::npos,
+              "#W55-E D12 a one-land colour failure is bounded to turn one, in those words");
+        CHECK(oneLandColour.find("even with every land") == string::npos,
+              "#W55-E D12 NEGATIVE the one-land branch never claims a multi-land board");
+        CHECK(colourCase.find("on turn one") == string::npos,
+              "#W55-E D12 NEGATIVE a two-land colour failure is NOT a turn-one claim");
+        CHECK(countCase.find("even with every land in this hand in play") == string::npos
+              && countCase.find("on turn one") == string::npos,
+              "#W55-E D12 NEGATIVE the COUNT family is untouched - it carries no scope clause");
+        CHECK(countCase.find("(1 land is not enough for your cheapest spell at mana value 2)")
+                  != string::npos,
+              "#W55-E D12 the count family renders byte-identically to wave 54");
+
+        //#W55-E (D23): a wall-missed ask is abandoned once the seat polls a
+        //DIFFERENT decision. `146v123` missed the wall, launched its one retry,
+        //and the window auto-passed before the retry could be consumed - two
+        //`no reply after 900s` events, one record.
+        CHECK(wallMissAbandoned(true, "PROMPT A", "PROMPT B"),
+              "#W55-E D23 a different decision under an open wall miss is an abandonment");
+        CHECK(!wallMissAbandoned(true, "PROMPT A", "PROMPT A"),
+              "#W55-E D23 NEGATIVE the SAME decision is the retry, not an abandonment");
+        CHECK(!wallMissAbandoned(false, "", "PROMPT B"),
+              "#W55-E D23 NEGATIVE no open wall miss, nothing to write down");
+        CHECK(!wallMissAbandoned(true, "", "PROMPT B"),
+              "#W55-E D23 NEGATIVE an empty base is not an ask that can be abandoned");
+
+        //#W55-E (D5a): the poll-churn stall guard's wall floor is read off the
+        //seat's own deadline, so raising WAGIC_GPT_TIMEOUT can never turn a slow
+        //decision into a force-close (deadline + lane Q's one retry, plus a full
+        //deadline of margin), with a static floor under a seat that has none.
+        CHECK(revealStallStructSecsFor(0) == 1800,
+              "#W55-E D5a a seat with no deadline gets the static 1800s floor");
+        CHECK(revealStallStructSecsFor(900000) == 2700,
+              "#W55-E D5a a 900s deadline buys 2700s - deadline + retry + a deadline of margin");
+        CHECK(revealStallStructSecsFor(300000) == 1800,
+              "#W55-E D5a NEGATIVE a short deadline never lowers the floor below 1800s");
+        CHECK(revealStallStructSecsFor(420000) > 420 * 2,
+              "#W55-E D5a the floor always exceeds one deadline plus its one retry");
         //A covered hand keeps its positive line and gains no cause clause.
         vector<string> covered; covered.push_back("Wall of Omens {1}{w}");
         int ww[5] = { 2, 0, 0, 0, 0 };
