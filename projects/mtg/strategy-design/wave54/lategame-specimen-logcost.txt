@@ -1,0 +1,576 @@
+# wave-54 lategame specimen: 1788425038-ai_baka_deck125-0x559abad8e9c0-vs-ai_baka_deck123.jsonl seq 188, turn 63, Cleanup, 25767 chars, options 9
+# reply: "PUT: 6, 9\nPLAN: Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn."
+# (per-decision USER message exactly as served; system prompt not included)
+
+GAME LOG (everything that has happened so far):
+=== Turn 1 - YOUR turn ===
+- Your opening hand (7 cards): Sphinx's Revelation; Plains; Glacial Fortress; Fall of the Gavel; Path to Exile; Tundra; Plains
+- Phase: Untap
+- You kept your opening hand (7 cards)
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 2 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Swamp
+=== Turn 3 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 4 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+=== Turn 5 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 6 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+- Opponent cast Idyllic Tutor
+- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
+- Opponent searched their library with Idyllic Tutor
+- Opponent used: choose card with Idyllic Tutor targeting Intruder Alarm
+- Opponent put the revealed Intruder Alarm into their hand
+=== Turn 7 - YOUR turn ===
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- You played Plains
+=== Turn 8 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+- Opponent cast Bloodline Keeper
+- Paid {1}{u}{u} for Cancel with Island #1; Island #2; Plains
+- You cast Cancel
+- Opponent's Bloodline Keeper was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 9 - YOUR turn ===
+- Phase: Draw
+- You drew Island
+- Phase: Main phase 1
+- You played Island
+=== Turn 10 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+- Opponent cast Intruder Alarm
+- Opponent's Intruder Alarm resolved and entered the battlefield
+=== Turn 11 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Phase: Main phase 2
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Tundra; Island #1; Island #2; Plains; Island #3; Glacial Fortress
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 3 life (now 23)
+- You drew Plains
+- You drew Glacial Fortress
+- You drew Supreme Verdict
+- Your Sphinx's Revelation resolved and went to your graveyard
+=== Turn 12 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Arcane Sanctum
+=== Turn 13 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Main phase 1
+- You played Plains
+=== Turn 14 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Plains
+- Opponent cast Thraben Doomsayer
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter
+- Opponent's Thraben Doomsayer was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 15 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Paid {1} for Elixir of Immortality with Island #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Island #2; Island #3
+- You gained 5 life (now 28)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (3 cards) into your library with Elixir of Immortality
+=== Turn 16 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Isolated Chapel
+=== Turn 17 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+- Phase: Main phase 1
+- You played Plains
+=== Turn 18 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 19 - YOUR turn ===
+- Phase: Draw
+- You drew Glacial Fortress
+- Phase: Main phase 1
+- You played Glacial Fortress
+=== Turn 20 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Marsh Flats
+- Opponent cast Lightning Greaves
+- Opponent's Lightning Greaves resolved and entered the battlefield
+- Opponent lost 1 life (now 19)
+- Opponent's Marsh Flats was put into the opponent's graveyard from the battlefield
+- Opponent used: Put a card onto the battlefield with Marsh Flats targeting Scrubland
+- Opponent's Scrubland entered the battlefield from the opponent's library
+=== Turn 21 - YOUR turn ===
+- Phase: Draw
+- You drew Essence Scatter
+=== Turn 22 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Tundra
+=== Turn 23 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+=== Turn 24 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 25 - YOUR turn ===
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 26 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 27 - YOUR turn ===
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 28 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 29 - YOUR turn ===
+- Phase: Draw
+- You drew Sphinx's Revelation
+=== Turn 30 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Devour Flesh
+=== Turn 31 - YOUR turn ===
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
+- You discarded Supreme Verdict
+=== Turn 32 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Lightning Greaves
+=== Turn 33 - YOUR turn ===
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Tundra #1; Island #1; Island #2; Plains #1; Island #3; Glacial Fortress #1; Plains #2; Glacial Fortress #2; Plains #3; Glacial Fortress #3; Plains #4; Seachrome Coast; Tundra #2
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 3 life (now 31)
+- You drew Supreme Verdict
+- You drew Dream Fracture
+- You drew Final Judgment
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Paid {1} for Elixir of Immortality from mana already floating
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality from mana already floating
+- You gained 5 life (now 36)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (2 cards) into your library with Elixir of Immortality
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Supreme Verdict, Final Judgment
+- You discarded Supreme Verdict
+- You discarded Final Judgment
+=== Turn 34 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Vision Skeins
+=== Turn 35 - YOUR turn ===
+- Phase: Draw
+- You drew Cancel
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Fall of the Gavel
+- You discarded Fall of the Gavel
+=== Turn 36 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Vision Skeins
+- Paid {1}{u}{u} for Cancel with Island #1; Island #2; Plains #1
+- You cast Cancel
+- Opponent's Vision Skeins was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+- Opponent cast Intruder Alarm
+- Paid {1}{u}{u} for Dream Fracture with Island #3; Glacial Fortress #1; Plains #2
+- You cast Dream Fracture (that Dream Fracture was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Intruder Alarm was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Tundra
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent played Arcane Sanctum
+=== Turn 37 - YOUR turn ===
+- Phase: Draw
+- You drew Path to Exile
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 38 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Bloodline Keeper
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Bloodline Keeper was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 39 - YOUR turn ===
+- Phase: Draw
+- You drew Plains
+- Phase: Main phase 1
+- You played Plains
+=== Turn 40 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Damnation
+- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Plains #1
+- You cast Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Damnation was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Seachrome Coast
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent played Underground Sea
+=== Turn 41 - YOUR turn ===
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- You played Seachrome Coast
+- Paid {6} for Staff of Nin with Plains #1; Plains #2; Plains #3; Plains #4; Plains #5; Island #1
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 18)
+=== Turn 42 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Intruder Alarm
+- Paid {1}{u}{u} for Dream Fracture with Island #2; Island #3; Tundra #1
+- You cast Dream Fracture
+- Opponent's Intruder Alarm was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Sphinx's Revelation
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+- Opponent cast Vision Skeins
+- You drew Essence Scatter
+- You drew Island
+- Opponent drew a card
+- Opponent drew a card
+- Opponent's Vision Skeins resolved and went to the opponent's graveyard
+- Opponent played Isolated Chapel
+=== Turn 43 - YOUR turn ===
+- Phase: Upkeep
+- You drew Lightmine Field
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 17)
+- Phase: Draw
+- You drew Cancel
+- Phase: Main phase 1
+- You played Island
+- Paid {u}{u}{w}{x} for Sphinx's Revelation with Tundra #1; Island #1; Island #2; Plains #1; Island #3; Glacial Fortress #1; Plains #2; Glacial Fortress #2; Plains #3; Glacial Fortress #3; Plains #4; Seachrome Coast #1; Tundra #2; Tundra #3; Plains #5; Seachrome Coast #2; Island #4
+- You announced X = 3 for Sphinx's Revelation
+- You cast Sphinx's Revelation
+- You gained 3 life (now 39)
+- You drew Island
+- You drew Sphinx's Revelation
+- You drew Island
+- Your Sphinx's Revelation resolved and went to your graveyard
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Island, Island
+- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
+- You discarded Island
+=== Turn 44 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Underground Sea
+- Opponent cast Tribute to Hunger
+- Opponent's Tribute to Hunger resolved and went to the opponent's graveyard
+=== Turn 45 - YOUR turn ===
+- Phase: Upkeep
+- You drew Path to Exile
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 16)
+- Phase: Draw
+- You drew Supreme Verdict
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Sphinx's Revelation, Supreme Verdict
+- You discarded Sphinx's Revelation
+- You discarded Supreme Verdict
+=== Turn 46 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+- Opponent cast Thraben Doomsayer
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Thraben Doomsayer was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 47 - YOUR turn ===
+- Phase: Upkeep
+- You drew Glacial Fortress
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 15)
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Main phase 1
+- You played Glacial Fortress
+- Paid {1} for Elixir of Immortality with Plains #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Plains #2; Plains #3
+- You gained 5 life (now 44)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (14 cards) into your library with Elixir of Immortality
+=== Turn 48 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Bloodline Keeper
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #4
+- You cast Essence Scatter
+- Opponent's Bloodline Keeper was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 49 - YOUR turn ===
+- Phase: Upkeep
+- You drew Essence Scatter
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 14)
+- Phase: Draw
+- You drew Seachrome Coast
+- Phase: Main phase 1
+- You played Seachrome Coast
+=== Turn 50 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Bloodline Keeper
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter
+- Opponent's Bloodline Keeper was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 51 - YOUR turn ===
+- Phase: Upkeep
+- You drew Path to Exile
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 13)
+- Phase: Draw
+- You drew Tundra
+- Phase: Main phase 1
+- You played Tundra
+=== Turn 52 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+=== Turn 53 - YOUR turn ===
+- Phase: Upkeep
+- You drew Supreme Verdict
+- You used: Deal 1 damage with Staff of Nin targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 12)
+- Phase: Draw
+- You drew Staff of Nin
+- Phase: Main phase 1
+- Paid {6} for Staff of Nin with Plains #1; Plains #2; Plains #3; Plains #4; Plains #5; Island #1
+- You cast Staff of Nin
+- Your Staff of Nin resolved and entered the battlefield
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 11)
+=== Turn 54 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Thraben Doomsayer
+- Paid {1}{u}{u} for Cancel with Island #2; Island #3; Island #4
+- You cast Cancel
+- Opponent's Thraben Doomsayer was COUNTERED by Cancel and went to the opponent's graveyard
+- Your Cancel resolved and went to your graveyard
+=== Turn 55 - YOUR turn ===
+- Phase: Upkeep
+- You drew Supreme Verdict
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 10)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 9)
+- You drew Supreme Verdict
+- Phase: Draw
+- You drew Elixir of Immortality
+- Phase: Cleanup
+- Cleanup discard (hand 9, limit 7): you chose Supreme Verdict, Supreme Verdict
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 3 copies in your hand; the other 2 are still there)
+- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
+=== Turn 56 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent played Scrubland
+=== Turn 57 - YOUR turn ===
+- Phase: Upkeep
+- You drew Final Judgment
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 8)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 7)
+- You drew Essence Scatter
+- Phase: Draw
+- You drew Dream Fracture
+- Phase: Cleanup
+- Cleanup discard (hand 10, limit 7): you chose Lightmine Field, Supreme Verdict, Final Judgment
+- You discarded Lightmine Field
+- You discarded Supreme Verdict
+- You discarded Final Judgment
+=== Turn 58 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Intruder Alarm
+- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Plains #1
+- You cast Dream Fracture
+- Opponent's Intruder Alarm was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Fall of the Gavel
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+=== Turn 59 - YOUR turn ===
+- Phase: Upkeep
+- You drew Lightmine Field
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 6)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 5)
+- You drew Sphinx's Revelation
+- Phase: Draw
+- You drew Essence Scatter
+- Phase: Cleanup
+- Cleanup discard (hand 10, limit 7): you chose Fall of the Gavel, Lightmine Field, Sphinx's Revelation
+- You discarded Fall of the Gavel
+- You discarded Lightmine Field
+- You discarded Sphinx's Revelation
+=== Turn 60 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Thraben Doomsayer
+- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
+- You cast Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Thraben Doomsayer was COUNTERED by Essence Scatter and went to the opponent's graveyard
+- Your Essence Scatter resolved and went to your graveyard
+=== Turn 61 - YOUR turn ===
+- Phase: Upkeep
+- You drew Dream Fracture
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 4)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 3)
+- You drew Seachrome Coast
+- Phase: Draw
+- You drew Sphinx's Revelation
+- Phase: Main phase 1
+- You played Seachrome Coast
+- Paid {1} for Elixir of Immortality with Plains #1
+- You cast Elixir of Immortality
+- Your Elixir of Immortality resolved and entered the battlefield
+- You used: Life with Elixir of Immortality
+- Paid {2} for Elixir of Immortality with Plains #2; Plains #3
+- You gained 5 life (now 49)
+- Your Elixir of Immortality was put into your library from the battlefield
+- You shuffled your graveyard (13 cards) into your library with Elixir of Immortality
+=== Turn 62 - opponent's turn ===
+- Phase: Draw
+- Opponent drew a card
+- Phase: Cleanup
+- Opponent discarded Tragic Slip
+=== Turn 63 - YOUR turn ===
+- Phase: Upkeep
+- You drew Dream Fracture
+- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 2)
+- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
+- Your Staff of Nin dealt 1 damage to the opponent (now 1)
+- You drew Essence Scatter
+- Phase: Draw
+- You drew Emrakul, the Aeons Torn
+- Phase: Main phase 1
+- Paid {15} for Emrakul, the Aeons Torn with Plains #1; Plains #2; Plains #3; Plains #4; Plains #5; Island #1; Island #2; Island #3; Island #4; Tundra #1; Glacial Fortress #1; Glacial Fortress #2; Glacial Fortress #3; Seachrome Coast #1; Tundra #2
+- You cast Emrakul, the Aeons Torn
+- Your Emrakul, the Aeons Torn resolved and entered the battlefield
+- Phase: Combat ends
+- Opponent cast Tribute to Hunger
+- Paid {1}{u}{u} for Dream Fracture with Tundra #3; Seachrome Coast #2; Glacial Fortress #4
+- You cast Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Tribute to Hunger was COUNTERED by Dream Fracture and went to the opponent's graveyard
+- You drew Supreme Verdict
+- Opponent drew a card
+- Your Dream Fracture resolved and went to your graveyard
+
+--- CURRENT SITUATION ---
+Phase: Cleanup | It is your turn.
+Your life: 49 | Opponent life: 1
+Mana available: 3 total (three untapped sources, tapped automatically when you cast; colours you can make: {u}{w} (sources that can make each: {W} 3, {U} 3 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Seachrome Coast #3 {w} or {u}; Tundra #4 {w} or {u}; Seachrome Coast #4 {w} or {u}
+Land drop: you have no land you could play right now (none playable from your hand or any other zone).
+Your hand (9 cards): Path to Exile (copy 1 of 4 in your hand) {w} [instant]; Path to Exile (copy 2 of 4 in your hand) {w} [instant]; Path to Exile (copy 3 of 4 in your hand) {w} [instant]; Path to Exile (copy 4 of 4 in your hand) {w} [instant]; Essence Scatter (copy 1 of 2 in your hand) {1}{u} [instant]; Sphinx's Revelation {u}{u}{w}{x} [instant]; Dream Fracture {1}{u}{u} [instant]; Essence Scatter (copy 2 of 2 in your hand) {1}{u} [instant]; Supreme Verdict {1}{u}{w}{w} [sorcery]
+Your battlefield (24 permanents listed, of which 1 is a creature, 0 of them able to attack right now, and 21 are lands): Emrakul, the Aeons Torn {15} (15/15) [flying, can't be countered, doesn't untap during its controller's untap step, protection from colored spells] [summoning sick - cannot attack this turn, but CAN block] [annihilator 6 - whenever it attacks, the defending player sacrifices 6 permanents]; Glacial Fortress #1-#4 [tapped] x4; Island #1-#4 [tapped] x4; Plains #1-#5 [tapped] x5; Seachrome Coast #3; Seachrome Coast #4; Seachrome Coast #1 [tapped]; Seachrome Coast #2 [tapped]; Staff of Nin #2 {6} [artifact] [tapped]; Staff of Nin #1 {6} [artifact] [tapped] {effect (each copy of this card does this): "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra #4; Tundra #1-#3 [tapped] x3
+Opponent battlefield (18 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 16 are lands): Arcane Sanctum #1; Arcane Sanctum #2; Intruder Alarm {2}{u} [enchantment] {effect: "Creatures don't untap during their controllers' untap steps. -- Whenever a creature enters, untap all creatures."}; Isolated Chapel #2; Isolated Chapel #3; Isolated Chapel #1 [tapped]; Lightning Greaves {2} [artifact] {effect: "Equipped creature has haste and shroud. (It can't be the target of spells or abilities.) -- Equip {0} ({0}: Attach to target creature you control. Equip only as a sorcery. This card enters unattached and stays on the battlefield if..."}; Plains [tapped]; Scrubland #1-#3 x3; Swamp [tapped]; Tundra #1-#4 x4; Underground Sea #1; Underground Sea #2
+Opponent hand size: 7 | Opponent library: 13 cards
+Artifacts in play: you 2 | opponent 1
+Your library: 26 cards
+
+YOUR PLAN (as you last stated it, 6 windows ago on turn 63): Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn.
+
+Cleanup step (CR 514.1): your hand has 9 cards and your maximum hand size is 7, so you must discard exactly 2 cards now. Name EXACTLY 2 card numbers - this is the ONLY ask for them; keep the cards your plan needs and discard what you can spare.
+1. Path to Exile (copy 1 of 4 in your hand) {w} (instant) {card text: Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then...}
+2. Path to Exile (copy 2 of 4 in your hand) {w} (instant) {card text: Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then...}
+3. Path to Exile (copy 3 of 4 in your hand) {w} (instant) {card text: Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then...}
+4. Path to Exile (copy 4 of 4 in your hand) {w} (instant) {card text: Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then...}
+5. Essence Scatter (copy 1 of 2 in your hand) {1}{u} (instant) {card text: Counter target creature spell.}
+6. Sphinx's Revelation {u}{u}{w}{x} (instant) {card text: You gain X life and draw X cards.}
+7. Dream Fracture {1}{u}{u} (instant) {card text: Counter target spell. Its controller draws a card. -- Draw a card.}
+8. Essence Scatter (copy 2 of 2 in your hand) {1}{u} (instant) {card text: Counter target creature spell.}
+9. Supreme Verdict {1}{u}{w}{w} (sorcery) {card text: Supreme Verdict can't be countered. -- Destroy all creatures.}
+On the FIRST line write PUT: followed by the 2 card numbers you discard, comma-separated (e.g. "PUT: 2, 5"); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.

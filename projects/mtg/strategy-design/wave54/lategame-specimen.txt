@@ -1,576 +1,355 @@
-# wave-54 lategame specimen: 1788425038-ai_baka_deck125-0x559abad8e9c0-vs-ai_baka_deck123.jsonl seq 188, turn 63, Cleanup, 25767 chars, options 9
-# reply: "PUT: 6, 9\nPLAN: Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn."
-# (per-decision USER message exactly as served; system prompt not included)
+# wave-54 lategame specimen (engine seat's recommendation): 1788425073-ai_baka_deck146-0x55cbe78957e0-vs-ai_baka_deck162.jsonl seq 46, turn 25, Main phase 2, life 8 vs 8, 23237 chars, options 7
+# reply: 'CHOICE: 7 (Cast nothing right now)'
+# (per-decision USER message exactly as served; system prompt not included). Companion: lategame-specimen-logcost.txt = 125v123 seq 188 (the 80% game-log exhibit).
 
 GAME LOG (everything that has happened so far):
 === Turn 1 - YOUR turn ===
-- Your opening hand (7 cards): Sphinx's Revelation; Plains; Glacial Fortress; Fall of the Gavel; Path to Exile; Tundra; Plains
+- Your opening hand (7 cards): Soul Shatter; Kaya the Inexorable; Shineshadow Snarl; Plains; Acererak the Archlich; Vanishing Verse; Plains
 - Phase: Untap
 - You kept your opening hand (7 cards)
 - Phase: Main phase 1
-- You played Tundra
+- You played Shineshadow Snarl
 === Turn 2 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Swamp
+- Opponent played Underground Sea
+- Opponent cast Shield Sphere
+- Opponent's Shield Sphere resolved and entered the battlefield
 === Turn 3 - YOUR turn ===
 - Phase: Draw
-- You drew Island
+- You drew Vanishing Verse
 - Phase: Main phase 1
-- You played Island
+- You played Plains
 === Turn 4 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Isolated Chapel
+- Opponent played Swamp
 === Turn 5 - YOUR turn ===
 - Phase: Draw
-- You drew Island
+- You drew Vanishing Verse
 - Phase: Main phase 1
-- You played Island
+- You played Plains
+- Paid {2}{b} for Soul Shatter with Shineshadow Snarl; Plains #1; Plains #2
+- You cast Soul Shatter
+- Your Soul Shatter resolved and went to your graveyard
+- Opponent used: sacrifice a creature or planeswalker with Soul Shatter targeting Shield Sphere
+- Opponent's Shield Sphere died
 === Turn 6 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Tundra
-- Opponent cast Idyllic Tutor
-- Opponent's Idyllic Tutor resolved and went to the opponent's graveyard
-- Opponent searched their library with Idyllic Tutor
-- Opponent used: choose card with Idyllic Tutor targeting Intruder Alarm
-- Opponent put the revealed Intruder Alarm into their hand
+- Opponent played Swamp
 === Turn 7 - YOUR turn ===
 - Phase: Draw
-- You drew Cancel
-- Phase: Main phase 1
-- You played Plains
+- You drew Barrowin of Clan Undurr
+- Phase: Main phase 2
+- Paid {2}{b} for Acererak the Archlich with Shineshadow Snarl; Plains #1; Plains #2
+- You cast Acererak the Archlich
+- Your Acererak the Archlich resolved and entered the battlefield
+- Your Acererak the Archlich was returned to your hand from the battlefield
+- You targeted Lost Mine of Phandelver with Acererak the Archlich's ability (choose a new dungeon)
+- You used: choose a new dungeon with Acererak the Archlich targeting Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You ventured into Lost Mine of Phandelver: venture step 1 of that run
+- You revealed your Soul Shatter from your library
+- You used: Place on top with Lost Mine of Phandelver
+- Your revealed Soul Shatter went to your library
 === Turn 8 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Tundra
-- Opponent cast Bloodline Keeper
-- Paid {1}{u}{u} for Cancel with Island #1; Island #2; Plains
-- You cast Cancel
-- Opponent's Bloodline Keeper was COUNTERED by Cancel and went to the opponent's graveyard
-- Your Cancel resolved and went to your graveyard
+- Opponent played Island
+- Opponent cast Dictate of Kruphix
+- Opponent's Dictate of Kruphix resolved and entered the battlefield
 === Turn 9 - YOUR turn ===
 - Phase: Draw
-- You drew Island
+- You drew Triumphant Adventurer
+- You drew Triumphant Adventurer
 - Phase: Main phase 1
-- You played Island
+- Paid {b}{w} for Vanishing Verse with Shineshadow Snarl; Plains #1
+- You cast Vanishing Verse (that Vanishing Verse was 1 of 3 copies in your hand; the other 2 are still there)
+- Opponent's Dictate of Kruphix was exiled from the battlefield
+- Your Vanishing Verse resolved and went to your graveyard
 === Turn 10 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Tundra
-- Opponent cast Intruder Alarm
-- Opponent's Intruder Alarm resolved and entered the battlefield
+- Opponent played Dismal Backwater
+- Opponent gained 1 life (now 21)
 === Turn 11 - YOUR turn ===
 - Phase: Draw
-- You drew Essence Scatter
+- You drew Soul Shatter
 - Phase: Main phase 1
-- You played Glacial Fortress
-- Phase: Main phase 2
-- Paid {u}{u}{w}{x} for Sphinx's Revelation with Tundra; Island #1; Island #2; Plains; Island #3; Glacial Fortress
-- You announced X = 3 for Sphinx's Revelation
-- You cast Sphinx's Revelation
-- You gained 3 life (now 23)
-- You drew Plains
-- You drew Glacial Fortress
-- You drew Supreme Verdict
-- Your Sphinx's Revelation resolved and went to your graveyard
+- Paid {b}{w} for Triumphant Adventurer with Shineshadow Snarl; Plains #1
+- You cast Triumphant Adventurer (that Triumphant Adventurer was 1 of 2 copies in your hand; the other 1 is still there)
+- Your Triumphant Adventurer resolved and entered the battlefield
 === Turn 12 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Arcane Sanctum
+- Opponent played Drowned Catacomb
+- Opponent cast Master of the Feast
+- Opponent's Master of the Feast resolved and entered the battlefield
+- Opponent cast Fog Bank
+- Opponent's Fog Bank resolved and entered the battlefield
 === Turn 13 - YOUR turn ===
 - Phase: Draw
-- You drew Dream Fracture
+- You drew Lolth, Spider Queen
 - Phase: Main phase 1
-- You played Plains
+- Paid {2}{b} for Soul Shatter with Shineshadow Snarl; Plains #1; Plains #2
+- You cast Soul Shatter
+- Your Soul Shatter resolved and went to your graveyard
+- Opponent used: sacrifice a creature or planeswalker with Soul Shatter targeting Master of the Feast
+- Opponent's Master of the Feast died
+- Phase: Attackers
+- You declared no attackers this turn
 === Turn 14 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Plains
-- Opponent cast Thraben Doomsayer
-- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
-- You cast Essence Scatter
-- Opponent's Thraben Doomsayer was COUNTERED by Essence Scatter and went to the opponent's graveyard
-- Your Essence Scatter resolved and went to your graveyard
+- Opponent played Swamp
+- Opponent cast Fate Unraveler
+- Opponent's Fate Unraveler resolved and entered the battlefield
 === Turn 15 - YOUR turn ===
 - Phase: Draw
-- You drew Elixir of Immortality
+- You drew Agadeem's Awakening
+- Opponent's Fate Unraveler dealt 1 damage to you (now 19)
 - Phase: Main phase 1
-- You played Glacial Fortress
-- Paid {1} for Elixir of Immortality with Island #1
-- You cast Elixir of Immortality
-- Your Elixir of Immortality resolved and entered the battlefield
-- You used: Life with Elixir of Immortality
-- Paid {2} for Elixir of Immortality with Island #2; Island #3
-- You gained 5 life (now 28)
-- Your Elixir of Immortality was put into your library from the battlefield
-- You shuffled your graveyard (3 cards) into your library with Elixir of Immortality
+- Paid {b}{w} for Vanishing Verse with Shineshadow Snarl; Plains #1
+- You targeted Fate Unraveler (3/4) with Vanishing Verse
+- You cast Vanishing Verse (that Vanishing Verse was 1 of 2 copies in your hand; the other 1 is still there)
+- Opponent's Fate Unraveler was exiled from the battlefield
+- Your Vanishing Verse resolved and went to your graveyard
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 2 of that run
+- You chose goblin lair (room 2 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a 1/1 red Goblin creature token.} for Lost Mine of Phandelver
+- You used: goblin lair with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver created a 1/1 Goblin token
 === Turn 16 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Isolated Chapel
+- Opponent played Drowned Catacomb
 === Turn 17 - YOUR turn ===
 - Phase: Draw
-- You drew Essence Scatter
+- You drew Acererak the Archlich
 - Phase: Main phase 1
-- You played Plains
+- Paid {b}{w} for Vanishing Verse with Shineshadow Snarl; Plains #1
+- You targeted Fog Bank (0/2) with Vanishing Verse
+- You cast Vanishing Verse
+- Opponent's Fog Bank was exiled from the battlefield
+- Your Vanishing Verse resolved and went to your graveyard
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer, Goblin
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 3 of that run
+- You chose dark pool (room 5 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Each opponent loses 1 life and you gain 1 life.} for Lost Mine of Phandelver
+- You used: dark pool with Lost Mine of Phandelver
+- You gained 1 life (now 20)
+- Opponent lost 1 life (now 20)
+- Phase: Combat damage
+- Your Triumphant Adventurer dealt 1 damage to the opponent (now 19)
+- Your Goblin dealt 1 damage to the opponent (now 18)
 === Turn 18 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Dictate of Kruphix
+- Opponent's Dictate of Kruphix resolved and entered the battlefield
 === Turn 19 - YOUR turn ===
 - Phase: Draw
-- You drew Glacial Fortress
+- You drew Silverquill Silencer
+- You drew Shineshadow Snarl
 - Phase: Main phase 1
-- You played Glacial Fortress
+- You played Shineshadow Snarl
+- Paid {b}{w} for Silverquill Silencer with Shineshadow Snarl #1; Plains #1
+- You cast Silverquill Silencer
+- Your Silverquill Silencer resolved and entered the battlefield
+- You used: Choose a name with Silverquill Silencer
+- You chose Silverquill Silencer's mode "Dictate of Kruphix"
+- Your Silverquill Silencer named Dictate of Kruphix
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer, Goblin
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 4 of that run
+- You drew Nadaar, Selfless Paladin
+- You used: dungeon completed with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your command zone to your zone
+- Phase: Combat damage
+- Your Triumphant Adventurer dealt 1 damage to the opponent (now 17)
+- Your Goblin dealt 1 damage to the opponent (now 16)
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Agadeem's Awakening
+- You discarded Agadeem's Awakening
 === Turn 20 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
+- Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Marsh Flats
-- Opponent cast Lightning Greaves
-- Opponent's Lightning Greaves resolved and entered the battlefield
-- Opponent lost 1 life (now 19)
-- Opponent's Marsh Flats was put into the opponent's graveyard from the battlefield
-- Opponent used: Put a card onto the battlefield with Marsh Flats targeting Scrubland
-- Opponent's Scrubland entered the battlefield from the opponent's library
+- Opponent played Dismal Backwater
+- Opponent gained 1 life (now 17)
+- Opponent cast Shield Sphere
+- Opponent's Shield Sphere resolved and entered the battlefield
 === Turn 21 - YOUR turn ===
 - Phase: Draw
-- You drew Essence Scatter
+- You drew Silverquill Silencer
+- You drew Vanishing Verse
+- Phase: Main phase 1
+- Paid {b}{w} for Vanishing Verse with Shineshadow Snarl #1; Plains #1
+- You targeted Dictate of Kruphix with Vanishing Verse
+- You cast Vanishing Verse
+- Opponent's Dictate of Kruphix was exiled from the battlefield
+- Your Vanishing Verse resolved and went to your graveyard
+- Paid {b}{w} for Triumphant Adventurer with Plains #2; Shineshadow Snarl #2
+- You cast Triumphant Adventurer
+- Your Triumphant Adventurer resolved and entered the battlefield
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer, Goblin, Silverquill Silencer
+- Phase: Blockers
+- You targeted Lost Mine of Phandelver with Triumphant Adventurer's ability (choose a new dungeon)
+- You used: choose a new dungeon with Triumphant Adventurer #1 targeting Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You ventured into Lost Mine of Phandelver: venture step 1 of that run
+- You revealed your Silverquill Command from your library
+- You used: Place on top with Lost Mine of Phandelver
+- Your revealed Silverquill Command went to your library
+- Opponent's Shield Sphere got a +0/-1 counter (now 0/5)
+- Phase: Combat damage
+- Your Triumphant Adventurer dealt 1 damage to the opponent (now 16)
+- Your Silverquill Silencer dealt 3 damage to Shield Sphere
+- Your Goblin dealt 1 damage to the opponent (now 15)
 === Turn 22 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
 - Phase: Main phase 1
-- Opponent played Tundra
+- Opponent cast Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted resolved and entered the battlefield
+- Opponent's Ob Nixilis, the Hate-Twisted got 5 loyalty counters (now 5)
+- Opponent's Ob Nixilis, the Hate-Twisted lost a loyalty counter
+- Opponent's Ob Nixilis, the Hate-Twisted lost a loyalty counter
+- Opponent used: -2: destroy target creature and draw two cards with Ob Nixilis, the Hate-Twisted targeting Silverquill Silencer
+- Your Silverquill Silencer died
+- You drew Soul Shatter
+- You drew Kaya the Inexorable
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 19)
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 18)
 === Turn 23 - YOUR turn ===
 - Phase: Draw
-- You drew Plains
+- You drew Brightclimb Pathway
+- Opponent's Ob Nixilis, the Hate-Twisted dealt 1 damage to you (now 17)
 - Phase: Main phase 1
-- You played Plains
+- You chose Play Land for Brightclimb Pathway
+- You played Brightclimb Pathway
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer, Triumphant Adventurer, Goblin
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 2 of that run
+- Paid {2}{b} for Soul Shatter with Shineshadow Snarl #1; Plains #1; Plains #2
+- You cast Soul Shatter
+- Your Soul Shatter resolved and went to your graveyard
+- Opponent used: sacrifice a creature or planeswalker with Soul Shatter targeting Ob Nixilis, the Hate-Twisted
+- Opponent's Ob Nixilis, the Hate-Twisted was put into the opponent's graveyard from the battlefield
+- You chose goblin lair (room 2 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Create a 1/1 red Goblin creature token.} for Lost Mine of Phandelver
+- You used: goblin lair with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver created a 1/1 Goblin token
+- You ventured into Lost Mine of Phandelver: venture step 3 of that run
+- You chose storeroom (room 4 of 7 in Lost Mine of Phandelver's printed room list) {room effect: Put a +1/+1 counter on target creature.} for Lost Mine of Phandelver
+- You targeted Triumphant Adventurer #2 (1/1) with Lost Mine of Phandelver's ability (storeroom)
+- You used: storeroom with Lost Mine of Phandelver targeting Triumphant Adventurer #2
+- Your Triumphant Adventurer #2 got a +1/+1 counter from Lost Mine of Phandelver (now 2/2)
+- Opponent's Shield Sphere got a +0/-1 counter (now 0/4)
+- Phase: Combat damage
+- Your Triumphant Adventurer dealt 2 damage to Shield Sphere
+- Your Triumphant Adventurer dealt 1 damage to the opponent (now 14)
+- Opponent's Shield Sphere died
+- Your Goblin dealt 1 damage to the opponent (now 13)
+- Phase: Cleanup
+- Cleanup discard (hand 8, limit 7): you chose Acererak the Archlich
+- You discarded Acererak the Archlich (that Acererak the Archlich was 1 of 2 copies in your hand; the other 1 is still there)
 === Turn 24 - opponent's turn ===
 - Phase: Draw
 - Opponent drew a card
+- Phase: Main phase 1
+- Opponent cast Underworld Dreams
+- Opponent's Underworld Dreams resolved and entered the battlefield
+- Opponent cast Forced Fruition
+- Opponent's Forced Fruition resolved and entered the battlefield
 === Turn 25 - YOUR turn ===
 - Phase: Draw
-- You drew Seachrome Coast
+- You drew Silverquill Silencer
+- Opponent's Underworld Dreams dealt 1 damage to you (now 16)
 - Phase: Main phase 1
-- You played Seachrome Coast
-=== Turn 26 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-=== Turn 27 - YOUR turn ===
-- Phase: Draw
-- You drew Tundra
-- Phase: Main phase 1
-- You played Tundra
-=== Turn 28 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-=== Turn 29 - YOUR turn ===
-- Phase: Draw
-- You drew Sphinx's Revelation
-=== Turn 30 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Cleanup
-- Opponent discarded Devour Flesh
-=== Turn 31 - YOUR turn ===
-- Phase: Draw
-- You drew Dream Fracture
-- Phase: Cleanup
-- Cleanup discard (hand 8, limit 7): you chose Supreme Verdict
-- You discarded Supreme Verdict
-=== Turn 32 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Cleanup
-- Opponent discarded Lightning Greaves
-=== Turn 33 - YOUR turn ===
-- Phase: Draw
-- You drew Elixir of Immortality
-- Phase: Main phase 1
-- Paid {u}{u}{w}{x} for Sphinx's Revelation with Tundra #1; Island #1; Island #2; Plains #1; Island #3; Glacial Fortress #1; Plains #2; Glacial Fortress #2; Plains #3; Glacial Fortress #3; Plains #4; Seachrome Coast; Tundra #2
-- You announced X = 3 for Sphinx's Revelation
-- You cast Sphinx's Revelation
-- You gained 3 life (now 31)
-- You drew Supreme Verdict
-- You drew Dream Fracture
-- You drew Final Judgment
-- Your Sphinx's Revelation resolved and went to your graveyard
-- Paid {1} for Elixir of Immortality from mana already floating
-- You cast Elixir of Immortality
-- Your Elixir of Immortality resolved and entered the battlefield
-- You used: Life with Elixir of Immortality
-- Paid {2} for Elixir of Immortality from mana already floating
-- You gained 5 life (now 36)
-- Your Elixir of Immortality was put into your library from the battlefield
-- You shuffled your graveyard (2 cards) into your library with Elixir of Immortality
-- Phase: Cleanup
-- Cleanup discard (hand 9, limit 7): you chose Supreme Verdict, Final Judgment
-- You discarded Supreme Verdict
-- You discarded Final Judgment
-=== Turn 34 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Cleanup
-- Opponent discarded Vision Skeins
-=== Turn 35 - YOUR turn ===
-- Phase: Draw
-- You drew Cancel
-- Phase: Cleanup
-- Cleanup discard (hand 8, limit 7): you chose Fall of the Gavel
-- You discarded Fall of the Gavel
-=== Turn 36 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Vision Skeins
-- Paid {1}{u}{u} for Cancel with Island #1; Island #2; Plains #1
-- You cast Cancel
-- Opponent's Vision Skeins was COUNTERED by Cancel and went to the opponent's graveyard
-- Your Cancel resolved and went to your graveyard
-- Opponent cast Intruder Alarm
-- Paid {1}{u}{u} for Dream Fracture with Island #3; Glacial Fortress #1; Plains #2
-- You cast Dream Fracture (that Dream Fracture was 1 of 3 copies in your hand; the other 2 are still there)
-- Opponent's Intruder Alarm was COUNTERED by Dream Fracture and went to the opponent's graveyard
-- You drew Tundra
-- Opponent drew a card
-- Your Dream Fracture resolved and went to your graveyard
-- Opponent played Arcane Sanctum
-=== Turn 37 - YOUR turn ===
-- Phase: Draw
-- You drew Path to Exile
-- Phase: Main phase 1
-- You played Tundra
-=== Turn 38 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Bloodline Keeper
-- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
-- You cast Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
-- Opponent's Bloodline Keeper was COUNTERED by Essence Scatter and went to the opponent's graveyard
-- Your Essence Scatter resolved and went to your graveyard
-=== Turn 39 - YOUR turn ===
-- Phase: Draw
+- Paid {b}{w} for Silverquill Silencer with Shineshadow Snarl #1; Plains #1
+- You cast Silverquill Silencer (that Silverquill Silencer was 1 of 2 copies in your hand; the other 1 is still there)
+- You drew Nadaar, Selfless Paladin
+- You drew Shineshadow Snarl
+- You drew Brightclimb Pathway
+- You drew Silverquill Command
 - You drew Plains
-- Phase: Main phase 1
-- You played Plains
-=== Turn 40 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Damnation
-- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Plains #1
-- You cast Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
-- Opponent's Damnation was COUNTERED by Dream Fracture and went to the opponent's graveyard
-- You drew Seachrome Coast
-- Opponent drew a card
-- Your Dream Fracture resolved and went to your graveyard
-- Opponent played Underground Sea
-=== Turn 41 - YOUR turn ===
-- Phase: Draw
-- You drew Staff of Nin
-- Phase: Main phase 1
-- You played Seachrome Coast
-- Paid {6} for Staff of Nin with Plains #1; Plains #2; Plains #3; Plains #4; Plains #5; Island #1
-- You cast Staff of Nin
-- Your Staff of Nin resolved and entered the battlefield
-- You used: Deal 1 damage with Staff of Nin targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 18)
-=== Turn 42 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Intruder Alarm
-- Paid {1}{u}{u} for Dream Fracture with Island #2; Island #3; Tundra #1
-- You cast Dream Fracture
-- Opponent's Intruder Alarm was COUNTERED by Dream Fracture and went to the opponent's graveyard
-- You drew Sphinx's Revelation
-- Opponent drew a card
-- Your Dream Fracture resolved and went to your graveyard
-- Opponent cast Vision Skeins
-- You drew Essence Scatter
-- You drew Island
-- Opponent drew a card
-- Opponent drew a card
-- Opponent's Vision Skeins resolved and went to the opponent's graveyard
-- Opponent played Isolated Chapel
-=== Turn 43 - YOUR turn ===
-- Phase: Upkeep
-- You drew Lightmine Field
-- You used: Deal 1 damage with Staff of Nin targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 17)
-- Phase: Draw
-- You drew Cancel
-- Phase: Main phase 1
-- You played Island
-- Paid {u}{u}{w}{x} for Sphinx's Revelation with Tundra #1; Island #1; Island #2; Plains #1; Island #3; Glacial Fortress #1; Plains #2; Glacial Fortress #2; Plains #3; Glacial Fortress #3; Plains #4; Seachrome Coast #1; Tundra #2; Tundra #3; Plains #5; Seachrome Coast #2; Island #4
-- You announced X = 3 for Sphinx's Revelation
-- You cast Sphinx's Revelation
-- You gained 3 life (now 39)
-- You drew Island
-- You drew Sphinx's Revelation
-- You drew Island
-- Your Sphinx's Revelation resolved and went to your graveyard
-- Phase: Cleanup
-- Cleanup discard (hand 9, limit 7): you chose Island, Island
-- You discarded Island (that Island was 1 of 2 copies in your hand; the other 1 is still there)
-- You discarded Island
-=== Turn 44 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Underground Sea
-- Opponent cast Tribute to Hunger
-- Opponent's Tribute to Hunger resolved and went to the opponent's graveyard
-=== Turn 45 - YOUR turn ===
-- Phase: Upkeep
-- You drew Path to Exile
-- You used: Deal 1 damage with Staff of Nin targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 16)
-- Phase: Draw
-- You drew Supreme Verdict
-- Phase: Cleanup
-- Cleanup discard (hand 9, limit 7): you chose Sphinx's Revelation, Supreme Verdict
-- You discarded Sphinx's Revelation
-- You discarded Supreme Verdict
-=== Turn 46 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Scrubland
-- Opponent cast Thraben Doomsayer
-- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
-- You cast Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
-- Opponent's Thraben Doomsayer was COUNTERED by Essence Scatter and went to the opponent's graveyard
-- Your Essence Scatter resolved and went to your graveyard
-=== Turn 47 - YOUR turn ===
-- Phase: Upkeep
-- You drew Glacial Fortress
-- You used: Deal 1 damage with Staff of Nin targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 15)
-- Phase: Draw
-- You drew Elixir of Immortality
-- Phase: Main phase 1
-- You played Glacial Fortress
-- Paid {1} for Elixir of Immortality with Plains #1
-- You cast Elixir of Immortality
-- Your Elixir of Immortality resolved and entered the battlefield
-- You used: Life with Elixir of Immortality
-- Paid {2} for Elixir of Immortality with Plains #2; Plains #3
-- You gained 5 life (now 44)
-- Your Elixir of Immortality was put into your library from the battlefield
-- You shuffled your graveyard (14 cards) into your library with Elixir of Immortality
-=== Turn 48 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Bloodline Keeper
-- Paid {1}{u} for Essence Scatter with Island #1; Plains #4
-- You cast Essence Scatter
-- Opponent's Bloodline Keeper was COUNTERED by Essence Scatter and went to the opponent's graveyard
-- Your Essence Scatter resolved and went to your graveyard
-=== Turn 49 - YOUR turn ===
-- Phase: Upkeep
-- You drew Essence Scatter
-- You used: Deal 1 damage with Staff of Nin targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 14)
-- Phase: Draw
-- You drew Seachrome Coast
-- Phase: Main phase 1
-- You played Seachrome Coast
-=== Turn 50 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Bloodline Keeper
-- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
-- You cast Essence Scatter
-- Opponent's Bloodline Keeper was COUNTERED by Essence Scatter and went to the opponent's graveyard
-- Your Essence Scatter resolved and went to your graveyard
-=== Turn 51 - YOUR turn ===
-- Phase: Upkeep
-- You drew Path to Exile
-- You used: Deal 1 damage with Staff of Nin targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 13)
-- Phase: Draw
-- You drew Tundra
-- Phase: Main phase 1
-- You played Tundra
-=== Turn 52 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-=== Turn 53 - YOUR turn ===
-- Phase: Upkeep
-- You drew Supreme Verdict
-- You used: Deal 1 damage with Staff of Nin targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 12)
-- Phase: Draw
-- You drew Staff of Nin
-- Phase: Main phase 1
-- Paid {6} for Staff of Nin with Plains #1; Plains #2; Plains #3; Plains #4; Plains #5; Island #1
-- You cast Staff of Nin
-- Your Staff of Nin resolved and entered the battlefield
-- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 11)
-=== Turn 54 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Thraben Doomsayer
-- Paid {1}{u}{u} for Cancel with Island #2; Island #3; Island #4
-- You cast Cancel
-- Opponent's Thraben Doomsayer was COUNTERED by Cancel and went to the opponent's graveyard
-- Your Cancel resolved and went to your graveyard
-=== Turn 55 - YOUR turn ===
-- Phase: Upkeep
-- You drew Supreme Verdict
-- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 10)
-- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 9)
-- You drew Supreme Verdict
-- Phase: Draw
-- You drew Elixir of Immortality
-- Phase: Cleanup
-- Cleanup discard (hand 9, limit 7): you chose Supreme Verdict, Supreme Verdict
-- You discarded Supreme Verdict (that Supreme Verdict was 1 of 3 copies in your hand; the other 2 are still there)
-- You discarded Supreme Verdict (that Supreme Verdict was 1 of 2 copies in your hand; the other 1 is still there)
-=== Turn 56 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent played Scrubland
-=== Turn 57 - YOUR turn ===
-- Phase: Upkeep
-- You drew Final Judgment
-- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 8)
-- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 7)
-- You drew Essence Scatter
-- Phase: Draw
-- You drew Dream Fracture
-- Phase: Cleanup
-- Cleanup discard (hand 10, limit 7): you chose Lightmine Field, Supreme Verdict, Final Judgment
-- You discarded Lightmine Field
-- You discarded Supreme Verdict
-- You discarded Final Judgment
-=== Turn 58 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Intruder Alarm
-- Paid {1}{u}{u} for Dream Fracture with Island #1; Island #2; Plains #1
-- You cast Dream Fracture
-- Opponent's Intruder Alarm was COUNTERED by Dream Fracture and went to the opponent's graveyard
-- You drew Fall of the Gavel
-- Opponent drew a card
-- Your Dream Fracture resolved and went to your graveyard
-=== Turn 59 - YOUR turn ===
-- Phase: Upkeep
-- You drew Lightmine Field
-- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 6)
-- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 5)
-- You drew Sphinx's Revelation
-- Phase: Draw
-- You drew Essence Scatter
-- Phase: Cleanup
-- Cleanup discard (hand 10, limit 7): you chose Fall of the Gavel, Lightmine Field, Sphinx's Revelation
-- You discarded Fall of the Gavel
-- You discarded Lightmine Field
-- You discarded Sphinx's Revelation
-=== Turn 60 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Main phase 1
-- Opponent cast Thraben Doomsayer
-- Paid {1}{u} for Essence Scatter with Island #1; Plains #1
-- You cast Essence Scatter (that Essence Scatter was 1 of 2 copies in your hand; the other 1 is still there)
-- Opponent's Thraben Doomsayer was COUNTERED by Essence Scatter and went to the opponent's graveyard
-- Your Essence Scatter resolved and went to your graveyard
-=== Turn 61 - YOUR turn ===
-- Phase: Upkeep
-- You drew Dream Fracture
-- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 4)
-- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 3)
-- You drew Seachrome Coast
-- Phase: Draw
-- You drew Sphinx's Revelation
-- Phase: Main phase 1
-- You played Seachrome Coast
-- Paid {1} for Elixir of Immortality with Plains #1
-- You cast Elixir of Immortality
-- Your Elixir of Immortality resolved and entered the battlefield
-- You used: Life with Elixir of Immortality
-- Paid {2} for Elixir of Immortality with Plains #2; Plains #3
-- You gained 5 life (now 49)
-- Your Elixir of Immortality was put into your library from the battlefield
-- You shuffled your graveyard (13 cards) into your library with Elixir of Immortality
-=== Turn 62 - opponent's turn ===
-- Phase: Draw
-- Opponent drew a card
-- Phase: Cleanup
-- Opponent discarded Tragic Slip
-=== Turn 63 - YOUR turn ===
-- Phase: Upkeep
-- You drew Dream Fracture
-- You used: Deal 1 damage with Staff of Nin #1 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 2)
-- You used: Deal 1 damage with Staff of Nin #2 targeting the opponent
-- Your Staff of Nin dealt 1 damage to the opponent (now 1)
-- You drew Essence Scatter
-- Phase: Draw
-- You drew Emrakul, the Aeons Torn
-- Phase: Main phase 1
-- Paid {15} for Emrakul, the Aeons Torn with Plains #1; Plains #2; Plains #3; Plains #4; Plains #5; Island #1; Island #2; Island #3; Island #4; Tundra #1; Glacial Fortress #1; Glacial Fortress #2; Glacial Fortress #3; Seachrome Coast #1; Tundra #2
-- You cast Emrakul, the Aeons Torn
-- Your Emrakul, the Aeons Torn resolved and entered the battlefield
-- Phase: Combat ends
-- Opponent cast Tribute to Hunger
-- Paid {1}{u}{u} for Dream Fracture with Tundra #3; Seachrome Coast #2; Glacial Fortress #4
-- You cast Dream Fracture (that Dream Fracture was 1 of 2 copies in your hand; the other 1 is still there)
-- Opponent's Tribute to Hunger was COUNTERED by Dream Fracture and went to the opponent's graveyard
-- You drew Supreme Verdict
-- Opponent drew a card
-- Your Dream Fracture resolved and went to your graveyard
+- You drew Pelakka Predation
+- You drew Brightclimb Pathway
+- Your Silverquill Silencer resolved and entered the battlefield
+- You used: Choose a name with Silverquill Silencer
+- You chose Silverquill Silencer's mode "Dictate of Kruphix"
+- Your Silverquill Silencer named Dictate of Kruphix
+- Opponent's Underworld Dreams dealt 1 damage to you (now 15)
+- Opponent's Underworld Dreams dealt 1 damage to you (now 14)
+- Opponent's Underworld Dreams dealt 1 damage to you (now 13)
+- Opponent's Underworld Dreams dealt 1 damage to you (now 12)
+- Opponent's Underworld Dreams dealt 1 damage to you (now 11)
+- Opponent's Underworld Dreams dealt 1 damage to you (now 10)
+- Opponent's Underworld Dreams dealt 1 damage to you (now 9)
+- You chose Play Land for Brightclimb Pathway
+- You played Brightclimb Pathway
+- Phase: Attackers
+- You declared attackers: Triumphant Adventurer, Triumphant Adventurer, Goblin, Goblin
+- Phase: Blockers
+- You ventured into Lost Mine of Phandelver: venture step 4 of that run
+- You drew Pelakka Predation
+- Opponent's Underworld Dreams dealt 1 damage to you (now 8)
+- You used: dungeon completed with Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your command zone to your zone
+- You targeted Lost Mine of Phandelver with Triumphant Adventurer's ability (choose a new dungeon)
+- You used: choose a new dungeon with Triumphant Adventurer #1 targeting Lost Mine of Phandelver
+- Your Lost Mine of Phandelver moved from your zone to your zone
+- You ventured into Lost Mine of Phandelver: venture step 1 of that run
+- You revealed your Plains from your library
+- You used: Place on top with Lost Mine of Phandelver
+- Your revealed Plains went to your library
+- Phase: Combat damage
+- Your Triumphant Adventurer dealt 2 damage to the opponent (now 11)
+- Your Triumphant Adventurer dealt 1 damage to the opponent (now 10)
+- Your Goblin dealt 1 damage to the opponent (now 9)
+- Your Goblin dealt 1 damage to the opponent (now 8)
 
 --- CURRENT SITUATION ---
-Phase: Cleanup | It is your turn.
-Your life: 49 | Opponent life: 1
-Mana available: 3 total (three untapped sources, tapped automatically when you cast; colours you can make: {u}{w} (sources that can make each: {W} 3, {U} 3 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
-  Those sources, one per untapped card: Seachrome Coast #3 {w} or {u}; Tundra #4 {w} or {u}; Seachrome Coast #4 {w} or {u}
-Land drop: you have no land you could play right now (none playable from your hand or any other zone).
-Your hand (9 cards): Path to Exile (copy 1 of 4 in your hand) {w} [instant]; Path to Exile (copy 2 of 4 in your hand) {w} [instant]; Path to Exile (copy 3 of 4 in your hand) {w} [instant]; Path to Exile (copy 4 of 4 in your hand) {w} [instant]; Essence Scatter (copy 1 of 2 in your hand) {1}{u} [instant]; Sphinx's Revelation {u}{u}{w}{x} [instant]; Dream Fracture {1}{u}{u} [instant]; Essence Scatter (copy 2 of 2 in your hand) {1}{u} [instant]; Supreme Verdict {1}{u}{w}{w} [sorcery]
-Your battlefield (24 permanents listed, of which 1 is a creature, 0 of them able to attack right now, and 21 are lands): Emrakul, the Aeons Torn {15} (15/15) [flying, can't be countered, doesn't untap during its controller's untap step, protection from colored spells] [summoning sick - cannot attack this turn, but CAN block] [annihilator 6 - whenever it attacks, the defending player sacrifices 6 permanents]; Glacial Fortress #1-#4 [tapped] x4; Island #1-#4 [tapped] x4; Plains #1-#5 [tapped] x5; Seachrome Coast #3; Seachrome Coast #4; Seachrome Coast #1 [tapped]; Seachrome Coast #2 [tapped]; Staff of Nin #2 {6} [artifact] [tapped]; Staff of Nin #1 {6} [artifact] [tapped] {effect (each copy of this card does this): "At the beginning of your upkeep, draw a card. -- {T}: Staff of Nin deals 1 damage to any target."}; Tundra #4; Tundra #1-#3 [tapped] x3
-Opponent battlefield (18 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 16 are lands): Arcane Sanctum #1; Arcane Sanctum #2; Intruder Alarm {2}{u} [enchantment] {effect: "Creatures don't untap during their controllers' untap steps. -- Whenever a creature enters, untap all creatures."}; Isolated Chapel #2; Isolated Chapel #3; Isolated Chapel #1 [tapped]; Lightning Greaves {2} [artifact] {effect: "Equipped creature has haste and shroud. (It can't be the target of spells or abilities.) -- Equip {0} ({0}: Attach to target creature you control. Equip only as a sorcery. This card enters unattached and stays on the battlefield if..."}; Plains [tapped]; Scrubland #1-#3 x3; Swamp [tapped]; Tundra #1-#4 x4; Underground Sea #1; Underground Sea #2
-Opponent hand size: 7 | Opponent library: 13 cards
-Artifacts in play: you 2 | opponent 1
-Your library: 26 cards
+Phase: Main phase 2 | It is your turn.
+Your life: 8 | Opponent life: 8
+Dungeons completed (you): 2 - effects that check "completed a dungeon" (e.g. a completed-dungeon anthem) are ACTIVE for you.
+Mana available: 4 total (four untapped sources, tapped automatically when you cast; colours you can make: {b}{w} (sources that can make each: {W} 4, {B} 1 - counted the same way as the total above: one per SOURCE, and a source that makes several colours is counted under EACH of them, so these need not add up to the total); mana of ANY colour pays a generic cost like {2})
+  Those sources, one per untapped card: Plains #2 {w}; Shineshadow Snarl #2 {b} or {w}; Brightclimb Pathway #1 {w}; Brightclimb Pathway #2 {w}
+Land drop: ALREADY USED this turn - you cannot play another land until your next turn. Do not plan mana that depends on a land entering now.
+Your hand (14 cards): Kaya the Inexorable (copy 1 of 2 in your hand) {3}{b}{w} [planeswalker]; Barrowin of Clan Undurr {2}{b}{w} (3/3) [creature]; Acererak the Archlich {2}{b} (5/5) [creature]; Lolth, Spider Queen {3}{b}{b} [planeswalker]; Nadaar, Selfless Paladin (copy 1 of 2 in your hand) {2}{w} (3/3) [creature]; Kaya the Inexorable (copy 2 of 2 in your hand) {3}{b}{w} [planeswalker]; Silverquill Silencer {b}{w} (3/2) [creature]; Nadaar, Selfless Paladin (copy 2 of 2 in your hand) {2}{w} (3/3) [creature]; Shineshadow Snarl (land: taps for {W}{B}); Silverquill Command {2}{b}{w} [sorcery]; Plains (land: taps for {W}); Pelakka Predation (copy 1 of 2 in your hand) {2}{b} [sorcery]; Brightclimb Pathway (land: taps for {W}); Pelakka Predation (copy 2 of 2 in your hand) {2}{b} [sorcery]
+Your battlefield (11 permanents listed, of which 5 are creatures, 0 of them able to attack right now, and 6 are lands): Shineshadow Snarl #1 [tapped]; Plains #1 [tapped]; Plains #2; Triumphant Adventurer #1 {b}{w} (1/1) [first strike, deathtouch] [tapped - cannot attack or block this turn]; Goblin #1 (1/1) [tapped - cannot attack or block this turn]; Shineshadow Snarl #2; Triumphant Adventurer #2 {b}{w} (2/2) (printed 1/1) [first strike, deathtouch] [counters: 1x +1/+1] [tapped - cannot attack or block this turn]; Brightclimb Pathway #1; Goblin #2 (1/1) [tapped - cannot attack or block this turn]; Silverquill Silencer {b}{w} (3/2) [summoning sick - cannot attack this turn, but CAN block] [named: Dictate of Kruphix]; Brightclimb Pathway #2
+Opponent battlefield (11 permanents listed, of which 0 are creatures, 0 of them without a restriction against attacking, and 9 are lands): Dismal Backwater #1 [tapped]; Dismal Backwater #2 [tapped]; Drowned Catacomb #1 [tapped]; Drowned Catacomb #2 [tapped]; Forced Fruition {4}{u}{u} [enchantment] {effect: "Whenever an opponent casts a spell, that player draws seven cards."}; Island [tapped]; Swamp #1-#3 [tapped] x3; Underground Sea [tapped]; Underworld Dreams {b}{b}{b} [enchantment] {effect: "Whenever an opponent draws a card, Underworld Dreams deals 1 damage to him or her."}
+Opponent hand size: 0 | Opponent library: 41 cards
+DRAW PUNISHERS on the battlefield: theirs - Underworld Dreams. Every card YOU draw costs you 1 life to theirs. They fire on EVERY draw - the draw step, a cycling ability, a draw spell, any extra draw - and the loss lands as the card is drawn, before anything can be done with it. Count that cost before choosing to draw.
+DRAW FORECAST: your next draw step draws 1 card = 1 x 1 = 1 life to the punishers above.
+Your library: 27 cards
 
-YOUR PLAN (as you last stated it, 6 windows ago on turn 63): Keep the counter in my hand payable; Staff of Nin only from a row whose leaves N covers that counter's cost; ping their face every turn.
+YOUR PLAN (as you last stated it, 2 windows ago on turn 25): Attack with all four unblocked creatures to deal 5 damage, bringing opponent to 8 life. In second main phase, cast Nadaar, Selfless Paladin for {2}{W} to advance the dungeon and add a 3/3 vigilance body to the board. Avoid drawing cards or casting Kaya/Lolth until Forced Fruition is removed, as Underworld Dreams will drain life on every draw.
 
-Cleanup step (CR 514.1): your hand has 9 cards and your maximum hand size is 7, so you must discard exactly 2 cards now. Name EXACTLY 2 card numbers - this is the ONLY ask for them; keep the cards your plan needs and discard what you can spare.
-1. Path to Exile (copy 1 of 4 in your hand) {w} (instant) {card text: Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then...}
-2. Path to Exile (copy 2 of 4 in your hand) {w} (instant) {card text: Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then...}
-3. Path to Exile (copy 3 of 4 in your hand) {w} (instant) {card text: Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then...}
-4. Path to Exile (copy 4 of 4 in your hand) {w} (instant) {card text: Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then...}
-5. Essence Scatter (copy 1 of 2 in your hand) {1}{u} (instant) {card text: Counter target creature spell.}
-6. Sphinx's Revelation {u}{u}{w}{x} (instant) {card text: You gain X life and draw X cards.}
-7. Dream Fracture {1}{u}{u} (instant) {card text: Counter target spell. Its controller draws a card. -- Draw a card.}
-8. Essence Scatter (copy 2 of 2 in your hand) {1}{u} (instant) {card text: Counter target creature spell.}
-9. Supreme Verdict {1}{u}{w}{w} (sorcery) {card text: Supreme Verdict can't be countered. -- Destroy all creatures.}
-On the FIRST line write PUT: followed by the 2 card numbers you discard, comma-separated (e.g. "PUT: 2, 5"); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
+Casting decision (Main phase 2, YOUR turn): which card do you cast now, if any?
+1. Cast Barrowin of Clan Undurr {2}{b}{w} (3/3) {leaves 0 of your 4 untapped mana sources untapped - casting this taps you out} {card text: "When Barrowin of Clan Undurr enters, venture into the dungeon. (Enter the first room or advance to the next room.) -- Whenever Barrowin of Clan Undurr attacks, return up to one creature card with mana value 3 or less from your graveyard to the battlefield if you've completed a dungeon."} [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their Underworld Dreams deals you 7 - you would be at 1] {taps you out - rows 2, 3, 4, 5 and 6 need more mana sources than the 0 this leaves}
+2. Cast Acererak the Archlich {2}{b} (5/5) {leaves 1 of your 4 untapped mana sources untapped} {card text: "When Acererak the Archlich enters, if you have not completed the dungeon Tomb of Annihilation, return Acererak the Archlich to its owner's hand and venture into the dungeon. -- Whenever Acererak the Archlich attacks, for each opponent, you create a 2/2 black Zombie creature token unless that player sacrifices a creature."} [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their Underworld Dreams deals you 7 - you would be at 1] {leaves 1 source - rows 1, 3, 4, 5 and 6 need more mana sources than the 1 this leaves}
+3. Cast Nadaar, Selfless Paladin {2}{w} (3/3) {leaves 1 of your 4 untapped mana sources untapped} {card text: "Vigilance -- Whenever Nadaar, Selfless Paladin enters or attacks, venture into the dungeon. (Enter the first room or advance to the next room.) -- Other creatures you control get +1/+1 as long as you've completed a dungeon."} [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their Underworld Dreams deals you 7 - you would be at 1] {leaves 1 source - rows 1, 2, 4, 5 and 6 need more mana sources than the 1 this leaves}
+4. Cast Silverquill Silencer {b}{w} (3/2) {leaves 2 of your 4 untapped mana sources untapped} {card text: "As Silverquill Silencer enters, choose a nonland card name. -- Whenever an opponent casts a spell with the chosen name, they lose 3 life and you draw a card."} [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their Underworld Dreams deals you 7 - you would be at 1] {leaves 2 sources - rows 1, 2, 3, 5 and 6 need more mana sources than the 2 this leaves}
+5. Cast Silverquill Command {2}{b}{w} {leaves 0 of your 4 untapped mana sources untapped - casting this taps you out} {card text: "Choose two -- Target creature gets +3/+3 and gains flying until end of turn. -- Return target creature card with mana value 2 or less from your graveyard to the battlefield. -- Target player draws a card and loses 1 life. -- Target opponent sacrifices a creature."} {modes live right now: creature gains 3/3 and return creature, creature gains 3/3 and you draw, creature gains 3/3 and opponent draws, return creature and you draw, return creature and opponent draws; dead (no legal object right now): creature gains 3/3 and sacrifice creature, return creature and sacrifice creature, you draw and sacrifice creature, opponent draws and sacrifice creature} [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their Underworld Dreams deals you 7 - you would be at 1] {taps you out - rows 1, 2, 3, 4 and 6 need more mana sources than the 0 this leaves}
+6. Cast Pelakka Predation {2}{b} {leaves 1 of your 4 untapped mana sources untapped} {card text: "Target opponent reveals their hand. You may choose a card from it with mana value 3 or greater. That player discards that card. // Pelakka Caverns (text omitted)"} [DRAW PRICE: casting this draws YOU 7 cards (their Forced Fruition), and their Underworld Dreams deals you 7 - you would be at 1] {leaves 1 source - rows 1, 2, 3, 4 and 5 need more mana sources than the 1 this leaves}
+7. Cast nothing right now
+
+On the FIRST line write CHOICE: followed by the number of your choice (this ask has no pass row) and its SHORT NAME in parentheses (the name only - copy nothing from the {...} annotations), e.g. "CHOICE: 1 (Cast Barrowin of Clan Undurr)" (a worked example of the format using the first option - choose the option YOU want); then a PLAN: line only if the reply rules call for one (no plan shown yet, or part of yours is now done or false). Write nothing else.
