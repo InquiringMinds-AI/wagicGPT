@@ -131,6 +131,36 @@ size_t gptPresetForUrl(const std::string& url);
 //Returns the body, or "" on transport error / non-200.
 std::string gptHttpGet(const std::string& url, long timeoutMs, const std::string& bearer);
 std::string gptHttpPost(const std::string& url, const std::string& body, long timeoutMs, const std::string& bearer);
+//audit-L (A24): the same round trips with the HTTP status out. `httpCode`
+//receives the status the server answered with - 0 when no status came back
+//(refused connection, curl error, a transport without one) - and `errBody`
+//the first 160 bytes of a non-200 body, the server's own explanation. The
+//body itself is still returned only on 200. A 401 (wrong key), 404 (rejected
+//model id), 413/400 (prompt over the context window), 429 and 5xx used to be
+//indistinguishable from an unreachable server.
+std::string gptHttpGet(const std::string& url, long timeoutMs, const std::string& bearer,
+                       long * httpCode, std::string * errBody);
+std::string gptHttpPost(const std::string& url, const std::string& body, long timeoutMs,
+                        const std::string& bearer, long * httpCode, std::string * errBody);
+//Log "http error <code> from <url>: <body head>" once per distinct (url, code).
+void gptNoteHttpFailure(const std::string& url, long code, const std::string& bodyHead);
+//gptLogLine, suppressed when the line equals the previous once-line (a run
+//of identical failures logs once). Safe from any thread.
+void gptLogLineOnce(const std::string& line);
+
+//audit-L (A49): curl's process-wide init exactly once, on the GAME thread -
+//call before any worker exists (the AIPlayerGPT ctor and gptSpawnWorker do;
+//curl_global_init is documented not thread-safe and used to run per seat).
+//Also first-touches the worker accounting where the Vita's lockless
+//__cxa_guard is safe.
+void gptCurlInit();
+//Workers spawned through gptSpawnWorker that have not returned yet.
+int gptWorkersInFlight();
+//Process-exit guard: wait up to maxWaitMs (50 ms polls) for in-flight
+//workers, then curl_global_cleanup when none remain. A worker still inside
+//libcurl when main returns races OpenSSL's atexit and this TU's statics.
+//Returns true when no worker was left behind.
+bool gptShutdownWorkers(long maxWaitMs);
 
 //--- ChatGPT-subscription backend (Codex Responses API) --------------------
 //The "OpenAI subscription" preset: OAuth tokens from the ChatGPT device-code

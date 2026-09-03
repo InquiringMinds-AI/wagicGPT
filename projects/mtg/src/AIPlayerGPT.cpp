@@ -566,7 +566,69 @@ string optionCardTextCore(const string& raw, size_t maxLen)
 //Detect the macro from the script and report the count so both surfaces can use
 //the real post-amass number. Returns 0 when the card does not amass.
 //Pure over the script text so the real primitives can be replayed in PARSETEST.
+//audit-L (A23): the "pure over magicText" scanners in this file lowercase and
+//line-split a card's script on every call - per row, per render, per board
+//scan - and each is a function of the script text alone (plus the static
+//macro table). Memoise by the input string: one entry per DISTINCT script
+//seen this process (a few dozen per game on the Vita), a map lookup per call
+//instead of a re-parse. Invisible by construction (same input, same output);
+//WAGIC_GPT_SCRIPTMEMO=0 bypasses it. Renders run on the game thread; the lock
+//covers the suite's threaded AI games. First touch is on the game thread.
+static bool scriptMemoEnabled()
+{
+    static int on = -1;
+    if (on < 0)
+    {
+        const char * e = getenv("WAGIC_GPT_SCRIPTMEMO");
+        on = (e && *e == '0') ? 0 : 1;
+    }
+    return on == 1;
+}
+template <class V>
+struct ScriptMemo
+{
+    std::map<string, V> table;
+    GptMutex mtx;
+    bool lookup(const string& key, V& out)
+    {
+        if (!scriptMemoEnabled())
+            return false;
+        std::lock_guard<GptMutex> g(mtx);
+        typename std::map<string, V>::const_iterator it = table.find(key);
+        if (it == table.end())
+            return false;
+        out = it->second;
+        return true;
+    }
+    void store(const string& key, const V& v)
+    {
+        if (!scriptMemoEnabled())
+            return;
+        std::lock_guard<GptMutex> g(mtx);
+        table[key] = v;
+    }
+};
+//found/count/flag triple for the (bool, int&, bool&) scanner shape
+struct ScanFacts3
+{
+    bool found;
+    int n;
+    bool flag;
+    ScanFacts3() : found(false), n(0), flag(false) {}
+};
+
+static int amassCountersFromScriptUncached(const string& magicText);
 static int amassCountersFromScript(const string& magicText)
+{
+    static ScriptMemo<int> memo; //audit-L (A23)
+    int v;
+    if (memo.lookup(magicText, v))
+        return v;
+    v = amassCountersFromScriptUncached(magicText);
+    memo.store(magicText, v);
+    return v;
+}
+static int amassCountersFromScriptUncached(const string& magicText)
 {
     string mt = magicText;
     for (size_t i = 0; i < mt.size(); i++)
@@ -689,7 +751,18 @@ static MTGCardInstance * findMyArmy(MTGCardInstance * card)
 //covers an Army. Read off the scripts, so a second such card stacks correctly
 //and a card-name table is never involved.
 //Pure core over the script text, so the parse is provable in PARSETEST.
+static int counterAddPlusFromScriptUncached(const string& magicText);
 static int counterAddPlusFromScript(const string& magicText)
+{
+    static ScriptMemo<int> memo; //audit-L (A23)
+    int v;
+    if (memo.lookup(magicText, v))
+        return v;
+    v = counterAddPlusFromScriptUncached(magicText);
+    memo.store(magicText, v);
+    return v;
+}
+static int counterAddPlusFromScriptUncached(const string& magicText)
 {
     if (magicText.find("otalcounteradded") == string::npos)
         return 0; //pre-filter; runs per permanent whenever an amass is previewed
@@ -1483,7 +1556,9 @@ string dynamicMagnitudes(MTGCardInstance * card)
     //loyalty costs already visible in the {card text} snippet, so an unscopable
     //number this pass evaluates from a NON-offered sub-ability is worse than
     //none (same spirit as skipping "rand"). Skip walkers.
-    if (card && card->hasType(Subtypes::TYPE_PLANESWALKER))
+    if (!card) //audit-L (L3): the guard used to test and then dereference anyway
+        return "";
+    if (card->hasType(Subtypes::TYPE_PLANESWALKER))
         return "";
     string rawText = card->magicText;
     string text = card->magicText;
@@ -2099,6 +2174,95 @@ static string pregameHandHeader(MTGGameZone * hand)
 
 string instanceHandle(MTGCardInstance * card); //defined below; used by describeAttachments
 
+//audit-L (A20): one pass over both battlefields per battlefield render, in
+//place of the per-host rescans. describeAttachments walked BOTH battlefields
+//for EVERY host with a string-keyed type lookup per pair, and instanceHandle
+//rescans the controller's battlefield per call - O(N^2) with findType inside:
+//4.6% of a small-board game, and 10^5-10^6 compares per render on the corpus's
+//300-1,500-permanent loop boards. The index holds exactly what those scans
+//compute, in the same order (player 0 then 1, battlefield array order), so the
+//rendered bytes are identical; a card the index cannot vouch for (its
+//controller() is not the seat whose battlefield it sits on) falls back to the
+//scan. WAGIC_GPT_BOARDINDEX=0 disables the index (legacy per-host scans).
+struct BoardRenderIndex
+{
+    std::map<MTGCardInstance *, vector<MTGCardInstance *> > attachments; //host -> attachments
+    std::map<MTGCardInstance *, string> handles;                        //card -> instanceHandle(card)
+    bool built;
+    BoardRenderIndex() : built(false) {}
+};
+static bool boardIndexEnabled()
+{
+    static int on = -1;
+    if (on < 0)
+    {
+        const char * e = getenv("WAGIC_GPT_BOARDINDEX");
+        on = (e && *e == '0') ? 0 : 1;
+    }
+    return on == 1;
+}
+//The reverse pointer is TYPE-SPLIT (see describeAttachments): the same test
+//the reverse block performs, with the fortification id resolved once.
+static bool isEquipmentOrFortification(MTGCardInstance * c)
+{
+    static const int kFortification = MTGAllCards::findType("fortification");
+    return c && (c->hasType(Subtypes::TYPE_EQUIPMENT) || c->hasType(kFortification));
+}
+static void buildBoardRenderIndex(GameObserver * obs, BoardRenderIndex& idx)
+{
+    if (!obs || !boardIndexEnabled())
+        return;
+    for (int p = 0; p < 2; p++)
+    {
+        Player * pl = obs->players[p];
+        if (!pl || !pl->game || !pl->game->battlefield)
+            continue;
+        MTGGameZone * bf = pl->game->battlefield;
+        std::map<string, int> total;
+        std::map<MTGCardInstance *, int> rank;
+        for (int x = 0; x < bf->nb_cards; x++)
+        {
+            MTGCardInstance * c = bf->cards[x];
+            if (!c)
+                continue;
+            rank[c] = ++total[c->name];
+            //exactly describeAttachments' pair test, inverted: an aura is listed
+            //under its auraParent; an equipment/fortification under its target
+            //(and under BOTH when the two differ, as the pair test would match both)
+            if (c->auraParent && c->auraParent != c)
+                idx.attachments[c->auraParent].push_back(c);
+            if (isEquipmentOrFortification(c) && c->target && c->target != c
+                && c->target != c->auraParent)
+                idx.attachments[c->target].push_back(c);
+        }
+        for (int x = 0; x < bf->nb_cards; x++)
+        {
+            MTGCardInstance * c = bf->cards[x];
+            if (!c || c->controller() != pl || !pl->game || pl->game->battlefield != bf)
+                continue; //instanceHandle reads the CONTROLLER's battlefield - vouch only when it is this one
+            if (total[c->name] < 2)
+                idx.handles[c] = string();
+            else
+            {
+                std::ostringstream h;
+                h << " #" << rank[c];
+                idx.handles[c] = h.str();
+            }
+        }
+    }
+    idx.built = true;
+}
+static string indexedHandle(const BoardRenderIndex * idx, MTGCardInstance * card)
+{
+    if (idx && idx->built && card)
+    {
+        std::map<MTGCardInstance *, string>::const_iterator it = idx->handles.find(card);
+        if (it != idx->handles.end())
+            return it->second;
+    }
+    return instanceHandle(card);
+}
+
 //The auras/equipment attached to a permanent. There is no forward list, so
 //find them the way the engine does (cf. MTGCardInstance::hasTotemArmor):
 //every attachment carries a reverse pointer to its host - but the pointer is
@@ -2110,12 +2274,29 @@ string instanceHandle(MTGCardInstance * card); //defined below; used by describe
 //auraParent by the engine - the very fact the reverse render at the
 //battlefield-line block already encodes. Match both, using the same type test
 //the reverse block performs, so the relationship is answerable from either end.
-void describeAttachments(std::ostringstream& out, MTGCardInstance * host)
+void describeAttachments(std::ostringstream& out, MTGCardInstance * host,
+                         const BoardRenderIndex * idx = NULL)
 {
     GameObserver * obs = host->getObserver();
     if (!obs)
         return;
     bool first = true;
+    if (idx && idx->built) //audit-L (A20): the indexed form of the scan below
+    {
+        std::map<MTGCardInstance *, vector<MTGCardInstance *> >::const_iterator it =
+            idx->attachments.find(host);
+        if (it != idx->attachments.end())
+            for (size_t k = 0; k < it->second.size(); k++)
+            {
+                MTGCardInstance * att = it->second[k];
+                out << (first ? " {attached: " : ", ") << att->getDisplayName()
+                    << indexedHandle(idx, att);
+                first = false;
+            }
+        if (!first)
+            out << "}";
+        return;
+    }
     for (int p = 0; p < 2; p++)
     {
         MTGGameZone * bf = obs->players[p]->game->battlefield;
@@ -2125,8 +2306,7 @@ void describeAttachments(std::ostringstream& out, MTGCardInstance * host)
             if (!att || att == host)
                 continue;
             bool attached = (att->auraParent == host);
-            if (!attached
-                && (att->hasType(Subtypes::TYPE_EQUIPMENT) || att->hasType("fortification")))
+            if (!attached && isEquipmentOrFortification(att))
                 attached = (att->target == host);
             if (!attached)
                 continue;
@@ -2253,7 +2433,18 @@ static int zoneCopyRank(MTGGameZone * zone, int index, int & outTotal)
 //number from memory ("not listed in text summary but standard for Emrakul").
 //Read N off the card's own script so the render is the engine's fact, not a
 //card-name table. Pure: takes the raw magicText, returns "" when absent.
+static string annihilatorTagUncached(const string& magicText);
 static string annihilatorTag(const string& magicText)
+{
+    static ScriptMemo<string> memo; //audit-L (A23)
+    string v;
+    if (memo.lookup(magicText, v))
+        return v;
+    v = annihilatorTagUncached(magicText);
+    memo.store(magicText, v);
+    return v;
+}
+static string annihilatorTagUncached(const string& magicText)
 {
     //Cheap pre-filter: this runs per permanent per render, and the lowercase
     //copy below is the only expensive part. "nnihilat" is case-stable whatever
@@ -2312,20 +2503,61 @@ void addTribeToken(const string& mt, size_t start,
 //(token makers etc.). Wave-26 deck22: Universal Automaton (a Changeling) was
 //mulliganed/bottomed as "not a Giant" while it enabled Blind-Spot Giant and fed
 //Calamity Bearer / Sunrise Sovereign / Borderland Behemoth.
+//audit-L (L1): the per-script half, memoised. The tribes a SCRIPT consumes
+//are a function of the script text and the type vocabulary; the vocabulary is
+//DB-level but findType(forceAdd) can grow it, so the memo is keyed to the
+//vocabulary size it was built against and rebuilt when that moves - the
+//union over a player's zones then costs one map lookup per card instead of a
+//lowercase pass over every script. Bytes identical: same tokens, same set.
+static void tribesConsumedByScript(const string& magicText, std::set<string>& out)
+{
+    static std::map<string, std::set<string> > memo;
+    static std::map<string, string> proper; //lowercased -> proper-cased subtype name
+    static size_t vocabSeen = (size_t) -1;
+    static GptMutex mtx;
+    std::lock_guard<GptMutex> g(mtx);
+    const vector<string>& vocab = MTGAllCards::getCreatureValuesById();
+    if (vocab.size() != vocabSeen || !scriptMemoEnabled())
+    {
+        vocabSeen = vocab.size();
+        memo.clear();
+        proper.clear();
+        for (size_t i = 0; i < vocab.size(); i++)
+        {
+            string low = vocab[i];
+            for (size_t k = 0; k < low.size(); k++)
+                low[k] = (char) tolower((unsigned char) low[k]);
+            if (!low.empty())
+                proper[low] = vocab[i];
+        }
+    }
+    std::map<string, std::set<string> >::const_iterator it = memo.find(magicText);
+    if (it != memo.end())
+    {
+        out.insert(it->second.begin(), it->second.end());
+        return;
+    }
+    std::set<string> found;
+    string mt = magicText;
+    for (size_t k = 0; k < mt.size(); k++)
+        mt[k] = (char) tolower((unsigned char) mt[k]);
+    //"other <type>" - the lord/foreach/aslongas(other TYPE) tribal form.
+    //Require a boundary before "other" so "another" does not match.
+    for (size_t q = 0; (q = mt.find("other ", q)) != string::npos; q += 6)
+        if (q == 0 || !isalnum((unsigned char) mt[q - 1]))
+            addTribeToken(mt, q + 6, proper, found);
+    //"&<type>" - a source/count filter that keys on a type.
+    for (size_t q = 0; (q = mt.find('&', q)) != string::npos; q += 1)
+        addTribeToken(mt, q + 1, proper, found);
+    if (scriptMemoEnabled())
+        memo[magicText] = found;
+    out.insert(found.begin(), found.end());
+}
+
 void collectTribalTypes(Player * p, std::set<string>& out)
 {
     if (!p || !p->game)
         return;
-    const vector<string>& vocab = MTGAllCards::getCreatureValuesById();
-    std::map<string, string> proper; //lowercased -> proper-cased subtype name
-    for (size_t i = 0; i < vocab.size(); i++)
-    {
-        string low = vocab[i];
-        for (size_t k = 0; k < low.size(); k++)
-            low[k] = (char) tolower((unsigned char) low[k]);
-        if (!low.empty())
-            proper[low] = vocab[i];
-    }
     MTGGameZone * zones[] = { p->game->library, p->game->hand, p->game->inPlay, p->game->graveyard };
     for (size_t z = 0; z < sizeof(zones) / sizeof(zones[0]); z++)
     {
@@ -2337,17 +2569,7 @@ void collectTribalTypes(Player * p, std::set<string>& out)
             MTGCardInstance * c = zone->cards[i];
             if (!c || c->magicText.empty())
                 continue;
-            string mt = c->magicText;
-            for (size_t k = 0; k < mt.size(); k++)
-                mt[k] = (char) tolower((unsigned char) mt[k]);
-            //"other <type>" - the lord/foreach/aslongas(other TYPE) tribal form.
-            //Require a boundary before "other" so "another" does not match.
-            for (size_t q = 0; (q = mt.find("other ", q)) != string::npos; q += 6)
-                if (q == 0 || !isalnum((unsigned char) mt[q - 1]))
-                    addTribeToken(mt, q + 6, proper, out);
-            //"&<type>" - a source/count filter that keys on a type.
-            for (size_t q = 0; (q = mt.find('&', q)) != string::npos; q += 1)
-                addTribeToken(mt, q + 1, proper, out);
+            tribesConsumedByScript(c->magicText, out); //audit-L (L1)
         }
     }
 }
@@ -3963,19 +4185,25 @@ string mutatedPileTextCore(const std::vector<std::pair<string, string> >& member
 //The pile-aware replacement for cardTextSnippet at the OPTION/TARGET emitters
 //(the only surfaces the defect lives on - battlefield summary lines quote no
 //text). Non-pile cards are unaffected.
+//audit-L (L3): the pile half, on a pile the caller already collected (both
+//emitters below used to walk the pile once to test it and again to render it).
+static string mutatePileTextFor(const std::vector<MTGCardInstance *>& pile, size_t maxLen)
+{
+    if (pile.size() < 2)
+        return "";
+    std::vector<std::pair<string, string> > members;
+    for (size_t i = 0; i < pile.size(); i++)
+        members.push_back(std::make_pair(mutatePileMemberName(pile[i]), pile[i]->text));
+    return mutatedPileTextCore(members, maxLen);
+}
+
 string pileAwareCardText(MTGCardInstance * c, size_t maxLen)
 {
     std::vector<MTGCardInstance *> pile;
     collectMutatePile(c, pile);
-    if (pile.size() >= 2)
-    {
-        std::vector<std::pair<string, string> > members;
-        for (size_t i = 0; i < pile.size(); i++)
-            members.push_back(std::make_pair(mutatePileMemberName(pile[i]), pile[i]->text));
-        string combined = mutatedPileTextCore(members, maxLen);
-        if (!combined.empty())
-            return combined;
-    }
+    string combined = mutatePileTextFor(pile, maxLen);
+    if (!combined.empty())
+        return combined;
     return c ? cardTextSnippet(c, maxLen) : string();
 }
 
@@ -3988,8 +4216,11 @@ string optionCardText(MTGCardInstance * c, size_t maxLen)
         return "";
     std::vector<MTGCardInstance *> pile;
     collectMutatePile(c, pile);
-    if (pile.size() >= 2)
-        return pileAwareCardText(c, maxLen);
+    if (pile.size() >= 2) //audit-L (L3): one pile walk, not two
+    {
+        string combined = mutatePileTextFor(pile, maxLen);
+        return combined.empty() ? cardTextSnippet(c, maxLen) : combined;
+    }
     if (isEngineTokenText(c->text))
         return "";
     return optionCardTextCore(c->text, maxLen);
@@ -4846,6 +5077,16 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                        const std::set<string> * effectSkip = NULL)
 {
     vector<string> entNames, entHandles, entTails;
+    //audit-L (A20): battlefield renders take handles and attachments from one
+    //pass over both battlefields instead of a rescan per entry.
+    BoardRenderIndex idx;
+    if (withStatus && zone)
+        for (int i = 0; i < zone->nb_cards; i++)
+            if (zone->cards[i])
+            {
+                buildBoardRenderIndex(zone->cards[i]->getObserver(), idx);
+                break;
+            }
     //#W46-3 pre-pass: how many DISTINCT effect-bearing names this line will
     //carry (sets the per-clause budget) and how many copies each has (sets the
     //"each copy" note). Counted before any entry is built so the budget is the
@@ -4891,7 +5132,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
         //Disambiguate same-named permanents so a board entry binds to the
         //A#/B#/target line that offers it (battlefield lines only; "" otherwise).
         if (withStatus)
-            entHandles.push_back(instanceHandle(card));
+            entHandles.push_back(indexedHandle(&idx, card)); //audit-L (A20)
         else
         {
             //N-166a: the hand's duplicates get their own, deliberately distinct
@@ -5019,7 +5260,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 }
                 out << "]";
             }
-            describeAttachments(out, card);
+            describeAttachments(out, card, &idx); //audit-L (A20)
             //the forward direction too: the equipment/aura itself names its
             //current host, so "is this already attached?" is answerable from
             //either end of the relationship. Equipment keeps its host in
@@ -5027,7 +5268,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             //auraParent.
             {
                 MTGCardInstance * host = NULL;
-                if (card->hasType(Subtypes::TYPE_EQUIPMENT) || card->hasType("fortification"))
+                if (isEquipmentOrFortification(card)) //audit-L (A20): same test, id resolved once
                     host = card->target;
                 else if (card->auraParent)
                     host = card->auraParent;
@@ -5039,7 +5280,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
                 //15. Every surface that NAMES a permanent carries its handle.
                 if (host)
                     out << " [attached to: " << host->getDisplayName()
-                        << instanceHandle(host) << "]";
+                        << indexedHandle(&idx, host) << "]"; //audit-L (A20)
             }
             //A tapped creature reads as harmless and the pilot builds plans
             //on that (wave-7 deck140 collapse: "tapped = no threat" bridged
@@ -5047,7 +5288,7 @@ void describeZoneCards(std::ostringstream& out, MTGGameZone * zone, bool withSta
             //at the flag: it untaps and attacks again next turn.
             MTGCardInstance * blockedAtk = card->isDefenser();
             string blockedName = blockedAtk
-                ? blockedAtk->getDisplayName() + instanceHandle(blockedAtk)
+                ? blockedAtk->getDisplayName() + indexedHandle(&idx, blockedAtk) //audit-L (A20)
                 : string("");
             if (card->isTapped())
                 out << (card->isCreature()
@@ -7086,7 +7327,21 @@ static string drawPunisherSummaryText(const vector<string>& mine, int minePerDra
 //number on the line, and the ask's own rail is to name the permanent rather
 //than guess a figure. Pure over the lowercased script, so PARSETEST proves
 //both halves against the real primitive lines.
+static bool drawPunisherClauseUncached(const string& magicText, int& perDraw, bool& conditional);
 static bool drawPunisherClause(const string& magicText, int& perDraw, bool& conditional)
+{
+    static ScriptMemo<ScanFacts3> memo; //audit-L (A23)
+    ScanFacts3 f;
+    if (!memo.lookup(magicText, f))
+    {
+        f.found = drawPunisherClauseUncached(magicText, f.n, f.flag);
+        memo.store(magicText, f);
+    }
+    perDraw = f.n;
+    conditional = f.flag;
+    return f.found;
+}
+static bool drawPunisherClauseUncached(const string& magicText, int& perDraw, bool& conditional)
 {
     perDraw = 0;
     conditional = false;
@@ -7246,7 +7501,18 @@ static string drawPriceRowTag(int cards, int perDraw, const string& punishers, i
 //Rorix at 1 life into it). Only the cast-trigger hook with a plain numeric
 //draw aimed at the caster is counted; anything gated or non-numeric is not a
 //number the pilot can count on and is left unclaimed. Pure over the script.
+static int castTriggerDrawCountUncached(const string& magicText);
 static int castTriggerDrawCount(const string& magicText)
+{
+    static ScriptMemo<int> memo; //audit-L (A23)
+    int v;
+    if (memo.lookup(magicText, v))
+        return v;
+    v = castTriggerDrawCountUncached(magicText);
+    memo.store(magicText, v);
+    return v;
+}
+static int castTriggerDrawCountUncached(const string& magicText)
 {
     int total = 0;
     size_t lp = 0;
@@ -7364,7 +7630,20 @@ static string castDrawPriceRowTag(int perCast, const string& castNames,
 //non-numeric amount (Teferi's Puzzle Box `draw:countedamount opponent`).
 //Per-CAST draws (Forced Fruition) are the cast-trigger scan's business and
 //ride the same tag through castTriggerDrawCount.
+static int opponentExtraDrawPerTurnUncached(const string& script, bool& variable);
 static int opponentExtraDrawPerTurn(const string& script, bool& variable)
+{
+    static ScriptMemo<ScanFacts3> memo; //audit-L (A23)
+    ScanFacts3 f;
+    if (!memo.lookup(script, f))
+    {
+        f.n = opponentExtraDrawPerTurnUncached(script, f.flag);
+        memo.store(script, f);
+    }
+    variable = f.flag;
+    return f.n;
+}
+static int opponentExtraDrawPerTurnUncached(const string& script, bool& variable)
 {
     variable = false;
     int total = 0;
@@ -7418,7 +7697,21 @@ static int opponentExtraDrawPerTurn(const string& script, bool& variable)
 //loss or damage aimed at that "opponent" - Liliana's Caress
 //`@discarded(*|opponenthand):life:-2 opponent`, Megrim `damage:2 opponent`.
 //`conditional` mirrors drawPunisherClause: named, not numbered.
+static bool discardPunisherClauseUncached(const string& script, int& perDiscard, bool& conditional);
 static bool discardPunisherClause(const string& script, int& perDiscard, bool& conditional)
+{
+    static ScriptMemo<ScanFacts3> memo; //audit-L (A23)
+    ScanFacts3 f;
+    if (!memo.lookup(script, f))
+    {
+        f.found = discardPunisherClauseUncached(script, f.n, f.flag);
+        memo.store(script, f);
+    }
+    perDiscard = f.n;
+    conditional = f.flag;
+    return f.found;
+}
+static bool discardPunisherClauseUncached(const string& script, int& perDiscard, bool& conditional)
 {
     perDiscard = 0;
     conditional = false;
@@ -7729,7 +8022,19 @@ static int lineControllerDrawCount(const string& low, size_t from)
 //line ("{3}{cycle}:name(cycling) draw:1" -> 1). 0 when the name is absent, the
 //line draws nothing, or the amount is not a plain number - the tag is then not
 //emitted at all rather than claiming a count the script does not state.
+static int scriptAbilityDrawCountUncached(const string& script, const string& abilityName);
 static int scriptAbilityDrawCount(const string& script, const string& abilityName)
+{
+    static ScriptMemo<int> memo; //audit-L (A23): keyed on both inputs
+    const string key = script + "\x01" + abilityName;
+    int v;
+    if (memo.lookup(key, v))
+        return v;
+    v = scriptAbilityDrawCountUncached(script, abilityName);
+    memo.store(key, v);
+    return v;
+}
+static int scriptAbilityDrawCountUncached(const string& script, const string& abilityName)
 {
     if (abilityName.empty())
         return 0;
@@ -7782,7 +8087,18 @@ static int scriptAbilityDrawCount(const string& script, const string& abilityNam
 //('@'), optional ('may '), modal ('choice ') or conditional ('if(') does not
 //happen just because the spell resolved, and claiming its cards would be a
 //false price. Those rows keep their current (untagged) text.
+static int scriptSelfDrawCountUncached(const string& script);
 static int scriptSelfDrawCount(const string& script)
+{
+    static ScriptMemo<int> memo; //audit-L (A23)
+    int v;
+    if (memo.lookup(script, v))
+        return v;
+    v = scriptSelfDrawCountUncached(script);
+    memo.store(script, v);
+    return v;
+}
+static int scriptSelfDrawCountUncached(const string& script)
 {
     int total = 0;
     size_t lp = 0;
@@ -8327,11 +8643,14 @@ struct AIPlayerGPT::AsyncState
     //refusal returns in milliseconds. Written by the worker under the mutex
     //alongside the body, read once on consume.
     bool timedOut;
-    AsyncState() : status(0), timedOut(false) {}
+    //audit-L (A24): the HTTP status of the round trip (0 = no status: a
+    //transport-level failure, a refused connection, or the Codex path). A
+    //4xx/5xx used to come back as an empty body indistinguishable from an
+    //unreachable server; the code is what tells a wrong key from a dead host.
+    long httpStatus;
+    AsyncState() : status(0), timedOut(false), httpStatus(0) {}
 };
 
-//Heap-allocated capture set for the HTTP worker. The worker owns and frees
-//it; the shared_ptr inside keeps AsyncState alive if the player is destroyed
 //WAGIC_PADLOG (Android: flag file User/padlog.on): async-lifecycle slice of
 //the input/UI trace - spawn/publish/consume/stale transitions, to pin the
 //"opponent is thinking forever with no worker thread" stall (2026-08-17).
@@ -8358,6 +8677,8 @@ static FILE * gptPadlogFile()
 #define GPTASYNCLOG(...) ((void)0)
 #endif //_DEBUG || WAGIC_DEVLOGS
 
+//Heap-allocated capture set for the HTTP worker. The worker owns and frees
+//it; the shared_ptr inside keeps AsyncState alive if the player is destroyed
 //mid-request.
 struct AIPlayerGPT::WorkerCtx
 {
@@ -8374,6 +8695,7 @@ void AIPlayerGPT::WorkerMain(void * p)
 {
     WorkerCtx * ctx = reinterpret_cast<WorkerCtx *>(p);
     string body;
+    long httpCode = 0; //audit-L (A24)
     if (ctx->codex)
     {
         //The subscription backend answers in the Responses shape over SSE.
@@ -8391,25 +8713,27 @@ void AIPlayerGPT::WorkerMain(void * p)
         {
             //Empty body = the seams' existing transport-failure path (Baka
             //answers). Log the WHY once per distinct cause, not per decision.
-            //Mutex-guarded: both selfplay seats can fail concurrently, and a
-            //racing write to a shared string is UB, not just a double log.
-            static GptMutex logMtx;
-            static string lastErr;
-            std::lock_guard<GptMutex> lg(logMtx);
-            if (err != lastErr)
-            {
-                lastErr = err;
-                gptLogLine("subscription request failed: " + err);
-            }
+            //audit-L (A49): the dedupe state lives in GptConfig, first-touched
+            //on the game thread by gptCurlInit - not a function-local static
+            //constructed on THIS worker, where the Vita's lockless __cxa_guard
+            //let two concurrently failing seats double-construct the mutex.
+            gptLogLineOnce("subscription request failed: " + err);
         }
     }
     else
     {
         GPTASYNCLOG("gpt worker start url=%s body=%zu\n", ctx->url.c_str(), ctx->requestBody.size());
-        body = gptHttpPost(ctx->url, ctx->requestBody, ctx->timeoutMs, ctx->key);
+        //audit-L (A24): the status code comes back with the body. A non-200
+        //is logged once per distinct (url, code) - the WHY of a match that
+        //plays on the heuristic - and rides the state to the record.
+        string errBody;
+        body = gptHttpPost(ctx->url, ctx->requestBody, ctx->timeoutMs, ctx->key, &httpCode, &errBody);
+        if (body.empty() && httpCode != 0 && httpCode != 200)
+            gptNoteHttpFailure(ctx->url, httpCode, errBody);
     }
     {
         std::lock_guard<GptMutex> g(ctx->state->mtx);
+        ctx->state->httpStatus = httpCode; //audit-L (A24)
         //#W53-Q (D10): the deadline test, on the 95% mark so a wall hit is not
         //missed by scheduling jitter between the client's clock and curl's.
         //An empty body under that mark is a refusal/error, not a timeout.
@@ -8674,9 +8998,25 @@ const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
     return hasReasoning ? "reasoning_only" : "empty_reply";
 }
 
+//audit-L (A24): the same table with the HTTP status in front of the clock. A
+//server that ANSWERED with a 401/404/413/429/5xx is its own class - a wrong
+//key, a rejected model id, a prompt over the context window, a rate limit -
+//and none of those is "empty_reply" (the unreachable-endpoint word) nor
+//"timeout" (the clock ran out with no status at all). The breaker still wins:
+//a stale-livelock give-up consumed no round trip. 0 and 200 carry nothing new
+//and fall through to the three-fact table above.
+const char * AIPlayerGPT::noAnswerClassFor(bool staleLivelock, bool timedOut,
+                                           bool hasReasoning, long httpStatus)
+{
+    if (!staleLivelock && httpStatus != 0 && httpStatus != 200)
+        return "http_error";
+    return noAnswerClassFor(staleLivelock, timedOut, hasReasoning);
+}
+
 const char * AIPlayerGPT::noAnswerClass() const
 {
-    return noAnswerClassFor(mLastStaleLivelock, mLastTimeout, !mLastReasoning.empty());
+    return noAnswerClassFor(mLastStaleLivelock, mLastTimeout, !mLastReasoning.empty(),
+                            mLastHttpStatus);
 }
 
 //#W54-B (D9). noAnswerClassFor above is the branch this item does NOT cover:
@@ -8719,6 +9059,8 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 //below once `content` is known.
                 mLastTimeout = mAsyncState->timedOut;
                 mAsyncState->timedOut = false;
+                mLastHttpStatus = mAsyncState->httpStatus; //audit-L (A24)
+                mAsyncState->httpStatus = 0;
                 content.clear();
                 mLastReasoningOnly = false;
                 mLastFinishLength = false;
@@ -8902,6 +9244,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
                 mStaleDropStreak = 0;
                 mLastStaleLivelock = true;
                 mLastTimeout = false; //#W53-Q (D10): a give-up, not a deadline
+                mLastHttpStatus = 0;  //audit-L (A24): no round trip was consumed here
                 content.clear();
                 return 0; //no answer: the caller's parse fails -> Baka fallback
             }
@@ -8921,6 +9264,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         state->prompt = userMsg;
         state->response.clear();
         state->timedOut = false; //#W53-Q (D10): the worker decides this one
+        state->httpStatus = 0;   //audit-L (A24): likewise
         state->started = std::chrono::steady_clock::now();
     }
     GPTASYNCLOG("gpt spawn ask prompt=%zu endpoint=%s\n", userMsg.size(), mEndpoint.c_str());
@@ -8967,6 +9311,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         }
         content.clear();
         mLastTimeout = false; //#W53-Q (D10): a refused thread, not a deadline
+        mLastHttpStatus = 0;  //audit-L (A24)
         DebugTrace("AIPlayerGPT: could not start the worker thread; falling back to the heuristic AI");
         //Log this ONCE. A platform that refuses one thread refuses all of them,
         //so the message is identical every time and repeats once per decision -
@@ -9342,9 +9687,11 @@ AIPlayerGPT::AIPlayerGPT(GameObserver *observer, string deckFile, string deckfil
     mPregameBottomingNow = false;        //#W42-D9
     mPregameShufflingBack = false;
     mPregameBottomedCount = 0;
-#ifndef WAGIC_NO_CURL
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-#endif
+    //audit-L (A49): once per process, on the game thread, before any worker
+    //(curl_global_init is documented not thread-safe; it used to run per seat,
+    //possibly while the previous duel's detached worker was still in libcurl).
+    gptCurlInit();
+    mLastHttpStatus = 0; //audit-L (A24)
     //File config first, environment variables override.
     GptSettings cfg = GptSettings::load();
     mConfigUrls = cfg.urls;
@@ -9495,9 +9842,40 @@ void AIPlayerGPT::ensureGameStartRecord()
         {"opp_deck", opponent() ? opponent()->deckFileSmall : ""},
         {"opp_deck_name", opponent() ? opponent()->deckName : ""},
     };
-    std::ofstream f(mTransLogPath.c_str(), std::ios::app);
-    if (f)
-        f << rec.dump() << "\n";
+    transLogWrite(rec.dump());
+}
+
+//audit-L (L4): one lazily-opened stream per seat, flushed per record, in place
+//of an open/append/close per record (the file's own #W-refusal note names a
+//per-event open on the game thread as a measured cause of console lag). The
+//stream opens on the FIRST write, which ensureGameStartRecord has already
+//renamed to its final -vs- name; every record is flushed, so a process that
+//exits without destroying the seat loses nothing. WAGIC_GPT_TRANSLOG_STREAM=0
+//restores the per-record open.
+void AIPlayerGPT::transLogWrite(const string& line)
+{
+    if (mTransLogPath.empty())
+        return;
+    static int streamOn = -1;
+    if (streamOn < 0)
+    {
+        const char * e = getenv("WAGIC_GPT_TRANSLOG_STREAM");
+        streamOn = (e && *e == '0') ? 0 : 1;
+    }
+    if (!streamOn)
+    {
+        std::ofstream f(mTransLogPath.c_str(), std::ios::app);
+        if (f)
+            f << line << "\n";
+        return;
+    }
+    if (!mTransLog.is_open())
+        mTransLog.open(mTransLogPath.c_str(), std::ios::app);
+    if (mTransLog)
+    {
+        mTransLog << line << "\n";
+        mTransLog.flush();
+    }
 }
 
 //WAVE-33 COMMIT-FAILURE INSTRUMENT (wave-32 synthesis §5). Two cheap,
@@ -9646,9 +10024,7 @@ void AIPlayerGPT::flushRecoveryRecord()
     //finding, and must not be dressed up as an action.
     if (!mNarrationPending.empty())
         rec["recovered_by"] = mNarrationPending;
-    std::ofstream f(mTransLogPath.c_str(), std::ios::app);
-    if (f)
-        f << rec.dump() << "\n";
+    transLogWrite(rec.dump()); //audit-L (L4)
 }
 
 //#W53-Q (D24): does this record hand its decision to the heuristic? TRUE only
@@ -9683,6 +10059,13 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     if (mTransLogPath.empty())
     {
         mLastParseNote.clear(); //consumed even when logging is off
+        //audit-L (A18): the narration delta has no consumer with the log off
+        //(the shipped default = the Vita) and grew for the whole game - 29 KB
+        //median, 192 KB max per seat-game in the corpus, held on a 40 MB heap
+        //for nobody. The feeders no longer write it when the path is empty;
+        //this clear catches anything that reached it before the path was known.
+        mNarrationPending.clear();
+        mLastHttpStatus = 0; //audit-L (A24): consumed even when logging is off
         return;
     }
     ensureGameStartRecord();
@@ -9714,6 +10097,10 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         {"opp_life", opponent() ? opponent()->life : 0},
         {"latency_ms", mLastLatencyMs},
     };
+    //audit-L (A24): the status the transport saw, on the record that consumed
+    //it (a 200 says nothing new and is not written; 0 = no status came back).
+    if (mLastHttpStatus != 0 && mLastHttpStatus != 200)
+        rec["http_status"] = mLastHttpStatus;
     //Answer-locked decode-garbage retry: mark the record and note the first
     //(garbage) attempt's latency separately; latency_ms above already carries the
     //SUMMED first+retry round trip (set in pollCompletionRetry).
@@ -9745,6 +10132,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         && planArguesAgainstRow(reply, (*optionTexts)[choice - 1]))
         appendParseNote(&mLastParseNote, "plan_contradicts_noop_row");
     mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
+    mLastHttpStatus = 0; //audit-L (A24): consumed with it
     //NATIVE REASONING (wave-34 #1b(A)): the model's own thinking for THIS
     //decision, from message.reasoning_content or from an inline <think> block -
     //captured on both paths because the server decides which one we get. This
@@ -9888,9 +10276,7 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     //priority) - offered-vs-taken tallies without re-parsing the prompt
     if (optionTexts)
         rec["options_text"] = *optionTexts;
-    std::ofstream f(mTransLogPath.c_str(), std::ios::app);
-    if (f)
-        f << rec.dump() << "\n";
+    transLogWrite(rec.dump()); //audit-L (L4)
     //#W53-Q (D24): this decision was handed off - the next record (or the
     //game-end record) will say what answered.
     if (handedToHeuristic(choice, fallback))
@@ -9955,9 +10341,9 @@ void AIPlayerGPT::logGameEnd()
         //interchangeable row and were resolved without a model call.
         {"identical_option_asks_resolved", mIdenticalOptionAsksResolved},
     };
-    std::ofstream f(mTransLogPath.c_str(), std::ios::app);
-    if (f)
-        f << rec.dump() << "\n";
+    transLogWrite(rec.dump()); //audit-L (L4)
+    if (mTransLog.is_open())
+        mTransLog.close(); //the game's last record
 }
 
 void AIPlayerGPT::resolveEndpoint()
@@ -10127,7 +10513,8 @@ void AIPlayerGPT::flushOpeningHand()
         for (size_t i = 0; i < mOpeningHand.size(); i++)
             o << (i ? "; " : "") << mOpeningHand[i];
         mNarration += o.str() + "\n";
-        mNarrationPending += o.str() + "\n"; //W42-D8: direct writers feed the delta too
+        if (!mTransLogPath.empty()) //audit-L (A18): no consumer with the log off
+            mNarrationPending += o.str() + "\n"; //W42-D8: direct writers feed the delta too
         mOpeningHand.clear();
     }
     mDealDone = true;
@@ -10138,6 +10525,16 @@ void AIPlayerGPT::flushOpeningHand()
 static string planMenuDiffClause(const string& absentName);
 
 string AIPlayerGPT::assemblePrompt(const string& tail)
+{
+    return assemblePrompt(tail, NULL);
+}
+
+//audit-L (A19): `situation`, when given, is the CURRENT SITUATION block the
+//caller already rendered for this tail (serializeGameStatePair's prompt
+//variant) and is spliced in verbatim instead of being rendered again here.
+//The pregame frame ignores it (hand-only by owner directive). NULL = the
+//one-argument behaviour, unchanged.
+string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation)
 {
     std::ostringstream u;
     //W41-3(c): a bulk move that ran right up to the decision point must be in
@@ -10180,7 +10577,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
     if (pregame)
         u << "--- YOUR OPENING HAND ---\n" << serializePregameState();
     else
-        u << "--- CURRENT SITUATION ---\n" << serializeGameState(&tail);
+        u << "--- CURRENT SITUATION ---\n" << (situation ? *situation : serializeGameState(&tail));
     //#W47-R9b (wave-46 docket R9; extends the N-146k owner directive of
     //2026-07-27 that pregame asks get the HAND and nothing else): the carried
     //plan is the last board-scoped sentence still reaching the pre-game asks,
@@ -10345,6 +10742,35 @@ string AIPlayerGPT::zoneNameDigest(MTGGameZone * z)
 //log, and is never touched by the trim below - which is the whole point: the
 //translog's per-record events field is fed from it instead of from a byte
 //offset into a buffer the trim rewrites from the front.
+//audit-L (L10): the trim arithmetic, pure so PARSETEST pins it.
+//narrationTrimKeep: how many tail bytes a trim keeps, given the marker length.
+//narrationTrimNear: does appending `line` (plus a pending-phase line and the
+//"- "/"\n" decoration on each) put the log over the 24,000 cap?
+static bool narrationTrimV1()
+{
+    static int v1 = -1;
+    if (v1 < 0)
+    {
+        const char * e = getenv("WAGIC_GPT_TRIM_V1");
+        v1 = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v1 == 1;
+}
+size_t narrationTrimKeep(size_t markerLen)
+{
+    const size_t keep = 20000;
+    if (narrationTrimV1() || markerLen + 1 >= keep)
+        return keep;
+    return keep - markerLen - 1;
+}
+bool narrationTrimNear(size_t logSize, size_t lineSize, size_t pendingPhaseSize)
+{
+    if (narrationTrimV1())
+        return logSize + lineSize > 24000;
+    const size_t decoration = 3 + (pendingPhaseSize ? pendingPhaseSize + 3 : 0);
+    return logSize + lineSize + decoration > 24000;
+}
+
 void narrationAppend(string& narration, string& pendingPhase, const string& line,
                      const string& trimMarker, string * delta = NULL)
 {
@@ -10369,7 +10795,14 @@ void narrationAppend(string& narration, string& pendingPhase, const string& line
     //has already handed its earlier lines to earlier records.
     if (narration.size() > 24000)
     {
-        size_t nl = narration.find('\n', narration.size() - 20000);
+        //audit-L (L10a): keep the tail SHORT of 20,000 by the marker's own
+        //length, so the post-trim size is <= ~20 KB whatever the digest weighs
+        //and the next trim is ~4 KB of lines away. A 3.9 KB+ digest (200+
+        //distinct names across four zones - mill/dredge boards) used to leave
+        //the buffer above 24,000 after its own trim, re-trimming on EVERY
+        //line: four zone walks and a 24 KB rebuild per event.
+        //WAGIC_GPT_TRIM_V1=1 restores the fixed 20,000-byte tail.
+        size_t nl = narration.find('\n', narration.size() - narrationTrimKeep(trimMarker.size()));
         if (nl != string::npos)
             narration = trimMarker + "\n" + narration.substr(nl + 1);
     }
@@ -10505,12 +10938,18 @@ void AIPlayerGPT::writeNarration(const string& line)
     //both graveyards and both exiles as they stand at the moment of the trim.
     //(built only when a trim is actually near - it walks four zones)
     string marker;
-    if (mNarration.size() + line.size() > 24000)
+    //audit-L (L10b): the precondition counts what the append actually adds -
+    //the pending-phase line and the "- "/"\n" decoration - so an append that
+    //crosses the cap only because of them no longer trims behind an EMPTY
+    //marker (a bare blank line, the zone digest lost).
+    if (narrationTrimNear(mNarration.size(), line.size(), mPendingPhase.size()))
         marker = trimMarkerLine(zoneNameDigest(game ? game->graveyard : NULL),
                                 zoneNameDigest(opponent() ? opponent()->game->graveyard : NULL),
                                 zoneNameDigest(game ? game->removedFromGame : NULL),
                                 zoneNameDigest(opponent() ? opponent()->game->removedFromGame : NULL));
-    narrationAppend(mNarration, mPendingPhase, line, marker, &mNarrationPending);
+    //audit-L (A18): the delta is fed only while something will consume it.
+    narrationAppend(mNarration, mPendingPhase, line, marker,
+                    mTransLogPath.empty() ? NULL : &mNarrationPending);
 }
 
 void AIPlayerGPT::narrateDecision(const string& line)
@@ -11190,7 +11629,11 @@ int AIPlayerGPT::receiveEvent(WEvent * event)
                 t << "=== Turn " << (observer->turn + 1) << " - "
                   << (observer->currentPlayer == this ? "YOUR turn" : "opponent's turn") << " ===";
                 mNarration += t.str() + "\n";
-                mNarrationPending += t.str() + "\n"; //W42-D8: delta gets the header too
+                if (!mTransLogPath.empty()) //audit-L (A18)
+                    mNarrationPending += t.str() + "\n"; //W42-D8: delta gets the header too
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+                renderProbeDump(); //audit-L: the render byte-diff instrument (dev builds)
+#endif
             }
             //#W43-11: a held run belongs to the phase it happened in. The
             //pending marker is consumed by the NEXT line written, so arming a
@@ -11369,6 +11812,53 @@ string AIPlayerGPT::scanDayNightDesignation()
 //activation event fires BEFORE the name is picked, so "Opponent used: Choose a
 //name with Silverquill Silencer" narrates a menu, not a choice). Scan both
 //battlefields after every event and narrate each (card, name) pair once.
+#if defined(_DEBUG) || defined(WAGIC_DEVLOGS)
+//audit-L: the render byte-diff instrument. WAGIC_GPT_RENDERPROBE=<file>
+//appends, once per turn per seat, the narration and the situation render (both
+//variants, through the pair path) plus a self-check that the pair path equals
+//the one-shot renders and that assemblePrompt's splice overload equals the
+//plain one. Driven by a WAGIC_REPLAY of a recorded game it turns "the render
+//is byte-identical before and after" into a diff instead of a claim. Dev
+//builds only; the env var is never read in a release build.
+void AIPlayerGPT::renderProbeDump()
+{
+    const char * path = getenv("WAGIC_GPT_RENDERPROBE");
+    if (!path || !*path || !observer || !game || !game->inPlay)
+        return;
+    //a fake option block naming the first own permanents, so the own-battlefield
+    //{effect:} skip has something to bite on
+    std::ostringstream tail;
+    tail << "Your options:\n";
+    int n = 0;
+    for (int i = 0; i < game->inPlay->nb_cards && n < 3; i++)
+        if (game->inPlay->cards[i])
+        {
+            n++;
+            tail << n << ". Activate " << game->inPlay->cards[i]->getDisplayName() << "\n";
+        }
+    tail << (n + 1) << ". Pass\n";
+    const string tailStr = tail.str();
+    string keyVariant;
+    const string promptVariant = serializeGameStatePair(tailStr, &keyVariant);
+    const string keyDirect = serializeGameState();
+    const string promptDirect = serializeGameState(&tailStr);
+    const string assembledPlain = assemblePrompt(tailStr);
+    const string assembledSpliced = assemblePrompt(tailStr, &promptVariant);
+    std::ofstream f(path, std::ios::app);
+    if (!f)
+        return;
+    f << "=== seat " << (observer->players[0] == this ? 0 : 1) << " turn " << observer->turn
+      << " phase " << observer->getCurrentGamePhaseName() << " ===\n";
+    f << "[pair-check] key " << (keyVariant == keyDirect ? "same" : "DIFFERENT")
+      << " prompt " << (promptVariant == promptDirect ? "same" : "DIFFERENT")
+      << " assemble " << (assembledPlain == assembledSpliced ? "same" : "DIFFERENT")
+      << " skip " << (promptVariant == keyVariant ? "none" : "active") << "\n";
+    f << "[pending-bytes] " << mNarrationPending.size() << "\n"; //A18's measure
+    f << "[narration]\n" << mNarration << "[situation]\n" << promptDirect
+      << "[key]\n" << keyDirect << "\n";
+}
+#endif //_DEBUG || WAGIC_DEVLOGS
+
 void AIPlayerGPT::noteChosenNames()
 {
     if (!observer)
@@ -11384,11 +11874,16 @@ void AIPlayerGPT::noteChosenNames()
             MTGCardInstance * c = bf->cards[i];
             if (!c || c->chooseaname.empty())
                 continue;
-            std::ostringstream key;
-            key << (void *) c << "\x01" << c->chooseaname;
-            if (mNarratedChosenNames.find(key.str()) != mNarratedChosenNames.end())
+            //audit-L (L2): this runs on EVERY event; the key is built without a
+            //stream. (An event-type gate was considered and declined: the
+            //setter fires no event of its own - see the comment above - so any
+            //gate would move the narration line to a later event.)
+            char ptr[32];
+            snprintf(ptr, sizeof(ptr), "%p", (void *) c);
+            const string key = string(ptr) + "\x01" + c->chooseaname;
+            if (mNarratedChosenNames.find(key) != mNarratedChosenNames.end())
                 continue;
-            mNarratedChosenNames.insert(key.str());
+            mNarratedChosenNames.insert(key);
             appendNarration(chosenNameNarration(pl == this, c->getDisplayName() + instanceHandle(c),
                                                 c->chooseaname));
         }
@@ -12238,6 +12733,25 @@ static string converterSituationLine(Player * me, Player * opp)
 //does not - and never rendered.
 string AIPlayerGPT::serializeGameState(const std::string * optionText)
 {
+    return serializeGameStateImpl(optionText, NULL);
+}
+
+//audit-L (A19): ONE heavy render for both the ask key and the prompt. The two
+//variants the seams need - serializeGameState() for the key (optionText NULL)
+//and serializeGameState(&tail) for the prompt - differ in exactly one block,
+//the own battlefield, and only when the option block names an own permanent
+//(the #W47 R7 skip). Everything else (the oracle pass, both battlefields'
+//index, the stack, the mana line, the punisher/converter scans, the zone
+//lines) is rendered once and shared byte-for-byte; the own block is rendered
+//a second time only when the skip set is non-empty. Returns the prompt
+//variant; *keyVariant receives the key variant.
+string AIPlayerGPT::serializeGameStatePair(const string& tail, string * keyVariant)
+{
+    return serializeGameStateImpl(&tail, keyVariant);
+}
+
+string AIPlayerGPT::serializeGameStateImpl(const std::string * optionText, std::string * keyVariant)
+{
     std::ostringstream out;
     Player * opp = this->opponent();
 
@@ -12577,7 +13091,19 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
         }
     out << "\n" << battlefieldHeaderText(true, myPermanents, myCreatures, myCanAttack,
                                          activeSeat == this, myAttacking, myLands);
+    //audit-L (A19): the one block the key variant renders differently.
+    const size_t ownBlockStart = keyVariant ? (size_t) out.tellp() : 0;
     describeZoneCards(out, game->inPlay, true, "your hand", true, &ownEffectSkip);
+    const size_t ownBlockEnd = keyVariant ? (size_t) out.tellp() : 0;
+    const bool ownBlockSame = ownEffectSkip.empty();
+    string ownBlockKey;
+    if (keyVariant && !ownBlockSame)
+    {
+        std::ostringstream alt;
+        std::set<string> noSkip;
+        describeZoneCards(alt, game->inPlay, true, "your hand", true, &noSkip);
+        ownBlockKey = alt.str();
+    }
     if (opp)
     {
         out << "\n" << battlefieldHeaderText(false, oppPermanents, oppCreatures, oppCanAttack,
@@ -12660,7 +13186,15 @@ string AIPlayerGPT::serializeGameState(const std::string * optionText)
         }
     }
     out << "\n" << yourLibraryLine(game->library->nb_cards, myLibInReveal) << "\n";
-    return out.str();
+    const string rendered = out.str();
+    if (keyVariant) //audit-L (A19): splice the key variant's own block in
+    {
+        if (ownBlockSame)
+            *keyVariant = rendered;
+        else
+            *keyVariant = rendered.substr(0, ownBlockStart) + ownBlockKey + rendered.substr(ownBlockEnd);
+    }
+    return rendered;
 }
 
 //A modal-DFC "Flip Side" activation reaches the seat wrapped: the doubleside
@@ -39661,6 +40195,62 @@ static const char * kW50Y_r94 =
         CHECK(AIPlayerGPT::handedToHeuristic(-1, "engine_answered")
               && AIPlayerGPT::handedToHeuristic(-1, "reveal_stall_forced"),
               "#W54-F D7b with a class stamped it earns one - both engine-answered classes");
+    }
+    // ---- audit-L: A24 http_error class, L10 trim arithmetic ----
+    cout << "\n[audit-L] A24 the http_error class\n";
+    {
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 401)) == "http_error",
+              "audit-L A24 a 401 is its own class - a wrong key is not a dead server");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 413)) == "http_error"
+              && string(AIPlayerGPT::noAnswerClassFor(false, false, false, 429)) == "http_error"
+              && string(AIPlayerGPT::noAnswerClassFor(false, false, false, 503)) == "http_error",
+              "audit-L A24 413/429/5xx likewise");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, true, false, 504)) == "http_error",
+              "audit-L A24 a status at the wall names the status - the server answered");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, true, 400)) == "http_error",
+              "audit-L A24 reasoning text beside a 4xx does not hide the status");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(true, false, false, 401)) == "stale_livelock",
+              "audit-L A24 NEGATIVE the breaker still wins - its give-up consumed no round trip");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 200)) == "empty_reply",
+              "audit-L A24 NEGATIVE a 200 with an empty body is the old class");
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, false, false, 0)) == "empty_reply"
+              && string(AIPlayerGPT::noAnswerClassFor(false, true, false, 0)) == "timeout"
+              && string(AIPlayerGPT::noAnswerClassFor(false, false, true, 0)) == "reasoning_only",
+              "audit-L A24 NEGATIVE no status = the three-fact table, unchanged");
+    }
+    cout << "\n[audit-L] L10 narration trim arithmetic\n";
+    {
+        CHECK(narrationTrimKeep(0) == 19999 && narrationTrimKeep(100) == 19899,
+              "audit-L L10a the kept tail is short of 20,000 by the marker and its newline");
+        CHECK(narrationTrimKeep(30000) == 20000,
+              "audit-L L10a NEGATIVE an absurd marker cannot drive the tail to zero");
+        CHECK(!narrationTrimNear(23990, 5, 0) && narrationTrimNear(23990, 8, 0),
+              "audit-L L10b the line's own '- '/newline decoration counts toward the cap");
+        CHECK(!narrationTrimNear(23980, 5, 0) && narrationTrimNear(23980, 5, 10),
+              "audit-L L10b a pending phase line that crosses the cap builds the marker");
+        CHECK(!narrationTrimNear(100, 100, 100),
+              "audit-L L10b NEGATIVE a short log is nowhere near the cap");
+        //the composed effect: a heavy marker no longer leaves the log above the
+        //cap after its own trim
+        string log, ph;
+        const string heavy(4000, 'x');
+        size_t prev = 0;
+        int trims = 0, overAfterTrim = 0;
+        for (int i = 0; i < 900; i++)
+        {
+            narrationAppend(log, ph, "You drew a card, and then some more text to pad the line out", heavy);
+            if (log.size() < prev) //a trim fired on this append
+            {
+                trims++;
+                if (log.size() > 20000)
+                    overAfterTrim++;
+            }
+            prev = log.size();
+        }
+        CHECK(trims > 0 && overAfterTrim == 0 && log.find(heavy) == 0,
+              "audit-L L10a every trim behind a 4 KB marker leaves the log at or under 20,000");
+        CHECK(trims < 900 / 50,
+              "audit-L L10a the trim fires once per ~4 KB of lines, not once per line");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
