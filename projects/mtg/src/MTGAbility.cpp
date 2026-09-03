@@ -7877,9 +7877,17 @@ int MTGAbility::testDestroy()
     //entry of the turn, per ability, per tick) can only turn a 1 into a 0, so
     //it runs only when the zone tests below would say 1 - the rare case.
     //target == source is already known to be in play, no dynamic_cast needed.
-    bool gone = !game->isInPlay(source);
-    if (!gone && target && target != source && !dynamic_cast<Player*>(target) && !game->isInPlay((MTGCardInstance *) target))
-        gone = true;
+    //GameObserver::isInPlay, inlined: MTGGameZone::hasCard is a currentZone
+    //compare, and the three-call chain is a real call on every build (no LTO).
+    MTGGameZone * bf0 = game->players[0]->game->inPlay;
+    MTGGameZone * bf1 = game->players[1]->game->inPlay;
+    bool gone = !(source->currentZone == bf0 || source->currentZone == bf1);
+    if (!gone && target && target != source && !dynamic_cast<Player*>(target))
+    {
+        MTGGameZone * tz = ((MTGCardInstance *) target)->currentZone;
+        if (tz != bf0 && tz != bf1)
+            gone = true;
+    }
     if (!gone)
         return 0;
     if(game->mLayers->stackLayer()->has(this)) //Moved here to avoid a random crash (e.g. blasphemous act)
