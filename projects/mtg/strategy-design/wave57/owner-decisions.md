@@ -33,3 +33,12 @@ board marker on every card that is a pending stack item's target (CardGui, befor
 independent of the grouping option. The claim that a per-card target border already exists was
 Claude's and unverified — the stack-entry target thumbnails exist (ActionStack.cpp), a board marker
 was not found.
+
+**Softlock escape (owner request, verbatim, 2026-09-03):** "We need a softlock exit to main menu
+option, for capturing diagnostics from softlocks." -> lane T: (a) in-thread hang guard at the
+engine's loop sites (per-tick time budget, throws a SoftlockAbort caught at the game-loop top ->
+diagnostics dump -> main menu); (b) watchdog thread + pad chord for unguarded hangs (dump, then
+forced exit — LiveArea on the console, the honest limit). Dump = turn/phase/active player,
+interrupt holder, pending choice + chooser state, stack, action-layer abilities, last transcript
+lines, last frame timing, the tripping loop site; file ux0:data/Wagic/softlock-<ts>.txt +
+`#classification=softlock` on the transcript.
