@@ -353,8 +353,14 @@ std::string wordWrap(const std::string& sentence, float width, int fontId)
             {                
                 if ( stringLength > width )
                 {
-                    while ( sentence[idx-1] != ' ' )
-                        idx--;
+                    //#W54-K (L19): back up to the previous space, but never past
+                    //the start of this line - a first word wider than the line
+                    //walked idx to 0 and read sentence[SIZE_MAX].
+                    size_t back = idx;
+                    while ( back > (size_t) breakIdx + 1 && sentence[back-1] != ' ' )
+                        back--;
+                    if ( back > (size_t) breakIdx + 1 )
+                        idx = back;
                 }
                 retVal[idx-1] = '\n';                
                 breakIdx = idx;
@@ -369,8 +375,11 @@ std::string wordWrap(const std::string& sentence, float width, int fontId)
             {                
                 if ( stringLength > width )
                 {
-                    while ( sentence[idx-1] != ' ' )
-                        idx--;
+                    size_t back = idx; //#W54-K (L19): bounded, see above
+                    while ( back > (size_t) breakIdx + 1 && sentence[back-1] != ' ' )
+                        back--;
+                    if ( back > (size_t) breakIdx + 1 )
+                        idx = back;
                     retVal[idx-1] = '\n';                
                 }
                 numLines++;

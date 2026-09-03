@@ -15,7 +15,7 @@ class TestSuiteActions
 {
 public:
     int nbitems;
-    string actions[MAX_TESTSUITE_ACTIONS];
+    vector<string> actions; // audit-K (A51): was string[MAX_TESTSUITE_ACTIONS], unchecked
     void add(string action);
     TestSuiteActions();
     void cleanup();

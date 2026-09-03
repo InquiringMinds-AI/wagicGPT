@@ -1140,9 +1140,9 @@ MTGCard * MTGAllCards::getOtherFaceCard(const string& name, int setId, int refId
     {
         MTGCard * c = printings[i].second;
         if (!c || c->setId != setId || !c->data) continue;
-        string cardName = c->data->name;
-        std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
-        if (cardName.compare(lower) == 0) ids.push_back(c->getMTGId());
+        //#W54-K (A36): compare the primitive's cached lowercase name; the
+        //per-printing lowercase copy was a heap string per printing per lookup.
+        if (c->data->getLCName().compare(lower) == 0) ids.push_back(c->getMTGId());
     }
     int pick = wagicPickFaceSiblingId(ids, refId);
     if (pick < 0) return fallback;
@@ -1207,9 +1207,7 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
         {
             MTGCard * c = printings[i].second;
             if (forcedSetId != c->setId) continue;
-            string cardName = c->data->name;
-            std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
-            if (cardName.compare(nameDescriptor) == 0) {
+            if (c->data->getLCName().compare(nameDescriptor) == 0) { //#W54-K (A36)
                 if (c->getRarity() == Constants::RARITY_T)
                 {
                     if (!tokenFallback) tokenFallback = c;
@@ -1247,8 +1245,7 @@ MTGCard * MTGAllCards::getCardByName(string nameDescriptor, int forcedSetId)
     for (size_t i = 0; i < printings.size(); i++)
     {
         MTGCard * c = printings[i].second;
-        string cardName = c->data->name;
-        std::transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
+        const string & cardName = c->data->getLCName(); //#W54-K (A36)
         if (setId != -1 && setId != c->setId)
         {
             //A printing with this exact name EXISTS, but the set hint filtered it out.
@@ -1313,7 +1310,7 @@ MTGDeck::MTGDeck(const string& config_file, MTGAllCards * _allcards, int meta_on
     size_t slash = filename.find_last_of("/");
     size_t dot = filename.find(".");
     meta_name = filename.substr(slash + 1, dot - slash - 1);
-    meta_id = atoi(meta_name.substr(4).c_str());
+    meta_id = meta_name.size() > 4 ? atoi(meta_name.substr(4).c_str()) : 0; //#W54-K (L19)
     std::string contents;
     if (JFileSystem::GetInstance()->readIntoString(config_file, contents))
     {
@@ -1396,6 +1393,7 @@ MTGDeck::MTGDeck(const string& config_file, MTGAllCards * _allcards, int meta_on
                     while (it != s.end() && std::isdigit(*it)) ++it;
                     if(!s.empty() && it == s.end()){
                         MTGCard * newcard = database->getCardById(atoi(s.c_str()));
+                        if(!newcard || !newcard->data) continue; //#W54-K (L19): unknown id
                         if(!CommandZone.size() && newcard->data->hasType("Legendary") && (newcard->data->hasType("Creature") || newcard->data->basicAbilities[Constants::CANBECOMMANDER] || newcard->data->hasType("Background"))) // If no commander has been added you can add one.
                             CommandZone.push_back(s);
                         else if(CommandZone.size() == 1 && newcard->data->hasType("Legendary") && (newcard->data->hasType("Creature") || newcard->data->basicAbilities[Constants::CANBECOMMANDER])){ // If a commander has been added you can add a new one just if both have partner ability of if one can choose a Background.
@@ -1882,7 +1880,7 @@ void MTGDeck::printDetailedDeckText(std::ofstream& file )
             continue;
         }
         MTGSetInfo *setInfo = setlist.getInfo(card->setId);
-        string setName = setInfo->id;
+        string setName = setInfo ? setInfo->id : string(); //#W54-K (L19)
         string cardName = card->data->getName();
 
         currentCard << "#" << nbCards << "x " << cardName << " (" << setName << "), ";

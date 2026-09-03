@@ -48,35 +48,32 @@ DeckStats::~DeckStats()
 
 DeckStat* DeckStats::getDeckStat(string opponentsFile)
 {
-    map<string, DeckStat *> stats = masterDeckStats[currentDeck];
-    //map<string, DeckStat *>::iterator it = stats.find(opponentsFile); 
-    //this method can not find the opponentfile string
-    //stats string for first doesn't even act like a string, i was forced to pull it out of the
-    //iter to make the comparison. it->first.find( for example was not finding it even though i can
-    //see them in the debugger as matching strings
-    map<string, DeckStat *>::iterator it;
+    //#W54-K (L20): the map used to be COPIED per query, and the lookup was a
+    //bare substring match, so "deck2" resolved to "deck20"'s row whenever
+    //deck2 had none. Exact key first; the substring fallback (kept for keys
+    //that carry a path prefix) only accepts a match that ends at a token
+    //boundary.
+    map<string, DeckStat *> & stats = masterDeckStats[currentDeck];
+    map<string, DeckStat *>::iterator it = stats.find(opponentsFile);
+    if (it != stats.end())
+        return it->second;
     for (it = stats.begin(); it != stats.end(); ++it) 
     {
-        string deckStatName = it->first;
-        if(deckStatName.find(opponentsFile.c_str()) != string::npos)
-        {
-            break;
-        }
+        const string & deckStatName = it->first;
+        size_t pos = deckStatName.find(opponentsFile);
+        if (pos == string::npos)
+            continue;
+        size_t after = pos + opponentsFile.size();
+        if (after == deckStatName.size() || !isalnum((unsigned char) deckStatName[after]))
+            return it->second;
     }
-    if (it == stats.end())
-    {
-        return NULL;
-    }
-    else
-    {
-        return it->second;
-    }
+    return NULL;
 }
 
 int DeckStats::nbGames()
 {
     int nbgames = 0;
-    map<string, DeckStat *> stats = masterDeckStats[currentDeck];
+    map<string, DeckStat *> & stats = masterDeckStats[currentDeck];
     map<string, DeckStat *>::iterator it;
     for (it = stats.begin(); it != stats.end(); it++)
     {
@@ -88,7 +85,7 @@ int DeckStats::nbGames()
 
 int DeckStats::percentVictories(string opponentsFile)
 {
-    map<string, DeckStat *> stats = masterDeckStats[currentDeck];
+    map<string, DeckStat *> & stats = masterDeckStats[currentDeck];
     map<string, DeckStat *>::iterator it = stats.find(opponentsFile);
     if (it == stats.end())
     {
@@ -104,7 +101,7 @@ int DeckStats::percentVictories()
 {
     int victories = 0;
     int nbgames = 0;
-    map<string, DeckStat *> stats = masterDeckStats[currentDeck];
+    map<string, DeckStat *> & stats = masterDeckStats[currentDeck];
     map<string, DeckStat *>::iterator it;
     for (it = stats.begin(); it != stats.end(); it++)
     {
@@ -184,7 +181,7 @@ void DeckStats::save(const std::string& filename)
     if (JFileSystem::GetInstance()->openForWrite(file, filename))
     {
         char writer[512];
-        map<string, DeckStat *> stats = masterDeckStats[currentDeck];
+        map<string, DeckStat *> & stats = masterDeckStats[currentDeck];
         map<string, DeckStat *>::iterator it;
         string manaColorIndex = "";
         int deckId = atoi(filename.substr(filename.find("_deck") + 5, filename.find(".txt")).c_str());

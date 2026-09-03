@@ -215,16 +215,16 @@ int AIPlayer::clickSingleTarget(TargetChooser *, vector<Targetable*>& potentialT
 
 AIPlayer * AIPlayerFactory::createAIPlayer(GameObserver *observer, MTGAllCards * collection, Player * opponent, int deckid)
 {
-    char deckFile[512];
+    string deckFile; //#W54-K (L22): was a char[512] sprintf of a profile-chosen path
     string avatarFilename = ""; // default imagename
-    char deckFileSmall[512];
+    string deckFileSmall;
     
     if (deckid == GameStateDuel::MENUITEM_EVIL_TWIN)
     { //Evil twin
-        sprintf(deckFile, "%s", opponent->deckFile.c_str());
+        deckFile = opponent->deckFile;
         DebugTrace("Evil Twin => " << opponent->deckFile);
         avatarFilename = "avatar.jpg";
-        sprintf(deckFileSmall, "%s", "ai_baka_eviltwin");
+        deckFileSmall = "ai_baka_eviltwin";
     }
     else
     {
@@ -236,11 +236,14 @@ AIPlayer * AIPlayerFactory::createAIPlayer(GameObserver *observer, MTGAllCards *
                 return NULL;
             deckid = 1 + WRand() % (nbdecks);
         }
-        sprintf(deckFile, "ai/baka/deck%i.txt", deckid);
+        char buf[64];
+        sprintf(buf, "ai/baka/deck%i.txt", deckid);
+        deckFile = buf;
         DeckMetaData *aiMeta = observer->getDeckManager()->getDeckMetaDataByFilename( deckFile, true);
         if(aiMeta)
             avatarFilename = aiMeta->getAvatarFilename();
-        sprintf(deckFileSmall, "ai_baka_deck%i", deckid);
+        sprintf(buf, "ai_baka_deck%i", deckid);
+        deckFileSmall = buf;
     }
 
     AIPlayer * ai = createAIPlayerFromDeckFile(observer, collection, opponent, deckFile, deckFileSmall, avatarFilename);

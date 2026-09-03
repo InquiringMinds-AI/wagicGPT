@@ -106,6 +106,20 @@ class AIPlayerBaka: public AIPlayer{
     vector<MTGAbility*> planPaymentForAction(MTGAbility * ability, MTGCardInstance * click,
                                              ManaCost * totalPotentialMana);
 
+    // audit-K (A3): the activation scan shared by selectAbility (every
+    // ability x its candidate cards) and doAbility (one card). See the
+    // definitions in AIPlayerBaka.cpp. WAGIC_BAKA_LEGACY_SCAN=1 restores
+    // the old every-pair scan.
+    static bool abilityCanReactTo(MTGAbility * a, MTGCardInstance * card);
+    void rankPair(MTGAbility * a, MTGCardInstance * card, ManaCost * totalPotentialMana,
+                  RankingContainer & ranking, vector<MTGAbility*> & abilityPayment,
+                  std::map<MTGCardInstance*, ManaCost*> & potentialByCard,
+                  MTGAbility * Specific,
+                  std::map<MTGAbility*, vector<MTGAbility*> > * costPlans);
+    void rankActivations(RankingContainer & ranking, ManaCost * totalPotentialMana,
+                         MTGAbility * Specific, MTGCardInstance * withCard,
+                         std::map<MTGAbility*, vector<MTGAbility*> > * costPlans);
+
     virtual MTGCardInstance * chooseCard(TargetChooser * tc, MTGCardInstance * source, int random = 0);
     //The COMMIT choice for an extra-cost target (what to sacrifice/tap/
     //discard to pay a cost) - split from chooseCard because chooseCard is

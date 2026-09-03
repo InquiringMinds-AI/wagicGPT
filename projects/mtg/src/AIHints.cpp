@@ -320,7 +320,7 @@ bool AIHints::canWeCombo(GameObserver* observer,MTGCardInstance * card,AIPlayerB
             for(unsigned int hPart = 0; hPart < hints[i]->hold.size(); hPart++)
             {
                 hintTc = tfc.createTargetChooser(hints[i]->hold[hPart],card);
-                int TcCheck = hintTc->countValidTargets();
+                int TcCheck = hintTc ? hintTc->countValidTargets() : 0; //#W54-K (L19)
                 if(hintTc && TcCheck >= hintTc->maxtargets)
                 {
                     comboPartsHold +=1;
@@ -333,7 +333,7 @@ bool AIHints::canWeCombo(GameObserver* observer,MTGCardInstance * card,AIPlayerB
             for(unsigned int hPart = 0; hPart < hints[i]->until.size(); hPart++)
             {
                 hintTc = tfc.createTargetChooser(hints[i]->until[hPart],card);
-                int TcCheck = hintTc->countValidTargets();
+                int TcCheck = hintTc ? hintTc->countValidTargets() : 0; //#W54-K (L19)
                 if(hintTc && TcCheck >= hintTc->maxtargets)
                 {
                     comboPartsUntil +=1;

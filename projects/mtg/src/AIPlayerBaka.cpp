@@ -12,6 +12,9 @@
 #include "ManaCostHybrid.h"
 #include "MTGRules.h"
 
+//#W54-K (A3): WAGIC_BAKA_LEGACY_SCAN=1 restores the every-pair activation scan (defined with rankActivations).
+static bool bakaLegacyScan();
+
 //
 // AIAction
 //
@@ -253,7 +256,10 @@ int OrderedAIAction::getEfficiency()
 
     AACastCard * CC = dynamic_cast<AACastCard*> (a);
     if (CC)
+    {
+        SAFE_DELETE(transAbility); //#W54-K (A37): was leaked on this early return
         return 99;
+    }
 
     switch (a->aType)
     {
@@ -967,7 +973,10 @@ int OrderedAIAction::getRevealedEfficiency(MTGAbility * ability2)
 
     AACastCard * CC = dynamic_cast<AACastCard*> (a);
     if (CC)
+    {
+        SAFE_DELETE(transAbility); //#W54-K (A37): was leaked on this early return
         return 99;
+    }
 
     switch (a->aType)
     {
@@ -1224,7 +1233,8 @@ int OrderedAIAction::getRevealedEfficiency(MTGAbility * ability2)
         {
             AManaProducer * manamaker = dynamic_cast<AManaProducer*>(a);
             GenericActivatedAbility * GAA = dynamic_cast<GenericActivatedAbility*>(ability2);
-            AForeach * forMana = dynamic_cast<AForeach*>(GAA->ability);
+            //#W54-K (A37): the getEfficiency original guards GAA; this copy dereferenced it.
+            AForeach * forMana = GAA ? dynamic_cast<AForeach*>(GAA->ability) : NULL;
             if (manamaker && forMana)
             {
                 int outPut = forMana->checkActivation();
@@ -2337,208 +2347,11 @@ int AIPlayerBaka::selectAbility()
     }
 
     RankingContainer ranking;
-    list<int>::iterator it;
-    vector<MTGAbility*>abilityPayment = vector<MTGAbility*>();
-    //This loop is extrmely inefficient. TODO: optimize!
     ManaCost * totalPotentialMana = getPotentialMana();
     totalPotentialMana->add(this->getManaPool());
-    for (size_t i = 1; i < observer->mLayers->actionLayer()->mObjects.size(); i++)
-    { //0 is not a mtgability...hackish
-        MTGAbility * a = ((MTGAbility *) observer->mLayers->actionLayer()->mObjects[i]);
-        //Skip mana abilities for performance
-        if (dynamic_cast<AManaProducer*> (a))
-            continue;
-        //Make sure we can use the ability with card in play
-        for (int j = 0; j < game->inPlay->nb_cards; j++)
-        {
-            MTGCardInstance * card = game->inPlay->cards[j];
-            if(a->getCost() && !a->isReactingToClick(card, totalPotentialMana))//for performance reason only look for specific mana if the payment couldnt be made with potential.
-            {
-                abilityPayment = canPayMana(card,a->getCost(),card->has(Constants::ANYTYPEOFMANAABILITY));
-            }
-            if (a->isReactingToClick(card, totalPotentialMana) || abilityPayment.size())
-            { //This test is to avoid the huge call to getPotentialManaCost after that
-                if(a->getCost() && a->getCost()->hasX() && totalPotentialMana->getConvertedCost() < a->getCost()->getConvertedCost()+1)
-                    continue;
-                //don't even bother to play an ability with {x} if you can't even afford x=1.
-                if (abilityPayment.size())
-                {
-                    ManaCost *fullPayment = NEW ManaCost();
-                    for(int ch = 0; ch < int(abilityPayment.size());ch++)
-                    {
-                        AManaProducer * ampp = dynamic_cast<AManaProducer*> (abilityPayment[ch]);
-                        if(ampp)
-                            fullPayment->add(ampp->output);
-                    }
-                    if (fullPayment && a->isReactingToClick(card, fullPayment))
-                        createAbilityTargets(a, card, ranking);
-                    delete fullPayment;
-                }
-                else
-                {
-                    ManaCost * pMana = getPotentialMana(card);
-                    pMana->add(this->getManaPool());
-                    if (a->isReactingToClick(card, pMana))
-                    {
-                        createAbilityTargets(a, card, ranking);
-                    }
-                    delete (pMana);
-                }     
-            }
-        }
-        //Make sure we can use the ability with card in commandzone
-        for (int j = 0; j < game->commandzone->nb_cards; j++)
-        {
-            MTGCardInstance * card = game->commandzone->cards[j];
-            if(a->getCost() && !a->isReactingToClick(card, totalPotentialMana))//for performance reason only look for specific mana if the payment couldnt be made with potential.
-            {
-                abilityPayment = canPayMana(card,a->getCost(),card->has(Constants::ANYTYPEOFMANAABILITY));
-            }
-            if (a->isReactingToClick(card, totalPotentialMana) || abilityPayment.size())
-            { //This test is to avoid the huge call to getPotentialManaCost after that
-                if(a->getCost() && a->getCost()->hasX() && totalPotentialMana->getConvertedCost() < a->getCost()->getConvertedCost()+1)
-                    continue;
-                //don't even bother to play an ability with {x} if you can't even afford x=1.
-                if (abilityPayment.size())
-                {
-                    ManaCost *fullPayment = NEW ManaCost();
-                    for(int ch = 0; ch < int(abilityPayment.size());ch++)
-                    {
-                        AManaProducer * ampp = dynamic_cast<AManaProducer*> (abilityPayment[ch]);
-                        if(ampp)
-                            fullPayment->add(ampp->output);
-                    }
-                    if (fullPayment && a->isReactingToClick(card, fullPayment))
-                        createAbilityTargets(a, card, ranking);
-                    delete fullPayment;
-                }
-                else
-                {
-                    ManaCost * pMana = getPotentialMana(card);
-                    pMana->add(this->getManaPool());
-                    if (a->isReactingToClick(card, pMana))
-                    {
-                        createAbilityTargets(a, card, ranking);
-                    }
-                    delete (pMana);
-                }     
-            }
-        }
-        //Make sure we can use the ability with card in hand
-        for (int j = 0; j < game->hand->nb_cards; j++)
-        {
-            MTGCardInstance * card = game->hand->cards[j];
-            if(a->getCost() && !a->isReactingToClick(card, totalPotentialMana))//for performance reason only look for specific mana if the payment couldnt be made with potential.
-            {
-                abilityPayment = canPayMana(card,a->getCost(),card->has(Constants::ANYTYPEOFMANAABILITY));
-            }
-            if (a->isReactingToClick(card, totalPotentialMana) || abilityPayment.size())
-            { //This test is to avoid the huge call to getPotentialManaCost after that
-                if(a->getCost() && a->getCost()->hasX() && totalPotentialMana->getConvertedCost() < a->getCost()->getConvertedCost()+1)
-                    continue;
-                //don't even bother to play an ability with {x} if you can't even afford x=1.
-                if (abilityPayment.size())
-                {
-                    ManaCost *fullPayment = NEW ManaCost();
-                    for(int ch = 0; ch < int(abilityPayment.size());ch++)
-                    {
-                        AManaProducer * ampp = dynamic_cast<AManaProducer*> (abilityPayment[ch]);
-                        if(ampp)
-                            fullPayment->add(ampp->output);
-                    }
-                    if (fullPayment && a->isReactingToClick(card, fullPayment))
-                        createAbilityTargets(a, card, ranking);
-                    delete fullPayment;
-                }
-                else
-                {
-                    ManaCost * pMana = getPotentialMana(card);
-                    pMana->add(this->getManaPool());
-                    if (a->isReactingToClick(card, pMana))
-                    {
-                        createAbilityTargets(a, card, ranking);
-                    }
-                    delete (pMana);
-                }     
-            }
-        }
-        //Make sure we can use the ability with card in graveyard
-        for (int j = 0; j < game->graveyard->nb_cards; j++)
-        {
-            MTGCardInstance * card = game->graveyard->cards[j];
-            if(a->getCost() && !a->isReactingToClick(card, totalPotentialMana))//for performance reason only look for specific mana if the payment couldnt be made with potential.
-            {
-                abilityPayment = canPayMana(card,a->getCost(),card->has(Constants::ANYTYPEOFMANAABILITY));
-            }
-            if (a->isReactingToClick(card, totalPotentialMana) || abilityPayment.size())
-            { //This test is to avoid the huge call to getPotentialManaCost after that
-                if(a->getCost() && a->getCost()->hasX() && totalPotentialMana->getConvertedCost() < a->getCost()->getConvertedCost()+1)
-                    continue;
-                //don't even bother to play an ability with {x} if you can't even afford x=1.
-                if (abilityPayment.size())
-                {
-                    ManaCost *fullPayment = NEW ManaCost();
-                    for(int ch = 0; ch < int(abilityPayment.size());ch++)
-                    {
-                        AManaProducer * ampp = dynamic_cast<AManaProducer*> (abilityPayment[ch]);
-                        if(ampp)
-                            fullPayment->add(ampp->output);
-                    }
-                    if (fullPayment && a->isReactingToClick(card, fullPayment))
-                        createAbilityTargets(a, card, ranking);
-                    delete fullPayment;
-                }
-                else
-                {
-                    ManaCost * pMana = getPotentialMana(card);
-                    pMana->add(this->getManaPool());
-                    if (a->isReactingToClick(card, pMana))
-                    {
-                        createAbilityTargets(a, card, ranking);
-                    }
-                    delete (pMana);
-                }     
-            }
-        }
-        //Make sure we can use the ability with card in exile
-        for (int j = 0; j < game->exile->nb_cards; j++)
-        {
-            MTGCardInstance * card = game->exile->cards[j];
-            if(a->getCost() && !a->isReactingToClick(card, totalPotentialMana))//for performance reason only look for specific mana if the payment couldnt be made with potential.
-            {
-                abilityPayment = canPayMana(card,a->getCost(),card->has(Constants::ANYTYPEOFMANAABILITY));
-            }
-            if (a->isReactingToClick(card, totalPotentialMana) || abilityPayment.size())
-            { //This test is to avoid the huge call to getPotentialManaCost after that
-                if(a->getCost() && a->getCost()->hasX() && totalPotentialMana->getConvertedCost() < a->getCost()->getConvertedCost()+1)
-                    continue;
-                //don't even bother to play an ability with {x} if you can't even afford x=1.
-                if (abilityPayment.size())
-                {
-                    ManaCost *fullPayment = NEW ManaCost();
-                    for(int ch = 0; ch < int(abilityPayment.size());ch++)
-                    {
-                        AManaProducer * ampp = dynamic_cast<AManaProducer*> (abilityPayment[ch]);
-                        if(ampp)
-                            fullPayment->add(ampp->output);
-                    }
-                    if (fullPayment && a->isReactingToClick(card, fullPayment))
-                        createAbilityTargets(a, card, ranking);
-                    delete fullPayment;
-                }
-                else
-                {
-                    ManaCost * pMana = getPotentialMana(card);
-                    pMana->add(this->getManaPool());
-                    if (a->isReactingToClick(card, pMana))
-                    {
-                        createAbilityTargets(a, card, ranking);
-                    }
-                    delete (pMana);
-                }     
-            }
-        }
-    }
+    //#W54-K (A3): one pass over the action layer, each ability probed only
+    //against the cards that can react to it - see rankActivations.
+    rankActivations(ranking, totalPotentialMana, NULL, NULL, NULL);
     const OrderedAIAction * chosenAction = chooseOrderedAction(ranking);
     if (chosenAction)
     {
@@ -2575,8 +2388,6 @@ int AIPlayerBaka::selectAbility()
         }
     }
     delete totalPotentialMana;
-
-    abilityPayment.clear();
     return 1;
 }
 
@@ -2622,70 +2433,14 @@ int AIPlayerBaka::doAbility(MTGAbility * Specific, MTGCardInstance * withCard)
     }
 
     RankingContainer ranking;
-    list<int>::iterator it;
-    vector<MTGAbility*>abilityPayment = vector<MTGAbility*>();
-    MTGCardInstance * card = withCard;
     ManaCost * totalPotentialMana = getPotentialMana();
     totalPotentialMana->add(this->getManaPool());
-    for (size_t i = 1; i < observer->mLayers->actionLayer()->mObjects.size(); i++)
-    {
-        MTGAbility * a = ((MTGAbility *)observer->mLayers->actionLayer()->mObjects[i]);
-        if (Specific && Specific != a)
-            continue;
-        //Make sure we can use the ability
-        if (a->getCost() && !a->isReactingToClick(card, totalPotentialMana))//for performance reason only look for specific mana if the payment couldnt be made with potential.
-        {
-            abilityPayment = canPayMana(card, a->getCost(), card->has(Constants::ANYTYPEOFMANAABILITY));
-        }
-        if (a->isReactingToClick(card, totalPotentialMana) || abilityPayment.size())
-        { //This test is to avoid the huge call to getPotentialManaCost after that
-            if (a->getCost() && a->getCost()->hasX() && totalPotentialMana->getConvertedCost() < a->getCost()->getConvertedCost() + 1)
-                continue;
-            //don't even bother to play an ability with {x} if you can't even afford x=1.
-            if (abilityPayment.size())
-            {
-                ManaCost *fullPayment = NEW ManaCost();
-                for (int ch = 0; ch < int(abilityPayment.size()); ch++)
-                {
-                    AManaProducer * ampp = dynamic_cast<AManaProducer*> (abilityPayment[ch]);
-                    if (ampp)
-                        fullPayment->add(ampp->output);
-                }
-                if (fullPayment && a->isReactingToClick(card, fullPayment))
-                    createAbilityTargets(a, card, ranking);
-                delete fullPayment;
-            }
-            else
-            {
-                ManaCost * pMana = getPotentialMana(card);
-                pMana->add(this->getManaPool());
-                if (a->isReactingToClick(card, pMana))
-                {
-                    createAbilityTargets(a, card, ranking);
-
-                    if (!Specific->getCost())
-                    {
-                        //attackcost, blockcost
-                        if (a->aType == MTGAbility::ATTACK_COST)
-                        {
-                            ManaCost * specificCost = NEW ManaCost(ManaCost::parseManaCost("{0}", NULL, NULL));
-                            specificCost->add(0, card->attackCostBackup);
-                            abilityPayment = canPayMana(card, specificCost, card->has(Constants::ANYTYPEOFMANAABILITY));
-                            SAFE_DELETE(specificCost);
-                        }
-                        else if (a->aType == MTGAbility::BLOCK_COST)
-                        {
-                            ManaCost * specificCost = NEW ManaCost(ManaCost::parseManaCost("{0}", NULL, NULL));
-                            specificCost->add(0, card->blockCostBackup);
-                            abilityPayment = canPayMana(card, specificCost, card->has(Constants::ANYTYPEOFMANAABILITY));
-                            SAFE_DELETE(specificCost);
-                        }
-                    }
-                }
-                delete (pMana);
-            }
-        }
-    }
+    //#W54-K (A3): the attack/block-cost plan the scan builds for a specific
+    //ability is keyed by that ability instead of riding the shared scan
+    //variable (which the N-116g note below documents as belonging to
+    //whichever pair last set it).
+    std::map<MTGAbility*, vector<MTGAbility*> > costPlans;
+    rankActivations(ranking, totalPotentialMana, Specific, withCard, &costPlans);
     if (ranking.size())
     {
         OrderedAIAction action = ranking.begin()->first;
@@ -2707,30 +2462,32 @@ int AIPlayerBaka::doAbility(MTGAbility * Specific, MTGCardInstance * withCard)
                 //cost path recomputes for the chosen action.
                 vector<MTGAbility*> chosenPayment = planPaymentForAction(action.ability, action.click,
                                                                         totalPotentialMana);
-                if (abilityPayment.size() || chosenPayment.size())
+                vector<MTGAbility*> & costPlan = costPlans[action.ability];
+                if (costPlan.size() || chosenPayment.size())
                 {
                     DebugTrace(" Ai knows exactly what mana to use for this ability.");
                 }
                 DebugTrace("AIPlayer:Using Activated ability");
 
-                if (!Specific->getCost())
+                if (Specific && !Specific->getCost())
                 {
                     //attackcost, blockcost
+                    //#W54-K (A12): "{0}" parsed through parseManaCost leaked the
+                    //parsed temporary on every call; an empty ManaCost is the
+                    //same cost ({0} adds nothing).
                     if (action.ability->aType == MTGAbility::ATTACK_COST)
                     {
-                        ManaCost * specificCost = NEW ManaCost(ManaCost::parseManaCost("{0}", NULL, NULL));
-                        specificCost->add(0, action.click->attackCostBackup);
-                        if (payTheManaCost(specificCost, action.click->has(Constants::ANYTYPEOFMANAABILITY), action.click, abilityPayment))
+                        ManaCost specificCost;
+                        specificCost.add(0, action.click->attackCostBackup);
+                        if (payTheManaCost(&specificCost, action.click->has(Constants::ANYTYPEOFMANAABILITY), action.click, costPlan))
                             clickstream.push(NEW AIAction(action));
-                        SAFE_DELETE(specificCost);
                     }
                     else if (action.ability->aType == MTGAbility::BLOCK_COST)
                     {
-                        ManaCost * specificCost = NEW ManaCost(ManaCost::parseManaCost("{0}", NULL, NULL));
-                        specificCost->add(0, action.click->blockCostBackup);
-                        if (payTheManaCost(specificCost, action.click->has(Constants::ANYTYPEOFMANAABILITY), action.click, abilityPayment))
+                        ManaCost specificCost;
+                        specificCost.add(0, action.click->blockCostBackup);
+                        if (payTheManaCost(&specificCost, action.click->has(Constants::ANYTYPEOFMANAABILITY), action.click, costPlan))
                             clickstream.push(NEW AIAction(action));
-                        SAFE_DELETE(specificCost);
                     }
                 }
                 else
@@ -2742,8 +2499,169 @@ int AIPlayerBaka::doAbility(MTGAbility * Specific, MTGCardInstance * withCard)
         }
     }
     delete totalPotentialMana;
-    abilityPayment.clear();
     return 1;
+}
+
+//#W54-K (A3) -----------------------------------------------------------------
+//The activation scan behind selectAbility() (every ability x its candidate
+//cards) and doAbility() (one card, optionally one ability).
+//
+//It used to probe EVERY non-mana ability against EVERY card of the AI's
+//battlefield, command zone, hand, graveyard and exile - ~1M (ability, card)
+//pairs per decision tick on a wide board, each probed twice, and each failing
+//pair with a cost running the full mana planner - while only the ability's
+//own source (or, for the few overrides that react to their TARGET, that
+//target) can ever answer isReactingToClick. Abilities with no source are the
+//rules-layer objects (MTGPutInPlayRule, MTGAttackRule, ...) that react to any
+//card, so they keep the full scan.
+//
+//Per pair the probe runs once and its result is reused; the specific-mana
+//plan is cleared before every pair (the shared, never-cleared vector was the
+//N-116g stale-plan defect: a plan built for one ability's cost leaked into
+//every later pair's "can this be paid" verdict); the per-card potential mana
+//is computed once per distinct card and reused across abilities.
+//
+//WAGIC_BAKA_LEGACY_SCAN=1 restores the old scan (all pairs, stale plan
+//carried) so the two can be compared on one binary.
+static bool bakaLegacyScan()
+{
+#if defined (PSP)
+    return false;
+#else
+    static const bool legacy = getenv("WAGIC_BAKA_LEGACY_SCAN") != NULL;
+    return legacy;
+#endif
+}
+
+bool AIPlayerBaka::abilityCanReactTo(MTGAbility * a, MTGCardInstance * card)
+{
+    if (!a->source)
+        return true; //rules-layer object: reacts to any card
+    if (a->source == card)
+        return true;
+    return dynamic_cast<MTGCardInstance*>(a->target) == card;
+}
+
+void AIPlayerBaka::rankPair(MTGAbility * a, MTGCardInstance * card, ManaCost * totalPotentialMana,
+                            RankingContainer & ranking, vector<MTGAbility*> & abilityPayment,
+                            std::map<MTGCardInstance*, ManaCost*> & potentialByCard,
+                            MTGAbility * Specific,
+                            std::map<MTGAbility*, vector<MTGAbility*> > * costPlans)
+{
+    int reacts = a->isReactingToClick(card, totalPotentialMana);
+    if (a->getCost() && !reacts)
+    {
+        //for performance reason only look for specific mana if the payment couldnt be made with potential.
+        abilityPayment = canPayMana(card, a->getCost(), card->has(Constants::ANYTYPEOFMANAABILITY));
+    }
+    if (!reacts && !abilityPayment.size())
+        return;
+    //don't even bother to play an ability with {x} if you can't even afford x=1.
+    if (a->getCost() && a->getCost()->hasX() && totalPotentialMana->getConvertedCost() < a->getCost()->getConvertedCost() + 1)
+        return;
+    if (abilityPayment.size())
+    {
+        ManaCost fullPayment;
+        for (int ch = 0; ch < int(abilityPayment.size()); ch++)
+        {
+            AManaProducer * ampp = dynamic_cast<AManaProducer*> (abilityPayment[ch]);
+            if (ampp)
+                fullPayment.add(ampp->output);
+        }
+        if (a->isReactingToClick(card, &fullPayment))
+            createAbilityTargets(a, card, ranking);
+        return;
+    }
+    ManaCost * pMana = potentialByCard[card];
+    if (!pMana)
+    {
+        pMana = getPotentialMana(card);
+        pMana->add(this->getManaPool());
+        potentialByCard[card] = pMana;
+    }
+    if (!a->isReactingToClick(card, pMana))
+        return;
+    createAbilityTargets(a, card, ranking);
+    if (costPlans && Specific && !Specific->getCost())
+    {
+        //attackcost, blockcost: plan the specific cost for THIS card now, the
+        //payment step reads it back by ability.
+        if (a->aType == MTGAbility::ATTACK_COST)
+        {
+            ManaCost specificCost;
+            specificCost.add(0, card->attackCostBackup);
+            (*costPlans)[a] = canPayMana(card, &specificCost, card->has(Constants::ANYTYPEOFMANAABILITY));
+        }
+        else if (a->aType == MTGAbility::BLOCK_COST)
+        {
+            ManaCost specificCost;
+            specificCost.add(0, card->blockCostBackup);
+            (*costPlans)[a] = canPayMana(card, &specificCost, card->has(Constants::ANYTYPEOFMANAABILITY));
+        }
+    }
+}
+
+void AIPlayerBaka::rankActivations(RankingContainer & ranking, ManaCost * totalPotentialMana,
+                                   MTGAbility * Specific, MTGCardInstance * withCard,
+                                   std::map<MTGAbility*, vector<MTGAbility*> > * costPlans)
+{
+    const bool legacy = bakaLegacyScan();
+    MTGGameZone * zones[] = { game->inPlay, game->commandzone, game->hand, game->graveyard, game->exile };
+    const int nbZones = 5;
+    vector<MTGAbility*> abilityPayment; //legacy: shared across pairs and never cleared
+    std::map<MTGCardInstance*, ManaCost*> potentialByCard;
+    ActionLayer * al = observer->mLayers->actionLayer();
+    for (size_t i = 1; i < al->mObjects.size(); i++)
+    { //0 is not a mtgability...hackish
+        MTGAbility * a = ((MTGAbility *) al->mObjects[i]);
+        if (Specific && Specific != a)
+            continue;
+        if (withCard)
+        {
+            //doAbility: one card. Mana abilities are NOT skipped here (the
+            //callers hand in attack/block-cost and combat abilities).
+            if (!legacy)
+            {
+                if (!abilityCanReactTo(a, withCard))
+                    continue;
+                abilityPayment.clear();
+            }
+            rankPair(a, withCard, totalPotentialMana, ranking, abilityPayment, potentialByCard, Specific, costPlans);
+            continue;
+        }
+        //Skip mana abilities for performance
+        if (dynamic_cast<AManaProducer*> (a))
+            continue;
+        if (legacy || !a->source)
+        {
+            for (int z = 0; z < nbZones; z++)
+            {
+                MTGGameZone * zone = zones[z];
+                for (int j = 0; j < zone->nb_cards; j++)
+                {
+                    if (!legacy)
+                        abilityPayment.clear();
+                    rankPair(a, zone->cards[j], totalPotentialMana, ranking, abilityPayment, potentialByCard, Specific, costPlans);
+                }
+            }
+            continue;
+        }
+        MTGCardInstance * cands[2] = { a->source, dynamic_cast<MTGCardInstance*>(a->target) };
+        if (cands[1] == cands[0])
+            cands[1] = NULL;
+        for (int z = 0; z < nbZones; z++)
+        {
+            for (int c = 0; c < 2; c++)
+            {
+                if (!cands[c] || !zones[z]->hasCard(cands[c]))
+                    continue;
+                abilityPayment.clear();
+                rankPair(a, cands[c], totalPotentialMana, ranking, abilityPayment, potentialByCard, Specific, costPlans);
+            }
+        }
+    }
+    for (std::map<MTGCardInstance*, ManaCost*>::iterator it = potentialByCard.begin(); it != potentialByCard.end(); ++it)
+        delete it->second;
 }
 
 int AIPlayerBaka::interruptIfICan()
@@ -2861,6 +2779,14 @@ int AIPlayerBaka::chooseTarget(TargetChooser * _tc, Player * forceTarget,MTGCard
         if(dynamic_cast<ProliferateChooser*> (tc))
             playerTargetedZone = 2;
     }
+    //#W54-K (A38): the ability text was re-parsed for every candidate card
+    //(times the AIStats multiplier); parse it once for the whole selection.
+    MTGAbility * withoutGuessingMulti = NULL;
+    if (tc->maxtargets != 1 && tc->belongsToAbility.size())
+    {
+        AbilityFactory af(observer);
+        withoutGuessingMulti = af.parseMagicLine(tc->belongsToAbility,0,NULL,tc->source);
+    }
     while(playerTargetedZone)
     {
         if (!tc->alreadyHasTarget(target) && tc->canTarget(target) && potentialTargets.size() < 50)
@@ -2895,17 +2821,13 @@ int AIPlayerBaka::chooseTarget(TargetChooser * _tc, Player * forceTarget,MTGCard
                     }
                     for (int l = 0; l < multiplier; l++)
                     {
-                        if(tc->maxtargets != 1 && tc->belongsToAbility.size())
+                        if(withoutGuessingMulti)
                         {
-                            AbilityFactory af(observer);
-                            MTGAbility * withoutGuessing = af.parseMagicLine(tc->belongsToAbility,0,NULL,tc->source);
-                            OrderedAIAction * effCheck = NEW OrderedAIAction(this, withoutGuessing,(MTGCardInstance*)tc->source,card);
-                            if(effCheck->getEfficiency())
+                            OrderedAIAction effCheck(this, withoutGuessingMulti,(MTGCardInstance*)tc->source,card);
+                            if(effCheck.getEfficiency())
                             {
                                 potentialTargets.push_back(card);
                             }
-                            SAFE_DELETE(effCheck);
-                            SAFE_DELETE(withoutGuessing);
                         }
                         else
                         {
@@ -2919,6 +2841,7 @@ int AIPlayerBaka::chooseTarget(TargetChooser * _tc, Player * forceTarget,MTGCard
             target = target->opponent();
         playerTargetedZone--;
     }
+    SAFE_DELETE(withoutGuessingMulti);
     if (potentialTargets.size())
     {
         if((!forceTarget && checkOnly)||(tc->maxtargets != 1))
@@ -3627,17 +3550,6 @@ MTGCardInstance * AIPlayerBaka::activateCombo()
             nextCardToPlay = comboCards.back();
 
             DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
-            DebugTrace("ai is doing a combo:" << nextCardToPlay->getName());
 
             if (game->playRestrictions->canPutIntoZone(nextCardToPlay, game->stack) == PlayRestriction::CANT_PLAY)
                 return NULL;
@@ -4251,7 +4163,7 @@ int AIPlayerBaka::chooseAttackers()
         attack = (myCreatures >= opponentCreatures && myForce > opponentForce)
             || (myForce > opponentForce) || (myForce > opponent()->life) || ((life - opponentForce) > 30) ;
     }
-    printf("Choose attackers : %i %i %i %i -> %i\n", opponentForce, opponentCreatures, myForce, myCreatures, attack);
+    DebugTrace("Choose attackers : " << opponentForce << " " << opponentCreatures << " " << myForce << " " << myCreatures << " -> " << attack);
 
     CardDescriptor cd;
     cd.init();
@@ -5026,7 +4938,16 @@ AIStats * AIPlayerBaka::getStats()
     {
         char statFile[512];
         sprintf(statFile, "ai/baka/stats/%s.stats", opponent()->deckFileSmall.c_str());
-        stats = NEW AIStats(this, statFile);
+        //#W54-K (A39): suite / headless / PARSETEST processes keep the table in
+        //memory only - no stats file read on the first damage event and no
+        //rewrite (halving the table) at every game end. Decisions are those of
+        //a fresh table either way (isInTop answers tooSmallCountsForTrue).
+        bool persistent = !(observer && observer->mSuiteGame);
+#if !defined (PSP)
+        if (getenv("WAGIC_TESTSUITE") || getenv("WAGIC_HEADLESS") || getenv("WAGIC_GPT_PARSETEST"))
+            persistent = false;
+#endif
+        stats = NEW AIStats(this, statFile, persistent);
     }
     return stats;
 }
