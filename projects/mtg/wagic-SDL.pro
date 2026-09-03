@@ -18,6 +18,8 @@ unix:QMAKE_CXXFLAGS += -std=gnu++14
 
 # Optional LLM-backed opponent (AIPlayerGPT) — Linux dev build only for now
 unix:DEFINES += WITH_GPT_AI
+# audit-W54 O2: the reply-parser self-test corpus compiles in only here (desktop)
+unix:DEFINES += WAGIC_GPT_PARSETEST_BUILD
 unix:INCLUDEPATH += include/thirdparty
 unix:LIBS += -lcurl
 # objs-sdl, NOT objs: the PSP container build writes MIPS objects into objs/,

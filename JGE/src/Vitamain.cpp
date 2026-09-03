@@ -20,6 +20,14 @@
 #include <SDL2/SDL.h>
 
 #include "../include/JGE.h"
+
+// audit-W54 O1 (A1): newlib carves ONE fixed heap at process start and vitaGL
+// takes the rest of RAM as its own pool. vpk11's memlog showed that pool idle
+// at ~158 MB for the whole session while the 128 MB default heap ran out
+// (std::bad_alloc in LoadPNG after ~30 games, arena ratcheting ~1.4 MB/game).
+// 224 MB leaves vitaGL ~62 MB, above the 48 MB texture-cache cap. Owner ruling
+// 2026-09-03: "lets try it". Revert = delete this one definition.
+extern "C" unsigned int _newlib_heap_size_user = 224 * 1024 * 1024;
 #include "../include/JTypes.h"
 #include "../include/JApp.h"
 #include "../include/JFileSystem.h"
@@ -56,10 +64,10 @@ static void debugLog(const char* msg) {
 // --- Memory probe (ux0:data/Wagic/memlog.txt, APPEND - survives relaunches) ---
 // Five crash dumps 2026-08-30..09-01 were std::bad_alloc in LoadPNG's decode
 // buffer, each after ~10 games of a session; desktop self-play holds flat, so
-// the growth is Vita-side. newlib's heap is a fixed 128MB memblock (weak
-// _newlib_heap_size_user unset) and vitaGL maps that SAME heap as its
-// VGL_MEM_EXTERNAL pool - textures spill into it once VRAM/RAM pools fill, so
-// a duel's art can fragment the heap the decode buffers need. One line per
+// the growth is Vita-side. newlib's heap is ONE fixed memblock (128 MB by
+// default; 224 MB since W54 O1 via _newlib_heap_size_user above); vitaGL's
+// pools are SEPARATE memblocks (its RAM pool is the remainder), so the
+// decode buffers compete only with the game's own allocations on that heap. One line per
 // game start / untap / game end: heap (mallinfo) + every vitaGL pool.
 // ALPHA-ONLY diagnostic - compiled out unless WAGIC_VITAMEMLOG (CMakeLists).
 #include <malloc.h>

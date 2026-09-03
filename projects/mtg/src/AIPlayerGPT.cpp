@@ -26564,6 +26564,11 @@ static string answerSegmentStatic(const string& content, const char * label, int
 
 void AIPlayerGPT::runParseSelfTest()
 {
+//audit-W54 O2 (A16): the self-test corpus is ~12k lines / ~1.4 MB of code and
+//literals that only the desktop main() ever calls. Compiled in only where
+//WAGIC_GPT_PARSETEST_BUILD is defined (wagic-SDL.pro: every desktop build);
+//the Vita/PSP/Android builds get the stub. Owner ruling 2026-09-03.
+#if defined(WAGIC_GPT_PARSETEST_BUILD)
     using std::cout;
     int passed = 0, failed = 0;
     #define CHECK(cond, label) do { \
@@ -39837,6 +39842,9 @@ static const char * kW50Y_r94 =
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
+#else
+    std::cout << "=== self-test: not compiled into this build (define WAGIC_GPT_PARSETEST_BUILD) ===\n";
+#endif
 }
 
 //Free-function entry so the JGE layer's main() can trigger the self-test
