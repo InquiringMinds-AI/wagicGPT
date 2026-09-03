@@ -13925,9 +13925,16 @@ static const char * kPassPriorityRowText = "Pass priority (take no action this w
 //"pass" are not two acts to this reader), and put the GUARANTEE on the row,
 //which it never stated: any change re-opens the window and no cast is given
 //up. Nothing is withheld, nothing is advised.
+//#W55-A (D11b): the two rows' LEADING WORDS must differ. Wave 54's reword led
+//with "Pass priority" - which is row 0's own short name - and the collision
+//cost 16 `pass_hold_ambiguous` stamps (13 of them `CHOICE: 0 (pass)` executing
+//row 0 correctly) and three replies that named row 0 while coding this row
+//(146v126 seq 54/56/57). The verb the pilot writes is still in the row's first
+//clause, one word later; only the HEAD changed, and the guarantee stays.
 static const char * kHoldPriorityRowText =
-    "Pass priority, and do not ask me again this turn unless the board changes"
-    " (any change re-opens this window; you give up no cast)";
+    "Hold priority for the rest of this turn: pass now, and do not ask me again"
+    " unless the board changes (any change re-opens this window; you give up no"
+    " cast)";
 
 //#W53-N (D2): the hold's board key is the situation block WITHOUT its leading
 //phase line. Phase progression is NOT a board change - it is exactly the
@@ -13948,8 +13955,21 @@ static const char * kHoldPriorityRowText =
 //nothing that could be acted on is dropped.
 static bool holdKeyDroppedLine(const string& line)
 {
+    //#W55-A (D2b): and WITHOUT the life line. A mandatory life-loss loop
+    //(Sanguine Bond + Exquisite Blood, 130v126 seq 67-106 / 123v126 seq
+    //112-140) re-opens this window once per POINT of life: the hold was taken
+    //six times inside that loop and stopped nothing, because "any change
+    //re-opens this window" is literally satisfied by a life tick. A life total
+    //moving while the stack, both battlefields, both hands and the phase are
+    //unchanged is not the board change the model meant when it pressed the
+    //row - and it is a change it opted to stop being asked about. It is
+    //dropped from THIS key only: the life line is rendered in full on every
+    //prompt, and every other re-opener stands (the stack top-first, either
+    //battlefield, poison, a newly available row, the turn ending), so any
+    //event that could actually change the answer still re-opens the window.
     return line.compare(0, 19, "Opponent hand size:") == 0
-        || line.compare(0, 14, "Your library: ") == 0;
+        || line.compare(0, 14, "Your library: ") == 0
+        || line.compare(0, 11, "Your life: ") == 0;
 }
 
 static string holdBoardKeyOf(const string& situation)
@@ -13977,6 +13997,63 @@ static string holdBoardKeyOf(const string& situation)
     return out;
 }
 
+//#W55-A (D2a): the OPTION-SET key - row names, costs and ordinals, never the
+//rendered string. 130v126 seq 67-106 is 40 consecutive decisions on ONE
+//two-row menu whose row 1 priced itself against a life total ticking one point
+//per iteration ("{no creature target - and 1 to the opponent at life 26 leaves
+//them at 25}"): 21 distinct rendered tuples across the 40 windows, so every key
+//built from the rendered rows read them as 21 different questions and neither
+//the declined-list count nor the hold could see the loop at all.
+//stripRenderAnnotationsLc already drops [...] groups and every {...} group that
+//is not a mana cost, which is exactly the volatile half; the one further mover
+//is castDeclineRow's Main-1 clause, which states a PHASE fact and made the same
+//list at Main 1 and Main 2 two different lists (D19: 162v126 s7-s12).
+//The annotations themselves are CORRECT and are NOT trimmed - they render in
+//full on every row; only the key changes.
+static string stripRenderAnnotationsLc(const string& s); //defined below
+
+static string optionSetKeyLine(const string& row)
+{
+    string core = stripRenderAnnotationsLc(row);
+    static const char * kCombatNextClause = " (combat comes next this turn)";
+    size_t c = core.find(kCombatNextClause);
+    if (c != string::npos)
+        core.erase(c, strlen(kCombatNextClause));
+    return core;
+}
+
+static string optionSetKeyOf(const std::vector<string>& rows)
+{
+    string k;
+    for (size_t i = 0; i < rows.size(); i++)
+        k += optionSetKeyLine(rows[i]) + "\n";
+    return k;
+}
+
+//#W55-A (D21): the HOLD row states its RISK ("any change re-opens this window;
+//you give up no cast") and never what taking it SAVES. Wave 54 measured 426
+//renders / 43 takes, and 22 of 212 (10.4%) even in windows already carrying the
+//declined-note at N >= 3 - a pilot unworried about the risk had no reason to
+//press the row. The benefit now rides the row itself, as a {...} annotation
+//like every other priced fact, so the option-set key above does not see it and
+//the row's identity is the same string on every window.
+//The docket's clause also carried the declined COUNT on the row. It is kept OFF
+//the row deliberately: the row's text is inside the ask key at both seams (and
+//inside the priority seam's deadlock key), so a number that rises with every
+//answer would mint a fresh question - the exact trap declinedListNote was built
+//to avoid. The count is stated by that prompt-only note, one line below the
+//list it is about, and D19/D2a are what finally deliver it to these windows.
+static string holdRowBenefitClause()
+{
+    return string(" {taking this row skips the rest of this turn's identical"
+                  " windows}");
+}
+
+static string holdRowLine()
+{
+    return string(kHoldPriorityRowText) + holdRowBenefitClause();
+}
+
 //#W53-N (D2): does a hold taken on <heldBoard> with <heldRows> still stand at
 //a window whose board is <nowBoard> and whose menu is <nowRows>? Two
 //re-openers here (the third, the turn ending, is the caller's): the board
@@ -13996,7 +14073,9 @@ static bool holdStillStands(const string& heldBoard, const string& nowBoard,
         return false;
     }
     for (size_t i = 0; i < nowRows.size(); i++)
-        if (heldRows.find(nowRows[i]) == heldRows.end())
+        //#W55-A (D2a): compared as OPTION-SET keys - a row whose only change
+        //is a moving annotation is the row the model already saw.
+        if (heldRows.find(optionSetKeyLine(nowRows[i])) == heldRows.end())
         {
             if (whyOut) *whyOut = "a row is newly available";
             return false;
@@ -14075,8 +14154,18 @@ static bool isReservedHoldEcho(const string& echoLc)
     if (comma != string::npos && t.size() > comma
         && t.compare(0, comma + 1, lowRow.substr(0, comma + 1)) == 0)
         return true;
+    //#W55-A (D11b/D21): the reworded row's own head through its colon, the row
+    //echoed back WITH its benefit annotation, and the two earlier spellings the
+    //model may still write.
+    size_t colon = lowRow.find(':');
+    if (colon != string::npos && t.size() == colon && t.compare(0, colon, lowRow, 0, colon) == 0)
+        return true;
+    if (t.size() > lowRow.size() && t.compare(0, lowRow.size(), lowRow) == 0)
+        return true;
     return t == "hold" || t == "hold priority"
-        || t == "hold priority - do not ask me again this turn unless the board changes";
+        || t == "hold priority - do not ask me again this turn unless the board changes"
+        || t == "pass priority, and do not ask me again this turn unless the board changes"
+               " (any change re-opens this window; you give up no cast)";
 }
 
 //#W54-A (D2a): where does the HOLD row sit on this menu (0-based), if at all?
@@ -14085,31 +14174,21 @@ static int holdRowIndexOf(const std::vector<string> * optionTexts)
     if (!optionTexts)
         return -1;
     for (size_t o = 0; o < optionTexts->size(); o++)
-        if ((*optionTexts)[o] == kHoldPriorityRowText)
+        //#W55-A (D21): the row carries a benefit annotation, so its identity
+        //is its own text as a HEAD, not the whole rendered string.
+        if ((*optionTexts)[o].compare(0, strlen(kHoldPriorityRowText),
+                                      kHoldPriorityRowText) == 0)
             return (int) o;
     return -1;
 }
 
-//#W54-A (D2a): is this reserved PASS echo also a word-boundary head of the HOLD
-//row's own text? After D2d both rows open "Pass priority", so a bare "(pass)"
-//or "(pass priority)" no longer names row 0 unambiguously - the index has to
-//break the tie, and the answer is never a third row either way.
-static bool passEchoAmbiguousWithHold(const string& echoLc, int holdRowIdx)
-{
-    if (holdRowIdx < 0)
-        return false;
-    size_t s = echoLc.find_first_not_of(" \t");
-    size_t e = echoLc.find_last_not_of(" \t.!");
-    if (s == string::npos || e == string::npos || e < s)
-        return false;
-    string t = echoLc.substr(s, e - s + 1);
-    string lowRow = kHoldPriorityRowText;
-    for (size_t i = 0; i < lowRow.size(); i++)
-        lowRow[i] = (char) tolower((unsigned char) lowRow[i]);
-    if (t.empty() || t.size() > lowRow.size() || lowRow.compare(0, t.size(), t) != 0)
-        return false;
-    return t.size() == lowRow.size() || !isalnum((unsigned char) lowRow[t.size()]);
-}
+//#W55-A (D11a): the wave-54 prefix-head test that made a reserved PASS echo
+//ambiguous with the HOLD row is RETIRED. Every reserved pass echo is an EXACT
+//name of row 0 - that is what makes it reserved - and an exact row label beats
+//a mere word-boundary head of another row's text, so 13 of wave 54's 16
+//`pass_hold_ambiguous` stamps were `CHOICE: 0 (pass)` executing row 0
+//correctly. D11b's reword removes the head collision at its source as well.
+//What remains genuinely ambiguous is handled at the branch below.
 
 //#W53-N (D2): honour the model's own hold. Returns true only when the model
 //took the HOLD row this turn, at this seam, and the board it took it on is
@@ -14162,7 +14241,7 @@ void AIPlayerGPT::takeHold(const char * seam, const string& situation,
     }
     std::set<string>& s = mHoldRows[seam];
     for (size_t i = 0; i < rows.size(); i++)
-        s.insert(rows[i]);
+        s.insert(optionSetKeyLine(rows[i])); //#W55-A (D2a)
     DebugTrace("AIPlayerGPT: the model took the hold row at the " << seam << " seam on turn "
                << observer->turn << " - this turn's remaining " << seam
                << " windows are held until the board changes");
@@ -16714,7 +16793,6 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     bool echoNoMatch = false;
     bool passEchoNamed = false; //#W53-N (D9): the parenthetical names row 0
     bool holdEchoNamed = false; //#W54-A (D2a): the parenthetical names the HOLD row
-    bool passEchoAmbiguous = false; //#W54-A (D2a): "(pass priority)" heads BOTH rows
     const int holdRowIdx = holdRowIndexOf(optionTexts); //#W54-A (D2a), 0-based
     bool exactNameRemap = false; //#W52-J D6: bound by the exact short name (hoisted for the conflict signatures)
     vector<string> words; //echo's significant words (hoisted for INDEX-WINS)
@@ -16843,8 +16921,6 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
             //silently take row 0.
             if (holdRowIdx >= 0 && isReservedHoldEcho(echoLc))
                 holdEchoNamed = true;
-            else if (passEchoNamed && passEchoAmbiguousWithHold(echoLc, holdRowIdx))
-                passEchoAmbiguous = true;
             //#W52-J (D6): the EXACT short name binds FIRST. The word pass below
             //drops "right"/"now" as render vocabulary and "cast" as filler, so
             //"Cast nothing right now" reduced to the single word "nothing" -
@@ -17194,15 +17270,18 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
     if (passEchoNamed)
     {
         int firstNum = firstCodedNum;
-        //#W54-A (D2a): after D2d both rows open "Pass priority", so a bare
-        //"(pass)" / "(pass priority)" names neither uniquely. The coded index
-        //decides between the two - and only between the two.
-        if (passEchoAmbiguous)
+        //#W55-A (D11a): an EXACT row label beats a prefix. A reserved pass echo
+        //IS row 0's own name, so it no longer stamps merely for heading another
+        //row's text (13 of wave 54's 16 stamps, all executing row 0 correctly).
+        //One shape stays genuinely ambiguous and keeps the stamp: the coded
+        //INDEX names the HOLD row while the echo names row 0 - the two halves of
+        //one reply disagree, and the index is the only half that tells the rows
+        //apart (146v126 seq 54/56/57, all executed on the hold row). The answer
+        //is still never a third row.
+        if (holdRowIdx >= 0 && firstNum == holdRowIdx + 1)
         {
             appendParseNote(noteOut, "pass_hold_ambiguous");
-            if (firstNum == holdRowIdx + 1)
-                return holdRowIdx + 1;
-            return 0;
+            return holdRowIdx + 1;
         }
         if (firstNum != 0)
             appendParseNote(noteOut, "pass_row_named");
@@ -18389,21 +18468,43 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         tail << index << ". " << rline << "\n";
     }
 
-    //#W53-N (D2): the HOLD row, offered on the OPPONENT'S turn only. It sits
-    //LAST among the numbered rows, with the other declines, and it is a row
-    //like any other - the model may take it or ignore it. Taking it removes
-    //no window and hides no legal play: the engine simply stops re-putting
-    //THIS question until the board moves (see holdHonoured). It is scoped to
-    //the opponent's turn because that is where the defect lives (966 windows
-    //for 85 acts, 286 of them at phases that produced none) and because on the
-    //seat's OWN turn the board changes with every land drop and cast, so a
-    //hold there would be taken and retired in the same breath.
-    int holdRow = 0;
-    if (observer->currentPlayer != this)
+    //#W53-N (D2, second half) + #W55-A (D2a/D19): how many times THIS EXACT
+    //list was already declined this turn, keyed on the OPTION SET (see
+    //optionSetKeyOf) rather than the rendered rows. Two defects retire here:
+    //an annotation tracking a moving life total minted a fresh key at every
+    //iteration of a mandatory loop (D2), and the cast decline row's Main-1
+    //clause made the same own-turn list at Main 1 and Main 2 two lists, so the
+    //count never reached the pair (D19, 162v126 s7-s12). Computed BEFORE the
+    //HOLD row is appended: the row is on every window now, and it renders the
+    //count this key produces.
+    if (mListDeclineTurn != observer->turn)
     {
-        holdRow = ++index;
-        shownLines.push_back(kHoldPriorityRowText);
-        tail << holdRow << ". " << kHoldPriorityRowText << "\n";
+        mListDeclineCount.clear();
+        mListDeclineTurn = observer->turn;
+    }
+    const string listKey = optionSetKeyOf(shownLines);
+    const int declinedN = mListDeclineCount.count(listKeyHash(listKey))
+                          ? mListDeclineCount[listKeyHash(listKey)] : 0;
+    string declinedNote = declinedListNote(declinedN);
+
+    //#W53-N (D2): the HOLD row. It sits LAST among the numbered rows, with the
+    //other declines, and it is a row like any other - the model may take it or
+    //ignore it. Taking it removes no window and hides no legal play: the
+    //engine simply stops re-putting THIS question until the board moves (see
+    //holdHonoured).
+    //#W55-A (D4): offered on EVERY window, the seat's OWN turn included. The
+    //wave-53 exclusion reasoned that "on the seat's own turn the board changes
+    //with every land drop and cast, so a hold there would be taken and retired
+    //in the same breath"; 126v125 seq 72-121 refutes it - 50 byte-identical
+    //own-turn Blockers windows, every reply a decline, no board change at all,
+    //and no row to close them with. holdBoardKeyOf already retires the hold on
+    //any real change, so offering the row everywhere weakens no guarantee: the
+    //model still opts in, one row at a time.
+    int holdRow = ++index;
+    {
+        const string holdLine = holdRowLine(); //#W55-A (D21)
+        shownLines.push_back(holdLine);
+        tail << holdRow << ". " << holdLine << "\n";
     }
     //#W48-F3: on a single-option window the decline becomes a real, numbered
     //LAST row instead of a clause buried in the reply-format sentence. The
@@ -18603,18 +18704,6 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         mLastChoice = 0; //a hold is a pass for this window
         return NULL;
     }
-    //#W53-N (D2, second half): how many times this EXACT list was already
-    //declined this turn. Prompt-only (declinedListNote says why).
-    if (mListDeclineTurn != observer->turn)
-    {
-        mListDeclineCount.clear();
-        mListDeclineTurn = observer->turn;
-    }
-    string listKey;
-    for (size_t lk = 0; lk < shownLines.size(); lk++)
-        listKey += shownLines[lk] + "\n";
-    string declinedNote = declinedListNote(mListDeclineCount.count(listKeyHash(listKey))
-                                           ? mListDeclineCount[listKeyHash(listKey)] : 0);
     //#W49-S (D8/D3): the one re-ask for this board state. Appending the
     //correction makes this a DIFFERENT question (its own askKey, a fresh
     //call); the board moving on retires it. It is deliberately NOT cleared on
@@ -20481,29 +20570,34 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         applyMenuFitTags(menu, rowUses, untappedSources);
         menu.push_back(castDeclineRow(observer->currentPlayer == this
                                       && observer->getCurrentGamePhase() == MTG_PHASE_FIRSTMAIN)); //the decline goes LAST
-        //#W53-N (D2): the HOLD row, last of all, on the OPPONENT'S turn only -
-        //884 of the corpus's 966 dead opponent-turn windows were THIS ask.
-        //The row is offered on the re-ask menus too: a window the model is
-        //still being asked about is a window it may still choose to close.
-        int holdRow = -1;
-        if (observer->currentPlayer != this)
-        {
-            holdRow = (int) menu.size();
-            menu.push_back(kHoldPriorityRowText);
-        }
-        //The model's own hold, honoured: no model call, no row withheld.
-        if (attempt == 0 && holdRow >= 0 && holdHonoured("cast", boardNow, menu))
-            return NULL;
+        //#W53-N (D2, second half) + #W55-A (D2a/D19): the declined-list count,
+        //keyed on the OPTION SET and taken BEFORE the HOLD row is appended (the
+        //row is on every window now and renders this count). The key drops the
+        //annotations that move without the question moving - the life-total
+        //pricing inside a mandatory loop (130v126 seq 67-106) and the decline
+        //row's Main-1 combat clause, which split the own-turn Main 1 / Main 2
+        //pair into two lists and kept the count off it (162v126 s7-s12).
         if (mListDeclineTurn != observer->turn)
         {
             mListDeclineCount.clear();
             mListDeclineTurn = observer->turn;
         }
-        string listKey;
-        for (size_t lk = 0; lk < menu.size(); lk++)
-            listKey += menu[lk] + "\n";
-        mNextAskPromptNote = declinedListNote(mListDeclineCount.count(listKeyHash(listKey))
-                                              ? mListDeclineCount[listKeyHash(listKey)] : 0);
+        const string listKey = optionSetKeyOf(menu);
+        const int declinedN = mListDeclineCount.count(listKeyHash(listKey))
+                              ? mListDeclineCount[listKeyHash(listKey)] : 0;
+        mNextAskPromptNote = declinedListNote(declinedN);
+        //#W53-N (D2): the HOLD row, last of all - 884 of the corpus's 966 dead
+        //opponent-turn windows were THIS ask. The row is offered on the re-ask
+        //menus too: a window the model is still being asked about is a window
+        //it may still choose to close.
+        //#W55-A (D4): and on the seat's OWN turn, for the reason the priority
+        //seam carries - an own-turn run of byte-identical windows had no row to
+        //close it. #W55-A (D21): the row states what taking it saves.
+        int holdRow = (int) menu.size();
+        menu.push_back(holdRowLine());
+        //The model's own hold, honoured: no model call, no row withheld.
+        if (attempt == 0 && holdHonoured("cast", boardNow, menu))
+            return NULL;
 
         std::ostringstream q;
         q << "Casting decision (" << observer->getCurrentGamePhaseName()
@@ -39074,11 +39168,26 @@ static const char * kW50Y_r94 =
     cout << "\n[#W53-N D2] the HOLD row: a model-takeable answer, not a cadence\n";
     {
         string row = kHoldPriorityRowText;
-        CHECK(row == "Pass priority, and do not ask me again this turn unless the board changes"
-                     " (any change re-opens this window; you give up no cast)",
-              "#W54-A D2d the hold row renders the docket's literal (was 'Hold priority - ...')");
-        CHECK(row.find("Pass priority") == 0,
-              "#W54-A D2d it leads with the verb the pilot already writes in its own PLAN");
+        //#W55-A (D11b): AMENDED. Wave 54's literal led with row 0's own name and
+        //that collision is R203/D11; the row now leads with its own act and
+        //carries the pilot's verb one clause later.
+        CHECK(row == "Hold priority for the rest of this turn: pass now, and do not ask me again"
+                     " unless the board changes (any change re-opens this window; you give up no"
+                     " cast)",
+              "#W55-A D11b the hold row renders the reworded literal");
+        CHECK(row.find("Hold priority") == 0 && row.find("pass now") != string::npos,
+              "#W55-A D11b it leads with its OWN act and still carries the pilot's verb");
+        //NEGATIVE (the defect this reword retires): the two rows' leading words
+        //must differ, so neither is a case-insensitive head of the other.
+        {
+            string p0 = kPassPriorityRowText, hr = row;
+            for (size_t i = 0; i < p0.size(); i++) p0[i] = (char) tolower((unsigned char) p0[i]);
+            string hlc = hr;
+            for (size_t i = 0; i < hlc.size(); i++) hlc[i] = (char) tolower((unsigned char) hlc[i]);
+            CHECK(hlc.compare(0, 4, p0, 0, 4) != 0
+                  && hlc.find(p0) != 0 && p0.compare(0, 4, hlc, 0, 4) != 0,
+                  "#W55-A D11b NEGATIVE neither row heads the other any more");
+        }
         CHECK(row.find("any change re-opens this window; you give up no cast") != string::npos,
               "#W54-A D2d the guarantee is ON the row, which it never stated before");
         string lc = row;
@@ -39123,15 +39232,22 @@ static const char * kW50Y_r94 =
         string sitD = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: 1 (top): opponent's Lightning Bolt [instant]\n";
         CHECK(holdBoardKeyOf(sitA) == holdBoardKeyOf(sitB),
               "#W53-N D2 a phase step alone is not a board change");
-        CHECK(holdBoardKeyOf(sitA) != holdBoardKeyOf(sitC),
-              "#W53-N D2 a life total change IS a board change");
+        //#W55-A (D2b): AMENDED, and this flip IS the item. A life total moving
+        //while everything else stands is a mandatory life-loss loop (130v126 seq
+        //67-106), not the board change the model meant when it pressed the row.
+        CHECK(holdBoardKeyOf(sitA) == holdBoardKeyOf(sitC),
+              "#W55-A D2b a life-only change no longer re-opens a hold the model took");
+        CHECK(holdBoardKeyOf(sitA).find("Your life") == string::npos
+              && holdBoardKeyOf(sitA).find("Stack: empty") != string::npos,
+              "#W55-A D2b the life line is out of the HOLD key and the stack line is still in it");
         CHECK(holdBoardKeyOf(sitA) != holdBoardKeyOf(sitD),
               "#W53-N D2 a new stack object IS a board change");
 
+        //#W55-A (D2a): the held set is OPTION-SET keys now, not rendered rows.
         std::set<string> held;
-        held.insert("Cast Dictate of Kruphix {3}{u}");
-        held.insert("Cast nothing right now");
-        held.insert(kHoldPriorityRowText);
+        held.insert(optionSetKeyLine("Cast Dictate of Kruphix {3}{u}"));
+        held.insert(optionSetKeyLine("Cast nothing right now"));
+        held.insert(optionSetKeyLine(kHoldPriorityRowText));
         vector<string> same;
         same.push_back("Cast Dictate of Kruphix {3}{u}");
         same.push_back("Cast nothing right now");
@@ -40154,18 +40270,34 @@ static const char * kW50Y_r94 =
               "#W54-A D2a the whole row echoed back (nested parens) answers as its own row");
         // ECHO SHAPE: the row's own leading clause, comma and all, is the hold row
         bool st6 = false;
-        CHECK(parseChoice("CHOICE: 0 (Pass priority, and do not ask me again this turn)",
+        CHECK(parseChoice("CHOICE: 0 (Hold priority for the rest of this turn: pass now,"
+                          " and do not ask me again)",
                           (int) menu.size(), &menu, &st6, NULL, NULL, true) == 2,
-              "#W54-A D2a the row's disambiguating prefix ('Pass priority, and ...') is the hold row");
-        // AMBIGUITY: after D2d "Pass priority" heads BOTH rows - the index decides.
+              "#W55-A D11b the reworded row's disambiguating prefix is still the hold row");
+        // #W55-A (D11b): the wave-54 spelling is still accepted - a model that
+        // writes the old literal is naming this row, not row 0.
+        bool st6b = false;
+        CHECK(parseChoice("CHOICE: 0 (Pass priority, and do not ask me again this turn unless the"
+                          " board changes (any change re-opens this window; you give up no cast))",
+                          (int) menu.size(), &menu, &st6b, NULL, NULL, true) == 2,
+              "#W55-A D11b the pre-reword literal still names the hold row");
+        // #W55-A (D11a): an EXACT row-0 name beats a prefix. Wave 54 stamped
+        // `pass_hold_ambiguous` on this shape 13 times, every one of them
+        // executing row 0 correctly.
+        bool st8 = false; string note8;
+        CHECK(parseChoice("CHOICE: 0 (Pass priority)", (int) menu.size(), &menu, &st8, NULL, &note8, true) == 0
+              && note8.find("pass_hold_ambiguous") == string::npos,
+              "#W55-A D11a 'CHOICE: 0 (Pass priority)' is row 0 and is no longer stamped");
+        bool st8b = false; string note8b;
+        CHECK(parseChoice("CHOICE: 0 (pass)", (int) menu.size(), &menu, &st8b, NULL, &note8b, true) == 0
+              && note8b.find("pass_hold_ambiguous") == string::npos,
+              "#W55-A D11a NEGATIVE the 13-firing shape 'CHOICE: 0 (pass)' stamps nothing");
+        // ...and the ONE genuinely ambiguous shape keeps the stamp: the coded
+        // index names the hold row while the echo names row 0 (146v126 s54/56/57).
         bool st7 = false; string note7;
         CHECK(parseChoice("CHOICE: 2 (Pass priority)", (int) menu.size(), &menu, &st7, NULL, &note7, true) == 2
               && note7.find("pass_hold_ambiguous") != string::npos,
-              "#W54-A D2a an ambiguous '(Pass priority)' with the hold index takes the hold row");
-        bool st8 = false; string note8;
-        CHECK(parseChoice("CHOICE: 0 (Pass priority)", (int) menu.size(), &menu, &st8, NULL, &note8, true) == 0
-              && note8.find("pass_hold_ambiguous") != string::npos,
-              "#W54-A D2a an ambiguous '(Pass priority)' with index 0 takes the pass row");
+              "#W55-A D11a the index-on-the-hold-row shape takes the hold row, and is stamped");
         // NEGATIVE: no hold row on the menu -> nothing changes for anyone.
         vector<string> nohold;
         nohold.push_back("Cast Tribute to Hunger {1}{b}");
@@ -40207,13 +40339,17 @@ static const char * kW50Y_r94 =
         CHECK(holdBoardKeyOf(base).find("Opponent hand size") == string::npos
               && holdBoardKeyOf(base).find("Your library") == string::npos,
               "#W54-A D2c the hidden-zone counters are not in the key");
-        CHECK(holdBoardKeyOf(base).find("Your life: 20 | Opponent life: 20") != string::npos
-              && holdBoardKeyOf(base).find("Stack: empty") != string::npos,
+        CHECK(holdBoardKeyOf(base).find("Stack: empty") != string::npos,
               "#W54-A D2c everything else the block carries IS still in the key");
-        // NEGATIVEs: the re-openers the lane designed all still fire.
+        //#W55-A (D2b): AMENDED - the life line joins the hidden-zone counters.
         string life = base; life.replace(life.find("Your life: 20"), 13, "Your life: 17");
-        CHECK(holdBoardKeyOf(base) != holdBoardKeyOf(life),
-              "#W54-A D2c NEGATIVE a life change still re-opens the window");
+        CHECK(holdBoardKeyOf(base) == holdBoardKeyOf(life),
+              "#W55-A D2b a life-only tick does not retire the hold (the mandatory-loop repro)");
+        //NEGATIVE: poison is a resource line too and it is NOT dropped - a
+        //poison counter is a change the model can act on.
+        string poison = base + "Poison: you 3 | opponent 0\n";
+        CHECK(holdBoardKeyOf(base) != holdBoardKeyOf(poison),
+              "#W55-A D2b NEGATIVE a poison counter still re-opens the window");
         string stack = base;
         stack.replace(stack.find("Stack: empty"), 12,
                       "Stack: 1 (top): opponent's Lightning Bolt [instant]");
@@ -40222,9 +40358,9 @@ static const char * kW50Y_r94 =
         string board = base + "Their battlefield: Grizzly Bears (2/2)\n";
         CHECK(holdBoardKeyOf(base) != holdBoardKeyOf(board),
               "#W54-A D2c NEGATIVE a permanent arriving still re-opens the window");
-        std::set<string> held;
-        held.insert("Cast Dictate of Kruphix {3}{u}");
-        held.insert(kHoldPriorityRowText);
+        std::set<string> held; //#W55-A (D2a): OPTION-SET keys
+        held.insert(optionSetKeyLine("Cast Dictate of Kruphix {3}{u}"));
+        held.insert(optionSetKeyLine(kHoldPriorityRowText));
         vector<string> same;
         same.push_back("Cast Dictate of Kruphix {3}{u}");
         same.push_back(kHoldPriorityRowText);
@@ -40670,6 +40806,118 @@ static const char * kW50Y_r94 =
               "#W55-B D14 NEGATIVE a first firing is never stamped exhausted");
     }
 
+    // ---- #W55-A (docket D2a/D2b/D19/D21): the option-set key, the hold's own
+    // key, and the HOLD row's benefit ----
+    cout << "\n[#W55-A D2a] the OPTION-SET key: a moving annotation is not a new question\n";
+    {
+        // 130v126 seq 67-106, verbatim shape: the SAME two-row menu at two
+        // iterations of the Sanguine Bond loop, differing only in the life
+        // totals its pricing annotation quotes.
+        vector<string> at26;
+        at26.push_back("Cast Spark Spray {r} {leaves 0 of your 1 untapped mana source untapped -"
+                       " casting this taps you out} {no creature target - and 1 to the opponent"
+                       " at life 26 leaves them at 25}");
+        at26.push_back("Cast nothing right now");
+        vector<string> at25;
+        at25.push_back("Cast Spark Spray {r} {leaves 0 of your 1 untapped mana source untapped -"
+                       " casting this taps you out} {no creature target - and 1 to the opponent"
+                       " at life 25 leaves them at 24}");
+        at25.push_back("Cast nothing right now");
+        CHECK(at26[0] != at25[0] && optionSetKeyOf(at26) == optionSetKeyOf(at25),
+              "#W55-A D2a the repro: 21 rendered tuples over 40 windows are ONE option set");
+        CHECK(optionSetKeyLine(at26[0]) == "cast spark spray {r}",
+              "#W55-A D2a the key is the row's name and COST - the annotations are dropped from it");
+        // NEGATIVE: the cost is part of the key, not furniture.
+        CHECK(optionSetKeyLine("Cast Spark Spray {r}") != optionSetKeyLine("Cast Spark Spray {1}{r}"),
+              "#W55-A D2a NEGATIVE a different mana cost is a different option");
+        // NEGATIVE: names and ordinals still separate rows.
+        CHECK(optionSetKeyLine("Cast Tribute to Hunger {1}{b}")
+              != optionSetKeyLine("Cast Dictate of Kruphix {3}{u}")
+              && optionSetKeyLine("Equip Lightning Greaves to Human #1")
+                 != optionSetKeyLine("Equip Lightning Greaves to Human #2"),
+              "#W55-A D2a NEGATIVE a different name or ordinal is a different option");
+        // NEGATIVE: a row appearing or disappearing changes the SET.
+        vector<string> grown(at26);
+        grown.push_back("Cast Tribute to Hunger {1}{b}");
+        CHECK(optionSetKeyOf(at26) != optionSetKeyOf(grown),
+              "#W55-A D2a NEGATIVE a menu that gained a row is a different option set");
+        // D19: castDeclineRow's Main-1 clause is a PHASE fact, and it split the
+        // own-turn Main 1 / Main 2 pair into two lists (162v126 s7-s12).
+        CHECK(optionSetKeyLine(castDeclineRow(true)) == optionSetKeyLine(castDeclineRow(false)),
+              "#W55-A D19 the decline row's Main-1 combat clause is out of the key");
+        vector<string> main1, main2;
+        main1.push_back("Cast Tribute to Hunger {1}{b} {right now: they control 0 creatures}");
+        main1.push_back(castDeclineRow(true));
+        main2.push_back("Cast Tribute to Hunger {1}{b} {right now: they control 0 creatures}");
+        main2.push_back(castDeclineRow(false));
+        CHECK(main1 != main2 && optionSetKeyOf(main1) == optionSetKeyOf(main2),
+              "#W55-A D19 the same own-turn list at Main 1 and Main 2 is ONE list, so the count reaches it");
+        // and the hold latch survives the loop it was taken in (D2a + D2b together)
+        {
+            string sit26 = "Phase: Main phase 1 | It is your turn.\nYour life: 20 | Opponent life: 26\n"
+                           "Stack: 1 (top): ability: Sanguine Bond's Life Loss [from their Sanguine Bond]\n";
+            string sit25 = "Phase: Main phase 1 | It is your turn.\nYour life: 20 | Opponent life: 25\n"
+                           "Stack: 1 (top): ability: Sanguine Bond's Life Loss [from their Sanguine Bond]\n";
+            std::set<string> held;
+            for (size_t i = 0; i < at26.size(); i++)
+                held.insert(optionSetKeyLine(at26[i]));
+            const char * why = "x";
+            CHECK(holdStillStands(holdBoardKeyOf(sit26), holdBoardKeyOf(sit25), held, at25, &why)
+                  && string(why).empty(),
+                  "#W55-A D2b a hold taken inside the loop STANDS at the next iteration");
+            vector<string> loopGrown(at25);
+            loopGrown.push_back("Cast Tribute to Hunger {1}{b}");
+            CHECK(!holdStillStands(holdBoardKeyOf(sit26), holdBoardKeyOf(sit25), held, loopGrown, &why)
+                  && string(why) == "a row is newly available",
+                  "#W55-A D2b NEGATIVE a newly available row inside the loop still re-opens the window");
+            string sitBoard = sit25 + "Their battlefield: Grizzly Bears (2/2)\n";
+            CHECK(!holdStillStands(holdBoardKeyOf(sit26), holdBoardKeyOf(sitBoard), held, at25, &why)
+                  && string(why) == "the board changed",
+                  "#W55-A D2b NEGATIVE a permanent arriving inside the loop still re-opens the window");
+        }
+    }
+
+    cout << "\n[#W55-A D21] the HOLD row states what taking it SAVES\n";
+    {
+        CHECK(holdRowBenefitClause()
+              == " {taking this row skips the rest of this turn's identical windows}",
+              "#W55-A D21 the benefit clause's literal");
+        const string line = holdRowLine();
+        CHECK(line == string(kHoldPriorityRowText) + holdRowBenefitClause(),
+              "#W55-A D21 the rendered row is the row plus its benefit, in that order");
+        // the clause is a {...} annotation, so the row's IDENTITY is unchanged:
+        // the option-set key, the hold latch and the row lookup all still see
+        // one row on every window.
+        CHECK(optionSetKeyLine(line) == optionSetKeyLine(kHoldPriorityRowText),
+              "#W55-A D21 the benefit annotation is out of the option-set key");
+        // NEGATIVE: it says nothing that is not true of the row - no advice, no
+        // claim that a window was removed, and no count (the count is the
+        // prompt-only declinedListNote, which is not in any ask key).
+        {
+            string lc = holdRowBenefitClause();
+            for (size_t i = 0; i < lc.size(); i++) lc[i] = (char) tolower((unsigned char) lc[i]);
+            CHECK(lc.find("you should") == string::npos && lc.find("recommend") == string::npos
+                  && lc.find("declined this same list") == string::npos
+                  && lc.find("their turn") == string::npos,
+                  "#W55-A D21 NEGATIVE the clause advises nothing, counts nothing, and owns the turn it is on");
+        }
+        vector<string> menu; //#W55-A (D4): the row is on own-turn menus too
+        menu.push_back("Cast Tribute to Hunger {1}{b}");
+        menu.push_back(line);
+        CHECK(holdRowIndexOf(&menu) == 1,
+              "#W55-A D21 the rendered row is still FOUND as the hold row");
+        // ECHO SHAPE: the row echoed back with its annotation is its own row.
+        bool st = false;
+        CHECK(parseChoice(string("CHOICE: 0 (") + line + ")", (int) menu.size(), &menu,
+                          &st, NULL, NULL, true) == 2,
+              "#W55-A D21 echo: the row WITH its benefit annotation answers as its own row");
+        // must-NOT-match NEGATIVE: the annotation alone names no row, and above
+        // all never the cast row sitting next to it.
+        bool st2 = false;
+        CHECK(parseChoice("CHOICE: 0 (taking this row skips the rest of this turn's identical windows)",
+                          (int) menu.size(), &menu, &st2, NULL, NULL, true) != 1,
+              "#W55-A D21 NEGATIVE the benefit annotation echoed alone never steals the cast row");
+    }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
