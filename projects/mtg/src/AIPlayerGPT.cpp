@@ -1961,6 +1961,40 @@ string landTag(MTGCardInstance * card)
 //here can name a battlefield, a life total, a phase or a mana pool, because
 //none of those is an input - the no-board-state rule is enforced by the
 //function's SIGNATURE rather than by remembering to filter.
+//#W54-E (D16, wave-53 ledger MED = R176). "Playing every land in this hand
+//would not cover any spell in it" was printed for TWO different hands: too few
+//lands, and enough lands of the wrong colour. The one wrong mulligan on the
+//wave-53 reviewers' seats (`152v162` s1: 2 lands making {G}{G} against five
+//white spells) was the COLOUR case and the reply's own stated reason was the
+//colour, so the two cases are not interchangeable to the pilot. Both facts are
+//already inputs here, so the line names WHICH it is. Strictly hand-derived like
+//everything else on this surface (the pregame ask carries no board state), and
+//pure so every branch is provable in PARSETEST.
+static string mulliganNoCoverCause(int lands, const int sources[5], int cheapestCmc)
+{
+    static const char * kSym[5] = { "{W}", "{U}", "{B}", "{R}", "{G}" };
+    std::ostringstream o;
+    if (cheapestCmc < 0)
+        return " (this hand holds no spells at all)";
+    if (lands < cheapestCmc)
+    {
+        o << " (" << lands << " land" << (lands == 1 ? " is" : "s are")
+          << " not enough for your cheapest spell at mana value " << cheapestCmc << ")";
+        return o.str();
+    }
+    //Land COUNT reaches the cheapest spell, so what is missing is a coloured
+    //pip. Name the colours these lands actually make, in the same symbols the
+    //"Mana sources among those lands" line two rows up already used.
+    string made;
+    for (int k = 0; k < 5; k++)
+        if (sources[k])
+            made += kSym[k];
+    o << " (you have " << lands << " land" << (lands == 1 ? "" : "s") << "; no spell in it"
+      << " is castable off "
+      << (made.empty() ? string("colourless mana") : made) << " alone)";
+    return o.str();
+}
+
 string pregameHandHeaderText(int handSize, int lands, int spells, const int sources[5],
                              const string& cheapestLabel, int cheapestCmc,
                              const vector<string>& reachable)
@@ -1999,7 +2033,8 @@ string pregameHandHeaderText(int handSize, int lands, int spells, const int sour
         o << ".\n";
     }
     else if (lands)
-        o << "Playing every land in this hand would not cover any spell in it.\n";
+        o << "Playing every land in this hand would not cover any spell in it"
+          << mulliganNoCoverCause(lands, sources, cheapestCmc) << ".\n"; //#W54-E (D16)
     return o.str();
 }
 
@@ -2701,14 +2736,28 @@ static string stackAbilityName(const string& sourceName, const string& menuText)
 //[from your Soul Shatter]`. Pure over the four strings so every branch is
 //provable in PARSETEST; an empty grantor falls back byte-identically to the
 //pre-fix forms above, so no other stack line moves.
+//#W54-E (D19, wave-53 ledger MED = R179): `genericKind` is the label used when
+//the ability has no effect name of its OWN. Many abilities default getMenuText
+//to the card's name, which rendered 53 wave-53 stack lines as
+//`ability: Ob Nixilis, the Hate-Twisted's Ob Nixilis, the Hate-Twisted` - the
+//name twice and the effect nowhere. A name is not an effect label, so when the
+//rendered label IS the grantor's name it is dropped for the kind the caller
+//read off the live object (triggered / activated / plain "ability"); the kind
+//is passed in rather than guessed here so this function stays pure and never
+//asserts a trigger it did not observe.
 static string stackAbilityLine(const string& grantorName, const string& menuText,
-                               const string& victimName, bool grantorMine)
+                               const string& victimName, bool grantorMine,
+                               const string& genericKind)
 {
     if (grantorName.empty())
         return stackAbilityName(string(), menuText);
     std::ostringstream o;
+    const string kind = genericKind.empty() ? string("ability") : genericKind;
+    string label = menuText.empty() ? string() : renderAbilityLabel(menuText);
+    if (label.empty() || w42Lower(label) == w42Lower(grantorName))
+        label = kind; //#W54-E (D19): never the source name twice
     o << "ability: " << grantorName << "'s ";
-    o << (menuText.empty() ? string("ability") : renderAbilityLabel(menuText));
+    o << label;
     if (!victimName.empty())
         o << " (aimed at " << victimName << ")";
     o << " [from " << (grantorMine ? "your " : "their ") << grantorName << "]";
@@ -2750,7 +2799,18 @@ static string stackAbilityBody(Interruptible * it, Player * seat)
             victim = vic->getDisplayName() + instanceHandle(vic);
     }
     if (srcName.empty() && !grantor.empty())
-        return stackAbilityLine(grantor, menu, victim, grantorMine);
+    {
+        //#W54-E (D19): the generic label, read off the live ability rather than
+        //assumed - a StackAbility carries the resolvable ability itself, so the
+        //two engine base classes answer "triggered" vs "activated" directly and
+        //anything else degrades to the neutral word.
+        string kind = "ability";
+        if (dynamic_cast<TriggeredAbility *>(sa->ability))
+            kind = "triggered ability";
+        else if (dynamic_cast<ActivatedAbility *>(sa->ability))
+            kind = "activated ability";
+        return stackAbilityLine(grantor, menu, victim, grantorMine, kind);
+    }
     return stackAbilityName(srcName, menu);
 }
 
@@ -3082,6 +3142,29 @@ static string potentialBlockersTag(const vector<string>& entries, const string& 
 static string noPotentialBlockersTag()
 {
     return " [no creature they control can block this attacker]";
+}
+
+//#W54-E (D17, wave-53 ledger MED = R177). Every A-line listed the SAME two
+//blockers in full, four times over, and nothing anywhere said there were only
+//two: `152v126` s26/s32/s40 each declared two attackers into two blockers, and
+//the seat lost 0-21 holding a 4/4 and a 7/5 whose worst printed price was one
+//life. The opposite number is what decides an alpha strike, and the engine has
+//it - the per-attacker lists were built from exactly this set. One header line,
+//the attack-side twin of the block header's "Unblocked, these attackers deal up
+//to X - you would be at Y". The subtraction is left as an expression rather
+//than evaluated because the attacker count is the model's to choose; the count
+//itself is the fact. Pure so both branches are provable in PARSETEST.
+static string attackerBlockerCountLine(int blockers)
+{
+    if (blockers <= 0)
+        return "They have 0 untapped creatures able to block: every attacker you"
+               " declare this turn is unblocked unless something changes first.\n";
+    std::ostringstream o;
+    o << "They have " << blockers << " untapped creature"
+      << (blockers == 1 ? "" : "s") << " able to block; declaring more than "
+      << blockers << " attackers leaves at least (your attackers - " << blockers
+      << ") of them unblocked.\n";
+    return o.str();
 }
 
 //#W45-2, the priced half. Every outcome in the tag above - collapsed or
@@ -6150,7 +6233,16 @@ static bool sourceDealsPoisonInsteadOfDamage(MTGCardInstance * c)
 //swing by whether its damage is REPLACED, price each half against its own
 //threshold, and DROP the take-the-damage advice entirely whenever any poison is
 //incoming (an accurate number with stale advice attached is still a misteach).
-static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming)
+//#W54-E (D21): the take-the-damage hint asserted its own premise. `123v130`
+//s55 printed "taking damage while ahead on LIFE is often correct" at 7 life
+//against 12; the seat blocked nothing, went to 1 and died next turn - the
+//wave-53 corpus's ONLY render falsehood. The two totals are both in hand at
+//the caller, so the clause is GATED on them and simply absent when the seat
+//is level or behind (the guide owns what to do then). oppLife is a required
+//argument, not a defaulted one: a forecast that cannot see the opponent's
+//life must not be able to fall back into printing the claim.
+static string combatDamageForecast(int life, int poison, int lifeIncoming, int poisonIncoming,
+                                   int oppLife)
 {
     std::ostringstream o;
     o << "Your life: " << life << ".";
@@ -6165,7 +6257,9 @@ static string combatDamageForecast(int life, int poison, int lifeIncoming, int p
           << " - you would be at " << (life - lifeIncoming)
           << (life - lifeIncoming <= 0
               ? " - LETHAL if it all connects (at 0 life you LOSE - 0 is not survival): block enough to survive."
-              : " - NOT lethal: block only where the trade favors you; taking damage while ahead on LIFE is often correct (your strategy guide's blocking rules override this general hint).")
+              : (life > oppLife
+                  ? " - NOT lethal: block only where the trade favors you; taking damage while ahead on LIFE is often correct (your strategy guide's blocking rules override this general hint)."
+                  : " - NOT lethal: block only where the trade favors you."))
           << "\n";
         return o.str();
     }
@@ -14031,7 +14125,9 @@ static bool isHarmToTargetAbility(MTGAbility * a, int depth = 0)
     return false;
 }
 
-static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped);
+static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped,
+                                     const string& colorsClause); //#W54-E (D20)
+static string fetchLandColorsClause(const bool adds[5], const bool canMake[5]); //#W54-E (D20)
 static bool isFetchCrackLine(const string& line);
 string AIPlayerGPT::describeAction(const OrderedAIAction& action)
 {
@@ -14415,7 +14511,27 @@ string AIPlayerGPT::describeAction(const OrderedAIAction& action)
             int untapped = ManaEngine::potentialColorReach(this, reachPolicy, NULL);
             string low = toLowerCopy(fsrc->magicText);
             bool entersTapped = low.find("tap(noevent)") != string::npos || low.find("tapped") != string::npos;
-            out << fetchMakesNoManaClause(untapped, entersTapped);
+            //#W54-E (D20): the colours the row's OWN target land makes, and
+            //which of them this board cannot already produce. action.target is
+            //the land named in the row's " targeting <land>" tail, so the
+            //clause can never describe a different card than the row does.
+            string colorsClause;
+            if (action.target && action.target->isLand())
+            {
+                bool adds[5], canMake[5];
+                landColorFlags(action.target, adds);
+                static const int kEngineColor[5] = { Constants::MTG_COLOR_WHITE, Constants::MTG_COLOR_BLUE,
+                                                     Constants::MTG_COLOR_BLACK, Constants::MTG_COLOR_RED,
+                                                     Constants::MTG_COLOR_GREEN };
+                ManaEngine::FreeProducerPolicy colourPolicy;
+                ManaCost * potential = NEW ManaCost();
+                ManaEngine::potentialColorReach(this, colourPolicy, potential);
+                for (int k = 0; k < 5; k++)
+                    canMake[k] = potential && potential->getCost(kEngineColor[k]) > 0;
+                SAFE_DELETE(potential);
+                colorsClause = fetchLandColorsClause(adds, canMake);
+            }
+            out << fetchMakesNoManaClause(untapped, entersTapped, colorsClause);
         }
     }
     //#W41-6: the repeat-activation countable, next to the cost it is paid with
@@ -16194,7 +16310,48 @@ bool AIPlayerGPT::choiceRetractedNoReplacement(const string& content, int option
 //basic land with Prismatic Vista") - 664 offers in the wave-9 corpus, the
 //top decision-count driver on control decks.
 //#W52-L (D16): pure, so the shape is provable in PARSETEST.
-static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped)
+//#W54-E (D20, wave-53 ledger MED = R180). The clause priced the crack in
+//SOURCES and never in COLOURS, on a menu whose whole point is which colour you
+//are fetching: `123v130` s36 offered Tundra and Underground Sea (both make {U})
+//among seven colourless-looking rows, the mana line read `colours you can make:
+//{b}{w}`, the hand held two {2}{u} spells, the reply said "I need a source that
+//makes {U}" and answered Swamp. 90 renders at that seat, colourless every time.
+//The colours are read with the SAME landColorFlags the hand line's
+//"(land: taps for {W}{U})" uses, and the cannot-make half is measured against
+//the same potential the mana line is built from - so no third opinion about
+//either fact can enter. Pure over two flag arrays so both halves are provable.
+static string fetchLandColorsClause(const bool adds[5], const bool canMake[5])
+{
+    static const char * kSym[5] = { "{W}", "{U}", "{B}", "{R}", "{G}" };
+    string list, missing;
+    int n = 0, m = 0;
+    for (int k = 0; k < 5; k++)
+    {
+        if (!adds[k])
+            continue;
+        if (n++)
+            list += " or ";
+        list += kSym[k];
+        if (!canMake[k])
+        {
+            if (m++)
+                missing += " or ";
+            missing += kSym[k];
+        }
+    }
+    //A land whose colours the engine could not read says NOTHING about colours:
+    //an unread script and a truly colourless land are indistinguishable here,
+    //and a wrong colour claim on this menu is exactly the defect being fixed.
+    if (!n)
+        return "";
+    string s = ", and it adds " + list;
+    if (m)
+        s += " (you cannot make " + missing + " right now)";
+    return s;
+}
+
+static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped,
+                                     const string& colorsClause)
 {
     std::ostringstream o;
     o << " {this land makes no mana - crack it for a land";
@@ -16202,6 +16359,7 @@ static string fetchMakesNoManaClause(int untapped, bool fetchedEntersTapped)
         o << " (the land it finds enters tapped)";
     else if (untapped >= 0)
         o << ": your untapped mana sources go from " << untapped << " to " << (untapped + 1);
+    o << colorsClause; //#W54-E (D20)
     o << "}";
     return o.str();
 }
@@ -22816,6 +22974,26 @@ int AIPlayerGPT::chooseAttackers()
         if (anyAttackerRangeRow)
             tail << kAttackerRangeNote;
     }
+    //#W54-E (D17): the opposite number, once, from the engine's own solo block
+    //gate - the same canBlock() the per-attacker lists above are filtered by,
+    //so the header and the rows can never disagree. UNTAPPED-NOW is the honest
+    //scope for the same reason the rows use it: their creatures do not untap
+    //before this combat's block step.
+    {
+        int blockerCount = 0;
+        Player * oppB = opponent();
+        if (oppB && oppB->game && oppB->game->inPlay)
+        {
+            MTGGameZone * bf = oppB->game->inPlay;
+            for (int i = 0; i < bf->nb_cards; i++)
+            {
+                MTGCardInstance * c = bf->cards[i];
+                if (c && c->isCreature() && c->canBlock())
+                    blockerCount++;
+            }
+        }
+        tail << attackerBlockerCountLine(blockerCount);
+    }
     //Wave-35 churn driver #5 (batch5 #12): the attackers ask stated neither of
     //the two facts that decide it, so the model derived them from scratch - one
     //26,457-char trace on a ONE-legal-attacker decision spent ~20,000 chars
@@ -23365,7 +23543,9 @@ int AIPlayerGPT::chooseBlockers()
                     poisonIncoming += attackers[j]->getToxicity();
             }
         }
-        tail << combatDamageForecast(life, poisonCount, lifeIncoming, poisonIncoming);
+        //#W54-E (D21): the opponent's life is what makes "ahead" a fact.
+        tail << combatDamageForecast(life, poisonCount, lifeIncoming, poisonIncoming,
+                                     opponent() ? opponent()->life : life);
     }
     //Capture each presented combat option line (attacker context + blocker
     //options WITH their trade annotations) for the translog: combat records
@@ -27060,14 +27240,14 @@ void AIPlayerGPT::runParseSelfTest()
     cout << "\n[W33-N105b] the block forecast prices poison against 10, not life against 20\n";
     {
         // CONTROL: the non-poison swing (wording re-pinned by W36 #3/#5 below).
-        string plain = combatDamageForecast(20, 0, 5, 0);
+        string plain = combatDamageForecast(20, 0, 5, 0, 15); //#W54-E (D21): ahead
         cout << "     " << plain;
         CHECK(plain == "Your life: 20. Unblocked, these attackers deal up to 5 - you would be at 15"
                        " - NOT lethal: block only where the trade favors you; taking damage while"
                        " ahead on LIFE is often correct (your strategy guide's blocking rules"
                        " override this general hint).\n",
               "W33-N105b a swing with no poison in it keeps the count arithmetic");
-        CHECK(combatDamageForecast(4, 0, 5, 0).find("LETHAL if it all connects") != string::npos,
+        CHECK(combatDamageForecast(4, 0, 5, 0, 20).find("LETHAL if it all connects") != string::npos,
               "W33-N105b the lethal branch of the non-poison forecast is unchanged");
         // W36 #3 (105/152/36 three-seat collision): the hint names LIFE as the
         // resource and yields to deck-guide blocking rules.
@@ -27075,18 +27255,18 @@ void AIPlayerGPT::runParseSelfTest()
               && plain.find("strategy guide's blocking rules override") != string::npos,
               "W36-3 the general hint is LIFE-scoped and yields to the deck guide");
         // W36 #5 (158 R1: "4 - 4 = 0 life. I survive!"): the boundary is EQUAL.
-        string zero = combatDamageForecast(4, 0, 4, 0);
+        string zero = combatDamageForecast(4, 0, 4, 0, 20);
         cout << "     " << zero;
         CHECK(zero.find("you would be at 0") != string::npos
               && zero.find("at 0 life you LOSE") != string::npos
               && zero.find("0 is not survival") != string::npos,
               "W36-5 reaching EXACTLY 0 is stated as LETHAL, not survival");
-        CHECK(combatDamageForecast(5, 0, 4, 0).find("at 0 life you LOSE") == string::npos,
+        CHECK(combatDamageForecast(5, 0, 4, 0, 20).find("at 0 life you LOSE") == string::npos,
               "W36-5 NEGATIVE: a survivable swing carries no 0-life boundary clause");
 
         // The deck36 s25 t12 GAME-LOSING window: 5 infect power onto 6 poison.
         // The old line said "you would be at 15 - NOT lethal" and the seat took it.
-        string inf = combatDamageForecast(20, 6, 0, 5);
+        string inf = combatDamageForecast(20, 6, 0, 5, 20);
         cout << "     " << inf;
         CHECK(inf.find("you would be at 15") == string::npos,
               "W33-N105b an infect swing emits NO life-total forecast for its damage");
@@ -27099,7 +27279,7 @@ void AIPlayerGPT::runParseSelfTest()
               "W33-N105b the forecast restates the current poison count it is pricing against");
 
         // Sub-threshold poison: not lethal, but never framed as affordable.
-        string sub = combatDamageForecast(20, 2, 0, 3);
+        string sub = combatDamageForecast(20, 2, 0, 3, 20);
         CHECK(sub.find("5 of 10 poison") != string::npos
               && sub.find("taking damage while ahead is often correct") == string::npos,
               "W33-N105b a sub-threshold poison swing still drops the stale advice");
@@ -27107,7 +27287,7 @@ void AIPlayerGPT::runParseSelfTest()
               "W33-N105b sub-threshold poison is framed as permanent, not as slack");
 
         // MIXED swing (a toxic attacker): BOTH halves must be priced.
-        string mixed = combatDamageForecast(9, 7, 4, 2);
+        string mixed = combatDamageForecast(9, 7, 4, 2, 20);
         cout << "     " << mixed;
         CHECK(mixed.find("9 of 10 poison") != string::npos
               && mixed.find("ORDINARY damage - your life would be 5") != string::npos,
@@ -36317,13 +36497,13 @@ static const char * kW50Y_r94 =
                   "#W52-L D15 echo: the verdict leaves no residue in the narrated record");
         }
         //D16: the fetch clause.
-        CHECK(fetchMakesNoManaClause(2, false) == " {this land makes no mana - crack it for a land: your untapped mana sources go from 2 to 3}",
+        CHECK(fetchMakesNoManaClause(2, false, "") == " {this land makes no mana - crack it for a land: your untapped mana sources go from 2 to 3}",
               "#W52-L D16 the fetch row prices the crack in untapped sources");
-        CHECK(fetchMakesNoManaClause(2, true) == " {this land makes no mana - crack it for a land (the land it finds enters tapped)}",
+        CHECK(fetchMakesNoManaClause(2, true, "") == " {this land makes no mana - crack it for a land (the land it finds enters tapped)}",
               "#W52-L D16 an enters-tapped fetch says so instead of promising a source");
         {
             string row = "Put a card onto the battlefield with Marsh Flats #2 targeting Plains [your library] [cost: Tap, Life, Sacrifice]"
-                         + fetchMakesNoManaClause(2, false);
+                         + fetchMakesNoManaClause(2, false, "");
             CHECK(isFetchCrackLine(row) && fetchLineKey(row) == "Put a card onto the battlefield with Marsh Flats #2",
                   "#W52-L D16 the clause leaves the fetch decline key untouched");
             CHECK(stripNarrationDecoration(row).find("makes no mana") == string::npos,
@@ -36958,21 +37138,21 @@ static const char * kW50Y_r94 =
         //deck146 vs125 seq 328 shape - three Soul Shatters, one Emrakul.
         string sac = renderAbilityLabel("Sacrifice a creature or planeswalker");
         string line4 = stackAbilityLine("Soul Shatter", "Sacrifice a creature or planeswalker",
-                                        "Emrakul, the Aeons Torn", true);
+                                        "Emrakul, the Aeons Torn", true, "triggered ability");
         cout << "     D4 stack line: " << line4 << "\n";
         CHECK(line4 == "ability: Soul Shatter's " + sac
                        + " (aimed at Emrakul, the Aeons Torn) [from your Soul Shatter]",
               "#W53-P D4a the granted sacrifice names its source, its victim and whose card it came from");
         CHECK(stackAbilityLine("Soul Shatter", "Sacrifice a creature or planeswalker",
-                               "Emrakul, the Aeons Torn", false).find("[from their Soul Shatter]") != string::npos,
+                               "Emrakul, the Aeons Torn", false, "triggered ability").find("[from their Soul Shatter]") != string::npos,
               "#W53-P D4a the other chair's copy says 'their'");
-        CHECK(stackAbilityLine("Soul Shatter", "Sacrifice a creature or planeswalker", "", true)
+        CHECK(stackAbilityLine("Soul Shatter", "Sacrifice a creature or planeswalker", "", true, "triggered ability")
               == "ability: Soul Shatter's " + sac + " [from your Soul Shatter]",
               "#W53-P D4a no pick yet: the source is still named, the aimed-at clause is not invented");
-        CHECK(stackAbilityLine("", "Sacrifice a creature or planeswalker", "Emrakul", true)
+        CHECK(stackAbilityLine("", "Sacrifice a creature or planeswalker", "Emrakul", true, "triggered ability")
               == stackAbilityName("", "Sacrifice a creature or planeswalker"),
               "#W53-P D4a NEGATIVE with no grantor the line is byte-identical to the pre-fix form");
-        CHECK(stackAbilityLine("", "", "", true) == "an ability whose source the engine can no longer name",
+        CHECK(stackAbilityLine("", "", "", true, "triggered ability") == "an ability whose source the engine can no longer name",
               "#W53-P D4a NEGATIVE the nameless fallback is untouched");
         CHECK(line4.find("StackAbility") == string::npos && line4.find("(Source: )") == string::npos,
               "#W53-P D4a NEGATIVE no engine identifier reaches the surface");
@@ -37174,6 +37354,147 @@ static const char * kW50Y_r94 =
               "#W53-V with three printings the nearest FORWARD id wins, not the last one");
         CHECK(wagicPickFaceSiblingId(three, 400000) == 300002,
               "#W53-V past every candidate it falls back to the nearest one behind");
+    }
+    // ---- #W54-E: D21 life gate, D17 blocker count, D16 mulligan cause,
+    // D20 fetch colours, D19 the source name twice ----
+    cout << "\n[#W54-E] D21 / D17 / D16 / D20 / D19\n";
+    {
+        //D21: the corpus's only render falsehood. `123v130` s55 was 7 life
+        //against 12 and the hint claimed the seat was ahead.
+        string behind = combatDamageForecast(7, 0, 6, 0, 12);
+        cout << "     D21 behind: " << behind;
+        CHECK(behind == "Your life: 7. Unblocked, these attackers deal up to 6 - you would be at 1"
+                        " - NOT lethal: block only where the trade favors you.\n",
+              "#W54-E D21 at 7 life against 12 the not-lethal verdict stands and the hint is gone");
+        CHECK(behind.find("ahead on LIFE") == string::npos,
+              "#W54-E D21 NEGATIVE 'ahead on LIFE' must NOT appear when my_life <= opp_life");
+        CHECK(combatDamageForecast(12, 0, 6, 0, 12).find("ahead on LIFE") == string::npos,
+              "#W54-E D21 NEGATIVE level life totals are not 'ahead' either");
+        CHECK(combatDamageForecast(13, 0, 6, 0, 12).find("ahead on LIFE") != string::npos,
+              "#W54-E D21 one point ahead still earns the hint, byte-identical to the shipped wording");
+        CHECK(combatDamageForecast(13, 0, 6, 0, 12).find("strategy guide's blocking rules override")
+              != string::npos,
+              "#W54-E D21 the hint keeps its yield-to-the-guide clause when it prints");
+        //The lethal branch never carried the hint and must not gain one.
+        CHECK(combatDamageForecast(4, 0, 6, 0, 99).find("ahead on LIFE") == string::npos
+              && combatDamageForecast(4, 0, 6, 0, 99).find("LETHAL if it all connects") != string::npos,
+              "#W54-E D21 NEGATIVE a lethal swing is unchanged whatever the opponent's life is");
+
+        //D17: the opposite number, once.
+        string two = attackerBlockerCountLine(2);
+        cout << "     D17: " << two;
+        CHECK(two == "They have 2 untapped creatures able to block; declaring more than 2"
+                     " attackers leaves at least (your attackers - 2) of them unblocked.\n",
+              "#W54-E D17 the blocker-count header states N and the subtraction it implies");
+        CHECK(attackerBlockerCountLine(1).find("1 untapped creature able") != string::npos,
+              "#W54-E D17 one blocker is singular");
+        CHECK(attackerBlockerCountLine(0).find("every attacker you declare this turn is unblocked")
+              != string::npos,
+              "#W54-E D17 an empty board says so positively rather than printing a 0-subtraction");
+        CHECK(attackerBlockerCountLine(0).find("leaves at least") == string::npos,
+              "#W54-E D17 NEGATIVE the zero branch carries no subtraction clause");
+
+        //D16: which of the two hands this is.
+        int gg[5] = { 0, 0, 0, 0, 2 };            //two lands, {G}{G}
+        vector<string> none;
+        string colourCase = pregameHandHeaderText(7, 2, 5, gg, "Wall of Omens {1}{w}", 2, none);
+        cout << "     D16 colour: " << colourCase.substr(colourCase.find("Playing every land"));
+        CHECK(colourCase.find("would not cover any spell in it (you have 2 lands; no spell in it"
+                              " is castable off {G} alone).") != string::npos,
+              "#W54-E D16 enough lands, wrong colour: the cause names the colours the lands make");
+        int one[5] = { 1, 0, 0, 0, 0 };           //one Plains
+        string countCase = pregameHandHeaderText(7, 1, 6, one, "Wall of Omens {1}{w}", 2, none);
+        cout << "     D16 count: " << countCase.substr(countCase.find("Playing every land"));
+        CHECK(countCase.find("would not cover any spell in it (1 land is not enough for your"
+                             " cheapest spell at mana value 2).") != string::npos,
+              "#W54-E D16 too few lands: the cause is the count, not the colour");
+        CHECK(countCase.find("castable off") == string::npos,
+              "#W54-E D16 NEGATIVE the count case never claims a colour is the problem");
+        CHECK(colourCase.find("not enough for your cheapest spell") == string::npos,
+              "#W54-E D16 NEGATIVE the colour case never claims the count is the problem");
+        //A covered hand keeps its positive line and gains no cause clause.
+        vector<string> covered; covered.push_back("Wall of Omens {1}{w}");
+        int ww[5] = { 2, 0, 0, 0, 0 };
+        CHECK(pregameHandHeaderText(7, 2, 5, ww, "Wall of Omens {1}{w}", 2, covered)
+                  .find("would not cover any spell") == string::npos,
+              "#W54-E D16 NEGATIVE a hand that DOES cover a spell never reaches the cause clause");
+        //Nothing on this surface may name a board (the owner's pregame rule).
+        CHECK(colourCase.find("battlefield") == string::npos
+              && colourCase.find("Mana available") == string::npos,
+              "#W54-E D16 NEGATIVE the cause clause is hand-derived: no board state joins the header");
+        //A landed hand with no spells at all is named for what it is.
+        CHECK(pregameHandHeaderText(7, 7, 0, ww, "", -1, none)
+                  .find("(this hand holds no spells at all)") != string::npos,
+              "#W54-E D16 an all-land hand states that, rather than a false count verdict");
+
+        //D20: the colours the fetched land makes, and the ones you cannot make.
+        bool tundra[5] = { true, true, false, false, false };   //Plains Island
+        bool bw[5] = { true, false, true, false, false };       //{B}{W} on board
+        string tc = fetchLandColorsClause(tundra, bw);
+        cout << "     D20: " << tc << "\n";
+        CHECK(tc == ", and it adds {W} or {U} (you cannot make {U} right now)",
+              "#W54-E D20 the row names both colours and the one this board is missing");
+        CHECK(fetchMakesNoManaClause(2, false, tc)
+              == " {this land makes no mana - crack it for a land: your untapped mana sources"
+                 " go from 2 to 3, and it adds {W} or {U} (you cannot make {U} right now)}",
+              "#W54-E D20 the clause continues the shipped sources sentence inside the same braces");
+        bool wOnly[5] = { true, false, false, false, false };
+        CHECK(fetchLandColorsClause(wOnly, bw) == ", and it adds {W}",
+              "#W54-E D20 NEGATIVE a colour you can already make earns no cannot-make tail");
+        bool nothing[5] = { false, false, false, false, false };
+        CHECK(fetchLandColorsClause(nothing, bw).empty(),
+              "#W54-E D20 NEGATIVE a land whose colours the engine could not read claims nothing");
+        CHECK(fetchMakesNoManaClause(2, false, "")
+              == " {this land makes no mana - crack it for a land: your untapped mana sources go from 2 to 3}",
+              "#W54-E D20 NEGATIVE with no colour clause the shipped string is byte-identical");
+        //Two missing colours read as one list, not two clauses.
+        bool ub[5] = { false, true, true, false, false };
+        bool wOnBoard[5] = { true, false, false, false, false };
+        CHECK(fetchLandColorsClause(ub, wOnBoard) == ", and it adds {U} or {B} (you cannot make {U} or {B} right now)",
+              "#W54-E D20 two unmakeable colours share one parenthetical");
+
+        //D19: the effect label that was the source name.
+        CHECK(stackAbilityLine("Ob Nixilis, the Hate-Twisted", "Ob Nixilis, the Hate-Twisted",
+                               "", true, "triggered ability")
+              == "ability: Ob Nixilis, the Hate-Twisted's triggered ability"
+                 " [from your Ob Nixilis, the Hate-Twisted]",
+              "#W54-E D19 a menu text that is just the card name degrades to the observed kind");
+        CHECK(stackAbilityLine("Ob Nixilis, the Hate-Twisted", "OB NIXILIS, THE HATE-TWISTED",
+                               "", true, "activated ability").find("'s activated ability ") != string::npos,
+              "#W54-E D19 the name match is case-insensitive and the kind is the caller's, not a guess");
+        CHECK(stackAbilityLine("Ob Nixilis, the Hate-Twisted", "", "", true, "")
+              == "ability: Ob Nixilis, the Hate-Twisted's ability"
+                 " [from your Ob Nixilis, the Hate-Twisted]",
+              "#W54-E D19 an unknown kind degrades to the neutral word, never to the name");
+        {
+            string dup = stackAbilityLine("Ob Nixilis, the Hate-Twisted", "Ob Nixilis, the Hate-Twisted",
+                                          "", true, "triggered ability");
+            size_t first = dup.find("Ob Nixilis, the Hate-Twisted");
+            size_t second = dup.find("Ob Nixilis, the Hate-Twisted", first + 1);
+            CHECK(second != string::npos && dup.find("Ob Nixilis, the Hate-Twisted", second + 1) == string::npos,
+                  "#W54-E D19 NEGATIVE the source name appears exactly twice: possessive + [from your ...]");
+        }
+        //A real effect label is untouched.
+        CHECK(stackAbilityLine("Soul Shatter", "Sacrifice a creature or planeswalker", "", true,
+                               "triggered ability")
+              == "ability: Soul Shatter's " + renderAbilityLabel("Sacrifice a creature or planeswalker")
+                 + " [from your Soul Shatter]",
+              "#W54-E D19 NEGATIVE an ability with a real label is byte-identical to lane P's shipped form");
+
+        //ECHO SHAPE: the model echoes these strings back inside its answers, so
+        //the annotation-stripping used on candidate rows must survive them.
+        CHECK(tc.find('[') == string::npos && tc.find(']') == string::npos,
+              "#W54-E D20 echo shape: the colour clause opens no square bracket, so the"
+              " annotation stripper's [...] contract is untouched");
+        CHECK(stripRenderAnnotationsLc("Tundra" + fetchMakesNoManaClause(2, false, tc)).find("tundra") == 0,
+              "#W54-E D20 echo shape: an echoed fetch row still begins with the land's own name");
+        //The header lines are not option rows, but the model echoes them too:
+        //neither may open a bracket or lead with a coded index.
+        CHECK(attackerBlockerCountLine(2).find('[') == string::npos
+              && attackerBlockerCountLine(2).find("They have") == 0,
+              "#W54-E D17 echo shape: the header is prose, opens no bracket and leads with 'They'");
+        CHECK(mulliganNoCoverCause(2, gg, 2).find('[') == string::npos,
+              "#W54-E D16 echo shape: the cause clause opens no bracket");
     }
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
