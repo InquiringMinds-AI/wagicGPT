@@ -8622,6 +8622,26 @@ const char * AIPlayerGPT::noAnswerClass() const
     return noAnswerClassFor(mLastStaleLivelock, mLastTimeout, !mLastReasoning.empty());
 }
 
+//#W54-B (D9). noAnswerClassFor above is the branch this item does NOT cover:
+//it classifies a reply that never came. The wave-53 corpus had ZERO empty
+//replies and six that reached 600 s and ANSWERED - 126v125 seq 13 at 868,729
+//ms (96.5% of the 900 s wall, and one of D13's two mis-executions), 126v146
+//seq 22 and 23 (the two windows that lost that game), 162v126 seq 10, 123v126
+//seq 1, 152v123 seq 16 - and not one carried a mark of any kind. These two
+//functions are the mark's arithmetic, pure so the table is pinned.
+long AIPlayerGPT::deadlineTenthsPct(long latencyMs, long timeoutMs)
+{
+    if (latencyMs < 0 || timeoutMs <= 0)
+        return -1; //no round trip on this record (cache/reuse), or no deadline
+    return (latencyMs * 1000) / timeoutMs;
+}
+
+bool AIPlayerGPT::isLongReply(long latencyMs, long timeoutMs, bool answered)
+{
+    //the SAME >= 95% mark the worker's timeout test uses, on the answered side
+    return answered && latencyMs >= 0 && timeoutMs > 0 && latencyMs * 100 >= timeoutMs * 95;
+}
+
 int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 {
     {
@@ -9583,6 +9603,10 @@ bool AIPlayerGPT::handedToHeuristic(int choice, const char * fallback)
     return choice < 0 && fallback != NULL && *fallback != '\0';
 }
 
+//#W54-B: the parse-note appender is defined with the parser below; this
+//record writer stamps three of its own signatures (D9/D13/D14).
+static void appendParseNote(std::string * noteOut, const char * sig);
+
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                                 const string& chosenText, const char * fallback, const vector<string> * optionTexts,
                                 const char * choiceSource)
@@ -9618,6 +9642,28 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
         rec["retry"] = 1;
         mLastRetry = false;
     }
+    //#W54-B (D9): a reply that ANSWERED at or past 95% of the configured
+    //deadline gets its own stamp and the elapsed fraction, so "the model
+    //nearly missed the wall" stops reading as "the model answered". No
+    //behaviour rides it and no dial moves - WAGIC_GPT_TIMEOUT is the owner's.
+    if (isLongReply(mLastLatencyMs, mTimeoutMs, !reply.empty()))
+    {
+        rec["long_reply"] = 1;
+        rec["deadline_pct"] = deadlineTenthsPct(mLastLatencyMs, mTimeoutMs) / 10.0;
+        appendParseNote(&mLastParseNote, "long_reply");
+    }
+    //#W54-B (D13): the latched coded line's index and its parenthetical BOTH
+    //disagree with the row that ran. 2 of 3,253 parentheticals in wave 53,
+    //silent both times.
+    if (latchedRowMismatch(reply, choice, optionCount, optionTexts))
+        appendParseNote(&mLastParseNote, "latched_row_mismatch");
+    //#W54-B (D14): the chosen row's own annotation says it does nothing and
+    //the reply's PLAN says so too - executed anyway, silently, 4 times at two
+    //seats. ADDITIVE: a stamp, never a suppression and never a re-ask.
+    if (choice >= 1 && optionTexts && choice <= (int) optionTexts->size()
+        && rowSaysNoOp((*optionTexts)[choice - 1])
+        && planArguesAgainstRow(reply, (*optionTexts)[choice - 1]))
+        appendParseNote(&mLastParseNote, "plan_contradicts_noop_row");
     mLastLatencyMs = -1; //consumed: the next record without a round trip is cache/reuse
     //NATIVE REASONING (wave-34 #1b(A)): the model's own thinking for THIS
     //decision, from message.reasoning_content or from an inline <think> block -
@@ -15153,6 +15199,23 @@ string AIPlayerGPT::buildRequestBody(const string& userMsg)
     return request.dump();
 }
 
+//#W54-B (D15): is this {...} a MANA SYMBOL rather than an annotation? A
+//cost symbol is at most three characters and carries no space and no colon -
+//{2} {b} {w/u} {2/w} {t} {x}. Every rendered annotation the option lines
+//carry is longer, or has a space or a colon in it: "{right now: they control
+//0 creatures}", "{kills: Sanguine Bond}", "{spends 3 of your 5}". Telling
+//them apart by SHAPE keeps the row's own cost in its core while no
+//annotation vocabulary can reach it.
+static bool isManaSymbolBody(const string& s, size_t b, size_t e)
+{
+    if (e <= b || e - b > 3)
+        return false;
+    for (size_t k = b; k < e; k++)
+        if (s[k] == ' ' || s[k] == '\t' || s[k] == ':')
+            return false;
+    return true;
+}
+
 //Strip the render-only annotations a model may copy out of the board/hand text
 //into its echoed answer - a bracketed "[changeling: counts as Giant]" /
 //"[artifact]" / "[tapped]" tail, or the parenthesized land-identity tag "(land:
@@ -15176,6 +15239,21 @@ static string stripRenderAnnotationsLc(const string& s)
                 break; //unterminated bracket - stop (rest is annotation-ish)
             i = c + 1;
             continue;
+        }
+        //#W54-B (D15): a curly ANNOTATION group is furniture exactly like a
+        //bracketed one. deck126 vs130 seq 21 bound "Sanguine Bond" - a name on
+        //NO row's label, present once on the whole menu inside row 1's "[finds
+        //only ...]" list - and executed row 1. The bracket half of that list
+        //was already stripped; "{kills: <name>}", "{right now: ... <name> is
+        //sacrificed}" and their kin were not.
+        if (s[i] == '{')
+        {
+            size_t c = s.find('}', i);
+            if (c != string::npos && !isManaSymbolBody(s, i + 1, c))
+            {
+                i = c + 1;
+                continue;
+            }
         }
         if (s[i] == '(')
         {
@@ -15300,6 +15378,169 @@ static void echoSignificantWords(const string& seg, vector<string>& out)
             w.clear();
         }
     }
+}
+
+//#W54-B (D13). The audit the latch path never had. deck126 vs125 seq 13 and
+//14 answered "CHOICE: 2 (Cast Idyllic Tutor)" on a three-row menu and row 1,
+//"Cast Perimeter Captain", executed: coded_answers 2, answer_replaced true,
+//latched_coded_line "2", parse_note None - the index and the parenthetical
+//agreed with EACH OTHER and both disagreed with what ran, and nothing said
+//so. 2 of the corpus's 3,253 parentheticals, AT the <= 1/3,000 carry ceiling
+//rather than under it.
+//Read on the LAST line-leading "CHOICE:" line, which is the line the engine's
+//own last-wins rule honours. TRUE only when the head index differs from the
+//executed row AND the parenthetical names no part of that row's own text.
+//Deliberately silent on the two shapes that look similar and are correct: a
+//name-over-index remap (the NAME won, so the parenthetical IS on the executed
+//row) and a cosmetic prefix ("Cast Vampire" for "Cast Vampire Nighthawk",
+//which the containment test accepts). Pure - no state, PARSETEST-provable.
+bool AIPlayerGPT::latchedRowMismatch(const string& reply, int choice, int optionCount,
+                                     const std::vector<string> * optionTexts)
+{
+    if (choice < 1 || !optionTexts || choice > (int) optionTexts->size())
+        return false; //row 0 (pass) carries no option text of its own
+    string line;
+    size_t lineStart = 0;
+    while (lineStart <= reply.size())
+    {
+        size_t lineEnd = reply.find('\n', lineStart);
+        size_t end = (lineEnd == string::npos) ? reply.size() : lineEnd;
+        size_t s = lineStart;
+        while (s < end && (reply[s] == ' ' || reply[s] == '\t'
+                           || reply[s] == '*' || reply[s] == '#' || reply[s] == '-'))
+            s++;
+        if (end - s >= 7)
+        {
+            static const char * kLabel = "CHOICE:";
+            bool m = true;
+            for (int k = 0; k < 7 && m; k++)
+                m = (toupper((unsigned char) reply[s + k]) == kLabel[k]);
+            if (m)
+                line = reply.substr(s + 7, end - (s + 7)); //last one wins
+        }
+        if (lineEnd == string::npos)
+            break;
+        lineStart = lineEnd + 1;
+    }
+    if (line.empty())
+        return false;
+    size_t d = line.find_first_not_of(" \t");
+    if (d == string::npos || !isdigit((unsigned char) line[d]))
+        return false; //no index on the latched line - nothing to disagree
+    int n = atoi(line.c_str() + d);
+    if (n < 0 || n > optionCount || n == choice)
+        return false; //off the menu entirely, or the index IS what ran
+    string name = headParenthetical(line);
+    for (size_t i = 0; i < name.size(); i++)
+        name[i] = (char) tolower((unsigned char) name[i]);
+    size_t a = name.find_last_not_of(" \t.");
+    name = (a == string::npos) ? string() : name.substr(0, a + 1);
+    if (name.size() < 4 || name == "pass" || name == "none" || name == "hold"
+        || name == "done" || name == "skip" || name == "decline" || name == "nobody")
+        return false; //a bare index or decline filler - no card name to disagree
+    if (stripRenderAnnotationsLc((*optionTexts)[choice - 1]).find(name) != string::npos)
+        return false; //the parenthetical is on the row that ran
+    string label = optionLabel((*optionTexts)[choice - 1]);
+    for (size_t i = 0; i < label.size(); i++)
+        label[i] = (char) tolower((unsigned char) label[i]);
+    vector<string> nw;
+    echoSignificantWords(name, nw);
+    if (!nw.empty())
+    {
+        bool all = true;
+        for (size_t k = 0; k < nw.size() && all; k++)
+            all = label.find(nw[k]) != string::npos;
+        if (all)
+            return false; //every naming word of the parenthetical is on that row
+    }
+    return true;
+}
+
+//#W54-B (D14), first half: does the chosen row's OWN annotation say the
+//action does nothing? These are the engine's own words, computed by the render
+//from the live board - "{right now: they control 0 creatures - at 0 this does
+//nothing}", "deals 0", "destroys 0 of their creatures", "kills 0 of the",
+//"no creature has died this turn, so Morbid does NOT apply". A row that
+//states a REAL magnitude ("drains 3", "destroys 2 of their creatures") says
+//nothing of the kind and must never match. Pure.
+bool AIPlayerGPT::rowSaysNoOp(const string& row)
+{
+    string low = row;
+    for (size_t i = 0; i < low.size(); i++)
+        low[i] = (char) tolower((unsigned char) low[i]);
+    static const char * kNoOp[] = {
+        "does nothing", "deals 0", "destroys 0", "kills 0", "removes 0",
+        "drains 0", "does not apply", "gains 0", "draws 0"
+    };
+    for (size_t i = 0; i < sizeof(kNoOp) / sizeof(kNoOp[0]); i++)
+        if (low.find(kNoOp[i]) != string::npos)
+            return true;
+    return false;
+}
+
+//#W54-B (D14), second half: does the reply's PLAN argue against the row the
+//reply CHOSE? Lane J's plan-vs-choice detector reads the prose BEFORE the
+//CHOICE: line and structurally cannot see this - deck126 vs125 seq 73 and 74
+//both put the contradiction AFTER it ("CHOICE: 1 (Cast Tribute to Hunger)" /
+//"PLAN: ... Avoid casting Tribute to Hunger as there are no creatures to
+//target."; then "The opponent has no creatures, so Tribute to Hunger does
+//nothing. Pass the turn.").
+//The negative has to be about THIS row, so the test is per SENTENCE of the
+//plan: the sentence names the row's card AND carries a word that argues
+//against doing it. A plan that names the card approvingly ("Cast Tribute to
+//Hunger to eat their best creature"), or argues against a DIFFERENT card,
+//never matches. Pure.
+bool AIPlayerGPT::planArguesAgainstRow(const string& reply, const string& row)
+{
+    size_t pos = findPlanMarker(reply, string::npos, NULL);
+    if (pos == string::npos)
+        return false;
+    string plan = reply.substr(pos + 5);
+    for (size_t i = 0; i < plan.size(); i++)
+        plan[i] = (char) tolower((unsigned char) plan[i]);
+    string name = optionLabel(row);
+    for (size_t i = 0; i < name.size(); i++)
+        name[i] = (char) tolower((unsigned char) name[i]);
+    size_t st = name.find_first_not_of(" \t");
+    if (st == string::npos)
+        return false;
+    name = name.substr(st);
+    static const char * kVerb[] = { "cast ", "play ", "activate ", "attack with ", "use " };
+    for (size_t i = 0; i < sizeof(kVerb) / sizeof(kVerb[0]); i++)
+    {
+        string v(kVerb[i]);
+        if (name.size() > v.size() && name.compare(0, v.size(), v) == 0)
+        {
+            name = name.substr(v.size());
+            break;
+        }
+    }
+    size_t e = name.find_last_not_of(" \t");
+    name = (e == string::npos) ? string() : name.substr(0, e + 1);
+    if (name.size() < 4)
+        return false; //nothing specific enough to attribute a sentence to
+    static const char * kAgainst[] = {
+        "avoid", "do not", "don't", "does nothing", "no creature", "not worth",
+        "useless", "pointless", "should not", "shouldn't", "no target",
+        "no legal target", "wasted", "instead of"
+    };
+    size_t start = 0;
+    while (start <= plan.size())
+    {
+        //';' too: "Avoid casting Damnation this turn; Tribute to Hunger is
+        //the play." is TWO claims, and only the first is a negative.
+        size_t stop = plan.find_first_of(".!?;\n", start);
+        size_t end = (stop == string::npos) ? plan.size() : stop;
+        string sent = plan.substr(start, end - start);
+        if (sent.find(name) != string::npos)
+            for (size_t i = 0; i < sizeof(kAgainst) / sizeof(kAgainst[0]); i++)
+                if (sent.find(kAgainst[i]) != string::npos)
+                    return true;
+        if (stop == string::npos)
+            break;
+        start = stop + 1;
+    }
+    return false;
 }
 
 //All-digit tokens of a string ("add 5 counters" -> {"5"}). The alpha filter
@@ -15700,10 +15941,15 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                                 echoMatches.push_back((int) o);
                         }
                 }
+                //#W54-B (D15): tier 2 is the FULL row minus its annotations,
+                //not the raw row. Its purpose stands - a reply that echoes
+                //nothing a label carries still reaches the row text past the
+                //first annotation - but a name that occurs ONLY inside
+                //"[finds only ...]" / "{kills: ...}" can no longer bind it.
                 if (echoMatches.empty())
                     for (size_t o = 0; o < optionTexts->size(); o++)
                     {
-                        string low = (*optionTexts)[o];
+                        string low = stripRenderAnnotationsLc((*optionTexts)[o]);
                         for (size_t i = 0; i < low.size(); i++)
                             low[i] = (char) tolower((unsigned char) low[i]);
                         bool all = true;
@@ -15874,7 +16120,9 @@ int AIPlayerGPT::parseChoice(const string& content, int optionCount,
                     for (int tier = 0; tier < 2 && relaxed.empty(); tier++)
                     for (size_t o = 0; o < optionTexts->size(); o++)
                     {
-                        string low = tier == 0 ? optionLabel((*optionTexts)[o]) : (*optionTexts)[o];
+                        //#W54-B (D15): tier 1 is annotation-stripped too
+                        string low = tier == 0 ? optionLabel((*optionTexts)[o])
+                                               : stripRenderAnnotationsLc((*optionTexts)[o]);
                         for (size_t i2 = 0; i2 < low.size(); i2++)
                             low[i2] = (char) tolower((unsigned char) low[i2]);
                         bool all = true;
@@ -30146,8 +30394,15 @@ void AIPlayerGPT::runParseSelfTest()
                        " \"target controller\": life -7, draws 16}";
         CHECK(stripNarrationDecoration(opt13) == "Cast Peer into the Abyss {4}{b}{b}{b}",
               "W39-13 echo: the labelled magnitude clause is dropped whole from narration");
-        CHECK(stripRenderAnnotationsLc(opt13).find("if you choose") != string::npos,
+        //#W54-B (D15): the labels stay on the OPTION LINE the model chooses
+        //from - opt13 itself is untouched - but they ARE annotation, so the
+        //echo-MATCHING core no longer carries them; a card name occurring
+        //only inside a "{right now: ...}" clause can never bind that row.
+        //The mana symbols are not annotation and stay.
+        CHECK(opt13.find("if you choose") != string::npos,
               "W39-13 the labels stay on the OPTION line the model chooses from");
+        CHECK(stripRenderAnnotationsLc(opt13) == "cast peer into the abyss {4}{b}{b}{b}",
+              "#W54-B D15 the {right now: ...} label is annotation: cut from the echo-matching core, mana symbols kept");
     }
 
     // ---- W39 #9: the foreach mana-producer label states the TOTAL ----
@@ -38270,6 +38525,175 @@ static const char * kW50Y_r94 =
                   "#W54-C D5 echo: the sub-menu row markers leave no residue either");
         }
     }
+    // ================= #W54-B: wave-53 docket D9 / D13 / D14 / D15 =================
+
+    // ---- #W54-B (D9): a reply that ANSWERED at the wall is stamped ----
+    cout << "\n[#W54-B D9] long_reply: the answered side of the 95% deadline mark\n";
+    {
+        //deck126 vs125 seq 13: 868,729 ms of a 900 s wall, and it ANSWERED.
+        CHECK(AIPlayerGPT::isLongReply(868729, 900000, true),
+              "#W54-B D9 deck126 vs125 seq 13: 868,729 ms of a 900 s deadline is a long_reply");
+        CHECK(AIPlayerGPT::deadlineTenthsPct(868729, 900000) == 965,
+              "#W54-B D9 the elapsed fraction is 96.5% (tenths of a percent, so the record can print 96.5)");
+        //the exact boundary, both sides
+        CHECK(AIPlayerGPT::isLongReply(855000, 900000, true)
+              && !AIPlayerGPT::isLongReply(854999, 900000, true),
+              "#W54-B D9 the gate is >= 95% of the deadline exactly, the same mark the timeout arm uses");
+        // NEGATIVES
+        CHECK(!AIPlayerGPT::isLongReply(5000, 900000, true),
+              "#W54-B D9 NEGATIVE a five-second answer is not stamped");
+        CHECK(!AIPlayerGPT::isLongReply(868729, 900000, false),
+              "#W54-B D9 NEGATIVE an EMPTY reply at the wall is the `timeout` class, never long_reply");
+        CHECK(!AIPlayerGPT::isLongReply(-1, 900000, true),
+              "#W54-B D9 NEGATIVE a cache/reuse record (latency -1) has no round trip to measure");
+        CHECK(!AIPlayerGPT::isLongReply(868729, 0, true)
+              && AIPlayerGPT::deadlineTenthsPct(868729, 0) == -1
+              && AIPlayerGPT::deadlineTenthsPct(-1, 900000) == -1,
+              "#W54-B D9 NEGATIVE no deadline and no latency are both unknowable, never a stamp");
+        //the no-answer table is untouched: this item adds a branch, it does
+        //not move one (WAGIC_GPT_TIMEOUT stays the owner's dial).
+        CHECK(string(AIPlayerGPT::noAnswerClassFor(false, true, false)) == "timeout",
+              "#W54-B D9 the wave-53 no-answer classes are unchanged by the answered-side stamp");
+    }
+
+    // ---- #W54-B (D13): index and parenthetical both disagree with what ran ----
+    cout << "\n[#W54-B D13] latched_row_mismatch\n";
+    {
+        vector<string> menu;
+        menu.push_back("Cast Perimeter Captain {1}{w}");
+        menu.push_back("Cast Idyllic Tutor {2}{w}");
+        menu.push_back("Cast nothing right now (combat comes next this turn)");
+        //deck126 vs125 seq 13/14, the two genuine mis-executions of the corpus
+        CHECK(AIPlayerGPT::latchedRowMismatch("CHOICE: 2 (Cast Idyllic Tutor)", 1, 3, &menu),
+              "#W54-B D13 deck126 vs125 seq 13: index 2 and name 'Cast Idyllic Tutor' both disagree with the executed row 1");
+        //two coded lines: the LAST is the latched one, and it is the one audited
+        CHECK(AIPlayerGPT::latchedRowMismatch("CHOICE: 3 (Cast nothing right now)\nCHOICE: 2 (Cast Idyllic Tutor)", 1, 3, &menu),
+              "#W54-B D13 seq 13's shape with coded_answers 2: the LAST coded line is read, and it names neither row 1's number nor its card");
+        // NEGATIVES - every shape that looks the same and is correct
+        CHECK(!AIPlayerGPT::latchedRowMismatch("CHOICE: 2 (Cast Idyllic Tutor)", 2, 3, &menu),
+              "#W54-B D13 NEGATIVE the index IS what ran: nothing disagrees");
+        CHECK(!AIPlayerGPT::latchedRowMismatch("CHOICE: 1 (Cast Idyllic Tutor)", 2, 3, &menu),
+              "#W54-B D13 NEGATIVE a name-over-index remap: the index differs but the parenthetical is ON the executed row");
+        CHECK(!AIPlayerGPT::latchedRowMismatch("CHOICE: 1 (Cast Idyllic)", 2, 3, &menu),
+              "#W54-B D13 NEGATIVE a cosmetic prefix of the executed row's label is a match, not a mismatch");
+        CHECK(!AIPlayerGPT::latchedRowMismatch("CHOICE: 2", 1, 3, &menu),
+              "#W54-B D13 NEGATIVE a bare index carries no name, so it cannot make BOTH disagree");
+        CHECK(!AIPlayerGPT::latchedRowMismatch("CHOICE: 2 (pass)", 1, 3, &menu),
+              "#W54-B D13 NEGATIVE decline filler in the parenthetical is not a name");
+        CHECK(!AIPlayerGPT::latchedRowMismatch("CHOICE: 1 (Cast Idyllic Tutor)", 0, 3, &menu),
+              "#W54-B D13 NEGATIVE row 0 (pass) has no option text of its own and is never audited");
+        CHECK(!AIPlayerGPT::latchedRowMismatch("I will hold everything back.", 1, 3, &menu),
+              "#W54-B D13 NEGATIVE a reply with no coded CHOICE line has no latched line to audit");
+        // ECHO SHAPE: the parenthetical may carry the row's rendered
+        // annotations back verbatim - that is still the executed row.
+        CHECK(!AIPlayerGPT::latchedRowMismatch("CHOICE: 1 (Cast Idyllic Tutor {2}{w})", 2, 3, &menu),
+              "#W54-B D13 echo shape: a parenthetical echoing the row's mana furniture still names the executed row");
+        // ...and a name that lives only inside ANOTHER row's annotation is
+        // exactly the D15 shape: it names neither row, so it is stamped.
+        vector<string> ann;
+        ann.push_back("Cast Perimeter Captain {1}{w} [finds only: Idyllic Tutor]");
+        ann.push_back("Cast Overgrown Battlement {1}{g}");
+        CHECK(AIPlayerGPT::latchedRowMismatch("CHOICE: 2 (Idyllic Tutor)", 1, 2, &ann),
+              "#W54-B D13 a parenthetical present ONLY inside row 1's annotation does not name row 1 (annotation-stripped core, D15)");
+    }
+
+    // ---- #W54-B (D14): a no-op row taken against the reply's own PLAN ----
+    cout << "\n[#W54-B D14] plan_contradicts_noop_row (a stamp, not a re-ask)\n";
+    {
+        string dead = "Cast Tribute to Hunger {2}{b} {right now: they control 0 creatures"
+                      " - at 0 this does nothing}";
+        string live = "Cast Tribute to Hunger {2}{b} {right now: they control 2 creatures"
+                      " - eats their best}";
+        CHECK(AIPlayerGPT::rowSaysNoOp(dead),
+              "#W54-B D14 the engine's own annotation says the action does nothing");
+        CHECK(!AIPlayerGPT::rowSaysNoOp(live),
+              "#W54-B D14 NEGATIVE a row stating a REAL magnitude is not a no-op row");
+        CHECK(AIPlayerGPT::rowSaysNoOp("Cast Bolt {r} {right now: deals 0}")
+              && AIPlayerGPT::rowSaysNoOp("Cast Damnation {2}{b}{b} {right now: destroys 0 of their creatures}")
+              && AIPlayerGPT::rowSaysNoOp("Cast Tragic Slip {b} [no creature has died this turn, so Morbid does NOT apply]"),
+              "#W54-B D14 the corpus's four no-op phrasings all read as no-op");
+        CHECK(!AIPlayerGPT::rowSaysNoOp("Cast Bolt {r} {right now: deals 3}")
+              && !AIPlayerGPT::rowSaysNoOp("Cast Damnation {2}{b}{b} {right now: destroys 2 of their creatures}"),
+              "#W54-B D14 NEGATIVE the same clauses with a live magnitude must NOT match");
+        string seq73 = "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: The board is stable."
+                       " Avoid casting Tribute to Hunger as there are no creatures to target.";
+        string seq74 = "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: The opponent has no creatures,"
+                       " so Tribute to Hunger does nothing. Pass the turn.";
+        CHECK(AIPlayerGPT::planArguesAgainstRow(seq73, dead),
+              "#W54-B D14 deck126 vs125 seq 73: the PLAN says avoid the very row the CHOICE line took");
+        CHECK(AIPlayerGPT::planArguesAgainstRow(seq74, dead),
+              "#W54-B D14 deck126 vs125 seq 74: the PLAN says the row does nothing and passes");
+        // NEGATIVES
+        CHECK(!AIPlayerGPT::planArguesAgainstRow(
+                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Cast Tribute to Hunger to eat"
+                  " their best creature and stabilise.", dead),
+              "#W54-B D14 NEGATIVE a PLAN that names the row APPROVINGLY is not a contradiction");
+        CHECK(!AIPlayerGPT::planArguesAgainstRow(
+                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Avoid casting Damnation this turn;"
+                  " Tribute to Hunger is the play.", dead),
+              "#W54-B D14 NEGATIVE the negative belongs to a DIFFERENT card - the clause boundary keeps them apart");
+        CHECK(!AIPlayerGPT::planArguesAgainstRow("CHOICE: 1 (Cast Tribute to Hunger)", dead),
+              "#W54-B D14 NEGATIVE no PLAN line, nothing to contradict");
+        CHECK(!AIPlayerGPT::planArguesAgainstRow(
+                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Avoid attacking into the wall.", dead),
+              "#W54-B D14 NEGATIVE a negative sentence that never names this row does not fire");
+        // ECHO SHAPE: the PLAN may carry the row back with its rendered
+        // annotation attached; the row's card name still anchors the sentence.
+        CHECK(AIPlayerGPT::planArguesAgainstRow(
+                  "CHOICE: 1 (Cast Tribute to Hunger)\nPLAN: Tribute to Hunger {2}{b} does nothing"
+                  " here. Hold the mana.", dead),
+              "#W54-B D14 echo shape: a PLAN echoing the row's mana furniture still names the row it argues against");
+        //the pair is what stamps: either half alone is silent
+        CHECK(AIPlayerGPT::rowSaysNoOp(dead) && AIPlayerGPT::planArguesAgainstRow(seq73, dead)
+              && !(AIPlayerGPT::rowSaysNoOp(live) && AIPlayerGPT::planArguesAgainstRow(seq73, live)),
+              "#W54-B D14 the stamp needs BOTH halves: the same PLAN over a LIVE row is not a contradiction");
+    }
+
+    // ---- #W54-B (D15): an echoed name inside an annotation can never bind ----
+    cout << "\n[#W54-B D15] echo matching against annotation-stripped row cores\n";
+    {
+        vector<string> menu;
+        menu.push_back("Cast Idyllic Tutor {2}{w} [finds only an enchantment card - every"
+                       " enchantment left in your library is a copy of one you already control"
+                       " or hold: Exquisite Blood, Sanguine Bond]");
+        menu.push_back("Cast Overgrown Battlement {1}{g}");
+        menu.push_back("Cast nothing right now (combat comes next this turn)");
+        string note;
+        bool st = false;
+        //deck126 vs130 seq 21: "Sanguine Bond" is on no row's label and occurs
+        //exactly once on the whole menu, inside row 1's [finds only ...] list.
+        //It used to bind row 1 (echo_index_conflict, row 1 executed).
+        int c = AIPlayerGPT::parseChoice(" 3 (Cast Sanguine Bond)", 3, &menu, &st, NULL, &note);
+        //-1 + stale_echo_in_range is the parse verdict the SEAM turns into the
+        //one named_row re-ask (the same route deck126 vs125 seq 9 took, and
+        //what seq 21 should have taken); it used to return 1 and cast.
+        CHECK(c == -1 && st && note.find("stale_echo_in_range") != string::npos,
+              "#W54-B D15 deck126 vs130 seq 21: a name only inside another row's annotation names NO row -> re-ask, not row 1");
+        CHECK(note.find("echo_index_conflict") == string::npos,
+              "#W54-B D15 NEGATIVE it must NOT resolve as an index/name conflict any more (that is what executed row 1)");
+        // POSITIVE control: the same menu, a name that IS on a label, binds
+        note.clear(); st = false;
+        CHECK(AIPlayerGPT::parseChoice(" 1 (Cast Idyllic Tutor)", 3, &menu, &st, NULL, &note) == 1,
+              "#W54-B D15 the row's own label still binds normally on the same menu");
+        // The full-row tier still reaches text PAST an annotation - what it
+        // may no longer see is the text INSIDE one.
+        vector<string> tail;
+        tail.push_back("Cast Fireball {x}{r} [sorcery] targeting Griselbrand");
+        tail.push_back("Cast nothing right now");
+        note.clear(); st = false;
+        CHECK(AIPlayerGPT::parseChoice(" 2 (Griselbrand)", 2, &tail, &st, NULL, &note) == 1,
+              "#W54-B D15 tier 2 still reads the row text AFTER an annotation (the name the label cut off)");
+        // the stripper itself: annotations out, mana symbols in
+        CHECK(stripRenderAnnotationsLc("Cast Tribute to Hunger {2}{b} {right now: they control"
+                                       " 0 creatures - at 0 this does nothing}")
+              == "cast tribute to hunger {2}{b}",
+              "#W54-B D15 a {right now: ...} clause is annotation and is cut; {2}{b} is the row's cost and stays");
+        CHECK(stripRenderAnnotationsLc("Cast Murder {1}{b}{b} {kills: Sanguine Bond}").find("sanguine") == string::npos,
+              "#W54-B D15 a {kills: <name>} victim is annotation - the name cannot reach the matching core");
+        CHECK(stripRenderAnnotationsLc("Cast Bolt {x}{w/u}{2/w}{t}") == "cast bolt {x}{w/u}{2/w}{t}",
+              "#W54-B D15 NEGATIVE hybrid, phyrexian-shaped and tap symbols are costs, not annotations - none is stripped");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
