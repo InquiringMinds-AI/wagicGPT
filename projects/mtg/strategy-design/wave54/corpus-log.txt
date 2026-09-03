@@ -1,0 +1,33 @@
+  probe  : qwen36-35b-a3b ok at http://100.116.136.74:8084 (0.009543s)
+== selfplay harness (matchups) ==
+  pool   : 146,152,125,126,162,123,130
+  games  : 21 (21 pairings x 1 reps), 21 concurrent
+  model  : qwen36-35b-a3b @ http://100.116.136.74:8084 (thinking=0, gpt timeout=900s)
+  caps   : 86400s total, NO per-game cap (fastclock=0.1)
+  hands  : FAIR (real deal, seats unpinned; wave 44+ baseline)
+  outdir : /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260903-034355
+waiting for in-flight games to finish...
+
+== harvested 42 player-game logs, 2306 decisions ==
+  ask        1683
+  priority   332
+  attackers  99
+  gamestart  42
+  gameend    42
+  blockers   36
+  discard    34
+  reveal     20
+  recovery   10
+  bottom     8
+
+== results (21 games, 0 timeouts/draws, 0 life-adjudicated at cap, 0 CRASHED, 0 HUNG - no winner, rerun owed) ==
+  deck152  5/6 wins  (83%)
+  deck146  5/6 wins  (83%)
+  deck126  4/6 wins  (67%)
+  deck162  2/6 wins  (33%)
+  deck130  2/6 wins  (33%)
+  deck123  2/6 wins  (33%)
+  deck125  1/6 wins  (17%)
+
+logs + results.tsv in: /home/magi/.Wagic/ai/gpt/selfplay-runs/matchups-20260903-034355
+exit=0
