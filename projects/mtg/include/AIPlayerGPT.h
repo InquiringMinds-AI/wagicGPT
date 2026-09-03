@@ -1051,14 +1051,13 @@ private:
     //already answered (the off-menu "CHOICE: 8 (Cast Acererak)" shape).
     int mCastAskTurn;
     int mCastAskPhase;
-    //#W53-N (D2): the model-owned HOLD. mHoldTurn/mHoldBoard are the turn and
-    //the phase-stripped situation the hold was taken on; mHoldRows records,
-    //per seam, the rows that were on the menu when it was taken, so a NEWLY
-    //AFFORDABLE row re-opens the window even on an unchanged board. Nothing
-    //here is a cache of an ANSWER: the engine only replays a hold the model
-    //itself chose, and only while the board it was chosen on still stands.
+    //#W53-N (D2): the model-owned HOLD. mHoldTurn is the turn it was taken on;
+    //mHoldRows records, per seam, the rows that were PRINTED when it was taken.
+    //#W56-A (D1): the rows are the whole predicate - the board key is gone, and
+    //a row whose printed text moved re-opens the window. Nothing here is a
+    //cache of an ANSWER: the engine only replays a hold the model itself chose,
+    //and only while the screen it was chosen on is still the screen.
     int mHoldTurn;
-    string mHoldBoard;
     std::map<string, std::set<string> > mHoldRows;
     int mHoldWindowsSkipped; //gameend report field
     //#W53-N (D2, second half): per-turn declines of an EXACT option list,
@@ -1075,17 +1074,21 @@ private:
     string mNextAskPromptNote;
 
     //#W53-N (D2): honour a hold the model took, at seam <seam>, for a window
-    //whose situation is <situation> and whose rows are <rows>. Returns true
+    //whose PRINTED rows are <rows> (#W56-A D1: the rows are the key). Returns true
     //when the hold still stands (the caller passes without a model call);
     //clears the latch and returns false on any re-opener.
-    bool holdHonoured(const char * seam, const string& situation,
-                      const std::vector<string>& rows);
+    bool holdHonoured(const char * seam, const std::vector<string>& rows);
     //#W53-N (D2): record the model's hold answer at this seam.
-    void takeHold(const char * seam, const string& situation,
-                  const std::vector<string>& rows);
+    void takeHold(const char * seam, const std::vector<string>& rows);
     //#W53-N (D12a): ", N windows ago on turn T" for the carried plan, empty
     //when the model stated it at the window now being rendered.
     string planAgeClause() const;
+    //#W56-A (D18): the async slot's identity - (seam, turn, phase, boardKey).
+    //mPromptTail is the seam: the question-and-options tail assemblePrompt was
+    //last handed. An answer whose slot still matches is an answer to the
+    //question being asked now, whatever the narration header did meanwhile.
+    string mPromptTail;
+    string asyncSlotKey(const string& userMsg);
     //Answer-locked decode-garbage retry (ITEM: decode-collapse mitigation).
     //mRetryActivePrompt: the retry userMsg (prefix + base) currently in flight;
     //empty when no retry is pending. mRetryBase: the base userMsg that active

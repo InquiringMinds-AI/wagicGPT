@@ -9180,6 +9180,13 @@ struct AIPlayerGPT::AsyncState
     GptMutex mtx;
     int status;      //0 idle, 1 in flight, 2 done (answer not yet consumed)
     string prompt;   //the userMsg the in-flight/done request was built for
+    //#W56-A (D18): the SLOT this request belongs to - (seam, turn, phase,
+    //boardKey), where the seam is the question-and-options tail the caller
+    //assembled. The prompt string carries a GAME LOG header and a plan block
+    //that grow under the same question, so `prompt != userMsg` was answering
+    //two different facts at once: "a different question" and "the same question
+    //re-rendered". The slot separates them.
+    string slotKey;
     string response; //raw HTTP body once status == 2
     std::chrono::steady_clock::time_point started; //request launch time
     //#W53-Q (D10): this round trip came back EMPTY at the wall. The transports
@@ -9609,6 +9616,33 @@ bool AIPlayerGPT::isLongReply(long latencyMs, long timeoutMs, bool answered)
     return answered && latencyMs >= 0 && timeoutMs > 0 && latencyMs * 100 >= timeoutMs * 95;
 }
 
+//#W56-A (D18): the async slot's identity. 43 stale drops in the wave-55
+//corpus, and lane E's WAGIC_GPT_DRIFT dump showed 24 of 30 on a stub game
+//alternating TWO questions on an unchanged board - the land-drop and casting
+//seams contending for the single slot across the turn flip - while the rest
+//were the same question re-rendered a tick later (a resolving 10DrawAction, a
+//resolving NextGamePhase, or the hold's own re-open). Only the first kind is a
+//stale answer. The tail (mPromptTail) carries the question AND its numbered
+//option list, so a slot match means the reply's indices address exactly the
+//rows the model was shown; turn, phase and the board serialization are the
+//belt to that brace. The force-close retry is its own slot: its reply is
+//consumed by a caller that reads it differently.
+static string asyncSlotKeyOf(bool forceClose, int turn, int phase,
+                             const string& seamTail, const string& board)
+{
+    std::ostringstream k;
+    k << (forceClose ? "FC|" : "|") << turn << "|" << phase << "|\n"
+      << seamTail << "\n=BOARD=\n" << board;
+    return k.str();
+}
+
+string AIPlayerGPT::asyncSlotKey(const string& userMsg)
+{
+    return asyncSlotKeyOf(userMsg.compare(0, strlen(kForceCloseTag), kForceCloseTag) == 0,
+                          observer->turn, observer->getCurrentGamePhase(),
+                          mPromptTail, serializeGameState());
+}
+
 int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
 {
     {
@@ -9617,7 +9651,19 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             return kChoicePending; //one request at a time; whatever asked, wait
         if (mAsyncState->status == 2)
         {
-            if (mAsyncState->prompt == userMsg)
+            //#W56-A (D18): the same SLOT - same seam, turn, phase and board -
+            //is the same question, however the narration header around it has
+            //grown since the request went out. The answer is consumed, not
+            //dropped and re-bought at a full round trip.
+            bool sameSlot = false;
+            if (mAsyncState->prompt != userMsg && !mAsyncState->slotKey.empty()
+                && mAsyncState->slotKey == asyncSlotKey(userMsg))
+            {
+                sameSlot = true;
+                DebugTrace("AIPlayerGPT: consuming an in-flight answer whose prompt text drifted"
+                           " (same seam, turn, phase and board)");
+            }
+            if (mAsyncState->prompt == userMsg || sameSlot)
             {
                 string body = mAsyncState->response;
                 mLastLatencyMs = (long) std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -9832,6 +9878,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
     //Idle: build the request on the game thread (the prompt members are not
     //shared with the worker) and launch the round trip in the background.
     string requestBody = buildRequestBody(userMsg);
+    const string slotAtLaunch = asyncSlotKey(userMsg); //#W56-A (D18)
     bool codex = gptCodexEndpoint(mEndpoint);
     string url = codex ? mEndpoint + "/responses" : mEndpoint + "/v1/chat/completions";
     string key = mApiKey;
@@ -9840,6 +9887,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
         std::lock_guard<GptMutex> g(state->mtx);
         state->status = 1;
         state->prompt = userMsg;
+        state->slotKey = slotAtLaunch; //#W56-A (D18)
         state->response.clear();
         state->timedOut = false; //#W53-Q (D10): the worker decides this one
         state->httpStatus = 0;   //audit-L (A24): likewise
@@ -9885,6 +9933,7 @@ int AIPlayerGPT::pollCompletion(const string& userMsg, string& content)
             state->status = 0;
             state->response.clear();
             state->prompt.clear();
+            state->slotKey.clear(); //#W56-A (D18)
             state->timedOut = false;
         }
         content.clear();
@@ -10668,6 +10717,29 @@ bool AIPlayerGPT::handedToHeuristic(int choice, const char * fallback)
 //record writer stamps three of its own signatures (D9/D13/D14).
 static void appendParseNote(std::string * noteOut, const char * sig);
 
+//#W56-A (D4): `chosen_text` is never empty while `choice >= 0`. 9 of the
+//wave-55 corpus's 3,171 records carried a live `choice` and no `chosen_text`,
+//every one of them written on the RE-ASK path (146v152 s17, 123v152 s56,
+//152v123 s77, 123v126 s25/s42, 123v146 s16, 130v123 s109/s122, 162v126 s33):
+//the reply named a row, the engine did not execute it, and the field the
+//harvest keys on went absent - so every class that passes through a re-ask is
+//silently under-counted (this wave's own HOLD-take census had to fall back to
+//the rendered row text). Nothing executed there, so the honest value is a
+//REASON, not a row: "<refused: plan_choice_conflict>" says the row was named,
+//not run, and names the class that stopped it. The row text is used only when
+//no class is available, and the last resort still says which row.
+static string refusedChosenText(int choice, const char * fallback,
+                                const std::vector<string> * optionTexts)
+{
+    if (fallback && *fallback)
+        return string("<refused: ") + fallback + ">";
+    if (optionTexts && choice >= 1 && choice <= (int) optionTexts->size())
+        return string("<refused: not executed: ") + (*optionTexts)[choice - 1] + ">";
+    std::ostringstream o;
+    o << "<refused: not executed: row " << choice << ">";
+    return o.str();
+}
+
 void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const string& reply, int choice, int optionCount,
                                 const string& chosenText, const char * fallback, const vector<string> * optionTexts,
                                 const char * choiceSource)
@@ -10820,6 +10892,8 @@ void AIPlayerGPT::writeTransLog(const char * kind, const string& userMsg, const 
     }
     if (!chosenText.empty())
         rec["chosen_text"] = chosenText;
+    else if (choice >= 0) //#W56-A (D4): never empty while a choice is live
+        rec["chosen_text"] = refusedChosenText(choice, fallback, optionTexts);
     if (fallback)
         rec["fallback"] = fallback;
     //#W50-Y D10 (iii): how many consecutive replies re-stated the carried plan
@@ -11198,8 +11272,40 @@ string AIPlayerGPT::assemblePrompt(const string& tail)
 //variant) and is spliced in verbatim instead of being rendered again here.
 //The pregame frame ignores it (hand-only by owner directive). NULL = the
 //one-argument behaviour, unchanged.
+//#W56-A (D11): the carried plan's two ages, both pure so the corpus holds
+//them without a game. plan_echo_count went 37 -> 143 between waves and 328 of
+//1,511 records served a plan more than 40 windows old, so (a) a plan is
+//WITHDRAWN outright at a hard age - the reply rules' own "no plan shown yet"
+//clause then asks for a fresh one - and (b) when the menu-diff note fires on a
+//plan already more than four windows old, the note is served ALONE: 152v125
+//seq 101 served the whole of a turn-39 plan and, in the same breath, the
+//sentence retracting the card it names, at a seat whose prompts reach 30,031
+//chars. A withdrawal is a TRUE token, not a deletion: the pilot is told the
+//plan is gone and asked for a new one.
+static const int kPlanHardAgeWindows = 40;
+static const int kPlanRetractionAloneAge = 4;
+
+static bool planHardAged(int windows)
+{
+    return windows >= kPlanHardAgeWindows;
+}
+
+static bool planRetractionServedAlone(int windows, bool retractionFires)
+{
+    return retractionFires && windows > kPlanRetractionAloneAge;
+}
+
+static string planWithdrawnBlock(const string& ageClause, const string& absentClause)
+{
+    return string("\nYOUR LAST PLAN is withdrawn (you stated it") + ageClause + absentClause
+         + "): state a fresh PLAN with this window's answer.\n";
+}
+
 string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation)
 {
+    //#W56-A (D18): the SEAM half of the async slot key - the question and its
+    //numbered option list, exactly as this prompt will carry them.
+    mPromptTail = tail;
     std::ostringstream u;
     //W41-3(c): a bulk move that ran right up to the decision point must be in
     //the log the model reads, not stranded in the accumulator.
@@ -11308,6 +11414,20 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation)
             if (gptcaveat::planAbsentActionName(mCurrentPlan, tail, planCards, absentName))
                 planAbsent = planMenuDiffClause(absentName);
         }
+        //#W56-A (D11): withdraw before serving. (a) a hard age, and (b) a
+        //retraction note on a plan older than a few windows - both end with
+        //the plan GONE from the frame and one sentence saying so, instead of
+        //the retraction being printed under the text it retracts.
+        const int planAgeW = (mPlanSetSeq < 0) ? 0 : (mTransSeq - mPlanSetSeq);
+        if (planHardAged(planAgeW) || planRetractionServedAlone(planAgeW, !planAbsent.empty()))
+        {
+            u << planWithdrawnBlock(planAgeClause(), planAbsent);
+            mCurrentPlan.clear();
+            mPlanEchoCount = 0;
+            mPlanSetSeq = -1;
+        }
+        else
+        {
         u << "\nYOUR PLAN (as you last stated it" << planAgeClause() << planAbsent
           << "): " << mCurrentPlan << "\n";
         //#W50-Y D10 (ii): on a TARGET window, a carried plan whose named
@@ -11361,6 +11481,7 @@ string AIPlayerGPT::assemblePrompt(const string& tail, const string * situation)
             //explicitly non-binding, and it names the only action it wants:
             //choose from this list, and refresh the plan if it is out of date.
             u << kStalePlanNote;
+        } //#W56-A (D11): end of the "plan still stands" branch
     }
     u << "\n" << tail;
     return u.str();
@@ -14514,66 +14635,26 @@ static const char * kHoldPriorityRowText =
     " unless the board changes (any change re-opens this window; you give up no"
     " cast)";
 
-//#W53-N (D2): the hold's board key is the situation block WITHOUT its leading
-//phase line. Phase progression is NOT a board change - it is exactly the
-//information 130v152's pilot acted on - but the hold is an answer about the
-//TURN, so a phase step must not silently retire it. Everything else the block
-//carries does re-open it: life, poison, both battlefields, both hands, and
-//the STACK top-first, so a new stack object changes this string.
-//#W54-A (D2c): and WITHOUT the hidden-zone counters. serializeGameState emits
-//"Opponent hand size: N | Opponent library: M cards" and "Your library: N
-//cards"; both move on every draw step, so the OPPONENT'S OWN DRAW retired
-//every hold taken at their upkeep - by construction, on every opponent turn
-//(125v126 seq 128 -> 130, then twelve more windows that turn; and
-//hold_windows_skipped was 0 on 38 of 40 gameends while six seats took the
-//row). A card moving into a hidden zone is not a board change the hold was
-//about. Every other re-opener the lane designed is untouched: life, poison,
-//both battlefields, the stack top-first, a newly affordable row, the turn
-//ending - and the opponent's hand CONTENTS are not in this block at all, so
-//nothing that could be acted on is dropped.
-static bool holdKeyDroppedLine(const string& line)
-{
-    //#W55-A (D2b): and WITHOUT the life line. A mandatory life-loss loop
-    //(Sanguine Bond + Exquisite Blood, 130v126 seq 67-106 / 123v126 seq
-    //112-140) re-opens this window once per POINT of life: the hold was taken
-    //six times inside that loop and stopped nothing, because "any change
-    //re-opens this window" is literally satisfied by a life tick. A life total
-    //moving while the stack, both battlefields, both hands and the phase are
-    //unchanged is not the board change the model meant when it pressed the
-    //row - and it is a change it opted to stop being asked about. It is
-    //dropped from THIS key only: the life line is rendered in full on every
-    //prompt, and every other re-opener stands (the stack top-first, either
-    //battlefield, poison, a newly available row, the turn ending), so any
-    //event that could actually change the answer still re-opens the window.
-    return line.compare(0, 19, "Opponent hand size:") == 0
-        || line.compare(0, 14, "Your library: ") == 0
-        || line.compare(0, 11, "Your life: ") == 0;
-}
-
-static string holdBoardKeyOf(const string& situation)
-{
-    size_t nl = situation.find('\n');
-    if (nl == string::npos)
-        return string();
-    string rest = situation.substr(nl + 1);
-    string out;
-    size_t start = 0;
-    while (start <= rest.size())
-    {
-        size_t end = rest.find('\n', start);
-        string line = (end == string::npos) ? rest.substr(start) : rest.substr(start, end - start);
-        if (!holdKeyDroppedLine(line))
-        {
-            out += line;
-            if (end != string::npos)
-                out += '\n';
-        }
-        if (end == string::npos)
-            break;
-        start = end + 1;
-    }
-    return out;
-}
+//#W56-A (D1): the hold's board key is GONE. Wave 53-55 keyed the latch on
+//the situation block (phase line, hidden-zone counters and finally the life
+//line dropped from it, one wave at a time); the corpus answer is that the
+//model's hold was never an answer about the BOARD at all - it was an answer
+//about the SCREEN it was shown. 113 of 282 takes were followed by a
+//byte-identical same-turn re-ask (123v126 seq 75-87: 13 windows, one
+//two-row menu, the HOLD row taken at s81-s85 and stopping nothing, while the
+//stack top alternated Sanguine Bond / Exquisite Blood every iteration and
+//retired the latch each time). The predicate is now the RENDERED OPTION
+//ROWS - name, cost, ordinals and each row's {right now: ...} price - byte for
+//byte: identical rows mean the identical question, and the model has already
+//answered it; anything that changes a printed row re-opens the window at
+//once, as before. This removes no row and caps nothing - it honours a row
+//the model pressed and withholds nothing from a seat that has not pressed
+//one. STATED RISK (it is why this is a predicate change and not a
+//suppression): a board change that alters the ANSWER'S VALUE without
+//altering any printed row - an incoming lethal attack under an unchanged
+//menu - no longer re-opens that seam until a printed row moves or the turn
+//ends. Bounded, because every cast, every combat declaration and every
+//priced row that moves with the board changes a printed row, but real.
 
 //#W55-A (D2a): the OPTION-SET key - row names, costs and ordinals, never the
 //rendered string. 130v126 seq 67-106 is 40 consecutive decisions on ONE
@@ -14639,23 +14720,20 @@ static string holdRowLine()
 //offered when the hold was taken, i.e. a newly affordable play. A row
 //DISAPPEARING is not a re-opener: the model already declined it. whyOut names
 //the re-opener for stderr.
-static bool holdStillStands(const string& heldBoard, const string& nowBoard,
-                            const std::set<string>& heldRows,
+//#W56-A (D1): ... and the board is no longer one of them. The whole predicate
+//is the RENDERED ROWS: every row printed now must be a row that was printed,
+//byte for byte, when the hold was taken. A row whose {right now: ...} price
+//moved is a row the model has not seen and re-opens the window; a row
+//DISAPPEARING still does not (the model already declined it).
+static bool holdStillStands(const std::set<string>& heldRows,
                             const std::vector<string>& nowRows,
                             const char ** whyOut)
 {
     if (whyOut) *whyOut = "";
-    if (heldBoard != nowBoard)
-    {
-        if (whyOut) *whyOut = "the board changed";
-        return false;
-    }
     for (size_t i = 0; i < nowRows.size(); i++)
-        //#W55-A (D2a): compared as OPTION-SET keys - a row whose only change
-        //is a moving annotation is the row the model already saw.
-        if (heldRows.find(optionSetKeyLine(nowRows[i])) == heldRows.end())
+        if (heldRows.find(nowRows[i]) == heldRows.end())
         {
-            if (whyOut) *whyOut = "a row is newly available";
+            if (whyOut) *whyOut = "a printed row changed or is newly available";
             return false;
         }
     return true;
@@ -14772,7 +14850,7 @@ static int holdRowIndexOf(const std::vector<string> * optionTexts)
 //took the HOLD row this turn, at this seam, and the board it took it on is
 //still the board in front of it with no row it has not already seen. Every
 //other outcome CLEARS the latch, so the default is always to ask.
-bool AIPlayerGPT::holdHonoured(const char * seam, const string& situation,
+bool AIPlayerGPT::holdHonoured(const char * seam,
                                const std::vector<string>& rows)
 {
     if (mHoldTurn != observer->turn)
@@ -14780,7 +14858,6 @@ bool AIPlayerGPT::holdHonoured(const char * seam, const string& situation,
         if (mHoldTurn >= 0) //a turn boundary retires the hold silently
         {
             mHoldTurn = -1;
-            mHoldBoard.clear();
             mHoldRows.clear();
         }
         return false;
@@ -14789,11 +14866,10 @@ bool AIPlayerGPT::holdHonoured(const char * seam, const string& situation,
     if (it == mHoldRows.end())
         return false; //held elsewhere, never at this seam: this question is owed
     const char * why = "";
-    if (!holdStillStands(mHoldBoard, holdBoardKeyOf(situation), it->second, rows, &why))
+    if (!holdStillStands(it->second, rows, &why))
     {
         DebugTrace("AIPlayerGPT: hold re-opened at the " << seam << " seam - " << why);
         mHoldTurn = -1;
-        mHoldBoard.clear();
         mHoldRows.clear();
         return false;
     }
@@ -14807,19 +14883,16 @@ bool AIPlayerGPT::holdHonoured(const char * seam, const string& situation,
 //#W53-N (D2): record the hold. A hold taken at a second seam on the same
 //board ADDS that seam's rows rather than replacing the latch, so one turn can
 //be held at both the priority and the casting seam.
-void AIPlayerGPT::takeHold(const char * seam, const string& situation,
-                           const std::vector<string>& rows)
+void AIPlayerGPT::takeHold(const char * seam, const std::vector<string>& rows)
 {
-    string key = holdBoardKeyOf(situation);
-    if (mHoldTurn != observer->turn || mHoldBoard != key)
+    if (mHoldTurn != observer->turn)
     {
         mHoldRows.clear();
         mHoldTurn = observer->turn;
-        mHoldBoard = key;
     }
     std::set<string>& s = mHoldRows[seam];
     for (size_t i = 0; i < rows.size(); i++)
-        s.insert(optionSetKeyLine(rows[i])); //#W55-A (D2a)
+        s.insert(rows[i]); //#W56-A (D1): the rendered row, byte for byte
     DebugTrace("AIPlayerGPT: the model took the hold row at the " << seam << " seam on turn "
                << observer->turn << " - this turn's remaining " << seam
                << " windows are held until the board changes");
@@ -15151,6 +15224,115 @@ static bool nameEchoesRow(const string& nameIn, const vector<string>& rows)
             row[i] = (char) tolower((unsigned char) row[i]);
         if (row.find(name) != string::npos)
             return true;
+    }
+    return false;
+}
+
+//#W56-A (D16): the row's name as PROSE would write it - the option line with
+//its annotations and mana cost stripped and its leading menu verb removed
+//("Cast Devour Flesh {1}{b} {right now: ...}" -> "devour flesh"). Lowercase,
+//pure. The decline, pass and hold rows have no prose name: they are what a
+//pass verdict already says, and reading them as rival rows is exactly the
+//over-fire this item retires. A name under four characters is not distinctive
+//enough to match on.
+static string stripRenderAnnotationsLc(const string& s); //defined below
+
+static string menuRowProseName(const string& row)
+{
+    string core = stripRenderAnnotationsLc(row);
+    //the mana cost braces stripRenderAnnotationsLc deliberately keeps
+    size_t br;
+    while ((br = core.find('{')) != string::npos)
+    {
+        size_t close = core.find('}', br);
+        if (close == string::npos)
+            break;
+        core.erase(br, close - br + 1);
+    }
+    //trim
+    size_t a = core.find_first_not_of(" \t");
+    size_t z = core.find_last_not_of(" \t");
+    core = (a == string::npos) ? string() : core.substr(a, z - a + 1);
+    if (core.compare(0, 12, "cast nothing") == 0 || core.compare(0, 4, "pass") == 0
+        || core.compare(0, 4, "hold") == 0 || core.compare(0, 4, "done") == 0)
+        return string();
+    static const char * kVerbs[] = { "cast ", "play ", "activate ", "equip ", "use ",
+                                     "attack with ", "block with ", "target ", "create " };
+    for (size_t v = 0; v < sizeof(kVerbs) / sizeof(kVerbs[0]); v++)
+        if (core.compare(0, strlen(kVerbs[v]), kVerbs[v]) == 0)
+        {
+            core = core.substr(strlen(kVerbs[v]));
+            break;
+        }
+    a = core.find_first_not_of(" \t");
+    z = core.find_last_not_of(" \t");
+    core = (a == string::npos) ? string() : core.substr(a, z - a + 1);
+    return (core.size() < 4) ? string() : core;
+}
+
+//#W56-A (D16): the reply's PROSE - everything after the first coded CHOICE
+//line, with every further coded line removed, lowercased. Post-think, like
+//every other reply scanner here.
+static string replyProseAfterChoice(const string& replyIn)
+{
+    string text = replyIn;
+    size_t thinkEnd = text.rfind("</think>");
+    if (thinkEnd != string::npos)
+        text = text.substr(thinkEnd + 8);
+    for (size_t i = 0; i < text.size(); i++)
+        text[i] = (char) tolower((unsigned char) text[i]);
+    size_t choiceAt = text.find("choice:");
+    if (choiceAt == string::npos)
+        return string();
+    size_t start = text.find('\n', choiceAt);
+    if (start == string::npos)
+        return string();
+    string out;
+    start++;
+    while (start <= text.size())
+    {
+        size_t end = text.find('\n', start);
+        string line = (end == string::npos) ? text.substr(start) : text.substr(start, end - start);
+        size_t f = line.find_first_not_of(" \t\r");
+        if (f == string::npos || line.compare(f, 7, "choice:") != 0)
+            out += line + "\n";
+        if (end == string::npos)
+            break;
+        start = end + 1;
+    }
+    return out;
+}
+
+//#W56-A (D16): does the prose name a row of THIS menu that is not the row the
+//CHOICE line took? 9 firings of `plan_choice_conflict` in the wave-55 corpus -
+//the largest fallback class - and every one of them was a live row taken
+//beside the pool's OWN mandated arithmetic vocabulary ("this window: pass",
+//"stop reached"), i.e. prose about the count, naming no other row. A pass
+//verdict beside a taken row is only a CONTRADICTION when the prose points at
+//something else on the same screen. A name that also appears inside the taken
+//row's own text is not another row (a kicked/unkicked pair).
+static bool proseNamesOtherMenuRow(const string& replyIn, const std::vector<string>& rows,
+                                   int choice, string * namedOut = NULL)
+{
+    if (namedOut) namedOut->clear();
+    if (choice < 1 || choice > (int) rows.size())
+        return false;
+    const string prose = replyProseAfterChoice(replyIn);
+    if (prose.empty())
+        return false;
+    const string takenCore = stripRenderAnnotationsLc(rows[choice - 1]);
+    for (size_t r = 0; r < rows.size(); r++)
+    {
+        if ((int) r == choice - 1)
+            continue;
+        const string name = menuRowProseName(rows[r]);
+        if (name.empty() || takenCore.find(name) != string::npos)
+            continue;
+        if (prose.find(name) != string::npos)
+        {
+            if (namedOut) *namedOut = name;
+            return true;
+        }
     }
     return false;
 }
@@ -19295,9 +19477,9 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     //with every land drop and cast, so a hold there would be taken and retired
     //in the same breath"; 126v125 seq 72-121 refutes it - 50 byte-identical
     //own-turn Blockers windows, every reply a decline, no board change at all,
-    //and no row to close them with. holdBoardKeyOf already retires the hold on
-    //any real change, so offering the row everywhere weakens no guarantee: the
-    //model still opts in, one row at a time.
+    //and no row to close them with. #W56-A (D1): the hold retires the moment a
+    //printed row moves, so offering the row everywhere weakens no guarantee:
+    //the model still opts in, one row at a time.
     int holdRow = ++index;
     {
         const string holdLine = holdRowLine(); //#W55-A (D21)
@@ -19497,7 +19679,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
     string boardKey = serializeGameState();
     //#W53-N (D2): the model's own hold, honoured. No model call, no window
     //removed from the record - the row the model took said this.
-    if (holdRow > 0 && holdHonoured("priority", boardKey, shownLines))
+    if (holdRow > 0 && holdHonoured("priority", shownLines))
     {
         mLastChoice = 0; //a hold is a pass for this window
         return NULL;
@@ -19676,11 +19858,23 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
         //detector for NO other shape - the wave-52 rejection of a general
         //narrowing stands (general-strategy.md, the R118 reconciliation).
         string passVerdict;
-        bool planChoiceConflict = (choice >= 1 && choice <= index && !content.empty()
+        bool passVerdictInProse = (choice >= 1 && choice <= index && !content.empty()
                                    && !(holdRow > 0 && choice == holdRow)
                                    && planSaysPassThisWindow(content, &passVerdict));
-        if (planChoiceConflict)
+        //#W56-A (D16): the census stays broad, the RE-ASK narrows. All 9 of the
+        //wave-55 firings were a live row taken beside the pool's own mandated
+        //arithmetic vocabulary and named no other row on the menu; four
+        //recovered, five reached _exhausted, at a full extra model call each.
+        //The re-ask now needs the prose to point at ANOTHER row of THIS menu -
+        //a contradiction the model can actually resolve.
+        string rivalRowName;
+        bool planChoiceConflict = passVerdictInProse
+                                  && proseNamesOtherMenuRow(content, shownLines, choice, &rivalRowName);
+        if (passVerdictInProse)
             appendParseNote(&mLastParseNote, "decision_reversed_in_prose");
+        if (passVerdictInProse && !planChoiceConflict)
+            //the narrowing, measured: the shape that used to buy a round trip
+            appendParseNote(&mLastParseNote, "plan_choice_conflict_narrowed");
         //#W52-J (D14b): a counted repeat-row take with no PLAN line at all
         //has no stop arithmetic to hold it to -> one re-ask for the PLAN line.
         bool planMissing = (repeatRowTaken && namedCount >= 1 && !replyHasPlanLine(content));
@@ -19793,7 +19987,7 @@ const OrderedAIAction * AIPlayerGPT::chooseOrderedAction(RankingContainer& ranki
             //#W53-N (D2): the model held. Nothing is narrated (a non-action
             //leaves no trace) and nothing is capped - the latch lives exactly
             //as long as the board it was taken on.
-            takeHold("priority", boardKey, shownLines);
+            takeHold("priority", shownLines);
         }
         else if (choice >= 1 && choice <= index)
         {
@@ -21435,7 +21629,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         int holdRow = (int) menu.size();
         menu.push_back(holdRowLine());
         //The model's own hold, honoured: no model call, no row withheld.
-        if (attempt == 0 && holdHonoured("cast", boardNow, menu))
+        if (attempt == 0 && holdHonoured("cast", menu))
             return NULL;
 
         std::ostringstream q;
@@ -21467,7 +21661,7 @@ MTGCardInstance * AIPlayerGPT::FindCardToPlay(ManaCost * pMana, const char * typ
         //#W53-N (D2): the model closed this turn's casting question itself.
         if (holdRow >= 0 && pick == holdRow)
         {
-            takeHold("cast", boardNow, menu);
+            takeHold("cast", menu);
             mListDeclineCount[listKeyHash(listKey)]++;
             return NULL;
         }
@@ -40263,53 +40457,56 @@ static const char * kW50Y_r94 =
         }
     }
 
-    cout << "\n[#W53-N D2] the hold's re-openers: board change, new stack object, newly affordable row\n";
+    cout << "\n[#W56-A D1] the hold's re-opener is the PRINTED ROWS, and nothing else\n";
     {
-        // holdBoardKeyOf drops the leading phase line and nothing else - phase
-        // progression is NOT a board change (130v152 seq 12 -> 13 declined at
-        // Main 1 and CAST at Combat begins, and that pilot never held).
+        //#W56-A (D1): AMENDED, and the amendment IS the item. Wave 53-55 keyed
+        //the latch on the situation block; 123v126 seq 75-87 is 13 windows on
+        //ONE two-row menu, byte-identical throughout, with the HOLD row taken
+        //five times and retired five times because the stack top alternated
+        //Sanguine Bond / Exquisite Blood underneath it. The situations below
+        //are composed exactly as serializeGameState emits them and the rows are
+        //composed FROM them, so the pin is on the pair, not on either alone.
         string sitA = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: empty\n";
-        string sitB = "Phase: Combat begins | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: empty\n";
-        string sitC = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 17 | Opponent life: 20\nStack: empty\n";
-        string sitD = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: 1 (top): opponent's Lightning Bolt [instant]\n";
-        CHECK(holdBoardKeyOf(sitA) == holdBoardKeyOf(sitB),
-              "#W53-N D2 a phase step alone is not a board change");
-        //#W55-A (D2b): AMENDED, and this flip IS the item. A life total moving
-        //while everything else stands is a mandatory life-loss loop (130v126 seq
-        //67-106), not the board change the model meant when it pressed the row.
-        CHECK(holdBoardKeyOf(sitA) == holdBoardKeyOf(sitC),
-              "#W55-A D2b a life-only change no longer re-opens a hold the model took");
-        CHECK(holdBoardKeyOf(sitA).find("Your life") == string::npos
-              && holdBoardKeyOf(sitA).find("Stack: empty") != string::npos,
-              "#W55-A D2b the life line is out of the HOLD key and the stack line is still in it");
-        CHECK(holdBoardKeyOf(sitA) != holdBoardKeyOf(sitD),
-              "#W53-N D2 a new stack object IS a board change");
-
-        //#W55-A (D2a): the held set is OPTION-SET keys now, not rendered rows.
+        string sitPhase = "Phase: Combat begins | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: empty\n";
+        string sitLife = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 17 | Opponent life: 20\nStack: empty\n";
+        string sitStack = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: 1 (top): ability: Sanguine Bond's Life Loss [from their Sanguine Bond]\n";
+        string sitStack2 = "Phase: Main phase 1 | It is the opponent's turn.\nYour life: 20 | Opponent life: 20\nStack: 1 (top): ability: Exquisite Blood's Life [from their Exquisite Blood]\n";
+        // the menu the pilot saw at every one of those windows
+        vector<string> rowsA;
+        rowsA.push_back("Cast Devour Flesh {1}{b} {right now: they sacrifice ONE of these 2, their choice}");
+        rowsA.push_back("Cast nothing right now");
+        rowsA.push_back(holdRowLine());
         std::set<string> held;
-        held.insert(optionSetKeyLine("Cast Dictate of Kruphix {3}{u}"));
-        held.insert(optionSetKeyLine("Cast nothing right now"));
-        held.insert(optionSetKeyLine(kHoldPriorityRowText));
-        vector<string> same;
-        same.push_back("Cast Dictate of Kruphix {3}{u}");
-        same.push_back("Cast nothing right now");
-        same.push_back(kHoldPriorityRowText);
+        for (size_t i = 0; i < rowsA.size(); i++)
+            held.insert(rowsA[i]); //#W56-A (D1): the RENDERED row is the key
         const char * why = "x";
-        CHECK(holdStillStands(holdBoardKeyOf(sitA), holdBoardKeyOf(sitB), held, same, &why)
-              && string(why).empty(),
-              "#W53-N D2 the hold stands across a phase step with the same board and the same rows");
-        CHECK(!holdStillStands(holdBoardKeyOf(sitA), holdBoardKeyOf(sitD), held, same, &why)
-              && string(why) == "the board changed",
-              "#W53-N D2 a new stack object RE-OPENS the window, and says so");
-        vector<string> grown(same);
+        CHECK(holdStillStands(held, rowsA, &why) && string(why).empty(),
+              "#W56-A D1 identical printed rows: the hold the model took STANDS");
+        //The three situation moves that used to retire it, all with the same
+        //printed rows. They are listed to state what the predicate now ignores.
+        CHECK(sitA != sitPhase && sitA != sitLife && sitA != sitStack && sitStack != sitStack2
+              && holdStillStands(held, rowsA, &why),
+              "#W56-A D1 a phase step, a life tick and an ALTERNATING STACK TOP no longer re-open a hold when no printed row moved (123v126 s75-s87)");
+        // a printed PRICE moving IS a re-opener - the row is a question the
+        // model has not been asked.
+        vector<string> priced(rowsA);
+        priced[0] = "Cast Devour Flesh {1}{b} {right now: they sacrifice ONE of these 3, their choice}";
+        CHECK(!holdStillStands(held, priced, &why)
+              && string(why) == "a printed row changed or is newly available",
+              "#W56-A D1 a {right now:} price change re-opens the window, and says so");
+        // must-NOT-match: the DECLINED-list key still collapses that same pair
+        // (wave-55 D2a is untouched); the hold key must not.
+        CHECK(optionSetKeyOf(rowsA) == optionSetKeyOf(priced),
+              "#W56-A D1 NEGATIVE the option-set key (the declined-note's key) still reads the two priced menus as ONE list");
+        vector<string> grown(rowsA);
         grown.push_back("Cast Spark Spray {r}");
-        CHECK(!holdStillStands(holdBoardKeyOf(sitA), holdBoardKeyOf(sitA), held, grown, &why)
-              && string(why) == "a row is newly available",
-              "#W53-N D2 a NEWLY AFFORDABLE row re-opens the window even on an unchanged board");
+        CHECK(!holdStillStands(held, grown, &why)
+              && string(why) == "a printed row changed or is newly available",
+              "#W56-A D1 a NEWLY AFFORDABLE row re-opens the window");
         vector<string> shrunk;
         shrunk.push_back("Cast nothing right now");
-        shrunk.push_back(kHoldPriorityRowText);
-        CHECK(holdStillStands(holdBoardKeyOf(sitA), holdBoardKeyOf(sitA), held, shrunk, &why),
+        shrunk.push_back(holdRowLine());
+        CHECK(holdStillStands(held, shrunk, &why),
               "#W53-N D2 NEGATIVE a row DISAPPEARING is not a re-opener - the model already declined it");
     }
 
@@ -41410,11 +41607,17 @@ static const char * kW50Y_r94 =
               "#W54-A D2a NEGATIVE a card name containing 'hold' is not the hold row");
     }
 
-    cout << "\n[#W54-A D2c] 125v126 seq 128 -> 130: the opponent's own draw step retired the hold\n";
+    cout << "\n[#W56-A D1] the wave-53/54/55 situation re-openers, all superseded by the printed rows\n";
     {
-        // the repro: two byte-identical windows one phase apart, turn 30, with
-        // ONLY the opponent's hand size and both library counts moved by their
-        // draw. Every other re-opener must survive untouched.
+        //#W56-A (D1): AMENDED. This block used to pin holdBoardKeyOf line by
+        //line - the phase line out (W53-N), the hidden-zone counters out
+        //(W54-A D2c, 125v126 s128 -> s130), the life line out (W55-A D2b), the
+        //stack line and both battlefields in. That key is DELETED: three waves
+        //of dropping lines from it ended at the corpus answer that the hold is
+        //an answer about the SCREEN. What the deleted key used to decide is
+        //re-pinned here as one rule - with the printed rows unchanged, NONE of
+        //these moves re-opens the window - so the behaviour change is explicit
+        //rather than implied by an absent function.
         string base =
             "Phase: Upkeep | It is the opponent's turn.\n"
             "Your life: 20 | Opponent life: 20\n"
@@ -41427,45 +41630,35 @@ static const char * kW50Y_r94 =
             "Stack: empty\n"
             "Opponent hand size: 5 | Opponent library: 40 cards\n"
             "Your library: 38 cards\n";
-        CHECK(holdBoardKeyOf(base) == holdBoardKeyOf(drew),
-              "#W54-A D2c the opponent's draw step no longer retires the hold");
-        CHECK(holdBoardKeyOf(base).find("Opponent hand size") == string::npos
-              && holdBoardKeyOf(base).find("Your library") == string::npos,
-              "#W54-A D2c the hidden-zone counters are not in the key");
-        CHECK(holdBoardKeyOf(base).find("Stack: empty") != string::npos,
-              "#W54-A D2c everything else the block carries IS still in the key");
-        //#W55-A (D2b): AMENDED - the life line joins the hidden-zone counters.
         string life = base; life.replace(life.find("Your life: 20"), 13, "Your life: 17");
-        CHECK(holdBoardKeyOf(base) == holdBoardKeyOf(life),
-              "#W55-A D2b a life-only tick does not retire the hold (the mandatory-loop repro)");
-        //NEGATIVE: poison is a resource line too and it is NOT dropped - a
-        //poison counter is a change the model can act on.
         string poison = base + "Poison: you 3 | opponent 0\n";
-        CHECK(holdBoardKeyOf(base) != holdBoardKeyOf(poison),
-              "#W55-A D2b NEGATIVE a poison counter still re-opens the window");
         string stack = base;
         stack.replace(stack.find("Stack: empty"), 12,
                       "Stack: 1 (top): opponent's Lightning Bolt [instant]");
-        CHECK(holdBoardKeyOf(base) != holdBoardKeyOf(stack),
-              "#W54-A D2c NEGATIVE a new stack object still re-opens the window");
         string board = base + "Their battlefield: Grizzly Bears (2/2)\n";
-        CHECK(holdBoardKeyOf(base) != holdBoardKeyOf(board),
-              "#W54-A D2c NEGATIVE a permanent arriving still re-opens the window");
-        std::set<string> held; //#W55-A (D2a): OPTION-SET keys
-        held.insert(optionSetKeyLine("Cast Dictate of Kruphix {3}{u}"));
-        held.insert(optionSetKeyLine(kHoldPriorityRowText));
+        CHECK(base != drew && base != life && base != poison && base != stack && base != board,
+              "#W56-A D1 the five situation moves are five different situation blocks");
+        std::set<string> held; //#W56-A (D1): RENDERED rows
+        held.insert("Cast Dictate of Kruphix {3}{u}");
+        held.insert(holdRowLine());
         vector<string> same;
         same.push_back("Cast Dictate of Kruphix {3}{u}");
-        same.push_back(kHoldPriorityRowText);
+        same.push_back(holdRowLine());
         const char * why = "x";
-        CHECK(holdStillStands(holdBoardKeyOf(base), holdBoardKeyOf(drew), held, same, &why)
-              && string(why).empty(),
-              "#W54-A D2c the hold taken at their upkeep SURVIVES their draw step");
+        CHECK(holdStillStands(held, same, &why) && string(why).empty(),
+              "#W56-A D1 the hold taken at their upkeep survives their draw step, a life tick, a poison counter, a new stack object and an arriving permanent - so long as no printed row moved");
         vector<string> grown(same);
         grown.push_back("Cast Spark Spray {r}");
-        CHECK(!holdStillStands(holdBoardKeyOf(base), holdBoardKeyOf(drew), held, grown, &why)
-              && string(why) == "a row is newly available",
-              "#W54-A D2c NEGATIVE a newly affordable row still re-opens it across the draw step");
+        CHECK(!holdStillStands(held, grown, &why)
+              && string(why) == "a printed row changed or is newly available",
+              "#W54-A D2c NEGATIVE a newly affordable row still re-opens it");
+        //NEGATIVE, and it is the whole guarantee: the arriving permanent that
+        //the deleted board key used to catch re-opens the window as soon as it
+        //PRINTS - a blocker on the menu, a cast row, a priced row that moves.
+        vector<string> repriced(same);
+        repriced[0] = "Cast Dictate of Kruphix {3}{u} {right now: draws you 1 and them 1}";
+        CHECK(!holdStillStands(held, repriced, &why),
+              "#W56-A D1 NEGATIVE a board change that reaches a printed row re-opens the window at once");
     }
 
     cout << "\n[#W54-A D12a] the PLAN block is bounded by SHAPE, not by 1,600 bytes\n";
@@ -41945,28 +42138,29 @@ static const char * kW50Y_r94 =
         main2.push_back(castDeclineRow(false));
         CHECK(main1 != main2 && optionSetKeyOf(main1) == optionSetKeyOf(main2),
               "#W55-A D19 the same own-turn list at Main 1 and Main 2 is ONE list, so the count reaches it");
-        // and the hold latch survives the loop it was taken in (D2a + D2b together)
+        // #W56-A (D1): AMENDED, and the amendment states the trade honestly.
+        // The two keys now DIVERGE on this very repro: the declined-note key
+        // (above) still reads the 21 rendered tuples as one list, while the
+        // HOLD key is the printed rows - so a hold taken at life 26 re-opens at
+        // life 25, because row 1 printed a different sentence. Wave 55 made the
+        // opposite call; the corpus that decided it (123v126 s75-s87, 130v152,
+        // 123v162 s36-s50) is the mandatory loop whose rows do NOT move, and
+        // that one is pinned in the #W56-A D1 block above. Nothing is withheld
+        // either way: a re-opened window is a question asked, never a row lost.
         {
-            string sit26 = "Phase: Main phase 1 | It is your turn.\nYour life: 20 | Opponent life: 26\n"
-                           "Stack: 1 (top): ability: Sanguine Bond's Life Loss [from their Sanguine Bond]\n";
-            string sit25 = "Phase: Main phase 1 | It is your turn.\nYour life: 20 | Opponent life: 25\n"
-                           "Stack: 1 (top): ability: Sanguine Bond's Life Loss [from their Sanguine Bond]\n";
             std::set<string> held;
             for (size_t i = 0; i < at26.size(); i++)
-                held.insert(optionSetKeyLine(at26[i]));
+                held.insert(at26[i]);
             const char * why = "x";
-            CHECK(holdStillStands(holdBoardKeyOf(sit26), holdBoardKeyOf(sit25), held, at25, &why)
-                  && string(why).empty(),
-                  "#W55-A D2b a hold taken inside the loop STANDS at the next iteration");
-            vector<string> loopGrown(at25);
+            CHECK(holdStillStands(held, at26, &why) && string(why).empty(),
+                  "#W56-A D1 the same printed menu keeps the hold");
+            CHECK(!holdStillStands(held, at25, &why)
+                  && string(why) == "a printed row changed or is newly available",
+                  "#W56-A D1 a row repriced by the ticking life total re-opens the window - the model has not been asked THIS screen");
+            vector<string> loopGrown(at26);
             loopGrown.push_back("Cast Tribute to Hunger {1}{b}");
-            CHECK(!holdStillStands(holdBoardKeyOf(sit26), holdBoardKeyOf(sit25), held, loopGrown, &why)
-                  && string(why) == "a row is newly available",
+            CHECK(!holdStillStands(held, loopGrown, &why),
                   "#W55-A D2b NEGATIVE a newly available row inside the loop still re-opens the window");
-            string sitBoard = sit25 + "Their battlefield: Grizzly Bears (2/2)\n";
-            CHECK(!holdStillStands(holdBoardKeyOf(sit26), holdBoardKeyOf(sitBoard), held, at25, &why)
-                  && string(why) == "the board changed",
-                  "#W55-A D2b NEGATIVE a permanent arriving inside the loop still re-opens the window");
         }
     }
 
@@ -42491,6 +42685,136 @@ static const char * kW50Y_r94 =
                   "#W55-C D17 REGRESSION lane E's clause still renders exactly as the corpus shows it");
         }
     }
+
+    cout << "\n[#W56-A D4] chosen_text is never empty while a choice is live\n";
+    {
+        vector<string> rows;
+        rows.push_back("Cast Devour Flesh {1}{b}");
+        rows.push_back("Cast nothing right now");
+        CHECK(refusedChosenText(1, "plan_choice_conflict", &rows)
+              == "<refused: plan_choice_conflict>",
+              "#W56-A D4 the re-ask path records the class that stopped the row, not an absent field");
+        CHECK(refusedChosenText(1, NULL, &rows)
+              == "<refused: not executed: Cast Devour Flesh {1}{b}>",
+              "#W56-A D4 with no class the row that was named is recorded instead");
+        CHECK(refusedChosenText(7, NULL, &rows) == "<refused: not executed: row 7>",
+              "#W56-A D4 an out-of-range row still says which row - the field is never empty");
+        // NEGATIVE: it must not read as an EXECUTED row - the harvest tells the
+        // two apart by the marker, so the marker may never be a bare row text.
+        CHECK(refusedChosenText(1, "multiblock_reask", &rows).compare(0, 10, "<refused: ") == 0,
+              "#W56-A D4 NEGATIVE every refusal value is marked as one");
+        // ECHO SHAPE: the value is a TRANSLOG field, never a rendered row. It
+        // must not name any row of the menu it was written for - a harvest that
+        // matches chosen_text against option texts has to see a non-row.
+        CHECK(!nameEchoesRow(refusedChosenText(1, "plan_choice_conflict", &rows), rows),
+              "#W56-A D4 echo: the refusal string echoes no row of the menu it was written for");
+    }
+
+    cout << "\n[#W56-A D11] the carried plan's hard age, and the retraction served alone\n";
+    {
+        CHECK(!planHardAged(39) && planHardAged(40) && planHardAged(143),
+              "#W56-A D11a a plan is withdrawn at 40 windows (the corpus max was 143)");
+        CHECK(!planRetractionServedAlone(4, true) && planRetractionServedAlone(5, true),
+              "#W56-A D11b the retraction is served alone once the plan is more than four windows old");
+        CHECK(!planRetractionServedAlone(60, false),
+              "#W56-A D11b NEGATIVE with no retraction note there is nothing to serve alone");
+        CHECK(planWithdrawnBlock(planAgeClauseText(6, 39),
+                                 planMenuDiffClause("Katilda, Dawnhart Prime"))
+              == "\nYOUR LAST PLAN is withdrawn (you stated it, 6 windows ago on turn 39;"
+                 " \"Katilda, Dawnhart Prime\" is no longer on your menu): state a fresh PLAN"
+                 " with this window's answer.\n",
+              "#W56-A D11b the 152v125 seq 101 repro renders as ONE sentence, with no plan text under it");
+        CHECK(planWithdrawnBlock(planAgeClauseText(41, 12), string())
+              == "\nYOUR LAST PLAN is withdrawn (you stated it, 41 windows ago on turn 12):"
+                 " state a fresh PLAN with this window's answer.\n",
+              "#W56-A D11a the hard-age withdrawal states the age and asks for a fresh plan");
+        // NEGATIVE: the withdrawal is not a ruling about the card and advises
+        // no action - it says the plan is gone, and nothing else.
+        string w = planWithdrawnBlock(planAgeClauseText(6, 39), planMenuDiffClause("Katilda, Dawnhart Prime"));
+        CHECK(w.find("cannot") == string::npos && w.find("illegal") == string::npos
+              && w.find("instead") == string::npos && w.find("YOUR PLAN (as you last stated it") == string::npos,
+              "#W56-A D11 NEGATIVE the withdrawal rules on nothing and carries no plan block");
+    }
+
+    cout << "\n[#W56-A D16] plan_choice_conflict fires only when the prose names ANOTHER row\n";
+    {
+        vector<string> menu;
+        menu.push_back("Create vampire with Lord of Lineage {2}{b} {right now: makes a 2/2}");
+        menu.push_back("Cast Tribute to Hunger {1}{b} {right now: they sacrifice ONE of these 2}");
+        menu.push_back("Cast nothing right now");
+        CHECK(menuRowProseName(menu[0]) == "vampire with lord of lineage"
+              && menuRowProseName(menu[1]) == "tribute to hunger",
+              "#W56-A D16 a row's prose name is its text without the verb, the cost and the annotations");
+        CHECK(menuRowProseName(menu[2]).empty()
+              && menuRowProseName(holdRowLine()).empty()
+              && menuRowProseName(kPassPriorityRowText).empty(),
+              "#W56-A D16 the decline, hold and pass rows have no prose name - a pass verdict is not a rival row");
+        // the 9 firings' shape: a live row taken beside the pool's own arithmetic.
+        const string vocab = "CHOICE: 1 (Create vampire with Lord of Lineage x3)\n"
+                             "PLAN: Stop at M = 27; M is 31 now; this window: pass (stop reached).";
+        CHECK(planSaysPassThisWindow(vocab) && !proseNamesOtherMenuRow(vocab, menu, 1),
+              "#W56-A D16 the mandated stop vocabulary alone no longer buys a re-ask (all 9 wave-55 firings)");
+        // the shape that IS a contradiction the model can resolve
+        const string rival = "CHOICE: 1 (Create vampire with Lord of Lineage x3)\n"
+                             "PLAN: We must pass - Tribute to Hunger is the play once they have a creature.";
+        string named;
+        CHECK(planSaysPassThisWindow(rival) && proseNamesOtherMenuRow(rival, menu, 1, &named)
+              && named == "tribute to hunger",
+              "#W56-A D16 prose naming ANOTHER row of this menu still fires, and names it");
+        // NEGATIVE: the prose naming the row it TOOK is not a rival.
+        const string self = "CHOICE: 2 (Cast Tribute to Hunger)\n"
+                            "PLAN: Tribute to Hunger now; we pass after that.";
+        CHECK(!proseNamesOtherMenuRow(self, menu, 2),
+              "#W56-A D16 NEGATIVE the prose naming the row the CHOICE took is not a conflict");
+        // NEGATIVE: names in the THINKING block are not prose about the answer.
+        const string think = "<think>Tribute to Hunger is better.</think>\n"
+                             "CHOICE: 1 (Create vampire with Lord of Lineage x3)\nPLAN: this window: pass.";
+        CHECK(!proseNamesOtherMenuRow(think, menu, 1),
+              "#W56-A D16 NEGATIVE a rival named inside <think> is not the reply's prose");
+        // NEGATIVE: a second coded CHOICE line is the answer-replacement lane's
+        // business (answer_replaced / latched_coded_line), not this one.
+        const string coded = "CHOICE: 1 (Create vampire with Lord of Lineage x3)\n"
+                             "CHOICE: 2 (Cast Tribute to Hunger)\nPLAN: this window: pass.";
+        CHECK(!proseNamesOtherMenuRow(coded, menu, 1),
+              "#W56-A D16 NEGATIVE a second CODED line is not prose");
+        // NEGATIVE: a name that is part of the taken row is not another row.
+        vector<string> kicked;
+        kicked.push_back("Cast Shock {r}");
+        kicked.push_back("Cast Shock {r} with kicker {1}{r}");
+        CHECK(!proseNamesOtherMenuRow("CHOICE: 2 (Cast Shock with kicker)\nPLAN: Shock them; this window: pass.",
+                                      kicked, 2),
+              "#W56-A D16 NEGATIVE a name contained in the taken row's own text is not a rival row");
+    }
+
+    cout << "\n[#W56-A D18] the async slot is (seam, turn, phase, board) - not the prompt text\n";
+    {
+        // lane E's WAGIC_GPT_DRIFT dump, verbatim in shape: two questions
+        // alternating on an unchanged board across the turn flip.
+        const string landTail = "Land drop: which land do you play now, if any?\n1. Play Forest\n2. Play nothing\n";
+        const string castTail = "Casting decision (Main phase 1, YOUR turn): which card do you cast now, if any?\n"
+                                "1. Cast Devour Flesh {1}{b}\n2. Cast nothing right now\n";
+        const string board = "Phase: Main phase 1 | It is your turn.\nYour life: 20 | Opponent life: 20\nStack: empty\n";
+        CHECK(asyncSlotKeyOf(false, 13, 4, landTail, board)
+              == asyncSlotKeyOf(false, 13, 4, landTail, board),
+              "#W56-A D18 the same seam, turn, phase and board is the same slot however the narration grew");
+        CHECK(asyncSlotKeyOf(false, 13, 4, landTail, board)
+              != asyncSlotKeyOf(false, 13, 4, castTail, board),
+              "#W56-A D18 the land-drop and casting seams are DIFFERENT slots - that answer is genuinely stale");
+        CHECK(asyncSlotKeyOf(false, 13, 4, castTail, board)
+              != asyncSlotKeyOf(false, 14, 4, castTail, board)
+              && asyncSlotKeyOf(false, 13, 4, castTail, board)
+                 != asyncSlotKeyOf(false, 13, 5, castTail, board),
+              "#W56-A D18 the turn flip and a phase step are different slots");
+        string moved = board;
+        moved.replace(moved.find("Stack: empty"), 12, "Stack: 1 (top): their Lightning Bolt [instant]");
+        CHECK(asyncSlotKeyOf(false, 13, 4, castTail, board)
+              != asyncSlotKeyOf(false, 13, 4, castTail, moved),
+              "#W56-A D18 NEGATIVE a moved board is never the same slot - the answer is dropped as before");
+        CHECK(asyncSlotKeyOf(true, 13, 4, castTail, board)
+              != asyncSlotKeyOf(false, 13, 4, castTail, board),
+              "#W56-A D18 NEGATIVE the forced-close retry is its own slot");
+    }
+
     cout << "\n=== self-test: " << passed << " passed, " << failed << " failed ===\n";
     cout.flush();
     #undef CHECK
