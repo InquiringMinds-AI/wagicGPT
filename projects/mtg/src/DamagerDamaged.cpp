@@ -85,8 +85,8 @@ void DamagerDamaged::Render(CombatStep mode)
         break;
     }
 
-    char buf[6];
-    sprintf(buf, "%i", sumDamages());
+    char buf[16]; //#W54-I (L18): was buf[6] + sprintf
+    snprintf(buf, sizeof(buf), "%i", sumDamages());
     mFont->DrawString(buf, actX - 14 * actZ + 5, actY - 14 * actZ);
 
 }

@@ -448,6 +448,15 @@ ManaCost::ManaCost(vector<int16_t>& _cost, int nb_elems)
 
 }
 
+//#W54-I (A7) disable flag: WAGIC_MANACOST_EAGER_SUBCOSTS=1 restores the pre-A7
+//eager allocation of eight empty sub-costs per copy (read once per process).
+static bool eagerSubCosts()
+{
+    static const bool eager = (getenv("WAGIC_MANACOST_EAGER_SUBCOSTS") != NULL
+                               && getenv("WAGIC_MANACOST_EAGER_SUBCOSTS")[0] == '1');
+    return eager;
+}
+
 // pointer copy constructor 
 
 ManaCost::ManaCost(ManaCost * manaCost)
@@ -460,18 +469,26 @@ ManaCost::ManaCost(ManaCost * manaCost)
         cost[i] = manaCost->getCost(i);
     }
     hybrids = manaCost->hybrids;
-    kicker = NEW ManaCost(manaCost->kicker);
+    //#W54-I (A7): sub-costs are copied only when the source HAS them. The old
+    //unconditional NEW ManaCost(NULL) yielded eight empty objects (~1.6 KB, 9
+    //allocations) per pointer copy - ~15% of suite CPU in ManaCost churn and a
+    //330 MB transient on one lord fixture - and made hasAnotherCost()/
+    //getAlternative() etc. TRUE on every copy. copy() (the card-cost builder)
+    //already yields NULL for absent sub-costs and every reader NULL-checks.
+    //WAGIC_MANACOST_EAGER_SUBCOSTS=1 restores the old eager empties.
+    const bool eager = eagerSubCosts();
+    kicker = (manaCost->kicker || eager) ? NEW ManaCost(manaCost->kicker) : NULL;
     if (kicker)
         kicker->isMulti = manaCost->isMulti;
-    Retrace = NEW ManaCost( manaCost->Retrace );
-    BuyBack = NEW ManaCost( manaCost->BuyBack );
-    alternative = NEW ManaCost( manaCost->alternative );
+    Retrace = (manaCost->Retrace || eager) ? NEW ManaCost( manaCost->Retrace ) : NULL;
+    BuyBack = (manaCost->BuyBack || eager) ? NEW ManaCost( manaCost->BuyBack ) : NULL;
+    alternative = (manaCost->alternative || eager) ? NEW ManaCost( manaCost->alternative ) : NULL;
     instantSpeed = manaCost->instantSpeed; //W53-SPLIT (this cost's own flag; the alternative's rides its copy ctor)
     alternativeName = manaCost->alternativeName;
-    FlashBack = NEW ManaCost( manaCost->FlashBack );
-    morph = NEW ManaCost( manaCost->morph );
-    suspend = NEW ManaCost( manaCost->suspend );
-    Bestow = NEW ManaCost(manaCost->Bestow);
+    FlashBack = (manaCost->FlashBack || eager) ? NEW ManaCost( manaCost->FlashBack ) : NULL;
+    morph = (manaCost->morph || eager) ? NEW ManaCost( manaCost->morph ) : NULL;
+    suspend = (manaCost->suspend || eager) ? NEW ManaCost( manaCost->suspend ) : NULL;
+    Bestow = (manaCost->Bestow || eager) ? NEW ManaCost(manaCost->Bestow) : NULL;
     extraCosts = NULL;
     if (manaCost->extraCosts)
     {
@@ -496,14 +513,16 @@ ManaCost::ManaCost(const ManaCost& manaCost)
     hybrids = manaCost.hybrids;
 
     // make new copies of the pointers for the deep copy
-    kicker = NEW ManaCost( manaCost.kicker );
-    Retrace = NEW ManaCost( manaCost.Retrace );
-    BuyBack = NEW ManaCost( manaCost.BuyBack );
-    alternative = NEW ManaCost( manaCost.alternative );
-    FlashBack = NEW ManaCost( manaCost.FlashBack );
-    morph = NEW ManaCost( manaCost.morph );
-    suspend = NEW ManaCost( manaCost.suspend );
-    Bestow = NEW ManaCost(manaCost.Bestow);
+    //#W54-I (A7): only the sub-costs the source has (see the pointer ctor).
+    const bool eager = eagerSubCosts();
+    kicker = (manaCost.kicker || eager) ? NEW ManaCost( manaCost.kicker ) : NULL;
+    Retrace = (manaCost.Retrace || eager) ? NEW ManaCost( manaCost.Retrace ) : NULL;
+    BuyBack = (manaCost.BuyBack || eager) ? NEW ManaCost( manaCost.BuyBack ) : NULL;
+    alternative = (manaCost.alternative || eager) ? NEW ManaCost( manaCost.alternative ) : NULL;
+    FlashBack = (manaCost.FlashBack || eager) ? NEW ManaCost( manaCost.FlashBack ) : NULL;
+    morph = (manaCost.morph || eager) ? NEW ManaCost( manaCost.morph ) : NULL;
+    suspend = (manaCost.suspend || eager) ? NEW ManaCost( manaCost.suspend ) : NULL;
+    Bestow = (manaCost.Bestow || eager) ? NEW ManaCost(manaCost.Bestow) : NULL;
     extraCosts = NULL;
     if (manaCost.extraCosts)
     {
@@ -512,28 +531,26 @@ ManaCost::ManaCost(const ManaCost& manaCost)
 
     manaUsedToCast = NULL;
     xColor = manaCost.xColor;
+    //#W54-I (L17): the copy ctor never ran init(), so these three were
+    //indeterminate on a by-value copy; carry the source's values.
+    isMulti = manaCost.isMulti;
+    instantSpeed = manaCost.instantSpeed;
+    alternativeName = manaCost.alternativeName;
 }
 
 // operator=
+//#W54-I (L17): was a SHALLOW copy of nine owned pointers (double-free on the
+//first by-value assignment) that also skipped the X slot. Deep-copy over
+//copy(), which clones extraCosts and rebuilds only the present sub-costs.
 ManaCost & ManaCost::operator= (const ManaCost & manaCost)
 {
     if ( this != &manaCost )
     {
-        for (int i = 0; i < Constants::NB_Colors; i++)
-            cost[i] = manaCost.cost[i];
-
-        hybrids = manaCost.hybrids;
-        extraCosts = manaCost.extraCosts;
-        kicker = manaCost.kicker;
-        Retrace = manaCost.Retrace;
-        BuyBack = manaCost.BuyBack;
-        alternative = manaCost.alternative;
-        FlashBack = manaCost.FlashBack;
-        morph = manaCost.morph;
-        suspend = manaCost.suspend;
-        Bestow = manaCost.Bestow;
-        manaUsedToCast = manaCost.manaUsedToCast;
-        xColor = manaCost.xColor;
+        copy(const_cast<ManaCost *>(&manaCost)); //cost[] incl. X, hybrids, extraCosts, sub-costs, xColor, instantSpeed, alternativeName
+        isMulti = manaCost.isMulti;
+        SAFE_DELETE(manaUsedToCast);
+        if (manaCost.manaUsedToCast)
+            manaUsedToCast = NEW ManaCost(manaCost.manaUsedToCast);
     }
     return *this;
 }
@@ -1107,7 +1124,11 @@ int ManaCost::canAfford(ManaCost * _cost, int anytypeofmana)
     ManaCost * diff = Diff(_cost);
     if(anytypeofmana > 0){
         int convertedC = _cost->getConvertedCost();
-        ManaCost * tmp = NEW ManaCost(ManaCost::parseManaCost("{0}", NULL, NULL));
+        //#W54-I (A12): parseManaCost("{0}") returned a NEW cost the outer copy
+        //never freed, and the first diff was overwritten unfreed - two leaks per
+        //anytypeofmana probe. An empty cost IS NEW ManaCost().
+        delete diff;
+        ManaCost * tmp = NEW ManaCost();
         for (int jj = 0; jj < convertedC; jj++)
             tmp->add(Constants::MTG_COLOR_ARTIFACT, 1);
         diff = Diff(tmp);

@@ -364,7 +364,8 @@ int MTGPutInPlayRule::isReactingToClick(MTGCardInstance * card, ManaCost *)
             {
                 if(card->has(Constants::ANYTYPEOFMANA) > 0 && card->sunburst == 0){
                     int convertedC = card->getManaCost()->getConvertedCost();
-                    card->getManaCost()->changeCostTo( NEW ManaCost(ManaCost::parseManaCost("{0}", NULL, card)) );
+                    ManaCost emptyCost; //#W54-I (A12): changeCostTo COPIES its argument - the old NEW ManaCost(parseManaCost("{0}")) leaked two objects per click
+                    card->getManaCost()->changeCostTo( &emptyCost );
                     for (int jj = 0; jj < convertedC; jj++)
                         card->getManaCost()->add(Constants::MTG_COLOR_ARTIFACT, 1);
                 }
@@ -1985,8 +1986,8 @@ int MTGPayZeroRule::isReactingToClick(MTGCardInstance * card, ManaCost * mana)
     {
         return 0;
     }
-    ManaCost * cost = NEW ManaCost(ManaCost::parseManaCost("{0}", NULL, NULL));
-    ManaCost * newCost = card->computeNewCost(card, cost, cost);
+    ManaCost * cost = NEW ManaCost(); //#W54-I (A12): was NEW ManaCost(parseManaCost("{0}")) - leaked the parsed temporary per click walk
+    ManaCost * newCost = card->computeNewCost(card, cost, cost); //returns `cost` itself, rewritten in place
     if (newCost->extraCosts)
         for (unsigned int i = 0; i < newCost->extraCosts->costs.size(); i++)
         {
@@ -1999,7 +2000,13 @@ int MTGPayZeroRule::isReactingToClick(MTGCardInstance * card, ManaCost * mana)
     else
         CustomName = "Zero Cast From Anywhere";
     
-    return MTGAlternativeCostRule::isReactingToClick(card, mana, newCost);
+    int reacting = MTGAlternativeCostRule::isReactingToClick(card, mana, newCost);
+    //#W54-I (A12): the probe cost was never freed either. The alternative-cost
+    //rule retains only an extraCosts list (the Offering branch, via
+    //game->mExtraPayment), so a cost without one is safe to free here.
+    if (newCost == cost && !cost->extraCosts)
+        SAFE_DELETE(cost);
+    return reacting;
 }
 
 int MTGPayZeroRule::reactToClick(MTGCardInstance * card)
@@ -2007,7 +2014,7 @@ int MTGPayZeroRule::reactToClick(MTGCardInstance * card)
     if (!isReactingToClick(card))
         return 0;
 
-    ManaCost * cost = NEW ManaCost(ManaCost::parseManaCost("{0}",NULL,NULL));
+    ManaCost * cost = NEW ManaCost(); //#W54-I (A12)
     ManaCost * newCost = card->computeNewCost(card,cost,cost);
     if(!newCost) return 0;
     if(newCost->extraCosts)
@@ -2182,7 +2189,7 @@ int MTGAttackCostRule::isReactingToClick(MTGCardInstance * card, ManaCost * aiCh
         }
 
         ManaCost * playerMana = card->controller()->getManaPool();
-        ManaCost * attackcost = NEW ManaCost(ManaCost::parseManaCost("{0}",NULL,NULL));
+        ManaCost * attackcost = NEW ManaCost(); //#W54-I (A12): was NEW ManaCost(parseManaCost("{0}")) - leaked per click walk
         attackcost->add(0,card->attackCostBackup);
         if(attackcost->extraCosts)
             for(unsigned int i = 0; i < attackcost->extraCosts->costs.size();i++)
@@ -2204,7 +2211,7 @@ int MTGAttackCostRule::reactToClick(MTGCardInstance * card)
     if (!isReactingToClick(card))
         return 0;
     Player * player = game->currentlyActing();
-    ManaCost * attackcost = NEW ManaCost(ManaCost::parseManaCost("{0}",NULL,NULL));
+    ManaCost * attackcost = NEW ManaCost(); //#W54-I (A12)
     attackcost->add(0,card->attackCostBackup);
     player->getManaPool()->pay(attackcost);//I think you can't pay partial cost to attack cost so you pay full (508.1i)
     card->attackCost = 0;
@@ -2262,7 +2269,7 @@ int MTGBlockCostRule::isReactingToClick(MTGCardInstance * card, ManaCost * aiChe
         }
 
         ManaCost * playerMana = card->controller()->getManaPool();
-        ManaCost * blockcost = NEW ManaCost(ManaCost::parseManaCost("{0}",NULL,NULL));
+        ManaCost * blockcost = NEW ManaCost(); //#W54-I (A12): was NEW ManaCost(parseManaCost("{0}")) - leaked per click walk
         blockcost->add(0,card->blockCostBackup);
         if(blockcost->extraCosts)
             for(unsigned int i = 0; i < blockcost->extraCosts->costs.size();i++)
@@ -2284,7 +2291,7 @@ int MTGBlockCostRule::reactToClick(MTGCardInstance * card)
     if (!isReactingToClick(card))
         return 0;
     Player * player = game->currentlyActing();
-    ManaCost * blockcost = NEW ManaCost(ManaCost::parseManaCost("{0}",NULL,NULL));
+    ManaCost * blockcost = NEW ManaCost(); //#W54-I (A12)
     blockcost->add(0,card->blockCostBackup);
     player->getManaPool()->pay(blockcost);//I think you can't pay partial cost to block cost so you pay full (509.1f)
     card->blockCost = 0;
@@ -4106,6 +4113,13 @@ void MTGNewLegend::MoveLegend(MTGCardInstance * card)
     SAFE_DELETE(LegendruleGeneric);
     MTGAbility * menuChoice = NEW MenuAbility(game, game->mLayers->actionLayer()->getMaxId(), NULL, myClone,true,selection,card->controller(),"Legendary Rule");
     menuChoice->addToGame();
+    //#W54-I (A34): myClone exists only so the share!name! chooser and the
+    //menu abilities have a stable named source; none of them owns it and it
+    //was never freed (~3 KB per legend-rule event, LSan-confirmed on the
+    //legend fixtures). Park it in the controller's garbage zone (the
+    //AACopier dummy idiom): the zone frees it two turn boundaries later,
+    //after the menu and its one-shot abilities have been garbage-collected.
+    card->controller()->game->garbage->addCard(myClone);
     return;
 }
 MTGNewLegend * MTGNewLegend::clone() const
@@ -4223,6 +4237,7 @@ void MTGNewPlaneswalker::MovePW(MTGCardInstance * card)
     SAFE_DELETE(PWruleGeneric);
     MTGAbility * menuChoice = NEW MenuAbility(game, game->mLayers->actionLayer()->getMaxId(), NULL, myClone,true,selection,card->controller(),"Planeswalker Uniqueness Rule");
     menuChoice->addToGame();
+    card->controller()->game->garbage->addCard(myClone); //#W54-I (A34): see MoveLegend
     return;
 }
 MTGNewPlaneswalker * MTGNewPlaneswalker::clone() const

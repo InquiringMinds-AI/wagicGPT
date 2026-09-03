@@ -18,6 +18,7 @@ Player::Player(GameObserver *observer, string file, string fileSmall, MTGDeck * 
         deck = NEW MTGDeck(file.c_str(), MTGCollection());
 
     premade = false;
+    deckId = 0; //#W54-I (L18): was never initialised (only AIPlayerFactory sets it)
     game = NULL;
     deckFile = file;
     deckFileSmall = fileSmall;
@@ -380,10 +381,29 @@ bool Player::DeadLifeState(bool check)
 }
 
 //Cleanup phase at the end of a turn
+//#W54-I (A15a): every zone move allocates a fresh MTGCardInstance and hangs
+//the old one off `previous`; cleanup() reaps that chain (guarded by
+//stillInUse() for instances the action layer still references), but only
+//battlefield and graveyard were swept - a bounced / Brainstormed / exiled
+//card kept its whole chain until game end. Sweep the other zones too.
+//WAGIC_CLEANUP_BATTLEFIELD_ONLY=1 restores the old two-zone sweep.
+static bool cleanupBattlefieldOnly()
+{
+    static const bool only = (getenv("WAGIC_CLEANUP_BATTLEFIELD_ONLY") != NULL
+                              && getenv("WAGIC_CLEANUP_BATTLEFIELD_ONLY")[0] == '1');
+    return only;
+}
 void Player::cleanupPhase()
 {
     game->inPlay->cleanupPhase();
     game->graveyard->cleanupPhase();
+    if (cleanupBattlefieldOnly())
+        return;
+    game->hand->cleanupPhase();
+    game->library->cleanupPhase();
+    game->exile->cleanupPhase();
+    game->commandzone->cleanupPhase();
+    game->reveal->cleanupPhase();
 }
 
 std::string Player::GetCurrentDeckStatsFile()

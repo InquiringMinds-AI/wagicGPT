@@ -1180,7 +1180,8 @@ void GameObserver::gameStateBasedEffects()
             ///clear imprints
             if(isInPlay(card) && card->imprintedCards.size())
             {
-                for(size_t ic = 0; ic < card->imprintedCards.size(); ic++)
+                //#W54-I (L18): walk backwards - erasing inside a forward loop skipped the next entry
+                for(size_t ic = card->imprintedCards.size(); ic-- > 0;)
                 {
                     if(!isInExile(card->imprintedCards[ic])) 
                     {
